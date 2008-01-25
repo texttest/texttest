@@ -76,7 +76,7 @@ class VirtualDisplayResponder(Responder):
     
     def notifyAllComplete(self):
         self.cleanXvfb()
-    def notifyExit(self, *args):
+    def notifyKillProcesses(self, *args):
         self.cleanXvfb()
     def cleanXvfb(self):
         if self.displayName and os.name == "posix":

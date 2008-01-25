@@ -278,26 +278,40 @@ statusMonitor = GUIStatusMonitor()
 class IdleHandlerManager:
     def __init__(self):
         self.sourceId = -1
-    def notifyActionStart(self, *args):
+        self.diag = plugins.getDiagnostics("Idle Handlers")
+    def notifyActionStart(self, message="", lock=True):
         # To make it possible to have an while-events-process loop
         # to update the GUI during actions, we need to make sure the idle
         # process isn't run. We hence remove that for a while here ...
-        if self.sourceId > 0:
-            gobject.source_remove(self.sourceId)
+        if lock:
+            self.disableHandler()
+    def notifyActionProgress(self, *args):
+        if self.sourceId >= 0:
+            raise plugins.TextTestError, "No Action currently exists to have progress on!"
+
     def notifyActionStop(self, *args):
         # Activate idle function again, see comment in notifyActionStart
-        if self.sourceId > 0:
-            self.enableHandler()
+        self.enableHandler()
             
     def enableHandler(self):
-        self.sourceId = self._enableHandler()
+        if self.sourceId == -1:
+            self.sourceId = plugins.Observable.threadedNotificationHandler.enablePoll(gobject.idle_add)
+            self.diag.info("Adding idle handler")
+            
+    def disableHandler(self):
+        if self.sourceId >= 0:
+            self.diag.info("Removing idle handler")
+            gobject.source_remove(self.sourceId)
+            self.sourceId = -1
 
-    def _enableHandler(self):
-        return plugins.Observable.threadedNotificationHandler.enablePoll(gobject.idle_add)
+    def notifyAllComplete(self):
+        self.diag.info("Disabling thread-based polling")
+        plugins.Observable.threadedNotificationHandler.disablePoll()
+    def notifyExit(self):
+        self.disableHandler()
+        
     
 class TextTestGUI(Responder, plugins.Observable):
-    EXIT_NOTIFIED = 1
-    COMPLETION_NOTIFIED = 2
     def __init__(self, optionMap, allApps):
         self.readGtkRCFiles()
         self.dynamic = not optionMap.has_key("gx")
@@ -320,18 +334,15 @@ class TextTestGUI(Responder, plugins.Observable):
         self.actionTabGUIs = self.createActionTabGUIs()
         self.notebookGUIs, rightWindowGUI = self.createRightWindowGUI()
         self.shortcutBarGUI = ShortcutBarGUI()
-        self.topWindowGUI = self.createTopWindowGUI(rightWindowGUI)
-        self.exitStatus = 0
-        if not self.dynamic:
-            self.exitStatus |= self.COMPLETION_NOTIFIED # no tests to wait for...
+        self.topWindowGUI = self.createTopWindowGUI(rightWindowGUI, allApps)
 
-        self.setUpObservers()
     def getTestTreeObservers(self):
         return [ self.testColumnGUI, self.testFileGUI, self.textInfoGUI ] + self.intvActions + self.notebookGUIs
     def getLifecycleObservers(self):
         # only the things that want to know about lifecycle changes irrespective of what's selected,
-        # otherwise we go via the test tree. Include add/remove as lifecycle
-        return [ self.testColumnGUI, self.testTreeGUI, self.progressBarGUI, self.progressMonitor, statusMonitor ] 
+        # otherwise we go via the test tree. Include add/remove as lifecycle, also final completion
+        return [ self.testColumnGUI, self.testTreeGUI, self.progressBarGUI,
+                 self.progressMonitor, statusMonitor, self.idleManager, self.topWindowGUI ] 
     def getActionObservers(self, action):
         if str(action.__class__).find("Reset") != -1:
             # It's such a hack, but so is this action...
@@ -345,15 +356,22 @@ class TextTestGUI(Responder, plugins.Observable):
         return filter(self.isFileObserver, self.intvActions)
     def isFileObserver(self, action):
         return hasattr(action, "notifyNewFileSelection") or hasattr(action, "notifyViewFile")
-    def getExitObservers(self):
-        return [ guiplugins.processTerminationMonitor, self ] 
+    def isFrameworkExitObserver(self, obs):
+        return (hasattr(obs, "notifyExit") or hasattr(obs, "notifyKillProcesses")) and obs is not self
+    def getExitObservers(self, frameworkObservers):
+        # Don't put ourselves in the observers twice or lots of weird stuff happens.
+        # Important that closing the GUI is the last thing to be done, so make sure we go at the end...
+        frameworkExitObservers = filter(self.isFrameworkExitObserver, frameworkObservers)
+        return [ guiplugins.processTerminationMonitor, statusMonitor ] + frameworkExitObservers + [ self.idleManager, self ] 
     def getTestColumnObservers(self):
         return [ self.testTreeGUI, statusMonitor, self.idleManager ]
     def getHideableGUIs(self):
         return [ self.toolBarGUI, self.shortcutBarGUI, statusMonitor ]
     def getAddSuitesObservers(self):
-        return [ self.testColumnGUI, self.topWindowGUI ] + self.intvActions
-    def setUpObservers(self):    
+        return [ self.testColumnGUI ] + self.intvActions
+    def setObservers(self, frameworkObservers):
+        # We don't actually have the framework observe changes here, this causes duplication. Just forward
+        # them as appropriate to where they belong. This is a bit of a hack really.
         for observer in self.getTestTreeObservers():
             self.testTreeGUI.addObserver(observer)
 
@@ -381,7 +399,7 @@ class TextTestGUI(Responder, plugins.Observable):
         for observer in self.getHideableGUIs():
             self.menuBarGUI.addObserver(observer)
 
-        for observer in self.getExitObservers():
+        for observer in self.getExitObservers(frameworkObservers):
             self.topWindowGUI.addObserver(observer)
     
     def readGtkRCFiles(self):
@@ -415,13 +433,11 @@ class TextTestGUI(Responder, plugins.Observable):
         self.topWindowGUI.createView()
         self.topWindowGUI.activate()
         self.idleManager.enableHandler()
-    def run(self):
-        gtk.main()
-    def createTopWindowGUI(self, rightWindowGUI):
+    def createTopWindowGUI(self, rightWindowGUI, allApps):
         mainWindowGUI = PaneGUI(self.testTreeGUI, rightWindowGUI, horizontal=True)
         parts = [ self.menuBarGUI, self.toolBarGUI, mainWindowGUI, self.shortcutBarGUI, statusMonitor ]
         boxGUI = BoxGUI(parts, horizontal=False)
-        return TopWindowGUI(boxGUI, self.dynamic)
+        return TopWindowGUI(boxGUI, self.dynamic, allApps)
     def createMenuAndToolBarGUIs(self, allApps):
         uiManager = gtk.UIManager()
         menu = MenuBarGUI(allApps, self.dynamic, uiManager, self.defaultActionGUIs)
@@ -493,6 +509,10 @@ class TextTestGUI(Responder, plugins.Observable):
             elif len(currTabGUIs) == 1:
                 tabInfo[tabName] = currTabGUIs[0]
         return tabInfo
+    def run(self):
+        gtk.main()
+    def notifyExit(self):
+        gtk.main_quit()
     def notifyLifecycleChange(self, test, state, changeDesc):
         self.notify("LifecycleChange", test, state, changeDesc)
     def notifyDescriptionChange(self, test):
@@ -512,8 +532,7 @@ class TextTestGUI(Responder, plugins.Observable):
         self.notify("AllRead", suites)
         if self.dynamic and len(suites) == 0:
             guilog.info("There weren't any tests to run, terminating...")
-            self.exitStatus |= self.COMPLETION_NOTIFIED
-            self.topWindowGUI.notifyQuit()
+            self.topWindowGUI.forceQuit()
             
     def notifyAdd(self, *args, **kwargs):
         self.notify("Add", *args, **kwargs)
@@ -525,57 +544,24 @@ class TextTestGUI(Responder, plugins.Observable):
         self.notify("Remove", test)
     def notifyAllComplete(self):
         self.notify("AllComplete")
-        plugins.Observable.threadedNotificationHandler.disablePoll()
-        self.exitStatus |= self.COMPLETION_NOTIFIED
-        if self.exitStatus & self.EXIT_NOTIFIED:
-            self.terminate()
-    def notifyExit(self, *args):
-        self.exitStatus |= self.EXIT_NOTIFIED        
-        if self.exitStatus & self.COMPLETION_NOTIFIED:
-            self.terminate()
-        else:
-            self.notify("Status", "Waiting for all tests to terminate ...")
-    def terminate(self):
-        self.idleManager.notifyActionStart() # disable idle handlers
-        self.notify("Status", "Removing all temporary files ...")
-        self.notify("ActionProgress")
-        self.topWindowGUI.removeWriteDirsAndWindow()
-        gtk.main_quit()
-
+    
 class TopWindowGUI(ContainerGUI):
-    def __init__(self, contentGUI, dynamic):
+    EXIT_NOTIFIED = 1
+    COMPLETION_NOTIFIED = 2
+    def __init__(self, contentGUI, dynamic, allApps):
         ContainerGUI.__init__(self, [ contentGUI ])
         self.dynamic = dynamic
         self.topWindow = None
-        self.allSuites = []
+        self.allApps = allApps
         self.windowSizeDescriptor = ""
-    def addSuites(self, suites):
-        self.allSuites = suites
-        if len(suites) > 0:
-            newObservers = filter(self.shouldAddExitObserver, suites[0].observers)
-            self.observers = newObservers + self.observers
-    def shouldAddExitObserver(self, observer):
-        if observer in self.observers:
-            return False
-        else:
-            return hasattr(observer, "notifyExit")
-    def allAppNames(self):
-        appNames = []
-        for app in self.allUniqueApps():
-            appNames.append(app.fullName + app.versionSuffix())
-        return appNames
-    def allUniqueApps(self):
-        allNames = []
-        uniqueApps = []
-        for suite in self.allSuites:
-            if not suite.app.fullName in allNames:
-                allNames.append(suite.app.fullName)
-                uniqueApps.append(suite.app)
-        return uniqueApps
+        self.exitStatus = 0
+        if not self.dynamic:
+            self.exitStatus |= self.COMPLETION_NOTIFIED # no tests to wait for...
+
     def getCheckoutTitle(self):
         allCheckouts = []
-        for suite in self.allSuites:
-            checkout = suite.app.checkout
+        for app in self.allApps:
+            checkout = app.checkout
             if checkout and not checkout in allCheckouts:
                 allCheckouts.append(checkout)
         if len(allCheckouts) == 0:
@@ -597,7 +583,8 @@ class TopWindowGUI(ContainerGUI):
         global globalTopWindow
         globalTopWindow = self.topWindow
         self.topWindow.set_icon_from_file(self.getIcon())
-        appNames = ",".join(self.allAppNames())
+        allAppNames = [ app.fullName + app.versionSuffix() for app in self.allApps ]
+        appNames = ",".join(allAppNames)
         if self.dynamic:
             checkoutTitle = self.getCheckoutTitle()
             self.topWindow.set_title("TextTest dynamic GUI : testing " + appNames + checkoutTitle + \
@@ -624,12 +611,25 @@ class TopWindowGUI(ContainerGUI):
         guilog.info("Top Window title is " + self.topWindow.get_title())
         guilog.info("Default widget is " + str(self.topWindow.get_focus().__class__))
         guilog.info(self.windowSizeDescriptor)
+    def forceQuit(self):
+        self.exitStatus |= self.COMPLETION_NOTIFIED
+        self.notifyQuit()
+    def notifyAllComplete(self, *args):
+        self.exitStatus |= self.COMPLETION_NOTIFIED
+        if self.exitStatus & self.EXIT_NOTIFIED:
+            self.terminate()
     def notifyQuit(self, *args):
+        self.exitStatus |= self.EXIT_NOTIFIED        
+        self.notify("KillProcesses")
+        if self.exitStatus & self.COMPLETION_NOTIFIED:
+            self.terminate()
+        else:
+            statusMonitor.notifyStatus("Waiting for all tests to terminate ...")
+            # When they have, we'll get notifyAllComplete
+    def terminate(self):
         self.notify("Exit")
-    def removeWriteDirsAndWindow(self):
-        for suite in self.allSuites:
-            suite.app.cleanWriteDirectory(suite)
         self.topWindow.destroy()
+
     def notifyError(self, message):
         showErrorDialog(message, self.topWindow)
     def notifyWarning(self, message):

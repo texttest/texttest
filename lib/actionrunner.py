@@ -13,7 +13,7 @@ class Cancelled(plugins.TestState):
                                    started=1, completed=1, lifecycleChange="complete")
 
 class BaseActionRunner(Responder, plugins.Observable):
-    def __init__(self, optionMap, diagName):
+    def __init__(self, optionMap, diag):
         Responder.__init__(self)
         plugins.Observable.__init__(self)
         self.optionMap = optionMap
@@ -22,7 +22,7 @@ class BaseActionRunner(Responder, plugins.Observable):
         self.allComplete = False
         self.lock = Lock()
         self.killSignal = None
-        self.diag = plugins.getDiagnostics(diagName)
+        self.diag = diag
         self.lockDiag = plugins.getDiagnostics("locks")
     def notifyAdd(self, test, initial):
         if test.classId() == "test-case":
@@ -45,7 +45,7 @@ class BaseActionRunner(Responder, plugins.Observable):
         self.killOrCancel(test)
         self.lock.release()
         
-    def notifyExit(self, sig=None):
+    def notifyKillProcesses(self, sig=None):
         self.diag.info("Got exit!")
         if self.allComplete:
             return
@@ -96,7 +96,7 @@ class BaseActionRunner(Responder, plugins.Observable):
             
 class ActionRunner(BaseActionRunner):
     def __init__(self, optionMap, allApps):
-        BaseActionRunner.__init__(self, optionMap, "Action Runner")
+        BaseActionRunner.__init__(self, optionMap, plugins.getDiagnostics("Action Runner"))
         self.currentTestRunner = None
         self.previousTestRunner = None
         self.script = optionMap.runScript()

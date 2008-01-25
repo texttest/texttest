@@ -1601,15 +1601,6 @@ class OptionFinder(plugins.OptionFinder):
             rootLogger.set_loglevel(log4py.LOGLEVEL_NONE)
     def findVersionList(self):
         versionList = []
-        givenVersions = self.findGivenVersions()
-        versionList += givenVersions
-        copyCount = int(self.get("cp", 1))
-        for copyNum in range(1, copyCount):
-            versionList += [ version + ".copy_" + str(copyNum) for version in givenVersions ]
-
-        return versionList
-    def findGivenVersions(self):
-        versionList = []
         for version in plugins.commasplit(self.get("v", "")):
             if version in versionList:
                 plugins.printWarning("Same version '" + version + "' requested more than once, ignoring.")

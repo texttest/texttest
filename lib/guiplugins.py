@@ -98,7 +98,7 @@ class ProcessTerminationMonitor(plugins.Observable):
         return running
     def getRunningProcesses(self):
         return filter(lambda (process, desc): process.poll() is None, self.processes)
-    def notifyExit(self, sig=None):
+    def notifyKillProcesses(self, sig=None):
         # Don't leak processes
         runningProcesses = self.getRunningProcesses()
         if len(runningProcesses) == 0:
@@ -108,6 +108,7 @@ class ProcessTerminationMonitor(plugins.Observable):
             self.notify("ActionProgress", "")
             guilog.info("Killing '" + description + "' interactive process")
             JobProcess(process.pid).killAll(sig)
+        
 
 processTerminationMonitor = ProcessTerminationMonitor()
        
@@ -313,13 +314,12 @@ class Quit(InteractiveAction):
         return "quit"
     def _getTitle(self):
         return "_Quit"
-    def messageAfterPerform(self):
-        # Don't provide one, the GUI isn't there to show it :)
-        pass
     def notifyNewTestSelection(self, *args):
         pass # we don't care and don't want to screw things up...
     def performOnCurrent(self):
         self.notify("Quit")
+    def messageAfterPerform(self):
+        pass # GUI isn't there to show it
     def getConfirmationMessage(self):
         processesToReport = guiConfig.getCompositeValue("query_kill_processes", "", modeDependent=True)
         runningProcesses = processTerminationMonitor.listRunning(processesToReport)

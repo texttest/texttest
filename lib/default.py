@@ -82,13 +82,16 @@ class Config:
     def getExtraVersions(self, app, forUse=True):
         if forUse and not self.useExtraVersions(app):
             return []
-        
-        extraVersions = self.getExtraVersionsFromConfig(app)
-        for extra in extraVersions:
-            if extra in app.versions:
-                return []
-        return extraVersions
 
+        extraVersions = []
+        fromConfig = self.getExtraVersionsFromConfig(app)
+        extraVersions += fromConfig
+        copyCount = int(self.optionMap.get("cp", 1))
+        for copyNum in range(1, copyCount):
+            extraVersions.append("copy_" + str(copyNum))
+
+        return extraVersions
+        
     def getExtraVersionsFromConfig(self, app):
         basic = app.getConfigValue("extra_version")
         batchSession = self.optionMap.get("b")
@@ -96,6 +99,9 @@ class Config:
             for batchExtra in app.getCompositeConfigValue("batch_extra_version", batchSession):
                 if batchExtra not in basic:
                     basic.append(batchExtra)
+        for extra in basic:
+            if extra in app.versions:
+                return []
         return basic
 
     def getDefaultInterface(self, allApps):

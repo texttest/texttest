@@ -19,6 +19,7 @@ class UniqueNameFinder(Responder):
             oldTest = self.name2test[test.name]
             self.storeUnique(oldTest, test)
         else:
+            self.diag.info("Storing test " + test.name)
             self.name2test[test.name] = test
     def notifyRemove(self, test):
         del self.name2test[test.name]
@@ -240,9 +241,15 @@ class TextTest(Responder, plugins.Observable):
                 sys.stdout.write(fullMsg)
         return appSuites
 
-    def deleteTempFiles(self):
-        for app, testSuite in self.appSuites.items():
-            app.cleanWriteDirectory(testSuite)
+    def notifyExit(self):
+        # Can get called several times, protect against this...
+        if len(self.appSuites) > 0:
+            self.notify("Status", "Removing all temporary files ...")
+            for app, testSuite in self.appSuites.items():
+                self.notify("ActionProgress")
+                app.cleanWriteDirectory(testSuite)
+            self.appSuites = []
+        
     def run(self):
         try:
             self._run()
@@ -262,7 +269,7 @@ class TextTest(Responder, plugins.Observable):
         try:
             self.createAndRunSuites(allApps)
         finally:
-            self.deleteTempFiles() # include the dud ones, possibly
+            self.notifyExit() # include the dud ones, possibly
     def createAndRunSuites(self, allApps):
         try:
             self.createResponders(allApps)
@@ -379,7 +386,7 @@ class TextTest(Responder, plugins.Observable):
         signal.signal(sig, signal.SIG_IGN)
         signalText = self.getSignalText(sig)
         self.writeTermMessage(signalText)
-        self.notify("Exit", sig)
+        self.notify("KillProcesses", sig)
         return signalText
     def handleSignalWhileStarting(self, sig, stackFrame):
         signalText = self.handleSignal(sig, stackFrame)

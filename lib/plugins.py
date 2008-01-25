@@ -383,8 +383,7 @@ class ThreadedNotificationHandler:
         self.active = False
     def enablePoll(self, idleHandleMethod):
         self.active = True
-        id = idleHandleMethod(self.pollQueue)
-        return id
+        return idleHandleMethod(self.pollQueue)
     def disablePoll(self):
         self.active = False
     def pollQueue(self):
@@ -400,6 +399,7 @@ class ThreadedNotificationHandler:
 
 class Observable:
     threadedNotificationHandler = ThreadedNotificationHandler()
+    obsDiag = None
     def __init__(self, passSelf=False):
         self.observers = []
         self.passSelf = passSelf
@@ -410,9 +410,14 @@ class Observable:
     def inMainThread(self):
         return currentThread().getName() == "MainThread"
     def notify(self, *args, **kwargs):
+        if not Observable.obsDiag:
+            Observable.obsDiag = getDiagnostics("Observable")
+
         if self.threadedNotificationHandler.active and not self.inMainThread():
+            self.obsDiag.info("To work queue " + repr(self.__class__) + " " + repr(args) + repr(kwargs))
             self.threadedNotificationHandler.transfer(self, *args, **kwargs)
         else:
+            self.obsDiag.info("Direct " + repr(self.__class__) + " " + repr(args) + repr(kwargs))
             self.performNotify(*args, **kwargs)
     def notifyThreaded(self, *args, **kwargs):
         # join the idle handler queue even if we're the main thread

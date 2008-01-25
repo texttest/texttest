@@ -403,7 +403,7 @@ class MasterInteractiveResponder(InteractiveResponder):
 class QueueSystemServer(BaseActionRunner):
     instance = None
     def __init__(self, optionMap, allApps):
-        BaseActionRunner.__init__(self, optionMap, "Queue System Submit")
+        BaseActionRunner.__init__(self, optionMap, plugins.getDiagnostics("Queue System Submit"))
         # queue for putting tests when we couldn't reuse the originals
         self.reuseFailureQueue = Queue()
         self.testCount = 0

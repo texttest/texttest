@@ -502,6 +502,8 @@ class TestState(Observable):
                 return "not compared:\n" + self.freeText
         else:
             return "not compared"
+    def getFreeText(self):
+        return self.freeText # some subclasses might want to calculate this...
     def getTypeBreakdown(self):
         return self.category, self.briefText
     def hasStarted(self):

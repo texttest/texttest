@@ -2041,11 +2041,12 @@ class TextInfoGUI(SubGUI):
         return len(tests) == 1
     def resetText(self, state):
         self.text = ""
+        freeText = state.getFreeText()
         if state.isComplete():
             self.text = "Test " + repr(state) + "\n"
-            if len(state.freeText) == 0:
+            if len(freeText) == 0:
                 self.text = self.text.replace(" :", "")
-        self.text += str(state.freeText)
+        self.text += str(freeText)
     def describe(self):
         guilog.info("---------- Text Info Window ----------")
         buffer = self.view.get_buffer()

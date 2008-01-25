@@ -245,7 +245,17 @@ class TestEnvironment(seqdict):
                 self.diag.info("Expanded " + var + " = " + newValue)
                 self[var] = newValue
         return expanded    
-            
+
+# Have the description as our free text, for display in the static GUI
+class NotStarted(plugins.TestState):
+    def __init__(self, freeTextMethod):
+        plugins.TestState.__init__(self, "not_started")
+        self.freeTextMethod = freeTextMethod
+    def getFreeText(self):
+        if len(self.freeText) == 0:
+            self.freeText = self.freeTextMethod()
+        return self.freeText
+        
 # Base class for TestCase and TestSuite
 class Test(plugins.Observable):
     def __init__(self, name, description, dircache, app, parent = None):
@@ -264,7 +274,7 @@ class Test(plugins.Observable):
         self.properties = MultiEntryDictionary()
         self.diag = plugins.getDiagnostics("test objects")
         # Test suites never change state, but it's convenient that they have one
-        self.state = plugins.TestState("not_started", freeText=self.getDescription())
+        self.state = NotStarted(self.getDescription)
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.name
     def paddedRepr(self):

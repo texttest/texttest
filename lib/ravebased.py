@@ -967,6 +967,8 @@ class BuildCode:
                 return "centreville"
             else:
                 return "brockville"
+        if arch == "x86_64_solaris":
+            return "sunriver"
     def getRemoteCommandLine(self, arch, absPath, makeCommand):
         commandLine = makeCommand + " -C " + absPath
         if arch == "sparc_64" or arch == "x86_64_linux":

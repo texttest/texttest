@@ -1843,28 +1843,20 @@ class SortTestSuiteFileDescending(SortTestSuiteFileAscending):
     def performOnCurrent(self):
         self.performRecursively(self.currentTest, False)
 
-class RepositionTest(InteractiveAction):
-    def __init__(self, *args):
-        InteractiveAction.__init__(self, *args)
-        self.currTestSelection = []
-        self.testToMove = None
-    def updateSelection(self, tests):
-        self.currTestSelection = tests # interested in suites, unlike most SelectionActions
-        if len(tests) == 1:
-            self.testToMove = tests[0]
-        else:
-            self.testToMove = None
+class RepositionTest(InteractiveTestAction):
+    def correctTestClass(self):
+        return True
     def _isActiveOnCurrent(self):
-        return len(self.currTestSelection) == 1 and \
-               self.currTestSelection[0].parent and \
-               not self.currTestSelection[0].parent.autoSortOrder
+        return InteractiveTestAction.isActiveOnCurrent(self) and \
+               self.currentTest.parent and \
+               not self.currentTest.parent.autoSortOrder
 
     def performOnCurrent(self):
         newIndex = self.findNewIndex()
-        if self.testToMove.parent.repositionTest(self.testToMove, newIndex):
+        if self.currentTest.parent.repositionTest(self.currentTest, newIndex):
             self.notify("RefreshTestSelection")
         else:
-            raise plugins.TextTestError, "\nThe test\n'" + self.testToMove.name + "'\nis not present in the default version\nand hence cannot be reordered.\n"
+            raise plugins.TextTestError, "\nThe test\n'" + self.currentTest.name + "'\nis not present in the default version\nand hence cannot be reordered.\n"
 
     
 class RepositionTestDown(RepositionTest):
@@ -1873,15 +1865,15 @@ class RepositionTestDown(RepositionTest):
     def _getTitle(self):
         return "Move down"
     def messageAfterPerform(self):
-        return "Moved " + repr(self.testToMove) + " one step down in suite."
+        return "Moved " + repr(self.currentTest) + " one step down in suite."
     def _getScriptTitle(self):
         return "Move selected test down in suite"
     def findNewIndex(self):
-        return min(self.testToMove.positionInParent() + 1, self.testToMove.parent.maxIndex())
+        return min(self.currentTest.positionInParent() + 1, self.currentTest.parent.maxIndex())
     def isActiveOnCurrent(self, *args):
         if not self._isActiveOnCurrent():
             return False
-        return self.currTestSelection[0].parent.testcases[self.currTestSelection[0].parent.maxIndex()] != self.currTestSelection[0]
+        return self.currentTest.parent.testcases[self.currentTest.parent.maxIndex()] != self.currentTest
 
 class RepositionTestUp(RepositionTest):
     def getStockId(self):
@@ -1889,15 +1881,15 @@ class RepositionTestUp(RepositionTest):
     def _getTitle(self):
         return "Move up"
     def messageAfterPerform(self):
-        return "Moved " + repr(self.testToMove) + " one step up in suite."
+        return "Moved " + repr(self.currentTest) + " one step up in suite."
     def _getScriptTitle(self):
         return "Move selected test up in suite"
     def findNewIndex(self):
-        return max(self.testToMove.positionInParent() - 1, 0)
+        return max(self.currentTest.positionInParent() - 1, 0)
     def isActiveOnCurrent(self, *args):
         if not self._isActiveOnCurrent():
             return False
-        return self.currTestSelection[0].parent.testcases[0] != self.currTestSelection[0]
+        return self.currentTest.parent.testcases[0] != self.currentTest
 
 class RepositionTestFirst(RepositionTest):
     def getStockId(self):
@@ -1905,7 +1897,7 @@ class RepositionTestFirst(RepositionTest):
     def _getTitle(self):
         return "Move to first"
     def messageAfterPerform(self):
-        return "Moved " + repr(self.testToMove) + " to first in suite."
+        return "Moved " + repr(self.currentTest) + " to first in suite."
     def _getScriptTitle(self):
         return "Move selected test to first in suite"
     def findNewIndex(self):
@@ -1913,7 +1905,7 @@ class RepositionTestFirst(RepositionTest):
     def isActiveOnCurrent(self, *args):
         if not self._isActiveOnCurrent():
             return False
-        return self.currTestSelection[0].parent.testcases[0] != self.currTestSelection[0]
+        return self.currentTest.parent.testcases[0] != self.currentTest
 
 class RepositionTestLast(RepositionTest):
     def getStockId(self):
@@ -1921,15 +1913,16 @@ class RepositionTestLast(RepositionTest):
     def _getTitle(self):
         return "Move to last"
     def messageAfterPerform(self):
-        return "Moved " + repr(self.testToMove) + " to last in suite."
+        return "Moved " + repr(self.currentTest) + " to last in suite."
     def _getScriptTitle(self):
         return "Move selected test to last in suite"
     def findNewIndex(self):
-        return self.testToMove.parent.maxIndex()
+        return self.currentTest.parent.maxIndex()
     def isActiveOnCurrent(self, *args):
         if not self._isActiveOnCurrent():
             return False
-        return self.currTestSelection[0].parent.testcases[len(self.currTestSelection[0].parent.testcases) - 1] != self.currTestSelection[0]
+        return self.currentTest.parent.testcases[len(self.currentTest.parent.testcases) - 1] != self.currentTest
+
     
 class RenameTest(InteractiveAction):
     def __init__(self, *args):

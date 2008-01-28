@@ -1798,30 +1798,25 @@ class RecomputeTest(InteractiveTestAction):
         test.app.recomputeProgress(test, self.observers)
         self.notify("Status", "Done recomputing status of " + repr(test) + ".")
 
-class SortTestSuiteFileAscending(InteractiveAction):
-    def __init__(self, *args):
-        InteractiveAction.__init__(self, *args)
-        self.currTestSelection = []
-    def updateSelection(self, tests):
-        self.currTestSelection = tests # interested in suites, unlike most SelectionActions
+class SortTestSuiteFileAscending(InteractiveTestAction):
+    def correctTestClass(self):
+        return self.currentTest.classId() == "test-suite"
     def isActiveOnCurrent(self, *args):
-        return len(self.currTestSelection) == 1 and \
-               self.currTestSelection[0].classId() == "test-suite" and \
-               not self.currTestSelection[0].autoSortOrder
+        return InteractiveTestAction.isActiveOnCurrent(self, *args) and not self.currentTest.autoSortOrder
     def getStockId(self):
         return "sort-ascending"
     def _getTitle(self):
         return "_Sort Test Suite File"
     def messageAfterPerform(self):
-        return "Sorted testsuite file for " + repr(self.currTestSelection[0]) + " in alphabetical order."
+        return "Sorted testsuite file for " + repr(self.currentTest) + " in alphabetical order."
     def _getScriptTitle(self):
         return "sort testsuite file for the selected test suite in alphabetical order"
     def performOnCurrent(self):
-        self.performRecursively(self.currTestSelection[0], True)
+        self.performRecursively(self.currentTest, True)
     def performRecursively(self, suite, ascending):        
         # First ask all sub-suites to sort themselves
         errors = ""
-        if self.currTestSelection[0].getConfigValue("sort_test_suites_recursively"):
+        if self.currentTest.getConfigValue("sort_test_suites_recursively"):
             for test in suite.testcases:
                 if test.classId() == "test-suite":
                     try:
@@ -1842,11 +1837,11 @@ class SortTestSuiteFileDescending(SortTestSuiteFileAscending):
     def _getTitle(self):
         return "_Reversed Sort Test Suite File"
     def messageAfterPerform(self):
-        return "Sorted testsuite file for " + repr(self.currTestSelection[0]) + " in reversed alphabetical order."
+        return "Sorted testsuite file for " + repr(self.currentTest) + " in reversed alphabetical order."
     def _getScriptTitle(self):
         return "sort testsuite file for the selected test suite in reversed alphabetical order"
     def performOnCurrent(self):
-        self.performRecursively(self.currTestSelection[0], False)
+        self.performRecursively(self.currentTest, False)
 
 class RepositionTest(InteractiveAction):
     def __init__(self, *args):

@@ -981,9 +981,11 @@ class TestTreeGUI(ContainerGUI):
     def describe(self):
         guilog.info("Test Tree description...")
         self.filteredModel.foreach(self.describeRow)
+    def isExpanded(self, iter):
+        parentIter = self.filteredModel.iter_parent(iter)
+        return not parentIter or self.treeView.row_expanded(self.filteredModel.get_path(parentIter))
     def describeRow(self, model, path, iter):
-        parentIter = model.iter_parent(iter)
-        if not parentIter or self.treeView.row_expanded(model.get_path(parentIter)):
+        if self.isExpanded(iter):
             test = model.get_value(iter, 2)
             if test:
                 guilog.info("-> " + test.getIndent() + model.get_value(iter, 0))
@@ -1155,9 +1157,10 @@ class TestTreeGUI(ContainerGUI):
         except RuntimeError:
             pass # convert_child_iter_to_iter throws RunTimeError if the row is hidden in the TreeModelFilter
     def notifySetTestSelection(self, selTests, selectCollapsed=True):
-        self.selectTestRows(selTests, selectCollapsed)
+        actualSelection = self.selectTestRows(selTests, selectCollapsed)
         guilog.info("Marking " + str(self.selection.count_selected_rows()) + " tests as selected")
-        self.selectionChanged(direct=False) # Here it's been set via some indirect mechanism, might want to behave differently 
+        # Here it's been set via some indirect mechanism, might want to behave differently 
+        self.sendSelectionNotification(actualSelection, direct=False) 
     def selectTestRows(self, selTests, selectCollapsed=True):
         self.selecting = True # don't respond to each individual programmatic change here
         self.selection.unselect_all()
@@ -1166,8 +1169,9 @@ class TestTreeGUI(ContainerGUI):
         actuallySelected = []
         for test in selTests:
             iter = self.findIter(test)
-            if not iter:
+            if not iter or (not selectCollapsed and not self.isExpanded(iter)):
                 continue
+
             actuallySelected.append(test)
             path = self.filteredModel.get_path(iter) 
             if not firstPath:

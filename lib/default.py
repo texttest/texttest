@@ -633,6 +633,7 @@ class Config:
         app.setConfigDefault("view_program", { "default": self.defaultViewProgram() },  \
                               "External program(s) to use for viewing and editing text files")
         app.setConfigDefault("follow_program", { "default": self.defaultFollowProgram() }, "External program to use for following progress of a file")
+        app.setConfigDefault("bug_system_script", { "default" : "" }, "The location of the script used to extract information from the bug system.")
     def getGuiColourDictionary(self):
         dict = {}
         dict["success"] = "green"

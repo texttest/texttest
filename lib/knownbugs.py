@@ -28,9 +28,9 @@ class BugSystemBug(Bug):
     def __init__(self, bugSystem, bugId):
         self.bugId = bugId
         self.bugSystem = bugSystem
-    def findInfo(self):
+    def findInfo(self, script):
         exec "from " + self.bugSystem + " import findBugText, findStatus, isResolved"
-        bugText = findBugText(self.bugId)
+        bugText = findBugText(script, self.bugId)
         status = findStatus(bugText)
         category = self.findCategory(isResolved(status))
         briefText = "bug " + self.bugId + " (" + status + ")"
@@ -48,7 +48,8 @@ class UnreportedBug(Bug):
         self.fullText = fullText
         self.briefText = briefText
         self.internalError = internalError
-    def findInfo(self):
+        self.bugSystem = "Internal"
+    def findInfo(self, script):
         return self.findCategory(self.internalError), self.briefText, self.fullText
 
 class BugTrigger:
@@ -245,7 +246,7 @@ class CheckForBugs(plugins.Action):
         for stem, fileBugData in activeBugs.items():
             bug = self.findBug(test, stem, fileBugData, multipleDiffs)
             if bug:
-                category, briefText, fullText = bug.findInfo()
+                category, briefText, fullText = bug.findInfo(test.getCompositeConfigValue("bug_system_script", bug.bugSystem))
                 self.diag.info("Changing to " + category + " with text " + briefText)
                 bugState = FailedPrediction(category, fullText, briefText, completed=1)
                 self.changeState(test, bugState)

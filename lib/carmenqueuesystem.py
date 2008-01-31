@@ -260,6 +260,7 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         app.setConfigDefault("default_architecture", "i386_linux", "Which Carmen architecture to run tests on by default")
         app.setConfigDefault("default_major_release", "master", "Which Carmen major release to run by default")
         app.setConfigDefault("maximum_cputime_for_short_queue", 10, "Maximum time a test can take and be sent to the short queue")
+        app.setCompositeConfigDefault("bug_system_script", "bugzilla", "http://bugzilla.carmen.se/cli.cgi")
         # plenty of people use CVS at Carmen, best to ignore it in data
         app.addConfigEntry("default", "CVS", "test_data_ignore")
         # ...and to use the plugin by default

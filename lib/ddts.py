@@ -2,7 +2,7 @@
 
 from os import popen
 
-def findBugText(bugId):
+def findBugText(scriptLocation, bugId):
     return popen("qrsh -l 'carmarch=*sparc*,short' -w e -now n 'dumpbug -n -r " + bugId + "' 2>&1").read()
 
 def findStatus(description):

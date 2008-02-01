@@ -1561,10 +1561,6 @@ class Application:
         self.configDir[key] = value
         if len(docString) > 0:
             self.configDocs[key] = docString
-    def setCompositeConfigDefault(self, key, key2, value, docString = ""):
-        self.configDir[key][key2] = value
-        if len(docString) > 0:
-            self.configDocs[key][key2] = docString
     def setConfigAlias(self, aliasName, realName):
         self.configDir.setAlias(aliasName, realName)
             

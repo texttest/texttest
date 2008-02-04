@@ -4,7 +4,6 @@ import texttestgui, gtk, plugins, custom_widgets, entrycompletion
 
 guilog = guiplugins.guilog
 scriptEngine = guiplugins.scriptEngine
-from gtkusecase import TreeModelIndexer
 
 #
 # Todo/improvements:
@@ -57,7 +56,7 @@ class CVSAction(guiplugins.InteractiveAction):
             except OSError:
                 raise plugins.TextTestError, "Could not run CVS: make sure you have it installed locally"
         return process.stdout.readlines()
-    def updateSelection(self, tests):
+    def updateSelection(self, tests, rowCount):
         self.currTestSelection = tests
         if not self.dynamic: # See bugzilla 17653
             self.currFileSelection = []
@@ -239,7 +238,7 @@ class CVSLog(CVSAction):
         for test in self.currTestSelection:
             fileArgs = self.getFilesForCVS(test, ignorePresence)
             if len(fileArgs) > 0:
-                self.notify("Status", "Logging " + self.getRelativePath(test.getDirectory(), rootDir))
+                self.notify("Status", "Logging " + test.getRelPath())
                 self.notify("ActionProgress", "")
                 args = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...
                 self.parseOutput(self.runCommand(args), rootDir, test)
@@ -321,7 +320,7 @@ class CVSLogLatest(CVSLog):
         for test in self.currTestSelection:
             fileArgs = self.getFilesForCVS(test)
             if len(fileArgs) > 0:
-                self.notify("Status", "Logging " + self.getRelativePath(test.getDirectory(), rootDir))
+                self.notify("Status", "Logging " + test.getRelPath())
                 self.notify("ActionProgress", "")
                 cmdArgs = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...
                 self.parseOutput(self.runCommand(cmdArgs), rootDir, test)
@@ -353,7 +352,7 @@ class CVSLogLatest(CVSLog):
                 enabled = False
             if enabled:
                 linesToShow += line
-        self.pages.append((self.getRelativePath(test.getDirectory(), rootDir), linesToShow))
+        self.pages.append((test.uniqueName, linesToShow))
 
 class CVSDiff(CVSAction):
     def __init__(self, *args):
@@ -413,7 +412,7 @@ class CVSDiff(CVSAction):
         for test in self.currTestSelection:
             fileArgs = self.getFilesForCVS(test)
             if len(fileArgs) > 0:
-                self.notify("Status", "Diffing " + self.getRelativePath(test.getDirectory(), rootDir))
+                self.notify("Status", "Diffing " + test.getRelPath())
                 self.notify("ActionProgress", "")
                 args = self.getCVSCmdArgs() + self.getRevisionOptions() + fileArgs # Popen doesn't like spaces in args ...
                 self.parseOutput(self.runCommand(args), rootDir, test)
@@ -509,7 +508,7 @@ class CVSStatus(CVSAction):
         for test in self.currTestSelection:
             fileArgs = self.getFilesForCVS(test)
             if len(fileArgs) > 0:
-                self.notify("Status", "Getting status for " + self.getRelativePath(test.getDirectory(), rootDir))
+                self.notify("Status", "Getting status for " + test.getRelPath())
                 self.notify("ActionProgress", "")
                 cvsArgs = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...            
                 self.parseOutput(self.runCommand(cvsArgs), rootDir, cvsRepository, test)
@@ -609,7 +608,7 @@ class CVSAnnotate(CVSAction):
         for test in self.currTestSelection:
             fileArgs = self.getFilesForCVS(test)
             if len(fileArgs) > 0:
-                self.notify("Status", "Getting annotations of " + self.getRelativePath(test.getDirectory(), rootDir))
+                self.notify("Status", "Getting annotations of " + test.getRelPath())
                 self.notify("ActionProgress", "")
                 args = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...
                 self.parseOutput(self.runCommand(args), rootDir, test)            
@@ -821,8 +820,8 @@ class CVSTreeViewDialog(guidialogs.ActionResultDialog):
         #              1 - Content (CVS output) for the corresponding file
         #              2 - Info. If the plugin wants to show two columns, this
         #                  is shown in the second column. If not, ignore.
-        #              3 - Entire path of the node. Created here, used primarily
-        #                  to distinguish leaf nodes with the same name in TreeModelIndexer.
+        #              3 - Relative path of the node. Mainly for testing as recorded traffic
+        #                  from CVS can give paths other than the local test tree, of course
         #              4 - Should the row be visible?
         self.treeModel = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING,
                                        gobject.TYPE_STRING, gobject.TYPE_STRING,
@@ -873,9 +872,8 @@ class CVSTreeViewDialog(guidialogs.ActionResultDialog):
         self.treeView.get_selection().connect("changed", self.showOutput)
         self.treeView.get_selection().set_select_function(self.canSelect)
         self.treeView.expand_all()
-        scriptEngine.monitor("select", self.treeView.get_selection(),
-                             TreeModelIndexer(self.filteredTreeModel, fileColumn, 3),
-                             noImplies = True)
+        scriptEngine.monitor("select", self.treeView.get_selection())
+
         if len(self.plugin.pages) > 0:
             self.treeView.get_selection().select_iter(
                 self.filteredTreeModel.convert_child_iter_to_iter(

@@ -115,8 +115,8 @@ class QueueSystemConfig(default.Config):
                    "successful test files under the Running/Advanced tab in the static GUI"
         else:
             return ""
-    def useExtraVersions(self, app):
-        return default.Config.useExtraVersions(self, app) and not self.slaveRun()
+    def useExtraVersions(self):
+        return not self.slaveRun()
     def keepTemporaryDirectories(self):
         return default.Config.keepTemporaryDirectories(self) or (self.slaveRun() and self.optionMap.has_key("keepslave"))
     def cleanSlaveFiles(self, test):

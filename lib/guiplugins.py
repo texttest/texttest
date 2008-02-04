@@ -143,8 +143,8 @@ class InteractiveAction(plugins.Observable):
             return [ self.optionGroup ]
     def createOptionGroupTab(self, optionGroup):
         return optionGroup.switches or optionGroup.options
-    def notifyNewTestSelection(self, tests, apps, direct):
-        self.updateSelection(tests)
+    def notifyNewTestSelection(self, tests, apps, rowCount, *args):
+        self.updateSelection(tests, rowCount)
         self.currAppSelection = apps
         newActive = self.allAppsValid() and self.isActiveOnCurrent()
         self.diag.info("New test selection for " + self.getTitle() + "=" + repr(tests) + " : new active = " + repr(newActive))
@@ -167,7 +167,7 @@ class InteractiveAction(plugins.Observable):
             if self.updateOptions():
                 self.notify("UpdateOptions")
 
-    def updateSelection(self, tests):
+    def updateSelection(self, tests, rowCount):
         pass
     def updateOptions(self):
         return False     
@@ -286,7 +286,7 @@ class SelectionAction(InteractiveAction):
     def __init__(self, allApps, *args):
         InteractiveAction.__init__(self, allApps)
         self.currTestSelection = []
-    def updateSelection(self, tests):
+    def updateSelection(self, tests, rowCount):
         self.currTestSelection = filter(lambda test: test.classId() == "test-case", tests)
     def isActiveOnCurrent(self, *args):
         return len(self.currTestSelection) > 0
@@ -342,8 +342,8 @@ class InteractiveTestAction(InteractiveAction):
         return repr(self.currentTest)
     def inButtonBar(self):
         return not self.inMenuOrToolBar() and len(self.getOptionGroups()) == 0
-    def updateSelection(self, tests):
-        if len(tests) == 1:
+    def updateSelection(self, tests, rowCount):
+        if rowCount == 1:
             self.currentTest = tests[0]
         else:
             self.currentTest = None
@@ -790,7 +790,11 @@ class PasteTests(InteractiveTestAction):
     def __init__(self, *args):
         InteractiveTestAction.__init__(self, *args)
         self.clipboardTests = []
+        self.allSelected = []
         self.removeAfter = False
+    def updateSelection(self, tests, rowCount):
+        self.allSelected = tests
+        InteractiveTestAction.updateSelection(self, tests, rowCount)
     def getStockId(self):
         return "paste"
     def _getTitle(self):
@@ -805,11 +809,19 @@ class PasteTests(InteractiveTestAction):
         return True # Can paste after suites also
     def isActiveOnCurrent(self, test=None, state=None):
         return InteractiveTestAction.isActiveOnCurrent(self, test, state) and len(self.clipboardTests) > 0
-    def getDestinationInfo(self):
-        if self.currentTest.classId() == "test-suite":
-            return self.currentTest, 0
+    def getCurrentTestMatchingApp(self, test):
+        for currTest in self.allSelected:
+            if currTest.app == test.app:
+                return currTest
+            
+    def getDestinationInfo(self, test):
+        currTest = self.getCurrentTestMatchingApp(test)
+        if currTest is None:
+            return None, 0
+        if currTest.classId() == "test-suite":
+            return currTest, 0
         else:
-            return self.currentTest.parent, self.currentTest.positionInParent() + 1
+            return currTest.parent, currTest.positionInParent() + 1
 
     def getNewTestName(self, suite, oldName):
         existingTest = suite.findSubtest(oldName)
@@ -842,22 +854,37 @@ class PasteTests(InteractiveTestAction):
         else:
             return placement
     def performOnCurrent(self):
-        suite, placement = self.getDestinationInfo()
         newTests = []
+        destInfo = seqdict()
         for test in self.clipboardTests:
+            suite, placement = self.getDestinationInfo(test)
+            if suite:
+                destInfo[test] = suite, placement
+        if len(destInfo) == 0:
+            raise plugins.TextTestError, "Cannot paste test there, as the copied test and currently selected test have no application/version in common"
+
+        suiteDeltas = {} # When we insert as we go along, need to update subsequent placements
+        for test in self.clipboardTests:
+            if not destInfo.has_key(test):
+                continue
+            suite, placement = destInfo[test]
+            realPlacement = placement + suiteDeltas.get(suite, 0)
             newName = self.getNewTestName(suite, test.name)
             guilog.info("Pasting test " + newName + " under test suite " + \
-                        repr(suite) + ", in position " + str(placement))
+                        repr(suite) + ", in position " + str(realPlacement))
             if self.removeAfter and newName == test.name and suite is test.parent:
                 # Cut + paste to the same suite is basically a reposition, do it as one action
-                test.parent.repositionTest(test, self.getRepositionPlacement(test, placement))
+                test.parent.repositionTest(test, self.getRepositionPlacement(test, realPlacement))
                 newTests.append(test)
                 self.notify("SetTestSelection", [ test ])
             else:
                 newDesc = self.getNewDescription(test)
-                testDir = suite.writeNewTest(newName, newDesc, placement)
-                testImported = self.createTestContents(test, suite, testDir, newDesc, placement)
-                placement += 1 # for several tests, insert them in order
+                testDir = suite.writeNewTest(newName, newDesc, realPlacement)
+                testImported = self.createTestContents(test, suite, testDir, newDesc, realPlacement)
+                if suiteDeltas.has_key(suite):
+                    suiteDeltas[suite] += 1
+                else:
+                    suiteDeltas[suite] = 1
                 if self.removeAfter:
                     newTests.append(testImported)
                     test.remove()
@@ -865,7 +892,8 @@ class PasteTests(InteractiveTestAction):
             # After a paste from cut, subsequent pastes should behave like copies of the new tests
             self.clipboardTests = newTests
             self.removeAfter = False
-        suite.contentChanged()
+        for suite, placement in destInfo.values():
+            suite.contentChanged()
     def createTestContents(self, testToCopy, suite, testDir, description, placement):
         stdFiles, defFiles = testToCopy.listStandardFiles(allVersions=True)
         for sourceFile in stdFiles + defFiles:
@@ -1174,7 +1202,7 @@ class SelectTests(SelectionAction):
         return possVersions
     def _getPossibleVersions(self, app):
         fullVersion = app.getFullVersion()
-        extraVersions = app.getExtraVersions(forUse=False)
+        extraVersions = app.getExtraVersions()
         if len(fullVersion) == 0:
             return [ "<default>" ] + extraVersions
         else:
@@ -1425,7 +1453,7 @@ class RunningAction(SelectionAction):
                 apps.append(test.app.name)
         return [ "-a", ",".join(apps) ]
     def checkTestRun(self, identifierString, errFile, testSel):
-        if len(self.currTestSelection) == 1 and self.currTestSelection[0] in testSel:
+        if len(self.currTestSelection) >= 1 and self.currTestSelection[0] in testSel:
             self.currTestSelection[0].filesChanged()
         testSel[0].notify("CloseDynamic", self.getUseCaseName())
         if os.path.isfile(errFile):
@@ -1594,7 +1622,7 @@ class CreateDefinitionFile(InteractiveTestAction):
         pass
 
 class RemoveTests(SelectionAction):
-    def updateSelection(self, tests):
+    def updateSelection(self, tests, rowCount):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions
     def notifyNewFileSelection(self, files):
         self.updateFileSelection(files)
@@ -1644,13 +1672,28 @@ Are you sure you wish to proceed?\n"""
             self.removeFiles()
         else:
             self.removeTests()
-    def removeTests(self):
-        namesRemoved = []
+    def getTestsToRemove(self, list):
+        toRemove = []
         warnings = ""
-        for test in self.currTestSelection:
+        for test in list:
             if not test.parent:
                 warnings += "\nThe root suite\n'" + test.name + " (" + test.app.name + ")'\ncannot be removed.\n"
-            elif test.remove():
+                continue
+            if test.classId() == "test-suite":
+                subTests, subWarnings = self.getTestsToRemove(test.testcases)
+                warnings += subWarnings
+                for subTest in subTests:
+                    if not subTest in toRemove:
+                        toRemove.append(subTest)
+            if not test in toRemove:
+                toRemove.append(test)
+
+        return toRemove, warnings
+    def removeTests(self):
+        namesRemoved = []
+        toRemove, warnings = self.getTestsToRemove(self.currTestSelection)
+        for test in toRemove:
+            if test.remove():
                 namesRemoved.append(test.name)
         self.notify("Status", "Removed test(s) " + ",".join(namesRemoved))
         if warnings:
@@ -1769,8 +1812,8 @@ class RecomputeTest(InteractiveTestAction):
         
         useState = self.getState(state)
         return useState.hasStarted() and not useState.isComplete()
-    def updateSelection(self, tests):
-        InteractiveTestAction.updateSelection(self, tests)
+    def updateSelection(self, tests, rowCount):
+        InteractiveTestAction.updateSelection(self, tests, rowCount)
         # Prevent recomputation triggering more...
         if self.recomputing:
             self.chainReaction = True
@@ -1799,6 +1842,12 @@ class RecomputeTest(InteractiveTestAction):
         self.notify("Status", "Done recomputing status of " + repr(test) + ".")
 
 class SortTestSuiteFileAscending(InteractiveTestAction):
+    def __init__(self, *args):
+        InteractiveTestAction.__init__(self, *args)
+        self.currSuites = []
+    def updateSelection(self, tests, *args):
+        InteractiveTestAction.updateSelection(self, tests, *args)
+        self.currSuites = tests
     def correctTestClass(self):
         return self.currentTest.classId() == "test-suite"
     def isActiveOnCurrent(self, *args):
@@ -1826,10 +1875,19 @@ class SortTestSuiteFileAscending(InteractiveTestAction):
 
         self.notify("Status", "Sorting " + repr(suite))
         self.notify("ActionProgress", "")
-        if suite.hasNonDefaultTests():
+        if self.hasNonDefaultTests():
             self.notify("Warning", "\nThe test suite\n'" + suite.name + "'\ncontains tests which are not present in the default version.\nTests which are only present in some versions will not be\nmixed with tests in the default version, which might lead to\nthe suite not looking entirely sorted.")
 
         suite.sortTests(ascending)
+    def hasNonDefaultTests(self):
+        if len(self.currSuites) == 1:
+            return False
+
+        for extraSuite in self.currSuites[1:]:
+            for test in extraSuite.testcases:
+                if not self.currentTest.findSubtest(test.name):
+                    return True
+        return False
 
 class SortTestSuiteFileDescending(SortTestSuiteFileAscending):
     def getStockId(self):
@@ -1921,27 +1979,21 @@ class RepositionTestLast(RepositionTest):
     def isActiveOnCurrent(self, *args):
         if not self._isActiveOnCurrent():
             return False
-        return self.currentTest.parent.testcases[len(self.currentTest.parent.testcases) - 1] != self.currentTest
+        currLastTest = self.currentTest.parent.testcases[len(self.currentTest.parent.testcases) - 1]
+        return currLastTest != self.currentTest
 
     
-class RenameTest(InteractiveAction):
+class RenameTest(InteractiveTestAction):
     def __init__(self, *args):
-        InteractiveAction.__init__(self, *args)
-        self.currTestSelection = []
+        InteractiveTestAction.__init__(self, *args)
         self.newName = ""
         self.oldName = ""
         self.newDescription = ""
         self.oldDescription = ""
-    def updateSelection(self, tests):
-        self.currTestSelection = tests # interested in suites, unlike most SelectionActions
-    def isActiveOnCurrent(self, *args):
-        return len(self.currTestSelection) == 1 and \
-               self.currTestSelection[0].parent != None and \
-               self.currTestSelection[0].classId() == "test-case"
     def getDialogType(self):
-        if len(self.currTestSelection) == 1:
-            self.newName = self.currTestSelection[0].name
-            self.newDescription = plugins.extractComment(self.currTestSelection[0].description)
+        if self.currentTest:
+            self.newName = self.currentTest.name
+            self.newDescription = plugins.extractComment(self.currentTest.description)
         else:
             self.newName = ""
             self.newDescription = ""
@@ -1967,26 +2019,26 @@ class RenameTest(InteractiveAction):
             message = "Nothing changed."
         return message
     def checkNewName(self):
-        if self.newName == self.currTestSelection[0].name:
+        if self.newName == self.currentTest.name:
             return ("", False)
         if len(self.newName) == 0:
             return ("Please enter a new name.", True)
         if self.newName.find(" ") != -1:
             return ("The new name must not contain spaces, please choose another name.", True)
-        for test in self.currTestSelection[0].parent.testCaseList():
+        for test in self.currentTest.parent.testCaseList():
             if test.name == self.newName:
                 return ("The name '" + self.newName + "' is already taken, please choose another name.", True)
-        newDir = os.path.join(self.currTestSelection[0].parent.getDirectory(), self.newName)
+        newDir = os.path.join(self.currentTest.parent.getDirectory(), self.newName)
         if os.path.isdir(newDir):
             return ("The directory '" + newDir + "' already exists.\n\nDo you want to overwrite it?", False)
         return ("", False)
     def performOnCurrent(self):
         try:
             if self.newName != self.oldName:
-                self.currTestSelection[0].rename(self.newName, self.newDescription)
+                self.currentTest.rename(self.newName, self.newDescription)
             if self.newDescription != self.oldDescription:
-                self.currTestSelection[0].rename(self.newName, self.newDescription)
-                self.currTestSelection[0].filesChanged() # To get the new description in the GUI ...
+                self.currentTest.rename(self.newName, self.newDescription)
+                self.currentTest.filesChanged() # To get the new description in the GUI ...
         except IOError, e:
             self.notify("Error", "Failed to rename test:\n" + str(e))
         except OSError, e:
@@ -1999,7 +2051,7 @@ class ShowFileProperties(SelectionAction):
     def isActiveOnCurrent(self, *args):
         return len(self.currTestSelection) == 1 and \
                len(self.currFileSelection) > 0
-    def updateSelection(self, tests):
+    def updateSelection(self, tests, *args):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions
     def notifyNewFileSelection(self, files):
         self.updateFileSelection(files)

@@ -77,12 +77,11 @@ class Config:
                (not self.hasExplicitInterface() and app.getConfigValue("default_interface") == "static_gui")
     def useConsole(self):
         return self.optionMap.has_key("con")
-    def useExtraVersions(self, app):
-        return not self.useStaticGUI(app)
-    def getExtraVersions(self, app, forUse=True):
-        if forUse and not self.useExtraVersions(app):
+    def useExtraVersions(self):
+        return True # static GUI didn't, once, but now we always read things the same.
+    def getExtraVersions(self, app):
+        if not self.useExtraVersions():
             return []
-
         extraVersions = []
         fromConfig = self.getExtraVersionsFromConfig(app)
         extraVersions += fromConfig
@@ -746,18 +745,11 @@ class GrepFilter(plugins.TextFilter):
             if self.matches(logFile):
                 return True
         return False
-    def getVersions(self, test):
-        versions = test.app.versions
-        if test.app.useExtraVersions():
-            return versions
-        else:
-            return versions + test.app.getExtraVersions(forUse=False)
     def findAllLogFiles(self, test):
         logFiles = []
-        versions = self.getVersions(test)
         for fileName in test.findAllStdFiles(self.fileStem):
             fileVersions = os.path.basename(fileName).split(".")[2:]
-            if self.allAllowed(fileVersions, versions):
+            if self.allAllowed(fileVersions, test.app.versions):
                 if os.path.isfile(fileName):
                     logFiles.append(fileName)
                 else:

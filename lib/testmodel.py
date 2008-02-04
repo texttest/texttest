@@ -13,7 +13,7 @@ from sets import Set, ImmutableSet
 helpIntro = """
 Note: the purpose of this help is primarily to document derived configurations and how they differ from the
 defaults. To find information on the configurations provided with texttest, consult the documentation at
-http://www.texttest.org/TextTest/docs
+http://www.texttest.org
 """            
 
 class DirectoryCache:
@@ -310,7 +310,6 @@ class Test(plugins.Observable):
     def setUniqueName(self, newName):
         if newName != self.uniqueName:
             self.uniqueName = newName
-            self.notify("UniqueNameChange")
     def setEnvironment(self, var, value, propFile=None):
         if propFile:
             self.addProperty(var, value, propFile)
@@ -463,9 +462,12 @@ class Test(plugins.Observable):
             return self.parent.testcases.index(self)
         else:
             return 0
-    def remove(self, removeFromTestFile = True):
+    def removeFiles(self):
         dir = self.getDirectory()
-        if os.path.isdir(dir) and self.parent: # might have already removed the enclosing suite
+        if os.path.isdir(dir):
+            shutil.rmtree(dir)
+    def remove(self, removeFromTestFile=True):
+        if self.parent: # might have already removed the enclosing suite
             self.parent.removeTest(self, removeFromTestFile)
             return True
         else:
@@ -493,19 +495,12 @@ class Test(plugins.Observable):
                 targetPath = sourcePath.replace(self.getDirectory(), newDir)
                 plugins.ensureDirExistsForFile(targetPath)
                 shutil.copy2(sourcePath, targetPath)
-
-            # Administration to get the new test in the GUI ...
-            cache = DirectoryCache(newDir)
-            if self.classId() == "test-case":
-                test = TestCase(newName, newDescription, cache, self.app, self.parent)
-            else:
-                test = TestSuite(newName, newDescription, cache, self.app, self.parent)
-            test.setObservers(self.observers)
-            currIndex = self.parent.testcases.index(self)
-            self.parent.testcases.insert(currIndex, test)
-            test.notify("Add", initial=False)
-            self.parent.removeTest(self, False)
-        self.parent.contentChanged()
+            self.removeFiles()
+            self.name = newName
+            self.notify("NameChange")
+            if self.parent.autoSortOrder:
+                self.parent.updateOrder()
+        
     def getRunEnvironment(self, onlyVars = []):
         return self.environment.getValues(onlyVars)
     def createPropertiesFiles(self):
@@ -769,7 +764,7 @@ class TestSuiteFileHandler:
             
 class TestSuite(Test):
     testSuiteFileHandler = TestSuiteFileHandler()
-    def __init__(self, name, description, dircache, app, parent=None, forTestRuns=0):
+    def __init__(self, name, description, dircache, app, parent=None):
         Test.__init__(self, name, description, dircache, app, parent)
         self.testcases = []
         contentFile = self.getContentFileName()
@@ -779,12 +774,11 @@ class TestSuite(Test):
     def getDescription(self):
         return "\nDescription:\n" + Test.getDescription(self)
             
-    def readContents(self, filters, forTestRuns=True):
-        testNames = self.readTestNames(forTestRuns)
-        self.createTestCases(filters, testNames, forTestRuns)
-        if len(self.testcases) == 0 and (forTestRuns or len(testNames) > 0):
-            # If we want to run tests, there is no point in empty test suites. For other purposes they might be useful...
-            # If the contents are filtered away we shouldn't include the suite either though.
+    def readContents(self, filters):
+        testNames = self.readTestNames()
+        self.createTestCases(filters, testNames)
+        if len(self.testcases) == 0 and len(testNames) > 0:
+            # If the contents are filtered away, don't include the suite 
             return False
 
         for filter in filters:
@@ -792,17 +786,16 @@ class TestSuite(Test):
                 self.diagnose("Contents rejected due to " + repr(filter))
                 return False
         return True
-    def readTestNames(self, forTestRuns, warn = True):
+    def readTestNames(self, warn=True):
         names = seqdict()
-        # If we're not running tests, we're displaying information and should find all the sub-versions 
-        for fileName in self.findTestSuiteFiles(forTestRuns):
-            for name, comment in self.testSuiteFileHandler.read(fileName, warn).items():
-                self.diagnose("Read " + name)
-                if warn and not self.fileExists(name):
-                    plugins.printWarning("The test " + name + " could not be found.\nPlease check the file at " + fileName)
-                    continue
-                if not names.has_key(name):
-                    names[name] = comment
+        fileName = self.getContentFileName()
+        for name, comment in self.testSuiteFileHandler.read(fileName, warn).items():
+            self.diagnose("Read " + name)
+            if warn and not self.fileExists(name):
+                plugins.printWarning("The test " + name + " could not be found.\nPlease check the file at " + fileName)
+                continue
+            if not names.has_key(name):
+                names[name] = comment
         return names
     def findTestCases(self, version):
         versionFile = self.getFileName("testsuite", version)        
@@ -832,11 +825,8 @@ class TestSuite(Test):
         return action.setUpSuite(self)
     def isAcceptedBy(self, filter):
         return filter.acceptsTestSuite(self)
-    def findTestSuiteFiles(self, forTestRuns=0):
+    def findTestSuiteFiles(self):
         contentFile = self.getContentFileName()
-        if forTestRuns:
-            return [ contentFile ]
-        
         versionFiles = []
         allFiles = self.app._getAllFileNames([ self.dircache ], "testsuite", allVersions=True)
         for newFile in allFiles:
@@ -859,8 +849,8 @@ class TestSuite(Test):
             self.testSuiteFileHandler.fileEdited(fileEdit)
         # Here we assume that only order can change...
         self.refreshFiles()
-        self.updateOrder(True)            
-    def updateOrder(self, readTestNames = False):
+        self.updateOrder(True, fileEdit)            
+    def updateOrder(self, readTestNames=False, fileEdit=""):
         if readTestNames:
             orderedTestNames = self.getOrderedTestNames().keys()
         else:
@@ -874,7 +864,7 @@ class TestSuite(Test):
                     break
         if newList != self.testcases:
             self.testcases = newList
-            self.notify("ContentChange")
+            self.notify("ContentChange", fileEdit)
     def size(self):
         size = 0
         for testcase in self.testcases:
@@ -886,7 +876,7 @@ class TestSuite(Test):
     # Observe: orderedTestNames can be both list and seqdict ... (it will be seqdict if read from file)
     def getOrderedTestNames(self, orderedTestNames = None): # We assume that tests exists, we just want to re-order ...
         if orderedTestNames is None:
-            orderedTestNames = self.readTestNames(False, False)
+            orderedTestNames = self.readTestNames(warn=False)
         if self.autoSortOrder:
             testCaseNames = map(lambda l: l.name, filter(lambda l: l.classId() == "test-case", self.testcases))
             if self.autoSortOrder == 1:
@@ -894,15 +884,15 @@ class TestSuite(Test):
             else:
                 orderedTestNames.sort(lambda a, b: self.compareTests(False, testCaseNames, a, b))
         return orderedTestNames
-    def createTestCases(self, filters, testNames, forTestRuns):
+    def createTestCases(self, filters, testNames):
         if self.autoSortOrder:
-            self.createAndSortTestCases(filters, testNames, forTestRuns)
+            self.createAndSortTestCases(filters, testNames)
         else:
             for testName, desc in testNames.items():
                 dirCache = self.createTestCache(testName)
-                self.createTestOrSuite(testName, desc, dirCache, filters, forTestRuns)
+                self.createTestOrSuite(testName, desc, dirCache, filters)
 
-    def createAndSortTestCases(self, filters, testNames, forTestRuns):
+    def createAndSortTestCases(self, filters, testNames):
         orderedTestNames = testNames.keys()
         testCaches = {}
         for testName in orderedTestNames:
@@ -916,13 +906,13 @@ class TestSuite(Test):
 
         for testName in orderedTestNames:
             dirCache = testCaches[testName]
-            self.createTestOrSuite(testName, testNames[testName], dirCache, filters, forTestRuns)
+            self.createTestOrSuite(testName, testNames[testName], dirCache, filters)
 
-    def createTestOrSuite(self, testName, description, dirCache, filters, forTestRuns):
+    def createTestOrSuite(self, testName, description, dirCache, filters):
         className = self.getSubtestClass(dirCache)
         subTest = self.createSubtest(testName, description, dirCache, className)
         if subTest.isAcceptedByAll(filters) and \
-               (className is TestCase or subTest.readContents(filters, forTestRuns)):
+               (className is TestCase or subTest.readContents(filters)):
             self.testcases.append(subTest)
             subTest.notify("Add", initial=True)
                 
@@ -973,7 +963,7 @@ class TestSuite(Test):
         if not self.testSuiteFileHandler.reposition(testSuiteFileName, test.name, newIndex):
             return False
 
-        testNamesInOrder = self.readTestNames(False, False)
+        testNamesInOrder = self.readTestNames(warn=False)
         newList = []
         for testName in testNamesInOrder.keys():
             test = self.findSubtest(testName)
@@ -983,9 +973,6 @@ class TestSuite(Test):
         self.testcases = newList
         self.notify("ContentChange")
         return True
-    def hasNonDefaultTests(self):
-        tests = self.testSuiteFileHandler.read(self.getContentFileName())
-        return len(tests) < len(self.testcases)
     def sortTests(self, ascending = True):
         # Get testsuite list, sort in the desired order. Test
         # cases always end up before suites, regardless of name.
@@ -994,7 +981,7 @@ class TestSuite(Test):
             comparator = lambda a, b: self.compareTests(ascending, testNames, a, b)
             self.testSuiteFileHandler.sort(testSuiteFileName, comparator)
 
-        testNamesInOrder = self.readTestNames(False, False)
+        testNamesInOrder = self.readTestNames(warn=False)
         newList = []
         for testName in testNamesInOrder.keys():
             for test in self.testcases:
@@ -1031,8 +1018,8 @@ class TestSuite(Test):
         except IndexError:
             return None
     def removeTest(self, test, removeFromTestFile = True):
-        try: 
-            shutil.rmtree(test.getDirectory())
+        try:
+            test.removeFiles()
             self.testcases.remove(test)
             if removeFromTestFile:
                 self.removeFromTestFile(test.name)
@@ -1418,7 +1405,7 @@ class Application:
         elif vset2.issubset(vset1):
             return 1
         
-        extraVersions = self.getExtraVersions(forUse=False)
+        extraVersions = self.getExtraVersions()
         extraIndex1 = self.extraVersionIndex(vset1, extraVersions)
         extraIndex2 = self.extraVersionIndex(vset2, extraVersions)
         return cmp(extraIndex1, extraIndex2)
@@ -1681,9 +1668,11 @@ class ApplicationEventResponder(Responder):
         self.scriptEngine.applicationEvent("completion of test actions")
     def notifyCloseDynamic(self, test, name):
         self.scriptEngine.applicationEvent(name + " GUI to be closed")
-    def notifyContentChange(self, suite):
-        eventName = "suite " + suite.uniqueName + " to change order"
-        self.scriptEngine.applicationEvent(eventName, suite.uniqueName)
+    def notifyContentChange(self, suite, fileEdit=""):
+        if fileEdit:
+            # Only bother with this if we're picking up a viewer process closing
+            eventName = "suite " + suite.uniqueName + " to change order"
+            self.scriptEngine.applicationEvent(eventName, suite.uniqueName)
 
 # Simple responder that collects completion notifications and sends one out when
 # it thinks everything is done.

@@ -22,7 +22,8 @@ class UniqueNameFinder(Responder):
             self.diag.info("Storing test " + test.name)
             self.name2test[test.name] = test
     def notifyRemove(self, test):
-        del self.name2test[test.name]
+        if self.name2test.has_key(test.name):
+            del self.name2test[test.name]
     def findParentIdentifiers(self, oldTest, newTest):
         oldParentId = " at top level"
         if oldTest.parent:
@@ -68,22 +69,16 @@ class Activator(Responder, plugins.Observable):
         self.diag = plugins.getDiagnostics("Activator")
     def addSuites(self, suites):
         self.suites = suites
-    def needsTestRuns(self):
-        for responder in self.observers:
-            if not responder.needsTestRuns():
-                return False
-        return True
     
     def run(self):
         goodSuites = []
         rejectedApps = Set()
-        forTestRuns = self.needsTestRuns()
         self.notify("StartRead")
         for suite in self.suites:
             filters = suite.app.getFilterList()
             self.diag.info("Creating test suite with filters " + repr(filters))
         
-            suite.readContents(filters, forTestRuns)
+            suite.readContents(filters)
             self.diag.info("SUCCESS: Created test suite of size " + str(suite.size()))
             if suite.size() > 0 or self.allowEmpty:
                 goodSuites.append(suite)

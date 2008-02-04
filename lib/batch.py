@@ -41,6 +41,8 @@ class BatchCategory(plugins.Filter):
         return len(self.tests)
     def acceptsTestCase(self, test):
         return self.tests.has_key(test.getRelPath())
+    def acceptsTestSuiteContents(self, suite):
+        return not suite.isEmpty()
     def describeBrief(self, app):
         if self.size() > 0:
             filters = [ self ]

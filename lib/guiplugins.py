@@ -1282,10 +1282,12 @@ class SelectTests(SelectionAction):
             return reqTests
         elif strategy == 1:
             return filter(self.isSelected, reqTests)
-        elif strategy == 2:
-            return reqTests + self.currTestSelection
-        elif strategy == 3:
-            return filter(self.isNotSelected, reqTests)
+        else:
+            extraRequested = filter(self.isNotSelected, reqTests)
+            if strategy == 2:
+                return extraRequested + self.currTestSelection
+            elif strategy == 3:
+                return extraRequested 
     def findTestCaseList(self, suite):
         version = self.optionGroup.getOptionValue("vs")
         if len(version) == 0:

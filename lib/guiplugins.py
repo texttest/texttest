@@ -1235,7 +1235,7 @@ class SelectTests(SelectionAction):
         for suite in self.getSuitesToTry():
             filters = self.getFilterList(suite.app)            
             reqTests = self.getRequestedTests(suite, filters)
-            newTests = self.combineWithPrevious(reqTests, strategy)
+            newTests = self.combineWithPrevious(reqTests, suite.app, strategy)
             guilog.info("Selected " + str(len(newTests)) + " out of a possible " + str(suite.size()))
             selectedTests += newTests
         self.notify("SetTestSelection", selectedTests, self.optionGroup.getSwitchValue("select_in_collapsed_suites"))
@@ -1274,7 +1274,7 @@ class SelectTests(SelectionAction):
             return tests
         else:
             return [ suite ]
-    def combineWithPrevious(self, reqTests, strategy):
+    def combineWithPrevious(self, reqTests, app, strategy):
         # Strategies: 0 - discard, 1 - refine, 2 - extend, 3 - exclude
         # If we want to extend selection, we include test if it was previsouly selected,
         # even if it doesn't fit the current criterion
@@ -1285,7 +1285,8 @@ class SelectTests(SelectionAction):
         else:
             extraRequested = filter(self.isNotSelected, reqTests)
             if strategy == 2:
-                return extraRequested + self.currTestSelection
+                selectedThisApp = filter(lambda test: test.app is app, self.currTestSelection)
+                return extraRequested + selectedThisApp
             elif strategy == 3:
                 return extraRequested 
     def findTestCaseList(self, suite):

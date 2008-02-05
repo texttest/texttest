@@ -1,4 +1,4 @@
-import ravebased, guiplugins
+import ravebased, guiplugins, os
 
 def getConfig(optionMap):
     return Config(optionMap)
@@ -13,7 +13,7 @@ class Config(ravebased.Config):
     def _subPlanName(self, test):
         opts = test.getWordsInFile("options")
         if opts:
-            return opts[-1][:-1]
+            return os.path.expandvars(opts[-1][:-1], test.getEnvironment)
 
 
 # Graphical import test

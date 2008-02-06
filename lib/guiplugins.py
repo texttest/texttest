@@ -2052,7 +2052,7 @@ class ShowFileProperties(SelectionAction):
         SelectionAction.__init__(self, allApps)
         self.dynamic = dynamic
     def isActiveOnCurrent(self, *args):
-        return len(self.currTestSelection) == 1 and \
+        return ((not self.dynamic) or len(self.currTestSelection) == 1) and \
                len(self.currFileSelection) > 0
     def updateSelection(self, tests, *args):
         self.currTestSelection = tests # interested in suites, unlike most SelectionActions
@@ -2068,14 +2068,23 @@ class ShowFileProperties(SelectionAction):
         return str(len(self.currFileSelection)) + " files"
     def performOnCurrent(self):
         self.properties = []
+        errors = []
         for file, comp in self.currFileSelection:
-            prop = plugins.FileProperties(file)
             if self.dynamic and comp:
-                propTmp = plugins.FileProperties(comp.tmpFile)
-                guilog.info("Showing properties of the file " + comp.tmpFile + ":\n" + propTmp.getUnixStringRepresentation())
-                self.properties.append(propTmp)
+                self.performOnFile(comp.tmpFile, self.properties, errors)
+            self.performOnFile(file, self.properties, errors)
+            
+        if len(errors):
+            self.notify("Error", "Failed to get file properties:\n" + "\n".join(errors))
+                
+    def performOnFile(self, file, properties, errors):
+        try:
+            prop = plugins.FileProperties(file)
             guilog.info("Showing properties of the file " + file + ":\n" + prop.getUnixStringRepresentation())
-            self.properties.append(prop)
+            properties.append(prop)
+        except Exception, e:
+            errors.append(str(e))          
+        
             
 class VersionInformation(InteractiveAction):
     def _getTitle(self):

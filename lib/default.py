@@ -53,6 +53,7 @@ class Config:
                 group.addSwitch("coll", "Collect results for batch mode session")
                 group.addOption("tp", "Private: Tests with exact path") # use for internal communication
                 group.addOption("fd", "Private: Directory to search for filter files in")
+                group.addOption("count", "Private: How many tests we believe there will be")
                 group.addOption("name", "Batch run not identified by date, but by name")
                 group.addOption("o", "Overwrite failures, optionally using version")
                 group.addOption("reconnect", "Reconnect to previous run")
@@ -635,13 +636,14 @@ class Config:
         app.setConfigDefault("bug_system_script", { "default" : "" }, "The location of the script used to extract information from the bug system.")
     def getGuiColourDictionary(self):
         dict = {}
+        dict["default"] = "red"
         dict["success"] = "green"
         dict["failure"] = "red"
         dict["running"] = "yellow"
         dict["not_started"] = "white"
         dict["pending"] = "white"
         dict["static"] = "grey90"
-        dict["marked by user"] = "orange"
+        dict["marked"] = "orange"
         return dict
     def getDefaultAccelerators(self):
         dict = {}

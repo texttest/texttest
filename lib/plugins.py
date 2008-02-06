@@ -531,6 +531,7 @@ class TestState(Observable):
         pass
 
 addCategory("unrunnable", "unrunnable", "could not be run")
+addCategory("marked", "marked by user", "was marked by the user")
 
 class Unrunnable(TestState):
     def __init__(self, freeText, briefText = "UNRUNNABLE", executionHosts=[], lifecycleChange=""):
@@ -542,7 +543,7 @@ class Unrunnable(TestState):
 class MarkedTestState(TestState):
     def __init__(self, freeText, briefText, oldState, executionHosts=[]):
         fullText = freeText + "\n\nORIGINAL STATE:\nTest " + repr(oldState) + "\n " + oldState.freeText
-        TestState.__init__(self, "marked by user", fullText, briefText, completed=1, \
+        TestState.__init__(self, "marked", fullText, briefText, completed=1, \
                            executionHosts=executionHosts, lifecycleChange="marked")
         self.oldState = oldState
     # We must implement this ourselves, since we want to be neither successful nor

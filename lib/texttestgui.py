@@ -49,13 +49,8 @@ def renderSuitesBold(column, cell, model, iter):
     else:
         cell.set_property('font', "bold")
 
-def getTestColour(test, category):
-    colours = test.getConfigValue("test_colours")
-    if colours.has_key(category):
-        return colours[category]
-    else:
-        # Everything unknown is assumed to be a new type of failure...
-        return colours["failure"]
+def getTestColour(category):
+    return guiConfig.getCompositeValue("test_colours", category)
 
 class PluginHandler:
     def __init__(self):
@@ -319,16 +314,17 @@ class TextTestGUI(Responder, plugins.Observable):
         Responder.__init__(self, optionMap)
         plugins.Observable.__init__(self)
         guiplugins.scriptEngine = self.scriptEngine
+        testCount = int(optionMap.get("count", 0))
         
         self.appFileGUI = ApplicationFileGUI(self.dynamic, allApps)
         self.textInfoGUI = TextInfoGUI()
-        self.progressMonitor = TestProgressMonitor(self.dynamic)
-        self.progressBarGUI = ProgressBarGUI(self.dynamic)
+        self.progressMonitor = TestProgressMonitor(self.dynamic, testCount)
+        self.progressBarGUI = ProgressBarGUI(self.dynamic, testCount)
         self.idleManager = IdleHandlerManager()
         self.intvActions = guiplugins.interactiveActionHandler.getInstances(self.dynamic, allApps)
         self.defaultActionGUIs, self.buttonBarGUIs = self.createActionGUIs()
         self.menuBarGUI, self.toolBarGUI, testPopupGUI, testFilePopupGUI = self.createMenuAndToolBarGUIs(allApps)
-        self.testColumnGUI = TestColumnGUI(self.dynamic)
+        self.testColumnGUI = TestColumnGUI(self.dynamic, testCount)
         self.testTreeGUI = TestTreeGUI(self.dynamic, allApps, testPopupGUI, self.testColumnGUI)
         self.testFileGUI = TestFileGUI(self.dynamic, testFilePopupGUI)
         self.actionTabGUIs = self.createActionTabGUIs()
@@ -838,10 +834,11 @@ class ShortcutBarGUI(SubGUI):
         pass # not yet integrated
 
 class TestColumnGUI(SubGUI):
-    def __init__(self, dynamic):
+    def __init__(self, dynamic, testCount):
         SubGUI.__init__(self)
-        self.totalNofTests = 0
-        self.totalNofDistinctTests = 0
+        self.givenTestCount = testCount
+        self.totalNofTests = testCount
+        self.totalNofDistinctTests = testCount
         self.nofSelectedTests = 0
         self.nofDistinctSelectedTests = 0
         self.totalNofTestsShown = 0
@@ -931,9 +928,10 @@ class TestColumnGUI(SubGUI):
     def describe(self):
         guilog.info("Test column header set to '" + self.column.get_title() + "'")
     def notifyTestTreeCounters(self, totalDelta, totalShownDelta, totalRowsDelta, initial=False):
-        self.totalNofTests += totalDelta
+        if not initial or self.givenTestCount == 0:
+            self.totalNofTests += totalDelta
+            self.totalNofDistinctTests += totalRowsDelta
         self.totalNofTestsShown += totalShownDelta
-        self.totalNofDistinctTests += totalRowsDelta
         self.updateTitle(initial)
       
     def notifyNewTestSelection(self, tests, apps, distinctTestCount, direct=False):
@@ -1049,10 +1047,10 @@ class TestTreeGUI(ContainerGUI):
         return iter
     def updateStateInModel(self, test, iter, state):
         if not self.dynamic:
-            return self.modelUpdate(iter, getTestColour(test, "static"))
+            return self.modelUpdate(iter, getTestColour("static"))
 
         resultType, summary = state.getTypeBreakdown()
-        return self.modelUpdate(iter, getTestColour(test, resultType), summary, getTestColour(test, state.category))
+        return self.modelUpdate(iter, getTestColour(resultType), summary, getTestColour(state.category))
     def modelUpdate(self, iter, colour, details="", colour2=None):
         if not colour2:
             colour2 = colour
@@ -1254,7 +1252,7 @@ class TestTreeGUI(ContainerGUI):
         # Print how many tests succeeded, color details column in success color,
         # collapse row, and try to collapse parent suite.
         detailText = "All " + str(suiteSize) + " tests successful"
-        successColour = getTestColour(suite, "success")
+        successColour = getTestColour("success")
         iter = self.itermap.getIterator(suite)
         self.model.set_value(iter, 3, detailText)
         self.model.set_value(iter, 4, successColour)
@@ -2359,7 +2357,7 @@ class TestFileGUI(FileViewGUI):
         else:
             return self.currentTest.name.replace("_", "__")
     def getColour(self, name):
-        return self.currentTest.getConfigValue("file_colours")[name]
+        return guiConfig.getCompositeValue("file_colours", name)
 
     def shouldShowCurrent(self, *args):
         return self.currentTest is not None
@@ -2483,30 +2481,34 @@ class TestFileGUI(FileViewGUI):
         return dirIters
 
 class ProgressBarGUI(SubGUI):
-    def __init__(self, dynamic):
+    def __init__(self, dynamic, testCount):
         SubGUI.__init__(self)
         self.dynamic = dynamic
-        self.totalNofTests = 0
+        self.totalNofTests = testCount
+        self.addedCount = 0
         self.nofCompletedTests = 0
         self.widget = None
-
+        
     def shouldShow(self):
         return self.dynamic
     def shouldDescribe(self):
-        return self.dynamic and self.totalNofTests > 0
+        return self.dynamic and self.addedCount > 0
 
     def describe(self):
         guilog.info("Progress bar set to fraction " + str(self.widget.get_fraction()) + ", text '" + self.widget.get_text() + "'")
 
     def createView(self):
         self.widget = gtk.ProgressBar()
+        self.resetBar()
         self.widget.show()
         return self.widget
 
     def notifyAdd(self, test, initial):
         if test.classId() == "test-case":
-            self.totalNofTests += 1
-            self.resetBar()
+            self.addedCount += 1
+            if self.addedCount > self.totalNofTests:
+                self.totalNofTests += 1
+                self.resetBar()
     def notifyAllRead(self, *args):
         self.contentsChanged()
 
@@ -2546,17 +2548,20 @@ class ClassificationTree(seqdict):
 # Class that keeps track of (and possibly shows) the progress of
 # pending/running/completed tests
 class TestProgressMonitor(SubGUI):
-    def __init__(self, dynamic):
+    def __init__(self, dynamic, testCount):
         SubGUI.__init__(self)
         self.classifications = {} # map from test to list of iterators where it exists
                 
         # Each row has 'type', 'number', 'show', 'tests'
         self.treeModel = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_INT, gobject.TYPE_BOOLEAN, \
                                        gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
+        self.diag = plugins.getDiagnostics("Progress Monitor")
         self.progressReport = None
         self.treeView = None
         self.dynamic = dynamic
-        self.diag = plugins.getDiagnostics("Progress Monitor")
+        self.testCount = testCount
+        if testCount > 0:
+            self.addNewIter("Not started", self.treeModel.get_iter_root(), "not_started", testCount)
     def getGroupTabTitle(self):
         return "Status"
     def shouldShow(self):
@@ -2592,8 +2597,10 @@ class TestProgressMonitor(SubGUI):
         return self.treeModel.get_value(pathIter, 2)
     def notifyAdd(self, test, initial):
         if self.dynamic and test.classId() == "test-case":
-            self.insertTest(test, test.state)
-            self.contentsChanged()
+            incrementCount = self.testCount == 0
+            self.insertTest(test, test.state, incrementCount)
+            if incrementCount:
+                self.contentsChanged()
     def selectionChanged(self, selection):
         # For each selected row, select the corresponding rows in the test treeview
         tests = []
@@ -2648,36 +2655,37 @@ class TestProgressMonitor(SubGUI):
             allTests = self.treeModel.get_value(iter, 5)
             allTests.remove(test)
             self.treeModel.set_value(iter, 5, allTests)
-    def insertTest(self, test, state):
+    def insertTest(self, test, state, incrementCount):
         self.classifications[test] = []
         classifiers = self.getClassifiers(state)
         nodeClassifier = classifiers.keys()[0]
-        self.addTestForNode(test, state, nodeClassifier, classifiers)
+        self.addTestForNode(test, state, nodeClassifier, classifiers, incrementCount)
         self.notify("Visibility", [ test ], self.shouldBeVisible(test))
 
-    def addTestForNode(self, test, state, nodeClassifier, classifiers, parentIter=None):
+    def addTestForNode(self, test, state, nodeClassifier, classifiers, incrementCount, parentIter=None):
         self.diag.info("Adding " + repr(test) + " for node " + nodeClassifier + " (" + repr(classifiers) + ")")
         nodeIter = self.findIter(nodeClassifier, parentIter)
         if nodeIter:
-            self.insertTestAtIter(nodeIter, test, state.category)
+            self.insertTestAtIter(nodeIter, test, state.category, incrementCount)
         else:
-            nodeIter = self.addNewIter(nodeClassifier, parentIter, test, state.category)
+            nodeIter = self.addNewIter(nodeClassifier, parentIter, state.category, 1, [ test ])
 
         self.classifications[test].append(nodeIter)
         for subNodeClassifier in classifiers[nodeClassifier]:
-            self.addTestForNode(test, state, subNodeClassifier, classifiers, nodeIter)
-    def insertTestAtIter(self, iter, test, category):
+            self.addTestForNode(test, state, subNodeClassifier, classifiers, incrementCount, nodeIter)
+    def insertTestAtIter(self, iter, test, category, incrementCount):
         allTests = self.treeModel.get_value(iter, 5)
         testCount = self.treeModel.get_value(iter, 1)
         if testCount == 0:
-            self.treeModel.set_value(iter, 3, getTestColour(test, category))
+            self.treeModel.set_value(iter, 3, getTestColour(category))
             self.treeModel.set_value(iter, 4, "bold")
-        self.treeModel.set_value(iter, 1, testCount + 1)
+        if incrementCount:
+            self.treeModel.set_value(iter, 1, testCount + 1)
         allTests.append(test)
         self.treeModel.set_value(iter, 5, allTests)
-    def addNewIter(self, classifier, parentIter, test, category):
+    def addNewIter(self, classifier, parentIter, category, testCount, tests=[]):
         showThis = guiConfig.showCategoryByDefault(category)
-        modelAttributes = [classifier, 1, showThis, getTestColour(test, category), "bold", [ test ]]
+        modelAttributes = [classifier, testCount, showThis, getTestColour(category), "bold", tests]
         newIter = self.treeModel.append(parentIter, modelAttributes)
         if parentIter:
             self.treeView.expand_row(self.treeModel.get_path(parentIter), open_all=0)
@@ -2692,7 +2700,7 @@ class TestProgressMonitor(SubGUI):
                 iter = self.treeModel.iter_next(iter)
     def notifyLifecycleChange(self, test, state, changeDesc):
         self.removeTest(test)
-        self.insertTest(test, state)
+        self.insertTest(test, state, incrementCount=True)
         self.contentsChanged()
 
     def shouldBeVisible(self, test):

@@ -1,5 +1,5 @@
 
-import plugins, os, sys, shutil, time, subprocess, operator
+import plugins, os, sys, shutil, time, subprocess, operator, types
 from jobprocess import JobProcess
 from copy import copy, deepcopy
 from threading import Thread
@@ -21,15 +21,30 @@ class GUIConfig:
         prevValue = None
         for app in self.apps:
             currValue = method(app, *args)
-            if not prevValue is None and currValue != prevValue:
-                # otherwise ignore silently
-                if not currValue is None:
-                    plugins.printWarning("GUI configuration '" + "::".join(args) +\
-                                         "' differs between applications, ignoring that from " + repr(app) + "\n" + \
-                                         "Value was " + repr(currValue) + ", change from " + repr(prevValue))
+            toUse = self.chooseValueFrom(prevValue, currValue)
+            if toUse is None and prevValue is not None:
+                plugins.printWarning("GUI configuration '" + "::".join(args) +\
+                                     "' differs between applications, ignoring that from " + repr(app) + "\n" + \
+                                     "Value was " + repr(currValue) + ", change from " + repr(prevValue))
             else:
-                prevValue = currValue
+                prevValue = toUse
         return prevValue
+    def chooseValueFrom(self, value1, value2):
+        if value1 is None or value1 == value2:
+            return value2
+        if value2 is None:
+            return value1
+        if type(value1) == types.ListType:
+            return self.createUnion(value1, value2)
+
+    def createUnion(self, list1, list2):
+        result = []
+        result += list1
+        for entry in list2:
+            if not entry in list1:
+                result.append(entry)
+        return result
+    
     def getModeName(self):
         if self.dynamic:
             return "dynamic"
@@ -1444,9 +1459,12 @@ class RunningAction(SelectionAction):
         ttOptions += self.invisibleGroup.getCommandLines()
         for group in self.getOptionGroups():
             ttOptions += group.getCommandLines()
+        ttOptions += [ "-count", str(self.getTestCount()) ]
         ttOptions += [ "-f", filterFile ]
         ttOptions += [ "-fd", self.getTmpFilterDir(app) ]
         return ttOptions
+    def getTestCount(self):
+        return len(self.currTestSelection) 
     def getTmpFilterDir(self, app):
         return os.path.join(app.writeDirectory, "temporary_filter_files")
     def getCmdlineOptionForApps(self):
@@ -1485,7 +1503,7 @@ class ReconnectToTests(RunningAction):
         return "Reconnected to"
     def getUseCaseName(self):
         return "reconnect"
-
+    
 class RunTests(RunningAction):
     def __init__(self, allApps):
         RunningAction.__init__(self, allApps)
@@ -1514,8 +1532,14 @@ class RunTests(RunningAction):
         return "Run selected tests"
     def getGroupTabTitle(self):
         return "Running"
+    def getTestCount(self):
+        return len(self.currTestSelection) * self.getCopyCount() * self.getVersionCount()
+    def getCopyCount(self):
+        return int(self.optionGroups[0].getOptionValue("cp"))
+    def getVersionCount(self):
+        return self.optionGroups[0].getOptionValue("v").count(",") + 1
     def performedDescription(self):
-        timesToRun = int(self.optionGroups[0].getOptionValue("cp"))
+        timesToRun = self.getCopyCount()
         numberOfTests = len(self.currTestSelection)
         if timesToRun != 1:
             if numberOfTests > 1:

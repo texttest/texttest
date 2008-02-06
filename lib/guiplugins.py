@@ -1631,6 +1631,7 @@ class CreateDefinitionFile(InteractiveTestAction):
         stemWithApp = stem + "." + self.currentTest.app.name
         if sourceFile and os.path.basename(sourceFile).startswith(stemWithApp) and not targetFileName.startswith(stemWithApp):
             targetFileName = targetFileName.replace(stem, stemWithApp, 1)
+            sourceFile = self.getSourceFile(stem, version, targetFileName)
             
         targetFile = os.path.join(self.currentTest.getDirectory(), targetFileName)
         plugins.ensureDirExistsForFile(targetFile)

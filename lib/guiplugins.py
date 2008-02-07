@@ -2062,11 +2062,8 @@ class RenameTest(InteractiveTestAction):
         return ("", False)
     def performOnCurrent(self):
         try:
-            if self.newName != self.oldName:
+            if self.newName != self.oldName or self.newDescription != self.oldDescription:
                 self.currentTest.rename(self.newName, self.newDescription)
-            if self.newDescription != self.oldDescription:
-                self.currentTest.rename(self.newName, self.newDescription)
-                self.currentTest.filesChanged() # To get the new description in the GUI ...
         except IOError, e:
             self.notify("Error", "Failed to rename test:\n" + str(e))
         except OSError, e:

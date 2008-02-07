@@ -474,9 +474,8 @@ class Test(plugins.Observable):
             return False
     def rename(self, newName, newDescription):
         # Correct all testsuite files ...
-        self.description = newDescription
         for testSuiteFileName in self.parent.findTestSuiteFiles():
-            self.parent.testSuiteFileHandler.rename(testSuiteFileName, self.name, newName, self.description)
+            self.parent.testSuiteFileHandler.rename(testSuiteFileName, self.name, newName, newDescription)
 
         # Create new directory, copy files if the new name is new (we might have
         # changed only the comment ...) (we don't want to rename dir, that can confuse CVS ...)
@@ -497,9 +496,14 @@ class Test(plugins.Observable):
                 shutil.copy2(sourcePath, targetPath)
             self.removeFiles()
             self.name = newName
-            self.notify("NameChange")
+            origRelPath = self.getRelPath()
+            self.dircache = DirectoryCache(newDir)
+            self.notify("NameChange", origRelPath)
             if self.parent.autoSortOrder:
                 self.parent.updateOrder()
+        if self.description != newDescription:
+            self.description = newDescription
+            self.refreshDescription()
         
     def getRunEnvironment(self, onlyVars = []):
         return self.environment.getValues(onlyVars)

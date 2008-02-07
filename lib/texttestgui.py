@@ -958,15 +958,17 @@ class TestIteratorMap:
         for app in allApps:
             for extra in [ app ] + app.extras:
                 self.parentApps[extra] = app
-    def getKey(self, test):
+    def getKey(self, test, relPath=None):
         if self.dynamic:
             return test
         elif test is not None:
-            return self.parentApps.get(test.app), test.getRelPath()
+            if relPath is None:
+                relPath = test.getRelPath()
+            return self.parentApps.get(test.app), relPath
     def store(self, test, iter):
         self.dict[self.getKey(test)] = iter
-    def getIterator(self, test):
-        return self.dict.get(self.getKey(test))
+    def getIterator(self, test, relPath=None):
+        return self.dict.get(self.getKey(test, relPath))
     def remove(self, test):
         key = self.getKey(test)
         if self.dict.has_key(key):
@@ -1338,13 +1340,13 @@ class TestTreeGUI(ContainerGUI):
             self.selection.unselect_iter(filteredIter)
         self.model.remove(iter)
         self.itermap.remove(test)
-    def notifyNameChange(self, test):
-        iter = self.itermap.getIterator(test)
+    def notifyNameChange(self, test, origRelPath):
+        iter = self.itermap.getIterator(test, origRelPath)
         self.model.set_value(iter, 0, test.name)
-        filteredIter = self.findIter(test)
+        filteredIter = self.filteredModel.convert_child_iter_to_iter(iter)
         self.describeTree()
         if self.selection.iter_is_selected(filteredIter):
-            self.notify("NameChange", test)
+            self.notify("NameChange", test, origRelPath)
     def notifyContentChange(self, suite, *args):
         suiteIter = self.itermap.getIterator(suite)
         newOrder = self.findNewOrder(suite, suiteIter)
@@ -2320,9 +2322,16 @@ class TestFileGUI(FileViewGUI):
     def __init__(self, dynamic, popupGUI):
         FileViewGUI.__init__(self, dynamic, "", popupGUI)
         self.currentTest = None
-    def notifyNameChange(self, test):
+    def notifyNameChange(self, test, origRelPath):
         if test is self.currentTest:
             self.setName( [ test ], 1)
+            self.model.foreach(self.updatePath, (origRelPath, test.getRelPath()))
+            self.describeName()
+    def updatePath(self, model, path, iter, data):
+        origPath, newPath = data
+        origFile = model.get_value(iter, 2)
+        if origFile:
+            model.set_value(iter, 2, origFile.replace(origPath, newPath))
     def notifyFileChange(self, test):
         if test is self.currentTest:
             self.recreateModel(test.state)

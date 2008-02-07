@@ -50,7 +50,7 @@ def renderSuitesBold(column, cell, model, iter):
         cell.set_property('font', "bold")
 
 def getTestColour(category):
-    return guiConfig.getCompositeValue("test_colours", category)
+    return guiConfig.getCompositeValue("test_colours", category, defaultKey="failure")
 
 class PluginHandler:
     def __init__(self):

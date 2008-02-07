@@ -1521,7 +1521,7 @@ class Application:
             return newDict
         else:
             return value
-    def getCompositeConfigValue(self, key, subKey, expandVars=True, getenvFunc=os.getenv):
+    def getCompositeConfigValue(self, key, subKey, expandVars=True, getenvFunc=os.getenv, defaultKey="default"):
         dict = self.getConfigValue(key, expandVars, getenvFunc)
         listVal = []
         for currSubKey, currValue in dict.items():
@@ -1532,7 +1532,7 @@ class Application:
                     return currValue
         # A certain amount of duplication here - hard to see how to avoid it
         # without compromising performance though...
-        defValue = dict.get("default")
+        defValue = dict.get(defaultKey)
         if defValue is not None:
             if type(defValue) == types.ListType:
                 listVal += defValue

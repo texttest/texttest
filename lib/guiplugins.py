@@ -15,12 +15,12 @@ class GUIConfig:
         self.dynamic = dynamic
     def _simpleValue(self, app, entryName):
         return app.getConfigValue(entryName)
-    def _compositeValue(self, app, sectionName, entryName):
-        return app.getCompositeConfigValue(sectionName, entryName)
-    def _getFromApps(self, method, *args):
+    def _compositeValue(self, app, *args, **kwargs):
+        return app.getCompositeConfigValue(*args, **kwargs)
+    def _getFromApps(self, method, *args, **kwargs):
         prevValue = None
         for app in self.apps:
-            currValue = method(app, *args)
+            currValue = method(app, *args, **kwargs)
             toUse = self.chooseValueFrom(prevValue, currValue)
             if toUse is None and prevValue is not None:
                 plugins.printWarning("GUI configuration '" + "::".join(args) +\
@@ -63,9 +63,9 @@ class GUIConfig:
     def getValue(self, entryName, modeDependent=False):
         nameToUse = self.getConfigName(entryName, modeDependent)
         return self._getFromApps(self._simpleValue, nameToUse)
-    def getCompositeValue(self, sectionName, entryName, modeDependent=False):
+    def getCompositeValue(self, sectionName, entryName, modeDependent=False, defaultKey="default"):
         nameToUse = self.getConfigName(entryName, modeDependent)
-        value = self._getFromApps(self._compositeValue, sectionName, nameToUse)
+        value = self._getFromApps(self._compositeValue, sectionName, nameToUse, defaultKey=defaultKey)
         if modeDependent and value is None:
             return self.getCompositeValue(sectionName, entryName)
         else:

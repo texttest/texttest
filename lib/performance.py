@@ -165,7 +165,7 @@ class PerformanceComparison:
 
 class TimeFilter(plugins.Filter):
     option = "r"
-    def __init__(self, timeLimit):
+    def __init__(self, timeLimit, *args):
         self.minTime = 0.0
         self.maxTime = sys.maxint
         times = plugins.commasplit(timeLimit)

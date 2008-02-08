@@ -158,12 +158,16 @@ class TextTest(Responder, plugins.Observable):
             versionList = self.inputOptions.findVersionList()
             if selectedAppDict.has_key(appName):
                 versionList = selectedAppDict[appName]
+            extraVersionsDuplicating = []
             for version in versionList:
-                app = self.addApplication(appName, dircache, version, versionList)
+                app, currExtra = self.addApplication(appName, dircache, version, versionList)
                 if app:
                     appList.append(app)
+                    extraVersionsDuplicating += currExtra
                 else:
                     raisedError = True
+            for toRemove in filter(lambda app: app.getFullVersion() in extraVersionsDuplicating, appList):
+                appList.remove(toRemove)
         return raisedError, appList
     def createApplication(self, appName, dircache, versionStr):
         try:
@@ -174,18 +178,18 @@ class TextTest(Responder, plugins.Observable):
     def addApplication(self, appName, dircache, version, allVersions):
         app = self.createApplication(appName, dircache, version)
         if not app:
-            return
+            return None, []
+        extraVersionsDuplicating = []
         for extraVersion in app.getExtraVersions():
             if extraVersion in allVersions:
-                plugins.printWarning("Same version '" + extraVersion + "' implicitly requested more than once, ignoring.")
-                continue
+                extraVersionsDuplicating.append(extraVersion)
             aggVersion = extraVersion
             if len(version) > 0:
                 aggVersion = version + "." + extraVersion
             extraApp = self.createApplication(appName, dircache, aggVersion)
             if extraApp:
                 app.extras.append(extraApp)
-        return app
+        return app, extraVersionsDuplicating
     def createResponders(self, allApps):
         responderClasses = []
         for app in allApps:

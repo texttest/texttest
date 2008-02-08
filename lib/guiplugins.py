@@ -318,10 +318,11 @@ class SelectionAction(InteractiveAction):
             
     def getCmdlineOption(self):
         selTestPaths = []
-        for test in self.currTestSelection:
-            relPath = test.getRelPath()
-            if not relPath in selTestPaths:
-                selTestPaths.append(relPath)
+        for app in self.currAppSelection:
+            selTestPaths.append("appdata=" + app.name + app.versionSuffix())
+            for test in self.currTestSelection:
+                if test.app is app:
+                    selTestPaths.append(test.getRelPath())
         return "-tp " + "\n".join(selTestPaths)
     
 class Quit(InteractiveAction):
@@ -1468,11 +1469,8 @@ class RunningAction(SelectionAction):
     def getTmpFilterDir(self, app):
         return os.path.join(app.writeDirectory, "temporary_filter_files")
     def getCmdlineOptionForApps(self):
-        apps = []
-        for test in self.currTestSelection:
-            if not test.app.name in apps:
-                apps.append(test.app.name)
-        return [ "-a", ",".join(apps) ]
+        appDescs = [ app.name + app.versionSuffix() for app in self.currAppSelection ]
+        return [ "-a", ",".join(appDescs) ]
     def checkTestRun(self, identifierString, errFile, testSel):
         if len(self.currTestSelection) >= 1 and self.currTestSelection[0] in testSel:
             self.currTestSelection[0].filesChanged()

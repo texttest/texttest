@@ -5,6 +5,7 @@ from traceback import format_exception
 from threading import currentThread
 from Queue import Queue, Empty
 from copy import copy
+from sets import Set
 
 # We standardise around UNIX paths, it's all much easier that way. They work fine,
 # and they don't run into weird issues in being confused with escape characters
@@ -312,9 +313,11 @@ class Filter:
         return 1
 
 class TextFilter(Filter):
-    def __init__(self, filterText):
-        self.texts = commasplit(filterText)
+    def __init__(self, filterText, *args):
+        self.texts = self.parseInput(filterText, *args)
         self.textTriggers = [ TextTrigger(text) for text in self.texts ]
+    def parseInput(self, filterText, *args):
+        return commasplit(filterText)
     def containsText(self, test):
         return self.stringContainsText(test.name)
     def stringContainsText(self, searchString):
@@ -327,6 +330,47 @@ class TextFilter(Filter):
 
 class TestPathFilter(TextFilter):
     option = "tp"
+    def parseInput(self, filterText, app):
+        allEntries = TextFilter.parseInput(self, filterText, app)
+        if allEntries[0].startswith("appdata="):
+            # chopped up per application
+            return self.parseForApp(allEntries, app)
+        else:
+            # old style, one size fits all
+            return allEntries
+    def parseForApp(self, allEntries, app):
+        active = False
+        myEntries = []
+        toFind = self.getSectionToFind(allEntries, app)
+        for entry in allEntries:
+            if entry == toFind:
+                active = True
+            elif entry.startswith("appdata="):
+                active = False
+            elif active:
+                myEntries.append(entry)
+        return myEntries
+    def getSectionToFind(self, allEntries, app):
+        allHeaders = filter(lambda entry: entry.startswith("appdata=" + app.name), allEntries)
+        myVersionSet = Set(app.versions)
+        bestVersionSet, bestHeader = None, None
+        for header in allHeaders:
+            currVersionSet = Set(header.split(".")[1:])
+            if bestVersionSet is None or self.isBetterMatch(currVersionSet, bestVersionSet, myVersionSet):
+                bestHeader = header
+                bestVersionSet = currVersionSet
+        return bestHeader
+    
+    def isBetterMatch(self, curr, best, mine):
+        # We want the most in common with mine, and the least not in common
+        currCommon = curr.intersection(mine)
+        bestCommon = best.intersection(mine)
+        if len(currCommon) > len(bestCommon):
+            return True
+        currDiff = curr.difference(mine)
+        bestDiff = best.difference(mine)
+        return len(currDiff) < len(bestDiff)
+
     def acceptsTestCase(self, test):
         return test.getRelPath() in self.texts
     def acceptsTestSuite(self, suite):

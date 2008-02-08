@@ -119,6 +119,8 @@ class QueueSystemConfig(default.Config):
         return not self.slaveRun()
     def keepTemporaryDirectories(self):
         return default.Config.keepTemporaryDirectories(self) or (self.slaveRun() and self.optionMap.has_key("keepslave"))
+    def cleanPreviousTempDirs(self):
+        return not self.slaveRun() and default.Config.cleanPreviousTempDirs(self)
     def cleanSlaveFiles(self, test):
         if test.state.hasSucceeded():
             writeDir = test.getDirectory(temporary=1)

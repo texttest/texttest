@@ -1464,24 +1464,22 @@ class Application:
         fullList += fromRemaining
         return fullList
     def makeWriteDirectory(self, subdir=None):
-        if not os.path.isdir(self.writeDirectory):
+        if self.configObject.cleanPreviousTempDirs():
             root, tmpId = os.path.split(self.writeDirectory)
-            self.tryCleanPreviousWriteDirs(root)
+            if os.path.isdir(root):
+                self.cleanPreviousWriteDirs(root)
         dirToMake = self.writeDirectory
         if subdir:
             dirToMake = os.path.join(self.writeDirectory, subdir)
         plugins.ensureDirectoryExists(dirToMake)
         self.diag.info("Made root directory at " + dirToMake)
-    def tryCleanPreviousWriteDirs(self, rootDir):
-        # If we keep our own temporary directories, wipe previously existing other ones
-        if not self.configObject.keepTemporaryDirectories() or not os.path.isdir(rootDir):
-            return
+    def cleanPreviousWriteDirs(self, rootDir):
         searchParts = os.path.basename(self.writeDirectory).split(".")[:-1]
         for file in os.listdir(rootDir):
             fileParts = file.split(".")
             if fileParts[:-1] == searchParts:
                 previousWriteDir = os.path.join(rootDir, file)
-                if os.path.isdir(previousWriteDir):
+                if os.path.isdir(previousWriteDir) and not plugins.samefile(previousWriteDir, self.writeDirectory):
                     print "Removing previous write directory", previousWriteDir
                     plugins.rmtree(previousWriteDir, attempts=3)
     def getActionSequence(self):

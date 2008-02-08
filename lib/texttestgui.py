@@ -836,7 +836,7 @@ class ShortcutBarGUI(SubGUI):
 class TestColumnGUI(SubGUI):
     def __init__(self, dynamic, testCount):
         SubGUI.__init__(self)
-        self.givenTestCount = testCount
+        self.addedCount = 0
         self.totalNofTests = testCount
         self.totalNofDistinctTests = testCount
         self.nofSelectedTests = 0
@@ -928,11 +928,16 @@ class TestColumnGUI(SubGUI):
     def describe(self):
         guilog.info("Test column header set to '" + self.column.get_title() + "'")
     def notifyTestTreeCounters(self, totalDelta, totalShownDelta, totalRowsDelta, initial=False):
-        if not initial or self.givenTestCount == 0:
+        self.addedCount += totalDelta
+        if not initial or self.totalNofTests < self.addedCount:
             self.totalNofTests += totalDelta
             self.totalNofDistinctTests += totalRowsDelta
         self.totalNofTestsShown += totalShownDelta
         self.updateTitle(initial)
+    def notifyAllRead(self):
+        if self.addedCount != self.totalNofTests:
+            self.totalNofTests = self.addedCount
+            self.updateTitle()
       
     def notifyNewTestSelection(self, tests, apps, distinctTestCount, direct=False):
         testcases = filter(lambda test: test.classId() == "test-case", tests)
@@ -1027,6 +1032,7 @@ class TestTreeGUI(ContainerGUI):
                 self.treeView.expand_all()
         self.treeView.connect('row-expanded', self.describeTree) # later expansions should cause description...
         self.contentsChanged()
+        self.notify("AllRead")
     def makeRowVisible(self, model, path, iter):
         self.model.set_value(iter, 5, True)
     def addSuiteWithParent(self, suite, parent, follower=None):    
@@ -2519,6 +2525,10 @@ class ProgressBarGUI(SubGUI):
                 self.totalNofTests += 1
                 self.resetBar()
     def notifyAllRead(self, *args):
+        # The initial number was told be the static GUI, treat it as a guess
+        # Can be wrong in case versions are defined by testsuite files.
+        self.totalNofTests = self.addedCount
+        self.resetBar()
         self.contentsChanged()
 
     def notifyLifecycleChange(self, test, state, changeDesc):
@@ -2570,7 +2580,7 @@ class TestProgressMonitor(SubGUI):
         self.dynamic = dynamic
         self.testCount = testCount
         if testCount > 0:
-            self.addNewIter("Not started", self.treeModel.get_iter_root(), "not_started", testCount)
+            self.addNewIter("Not started", None, "not_started", testCount)
     def getGroupTabTitle(self):
         return "Status"
     def shouldShow(self):
@@ -2610,6 +2620,12 @@ class TestProgressMonitor(SubGUI):
             self.insertTest(test, test.state, incrementCount)
             if incrementCount:
                 self.contentsChanged()
+    def notifyAllRead(self, *args):
+        # Fix the not started count in case the initial guess was wrong
+        if self.testCount > 0:
+            self.diag.info("Reading complete, updating not-started count to actual answer")
+            iter = self.treeModel.get_iter_root()
+            self.treeModel.set_value(iter, 1, len(self.treeModel.get_value(iter, 5)))
     def selectionChanged(self, selection):
         # For each selected row, select the corresponding rows in the test treeview
         tests = []

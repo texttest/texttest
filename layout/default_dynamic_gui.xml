@@ -8,10 +8,14 @@
         <separator/>
       </placeholder>
     </menu>
+
     <menu action="actionsmenu">
       <menuitem action="Kill"/>
       <menuitem action="Mark"/>
       <menuitem action="Unmark"/>
+      <separator/>
+      <menuitem action="Recompute Status"/>
+      <separator/>
     </menu>
   </menubar>
 
@@ -25,6 +29,9 @@
   <popup name="TestPopupMenu">
     <menuitem action="Mark"/>
     <menuitem action="Unmark"/>
+    <separator/>
+    <menuitem action="Recompute Status"/>
+    <separator/>
   </popup>
 
   <popup name="TestFilePopupMenu">

@@ -1867,6 +1867,36 @@ class RecomputeTest(InteractiveTestAction):
         test.app.recomputeProgress(test, self.observers)
         self.notify("Status", "Done recomputing status of " + repr(test) + ".")
 
+class RecomputeAllTests(SelectionAction):
+    def __init__(self, allApps, *args):
+        SelectionAction.__init__(self, allApps, *args)
+        self.latestNumberOfRecomputations = 0
+    def isActiveOnCurrent(self, test=None, state=None):
+        for test in self.currTestSelection:
+            if test.needsRecalculation():
+                return True
+        return False
+    def _getTitle(self):
+        return "Recompute Status"
+    def messageAfterPerform(self):
+        if self.latestNumberOfRecomputations == 0:            
+            return "No test needed recomputation."
+        elif self.latestNumberOfRecomputations == 1:
+            return "Recomputed status of 1 test."
+        else:
+            return "Recomputed status of " + str(self.latestNumberOfRecomputations) + " tests."
+    def _getScriptTitle(self):
+        return "recompute status of all tests"
+    def performOnCurrent(self):
+        self.latestNumberOfRecomputations = 0
+        for test in self.currTestSelection:
+            if test.needsRecalculation():
+                self.latestNumberOfRecomputations += 1
+                self.notify("Status", "Recomputing status of " + repr(test) + " ...")
+                self.notify("ActionProgress", "")                
+                test.app.recomputeProgress(test, self.observers)
+ 
+
 class SortTestSuiteFileAscending(InteractiveTestAction):
     def __init__(self, *args):
         InteractiveTestAction.__init__(self, *args)
@@ -1941,7 +1971,6 @@ class RepositionTest(InteractiveTestAction):
             self.notify("RefreshTestSelection")
         else:
             raise plugins.TextTestError, "\nThe test\n'" + self.currentTest.name + "'\nis not present in the default version\nand hence cannot be reordered.\n"
-
     
 class RepositionTestDown(RepositionTest):
     def getStockId(self):
@@ -2007,7 +2036,6 @@ class RepositionTestLast(RepositionTest):
             return False
         currLastTest = self.currentTest.parent.testcases[len(self.currentTest.parent.testcases) - 1]
         return currLastTest != self.currentTest
-
     
 class RenameTest(InteractiveTestAction):
     def __init__(self, *args):
@@ -2148,9 +2176,12 @@ class MigrationNotes(InteractiveAction):
 class InteractiveActionHandler:
     def __init__(self):
         self.actionPreClasses = [ Quit, ViewInEditor, ShowFileProperties ]
-        self.actionDynamicClasses = [ ViewFilteredInEditor, ViewFileDifferences, ViewFilteredFileDifferences, FollowFile, \
-                                      SaveTests, SaveSelection, RecomputeTest, KillTests, MarkTest, UnmarkTest ]
-        self.actionStaticClasses = [ RecordTest, CopyTests, CutTests, PasteTests, ImportTestCase, ImportTestSuite, \
+        self.actionDynamicClasses = [ ViewFilteredInEditor, ViewFileDifferences, \
+                                      ViewFilteredFileDifferences, FollowFile, \
+                                      SaveTests, SaveSelection, RecomputeTest, \
+                                      RecomputeAllTests, KillTests, MarkTest, UnmarkTest ]
+        self.actionStaticClasses = [ RecordTest, CopyTests, CutTests, \
+                                     PasteTests, ImportTestCase, ImportTestSuite, \
                                      CreateDefinitionFile, ReportBugs, SelectTests, \
                                      RunTests, ResetGroups, RenameTest, RemoveTests, \
                                      SortTestSuiteFileAscending, SortTestSuiteFileDescending, \

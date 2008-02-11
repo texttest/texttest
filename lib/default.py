@@ -330,13 +330,20 @@ class Config:
         return filters
 
     def updateConfigOptions(self, optionGroup):
-        self.filterFileMap = {} # wipe the cache, it's irrelevant now
         for key, option in optionGroup.options.items():
-            if len(option.getValue()):
-                self.optionMap[key] = option.getValue()
-            elif self.optionMap.has_key(key):
-                del self.optionMap[key]
-    
+            if self.updateOption(key, option) and key == "f":
+                # We updated the file filter selection, ignore the cache from now on
+                self.filterFileMap = {} 
+    def updateOption(self, key, option):
+        if len(option.getValue()):
+            self.optionMap[key] = option.getValue()
+            return True
+        elif self.optionMap.has_key(key):
+            del self.optionMap[key]
+            return True
+        else:
+            return False
+        
     def getFiltersFromFile(self, app, filename):        
         if not os.path.isfile(filename):
             raise plugins.TextTestError, "\nCould not find filter file at '" + filename + "'"

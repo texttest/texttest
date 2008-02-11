@@ -3,6 +3,7 @@
 import os, performance, plugins, respond, sys, string, time, types, shutil, testoverview
 from ndict import seqdict
 from cPickle import Pickler
+from sets import Set
 
 class BatchVersionFilter:
     def __init__(self, batchSession):
@@ -511,9 +512,10 @@ class GenerateHistoricalReport(plugins.Action):
         subdirs = []
         dirlist = os.listdir(repository)
         dirlist.sort()
+        appVersions = Set(app.versions)
         for dir in dirlist:
             dirVersions = dir.split(".")
-            if self.isSubset(app.versions, dirVersions):
+            if Set(dirVersions).issuperset(appVersions):
                 # Check all tails that this is not an extraVersion
                 inExtraVersions = False;
                 for pos in xrange(len(dirVersions)):
@@ -529,12 +531,7 @@ class GenerateHistoricalReport(plugins.Action):
             if not version in app.versions:
                 extraVersions.append(version)
         return extraVersions
-    def isSubset(self, appVersions, dirVersions):
-        for version in appVersions:
-            if not version in dirVersions:
-                return False
-        return True
-
+    
 class CollectFiles(plugins.ScriptWithArgs):
     scriptDoc = "Collect and send all batch reports that have been written to intermediate files"
     def __init__(self, args=[""]):

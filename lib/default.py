@@ -315,8 +315,12 @@ class Config:
             return self.filterFileMap[app]
         elif self.optionMap.has_key("f"):
             return self.optionMap["f"]
-        elif self.batchMode():
-            return app.getCompositeConfigValue("batch_filter_file", self.optionMap["b"])
+        else:
+            fromConfig = app.getConfigValue("default_filter_file")
+            if fromConfig:
+                return fromConfig
+            elif self.batchMode():
+                return app.getCompositeConfigValue("batch_filter_file", self.optionMap["b"])
 
     def getFilterList(self, app):
         filters = self.getFiltersFromMap(self.optionMap, app)
@@ -708,6 +712,7 @@ class Config:
     def setMiscDefaults(self, app):
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
         app.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")
+        app.setConfigDefault("default_filter_file", "", "Filter file to use by default, generally only useful for versions")
         app.setConfigDefault("trace_level_variable", "", "Environment variable that sets a simple trace-log level")
         app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
         app.setConfigDefault("test_data_properties", { "default" : "" }, "Write the contents of test_data_environment to the given Java properties file")

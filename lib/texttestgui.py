@@ -963,17 +963,28 @@ class TestIteratorMap:
         for app in allApps:
             for extra in [ app ] + app.extras:
                 self.parentApps[extra] = app
-    def getKey(self, test, relPath=None):
+    def getKey(self, test):
         if self.dynamic:
             return test
         elif test is not None:
-            if relPath is None:
-                relPath = test.getRelPath()
-            return self.parentApps.get(test.app), relPath
+            return self.parentApps.get(test.app), test.getRelPath()
     def store(self, test, iter):
         self.dict[self.getKey(test)] = iter
-    def getIterator(self, test, relPath=None):
-        return self.dict.get(self.getKey(test, relPath))
+    def updateIterator(self, test, oldRelPath):
+        if self.dynamic:
+            return self.getIterator(test)
+        # relative path of test has changed
+        key = self.parentApps.get(test.app), oldRelPath
+        iter = self.dict.get(key)
+        if iter is not None:
+            self.store(test, iter)
+            del self.dict[key]
+            return iter
+        else:
+            return self.getIterator(test)
+    
+    def getIterator(self, test):
+        return self.dict.get(self.getKey(test))
     def remove(self, test):
         key = self.getKey(test)
         if self.dict.has_key(key):
@@ -1347,7 +1358,7 @@ class TestTreeGUI(ContainerGUI):
         self.model.remove(iter)
         self.itermap.remove(test)
     def notifyNameChange(self, test, origRelPath):
-        iter = self.itermap.getIterator(test, origRelPath)
+        iter = self.itermap.updateIterator(test, origRelPath)
         self.model.set_value(iter, 0, test.name)
         filteredIter = self.filteredModel.convert_child_iter_to_iter(iter)
         self.describeTree()

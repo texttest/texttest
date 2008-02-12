@@ -2044,6 +2044,11 @@ class RenameTest(InteractiveTestAction):
         self.oldName = ""
         self.newDescription = ""
         self.oldDescription = ""
+        self.allSelected = []
+    def updateSelection(self, tests, rowCount):
+        self.allSelected = tests
+        InteractiveTestAction.updateSelection(self, tests, rowCount)
+    
     def getDialogType(self):
         if self.currentTest:
             self.newName = self.currentTest.name
@@ -2089,7 +2094,8 @@ class RenameTest(InteractiveTestAction):
     def performOnCurrent(self):
         try:
             if self.newName != self.oldName or self.newDescription != self.oldDescription:
-                self.currentTest.rename(self.newName, self.newDescription)
+                for test in self.allSelected:
+                    test.rename(self.newName, self.newDescription)
         except IOError, e:
             self.notify("Error", "Failed to rename test:\n" + str(e))
         except OSError, e:

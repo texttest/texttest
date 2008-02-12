@@ -892,7 +892,6 @@ class PasteTests(InteractiveTestAction):
                 # Cut + paste to the same suite is basically a reposition, do it as one action
                 test.parent.repositionTest(test, self.getRepositionPlacement(test, realPlacement))
                 newTests.append(test)
-                self.notify("SetTestSelection", [ test ])
             else:
                 newDesc = self.getNewDescription(test)
                 testDir = suite.writeNewTest(newName, newDesc, realPlacement)
@@ -901,9 +900,12 @@ class PasteTests(InteractiveTestAction):
                     suiteDeltas[suite] += 1
                 else:
                     suiteDeltas[suite] = 1
+                newTests.append(testImported)
                 if self.removeAfter:
-                    newTests.append(testImported)
                     test.remove()
+
+        guilog.info("Selecting new tests : " + repr(newTests))
+        self.notify("SetTestSelection", newTests)
         if self.removeAfter:
             # After a paste from cut, subsequent pastes should behave like copies of the new tests
             self.clipboardTests = newTests
@@ -1004,6 +1006,8 @@ class ImportTest(InteractiveTestAction):
         testDir = suite.writeNewTest(testName, description, placement)
         self.testImported = self.createTestContents(suite, testDir, description, placement)
         suite.contentChanged()
+        guilog.info("Selecting new test " + self.testImported.name)
+        self.notify("SetTestSelection", [ self.testImported ])       
     def getDestinationSuite(self):
         return self.currentTest
     def getPlacement(self):

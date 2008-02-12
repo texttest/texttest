@@ -1316,8 +1316,6 @@ class TestTreeGUI(ContainerGUI):
 
         self.tryAddTest(test, initial)
         if not initial:
-            guilog.info("Selecting new test " + test.name)
-            self.notifySetTestSelection([ test ])
             self.describeTree()
     def getTotalRowsDelta(self, test):
         if self.itermap.getIterator(test):

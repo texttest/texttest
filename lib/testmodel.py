@@ -481,20 +481,8 @@ class Test(plugins.Observable):
         # changed only the comment ...) (we don't want to rename dir, that can confuse CVS ...)
         if self.name != newName:
             newDir = self.parent.makeSubDirectory(newName)
-            stdFiles, defFiles = self.listStandardFiles(allVersions=True)
-            for sourceFile in stdFiles + defFiles:
-                dirname, local = os.path.split(sourceFile)
-                if dirname == self.getDirectory():
-                    targetFile = os.path.join(newDir, local)
-                    shutil.copy2(sourceFile, targetFile)
-            dataFiles = self.listDataFiles()
-            for sourcePath in dataFiles:
-                if os.path.isdir(sourcePath):
-                    continue
-                targetPath = sourcePath.replace(self.getDirectory(), newDir)
-                plugins.ensureDirExistsForFile(targetPath)
-                shutil.copy2(sourcePath, targetPath)
-            self.removeFiles()
+            if os.path.isdir(self.getDirectory()):
+                self.moveFilesForRename(newDir)
             self.name = newName
             origRelPath = self.getRelPath()
             self.dircache = DirectoryCache(newDir)
@@ -504,7 +492,21 @@ class Test(plugins.Observable):
         if self.description != newDescription:
             self.description = newDescription
             self.refreshDescription()
-        
+    def moveFilesForRename(self, newDir):
+        stdFiles, defFiles = self.listStandardFiles(allVersions=True)
+        for sourceFile in stdFiles + defFiles:
+            dirname, local = os.path.split(sourceFile)
+            if dirname == self.getDirectory():
+                targetFile = os.path.join(newDir, local)
+                shutil.copy2(sourceFile, targetFile)
+        dataFiles = self.listDataFiles()
+        for sourcePath in dataFiles:
+            if os.path.isdir(sourcePath):
+                continue
+            targetPath = sourcePath.replace(self.getDirectory(), newDir)
+            plugins.ensureDirExistsForFile(targetPath)
+            shutil.copy2(sourcePath, targetPath)
+        self.removeFiles()
     def getRunEnvironment(self, onlyVars = []):
         return self.environment.getValues(onlyVars)
     def createPropertiesFiles(self):

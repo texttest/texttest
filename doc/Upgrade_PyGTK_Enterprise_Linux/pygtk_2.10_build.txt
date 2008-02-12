@@ -9,7 +9,9 @@ Run
 
 > tar zxvf tiff-v3.6.1.tar.gz
 > cd tiff-v3.6.1
-> ./configure --prefix=$INSTALLATION_DIR # change man page dir to $INSTALLATION_DIR/man/
+> ./configure --prefix=$INSTALLATION_DIR 
+# It will ask you to check the installation dirs. The man page is invariably
+# central. Answer "no" and change it to $INSTALLATION_DIR/man/
 > make
 > make install
 > cd $SOURCE_DIR
@@ -93,6 +95,7 @@ Run
 
 pygobject-2.13.2
 ----------------
+# (This will fail if you haven't got python-devel installed, see the note in overview.txt)
 
 Run
 
@@ -222,23 +225,3 @@ Run
 > make install
 > cd $SOURCE_DIR
 
-clearlooks-0.6.2
-----------------
-
-Run
-
-> tar jxvf clearlooks-0.6.2.tar.bz2 
-> cd clearlooks-0.6.2
-> ./configure --prefix=$INSTALLATION_DIR
-> make
-> make install
-> cd $SOURCE_DIR
-
-Clearlooks-Big_Pack-0.6.x (various Clearlooks themes)
------------------------------------------------------
-
-Run
-
-> cd $INSTALLATION_DIR/share/themes/
-> tar zxvf Clearlooks-Big_Pack-0.6.x.tar.gz
-> cd $SOURCE_DIR

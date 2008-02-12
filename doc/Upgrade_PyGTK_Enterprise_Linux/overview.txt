@@ -3,11 +3,11 @@
 INTRODUCTION
 ***************************************
 
-Several TextTest users are known to be using Red Hat Enterprise Linux, which comes packaged with Python
-and PyGTK. This has been very convenient in the past, but in recent times TextTest's required versions
-have overtaken the ones bundled with RHEL. Users of RHEL3 can thus not use anything beyond TextTest 3.7
-without extra work, and those with RHEL4 cannot go beyond TextTest 3.8. To move forward you need to upgrade
-Python and/or PyGTK.
+Several TextTest users are known to be using Red Hat Enterprise Linux and SuSE Linux Enterprise, which come
+packaged with Python and PyGTK. This has been very convenient in the past, but in recent times TextTest's required versions
+have overtaken the ones bundled with RHEL (and SuSE). Users of RHEL3 can thus not use anything beyond TextTest 3.7
+without extra work, and those with RHEL4 cannot go beyond TextTest 3.8. Users of SuSE 10 are stuck with TextTest 3.9.1.
+To move forward you need to upgrade Python and/or PyGTK.
 
 Naturally you can simply do this by upgrading in-place the versions that come with the system. This is easy
 to do and doesn't need a guide, but in practice system administrators tend not to like doing this sort of 
@@ -15,8 +15,8 @@ thing as it's difficult to be totally sure it won't screw up something else in t
 generally necessary to create Python and PyGTK versions in non-default positions. This process has been 
 shown to be a bit fiddly, especially for PyGTK, hence this guide.
 
-This guide is based on what we did to create such a separate installation of Python 2.4.3 and PyGTK 2.6.3
-on our RHEL4 system. Naturally we cannot guarantee that all dependencies are satisfied if you attempt this 
+This guide is based on what we did to create such a separate installation of Python 2.4.3 and PyGTK 2.10.6 on our 
+RHEL4 system. Naturally we cannot guarantee that all dependencies are satisfied if you attempt this 
 process somewhere else, on some other architechture, or if you choose to use other (newer) versions of the 
 libs than we have used. But we hope it is a useful start for those who haven't done this sort of thing before.
 
@@ -32,18 +32,23 @@ BUILD INSTRUCTIONS
 
 Let INSTALLATION_DIR be the directory where the installation should end up. Let SOURCE_DIR be the root directory of the build, where we'll untar the packages. Download the following packages from the Python and/or PyGTK sites:
 
--rw-rw-r--   1 mattias carm   518003 May 23 16:17 atk-1.9.0.tar.bz2
--rw-rw-r--   1 mattias carm  2380899 May 23 16:17 glib-2.6.6.tar.bz2
--rw-rw-r--   1 mattias carm 11711408 May 23 16:17 gtk+-2.6.9.tar.bz2
--rw-rw-r--   1 mattias carm   613261 May 23 16:17 jpegsrc.v6b.tar.gz
--rw-rw-r--   1 mattias carm   289499 May 23 16:17 libart_lgpl-2.3.17.tar.bz2
--rw-rw-r--   1 mattias carm   543791 May 23 16:18 libgsf-1.14.3.tar.bz2
--rw-rw-r--   1 mattias carm   384970 May 23 16:17 libpng-1.2.8.tar.bz2
--rw-rw-r--   1 mattias carm   396901 May 23 17:05 librsvg-2.12.7.tar.bz2
--rw-rw-r--   1 mattias carm  1021372 May 23 16:18 pango-1.8.2.tar.bz2
--rw-rw-r--   1 mattias carm   731516 May 23 16:18 pygtk-2.6.3.tar.bz2
--rw-rw-r--   1 mattias carm  8005915 May 23 16:18 Python-2.4.3.tar.bz2
--rw-rw-r--   1 mattias carm  1072165 May 23 16:18 tiff-v3.6.1.tar.gz
+tiff-v3.6.1.tar.gz
+jpegsrc.v6b.tar.gz
+libpng-1.2.8.tar.bz2
+libart_lgpl-2.3.17.tar.bz2
+glib-2.12.13.tar.gz
+atk-1.9.1.tar.bz2
+pygobject-2.13.2.tar.gz
+pkg-config-0.20.tar.gz
+libgsf-1.14.3.tar.bz2
+freetype-2.2.1.tar.bz2
+fontconfig-2.4.2.tar.gz
+cairo-1.2.6.tar.gz
+pango-1.16.4.tar.gz
+gtk+-2.10.14.tar.gz
+pycairo-1.2.6.tar.gz
+librsvg-2.16.1.tar.gz
+pygtk-2.10.6.tar.gz
 
 Python-2.4.3
 ------------
@@ -62,9 +67,13 @@ default while building PyGTK, so you need to do something like
 
 setenv PATH $INSTALLATION_DIR/bin/:${PATH}
 
-PyGTK.2.6.3
------------
-Build all the PyGTK libraries required as described in pygtk_2.6_build.txt
+PyGTK.2.10.6
+------------
+Note - the python installation mentioned above needs to have the python-devel package
+installed for things to work. Check this by "rpm -qa | grep python-devel". If it doesn't,
+either build as above or get someone to install this RPM.
+
+Build all the PyGTK libraries required as described in pygtk_2.10_build.txt
 
 ***************************************
 RUN INSTRUCTIONS

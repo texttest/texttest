@@ -318,7 +318,7 @@ class SelectionAction(InteractiveAction):
             
     def getCmdlineOption(self):
         selTestPaths = []
-        for app in self.currAppSelection:
+        for app in self.validApps:
             selTestPaths.append("appdata=" + app.name + app.versionSuffix())
             for test in self.currTestSelection:
                 if test.app is app:

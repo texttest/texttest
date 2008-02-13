@@ -76,6 +76,8 @@ Run
 
 # Now, to make sure the build system finds our newly installed glib (and other packages, as we continue), set
 # We include /usr/lib/pkgconfig in the config path since on our system libxml-2.0 is installed in /usr/lib.
+# On 64-bit systems this may well need to be /usr/lib64/pkgconfig instead. Check for the existence of
+# /usr/lib64/pkgconfig/libxml-2.0.pc and /usr/lib/pkgconfig/libxml-2.0.pc if unsure.
 
 > setenv PKG_CONFIG_PATH ${INSTALLATION_DIR}/lib/pkgconfig/:/usr/lib/pkgconfig
 > setenv LD_LIBRARY_PATH $INSTALLATION_DIR/lib/:${LD_LIBRARY_PATH}
@@ -159,7 +161,7 @@ cairo-1.2.6
 
 Run
 
-> tar zxvf 
+> tar zxvf cairo-1.2.6.tar.gz
 > cd cairo-1.2.6
 > ./configure --prefix=$INSTALLATION_DIR
 > make
@@ -171,7 +173,7 @@ pango-1.16.4
 
 Run
 
-> tar jxvf pango-1.16.4.tar.bz2
+> tar zxvf pango-1.16.4.tar.gz
 > cd pango-1.16.4
 > ./configure --prefix=$INSTALLATION_DIR
 > make
@@ -180,6 +182,7 @@ Run
 
 gtk+-2.10.14
 ------------
+# (This may fail if you haven't got cups-devel installed, see the note in overview.txt)
 
 Run
 

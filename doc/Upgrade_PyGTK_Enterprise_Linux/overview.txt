@@ -70,8 +70,11 @@ setenv PATH $INSTALLATION_DIR/bin/:${PATH}
 PyGTK.2.10.6
 ------------
 Note - the python installation mentioned above needs to have the python-devel package
-installed for things to work. Check this by "rpm -qa | grep python-devel". If it doesn't,
-either build as above or get someone to install this RPM.
+installed for things to work. Check this by "rpm -q python-devel". If it doesn't,
+either build as above or get someone to install this RPM. 
+
+When I built on SuSE 10.1 it also required the "cups-devel" package. RHEL4 didn't
+however need this.
 
 Build all the PyGTK libraries required as described in pygtk_2.10_build.txt
 

@@ -63,10 +63,13 @@ class Config:
                     group.addSwitch("record", "Private: Record usecase rather than replay what is present")
     def getActionSequence(self):
         if self.optionMap.has_key("coll"):
-            batchSession = self.optionValue("b")
-            emailHandler = batch.CollectFiles([ "batch=" + batchSession ])
-            webHandler = batch.GenerateHistoricalReport([ batchSession ])
-            return [ emailHandler, webHandler ]
+            arg = self.optionMap.get("coll")
+            if arg == "web":
+                return []
+            else:
+                batchSession = self.optionValue("b")
+                emailHandler = batch.CollectFiles([ "batch=" + batchSession ])
+                return [ emailHandler ]
         if self.isReconnecting():
             return self.getReconnectSequence()
 
@@ -138,11 +141,15 @@ class Config:
         if not self.optionMap.has_key("gx"):
             classes += self.getThreadActionClasses()
 
-        if self.batchMode() and not self.optionMap.has_key("coll"):
-            if self.optionValue("b") is None:
-                print "No batch session identifier provided, using 'default'"
-                self.optionMap["b"] = "default"
-            classes.append(batch.BatchResponder)
+        if self.batchMode():
+            if self.optionMap.has_key("coll"):
+                if self.optionMap["coll"] != "mail": 
+                    classes.append(batch.WebPageResponder)
+            else:
+                if self.optionValue("b") is None:
+                    print "No batch session identifier provided, using 'default'"
+                    self.optionMap["b"] = "default"
+                classes.append(batch.BatchResponder)
         if self.useVirtualDisplay():
             from unixonly import VirtualDisplayResponder
             classes.append(VirtualDisplayResponder)

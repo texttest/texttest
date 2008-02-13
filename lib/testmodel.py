@@ -449,10 +449,13 @@ class Test(plugins.Observable):
         return self.app.getCompositeConfigValue(key, subKey, expandVars, self.getEnvironment)
     def actionsCompleted(self):
         self.diagnose("All actions completed")
-        if self.state.isComplete() and not self.state.lifecycleChange:
-            self.diagnose("Completion notified")
-            self.state.lifecycleChange = "complete"
-            self.changeState(self.state)
+        if self.state.isComplete():
+            if not self.state.lifecycleChange:
+                self.diagnose("Completion notified")
+                self.state.lifecycleChange = "complete"
+                self.changeState(self.state)
+        else:
+            self.notify("Complete")
     def getRelPath(self):
         return plugins.relpath(self.getDirectory(), self.app.getDirectory())
     def getDirectory(self, temporary=False, forFramework=False):

@@ -963,8 +963,6 @@ class DescribePlotTest(plugins.Action):
         return "Plotting"
     def __call__(self, test):
         self.describe(test)
-        # Trigger a completion notification (rabid abuse of Action/Responder paradigm)
-        test.changeState(plugins.TestState("plotted", completed=1))
     def setUpSuite(self, suite):
         self.describe(suite)
 

@@ -465,33 +465,30 @@ class ArchiveRepository(plugins.ScriptWithArgs):
             return False
         return True
 
-class GenerateHistoricalReport(plugins.Action):
-    scriptDoc = "Generate reports based on the historical repository"
-    appsGenerated = []
-    def __init__(self, args):
-        self.batchSession = args[0]
-    def setUpApplication(self, app):
-        if app in self.appsGenerated:
-            return
-        self.appsGenerated.append(app)
-        self.appsGenerated += app.extras
-        repository = app.getCompositeConfigValue("batch_result_repository", self.batchSession)
-        if not repository:
-            return
-        repository = os.path.join(repository, app.name)
-        if not os.path.isdir(repository):
-            raise plugins.TextTestError, "Batch result repository " + repository + " does not exist"
+class WebPageResponder(respond.Responder):
+    def __init__(self, optionMap, allApps):
+        respond.Responder.__init__(self, optionMap, allApps)
+        self.batchSession = optionMap.get("b", "default")
+        self.allApps = allApps
+    def notifyAllComplete(self):
+        for app in self.allApps:
+            repository = app.getCompositeConfigValue("batch_result_repository", self.batchSession)
+            if not repository:
+                return
+            repository = os.path.join(repository, app.name)
+            if not os.path.isdir(repository):
+                raise plugins.TextTestError, "Batch result repository " + repository + " does not exist"
 
-        extraVersions = self.getExtraVersions(app)
-        relevantSubDirs = self.findRelevantSubdirectories(repository, app, extraVersions)
-        pageTopDir = app.getCompositeConfigValue("historical_report_location", self.batchSession)
-        pageDir = os.path.join(pageTopDir, app.name)
-        plugins.ensureDirectoryExists(pageDir)
-        try:
-            self.generateWebPages(app, pageDir, extraVersions, relevantSubDirs)
-        except:
-            sys.stderr.write("Caught exception while generating web pages :\n")
-            plugins.printException()
+            extraVersions = self.getExtraVersions(app)
+            relevantSubDirs = self.findRelevantSubdirectories(repository, app, extraVersions)
+            pageTopDir = app.getCompositeConfigValue("historical_report_location", self.batchSession)
+            pageDir = os.path.join(pageTopDir, app.name)
+            plugins.ensureDirectoryExists(pageDir)
+            try:
+                self.generateWebPages(app, pageDir, extraVersions, relevantSubDirs)
+            except:
+                sys.stderr.write("Caught exception while generating web pages :\n")
+                plugins.printException()
     def generateWebPages(self, app, pageDir, extraVersions, relevantSubDirs):
         testoverview.colourFinder.setColourDict(app.getConfigValue("testoverview_colours"))
         webPageGeneratorClass = self.getWebPageGeneratorClass(app)

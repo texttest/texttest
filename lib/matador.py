@@ -453,7 +453,8 @@ class CreatePerformanceReport(guiplugins.SelectionAction):
     def __init__(self, *args):
         guiplugins.SelectionAction.__init__(self, *args)
         self.rootDir = ""
-        self.versions = ["11", "12", "13", "master" ]
+        self.versions = ["11", "12", "13", "14", "master" ]
+        self.objectiveText = "Total cost of plan"
     def inToolBar(self): 
         return False
     def getMainMenuPath(self):
@@ -481,7 +482,7 @@ class CreatePerformanceReport(guiplugins.SelectionAction):
     def collectTest(self, test):
         self.apps[test.app.fullName] = test.app.fullName
         pathToTest = os.path.join(self.rootDir,
-                                  os.path.join(test.app.fullName.lower(),
+                                  os.path.join(test.app.fullName.lower().replace(' ', '_'),
                                                os.path.join(test.getRelPath(), "index.html")))
         dir, file = os.path.split(os.path.abspath(pathToTest))
         try:
@@ -511,6 +512,9 @@ class CreatePerformanceReport(guiplugins.SelectionAction):
         file.write("#maintableheader {\n font-weight: bold;\n background-color: " + tableBackgroundColor + ";\n padding: 0pt 5pt 0pt 5pt;\n}\n\n")
         file.write("#maintableheaderlast {\n font-weight: bold;\n background-color: " + tableBackgroundColor + ";\n padding: 0pt 5pt 0pt 5pt;\n border-bottom: thin solid;\n}\n\n")
         file.write("#maintablecell {\n padding: 0pt 5pt 0pt 5pt;\n}\n\n")
+        file.write("#maintablefooterfirst {\n padding: 5pt 0pt 0pt 0pt;\n border-top: thin solid;\n font-weight: bold;\n}\n\n")
+        file.write("#maintablefootercaption {\n padding: 5pt 0pt 0pt 0pt;\n font-weight: bold;\n border-top: thin solid;\n}\n\n")
+        file.write("#maintablefooter {\n padding: 0pt 0pt 0pt 0pt;\n font-weight: bold;\n}\n\n")
         file.write("#graphcaption {\n font-size: 8pt;\n font-weight: bold;\n}\n\n")
         file.write("#performancetableheader {\n font-weight: bold;\n background-color: " + tableBackgroundColor + ";\n}\n\n")
         file.write("#performancetable {\n font-size: 8pt;\n}\n\n")
@@ -544,10 +548,19 @@ class CreatePerformanceReport(guiplugins.SelectionAction):
         file.write("</tr>\n")
         file.write("    <tr><td align=\"left\" valign=\"middle\"><div id=\"maintableheader\">Test case</div></td>")
         for version in self.versions:
-            file.write("<td align=\"right\" valign=\"middle\"><div id=\"maintableheader\">Solution cost</div></td>")
-            file.write("<td align=\"right\" valign=\"middle\"><div id=\"maintableheader\">CPU time</div></td>")
-            file.write("<td align=\"right\" valign=\"middle\"><div id=\"maintableheader\">Time to worst (KPI)</div></td>")
+            file.write("<td align=\"right\" valign=\"middle\" width=\"33%\"><div id=\"maintableheader\">Solution cost</div></td>")
+            file.write("<td align=\"right\" valign=\"middle\" width=\"33%\"><div id=\"maintableheader\">CPU time</div></td>")
+            file.write("<td align=\"right\" valign=\"middle\" width=\"33%\"><div id=\"maintableheader\">Time to worst (KPI)</div></td>")
         file.write("</tr>\n")
+
+        # Init column status count vectors ...
+        bestWorstColumnsCount = ({}, {}, {}, {})
+        for columnIndex in xrange(0, 3 * len(self.versions), 1):
+            bestWorstColumnsCount[0][columnIndex] = 0
+            bestWorstColumnsCount[1][columnIndex] = 0
+            bestWorstColumnsCount[2][columnIndex] = 0
+            bestWorstColumnsCount[3][columnIndex] = 0
+            
         for i in xrange(0, len(self.testPaths), 1):
             self.notify("Status", "Creating report for " + self.testPaths[i][0].getRelPath())
             self.notify("ActionProgress", "")
@@ -570,8 +583,34 @@ class CreatePerformanceReport(guiplugins.SelectionAction):
                         cost = results[len(results) - 1][1]
                         time = results[len(results) - 1][3]
                 row.append([cost, time, kpi[version]])
-            self.outputRow(file, "<td align=\"right\" valign=\"middle\">", "<div id=\"maintablecell\">", row, "</div>", "</td>")
+            bestWorstColumns = self.outputRow(file, "<td align=\"right\" valign=\"middle\">", "<div id=\"maintablecell\">", row, "</div>", "</td>")
+            for bestColumn in bestWorstColumns[0]:
+                bestWorstColumnsCount[0][bestColumn] += 1
+            for middleColumn in bestWorstColumns[1]:
+                bestWorstColumnsCount[1][middleColumn] += 1
+            for worstColumn in bestWorstColumns[2]:
+                bestWorstColumnsCount[2][worstColumn] += 1
+            for noResultColumn in bestWorstColumns[3]:
+                bestWorstColumnsCount[3][noResultColumn] += 1
             file.write("</tr>\n")
+
+        file.write("  <tr>\n<td align=\"left\" valign=\"middle\"><div id=\"maintablefootercaption\"><table border=\"0\" width=\"100%\"><tr><td align=\"left\">Total count</td><td align=\"right\">Better:</td></tr></table></div></td>")
+        for columnIndex in xrange(0, 3 * len(self.versions), 1):
+            file.write("<td align=\"right\" valign=\"top\"><div id=\"maintablefooterfirst\"><div id=\"bestrowentry\">" + str(bestWorstColumnsCount[0][columnIndex]) + "</div></div></td>")
+        file.write("  </tr>")
+        file.write("  <tr>\n<td align=\"left\" valign=\"middle\"><div id=\"maintablefooter\" align=\"right\">Worse:</div></td>")
+        for columnIndex in xrange(0, 3 * len(self.versions), 1):
+            file.write("<td align=\"right\" valign=\"middle\"><div id=\"maintablefooter\"><div id=\"worstrowentry\">" + str(bestWorstColumnsCount[2][columnIndex]) + "</div></div></td>")
+        file.write("  </tr>")
+        file.write("  <tr>\n<td align=\"left\" valign=\"middle\"><div id=\"maintablefooter\" align=\"right\">Neither:</div></td>")
+        for columnIndex in xrange(0, 3 * len(self.versions), 1):
+            file.write("<td align=\"right\" valign=\"middle\"><div id=\"maintablefooter\">" + str(bestWorstColumnsCount[1][columnIndex]) + "</div></td>")
+        file.write("  </tr>")
+        file.write("  <tr>\n<td align=\"left\" valign=\"middle\"><div id=\"maintablefooter\" align=\"right\">No result:</div></td>")
+        for columnIndex in xrange(0, 3 * len(self.versions), 1):
+            file.write("<td align=\"right\" valign=\"middle\"><div id=\"maintablefooter\">" + str(bestWorstColumnsCount[3][columnIndex]) + "</div></td>")
+        file.write("  </tr>")
+            
         file.write("   </table></div>\n")
         file.write("  </div></td></tr></table></center>\n </body>\n</html>\n")
         file.close()
@@ -619,7 +658,7 @@ class CreatePerformanceReport(guiplugins.SelectionAction):
             latestSolution = ""
             results = []
             for line in lines:
-                if line.find("Total cost of plan") != -1:
+                if line.find(self.objectiveText) != -1:
                     latestCost = line[line.rfind(":") + 2:].strip(" \n")
                 elif line.find("Assignment percentage") != -1:
                     latestAssignment = line[line.rfind(":") + 2:].strip(" \n")
@@ -644,7 +683,7 @@ class CreatePerformanceReport(guiplugins.SelectionAction):
 
     def generateGraphs(self, dir, performance, terminal):
         self.generateGraphData(dir, performance)
-        return self.generateGraph(dir, "cost", "Time (minutes)", "Total cost of plan", terminal), \
+        return self.generateGraph(dir, "cost", "Time (minutes)", self.objectiveText, terminal), \
                self.generateGraph(dir, "assignment", "Time (minutes)", "Assignment percentage", terminal), \
                self.generateGraph(dir, "memory", "Time (minutes)", "Memory consumption (Mb)", terminal)
 
@@ -720,9 +759,12 @@ class CreatePerformanceReport(guiplugins.SelectionAction):
             if performance.has_key(version):
                 results = performance[version]
                 if len(results) > 0:
-                    lastSolution = int(results[len(results) - 1][1])
-                    if lastSolution > worstSolution:
-                           worstSolution = lastSolution
+                    try:
+                        lastSolution = int(results[len(results) - 1][1])
+                        if lastSolution > worstSolution:
+                            worstSolution = lastSolution
+                    except:
+                        pass # lastSolution might be empty (''), for example ...
             
         file.write("     <tr><td align=\"right\" valign=\"middle\"><div id=\"performancetableheader\">Time to solution " + str(worstSolution) + ":</div></td>")        
         row = []
@@ -732,9 +774,12 @@ class CreatePerformanceReport(guiplugins.SelectionAction):
             if performance.has_key(version):
                 results = performance[version]
                 for iter in results:
-                    if int(iter[1]) <= worstSolution:
-                        data = iter[3]                        
-                        break
+                    try:
+                        if int(iter[1]) <= worstSolution:
+                            data = iter[3]                        
+                            break
+                    except:
+                        pass # lastSolution might be empty (''), for example ...
             kpi[version] = data
             row.append([data])
         self.outputRow(file, "<td align=\"right\" valign=\"top\">", "", row, "", "</td>")            
@@ -786,8 +831,9 @@ class CreatePerformanceReport(guiplugins.SelectionAction):
 
     # Observe: data is a vector of vectors.
     def outputRow(self, file, prefix, innerPrefix, data, innerSuffix, suffix, markExtremes = True):
+        bestWorstColumns = ([], [], [], [])
         if len(data) == 0:
-            return 
+            return bestWorstColumns
 
         least = data[0][:]
         largest = data[0][:]
@@ -802,14 +848,24 @@ class CreatePerformanceReport(guiplugins.SelectionAction):
                 if least[i] == "-" or comp2 == 1:
                     least[i] = d[i]
 
+        columnIndex = 0
         for d in data:
             for i in xrange(0, len(d), 1):            
                 if markExtremes and d[i] != "-" and d[i] == least[i]: # 'Best'
+                    bestWorstColumns[0].append(columnIndex)
                     file.write(prefix + "<div id=\"bestrowentry\">" + innerPrefix + d[i] + innerSuffix + "</div>" + suffix)
                 elif markExtremes and d[i] != "-" and d[i] == largest[i]: # 'Worst'
+                    bestWorstColumns[2].append(columnIndex)
                     file.write(prefix + "<div id=\"worstrowentry\">" + innerPrefix + d[i] + innerSuffix + "</div>" + suffix)
                 else:
-                    file.write(prefix + innerPrefix + d[i] + innerSuffix + suffix)                
+                    if d[i] == "-":
+                        bestWorstColumns[3].append(columnIndex)
+                    else:
+                        bestWorstColumns[1].append(columnIndex)
+                    file.write(prefix + innerPrefix + d[i] + innerSuffix + suffix)
+                columnIndex += 1
+               
+        return bestWorstColumns
 
     # -1 means v1 < v2, 0 v1 == v2, 1 v1 > v2
     def compareValues(self, v1, v2):

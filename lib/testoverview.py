@@ -40,8 +40,8 @@ def getDisplayText(tag):
         return tag
 
 class GenerateWebPages:
-    def __init__(self, pageAppName, pageVersion, pageDir, extraVersions):
-        self.pageAppName = pageAppName
+    def __init__(self, pageTitle, pageVersion, pageDir, extraVersions):
+        self.pageTitle = pageTitle
         self.pageVersion = pageVersion
         self.extraVersions = extraVersions
         self.pageDir = pageDir
@@ -53,12 +53,12 @@ class GenerateWebPages:
         return TestTable()
     def getSelectorClasses(self):
         return [ SelectorLast6Days, SelectorAll ]
-    def generate(self, repositoryDirs):            
+    def generate(self, repositoryDirs, dirTitles):            
         foundMinorVersions = HTMLgen.Container()
         details = TestDetails()
         usedSelectors = seqdict()
-        for repositoryDir in repositoryDirs:
-            version = os.path.basename(repositoryDir)
+        for index, repositoryDir in enumerate(repositoryDirs):
+            version = dirTitles[index]
             self.diag.info("Generating " + version)
             loggedTests = seqdict()
             tagsFound = []
@@ -84,9 +84,8 @@ class GenerateWebPages:
             selContainer.append(HTMLgen.Href(self.getOverviewPageName(usedSel), selKey))
         for page in self.pagesOverview.values():
             page.prepend(HTMLgen.Heading(2, selContainer, align = 'center'))
-            page.prepend(HTMLgen.Heading(1, HTMLgen.Container(HTMLgen.Text("Versions " + self.pageVersion + "-"),
-                                                                      foundMinorVersions), align = 'center'))
-            page.prepend(HTMLgen.Heading(1, "Test results for ", self.pageAppName, align = 'center'))
+            page.prepend(HTMLgen.Heading(1, foundMinorVersions, align = 'center'))
+            page.prepend(HTMLgen.Heading(1, "Test results for ", self.pageTitle, align = 'center'))
 
         self.writePages()
     def processTestStateFiles(self, categoryHandler, loggedTests, tagsFound, repositoryDir):
@@ -151,7 +150,7 @@ class GenerateWebPages:
         return plugins.Unrunnable(freeText, "read error")
     def addOverviewPages(self, item, version, table):
         if not self.pagesOverview.has_key(item):
-            pageOverviewTitle = "Test results for " + self.pageAppName + " - version " + self.pageVersion
+            pageOverviewTitle = "Test results for " + self.pageTitle
             self.pagesOverview[item] = HTMLgen.SimpleDocument(title = pageOverviewTitle,
                                                               style = "body,td,th {color: #000000;font-size: 11px;font-family: Helvetica;}")
         self.pagesOverview[item].append(HTMLgen.Name(version))
@@ -160,10 +159,9 @@ class GenerateWebPages:
         for tag in details.keys():
             if not self.pagesDetails.has_key(tag):
                 tagText = getDisplayText(tag)
-                pageDetailTitle = "Detailed test results for " + self.pageAppName + " - version " + \
-                                  self.pageVersion + ": " + tagText
+                pageDetailTitle = "Detailed test results for " + self.pageTitle + ": " + tagText
                 self.pagesDetails[tag] = HTMLgen.SimpleDocument(title = pageDetailTitle)
-                self.pagesDetails[tag].append(HTMLgen.Heading(1, tagText + " - detailed test results for ", self.pageAppName, align = 'center'))
+                self.pagesDetails[tag].append(HTMLgen.Heading(1, tagText + " - detailed test results for ", self.pageTitle, align = 'center'))
             self.pagesDetails[tag].append(details[tag])
     def writePages(self):
         print "Writing overview pages..."

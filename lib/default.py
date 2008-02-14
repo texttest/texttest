@@ -557,11 +557,18 @@ class Config:
             return colourFinder.getDefaultDict()
         except:
             return {}
+    def getDefaultPageName(self, app):
+        pageName = app.fullName
+        fullVersion = app.getFullVersion()
+        if fullVersion:
+            pageName += " - version " + fullVersion
+        return pageName
     def setBatchDefaults(self, app):
         # Batch values. Maps from session name to values
         app.setConfigDefault("smtp_server", "localhost", "Server to use for sending mail in batch mode")
         app.setConfigDefault("batch_result_repository", { "default" : "" }, "Directory to store historical batch results under")
         app.setConfigDefault("historical_report_location", { "default" : "" }, "Directory to create reports on historical batch data under")
+        app.setConfigDefault("historical_report_page_name", { "default" : self.getDefaultPageName(app) }, "Header for page on which this application should appear")
         app.setConfigDefault("testoverview_colours", self.getDefaultTestOverviewColours(), "Colours to use for historical batch HTML reports")
         app.setConfigDefault("batch_sender", { "default" : self.getDefaultMailAddress() }, "Sender address to use sending mail in batch mode")
         app.setConfigDefault("batch_recipients", { "default" : self.getDefaultMailAddress() }, "Addresses to send mail to in batch mode")

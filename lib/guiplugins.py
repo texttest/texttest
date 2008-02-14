@@ -1472,8 +1472,15 @@ class RunningAction(SelectionAction):
         return len(self.currTestSelection) 
     def getTmpFilterDir(self, app):
         return os.path.join(app.writeDirectory, "temporary_filter_files")
+    def getAppsSelectedNoExtras(self):
+        apps = copy(self.currAppSelection)
+        for app in self.currAppSelection:
+            for extra in app.extras:
+                if extra in apps:
+                    apps.remove(extra)
+        return apps
     def getCmdlineOptionForApps(self):
-        appDescs = [ app.name + app.versionSuffix() for app in self.currAppSelection ]
+        appDescs = [ app.name + app.versionSuffix() for app in self.getAppsSelectedNoExtras() ]
         return [ "-a", ",".join(appDescs) ]
     def checkTestRun(self, identifierString, errFile, testSel):
         if len(self.currTestSelection) >= 1 and self.currTestSelection[0] in testSel:

@@ -29,8 +29,6 @@ class Responder:
     # Called when everything is finished
     def notifyAllComplete(self):
         pass
-    def needsTestRuns(self):
-        return 1
     def canBeMainThread(self):
         return True
 

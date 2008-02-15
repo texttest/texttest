@@ -53,12 +53,11 @@ class GenerateWebPages:
         return TestTable()
     def getSelectorClasses(self):
         return [ SelectorLast6Days, SelectorAll ]
-    def generate(self, repositoryDirs, dirTitles):            
+    def generate(self, repositoryDirs):            
         foundMinorVersions = HTMLgen.Container()
         details = TestDetails()
         usedSelectors = seqdict()
-        for index, repositoryDir in enumerate(repositoryDirs):
-            version = dirTitles[index]
+        for repositoryDir, version in repositoryDirs:
             self.diag.info("Generating " + version)
             loggedTests = seqdict()
             tagsFound = []

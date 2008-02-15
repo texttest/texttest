@@ -491,9 +491,9 @@ class WebPageResponder(respond.Responder):
             pageTopDir = app.getCompositeConfigValue("historical_report_location", self.batchSession)
             pageDir = os.path.join(pageTopDir, app.name)
             extraVersions = self.getExtraVersions(app)
-            relevantSubDirs = self.findRelevantSubdirectories(repository, app, extraVersions)
-            dirTitles = map(os.path.basename, relevantSubDirs)
-            self.makeAndGenerate(pageDir, app, extraVersions, relevantSubDirs, pageTitle, dirTitles)
+            subDirs = self.findRelevantSubdirectories(repository, app, extraVersions)
+            relevantSubDirs = [ (subDir, os.path.basename(subDir)) for subDir in subDirs ]
+            self.makeAndGenerate(pageDir, app, extraVersions, relevantSubDirs, pageTitle)
                 
     def getAppRepositoryInfo(self):
         appInfo = seqdict()
@@ -514,13 +514,19 @@ class WebPageResponder(respond.Responder):
         extraVersions, relevantSubDirs = [], []
         for app, repository in pageInfo:
             extraVersions += self.getExtraVersions(app)
-            relevantSubDirs += self.findRelevantSubdirectories(repository, app, extraVersions)
+            for relDir in self.findRelevantSubdirectories(repository, app, extraVersions):
+                relevantSubDirs.append((relDir, self.getVersionTitle(app, relDir)))
         return app, extraVersions, relevantSubDirs
+    def getVersionTitle(self, app, dir):
+        version = os.path.basename(dir)
+        title = app.fullName
+        if len(version) > 0 and version != "default":
+            title += " version " + version
+        return title
     def generateCommonPage(self, pageTitle, pageInfo):
         app, extraVersions, relevantSubDirs = self.transformToCommon(pageInfo)
         pageDir = app.getCompositeConfigValue("historical_report_location", self.batchSession)
-        appNames = [ entry[0].fullName for entry in pageInfo ]
-        self.makeAndGenerate(pageDir, app, extraVersions, relevantSubDirs, pageTitle, appNames)
+        self.makeAndGenerate(pageDir, app, extraVersions, relevantSubDirs, pageTitle)
         
     def makeAndGenerate(self, pageDir, *args):
         plugins.ensureDirectoryExists(pageDir)
@@ -530,11 +536,11 @@ class WebPageResponder(respond.Responder):
             sys.stderr.write("Caught exception while generating web pages :\n")
             plugins.printException()
 
-    def generateWebPages(self, pageDir, app, extraVersions, relevantSubDirs, pageTitle, dirTitles):
+    def generateWebPages(self, pageDir, app, extraVersions, relevantSubDirs, pageTitle):
         testoverview.colourFinder.setColourDict(app.getConfigValue("testoverview_colours"))
         webPageGeneratorClass = self.getWebPageGeneratorClass(app)
         generator = webPageGeneratorClass(pageTitle, getVersionName(app), pageDir, extraVersions)
-        generator.generate(relevantSubDirs, dirTitles)
+        generator.generate(relevantSubDirs)
     def getWebPageGeneratorClass(self, app):
         # Take the most specific module first, see guiplugins.py comment for why...
         for module in reversed(app.getConfigValue("interactive_action_module")):

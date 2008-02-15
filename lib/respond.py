@@ -79,7 +79,7 @@ class InteractiveResponder(Responder):
             saveDesc += "(overwriting succeeded files also)"
         self.describeSave(test, saveDesc)
         test.state.save(test, exact, version, self.overwriteSuccess)
-        newState = test.state.makeNewState(test.app)
+        newState = test.state.makeNewState(test.app, "saved")
         test.changeState(newState)
     def describeSave(self, test, saveDesc):
         print test.getIndent() + "Saving " + repr(test) + saveDesc

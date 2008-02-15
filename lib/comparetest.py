@@ -264,6 +264,12 @@ class TestComparison(BaseTestComparison):
             for comparison in self.filterComparisons(self.correctResults, onlyStems):
                 self.updateStatus(test, comparison, versionString)
                 comparison.overwrite(test, exact, versionString)
+    def recalculateComparisons(self, test):
+        resultFiles, defFiles = test.listStandardFiles(allVersions=False)
+        stdFiles = self.makeStemDict(resultFiles + defFiles)
+        for fileComp in self.allResults:
+            stdFile = stdFiles.get(fileComp.stem)
+            fileComp.findAndCompare(test, stdFile)
     def filterComparisons(self, resultList, onlyStems):
         if len(onlyStems) == 0:
             return resultList
@@ -277,8 +283,8 @@ class TestComparison(BaseTestComparison):
             versionRepr = ", no version"
         self.notifyIfMainThread("Status", testRepr + str(comparison) + versionRepr)
         self.notifyIfMainThread("ActionProgress", "")
-    def makeNewState(self, app):
-        newState = TestComparison(self, app, "be saved")
+    def makeNewState(self, app, lifeCycleDest):
+        newState = TestComparison(self, app, "be " + lifeCycleDest)
         for comparison in self.allResults:
             newState.addComparison(comparison)
         newState.categorise()
@@ -339,15 +345,15 @@ class MakeComparisons(plugins.Action):
         newState = self.testComparisonClass(test.state, test.app)
         newState.computeFor(test)
         self.describe(test, newState.getPostText())
-    def createNewProgressState(self, test):
-        if test.state.isComplete():
-            return self.testComparisonClass(test.state, test.app, lifecycleChange="be recalculated")
-        else:
-            return self.progressComparisonClass(test.state)
     def recomputeProgress(self, test, observers):
-        newState = self.createNewProgressState(test)
-        newState.setObservers(observers)
-        newState.computeFor(test)        
+        if test.state.isComplete():
+            test.state.recalculateComparisons(test)
+            newState = test.state.makeNewState(test.app, "recalculated")
+            test.changeState(newState)
+        else:
+            newState = self.progressComparisonClass(test.state)
+            newState.setObservers(observers)
+            newState.computeFor(test)        
     def setUpSuite(self, suite):
         self.describe(suite)
     

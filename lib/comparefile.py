@@ -7,7 +7,7 @@ from shutil import copyfile
 from fnmatch import fnmatch
 
 class FileComparison:
-    def __init__(self, test, stem, standardFile, tmpFile, testInProgress = 0, observers={}):
+    def __init__(self, test, stem, standardFile, tmpFile, testInProgress=False, observers={}):
         self.stdFile = standardFile
         self.stdCmpFile = self.stdFile
         self.tmpFile = tmpFile
@@ -15,16 +15,6 @@ class FileComparison:
         self.stem = stem
         self.differenceCache = False 
         self.diag = plugins.getDiagnostics("FileComparison")
-        filterFileBase = test.makeTmpFileName(stem + "." + test.app.name, forFramework=1)
-        origCmp = filterFileBase + "origcmp"
-        if os.path.isfile(origCmp):
-            self.stdCmpFile = origCmp
-        tmpCmpFileName = filterFileBase + "cmp"
-        if testInProgress:
-            tmpCmpFileName = filterFileBase + "partcmp"
-        if os.path.isfile(tmpCmpFileName):
-            self.tmpCmpFile = tmpCmpFileName
-        self.diag.info("File comparison std: " + repr(self.stdFile) + " tmp: " + repr(self.tmpFile))
         self.severity = test.getCompositeConfigValue("failure_severity", self.stem)
         self.displayPriority = test.getCompositeConfigValue("failure_display_priority", self.stem)
         maxLength = test.getConfigValue("lines_of_text_difference")
@@ -36,6 +26,20 @@ class FileComparison:
         self.previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength)
         self.textDiffTool = test.getConfigValue("text_diff_program")
         self.textDiffToolMaxSize = plugins.parseBytes(test.getConfigValue("text_diff_program_max_file_size"))
+        self.findAndCompare(test, standardFile, testInProgress)
+    def findAndCompare(self, test, standardFile, testInProgress=False):
+        self.stdFile = standardFile
+        self.stdCmpFile = self.stdFile
+        filterFileBase = test.makeTmpFileName(self.stem + "." + test.app.name, forFramework=1)
+        origCmp = filterFileBase + "origcmp"
+        if os.path.isfile(origCmp):
+            self.stdCmpFile = origCmp
+        tmpCmpFileName = filterFileBase + "cmp"
+        if testInProgress:
+            tmpCmpFileName = filterFileBase + "partcmp"
+        if os.path.isfile(tmpCmpFileName):
+            self.tmpCmpFile = tmpCmpFileName
+        self.diag.info("File comparison std: " + repr(self.stdFile) + " tmp: " + repr(self.tmpFile))
         # subclasses may override if they don't want to store in this way
         self.cacheDifferences()
     def __getstate__(self):

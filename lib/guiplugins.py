@@ -484,7 +484,7 @@ class SaveTests(SelectionAction):
                 testComparison = test.state
                 testComparison.setObservers(self.observers)
                 testComparison.save(test, self.getExactness(), version, overwriteSuccess, self.newFilesAsDiags(), stemsToSave)
-                newState = testComparison.makeNewState(test.app)
+                newState = testComparison.makeNewState(test.app, "saved")
                 test.changeState(newState)
 
             self.notify("Status", "Saved " + testDesc + ".")

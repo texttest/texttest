@@ -581,8 +581,7 @@ class TestCase(Test):
                performanceDescription + \
                memoryDescription    
     def needsRecalculation(self):
-        return self.state.isComplete() and self.state.needsRecalculation() and \
-               os.path.isdir(self.getDirectory(temporary=1))
+        return self.state.isComplete() and self.state.needsRecalculation()
     def callAction(self, action):
         return action(self)
     def changeState(self, state):

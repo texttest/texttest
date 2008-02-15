@@ -47,7 +47,10 @@ class FilterTemporary(FilterAction):
 class FilterRecompute(FilterOriginal):
     def filesToFilter(self, test):
         if test.state.isComplete():
-            return FilterOriginal.filesToFilter(self, test)
+            if hasattr(test.state, "allResults"):
+                return [ fileComp.stdFile for fileComp in test.state.allResults ]
+            else:
+                return []
         else:
             return test.listTmpFiles()
     def getPostfix(self, test):
@@ -68,7 +71,7 @@ class RunDependentTextFilter(plugins.Observable):
             self.orderFilters[orderFilter] = []
     def filterFile(self, fileName, newFileName):
         self.diag.info("Filtering " + fileName + " to create " + newFileName)
-        newFile = open(newFileName, "w")
+        newFile = plugins.openForWrite(newFileName)
         lineNumber = 0
         for line in open(fileName, "rU").xreadlines(): # use universal newlines to simplify
             # We don't want to stack up ActionProgreess calls in ThreaderNotificationHandler ...

@@ -1043,37 +1043,27 @@ class TestTreeGUI(ContainerGUI):
         self.notify("AllRead")
     def makeRowVisible(self, model, path, iter):
         self.model.set_value(iter, 5, True)
-    def addSuiteWithParent(self, suite, parent, follower=None):    
-        iter = self.model.insert_before(parent, follower)
+    def getNodeName(self, suite, parent):
         nodeName = suite.name
         if parent == None:
             appName = suite.app.name + suite.app.versionSuffix()
             if appName != nodeName:
                 nodeName += " (" + appName + ")"
-        self.model.set_value(iter, 0, nodeName)
-        self.model.set_value(iter, 2, [ suite ])
-        self.model.set_value(iter, 5, self.newTestsVisible or not suite.parent)
+        return nodeName
+    
+    def addSuiteWithParent(self, suite, parent, follower=None):
+        nodeName = self.getNodeName(suite, parent)
+        colour = guiConfig.getTestColour("not_started")
+        visible = self.newTestsVisible or not suite.parent
+        row = [ nodeName, colour, [ suite ], "", colour, visible ] 
+        iter = self.model.insert_before(parent, follower, row)
         storeIter = iter.copy()
         self.itermap.store(suite, storeIter)
-        self.updateStateInModel(suite, iter, suite.state)
         path = self.model.get_path(iter)
         if self.newTestsVisible and parent is not None:
             filterPath = self.filteredModel.convert_child_path_to_path(path)
             self.treeView.expand_to_path(filterPath)
         return iter
-    def updateStateInModel(self, test, iter, state):
-        if not self.dynamic:
-            return self.modelUpdate(iter, guiConfig.getTestColour("static"))
-
-        resultType, summary = state.getTypeBreakdown()
-        return self.modelUpdate(iter, guiConfig.getTestColour(resultType), summary, guiConfig.getTestColour(state.category))
-    def modelUpdate(self, iter, colour, details="", colour2=None):
-        if not colour2:
-            colour2 = colour
-        self.model.set_value(iter, 1, colour)
-        if self.dynamic:
-            self.model.set_value(iter, 3, details)
-            self.model.set_value(iter, 4, colour2)
     def createView(self):
         self.filteredModel = self.model.filter_new()
         self.filteredModel.set_visible_column(5)
@@ -1231,9 +1221,15 @@ class TestTreeGUI(ContainerGUI):
                 view.expand_row(model.get_path(iter), open_all=False)
              
             iter = view.get_model().iter_next(iter)
+    def updateStateInModel(self, iter, state):
+        resultType, summary = state.getTypeBreakdown()
+        self.model.set_value(iter, 1, guiConfig.getTestColour(resultType))
+        self.model.set_value(iter, 3, summary)
+        self.model.set_value(iter, 4, guiConfig.getTestColour(state.category))
+    
     def notifyLifecycleChange(self, test, state, changeDesc):
         iter = self.itermap.getIterator(test)
-        self.updateStateInModel(test, iter, state)
+        self.updateStateInModel(iter, state)
         self.diagnoseTest(test, iter)
 
         # We don't want to affect the success count

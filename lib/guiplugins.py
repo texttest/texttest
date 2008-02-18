@@ -80,8 +80,11 @@ class GUIConfig:
         else:
             return False    
     def getTestColour(self, category):
-        nameToUse = self.getConfigName(category)
-        return self.getCompositeValue("test_colours", nameToUse, defaultKey="failure")
+        if self.dynamic:
+            nameToUse = self.getConfigName(category)
+            return self.getCompositeValue("test_colours", nameToUse, defaultKey="failure")
+        else:
+            return self.getCompositeValue("test_colours", "static")
     
 # The purpose of this class is to provide a means to monitor externally
 # started process, so that (a) code can be called when they exit, and (b)

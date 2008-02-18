@@ -597,10 +597,13 @@ class QueueSystemServer(BaseActionRunner):
             return False
         
         self.lockDiag.info("Got lock for submission")
-        process = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                   cwd=self.getSlaveLogDir(test), env=slaveEnv)
-        stdout, stderr = process.communicate()
-        errorMessage = self.findErrorMessage(stderr, queueSystem)
+        try:
+            process = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                       cwd=self.getSlaveLogDir(test), env=slaveEnv)
+            stdout, stderr = process.communicate()
+            errorMessage = self.findErrorMessage(stderr, queueSystem)
+        except OSError:
+            errorMessage = "local machine is not a submit host"
         if not errorMessage:
             jobId = queueSystem.findJobId(stdout)
             self.diag.info("Job created with id " + jobId)

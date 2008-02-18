@@ -689,6 +689,8 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
         self.diag.info("Found the following entry finders:" + str(self.entryFinders))
     def makePerformanceFiles(self, test):
         for fileStem, entryFinder in self.entryFinders.items():
+            if len(entryFinder) == 0:
+                continue # don't allow empty entry finders
             if not self.allMachinesTestPerformance(test, fileStem):
                 self.diag.info("Not extracting performance file for " + fileStem + ": not on performance machines")
                 continue
@@ -749,24 +751,25 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
         regExp = re.compile(pattern)        
         match = regExp.match(line)
         if not match:
-            return None
+            return
         restOfLine = match.group('restofline')
         self.diag.info(" entry found, extracting value from: " + restOfLine)
+        words = restOfLine.split()
+        if len(words) == 0:
+            return
         try:
-            number = float(restOfLine.split()[0])
+            number = float(words[0])
             if restOfLine.lower().find("kb") != -1:
                 number = float(number / 1024.0)
             return number
-        except:
+        except ValueError:
             # try parsing the memString as a h*:mm:ss time string
             # * - any number of figures are allowed for the hour part
             timeRegExp = re.compile(r'(?P<hours>\d+)\:(?P<minutes>\d\d)\:(?P<seconds>\d\d)')
-            match = timeRegExp.match(restOfLine.split()[0])
+            match = timeRegExp.match(words[0])
             if match:
                 hours = float(match.group('hours'))
                 minutes = float(match.group('minutes'))
                 seconds = float(match.group('seconds'))
                 return hours*60*60 + minutes*60 + seconds
-            else:
-                return None
 

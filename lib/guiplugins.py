@@ -301,6 +301,9 @@ class SelectionAction(InteractiveAction):
     def __init__(self, allApps, *args):
         InteractiveAction.__init__(self, allApps)
         self.currTestSelection = []
+        self.rootTestSuites = []
+    def addSuites(self, suites):
+        self.rootTestSuites = suites
     def updateSelection(self, tests, rowCount):
         self.currTestSelection = filter(lambda test: test.classId() == "test-case", tests)
     def isActiveOnCurrent(self, *args):
@@ -318,10 +321,10 @@ class SelectionAction(InteractiveAction):
             
     def getCmdlineOption(self):
         selTestPaths = []
-        for app in self.validApps:
-            selTestPaths.append("appdata=" + app.name + app.versionSuffix())
-            for test in self.currTestSelection:
-                if test.app is app:
+        for suite in self.rootTestSuites:
+            selTestPaths.append("appdata=" + suite.app.name + suite.app.versionSuffix())
+            for test in suite.testCaseList():
+                if self.isSelected(test):
                     selTestPaths.append(test.getRelPath())
         return "-tp " + "\n".join(selTestPaths)
     
@@ -1201,7 +1204,6 @@ class ImportTestSuite(ImportTest):
 class SelectTests(SelectionAction):
     def __init__(self, allApps):
         SelectionAction.__init__(self, allApps)
-        self.rootTestSuites = []
         self.diag = plugins.getDiagnostics("Select Tests")
         self.addOption("vs", "Tests for version", description="Select tests for a specific version.",
                        possibleValues=self.getPossibleVersions(allApps))
@@ -1211,8 +1213,6 @@ class SelectTests(SelectionAction):
         for app in allApps:
             appSelectGroup = self.findSelectGroup(app)
             self.optionGroup.mergeIn(appSelectGroup)
-    def addSuites(self, suites):
-        self.rootTestSuites = suites
     def getPossibleVersions(self, allApps):
         possVersions = []
         for app in allApps:

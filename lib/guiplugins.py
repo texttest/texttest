@@ -13,6 +13,7 @@ class GUIConfig:
     def __init__(self, dynamic, allApps):
         self.apps = allApps
         self.dynamic = dynamic
+        self.hiddenCategories = map(self.getConfigName, self.getValue("hide_test_category"))
     def _simpleValue(self, app, entryName):
         return app.getConfigValue(entryName)
     def _compositeValue(self, app, *args, **kwargs):
@@ -50,7 +51,7 @@ class GUIConfig:
             return "dynamic"
         else:
             return "static"
-    def getConfigName(self, name, modeDependent):
+    def getConfigName(self, name, modeDependent=False):
         formattedName = name.lower().replace(" ", "_").replace(":", "_")
         if modeDependent:
             if len(name) > 0:
@@ -74,7 +75,8 @@ class GUIConfig:
         return self.getCompositeValue("window_size", name, modeDependent=True)
     def showCategoryByDefault(self, category):
         if self.dynamic:
-            return category.lower() not in self.getValue("hide_test_category")
+            nameToUse = self.getConfigName(category)
+            return nameToUse not in self.hiddenCategories
         else:
             return False    
     

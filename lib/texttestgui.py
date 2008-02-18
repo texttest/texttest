@@ -2717,8 +2717,15 @@ class TestProgressMonitor(SubGUI):
             self.treeModel.set_value(iter, 1, testCount + 1)
         allTests.append(test)
         self.treeModel.set_value(iter, 5, allTests)
+    def showByDefault(self, classifier, parentIter, category):
+        if not guiConfig.showCategoryByDefault(classifier):
+            return False
+        if parentIter:
+            return self.treeModel.get_value(parentIter, 2)
+        else:
+            return guiConfig.showCategoryByDefault(category)
     def addNewIter(self, classifier, parentIter, category, testCount, tests=[]):
-        showThis = guiConfig.showCategoryByDefault(category)
+        showThis = self.showByDefault(classifier, parentIter, category)
         modelAttributes = [classifier, testCount, showThis, getTestColour(category), "bold", tests]
         newIter = self.treeModel.append(parentIter, modelAttributes)
         if parentIter:

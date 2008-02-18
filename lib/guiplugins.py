@@ -1251,13 +1251,19 @@ class SelectTests(SelectionAction):
     def performOnCurrent(self): 
         # Get strategy. 0 = discard, 1 = refine, 2 = extend, 3 = exclude
         strategy = self.optionGroup.getSwitchValue("current_selection")
-        selectedTests = []                
-        for suite in self.getSuitesToTry():
-            filters = self.getFilterList(suite.app)            
-            reqTests = self.getRequestedTests(suite, filters)
-            newTests = self.combineWithPrevious(reqTests, suite.app, strategy)
+        selectedTests = []
+        suitesToTry = self.getSuitesToTry()
+        for suite in self.rootTestSuites:
+            if suite in suitesToTry:
+                filters = self.getFilterList(suite.app)            
+                reqTests = self.getRequestedTests(suite, filters)
+                newTests = self.combineWithPrevious(reqTests, suite.app, strategy)
+            else:
+                newTests = self.combineWithPrevious([], suite.app, strategy)
+                
             guilog.info("Selected " + str(len(newTests)) + " out of a possible " + str(suite.size()))
             selectedTests += newTests
+
         self.notify("SetTestSelection", selectedTests, self.optionGroup.getSwitchValue("select_in_collapsed_suites"))
     def getSuitesToTry(self):
         # If only some of the suites present match the version selection, only consider them.

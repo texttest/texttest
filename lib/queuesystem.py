@@ -802,7 +802,7 @@ class MachineInfoFinder(sandbox.MachineInfoFinder):
         for machine in rawPerfMachines:
             if machine != "any":
                 perfMachines += self.queueMachineInfo.findActualMachines(machine)
-        if "any" in rawPerfMachines and len(perfMachines) == 0:
+        if "any" in rawPerfMachines and len(resources) == 0:
             return rawPerfMachines
         else:
             return perfMachines

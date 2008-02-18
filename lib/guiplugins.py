@@ -79,6 +79,9 @@ class GUIConfig:
             return nameToUse not in self.hiddenCategories
         else:
             return False    
+    def getTestColour(self, category):
+        nameToUse = self.getConfigName(category)
+        return self.getCompositeValue("test_colours", nameToUse, defaultKey="failure")
     
 # The purpose of this class is to provide a means to monitor externally
 # started process, so that (a) code can be called when they exit, and (b)

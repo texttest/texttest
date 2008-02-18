@@ -575,7 +575,7 @@ class TestState(Observable):
         pass
 
 addCategory("unrunnable", "unrunnable", "could not be run")
-addCategory("marked", "marked by user", "was marked by the user")
+addCategory("marked", "marked", "was marked by the user")
 
 class Unrunnable(TestState):
     def __init__(self, freeText, briefText = "UNRUNNABLE", executionHosts=[], lifecycleChange=""):

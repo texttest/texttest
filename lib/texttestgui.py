@@ -49,9 +49,6 @@ def renderSuitesBold(column, cell, model, iter):
     else:
         cell.set_property('font', "bold")
 
-def getTestColour(category):
-    return guiConfig.getCompositeValue("test_colours", category, defaultKey="failure")
-
 class PluginHandler:
     def __init__(self):
         self.modules = []
@@ -1066,10 +1063,10 @@ class TestTreeGUI(ContainerGUI):
         return iter
     def updateStateInModel(self, test, iter, state):
         if not self.dynamic:
-            return self.modelUpdate(iter, getTestColour("static"))
+            return self.modelUpdate(iter, guiConfig.getTestColour("static"))
 
         resultType, summary = state.getTypeBreakdown()
-        return self.modelUpdate(iter, getTestColour(resultType), summary, getTestColour(state.category))
+        return self.modelUpdate(iter, guiConfig.getTestColour(resultType), summary, guiConfig.getTestColour(state.category))
     def modelUpdate(self, iter, colour, details="", colour2=None):
         if not colour2:
             colour2 = colour
@@ -1271,7 +1268,7 @@ class TestTreeGUI(ContainerGUI):
         # Print how many tests succeeded, color details column in success color,
         # collapse row, and try to collapse parent suite.
         detailText = "All " + str(suiteSize) + " tests successful"
-        successColour = getTestColour("success")
+        successColour = guiConfig.getTestColour("success")
         iter = self.itermap.getIterator(suite)
         self.model.set_value(iter, 3, detailText)
         self.model.set_value(iter, 4, successColour)
@@ -2654,7 +2651,11 @@ class TestProgressMonitor(SubGUI):
         classifiers = ClassificationTree()
         catDesc = self.getCategoryDescription(state)
         if state.isMarked():
-            classifiers.addClassification([ catDesc, state.briefText ])
+            if state.briefText == catDesc:
+                # Just in case - otherwise we get an infinite loop...
+                classifiers.addClassification([ catDesc, "Marked as Marked" ])
+            else:
+                classifiers.addClassification([ catDesc, state.briefText ])
             return classifiers
 
         if not state.isComplete() or not state.hasFailed():
@@ -2711,7 +2712,7 @@ class TestProgressMonitor(SubGUI):
         allTests = self.treeModel.get_value(iter, 5)
         testCount = self.treeModel.get_value(iter, 1)
         if testCount == 0:
-            self.treeModel.set_value(iter, 3, getTestColour(category))
+            self.treeModel.set_value(iter, 3, guiConfig.getTestColour(category))
             self.treeModel.set_value(iter, 4, "bold")
         if incrementCount:
             self.treeModel.set_value(iter, 1, testCount + 1)
@@ -2726,7 +2727,7 @@ class TestProgressMonitor(SubGUI):
             return guiConfig.showCategoryByDefault(category)
     def addNewIter(self, classifier, parentIter, category, testCount, tests=[]):
         showThis = self.showByDefault(classifier, parentIter, category)
-        modelAttributes = [classifier, testCount, showThis, getTestColour(category), "bold", tests]
+        modelAttributes = [classifier, testCount, showThis, guiConfig.getTestColour(category), "bold", tests]
         newIter = self.treeModel.append(parentIter, modelAttributes)
         if parentIter:
             self.treeView.expand_row(self.treeModel.get_path(parentIter), open_all=0)

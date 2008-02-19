@@ -478,6 +478,11 @@ class WebPageResponder(respond.Responder):
         respond.Responder.__init__(self, optionMap, allApps)
         self.batchSession = optionMap.get("b", "default")
         self.allApps = allApps
+    def addSuites(self, suites):
+        # These are the ones that got through. Remove all rejected apps...
+        apps = Set([ suite.app for suite in suites ])
+        for app in Set(self.allApps).difference(apps):
+            self.allApps.remove(app)
     def notifyAllComplete(self):
         appInfo = self.getAppRepositoryInfo()
         for pageTitle, pageInfo in appInfo.items():

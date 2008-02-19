@@ -628,6 +628,7 @@ class FilterRuleBuilds(plugins.Action):
             
             # If no ruleset is associated with the test anyway, or the source file isn't there, don't try to build it...
             if not ruleset.isValid():
+                self.diag.info("Ruleset " + rulesetName + " not valid")
                 continue
 
             if self.shouldCompileFor(test, ruleset):

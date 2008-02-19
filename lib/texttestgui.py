@@ -334,7 +334,7 @@ class TextTestGUI(Responder, plugins.Observable):
     def getLifecycleObservers(self):
         # only the things that want to know about lifecycle changes irrespective of what's selected,
         # otherwise we go via the test tree. Include add/remove as lifecycle, also final completion
-        return [ self.testTreeGUI, self.progressBarGUI, self.progressMonitor,
+        return [ self.progressBarGUI, self.progressMonitor, self.testTreeGUI, 
                  statusMonitor, self.idleManager, self.topWindowGUI ] 
     def getActionObservers(self, action):
         if str(action.__class__).find("Reset") != -1:
@@ -473,7 +473,8 @@ class TextTestGUI(Responder, plugins.Observable):
                 tabInfo.append((name, notebookGUI))
 
         notebookGUI = NotebookGUI(tabInfo, self.getNotebookScriptName("Top"))
-        return [ notebookGUI ] + subNotebookGUIs.values(), notebookGUI
+        allNotebookGUIs = [ notebookGUI ] + filter(lambda gui: isinstance(gui, NotebookGUI), subNotebookGUIs.values())
+        return allNotebookGUIs, notebookGUI
     
     def getNotebookScriptName(self, tabName):
         if tabName == "Top":
@@ -982,6 +983,7 @@ class TestIteratorMap:
     
     def getIterator(self, test):
         return self.dict.get(self.getKey(test))
+
     def remove(self, test):
         key = self.getKey(test)
         if self.dict.has_key(key):
@@ -1221,29 +1223,25 @@ class TestTreeGUI(ContainerGUI):
                 view.expand_row(model.get_path(iter), open_all=False)
              
             iter = view.get_model().iter_next(iter)
-    def updateStateInModel(self, iter, state):
-        resultType, summary = state.getTypeBreakdown()
-        self.model.set_value(iter, 1, guiConfig.getTestColour(resultType))
-        self.model.set_value(iter, 3, summary)
-        self.model.set_value(iter, 4, guiConfig.getTestColour(state.category))
-    
-    def notifyLifecycleChange(self, test, state, changeDesc):
+    def notifyTestAppearance(self, test, detailText, colour1, colour2, updateSuccess):
         iter = self.itermap.getIterator(test)
-        self.updateStateInModel(iter, state)
+        self.model.set_value(iter, 1, colour1) 
+        self.model.set_value(iter, 3, detailText)
+        self.model.set_value(iter, 4, colour2)
         self.diagnoseTest(test, iter)
-
-        # We don't want to affect the success count
-        # when we unmark a previously successful test ...
-        if state.hasSucceeded() and changeDesc != "unmarked":
+        if updateSuccess:
             self.updateSuiteSuccess(test.parent)
+
+    def notifyLifecycleChange(self, test, *args):
         if test in self.selectedTests:
-            self.notify("LifecycleChange", test, state, changeDesc)
-    def notifyFileChange(self, test):
+            self.notify("LifecycleChange", test, *args)
+    def notifyFileChange(self, test, *args):
         if test in self.selectedTests:
-            self.notify("FileChange", test)
-    def notifyDescriptionChange(self, test):
+            self.notify("FileChange", test, *args)
+    def notifyDescriptionChange(self, test, *args):
         if test in self.selectedTests:
-            self.notify("DescriptionChange", test)
+            self.notify("DescriptionChange", test, *args)
+
     def updateSuiteSuccess(self, suite):
         successCount = self.successPerSuite.get(suite, 0) + 1
         self.successPerSuite[suite] = successCount
@@ -1255,6 +1253,7 @@ class TestTreeGUI(ContainerGUI):
             self.updateSuiteSuccess(suite.parent)
             
     def diagnoseTest(self, test, iter):
+        self.writeSeparator()
         guilog.info("Redrawing test " + test.name + " coloured " + self.model.get_value(iter, 1))
         secondColumnText = self.model.get_value(iter, 3)
         if secondColumnText:
@@ -1307,6 +1306,7 @@ class TestTreeGUI(ContainerGUI):
             self.notify("TestTreeCounters", initial=initial, totalDelta=1,
                         totalShownDelta=int(self.newTestsVisible), totalRowsDelta=self.getTotalRowsDelta(test))
 
+        self.diag.info("Adding test " + repr(test))
         self.tryAddTest(test, initial)
         if not initial:
             self.describeTree()
@@ -2582,7 +2582,8 @@ class TestProgressMonitor(SubGUI):
         self.dynamic = dynamic
         self.testCount = testCount
         if testCount > 0:
-            self.addNewIter("Not started", None, "not_started", testCount)
+            colour = guiConfig.getTestColour("not_started")
+            self.addNewIter("Not started", None, colour, "not_started", testCount)
     def getGroupTabTitle(self):
         return "Status"
     def shouldShow(self):
@@ -2690,25 +2691,33 @@ class TestProgressMonitor(SubGUI):
         self.classifications[test] = []
         classifiers = self.getClassifiers(state)
         nodeClassifier = classifiers.keys()[0]
-        self.addTestForNode(test, state, nodeClassifier, classifiers, incrementCount)
+        colour = guiConfig.getTestColour(state.category)
+        self.addTestForNode(test, colour, state.category, nodeClassifier, classifiers, incrementCount)
+        return colour
+    def updateTestAppearance(self, test, state, changeDesc, colour):
+        resultType, summary = state.getTypeBreakdown()
+        mainColour = guiConfig.getTestColour(resultType)
+        # Don't change suite states when unmarking tests
+        updateSuccess = state.hasSucceeded() and changeDesc != "unmarked"
+        self.notify("TestAppearance", test, summary, mainColour, colour, updateSuccess)
         self.notify("Visibility", [ test ], self.shouldBeVisible(test))
 
-    def addTestForNode(self, test, state, nodeClassifier, classifiers, incrementCount, parentIter=None):
+    def addTestForNode(self, test, colour, category, nodeClassifier, classifiers, incrementCount, parentIter=None):
         self.diag.info("Adding " + repr(test) + " for node " + nodeClassifier + " (" + repr(classifiers) + ")")
         nodeIter = self.findIter(nodeClassifier, parentIter)
         if nodeIter:
-            self.insertTestAtIter(nodeIter, test, state.category, incrementCount)
+            self.insertTestAtIter(nodeIter, test, colour, incrementCount)
         else:
-            nodeIter = self.addNewIter(nodeClassifier, parentIter, state.category, 1, [ test ])
+            nodeIter = self.addNewIter(nodeClassifier, parentIter, colour, category, 1, [ test ])
 
         self.classifications[test].append(nodeIter)
         for subNodeClassifier in classifiers[nodeClassifier]:
-            self.addTestForNode(test, state, subNodeClassifier, classifiers, incrementCount, nodeIter)
-    def insertTestAtIter(self, iter, test, category, incrementCount):
+            self.addTestForNode(test, colour, category, subNodeClassifier, classifiers, incrementCount, nodeIter)
+    def insertTestAtIter(self, iter, test, colour, incrementCount):
         allTests = self.treeModel.get_value(iter, 5)
         testCount = self.treeModel.get_value(iter, 1)
         if testCount == 0:
-            self.treeModel.set_value(iter, 3, guiConfig.getTestColour(category))
+            self.treeModel.set_value(iter, 3, colour)
             self.treeModel.set_value(iter, 4, "bold")
         if incrementCount:
             self.treeModel.set_value(iter, 1, testCount + 1)
@@ -2721,9 +2730,9 @@ class TestProgressMonitor(SubGUI):
             return self.treeModel.get_value(parentIter, 2)
         else:
             return guiConfig.showCategoryByDefault(category)
-    def addNewIter(self, classifier, parentIter, category, testCount, tests=[]):
+    def addNewIter(self, classifier, parentIter, colour, category, testCount, tests=[]):
         showThis = self.showByDefault(classifier, parentIter, category)
-        modelAttributes = [classifier, testCount, showThis, guiConfig.getTestColour(category), "bold", tests]
+        modelAttributes = [classifier, testCount, showThis, colour, "bold", tests]
         newIter = self.treeModel.append(parentIter, modelAttributes)
         if parentIter:
             self.treeView.expand_row(self.treeModel.get_path(parentIter), open_all=0)
@@ -2738,7 +2747,8 @@ class TestProgressMonitor(SubGUI):
                 iter = self.treeModel.iter_next(iter)
     def notifyLifecycleChange(self, test, state, changeDesc):
         self.removeTest(test)
-        self.insertTest(test, state, incrementCount=True)
+        colourInserted = self.insertTest(test, state, incrementCount=True)
+        self.updateTestAppearance(test, state, changeDesc, colourInserted)
         self.contentsChanged()
 
     def shouldBeVisible(self, test):

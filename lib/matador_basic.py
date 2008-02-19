@@ -43,11 +43,12 @@ class Config(optimization.OptimizationConfig):
                     finalWord = line.split(" ")[-1]
                     return finalWord.strip()
         subPlanDir = self._getSubPlanDirName(test)
-        problemsFile = os.path.join(subPlanDir, "APC_FILES", "problems")
-        if os.path.isfile(problemsFile):
-            for line in open(problemsFile).xreadlines():
-                if line.startswith("153"):
-                    return line.split(";")[3]
+        if subPlanDir:
+            problemsFile = os.path.join(subPlanDir, "APC_FILES", "problems")
+            if os.path.isfile(problemsFile):
+                for line in open(problemsFile).xreadlines():
+                    if line.startswith("153"):
+                        return line.split(";")[3]
 
     def filesFromRulesFile(self, test, rulesFile):
         scriptFile = self.getScriptFileFromPyOption(test)

@@ -14,6 +14,23 @@ class GUIConfig:
         self.apps = allApps
         self.dynamic = dynamic
         self.hiddenCategories = map(self.getConfigName, self.getValue("hide_test_category"))
+        self.colourDict = self.makeColourDictionary()
+    def makeColourDictionary(self):
+        dict = {}
+        for app in self.apps:
+            for key, value in self.getColoursForApp(app):
+                if dict.has_key(key) and dict[key] != value:
+                    plugins.printWarning("Test colour for state '" + key +\
+                                     "' differs between applications, ignoring that from " + repr(app) + "\n" + \
+                                     "Value was " + repr(value) + ", change from " + repr(dict[key]))
+                else:
+                    dict[key] = value
+        return dict
+    def getColoursForApp(self, app):
+        colours = seqdict()
+        for key, value in app.getConfigValue("test_colours").items():
+            colours[self.getConfigName(key)] = value
+        return colours.items()
     def _simpleValue(self, app, entryName):
         return app.getConfigValue(entryName)
     def _compositeValue(self, app, *args, **kwargs):
@@ -79,10 +96,13 @@ class GUIConfig:
             return nameToUse not in self.hiddenCategories
         else:
             return False    
-    def getTestColour(self, category):
+    def getTestColour(self, categories):
         if self.dynamic:
-            nameToUse = self.getConfigName(category)
-            return self.getCompositeValue("test_colours", nameToUse, defaultKey="failure")
+            for category in categories:
+                nameToUse = self.getConfigName(category)
+                if self.colourDict.has_key(nameToUse):
+                    return self.colourDict[nameToUse]
+            return self.colourDict.get("failure")
         else:
             return self.getCompositeValue("test_colours", "static")
     

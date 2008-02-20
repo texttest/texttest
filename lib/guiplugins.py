@@ -96,13 +96,15 @@ class GUIConfig:
             return nameToUse not in self.hiddenCategories
         else:
             return False    
-    def getTestColour(self, categories):
+    def getTestColour(self, category, fallback=None):
         if self.dynamic:
-            for category in categories:
-                nameToUse = self.getConfigName(category)
-                if self.colourDict.has_key(nameToUse):
-                    return self.colourDict[nameToUse]
-            return self.colourDict.get("failure")
+            nameToUse = self.getConfigName(category)
+            if self.colourDict.has_key(nameToUse):
+                return self.colourDict[nameToUse]
+            elif fallback:
+                return fallback
+            else:
+                return self.colourDict.get("failure")
         else:
             return self.getCompositeValue("test_colours", "static")
     

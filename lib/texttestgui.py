@@ -1055,7 +1055,7 @@ class TestTreeGUI(ContainerGUI):
     
     def addSuiteWithParent(self, suite, parent, follower=None):
         nodeName = self.getNodeName(suite, parent)
-        colour = guiConfig.getTestColour([ "not_started" ])
+        colour = guiConfig.getTestColour("not_started")
         visible = self.newTestsVisible or not suite.parent
         row = [ nodeName, colour, [ suite ], "", colour, visible ] 
         iter = self.model.insert_before(parent, follower, row)
@@ -1263,7 +1263,7 @@ class TestTreeGUI(ContainerGUI):
         # Print how many tests succeeded, color details column in success color,
         # collapse row, and try to collapse parent suite.
         detailText = "All " + str(suiteSize) + " tests successful"
-        successColour = guiConfig.getTestColour([ "success" ])
+        successColour = guiConfig.getTestColour("success")
         iter = self.itermap.getIterator(suite)
         self.model.set_value(iter, 3, detailText)
         self.model.set_value(iter, 4, successColour)
@@ -2582,7 +2582,7 @@ class TestProgressMonitor(SubGUI):
         self.dynamic = dynamic
         self.testCount = testCount
         if testCount > 0:
-            colour = guiConfig.getTestColour([ "not_started" ])
+            colour = guiConfig.getTestColour("not_started")
             self.addNewIter("Not started", None, colour, "not_started", testCount)
     def getGroupTabTitle(self):
         return "Status"
@@ -2690,32 +2690,36 @@ class TestProgressMonitor(SubGUI):
     def insertTest(self, test, state, incrementCount):
         self.classifications[test] = []
         classifiers = self.getClassifiers(state)
-        colourCategories = classifiers.keys()
-        nodeClassifier = colourCategories[0]
-        colourCategories.reverse()
-        colourCategories.append(state.category)
-        colour = guiConfig.getTestColour(colourCategories)
-        self.addTestForNode(test, colour, state.category, nodeClassifier, classifiers, incrementCount)
-        return colour
+        nodeClassifier = classifiers.keys()[0]
+        defaultColour = guiConfig.getTestColour(state.category)
+        return self.addTestForNode(test, defaultColour, state.category, nodeClassifier, classifiers, incrementCount)
     def updateTestAppearance(self, test, state, changeDesc, colour):
         resultType, summary = state.getTypeBreakdown()
-        mainColour = guiConfig.getTestColour([ resultType ])
+        mainColour = guiConfig.getTestColour(resultType)
         # Don't change suite states when unmarking tests
         updateSuccess = state.hasSucceeded() and changeDesc != "unmarked"
         self.notify("TestAppearance", test, summary, mainColour, colour, updateSuccess)
         self.notify("Visibility", [ test ], self.shouldBeVisible(test))
 
-    def addTestForNode(self, test, colour, category, nodeClassifier, classifiers, incrementCount, parentIter=None):
+    def addTestForNode(self, test, defaultColour, category, nodeClassifier, classifiers, incrementCount, parentIter=None):
         self.diag.info("Adding " + repr(test) + " for node " + nodeClassifier + " (" + repr(classifiers) + ")")
         nodeIter = self.findIter(nodeClassifier, parentIter)
+        colour = guiConfig.getTestColour(nodeClassifier, defaultColour)
         if nodeIter:
             self.insertTestAtIter(nodeIter, test, colour, incrementCount)
         else:
             nodeIter = self.addNewIter(nodeClassifier, parentIter, colour, category, 1, [ test ])
 
         self.classifications[test].append(nodeIter)
+        subColours = []
         for subNodeClassifier in classifiers[nodeClassifier]:
-            self.addTestForNode(test, colour, category, subNodeClassifier, classifiers, incrementCount, nodeIter)
+            subColour = self.addTestForNode(test, colour, category, subNodeClassifier, classifiers, incrementCount, nodeIter)
+            subColours.append(subColour)
+            
+        if len(subColours) > 0:
+            return subColours[0]
+        else:
+            return colour
     def insertTestAtIter(self, iter, test, colour, incrementCount):
         allTests = self.treeModel.get_value(iter, 5)
         testCount = self.treeModel.get_value(iter, 1)

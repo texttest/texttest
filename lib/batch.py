@@ -486,6 +486,7 @@ class WebPageResponder(respond.Responder):
     def notifyAllComplete(self):
         appInfo = self.getAppRepositoryInfo()
         for pageTitle, pageInfo in appInfo.items():
+            print "Generating page for", pageTitle
             if len(pageInfo) == 1:
                 self.generatePagePerApp(pageTitle, pageInfo)
             else:

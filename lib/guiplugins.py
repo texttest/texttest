@@ -656,11 +656,19 @@ class ViewInEditor(FileViewAction):
         description = descriptor + " " + os.path.basename(fileName)
         refresh = bool(exitHandler)
         guilog.info("Viewing file " + fileName + " using '" + descriptor + "', refresh set to " + str(refresh))
-        process = self.startViewer(cmdArgs, description=description, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
+        process = self.startViewer(cmdArgs, description=description, env=self.getViewerEnvironment(cmdArgs),
+                                   exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
         scriptEngine.monitorProcess("views and edits test files", process, [ fileName ])
+    def getViewerEnvironment(self, cmdArgs):
+        # An absolute path to the viewer may indicate a custom tool, send the test environment along too
+        # Doing this is unlikely to cause harm in any case
+        if self.currentTest and os.path.isabs(cmdArgs[0]):
+            return self.currentTest.getRunEnvironment()
     def getViewCommand(self, fileName, viewProgram):
         # viewProgram might have arguments baked into it...
-        return plugins.splitcmd(viewProgram) + [ fileName ], viewProgram
+        cmdArgs = plugins.splitcmd(viewProgram) + [ fileName ]
+        descriptor = " ".join([ os.path.basename(cmdArgs[0]) ] + cmdArgs[1:-1])
+        return cmdArgs, descriptor
     
     def findExitHandlerInfo(self, fileName):
         if self.dynamic:

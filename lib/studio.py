@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.19 2008/01/22 16:03:41 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.20 2008/02/21 16:15:41 geoff Exp $
 #
 import ravebased, sandbox, plugins, guiplugins, subprocess
 import os, shutil, string
@@ -239,20 +239,3 @@ class RecordTest(guiplugins.RecordTest):
             self.notify("Status", message)
         else:
             guiplugins.RecordTest.setTestReady(self, test, usecase)
-
-class ViewInEditor(guiplugins.ViewInEditor):
-    def getViewCommand(self, fileName, stdViewProgram):
-        fname=os.path.basename(fileName)
-        if not (fname.startswith("usecase.") \
-                or (fname.startswith("slave_") and fname.find("usecase.") > 0)):
-            return guiplugins.ViewInEditor.getViewCommand(self, fileName, stdViewProgram)
-        carmSys = self.currentTest.getEnvironment("CARMSYS")
-        carmUsr = self.currentTest.getEnvironment("CARMUSR")
-        if not carmSys or not carmUsr:
-            return guiplugins.ViewInEditor.getViewCommand(self, fileName, stdViewProgram)
-        viewProgram = os.path.join(carmSys, "bin", "startMacroRecorder")
-        if not os.path.isfile(viewProgram):
-            raise plugins.TextTestError, "Could not find macro editor at " + viewProgram
-        envArgs = [ "env", "USER=nightjob", "CARMSYS=" + carmSys, "CARMUSR=" + carmUsr ]
-        cmdArgs = envArgs + [ viewProgram, fileName ]
-        return cmdArgs, "macro editor"

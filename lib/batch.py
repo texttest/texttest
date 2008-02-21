@@ -485,12 +485,15 @@ class WebPageResponder(respond.Responder):
             self.allApps.remove(app)
     def notifyAllComplete(self):
         appInfo = self.getAppRepositoryInfo()
+        print "Generating web pages..."
+        sys.stdout.flush()
         for pageTitle, pageInfo in appInfo.items():
             print "Generating page for", pageTitle
             if len(pageInfo) == 1:
                 self.generatePagePerApp(pageTitle, pageInfo)
             else:
                 self.generateCommonPage(pageTitle, pageInfo)
+        print "Completed web page generation."
 
     def generatePagePerApp(self, pageTitle, pageInfo):
         for app, repository in pageInfo:

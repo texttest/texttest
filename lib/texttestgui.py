@@ -1230,7 +1230,7 @@ class TestTreeGUI(ContainerGUI):
         self.model.set_value(iter, 4, colour2)
         self.diagnoseTest(test, iter)
         if updateSuccess:
-            self.updateSuiteSuccess(test.parent)
+            self.updateSuiteSuccess(test.parent, colour1)
 
     def notifyLifecycleChange(self, test, *args):
         if test in self.selectedTests:
@@ -1242,15 +1242,15 @@ class TestTreeGUI(ContainerGUI):
         if test in self.selectedTests:
             self.notify("DescriptionChange", test, *args)
 
-    def updateSuiteSuccess(self, suite):
+    def updateSuiteSuccess(self, suite, colour):
         successCount = self.successPerSuite.get(suite, 0) + 1
         self.successPerSuite[suite] = successCount
         suiteSize = suite.size()
         if successCount == suiteSize:
-            self.setAllSucceeded(suite, suiteSize)
+            self.setAllSucceeded(suite, suiteSize, colour)
 
         if suite.parent:
-            self.updateSuiteSuccess(suite.parent)
+            self.updateSuiteSuccess(suite.parent, colour)
             
     def diagnoseTest(self, test, iter):
         self.writeSeparator()
@@ -1259,15 +1259,14 @@ class TestTreeGUI(ContainerGUI):
         if secondColumnText:
             guilog.info("(Second column '" + secondColumnText + "' coloured " + self.model.get_value(iter, 4) + ")")
             
-    def setAllSucceeded(self, suite, suiteSize):
+    def setAllSucceeded(self, suite, suiteSize, colour):
         # Print how many tests succeeded, color details column in success color,
         # collapse row, and try to collapse parent suite.
         detailText = "All " + str(suiteSize) + " tests successful"
-        successColour = guiConfig.getTestColour("success")
         iter = self.itermap.getIterator(suite)
         self.model.set_value(iter, 3, detailText)
-        self.model.set_value(iter, 4, successColour)
-        guilog.info("Redrawing suite " + suite.name + " : second column '" + detailText +  "' coloured " + successColour)
+        self.model.set_value(iter, 4, colour)
+        guilog.info("Redrawing suite " + suite.name + " : second column '" + detailText +  "' coloured " + colour)
 
         if suite.getConfigValue("auto_collapse_successful") == 1:
             self.collapseRow(iter)
@@ -2691,11 +2690,16 @@ class TestProgressMonitor(SubGUI):
         self.classifications[test] = []
         classifiers = self.getClassifiers(state)
         nodeClassifier = classifiers.keys()[0]
-        defaultColour = guiConfig.getTestColour(state.category)
+        defaultColour = self.getDefaultColour(state, nodeClassifier, classifiers)
         return self.addTestForNode(test, defaultColour, state.category, nodeClassifier, classifiers, incrementCount)
+    def getDefaultColour(self, state, nodeClassifier, classifiers):
+        # Use the category description if there is only one level, otherwise rely on the status names
+        if len(classifiers.get(nodeClassifier)) == 0:
+            return guiConfig.getTestColour(state.category)
     def updateTestAppearance(self, test, state, changeDesc, colour):
         resultType, summary = state.getTypeBreakdown()
-        mainColour = guiConfig.getTestColour(resultType)
+        catDesc = self.getCategoryDescription(state, resultType)
+        mainColour = guiConfig.getTestColour(catDesc, guiConfig.getTestColour(resultType))
         # Don't change suite states when unmarking tests
         updateSuccess = state.hasSucceeded() and changeDesc != "unmarked"
         self.notify("TestAppearance", test, summary, mainColour, colour, updateSuccess)

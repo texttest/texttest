@@ -8,7 +8,7 @@ class FilterAction(plugins.Action):
     def __init__(self):
         self.diag = plugins.getDiagnostics("Filter Actions")
     def __call__(self, test):
-        for fileName in self.filesToFilter(test):
+        for fileName, postfix in self.filesToFilter(test):
             self.diag.info("Considering for filtering : " + fileName)
             stem = os.path.basename(fileName).split(".")[0]
             runDepTexts = test.getCompositeConfigValue("run_dependent_text", stem)
@@ -16,7 +16,7 @@ class FilterAction(plugins.Action):
             if len(runDepTexts) > 0 or len(unorderedTexts) > 0 or self.changedOs(test.app):
                 fileFilter= RunDependentTextFilter(test.getRelPath(), runDepTexts, unorderedTexts)
                 filterFileBase = test.makeTmpFileName(stem + "." + test.app.name, forFramework=1)
-                newFileName = filterFileBase + self.getPostfix(test)
+                newFileName = filterFileBase + postfix
                 if self.shouldRemove(newFileName, fileName):
                     self.diag.info("Removing previous file at " + newFileName)
                     os.remove(newFileName)
@@ -30,34 +30,33 @@ class FilterAction(plugins.Action):
         if not os.path.isfile(newFile):
             return False
         return plugins.modifiedTime(newFile) <= plugins.modifiedTime(oldFile)
+    def constantPostfix(self, files, postfix):
+        return [ (file, postfix) for file in files ]
         
 class FilterOriginal(FilterAction):
     def filesToFilter(self, test):
         resultFiles, defFiles = test.listStandardFiles(allVersions=False)
-        return resultFiles + defFiles
-    def getPostfix(self, test):
-        return "origcmp"
+        return self.constantPostfix(resultFiles + defFiles, "origcmp")
 
 class FilterTemporary(FilterAction):
     def filesToFilter(self, test):
-        return test.listTmpFiles()
-    def getPostfix(self, test):
-        return "cmp"
+        return self.constantPostfix(test.listTmpFiles(), "cmp")
 
 class FilterRecompute(FilterOriginal):
     def filesToFilter(self, test):
         if test.state.isComplete():
             if hasattr(test.state, "allResults"):
-                return [ fileComp.stdFile for fileComp in test.state.allResults ]
+                result = []
+                for fileComp in test.state.allResults:
+                    if fileComp.stdFile:
+                        result.append((fileComp.stdFile, "origcmp"))
+                    if fileComp.tmpFile:
+                        result.append((fileComp.tmpFile, "cmp"))
+                return result
             else:
                 return []
         else:
-            return test.listTmpFiles()
-    def getPostfix(self, test):
-        if test.state.isComplete():
-            return FilterOriginal.getPostfix(self, test)
-        else:
-            return "partcmp"
+            return self.constantPostfix(test.listTmpFiles(), "partcmp")
 
 class RunDependentTextFilter(plugins.Observable):
     def __init__(self, testId, runDepTexts, unorderedTexts):

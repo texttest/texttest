@@ -1088,7 +1088,8 @@ class RecordTest(InteractiveTestAction):
     def getRecordMode(self):
         return self.currentTest.getConfigValue("use_case_record_mode")
     def isActiveOnCurrent(self, *args):
-        return InteractiveTestAction.isActiveOnCurrent(self, *args) and self.getRecordMode() != "disabled"
+        return InteractiveTestAction.isActiveOnCurrent(self, *args) and self.getRecordMode() != "disabled" and \
+               self.currentTest.getConfigValue("use_case_recorder") != "none"
     def updateOptions(self):
         if self.currentApp is not self.currentTest.app:
             self.currentApp = self.currentTest.app

@@ -549,7 +549,10 @@ class TestState(Observable):
     def getFreeText(self):
         return self.freeText # some subclasses might want to calculate this...
     def getTypeBreakdown(self):
-        return self.category, self.briefText
+        if self.isComplete():
+            return "failure", self.briefText
+        else:
+            return self.category, self.briefText
     def hasStarted(self):
         return self.started or self.completed
     def isComplete(self):
@@ -596,6 +599,8 @@ class MarkedTestState(TestState):
         return False
     def isMarked(self):
         return True
+    def getTypeBreakdown(self):
+        return self.category, self.briefText
 
 # Simple handle to get diagnostics object. Better than using log4py directly,
 # as it ensures everything appears by default in a standard place with a standard name.

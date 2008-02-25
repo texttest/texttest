@@ -462,7 +462,7 @@ class CreatePerformanceReport(guiplugins.SelectionAction):
     def separatorBeforeInMainMenu(self):
         return True
     def getDialogType(self):
-        return "guidialogs.CreatePerformanceReportDialog"
+        return "matadordialogs.CreatePerformanceReportDialog"
     def _getTitle(self):
         return "Create Performance Report..."
     def _getScriptTitle(self):

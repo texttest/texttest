@@ -263,8 +263,6 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         app.addConfigEntry("bugzilla", "http://bugzilla.carmen.se/cli.cgi", "bug_system_script")
         # plenty of people use CVS at Carmen, best to ignore it in data
         app.addConfigEntry("default", "CVS", "test_data_ignore")
-        # ...and to use the plugin by default
-        app.addConfigEntry("interactive_action_module", "cvs")
         for batchSession in self.getFilteredBatchSessions():
             app.addConfigEntry(batchSession, "true", "batch_use_version_filtering")
         for var, value in self.getCarmenEnvironment(app):

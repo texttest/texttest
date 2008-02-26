@@ -1,16 +1,6 @@
 #!/usr/bin/env python
 
-import gtk, entrycompletion
-
-import plugins, os, sys
-scriptEngine = None
-guilog = None
-from gtkusecase import ScriptEngine, TreeModelIndexer
-
-def setupScriptEngine(engine):
-    global scriptEngine, guilog
-    scriptEngine = engine
-    from guiplugins import guilog
+import gtk, guiplugins, entrycompletion, plugins, os, sys
 
 def destroyDialog(dialog, *args):
     dialog.destroy()
@@ -45,29 +35,29 @@ def createDialogMessage(message, stockIcon, scrollBars=False):
     return alignment
 
 def showErrorDialog(message, parent=None):
-    guilog.info("ERROR: " + message)
+    guiplugins.guilog.info("ERROR: " + message)
     dialog = gtk.Dialog("TextTest Error", parent, buttons=(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
     dialog.set_modal(True)
     dialog.vbox.pack_start(createDialogMessage(message, gtk.STOCK_DIALOG_ERROR), expand=True, fill=True)
-    scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
+    guiplugins.scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
     dialog.show_all()
     dialog.set_default_response(gtk.RESPONSE_ACCEPT)
 
 def showWarningDialog(message, parent=None):
-    guilog.info("WARNING: " + message)
+    guiplugins.guilog.info("WARNING: " + message)
     dialog = gtk.Dialog("TextTest Warning", parent, buttons=(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
     dialog.set_modal(True)
     dialog.vbox.pack_start(createDialogMessage(message, gtk.STOCK_DIALOG_WARNING), expand=True, fill=True)
-    scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
+    guiplugins.scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
     dialog.show_all()
     dialog.set_default_response(gtk.RESPONSE_ACCEPT)
 
 def showInformationDialog(message, parent=None):
-    guilog.info("INFORMATION: " + message)
+    guiplugins.guilog.info("INFORMATION: " + message)
     dialog = gtk.Dialog("TextTest Information", parent, buttons=(gtk.STOCK_CLOSE, gtk.RESPONSE_CLOSE))
     dialog.set_modal(True)
     dialog.vbox.pack_start(createDialogMessage(message, gtk.STOCK_DIALOG_INFO), expand=True, fill=True)
-    scriptEngine.connect("press close", "response", dialog, destroyDialog, gtk.RESPONSE_CLOSE)
+    guiplugins.scriptEngine.connect("press close", "response", dialog, destroyDialog, gtk.RESPONSE_CLOSE)
     dialog.show_all()
     dialog.set_default_response(gtk.RESPONSE_CLOSE)
 
@@ -126,8 +116,8 @@ class ActionConfirmationDialog(GenericActionDialog):
     def createButtons(self):
         self.cancelButton = self.dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL)
         self.okButton = self.dialog.add_button(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT)       
-        scriptEngine.connect("press cancel", "clicked", self.cancelButton, self.respond, gtk.RESPONSE_CANCEL, False)
-        scriptEngine.connect("press ok", "clicked", self.okButton, self.respond, gtk.RESPONSE_ACCEPT, True)
+        guiplugins.scriptEngine.connect("press cancel", "clicked", self.cancelButton, self.respond, gtk.RESPONSE_CANCEL, False)
+        guiplugins.scriptEngine.connect("press ok", "clicked", self.okButton, self.respond, gtk.RESPONSE_ACCEPT, True)
 
     def respond(self, button, saidOK, *args):
         entrycompletion.manager.collectCompletions()
@@ -154,7 +144,7 @@ class ActionResultDialog(GenericActionDialog):
 
     def createButtons(self):
         self.okButton = self.dialog.add_button(gtk.STOCK_CLOSE, gtk.RESPONSE_ACCEPT)       
-        scriptEngine.connect("press close", "clicked", self.okButton, self.respond, gtk.RESPONSE_ACCEPT, True)
+        guiplugins.scriptEngine.connect("press close", "clicked", self.okButton, self.respond, gtk.RESPONSE_ACCEPT, True)
         self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
 
     def respond(self, button, saidOK, *args):
@@ -177,7 +167,7 @@ class YesNoDialog(ActionConfirmationDialog):
             self.message = self.plugin.confirmationMessage
         else:
             self.message = message
-        guilog.info(self.alarmLevel().upper() + ": " + self.message)
+        guiplugins.guilog.info(self.alarmLevel().upper() + ": " + self.message)
         self.dialog.set_default_response(gtk.RESPONSE_NO)
 
     def getDialogTitle(self):
@@ -186,9 +176,9 @@ class YesNoDialog(ActionConfirmationDialog):
     def createButtons(self):
         noButton = self.dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
         yesButton = self.dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
-        scriptEngine.connect("answer no to texttest " + self.alarmLevel(), "clicked",
+        guiplugins.scriptEngine.connect("answer no to texttest " + self.alarmLevel(), "clicked",
                              noButton, self.respond, gtk.RESPONSE_NO, False)
-        scriptEngine.connect("answer yes to texttest " + self.alarmLevel(), "clicked", yesButton,
+        guiplugins.scriptEngine.connect("answer yes to texttest " + self.alarmLevel(), "clicked", yesButton,
                              self.respond, gtk.RESPONSE_YES, True)
 
     def addContents(self):
@@ -238,7 +228,7 @@ class SaveSelectionDialog(ActionConfirmationDialog):
         for i in xrange(len(self.folders) - 1, -1, -1):
             self.fileChooser.add_shortcut_folder(self.folders[i][1])
         self.fileChooser.set_local_only(True)
-        scriptEngine.registerSaveFileChooser(self.fileChooser, "enter filter-file name =", "choose folder", "press save", "press cancel",
+        guiplugins.scriptEngine.registerSaveFileChooser(self.fileChooser, "enter filter-file name =", "choose folder", "press save", "press cancel",
                                              self.respond, self.okButton, self.cancelButton)
         vbox.pack_start(self.fileChooser, expand=True, fill=True)
 
@@ -248,8 +238,8 @@ class SaveSelectionDialog(ActionConfirmationDialog):
         frameBox = gtk.VBox()
         self.radio1 = gtk.RadioButton(label="_List of selected tests", use_underline=True)
         self.radio2 = gtk.RadioButton(self.radio1, label="C_riteria entered in the Selection tab\n(Might not match current selection, if it has been modified)", use_underline=True) # Letting C be mnemonic conflicts with cancel button ...
-        scriptEngine.registerToggleButton(self.radio1, "choose to save list of selected tests")
-        scriptEngine.registerToggleButton(self.radio2, "choose to save selection criteria")
+        guiplugins.scriptEngine.registerToggleButton(self.radio1, "choose to save list of selected tests")
+        guiplugins.scriptEngine.registerToggleButton(self.radio2, "choose to save selection criteria")
         frameBox.pack_start(self.radio1)
         frameBox.pack_start(self.radio2)
         frame.add(frameBox)
@@ -305,7 +295,7 @@ class LoadSelectionDialog(ActionConfirmationDialog):
     def createButtons(self):
         self.cancelButton = self.dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL)
         self.okButton = self.dialog.add_button("texttest-stock-load", gtk.RESPONSE_ACCEPT)
-        scriptEngine.registerOpenFileChooser(self.fileChooser, "select filter-file", "look in folder", "press load", "press cancel", 
+        guiplugins.scriptEngine.registerOpenFileChooser(self.fileChooser, "select filter-file", "look in folder", "press load", "press cancel", 
                                              self.respond, self.okButton, self.cancelButton)
         
     def addContents(self):
@@ -368,7 +358,7 @@ class RenameDialog(ActionConfirmationDialog):
         self.entry.set_activates_default(True)
         entrycompletion.manager.register(self.entry)
         self.entry.set_text(self.plugin.newName)
-        scriptEngine.registerEntry(self.entry, "enter new name ")
+        guiplugins.scriptEngine.registerEntry(self.entry, "enter new name ")
         vbox.pack_start(self.entry)
         hbox3 = gtk.HBox()
         hbox3.pack_start(gtk.Label("\nNew description:"), expand=False, fill=False)
@@ -377,7 +367,7 @@ class RenameDialog(ActionConfirmationDialog):
         self.descriptionEntry.set_activates_default(True)
         entrycompletion.manager.register(self.descriptionEntry)
         self.descriptionEntry.set_text(self.plugin.newDescription)
-        scriptEngine.registerEntry(self.descriptionEntry, "enter new description ")
+        guiplugins.scriptEngine.registerEntry(self.descriptionEntry, "enter new description ")
         vbox.pack_start(self.descriptionEntry)
         
     def respond(self, button, saidOK, *args):
@@ -414,7 +404,7 @@ class MarkTestDialog(ActionConfirmationDialog):
         entrycompletion.manager.register(self.briefEntry)
         self.briefEntry.set_text("Checked")
         self.briefEntry.set_activates_default(True)
-        scriptEngine.registerEntry(self.briefEntry, "enter new test state brief text ")
+        guiplugins.scriptEngine.registerEntry(self.briefEntry, "enter new test state brief text ")
         vbox.pack_start(self.briefEntry)
 
         hbox2 = gtk.HBox()
@@ -424,7 +414,7 @@ class MarkTestDialog(ActionConfirmationDialog):
         entrycompletion.manager.register(self.freeEntry)
         self.freeEntry.set_text("Checked at " + plugins.localtime())
         self.freeEntry.set_activates_default(True)
-        scriptEngine.registerEntry(self.freeEntry, "enter new test state free text ")
+        guiplugins.scriptEngine.registerEntry(self.freeEntry, "enter new test state free text ")
         vbox.pack_start(self.freeEntry)
         
     def respond(self, button, saidOK, *args):

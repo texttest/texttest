@@ -1,9 +1,6 @@
 
-import gtk
-import gobject
-
-import guiplugins, guidialogs, plugins, texttest_version, os, string, sys, glob
-from gtkusecase import ScriptEngine
+import gtk, guidialogs, plugins, texttest_version, os, string, sys, glob
+from guiplugins import scriptEngine, guilog
 
 # Show useful info about TextTest.
 # I don't particularly like the standard gtk.AboutDialog, and we also want
@@ -20,10 +17,10 @@ class AboutTextTestDialog(guidialogs.ActionResultDialog):
         self.licenseButton = self.dialog.add_button('_License', gtk.RESPONSE_NONE)
         self.versionsButton = self.dialog.add_button('_Versions', gtk.RESPONSE_NONE)
         self.closeButton = self.dialog.add_button(gtk.STOCK_CLOSE, gtk.RESPONSE_CLOSE)
-        guidialogs.scriptEngine.connect("press credits", "clicked", self.creditsButton, self.showCredits)
-        guidialogs.scriptEngine.connect("press license", "clicked", self.licenseButton, self.showLicense)
-        guidialogs.scriptEngine.connect("press versions", "clicked", self.versionsButton, self.showVersions)
-        guidialogs.scriptEngine.connect("press close", "clicked", self.closeButton, self.respond, gtk.RESPONSE_CLOSE, True)
+        scriptEngine.connect("press credits", "clicked", self.creditsButton, self.showCredits)
+        scriptEngine.connect("press license", "clicked", self.licenseButton, self.showLicense)
+        scriptEngine.connect("press versions", "clicked", self.versionsButton, self.showVersions)
+        scriptEngine.connect("press close", "clicked", self.closeButton, self.respond, gtk.RESPONSE_CLOSE, True)
 
     def addContents(self):
         logo = gtk.Image()
@@ -73,9 +70,9 @@ class VersionsDialog(guidialogs.ActionResultDialog):
         pythonVersion = ".".join(map(lambda l: str(l), sys.version_info))
         gtkVersion = ".".join(map(lambda l: str(l), gtk.gtk_version))
         pygtkVersion = ".".join(map(lambda l: str(l), gtk.pygtk_version))
-        guidialogs.guilog.info("Showing component versions: \n TextTest: " + textTestVersion +
-                               "\n Python: " + pythonVersion + "\n GTK: " + gtkVersion +
-                               "\n PyGTK: " + pygtkVersion)
+        guilog.info("Showing component versions: \n TextTest: " + textTestVersion +
+                    "\n Python: " + pythonVersion + "\n GTK: " + gtkVersion +
+                    "\n PyGTK: " + pygtkVersion)
         
         table = gtk.Table(4, 2, homogeneous=False)
         table.set_row_spacings(1)
@@ -129,7 +126,7 @@ class CreditsDialog(guidialogs.ActionResultDialog):
             unicodeInfo = plugins.decodeText("".join(authorFile.readlines()))           
             authorFile.close()
             creditsText = plugins.encodeToUTF(unicodeInfo)
-            guidialogs.guilog.info("Showing credits:\n" + creditsText)
+            guilog.info("Showing credits:\n" + creditsText)
             buffer = gtk.TextBuffer()
             buffer.set_text(creditsText)
         except Exception, e:
@@ -158,7 +155,7 @@ class LicenseDialog(guidialogs.ActionResultDialog):
             unicodeInfo = plugins.decodeText("".join(licenseFile.readlines()))           
             licenseFile.close()
             licenseText = plugins.encodeToUTF(unicodeInfo)
-            guidialogs.guilog.info("Showing license:\n" + licenseText)
+            guilog.info("Showing license:\n" + licenseText)
             buffer = gtk.TextBuffer()
             buffer.set_text(licenseText)
         except Exception, e:
@@ -190,7 +187,7 @@ class MigrationNotesDialog(guidialogs.ActionResultDialog):
             unicodeInfo = plugins.decodeText("".join(notesFile.readlines()))           
             notesFile.close()
             notesText = plugins.encodeToUTF(unicodeInfo)
-            guidialogs.guilog.info("Adding migration notes from file '" + os.path.basename(note) + "':\n" + notesText)
+            guilog.info("Adding migration notes from file '" + os.path.basename(note) + "':\n" + notesText)
 
             buffer = gtk.TextBuffer()
             buffer.set_text(notesText)
@@ -209,7 +206,7 @@ class MigrationNotesDialog(guidialogs.ActionResultDialog):
         if notebook.get_n_pages() == 0:
             raise plugins.TextTestError, "\nNo migration notes could be found in\n" + plugins.installationDir("doc") + "\n"
         else:
-            guidialogs.scriptEngine.monitorNotebook(notebook, "view migration notes in tab")
+            scriptEngine.monitorNotebook(notebook, "view migration notes in tab")
             parentSize = self.parent.get_size()
             self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[0] * 0.7))
             self.dialog.vbox.pack_start(notebook, expand=True, fill=True)

@@ -1309,12 +1309,11 @@ class Application:
         self.setConfigDefault("extra_search_directory", { "default" : [] }, "Additional directories to search for settings besides the test structure")
         self.setConfigAlias("test_data_searchpath", "extra_search_directory")
         self.setConfigAlias("extra_config_directory", "extra_search_directory")
-        self.setConfigDefault("interactive_action_module", [],
-                              "Module to search for InteractiveActions for the GUI")
     def setDependentConfigDefaults(self):
         executable = self.getConfigValue("executable")
         # Set values which default to other values
-        self.addConfigEntry("interactive_action_module", self.getConfigValue("config_module"))
+        self.setConfigDefault("interactive_action_module", self.getConfigValue("config_module") + "_gui",
+                              "Module to search for InteractiveActions for the GUI")
         self.setConfigDefault("interpreter", plugins.getInterpreter(executable), "Program to use as interpreter for the SUT")
     def createOptionGroups(self, inputOptions):
         groupNames = [ "Select Tests", "Basic", "Advanced", "Invisible" ]

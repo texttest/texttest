@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, performance, plugins, respond, sys, string, time, types, shutil, testoverview
+import os, performance, plugins, respond, sys, string, time, types, shutil
 from ndict import seqdict
 from cPickle import Pickler
 from sets import Set
@@ -546,20 +546,10 @@ class WebPageResponder(respond.Responder):
             plugins.printException()
 
     def generateWebPages(self, pageDir, app, extraVersions, relevantSubDirs, pageTitle):
-        testoverview.colourFinder.setColourDict(app.getConfigValue("testoverview_colours"))
-        webPageGeneratorClass = self.getWebPageGeneratorClass(app)
-        generator = webPageGeneratorClass(pageTitle, getVersionName(app), pageDir, extraVersions)
+        webPageGeneratorClass = app.getWebPageGeneratorClass()
+        generator = webPageGeneratorClass(pageTitle, getVersionName(app), pageDir,
+                                          extraVersions, app.getConfigValue("testoverview_colours"))
         generator.generate(relevantSubDirs)
-    def getWebPageGeneratorClass(self, app):
-        # Take the most specific module first, see guiplugins.py comment for why...
-        for module in reversed(app.getConfigValue("interactive_action_module")):
-            command = "from " + module + " import GenerateWebPages"
-            try:
-                exec command
-                return GenerateWebPages
-            except:
-                pass
-        return testoverview.GenerateWebPages
 
     def findRelevantSubdirectories(self, repository, app, extraVersions):
         subdirs = []

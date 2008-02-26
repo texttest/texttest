@@ -40,7 +40,7 @@ def getDisplayText(tag):
         return tag
 
 class GenerateWebPages:
-    def __init__(self, pageTitle, pageVersion, pageDir, extraVersions):
+    def __init__(self, pageTitle, pageVersion, pageDir, extraVersions, colourDict):
         self.pageTitle = pageTitle
         self.pageVersion = pageVersion
         self.extraVersions = extraVersions
@@ -48,6 +48,7 @@ class GenerateWebPages:
         self.pagesOverview = seqdict()
         self.pagesDetails = seqdict()
         self.diag = plugins.getDiagnostics("GenerateWebPages")
+        colourFinder.setColourDict(colourDict)
     def createTestTable(self):
         # Hook for configurations to inherit from
         return TestTable()

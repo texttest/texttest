@@ -127,7 +127,7 @@ optimization.PlotSubplans
 """
 
 
-import ravebased, os, sys, string, shutil, plugins, math, re, unixonly, guiplugins, copy, testoverview, time, testmodel, subprocess
+import ravebased, os, sys, string, shutil, plugins, math, re, unixonly, copy, testoverview, time, testmodel, subprocess
 from ndict import seqdict
 from time import sleep
 from respond import Responder
@@ -182,6 +182,8 @@ class OptimizationConfig(ravebased.Config):
             return ravebased.Config.getResponderClasses(self, allApps)
     def getTestComparator(self):
         return MakeComparisons(OptimizationTestComparison, self.getProgressComparisonClass())
+    def getWebPageGeneratorClass(self):
+        return GenerateWebPages
     def getProgressComparisonClass(self):
         pass # for APC
     def getProgressReportBuilder(self):
@@ -217,8 +219,6 @@ class OptimizationConfig(ravebased.Config):
         app.setConfigDefault("skip_comparison_if_not_present", "error", "List of files that are compared only if they are created by the test, i.e. they will not be reported as missing")
         app.addConfigEntry("definition_file_stems", "raveparameters")
         app.addConfigEntry("plot_graph", "<control>p", "gui_accelerators")
-        # pick up the GUI stuff from here...
-        app.addConfigEntry("interactive_action_module", "optimization")
 
 # Insert the contents of all raveparameters into the temporary rules file
 # Also assume the subplan will be changed, but nothing else.
@@ -895,33 +895,6 @@ class MakeProgressReport(plugins.Action):
         titleWidth = 30
         print string.ljust(title, titleWidth) + ": " + string.rjust(str(currEntry), fieldWidth) + string.rjust(str(refEntry), fieldWidth)
 
-# Graphical import test
-class ImportTestCase(guiplugins.ImportTestCase):
-    def addDefinitionFileOption(self):
-        self.addOption("sp", "Subplan name")
-    def getSubplanName(self):
-        return self.optionGroup.getOptionValue("sp")
-    def checkName(self, suite, testName):
-        guiplugins.ImportTestCase.checkName(self, suite, testName)
-        if not suite.getEnvironment("CARMUSR"):
-            raise plugins.TextTestError, "Not allowed to create tests under a suite where CARMUSR isn't defined"
-        
-        if len(self.getSubplanName()) == 0:
-            raise plugins.TextTestError, "No subplan name given for new " + self.testType() + "!" + "\n" + \
-                  "Fill in the 'Adding " + self.testType() + "' tab below."
-    def getNewTestName(self):
-        nameEntered = guiplugins.ImportTestCase.getNewTestName(self)
-        if len(nameEntered) > 0:
-            return nameEntered
-        # Default test name to subplan name
-        subplan = self.getSubplanName()
-        if len(subplan) == 0:
-            return nameEntered
-        root, local = os.path.split(subplan)
-        return local
-    def getOptions(self, suite):
-        pass
-    # getOptions implemented in subclasses
         
 class TraverseSubPlans(plugins.Action):
     def __init__(self, args = []):
@@ -983,74 +956,6 @@ class GraphPlotResponder(Responder):
         except plugins.TextTestError, e:
             print e
 
-# This is the action responsible for plotting from the GUI.
-class PlotTestInGUI(guiplugins.SelectionAction):
-    def __init__(self, allApps, dynamic):
-        guiplugins.SelectionAction.__init__(self, allApps, dynamic)
-        self.dynamic = dynamic
-        self.testGraph = TestGraph(self.optionGroup)
-    def __repr__(self):
-        return "Plotting Graph"
-    def _getTitle(self):
-        return "_Plot Graph"
-    def __repr__(self):
-        return "Plotting"
-    def getStockId(self):
-        return "clear"    
-    def getTabTitle(self):
-        return "Graph"
-    def getGroupTabTitle(self):
-        return "Graph"
-    def messageBeforePerform(self):
-        return "Plotting tests ..."
-    def messageAfterPerform(self):
-        return "Plotted " + self.describeTests() + "."    
-    def performOnCurrent(self):
-        for test in self.currTestSelection:
-            self.createGUIPlotObjects(test)
-        self.plotGraph(self.currTestSelection[0].app.writeDirectory) # This is not correct if you plot multiple applications!
-    def createGUIPlotObjects(self, test):
-        logFileStem = test.getConfigValue("log_file")
-        if self.dynamic:
-            tmpFile = self.getTmpFile(test, logFileStem)
-            if tmpFile:
-                self.testGraph.createPlotObjects("this run", None, tmpFile, test, None)
-
-        stdFile = test.getFileName(logFileStem)
-        if stdFile:
-            self.testGraph.createPlotObjects(None, None, stdFile, test, None)
-    
-        if not self.dynamic:
-            for version in self.testGraph.getExtraVersions():
-                plotFile = test.getFileName(logFileStem, version)
-                if plotFile and plotFile.endswith(test.app.name + "." + version):
-                    self.testGraph.createPlotObjects(None, version, plotFile, test, None)
-
-    def getTmpFile(self, test, logFileStem):
-        if test.state.isComplete():
-            try:
-                fileComp, storageList = test.state.findComparison(logFileStem, includeSuccess=True)
-                if fileComp:
-                    return fileComp.tmpFile
-            except AttributeError:
-                pass
-        else:
-            tmpFile = self.getRunningTmpFile(test, logFileStem)
-            if os.path.isfile(tmpFile):
-                return tmpFile
-    def getRunningTmpFile(self, test, logFileStem):
-        return test.makeTmpFileName(logFileStem)
-    def plotGraph(self, writeDirectory):
-        try:
-            plotProcess = self.testGraph.plot(writeDirectory)
-            if plotProcess:
-                # Should really monitor this and close it when GUI closes,
-                # but it isn't a child process so this means ps and load on the machine
-                #self.processes.append(plotProcess)
-                guiplugins.scriptEngine.monitorProcess("plots graphs", plotProcess)
-        finally:
-            # The TestGraph is "used", create a new one so that the user can do another plot.
-            self.testGraph = TestGraph(self.optionGroup)
 
 plotSubplanDone = None
 
@@ -1860,7 +1765,7 @@ class PlotAverager(Averager):
             xx.append(xScaleFactor * xVal)
         return xx, yValues
 
-# End of "PlotTest" functionality.
+### End of plot stuff
 
 # Override for webpage generation with generation of weekend page in it
 class GenerateWebPages(testoverview.GenerateWebPages):
@@ -1887,46 +1792,3 @@ class SelectorWeekend(testoverview.Selector):
         return "_weekend"
     def __repr__(self):
         return "Weekend"
-    
-class StartStudio(guiplugins.InteractiveTestAction):
-    def __init__(self, *args):
-        guiplugins.InteractiveTestAction.__init__(self, *args)
-        self.addOption("sys", "Studio CARMSYS to use")
-    def __repr__(self):
-        return "Studio"    
-    def inMenuOrToolBar(self):
-        return False
-    def _getTitle(self):
-        return "Studio"
-    def getTabTitle(self):
-        return "Studio"
-    def getScriptTitle(self, tab):
-        return "Start Studio"
-    def updateOptions(self):
-        self.optionGroup.setOptionValue("sys", self.currentTest.getEnvironment("CARMSYS"))
-        return False
-    def performOnCurrent(self):
-        environ = self.currentTest.getRunEnvironment([ "CARMUSR", "CARMTMP" ])
-        environ["CARMSYS"] = self.optionGroup.getOptionValue("sys")
-        print "CARMSYS:", environ["CARMSYS"]
-        print "CARMUSR:", environ["CARMUSR"]
-        print "CARMTMP:", environ["CARMTMP"]
-        fullSubPlanPath = self.currentTest.app._getSubPlanDirName(self.currentTest)
-        lPos = fullSubPlanPath.find("LOCAL_PLAN/")
-        subPlan = fullSubPlanPath[lPos + 11:]
-        localPlan = string.join(subPlan.split(os.sep)[0:-1], os.sep)
-        studio = os.path.join(environ["CARMSYS"], "bin", "studio")
-        if not os.path.isfile(studio):
-            raise plugins.TextTestError, "Cannot start studio, no file at " + studio
-        cmdArgs = [ studio, "-w", "-p'CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + "\",0)'" ]
-        process = self.startViewer(cmdArgs, description="Studio on " + subPlan, env=environ)
-        guiplugins.scriptEngine.monitorProcess("runs studio", process)
-
-def getInteractiveActionClasses(dynamic):
-    if dynamic:
-        return []
-    else:
-        return [ StartStudio ]
-
-def getMenuNames():
-    return [ "optimization" ]

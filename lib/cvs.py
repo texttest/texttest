@@ -1,9 +1,7 @@
 
-import os, guiplugins, guidialogs, gobject, datetime, time, subprocess
+import os, guidialogs, gobject, datetime, time, subprocess, default_gui
 import texttestgui, gtk, plugins, custom_widgets, entrycompletion
-
-guilog = guiplugins.guilog
-scriptEngine = guiplugins.scriptEngine
+from guiplugins import scriptEngine, guilog, InteractiveAction
 
 #
 # Todo/improvements:
@@ -36,9 +34,9 @@ scriptEngine = guiplugins.scriptEngine
 #
 # Base class for all CVS actions.
 #
-class CVSAction(guiplugins.InteractiveAction):
+class CVSAction(InteractiveAction):
     def __init__(self, cvsArgs, allApps=[], dynamic=False):
-        guiplugins.InteractiveAction.__init__(self, allApps)
+        InteractiveAction.__init__(self, allApps)
         self.currTestSelection = []
         self.cvsArgs = cvsArgs
         self.recursive = False
@@ -658,14 +656,16 @@ class CVSAnnotateRecursive(CVSAnnotate):
 texttestgui.pluginHandler.modules.append("cvs")
 
 #
-# Standard methods called by plugin mechanism
+# Configuration for the Interactive Actions
 #
-def getMenuNames():
-    return [ "CVS" ]
+class InteractiveActionConfig(default_gui.InteractiveActionConfig):
+    def getMenuNames(self):
+        return default_gui.InteractiveActionConfig.getMenuNames(self) + [ "CVS" ]
 
-def getInteractiveActionClasses(dynamic):
-    return [ CVSLog, CVSLogRecursive, CVSLogLatest, CVSDiff, CVSDiffRecursive, CVSStatus,
-             CVSStatusRecursive, CVSAnnotate, CVSAnnotateRecursive ]
+    def getInteractiveActionClasses(self, dynamic):
+        return default_gui.InteractiveActionConfig.getInteractiveActionClasses(self, dynamic) + \
+               [ CVSLog, CVSLogRecursive, CVSLogLatest, CVSDiff, CVSDiffRecursive, CVSStatus,
+                 CVSStatusRecursive, CVSAnnotate, CVSAnnotateRecursive ]
 
 #
 #

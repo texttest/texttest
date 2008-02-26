@@ -1,5 +1,5 @@
 
-import os, sys, plugins, sandbox, reconnect, respond, rundependent, comparetest, batch, subprocess, operator, glob, signal
+import os, sys, plugins, sandbox, reconnect, respond, rundependent, comparetest, batch, subprocess, operator, glob, signal, testoverview
 
 from threading import Lock
 from knownbugs import CheckForBugs, CheckForCrashes
@@ -551,6 +551,8 @@ class Config:
     def getDefaultMailAddress(self):
         user = os.getenv("USER", "$USER")
         return user + "@localhost"
+    def getWebPageGeneratorClass(self):
+        return testoverview.GenerateWebPages
     def getDefaultTestOverviewColours(self):
         try:
             from testoverview import colourFinder

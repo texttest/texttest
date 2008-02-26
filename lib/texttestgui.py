@@ -27,14 +27,13 @@ except:
     raiseException("Unable to import module 'gobject'")
 
 import guiplugins, plugins, os, sys, operator, entrycompletion
-from gtkusecase import ScriptEngine, RadioGroupIndexer
+from gtkusecase import RadioGroupIndexer
 from ndict import seqdict
 from respond import Responder
 from copy import copy
 from glob import glob
 from sets import Set
 
-import guidialogs
 from guidialogs import showErrorDialog, showWarningDialog, showInformationDialog
 
 def renderParentsBold(column, cell, model, iter):
@@ -307,10 +306,10 @@ class TextTestGUI(Responder, plugins.Observable):
     def __init__(self, optionMap, allApps):
         self.readGtkRCFiles()
         self.dynamic = not optionMap.has_key("gx")
-        guiplugins.setUpGlobals(self.dynamic, allApps)
+        global guilog, guiConfig, scriptEngine
+        guilog, guiConfig, scriptEngine = guiplugins.setUpGlobals(self.dynamic, allApps)
         Responder.__init__(self, optionMap)
         plugins.Observable.__init__(self)
-        guiplugins.scriptEngine = self.scriptEngine
         testCount = int(optionMap.get("count", 0))
         
         self.appFileGUI = ApplicationFileGUI(self.dynamic, allApps)
@@ -407,12 +406,6 @@ class TextTestGUI(Responder, plugins.Observable):
         if os.path.isfile(file):
             gtk.rc_add_default_file(file)
     
-    def setUpScriptEngine(self):
-        global guilog, guiConfig, scriptEngine
-        from guiplugins import guilog, guiConfig
-        scriptEngine = ScriptEngine(guilog, enableShortcuts=1)
-        self.scriptEngine = scriptEngine
-        guidialogs.setupScriptEngine(scriptEngine)
     def addSuites(self, suites):
         for observer in self.getAddSuitesObservers():
             observer.addSuites(suites)
@@ -2312,8 +2305,8 @@ class ApplicationFileGUI(FileViewGUI):
         allFiles.sort()
         return allFiles
     def getImportedFiles(self, file, app = None):
+        imports = []
         if os.path.isfile(file):
-            imports = []
             importLines = filter(lambda l: l.startswith("import_config_file"), open(file, "r").readlines())
             for line in importLines:
                 try:
@@ -2323,7 +2316,7 @@ class ApplicationFileGUI(FileViewGUI):
                     imports.append(file)
                 except Exception: # App. file not found ...
                     continue
-            return imports
+        return imports
 
 class TestFileGUI(FileViewGUI):
     def __init__(self, dynamic, popupGUI):
@@ -2841,19 +2834,3 @@ class TestProgressMonitor(SubGUI):
             if self.shouldBeVisible(test) == newValue:
                 changedTests.append(test)
         self.notify("Visibility", changedTests, newValue)
-
-
-# Class for importing self tests
-class ImportTestCase(guiplugins.ImportTestCase):
-    def addDefinitionFileOption(self):
-        guiplugins.ImportTestCase.addDefinitionFileOption(self)
-        self.addSwitch("GUI", "Use TextTest GUI", 1)
-        self.addSwitch("sGUI", "Use TextTest Static GUI", 0)
-    def getOptions(self, suite):
-        options = guiplugins.ImportTestCase.getOptions(self, suite)
-        if self.optionGroup.getSwitchValue("sGUI"):
-            options += " -gx"
-        elif self.optionGroup.getSwitchValue("GUI"):
-            options += " -g"
-        return options
-

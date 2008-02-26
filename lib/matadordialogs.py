@@ -1,10 +1,12 @@
 
-import gtk, os, entrycompletion, guidialogs
+import gtk, os, entrycompletion
+from guidialogs import ActionConfirmationDialog
+from guiplugins import scriptEngine
 
 # Dialog for performance report...
-class CreatePerformanceReportDialog(guidialogs.ActionConfirmationDialog):
+class CreatePerformanceReportDialog(ActionConfirmationDialog):
     def __init__(self, parent, okMethod, cancelMethod, plugin):
-        guidialogs.ActionConfirmationDialog.__init__(self, parent, okMethod, cancelMethod, plugin)
+        ActionConfirmationDialog.__init__(self, parent, okMethod, cancelMethod, plugin)
         self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
 
     def addContents(self):
@@ -30,9 +32,9 @@ class CreatePerformanceReportDialog(guidialogs.ActionConfirmationDialog):
         table.attach(self.dirEntry, 1, 2, 0, 1)
         table.attach(self.versionsEntry, 1, 2, 1, 2)
         table.attach(self.objectiveTextEntry, 1, 2, 2, 3)
-        guidialogs.scriptEngine.registerEntry(self.dirEntry, "choose directory ")
-        guidialogs.scriptEngine.registerEntry(self.versionsEntry, "choose versions ")
-        guidialogs.scriptEngine.registerEntry(self.objectiveTextEntry, "choose objective text ")
+        scriptEngine.registerEntry(self.dirEntry, "choose directory ")
+        scriptEngine.registerEntry(self.versionsEntry, "choose versions ")
+        scriptEngine.registerEntry(self.objectiveTextEntry, "choose objective text ")
         self.dialog.vbox.pack_start(table, expand = True, fill = True)
         
     def respond(self, button, saidOK, *args):
@@ -40,4 +42,4 @@ class CreatePerformanceReportDialog(guidialogs.ActionConfirmationDialog):
             self.plugin.rootDir = os.path.abspath(self.dirEntry.get_text())
             self.plugin.versions = self.versionsEntry.get_text().replace(" ", "").split(",")
             self.plugin.objectiveText = self.objectiveTextEntry.get_text()
-        guidialogs.ActionConfirmationDialog.respond(self, button, saidOK, *args)
+        ActionConfirmationDialog.respond(self, button, saidOK, *args)

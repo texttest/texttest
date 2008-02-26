@@ -274,11 +274,11 @@ class ViewInEditor(FileViewAction):
     def getToolConfigEntry(self):
         return "view_program"
     def viewFile(self, fileName, viewTool, exitHandler, exitHandlerArgs):
-        cmdArgs, descriptor = self.getViewCommand(fileName, viewTool)
+        cmdArgs, descriptor, env = self.getViewCommand(fileName, viewTool)
         description = descriptor + " " + os.path.basename(fileName)
         refresh = bool(exitHandler)
         guilog.info("Viewing file " + fileName + " using '" + descriptor + "', refresh set to " + str(refresh))
-        process = self.startViewer(cmdArgs, description=description, env=self.getViewerEnvironment(cmdArgs),
+        process = self.startViewer(cmdArgs, description=description, env=env,
                                    exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
         scriptEngine.monitorProcess("views and edits test files", process, [ fileName ])
     def getViewerEnvironment(self, cmdArgs):
@@ -289,8 +289,13 @@ class ViewInEditor(FileViewAction):
     def getViewCommand(self, fileName, viewProgram):
         # viewProgram might have arguments baked into it...
         cmdArgs = plugins.splitcmd(viewProgram) + [ fileName ]
-        descriptor = " ".join([ os.path.basename(cmdArgs[0]) ] + cmdArgs[1:-1])
-        return cmdArgs, descriptor
+        program = cmdArgs[0]
+        descriptor = " ".join([ os.path.basename(program) ] + cmdArgs[1:-1])
+        env = self.getViewerEnvironment(cmdArgs)
+        interpreter = plugins.getInterpreter(program)
+        if interpreter:
+            cmdArgs = [ interpreter ] + cmdArgs
+        return cmdArgs, descriptor, env
     
     def findExitHandlerInfo(self, fileName):
         if self.dynamic:

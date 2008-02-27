@@ -714,7 +714,7 @@ class MenuBarGUI(SubGUI):
         return self.getDescriptionFilesInDir(plugins.installationDir("layout")) + \
                self.getDescriptionFilesInDir(plugins.getPersonalConfigDir())
     def getDescriptionFilesInDir(self, layoutDir):
-        allFiles = os.path.join(layoutDir, "*_gui.xml")
+        allFiles = os.path.join(layoutDir, "*.xml")
         self.diag.info("All description files : " + repr(allFiles))
         # Pick up all GUI descriptions corresponding to modules we've loaded
         loadFiles = filter(self.shouldLoad, glob(allFiles))
@@ -727,16 +727,20 @@ class MenuBarGUI(SubGUI):
         default2 = base2.startswith("default")
         if default1 != default2:
             return cmp(default2, default1)
-        partCount1 = base1.count("_")
-        partCount2 = base2.count("_")
+        partCount1 = base1.count("-")
+        partCount2 = base2.count("-")
         if partCount1 != partCount2:
-            return cmp(partCount1, partCount2) # less _ implies read first (not mode-specific)
+            return cmp(partCount1, partCount2) # less - implies read first (not mode-specific)
         return cmp(base2, base1) # something deterministic, just to make sure it's the same for everyone
     def shouldLoad(self, fileName):
-        parts = os.path.basename(fileName).split("_")
-        moduleName = parts[0]
-        mode = parts[1]
-        return sys.modules.has_key(moduleName) and self.correctMode(mode)
+        baseName = os.path.basename(fileName)
+        if (baseName.endswith("-dynamic.xml") and self.dynamic) or \
+               (baseName.endswith("-static.xml") and not self.dynamic):
+            moduleName = "-".join(baseName.split("-")[:-1])
+        else:
+            moduleName = baseName[:-4]
+        self.diag.info("Checking if we loaded module " + moduleName)
+        return sys.modules.has_key(moduleName)
     def correctMode(self, mode):
         if mode == "static":
             return not self.dynamic

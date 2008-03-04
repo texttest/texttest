@@ -1099,7 +1099,13 @@ class OptionGroup:
     def setOptionValue(self, key, value):
         if self.options.has_key(key):
             return self.options[key].setValue(value)
-    
+    def getOptionValueMap(self):
+        values = {}
+        for key, option in self.options.items():
+            value = option.getValue()
+            if len(value):
+                values[key] = option.getValue()
+        return values
     def getCommandLines(self):
         commandLines = []
         for key, option in self.options.items():

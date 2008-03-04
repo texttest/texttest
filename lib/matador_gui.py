@@ -33,8 +33,8 @@ class SelectTests(default_gui.SelectTests):
                 for featureName in plugins.readList(featureFile):
                     self.addSwitch(featureName, featureName, 0)
                     self.features.append(featureName)
-    def getFilterList(self, app):
-        filters = default_gui.SelectTests.getFilterList(self, app)    
+    def getFilterList(self, *args, **kwargs):
+        filters = default_gui.SelectTests.getFilterList(self, *args, **kwargs)    
         selectedFeatures = self.getSelectedFeatures()
         if len(selectedFeatures) > 0:
             guiplugins.guilog.info("Selected " + str(len(selectedFeatures)) + " features...")

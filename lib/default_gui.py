@@ -910,9 +910,8 @@ class SelectTests(SelectionAction):
     def getFilterList(self, app):
         appSelectGroup = self.findSelectGroup(app)
         appSelectGroup.updateFrom(self.optionGroup)
-        app.updateConfigOptions(appSelectGroup)
-        return app.getFilterList()
-    def performOnCurrent(self): 
+        return app.getFilterList(appSelectGroup.getOptionValueMap())
+    def makeNewSelection(self):
         # Get strategy. 0 = discard, 1 = refine, 2 = extend, 3 = exclude
         strategy = self.optionGroup.getSwitchValue("current_selection")
         selectedTests = []
@@ -927,8 +926,11 @@ class SelectTests(SelectionAction):
                 
             guilog.info("Selected " + str(len(newTests)) + " out of a possible " + str(suite.size()))
             selectedTests += newTests
+        return selectedTests
 
-        self.notify("SetTestSelection", selectedTests, self.optionGroup.getSwitchValue("select_in_collapsed_suites"))
+    def performOnCurrent(self):
+        newSelection = self.makeNewSelection()
+        self.notify("SetTestSelection", newSelection, self.optionGroup.getSwitchValue("select_in_collapsed_suites"))
     def getSuitesToTry(self):
         # If only some of the suites present match the version selection, only consider them.
         # If none of them do, try to filter them all
@@ -1077,17 +1079,12 @@ class LoadSelection(SelectTests):
     def getDirectories(self):
         self.folders = self.optionGroup.getOption("f").getDirectories()
         return self.folders
+    def getFilterList(self, app):
+        return app.getFiltersFromFile(self.fileName)
     def performOnCurrent(self):
         if self.fileName:
-            oldFileName = self.optionGroup.getOption("f").getValue()
-            oldSwitchValue = self.optionGroup.getSwitch("select_in_collapsed_suites").getValue()
-            try:
-                self.optionGroup.getOption("f").setValue(self.fileName)
-                self.optionGroup.getSwitch("select_in_collapsed_suites").setValue(1)        
-                SelectTests.performOnCurrent(self)
-            finally:
-                self.optionGroup.getOption("f").setValue(oldFileName)
-                self.optionGroup.getSwitch("select_in_collapsed_suites").setValue(oldSwitchValue)        
+            newSelection = self.makeNewSelection()
+            self.notify("SetTestSelection", newSelection, True)
     def messageBeforePerform(self):
         return "Loading test selection ..."
     def messageAfterPerform(self):

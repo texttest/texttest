@@ -329,27 +329,16 @@ class Config:
             elif self.batchMode():
                 return app.getCompositeConfigValue("batch_filter_file", self.optionMap["b"])
 
-    def getFilterList(self, app):
-        filters = self.getFiltersFromMap(self.optionMap, app)
-        filterFileName = self.findFilterFileName(app)
+    def getFilterList(self, app, options=None):
+        if options is None:
+            filters = self.getFiltersFromMap(self.optionMap, app)
+            filterFileName = self.findFilterFileName(app)
+        else:
+            filters = self.getFiltersFromMap(options, app)
+            filterFileName = options.get("f")
         if filterFileName:
             filters += self.getFiltersFromFile(app, filterFileName)
         return filters
-
-    def updateConfigOptions(self, optionGroup):
-        for key, option in optionGroup.options.items():
-            if self.updateOption(key, option) and key == "f":
-                # We updated the file filter selection, ignore the cache from now on
-                self.filterFileMap = {} 
-    def updateOption(self, key, option):
-        if len(option.getValue()):
-            self.optionMap[key] = option.getValue()
-            return True
-        elif self.optionMap.has_key(key):
-            del self.optionMap[key]
-            return True
-        else:
-            return False
         
     def getFiltersFromFile(self, app, filename):        
         if not os.path.isfile(filename):

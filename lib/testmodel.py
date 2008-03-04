@@ -1222,7 +1222,7 @@ class Application:
         configPath = self._getFileName(dirCaches, fileName)
         if not configPath:
             raise BadConfigError, "Cannot find file '" + fileName + "' to import config file settings from"
-        return configPath
+        return os.path.normpath(configPath)
     
     def getDataFileNames(self, getenvFunc=os.getenv):
         allNames = self.getConfigValue("link_test_path", getenvFunc=getenvFunc) + \

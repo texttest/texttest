@@ -1166,11 +1166,18 @@ class TestTreeGUI(ContainerGUI):
         self.notify("NewTestSelection", tests, apps, self.selection.count_selected_rows(), direct)
     def getSelected(self):
         allSelected = []
-        self.selection.selected_foreach(self.addSelTest, allSelected)
+        self.selection.selected_foreach(self.addSelTest, (allSelected, Set(self.selectedTests)))
         self.diag.info("Selected tests are " + repr(allSelected))
         return allSelected
-    def addSelTest(self, model, path, iter, selected, *args):
-        selected += model.get_value(iter, 2)
+    def addSelTest(self, model, path, iter, args):
+        selected, prevSelected = args
+        selected += self.getNewSelected(model.get_value(iter, 2), prevSelected)
+    def getNewSelected(self, tests, prevSelected):
+        intersection = prevSelected.intersection(Set(tests))
+        if len(intersection) == 0 or len(intersection) == len(tests):
+            return tests
+        else:
+            return list(intersection)
     def findIter(self, test):
         try:
             childIter = self.itermap.getIterator(test)

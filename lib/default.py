@@ -308,36 +308,39 @@ class Config:
                  ApplicationFilter, TestDescriptionFilter ]
     def checkFilterFileSanity(self, app):
         # Turn any input relative files into absolute ones, throw if we can't
-        filterFileName = self.findFilterFileName(app)
-        if filterFileName and not os.path.isabs(filterFileName):
-             dirsToSearchIn = map(lambda pair: pair[1], self.getFilterFileDirectories([app], False))
-             realFilename = app.getFileName(dirsToSearchIn, filterFileName)
-             if realFilename:
-                 self.filterFileMap[app] = realFilename
-             else:
-                 raise plugins.TextTestError, "filter file '" + filterFileName + "' could not be found."
+        for filterFileName in self.findFilterFileNames(app):
+            if not os.path.isabs(filterFileName):
+                dirsToSearchIn = map(lambda pair: pair[1], self.getFilterFileDirectories([app], False))
+                realFilename = app.getFileName(dirsToSearchIn, filterFileName)
+                if realFilename:
+                    self.filterFileMap.setdefault(app, []).append(realFilename)
+                else:
+                    raise plugins.TextTestError, "filter file '" + filterFileName + "' could not be found."
              
-    def findFilterFileName(self, app):
+    def findFilterFileNames(self, app):
         if self.filterFileMap.has_key(app):
             return self.filterFileMap[app]
-        elif self.optionMap.has_key("f"):
-            return self.optionMap["f"]
-        else:
-            fromConfig = app.getConfigValue("default_filter_file")
-            if fromConfig:
-                return fromConfig
-            elif self.batchMode():
-                return app.getCompositeConfigValue("batch_filter_file", self.optionMap["b"])
+        names = []
+        if self.optionMap.has_key("f"):
+            names.append(self.optionMap["f"])
+        fromConfig = app.getConfigValue("default_filter_file")
+        if fromConfig:
+            names.append(fromConfig)
+        if self.batchMode():
+            fromBatch = app.getCompositeConfigValue("batch_filter_file", self.optionMap["b"])
+            if fromBatch:
+                names.append(fromBatch)
+        return names
 
     def getFilterList(self, app, options=None):
         if options is None:
             filters = self.getFiltersFromMap(self.optionMap, app)
-            filterFileName = self.findFilterFileName(app)
+            for filterFileName in self.findFilterFileNames(app):
+                filters += self.getFiltersFromFile(app, filterFileName)
         else:
             filters = self.getFiltersFromMap(options, app)
-            filterFileName = options.get("f")
-        if filterFileName:
-            filters += self.getFiltersFromFile(app, filterFileName)
+            if options.has_key("f"):
+                filters += self.getFiltersFromFile(app, options.get("f"))
         return filters
         
     def getFiltersFromFile(self, app, filename):        

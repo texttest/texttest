@@ -244,7 +244,7 @@ class TestRunner:
             self.failTest(exceptionText)
     def failTest(self, excString):
         execHosts = self.test.state.executionHosts
-        failState = plugins.Unrunnable(freeText=excString, executionHosts=execHosts)
+        failState = plugins.Unrunnable(freeText=excString, briefText="TEXTTEST EXCEPTION", executionHosts=execHosts)
         self.test.changeState(failState)
     def performActions(self, previousTestRunner):
         tearDownSuites, setUpSuites = self.findSuitesToChange(previousTestRunner)

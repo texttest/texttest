@@ -581,7 +581,7 @@ addCategory("unrunnable", "unrunnable", "could not be run")
 addCategory("marked", "marked", "was marked by the user")
 
 class Unrunnable(TestState):
-    def __init__(self, freeText, briefText = "UNRUNNABLE", executionHosts=[], lifecycleChange=""):
+    def __init__(self, freeText, briefText, executionHosts=[], lifecycleChange=""):
         TestState.__init__(self, "unrunnable", freeText, briefText, completed=1, \
                            executionHosts=executionHosts, lifecycleChange=lifecycleChange)
     def shouldAbandon(self):

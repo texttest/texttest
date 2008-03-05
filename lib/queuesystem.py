@@ -615,7 +615,7 @@ class QueueSystemServer(BaseActionRunner):
             self.lock.release()
             self.diag.info("Job not created : " + errorMessage)
             fullError = self.getFullSubmitError(test, errorMessage, cmdArgs)
-            test.changeState(plugins.Unrunnable(freeText=fullError))
+            test.changeState(plugins.Unrunnable(fullError, "NOT SUBMITTED"))
             self.handleErrorState(test)
             return False
     def findErrorMessage(self, stderr, queueSystem):

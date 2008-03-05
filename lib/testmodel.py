@@ -5,7 +5,7 @@ from fnmatch import fnmatch
 from usecase import ScriptEngine, UseCaseScriptError
 from ndict import seqdict
 from copy import copy
-from cPickle import Pickler, Unpickler, UnpicklingError
+from cPickle import Pickler, loads, UnpicklingError
 from respond import Responder
 from threading import Lock
 from sets import Set, ImmutableSet
@@ -651,8 +651,9 @@ class TestCase(Test):
             return os.path.join(dir, stem)
     def getNewState(self, file):
         try:
-            unpickler = Unpickler(file)
-            newState = unpickler.load()
+            # Would like to do load(file) here... but it doesn't work with universal line endings, see Python bug 1724366
+            # http://sourceforge.net/tracker/index.php?func=detail&aid=1724366&group_id=5470&atid=105470
+            newState = loads(file.read())
             return True, newState
         except UnpicklingError:
             return False, plugins.Unrunnable(briefText="read error", \

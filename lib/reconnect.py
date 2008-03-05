@@ -67,7 +67,7 @@ class ReconnectTest(plugins.Action):
         stateToUse = None
         stateFile = os.path.join(location, "framework_tmp", "teststate")
         if os.path.isfile(stateFile):
-            loaded, newState = test.getNewState(open(stateFile))
+            loaded, newState = test.getNewState(open(stateFile, "rU"))
             if loaded and self.modifyState(test, newState): # if we can't read it, recompute it
                 stateToUse = newState
 

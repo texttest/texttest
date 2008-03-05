@@ -2694,12 +2694,14 @@ class TestProgressMonitor(SubGUI):
         self.classifications[test] = []
         classifiers = self.getClassifiers(state)
         nodeClassifier = classifiers.keys()[0]
-        defaultColour = self.getDefaultColour(state, nodeClassifier, classifiers)
-        return self.addTestForNode(test, defaultColour, state.category, nodeClassifier, classifiers, incrementCount)
-    def getDefaultColour(self, state, nodeClassifier, classifiers):
+        defaultColour, defaultVisibility = self.getCategorySettings(state.category, nodeClassifier, classifiers)
+        return self.addTestForNode(test, defaultColour, defaultVisibility, nodeClassifier, classifiers, incrementCount)
+    def getCategorySettings(self, category, nodeClassifier, classifiers):
         # Use the category description if there is only one level, otherwise rely on the status names
-        if len(classifiers.get(nodeClassifier)) == 0:
-            return guiConfig.getTestColour(state.category)
+        if len(classifiers.get(nodeClassifier)) == 0 or category == "failure":
+            return guiConfig.getTestColour(category), guiConfig.showCategoryByDefault(category)
+        else:
+            return None, True
     def updateTestAppearance(self, test, state, changeDesc, colour):
         resultType, summary = state.getTypeBreakdown()
         catDesc = self.getCategoryDescription(state, resultType)
@@ -2709,19 +2711,20 @@ class TestProgressMonitor(SubGUI):
         self.notify("TestAppearance", test, summary, mainColour, colour, updateSuccess)
         self.notify("Visibility", [ test ], self.shouldBeVisible(test))
 
-    def addTestForNode(self, test, defaultColour, category, nodeClassifier, classifiers, incrementCount, parentIter=None):
-        self.diag.info("Adding " + repr(test) + " for node " + nodeClassifier + " (" + repr(classifiers) + ")")
+    def addTestForNode(self, test, defaultColour, defaultVisibility, nodeClassifier, classifiers, incrementCount, parentIter=None):
+        self.diag.info("Adding " + repr(test) + " for node " + nodeClassifier + ", default visible = " + repr(defaultVisibility))
         nodeIter = self.findIter(nodeClassifier, parentIter)
         colour = guiConfig.getTestColour(nodeClassifier, defaultColour)
+        visibility = guiConfig.showCategoryByDefault(nodeClassifier, defaultVisibility)
         if nodeIter:
             self.insertTestAtIter(nodeIter, test, colour, incrementCount)
         else:
-            nodeIter = self.addNewIter(nodeClassifier, parentIter, colour, category, 1, [ test ])
+            nodeIter = self.addNewIter(nodeClassifier, parentIter, colour, visibility, 1, [ test ])
 
         self.classifications[test].append(nodeIter)
         subColours = []
         for subNodeClassifier in classifiers[nodeClassifier]:
-            subColour = self.addTestForNode(test, colour, category, subNodeClassifier, classifiers, incrementCount, nodeIter)
+            subColour = self.addTestForNode(test, colour, visibility, subNodeClassifier, classifiers, incrementCount, nodeIter)
             subColours.append(subColour)
             
         if len(subColours) > 0:
@@ -2738,16 +2741,8 @@ class TestProgressMonitor(SubGUI):
             self.treeModel.set_value(iter, 1, testCount + 1)
         allTests.append(test)
         self.treeModel.set_value(iter, 5, allTests)
-    def showByDefault(self, classifier, parentIter, category):
-        if not guiConfig.showCategoryByDefault(classifier):
-            return False
-        if parentIter:
-            return self.treeModel.get_value(parentIter, 2)
-        else:
-            return guiConfig.showCategoryByDefault(category)
-    def addNewIter(self, classifier, parentIter, colour, category, testCount, tests=[]):
-        showThis = self.showByDefault(classifier, parentIter, category)
-        modelAttributes = [classifier, testCount, showThis, colour, "bold", tests]
+    def addNewIter(self, classifier, parentIter, colour, visibility, testCount, tests=[]):
+        modelAttributes = [classifier, testCount, visibility, colour, "bold", tests]
         newIter = self.treeModel.append(parentIter, modelAttributes)
         if parentIter:
             self.treeView.expand_row(self.treeModel.get_path(parentIter), open_all=0)

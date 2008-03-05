@@ -102,10 +102,15 @@ class GUIConfig:
             return value
     def getWindowOption(self, name):
         return self.getCompositeValue("window_size", name, modeDependent=True)
-    def showCategoryByDefault(self, category):
+    def showCategoryByDefault(self, category, fallback=None):
         if self.dynamic:
             nameToUse = self.getConfigName(category)
-            return nameToUse not in self.hiddenCategories
+            if nameToUse in self.hiddenCategories:
+                return False
+            elif fallback is not None:
+                return fallback
+            else:
+                return True
         else:
             return False    
     def getTestColour(self, category, fallback=None):

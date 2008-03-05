@@ -323,13 +323,9 @@ class Config:
         names = []
         if self.optionMap.has_key("f"):
             names.append(self.optionMap["f"])
-        fromConfig = app.getConfigValue("default_filter_file")
-        if fromConfig:
-            names.append(fromConfig)
+        names += app.getConfigValue("default_filter_file")
         if self.batchMode():
-            fromBatch = app.getCompositeConfigValue("batch_filter_file", self.optionMap["b"])
-            if fromBatch:
-                names.append(fromBatch)
+            names += app.getCompositeConfigValue("batch_filter_file", self.optionMap["b"])
         return names
 
     def getFilterList(self, app, options=None):
@@ -567,7 +563,7 @@ class Config:
         app.setConfigDefault("batch_sender", { "default" : self.getDefaultMailAddress() }, "Sender address to use sending mail in batch mode")
         app.setConfigDefault("batch_recipients", { "default" : self.getDefaultMailAddress() }, "Addresses to send mail to in batch mode")
         app.setConfigDefault("batch_timelimit", { "default" : None }, "Maximum length of test to include in batch mode runs")
-        app.setConfigDefault("batch_filter_file", { "default" : None }, "Generic filter for batch session, more flexible than timelimit")
+        app.setConfigDefault("batch_filter_file", { "default" : [] }, "Generic filter for batch session, more flexible than timelimit")
         app.setConfigDefault("batch_use_collection", { "default" : "false" }, "Do we collect multiple mails into one in batch mode")
         # Sample to show that values are lists
         app.setConfigDefault("batch_use_version_filtering", { "default" : "false" }, "Which batch sessions use the version filtering mechanism")
@@ -727,7 +723,7 @@ class Config:
     def setMiscDefaults(self, app):
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
         app.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")
-        app.setConfigDefault("default_filter_file", "", "Filter file to use by default, generally only useful for versions")
+        app.setConfigDefault("default_filter_file", [], "Filter file to use by default, generally only useful for versions")
         app.setConfigDefault("trace_level_variable", "", "Environment variable that sets a simple trace-log level")
         app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
         app.setConfigDefault("test_data_properties", { "default" : "" }, "Write the contents of test_data_environment to the given Java properties file")

@@ -1617,13 +1617,22 @@ class OptionFinder(plugins.OptionFinder):
         appDict = {}
         versionList = self.findVersionList()
         for app in apps:
-            if "." in app:
-                appName, versionName = app.split(".", 1)
-                self.addToAppDict(appDict, appName, versionName)
-            else:
-                for version in versionList:
-                    self.addToAppDict(appDict, app, version)
+            parts = app.split(".", 1)
+            appName = parts[0]
+            appVersion = ""
+            if len(parts) > 1:
+                appVersion = parts[1]
+            for version in versionList:
+                self.addToAppDict(appDict, appName, self.combineVersions(appVersion, version))
+
         return appDict
+    def combineVersions(self, v1, v2):
+        if len(v1) == 0 or v1 == v2:
+            return v2
+        elif len(v2) == 0:
+            return v1
+        else:
+            return v1 + "." + v2
     def addToAppDict(self, appDict, appName, versionName):
         if appDict.has_key(appName):
             appDict[appName].append(versionName)

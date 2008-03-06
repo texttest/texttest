@@ -1187,7 +1187,7 @@ class TestTreeGUI(ContainerGUI):
                 return self.filteredModel.convert_child_iter_to_iter(childIter)
         except RuntimeError:
             pass # convert_child_iter_to_iter throws RunTimeError if the row is hidden in the TreeModelFilter
-    def notifySetTestSelection(self, selTests, selectCollapsed=True):
+    def notifySetTestSelection(self, selTests, criteria="", selectCollapsed=True):
         actualSelection = self.selectTestRows(selTests, selectCollapsed)
         guilog.info("Marking " + str(self.selection.count_selected_rows()) + " tests as selected")
         # Here it's been set via some indirect mechanism, might want to behave differently 

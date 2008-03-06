@@ -2,6 +2,7 @@
 import plugins, os, sys, shutil, time, subprocess, operator, types
 from guiplugins import SelectionAction, InteractiveAction, InteractiveTestAction, guilog, guiConfig, scriptEngine
 from jobprocess import JobProcess
+from sets import Set
 from copy import copy, deepcopy
 from threading import Thread
 from glob import glob
@@ -874,10 +875,15 @@ class SelectTests(SelectionAction):
                        possibleValues=self.getPossibleVersions(allApps))
         self.addSwitch("select_in_collapsed_suites", "Select in collapsed suites", 0, description="Select in currently collapsed suites as well?")
         self.addSwitch("current_selection", "Current selection:", options = [ "Discard", "Refine", "Extend", "Exclude"], description="How should we treat the currently selected tests?\n - Discard: Unselect all currently selected tests before applying the new selection criteria.\n - Refine: Apply the new selection criteria only to the currently selected tests, to obtain a subselection.\n - Extend: Keep the currently selected tests even if they do not match the new criteria, and extend the selection with all other tests which meet the new criteria.\n - Exclude: After applying the new selection criteria to all tests, unselect the currently selected tests, to exclude them from the new selection.")
-
+        self.appKeys = Set()
         for app in allApps:
             appSelectGroup = self.findSelectGroup(app)
+            self.appKeys.update(Set(appSelectGroup.keys()))
             self.optionGroup.mergeIn(appSelectGroup)
+    def findSelectGroup(self, app):
+        for group in app.optionGroups:
+            if group.name.startswith("Select"):
+                return group
     def addSuites(self, suites):
         self.rootTestSuites = suites
     def getPossibleVersions(self, allApps):
@@ -911,9 +917,7 @@ class SelectTests(SelectionAction):
         return "Selected " + self.describeTests() + "."    
     # No messageAfterPerform necessary - we update the status bar when the selection changes inside TextTestGUI
     def getFilterList(self, app):
-        appSelectGroup = self.findSelectGroup(app)
-        appSelectGroup.updateFrom(self.optionGroup)
-        return app.getFilterList(appSelectGroup.getOptionValueMap())
+        return app.getFilterList(self.optionGroup.getOptionValueMap())
     def makeNewSelection(self):
         # Get strategy. 0 = discard, 1 = refine, 2 = extend, 3 = exclude
         strategy = self.optionGroup.getSwitchValue("current_selection")
@@ -933,7 +937,9 @@ class SelectTests(SelectionAction):
 
     def performOnCurrent(self):
         newSelection = self.makeNewSelection()
-        self.notify("SetTestSelection", newSelection, self.optionGroup.getSwitchValue("select_in_collapsed_suites"))
+        criteria = " ".join(self.optionGroup.getCommandLines(onlyKeys=self.appKeys))
+        self.notify("SetTestSelection", newSelection, criteria, self.optionGroup.getSwitchValue("select_in_collapsed_suites"))
+        
     def getSuitesToTry(self):
         # If only some of the suites present match the version selection, only consider them.
         # If none of them do, try to filter them all
@@ -1023,7 +1029,7 @@ class ResetGroups(InteractiveAction):
 class SaveSelection(SelectionAction):
     def __init__(self, allApps, *args):
         SelectionAction.__init__(self, allApps, *args)
-        self.selectionGroup = self.findSelectGroup(allApps[0])
+        self.selectionCriteria = ""
         self.fileName = ""
         self.saveTestList = ""
         self.rootTestSuites = []
@@ -1057,12 +1063,14 @@ class SaveSelection(SelectionAction):
                 if self.isSelected(test):
                     selTestPaths.append(test.getRelPath())
         return "-tp " + "\n".join(selTestPaths)
+    def notifySetTestSelection(self, tests, criteria="", *args):
+        self.selectionCriteria = criteria
     def getTextToSave(self):
         actualTests = self.saveActualTests()
         if actualTests:
             return self.getTestPathFilterArg()
         else:
-            return " ".join(self.selectionGroup.getCommandLines())
+            return self.selectionCriteria
     def notifySaveSelection(self, fileName):
         self.fileName = fileName
         self.saveTestList = True
@@ -1102,7 +1110,7 @@ class LoadSelection(SelectTests):
     def performOnCurrent(self):
         if self.fileName:
             newSelection = self.makeNewSelection()
-            self.notify("SetTestSelection", newSelection, True)
+            self.notify("SetTestSelection", newSelection, "-f " + self.fileName, True)
     def messageBeforePerform(self):
         return "Loading test selection ..."
     def messageAfterPerform(self):

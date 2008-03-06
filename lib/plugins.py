@@ -1070,11 +1070,6 @@ class OptionGroup:
         for key, option in group.options.items():
             if not self.options.has_key(key):
                 self.options[key] = copy(option)
-    def updateFrom(self, group):
-        for key, switch in group.switches.items():
-            self.setSwitchValue(key, switch.getValue())
-        for key, option in group.options.items():
-            self.setOptionValue(key, option.getValue())
     def getSwitchValue(self, key, defValue = None):
         if self.switches.has_key(key):
             return self.switches[key].getValue()
@@ -1106,16 +1101,24 @@ class OptionGroup:
             if len(value):
                 values[key] = option.getValue()
         return values
-    def getCommandLines(self):
+    def keys(self):
+        return self.options.keys() + self.switches.keys()
+    def getCommandLines(self, onlyKeys=[]):
         commandLines = []
         for key, option in self.options.items():
-            if len(option.getValue()):
+            if self.accept(key, option, onlyKeys):
                 commandLines.append("-" + key)
                 commandLines.append(option.getValue())
         for key, switch in self.switches.items():
-            if switch.getValue():
+            if self.accept(key, switch, onlyKeys):
                 commandLines.append("-" + key)
         return commandLines
+    def accept(self, key, option, onlyKeys):
+        if not option.getValue():
+            return False
+        if len(onlyKeys) == 0:
+            return True
+        return key in onlyKeys
     def readCommandLineArguments(self, args):
         for arg in args:
             if arg.find("=") != -1:

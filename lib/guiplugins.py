@@ -362,10 +362,6 @@ class SelectionAction(InteractiveAction):
         return test in self.currTestSelection
     def isNotSelected(self, test):
         return not self.isSelected(test)
-    def findSelectGroup(self, app):
-        for group in app.optionGroups:
-            if group.name.startswith("Select"):
-                return group
     
     
 # The class to inherit from if you want test-based actions that can run from the GUI

@@ -341,8 +341,10 @@ class TextTestGUI(Responder, plugins.Observable):
             return [ statusMonitor ] + self.actionTabGUIs
         else:
             # These actions might change the tree view selection or the status bar, need to observe them
-            clipboardObservers = filter(lambda action: hasattr(action, "notifyClipboard"), self.intvActions)
-            return clipboardObservers + [ self.testTreeGUI, self.testFileGUI, statusMonitor, self.idleManager, self.topWindowGUI ]
+            actionObservers = filter(self.isActionObserver, self.intvActions)
+            return actionObservers + [ self.testTreeGUI, self.testFileGUI, statusMonitor, self.idleManager, self.topWindowGUI ]
+    def isActionObserver(self, action):
+        return hasattr(action, "notifyClipboard") or hasattr(action, "notifySaveSelection")
     def getFileViewObservers(self):
         # We should potentially let other GUIs be file observers too ...
         return filter(self.isFileObserver, self.intvActions)

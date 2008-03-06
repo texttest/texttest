@@ -869,6 +869,7 @@ class SelectTests(SelectionAction):
     def __init__(self, allApps, *args):
         SelectionAction.__init__(self, allApps)
         self.diag = plugins.getDiagnostics("Select Tests")
+        self.rootTestSuites = []
         self.addOption("vs", "Tests for version", description="Select tests for a specific version.",
                        possibleValues=self.getPossibleVersions(allApps))
         self.addSwitch("select_in_collapsed_suites", "Select in collapsed suites", 0, description="Select in currently collapsed suites as well?")
@@ -877,6 +878,8 @@ class SelectTests(SelectionAction):
         for app in allApps:
             appSelectGroup = self.findSelectGroup(app)
             self.optionGroup.mergeIn(appSelectGroup)
+    def addSuites(self, suites):
+        self.rootTestSuites = suites
     def getPossibleVersions(self, allApps):
         possVersions = []
         for app in allApps:
@@ -1023,6 +1026,9 @@ class SaveSelection(SelectionAction):
         self.selectionGroup = self.findSelectGroup(allApps[0])
         self.fileName = ""
         self.saveTestList = ""
+        self.rootTestSuites = []
+    def addSuites(self, suites):
+        self.rootTestSuites = suites
     def getStockId(self):
         return "save-as"
     def getDialogType(self):
@@ -1043,12 +1049,24 @@ class SaveSelection(SelectionAction):
         return self.folders
     def saveActualTests(self):
         return guiConfig.dynamic or self.saveTestList
+    def getTestPathFilterArg(self):
+        selTestPaths = []
+        for suite in self.rootTestSuites:
+            selTestPaths.append("appdata=" + suite.app.name + suite.app.versionSuffix())
+            for test in suite.testCaseList():
+                if self.isSelected(test):
+                    selTestPaths.append(test.getRelPath())
+        return "-tp " + "\n".join(selTestPaths)
     def getTextToSave(self):
         actualTests = self.saveActualTests()
         if actualTests:
-            return self.getCmdlineOption()
+            return self.getTestPathFilterArg()
         else:
             return " ".join(self.selectionGroup.getCommandLines())
+    def notifySaveSelection(self, fileName):
+        self.fileName = fileName
+        self.saveTestList = True
+        self.performOnCurrent()
     def performOnCurrent(self):
         toWrite = self.getTextToSave()
         try:
@@ -1122,9 +1140,7 @@ class RunningAction(SelectionAction):
         # Because the description of the selection can be extremely long, we write it in a file and refer to it
         # This avoids too-long command lines which are a problem at least on Windows XP
         filterFileName = os.path.join(writeDir, "gui_select")
-        writeFile = open(filterFileName, "w")
-        writeFile.write(self.getCmdlineOption() + "\n")
-        writeFile.close()
+        self.notify("SaveSelection", filterFileName)
         return filterFileName
     def getTextTestOptions(self, filterFile, app):
         ttOptions = self.getCmdlineOptionForApps()

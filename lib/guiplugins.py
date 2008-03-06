@@ -352,9 +352,6 @@ class SelectionAction(InteractiveAction):
     def __init__(self, allApps, *args):
         InteractiveAction.__init__(self, allApps)
         self.currTestSelection = []
-        self.rootTestSuites = []
-    def addSuites(self, suites):
-        self.rootTestSuites = suites
     def updateSelection(self, tests, rowCount):
         self.currTestSelection = filter(lambda test: test.classId() == "test-case", tests)
     def isActiveOnCurrent(self, *args):
@@ -369,15 +366,7 @@ class SelectionAction(InteractiveAction):
         for group in app.optionGroups:
             if group.name.startswith("Select"):
                 return group
-            
-    def getCmdlineOption(self):
-        selTestPaths = []
-        for suite in self.rootTestSuites:
-            selTestPaths.append("appdata=" + suite.app.name + suite.app.versionSuffix())
-            for test in suite.testCaseList():
-                if self.isSelected(test):
-                    selTestPaths.append(test.getRelPath())
-        return "-tp " + "\n".join(selTestPaths)
+    
     
 # The class to inherit from if you want test-based actions that can run from the GUI
 class InteractiveTestAction(InteractiveAction):

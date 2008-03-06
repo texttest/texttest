@@ -382,12 +382,6 @@ class InteractiveTestAction(InteractiveAction):
             self.currentTest = tests[0]
         else:
             self.currentTest = None
-    def startViewer(self, cmdArgs, description = "", env=None, exitHandler=None, exitHandlerArgs=()):
-        testDesc = self.testDescription()
-        fullDesc = description + testDesc
-        process = self.startExternalProgram(cmdArgs, fullDesc, env=env, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
-        self.notify("Status", 'Started "' + description + '" in background' + testDesc + '.')
-        return process
     def testDescription(self):
         if self.currentTest:
             return " (from test " + self.currentTest.uniqueName + ")"

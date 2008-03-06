@@ -243,7 +243,14 @@ class FileViewAction(InteractiveTestAction):
             return "\n" + self.currentTest.app.noFileAdvice()
         else:
             return ""
-    
+
+    def startViewer(self, cmdArgs, description = "", env=None, exitHandler=None, exitHandlerArgs=()):
+        testDesc = self.testDescription()
+        fullDesc = description + testDesc
+        process = self.startExternalProgram(cmdArgs, fullDesc, env=env, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
+        self.notify("Status", 'Started "' + description + '" in background' + testDesc + '.')
+        return process
+
     def handleNoFile(self, fileName):
         self.notify("Error", "File '" + os.path.basename(fileName) + "' cannot be viewed"
                     " as it has been removed in the file system." + self.noFileAdvice())

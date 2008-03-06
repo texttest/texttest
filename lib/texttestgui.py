@@ -2588,7 +2588,8 @@ class TestProgressMonitor(SubGUI):
         self.testCount = testCount
         if testCount > 0:
             colour = guiConfig.getTestColour("not_started")
-            self.addNewIter("Not started", None, colour, "not_started", testCount)
+            visibility = guiConfig.showCategoryByDefault("not_started")
+            self.addNewIter("Not started", None, colour, visibility, testCount)
     def getGroupTabTitle(self):
         return "Status"
     def shouldShow(self):
@@ -2796,9 +2797,11 @@ class TestProgressMonitor(SubGUI):
             indentation = ("--" * (self.getIterDepth(childIter) + 1)) + "> "
             name = self.treeModel.get_value(childIter, 0)
             count = str(self.treeModel.get_value(childIter, 1))
+            visible = self.treeModel.get_value(childIter, 2)
             bg = self.treeModel.get_value(childIter, 3)
             font = self.treeModel.get_value(childIter, 4)
-            guilog.info(indentation + name + " : " + count + ", colour '" + bg + "', font '" + font + "'")
+            guilog.info(indentation + name + " : " + count + ", colour '" + bg +
+                        "', font '" + font + "'" + "', visible=" + repr(visible))
             childIters = childIters[1:len(childIters)]
 
     def getIterDepth(self, iter):

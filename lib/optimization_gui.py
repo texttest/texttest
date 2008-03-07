@@ -136,8 +136,10 @@ class StartStudio(guiplugins.InteractiveAction):
         if not os.path.isfile(studio):
             raise plugins.TextTestError, "Cannot start studio, no file at " + studio
         cmdArgs = [ studio, "-w", "-p'CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + "\",0)'" ]
-        process = self.startExternalProgram(cmdArgs, description="Studio on " + subPlan, env=environ)
-        guiplugins.scriptEngine.monitorProcess("runs studio", process)
+        nullFile = open(os.devnull, "w")
+        guiplugins.processMonitor.startProcess(cmdArgs, description="Studio on " + subPlan,
+                                               stdout=nullFile, stderr=nullFile,
+                                               env=environ, scriptName="runs studio")
 
 class InteractiveActionConfig(cvs.InteractiveActionConfig):
     def getInteractiveActionClasses(self, dynamic):

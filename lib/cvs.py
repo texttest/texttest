@@ -1,7 +1,7 @@
 
 import os, guidialogs, gobject, datetime, time, subprocess, default_gui
 import texttestgui, gtk, plugins, custom_widgets, entrycompletion
-from guiplugins import scriptEngine, guilog, InteractiveAction
+from guiplugins import scriptEngine, guilog, InteractiveAction, processMonitor
 
 #
 # Todo/improvements:
@@ -116,8 +116,8 @@ class CVSAction(InteractiveAction):
             guidialogs.showErrorDialog("\nCannot find graphical CVS difference program '" + cvsDiffProgram + \
                   "'.\nPlease install it somewhere on your $PATH.\n", dialog.dialog)
         cmdArgs = [ cvsDiffProgram ] + dialog.plugin.getRevisionOptions() + [ path ]
-        process = self.startExternalProgram(cmdArgs, "Graphical CVS diff for file " + path)
-        scriptEngine.monitorProcess("shows CVS differences graphically", process)
+        processMonitor.startProcess(cmdArgs, description="Graphical CVS diff for file " + path,
+                                    stderr=open(os.devnull, "w"), scriptName="shows CVS differences graphically")
     def getCVSRoot(self):
         cvsRoot = os.getenv("CVSROOT")
         if cvsRoot:

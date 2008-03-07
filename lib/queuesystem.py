@@ -96,11 +96,10 @@ class QueueSystemConfig(default.Config):
     def getPossibleResources(self, queueSystem):
         return []
     def useQueueSystem(self):
-        return not self.isReconnecting() and not self.optionMap.has_key("l") and \
-               not self.optionMap.has_key("gx") and not self.optionMap.runScript() and not self.optionMap.has_key("coll")
-    def getRunOptions(self, checkout):
-        # Options to add by default when recording, auto-replaying or running as slave
-        return [ "-l" ] + default.Config.getRunOptions(self, checkout)
+        for localFlag in [ "reconnect", "l", "gx", "s", "coll", "record", "autoreplay" ]:
+            if self.optionMap.has_key(localFlag):
+                return False
+        return True
     def slaveRun(self):
         return self.optionMap.has_key("slave")
     def getWriteDirectoryName(self, app):
@@ -146,8 +145,9 @@ class QueueSystemConfig(default.Config):
             return MasterInteractiveResponder
         else:
             return InteractiveResponder
+    
     def getSlaveSwitches(self):
-        return [ "b", "trace", "ignorecat", "actrep", "rectraffic", "keeptmp", "keepslave" ]
+        return [ "c", "b", "trace", "ignorecat", "actrep", "rectraffic", "keeptmp", "keepslave" ]
     def getExecHostFinder(self):
         if self.slaveRun():
             return FindExecutionHosts()
@@ -556,8 +556,11 @@ class QueueSystemServer(BaseActionRunner):
         # it comes to noticing extra shells
         return "exec $SHELL -c \"exec " + command + "\""
     def getSlaveCommand(self, test, submissionRules):
-        return plugins.textTestName + " " + " ".join(test.app.getRunOptions()) + " -tp " + test.getRelPath() \
-               + self.getSlaveArgs(test) + " " + self.getRunOptions(test.app, submissionRules)
+        return plugins.textTestName + " -d " + os.getenv("TEXTTEST_HOME") + \
+               " -a " + test.app.name + test.app.versionSuffix() + \
+               " -l -tp " + test.getRelPath() + \
+               self.getSlaveArgs(test) + " " + \
+               self.getRunOptions(test.app, submissionRules)
     def getSlaveArgs(self, test):
         return " -slave " + test.app.writeDirectory + " -servaddr " + self.submitAddress
     def getRunOptions(self, app, submissionRules):

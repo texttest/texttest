@@ -1329,17 +1329,6 @@ class Application:
             if not optionGroup:
                 raise BadConfigError, "unrecognised option -" + option
         return optionGroups
-    def getRunOptions(self, version=None, checkout=None):
-        if not checkout:
-            inputCheckout = self.inputOptions.get("c")
-            if inputCheckout:
-                checkout = inputCheckout
-        if not version:
-            version = self.getFullVersion()
-        options = [ "-d", self.inputOptions.directoryName, "-a", self.name ]
-        if version:
-            options += [ "-v", version ]
-        return options + self.configObject.getRunOptions(checkout)
     def addToOptionGroup(self, group):
         if group.name.startswith("Basic"):
             group.addOption("v", "Run this version", self.getFullVersion())

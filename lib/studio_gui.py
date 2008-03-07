@@ -69,15 +69,16 @@ class ImportTestCase(default_gui.ImportTestCase):
             fullMacroPath = os.path.join(suite.getEnvironment("CARMUSR"), "macros", macroToImport)
             shutil.copyfile(fullMacroPath, usecaseFile)
 
+# Allow manual specification of a ruleset, and two auto-replays needed for macro recorder...
 class RecordTest(default_gui.RecordTest):
     def __init__(self, *args):
         default_gui.RecordTest.__init__(self, *args)
-        self.optionGroup.addOption("rset", "Compile this ruleset first")
+        self.optionGroup.addOption("rulecomp", "Compile this ruleset first")
         self.changedUseCaseVersion = ""
     def updateOptions(self):
         retValue = default_gui.RecordTest.updateOptions(self)
-        self.optionGroup.setOptionValue("rset", "")
-        self.optionGroup.setPossibleValues("rset", self.findRuleSets())
+        self.optionGroup.setOptionValue("rulecomp", "")
+        self.optionGroup.setPossibleValues("rulecomp", self.findRuleSets())
         return retValue
     def findRuleSets(self):
         carmUsr = self.currTestSelection[0].getEnvironment("CARMUSR")
@@ -90,25 +91,20 @@ class RecordTest(default_gui.RecordTest):
             return []
     def isRuleSource(self, fileName):
         return not fileName.startswith(".")
-    def getRunOptions(self, test, usecase, overwriteVersion):
-        basicOptions = default_gui.RecordTest.getRunOptions(self, test, usecase, overwriteVersion)
-        ruleset = self.optionGroup.getOptionValue("rset")
-        if usecase == "record" and ruleset:
-            return [ "-rulecomp", "-rset", ruleset ] + basicOptions
-        return basicOptions
+    def getCommandLineKeys(self):
+        return default_gui.RecordTest.getCommandLineKeys(self) + [ "rulecomp" ]
     def getChangedUseCaseVersion(self, test):
         ret = default_gui.RecordTest.getChangedUseCaseVersion(self, test)
         self.changedUseCaseVersion = ret # cache the result, for using in our auto-replay
         return ret
-    # We want to generate a second auto-replay...
-    def setTestReady(self, test, usecase=""):
+    def handleCompletion(self, testSel, usecase):
         if usecase == "replay":
-            self.startTextTestProcess(test, "replay2", self.changedUseCaseVersion)
-            message = "First auto-replay completed for " + repr(test) + \
+            self.startTextTestProcess("replay2", self.getReplayRunModeOptions(self.changedUseCaseVersion))
+            message = "First auto-replay completed for " + repr(testSel[0]) + \
                       ". Second auto-replay now started. Don't submit the test manually!"
             self.notify("Status", message)
         else:
-            default_gui.RecordTest.setTestReady(self, test, usecase)
+            default_gui.RecordTest.handleCompletion(self, testSel, usecase)
 
 class InteractiveActionConfig(cvs.InteractiveActionConfig):
     def getReplacements(self):

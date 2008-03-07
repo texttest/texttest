@@ -356,7 +356,7 @@ class TextTestGUI(Responder, plugins.Observable):
         # Don't put ourselves in the observers twice or lots of weird stuff happens.
         # Important that closing the GUI is the last thing to be done, so make sure we go at the end...
         frameworkExitObservers = filter(self.isFrameworkExitObserver, frameworkObservers)
-        return [ guiplugins.processTerminationMonitor, statusMonitor ] + frameworkExitObservers + [ self.idleManager, self ] 
+        return [ guiplugins.processMonitor, statusMonitor ] + frameworkExitObservers + [ self.idleManager, self ] 
     def getTestColumnObservers(self):
         return [ self.testTreeGUI, statusMonitor, self.idleManager ]
     def getHideableGUIs(self):
@@ -378,7 +378,7 @@ class TextTestGUI(Responder, plugins.Observable):
             
         # watch for category selections
         self.progressMonitor.addObserver(self.testTreeGUI)
-        guiplugins.processTerminationMonitor.addObserver(statusMonitor)
+        guiplugins.processMonitor.addObserver(statusMonitor)
         for observer in self.getLifecycleObservers():        
             self.addObserver(observer) # forwarding of test observer mechanism
 
@@ -442,8 +442,7 @@ class TextTestGUI(Responder, plugins.Observable):
         return defaultGUIs, buttonGUIs
 
     def createActionGUIForTab(self, action):
-        if action.canPerform():
-            return ButtonActionGUI(action, fromTab=True)
+        return ButtonActionGUI(action, fromTab=True)
     def createActionTabGUIs(self):
         actionTabGUIs = []
         for action in self.intvActions:

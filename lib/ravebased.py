@@ -141,8 +141,6 @@ class Config(CarmenConfig):
                 group.addOption("build", "Build application target")
                 group.addSwitch("debug", "Use debug rulesets")
                 group.addSwitch("raveexp", "Run with RAVE Explorer")
-            elif group.name.startswith("Invisible"):
-                group.addOption("rset", "Private: used for submitting ruleset names to compile")
     def getFilterClasses(self):
         return CarmenConfig.getFilterClasses(self) + [ UserFilter ]
     def getSlaveServerClass(self):
@@ -172,10 +170,9 @@ class Config(CarmenConfig):
     def buildRulesetsAlways(self, app):
         return app.getConfigValue("build_rulesets_always") == "true"
     def rebuildAllRulesets(self, app):
-        return self.isNightJob() or (self.optionMap.has_key("rulecomp") and not self.optionValue("rulecomp"))\
-               or self.buildRulesetsAlways(app)
+        return self.isNightJob() or self.optionMap.has_key("rulecomp") or self.buildRulesetsAlways(app)
     def buildRules(self):
-        if self.optionMap.has_key("skip") or self.isReconnecting():
+        if self.optionMap.has_key("skip") or self.isReconnecting() or self.optionMap.has_key("autoreplay"):
             return 0
         if self.optionMap.has_key("rulecomp"):
             return 1
@@ -183,7 +180,7 @@ class Config(CarmenConfig):
     def defaultBuildRules(self):
         return 0
     def getRuleSetNames(self, test, forCompile=True):
-        cmdLineOption = self.optionMap.get("rset")
+        cmdLineOption = self.optionMap.get("rulecomp")
         if cmdLineOption:
             cmdLineRules = cmdLineOption.split(",")
             if forCompile:

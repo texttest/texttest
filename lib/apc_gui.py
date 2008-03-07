@@ -15,8 +15,7 @@ class ViewApcLog(guiplugins.InteractiveAction):
             file = open(viewLogScript)
             cmdArgs = eval(file.readlines()[0].strip())
             file.close()
-            process = self.startExternalProgram(cmdArgs, "APC log viewer")
-            guiplugins.scriptEngine.monitorProcess("views the APC log", process)
+            guiplugins.processMonitor.startProcess(cmdArgs, "APC log viewer", scriptName="views the APC log")
         else:
             raise plugins.TextTestError, "APC log file not yet available"
     def _getTitle(self):
@@ -71,14 +70,6 @@ class SaveBestSolution(guiplugins.InteractiveAction):
         #all equal
         return 0
         
-    def canPerformOnTest(self):
-        self.kpiGroupForTest, self.kpiGroups, dummy = readKPIGroupFileCommon(self.currTestSelection[0].parent)
-        if not self.kpiGroupForTest.has_key(self.currTestSelection[0].name):
-            self.hostCaseName = self.currTestSelection[0].name
-        else:
-            self.hostCaseName = self.findFirstInKPIGroup()
-        return self.solutionIsBetter()
-
     def findFirstInKPIGroup(self):
         gp=self.kpiGroupForTest[self.currTestSelection[0].name]
         tests = filter(lambda x:self.kpiGroupForTest[x] == gp, self.kpiGroupForTest.keys())

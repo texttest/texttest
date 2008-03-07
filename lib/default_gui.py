@@ -1,6 +1,6 @@
 
 import plugins, os, sys, shutil, time, subprocess, operator, types
-from guiplugins import InteractiveAction, guilog, guiConfig, scriptEngine
+from guiplugins import InteractiveAction, guilog, guiConfig, processMonitor
 from jobprocess import JobProcess
 from sets import Set
 from copy import copy, deepcopy
@@ -25,7 +25,7 @@ class Quit(InteractiveAction):
     def messageAfterPerform(self):
         pass # GUI isn't there to show it
     def getConfirmationMessage(self):
-        runningProcesses = self.listRunningProcesses()
+        runningProcesses = processMonitor.listRunningProcesses()
         if len(runningProcesses) == 0:
             return ""
         else:
@@ -246,13 +246,13 @@ class FileViewAction(InteractiveAction):
         else:
             return ""
 
-    def startViewer(self, cmdArgs, description = "", env=None, exitHandler=None, exitHandlerArgs=()):
+    def startViewer(self, cmdArgs, description, *args, **kwargs):
         testDesc = self.testDescription()
         fullDesc = description + testDesc
-        process = self.startExternalProgram(cmdArgs, fullDesc, env=env, exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
+        nullFile = open(os.devnull, "w")
+        processMonitor.startProcess(cmdArgs, fullDesc, stdout=nullFile, stderr=nullFile, *args, **kwargs)
         self.notify("Status", 'Started "' + description + '" in background' + testDesc + '.')
-        return process
-
+        
     def handleNoFile(self, fileName):
         self.notify("Error", "File '" + os.path.basename(fileName) + "' cannot be viewed"
                     " as it has been removed in the file system." + self.noFileAdvice())
@@ -288,9 +288,8 @@ class ViewInEditor(FileViewAction):
         description = descriptor + " " + os.path.basename(fileName)
         refresh = bool(exitHandler)
         guilog.info("Viewing file " + fileName + " using '" + descriptor + "', refresh set to " + str(refresh))
-        process = self.startViewer(cmdArgs, description=description, env=env,
-                                   exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
-        scriptEngine.monitorProcess("views and edits test files", process, [ fileName ])
+        self.startViewer(cmdArgs, description=description, scriptName="views and edits test files", env=env,
+                         filesEdited=[ fileName ], exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
     def getViewerEnvironment(self, cmdArgs):
         # An absolute path to the viewer may indicate a custom tool, send the test environment along too
         # Doing this is unlikely to cause harm in any case
@@ -375,8 +374,7 @@ class ViewFileDifferences(FileViewAction):
         guilog.info("-- original file : " + stdFile)
         guilog.info("--  current file : " + tmpFile)
         cmdArgs = plugins.splitcmd(diffProgram) + [ stdFile, tmpFile ]
-        process = self.startViewer(cmdArgs, description=description)
-        scriptEngine.monitorProcess("shows graphical differences in test files", process)
+        self.startViewer(cmdArgs, description=description, scriptName="shows graphical differences in test files")
     
 class ViewFilteredFileDifferences(ViewFileDifferences):
     def _getTitle(self):
@@ -425,8 +423,8 @@ class FollowFile(FileViewAction):
         useFile = self.fileToFollow(fileName, comparison)
         guilog.info("Following file " + useFile + " using '" + followProgram + "'")
         description = followProgram + " " + os.path.basename(useFile)
-        process = self.startViewer(self.getFollowCommand(followProgram, useFile), description=description)
-        scriptEngine.monitorProcess("follows progress of test files", process)    
+        cmdArgs = self.getFollowCommand(followProgram, useFile)
+        self.startViewer(cmdArgs, description=description, scriptName="follows progress of test files")    
 
 class KillTests(InteractiveAction):
     def getStockId(self):
@@ -703,124 +701,6 @@ class ImportTest(InteractiveAction):
                 raise plugins.TextTestError, "A " + self.testType() + " with the name '" + \
                       testName + "' already exists, please choose another name"
         
-class RecordTest(InteractiveAction):
-    def __init__(self, *args):
-        InteractiveAction.__init__(self, *args)
-        self.recordTime = None
-        self.currentApp = None
-        self.addOption("v", "Version to record")
-        self.addOption("c", "Checkout to use for recording") 
-        self.addSwitch("rep", "Automatically replay test after recording it", 1)
-        self.addSwitch("repgui", "", defaultValue = 0, options = ["Auto-replay invisible", "Auto-replay in dynamic GUI"])
-    def singleTestOnly(self):
-        return True
-    def correctTestClass(self):
-        return "test-case"
-    def inMenuOrToolBar(self):
-        return False
-    def getTabTitle(self):
-        return "Recording"
-    def messageAfterPerform(self):
-        return "Started record session for " + self.describeTests()
-    def performOnCurrent(self):
-        guilog.info("Starting dynamic GUI in record mode...")
-        self.updateRecordTime(self.currTestSelection[0])
-        self.startTextTestProcess(self.currTestSelection[0], "record")
-    def getRecordMode(self):
-        return self.currTestSelection[0].getConfigValue("use_case_record_mode")
-    def isActiveOnCurrent(self, *args):
-        return InteractiveAction.isActiveOnCurrent(self, *args) and self.getRecordMode() != "disabled" and \
-               self.currTestSelection[0].getConfigValue("use_case_recorder") != "none"
-    def updateOptions(self):
-        if self.currentApp is not self.currTestSelection[0].app:
-            self.currentApp = self.currTestSelection[0].app
-            self.optionGroup.setOptionValue("v", self.currTestSelection[0].app.getFullVersion(forSave=1))
-            self.optionGroup.setOptionValue("c", self.currTestSelection[0].app.checkout)
-            return True
-        else:
-            return False
-    def getUseCaseFile(self, test):
-        return test.getFileName("usecase", self.optionGroup.getOptionValue("v"))
-    def updateRecordTime(self, test):
-        file = self.getUseCaseFile(test)
-        if file:
-            self._updateRecordTime(file)
-    def _updateRecordTime(self, file):
-        newTime = plugins.modifiedTime(file)
-        if newTime != self.recordTime:
-            self.recordTime = newTime
-            outerRecord = os.getenv("USECASE_RECORD_SCRIPT")
-            if outerRecord:
-                # If we have an "outer" record going on, provide the result as a target recording...
-                target = plugins.addLocalPrefix(outerRecord, "target_record")
-                shutil.copyfile(file, target)
-            return True
-        else:
-            return False
-    def getChangedUseCaseVersion(self, test):
-        file = self.getUseCaseFile(test)
-        if not file or not self._updateRecordTime(file):
-            return
-
-        parts = os.path.basename(file).split(".")
-        return ".".join(parts[2:])
-    def startTextTestProcess(self, test, usecase, overwriteVersion=""):
-        ttOptions = self.getRunOptions(test, usecase, overwriteVersion)
-        guilog.info("Starting " + usecase + " run of TextTest with arguments " + repr(ttOptions))
-        cmdArgs = self.getTextTestArgs() + ttOptions
-        writeDir = self.getWriteDir(test)
-        plugins.ensureDirectoryExists(writeDir)
-        logFile = self.getLogFile(writeDir, usecase, "output")
-        errFile = self.getLogFile(writeDir, usecase)
-        self.startExtProgramNewUsecase(cmdArgs, usecase, logFile, errFile, \
-                                       exitHandler=self.textTestCompleted, exitHandlerArgs=(test,usecase))
-    def getLogFile(self, writeDir, usecase, type="errors"):
-        return os.path.join(writeDir, usecase + "_" + type + ".log")
-    def textTestCompleted(self, test, usecase):
-        # Refresh the files before changed the data
-        test.refreshFiles()
-        if usecase == "record":
-            self.setTestRecorded(test, usecase)
-        else:
-            self.setTestReady(test, usecase)
-        test.filesChanged()
-        test.notify("CloseDynamic", usecase)
-    def getWriteDir(self, test):
-        return os.path.join(test.app.writeDirectory, "record")
-    def setTestRecorded(self, test, usecase):
-        writeDir = self.getWriteDir(test)
-        errFile = self.getLogFile(writeDir, usecase)
-        if os.path.isfile(errFile):
-            errText = open(errFile).read()
-            if len(errText):
-                self.notify("Status", "Recording failed for " + repr(test))
-                return self.notify("Error", "Recording use-case failed, with the following errors:\n" + errText)
-
-        changedUseCaseVersion = self.getChangedUseCaseVersion(test)
-        if changedUseCaseVersion is not None and self.optionGroup.getSwitchValue("rep"):
-            self.startTextTestProcess(test, "replay", changedUseCaseVersion)
-            message = "Recording completed for " + repr(test) + \
-                      ". Auto-replay of test now started. Don't submit the test manually!"
-            self.notify("Status", message)
-        else:
-            self.notify("Status", "Recording completed for " + repr(test) + ", not auto-replaying")
-    def setTestReady(self, test, usecase=""):
-        self.notify("Status", "Recording and auto-replay completed for " + repr(test))
-    def getRunOptions(self, test, usecase, overwriteVersion):
-        version = self.optionGroup.getOptionValue("v")
-        checkout = self.optionGroup.getOptionValue("c")
-        basicOptions = self.getRunModeOptions(usecase, overwriteVersion) + [ "-tp", test.getRelPath() ] + \
-                       test.app.getRunOptions(version, checkout)
-        if usecase == "record":
-            basicOptions.append("-record")
-        return basicOptions
-    def getRunModeOptions(self, usecase, overwriteVersion):
-        if usecase == "record" or self.optionGroup.getSwitchValue("repgui"):
-            return [ "-g" ]
-        else:
-            return [ "-o", overwriteVersion ]
-    def _getTitle(self):
-        return "Record _Use-Case"
     
 class ImportTestCase(ImportTest):
     def __init__(self, *args):
@@ -1044,10 +924,11 @@ class ResetGroups(InteractiveAction):
         pass # we don't care and don't want to screw things up...
     
 class SaveSelection(InteractiveAction):
-    def __init__(self, allApps, *args):
-        InteractiveAction.__init__(self, allApps, *args)
+    def __init__(self, allApps, dynamic):
+        InteractiveAction.__init__(self, allApps, dynamic)
         self.selectionCriteria = ""
         self.fileName = ""
+        self.dynamic = dynamic
         self.saveTestList = ""
         self.rootTestSuites = []
     def correctTestClass(self):
@@ -1063,17 +944,16 @@ class SaveSelection(InteractiveAction):
     def _getScriptTitle(self):
         return "Save selected tests in file"
     def dialogEnableOptions(self):
-        return not guiConfig.dynamic
+        return not self.dynamic
     def getDirectories(self):
-        apps = guiConfig.apps
-        dirs = apps[0].getFilterFileDirectories(apps)
+        dirs = self.validApps[0].getFilterFileDirectories(self.validApps)
         if len(dirs) > 0:
             self.folders = (dirs, dirs[0][1])
         else:
             self.folders = (dirs, None)
         return self.folders
     def saveActualTests(self):
-        return guiConfig.dynamic or self.saveTestList
+        return self.dynamic or self.saveTestList
     def getTestPathFilterArg(self):
         selTestPaths = []
         for suite in self.rootTestSuites:
@@ -1150,36 +1030,65 @@ class RunningAction(InteractiveAction):
         return "test-case"
     def messageAfterPerform(self):
         return self.performedDescription() + " " + self.describeTests() + " at " + plugins.localtime() + "."
+    
     def performOnCurrent(self):
-        app = self.currTestSelection[0].app
+        self.startTextTestProcess(self.getUseCaseName(), self.invisibleGroup.getCommandLines())
+    def startTextTestProcess(self, usecase, runModeOptions):
+        app = self.currAppSelection[0]
         writeDir = os.path.join(app.writeDirectory, "dynamic_run" + str(self.runNumber))
         plugins.ensureDirectoryExists(writeDir)
         filterFile = self.writeFilterFile(writeDir)
-        ttOptions = self.getTextTestOptions(filterFile, app)
+        ttOptions = runModeOptions + self.getTextTestOptions(filterFile, app)
+        guilog.info("Starting " + usecase + " run of TextTest with arguments " + repr(ttOptions))
         logFile = os.path.join(writeDir, "output.log")
         errFile = os.path.join(writeDir, "errors.log")
-        usecase = self.getUseCaseName()
         self.runNumber += 1
         description = "Dynamic GUI started at " + plugins.localtime()
         cmdArgs = self.getTextTestArgs() + ttOptions
-        identifierString = "started at " + plugins.localtime()
-        self.startExtProgramNewUsecase(cmdArgs, usecase, logFile, errFile, exitHandler=self.checkTestRun, \
-                                       exitHandlerArgs=(identifierString,errFile,self.currTestSelection), description = description)
+        env = self.getNewUseCaseEnvironment(usecase)
+        processMonitor.startProcess(cmdArgs, description, env=env,
+                                    stdout=open(logFile, "w"), stderr=open(errFile, "w"),
+                                    exitHandler=self.checkTestRun, 
+                                    exitHandlerArgs=(errFile,self.currTestSelection,usecase))
+
+    def getNewUseCaseEnvironment(self, usecase):
+        environ = deepcopy(os.environ)
+        recScript = os.getenv("USECASE_RECORD_SCRIPT")
+        if recScript:
+            environ["USECASE_RECORD_SCRIPT"] = plugins.addLocalPrefix(recScript, usecase)
+        repScript = os.getenv("USECASE_REPLAY_SCRIPT")
+        if repScript:
+            # Dynamic GUI might not record anything (it might fail) - don't try to replay files that
+            # aren't there...
+            dynRepScript = plugins.addLocalPrefix(repScript, usecase)
+            if os.path.isfile(dynRepScript):
+                environ["USECASE_REPLAY_SCRIPT"] = dynRepScript
+            else:
+                del environ["USECASE_REPLAY_SCRIPT"]
+        return environ
+    
     def writeFilterFile(self, writeDir):
         # Because the description of the selection can be extremely long, we write it in a file and refer to it
         # This avoids too-long command lines which are a problem at least on Windows XP
         filterFileName = os.path.join(writeDir, "gui_select")
         self.notify("SaveSelection", filterFileName)
         return filterFileName
+    def getTextTestArgs(self):
+        if os.name == "nt" and plugins.textTestName.endswith(".py"):
+            return [ "python", plugins.textTestName ] # Windows isn't clever enough to figure out how to run Python programs...
+        else:
+            return [ plugins.textTestName ]
     def getTextTestOptions(self, filterFile, app):
         ttOptions = self.getCmdlineOptionForApps()
-        ttOptions += self.invisibleGroup.getCommandLines()
         for group in self.getOptionGroups():
-            ttOptions += group.getCommandLines()
+            ttOptions += group.getCommandLines(self.getCommandLineKeys())
         ttOptions += [ "-count", str(self.getTestCount()) ]
         ttOptions += [ "-f", filterFile ]
         ttOptions += [ "-fd", self.getTmpFilterDir(app) ]
         return ttOptions
+    def getCommandLineKeys(self):
+        # assume everything by default
+        return []
     def getTestCount(self):
         return len(self.currTestSelection) 
     def getTmpFilterDir(self, app):
@@ -1194,15 +1103,24 @@ class RunningAction(InteractiveAction):
     def getCmdlineOptionForApps(self):
         appDescs = [ app.name + app.versionSuffix() for app in self.getAppsSelectedNoExtras() ]
         return [ "-a", ",".join(appDescs) ]
-    def checkTestRun(self, identifierString, errFile, testSel):
-        if len(self.currTestSelection) >= 1 and self.currTestSelection[0] in testSel:
-            self.currTestSelection[0].filesChanged()
-        testSel[0].notify("CloseDynamic", self.getUseCaseName())
+    def checkTestRun(self, errFile, testSel, usecase):
+        if self.checkErrorFile(errFile, testSel, usecase):
+            self.handleCompletion(testSel, usecase)
+            if len(self.currTestSelection) >= 1 and self.currTestSelection[0] in testSel:
+                self.currTestSelection[0].filesChanged()
+
+        testSel[0].notify("CloseDynamic", usecase)
+
+    def checkErrorFile(self, errFile, testSel, usecase):
         if os.path.isfile(errFile):
             errText = open(errFile).read()
             if len(errText):
-                self.notify("Error", "Dynamic run failed, with the following errors:\n" + errText)
-            
+                self.notify("Status", usecase.capitalize() + " run failed for " + repr(testSel[0]))
+                self.notify("Error", usecase.capitalize() + " run failed, with the following errors:\n" + errText)
+                return False
+        return True
+    def handleCompletion(self, *args):
+        pass # only used when recording
 
 class ReconnectToTests(RunningAction):
     def __init__(self, *args):
@@ -1286,6 +1204,91 @@ class RunTests(RunningAction):
                        "popping up and may be hard to follow.\nAre you sure you want to do this?"
         else:
             return ""
+
+
+class RecordTest(RunningAction):
+    def __init__(self, *args):
+        RunningAction.__init__(self, *args)
+        self.currentApp = None
+        self.recordTime = None
+        self.addOption("v", "Version to record")
+        self.addOption("c", "Checkout to use for recording") 
+        self.addSwitch("rep", "Automatically replay test after recording it", 1)
+        self.addSwitch("repgui", "", defaultValue = 0, options = ["Auto-replay invisible", "Auto-replay in dynamic GUI"])
+    def singleTestOnly(self):
+        return True
+    def inMenuOrToolBar(self):
+        return False
+    def getTabTitle(self):
+        return "Recording"
+    def messageAfterPerform(self):
+        return "Started record session for " + self.describeTests()
+    def performOnCurrent(self):
+        self.updateRecordTime(self.currTestSelection[0])
+        self.startTextTestProcess("record", self.invisibleGroup.getCommandLines() + [ "-record" ])
+    def getRecordMode(self):
+        return self.currTestSelection[0].getConfigValue("use_case_record_mode")
+    def isActiveOnCurrent(self, *args):
+        return RunningAction.isActiveOnCurrent(self, *args) and self.getRecordMode() != "disabled" and \
+               self.currTestSelection[0].getConfigValue("use_case_recorder") != "none"
+    def updateOptions(self):
+        if self.currentApp is not self.currAppSelection[0]:
+            self.currentApp = self.currAppSelection[0]
+            self.optionGroup.setOptionValue("v", self.currentApp.getFullVersion(forSave=1))
+            self.optionGroup.setOptionValue("c", self.currentApp.checkout)
+            return True
+        else:
+            return False
+    def getUseCaseFile(self, test):
+        return test.getFileName("usecase", self.optionGroup.getOptionValue("v"))
+    def updateRecordTime(self, test):
+        file = self.getUseCaseFile(test)
+        if file:
+            self._updateRecordTime(file)
+    def _updateRecordTime(self, file):
+        newTime = plugins.modifiedTime(file)
+        if newTime != self.recordTime:
+            self.recordTime = newTime
+            outerRecord = os.getenv("USECASE_RECORD_SCRIPT")
+            if outerRecord:
+                # If we have an "outer" record going on, provide the result as a target recording...
+                target = plugins.addLocalPrefix(outerRecord, "target_record")
+                shutil.copyfile(file, target)
+            return True
+        else:
+            return False
+    def getChangedUseCaseVersion(self, test):
+        test.refreshFiles() # update cache after record run
+        file = self.getUseCaseFile(test)
+        if not file or not self._updateRecordTime(file):
+            return
+
+        parts = os.path.basename(file).split(".")
+        return ".".join(parts[2:])
+    
+    def handleCompletion(self, testSel, usecase):
+        test = testSel[0]
+        if usecase == "record":
+            changedUseCaseVersion = self.getChangedUseCaseVersion(test)
+            if changedUseCaseVersion is not None and self.optionGroup.getSwitchValue("rep"):
+                self.startTextTestProcess("replay", self.getReplayRunModeOptions(changedUseCaseVersion))
+                message = "Recording completed for " + repr(test) + \
+                          ". Auto-replay of test now started. Don't submit the test manually!"
+                self.notify("Status", message)
+            else:
+                self.notify("Status", "Recording completed for " + repr(test) + ", not auto-replaying")
+        else:
+            self.notify("Status", "Recording and auto-replay completed for " + repr(test))
+    def getCommandLineKeys(self):
+        return [ "v", "c" ]
+    def getReplayRunModeOptions(self, overwriteVersion):
+        if self.optionGroup.getSwitchValue("repgui"):
+            return self.invisibleGroup.getCommandLines() + [ "-autoreplay" ]
+        else:
+            return [ "-autoreplay", "-o", overwriteVersion ]
+    def _getTitle(self):
+        return "Record _Use-Case"
+
 
 class CreateDefinitionFile(InteractiveAction):
     def __init__(self, *args):

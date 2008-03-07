@@ -143,7 +143,8 @@ class ProcessTerminationMonitor(plugins.Observable):
                 exitHandler(*exitHandlerArgs)
         except OSError:
             pass # Can be thrown by wait() sometimes when the process is killed
-    def listRunning(self, processesToCheck):
+    def listRunningProcesses(self):
+        processesToCheck = guiConfig.getCompositeValue("query_kill_processes", "", modeDependent=True)
         running = []
         if len(processesToCheck) == 0:
             return running
@@ -158,6 +159,14 @@ class ProcessTerminationMonitor(plugins.Observable):
                     break
 
         return running
+    
+    def startProcess(self, cmdArgs, description = "", exitHandler=None, exitHandlerArgs=(),
+                     scriptName="", filesEdited = "", **kwargs):
+        process = subprocess.Popen(cmdArgs, stdin=open(os.devnull), startupinfo=plugins.getProcessStartUpInfo(), **kwargs)
+        self.addMonitoring(process, description, exitHandler, exitHandlerArgs)
+        if scriptName:
+            scriptEngine.monitorProcess(scriptName, process, filesEdited)
+        
     def getRunningProcesses(self):
         return filter(lambda (process, desc): process.poll() is None, self.processes)
     def notifyKillProcesses(self, sig=None):
@@ -172,7 +181,7 @@ class ProcessTerminationMonitor(plugins.Observable):
             JobProcess(process.pid).killAll(sig)
         
 
-processTerminationMonitor = ProcessTerminationMonitor()
+processMonitor = ProcessTerminationMonitor()
        
 class InteractiveAction(plugins.Observable):
     def __init__(self, allApps, *args):
@@ -264,9 +273,6 @@ class InteractiveAction(plugins.Observable):
         else:
             return ""
 
-    def canPerform(self):
-        return True # do we want a button on the tab for this?
-
     # Should we create a gtk.Action? (or connect to button directly ...)
     def inMenuOrToolBar(self): 
         return True
@@ -321,37 +327,6 @@ class InteractiveAction(plugins.Observable):
                                    selectFile, description)
     def addSwitch(self, key, name, defaultValue = 0, options = [], description = ""):
         self.optionGroup.addSwitch(key, name, defaultValue, options, description)
-    def getTextTestArgs(self):
-        if os.name == "nt" and plugins.textTestName.endswith(".py"):
-            return [ "python", plugins.textTestName ] # Windows isn't clever enough to figure out how to run Python programs...
-        else:
-            return [ plugins.textTestName ]
-    def listRunningProcesses(self):
-        processesToReport = guiConfig.getCompositeValue("query_kill_processes", "", modeDependent=True)
-        return processTerminationMonitor.listRunning(processesToReport)
-
-    def startExternalProgram(self, cmdArgs, description = "", env=None, outfile=os.devnull, errfile=os.devnull, \
-                             exitHandler=None, exitHandlerArgs=()):
-        process = subprocess.Popen(cmdArgs, env=env, stdin=open(os.devnull), stdout=open(outfile, "w"), stderr=open(errfile, "w"), \
-                                   startupinfo=plugins.getProcessStartUpInfo())
-        processTerminationMonitor.addMonitoring(process, description, exitHandler, exitHandlerArgs)
-        return process
-    def startExtProgramNewUsecase(self, cmdArgs, usecase, outfile, errfile, \
-                                  exitHandler, exitHandlerArgs, description = ""):
-        environ = deepcopy(os.environ)
-        recScript = os.getenv("USECASE_RECORD_SCRIPT")
-        if recScript:
-            environ["USECASE_RECORD_SCRIPT"] = plugins.addLocalPrefix(recScript, usecase)
-        repScript = os.getenv("USECASE_REPLAY_SCRIPT")
-        if repScript:
-            # Dynamic GUI might not record anything (it might fail) - don't try to replay files that
-            # aren't there...
-            dynRepScript = plugins.addLocalPrefix(repScript, usecase)
-            if os.path.isfile(dynRepScript):
-                environ["USECASE_REPLAY_SCRIPT"] = dynRepScript
-            else:
-                del environ["USECASE_REPLAY_SCRIPT"]
-        return self.startExternalProgram(cmdArgs, description, environ, outfile, errfile, exitHandler, exitHandlerArgs)
     def describe(self, testObj, postText = ""):
         guilog.info(testObj.getIndent() + repr(self) + " " + repr(testObj) + postText)
     def startPerform(self):

@@ -48,7 +48,7 @@ class ImportTestCase(default_gui.ImportTestCase):
         self.optionGroup.setPossibleValues("mac", self.getExistingMacros())
         return True
     def getExistingMacros(self):
-        carmUsr = self.currentTest.getEnvironment("CARMUSR")
+        carmUsr = self.currTestSelection[0].getEnvironment("CARMUSR")
         if not carmUsr:
             return []
         path = os.path.join(carmUsr, "macros")
@@ -80,7 +80,7 @@ class RecordTest(default_gui.RecordTest):
         self.optionGroup.setPossibleValues("rset", self.findRuleSets())
         return retValue
     def findRuleSets(self):
-        carmUsr = self.currentTest.getEnvironment("CARMUSR")
+        carmUsr = self.currTestSelection[0].getEnvironment("CARMUSR")
         if not carmUsr:
             return []
         sourceDir = os.path.join(carmUsr, "crc", "source")

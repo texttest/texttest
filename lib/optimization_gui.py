@@ -30,11 +30,13 @@ class ImportTestCase(default_gui.ImportTestCase):
     # getOptions implemented in subclasses
         
 # This is the action responsible for plotting from the GUI.
-class PlotTestInGUI(guiplugins.SelectionAction):
+class PlotTestInGUI(guiplugins.InteractiveAction):
     def __init__(self, allApps, dynamic):
-        guiplugins.SelectionAction.__init__(self, allApps, dynamic)
+        guiplugins.InteractiveAction.__init__(self, allApps, dynamic)
         self.dynamic = dynamic
         self.testGraph = optimization.TestGraph(self.optionGroup)
+    def correctTestClass(self):
+        return "test-case"
     def __repr__(self):
         return "Plotting Graph"
     def _getTitle(self):
@@ -99,14 +101,18 @@ class PlotTestInGUI(guiplugins.SelectionAction):
             self.testGraph = optimization.TestGraph(self.optionGroup)
 
     
-class StartStudio(guiplugins.InteractiveTestAction):
+class StartStudio(guiplugins.InteractiveAction):
     def __init__(self, *args):
-        guiplugins.InteractiveTestAction.__init__(self, *args)
+        guiplugins.InteractiveAction.__init__(self, *args)
         self.addOption("sys", "Studio CARMSYS to use")
     def __repr__(self):
         return "Studio"    
     def inMenuOrToolBar(self):
         return False
+    def singleTestOnly(self):
+        return True
+    def correctTestClass(self):
+        return "test-case"
     def _getTitle(self):
         return "Studio"
     def getTabTitle(self):
@@ -114,15 +120,15 @@ class StartStudio(guiplugins.InteractiveTestAction):
     def getScriptTitle(self, tab):
         return "Start Studio"
     def updateOptions(self):
-        self.optionGroup.setOptionValue("sys", self.currentTest.getEnvironment("CARMSYS"))
+        self.optionGroup.setOptionValue("sys", self.currTestSelection[0].getEnvironment("CARMSYS"))
         return False
     def performOnCurrent(self):
-        environ = self.currentTest.getRunEnvironment([ "CARMUSR", "CARMTMP" ])
+        environ = self.currTestSelection[0].getRunEnvironment([ "CARMUSR", "CARMTMP" ])
         environ["CARMSYS"] = self.optionGroup.getOptionValue("sys")
         print "CARMSYS:", environ["CARMSYS"]
         print "CARMUSR:", environ["CARMUSR"]
         print "CARMTMP:", environ["CARMTMP"]
-        fullSubPlanPath = self.currentTest.app._getSubPlanDirName(self.currentTest)
+        fullSubPlanPath = self.currAppSelection[0]._getSubPlanDirName(self.currTestSelection[0])
         lPos = fullSubPlanPath.find("LOCAL_PLAN/")
         subPlan = fullSubPlanPath[lPos + 11:]
         localPlan = os.sep.join(subPlan.split(os.sep)[0:-1])

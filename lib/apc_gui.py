@@ -2,13 +2,15 @@
 import apc_basic_gui, optimization_gui, ravebased_gui, default_gui, guiplugins, plugins, os, sys, shutil, time
 from apc import readKPIGroupFileCommon
 
-class ViewApcLog(guiplugins.InteractiveTestAction):
+class ViewApcLog(guiplugins.InteractiveAction):
     def __repr__(self):
         return "Viewing log of"
+    def singleTestOnly(self):
+        return True
     def inMenuOrToolBar(self):
         return False
     def performOnCurrent(self):
-        viewLogScript = self.currentTest.makeTmpFileName("view_apc_log", forFramework=1)
+        viewLogScript = self.currTestSelection[0].makeTmpFileName("view_apc_log", forFramework=1)
         if os.path.isfile(viewLogScript):
             file = open(viewLogScript)
             cmdArgs = eval(file.readlines()[0].strip())
@@ -20,31 +22,33 @@ class ViewApcLog(guiplugins.InteractiveTestAction):
     def _getTitle(self):
         return "View APC Log"
 
-class SaveBestSolution(guiplugins.InteractiveTestAction):
+class SaveBestSolution(guiplugins.InteractiveAction):
     def inMenuOrToolBar(self):
         return False
+    def singleTestOnly(self):
+        return True
     def performOnCurrent(self):
         import shutil
         # If we have the possibility to save, we know that the current solution is best
-        testdir = self.currentTest.parent.getDirectory(1)
+        testdir = self.currTestSelection[0].parent.getDirectory(1)
         bestStatusFile = os.path.join(testdir, self.hostCaseName, "best_known_status");
-        currentStatusFile = self.currentTest.makeTmpFileName("status")
+        currentStatusFile = self.currTestSelection[0].makeTmpFileName("status")
         shutil.copyfile(currentStatusFile, bestStatusFile)
 
         bestSolFile = os.path.join(testdir, self.hostCaseName, "best_known_solution");
-        currentSolFile = self.currentTest.makeTmpFileName("solution")
+        currentSolFile = self.currTestSelection[0].makeTmpFileName("solution")
         shutil.copyfile(currentSolFile, bestSolFile)
         
     def _getTitle(self):
         return "Save best"
 
     def solutionIsBetter(self):
-        parentDir = self.currentTest.parent.getDirectory(1)
+        parentDir = self.currTestSelection[0].parent.getDirectory(1)
         bestStatusFile = os.path.join(parentDir, self.hostCaseName, "best_known_status");
-        statusFile = self.currentTest.makeTmpFileName("status")
+        statusFile = self.currTestSelection[0].makeTmpFileName("status")
         if not os.path.isfile(statusFile):
             return 0
-        solutionFile = self.currentTest.makeTmpFileName("solution")
+        solutionFile = self.currTestSelection[0].makeTmpFileName("solution")
         if not os.path.isfile(solutionFile):
             return 0
         # read solutions
@@ -68,21 +72,25 @@ class SaveBestSolution(guiplugins.InteractiveTestAction):
         return 0
         
     def canPerformOnTest(self):
-        self.kpiGroupForTest, self.kpiGroups, dummy = readKPIGroupFileCommon(self.currentTest.parent)
-        if not self.kpiGroupForTest.has_key(self.currentTest.name):
-            self.hostCaseName = self.currentTest.name
+        self.kpiGroupForTest, self.kpiGroups, dummy = readKPIGroupFileCommon(self.currTestSelection[0].parent)
+        if not self.kpiGroupForTest.has_key(self.currTestSelection[0].name):
+            self.hostCaseName = self.currTestSelection[0].name
         else:
             self.hostCaseName = self.findFirstInKPIGroup()
         return self.solutionIsBetter()
 
     def findFirstInKPIGroup(self):
-        gp=self.kpiGroupForTest[self.currentTest.name]
+        gp=self.kpiGroupForTest[self.currTestSelection[0].name]
         tests = filter(lambda x:self.kpiGroupForTest[x] == gp, self.kpiGroupForTest.keys())
         tests.sort()
         return tests[0]
 
 # This is the action responsible for selecting a KPI group in the GUI.
-class SelectKPIGroup(guiplugins.InteractiveTestAction):
+class SelectKPIGroup(guiplugins.InteractiveAction):
+    def singleTestOnly(self):
+        return True
+    def correctTestClass(self):
+        return "test-case"
     def __repr__(self):
         return "Select KPI group"
     def _getTitle(self):
@@ -102,13 +110,13 @@ class SelectKPIGroup(guiplugins.InteractiveTestAction):
         if tests:
             self.notify("SetTestSelection", tests)
     def getTestsToSelect(self):
-        suite = self.currentTest.parent
+        suite = self.currTestSelection[0].parent
         kpiGroupForTest, kpiGroups, percscale = readKPIGroupFileCommon(suite)
-        if not kpiGroupForTest.has_key(self.currentTest.name):
-            self.message = "Test " + self.currentTest.name +  " is not in an KPI group."
-            return [ self.currentTest ]
+        if not kpiGroupForTest.has_key(self.currTestSelection[0].name):
+            self.message = "Test " + self.currTestSelection[0].name +  " is not in an KPI group."
+            return self.currTestSelection
 
-        kpiGroup = kpiGroupForTest[self.currentTest.name]
+        kpiGroup = kpiGroupForTest[self.currTestSelection[0].name]
         tests = filter(lambda test: kpiGroupForTest.get(test.name) == kpiGroup, suite.testcases)
         self.message = "Selected " + str(len(tests)) + " tests in KPI group " + kpiGroup + "."
         return tests
@@ -154,12 +162,12 @@ class PlotTestInGUI(optimization_gui.PlotTestInGUI):
         return test.makeTmpFileName("APC_FILES/" + logFileStem, forComparison=0)
     
 # Specialization of plotting in the GUI for APC
-class PlotProfileInGUIAPC(guiplugins.SelectionAction):
+class PlotProfileInGUIAPC(guiplugins.InteractiveAction):
     def __init__(self, allApps, dynamic):
         path = "/carm/proj/apc/bin"
         if not sys.path.count(path):
             sys.path.append(path)
-        guiplugins.SelectionAction.__init__(self, allApps, dynamic)
+        guiplugins.InteractiveAction.__init__(self, allApps, dynamic)
         self.dynamic = dynamic
         self.sizes = ["a4","a4l","a3","a3l"]
         self.addSwitch("size", "Size of plot:     ", 0, self.sizes);
@@ -182,7 +190,9 @@ class PlotProfileInGUIAPC(guiplugins.SelectionAction):
     def messageBeforePerform(self):
         return "Plotting profiles for tests ..."
     def messageAfterPerform(self):
-        return "Plotted " + self.describeTests() + " profiles."    
+        return "Plotted " + self.describeTests() + " profiles."
+    def correctTestClass(self):
+        return "test-case"
     def describeTests(self):
         return str(self.numPlottedTests) + " tests"
     def performOnCurrent(self):
@@ -307,17 +317,21 @@ class Quit(default_gui.Quit):
                     return "Tests have been runnning for %d minutes,\n are you sure you want to quit?" % elapsedTime
         return ""
 
-class CVSLogInGUI(guiplugins.InteractiveTestAction):
+class CVSLogInGUI(guiplugins.InteractiveAction):
     def inMenuOrToolBar(self):
         return False
+    def singleTestOnly(self):
+        return True
+    def correctTestClass(self):
+        return "test-case"
     def performOnCurrent(self):
-        logFileStem = self.currentTest.app.getConfigValue("log_file")
+        logFileStem = self.currTestSelection[0].app.getConfigValue("log_file")
         files = [ logFileStem ]
-        files += self.currentTest.app.getConfigValue("cvs_log_for_files").split(",")
+        files += self.currTestSelection[0].app.getConfigValue("cvs_log_for_files").split(",")
         cvsInfo = ""
-        path = self.currentTest.getDirectory()
+        path = self.currTestSelection[0].getDirectory()
         for file in files:
-            fileName = self.currentTest.getFileName(file)
+            fileName = self.currTestSelection[0].getFileName(file)
             if fileName:
                 cvsInfo += self.getCVSInfo(path, os.path.basename(fileName))
         self.notify("Information", "CVS Logs" + os.linesep + os.linesep + cvsInfo)

@@ -48,12 +48,14 @@ class SelectTests(default_gui.SelectTests):
         return result
     
 
-class CreatePerformanceReport(guiplugins.SelectionAction):
+class CreatePerformanceReport(guiplugins.InteractiveAction):
     def __init__(self, *args):
-        guiplugins.SelectionAction.__init__(self, *args)
+        guiplugins.InteractiveAction.__init__(self, *args)
         self.rootDir = ""
         self.versions = ["11", "12", "13", "14", "master" ]
         self.objectiveText = "Total cost of plan"
+    def correctTestClass(self):
+        return "test-case"
     def inToolBar(self): 
         return False
     def getMainMenuPath(self):

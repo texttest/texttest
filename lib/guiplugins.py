@@ -177,6 +177,7 @@ processTerminationMonitor = ProcessTerminationMonitor()
 class InteractiveAction(plugins.Observable):
     def __init__(self, allApps, *args):
         plugins.Observable.__init__(self)
+        self.currTestSelection = []
         self.currFileSelection = []
         self.currAppSelection = []
         self.diag = plugins.getDiagnostics("Interactive Actions")
@@ -228,22 +229,47 @@ class InteractiveAction(plugins.Observable):
         if newActive:
             if self.updateOptions():
                 self.notify("UpdateOptions")
+    def singleTestOnly(self):
+        return False
 
     def updateSelection(self, tests, rowCount):
-        pass
+        if rowCount != 1 and self.singleTestOnly():
+            self.currTestSelection = []
+        else:
+            self.currTestSelection = tests
+            testClass = self.correctTestClass()
+            if testClass:
+                self.currTestSelection = filter(lambda test: test.classId() == testClass, tests)
+    
     def updateOptions(self):
         return False     
     def isActiveOnCurrent(self, *args):
-        return True
+        return len(self.currTestSelection) > 0
+    def describeTests(self):
+        if len(self.currTestSelection) == 1:
+            return repr(self.currTestSelection[0])
+        else:
+            return str(len(self.currTestSelection)) + " tests"
+    def isSelected(self, test):
+        return test in self.currTestSelection
+    def isNotSelected(self, test):
+        return not self.isSelected(test)
+    def correctTestClass(self):
+        pass
+    def inButtonBar(self):
+        return not self.inMenuOrToolBar() and len(self.getOptionGroups()) == 0
+    def testDescription(self):
+        if len(self.currTestSelection) > 0:
+            return " (from test " + self.currTestSelection[0].uniqueName + ")"
+        else:
+            return ""
+
     def canPerform(self):
         return True # do we want a button on the tab for this?
 
     # Should we create a gtk.Action? (or connect to button directly ...)
     def inMenuOrToolBar(self): 
         return True
-    # Put the action in a button bar?
-    def inButtonBar(self):
-        return False
     def getStockId(self): # The stock ID for the action, in toolbar and menu.
         pass
     def getTooltip(self):
@@ -347,47 +373,7 @@ class InteractiveAction(plugins.Observable):
             self.startPerform()
         finally:
             self.endPerform()
-    
-class SelectionAction(InteractiveAction):
-    def __init__(self, allApps, *args):
-        InteractiveAction.__init__(self, allApps)
-        self.currTestSelection = []
-    def updateSelection(self, tests, rowCount):
-        self.currTestSelection = filter(lambda test: test.classId() == "test-case", tests)
-    def isActiveOnCurrent(self, *args):
-        return len(self.currTestSelection) > 0
-    def describeTests(self):
-        return str(len(self.currTestSelection)) + " tests"
-    def isSelected(self, test):
-        return test in self.currTestSelection
-    def isNotSelected(self, test):
-        return not self.isSelected(test)
-    
-    
-# The class to inherit from if you want test-based actions that can run from the GUI
-class InteractiveTestAction(InteractiveAction):
-    def __init__(self, validApps, *args):
-        InteractiveAction.__init__(self, validApps, *args)
-        self.currentTest = None
-    def isActiveOnCurrent(self, *args):
-        return self.currentTest is not None and self.correctTestClass()
-    def correctTestClass(self):
-        return self.currentTest.classId() == "test-case"
-    def describeTests(self):
-        return repr(self.currentTest)
-    def inButtonBar(self):
-        return not self.inMenuOrToolBar() and len(self.getOptionGroups()) == 0
-    def updateSelection(self, tests, rowCount):
-        if rowCount == 1:
-            self.currentTest = tests[0]
-        else:
-            self.currentTest = None
-    def testDescription(self):
-        if self.currentTest:
-            return " (from test " + self.currentTest.uniqueName + ")"
-        else:
-            return ""
-        
+                
 
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:

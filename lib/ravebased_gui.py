@@ -4,26 +4,9 @@ from guiplugins import guilog
 
 # Graphical import suite
 class ImportTestSuite(default_gui.ImportTestSuite):
-    def getEnvironment(self, envVar):
-        if self.currentTest:
-            return self.currentTest.getEnvironment("CARMUSR", "")
-        else:
-            return ""
     def addEnvironmentFileOptions(self):
-        usr = self.getEnvironment("CARMUSR")
-        dta = self.getEnvironment("CARMDATA")
-        if dta == usr:
-            dta = ""
-        if dta and usr:
-            try:
-                rdta = os.path.realpath(dta)
-                rusr = os.path.realpath(usr)
-                if rdta.startswith(rusr):
-                    dta=""
-            except:
-                    dta=""
-        self.optionGroup.addOption("usr", "CARMUSR", usr)
-        self.optionGroup.addOption("data", "CARMDATA (only if different)", dta)
+        self.optionGroup.addOption("usr", "CARMUSR")
+        self.optionGroup.addOption("data", "CARMDATA (only if different)")
     def updateOptionGroup(self, state):
         defaultgui.ImportTestSuite.updateOptionGroup(self, state)
         self.optionGroup.setOptionValue("usr", "")

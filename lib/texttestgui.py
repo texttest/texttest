@@ -26,8 +26,7 @@ try:
 except:
     raiseException("Unable to import module 'gobject'")
 
-import guiplugins, plugins, os, sys, operator, entrycompletion
-from gtkusecase import RadioGroupIndexer
+import guiplugins, plugins, os, sys, operator
 from ndict import seqdict
 from respond import Responder
 from copy import copy
@@ -48,120 +47,11 @@ def renderSuitesBold(column, cell, model, iter):
     else:
         cell.set_property('font', "bold")
 
-class PluginHandler:
-    def __init__(self):
-        self.modules = []
-    def getInstance(self, className, *args):
-        dotPos = className.find(".")
-        if dotPos == -1:
-            for module in self.modules:
-                command = "from " + module + " import " + className + " as realClassName"
-                try:
-                    exec command
-                    guilog.info("Loaded class '" + className + "' from module '" + module + "'")
-                except ImportError:
-                    continue
-            
-                actionObject = self.tryMakeObject(realClassName, *args)
-                if actionObject:
-                    return actionObject
-        else:
-            module = className[0:dotPos]
-            theClassName = className[dotPos + 1:]
-            exec "from " + module + " import " + theClassName + " as realClassName"
-            return self.tryMakeObject(realClassName, *args)
-
-        return self.tryMakeObject(className, *args)
-    def tryMakeObject(self, className, *args):
-        try:
-            return className(*args)
-        except:
-            # If some invalid interactive action is provided, need to know which
-            plugins.printWarning("Problem with class " + className.__name__ + ", ignoring...")
-            plugins.printException()
-
-pluginHandler = PluginHandler()
-
-# base class for all "GUI" classes which manage parts of the display
-class SubGUI(plugins.Observable):
-    def __init__(self):
-        plugins.Observable.__init__(self)
-        self.active = False
-        self.widget = None
-    def setActive(self, newValue):
-        if self.shouldShow():
-            self.active = newValue
-
-    def activate(self):
-        self.setActive(True)
-        self.contentsChanged()
-
-    def deactivate(self):
-        self.setActive(False)
-    def writeSeparator(self):
-        guilog.info("") # blank line for demarcation
-    def shouldDescribe(self):
-        return self.active and self.shouldShowCurrent()
-    def contentsChanged(self):
-        if self.shouldDescribe():
-            self.writeSeparator()
-            self.describe()
-
-    def describe(self):
-        pass
-
-    def createView(self):
-        pass
-
-    def shouldShow(self):
-        return True # should this be shown/created at all this run
-
-    def shouldShowCurrent(self, *args):
-        return True # should this be shown or hidden in the current context?
-
-    def getTabTitle(self):
-        return "Need Title For Tab!"
-
-    def getGroupTabTitle(self):
-        return "Test"
-
-    def forceVisible(self, rowCount):
-        return False
-
-    def addScrollBars(self, view):
-        window = gtk.ScrolledWindow()
-        window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        self.addToScrolledWindow(window, view)
-        window.show()
-        return window
-
-    def addToScrolledWindow(self, window, widget):
-        if isinstance(widget, gtk.VBox):
-            window.add_with_viewport(widget)
-        else:
-            window.add(widget)
     
-    def showPopupMenu(self, treeview, event):
-        if event.button == 3 and len(self.popupGUI.widget.get_children()) > 0:
-            time = event.time
-            pathInfo = treeview.get_path_at_pos(int(event.x), int(event.y))
-            selection = treeview.get_selection()
-            selectedRows = selection.get_selected_rows()
-            # If they didnt right click on a currently selected
-            # row, change the selection
-            if pathInfo is not None:
-                if pathInfo[0] not in selectedRows[1]:
-                    selection.unselect_all()
-                    selection.select_path(pathInfo[0])
-                path, col, cellx, celly = pathInfo
-                treeview.grab_focus()
-                self.popupGUI.widget.popup(None, None, None, event.button, time)
-                return True
-
 # base class for managing containers
-class ContainerGUI(SubGUI):
+class ContainerGUI(guiplugins.SubGUI):
     def __init__(self, subguis):
-        SubGUI.__init__(self)
+        guiplugins.SubGUI.__init__(self)
         self.subguis = subguis
     def forceVisible(self, rowCount):
         for subgui in self.subguis:
@@ -177,11 +67,11 @@ class ContainerGUI(SubGUI):
     def shouldDescribe(self):
         return self.active
     def setActive(self, value):
-        SubGUI.setActive(self, value)
+        guiplugins.SubGUI.setActive(self, value)
         for subgui in self.subguis:
             subgui.setActive(value)
     def contentsChanged(self):
-        SubGUI.contentsChanged(self)
+        guiplugins.SubGUI.contentsChanged(self)
         for subgui in self.subguis:
             subgui.contentsChanged()
                     
@@ -190,15 +80,14 @@ class ContainerGUI(SubGUI):
 # It is also responsible for keeping the throbber rotating
 # while actions are under way.
 # 
-class GUIStatusMonitor(SubGUI):
+class GUIStatusMonitor(guiplugins.SubGUI):
     def __init__(self):
-        SubGUI.__init__(self)
+        guiplugins.SubGUI.__init__(self)
         self.throbber = None
         self.animation = None
         self.pixbuf = None
         self.label = None
-        self.busy = False
-
+        
     def getWidgetName(self):
         return "_Status bar"
     def describe(self):
@@ -211,14 +100,12 @@ class GUIStatusMonitor(SubGUI):
             self.throbber.set_from_animation(self.animation)
             if lock:
                 self.throbber.grab_add()
-                self.busy = True
             
     def notifyActionProgress(self, message=""):
         while gtk.events_pending():
             gtk.main_iteration(False)
 
     def notifyActionStop(self, message=""):
-        self.busy = False
         if self.throbber:
             self.throbber.set_from_pixbuf(self.pixbuf)
             self.pixbuf = None
@@ -317,13 +204,12 @@ class TextTestGUI(Responder, plugins.Observable):
         self.progressMonitor = TestProgressMonitor(self.dynamic, testCount)
         self.progressBarGUI = ProgressBarGUI(self.dynamic, testCount)
         self.idleManager = IdleHandlerManager()
-        self.intvActions = guiplugins.interactiveActionHandler.getInstances(self.dynamic, allApps)
-        self.defaultActionGUIs, self.buttonBarGUIs = self.createActionGUIs()
+        self.intvActions, self.defaultActionGUIs, self.buttonBarGUIs, self.actionTabGUIs = \
+                          guiplugins.interactiveActionHandler.getPluginGUIs(self.dynamic, allApps)
         self.menuBarGUI, self.toolBarGUI, testPopupGUI, testFilePopupGUI = self.createMenuAndToolBarGUIs(allApps)
         self.testColumnGUI = TestColumnGUI(self.dynamic, testCount)
         self.testTreeGUI = TestTreeGUI(self.dynamic, allApps, testPopupGUI, self.testColumnGUI)
         self.testFileGUI = TestFileGUI(self.dynamic, testFilePopupGUI)
-        self.actionTabGUIs = self.createActionTabGUIs()
         self.notebookGUIs, rightWindowGUI = self.createRightWindowGUI()
         self.shortcutBarGUI = ShortcutBarGUI()
         self.topWindowGUI = self.createTopWindowGUI(rightWindowGUI, allApps)
@@ -356,7 +242,8 @@ class TextTestGUI(Responder, plugins.Observable):
         # Don't put ourselves in the observers twice or lots of weird stuff happens.
         # Important that closing the GUI is the last thing to be done, so make sure we go at the end...
         frameworkExitObservers = filter(self.isFrameworkExitObserver, frameworkObservers)
-        return [ guiplugins.processMonitor, statusMonitor ] + frameworkExitObservers + [ self.idleManager, self ] 
+        return self.defaultActionGUIs + [ guiplugins.processMonitor, statusMonitor ] + \
+               frameworkExitObservers + [ self.idleManager, self ] 
     def getTestColumnObservers(self):
         return [ self.testTreeGUI, statusMonitor, self.idleManager ]
     def getHideableGUIs(self):
@@ -412,10 +299,6 @@ class TextTestGUI(Responder, plugins.Observable):
         for observer in self.getAddSuitesObservers():
             observer.addSuites(suites)
             
-        # Must be done after suites are added, to
-        # make sure config options are available ...
-        entrycompletion.manager.start()
-
         self.topWindowGUI.createView()
         self.topWindowGUI.activate()
         self.idleManager.enableHandler()
@@ -428,30 +311,10 @@ class TextTestGUI(Responder, plugins.Observable):
         uiManager = gtk.UIManager()
         menu = MenuBarGUI(allApps, self.dynamic, uiManager, self.defaultActionGUIs)
         toolbar = ToolBarGUI(uiManager, self.defaultActionGUIs, self.progressBarGUI)
-        testPopup = TestPopupMenuGUI(uiManager, self.defaultActionGUIs)
-        testFilePopup = TestFilePopupMenuGUI(uiManager, self.defaultActionGUIs)
+        testPopup = PopupMenuGUI("TestPopupMenu", uiManager, self.defaultActionGUIs)
+        testFilePopup = PopupMenuGUI("TestFilePopupMenu", uiManager, self.defaultActionGUIs)
         return menu, toolbar, testPopup, testFilePopup
-    def createActionGUIs(self):
-        defaultGUIs, buttonGUIs = [], []
-        for action in self.intvActions:
-            if action.inMenuOrToolBar():
-                defaultGUIs.append(DefaultActionGUI(action))
-            elif action.inButtonBar():
-                buttonGUIs.append(ButtonActionGUI(action))
-
-        return defaultGUIs, buttonGUIs
-
-    def createActionGUIForTab(self, action):
-        return ButtonActionGUI(action, fromTab=True)
-    def createActionTabGUIs(self):
-        actionTabGUIs = []
-        for action in self.intvActions:
-            actionGUI = self.createActionGUIForTab(action)
-            for optionGroup in action.getOptionGroups():
-                if action.createOptionGroupTab(optionGroup):
-                    actionTabGUIs.append(ActionTabGUI(optionGroup, action, actionGUI))
-        return actionTabGUIs
-
+    
     def createRightWindowGUI(self):
         tabGUIs = [ self.appFileGUI, self.textInfoGUI, self.progressMonitor ] + self.actionTabGUIs
         buttonBarGUI = BoxGUI(self.buttonBarGUIs, horizontal=True, reversed=True)
@@ -566,8 +429,6 @@ class TopWindowGUI(ContainerGUI):
         except:
             plugins.printWarning("Failed to register texttest stock icons.")
             plugins.printException()
-        global globalTopWindow
-        globalTopWindow = self.topWindow
         self.topWindow.set_icon_from_file(self.getIcon())
         allAppNames = [ app.fullName + app.versionSuffix() for app in self.allApps ]
         appNames = ",".join(allAppNames)
@@ -582,6 +443,7 @@ class TopWindowGUI(ContainerGUI):
         self.topWindow.add(self.subguis[0].createView())
         self.windowSizeDescriptor = self.adjustSize()
         self.topWindow.show()
+        self.notify("TopWindow", self.topWindow)
         scriptEngine.connect("close window", "delete_event", self.topWindow, self.notifyQuit)
         return self.topWindow
 
@@ -643,9 +505,9 @@ class TopWindowGUI(ContainerGUI):
             return int(fullSize * proportion), descriptor
         
 
-class MenuBarGUI(SubGUI):
+class MenuBarGUI(guiplugins.SubGUI):
     def __init__(self, allApps, dynamic, uiManager, actionGUIs):
-        SubGUI.__init__(self)
+        guiplugins.SubGUI.__init__(self)
         # Create GUI manager, and a few default action groups
         self.menuNames = guiplugins.interactiveActionHandler.getMenuNames(allApps)
         self.dynamic = dynamic
@@ -656,7 +518,7 @@ class MenuBarGUI(SubGUI):
         self.toggleActions = []
         self.diag = plugins.getDiagnostics("Menu Bar")
     def setActive(self, active):
-        SubGUI.setActive(self, active)
+        guiplugins.SubGUI.setActive(self, active)
         self.widget.get_toplevel().add_accel_group(self.uiManager.get_accel_group())
         if self.shouldHide("menubar"):
             self.hide(self.widget, "Menubar")
@@ -791,35 +653,39 @@ class ToolBarGUI(ContainerGUI):
     def describe(self):
         guilog.info("UI layout: \n" + self.uiManager.get_ui())
 
-class TestPopupMenuGUI(SubGUI):
-    def __init__(self, uiManager, actionGUIs):
-        SubGUI.__init__(self)
+class PopupMenuGUI(guiplugins.SubGUI):
+    def __init__(self, name, uiManager, actionGUIs):
+        guiplugins.SubGUI.__init__(self)
+        self.name = name
         self.uiManager = uiManager
         self.actionGUIs = actionGUIs
         self.actionGroup = uiManager.get_action_groups()[0]
     def getWidgetName(self):
-        return "_TestPopupMenu"
+        return "_" + self.name
     def createView(self):
         self.uiManager.ensure_update()
-        self.widget = self.uiManager.get_widget("/TestPopupMenu")
+        self.widget = self.uiManager.get_widget("/" + self.name)
         self.widget.show_all()
         return self.widget
+    def showMenu(self, treeview, event):
+        if event.button == 3 and len(self.widget.get_children()) > 0:
+            time = event.time
+            pathInfo = treeview.get_path_at_pos(int(event.x), int(event.y))
+            selection = treeview.get_selection()
+            selectedRows = selection.get_selected_rows()
+            # If they didnt right click on a currently selected
+            # row, change the selection
+            if pathInfo is not None:
+                if pathInfo[0] not in selectedRows[1]:
+                    selection.unselect_all()
+                    selection.select_path(pathInfo[0])
+                path, col, cellx, celly = pathInfo
+                treeview.grab_focus()
+                self.widget.popup(None, None, None, event.button, time)
+                return True
 
-class TestFilePopupMenuGUI(SubGUI):
-    def __init__(self, uiManager, actionGUIs):
-        SubGUI.__init__(self)
-        self.uiManager = uiManager
-        self.actionGUIs = actionGUIs
-        self.actionGroup = uiManager.get_action_groups()[0]
-    def getWidgetName(self):
-        return "_TestFilePopupMenu"
-    def createView(self):
-        self.uiManager.ensure_update()
-        self.widget = self.uiManager.get_widget("/TestFilePopupMenu")
-        self.widget.show_all()
-        return self.widget
 
-class ShortcutBarGUI(SubGUI):
+class ShortcutBarGUI(guiplugins.SubGUI):
     def getWidgetName(self):
         return "_Shortcut bar"
     def createView(self):
@@ -829,9 +695,9 @@ class ShortcutBarGUI(SubGUI):
     def contentsChanged(self):
         pass # not yet integrated
 
-class TestColumnGUI(SubGUI):
+class TestColumnGUI(guiplugins.SubGUI):
     def __init__(self, dynamic, testCount):
-        SubGUI.__init__(self)
+        guiplugins.SubGUI.__init__(self)
         self.addedCount = 0
         self.totalNofTests = testCount
         self.totalNofDistinctTests = testCount
@@ -1085,7 +951,7 @@ class TestTreeGUI(ContainerGUI):
         scriptEngine.monitorExpansion(self.treeView, "show test suite", "hide test suite")
         self.treeView.connect('row-expanded', self.rowExpanded)
         self.expandLevel(self.treeView, self.filteredModel.get_iter_root())
-        self.treeView.connect("button_press_event", self.showPopupMenu)
+        self.treeView.connect("button_press_event", self.popupGUI.showMenu)
         
         scriptEngine.monitor("set test selection to", self.selection)
         self.selection.connect("changed", self.userChangedSelection)
@@ -1094,7 +960,7 @@ class TestTreeGUI(ContainerGUI):
         self.popupGUI.createView()
         return self.addScrollBars(self.treeView)
     def describeTree(self, *args):
-        SubGUI.contentsChanged(self) # don't describe the column too...
+        guiplugins.SubGUI.contentsChanged(self) # don't describe the column too...
 
     def canSelect(self, path):
         pathIter = self.filteredModel.get_iter(path)
@@ -1448,129 +1314,7 @@ class TestTreeGUI(ContainerGUI):
             else:
                 child = self.model.iter_next(child)
         return False
-
-
-class ActionGUI(SubGUI):
-    def __init__(self, action):
-        SubGUI.__init__(self)
-        self.action = action
-    def getStockId(self):
-        stockId = self.action.getStockId()
-        if stockId:
-            return "gtk-" + stockId 
-    def describe(self):
-        message = "Viewing action with title '" + self.action.getTitle(includeMnemonics=True) + "'"
-        message += self.detailDescription()
-        message += self.sensitivityDescription()
-        guilog.info(message)
-    def notifySensitivity(self, newValue):
-        actionOrButton = self.actionOrButton()
-        if not actionOrButton:
-            return
-        oldValue = actionOrButton.get_property("sensitive")
-        actionOrButton.set_property("sensitive", newValue)
-        if self.active and oldValue != newValue:
-            guilog.info("Setting sensitivity of action '" + self.action.getTitle(includeMnemonics=True) + "' to " + repr(newValue))
-    def detailDescription(self):
-        return ""
-    def sensitivityDescription(self):
-        if self.actionOrButton().get_property("sensitive"):
-            return ""
-        else:
-            return " (greyed out)"
-    def runInteractive(self, *args):
-        if statusMonitor.busy: # If we're busy with some other action, ignore this one ...
-            return
-        dialogType = self.action.getDialogType()
-        if dialogType is not None:
-            if dialogType:
-                dialog = pluginHandler.getInstance(dialogType, globalTopWindow,
-                                                   self._runInteractive, self._dontRun, self.action)
-                dialog.run()
-            else:
-                # Each time we perform an action we collect and save the current registered entries
-                # Actions showing dialogs will handle this in the dialog code.
-                entrycompletion.manager.collectCompletions()
-                self._runInteractive()
-    def _dontRun(self):
-        statusMonitor.notifyStatus("Action cancelled.")
-    def _runInteractive(self):
-        try:
-            self.action.startPerform()
-            resultDialogType = self.action.getResultDialogType()
-            if resultDialogType:
-                resultDialog = pluginHandler.getInstance(resultDialogType, globalTopWindow, None, self.action)
-                resultDialog.run()
-        finally:
-            self.action.endPerform()
-           
-class DefaultActionGUI(ActionGUI):
-    def __init__(self, action):
-        ActionGUI.__init__(self, action)
-        self.accelerator = None
-        title = self.action.getTitle(includeMnemonics=True)
-        actionName = self.action.getTitle(includeMnemonics=False)
-        self.gtkAction = gtk.Action(actionName, title, \
-                                    self.action.getTooltip(), self.getStockId())
-        scriptEngine.connect(self.action.getScriptTitle(False), "activate", self.gtkAction, self.runInteractive)
-        if not action.isActiveOnCurrent():
-            self.gtkAction.set_property("sensitive", False)
-            
-    def addToGroups(self, actionGroup, accelGroup):
-        self.accelerator = self.getAccelerator()
-        actionGroup.add_action_with_accel(self.gtkAction, self.accelerator)
-        self.gtkAction.set_accel_group(accelGroup)
-        self.gtkAction.connect_accelerator()
-        
-    def actionOrButton(self):
-        return self.gtkAction
-        
-    def getAccelerator(self):
-        realAcc = guiConfig.getCompositeValue("gui_accelerators", self.action.getTitle().rstrip("."))
-        if realAcc:
-            key, mod = gtk.accelerator_parse(realAcc)
-            if self.isValid(key, mod):
-                return realAcc
-            else:
-                plugins.printWarning("Keyboard accelerator '" + realAcc + "' for action '" \
-                                     + self.action.getTitle() + "' is not valid, ignoring ...")
-    def isValid(self, key, mod):
-        if os.name == "nt":
-            # gtk.accelerator_valid appears utterly broken on Windows
-            name = gtk.accelerator_name(key, mod)
-            return len(name) > 0 and name != "VoidSymbol"
-        else:
-            return gtk.accelerator_valid(key, mod)
-    def detailDescription(self):
-        message = ""
-        stockId = self.getStockId()
-        if stockId:
-            message += ", stock id '" + repr(stockId) + "'"
-        if self.accelerator:
-            message += ", accelerator '" + repr(self.accelerator) + "'"
-        return message            
     
-class ButtonActionGUI(ActionGUI):
-    def __init__(self, action, fromTab=False):
-        ActionGUI.__init__(self, action)
-        self.scriptTitle = self.action.getScriptTitle(fromTab)
-        self.button = None
-        self.tooltips = gtk.Tooltips()
-    def actionOrButton(self):
-        return self.button
-    def createView(self):
-        self.createButton()
-        if not self.action.isActiveOnCurrent():
-            self.button.set_property("sensitive", False)
-        return self.button
-    def createButton(self):
-        self.button = gtk.Button(self.action.getTitle(includeMnemonics=True))
-        if self.getStockId():
-            self.button.set_image(gtk.image_new_from_stock(self.getStockId(), gtk.ICON_SIZE_BUTTON))
-        self.tooltips.set_tip(self.button, self.scriptTitle)
-        scriptEngine.connect(self.scriptTitle, "clicked", self.button, self.runInteractive)
-        self.button.show()
-        return self.button
     
 class BoxGUI(ContainerGUI):
     def __init__(self, subguis, horizontal, reversed=False):
@@ -1619,255 +1363,11 @@ class BoxGUI(ContainerGUI):
             
         box.show()
         return box
-
-class ComboBoxListFinder:
-    def __init__(self, combobox):
-        self.model = combobox.get_model()
-        self.textColumn = combobox.get_text_column()
-    def __call__(self):
-        entries = []
-        self.model.foreach(self.getText, entries)
-        return entries
-    def getText(self, model, path, iter, entries):
-        text = self.model.get_value(iter, self.textColumn)
-        entries.append(text)
         
-class ActionTabGUI(SubGUI):
-    def __init__(self, optionGroup, action, buttonGUI):
-        SubGUI.__init__(self)
-        self.optionGroup = optionGroup
-        self.buttonGUI = buttonGUI
-        self.action = action
-        self.vbox = None
-        self.diag = plugins.getDiagnostics("Action Tabs")
-        self.sensitive = action.isActiveOnCurrent()
-        self.diag.info("Creating action tab for " + self.getTabTitle() + ", sensitive " + repr(self.sensitive))
-        self.tooltips = gtk.Tooltips()
-    def getGroupTabTitle(self):
-        return self.action.getGroupTabTitle()
-    def getTabTitle(self):
-        return self.optionGroup.name
-    def shouldShowCurrent(self, *args):
-        return self.sensitive
-    def createView(self):
-        return self.addScrollBars(self.createVBox())
-    def notifySensitivity(self, newValue):
-        self.diag.info("Sensitivity of " + self.getTabTitle() + " changed to " + repr(newValue))
-        self.sensitive = newValue
-    def notifyReset(self):
-        self.optionGroup.reset()
-        self.contentsChanged()
-    def notifyUpdateOptions(self):
-        self.contentsChanged()        
-    def createVBox(self):
-        self.vbox = gtk.VBox()
-        if len(self.optionGroup.options) > 0:
-            # Creating 0-row table gives a warning ...
-            table = gtk.Table(len(self.optionGroup.options), 2, homogeneous=False)
-            table.set_row_spacings(1)
-            rowIndex = 0        
-            for option in self.optionGroup.options.values():
-                newValue = self.updateForConfig(option)
-                if newValue:
-                    option.addPossibleValue(newValue)
-                for extraOption in self.getConfigOptions(option):
-                    option.addPossibleValue(extraOption)
 
-                label, entry = self.createOptionEntry(option)
-                if isinstance(label, gtk.Label):
-                    label.set_alignment(1.0, 0.5)
-                else:
-                    label.get_children()[0].set_alignment(1.0, 0.5)
-                table.attach(label, 0, 1, rowIndex, rowIndex + 1, xoptions=gtk.FILL, xpadding=1)
-                table.attach(entry, 1, 2, rowIndex, rowIndex + 1)
-                rowIndex += 1
-                table.show_all()
-            self.vbox.pack_start(table, expand=False, fill=False)
-        
-        for switch in self.optionGroup.switches.values():
-            hbox = self.createSwitchBox(switch)
-            self.vbox.pack_start(hbox, expand=False, fill=False)
-        if self.buttonGUI:
-            button = self.buttonGUI.createButton()
-            buttonbox = gtk.HBox()
-            buttonbox.pack_start(button, expand=True, fill=False)
-            buttonbox.show()
-            self.vbox.pack_start(buttonbox, expand=False, fill=False, padding=8)
-        self.vbox.show()
-        return self.vbox
-        
-    def createComboBox(self, option):
-        combobox = gtk.combo_box_entry_new_text()
-        entry = combobox.child
-        option.setPossibleValuesMethods(combobox.append_text, ComboBoxListFinder(combobox))
-        
-        option.setClearMethod(combobox.get_model().clear)
-        return combobox, entry
-
-    def createOptionWidget(self, option):
-        box = gtk.HBox()
-        if option.inqNofValues() > 1:
-            (widget, entry) = self.createComboBox(option)
-            box.pack_start(widget, expand=True, fill=True)
-        else:
-            entry = gtk.Entry()
-            box.pack_start(entry, expand=True, fill=True)
-        
-        if option.selectDir:
-            button = gtk.Button("...")
-            box.pack_start(button, expand=False, fill=False)
-            scriptEngine.connect("search for directories for '" + option.name + "'",
-                                 "clicked", button, self.showDirectoryChooser, None, entry, option)
-        elif option.selectFile:
-            button = gtk.Button("...")
-            box.pack_start(button, expand=False, fill=False)
-            scriptEngine.connect("search for files for '" + option.name + "'",
-                                 "clicked", button, self.showFileChooser, None, entry, option)
-        return (box, entry)
-  
-    def getConfigOptions(self, option):
-        return guiConfig.getCompositeValue("gui_entry_options", option.name)    
-
-    def updateForConfig(self, option):
-        fromConfig = guiConfig.getCompositeValue("gui_entry_overrides", option.name)
-        if fromConfig != "<not set>":
-            option.setValue(fromConfig)
-            return fromConfig
-    
-    def createOptionEntry(self, option):
-        widget, entry = self.createOptionWidget(option)
-        label = gtk.EventBox()
-        label.add(gtk.Label(option.name + "  "))
-        if option.description:
-            self.tooltips.set_tip(label, option.description)
-        scriptEngine.registerEntry(entry, "enter " + option.name + " =")
-        if self.buttonGUI:
-            scriptEngine.connect("activate from " + option.name, "activate", entry, self.buttonGUI.runInteractive)
-        entry.set_text(option.getValue())
-        entrycompletion.manager.register(entry)
-        # Options in drop-down lists don't change, so we just add them once and for all.
-        for text in option.listPossibleValues():
-            entrycompletion.manager.addTextCompletion(text)
-        option.setMethods(entry.get_text, entry.set_text)
-        return label, widget
-    
-    def createSwitchBox(self, switch):
-        if len(switch.options) >= 1:
-            hbox = gtk.HBox()
-            label = gtk.EventBox()
-            label.add(gtk.Label(switch.name))
-            if switch.description:
-                self.tooltips.set_tip(label, switch.description)
-            hbox.pack_start(label, expand=False, fill=False)
-            count = 0
-            buttons = []
-            mainRadioButton = None
-            for index in range(len(switch.options)):
-                option = switch.options[index]
-                if guiConfig.getCompositeValue("gui_entry_overrides", switch.name + option) == "1":
-                    switch.setValue(index)
-                radioButton = gtk.RadioButton(mainRadioButton, option)
-                buttons.append(radioButton)
-                scriptEngine.registerToggleButton(radioButton, "choose " + option)
-                if not mainRadioButton:
-                    mainRadioButton = radioButton
-                if switch.defaultValue == index:
-                    switch.resetMethod = radioButton.set_active
-                if switch.getValue() == index:
-                    radioButton.set_active(True)
-                else:
-                    radioButton.set_active(False)
-                hbox.pack_start(radioButton, expand=True, fill=True)
-                count = count + 1
-            indexer = RadioGroupIndexer(buttons)
-            switch.setMethods(indexer.getActiveIndex, indexer.setActiveIndex)
-            hbox.show_all()
-            return hbox  
-        else:
-            self.updateForConfig(switch)
-            checkButton = gtk.CheckButton(switch.name)
-            if int(switch.getValue()):
-                checkButton.set_active(True)
-            scriptEngine.registerToggleButton(checkButton, "check " + switch.name, "uncheck " + switch.name)
-            switch.setMethods(checkButton.get_active, checkButton.set_active)
-            checkButton.show()
-            return checkButton
-
-    def showDirectoryChooser(self, widget, entry, option):
-        dialog = gtk.FileChooserDialog("Select a directory",
-                                       globalTopWindow,
-                                       gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER,
-                                       (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
-                                        gtk.STOCK_OPEN, gtk.RESPONSE_OK))
-        self.startChooser(dialog, entry, option)
-
-    def showFileChooser(self, widget, entry, option):
-        dialog = gtk.FileChooserDialog("Select a file",
-                                       globalTopWindow,
-                                       gtk.FILE_CHOOSER_ACTION_OPEN,
-                                       (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,                                        
-                                        gtk.STOCK_OPEN, gtk.RESPONSE_OK))
-        self.startChooser(dialog, entry, option)
-
-    def startChooser(self, dialog, entry, option):
-        # Folders is a list of pairs (short name, absolute path),
-        # where 'short name' means the name given in the config file, e.g.
-        # 'temporary_filter_files' or 'filter_files' ...
-        dialog.set_modal(True)
-        folders, defaultFolder = option.getDirectories()
-        scriptEngine.registerOpenFileChooser(dialog, "select filter-file", "look in folder", 
-                                             "open selected file", "cancel file selection", self.respond, respondMethodArg=entry)
-        # If current entry forms a valid path, set that as default
-        currPath = entry.get_text()
-        currDir, currFile = os.path.split(currPath)
-        if os.path.isdir(currDir):
-            dialog.set_current_folder(currDir)
-        elif defaultFolder and os.path.isdir(os.path.abspath(defaultFolder)):
-            dialog.set_current_folder(os.path.abspath(defaultFolder))
-        for i in xrange(len(folders) - 1, -1, -1):
-            dialog.add_shortcut_folder(folders[i][1])
-        dialog.set_default_response(gtk.RESPONSE_OK)
-        dialog.show()
-    def respond(self, dialog, response, entry):
-        if response == gtk.RESPONSE_OK:
-            entry.set_text(dialog.get_filename().replace("\\", "/"))
-            entry.set_position(-1) # Sets position last, makes it possible to see the vital part of long paths 
-        dialog.destroy()
-        
-    def describe(self):
-        guilog.info("Viewing notebook page for '" + self.getTabTitle() + "'")
-        for option in self.optionGroup.options.values():
-            guilog.info(self.getOptionDescription(option))
-        for switch in self.optionGroup.switches.values():
-            guilog.info(self.getSwitchDescription(switch))
-
-        if self.buttonGUI:
-            self.buttonGUI.describe()
-        
-    def getOptionDescription(self, option):
-        value = option.getValue()
-        text = "Viewing entry for option '" + option.name + "'"
-        if len(value) > 0:
-            text += " (set to '" + value + "')"
-        if option.inqNofValues() > 1:
-            text += " (drop-down list containing " + repr(option.listPossibleValues()) + ")"
-        return text
-    
-    def getSwitchDescription(self, switch):
-        value = switch.getValue()
-        if len(switch.options) >= 1:
-            text = "Viewing radio button for switch '" + switch.name + "', options "
-            text += "/".join(switch.options)
-            text += "'. Default value " + str(value) + "."
-        else:
-            text = "Viewing check button for switch '" + switch.name + "'"
-            if value:
-                text += " (checked)"
-        return text
-
-class NotebookGUI(SubGUI):
+class NotebookGUI(guiplugins.SubGUI):
     def __init__(self, tabInfo, scriptTitle):
-        SubGUI.__init__(self)
+        guiplugins.SubGUI.__init__(self)
         self.scriptTitle = scriptTitle
         self.diag = plugins.getDiagnostics("GUI notebook")
         self.tabInfo = tabInfo
@@ -1875,13 +1375,13 @@ class NotebookGUI(SubGUI):
         self.currentTabGUI = None
 
     def setActive(self, value):
-        SubGUI.setActive(self, value)
+        guiplugins.SubGUI.setActive(self, value)
         if self.currentTabGUI:
             self.diag.info("Setting active flag " + repr(value) + " for '" + self.currentTabGUI.getTabTitle() + "'")
             self.currentTabGUI.setActive(value)
 
     def contentsChanged(self):
-        SubGUI.contentsChanged(self)
+        guiplugins.SubGUI.contentsChanged(self)
         if self.currentTabGUI:
             self.currentTabGUI.contentsChanged()
 
@@ -2011,14 +1511,14 @@ class NotebookGUI(SubGUI):
             self.updateCurrentPage(rowCount)
   
         if pagesShown or pagesHidden:
-            SubGUI.contentsChanged(self) # just the tabs will do here, the rest is described by other means
+            guiplugins.SubGUI.contentsChanged(self) # just the tabs will do here, the rest is described by other means
     def notifyLifecycleChange(self, test, state, changeDesc):
         if not self.notebook:
             return 
         pagesShown = self.showNewPages(test, state)
         pagesHidden = self.hideOldPages(test, state)
         if pagesShown or pagesHidden:
-            SubGUI.contentsChanged(self) # just the tabs will do here, the rest is described by other means
+            guiplugins.SubGUI.contentsChanged(self) # just the tabs will do here, the rest is described by other means
         
           
 class PaneGUI(ContainerGUI):
@@ -2094,9 +1594,9 @@ class PaneGUI(ContainerGUI):
         if pos > 0:
             self.paned.disconnect(self.separatorHandler)
     
-class TextInfoGUI(SubGUI):
+class TextInfoGUI(guiplugins.SubGUI):
     def __init__(self):
-        SubGUI.__init__(self)
+        guiplugins.SubGUI.__init__(self)
         self.currentTest = None
         self.text = ""
         self.view = None
@@ -2158,9 +1658,9 @@ class TextInfoGUI(SubGUI):
         return plugins.encodeToUTF(unicodeInfo, guilog)
 
         
-class FileViewGUI(SubGUI):
+class FileViewGUI(guiplugins.SubGUI):
     def __init__(self, dynamic, title = "", popupGUI = None):
-        SubGUI.__init__(self)
+        guiplugins.SubGUI.__init__(self)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING,\
                                    gobject.TYPE_PYOBJECT, gobject.TYPE_STRING)
         self.popupGUI = popupGUI
@@ -2221,7 +1721,7 @@ class FileViewGUI(SubGUI):
         view.expand_all()
         self.monitorEvents()
         if self.popupGUI:
-            view.connect("button_press_event", self.showPopupMenu)
+            view.connect("button_press_event", self.popupGUI.showMenu)
             self.popupGUI.createView()
 
         view.show()
@@ -2245,7 +1745,7 @@ class FileViewGUI(SubGUI):
         try:
             self.notify("ViewFile", fileName, comparison)
         except plugins.TextTestError, e:
-            showErrorDialog(str(e), globalTopWindow)
+            showErrorDialog(str(e), self.selection.get_tree_view().get_toplevel())
 
         self.selection.unselect_all()
     def notifyNewFile(self, fileName, overwrittenExisting):
@@ -2501,9 +2001,9 @@ class TestFileGUI(FileViewGUI):
                 dirIters[file] = newiter
         return dirIters
 
-class ProgressBarGUI(SubGUI):
+class ProgressBarGUI(guiplugins.SubGUI):
     def __init__(self, dynamic, testCount):
-        SubGUI.__init__(self)
+        guiplugins.SubGUI.__init__(self)
         self.dynamic = dynamic
         self.totalNofTests = testCount
         self.addedCount = 0
@@ -2572,9 +2072,9 @@ class ClassificationTree(seqdict):
         
 # Class that keeps track of (and possibly shows) the progress of
 # pending/running/completed tests
-class TestProgressMonitor(SubGUI):
+class TestProgressMonitor(guiplugins.SubGUI):
     def __init__(self, dynamic, testCount):
-        SubGUI.__init__(self)
+        guiplugins.SubGUI.__init__(self)
         self.classifications = {} # map from test to list of iterators where it exists
                 
         # Each row has 'type', 'number', 'show', 'tests'

@@ -1,5 +1,6 @@
 
-import plugins, os, sys, shutil, time, subprocess, operator, types
+import gtk, entrycompletion, plugins, os, sys, shutil, time, subprocess, operator, types
+from gtkusecase import RadioGroupIndexer
 from jobprocess import JobProcess
 from copy import copy, deepcopy
 from threading import Thread
@@ -13,11 +14,11 @@ guilog, guiConfig, scriptEngine = None, None, None
 def setUpGlobals(dynamic, allApps):
     global guilog, guiConfig, scriptEngine
     from gtkusecase import ScriptEngine
-    guiConfig = GUIConfig(dynamic, allApps)
     if dynamic:
         guilog = plugins.getDiagnostics("dynamic GUI behaviour")
     else:
         guilog = plugins.getDiagnostics("static GUI behaviour")
+    guiConfig = GUIConfig(dynamic, allApps)
     scriptEngine = ScriptEngine(guilog, enableShortcuts=1)
     return guilog, guiConfig, scriptEngine
 
@@ -27,6 +28,7 @@ class GUIConfig:
         self.dynamic = dynamic
         self.hiddenCategories = map(self.getConfigName, self.getValue("hide_test_category"))
         self.colourDict = self.makeColourDictionary()
+        self.setUpEntryCompletion()
     def makeColourDictionary(self):
         dict = {}
         for app in self.apps:
@@ -43,6 +45,12 @@ class GUIConfig:
         for key, value in app.getConfigValue("test_colours").items():
             colours[self.getConfigName(key)] = value
         return colours.items()
+    def setUpEntryCompletion(self):
+        matching = self.getValue("gui_entry_completion_matching")
+        if matching != 0:
+            inline = self.getValue("gui_entry_completion_inline")
+            completions = self.getCompositeValue("gui_entry_completions", "", modeDependent=True)
+            entrycompletion.manager.start(matching, inline, completions, guilog)
     def _simpleValue(self, app, entryName):
         return app.getConfigValue(entryName)
     def _compositeValue(self, app, *args, **kwargs):
@@ -191,6 +199,9 @@ class InteractiveAction(plugins.Observable):
         self.currAppSelection = []
         self.diag = plugins.getDiagnostics("Interactive Actions")
         self.optionGroup = plugins.OptionGroup(self.getTabTitle())
+        # convenience shortcuts...
+        self.addOption = self.optionGroup.addOption
+        self.addSwitch = self.optionGroup.addSwitch
         self.validApps = []
         for app in allApps:
             self.validApps.append(app)
@@ -319,14 +330,6 @@ class InteractiveAction(plugins.Observable):
             return baseTitle
     def _getScriptTitle(self):
         return self.getTitle()
-    def addOption(self, key, name, value = "", possibleValues = [],
-                  allocateNofValues = -1, description = "",
-                  selectDir = False, selectFile = False):
-        self.optionGroup.addOption(key, name, value, possibleValues,
-                                   allocateNofValues, selectDir,
-                                   selectFile, description)
-    def addSwitch(self, key, name, defaultValue = 0, options = [], description = ""):
-        self.optionGroup.addSwitch(key, name, defaultValue, options, description)
     def describe(self, testObj, postText = ""):
         guilog.info(testObj.getIndent() + repr(self) + " " + repr(testObj) + postText)
     def startPerform(self):
@@ -348,7 +351,480 @@ class InteractiveAction(plugins.Observable):
             self.startPerform()
         finally:
             self.endPerform()
+    def cancel(self):
+        self.notify("Status", "Action cancelled.")
                 
+
+# base class for all "GUI" classes which manage parts of the display
+class SubGUI(plugins.Observable):
+    def __init__(self):
+        plugins.Observable.__init__(self)
+        self.active = False
+        self.widget = None
+    def setActive(self, newValue):
+        if self.shouldShow():
+            self.active = newValue
+
+    def activate(self):
+        self.setActive(True)
+        self.contentsChanged()
+
+    def deactivate(self):
+        self.setActive(False)
+    def writeSeparator(self):
+        guilog.info("") # blank line for demarcation
+    def shouldDescribe(self):
+        return self.active and self.shouldShowCurrent()
+    def contentsChanged(self):
+        if self.shouldDescribe():
+            self.writeSeparator()
+            self.describe()
+
+    def describe(self):
+        pass
+
+    def createView(self):
+        pass
+
+    def shouldShow(self):
+        return True # should this be shown/created at all this run
+
+    def shouldShowCurrent(self, *args):
+        return True # should this be shown or hidden in the current context?
+
+    def getTabTitle(self):
+        return "Need Title For Tab!"
+
+    def getGroupTabTitle(self):
+        return "Test"
+
+    def forceVisible(self, rowCount):
+        return False
+
+    def addScrollBars(self, view):
+        window = gtk.ScrolledWindow()
+        window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        self.addToScrolledWindow(window, view)
+        window.show()
+        return window
+
+    def addToScrolledWindow(self, window, widget):
+        if isinstance(widget, gtk.VBox):
+            window.add_with_viewport(widget)
+        else:
+            window.add(widget)
+
+
+class ActionGUI(SubGUI):
+    busy = False
+    def __init__(self, action):
+        SubGUI.__init__(self)
+        self.action = action
+    def getStockId(self):
+        stockId = self.action.getStockId()
+        if stockId:
+            return "gtk-" + stockId 
+    def describe(self):
+        message = "Viewing action with title '" + self.action.getTitle(includeMnemonics=True) + "'"
+        message += self.detailDescription()
+        message += self.sensitivityDescription()
+        guilog.info(message)
+    def notifySensitivity(self, newValue):
+        actionOrButton = self.actionOrButton()
+        if not actionOrButton:
+            return
+        oldValue = actionOrButton.get_property("sensitive")
+        actionOrButton.set_property("sensitive", newValue)
+        if self.active and oldValue != newValue:
+            guilog.info("Setting sensitivity of action '" + self.action.getTitle(includeMnemonics=True) + "' to " + repr(newValue))
+    def detailDescription(self):
+        return ""
+    def sensitivityDescription(self):
+        if self.actionOrButton().get_property("sensitive"):
+            return ""
+        else:
+            return " (greyed out)"
+    def getTopWindow(self):
+        pass
+    def runInteractive(self, *args):
+        if self.busy: # If we're busy with some other action, ignore this one ...
+            return
+        dialogType = self.action.getDialogType()
+        if dialogType is not None:
+            if dialogType:
+                dialog = pluginHandler.getInstance(dialogType, self.getTopWindow(),
+                                                   self._runInteractive, self.action.cancel, self.action)
+                dialog.run()
+            else:
+                # Each time we perform an action we collect and save the current registered entries
+                # Actions showing dialogs will handle this in the dialog code.
+                entrycompletion.manager.collectCompletions()
+                self._runInteractive()
+    def _runInteractive(self):
+        try:
+            ActionGUI.busy = True
+            self.action.startPerform()
+            resultDialogType = self.action.getResultDialogType()
+            if resultDialogType:
+                resultDialog = pluginHandler.getInstance(resultDialogType, self.getTopWindow(), None, self.action)
+                resultDialog.run()
+        finally:
+            self.action.endPerform()
+            ActionGUI.busy = False
+           
+class DefaultActionGUI(ActionGUI):
+    def __init__(self, action):
+        ActionGUI.__init__(self, action)
+        self.accelerator = None
+        self.topWindow = None
+        title = self.action.getTitle(includeMnemonics=True)
+        actionName = self.action.getTitle(includeMnemonics=False)
+        self.gtkAction = gtk.Action(actionName, title, \
+                                    self.action.getTooltip(), self.getStockId())
+        scriptEngine.connect(self.action.getScriptTitle(False), "activate", self.gtkAction, self.runInteractive)
+        if not action.isActiveOnCurrent():
+            self.gtkAction.set_property("sensitive", False)
+    def notifyTopWindow(self, window):
+        self.topWindow = window
+    def getTopWindow(self):
+        return self.topWindow
+    def addToGroups(self, actionGroup, accelGroup):
+        self.accelerator = self.getAccelerator()
+        actionGroup.add_action_with_accel(self.gtkAction, self.accelerator)
+        self.gtkAction.set_accel_group(accelGroup)
+        self.gtkAction.connect_accelerator()
+        
+    def actionOrButton(self):
+        return self.gtkAction
+        
+    def getAccelerator(self):
+        realAcc = guiConfig.getCompositeValue("gui_accelerators", self.action.getTitle().rstrip("."))
+        if realAcc:
+            key, mod = gtk.accelerator_parse(realAcc)
+            if self.isValid(key, mod):
+                return realAcc
+            else:
+                plugins.printWarning("Keyboard accelerator '" + realAcc + "' for action '" \
+                                     + self.action.getTitle() + "' is not valid, ignoring ...")
+    def isValid(self, key, mod):
+        if os.name == "nt":
+            # gtk.accelerator_valid appears utterly broken on Windows
+            name = gtk.accelerator_name(key, mod)
+            return len(name) > 0 and name != "VoidSymbol"
+        else:
+            return gtk.accelerator_valid(key, mod)
+    def detailDescription(self):
+        message = ""
+        stockId = self.getStockId()
+        if stockId:
+            message += ", stock id '" + repr(stockId) + "'"
+        if self.accelerator:
+            message += ", accelerator '" + repr(self.accelerator) + "'"
+        return message            
+    
+class ButtonActionGUI(ActionGUI):
+    def __init__(self, action, fromTab=False):
+        ActionGUI.__init__(self, action)
+        self.scriptTitle = self.action.getScriptTitle(fromTab)
+        self.button = None
+        self.tooltips = gtk.Tooltips()
+    def getTopWindow(self):
+        return self.button.get_toplevel()
+    def actionOrButton(self):
+        return self.button
+    def createView(self):
+        self.createButton()
+        if not self.action.isActiveOnCurrent():
+            self.button.set_property("sensitive", False)
+        return self.button
+    def createButton(self):
+        self.button = gtk.Button(self.action.getTitle(includeMnemonics=True))
+        if self.getStockId():
+            self.button.set_image(gtk.image_new_from_stock(self.getStockId(), gtk.ICON_SIZE_BUTTON))
+        self.tooltips.set_tip(self.button, self.scriptTitle)
+        scriptEngine.connect(self.scriptTitle, "clicked", self.button, self.runInteractive)
+        self.button.show()
+        return self.button
+
+class ComboBoxListFinder:
+    def __init__(self, combobox):
+        self.model = combobox.get_model()
+        self.textColumn = combobox.get_text_column()
+    def __call__(self):
+        entries = []
+        self.model.foreach(self.getText, entries)
+        return entries
+    def getText(self, model, path, iter, entries):
+        text = self.model.get_value(iter, self.textColumn)
+        entries.append(text)
+
+
+class ActionTabGUI(SubGUI):
+    def __init__(self, optionGroup, action, buttonGUI):
+        SubGUI.__init__(self)
+        self.optionGroup = optionGroup
+        self.buttonGUI = buttonGUI
+        self.action = action
+        self.vbox = None
+        self.diag = plugins.getDiagnostics("Action Tabs")
+        self.sensitive = action.isActiveOnCurrent()
+        self.diag.info("Creating action tab for " + self.getTabTitle() + ", sensitive " + repr(self.sensitive))
+        self.tooltips = gtk.Tooltips()
+    def getGroupTabTitle(self):
+        return self.action.getGroupTabTitle()
+    def getTabTitle(self):
+        return self.optionGroup.name
+    def shouldShowCurrent(self, *args):
+        return self.sensitive
+    def createView(self):
+        return self.addScrollBars(self.createVBox())
+    def notifySensitivity(self, newValue):
+        self.diag.info("Sensitivity of " + self.getTabTitle() + " changed to " + repr(newValue))
+        self.sensitive = newValue
+    def notifyReset(self):
+        self.optionGroup.reset()
+        self.contentsChanged()
+    def notifyUpdateOptions(self):
+        self.contentsChanged()        
+    def createVBox(self):
+        self.vbox = gtk.VBox()
+        if len(self.optionGroup.options) > 0:
+            # Creating 0-row table gives a warning ...
+            table = gtk.Table(len(self.optionGroup.options), 2, homogeneous=False)
+            table.set_row_spacings(1)
+            rowIndex = 0        
+            for option in self.optionGroup.options.values():
+                newValue = self.updateForConfig(option)
+                if newValue:
+                    option.addPossibleValue(newValue)
+                for extraOption in self.getConfigOptions(option):
+                    option.addPossibleValue(extraOption)
+
+                label, entry = self.createOptionEntry(option)
+                if isinstance(label, gtk.Label):
+                    label.set_alignment(1.0, 0.5)
+                else:
+                    label.get_children()[0].set_alignment(1.0, 0.5)
+                table.attach(label, 0, 1, rowIndex, rowIndex + 1, xoptions=gtk.FILL, xpadding=1)
+                table.attach(entry, 1, 2, rowIndex, rowIndex + 1)
+                rowIndex += 1
+                table.show_all()
+            self.vbox.pack_start(table, expand=False, fill=False)
+        
+        for switch in self.optionGroup.switches.values():
+            hbox = self.createSwitchBox(switch)
+            self.vbox.pack_start(hbox, expand=False, fill=False)
+        if self.buttonGUI:
+            button = self.buttonGUI.createButton()
+            buttonbox = gtk.HBox()
+            buttonbox.pack_start(button, expand=True, fill=False)
+            buttonbox.show()
+            self.vbox.pack_start(buttonbox, expand=False, fill=False, padding=8)
+        self.vbox.show()
+        return self.vbox
+        
+    def createComboBox(self, option):
+        combobox = gtk.combo_box_entry_new_text()
+        entry = combobox.child
+        option.setPossibleValuesMethods(combobox.append_text, ComboBoxListFinder(combobox))
+        
+        option.setClearMethod(combobox.get_model().clear)
+        return combobox, entry
+
+    def createOptionWidget(self, option):
+        box = gtk.HBox()
+        if option.inqNofValues() > 1:
+            (widget, entry) = self.createComboBox(option)
+            box.pack_start(widget, expand=True, fill=True)
+        else:
+            entry = gtk.Entry()
+            box.pack_start(entry, expand=True, fill=True)
+        
+        if option.selectDir:
+            button = gtk.Button("...")
+            box.pack_start(button, expand=False, fill=False)
+            scriptEngine.connect("search for directories for '" + option.name + "'",
+                                 "clicked", button, self.showDirectoryChooser, None, entry, option)
+        elif option.selectFile:
+            button = gtk.Button("...")
+            box.pack_start(button, expand=False, fill=False)
+            scriptEngine.connect("search for files for '" + option.name + "'",
+                                 "clicked", button, self.showFileChooser, None, entry, option)
+        return (box, entry)
+  
+    def getConfigOptions(self, option):
+        return guiConfig.getCompositeValue("gui_entry_options", option.name)    
+
+    def updateForConfig(self, option):
+        fromConfig = guiConfig.getCompositeValue("gui_entry_overrides", option.name)
+        if fromConfig != "<not set>":
+            option.setValue(fromConfig)
+            return fromConfig
+    
+    def createOptionEntry(self, option):
+        widget, entry = self.createOptionWidget(option)
+        label = gtk.EventBox()
+        label.add(gtk.Label(option.name + "  "))
+        if option.description:
+            self.tooltips.set_tip(label, option.description)
+        scriptEngine.registerEntry(entry, "enter " + option.name + " =")
+        if self.buttonGUI:
+            scriptEngine.connect("activate from " + option.name, "activate", entry, self.buttonGUI.runInteractive)
+        entry.set_text(option.getValue())
+        entrycompletion.manager.register(entry)
+        # Options in drop-down lists don't change, so we just add them once and for all.
+        for text in option.listPossibleValues():
+            entrycompletion.manager.addTextCompletion(text)
+        option.setMethods(entry.get_text, entry.set_text)
+        return label, widget
+    
+    def createSwitchBox(self, switch):
+        if len(switch.options) >= 1:
+            hbox = gtk.HBox()
+            label = gtk.EventBox()
+            label.add(gtk.Label(switch.name))
+            if switch.description:
+                self.tooltips.set_tip(label, switch.description)
+            hbox.pack_start(label, expand=False, fill=False)
+            count = 0
+            buttons = []
+            mainRadioButton = None
+            for index in range(len(switch.options)):
+                option = switch.options[index]
+                if guiConfig.getCompositeValue("gui_entry_overrides", switch.name + option) == "1":
+                    switch.setValue(index)
+                radioButton = gtk.RadioButton(mainRadioButton, option)
+                buttons.append(radioButton)
+                scriptEngine.registerToggleButton(radioButton, "choose " + option)
+                if not mainRadioButton:
+                    mainRadioButton = radioButton
+                if switch.defaultValue == index:
+                    switch.resetMethod = radioButton.set_active
+                if switch.getValue() == index:
+                    radioButton.set_active(True)
+                else:
+                    radioButton.set_active(False)
+                hbox.pack_start(radioButton, expand=True, fill=True)
+                count = count + 1
+            indexer = RadioGroupIndexer(buttons)
+            switch.setMethods(indexer.getActiveIndex, indexer.setActiveIndex)
+            hbox.show_all()
+            return hbox  
+        else:
+            self.updateForConfig(switch)
+            checkButton = gtk.CheckButton(switch.name)
+            if int(switch.getValue()):
+                checkButton.set_active(True)
+            scriptEngine.registerToggleButton(checkButton, "check " + switch.name, "uncheck " + switch.name)
+            switch.setMethods(checkButton.get_active, checkButton.set_active)
+            checkButton.show()
+            return checkButton
+
+    def showDirectoryChooser(self, widget, entry, option):
+        dialog = gtk.FileChooserDialog("Select a directory",
+                                       self.vbox.get_toplevel(),
+                                       gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER,
+                                       (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
+                                        gtk.STOCK_OPEN, gtk.RESPONSE_OK))
+        self.startChooser(dialog, entry, option)
+
+    def showFileChooser(self, widget, entry, option):
+        dialog = gtk.FileChooserDialog("Select a file",
+                                       self.vbox.get_toplevel(),
+                                       gtk.FILE_CHOOSER_ACTION_OPEN,
+                                       (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,                                        
+                                        gtk.STOCK_OPEN, gtk.RESPONSE_OK))
+        self.startChooser(dialog, entry, option)
+
+    def startChooser(self, dialog, entry, option):
+        # Folders is a list of pairs (short name, absolute path),
+        # where 'short name' means the name given in the config file, e.g.
+        # 'temporary_filter_files' or 'filter_files' ...
+        dialog.set_modal(True)
+        folders, defaultFolder = option.getDirectories()
+        scriptEngine.registerOpenFileChooser(dialog, "select filter-file", "look in folder", 
+                                             "open selected file", "cancel file selection", self.respond, respondMethodArg=entry)
+        # If current entry forms a valid path, set that as default
+        currPath = entry.get_text()
+        currDir, currFile = os.path.split(currPath)
+        if os.path.isdir(currDir):
+            dialog.set_current_folder(currDir)
+        elif defaultFolder and os.path.isdir(os.path.abspath(defaultFolder)):
+            dialog.set_current_folder(os.path.abspath(defaultFolder))
+        for i in xrange(len(folders) - 1, -1, -1):
+            dialog.add_shortcut_folder(folders[i][1])
+        dialog.set_default_response(gtk.RESPONSE_OK)
+        dialog.show()
+    def respond(self, dialog, response, entry):
+        if response == gtk.RESPONSE_OK:
+            entry.set_text(dialog.get_filename().replace("\\", "/"))
+            entry.set_position(-1) # Sets position last, makes it possible to see the vital part of long paths 
+        dialog.destroy()
+        
+    def describe(self):
+        guilog.info("Viewing notebook page for '" + self.getTabTitle() + "'")
+        for option in self.optionGroup.options.values():
+            guilog.info(self.getOptionDescription(option))
+        for switch in self.optionGroup.switches.values():
+            guilog.info(self.getSwitchDescription(switch))
+
+        if self.buttonGUI:
+            self.buttonGUI.describe()
+        
+    def getOptionDescription(self, option):
+        value = option.getValue()
+        text = "Viewing entry for option '" + option.name + "'"
+        if len(value) > 0:
+            text += " (set to '" + value + "')"
+        if option.inqNofValues() > 1:
+            text += " (drop-down list containing " + repr(option.listPossibleValues()) + ")"
+        return text
+    
+    def getSwitchDescription(self, switch):
+        value = switch.getValue()
+        if len(switch.options) >= 1:
+            text = "Viewing radio button for switch '" + switch.name + "', options "
+            text += "/".join(switch.options)
+            text += "'. Default value " + str(value) + "."
+        else:
+            text = "Viewing check button for switch '" + switch.name + "'"
+            if value:
+                text += " (checked)"
+        return text
+
+class PluginHandler:
+    def __init__(self):
+        self.modules = []
+    def getInstance(self, className, *args):
+        dotPos = className.find(".")
+        if dotPos == -1:
+            for module in self.modules:
+                command = "from " + module + " import " + className + " as realClassName"
+                try:
+                    exec command
+                    guilog.info("Loaded class '" + className + "' from module '" + module + "'")
+                except ImportError:
+                    continue
+            
+                actionObject = self.tryMakeObject(realClassName, *args)
+                if actionObject:
+                    return actionObject
+        else:
+            module = className[0:dotPos]
+            theClassName = className[dotPos + 1:]
+            exec "from " + module + " import " + theClassName + " as realClassName"
+            return self.tryMakeObject(realClassName, *args)
+
+        return self.tryMakeObject(className, *args)
+    def tryMakeObject(self, className, *args):
+        try:
+            return className(*args)
+        except:
+            # If some invalid interactive action is provided, need to know which
+            plugins.printWarning("Problem with class " + className.__name__ + ", ignoring...")
+            plugins.printException()
+
+pluginHandler = PluginHandler()
 
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:
@@ -372,7 +848,25 @@ class InteractiveActionHandler:
         command = "from " + module + " import InteractiveActionConfig"
         exec command
         return InteractiveActionConfig()
-        
+
+    def getPluginGUIs(self, dynamic, allApps):
+        instances = self.getInstances(dynamic, allApps)
+        defaultGUIs, buttonGUIs, actionTabGUIs = [], [], []
+        for action in instances:
+            if action.inMenuOrToolBar():
+                defaultGUIs.append(DefaultActionGUI(action))
+            elif action.inButtonBar():
+                buttonGUIs.append(ButtonActionGUI(action))
+
+            optionGroups = action.getOptionGroups()
+            if len(optionGroups) > 0:
+                actionGUI = ButtonActionGUI(action, fromTab=True)
+                for optionGroup in optionGroups:
+                    if action.createOptionGroupTab(optionGroup):
+                        actionTabGUIs.append(ActionTabGUI(optionGroup, action, actionGUI))
+
+        return instances, defaultGUIs, buttonGUIs, actionTabGUIs
+    
     def getInstances(self, dynamic, allApps):
         instances = []
         classNames = []

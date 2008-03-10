@@ -1,25 +1,25 @@
 #!/usr/bin/env python
 
-import gtk, guiplugins
+import gtk
 
 class EntryCompletionManager:
     def __init__(self):
         self.completions = gtk.ListStore(str)
         self.entries = []
         self.enabled = False
-        
-    def start(self):
-        self.matching = guiplugins.guiConfig.getValue("gui_entry_completion_matching")
-        if self.matching != 0:
-            self.enabled = True
-            guiplugins.guilog.info("Enabling entry completion, using matching " + str(self.matching))
-            self.inlineCompletions = guiplugins.guiConfig.getValue("gui_entry_completion_inline")            
-            if self.inlineCompletions:
-                guiplugins.guilog.info(" - Inlining common completion prefixes in entries.")
+        self.useContainsFunction = False
+        self.diag = None
+    def start(self, matching, inline, completions, diag):
+        self.enabled = True
+        self.diag = diag
+        self.useContainsFunction = matching == 2
+        self.diag.info("Enabling entry completion, using matching " + str(matching))
+        self.inlineCompletions = inline
+        if self.inlineCompletions:
+            self.diag.info(" - Inlining common completion prefixes in entries.")
                 
-            completions = guiplugins.guiConfig.getCompositeValue("gui_entry_completions", "", modeDependent=True)
-            for completion in completions:
-                self.addTextCompletion(completion)
+        for completion in completions:
+            self.addTextCompletion(completion)
             
     def register(self, entry):
         if self.enabled:
@@ -28,7 +28,7 @@ class EntryCompletionManager:
             if self.inlineCompletions:
                 completion.set_inline_completion(True)
             completion.set_text_column(0)        
-            if self.matching == 2: # Matching on start is default for gtk.EntryCompletion
+            if self.useContainsFunction: # Matching on start is default for gtk.EntryCompletion
                 completion.set_match_func(self.containsMatchFunction)        
 
             self.addCompletion(entry)
@@ -41,7 +41,7 @@ class EntryCompletionManager:
 
     def addTextCompletion(self, text):
         if self.enabled and text and text not in [row[0] for row in self.completions]:
-            guiplugins.guilog.info("Adding entry completion " + repr(text) + " ...")
+            self.diag.info("Adding entry completion " + repr(text) + " ...")
             self.completions.prepend([text])            
 
     def collectCompletions(self):

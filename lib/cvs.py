@@ -1,7 +1,7 @@
 
 import os, guidialogs, gobject, datetime, time, subprocess, default_gui
-import texttestgui, gtk, plugins, custom_widgets, entrycompletion
-from guiplugins import scriptEngine, guilog, InteractiveAction, processMonitor
+import gtk, plugins, custom_widgets, entrycompletion
+from guiplugins import scriptEngine, guilog, InteractiveAction, processMonitor, pluginHandler
 
 #
 # Todo/improvements:
@@ -653,7 +653,7 @@ class CVSAnnotateRecursive(CVSAnnotate):
 #
 # Register cvs plugin at TextTest GUI 
 #
-texttestgui.pluginHandler.modules.append("cvs")
+pluginHandler.modules.append("cvs")
 
 #
 # Configuration for the Interactive Actions

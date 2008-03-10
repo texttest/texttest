@@ -1214,7 +1214,7 @@ class RecordTest(RunningAction):
         self.addOption("v", "Version to record")
         self.addOption("c", "Checkout to use for recording") 
         self.addSwitch("rep", "Automatically replay test after recording it", 1)
-        self.addSwitch("repgui", "", defaultValue = 0, options = ["Auto-replay invisible", "Auto-replay in dynamic GUI"])
+        self.addSwitch("repgui", "", options = ["Auto-replay invisible", "Auto-replay in dynamic GUI"])
     def singleTestOnly(self):
         return True
     def inMenuOrToolBar(self):

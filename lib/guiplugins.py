@@ -559,12 +559,10 @@ class ComboBoxListFinder:
         entries.append(text)
 
 
-class ActionTabGUI(SubGUI):
-    def __init__(self, optionGroup, action, buttonGUI):
-        SubGUI.__init__(self)
+class ActionTabGUI(ButtonActionGUI):
+    def __init__(self, optionGroup, action):
+        ButtonActionGUI.__init__(self, action, fromTab=True)
         self.optionGroup = optionGroup
-        self.buttonGUI = buttonGUI
-        self.action = action
         self.vbox = None
         self.diag = plugins.getDiagnostics("Action Tabs")
         self.sensitive = action.isActiveOnCurrent()
@@ -614,12 +612,12 @@ class ActionTabGUI(SubGUI):
         for switch in self.optionGroup.switches.values():
             hbox = self.createSwitchBox(switch)
             self.vbox.pack_start(hbox, expand=False, fill=False)
-        if self.buttonGUI:
-            button = self.buttonGUI.createButton()
-            buttonbox = gtk.HBox()
-            buttonbox.pack_start(button, expand=True, fill=False)
-            buttonbox.show()
-            self.vbox.pack_start(buttonbox, expand=False, fill=False, padding=8)
+
+        button = self.createButton()
+        buttonbox = gtk.HBox()
+        buttonbox.pack_start(button, expand=True, fill=False)
+        buttonbox.show()
+        self.vbox.pack_start(buttonbox, expand=False, fill=False, padding=8)
         self.vbox.show()
         return self.vbox
         
@@ -668,8 +666,7 @@ class ActionTabGUI(SubGUI):
         if option.description:
             self.tooltips.set_tip(label, option.description)
         scriptEngine.registerEntry(entry, "enter " + option.name + " =")
-        if self.buttonGUI:
-            scriptEngine.connect("activate from " + option.name, "activate", entry, self.buttonGUI.runInteractive)
+        scriptEngine.connect("activate from " + option.name, "activate", entry, self.runInteractive)
         entry.set_text(option.getValue())
         entrycompletion.manager.register(entry)
         # Options in drop-down lists don't change, so we just add them once and for all.
@@ -768,8 +765,7 @@ class ActionTabGUI(SubGUI):
         for switch in self.optionGroup.switches.values():
             guilog.info(self.getSwitchDescription(switch))
 
-        if self.buttonGUI:
-            self.buttonGUI.describe()
+        ButtonActionGUI.describe(self)
         
     def getOptionDescription(self, option):
         value = option.getValue()
@@ -860,10 +856,9 @@ class InteractiveActionHandler:
 
             optionGroups = action.getOptionGroups()
             if len(optionGroups) > 0:
-                actionGUI = ButtonActionGUI(action, fromTab=True)
                 for optionGroup in optionGroups:
                     if action.createOptionGroupTab(optionGroup):
-                        actionTabGUIs.append(ActionTabGUI(optionGroup, action, actionGUI))
+                        actionTabGUIs.append(ActionTabGUI(optionGroup, action))
 
         return instances, defaultGUIs, buttonGUIs, actionTabGUIs
     

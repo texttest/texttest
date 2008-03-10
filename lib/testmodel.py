@@ -62,7 +62,7 @@ class DirectoryCache:
             fileStem, versions = self.splitStem(fileName[len(stem):])
             if len(fileStem) == 0:
                 return versions
-
+            
     def findVersionSetMethod(self, versionSetMethod):
         if versionSetMethod:
             return versionSetMethod
@@ -1412,24 +1412,36 @@ class Application:
                 return extraVersions.index(version)
         return 99
     def compareForPriority(self, vset1, vset2):
+        versionSet = Set(self.versions)
+        self.diag.info("Compare " + repr(vset1) + " to " + repr(vset2))
+        if len(versionSet) > 0:
+            if vset1.issuperset(versionSet):
+                return 1
+            elif vset2.issuperset(versionSet):
+                return -1
+            
         explicitVersions = Set([ self.name ] + self.versions)
+        priority1 = self.getVersionSetPriority(vset1)
+        priority2 = self.getVersionSetPriority(vset2)
+        # Low number implies higher priority...
+        if priority1 != priority2:
+            self.diag.info("Version priority " + repr(priority1) + " vs " + repr(priority2))
+            return cmp(priority2, priority1)
+        
         versionCount1 = len(vset1.intersection(explicitVersions))
         versionCount2 = len(vset2.intersection(explicitVersions))
         if versionCount1 != versionCount2:
             # More explicit versions implies higher priority
+            self.diag.info("Version count " + repr(versionCount1) + " vs " + repr(versionCount2))
             return cmp(versionCount1, versionCount2)
 
         baseVersions = Set(self.getConfigValue("base_version"))
         baseCount1 = len(vset1.intersection(baseVersions))
         baseCount2 = len(vset2.intersection(baseVersions))
-        if baseCount1 != baseCount2:
-            # More base versions implies higher priority
-            return cmp(baseCount1, baseCount2)
-
-        priority1 = self.getVersionSetPriority(vset1)
-        priority2 = self.getVersionSetPriority(vset2)
-        # Low number implies higher priority...
-        return cmp(priority2, priority1)
+        self.diag.info("Base count " + repr(baseCount1) + " vs " + repr(baseCount2))
+        # More base versions implies higher priority
+        return cmp(baseCount1, baseCount2)
+        
     def getVersionSetPriority(self, vlist):
         if len(vlist) == 0:
             return 99

@@ -2170,18 +2170,19 @@ class TestProgressMonitor(guiplugins.SubGUI):
             classifiers.addClassification([ "Failed", catDesc, details ])
             return classifiers
 
-        for fileComp in state.getComparisons():
-            fileClass = self.getFileClassification(fileComp, state)
+        comparisons = state.getComparisons()
+        for fileComp in filter(lambda c: c.getType() == "failure", comparisons):
+            fileClass = [ "Failed", "Differences", fileComp.getSummary(includeNumbers=False) ]
             self.diag.info("Adding file classification for " + repr(fileComp) + " = " + repr(fileClass))
             classifiers.addClassification(fileClass)
-
+            
+        for fileComp in filter(lambda c: c.getType() != "failure", comparisons):
+            summary = fileComp.getSummary(includeNumbers=False)
+            fileClass = [ "Failed", "Performance differences", self.getCategoryDescription(state, summary) ]
+            self.diag.info("Adding file classification for " + repr(fileComp) + " = " + repr(fileClass))
+            classifiers.addClassification(fileClass)
+            
         return classifiers
-    def getFileClassification(self, fileComp, state):
-        summary = fileComp.getSummary(includeNumbers=False)
-        if fileComp.getType() == "failure":
-            return [ "Failed", "Differences", summary ]
-        else:
-            return [ "Failed", "Performance differences", self.getCategoryDescription(state, summary) ]
     def removeTest(self, test):
         for iter in self.findTestIterators(test):
             testCount = self.treeModel.get_value(iter, 1)

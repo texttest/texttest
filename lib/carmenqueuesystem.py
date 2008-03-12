@@ -77,7 +77,7 @@ def getMajorReleaseVersion(app):
     if defaultMajRelease == "none":
         return defaultMajRelease
     
-    for version in app.versions:
+    for version in app.versions + app.getConfigValue("base_version"):
         if version in majorReleases:
             return version
     return defaultMajRelease

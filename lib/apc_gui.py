@@ -96,6 +96,8 @@ class SelectKPIGroup(guiplugins.InteractiveAction):
         return "Selecting tests in KPI group..."
     def messageAfterPerform(self):
         return self.message
+    def getSignalsSent(self):
+        return [ "SetTestSelection" ]
     def performOnCurrent(self):
         tests = self.getTestsToSelect()
         if tests:

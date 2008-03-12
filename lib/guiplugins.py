@@ -211,6 +211,17 @@ class InteractiveAction(plugins.Observable):
             return self.optionGroup.name
         else:
             return self.getTitle()
+    def setObservers(self, observers):
+        signals = [ "Error", "Status", "ActionProgress" ] + self.getSignalsSent()
+        self.diag.info("Observing " + str(self.__class__) + " :")
+        for observer in observers:
+            for signal in signals:
+                if hasattr(observer, "notify" + signal):
+                    self.diag.info("-> " + str(observer.__class__))
+                    self.addObserver(observer)
+                    break
+    def getSignalsSent(self):
+        return [] # set up like this so every single derived class doesn't have to include it
     def allAppsValid(self):
         for app in self.currAppSelection:
             if app not in self.validApps:
@@ -219,6 +230,10 @@ class InteractiveAction(plugins.Observable):
         return True
     def addSuites(self, suites):
         pass
+    def notifyViewFile(self, *args):
+        pass
+    def updateClipboard(self, *args, **kwargs):
+        return False
     def getOptionGroups(self):
         if self.optionGroup.empty():
             return []
@@ -226,33 +241,7 @@ class InteractiveAction(plugins.Observable):
             return [ self.optionGroup ]
     def createOptionGroupTab(self, optionGroup):
         return optionGroup.switches or optionGroup.options
-    def notifyNewTestSelection(self, tests, apps, rowCount, *args):
-        self.updateSelection(tests, rowCount)
-        self.currAppSelection = apps
-        newActive = self.allAppsValid() and self.isActiveOnCurrent()
-        self.diag.info("New test selection for " + self.getTitle() + "=" + repr(tests) + " : new active = " + repr(newActive))
-        self.changeSensitivity(newActive)
-        
-    def notifyLifecycleChange(self, test, state, desc):
-        newActive = self.isActiveOnCurrent(test, state)
-        self.diag.info("State change for " + self.getTitle() + "=" + state.category + " : new active = " + repr(newActive))
-        self.changeSensitivity(newActive)
-
-    def updateFileSelection(self, files):
-        self.currFileSelection = files
-        newActive = self.isActiveOnCurrent()
-        self.diag.info("New file selection for " + self.getTitle() + "=" + repr(files) + " : new active = " + repr(newActive))
-        self.changeSensitivity(newActive)
-
-    def changeSensitivity(self, newActive):
-        self.notify("Sensitivity", newActive)
-        if newActive:
-            if self.updateOptions():
-                self.notify("UpdateOptions")
-    def singleTestOnly(self):
-        return False
-
-    def updateSelection(self, tests, rowCount):
+    def updateSelection(self, tests, apps, rowCount, *args):
         if rowCount != 1 and self.singleTestOnly():
             self.currTestSelection = []
         else:
@@ -260,6 +249,20 @@ class InteractiveAction(plugins.Observable):
             testClass = self.correctTestClass()
             if testClass:
                 self.currTestSelection = filter(lambda test: test.classId() == testClass, tests)
+                
+        self.currAppSelection = apps
+        newActive = self.allAppsValid() and self.isActiveOnCurrent()
+        self.diag.info("New test selection for " + self.getTitle() + "=" + repr(tests) + " : new active = " + repr(newActive))
+        return newActive
+        
+    def updateFileSelection(self, files):
+        self.currFileSelection = files
+        newActive = self.isActiveOnCurrent()
+        self.diag.info("New file selection for " + self.getTitle() + "=" + repr(files) + " : new active = " + repr(newActive))
+        return newActive
+
+    def singleTestOnly(self):
+        return False        
     
     def updateOptions(self):
         return False     
@@ -420,6 +423,8 @@ class ActionGUI(SubGUI):
     def __init__(self, action):
         SubGUI.__init__(self)
         self.action = action
+    def __getattr__(self, name):
+        return getattr(self.action, name)
     def getStockId(self):
         stockId = self.action.getStockId()
         if stockId:
@@ -429,7 +434,36 @@ class ActionGUI(SubGUI):
         message += self.detailDescription()
         message += self.sensitivityDescription()
         guilog.info(message)
-    def notifySensitivity(self, newValue):
+    def addSuites(self, suites):
+        self.action.addSuites(suites)
+    def notifyViewFile(self, *args):
+        self.action.notifyViewFile(*args)
+    def notifyClipboard(self, *args, **kwargs):
+        if self.action.updateClipboard(*args, **kwargs):
+            self.setSensitivity(True)
+    def setObservers(self, observers):
+        if len(self.action.observers) > 0:
+            return # Can have several ActionGUIs for the same Action
+        allObservers = []
+        for observer in observers:
+            allObservers.append(observer)
+            if isinstance(observer, ActionGUI):
+                allObservers.append(observer.action)
+        self.action.setObservers(allObservers)
+        
+    def notifyNewTestSelection(self, *args):
+        newActive = self.action.updateSelection(*args)
+        self.setSensitivity(newActive)
+
+    def notifyLifecycleChange(self, test, state, desc):
+        newActive = self.action.isActiveOnCurrent(test, state)
+        self.setSensitivity(newActive)
+
+    def notifyNewFileSelection(self, files):
+        newActive = self.action.updateFileSelection(files)
+        self.setSensitivity(newActive)
+        
+    def setSensitivity(self, newValue):
         actionOrButton = self.actionOrButton()
         if not actionOrButton:
             return
@@ -576,14 +610,15 @@ class ActionTabGUI(ButtonActionGUI):
         return self.sensitive
     def createView(self):
         return self.addScrollBars(self.createVBox())
-    def notifySensitivity(self, newValue):
-        self.diag.info("Sensitivity of " + self.getTabTitle() + " changed to " + repr(newValue))
+    def setSensitivity(self, newValue):
         self.sensitive = newValue
+        self.diag.info("Sensitivity of " + self.getTabTitle() + " changed to " + repr(newValue))
+        if self.sensitive and self.action.updateOptions():
+            self.contentsChanged()        
+
     def notifyReset(self):
         self.optionGroup.reset()
         self.contentsChanged()
-    def notifyUpdateOptions(self):
-        self.contentsChanged()        
     def createVBox(self):
         self.vbox = gtk.VBox()
         if len(self.optionGroup.options) > 0:
@@ -850,17 +885,20 @@ class InteractiveActionHandler:
         defaultGUIs, buttonGUIs, actionTabGUIs = [], [], []
         for action in instances:
             if action.inMenuOrToolBar():
+                self.diag.info("Menu/toolbar: " + str(action.__class__))
                 defaultGUIs.append(DefaultActionGUI(action))
             elif action.inButtonBar():
+                self.diag.info("Button: " + str(action.__class__))
                 buttonGUIs.append(ButtonActionGUI(action))
 
             optionGroups = action.getOptionGroups()
             if len(optionGroups) > 0:
                 for optionGroup in optionGroups:
                     if action.createOptionGroupTab(optionGroup):
+                        self.diag.info("Tab: " + str(action.__class__))
                         actionTabGUIs.append(ActionTabGUI(optionGroup, action))
 
-        return instances, defaultGUIs, buttonGUIs, actionTabGUIs
+        return defaultGUIs, buttonGUIs, actionTabGUIs
     
     def getInstances(self, dynamic, allApps):
         instances = []

@@ -20,6 +20,8 @@ class Quit(InteractiveAction):
         pass # we don't care and don't want to screw things up...
     def isActiveOnCurrent(self, *args):
         return True
+    def getSignalsSent(self):
+        return [ "Quit" ]
     def performOnCurrent(self):
         self.notify("Quit")
     def messageAfterPerform(self):
@@ -111,8 +113,6 @@ class SaveTests(InteractiveAction):
             return self.getDefaultSaveVersion(test.app)
         else:
             return versionString
-    def notifyNewFileSelection(self, files):
-        self.updateFileSelection(files)
     def newFilesAsDiags(self):
         return int(self.optionGroup.getSwitchValue("newdiag", 0))
     def isActiveOnCurrent(self, test=None, state=None):
@@ -219,10 +219,10 @@ class FileViewAction(InteractiveAction):
         return self._isActiveForFile(fileName, comparison)
     def _isActiveForFile(self, fileName, comparison):
         return True
-    def notifyNewFileSelection(self, files):
+    def updateFileSelection(self, files):
         for fileName, comparison in files:
             self.viewTools[fileName] = self.getViewTool(fileName)
-        self.updateFileSelection(files)
+        return InteractiveAction.updateFileSelection(self, files)
     
     def useFiltered(self):
         return False
@@ -444,6 +444,8 @@ class KillTests(InteractiveAction):
                 if not seltest.state.isComplete():
                     return True
         return False
+    def getSignalsSent(self):
+        return [ "Kill" ]
     def performOnCurrent(self):
         tests = filter(lambda test: not test.state.isComplete(), self.currTestSelection)
         tests.reverse() # best to cut across the action thread rather than follow it and disturb it excessively
@@ -455,30 +457,33 @@ class KillTests(InteractiveAction):
             test.notify("Kill")
 
         self.notify("Status", "Killed " + testDesc + ".")
-    
-class CopyTests(InteractiveAction):
-    def correctTestClass(self):
-        return "test-case"
-    def getStockId(self):
-        return "copy"
-    def _getTitle(self):
-        return "_Copy"
-    def _getScriptTitle(self):
-        return "Copy selected tests"
-    def performOnCurrent(self):
-        self.notify("Clipboard", self.currTestSelection, cut=False)
 
-class CutTests(InteractiveAction):
+class ClipboardAction(InteractiveAction):
     def correctTestClass(self):
         return "test-case"
+    def getSignalsSent(self):
+        return [ "Clipboard" ]
     def getStockId(self):
-        return "cut"
+        return self.getName()
     def _getTitle(self):
-        return "_Cut"
+        return "_" + self.getName().capitalize()
     def _getScriptTitle(self):
-        return "Cut selected tests"
+        return self.getName().capitalize() + " selected tests"
     def performOnCurrent(self):
-        self.notify("Clipboard", self.currTestSelection, cut=True)
+        self.notify("Clipboard", self.currTestSelection, cut=self.shouldCut())
+
+    
+class CopyTests(ClipboardAction):
+    def getName(self):
+        return "copy"
+    def shouldCut(self):
+        return False
+    
+class CutTests(ClipboardAction):
+    def getName(self):
+        return "cut"
+    def shouldCut(self):
+        return True
 
 class PasteTests(InteractiveAction):
     def __init__(self, *args):
@@ -493,10 +498,10 @@ class PasteTests(InteractiveAction):
         return "_Paste"
     def _getScriptTitle(self):
         return "Paste tests from clipboard"
-    def notifyClipboard(self, tests, cut=False):
+    def updateClipboard(self, tests, cut=False):
         self.clipboardTests = tests
         self.removeAfter = cut
-        self.notify("Sensitivity", True)
+        return True
     def isActiveOnCurrent(self, test=None, state=None):
         return InteractiveAction.isActiveOnCurrent(self, test, state) and len(self.clipboardTests) > 0
     def getCurrentTestMatchingApp(self, test):
@@ -586,6 +591,9 @@ class PasteTests(InteractiveAction):
             self.removeAfter = False
         for suite, placement in destInfo.values():
             suite.contentChanged()
+    def getSignalsSent(self):
+        return [ "SetTestSelection" ]
+
     def createTestContents(self, testToCopy, suite, testDir, description, placement):
         stdFiles, defFiles = testToCopy.listStandardFiles(allVersions=True)
         for sourceFile in stdFiles + defFiles:
@@ -683,7 +691,9 @@ class ImportTest(InteractiveAction):
         self.testImported = self.createTestContents(suite, testDir, description, placement)
         suite.contentChanged()
         guilog.info("Selecting new test " + self.testImported.name)
-        self.notify("SetTestSelection", [ self.testImported ])       
+        self.notify("SetTestSelection", [ self.testImported ])
+    def getSignalsSent(self):
+        return [ "SetTestSelection" ]
     def getDestinationSuite(self):
         return self.currTestSelection[0]
     def getPlacement(self):
@@ -764,7 +774,7 @@ class ImportTestSuite(ImportTest):
 class SelectTests(InteractiveAction):
     def __init__(self, allApps, *args):
         InteractiveAction.__init__(self, allApps)
-        self.diag = plugins.getDiagnostics("Select Tests")
+        self.selectDiag = plugins.getDiagnostics("Select Tests")
         self.rootTestSuites = []
         self.addOption("vs", "Tests for version", description="Select tests for a specific version.",
                        possibleValues=self.getPossibleVersions(allApps))
@@ -797,6 +807,8 @@ class SelectTests(InteractiveAction):
             return [ fullVersion ] + [ fullVersion + "." + extra for extra in extraVersions ]
     def isActiveOnCurrent(self, *args):
         return True
+    def getSignalsSent(self):
+        return [ "SetTestSelection" ]
     def getStockId(self):
         return "refresh"
         #return "find"
@@ -895,7 +907,7 @@ class SelectTests(InteractiveAction):
 
         fullVersion = suite.app.getFullVersion()
         versionToUse = self.findCombinedVersion(version, fullVersion)       
-        self.diag.info("Trying to get test cases for " + repr(suite) + ", version " + versionToUse)
+        self.selectDiag.info("Trying to get test cases for " + repr(suite) + ", version " + versionToUse)
         return suite.findTestCases(versionToUse)
 
     def findCombinedVersion(self, version, fullVersion):
@@ -918,6 +930,8 @@ class ResetGroups(InteractiveAction):
         return "All options reset to default values."
     def _getScriptTitle(self):
         return "Reset running options"
+    def getSignalsSent(self):
+        return [ "Reset" ]
     def performOnCurrent(self):
         self.notify("Reset")
     def notifyNewTestSelection(self, *args):
@@ -1066,7 +1080,8 @@ class RunningAction(InteractiveAction):
             else:
                 del environ["USECASE_REPLAY_SCRIPT"]
         return environ
-    
+    def getSignalsSent(self):
+        return [ "SaveSelection" ]
     def writeFilterFile(self, writeDir):
         # Because the description of the selection can be extremely long, we write it in a file and refer to it
         # This avoids too-long command lines which are a problem at least on Windows XP
@@ -1370,12 +1385,12 @@ class CreateDefinitionFile(InteractiveAction):
         else:
             raise plugins.TextTestError, "Unable to create file, no possible source found and target file already exists:\n" + targetFile
         self.notify("NewFile", targetFile, fileExisted)
+    def getSignalsSent(self):
+        return [ "NewFile" ]
     def messageAfterPerform(self):
         pass
 
 class RemoveTests(InteractiveAction):
-    def notifyNewFileSelection(self, files):
-        self.updateFileSelection(files)
     def isActiveOnCurrent(self, *args):
         for test in self.currTestSelection:
             if test.parent:
@@ -1564,8 +1579,8 @@ class RecomputeTest(InteractiveAction):
         
         useState = self.getState(state)
         return useState.hasStarted() and not useState.isComplete()
-    def updateSelection(self, tests, rowCount):
-        InteractiveAction.updateSelection(self, tests, rowCount)
+    def updateSelection(self, tests, apps, rowCount, *args):
+        newActive = InteractiveAction.updateSelection(self, tests, apps, rowCount, *args)
         # Prevent recomputation triggering more...
         if self.recomputing:
             self.chainReaction = True
@@ -1577,7 +1592,7 @@ class RecomputeTest(InteractiveAction):
             self.recomputing = False
             if self.chainReaction:
                 self.chainReaction = False
-                return "Recomputation chain reaction!"
+        return newActive
     def inMenuOrToolBar(self):
         return False
     def _getTitle(self):
@@ -1686,6 +1701,8 @@ class RepositionTest(InteractiveAction):
         return InteractiveAction.isActiveOnCurrent(self) and \
                self.currTestSelection[0].parent and \
                not self.currTestSelection[0].parent.autoSortOrder
+    def getSignalsSent(self):
+        return [ "RefreshTestSelection" ]
 
     def performOnCurrent(self):
         newIndex = self.findNewIndex()
@@ -1829,8 +1846,6 @@ class ShowFileProperties(InteractiveAction):
     def isActiveOnCurrent(self, *args):
         return ((not self.dynamic) or len(self.currTestSelection) == 1) and \
                len(self.currFileSelection) > 0
-    def notifyNewFileSelection(self, files):
-        self.updateFileSelection(files)
     def getResultDialogType(self):
         return "guidialogs.FilePropertiesDialog"
     def _getTitle(self):

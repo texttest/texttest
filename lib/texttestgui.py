@@ -204,8 +204,8 @@ class TextTestGUI(Responder, plugins.Observable):
         self.progressMonitor = TestProgressMonitor(self.dynamic, testCount)
         self.progressBarGUI = ProgressBarGUI(self.dynamic, testCount)
         self.idleManager = IdleHandlerManager()
-        self.intvActions, self.defaultActionGUIs, self.buttonBarGUIs, self.actionTabGUIs = \
-                          guiplugins.interactiveActionHandler.getPluginGUIs(self.dynamic, allApps)
+        self.defaultActionGUIs, self.buttonBarGUIs, self.actionTabGUIs = \
+                                guiplugins.interactiveActionHandler.getPluginGUIs(self.dynamic, allApps)
         self.menuBarGUI, self.toolBarGUI, testPopupGUI, testFilePopupGUI = self.createMenuAndToolBarGUIs(allApps)
         self.testColumnGUI = TestColumnGUI(self.dynamic, testCount)
         self.testTreeGUI = TestTreeGUI(self.dynamic, allApps, testPopupGUI, self.testColumnGUI)
@@ -215,27 +215,18 @@ class TextTestGUI(Responder, plugins.Observable):
         self.topWindowGUI = self.createTopWindowGUI(rightWindowGUI, allApps)
 
     def getTestTreeObservers(self):
-        return [ self.testColumnGUI, self.testFileGUI, self.textInfoGUI ] + self.intvActions + self.notebookGUIs
+        return [ self.testColumnGUI, self.testFileGUI, self.textInfoGUI ] + self.allActionGUIs() + self.notebookGUIs
+    def allActionGUIs(self):
+        return self.defaultActionGUIs + self.buttonBarGUIs + self.actionTabGUIs
     def getLifecycleObservers(self):
         # only the things that want to know about lifecycle changes irrespective of what's selected,
         # otherwise we go via the test tree. Include add/remove as lifecycle, also final completion
         return [ self.progressBarGUI, self.progressMonitor, self.testTreeGUI, 
-                 statusMonitor, self.idleManager, self.topWindowGUI ] 
-    def getActionObservers(self, action):
-        if str(action.__class__).find("Reset") != -1:
-            # It's such a hack, but so is this action...
-            return [ statusMonitor ] + self.actionTabGUIs
-        else:
-            # These actions might change the tree view selection or the status bar, need to observe them
-            actionObservers = filter(self.isActionObserver, self.intvActions)
-            return actionObservers + [ self.testTreeGUI, self.testFileGUI, statusMonitor, self.idleManager, self.topWindowGUI ]
-    def isActionObserver(self, action):
-        return hasattr(action, "notifyClipboard") or hasattr(action, "notifySaveSelection")
+                 statusMonitor, self.idleManager, self.topWindowGUI ]
+    def getActionObservers(self):
+        return [ self.testTreeGUI, self.testFileGUI, statusMonitor, self.idleManager, self.topWindowGUI ]
     def getFileViewObservers(self):
-        # We should potentially let other GUIs be file observers too ...
-        return filter(self.isFileObserver, self.intvActions)
-    def isFileObserver(self, action):
-        return hasattr(action, "notifyNewFileSelection") or hasattr(action, "notifyViewFile")
+        return self.defaultActionGUIs
     def isFrameworkExitObserver(self, obs):
         return (hasattr(obs, "notifyExit") or hasattr(obs, "notifyKillProcesses")) and obs is not self
     def getExitObservers(self, frameworkObservers):
@@ -249,7 +240,7 @@ class TextTestGUI(Responder, plugins.Observable):
     def getHideableGUIs(self):
         return [ self.toolBarGUI, self.shortcutBarGUI, statusMonitor ]
     def getAddSuitesObservers(self):
-        return [ self.testColumnGUI ] + self.intvActions
+        return [ self.testColumnGUI ] + self.defaultActionGUIs
     def setObservers(self, frameworkObservers):
         # We don't actually have the framework observe changes here, this causes duplication. Just forward
         # them as appropriate to where they belong. This is a bit of a hack really.
@@ -269,13 +260,10 @@ class TextTestGUI(Responder, plugins.Observable):
         for observer in self.getLifecycleObservers():        
             self.addObserver(observer) # forwarding of test observer mechanism
 
-        for action in self.intvActions:
-            for observer in self.getActionObservers(action):
-                action.addObserver(observer)
-
-        # Action-based GUIs should observe their actions
-        for actionBasedGUI in self.defaultActionGUIs + self.buttonBarGUIs + self.actionTabGUIs:
-            actionBasedGUI.action.addObserver(actionBasedGUI)
+        actionGUIs = self.allActionGUIs()
+        observers = actionGUIs + self.getActionObservers()
+        for actionGUI in actionGUIs:
+            actionGUI.setObservers(observers)
 
         for observer in self.getHideableGUIs():
             self.menuBarGUI.addObserver(observer)

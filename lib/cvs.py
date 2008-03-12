@@ -37,7 +37,6 @@ from guiplugins import scriptEngine, guilog, InteractiveAction, processMonitor, 
 class CVSAction(InteractiveAction):
     def __init__(self, cvsArgs, allApps=[], dynamic=False):
         InteractiveAction.__init__(self, allApps)
-        self.currTestSelection = []
         self.cvsArgs = cvsArgs
         self.recursive = False
         self.dynamic = dynamic
@@ -54,10 +53,11 @@ class CVSAction(InteractiveAction):
             except OSError:
                 raise plugins.TextTestError, "Could not run CVS: make sure you have it installed locally"
         return process.stdout.readlines()
-    def updateSelection(self, tests, rowCount):
-        self.currTestSelection = tests
+    def updateSelection(self, *args):
+        newActive = InteractiveAction.updateSelection(self, *args)
         if not self.dynamic: # See bugzilla 17653
             self.currFileSelection = []
+        return newActive
     def notifyNewFileSelection(self, files):
         self.updateFileSelection(files)
     def isActiveOnCurrent(self, *args):

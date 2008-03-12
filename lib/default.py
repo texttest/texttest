@@ -305,13 +305,18 @@ class Config:
     def checkFilterFileSanity(self, app):
         # Turn any input relative files into absolute ones, throw if we can't
         for filterFileName in self.findFilterFileNames(app):
-            if not os.path.isabs(filterFileName):
-                dirsToSearchIn = map(lambda pair: pair[1], self.getFilterFileDirectories([app], False))
-                realFilename = app.getFileName(dirsToSearchIn, filterFileName)
-                if realFilename:
-                    self.filterFileMap.setdefault(app, []).append(realFilename)
-                else:
-                    raise plugins.TextTestError, "filter file '" + filterFileName + "' could not be found."
+            absName = self.getAbsoluteFilterFileName(filterFileName, app)
+            if absName:
+                self.filterFileMap.setdefault(app, []).append(absName)
+            else:
+                raise plugins.TextTestError, "filter file '" + filterFileName + "' could not be found."
+        
+    def getAbsoluteFilterFileName(self, filterFileName, app):
+        if os.path.isabs(filterFileName):
+            return filterFileName
+
+        dirsToSearchIn = map(lambda pair: pair[1], self.getFilterFileDirectories([app], False))
+        return app.getFileName(dirsToSearchIn, filterFileName)
              
     def findFilterFileNames(self, app):
         if self.filterFileMap.has_key(app):

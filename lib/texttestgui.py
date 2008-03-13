@@ -609,7 +609,7 @@ class ToolBarGUI(ContainerGUI):
     def __init__(self, uiManager, actionGUIs, subgui):
         ContainerGUI.__init__(self, [ subgui ])
         self.uiManager = uiManager
-        self.actionGUIs = filter(lambda a: a.action.inMenuOrToolBar(), actionGUIs)
+        self.actionGUIs = actionGUIs
     def getWidgetName(self):
         return "_Toolbar"
     def ensureVisible(self, toolbar):

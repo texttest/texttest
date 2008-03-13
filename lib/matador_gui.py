@@ -54,6 +54,10 @@ class CreatePerformanceReport(guiplugins.InteractiveAction):
         self.rootDir = ""
         self.versions = ["11", "12", "13", "14", "master" ]
         self.objectiveText = "Total cost of plan"
+    def setInfo(self, rootDir, versions, objectiveText):
+        self.rootDir = rootDir
+        self.versions = versions
+        self.objectiveText = objectiveText
     def correctTestClass(self):
         return "test-case"
     def inToolBar(self): 

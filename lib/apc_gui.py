@@ -86,11 +86,11 @@ class SelectKPIGroup(guiplugins.InteractiveAction):
         return "Select KPI group"
     def _getTitle(self):
         return "_Select KPI group"
-    def getStockId(self):
+    def _getStockId(self):
         return "index"
     def getTabTitle(self):
         return "KPI group"
-    def getGroupTabTitle(self):
+    def _getGroupTabTitle(self):
         return "Select KPI group"
     def messageBeforePerform(self):
         return "Selecting tests in KPI group..."
@@ -174,11 +174,11 @@ class PlotProfileInGUIAPC(guiplugins.InteractiveAction):
         return "_Plot Profile"
     def __repr__(self):
         return "Plotting Profile"
-    def getStockId(self):
+    def _getStockId(self):
         return "clear"    
     def getTabTitle(self):
         return "Profile"
-    def getGroupTabTitle(self):
+    def _getGroupTabTitle(self):
         return "Profile"
     def messageBeforePerform(self):
         return "Plotting profiles for tests ..."

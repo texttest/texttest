@@ -39,7 +39,7 @@ class CreatePerformanceReportDialog(ActionConfirmationDialog):
         
     def respond(self, button, saidOK, *args):
         if saidOK:
-            self.plugin.rootDir = os.path.abspath(self.dirEntry.get_text())
-            self.plugin.versions = self.versionsEntry.get_text().replace(" ", "").split(",")
-            self.plugin.objectiveText = self.objectiveTextEntry.get_text()
+            self.plugin.setInfo(os.path.abspath(self.dirEntry.get_text()),
+                                self.versionsEntry.get_text().replace(" ", "").split(","),
+                                self.objectiveTextEntry.get_text())
         ActionConfirmationDialog.respond(self, button, saidOK, *args)

@@ -265,9 +265,9 @@ class SaveSelectionDialog(ActionConfirmationDialog):
 
     def setOptionsAndExit(self, saidOK):
         # Transfer file name and options back to plugin
-        self.plugin.fileName = self.fileChooser.get_filename().replace("\\", "/")
-        if self.enableOptions:
-            self.plugin.saveTestList = self.radio1.get_active()
+        fileName = self.fileChooser.get_filename().replace("\\", "/")
+        saveTestList = self.enableOptions and self.radio1.get_active()
+        self.plugin.setOptions(fileName, saveTestList)
         self.doExit(saidOK)
         
     def doExit(self, saidOK):
@@ -322,7 +322,7 @@ class LoadSelectionDialog(ActionConfirmationDialog):
         else:
             self.doExit()
     def setOptionsAndExit(self):
-        self.plugin.fileName = self.fileChooser.get_filename().replace("\\", "/")
+        self.plugin.setFileName(self.fileChooser.get_filename().replace("\\", "/"))
         self.clearDialog()
         self.okMethod()
 
@@ -372,8 +372,7 @@ class RenameDialog(ActionConfirmationDialog):
         
     def respond(self, button, saidOK, *args):
         if saidOK:
-            self.plugin.newName = self.entry.get_text()
-            self.plugin.newDescription = self.descriptionEntry.get_text()
+            self.plugin.setNewInfo(self.entry.get_text(), self.descriptionEntry.get_text())
             message, error = self.plugin.checkNewName()
             if error:
                 showErrorDialog(message, self.dialog)
@@ -419,8 +418,7 @@ class MarkTestDialog(ActionConfirmationDialog):
         
     def respond(self, button, saidOK, *args):
         if saidOK:
-            self.plugin.newBriefText = self.briefEntry.get_text()
-            self.plugin.newFreeText = self.freeEntry.get_text()
+            self.plugin.setTexts(self.briefEntry.get_text(), self.freeEntry.get_text())
         ActionConfirmationDialog.respond(self, button, saidOK, *args)
 
 class FilePropertiesDialog(ActionResultDialog):

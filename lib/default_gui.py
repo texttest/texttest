@@ -1,6 +1,6 @@
 
 import plugins, os, sys, shutil, time, subprocess, operator, types
-from guiplugins import InteractiveAction, guilog, guiConfig, processMonitor
+from guiplugins import InteractiveAction, DefaultActionGUI, guilog, guiConfig, processMonitor
 from jobprocess import JobProcess
 from sets import Set
 from copy import copy, deepcopy
@@ -11,8 +11,8 @@ from ndict import seqdict
 from log4py import LOGLEVEL_NORMAL
    
     
-class Quit(InteractiveAction):
-    def getStockId(self):
+class Quit(DefaultActionGUI):
+    def _getStockId(self):
         return "quit"
     def _getTitle(self):
         return "_Quit"
@@ -43,7 +43,7 @@ class SaveTests(InteractiveAction):
         self.addSwitch("over", "Replace successfully compared files also", 0)
         if self.hasPerformance(allApps):
             self.addSwitch("ex", "Save: ", 1, ["Average performance", "Exact performance"])
-    def getStockId(self):
+    def _getStockId(self):
         return "save"
     def getTabTitle(self):
         return "Saving"
@@ -160,6 +160,9 @@ class MarkTest(InteractiveAction):
         InteractiveAction.__init__(self, *args)
         self.newBriefText = ""
         self.newFreeText = ""
+    def setTexts(self, briefText, freeText):
+        self.newBriefText = briefText
+        self.newFreeText = freeText
     def _getTitle(self):
         return "_Mark"
     def _getScriptTitle(self):
@@ -427,7 +430,7 @@ class FollowFile(FileViewAction):
         self.startViewer(cmdArgs, description=description, scriptName="follows progress of test files")    
 
 class KillTests(InteractiveAction):
-    def getStockId(self):
+    def _getStockId(self):
         return "stop"
     def _getTitle(self):
         return "_Kill"
@@ -463,7 +466,7 @@ class ClipboardAction(InteractiveAction):
         return "test-case"
     def getSignalsSent(self):
         return [ "Clipboard" ]
-    def getStockId(self):
+    def _getStockId(self):
         return self.getName()
     def _getTitle(self):
         return "_" + self.getName().capitalize()
@@ -492,7 +495,7 @@ class PasteTests(InteractiveAction):
         self.removeAfter = False
     def singleTestOnly(self):
         return True
-    def getStockId(self):
+    def _getStockId(self):
         return "paste"
     def _getTitle(self):
         return "_Paste"
@@ -809,14 +812,14 @@ class SelectTests(InteractiveAction):
         return True
     def getSignalsSent(self):
         return [ "SetTestSelection" ]
-    def getStockId(self):
+    def _getStockId(self):
         return "refresh"
         #return "find"
     def _getTitle(self):
         return "_Select"
     def _getScriptTitle(self):
         return "Select indicated tests"
-    def getGroupTabTitle(self):
+    def _getGroupTabTitle(self):
         return "Selection"
     def messageBeforePerform(self):
         return "Selecting tests ..."
@@ -922,7 +925,7 @@ class SelectTests(InteractiveAction):
 class ResetGroups(InteractiveAction):
     def isActiveOnCurrent(self, *args):
         return True
-    def getStockId(self):
+    def _getStockId(self):
         return "revert-to-saved"
     def _getTitle(self):
         return "R_eset"
@@ -949,7 +952,7 @@ class SaveSelection(InteractiveAction):
         return "test-case"
     def addSuites(self, suites):
         self.rootTestSuites = suites
-    def getStockId(self):
+    def _getStockId(self):
         return "save-as"
     def getDialogType(self):
         return "guidialogs.SaveSelectionDialog" # Since guiplugins cannot depend on gtk, we cannot call dialog ourselves ...
@@ -959,6 +962,9 @@ class SaveSelection(InteractiveAction):
         return "Save selected tests in file"
     def dialogEnableOptions(self):
         return not self.dynamic
+    def setOptions(self, fileName, saveTestList):
+        self.fileName = fileName
+        self.saveTestList = saveTestList
     def getDirectories(self):
         dirs = self.validApps[0].getFilterFileDirectories(self.validApps)
         if len(dirs) > 0:
@@ -1003,13 +1009,15 @@ class LoadSelection(SelectTests):
     def __init__(self, *args):
         SelectTests.__init__(self, *args)
         self.fileName = ""
-    def getStockId(self):
+    def setFileName(self, name):
+        self.fileName = name
+    def _getStockId(self):
         return "open"
     def _getTitle(self):
         return "_Load Selection..."
     def _getScriptTitle(self):
         return "Load test selection from file"
-    def getGroupTabTitle(self):
+    def _getGroupTabTitle(self):
         return ""
     def createOptionGroupTab(self, optionGroup):
         return False
@@ -1143,9 +1151,9 @@ class ReconnectToTests(RunningAction):
         self.addOption("v", "Version to reconnect to")
         self.addOption("reconnect", "Temporary result directory", os.getenv("TEXTTEST_TMP"), description="Specify a directory containing temporary texttest results. The reconnection will use a random subdirectory matching the version used.")
         self.addSwitch("reconnfull", "Results:", 0, ["Display as they were", "Recompute from files"])
-    def getGroupTabTitle(self):
+    def _getGroupTabTitle(self):
         return "Running"
-    def getStockId(self):
+    def _getStockId(self):
         return "connect"
     def _getTitle(self):
         return "Re_connect"
@@ -1180,11 +1188,11 @@ class RunTests(RunningAction):
         return self.optionGroups
     def _getTitle(self):
         return "_Run"
-    def getStockId(self):
+    def _getStockId(self):
         return "execute"
     def _getScriptTitle(self):
         return "Run selected tests"
-    def getGroupTabTitle(self):
+    def _getGroupTabTitle(self):
         return "Running"
     def getTestCount(self):
         return len(self.currTestSelection) * self.getCopyCount() * self.getVersionCount()
@@ -1316,7 +1324,7 @@ class CreateDefinitionFile(InteractiveAction):
         return False
     def _getTitle(self):
         return "Create _File"
-    def getStockId(self):
+    def _getStockId(self):
         return "new" 
     def getTabTitle(self):
         return "New File" 
@@ -1402,7 +1410,7 @@ class RemoveTests(InteractiveAction):
             return False
     def _getTitle(self):
         return "Remove..."
-    def getStockId(self):
+    def _getStockId(self):
         return "delete"
     def _getScriptTitle(self):
         return "Remove selected files"
@@ -1645,7 +1653,7 @@ class SortTestSuiteFileAscending(InteractiveAction):
         return "test-suite"
     def isActiveOnCurrent(self, *args):
         return InteractiveAction.isActiveOnCurrent(self, *args) and not self.currTestSelection[0].autoSortOrder
-    def getStockId(self):
+    def _getStockId(self):
         return "sort-ascending"
     def _getTitle(self):
         return "_Sort Test Suite File"
@@ -1683,7 +1691,7 @@ class SortTestSuiteFileAscending(InteractiveAction):
         return False
 
 class SortTestSuiteFileDescending(SortTestSuiteFileAscending):
-    def getStockId(self):
+    def _getStockId(self):
         return "sort-descending"
     def _getTitle(self):
         return "_Reversed Sort Test Suite File"
@@ -1712,7 +1720,7 @@ class RepositionTest(InteractiveAction):
             raise plugins.TextTestError, "\nThe test\n'" + self.currTestSelection[0].name + "'\nis not present in the default version\nand hence cannot be reordered.\n"
     
 class RepositionTestDown(RepositionTest):
-    def getStockId(self):
+    def _getStockId(self):
         return "go-down"
     def _getTitle(self):
         return "Move down"
@@ -1728,7 +1736,7 @@ class RepositionTestDown(RepositionTest):
         return self.currTestSelection[0].parent.testcases[self.currTestSelection[0].parent.maxIndex()] != self.currTestSelection[0]
 
 class RepositionTestUp(RepositionTest):
-    def getStockId(self):
+    def _getStockId(self):
         return "go-up"
     def _getTitle(self):
         return "Move up"
@@ -1744,7 +1752,7 @@ class RepositionTestUp(RepositionTest):
         return self.currTestSelection[0].parent.testcases[0] != self.currTestSelection[0]
 
 class RepositionTestFirst(RepositionTest):
-    def getStockId(self):
+    def _getStockId(self):
         return "goto-top"
     def _getTitle(self):
         return "Move to first"
@@ -1760,7 +1768,7 @@ class RepositionTestFirst(RepositionTest):
         return self.currTestSelection[0].parent.testcases[0] != self.currTestSelection[0]
 
 class RepositionTestLast(RepositionTest):
-    def getStockId(self):
+    def _getStockId(self):
         return "goto-bottom"
     def _getTitle(self):
         return "Move to last"
@@ -1783,6 +1791,9 @@ class RenameTest(InteractiveAction):
         self.oldName = ""
         self.newDescription = ""
         self.oldDescription = ""
+    def setNewInfo(self, name, desc):
+        self.newName = name
+        self.newDescription = desc
     def correctTestClass(self):
         return "test-case"
     def singleTestOnly(self):
@@ -1797,7 +1808,7 @@ class RenameTest(InteractiveAction):
         self.oldName = self.newName
         self.oldDescription = self.newDescription
         return "guidialogs.RenameDialog"
-    def getStockId(self):
+    def _getStockId(self):
         return "italic"
     def _getTitle(self):
         return "_Rename..."
@@ -1891,7 +1902,7 @@ class VersionInformation(InteractiveAction):
 class AboutTextTest(InteractiveAction):
     def isActiveOnCurrent(self, *args):
         return True
-    def getStockId(self):
+    def _getStockId(self):
         return "about"
     def _getTitle(self):
         return "_About TextTest"

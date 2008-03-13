@@ -43,11 +43,11 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         return "_Plot Graph"
     def __repr__(self):
         return "Plotting"
-    def getStockId(self):
+    def _getStockId(self):
         return "clear"    
     def getTabTitle(self):
         return "Graph"
-    def getGroupTabTitle(self):
+    def _getGroupTabTitle(self):
         return "Graph"
     def messageBeforePerform(self):
         return "Plotting tests ..."

@@ -425,6 +425,8 @@ class OldActionGUI(SubGUI):
         if stockId:
             return "gtk-" + stockId 
     def describe(self):
+        self.describeAction()
+    def describeAction(self):
         message = "Viewing action with title '" + self.getTitle(includeMnemonics=True) + "'"
         message += self.detailDescription()
         message += self.sensitivityDescription()
@@ -460,8 +462,9 @@ class OldActionGUI(SubGUI):
             return
         oldValue = actionOrButton.get_property("sensitive")
         actionOrButton.set_property("sensitive", newValue)
-        if self.active and oldValue != newValue:
+        if oldValue != newValue:
             guilog.info("Setting sensitivity of action '" + self.getTitle(includeMnemonics=True) + "' to " + repr(newValue))
+        
     def detailDescription(self):
         return ""
     def sensitivityDescription(self):
@@ -547,36 +550,26 @@ class OldDefaultActionGUI(OldActionGUI):
             message += ", accelerator '" + repr(self.accelerator) + "'"
         return message
 
+    def createView(self):
+        return self.createButton()
+
+    def createButton(self):
+        button = gtk.Button()
+        self.gtkAction.connect_proxy(button)
+        # In theory all this should be automatic, but it appears not to work
+        if self.getStockId():
+            button.set_image(gtk.image_new_from_stock(self.getStockId(), gtk.ICON_SIZE_BUTTON))
+        self.tooltips = gtk.Tooltips()
+        self.tooltips.set_tip(button, self.getTooltip())
+        button.show()
+        return button
+
 class DefaultActionGUI(OldDefaultActionGUI,InteractiveAction):
     def __init__(self, *args):
         InteractiveAction.__init__(self, *args)
         OldDefaultActionGUI.__init__(self)
     def hasObservers(self):
         return len(self.observers) > 0
-
-class ButtonActionGUI(OldActionGUI):
-    def __init__(self, fromTab=False, *args):
-        OldActionGUI.__init__(self, *args)
-        self.scriptTitle = self.getScriptTitle(fromTab)
-        self.button = None
-        self.tooltips = gtk.Tooltips()
-    def getTopWindow(self):
-        return self.button.get_toplevel()
-    def actionOrButton(self):
-        return self.button
-    def createView(self):
-        self.createButton()
-        if not self.isActiveOnCurrent():
-            self.button.set_property("sensitive", False)
-        return self.button
-    def createButton(self):
-        self.button = gtk.Button(self.getTitle(includeMnemonics=True))
-        if self.getStockId():
-            self.button.set_image(gtk.image_new_from_stock(self.getStockId(), gtk.ICON_SIZE_BUTTON))
-        self.tooltips.set_tip(self.button, self.scriptTitle)
-        scriptEngine.connect(self.scriptTitle, "clicked", self.button, self.runInteractive)
-        self.button.show()
-        return self.button
 
 class ComboBoxListFinder:
     def __init__(self, combobox):
@@ -591,9 +584,9 @@ class ComboBoxListFinder:
         entries.append(text)
 
 
-class ActionTabGUI(ButtonActionGUI):
+class ActionTabGUI(OldDefaultActionGUI):
     def __init__(self, optionGroup, *args):
-        ButtonActionGUI.__init__(self, fromTab=True, *args)
+        OldDefaultActionGUI.__init__(self, *args)
         self.optionGroup = optionGroup
         self.vbox = None
         self.diag = plugins.getDiagnostics("Action Tabs")
@@ -609,6 +602,7 @@ class ActionTabGUI(ButtonActionGUI):
     def createView(self):
         return self.addScrollBars(self.createVBox())
     def setSensitivity(self, newValue):
+        OldDefaultActionGUI.setSensitivity(self, newValue)
         self.sensitive = newValue
         self.diag.info("Sensitivity of " + self.getTabTitle() + " changed to " + repr(newValue))
         if self.sensitive and self.updateOptions():
@@ -798,7 +792,7 @@ class ActionTabGUI(ButtonActionGUI):
         for switch in self.optionGroup.switches.values():
             guilog.info(self.getSwitchDescription(switch))
 
-        ButtonActionGUI.describe(self)
+        self.describeAction()
         
     def getOptionDescription(self, option):
         value = option.getValue()
@@ -868,11 +862,6 @@ class DefaultForwarder(OldDefaultActionGUI,Forwarder):
         Forwarder.__init__(self, action)
         OldDefaultActionGUI.__init__(self)
 
-class ButtonForwarder(ButtonActionGUI,Forwarder):
-    def __init__(self, action):
-        Forwarder.__init__(self, action)
-        ButtonActionGUI.__init__(self)
-
 class ActionTabForwarder(ActionTabGUI,Forwarder):
     def __init__(self, optionGroup, action):
         Forwarder.__init__(self, action)
@@ -901,25 +890,35 @@ class InteractiveActionHandler:
         exec command
         return InteractiveActionConfig()
 
-    def getPluginGUIs(self, dynamic, allApps):
+    def getPluginGUIs(self, dynamic, allApps, uiManager):
         instances = self.getInstances(dynamic, allApps)
         defaultGUIs, buttonGUIs, actionTabGUIs = [], [], []
         for action in instances:
             if isinstance(action, DefaultActionGUI):
                 defaultGUIs.append(action)
-            elif action.inMenuOrToolBar():
-                self.diag.info("Menu/toolbar: " + str(action.__class__))
-                defaultGUIs.append(DefaultForwarder(action))
-            elif action.inButtonBar():
-                self.diag.info("Button: " + str(action.__class__))
-                buttonGUIs.append(ButtonForwarder(action))
+            else:
+                optionGroups = action.getOptionGroups()
+                if len(optionGroups) > 0:
+                    for optionGroup in optionGroups:
+                        if action.createOptionGroupTab(optionGroup):
+                            self.diag.info("Tab: " + str(action.__class__))
+                            actionTabGUIs.append(ActionTabForwarder(optionGroup, action))
+                else:
+                    actionGUI = DefaultForwarder(action)
+                    if action.inButtonBar():
+                        self.diag.info("Button: " + str(action.__class__))
+                        buttonGUIs.append(actionGUI)
+                    else:
+                        self.diag.info("Menu/toolbar: " + str(action.__class__))
+                        # It's always active, always visible
+                        actionGUI.setActive(True)
+                        defaultGUIs.append(actionGUI)
 
-            optionGroups = action.getOptionGroups()
-            if len(optionGroups) > 0:
-                for optionGroup in optionGroups:
-                    if action.createOptionGroupTab(optionGroup):
-                        self.diag.info("Tab: " + str(action.__class__))
-                        actionTabGUIs.append(ActionTabForwarder(optionGroup, action))
+        actionGroup = gtk.ActionGroup("AllActions")
+        uiManager.insert_action_group(actionGroup, 0)
+        accelGroup = uiManager.get_accel_group()
+        for actionGUI in defaultGUIs + buttonGUIs + actionTabGUIs:
+            actionGUI.addToGroups(actionGroup, accelGroup)
 
         return defaultGUIs, buttonGUIs, actionTabGUIs
     

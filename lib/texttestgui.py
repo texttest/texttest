@@ -204,9 +204,10 @@ class TextTestGUI(Responder, plugins.Observable):
         self.progressMonitor = TestProgressMonitor(self.dynamic, testCount)
         self.progressBarGUI = ProgressBarGUI(self.dynamic, testCount)
         self.idleManager = IdleHandlerManager()
+        uiManager = gtk.UIManager()
         self.defaultActionGUIs, self.buttonBarGUIs, self.actionTabGUIs = \
-                                guiplugins.interactiveActionHandler.getPluginGUIs(self.dynamic, allApps)
-        self.menuBarGUI, self.toolBarGUI, testPopupGUI, testFilePopupGUI = self.createMenuAndToolBarGUIs(allApps)
+                                guiplugins.interactiveActionHandler.getPluginGUIs(self.dynamic, allApps, uiManager)
+        self.menuBarGUI, self.toolBarGUI, testPopupGUI, testFilePopupGUI = self.createMenuAndToolBarGUIs(allApps, uiManager)
         self.testColumnGUI = TestColumnGUI(self.dynamic, testCount)
         self.testTreeGUI = TestTreeGUI(self.dynamic, allApps, testPopupGUI, self.testColumnGUI)
         self.testFileGUI = TestFileGUI(self.dynamic, testFilePopupGUI)
@@ -226,7 +227,7 @@ class TextTestGUI(Responder, plugins.Observable):
     def getActionObservers(self):
         return [ self.testTreeGUI, self.testFileGUI, statusMonitor, self.idleManager, self.topWindowGUI ]
     def getFileViewObservers(self):
-        return self.defaultActionGUIs
+        return self.defaultActionGUIs + self.actionTabGUIs
     def isFrameworkExitObserver(self, obs):
         return (hasattr(obs, "notifyExit") or hasattr(obs, "notifyKillProcesses")) and obs is not self
     def getExitObservers(self, frameworkObservers):
@@ -240,7 +241,7 @@ class TextTestGUI(Responder, plugins.Observable):
     def getHideableGUIs(self):
         return [ self.toolBarGUI, self.shortcutBarGUI, statusMonitor ]
     def getAddSuitesObservers(self):
-        return [ self.testColumnGUI ] + self.defaultActionGUIs
+        return [ self.testColumnGUI ] + self.defaultActionGUIs + self.actionTabGUIs
     def setObservers(self, frameworkObservers):
         # We don't actually have the framework observe changes here, this causes duplication. Just forward
         # them as appropriate to where they belong. This is a bit of a hack really.
@@ -295,12 +296,12 @@ class TextTestGUI(Responder, plugins.Observable):
         parts = [ self.menuBarGUI, self.toolBarGUI, mainWindowGUI, self.shortcutBarGUI, statusMonitor ]
         boxGUI = BoxGUI(parts, horizontal=False)
         return TopWindowGUI(boxGUI, self.dynamic, allApps)
-    def createMenuAndToolBarGUIs(self, allApps):
-        uiManager = gtk.UIManager()
-        menu = MenuBarGUI(allApps, self.dynamic, uiManager, self.defaultActionGUIs)
-        toolbar = ToolBarGUI(uiManager, self.defaultActionGUIs, self.progressBarGUI)
-        testPopup = PopupMenuGUI("TestPopupMenu", uiManager, self.defaultActionGUIs)
-        testFilePopup = PopupMenuGUI("TestFilePopupMenu", uiManager, self.defaultActionGUIs)
+    def createMenuAndToolBarGUIs(self, allApps, uiManager):
+        menuActions = filter(lambda gui: gui.inMenuOrToolBar(), self.allActionGUIs())
+        menu = MenuBarGUI(allApps, self.dynamic, uiManager, menuActions)
+        toolbar = ToolBarGUI(uiManager, self.progressBarGUI)
+        testPopup = PopupMenuGUI("TestPopupMenu", uiManager)
+        testFilePopup = PopupMenuGUI("TestFilePopupMenu", uiManager)
         return menu, toolbar, testPopup, testFilePopup
     
     def createRightWindowGUI(self):
@@ -501,8 +502,7 @@ class MenuBarGUI(guiplugins.SubGUI):
         self.dynamic = dynamic
         self.uiManager = uiManager
         self.actionGUIs = actionGUIs
-        self.actionGroup = gtk.ActionGroup("AllActions")
-        self.uiManager.insert_action_group(self.actionGroup, 0)
+        self.actionGroup = self.uiManager.get_action_groups()[0]
         self.toggleActions = []
         self.diag = plugins.getDiagnostics("Menu Bar")
     def setActive(self, active):
@@ -510,8 +510,6 @@ class MenuBarGUI(guiplugins.SubGUI):
         self.widget.get_toplevel().add_accel_group(self.uiManager.get_accel_group())
         if self.shouldHide("menubar"):
             self.hide(self.widget, "Menubar")
-        for actionGUI in self.actionGUIs:
-            actionGUI.setActive(active)
         for toggleAction in self.toggleActions:
             if self.shouldHide(toggleAction.get_name()):
                 toggleAction.set_active(False)
@@ -549,9 +547,7 @@ class MenuBarGUI(guiplugins.SubGUI):
                 realMenuName = menuName.capitalize()
             self.actionGroup.add_action(gtk.Action(menuName + "menu", "_" + realMenuName, None, None))
         self.createToggleActions()
-        for actionGUI in self.actionGUIs:
-            actionGUI.addToGroups(self.actionGroup, self.uiManager.get_accel_group())
-            
+        
         for file in self.getGUIDescriptionFileNames():
             try:
                 self.diag.info("Reading UI from file " + file)
@@ -603,13 +599,12 @@ class MenuBarGUI(guiplugins.SubGUI):
         for toggleAction in self.toggleActions:
             guilog.info("Viewing toggle action with title '" + toggleAction.get_property("label") + "'")
         for actionGUI in self.actionGUIs:
-            actionGUI.describe()
+            actionGUI.describeAction()
 
 class ToolBarGUI(ContainerGUI):
-    def __init__(self, uiManager, actionGUIs, subgui):
+    def __init__(self, uiManager, subgui):
         ContainerGUI.__init__(self, [ subgui ])
         self.uiManager = uiManager
-        self.actionGUIs = actionGUIs
     def getWidgetName(self):
         return "_Toolbar"
     def ensureVisible(self, toolbar):
@@ -642,12 +637,10 @@ class ToolBarGUI(ContainerGUI):
         guilog.info("UI layout: \n" + self.uiManager.get_ui())
 
 class PopupMenuGUI(guiplugins.SubGUI):
-    def __init__(self, name, uiManager, actionGUIs):
+    def __init__(self, name, uiManager):
         guiplugins.SubGUI.__init__(self)
         self.name = name
         self.uiManager = uiManager
-        self.actionGUIs = actionGUIs
-        self.actionGroup = uiManager.get_action_groups()[0]
     def getWidgetName(self):
         return "_" + self.name
     def createView(self):

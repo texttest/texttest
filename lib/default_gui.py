@@ -1009,6 +1009,8 @@ class LoadSelection(SelectTests):
     def __init__(self, *args):
         SelectTests.__init__(self, *args)
         self.fileName = ""
+    def getOptionGroups(self):
+        return []
     def setFileName(self, name):
         self.fileName = name
     def _getStockId(self):
@@ -1592,7 +1594,7 @@ class RecomputeTest(InteractiveAction):
         # Prevent recomputation triggering more...
         if self.recomputing:
             self.chainReaction = True
-            return
+            return newActive
         if rowCount == 1 and self.currTestSelection[0].needsRecalculation():
             self.recomputing = True
             self.currTestSelection[0].refreshFiles()

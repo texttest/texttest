@@ -2,7 +2,7 @@
 import apc_basic_gui, optimization_gui, ravebased_gui, default_gui, guiplugins, plugins, os, sys, shutil, time
 from apc import readKPIGroupFileCommon
 
-class ViewApcLog(guiplugins.InteractiveAction):
+class ViewApcLog(guiplugins.ActionGUI):
     def __repr__(self):
         return "Viewing log of"
     def singleTestOnly(self):
@@ -21,7 +21,7 @@ class ViewApcLog(guiplugins.InteractiveAction):
     def _getTitle(self):
         return "View APC Log"
 
-class SaveBestSolution(guiplugins.InteractiveAction):
+class SaveBestSolution(guiplugins.ActionGUI):
     def inMenuOrToolBar(self):
         return False
     def singleTestOnly(self):
@@ -77,7 +77,7 @@ class SaveBestSolution(guiplugins.InteractiveAction):
         return tests[0]
 
 # This is the action responsible for selecting a KPI group in the GUI.
-class SelectKPIGroup(guiplugins.InteractiveAction):
+class SelectKPIGroup(guiplugins.ActionGUI):
     def singleTestOnly(self):
         return True
     def correctTestClass(self):
@@ -310,7 +310,7 @@ class Quit(default_gui.Quit):
                     return "Tests have been runnning for %d minutes,\n are you sure you want to quit?" % elapsedTime
         return ""
 
-class CVSLogInGUI(guiplugins.InteractiveAction):
+class CVSLogInGUI(guiplugins.ActionGUI):
     def inMenuOrToolBar(self):
         return False
     def singleTestOnly(self):

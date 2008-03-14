@@ -241,8 +241,6 @@ class InteractiveAction(plugins.Observable):
         pass
     def notifyViewFile(self, *args):
         pass
-    def updateClipboard(self, *args, **kwargs):
-        return False
     def getOptionGroups(self):
         if self.optionGroup.empty():
             return []
@@ -342,8 +340,6 @@ class InteractiveAction(plugins.Observable):
             return baseTitle
     def _getScriptTitle(self):
         return self.getTitle()
-    def describe(self, testObj, postText = ""):
-        guilog.info(testObj.getIndent() + repr(self) + " " + repr(testObj) + postText)
     def startPerform(self):
         message = self.messageBeforePerform()
         if message != None:
@@ -522,10 +518,6 @@ class OldActionGUI(OldBasicActionGUI):
         self.topWindow = None
         if not self.isActiveOnCurrent():
             self.gtkAction.set_property("sensitive", False)
-
-    def notifyClipboard(self, *args, **kwargs):
-        if self.updateClipboard(*args, **kwargs):
-            self.setSensitivity(True)
 
     def notifyTopWindow(self, window):
         self.topWindow = window

@@ -1,6 +1,6 @@
 
 import plugins, os, sys, shutil, time, subprocess, operator, types
-from guiplugins import InteractiveAction, BasicActionGUI, guilog, guiConfig, processMonitor
+from guiplugins import InteractiveAction, BasicActionGUI, ActionGUI, guilog, guiConfig, processMonitor
 from jobprocess import JobProcess
 from sets import Set
 from copy import copy, deepcopy
@@ -135,8 +135,7 @@ class SaveTests(InteractiveAction):
         try:
             for test in tests:
                 version = self.getVersion(test)
-                fullDesc = " - version " + version + saveDesc
-                self.describe(test, fullDesc)
+                guilog.info("Saving " + repr(test) + " - version " + version + saveDesc)
                 testComparison = test.state
                 testComparison.setObservers(self.observers)
                 testComparison.save(test, self.getExactness(), version, overwriteSuccess, self.newFilesAsDiags(), stemsToSave)
@@ -184,7 +183,7 @@ class MarkTest(InteractiveAction):
                 return True
         return False
 
-class UnmarkTest(InteractiveAction):
+class UnmarkTest(ActionGUI):
     def _getTitle(self):
         return "_Unmark"
     def _getScriptTitle(self):
@@ -201,14 +200,14 @@ class UnmarkTest(InteractiveAction):
                 return True
         return False
 
-class FileViewAction(InteractiveAction):
+class FileViewAction(ActionGUI):
     def __init__(self, *args):
-        InteractiveAction.__init__(self, *args)
+        ActionGUI.__init__(self, *args)
         self.viewTools = {}
     def singleTestOnly(self):
         return True
     def isActiveOnCurrent(self, *args):
-        if not InteractiveAction.isActiveOnCurrent(self):
+        if not ActionGUI.isActiveOnCurrent(self):
             return False
         for fileName, comparison in self.currFileSelection:
             if self.isActiveForFile(fileName, comparison):
@@ -223,7 +222,7 @@ class FileViewAction(InteractiveAction):
     def updateFileSelection(self, files):
         for fileName, comparison in files:
             self.viewTools[fileName] = self.getViewTool(fileName)
-        return InteractiveAction.updateFileSelection(self, files)
+        return ActionGUI.updateFileSelection(self, files)
     
     def useFiltered(self):
         return False
@@ -427,13 +426,11 @@ class FollowFile(FileViewAction):
         cmdArgs = self.getFollowCommand(followProgram, useFile)
         self.startViewer(cmdArgs, description=description, scriptName="follows progress of test files")    
 
-class KillTests(InteractiveAction):
+class KillTests(ActionGUI):
     def _getStockId(self):
         return "stop"
     def _getTitle(self):
         return "_Kill"
-    def __repr__(self):
-        return "Killing"
     def _getScriptTitle(self):
         return "Kill selected tests"
     def isActiveOnCurrent(self, test=None, state=None):
@@ -454,12 +451,12 @@ class KillTests(InteractiveAction):
         self.notify("Status", "Killing " + testDesc + " ...")
         for test in tests:
             self.notify("ActionProgress", "")
-            self.describe(test)
+            guilog.info("Killing " + repr(test))
             test.notify("Kill")
 
         self.notify("Status", "Killed " + testDesc + ".")
 
-class ClipboardAction(InteractiveAction):
+class ClipboardAction(ActionGUI):
     def correctTestClass(self):
         return "test-case"
     def getSignalsSent(self):
@@ -486,9 +483,9 @@ class CutTests(ClipboardAction):
     def shouldCut(self):
         return True
 
-class PasteTests(InteractiveAction):
+class PasteTests(ActionGUI):
     def __init__(self, *args):
-        InteractiveAction.__init__(self, *args)
+        ActionGUI.__init__(self, *args)
         self.clipboardTests = []
         self.removeAfter = False
     def singleTestOnly(self):
@@ -499,12 +496,13 @@ class PasteTests(InteractiveAction):
         return "_Paste"
     def _getScriptTitle(self):
         return "Paste tests from clipboard"
-    def updateClipboard(self, tests, cut=False):
+    def notifyClipboard(self, tests, cut=False):
         self.clipboardTests = tests
         self.removeAfter = cut
-        return True
+        self.setSensitivity(True)
+
     def isActiveOnCurrent(self, test=None, state=None):
-        return InteractiveAction.isActiveOnCurrent(self, test, state) and len(self.clipboardTests) > 0
+        return ActionGUI.isActiveOnCurrent(self, test, state) and len(self.clipboardTests) > 0
     def getCurrentTestMatchingApp(self, test):
         for currTest in self.currTestSelection:
             if currTest.app == test.app:

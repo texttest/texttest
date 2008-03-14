@@ -918,7 +918,7 @@ class SelectTests(InteractiveAction):
                     combined += "." + appVer
         return combined
 
-class ResetGroups(InteractiveAction):
+class ResetGroups(BasicActionGUI):
     def isActiveOnCurrent(self, *args):
         return True
     def _getStockId(self):
@@ -933,8 +933,6 @@ class ResetGroups(InteractiveAction):
         return [ "Reset" ]
     def performOnCurrent(self):
         self.notify("Reset")
-    def notifyNewTestSelection(self, *args):
-        pass # we don't care and don't want to screw things up...
     
 class SaveSelection(InteractiveAction):
     def __init__(self, allApps, dynamic):
@@ -1396,7 +1394,7 @@ class CreateDefinitionFile(InteractiveAction):
     def messageAfterPerform(self):
         pass
 
-class RemoveTests(InteractiveAction):
+class RemoveTests(ActionGUI):
     def isActiveOnCurrent(self, *args):
         for test in self.currTestSelection:
             if test.parent:
@@ -1567,9 +1565,9 @@ class ReportBugs(InteractiveAction):
         writeFile.close()
         self.currTestSelection[0].filesChanged()
 
-class RecomputeTest(InteractiveAction):
+class RecomputeTest(ActionGUI):
     def __init__(self, *args):
-        InteractiveAction.__init__(self, *args)
+        ActionGUI.__init__(self, *args)
         self.recomputing = False
         self.chainReaction = False
     def singleTestOnly(self):
@@ -1580,13 +1578,13 @@ class RecomputeTest(InteractiveAction):
         else:
             return self.currTestSelection[0].state
     def isActiveOnCurrent(self, test=None, state=None):
-        if not InteractiveAction.isActiveOnCurrent(self):
+        if not ActionGUI.isActiveOnCurrent(self):
             return False
         
         useState = self.getState(state)
         return useState.hasStarted() and not useState.isComplete()
     def updateSelection(self, tests, apps, rowCount, *args):
-        newActive = InteractiveAction.updateSelection(self, tests, apps, rowCount, *args)
+        newActive = ActionGUI.updateSelection(self, tests, apps, rowCount, *args)
         # Prevent recomputation triggering more...
         if self.recomputing:
             self.chainReaction = True
@@ -1614,9 +1612,9 @@ class RecomputeTest(InteractiveAction):
         test.app.recomputeProgress(test, self.observers)
         self.notify("Status", "Done recomputing status of " + repr(test) + ".")
 
-class RecomputeAllTests(InteractiveAction):
+class RecomputeAllTests(ActionGUI):
     def __init__(self, allApps, *args):
-        InteractiveAction.__init__(self, allApps, *args)
+        ActionGUI.__init__(self, allApps, *args)
         self.latestNumberOfRecomputations = 0
     def isActiveOnCurrent(self, test=None, state=None):
         for test in self.currTestSelection:
@@ -1644,13 +1642,13 @@ class RecomputeAllTests(InteractiveAction):
                 test.app.recomputeProgress(test, self.observers)
  
 
-class SortTestSuiteFileAscending(InteractiveAction):
+class SortTestSuiteFileAscending(ActionGUI):
     def singleTestOnly(self):
         return True
     def correctTestClass(self):
         return "test-suite"
     def isActiveOnCurrent(self, *args):
-        return InteractiveAction.isActiveOnCurrent(self, *args) and not self.currTestSelection[0].autoSortOrder
+        return ActionGUI.isActiveOnCurrent(self, *args) and not self.currTestSelection[0].autoSortOrder
     def _getStockId(self):
         return "sort-ascending"
     def _getTitle(self):
@@ -1700,11 +1698,11 @@ class SortTestSuiteFileDescending(SortTestSuiteFileAscending):
     def performOnCurrent(self):
         self.performRecursively(self.currTestSelection[0], False)
 
-class RepositionTest(InteractiveAction):
+class RepositionTest(ActionGUI):
     def singleTestOnly(self):
         return True
     def _isActiveOnCurrent(self):
-        return InteractiveAction.isActiveOnCurrent(self) and \
+        return ActionGUI.isActiveOnCurrent(self) and \
                self.currTestSelection[0].parent and \
                not self.currTestSelection[0].parent.autoSortOrder
     def getSignalsSent(self):

@@ -899,7 +899,14 @@ class InteractiveActionHandler:
         defaultGUIs, buttonGUIs, actionTabGUIs = [], [], []
         for action in instances:
             if isinstance(action, ActionGUI):
-                defaultGUIs.append(action)
+                if action.inButtonBar():
+                    self.diag.info("Button: " + str(action.__class__))
+                    buttonGUIs.append(action)
+                else:
+                    self.diag.info("Menu/toolbar: " + str(action.__class__))
+                    # It's always active, always visible
+                    action.setActive(True)
+                    defaultGUIs.append(action)
             else:
                 optionGroups = action.getOptionGroups()
                 if len(optionGroups) > 0:

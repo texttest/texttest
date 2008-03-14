@@ -302,16 +302,12 @@ class InteractiveAction(plugins.Observable):
     def getTooltip(self):
         return self.getScriptTitle(False)
     def getDialogType(self): # The dialog type to launch on action execution.
-        try:
-            self.confirmationMessage = self.getConfirmationMessage()
-            if self.confirmationMessage:
-                return "guidialogs.ConfirmationDialog"
-            else:
-                return ""
-        except plugins.TextTestError, e:
-            self.notify("Error", str(e))
+        self.confirmationMessage = self.getConfirmationMessage()
+        if self.confirmationMessage:
+            return ConfirmationDialog
+
     def getResultDialogType(self): # The dialog type to launch when the action has finished execution.
-        return ""
+        pass
     def getTitle(self, includeMnemonics=False):
         title = self._getTitle()
         if includeMnemonics:
@@ -362,6 +358,197 @@ class InteractiveAction(plugins.Observable):
     def cancel(self):
         self.notify("Status", "Action cancelled.")
                 
+
+def destroyDialog(dialog, *args):
+    dialog.destroy()
+
+def createDialogMessage(message, stockIcon, scrollBars=False):
+    buffer = gtk.TextBuffer()
+    buffer.set_text(message)
+    textView = gtk.TextView(buffer)
+    textView.set_editable(False)
+    textView.set_cursor_visible(False)
+    textView.set_left_margin(5)
+    textView.set_right_margin(5)
+    hbox = gtk.HBox()
+    imageBox = gtk.VBox()
+    imageBox.pack_start(gtk.image_new_from_stock(stockIcon, gtk.ICON_SIZE_DIALOG), expand=False)
+    hbox.pack_start(imageBox, expand=False)
+    scrolledWindow = gtk.ScrolledWindow()
+    # What we would like is that the dialog expands without scrollbars
+    # until it reaches some maximum size, and then adds scrollbars. At
+    # the moment I cannot make this happen without setting a fixed window
+    # size, so I'll set the scrollbar policy to never instead.
+    if scrollBars:
+        scrolledWindow.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+    else:
+        scrolledWindow.set_policy(gtk.POLICY_NEVER, gtk.POLICY_NEVER)
+    scrolledWindow.add(textView)
+    scrolledWindow.set_shadow_type(gtk.SHADOW_IN)
+    hbox.pack_start(scrolledWindow, expand=True, fill=True)
+    alignment = gtk.Alignment()
+    alignment.set_padding(5, 5, 0, 5)
+    alignment.add(hbox)
+    return alignment
+
+def showErrorDialog(message, parent=None):
+    guilog.info("ERROR: " + message)
+    dialog = gtk.Dialog("TextTest Error", parent, buttons=(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
+    dialog.set_modal(True)
+    dialog.vbox.pack_start(createDialogMessage(message, gtk.STOCK_DIALOG_ERROR), expand=True, fill=True)
+    scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
+    dialog.show_all()
+    dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+
+def showWarningDialog(message, parent=None):
+    guilog.info("WARNING: " + message)
+    dialog = gtk.Dialog("TextTest Warning", parent, buttons=(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
+    dialog.set_modal(True)
+    dialog.vbox.pack_start(createDialogMessage(message, gtk.STOCK_DIALOG_WARNING), expand=True, fill=True)
+    scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
+    dialog.show_all()
+    dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+
+def showInformationDialog(message, parent=None):
+    guilog.info("INFORMATION: " + message)
+    dialog = gtk.Dialog("TextTest Information", parent, buttons=(gtk.STOCK_CLOSE, gtk.RESPONSE_CLOSE))
+    dialog.set_modal(True)
+    dialog.vbox.pack_start(createDialogMessage(message, gtk.STOCK_DIALOG_INFO), expand=True, fill=True)
+    scriptEngine.connect("press close", "response", dialog, destroyDialog, gtk.RESPONSE_CLOSE)
+    dialog.show_all()
+    dialog.set_default_response(gtk.RESPONSE_CLOSE)
+
+#
+# A generic action dialog, containing stuff which is shared between ActionConfirmationDialog
+# and ActionResultDialog. It is recommended to inherit from those instead of directly
+# from this class.
+#
+class GenericActionDialog:
+    def __init__(self, parent, plugin):
+        self.parent = parent
+        self.plugin = plugin
+
+    def getDialogTitle(self):
+        return self.plugin.getScriptTitle(None)        
+
+    def isModal(self):
+        return True
+
+    def isResizeable(self):
+        return True
+    
+    def run(self):
+        self.addContents()
+        # Show if we've added something. This'll let us leave the dialog
+        # empty and e.g. pop up an error dialog if that is more suitable ...
+        if len(self.dialog.vbox.get_children()) > 2: # Separator and buttonbox are always there ...
+            self.dialog.show_all()
+        
+    def getStockIcon(self, stockItem):
+        imageBox = gtk.VBox()
+        imageBox.pack_start(gtk.image_new_from_stock(stockItem, gtk.ICON_SIZE_DIALOG), expand=False)
+        return imageBox
+
+#
+# A skeleton for a dialog which can replace the 'tab options' of
+# today's actions. I think it should be possible to customize the
+# look of the dialog, so I'll let each subclass create its widgets,
+# rather than follow the TextTestGUI way to centrally decide the
+# option tab page layout. I think this will only add a minor overhead,
+# but will make it much easier to make the dialogs look nice.
+# 
+class ActionConfirmationDialog(GenericActionDialog):
+    def __init__(self, parent, okMethod, cancelMethod, plugin):
+        GenericActionDialog.__init__(self, parent, plugin)
+        self.okMethod = okMethod
+        self.cancelMethod = cancelMethod
+        if self.isModal():
+            self.dialog = gtk.Dialog(self.getDialogTitle(), parent, flags=gtk.DIALOG_MODAL) 
+            self.dialog.set_modal(True)
+        else:
+            self.dialog = gtk.Dialog(self.plugin.getScriptTitle(None))
+        self.dialog.set_resizable(self.isResizeable())
+        self.createButtons()
+
+    def createButtons(self):
+        self.cancelButton = self.dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL)
+        self.okButton = self.dialog.add_button(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT)       
+        scriptEngine.connect("press cancel", "clicked", self.cancelButton, self.respond, gtk.RESPONSE_CANCEL, False)
+        scriptEngine.connect("press ok", "clicked", self.okButton, self.respond, gtk.RESPONSE_ACCEPT, True)
+
+    def respond(self, button, saidOK, *args):
+        entrycompletion.manager.collectCompletions()
+        self.dialog.hide()
+        self.dialog.response(gtk.RESPONSE_NONE)
+        if saidOK and self.okMethod:
+            self.okMethod()
+        elif self.cancelMethod:
+            self.cancelMethod()
+
+
+# A skeleton for a dialog which can show results of actions. 
+class ActionResultDialog(GenericActionDialog):
+    def __init__(self, parent, okMethod, plugin):
+        GenericActionDialog.__init__(self, parent, plugin)
+        self.okMethod = okMethod
+        if self.isModal():
+            self.dialog = gtk.Dialog(self.getDialogTitle(), parent, flags=gtk.DIALOG_MODAL) 
+            self.dialog.set_modal(True)
+        else:
+            self.dialog = gtk.Dialog(self.getDialogTitle())             
+        self.dialog.set_resizable(self.isResizeable())
+        self.createButtons()
+
+    def createButtons(self):
+        self.okButton = self.dialog.add_button(gtk.STOCK_CLOSE, gtk.RESPONSE_ACCEPT)       
+        scriptEngine.connect("press close", "clicked", self.okButton, self.respond, gtk.RESPONSE_ACCEPT, True)
+        self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+
+    def respond(self, button, saidOK, *args):
+        entrycompletion.manager.collectCompletions()
+        self.dialog.hide()
+        self.dialog.response(gtk.RESPONSE_NONE)
+        if self.okMethod:
+            self.okMethod()
+
+       
+class YesNoDialog(ActionConfirmationDialog):
+    def __init__(self, parent, okMethod, cancelMethod, plugin, message=None):
+        ActionConfirmationDialog.__init__(self, parent, okMethod, cancelMethod, plugin)
+        if self.plugin:
+            self.message = self.plugin.confirmationMessage
+        else:
+            self.message = message
+        guilog.info(self.alarmLevel().upper() + ": " + self.message)
+        self.dialog.set_default_response(gtk.RESPONSE_NO)
+
+    def getDialogTitle(self):
+        return "TextTest " + self.alarmLevel()
+
+    def createButtons(self):
+        noButton = self.dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
+        yesButton = self.dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
+        scriptEngine.connect("answer no to texttest " + self.alarmLevel(), "clicked",
+                             noButton, self.respond, gtk.RESPONSE_NO, False)
+        scriptEngine.connect("answer yes to texttest " + self.alarmLevel(), "clicked", yesButton,
+                             self.respond, gtk.RESPONSE_YES, True)
+
+    def addContents(self):
+        contents = createDialogMessage(self.message, self.stockIcon())
+        self.dialog.vbox.pack_start(contents, expand=True, fill=True)
+
+class QueryDialog(YesNoDialog):
+    def alarmLevel(self):
+        return "Query"
+    def stockIcon(self):
+        return gtk.STOCK_DIALOG_QUESTION
+
+class ConfirmationDialog(YesNoDialog):
+    def alarmLevel(self):
+        return "Confirmation"
+    def stockIcon(self):
+        return gtk.STOCK_DIALOG_WARNING
+        
 
 # base class for all "GUI" classes which manage parts of the display
 class SubGUI(plugins.Observable):
@@ -486,25 +673,27 @@ class OldBasicActionGUI(SubGUI):
     def runInteractive(self, *args):
         if self.busy: # If we're busy with some other action, ignore this one ...
             return
-        dialogType = self.getDialogType()
-        if dialogType is not None:
+                
+        try:
+            dialogType = self.getDialogType()
             if dialogType:
-                dialog = pluginHandler.getInstance(dialogType, self.topWindow,
-                                                   self._runInteractive, self.cancel, self)
+                dialog = dialogType(self.topWindow, self._runInteractive, self.cancel, self)
                 dialog.run()
             else:
                 # Each time we perform an action we collect and save the current registered entries
                 # Actions showing dialogs will handle this in the dialog code.
                 entrycompletion.manager.collectCompletions()
                 self._runInteractive()
-
+        except plugins.TextTestError, e:
+            showErrorDialog(str(e))
+            
     def _runInteractive(self):
         try:
             OldBasicActionGUI.busy = True
             self.startPerform()
             resultDialogType = self.getResultDialogType()
             if resultDialogType:
-                resultDialog = pluginHandler.getInstance(resultDialogType, self.topWindow, None, self)
+                resultDialog = resultDialogType(self.topWindow, None, self)
                 resultDialog.run()
         finally:
             self.endPerform()
@@ -819,39 +1008,6 @@ class ActionTabGUI(OldActionGUI):
                 text += " (checked)"
         return text
 
-class PluginHandler:
-    def __init__(self):
-        self.modules = []
-    def getInstance(self, className, *args):
-        dotPos = className.find(".")
-        if dotPos == -1:
-            for module in self.modules:
-                command = "from " + module + " import " + className + " as realClassName"
-                try:
-                    exec command
-                    guilog.info("Loaded class '" + className + "' from module '" + module + "'")
-                except ImportError:
-                    continue
-            
-                actionObject = self.tryMakeObject(realClassName, *args)
-                if actionObject:
-                    return actionObject
-        else:
-            module = className[0:dotPos]
-            theClassName = className[dotPos + 1:]
-            exec "from " + module + " import " + theClassName + " as realClassName"
-            return self.tryMakeObject(realClassName, *args)
-
-        return self.tryMakeObject(className, *args)
-    def tryMakeObject(self, className, *args):
-        try:
-            return className(*args)
-        except:
-            # If some invalid interactive action is provided, need to know which
-            plugins.printWarning("Problem with class " + className.__name__ + ", ignoring...")
-            plugins.printException()
-
-pluginHandler = PluginHandler()
 
 class Forwarder:
     def __init__(self, action):

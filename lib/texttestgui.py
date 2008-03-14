@@ -33,7 +33,6 @@ from copy import copy
 from glob import glob
 from sets import Set
 
-from guidialogs import showErrorDialog, showWarningDialog, showInformationDialog
 
 def renderParentsBold(column, cell, model, iter):
     if model.iter_has_child(iter):
@@ -468,11 +467,11 @@ class TopWindowGUI(ContainerGUI):
         self.topWindow.destroy()
 
     def notifyError(self, message):
-        showErrorDialog(message, self.topWindow)
+        guiplugins.showErrorDialog(message, self.topWindow)
     def notifyWarning(self, message):
-        showWarningDialog(message, self.topWindow)
+        guiplugins.showWarningDialog(message, self.topWindow)
     def notifyInformation(self, message):
-        showInformationDialog(message, self.topWindow)
+        guiplugins.showInformationDialog(message, self.topWindow)
     def adjustSize(self):
         if guiConfig.getWindowOption("maximize"):
             self.topWindow.maximize()
@@ -1726,7 +1725,7 @@ class FileViewGUI(guiplugins.SubGUI):
         try:
             self.notify("ViewFile", fileName, comparison)
         except plugins.TextTestError, e:
-            showErrorDialog(str(e), self.selection.get_tree_view().get_toplevel())
+            guiplugins.showErrorDialog(str(e), self.selection.get_tree_view().get_toplevel())
 
         self.selection.unselect_all()
     def notifyNewFile(self, fileName, overwrittenExisting):

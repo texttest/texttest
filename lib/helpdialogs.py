@@ -1,11 +1,11 @@
 
-import gtk, guidialogs, plugins, texttest_version, os, string, sys, glob
-from guiplugins import scriptEngine, guilog
+import gtk, plugins, texttest_version, os, string, sys, glob
+from guiplugins import scriptEngine, guilog, InteractiveAction, ActionResultDialog, showErrorDialog
 
 # Show useful info about TextTest.
 # I don't particularly like the standard gtk.AboutDialog, and we also want
 # to show pygtk/gtk/python versions in our dialog, so we create our own ...
-class AboutTextTestDialog(guidialogs.ActionResultDialog):
+class AboutTextTestDialog(ActionResultDialog):
     def getDialogTitle(self):
         return "About TextTest"
 
@@ -58,7 +58,7 @@ class AboutTextTestDialog(guidialogs.ActionResultDialog):
         dialog = VersionsDialog(self.dialog, None, None)
         dialog.run()
 
-class VersionsDialog(guidialogs.ActionResultDialog):
+class VersionsDialog(ActionResultDialog):
     def getDialogTitle(self):
         return "Version Information"
 
@@ -113,7 +113,7 @@ class VersionsDialog(guidialogs.ActionResultDialog):
             alignment.add(gtk.Label(label))
         return alignment
 
-class CreditsDialog(guidialogs.ActionResultDialog):
+class CreditsDialog(ActionResultDialog):
     def getDialogTitle(self):
         return "TextTest Credits"
 
@@ -130,7 +130,7 @@ class CreditsDialog(guidialogs.ActionResultDialog):
             buffer = gtk.TextBuffer()
             buffer.set_text(creditsText)
         except Exception, e:
-            guidialogs.showErrorDialog("Failed to show AUTHORS file:\n" + str(e), self.parent)
+            showErrorDialog("Failed to show AUTHORS file:\n" + str(e), self.parent)
             return
 
         textView = gtk.TextView(buffer)
@@ -142,7 +142,7 @@ class CreditsDialog(guidialogs.ActionResultDialog):
         notebook.append_page(textView, gtk.Label("Written by"))
         self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
 
-class LicenseDialog(guidialogs.ActionResultDialog):
+class LicenseDialog(ActionResultDialog):
     def getDialogTitle(self):
         return "TextTest License"
 
@@ -159,7 +159,7 @@ class LicenseDialog(guidialogs.ActionResultDialog):
             buffer = gtk.TextBuffer()
             buffer.set_text(licenseText)
         except Exception, e:
-            guidialogs.showErrorDialog("Failed to show LICENSE file:\n" + str(e), self.parent)
+            showErrorDialog("Failed to show LICENSE file:\n" + str(e), self.parent)
             return
 
         textView = gtk.TextView(buffer)
@@ -171,7 +171,7 @@ class LicenseDialog(guidialogs.ActionResultDialog):
         notebook.append_page(textView, gtk.Label("License"))
         self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
 
-class MigrationNotesDialog(guidialogs.ActionResultDialog):
+class MigrationNotesDialog(ActionResultDialog):
     def getDialogTitle(self):
         return "TextTest Migration Notes"
 
@@ -210,3 +210,47 @@ class MigrationNotesDialog(guidialogs.ActionResultDialog):
             parentSize = self.parent.get_size()
             self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[0] * 0.7))
             self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
+
+class VersionInformation(InteractiveAction):
+    def isActiveOnCurrent(self, *args):
+        return True
+    def _getTitle(self):
+        return "Component _Versions"
+    def messageAfterPerform(self):
+        return ""
+    def _getScriptTitle(self):
+        return "show component version information"
+    def getResultDialogType(self):
+        return VersionsDialog
+    def performOnCurrent(self):
+        pass # The only result is the result popup dialog ...
+
+class AboutTextTest(InteractiveAction):
+    def isActiveOnCurrent(self, *args):
+        return True
+    def _getStockId(self):
+        return "about"
+    def _getTitle(self):
+        return "_About TextTest"
+    def messageAfterPerform(self):
+        return ""
+    def _getScriptTitle(self):
+        return "show information about texttest"
+    def getResultDialogType(self):
+        return AboutTextTestDialog
+    def performOnCurrent(self):
+        pass # The only result is the result popup dialog ...
+
+class MigrationNotes(InteractiveAction):
+    def isActiveOnCurrent(self, *args):
+        return True
+    def _getTitle(self):
+        return "_Migration Notes"
+    def messageAfterPerform(self):
+        return ""
+    def _getScriptTitle(self):
+        return "show texttest migration notes"
+    def getResultDialogType(self):
+        return MigrationNotesDialog
+    def performOnCurrent(self):
+        pass # The only result is the result popup dialog ...

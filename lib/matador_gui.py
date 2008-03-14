@@ -1,5 +1,5 @@
 
-import matador_basic_gui, optimization_gui, ravebased_gui, default_gui, guiplugins, plugins, os
+import matador_basic_gui, optimization_gui, ravebased_gui, default_gui, guiplugins, plugins, os, gtk, entrycompletion
 from matador import staticLinkageInCustomerFile
 from time import time, ctime
 
@@ -46,6 +46,48 @@ class SelectTests(default_gui.SelectTests):
             if self.optionGroup.getSwitchValue(feature, 0):
                 result.append(feature)
         return result
+
+
+# Dialog for performance report...
+class CreatePerformanceReportDialog(guiplugins.ActionConfirmationDialog):
+    def __init__(self, parent, okMethod, cancelMethod, plugin):
+        guiplugins.ActionConfirmationDialog.__init__(self, parent, okMethod, cancelMethod, plugin)
+        self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+
+    def addContents(self):
+        # A simple entry for the path, and one for the versions ...
+        self.dirEntry = gtk.Entry()
+        self.versionsEntry = gtk.Entry()
+        self.objectiveTextEntry = gtk.Entry()
+        entrycompletion.manager.register(self.dirEntry)
+        entrycompletion.manager.register(self.versionsEntry)
+        entrycompletion.manager.register(self.objectiveTextEntry)
+        self.dirEntry.set_activates_default(True)
+        self.versionsEntry.set_activates_default(True)
+        self.objectiveTextEntry.set_activates_default(True)
+        self.dirEntry.set_text(self.plugin.rootDir)
+        self.versionsEntry.set_text(",".join(self.plugin.versions).rstrip(","))
+        self.objectiveTextEntry.set_text(self.plugin.objectiveText)
+        
+        table = gtk.Table(3, 2, homogeneous=False)
+        table.set_row_spacings(1)
+        table.attach(gtk.Label("Save in directory:"), 0, 1, 0, 1, xoptions=gtk.FILL, xpadding=1)
+        table.attach(gtk.Label("Compare versions:"), 0, 1, 1, 2, xoptions=gtk.FILL, xpadding=1)
+        table.attach(gtk.Label("Objective value text:"), 0, 1, 2, 3, xoptions=gtk.FILL, xpadding=1)
+        table.attach(self.dirEntry, 1, 2, 0, 1)
+        table.attach(self.versionsEntry, 1, 2, 1, 2)
+        table.attach(self.objectiveTextEntry, 1, 2, 2, 3)
+        guiplugins.scriptEngine.registerEntry(self.dirEntry, "choose directory ")
+        guiplugins.scriptEngine.registerEntry(self.versionsEntry, "choose versions ")
+        guiplugins.scriptEngine.registerEntry(self.objectiveTextEntry, "choose objective text ")
+        self.dialog.vbox.pack_start(table, expand = True, fill = True)
+        
+    def respond(self, button, saidOK, *args):
+        if saidOK:
+            self.plugin.setInfo(os.path.abspath(self.dirEntry.get_text()),
+                                self.versionsEntry.get_text().replace(" ", "").split(","),
+                                self.objectiveTextEntry.get_text())
+        guiplugins.ActionConfirmationDialog.respond(self, button, saidOK, *args)
     
 
 class CreatePerformanceReport(guiplugins.InteractiveAction):
@@ -67,7 +109,7 @@ class CreatePerformanceReport(guiplugins.InteractiveAction):
     def separatorBeforeInMainMenu(self):
         return True
     def getDialogType(self):
-        return "matadordialogs.CreatePerformanceReportDialog"
+        return CreatePerformanceReportDialog
     def _getTitle(self):
         return "Create Performance Report..."
     def _getScriptTitle(self):

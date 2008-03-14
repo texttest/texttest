@@ -1,7 +1,7 @@
 
-import os, guidialogs, gobject, datetime, time, subprocess, default_gui
+import os, gobject, datetime, time, subprocess, default_gui
 import gtk, plugins, custom_widgets, entrycompletion
-from guiplugins import scriptEngine, guilog, InteractiveAction, processMonitor, pluginHandler
+from guiplugins import scriptEngine, guilog, InteractiveAction, processMonitor, showErrorDialog, ActionResultDialog
 
 #
 # Todo/improvements:
@@ -69,7 +69,7 @@ class CVSAction(InteractiveAction):
     def getResultDialogSecondColumnTitle(self):
         return "Information"
     def getResultDialogType(self):
-        return "CVSTreeViewDialog"
+        return CVSTreeViewDialog
     def getResultDialogTitle(self):
         return self._getScriptTitle()
     def getResultDialogIconType(self):
@@ -113,8 +113,8 @@ class CVSAction(InteractiveAction):
         guilog.info("Viewing CVS differences for file '" + path + "' graphically ...")
         cvsDiffProgram = "tkdiff" # Hardcoded for now ...
         if not plugins.canExecute(cvsDiffProgram):
-            guidialogs.showErrorDialog("\nCannot find graphical CVS difference program '" + cvsDiffProgram + \
-                  "'.\nPlease install it somewhere on your $PATH.\n", dialog.dialog)
+            showErrorDialog("\nCannot find graphical CVS difference program '" + cvsDiffProgram + \
+                            "'.\nPlease install it somewhere on your $PATH.\n", dialog.dialog)
         cmdArgs = [ cvsDiffProgram ] + dialog.plugin.getRevisionOptions() + [ path ]
         processMonitor.startProcess(cmdArgs, description="Graphical CVS diff for file " + path,
                                     stderr=open(os.devnull, "w"), scriptName="shows CVS differences graphically")
@@ -207,7 +207,7 @@ class CVSLog(CVSAction):
     def _getScriptTitle(self):
         return "cvs log for the selected files"
     def getResultDialogType(self):
-        return "CVSTreeViewDialog"
+        return CVSTreeViewDialog
     def getResultDialogIconType(self):
         if not self.notInRepository:           
             return gtk.STOCK_DIALOG_INFO
@@ -303,7 +303,7 @@ class CVSLogLatest(CVSLog):
     def _getScriptTitle(self):
         return "cvs log latest for the selected test"
     def getResultDialogType(self):
-        return "CVSNotebookDialog"
+        return CVSNotebookDialog
     def getResultDialogMessage(self):
         message = "Showing latest log entries for the CVS controlled files.\nCVS log command used: " + " ".join(self.cvsArgs)
         if not self.recursive:
@@ -366,7 +366,7 @@ class CVSDiff(CVSAction):
     def _getScriptTitle(self):
         return "cvs diff for the selected files" 
     def getResultDialogType(self):
-        return "CVSTreeViewDialog"
+        return CVSTreeViewDialog
     def getResultDialogIconType(self):
         if len(self.pages) == 0 and not self.notInRepository:            
             return gtk.STOCK_DIALOG_INFO
@@ -476,7 +476,7 @@ class CVSStatus(CVSAction):
     def _getScriptTitle(self):
         return "cvs status for the selected files"
     def getResultDialogType(self):
-        return "CVSStatusDialog"
+        return CVSStatusDialog
     def getResultDialogTwoColumnsInTreeView(self):
         return True
     def getResultDialogIconType(self):
@@ -650,10 +650,6 @@ class CVSAnnotateRecursive(CVSAnnotate):
     def _getScriptTitle(self):
         return "recursive " + CVSAnnotate._getScriptTitle(self)
 
-#
-# Register cvs plugin at TextTest GUI 
-#
-pluginHandler.modules.append("cvs")
 
 #
 # Configuration for the Interactive Actions
@@ -673,9 +669,9 @@ class InteractiveActionConfig(default_gui.InteractiveActionConfig):
 #
 #
     
-class CVSTreeViewDialog(guidialogs.ActionResultDialog):
+class CVSTreeViewDialog(ActionResultDialog):
     def __init__(self, parent, okMethod, plugin, extraButtons = []):
-        guidialogs.ActionResultDialog.__init__(self, parent, okMethod, plugin)        
+        ActionResultDialog.__init__(self, parent, okMethod, plugin)        
         
     def isModal(self):
         return False
@@ -964,7 +960,7 @@ class CVSStatusDialog(CVSTreeViewDialog):
 # but presents it in a gtk.Notebook instead of in a gtk.TreeView. The data
 # contained in each TreeView node is instead but in a notebook page.
 #
-class CVSNotebookDialog(guidialogs.ActionResultDialog):
+class CVSNotebookDialog(ActionResultDialog):
     def isModal(self):
         return False
     

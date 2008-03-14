@@ -22,6 +22,15 @@ def setUpGlobals(dynamic, allApps):
     scriptEngine = ScriptEngine(guilog, enableShortcuts=1)
     return guilog, guiConfig, scriptEngine
 
+# gtk.accelerator_valid appears utterly broken on Windows
+def windowsAcceleratorValid(key, mod):
+    name = gtk.accelerator_name(key, mod)
+    return len(name) > 0 and name != "VoidSymbol"
+
+if os.name == "nt":
+    gtk.accelerator_valid = windowsAcceleratorValid
+            
+
 class GUIConfig:
     def __init__(self, dynamic, allApps):
         self.apps = allApps
@@ -416,24 +425,58 @@ class SubGUI(plugins.Observable):
             window.add_with_viewport(widget)
         else:
             window.add(widget)
-    
 
-class OldActionGUI(SubGUI):
+# Introduce an extra level without all the selection-dependent stuff, some actions want
+# to inherit from here and it provides a separation
+class OldBasicActionGUI(SubGUI):
     busy = False
+    def __init__(self, *args):
+        SubGUI.__init__(self, *args)
+        self.accelerator = None
+        title = self.getTitle(includeMnemonics=True)
+        actionName = self.getTitle(includeMnemonics=False)
+        self.gtkAction = gtk.Action(actionName, title, \
+                                    self.getTooltip(), self.getStockId())
+        scriptEngine.connect(self.getScriptTitle(False), "activate", self.gtkAction, self.runInteractive)
+
     def getStockId(self):
         stockId = self._getStockId()
         if stockId:
             return "gtk-" + stockId 
+
     def describe(self):
         self.describeAction()
+
     def describeAction(self):
         message = "Viewing action with title '" + self.getTitle(includeMnemonics=True) + "'"
         message += self.detailDescription()
-        message += self.sensitivityDescription()
         guilog.info(message)
-    def notifyClipboard(self, *args, **kwargs):
-        if self.updateClipboard(*args, **kwargs):
-            self.setSensitivity(True)
+
+    def detailDescription(self):
+        message = ""
+        stockId = self.getStockId()
+        if stockId:
+            message += ", stock id '" + repr(stockId) + "'"
+        if self.accelerator:
+            message += ", accelerator '" + repr(self.accelerator) + "'"
+        return message
+
+    def addToGroups(self, actionGroup, accelGroup):
+        self.accelerator = self.getAccelerator()
+        actionGroup.add_action_with_accel(self.gtkAction, self.accelerator)
+        self.gtkAction.set_accel_group(accelGroup)
+        self.gtkAction.connect_accelerator()
+            
+    def getAccelerator(self):
+        realAcc = guiConfig.getCompositeValue("gui_accelerators", self.getTitle().rstrip("."))
+        if realAcc:
+            key, mod = gtk.accelerator_parse(realAcc)
+            if gtk.accelerator_valid(key, mod):
+                return realAcc
+            else:
+                plugins.printWarning("Keyboard accelerator '" + realAcc + "' for action '" \
+                                     + self.getTitle() + "' is not valid, ignoring ...")
+    
     def setObservers(self, observers):
         if self.hasObservers():
             return # Can have several ActionGUIs for the same Action
@@ -443,6 +486,49 @@ class OldActionGUI(SubGUI):
             if hasattr(observer, "action"):
                 allObservers.append(observer.action)
         self.setRelevantObservers(allObservers)
+
+    def runInteractive(self, *args):
+        if self.busy: # If we're busy with some other action, ignore this one ...
+            return
+        dialogType = self.getDialogType()
+        if dialogType is not None:
+            if dialogType:
+                dialog = pluginHandler.getInstance(dialogType, self.topWindow,
+                                                   self._runInteractive, self.cancel, self)
+                dialog.run()
+            else:
+                # Each time we perform an action we collect and save the current registered entries
+                # Actions showing dialogs will handle this in the dialog code.
+                entrycompletion.manager.collectCompletions()
+                self._runInteractive()
+
+    def _runInteractive(self):
+        try:
+            OldBasicActionGUI.busy = True
+            self.startPerform()
+            resultDialogType = self.getResultDialogType()
+            if resultDialogType:
+                resultDialog = pluginHandler.getInstance(resultDialogType, self.topWindow, None, self)
+                resultDialog.run()
+        finally:
+            self.endPerform()
+            OldBasicActionGUI.busy = False
+    
+    
+class OldActionGUI(OldBasicActionGUI):
+    busy = False
+    def __init__(self, *args):
+        OldBasicActionGUI.__init__(self, *args)
+        self.topWindow = None
+        if not self.isActiveOnCurrent():
+            self.gtkAction.set_property("sensitive", False)
+
+    def notifyClipboard(self, *args, **kwargs):
+        if self.updateClipboard(*args, **kwargs):
+            self.setSensitivity(True)
+
+    def notifyTopWindow(self, window):
+        self.topWindow = window
         
     def notifyNewTestSelection(self, *args):
         newActive = self.updateSelection(*args)
@@ -457,99 +543,18 @@ class OldActionGUI(SubGUI):
         self.setSensitivity(newActive)
         
     def setSensitivity(self, newValue):
-        actionOrButton = self.actionOrButton()
-        if not actionOrButton:
-            return
-        oldValue = actionOrButton.get_property("sensitive")
-        actionOrButton.set_property("sensitive", newValue)
+        oldValue = self.gtkAction.get_property("sensitive")
+        self.gtkAction.set_property("sensitive", newValue)
         if oldValue != newValue:
             guilog.info("Setting sensitivity of action '" + self.getTitle(includeMnemonics=True) + "' to " + repr(newValue))
         
     def detailDescription(self):
-        return ""
-    def sensitivityDescription(self):
-        if self.actionOrButton().get_property("sensitive"):
-            return ""
+        basic = OldBasicActionGUI.detailDescription(self)
+        if self.gtkAction.get_property("sensitive"):
+            return basic
         else:
-            return " (greyed out)"
-    def getTopWindow(self):
-        pass
-    def runInteractive(self, *args):
-        if self.busy: # If we're busy with some other action, ignore this one ...
-            return
-        dialogType = self.getDialogType()
-        if dialogType is not None:
-            if dialogType:
-                dialog = pluginHandler.getInstance(dialogType, self.getTopWindow(),
-                                                   self._runInteractive, self.cancel, self)
-                dialog.run()
-            else:
-                # Each time we perform an action we collect and save the current registered entries
-                # Actions showing dialogs will handle this in the dialog code.
-                entrycompletion.manager.collectCompletions()
-                self._runInteractive()
-    def _runInteractive(self):
-        try:
-            OldActionGUI.busy = True
-            self.startPerform()
-            resultDialogType = self.getResultDialogType()
-            if resultDialogType:
-                resultDialog = pluginHandler.getInstance(resultDialogType, self.getTopWindow(), None, self)
-                resultDialog.run()
-        finally:
-            self.endPerform()
-            OldActionGUI.busy = False
-           
-class OldDefaultActionGUI(OldActionGUI):
-    def __init__(self, *args):
-        OldActionGUI.__init__(self, *args)
-        self.accelerator = None
-        self.topWindow = None
-        title = self.getTitle(includeMnemonics=True)
-        actionName = self.getTitle(includeMnemonics=False)
-        self.gtkAction = gtk.Action(actionName, title, \
-                                    self.getTooltip(), self.getStockId())
-        scriptEngine.connect(self.getScriptTitle(False), "activate", self.gtkAction, self.runInteractive)
-        if not self.isActiveOnCurrent():
-            self.gtkAction.set_property("sensitive", False)
-    def notifyTopWindow(self, window):
-        self.topWindow = window
-    def getTopWindow(self):
-        return self.topWindow
-    def addToGroups(self, actionGroup, accelGroup):
-        self.accelerator = self.getAccelerator()
-        actionGroup.add_action_with_accel(self.gtkAction, self.accelerator)
-        self.gtkAction.set_accel_group(accelGroup)
-        self.gtkAction.connect_accelerator()
-        
-    def actionOrButton(self):
-        return self.gtkAction
-        
-    def getAccelerator(self):
-        realAcc = guiConfig.getCompositeValue("gui_accelerators", self.getTitle().rstrip("."))
-        if realAcc:
-            key, mod = gtk.accelerator_parse(realAcc)
-            if self.isValid(key, mod):
-                return realAcc
-            else:
-                plugins.printWarning("Keyboard accelerator '" + realAcc + "' for action '" \
-                                     + self.getTitle() + "' is not valid, ignoring ...")
-    def isValid(self, key, mod):
-        if os.name == "nt":
-            # gtk.accelerator_valid appears utterly broken on Windows
-            name = gtk.accelerator_name(key, mod)
-            return len(name) > 0 and name != "VoidSymbol"
-        else:
-            return gtk.accelerator_valid(key, mod)
-    def detailDescription(self):
-        message = ""
-        stockId = self.getStockId()
-        if stockId:
-            message += ", stock id '" + repr(stockId) + "'"
-        if self.accelerator:
-            message += ", accelerator '" + repr(self.accelerator) + "'"
-        return message
-
+            return basic + " (greyed out)"
+    
     def createView(self):
         return self.createButton()
 
@@ -564,10 +569,17 @@ class OldDefaultActionGUI(OldActionGUI):
         button.show()
         return button
 
-class DefaultActionGUI(OldDefaultActionGUI,InteractiveAction):
+class BasicActionGUI(OldBasicActionGUI,InteractiveAction):
     def __init__(self, *args):
         InteractiveAction.__init__(self, *args)
-        OldDefaultActionGUI.__init__(self)
+        OldBasicActionGUI.__init__(self)
+    def hasObservers(self):
+        return len(self.observers) > 0
+
+class ActionGUI(OldActionGUI,InteractiveAction):
+    def __init__(self, *args):
+        InteractiveAction.__init__(self, *args)
+        OldActionGUI.__init__(self)
     def hasObservers(self):
         return len(self.observers) > 0
 
@@ -584,9 +596,9 @@ class ComboBoxListFinder:
         entries.append(text)
 
 
-class ActionTabGUI(OldDefaultActionGUI):
+class ActionTabGUI(OldActionGUI):
     def __init__(self, optionGroup, *args):
-        OldDefaultActionGUI.__init__(self, *args)
+        OldActionGUI.__init__(self, *args)
         self.optionGroup = optionGroup
         self.vbox = None
         self.diag = plugins.getDiagnostics("Action Tabs")
@@ -602,7 +614,7 @@ class ActionTabGUI(OldDefaultActionGUI):
     def createView(self):
         return self.addScrollBars(self.createVBox())
     def setSensitivity(self, newValue):
-        OldDefaultActionGUI.setSensitivity(self, newValue)
+        OldActionGUI.setSensitivity(self, newValue)
         self.sensitive = newValue
         self.diag.info("Sensitivity of " + self.getTabTitle() + " changed to " + repr(newValue))
         if self.sensitive and self.updateOptions():
@@ -857,10 +869,10 @@ class Forwarder:
     def hasObservers(self):
         return len(self.action.observers) > 0
 
-class DefaultForwarder(OldDefaultActionGUI,Forwarder):
+class DefaultForwarder(OldActionGUI,Forwarder):
     def __init__(self, action):
         Forwarder.__init__(self, action)
-        OldDefaultActionGUI.__init__(self)
+        OldActionGUI.__init__(self)
 
 class ActionTabForwarder(ActionTabGUI,Forwarder):
     def __init__(self, optionGroup, action):
@@ -894,7 +906,7 @@ class InteractiveActionHandler:
         instances = self.getInstances(dynamic, allApps)
         defaultGUIs, buttonGUIs, actionTabGUIs = [], [], []
         for action in instances:
-            if isinstance(action, DefaultActionGUI):
+            if isinstance(action, ActionGUI):
                 defaultGUIs.append(action)
             else:
                 optionGroups = action.getOptionGroups()

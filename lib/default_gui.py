@@ -1,6 +1,6 @@
 
 import plugins, os, sys, shutil, time, subprocess, operator, types
-from guiplugins import InteractiveAction, DefaultActionGUI, guilog, guiConfig, processMonitor
+from guiplugins import InteractiveAction, BasicActionGUI, guilog, guiConfig, processMonitor
 from jobprocess import JobProcess
 from sets import Set
 from copy import copy, deepcopy
@@ -11,13 +11,11 @@ from ndict import seqdict
 from log4py import LOGLEVEL_NORMAL
    
     
-class Quit(DefaultActionGUI):
+class Quit(BasicActionGUI):
     def _getStockId(self):
         return "quit"
     def _getTitle(self):
         return "_Quit"
-    def notifyNewTestSelection(self, *args):
-        pass # we don't care and don't want to screw things up...
     def isActiveOnCurrent(self, *args):
         return True
     def getSignalsSent(self):

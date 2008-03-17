@@ -30,15 +30,13 @@ class ImportTestCase(default_gui.ImportTestCase):
     # getOptions implemented in subclasses
         
 # This is the action responsible for plotting from the GUI.
-class PlotTestInGUI(guiplugins.InteractiveAction):
+class PlotTestInGUI(guiplugins.ActionTabGUI):
     def __init__(self, allApps, dynamic):
-        guiplugins.InteractiveAction.__init__(self, allApps, dynamic)
+        guiplugins.ActionTabGUI.__init__(self, allApps, dynamic)
         self.dynamic = dynamic
         self.testGraph = optimization.TestGraph(self.optionGroup)
     def correctTestClass(self):
         return "test-case"
-    def __repr__(self):
-        return "Plotting Graph"
     def _getTitle(self):
         return "_Plot Graph"
     def __repr__(self):
@@ -47,7 +45,7 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
         return "clear"    
     def getTabTitle(self):
         return "Graph"
-    def _getGroupTabTitle(self):
+    def getGroupTabTitle(self):
         return "Graph"
     def messageBeforePerform(self):
         return "Plotting tests ..."
@@ -101,12 +99,10 @@ class PlotTestInGUI(guiplugins.InteractiveAction):
             self.testGraph = optimization.TestGraph(self.optionGroup)
 
     
-class StartStudio(guiplugins.InteractiveAction):
+class StartStudio(guiplugins.ActionTabGUI):
     def __init__(self, *args):
-        guiplugins.InteractiveAction.__init__(self, *args)
+        guiplugins.ActionTabGUI.__init__(self, *args)
         self.addOption("sys", "Studio CARMSYS to use")
-    def __repr__(self):
-        return "Studio"    
     def inMenuOrToolBar(self):
         return False
     def singleTestOnly(self):

@@ -207,19 +207,10 @@ class InteractiveAction(plugins.Observable):
         self.currFileSelection = []
         self.currAppSelection = []
         self.diag = plugins.getDiagnostics("Interactive Actions")
-        self.optionGroup = plugins.OptionGroup(self.getTabTitle())
-        # convenience shortcuts...
-        self.addOption = self.optionGroup.addOption
-        self.addSwitch = self.optionGroup.addSwitch
         self.validApps = []
         for app in allApps:
             self.validApps.append(app)
             self.validApps += app.extras
-    def __repr__(self):
-        if self.optionGroup.name:
-            return self.optionGroup.name
-        else:
-            return self.getTitle()
     def setRelevantObservers(self, observers):
         signals = [ "Error", "Status", "ActionProgress" ] + self.getSignalsSent()
         self.diag.info("Observing " + str(self.__class__) + " :")
@@ -241,13 +232,6 @@ class InteractiveAction(plugins.Observable):
         pass
     def notifyViewFile(self, *args):
         pass
-    def getOptionGroups(self):
-        if self.optionGroup.empty():
-            return []
-        else:
-            return [ self.optionGroup ]
-    def createOptionGroupTab(self, optionGroup):
-        return optionGroup.switches or optionGroup.options
     def updateSelection(self, tests, apps, rowCount, *args):
         if rowCount != 1 and self.singleTestOnly():
             self.currTestSelection = []
@@ -287,7 +271,7 @@ class InteractiveAction(plugins.Observable):
     def correctTestClass(self):
         pass
     def inButtonBar(self):
-        return not self.inMenuOrToolBar() and len(self.getOptionGroups()) == 0
+        return not self.inMenuOrToolBar()
     def testDescription(self):
         if len(self.currTestSelection) > 0:
             return " (from test " + self.currTestSelection[0].uniqueName + ")"
@@ -323,11 +307,6 @@ class InteractiveAction(plugins.Observable):
         return "Performed '" + self.getTooltip() + "' on " + self.describeTests() + "."
     def getConfirmationMessage(self):
         return ""
-    def getTabTitle(self):
-        return self._getGroupTabTitle()
-    def _getGroupTabTitle(self):
-        # Default behaviour is not to create a group tab, override to get one...
-        return "Test"
     def getScriptTitle(self, tab):
         baseTitle = self._getScriptTitle()
         if tab and self.inMenuOrToolBar():
@@ -750,19 +729,6 @@ class OldActionGUI(OldBasicActionGUI):
         button.show()
         return button
 
-class BasicActionGUI(OldBasicActionGUI,InteractiveAction):
-    def __init__(self, *args):
-        InteractiveAction.__init__(self, *args)
-        OldBasicActionGUI.__init__(self)
-    def hasObservers(self):
-        return len(self.observers) > 0
-
-class ActionGUI(OldActionGUI,InteractiveAction):
-    def __init__(self, *args):
-        InteractiveAction.__init__(self, *args)
-        OldActionGUI.__init__(self)
-    def hasObservers(self):
-        return len(self.observers) > 0
 
 class ComboBoxListFinder:
     def __init__(self, combobox):
@@ -777,19 +743,18 @@ class ComboBoxListFinder:
         entries.append(text)
 
 
-class ActionTabGUI(OldActionGUI):
-    def __init__(self, optionGroup, *args):
-        OldActionGUI.__init__(self, *args)
-        self.optionGroup = optionGroup
+class OldActionTabGUI(OldActionGUI):
+    def __init__(self):
+        OldActionGUI.__init__(self)
+        self.optionGroup = plugins.OptionGroup(self.getTabTitle())
+        # convenience shortcuts...
+        self.addOption = self.optionGroup.addOption
+        self.addSwitch = self.optionGroup.addSwitch
         self.vbox = None
         self.diag = plugins.getDiagnostics("Action Tabs")
         self.sensitive = self.isActiveOnCurrent()
         self.diag.info("Creating action tab for " + self.getTabTitle() + ", sensitive " + repr(self.sensitive))
         self.tooltips = gtk.Tooltips()
-    def getGroupTabTitle(self):
-        return self._getGroupTabTitle()
-    def getTabTitle(self):
-        return self.optionGroup.name
     def shouldShowCurrent(self, *args):
         return self.sensitive
     def createView(self):
@@ -952,6 +917,26 @@ class ActionTabGUI(OldActionGUI):
                                        (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,                                        
                                         gtk.STOCK_OPEN, gtk.RESPONSE_OK))
         self.startChooser(dialog, entry, option)
+    def getDirectoriesForDialog(self, dirs):
+        for dir in dirs:
+            try:
+                os.makedirs(dir[1])
+            except:
+                pass # makedir throws if dir exists ...                    
+        # Set first non-empty dir as default ...)
+        existingDirs = []
+        defaultDir = None
+        for dir in dirs:
+            if os.path.isdir(os.path.abspath(dir[1])):
+                if len(os.listdir(os.path.abspath(dir[1]))) > 0 and \
+                       not defaultDir:                
+                    defaultDir = dir[1]
+                existingDirs.append(dir)
+
+        if not defaultDir:
+            defaultDir = dirs[0][1]
+            
+        return (existingDirs, defaultDir)
 
     def startChooser(self, dialog, entry, option):
         # Folders is a list of pairs (short name, absolute path),
@@ -1008,6 +993,26 @@ class ActionTabGUI(OldActionGUI):
                 text += " (checked)"
         return text
 
+class BasicActionGUI(OldBasicActionGUI,InteractiveAction):
+    def __init__(self, *args):
+        InteractiveAction.__init__(self, *args)
+        OldBasicActionGUI.__init__(self)
+    def hasObservers(self):
+        return len(self.observers) > 0
+
+class ActionGUI(OldActionGUI,InteractiveAction):
+    def __init__(self, *args):
+        InteractiveAction.__init__(self, *args)
+        OldActionGUI.__init__(self)
+    def hasObservers(self):
+        return len(self.observers) > 0
+
+class ActionTabGUI(OldActionTabGUI,InteractiveAction):
+    def __init__(self, *args):
+        InteractiveAction.__init__(self, *args)
+        OldActionTabGUI.__init__(self)
+    def hasObservers(self):
+        return len(self.observers) > 0
 
 class Forwarder:
     def __init__(self, action):
@@ -1021,11 +1026,6 @@ class DefaultForwarder(OldActionGUI,Forwarder):
     def __init__(self, action):
         Forwarder.__init__(self, action)
         OldActionGUI.__init__(self)
-
-class ActionTabForwarder(ActionTabGUI,Forwarder):
-    def __init__(self, optionGroup, action):
-        Forwarder.__init__(self, action)
-        ActionTabGUI.__init__(self, optionGroup)
 
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:
@@ -1054,7 +1054,10 @@ class InteractiveActionHandler:
         instances = self.getInstances(dynamic, allApps)
         defaultGUIs, buttonGUIs, actionTabGUIs = [], [], []
         for action in instances:
-            if isinstance(action, ActionGUI):
+            if isinstance(action, ActionTabGUI):
+                self.diag.info("Tab: " + str(action.__class__))
+                actionTabGUIs.append(action)
+            elif isinstance(action, ActionGUI):
                 if action.inButtonBar():
                     self.diag.info("Button: " + str(action.__class__))
                     buttonGUIs.append(action)
@@ -1064,22 +1067,15 @@ class InteractiveActionHandler:
                     action.setActive(True)
                     defaultGUIs.append(action)
             else:
-                optionGroups = action.getOptionGroups()
-                if len(optionGroups) > 0:
-                    for optionGroup in optionGroups:
-                        if action.createOptionGroupTab(optionGroup):
-                            self.diag.info("Tab: " + str(action.__class__))
-                            actionTabGUIs.append(ActionTabForwarder(optionGroup, action))
+                actionGUI = DefaultForwarder(action)
+                if action.inButtonBar():
+                    self.diag.info("Button: " + str(action.__class__))
+                    buttonGUIs.append(actionGUI)
                 else:
-                    actionGUI = DefaultForwarder(action)
-                    if action.inButtonBar():
-                        self.diag.info("Button: " + str(action.__class__))
-                        buttonGUIs.append(actionGUI)
-                    else:
-                        self.diag.info("Menu/toolbar: " + str(action.__class__))
-                        # It's always active, always visible
-                        actionGUI.setActive(True)
-                        defaultGUIs.append(actionGUI)
+                    self.diag.info("Menu/toolbar: " + str(action.__class__))
+                    # It's always active, always visible
+                    actionGUI.setActive(True)
+                    defaultGUIs.append(actionGUI)
 
         actionGroup = gtk.ActionGroup("AllActions")
         uiManager.insert_action_group(actionGroup, 0)

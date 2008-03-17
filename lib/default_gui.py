@@ -33,9 +33,9 @@ class Quit(guiplugins.BasicActionGUI):
 
         
 # Plugin for saving tests (standard)
-class SaveTests(guiplugins.InteractiveAction):
+class SaveTests(guiplugins.ActionTabGUI):
     def __init__(self, allApps, *args):
-        guiplugins.InteractiveAction.__init__(self, allApps, *args)
+        guiplugins.ActionTabGUI.__init__(self, allApps, *args)
         self.addOption("v", "Version to save")
         self.addSwitch("over", "Replace successfully compared files also", 0)
         if self.hasPerformance(allApps):
@@ -649,9 +649,9 @@ class PasteTests(guiplugins.ActionGUI):
         return suite.addTestCase(os.path.basename(testDir), description, placement)
         
 # And a generic import test. Note acts on test suites
-class ImportTest(guiplugins.InteractiveAction):
+class ImportTest(guiplugins.ActionTabGUI):
     def __init__(self, *args):
-        guiplugins.InteractiveAction.__init__(self, *args)
+        guiplugins.ActionTabGUI.__init__(self, *args)
         self.optionGroup.addOption("name", self.getNameTitle())
         self.optionGroup.addOption("desc", self.getDescTitle(), description="Enter a description of the new " + self.testType().lower() + " which will be inserted as a comment in the testsuite file.")
         self.optionGroup.addOption("testpos", self.getPlaceTitle(), "last in suite", allocateNofValues=2, description="Where in the test suite should the test be placed?")
@@ -809,9 +809,9 @@ class ImportTestSuite(ImportTest):
             file = open(envFile, "w")
             file.write("# Dictionary of environment to variables to set in test suite\n")
 
-class SelectTests(guiplugins.InteractiveAction):
+class SelectTests(guiplugins.ActionTabGUI):
     def __init__(self, allApps, *args):
-        guiplugins.InteractiveAction.__init__(self, allApps)
+        guiplugins.ActionTabGUI.__init__(self, allApps)
         self.selectDiag = plugins.getDiagnostics("Select Tests")
         self.rootTestSuites = []
         self.addOption("vs", "Tests for version", description="Select tests for a specific version.",
@@ -854,7 +854,9 @@ class SelectTests(guiplugins.InteractiveAction):
         return "_Select"
     def _getScriptTitle(self):
         return "Select indicated tests"
-    def _getGroupTabTitle(self):
+    def getTabTitle(self):
+        return "Selection"
+    def getGroupTabTitle(self):
         return "Selection"
     def messageBeforePerform(self):
         return "Selecting tests ..."
@@ -1181,47 +1183,57 @@ class LoadSelectionDialog(guiplugins.ActionConfirmationDialog):
         self.clearDialog()
         self.cancelMethod()
 
-class LoadSelection(SelectTests):
-    def __init__(self, *args):
-        SelectTests.__init__(self, *args)
-        self.fileName = ""
-    def getOptionGroups(self):
-        return []
+class LoadSelection(guiplugins.InteractiveAction):
+    def __init__(self, allApps, *args):
+        guiplugins.InteractiveAction.__init__(self, allApps, *args)
+        self.optionGroup = plugins.OptionGroup(self._getScriptTitle())
+    
+        self.optionGroup.addOption("f", "", possibleDirs=allApps[0].getFilterFileDirectories(allApps, createDirs=False))
+        self.rootTestSuites = []
+    def addSuites(self, suites):
+        self.rootTestSuites = suites
+    def isActiveOnCurrent(self, *args):
+        return True
     def setFileName(self, name):
-        self.fileName = name
+        self.optionGroup.setOptionValue("f", name)
+    def getSignalsSent(self):
+        return [ "SetTestSelection" ]
     def _getStockId(self):
         return "open"
     def _getTitle(self):
         return "_Load Selection..."
     def _getScriptTitle(self):
         return "Load test selection from file"
-    def _getGroupTabTitle(self):
-        return ""
-    def createOptionGroupTab(self, optionGroup):
-        return False
     def getDialogType(self):
         return LoadSelectionDialog
     def getDirectories(self):
-        self.folders = self.optionGroup.getOption("f").getDirectories()
-        return self.folders
-    def getFilterList(self, app):
-        return app.getFiltersFromFile(self.fileName)
+        return self.optionGroup.getOption("f").getDirectories()
     def performOnCurrent(self):
-        if self.fileName:
-            newSelection = self.makeNewSelection()
-            self.notify("SetTestSelection", newSelection, "-f " + self.fileName, True)
+        fileName = self.optionGroup.getOptionValue("f")
+        if fileName:
+            newSelection = self.makeNewSelection(fileName)
+            guiplugins.guilog.info("Loaded " + str(len(newSelection)) + " tests from " + fileName)
+            self.notify("SetTestSelection", newSelection, "-f " + fileName, True)
+            self.notify("Status", "Loaded test selection from file '" + fileName + "'.")
+        else:
+            self.notify("Status", "No test selection loaded.")
+
+    def makeNewSelection(self, fileName):
+        tests = []
+        for suite in self.rootTestSuites:
+            filters = suite.app.getFiltersFromFile(fileName)
+            tests += suite.testCaseList(filters)
+        return tests
+
     def messageBeforePerform(self):
         return "Loading test selection ..."
     def messageAfterPerform(self):
-        if self.fileName:
-            return "Loaded test selection from file '" + self.fileName + "'."
-        else:
-            return "No test selection loaded."
-
-class RunningAction(guiplugins.InteractiveAction):
+        pass
+    
+class RunningAction(guiplugins.ActionTabGUI):
     runNumber = 1
     def __init__(self, allApps, *args):
-        guiplugins.InteractiveAction.__init__(self, allApps)
+        guiplugins.ActionTabGUI.__init__(self, allApps)
         for app in allApps:
             for group in app.optionGroups:
                 if group.name.startswith("Invisible"):
@@ -1279,6 +1291,8 @@ class RunningAction(guiplugins.InteractiveAction):
             return [ "python", plugins.textTestName ] # Windows isn't clever enough to figure out how to run Python programs...
         else:
             return [ plugins.textTestName ]
+    def getOptionGroups(self):
+        return [ self.optionGroup ]
     def getTextTestOptions(self, filterFile, app):
         ttOptions = self.getCmdlineOptionForApps()
         for group in self.getOptionGroups():
@@ -1329,7 +1343,7 @@ class ReconnectToTests(RunningAction):
         self.addOption("v", "Version to reconnect to")
         self.addOption("reconnect", "Temporary result directory", os.getenv("TEXTTEST_TMP"), description="Specify a directory containing temporary texttest results. The reconnection will use a random subdirectory matching the version used.")
         self.addSwitch("reconnfull", "Results:", 0, ["Display as they were", "Recompute from files"])
-    def _getGroupTabTitle(self):
+    def getGroupTabTitle(self):
         return "Running"
     def _getStockId(self):
         return "connect"
@@ -1345,33 +1359,24 @@ class ReconnectToTests(RunningAction):
         return "reconnect"
     
 class RunTests(RunningAction):
+    optionGroups = []
     def __init__(self, allApps, *args):
         RunningAction.__init__(self, allApps)
-        self.optionGroups = []
+        self.optionGroups.append(self.optionGroup)
         for app in allApps:
             for group in app.optionGroups:
-                if not group.name.startswith("Invisible") and not group.name.startswith("Select"):
-                    self.insertGroup(group)
-    def insertGroup(self, group):
-        groupToUse = self.findPreviousGroup(group.name)
-        if not groupToUse:
-            groupToUse = plugins.OptionGroup(group.name)
-            self.optionGroups.append(groupToUse)
-        groupToUse.mergeIn(group)
-    def findPreviousGroup(self, name):
-        for group in self.optionGroups:
-            if group.name == name:
-                return group
-    def getOptionGroups(self):
-        return self.optionGroups
+                if group.name == self.getTabTitle():
+                    self.optionGroup.mergeIn(group)
     def _getTitle(self):
         return "_Run"
     def _getStockId(self):
         return "execute"
     def _getScriptTitle(self):
         return "Run selected tests"
-    def _getGroupTabTitle(self):
+    def getGroupTabTitle(self):
         return "Running"
+    def getOptionGroups(self):
+        return self.optionGroups
     def getTestCount(self):
         return len(self.currTestSelection) * self.getCopyCount() * self.getVersionCount()
     def getCopyCount(self):
@@ -1406,6 +1411,13 @@ class RunTests(RunningAction):
         else:
             return ""
 
+class RunTestsBasic(RunTests):
+    def getTabTitle(self):
+        return "Basic"
+
+class RunTestsAdvanced(RunTests):
+    def getTabTitle(self):
+        return "Advanced"
 
 class RecordTest(RunningAction):
     def __init__(self, *args):
@@ -1491,9 +1503,9 @@ class RecordTest(RunningAction):
         return "Record _Use-Case"
 
 
-class CreateDefinitionFile(guiplugins.InteractiveAction):
+class CreateDefinitionFile(guiplugins.ActionTabGUI):
     def __init__(self, *args):
-        guiplugins.InteractiveAction.__init__(self, *args)
+        guiplugins.ActionTabGUI.__init__(self, *args)
         self.addOption("type", "Type of definition file to create", allocateNofValues=2)
         self.addOption("v", "Version identifier to use")
     def singleTestOnly(self):
@@ -1669,9 +1681,9 @@ Are you sure you wish to proceed?\n"""
     def messageAfterPerform(self):
         pass # do it as part of the method as currentTest will have changed by the end!
     
-class ReportBugs(guiplugins.InteractiveAction):
+class ReportBugs(guiplugins.ActionTabGUI):
     def __init__(self, *args):
-        guiplugins.InteractiveAction.__init__(self, *args)
+        guiplugins.ActionTabGUI.__init__(self, *args)
         self.addOption("search_string", "Text or regexp to match")
         self.addOption("search_file", "File to search in")
         self.addOption("version", "Version to report for")
@@ -2179,7 +2191,7 @@ class InteractiveActionConfig:
             classes += [ RecordTest, CopyTests, CutTests, 
                          PasteTests, ImportTestCase, ImportTestSuite, 
                          CreateDefinitionFile, ReportBugs, SelectTests, 
-                         RunTests, ResetGroups, RenameTest, RemoveTests, 
+                         RunTestsBasic, RunTestsAdvanced, ResetGroups, RenameTest, RemoveTests, 
                          SortTestSuiteFileAscending, SortTestSuiteFileDescending, 
                          RepositionTestFirst, RepositionTestUp,
                          RepositionTestDown, RepositionTestLast,

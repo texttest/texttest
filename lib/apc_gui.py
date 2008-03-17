@@ -155,12 +155,12 @@ class PlotTestInGUI(optimization_gui.PlotTestInGUI):
         return test.makeTmpFileName("APC_FILES/" + logFileStem, forComparison=0)
     
 # Specialization of plotting in the GUI for APC
-class PlotProfileInGUIAPC(guiplugins.InteractiveAction):
+class PlotProfileInGUIAPC(guiplugins.ActionTabGUI):
     def __init__(self, allApps, dynamic):
         path = "/carm/proj/apc/bin"
         if not sys.path.count(path):
             sys.path.append(path)
-        guiplugins.InteractiveAction.__init__(self, allApps, dynamic)
+        guiplugins.ActionTabGUI.__init__(self, allApps, dynamic)
         self.dynamic = dynamic
         self.sizes = ["a4","a4l","a3","a3l"]
         self.addSwitch("size", "Size of plot:     ", 0, self.sizes);
@@ -168,8 +168,6 @@ class PlotProfileInGUIAPC(guiplugins.InteractiveAction):
         self.addOption("base", "Baseline profile version", "")
         self.addSwitch("aggregate", "Aggregate all selections")
         self.numPlottedTests = 0
-    def __repr__(self):
-        return "Plotting Profile"
     def _getTitle(self):
         return "_Plot Profile"
     def __repr__(self):
@@ -178,7 +176,7 @@ class PlotProfileInGUIAPC(guiplugins.InteractiveAction):
         return "clear"    
     def getTabTitle(self):
         return "Profile"
-    def _getGroupTabTitle(self):
+    def getGroupTabTitle(self):
         return "Profile"
     def messageBeforePerform(self):
         return "Plotting profiles for tests ..."

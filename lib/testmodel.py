@@ -547,8 +547,11 @@ class TestCase(Test):
         self.writeDirectory = os.path.join(app.writeDirectory, app.name + app.versionSuffix(), self.getRelPath())       
     def classId(self):
         return "test-case"
-    def testCaseList(self):
-        return [ self ]
+    def testCaseList(self, filters=[]):
+        if self.isAcceptedByAll(filters):
+            return [ self ]
+        else:
+            return []
     def getDirectory(self, temporary=False, forFramework=False):
         if temporary:
             if forFramework:
@@ -817,10 +820,12 @@ class TestSuite(Test):
 
     def fileExists(self, name):
         return self.dircache.exists(name)
-    def testCaseList(self):
+    def testCaseList(self, filters=[]):
         list = []
+        if not self.isAcceptedByAll(filters):
+            return list
         for case in self.testcases:
-            list += case.testCaseList()
+            list += case.testCaseList(filters)
         return list
     def getRunningTests(self):
         runningTests = filter(lambda test: not test.state.isComplete(), self.testCaseList())

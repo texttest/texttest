@@ -286,11 +286,6 @@ class GenericActionDialog:
         if len(self.dialog.vbox.get_children()) > 2: # Separator and buttonbox are always there ...
             self.dialog.show_all()
         
-    def getStockIcon(self, stockItem):
-        imageBox = gtk.VBox()
-        imageBox.pack_start(gtk.image_new_from_stock(stockItem, gtk.ICON_SIZE_DIALOG), expand=False)
-        return imageBox
-
 #
 # A skeleton for a dialog which can replace the 'tab options' of
 # today's actions. I think it should be possible to customize the
@@ -326,33 +321,7 @@ class ActionConfirmationDialog(GenericActionDialog):
             self.okMethod()
         elif self.cancelMethod:
             self.cancelMethod()
-
-
-# A skeleton for a dialog which can show results of actions. 
-class ActionResultDialog(GenericActionDialog):
-    def __init__(self, parent, okMethod, plugin):
-        GenericActionDialog.__init__(self, parent, plugin)
-        self.okMethod = okMethod
-        if self.isModal():
-            self.dialog = gtk.Dialog(self.getDialogTitle(), parent, flags=gtk.DIALOG_MODAL) 
-            self.dialog.set_modal(True)
-        else:
-            self.dialog = gtk.Dialog(self.getDialogTitle())             
-        self.dialog.set_resizable(self.isResizeable())
-        self.createButtons()
-
-    def createButtons(self):
-        self.okButton = self.dialog.add_button(gtk.STOCK_CLOSE, gtk.RESPONSE_ACCEPT)       
-        scriptEngine.connect("press close", "clicked", self.okButton, self.respond, gtk.RESPONSE_ACCEPT, True)
-        self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
-
-    def respond(self, button, saidOK, *args):
-        entrycompletion.manager.collectCompletions()
-        self.dialog.hide()
-        self.dialog.response(gtk.RESPONSE_NONE)
-        if self.okMethod:
-            self.okMethod()
-
+            
        
 class YesNoDialog(ActionConfirmationDialog):
     def __init__(self, parent, okMethod, cancelMethod, plugin, message=None):
@@ -554,9 +523,6 @@ class BasicActionGUI(SubGUI):
         if self.confirmationMessage:
             return ConfirmationDialog
 
-    def getResultDialogType(self): # The dialog type to launch when the action has finished execution.
-        pass
-    
     def runInteractive(self, *args):
         if self.busy: # If we're busy with some other action, ignore this one ...
             return
@@ -578,10 +544,6 @@ class BasicActionGUI(SubGUI):
         try:
             BasicActionGUI.busy = True
             self.startPerform()
-            resultDialogType = self.getResultDialogType()
-            if resultDialogType:
-                resultDialog = resultDialogType(self.topWindow, None, self)
-                resultDialog.run()
         finally:
             self.endPerform()
             BasicActionGUI.busy = False
@@ -715,6 +677,48 @@ class ActionGUI(BasicActionGUI):
         button.show()
         return button
 
+# These actions consist of bringing up a dialog and only doing that
+# (i.e. the dialog is not a mechanism to steer how the action should be run)
+class ActionResultDialogGUI(ActionGUI):
+    def performOnCurrent(self):
+        self.dialog = self.createDialog()
+        self.addContents()
+        self.createButtons()
+        # Show if we've added something. This'll let us leave the dialog
+        # empty and e.g. pop up an error dialog if that is more suitable ...
+        if len(self.dialog.vbox.get_children()) > 2: # Separator and buttonbox are always there ...
+            self.dialog.show_all()
+
+    def isModal(self):
+        return True
+
+    def addContents(self):
+        pass
+
+    def getDialogTitle(self):
+        return self.getTooltip()
+
+    def getParentWindow(self):
+        return self.topWindow
+    
+    def createDialog(self):
+        if self.isModal():
+            dialog = gtk.Dialog(self.getDialogTitle(), self.getParentWindow(), flags=gtk.DIALOG_MODAL) 
+            dialog.set_modal(True)
+            return dialog
+        else:
+            return gtk.Dialog(self.getDialogTitle())
+        
+    def createButtons(self):
+        okButton = self.dialog.add_button(gtk.STOCK_CLOSE, gtk.RESPONSE_ACCEPT)       
+        scriptEngine.connect("press close", "clicked", okButton, self.respond, gtk.RESPONSE_ACCEPT, True)
+        self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+
+    def respond(self, *args):
+        entrycompletion.manager.collectCompletions()
+        self.dialog.hide()
+        self.dialog.response(gtk.RESPONSE_NONE)
+                
 
 class ComboBoxListFinder:
     def __init__(self, combobox):

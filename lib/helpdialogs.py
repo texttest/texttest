@@ -1,27 +1,33 @@
 
 import gtk, plugins, texttest_version, os, string, sys, glob
-from guiplugins import scriptEngine, guilog, ActionGUI, ActionResultDialog, showErrorDialog
+from guiplugins import scriptEngine, guilog, ActionResultDialogGUI, showErrorDialog
 
 # Show useful info about TextTest.
 # I don't particularly like the standard gtk.AboutDialog, and we also want
 # to show pygtk/gtk/python versions in our dialog, so we create our own ...
-class AboutTextTestDialog(ActionResultDialog):
+class AboutTextTest(ActionResultDialogGUI):
     def getDialogTitle(self):
         return "About TextTest"
-
-    def isResizeable(self):
-        return False
+    def isActiveOnCurrent(self, *args):
+        return True
+    def _getStockId(self):
+        return "about"
+    def _getTitle(self):
+        return "_About TextTest"
+    def messageAfterPerform(self):
+        return ""
+    def getTooltip(self):
+        return "show information about texttest"
     
     def createButtons(self):        
         self.creditsButton = self.dialog.add_button('texttest-stock-credits', gtk.RESPONSE_NONE)
         self.licenseButton = self.dialog.add_button('_License', gtk.RESPONSE_NONE)
         self.versionsButton = self.dialog.add_button('_Versions', gtk.RESPONSE_NONE)
-        self.closeButton = self.dialog.add_button(gtk.STOCK_CLOSE, gtk.RESPONSE_CLOSE)
         scriptEngine.connect("press credits", "clicked", self.creditsButton, self.showCredits)
         scriptEngine.connect("press license", "clicked", self.licenseButton, self.showLicense)
         scriptEngine.connect("press versions", "clicked", self.versionsButton, self.showVersions)
-        scriptEngine.connect("press close", "clicked", self.closeButton, self.respond, gtk.RESPONSE_CLOSE, True)
-
+        ActionResultDialogGUI.createButtons(self)
+        
     def addContents(self):
         logo = gtk.Image()
         logo.set_from_pixbuf(gtk.gdk.pixbuf_new_from_file(
@@ -44,26 +50,32 @@ class AboutTextTestDialog(ActionResultDialog):
         self.dialog.vbox.pack_start(messageLabel, expand=False, fill=False)
         self.dialog.vbox.pack_start(urlLabel, expand=False, fill=False)
         self.dialog.vbox.pack_start(licenseLabel, expand=False, fill=False)
-        self.dialog.set_default_response(gtk.RESPONSE_CLOSE)
+        self.dialog.set_resizable(False)
 
-    def showCredits(self, button):
-        dialog = CreditsDialog(self.dialog, None, None)
-        dialog.run()
+    def showCredits(self, *args):
+        newDialog = CreditsDialog(self.dialog, self.validApps)
+        newDialog.performOnCurrent()
 
-    def showLicense(self, button):
-        dialog = LicenseDialog(self.dialog, None, None)
-        dialog.run()
+    def showLicense(self, *args):
+        newDialog = LicenseDialog(self.dialog, self.validApps)
+        newDialog.performOnCurrent()
 
-    def showVersions(self, button):
-        dialog = VersionsDialog(self.dialog, None, None)
-        dialog.run()
+    def showVersions(self, *args):
+        newDialog = ShowVersions(self.validApps)
+        newDialog.performOnCurrent()
 
-class VersionsDialog(ActionResultDialog):
+class ShowVersions(ActionResultDialogGUI):
+    def isActiveOnCurrent(self, *args):
+        return True
+    def _getTitle(self):
+        return "Component _Versions"
+    def messageAfterPerform(self):
+        return ""
+    def getTooltip(self):
+        return "show component version information"
+
     def getDialogTitle(self):
         return "Version Information"
-
-    def isResizeable(self):
-        return False
     
     def addContents(self):
         textTestVersion = texttest_version.version
@@ -113,13 +125,17 @@ class VersionsDialog(ActionResultDialog):
             alignment.add(gtk.Label(label))
         return alignment
 
-class CreditsDialog(ActionResultDialog):
-    def getDialogTitle(self):
+class CreditsDialog(ActionResultDialogGUI):
+    def __init__(self, parent, *args):
+        ActionResultDialogGUI.__init__(self, *args)
+        self.parent = parent
+
+    def getParentWindow(self):
+        return self.parent
+    
+    def _getTitle(self):
         return "TextTest Credits"
 
-    def isResizeable(self):
-        return False
-    
     def addContents(self):
         try:
             authorFile = open(os.path.join(plugins.installationDir("doc"), "AUTHORS"))
@@ -141,13 +157,18 @@ class CreditsDialog(ActionResultDialog):
         notebook = gtk.Notebook()
         notebook.append_page(textView, gtk.Label("Written by"))
         self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
+        self.dialog.set_resizable(False)
+        
+class LicenseDialog(ActionResultDialogGUI):
+    def __init__(self, parent, *args):
+        ActionResultDialogGUI.__init__(self, *args)
+        self.parent = parent
 
-class LicenseDialog(ActionResultDialog):
-    def getDialogTitle(self):
+    def getParentWindow(self):
+        return self.parent
+    
+    def _getTitle(self):
         return "TextTest License"
-
-    def isResizeable(self):
-        return False
     
     def addContents(self):
         try:
@@ -171,7 +192,16 @@ class LicenseDialog(ActionResultDialog):
         notebook.append_page(textView, gtk.Label("License"))
         self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
 
-class MigrationNotesDialog(ActionResultDialog):
+class ShowMigrationNotes(ActionResultDialogGUI):
+    def isActiveOnCurrent(self, *args):
+        return True
+    def _getTitle(self):
+        return "_Migration Notes"
+    def messageAfterPerform(self):
+        return ""
+    def getTooltip(self):
+        return "show texttest migration notes"
+
     def getDialogTitle(self):
         return "TextTest Migration Notes"
 
@@ -207,50 +237,8 @@ class MigrationNotesDialog(ActionResultDialog):
             raise plugins.TextTestError, "\nNo migration notes could be found in\n" + plugins.installationDir("doc") + "\n"
         else:
             scriptEngine.monitorNotebook(notebook, "view migration notes in tab")
-            parentSize = self.parent.get_size()
+            parentSize = self.topWindow.get_size()
             self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[0] * 0.7))
             self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
 
-class VersionInformation(ActionGUI):
-    def isActiveOnCurrent(self, *args):
-        return True
-    def _getTitle(self):
-        return "Component _Versions"
-    def messageAfterPerform(self):
-        return ""
-    def getTooltip(self):
-        return "show component version information"
-    def getResultDialogType(self):
-        return VersionsDialog
-    def performOnCurrent(self):
-        pass # The only result is the result popup dialog ...
 
-class AboutTextTest(ActionGUI):
-    def isActiveOnCurrent(self, *args):
-        return True
-    def _getStockId(self):
-        return "about"
-    def _getTitle(self):
-        return "_About TextTest"
-    def messageAfterPerform(self):
-        return ""
-    def getTooltip(self):
-        return "show information about texttest"
-    def getResultDialogType(self):
-        return AboutTextTestDialog
-    def performOnCurrent(self):
-        pass # The only result is the result popup dialog ...
-
-class MigrationNotes(ActionGUI):
-    def isActiveOnCurrent(self, *args):
-        return True
-    def _getTitle(self):
-        return "_Migration Notes"
-    def messageAfterPerform(self):
-        return ""
-    def getTooltip(self):
-        return "show texttest migration notes"
-    def getResultDialogType(self):
-        return MigrationNotesDialog
-    def performOnCurrent(self):
-        pass # The only result is the result popup dialog ...

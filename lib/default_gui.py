@@ -2092,11 +2092,39 @@ class RenameTest(guiplugins.ActionGUI):
             self.notify("Error", "Failed to rename test:\n" + str(e))
         except OSError, e:
             self.notify("Error", "Failed to rename test:\n" + str(e))
+        
+ 
+class ShowFileProperties(guiplugins.ActionResultDialogGUI):
+    def __init__(self, allApps, dynamic):
+        self.dynamic = dynamic
+        guiplugins.ActionGUI.__init__(self, allApps)
+    def isActiveOnCurrent(self, *args):
+        return ((not self.dynamic) or len(self.currTestSelection) == 1) and \
+               len(self.currFileSelection) > 0
+    def _getTitle(self):
+        return "_File Properties"
+    def getTooltip(self):
+        return "Show properties of selected files"
+    def describeTests(self):
+        return str(len(self.currFileSelection)) + " files"
+    def getAllProperties(self):
+        errors, properties = [], []
+        for file, comp in self.currFileSelection:
+            if self.dynamic and comp:
+                self.processFile(comp.tmpFile, properties, errors)
+            self.processFile(file, properties, errors)
+            
+        if len(errors):
+            self.notify("Error", "Failed to get file properties:\n" + "\n".join(errors))
 
-class FilePropertiesDialog(guiplugins.ActionResultDialog):
-    def __init__(self, parent, okMethod, plugin):
-        guiplugins.ActionResultDialog.__init__(self, parent, okMethod, plugin)
-        self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+        return properties
+    def processFile(self, file, properties, errors):
+        try:
+            prop = plugins.FileProperties(file)
+            guiplugins.guilog.info("Showing properties of the file " + file + ":\n" + prop.getUnixStringRepresentation())
+            properties.append(prop)
+        except Exception, e:
+            errors.append(str(e))          
 
     # xalign = 1.0 means right aligned, 0.0 means left aligned
     def justify(self, text, xalign = 0.0):
@@ -2108,12 +2136,13 @@ class FilePropertiesDialog(guiplugins.ActionResultDialog):
 
     def addContents(self):
         dirToProperties = {}
-        for prop in self.plugin.properties:
-            if not dirToProperties.has_key(prop.dir):
-                dirToProperties[prop.dir] = [ prop ]
-            else:
-                dirToProperties[prop.dir].append(prop)
+        for prop in self.getAllProperties():
+            dirToProperties.setdefault(prop.dir, []).append(prop)
 
+        vbox = self.createVBox(dirToProperties)
+        self.dialog.vbox.pack_start(vbox, expand=True, fill=True)              
+
+    def createVBox(self, dirToProperties):
         vbox = gtk.VBox()
         for dir, properties in dirToProperties.items():
             expander = gtk.Expander()
@@ -2142,44 +2171,9 @@ class FilePropertiesDialog(guiplugins.ActionResultDialog):
             border.set_padding(5, 5, 5, 5)
             border.add(expander)
             vbox.pack_start(border, expand=False, fill=False)
-        self.dialog.vbox.pack_start(vbox, expand=True, fill=True)
-        
- 
-class ShowFileProperties(guiplugins.ActionGUI):
-    def __init__(self, allApps, dynamic):
-        self.dynamic = dynamic
-        guiplugins.ActionGUI.__init__(self, allApps)
-    def isActiveOnCurrent(self, *args):
-        return ((not self.dynamic) or len(self.currTestSelection) == 1) and \
-               len(self.currFileSelection) > 0
-    def getResultDialogType(self):
-        return FilePropertiesDialog
-    def _getTitle(self):
-        return "_File Properties"
-    def getTooltip(self):
-        return "Show properties of selected files"
-    def describeTests(self):
-        return str(len(self.currFileSelection)) + " files"
-    def performOnCurrent(self):
-        self.properties = []
-        errors = []
-        for file, comp in self.currFileSelection:
-            if self.dynamic and comp:
-                self.performOnFile(comp.tmpFile, self.properties, errors)
-            self.performOnFile(file, self.properties, errors)
-            
-        if len(errors):
-            self.notify("Error", "Failed to get file properties:\n" + "\n".join(errors))
-                
-    def performOnFile(self, file, properties, errors):
-        try:
-            prop = plugins.FileProperties(file)
-            guiplugins.guilog.info("Showing properties of the file " + file + ":\n" + prop.getUnixStringRepresentation())
-            properties.append(prop)
-        except Exception, e:
-            errors.append(str(e))          
-              
+        return vbox
 
+    
 class InteractiveActionConfig:
     def getMenuNames(self):
         return [ "file", "edit", "view", "actions", "site", "reorder", "help" ]
@@ -2200,7 +2194,7 @@ class InteractiveActionConfig:
                          RepositionTestFirst, RepositionTestUp,
                          RepositionTestDown, RepositionTestLast,
                          ReconnectToTests, LoadSelection, SaveSelection ]
-        classes += [ helpdialogs.MigrationNotes, helpdialogs.VersionInformation, helpdialogs.AboutTextTest ]
+        classes += [ helpdialogs.ShowMigrationNotes, helpdialogs.ShowVersions, helpdialogs.AboutTextTest ]
         return classes
 
     def getReplacements(self):

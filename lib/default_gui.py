@@ -46,7 +46,7 @@ class SaveTests(guiplugins.ActionTabGUI):
         return "Saving"
     def _getTitle(self):
         return "_Save"
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "Save results for selected tests"
     def messageAfterPerform(self):
         pass # do it in the method
@@ -191,9 +191,9 @@ class MarkTestDialog(guiplugins.ActionConfirmationDialog):
         guiplugins.ActionConfirmationDialog.respond(self, button, saidOK, *args)
 
         
-class MarkTest(guiplugins.InteractiveAction):
+class MarkTest(guiplugins.ActionGUI):
     def __init__(self, *args):
-        guiplugins.InteractiveAction.__init__(self, *args)
+        guiplugins.ActionGUI.__init__(self, *args)
         self.newBriefText = ""
         self.newFreeText = ""
     def setTexts(self, briefText, freeText):
@@ -201,7 +201,7 @@ class MarkTest(guiplugins.InteractiveAction):
         self.newFreeText = freeText
     def _getTitle(self):
         return "_Mark"
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "Mark the selected tests"
     def getDialogType(self):
         return MarkTestDialog 
@@ -225,7 +225,7 @@ class MarkTest(guiplugins.InteractiveAction):
 class UnmarkTest(guiplugins.ActionGUI):
     def _getTitle(self):
         return "_Unmark"
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "Unmark the selected tests"
     def performOnCurrent(self):
         for test in self.currTestSelection:
@@ -284,7 +284,11 @@ class FileViewAction(guiplugins.ActionGUI):
             return "\n" + self.currAppSelection[0].noFileAdvice()
         else:
             return ""
-
+    def testDescription(self):
+        if len(self.currTestSelection) > 0:
+            return " (from test " + self.currTestSelection[0].uniqueName + ")"
+        else:
+            return ""
     def startViewer(self, cmdArgs, description, *args, **kwargs):
         testDesc = self.testDescription()
         fullDesc = description + testDesc
@@ -470,7 +474,7 @@ class KillTests(guiplugins.ActionGUI):
         return "stop"
     def _getTitle(self):
         return "_Kill"
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "Kill selected tests"
     def isActiveOnCurrent(self, test=None, state=None):
         for seltest in self.currTestSelection:
@@ -504,7 +508,7 @@ class ClipboardAction(guiplugins.ActionGUI):
         return self.getName()
     def _getTitle(self):
         return "_" + self.getName().capitalize()
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return self.getName().capitalize() + " selected tests"
     def performOnCurrent(self):
         self.notify("Clipboard", self.currTestSelection, cut=self.shouldCut())
@@ -533,7 +537,7 @@ class PasteTests(guiplugins.ActionGUI):
         return "paste"
     def _getTitle(self):
         return "_Paste"
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "Paste tests from clipboard"
     def notifyClipboard(self, tests, cut=False):
         self.clipboardTests = tests
@@ -852,7 +856,7 @@ class SelectTests(guiplugins.ActionTabGUI):
         #return "find"
     def _getTitle(self):
         return "_Select"
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "Select indicated tests"
     def getTabTitle(self):
         return "Selection"
@@ -929,9 +933,9 @@ class SelectTests(guiplugins.ActionTabGUI):
         if strategy == 0:
             return reqTests
         elif strategy == 1:
-            return filter(self.isSelected, reqTests)
+            return filter(lambda test: test in self.currTestSelection, reqTests)
         else:
-            extraRequested = filter(self.isNotSelected, reqTests)
+            extraRequested = filter(lambda test: test not in self.currTestSelection, reqTests)
             if strategy == 2:
                 selectedThisApp = filter(lambda test: test.app is app, self.currTestSelection)
                 return extraRequested + selectedThisApp
@@ -968,7 +972,7 @@ class ResetGroups(guiplugins.BasicActionGUI):
         return "R_eset"
     def messageAfterPerform(self):
         return "All options reset to default values."
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "Reset running options"
     def getSignalsSent(self):
         return [ "Reset" ]
@@ -1061,9 +1065,9 @@ class SaveSelectionDialog(guiplugins.ActionConfirmationDialog):
             self.cancelMethod()
 
     
-class SaveSelection(guiplugins.InteractiveAction):
+class SaveSelection(guiplugins.ActionGUI):
     def __init__(self, allApps, dynamic):
-        guiplugins.InteractiveAction.__init__(self, allApps, dynamic)
+        guiplugins.ActionGUI.__init__(self, allApps, dynamic)
         self.selectionCriteria = ""
         self.fileName = ""
         self.dynamic = dynamic
@@ -1079,7 +1083,7 @@ class SaveSelection(guiplugins.InteractiveAction):
         return SaveSelectionDialog
     def _getTitle(self):
         return "S_ave Selection..."
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "Save selected tests in file"
     def dialogEnableOptions(self):
         return not self.dynamic
@@ -1100,7 +1104,7 @@ class SaveSelection(guiplugins.InteractiveAction):
         for suite in self.rootTestSuites:
             selTestPaths.append("appdata=" + suite.app.name + suite.app.versionSuffix())
             for test in suite.testCaseList():
-                if self.isSelected(test):
+                if test in self.currTestSelection:
                     selTestPaths.append(test.getRelPath())
         return "-tp " + "\n".join(selTestPaths)
     def notifySetTestSelection(self, tests, criteria="", *args):
@@ -1183,10 +1187,10 @@ class LoadSelectionDialog(guiplugins.ActionConfirmationDialog):
         self.clearDialog()
         self.cancelMethod()
 
-class LoadSelection(guiplugins.InteractiveAction):
+class LoadSelection(guiplugins.ActionGUI):
     def __init__(self, allApps, *args):
-        guiplugins.InteractiveAction.__init__(self, allApps, *args)
-        self.optionGroup = plugins.OptionGroup(self._getScriptTitle())
+        guiplugins.ActionGUI.__init__(self, allApps, *args)
+        self.optionGroup = plugins.OptionGroup(self.getTooltip())
     
         self.optionGroup.addOption("f", "", possibleDirs=allApps[0].getFilterFileDirectories(allApps, createDirs=False))
         self.rootTestSuites = []
@@ -1202,7 +1206,7 @@ class LoadSelection(guiplugins.InteractiveAction):
         return "open"
     def _getTitle(self):
         return "_Load Selection..."
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "Load test selection from file"
     def getDialogType(self):
         return LoadSelectionDialog
@@ -1349,7 +1353,7 @@ class ReconnectToTests(RunningAction):
         return "connect"
     def _getTitle(self):
         return "Re_connect"
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "Reconnect to previously run tests"
     def getTabTitle(self):
         return "Reconnect"
@@ -1371,7 +1375,7 @@ class RunTests(RunningAction):
         return "_Run"
     def _getStockId(self):
         return "execute"
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "Run selected tests"
     def getGroupTabTitle(self):
         return "Running"
@@ -1602,7 +1606,7 @@ class RemoveTests(guiplugins.ActionGUI):
         return "Remove..."
     def _getStockId(self):
         return "delete"
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "Remove selected files"
     def getFilesDescription(self, number = None):
         numberOfFiles = len(self.currFileSelection)
@@ -1701,7 +1705,7 @@ class ReportBugs(guiplugins.ActionTabGUI):
         return False
     def _getTitle(self):
         return "Report"
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "Report Described Bugs"
     def getTabTitle(self):
         return "Bugs"
@@ -1795,7 +1799,7 @@ class RecomputeTest(guiplugins.ActionGUI):
         return False
     def _getTitle(self):
         return "_Update Info"
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "Update test progress information and compare test files so far"
     def messageBeforePerform(self):
         return "Recomputing status of " + self.describeTests() + " ..."
@@ -1824,7 +1828,7 @@ class RecomputeAllTests(guiplugins.ActionGUI):
             return "Recomputed status of 1 test."
         else:
             return "Recomputed status of " + str(self.latestNumberOfRecomputations) + " tests."
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "recompute status of all tests"
     def performOnCurrent(self):
         self.latestNumberOfRecomputations = 0
@@ -1849,7 +1853,7 @@ class SortTestSuiteFileAscending(guiplugins.ActionGUI):
         return "_Sort Test Suite File"
     def messageAfterPerform(self):
         return "Sorted testsuite file for " + self.describeTests() + " in alphabetical order."
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "sort testsuite file for the selected test suite in alphabetical order"
     def performOnCurrent(self):
         self.performRecursively(self.currTestSelection[0], True)
@@ -1887,7 +1891,7 @@ class SortTestSuiteFileDescending(SortTestSuiteFileAscending):
         return "_Reversed Sort Test Suite File"
     def messageAfterPerform(self):
         return "Sorted testsuite file for " + self.describeTests() + " in reversed alphabetical order."
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "sort testsuite file for the selected test suite in reversed alphabetical order"
     def performOnCurrent(self):
         self.performRecursively(self.currTestSelection[0], False)
@@ -1916,7 +1920,7 @@ class RepositionTestDown(RepositionTest):
         return "Move down"
     def messageAfterPerform(self):
         return "Moved " + self.describeTests() + " one step down in suite."
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "Move selected test down in suite"
     def findNewIndex(self):
         return min(self.currTestSelection[0].positionInParent() + 1, self.currTestSelection[0].parent.maxIndex())
@@ -1932,7 +1936,7 @@ class RepositionTestUp(RepositionTest):
         return "Move up"
     def messageAfterPerform(self):
         return "Moved " + self.describeTests() + " one step up in suite."
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "Move selected test up in suite"
     def findNewIndex(self):
         return max(self.currTestSelection[0].positionInParent() - 1, 0)
@@ -1948,7 +1952,7 @@ class RepositionTestFirst(RepositionTest):
         return "Move to first"
     def messageAfterPerform(self):
         return "Moved " + self.describeTests() + " to first in suite."
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "Move selected test to first in suite"
     def findNewIndex(self):
         return 0
@@ -1964,7 +1968,7 @@ class RepositionTestLast(RepositionTest):
         return "Move to last"
     def messageAfterPerform(self):
         return "Moved " + repr(self.currTestSelection[0]) + " to last in suite."
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "Move selected test to last in suite"
     def findNewIndex(self):
         return self.currTestSelection[0].parent.maxIndex()
@@ -2023,9 +2027,9 @@ class RenameDialog(guiplugins.ActionConfirmationDialog):
         guiplugins.ActionConfirmationDialog.respond(self, button, saidOK, *args)
 
     
-class RenameTest(guiplugins.InteractiveAction):
+class RenameTest(guiplugins.ActionGUI):
     def __init__(self, *args):
-        guiplugins.InteractiveAction.__init__(self, *args)
+        guiplugins.ActionGUI.__init__(self, *args)
         self.newName = ""
         self.oldName = ""
         self.newDescription = ""
@@ -2051,7 +2055,7 @@ class RenameTest(guiplugins.InteractiveAction):
         return "italic"
     def _getTitle(self):
         return "_Rename..."
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "Rename selected test"
     def messageAfterPerform(self):
         if self.oldName != self.newName:
@@ -2141,10 +2145,10 @@ class FilePropertiesDialog(guiplugins.ActionResultDialog):
         self.dialog.vbox.pack_start(vbox, expand=True, fill=True)
         
  
-class ShowFileProperties(guiplugins.InteractiveAction):
+class ShowFileProperties(guiplugins.ActionGUI):
     def __init__(self, allApps, dynamic):
-        guiplugins.InteractiveAction.__init__(self, allApps)
         self.dynamic = dynamic
+        guiplugins.ActionGUI.__init__(self, allApps)
     def isActiveOnCurrent(self, *args):
         return ((not self.dynamic) or len(self.currTestSelection) == 1) and \
                len(self.currFileSelection) > 0
@@ -2152,7 +2156,7 @@ class ShowFileProperties(guiplugins.InteractiveAction):
         return FilePropertiesDialog
     def _getTitle(self):
         return "_File Properties"
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "Show properties of selected files"
     def describeTests(self):
         return str(len(self.currFileSelection)) + " files"

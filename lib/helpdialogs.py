@@ -1,6 +1,6 @@
 
 import gtk, plugins, texttest_version, os, string, sys, glob
-from guiplugins import scriptEngine, guilog, InteractiveAction, ActionResultDialog, showErrorDialog
+from guiplugins import scriptEngine, guilog, ActionGUI, ActionResultDialog, showErrorDialog
 
 # Show useful info about TextTest.
 # I don't particularly like the standard gtk.AboutDialog, and we also want
@@ -211,21 +211,21 @@ class MigrationNotesDialog(ActionResultDialog):
             self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[0] * 0.7))
             self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
 
-class VersionInformation(InteractiveAction):
+class VersionInformation(ActionGUI):
     def isActiveOnCurrent(self, *args):
         return True
     def _getTitle(self):
         return "Component _Versions"
     def messageAfterPerform(self):
         return ""
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "show component version information"
     def getResultDialogType(self):
         return VersionsDialog
     def performOnCurrent(self):
         pass # The only result is the result popup dialog ...
 
-class AboutTextTest(InteractiveAction):
+class AboutTextTest(ActionGUI):
     def isActiveOnCurrent(self, *args):
         return True
     def _getStockId(self):
@@ -234,21 +234,21 @@ class AboutTextTest(InteractiveAction):
         return "_About TextTest"
     def messageAfterPerform(self):
         return ""
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "show information about texttest"
     def getResultDialogType(self):
         return AboutTextTestDialog
     def performOnCurrent(self):
         pass # The only result is the result popup dialog ...
 
-class MigrationNotes(InteractiveAction):
+class MigrationNotes(ActionGUI):
     def isActiveOnCurrent(self, *args):
         return True
     def _getTitle(self):
         return "_Migration Notes"
     def messageAfterPerform(self):
         return ""
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "show texttest migration notes"
     def getResultDialogType(self):
         return MigrationNotesDialog

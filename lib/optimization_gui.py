@@ -113,7 +113,7 @@ class StartStudio(guiplugins.ActionTabGUI):
         return "Studio"
     def getTabTitle(self):
         return "Studio"
-    def getScriptTitle(self, tab):
+    def getTooltip(self):
         return "Start Studio"
     def updateOptions(self):
         self.optionGroup.setOptionValue("sys", self.currTestSelection[0].getEnvironment("CARMSYS"))

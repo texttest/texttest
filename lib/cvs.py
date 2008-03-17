@@ -1,7 +1,7 @@
 
 import os, gobject, datetime, time, subprocess, default_gui
 import gtk, plugins, custom_widgets, entrycompletion
-from guiplugins import scriptEngine, guilog, InteractiveAction, processMonitor, showErrorDialog, ActionResultDialog
+from guiplugins import scriptEngine, guilog, ActionGUI, processMonitor, showErrorDialog, ActionResultDialog
 
 #
 # Todo/improvements:
@@ -34,9 +34,9 @@ from guiplugins import scriptEngine, guilog, InteractiveAction, processMonitor, 
 #
 # Base class for all CVS actions.
 #
-class CVSAction(InteractiveAction):
+class CVSAction(ActionGUI):
     def __init__(self, cvsArgs, allApps=[], dynamic=False):
-        InteractiveAction.__init__(self, allApps)
+        ActionGUI.__init__(self, allApps)
         self.cvsArgs = cvsArgs
         self.recursive = False
         self.dynamic = dynamic
@@ -54,7 +54,7 @@ class CVSAction(InteractiveAction):
                 raise plugins.TextTestError, "Could not run CVS: make sure you have it installed locally"
         return process.stdout.readlines()
     def updateSelection(self, *args):
-        newActive = InteractiveAction.updateSelection(self, *args)
+        newActive = ActionGUI.updateSelection(self, *args)
         if not self.dynamic: # See bugzilla 17653
             self.currFileSelection = []
         return newActive
@@ -63,7 +63,7 @@ class CVSAction(InteractiveAction):
     def isActiveOnCurrent(self, *args):
         return len(self.currTestSelection) > 0 
     def messageAfterPerform(self):
-        return "Performed " + self._getScriptTitle() + "."
+        return "Performed " + self.getTooltip() + "."
     def getResultDialogTwoColumnsInTreeView(self):
         return False
     def getResultDialogSecondColumnTitle(self):
@@ -71,7 +71,7 @@ class CVSAction(InteractiveAction):
     def getResultDialogType(self):
         return CVSTreeViewDialog
     def getResultDialogTitle(self):
-        return self._getScriptTitle()
+        return self.getTooltip()
     def getResultDialogIconType(self):
         return gtk.STOCK_DIALOG_INFO;
     def getSelectionDialogIconType(self):
@@ -204,7 +204,7 @@ class CVSLog(CVSAction):
         CVSAction.__init__(self, [ "log", "-N", "-l" ], *args)
     def _getTitle(self):
         return "_Log"
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "cvs log for the selected files"
     def getResultDialogType(self):
         return CVSTreeViewDialog
@@ -291,8 +291,8 @@ class CVSLogRecursive(CVSLog):
         self.recursive = True
     def _getTitle(self):
         return "Log Recursive"
-    def _getScriptTitle(self):
-        return "recursive " + CVSLog._getScriptTitle(self)
+    def getTooltip(self):
+        return "recursive " + CVSLog.getTooltip(self)
 
 class CVSLogLatest(CVSLog):
     def __init__(self, *args):
@@ -300,7 +300,7 @@ class CVSLogLatest(CVSLog):
         self.cvsArgs = [ "log", "-N", "-l", "-rHEAD" ]
     def _getTitle(self):
         return "Log Latest"
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "cvs log latest for the selected test"
     def getResultDialogType(self):
         return CVSNotebookDialog
@@ -363,7 +363,7 @@ class CVSDiff(CVSAction):
         self.revision2 = rev2
     def _getTitle(self):
         return "_Difference"
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "cvs diff for the selected files" 
     def getResultDialogType(self):
         return CVSTreeViewDialog
@@ -460,8 +460,8 @@ class CVSDiffRecursive(CVSDiff):
         self.recursive = True
     def _getTitle(self):
         return "Difference Recursive"
-    def _getScriptTitle(self):
-        return "recursive " + CVSDiff._getScriptTitle(self)
+    def getTooltip(self):
+        return "recursive " + CVSDiff.getTooltip(self)
 
 
 class CVSStatus(CVSAction):
@@ -473,7 +473,7 @@ class CVSStatus(CVSAction):
         CVSAction.__init__(self, [ "status", "-l" ], *args)
     def _getTitle(self):
         return "_Status"
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "cvs status for the selected files"
     def getResultDialogType(self):
         return CVSStatusDialog
@@ -570,8 +570,8 @@ class CVSStatusRecursive(CVSStatus):
         self.recursive = True
     def _getTitle(self):
         return "Status Recursive"
-    def _getScriptTitle(self):
-        return "recursive " + CVSStatus._getScriptTitle(self)
+    def getTooltip(self):
+        return "recursive " + CVSStatus.getTooltip(self)
 
 
 class CVSAnnotate(CVSAction):
@@ -579,7 +579,7 @@ class CVSAnnotate(CVSAction):
         CVSAction.__init__(self, [ "annotate", "-l" ], *args)
     def _getTitle(self):
         return "A_nnotate"
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "cvs annotate for the selected files"
     def getResultDialogIconType(self):
         if not self.notInRepository:           
@@ -647,8 +647,8 @@ class CVSAnnotateRecursive(CVSAnnotate):
         self.recursive = True
     def _getTitle(self):
         return "Annotate Recursive"
-    def _getScriptTitle(self):
-        return "recursive " + CVSAnnotate._getScriptTitle(self)
+    def getTooltip(self):
+        return "recursive " + CVSAnnotate.getTooltip(self)
 
 
 #

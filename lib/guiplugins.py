@@ -199,144 +199,7 @@ class ProcessTerminationMonitor(plugins.Observable):
         
 
 processMonitor = ProcessTerminationMonitor()
-       
-class InteractiveAction(plugins.Observable):
-    def __init__(self, allApps, *args):
-        plugins.Observable.__init__(self)
-        self.currTestSelection = []
-        self.currFileSelection = []
-        self.currAppSelection = []
-        self.diag = plugins.getDiagnostics("Interactive Actions")
-        self.validApps = []
-        for app in allApps:
-            self.validApps.append(app)
-            self.validApps += app.extras
-    def setRelevantObservers(self, observers):
-        signals = [ "Error", "Status", "ActionProgress" ] + self.getSignalsSent()
-        self.diag.info("Observing " + str(self.__class__) + " :")
-        for observer in observers:
-            for signal in signals:
-                if hasattr(observer, "notify" + signal):
-                    self.diag.info("-> " + str(observer.__class__))
-                    self.addObserver(observer)
-                    break
-    def getSignalsSent(self):
-        return [] # set up like this so every single derived class doesn't have to include it
-    def allAppsValid(self):
-        for app in self.currAppSelection:
-            if app not in self.validApps:
-                self.diag.info("Rejecting due to invalid selected app : " + repr(app))
-                return False
-        return True
-    def addSuites(self, suites):
-        pass
-    def notifyViewFile(self, *args):
-        pass
-    def updateSelection(self, tests, apps, rowCount, *args):
-        if rowCount != 1 and self.singleTestOnly():
-            self.currTestSelection = []
-        else:
-            self.currTestSelection = tests
-            testClass = self.correctTestClass()
-            if testClass:
-                self.currTestSelection = filter(lambda test: test.classId() == testClass, tests)
-                
-        self.currAppSelection = apps
-        newActive = self.allAppsValid() and self.isActiveOnCurrent()
-        self.diag.info("New test selection for " + self.getTitle() + "=" + repr(tests) + " : new active = " + repr(newActive))
-        return newActive
-        
-    def updateFileSelection(self, files):
-        self.currFileSelection = files
-        newActive = self.isActiveOnCurrent()
-        self.diag.info("New file selection for " + self.getTitle() + "=" + repr(files) + " : new active = " + repr(newActive))
-        return newActive
-
-    def singleTestOnly(self):
-        return False        
-    
-    def updateOptions(self):
-        return False     
-    def isActiveOnCurrent(self, *args):
-        return len(self.currTestSelection) > 0
-    def describeTests(self):
-        if len(self.currTestSelection) == 1:
-            return repr(self.currTestSelection[0])
-        else:
-            return str(len(self.currTestSelection)) + " tests"
-    def isSelected(self, test):
-        return test in self.currTestSelection
-    def isNotSelected(self, test):
-        return not self.isSelected(test)
-    def correctTestClass(self):
-        pass
-    def inButtonBar(self):
-        return not self.inMenuOrToolBar()
-    def testDescription(self):
-        if len(self.currTestSelection) > 0:
-            return " (from test " + self.currTestSelection[0].uniqueName + ")"
-        else:
-            return ""
-
-    # Should we create a gtk.Action? (or connect to button directly ...)
-    def inMenuOrToolBar(self): 
-        return True
-    def _getStockId(self): # The stock ID for the action, in toolbar and menu.
-        pass
-    def getTooltip(self):
-        return self.getScriptTitle(False)
-    def getDialogType(self): # The dialog type to launch on action execution.
-        self.confirmationMessage = self.getConfirmationMessage()
-        if self.confirmationMessage:
-            return ConfirmationDialog
-
-    def getResultDialogType(self): # The dialog type to launch when the action has finished execution.
-        pass
-    def getTitle(self, includeMnemonics=False):
-        title = self._getTitle()
-        if includeMnemonics:
-            return title
-        else:
-            return title.replace("_", "")
-    def getDirectories(self):
-        return ([], None)
-    def messageBeforePerform(self):
-        # Don't change this by default, most of these things don't take very long
-        pass
-    def messageAfterPerform(self):
-        return "Performed '" + self.getTooltip() + "' on " + self.describeTests() + "."
-    def getConfirmationMessage(self):
-        return ""
-    def getScriptTitle(self, tab):
-        baseTitle = self._getScriptTitle()
-        if tab and self.inMenuOrToolBar():
-            return baseTitle + " from tab"
-        else:
-            return baseTitle
-    def _getScriptTitle(self):
-        return self.getTitle()
-    def startPerform(self):
-        message = self.messageBeforePerform()
-        if message != None:
-            self.notify("Status", message)
-        self.notify("ActionStart", message)
-        try:
-            self.performOnCurrent()
-            message = self.messageAfterPerform()
-            if message != None:
-                self.notify("Status", message)
-        except plugins.TextTestError, e:
-            self.notify("Error", str(e))
-    def endPerform(self):
-        self.notify("ActionStop", "")
-    def perform(self):
-        try:
-            self.startPerform()
-        finally:
-            self.endPerform()
-    def cancel(self):
-        self.notify("Status", "Action cancelled.")
-                
+                       
 
 def destroyDialog(dialog, *args):
     dialog.destroy()
@@ -408,7 +271,7 @@ class GenericActionDialog:
         self.plugin = plugin
 
     def getDialogTitle(self):
-        return self.plugin.getScriptTitle(None)        
+        return self.plugin.getTooltip()        
 
     def isModal(self):
         return True
@@ -445,7 +308,7 @@ class ActionConfirmationDialog(GenericActionDialog):
             self.dialog = gtk.Dialog(self.getDialogTitle(), parent, flags=gtk.DIALOG_MODAL) 
             self.dialog.set_modal(True)
         else:
-            self.dialog = gtk.Dialog(self.plugin.getScriptTitle(None))
+            self.dialog = gtk.Dialog(self.plugin.getTooltip())
         self.dialog.set_resizable(self.isResizeable())
         self.createButtons()
 
@@ -590,21 +453,43 @@ class SubGUI(plugins.Observable):
 
 # Introduce an extra level without all the selection-dependent stuff, some actions want
 # to inherit from here and it provides a separation
-class OldBasicActionGUI(SubGUI):
+class BasicActionGUI(SubGUI):
     busy = False
     def __init__(self, *args):
-        SubGUI.__init__(self, *args)
+        SubGUI.__init__(self)
         self.accelerator = None
+        self.topWindow = None
+        self.diag = plugins.getDiagnostics("Interactive Actions")
         title = self.getTitle(includeMnemonics=True)
         actionName = self.getTitle(includeMnemonics=False)
         self.gtkAction = gtk.Action(actionName, title, \
                                     self.getTooltip(), self.getStockId())
-        scriptEngine.connect(self.getScriptTitle(False), "activate", self.gtkAction, self.runInteractive)
+        scriptEngine.connect(self.getTooltip(), "activate", self.gtkAction, self.runInteractive)
+
+    def notifyTopWindow(self, window):
+        self.topWindow = window
+
+    def getTitle(self, includeMnemonics=False):
+        title = self._getTitle()
+        if includeMnemonics:
+            return title
+        else:
+            return title.replace("_", "")
+
+    def getTooltip(self):
+        return self.getTitle(includeMnemonics=False)
 
     def getStockId(self):
         stockId = self._getStockId()
         if stockId:
             return "gtk-" + stockId 
+
+    def _getStockId(self): # The stock ID for the action, in toolbar and menu.
+        pass
+
+    # Should we create a gtk.Action? (or connect to button directly ...)
+    def inMenuOrToolBar(self): 
+        return True
 
     def describe(self):
         self.describeAction()
@@ -640,7 +525,7 @@ class OldBasicActionGUI(SubGUI):
                                      + self.getTitle() + "' is not valid, ignoring ...")
     
     def setObservers(self, observers):
-        if self.hasObservers():
+        if len(self.observers) > 0:
             return # Can have several ActionGUIs for the same Action
         allObservers = []
         for observer in observers:
@@ -649,6 +534,29 @@ class OldBasicActionGUI(SubGUI):
                 allObservers.append(observer.action)
         self.setRelevantObservers(allObservers)
 
+    def setRelevantObservers(self, observers):
+        signals = [ "Error", "Status", "ActionProgress" ] + self.getSignalsSent()
+        self.diag.info("Observing " + str(self.__class__) + " :")
+        for observer in observers:
+            for signal in signals:
+                if hasattr(observer, "notify" + signal):
+                    self.diag.info("-> " + str(observer.__class__))
+                    self.addObserver(observer)
+                    break
+    def getSignalsSent(self):
+        return [] # set up like this so every single derived class doesn't have to include it
+
+    def getConfirmationMessage(self):
+        return ""
+
+    def getDialogType(self): # The dialog type to launch on action execution.
+        self.confirmationMessage = self.getConfirmationMessage()
+        if self.confirmationMessage:
+            return ConfirmationDialog
+
+    def getResultDialogType(self): # The dialog type to launch when the action has finished execution.
+        pass
+    
     def runInteractive(self, *args):
         if self.busy: # If we're busy with some other action, ignore this one ...
             return
@@ -668,7 +576,7 @@ class OldBasicActionGUI(SubGUI):
             
     def _runInteractive(self):
         try:
-            OldBasicActionGUI.busy = True
+            BasicActionGUI.busy = True
             self.startPerform()
             resultDialogType = self.getResultDialogType()
             if resultDialogType:
@@ -676,24 +584,74 @@ class OldBasicActionGUI(SubGUI):
                 resultDialog.run()
         finally:
             self.endPerform()
-            OldBasicActionGUI.busy = False
+            BasicActionGUI.busy = False
+    
+    def messageBeforePerform(self):
+        # Don't change this by default, most of these things don't take very long
+        pass
+
+    def messageAfterPerform(self):
+        return "Performed '" + self.getTooltip() + "' on " + self.describeTests() + "."
+    
+    def startPerform(self):
+        message = self.messageBeforePerform()
+        if message != None:
+            self.notify("Status", message)
+        self.notify("ActionStart", message)
+        try:
+            self.performOnCurrent()
+            message = self.messageAfterPerform()
+            if message != None:
+                self.notify("Status", message)
+        except plugins.TextTestError, e:
+            self.notify("Error", str(e))
+
+    def endPerform(self):
+        self.notify("ActionStop", "")
+
+    def perform(self):
+        try:
+            self.startPerform()
+        finally:
+            self.endPerform()
+
+    def cancel(self):
+        self.notify("Status", "Action cancelled.")
     
     
-class OldActionGUI(OldBasicActionGUI):
+class ActionGUI(BasicActionGUI):
     busy = False
-    def __init__(self, *args):
-        OldBasicActionGUI.__init__(self, *args)
-        self.topWindow = None
+    def __init__(self, allApps, *args):
+        BasicActionGUI.__init__(self)
+        self.currTestSelection = []
+        self.currFileSelection = []
+        self.currAppSelection = []
+        self.validApps = []
+        for app in allApps:
+            self.validApps.append(app)
+            self.validApps += app.extras    
+
         if not self.isActiveOnCurrent():
             self.gtkAction.set_property("sensitive", False)
-
-    def notifyTopWindow(self, window):
-        self.topWindow = window
         
     def notifyNewTestSelection(self, *args):
         newActive = self.updateSelection(*args)
         self.setSensitivity(newActive)
 
+    def updateSelection(self, tests, apps, rowCount, *args):
+        if rowCount != 1 and self.singleTestOnly():
+            self.currTestSelection = []
+        else:
+            self.currTestSelection = tests
+            testClass = self.correctTestClass()
+            if testClass:
+                self.currTestSelection = filter(lambda test: test.classId() == testClass, tests)
+                
+        self.currAppSelection = apps
+        newActive = self.allAppsValid() and self.isActiveOnCurrent()
+        self.diag.info("New test selection for " + self.getTitle() + "=" + repr(tests) + " : new active = " + repr(newActive))
+        return newActive
+        
     def notifyLifecycleChange(self, test, state, desc):
         newActive = self.isActiveOnCurrent(test, state)
         self.setSensitivity(newActive)
@@ -702,6 +660,22 @@ class OldActionGUI(OldBasicActionGUI):
         newActive = self.updateFileSelection(files)
         self.setSensitivity(newActive)
         
+    def updateFileSelection(self, files):
+        self.currFileSelection = files
+        newActive = self.isActiveOnCurrent()
+        self.diag.info("New file selection for " + self.getTitle() + "=" + repr(files) + " : new active = " + repr(newActive))
+        return newActive
+
+    def allAppsValid(self):
+        for app in self.currAppSelection:
+            if app not in self.validApps:
+                self.diag.info("Rejecting due to invalid selected app : " + repr(app))
+                return False
+        return True
+
+    def isActiveOnCurrent(self, *args):
+        return len(self.currTestSelection) > 0
+
     def setSensitivity(self, newValue):
         oldValue = self.gtkAction.get_property("sensitive")
         self.gtkAction.set_property("sensitive", newValue)
@@ -709,11 +683,23 @@ class OldActionGUI(OldBasicActionGUI):
             guilog.info("Setting sensitivity of action '" + self.getTitle(includeMnemonics=True) + "' to " + repr(newValue))
         
     def detailDescription(self):
-        basic = OldBasicActionGUI.detailDescription(self)
+        basic = BasicActionGUI.detailDescription(self)
         if self.gtkAction.get_property("sensitive"):
             return basic
         else:
             return basic + " (greyed out)"
+
+    def singleTestOnly(self):
+        return False        
+
+    def describeTests(self):
+        if len(self.currTestSelection) == 1:
+            return repr(self.currTestSelection[0])
+        else:
+            return str(len(self.currTestSelection)) + " tests"
+
+    def correctTestClass(self):
+        pass
     
     def createView(self):
         return self.createButton()
@@ -743,9 +729,9 @@ class ComboBoxListFinder:
         entries.append(text)
 
 
-class OldActionTabGUI(OldActionGUI):
-    def __init__(self):
-        OldActionGUI.__init__(self)
+class ActionTabGUI(ActionGUI):
+    def __init__(self, *args):
+        ActionGUI.__init__(self, *args)
         self.optionGroup = plugins.OptionGroup(self.getTabTitle())
         # convenience shortcuts...
         self.addOption = self.optionGroup.addOption
@@ -760,11 +746,13 @@ class OldActionTabGUI(OldActionGUI):
     def createView(self):
         return self.addScrollBars(self.createVBox())
     def setSensitivity(self, newValue):
-        OldActionGUI.setSensitivity(self, newValue)
+        ActionGUI.setSensitivity(self, newValue)
         self.sensitive = newValue
         self.diag.info("Sensitivity of " + self.getTabTitle() + " changed to " + repr(newValue))
         if self.sensitive and self.updateOptions():
             self.contentsChanged()        
+    def updateOptions(self):
+        return False     
 
     def notifyReset(self):
         self.optionGroup.reset()
@@ -917,27 +905,7 @@ class OldActionTabGUI(OldActionGUI):
                                        (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,                                        
                                         gtk.STOCK_OPEN, gtk.RESPONSE_OK))
         self.startChooser(dialog, entry, option)
-    def getDirectoriesForDialog(self, dirs):
-        for dir in dirs:
-            try:
-                os.makedirs(dir[1])
-            except:
-                pass # makedir throws if dir exists ...                    
-        # Set first non-empty dir as default ...)
-        existingDirs = []
-        defaultDir = None
-        for dir in dirs:
-            if os.path.isdir(os.path.abspath(dir[1])):
-                if len(os.listdir(os.path.abspath(dir[1]))) > 0 and \
-                       not defaultDir:                
-                    defaultDir = dir[1]
-                existingDirs.append(dir)
-
-        if not defaultDir:
-            defaultDir = dirs[0][1]
-            
-        return (existingDirs, defaultDir)
-
+    
     def startChooser(self, dialog, entry, option):
         # Folders is a list of pairs (short name, absolute path),
         # where 'short name' means the name given in the config file, e.g.
@@ -993,39 +961,6 @@ class OldActionTabGUI(OldActionGUI):
                 text += " (checked)"
         return text
 
-class BasicActionGUI(OldBasicActionGUI,InteractiveAction):
-    def __init__(self, *args):
-        InteractiveAction.__init__(self, *args)
-        OldBasicActionGUI.__init__(self)
-    def hasObservers(self):
-        return len(self.observers) > 0
-
-class ActionGUI(OldActionGUI,InteractiveAction):
-    def __init__(self, *args):
-        InteractiveAction.__init__(self, *args)
-        OldActionGUI.__init__(self)
-    def hasObservers(self):
-        return len(self.observers) > 0
-
-class ActionTabGUI(OldActionTabGUI,InteractiveAction):
-    def __init__(self, *args):
-        InteractiveAction.__init__(self, *args)
-        OldActionTabGUI.__init__(self)
-    def hasObservers(self):
-        return len(self.observers) > 0
-
-class Forwarder:
-    def __init__(self, action):
-        self.action = action
-    def __getattr__(self, name):
-        return getattr(self.action, name)
-    def hasObservers(self):
-        return len(self.action.observers) > 0
-
-class DefaultForwarder(OldActionGUI,Forwarder):
-    def __init__(self, action):
-        Forwarder.__init__(self, action)
-        OldActionGUI.__init__(self)
 
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:
@@ -1057,25 +992,15 @@ class InteractiveActionHandler:
             if isinstance(action, ActionTabGUI):
                 self.diag.info("Tab: " + str(action.__class__))
                 actionTabGUIs.append(action)
-            elif isinstance(action, ActionGUI):
-                if action.inButtonBar():
-                    self.diag.info("Button: " + str(action.__class__))
-                    buttonGUIs.append(action)
-                else:
+            else:
+                if action.inMenuOrToolBar():
                     self.diag.info("Menu/toolbar: " + str(action.__class__))
                     # It's always active, always visible
                     action.setActive(True)
                     defaultGUIs.append(action)
-            else:
-                actionGUI = DefaultForwarder(action)
-                if action.inButtonBar():
-                    self.diag.info("Button: " + str(action.__class__))
-                    buttonGUIs.append(actionGUI)
                 else:
-                    self.diag.info("Menu/toolbar: " + str(action.__class__))
-                    # It's always active, always visible
-                    actionGUI.setActive(True)
-                    defaultGUIs.append(actionGUI)
+                    self.diag.info("Button: " + str(action.__class__))
+                    buttonGUIs.append(action)
 
         actionGroup = gtk.ActionGroup("AllActions")
         uiManager.insert_action_group(actionGroup, 0)

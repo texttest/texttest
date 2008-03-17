@@ -240,7 +240,8 @@ class TextTestGUI(Responder, plugins.Observable):
     def getHideableGUIs(self):
         return [ self.toolBarGUI, self.shortcutBarGUI, statusMonitor ]
     def getAddSuitesObservers(self):
-        return [ self.testColumnGUI ] + self.defaultActionGUIs + self.actionTabGUIs
+        return [ self.testColumnGUI ] + filter(lambda obs: hasattr(obs, "addSuites"),
+                                               self.defaultActionGUIs + self.actionTabGUIs)
     def setObservers(self, frameworkObservers):
         # We don't actually have the framework observe changes here, this causes duplication. Just forward
         # them as appropriate to where they belong. This is a bit of a hack really.

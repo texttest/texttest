@@ -90,9 +90,9 @@ class CreatePerformanceReportDialog(guiplugins.ActionConfirmationDialog):
         guiplugins.ActionConfirmationDialog.respond(self, button, saidOK, *args)
     
 
-class CreatePerformanceReport(guiplugins.InteractiveAction):
+class CreatePerformanceReport(guiplugins.ActionGUI):
     def __init__(self, *args):
-        guiplugins.InteractiveAction.__init__(self, *args)
+        guiplugins.ActionGUI.__init__(self, *args)
         self.rootDir = ""
         self.versions = ["11", "12", "13", "14", "master" ]
         self.objectiveText = "Total cost of plan"
@@ -112,7 +112,7 @@ class CreatePerformanceReport(guiplugins.InteractiveAction):
         return CreatePerformanceReportDialog
     def _getTitle(self):
         return "Create Performance Report..."
-    def _getScriptTitle(self):
+    def getTooltip(self):
         return "create performance report for selected tests"
     def messageAfterPerform(self):
         return "Created performance report in " + self.rootDir

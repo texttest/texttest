@@ -39,7 +39,7 @@ class SaveTests(guiplugins.ActionTabGUI):
         self.addOption("v", "Version to save")
         self.addSwitch("over", "Replace successfully compared files also", 0)
         if self.hasPerformance(allApps):
-            self.addSwitch("ex", "Save: ", 1, ["Average performance", "Exact performance"])
+            self.addSwitch("ex", "Save", 1, ["Average performance", "Exact performance"])
     def _getStockId(self):
         return "save"
     def getTabTitle(self):
@@ -151,67 +151,24 @@ class SaveTests(guiplugins.ActionTabGUI):
             else:
                 raise plugins.TextTestError, errorStr
 
-
-class MarkTestDialog(guiplugins.ActionConfirmationDialog):
-    def __init__(self, parent, okMethod, cancelMethod, plugin):
-        guiplugins.ActionConfirmationDialog.__init__(self, parent, okMethod, cancelMethod, plugin)
-        self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
         
-    def addContents(self):        
-        alignment = gtk.Alignment()
-        alignment.set(1.0, 1.0, 1.0, 1.0)
-        alignment.set_padding(5, 5, 5, 5)
-        vbox = gtk.VBox()
-        alignment.add(vbox)
-        self.dialog.vbox.pack_start(alignment, expand=True, fill=True)
-
-        hbox = gtk.HBox()
-        hbox.pack_start(gtk.Label("Brief text:"), expand=False, fill=False)
-        vbox.pack_start(hbox)
-        self.briefEntry = gtk.Entry()
-        entrycompletion.manager.register(self.briefEntry)
-        self.briefEntry.set_text("Checked")
-        self.briefEntry.set_activates_default(True)
-        guiplugins.scriptEngine.registerEntry(self.briefEntry, "enter new test state brief text ")
-        vbox.pack_start(self.briefEntry)
-
-        hbox2 = gtk.HBox()
-        hbox2.pack_start(gtk.Label("Free text:"), expand=False, fill=False)
-        vbox.pack_start(hbox2)
-        self.freeEntry = gtk.Entry()
-        entrycompletion.manager.register(self.freeEntry)
-        self.freeEntry.set_text("Checked at " + plugins.localtime())
-        self.freeEntry.set_activates_default(True)
-        guiplugins.scriptEngine.registerEntry(self.freeEntry, "enter new test state free text ")
-        vbox.pack_start(self.freeEntry)
-        
-    def respond(self, button, saidOK, *args):
-        if saidOK:
-            self.plugin.setTexts(self.briefEntry.get_text(), self.freeEntry.get_text())
-        guiplugins.ActionConfirmationDialog.respond(self, button, saidOK, *args)
-
-        
-class MarkTest(guiplugins.ActionGUI):
+class MarkTest(guiplugins.ActionDialogGUI):
     def __init__(self, *args):
-        guiplugins.ActionGUI.__init__(self, *args)
-        self.newBriefText = ""
-        self.newFreeText = ""
-    def setTexts(self, briefText, freeText):
-        self.newBriefText = briefText
-        self.newFreeText = freeText
+        guiplugins.ActionDialogGUI.__init__(self, *args)
+        self.addOption("brief", "Brief text", "Checked")
+        self.addOption("free", "Free text", "Checked at " + plugins.localtime())
     def _getTitle(self):
         return "_Mark"
     def getTooltip(self):
         return "Mark the selected tests"
-    def getDialogType(self):
-        return MarkTestDialog 
     def performOnCurrent(self):
         for test in self.currTestSelection:
             oldState = test.state
             if oldState.isComplete():
                 if test.state.isMarked():
                     oldState = test.state.oldState # Keep the old state so as not to build hierarchies ...
-                newState = plugins.MarkedTestState(self.newFreeText, self.newBriefText, oldState)
+                newState = plugins.MarkedTestState(self.optionGroup.getOptionValue("free"),
+                                                   self.optionGroup.getOptionValue("brief"), oldState)
                 test.changeState(newState)
                 self.notify("ActionProgress", "") # Just to update gui ...            
     def isActiveOnCurrent(self, test=None, state=None):
@@ -821,7 +778,7 @@ class SelectTests(guiplugins.ActionTabGUI):
         self.addOption("vs", "Tests for version", description="Select tests for a specific version.",
                        possibleValues=self.getPossibleVersions(allApps))
         self.addSwitch("select_in_collapsed_suites", "Select in collapsed suites", 0, description="Select in currently collapsed suites as well?")
-        self.addSwitch("current_selection", "Current selection:", options = [ "Discard", "Refine", "Extend", "Exclude"], description="How should we treat the currently selected tests?\n - Discard: Unselect all currently selected tests before applying the new selection criteria.\n - Refine: Apply the new selection criteria only to the currently selected tests, to obtain a subselection.\n - Extend: Keep the currently selected tests even if they do not match the new criteria, and extend the selection with all other tests which meet the new criteria.\n - Exclude: After applying the new selection criteria to all tests, unselect the currently selected tests, to exclude them from the new selection.")
+        self.addSwitch("current_selection", "Current selection", options = [ "Discard", "Refine", "Extend", "Exclude"], description="How should we treat the currently selected tests?\n - Discard: Unselect all currently selected tests before applying the new selection criteria.\n - Refine: Apply the new selection criteria only to the currently selected tests, to obtain a subselection.\n - Extend: Keep the currently selected tests even if they do not match the new criteria, and extend the selection with all other tests which meet the new criteria.\n - Exclude: After applying the new selection criteria to all tests, unselect the currently selected tests, to exclude them from the new selection.")
         self.appKeys = Set()
         for app in allApps:
             appSelectGroup = self.findSelectGroup(app)
@@ -979,99 +936,18 @@ class ResetGroups(guiplugins.BasicActionGUI):
     def performOnCurrent(self):
         self.notify("Reset")
 
-class SaveSelectionDialog(guiplugins.ActionConfirmationDialog):
-    def __init__(self, parent, okMethod, cancelMethod, plugin):
-        self.fileChooser = gtk.FileChooserWidget(gtk.FILE_CHOOSER_ACTION_SAVE)
-        self.fileChooser.set_show_hidden(True)
-        self.plugin = plugin
-        self.folders, defaultFolder = self.plugin.getDirectories()
-        self.startFolder = os.getcwd() # Just to make sure we always have some dir ...
-        if defaultFolder and os.path.isdir(os.path.abspath(defaultFolder)):
-            self.startFolder = os.path.abspath(defaultFolder)
-        self.enableOptions = self.plugin.dialogEnableOptions()
-        guiplugins.ActionConfirmationDialog.__init__(self, parent, okMethod, cancelMethod, plugin)
-        self.dialog.set_modal(True)
-        self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
-    def createButtons(self):
-        self.cancelButton = self.dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL)
-        self.okButton = self.dialog.add_button(gtk.STOCK_SAVE, gtk.RESPONSE_ACCEPT)
-        
-    def addContents(self):
-        alignment = gtk.Alignment()
-        alignment.set(1.0, 1.0, 1.0, 1.0)
-        alignment.set_padding(5, 5, 5, 5)
-        vbox = gtk.VBox()
-        alignment.add(vbox)
-        self.dialog.vbox.pack_start(alignment, expand=True, fill=True)
-
-        # We want a filechooser dialog to let the user choose where, and
-        # with which name, to save the selection.
-        self.fileChooser.set_current_folder(self.startFolder)
-        for i in xrange(len(self.folders) - 1, -1, -1):
-            self.fileChooser.add_shortcut_folder(self.folders[i][1])
-        self.fileChooser.set_local_only(True)
-        guiplugins.scriptEngine.registerSaveFileChooser(self.fileChooser, "enter filter-file name =", "choose folder", "press save", "press cancel",
-                                             self.respond, self.okButton, self.cancelButton)
-        vbox.pack_start(self.fileChooser, expand=True, fill=True)
-
-        # In the static GUI case, we also want radiobuttons specifying 
-        # whether we want to save the actual tests, or the selection criteria.
-        frame = gtk.Frame("Save")
-        frameBox = gtk.VBox()
-        self.radio1 = gtk.RadioButton(label="_List of selected tests", use_underline=True)
-        self.radio2 = gtk.RadioButton(self.radio1, label="C_riteria entered in the Selection tab\n(Might not match current selection, if it has been modified)", use_underline=True) # Letting C be mnemonic conflicts with cancel button ...
-        guiplugins.scriptEngine.registerToggleButton(self.radio1, "choose to save list of selected tests")
-        guiplugins.scriptEngine.registerToggleButton(self.radio2, "choose to save selection criteria")
-        frameBox.pack_start(self.radio1)
-        frameBox.pack_start(self.radio2)
-        frame.add(frameBox)
-        if not self.enableOptions:
-            frame.set_sensitive(False)
-        self.fileChooser.set_extra_widget(frame)
-    def respond(self, button, saidOK, *args):
-        if saidOK:
-            if not self.fileChooser.get_filename():
-                self.fileChooser.set_current_name("filename_mandatory")
-                return
-            if os.path.isdir(self.fileChooser.get_filename()):
-                self.fileChooser.set_current_folder(self.fileChooser.get_filename())
-                self.fileChooser.set_current_name("filename_mandatory")
-                return                
-            if os.path.exists(self.fileChooser.get_filename()):
-                message = "\nThe file \n" + self.fileChooser.get_filename().replace("\\", "/") +\
-                          "\nalready exists.\n\nDo you want to overwrite it?\n"
-                confirmation = guiplugins.QueryDialog(self.dialog, lambda : self.setOptionsAndExit(saidOK),
-                                                      None, None, message)
-                confirmation.run()
-            else:
-                self.setOptionsAndExit(saidOK)
-        else:
-            self.doExit(saidOK)
-
-    def setOptionsAndExit(self, saidOK):
-        # Transfer file name and options back to plugin
-        fileName = self.fileChooser.get_filename().replace("\\", "/")
-        saveTestList = self.enableOptions and self.radio1.get_active()
-        self.plugin.setOptions(fileName, saveTestList)
-        self.doExit(saidOK)
-        
-    def doExit(self, saidOK):
-        entrycompletion.manager.collectCompletions()
-        self.dialog.hide()
-        self.dialog.response(gtk.RESPONSE_NONE)
-        if saidOK:
-            self.okMethod()
-        else:
-            self.cancelMethod()
-
     
-class SaveSelection(guiplugins.ActionGUI):
+class SaveSelection(guiplugins.ActionDialogGUI):
     def __init__(self, allApps, dynamic):
-        guiplugins.ActionGUI.__init__(self, allApps, dynamic)
+        guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic)
+        self.addOption("f", "enter filter-file name =",
+                       possibleDirs=allApps[0].getFilterFileDirectories(allApps, createDirs=False), saveFile=True)
+        if not dynamic:
+            # In the static GUI case, we also want radiobuttons specifying 
+            # whether we want to save the actual tests, or the selection criteria.
+            self.addSwitch("tests", "Save", options= [ "_List of selected tests", "C_riteria entered in the Selection tab\n(Might not match current selection, if it has been modified)" ])
         self.selectionCriteria = ""
-        self.fileName = ""
         self.dynamic = dynamic
-        self.saveTestList = ""
         self.rootTestSuites = []
     def correctTestClass(self):
         return "test-case"
@@ -1079,26 +955,11 @@ class SaveSelection(guiplugins.ActionGUI):
         self.rootTestSuites = suites
     def _getStockId(self):
         return "save-as"
-    def getDialogType(self):
-        return SaveSelectionDialog
     def _getTitle(self):
         return "S_ave Selection..."
     def getTooltip(self):
         return "Save selected tests in file"
-    def dialogEnableOptions(self):
-        return not self.dynamic
-    def setOptions(self, fileName, saveTestList):
-        self.fileName = fileName
-        self.saveTestList = saveTestList
-    def getDirectories(self):
-        dirs = self.validApps[0].getFilterFileDirectories(self.validApps)
-        if len(dirs) > 0:
-            self.folders = (dirs, dirs[0][1])
-        else:
-            self.folders = (dirs, None)
         return self.folders
-    def saveActualTests(self):
-        return self.dynamic or self.saveTestList
     def getTestPathFilterArg(self):
         selTestPaths = []
         for suite in self.rootTestSuites:
@@ -1110,96 +971,54 @@ class SaveSelection(guiplugins.ActionGUI):
     def notifySetTestSelection(self, tests, criteria="", *args):
         self.selectionCriteria = criteria
     def getTextToSave(self):
-        actualTests = self.saveActualTests()
-        if actualTests:
+        if self.dynamic or not self.optionGroup.getSwitchValue("tests"):
             return self.getTestPathFilterArg()
         else:
             return self.selectionCriteria
+    def respond(self, button, saidOK, dialog):
+        fileName = self.optionGroup.getOptionValue("f")    
+        if fileName and saidOK and os.path.isfile(fileName):
+            message = "\nThe file \n" + fileName.replace("\\", "/") +\
+                      "\nalready exists.\n\nDo you want to overwrite it?\n"
+            newDialog = self.makeQueryDialog(dialog, message, gtk.STOCK_DIALOG_QUESTION, "Query", self.defaultRespond)
+            newDialog.show_all()
+        else:
+            self.defaultRespond(button, saidOK, dialog)
+    def defaultRespond(self, *args):
+        guiplugins.ActionDialogGUI.respond(self, *args)
+
     def notifySaveSelection(self, fileName):
-        self.fileName = fileName
-        self.saveTestList = True
-        self.performOnCurrent()
+        toSave = self.getTestPathFilterArg()
+        self.writeFile(fileName, toSave)
     def performOnCurrent(self):
         toWrite = self.getTextToSave()
+        fileName = self.optionGroup.getOptionValue("f")
+        if not fileName:
+            raise plugins.TextTestError, "Cannot save selection - no file name specified"
+        elif os.path.isdir(fileName):
+            raise plugins.TextTestError, "Cannot save selection - existing directory specified"
+        else:
+            self.writeFile(fileName, toWrite)
+    def writeFile(self, fileName, toWrite):
         try:
-            file = open(self.fileName, "w")
+            file = open(fileName, "w")
             file.write(toWrite + "\n")
             file.close()
         except IOError, e:
-            self.notify("Error", "\nFailed to save selection:\n" + str(e) + "\n")
+            raise plugins.TextTestError, "\nFailed to save selection:\n" + str(e) + "\n"
     def messageAfterPerform(self):
-        return "Saved " + self.describeTests() + " in file '" + self.fileName + "'."
+        return "Saved " + self.describeTests() + " in file '" + self.optionGroup.getOptionValue("f") + "'."
 
 
-class LoadSelectionDialog(guiplugins.ActionConfirmationDialog):
-    def __init__(self, parent, okMethod, cancelMethod, plugin):
-        self.fileChooser = gtk.FileChooserWidget(gtk.FILE_CHOOSER_ACTION_OPEN)
-        self.fileChooser.set_show_hidden(True)
-        self.plugin = plugin
-        self.folders, defaultFolder = self.plugin.getDirectories()
-        self.startFolder = os.getcwd() # Just to make sure we always have some dir ...
-        if defaultFolder and os.path.isdir(os.path.abspath(defaultFolder)):
-            self.startFolder = os.path.abspath(defaultFolder)
-        guiplugins.ActionConfirmationDialog.__init__(self, parent, okMethod, cancelMethod, plugin)
-        self.dialog.set_modal(True)
-        self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
-
-    def createButtons(self):
-        self.cancelButton = self.dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL)
-        self.okButton = self.dialog.add_button("texttest-stock-load", gtk.RESPONSE_ACCEPT)
-        guiplugins.scriptEngine.registerOpenFileChooser(self.fileChooser, "select filter-file", "look in folder", "press load", "press cancel", 
-                                             self.respond, self.okButton, self.cancelButton)
-        
-    def addContents(self):
-        alignment = gtk.Alignment()
-        alignment.set(1.0, 1.0, 1.0, 1.0)
-        alignment.set_padding(5, 5, 5, 5)
-        vbox = gtk.VBox()
-        alignment.add(vbox)
-        self.dialog.vbox.pack_start(alignment, expand=True, fill=True)
-
-        # We want a filechooser dialog to let the user choose where, and
-        # with which name, to save the selection.
-        self.fileChooser.set_current_folder(self.startFolder)
-        for i in xrange(len(self.folders) - 1, -1, -1):
-            self.fileChooser.add_shortcut_folder(self.folders[i][1])
-        self.fileChooser.set_local_only(True)
-        vbox.pack_start(self.fileChooser, expand=True, fill=True)
-        parentSize = self.parent.get_size()
-        self.dialog.resize(int(parentSize[0] / 1.2), int(parentSize[0] / 1.7))
-
-    def respond(self, widget, saidOK, *args):
-        if saidOK:
-            self.setOptionsAndExit()
-        else:
-            self.doExit()
-    def setOptionsAndExit(self):
-        self.plugin.setFileName(self.fileChooser.get_filename().replace("\\", "/"))
-        self.clearDialog()
-        self.okMethod()
-
-    def clearDialog(self):
-        self.dialog.hide()
-        self.dialog.response(gtk.RESPONSE_NONE)
-
-    def doExit(self):
-        entrycompletion.manager.collectCompletions()
-        self.clearDialog()
-        self.cancelMethod()
-
-class LoadSelection(guiplugins.ActionGUI):
+class LoadSelection(guiplugins.ActionDialogGUI):
     def __init__(self, allApps, *args):
-        guiplugins.ActionGUI.__init__(self, allApps, *args)
-        self.optionGroup = plugins.OptionGroup(self.getTooltip())
-    
-        self.optionGroup.addOption("f", "", possibleDirs=allApps[0].getFilterFileDirectories(allApps, createDirs=False))
+        guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
+        self.addOption("f", "select filter-file", possibleDirs=allApps[0].getFilterFileDirectories(allApps, createDirs=False), selectFile=True)
         self.rootTestSuites = []
     def addSuites(self, suites):
         self.rootTestSuites = suites
     def isActiveOnCurrent(self, *args):
         return True
-    def setFileName(self, name):
-        self.optionGroup.setOptionValue("f", name)
     def getSignalsSent(self):
         return [ "SetTestSelection" ]
     def _getStockId(self):
@@ -1208,8 +1027,6 @@ class LoadSelection(guiplugins.ActionGUI):
         return "_Load Selection..."
     def getTooltip(self):
         return "Load test selection from file"
-    def getDialogType(self):
-        return LoadSelectionDialog
     def getDirectories(self):
         return self.optionGroup.getOption("f").getDirectories()
     def performOnCurrent(self):
@@ -1228,6 +1045,10 @@ class LoadSelection(guiplugins.ActionGUI):
             filters = suite.app.getFiltersFromFile(fileName)
             tests += suite.testCaseList(filters)
         return tests
+    def createButtons(self, dialog, *args):
+        guiplugins.ActionDialogGUI.createButtons(self, dialog, *args)
+        parentSize = self.topWindow.get_size()
+        dialog.resize(int(parentSize[0] / 1.2), int(parentSize[0] / 1.7))
 
     def messageBeforePerform(self):
         return "Loading test selection ..."
@@ -1346,7 +1167,7 @@ class ReconnectToTests(RunningAction):
         RunningAction.__init__(self, *args)
         self.addOption("v", "Version to reconnect to")
         self.addOption("reconnect", "Temporary result directory", os.getenv("TEXTTEST_TMP"), description="Specify a directory containing temporary texttest results. The reconnection will use a random subdirectory matching the version used.")
-        self.addSwitch("reconnfull", "Results:", 0, ["Display as they were", "Recompute from files"])
+        self.addSwitch("reconnfull", "Results", 0, ["Display as they were", "Recompute from files"])
     def getGroupTabTitle(self):
         return "Running"
     def _getStockId(self):
@@ -1977,80 +1798,29 @@ class RepositionTestLast(RepositionTest):
             return False
         currLastTest = self.currTestSelection[0].parent.testcases[len(self.currTestSelection[0].parent.testcases) - 1]
         return currLastTest != self.currTestSelection[0]
-
-class RenameDialog(guiplugins.ActionConfirmationDialog):
-    def __init__(self, parent, okMethod, cancelMethod, plugin):
-        guiplugins.ActionConfirmationDialog.__init__(self, parent, okMethod, cancelMethod, plugin)
-        self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
-        
-    def addContents(self):        
-        alignment = gtk.Alignment()
-        alignment.set(1.0, 1.0, 1.0, 1.0)
-        alignment.set_padding(5, 5, 5, 5)
-        vbox = gtk.VBox()
-        alignment.add(vbox)
-        self.dialog.vbox.pack_start(alignment, expand=True, fill=True)
-
-        header = gtk.Label()
-        header.set_markup("<b>" + plugins.convertForMarkup(self.plugin.oldName) + "</b>")
-        vbox.pack_start(header)
-        hbox2 = gtk.HBox()
-        hbox2.pack_start(gtk.Label("\nNew name:"), expand=False, fill=False)        
-        vbox.pack_start(hbox2)
-        self.entry = gtk.Entry()
-        self.entry.set_activates_default(True)
-        entrycompletion.manager.register(self.entry)
-        self.entry.set_text(self.plugin.newName)
-        guiplugins.scriptEngine.registerEntry(self.entry, "enter new name ")
-        vbox.pack_start(self.entry)
-        hbox3 = gtk.HBox()
-        hbox3.pack_start(gtk.Label("\nNew description:"), expand=False, fill=False)
-        vbox.pack_start(hbox3)
-        self.descriptionEntry = gtk.Entry()
-        self.descriptionEntry.set_activates_default(True)
-        entrycompletion.manager.register(self.descriptionEntry)
-        self.descriptionEntry.set_text(self.plugin.newDescription)
-        guiplugins.scriptEngine.registerEntry(self.descriptionEntry, "enter new description ")
-        vbox.pack_start(self.descriptionEntry)
-        
-    def respond(self, button, saidOK, *args):
-        if saidOK:
-            self.plugin.setNewInfo(self.entry.get_text(), self.descriptionEntry.get_text())
-            message, error = self.plugin.checkNewName()
-            if error:
-                showErrorDialog(message, self.dialog)
-                return
-            elif message:
-                dialog = QueryDialog(self.dialog, lambda: guiplugins.ActionConfirmationDialog.respond(self, button, saidOK, *args), None, None, message)
-                dialog.run()
-                return
-        guiplugins.ActionConfirmationDialog.respond(self, button, saidOK, *args)
-
     
-class RenameTest(guiplugins.ActionGUI):
+class RenameTest(guiplugins.ActionDialogGUI):
     def __init__(self, *args):
-        guiplugins.ActionGUI.__init__(self, *args)
-        self.newName = ""
+        guiplugins.ActionDialogGUI.__init__(self, *args)
+        self.addOption("name", "\nNew name")
+        self.addOption("desc", "\nNew description")
         self.oldName = ""
-        self.newDescription = ""
         self.oldDescription = ""
-    def setNewInfo(self, name, desc):
-        self.newName = name
-        self.newDescription = desc
     def correctTestClass(self):
         return "test-case"
     def singleTestOnly(self):
         return True
-    def getDialogType(self):
-        if self.isActiveOnCurrent():
-            self.newName = self.currTestSelection[0].name
-            self.newDescription = plugins.extractComment(self.currTestSelection[0].description)
-        else:
-            self.newName = ""
-            self.newDescription = ""
-        self.oldName = self.newName
-        self.oldDescription = self.newDescription
-        return RenameDialog
+    def updateOptions(self):
+        self.oldName = self.currTestSelection[0].name
+        self.oldDescription = plugins.extractComment(self.currTestSelection[0].description)
+        self.optionGroup.setOptionValue("name", self.oldName)
+        self.optionGroup.setOptionValue("desc", self.oldDescription)
+        return True
+    def fillVBox(self, vbox):
+        header = gtk.Label()
+        header.set_markup("<b>" + plugins.convertForMarkup(self.oldName) + "</b>")
+        vbox.pack_start(header)
+        return guiplugins.ActionDialogGUI.fillVBox(self, vbox)
     def _getStockId(self):
         return "italic"
     def _getTitle(self):
@@ -2058,36 +1828,39 @@ class RenameTest(guiplugins.ActionGUI):
     def getTooltip(self):
         return "Rename selected test"
     def messageAfterPerform(self):
-        if self.oldName != self.newName:
-            message = "Renamed test " + self.oldName + " to " + self.newName
-            if self.oldDescription != self.newDescription:
+        newName = self.optionGroup.getOptionValue("name")
+        newDesc = self.optionGroup.getOptionValue("desc")
+        if self.oldName != newName:
+            message = "Renamed test " + self.oldName + " to " + newName
+            if self.oldDescription != newDesc:
                 message += " and changed description."
             else:
                 message += "."
-        elif self.newDescription != self.oldDescription:
+        elif newDesc != self.oldDescription:
             message = "Changed description of test " + self.oldName + "."
         else:
             message = "Nothing changed."
         return message
-    def checkNewName(self):
-        if self.newName == self.currTestSelection[0].name:
-            return ("", False)
-        if len(self.newName) == 0:
-            return ("Please enter a new name.", True)
-        if self.newName.find(" ") != -1:
-            return ("The new name must not contain spaces, please choose another name.", True)
-        for test in self.currTestSelection[0].parent.testCaseList():
-            if test.name == self.newName:
-                return ("The name '" + self.newName + "' is already taken, please choose another name.", True)
-        newDir = os.path.join(self.currTestSelection[0].parent.getDirectory(), self.newName)
-        if os.path.isdir(newDir):
-            return ("The directory '" + newDir + "' already exists.\n\nDo you want to overwrite it?", False)
-        return ("", False)
+    def checkNewName(self, newName):
+        if len(newName) == 0:
+            raise plugins.TextTestError, "Please enter a new name."
+        if newName.find(" ") != -1:
+            raise plugins.TextTestError, "The new name must not contain spaces, please choose another name."
+        if newName != self.oldName:
+            for test in self.currTestSelection[0].parent.testCaseList():
+                if test.name == newName:
+                    raise plugins.TextTestError, "The name '" + newName + "' is already taken, please choose another name."
+            newDir = os.path.join(self.currTestSelection[0].parent.getDirectory(), newName)
+            if os.path.isdir(newDir):
+                raise plugins.TextTestError, "The directory " + newDir + " already exists, please choose another name."
     def performOnCurrent(self):
         try:
-            if self.newName != self.oldName or self.newDescription != self.oldDescription:
+            newName = self.optionGroup.getOptionValue("name")
+            self.checkNewName(newName)
+            newDesc = self.optionGroup.getOptionValue("desc")
+            if newName != self.oldName or newDesc != self.oldDescription:
                 for test in self.currTestSelection:
-                    test.rename(self.newName, self.newDescription)
+                    test.rename(newName, newDesc)
         except IOError, e:
             self.notify("Error", "Failed to rename test:\n" + str(e))
         except OSError, e:

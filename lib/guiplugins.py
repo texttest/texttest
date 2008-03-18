@@ -260,106 +260,6 @@ def showInformationDialog(message, parent=None):
     dialog.show_all()
     dialog.set_default_response(gtk.RESPONSE_CLOSE)
 
-#
-# A generic action dialog, containing stuff which is shared between ActionConfirmationDialog
-# and ActionResultDialog. It is recommended to inherit from those instead of directly
-# from this class.
-#
-class GenericActionDialog:
-    def __init__(self, parent, plugin):
-        self.parent = parent
-        self.plugin = plugin
-
-    def getDialogTitle(self):
-        return self.plugin.getTooltip()        
-
-    def isModal(self):
-        return True
-
-    def isResizeable(self):
-        return True
-    
-    def run(self):
-        self.addContents()
-        # Show if we've added something. This'll let us leave the dialog
-        # empty and e.g. pop up an error dialog if that is more suitable ...
-        if len(self.dialog.vbox.get_children()) > 2: # Separator and buttonbox are always there ...
-            self.dialog.show_all()
-        
-#
-# A skeleton for a dialog which can replace the 'tab options' of
-# today's actions. I think it should be possible to customize the
-# look of the dialog, so I'll let each subclass create its widgets,
-# rather than follow the TextTestGUI way to centrally decide the
-# option tab page layout. I think this will only add a minor overhead,
-# but will make it much easier to make the dialogs look nice.
-# 
-class ActionConfirmationDialog(GenericActionDialog):
-    def __init__(self, parent, okMethod, cancelMethod, plugin):
-        GenericActionDialog.__init__(self, parent, plugin)
-        self.okMethod = okMethod
-        self.cancelMethod = cancelMethod
-        if self.isModal():
-            self.dialog = gtk.Dialog(self.getDialogTitle(), parent, flags=gtk.DIALOG_MODAL) 
-            self.dialog.set_modal(True)
-        else:
-            self.dialog = gtk.Dialog(self.plugin.getTooltip())
-        self.dialog.set_resizable(self.isResizeable())
-        self.createButtons()
-
-    def createButtons(self):
-        self.cancelButton = self.dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL)
-        self.okButton = self.dialog.add_button(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT)       
-        scriptEngine.connect("press cancel", "clicked", self.cancelButton, self.respond, gtk.RESPONSE_CANCEL, False)
-        scriptEngine.connect("press ok", "clicked", self.okButton, self.respond, gtk.RESPONSE_ACCEPT, True)
-
-    def respond(self, button, saidOK, *args):
-        entrycompletion.manager.collectCompletions()
-        self.dialog.hide()
-        self.dialog.response(gtk.RESPONSE_NONE)
-        if saidOK and self.okMethod:
-            self.okMethod()
-        elif self.cancelMethod:
-            self.cancelMethod()
-            
-       
-class YesNoDialog(ActionConfirmationDialog):
-    def __init__(self, parent, okMethod, cancelMethod, plugin, message=None):
-        ActionConfirmationDialog.__init__(self, parent, okMethod, cancelMethod, plugin)
-        if self.plugin:
-            self.message = self.plugin.confirmationMessage
-        else:
-            self.message = message
-        guilog.info(self.alarmLevel().upper() + ": " + self.message)
-        self.dialog.set_default_response(gtk.RESPONSE_NO)
-
-    def getDialogTitle(self):
-        return "TextTest " + self.alarmLevel()
-
-    def createButtons(self):
-        noButton = self.dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
-        yesButton = self.dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
-        scriptEngine.connect("answer no to texttest " + self.alarmLevel(), "clicked",
-                             noButton, self.respond, gtk.RESPONSE_NO, False)
-        scriptEngine.connect("answer yes to texttest " + self.alarmLevel(), "clicked", yesButton,
-                             self.respond, gtk.RESPONSE_YES, True)
-
-    def addContents(self):
-        contents = createDialogMessage(self.message, self.stockIcon())
-        self.dialog.vbox.pack_start(contents, expand=True, fill=True)
-
-class QueryDialog(YesNoDialog):
-    def alarmLevel(self):
-        return "Query"
-    def stockIcon(self):
-        return gtk.STOCK_DIALOG_QUESTION
-
-class ConfirmationDialog(YesNoDialog):
-    def alarmLevel(self):
-        return "Confirmation"
-    def stockIcon(self):
-        return gtk.STOCK_DIALOG_WARNING
-        
 
 # base class for all "GUI" classes which manage parts of the display
 class SubGUI(plugins.Observable):
@@ -438,6 +338,25 @@ class BasicActionGUI(SubGUI):
     def notifyTopWindow(self, window):
         self.topWindow = window
 
+    def getParentWindow(self):
+        return self.topWindow
+
+    def isModal(self):
+        return True
+
+    def getDialogTitle(self):
+        return self.getTooltip()
+
+    def createDialog(self):
+        if self.isModal():
+            dialog = gtk.Dialog(self.getDialogTitle(), self.getParentWindow(), flags=gtk.DIALOG_MODAL) 
+            dialog.set_modal(True)
+        else:
+            dialog = gtk.Dialog(self.getDialogTitle())
+
+        dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+        return dialog
+    
     def getTitle(self, includeMnemonics=False):
         title = self._getTitle()
         if includeMnemonics:
@@ -515,23 +434,53 @@ class BasicActionGUI(SubGUI):
     def getSignalsSent(self):
         return [] # set up like this so every single derived class doesn't have to include it
 
+    def makeQueryDialog(self, parent, message, stockIcon, alarmLevel, respondMethod):
+        dialogTitle = "TextTest " + alarmLevel
+        dialog = gtk.Dialog(dialogTitle, parent, flags=gtk.DIALOG_MODAL) 
+        dialog.set_modal(True)
+        guilog.info(alarmLevel.upper() + ": " + message)
+        dialog.set_default_response(gtk.RESPONSE_NO)
+
+        noButton = dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
+        yesButton = dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
+        scriptEngine.connect("answer no to texttest " + alarmLevel, "clicked",
+                             noButton, respondMethod, gtk.RESPONSE_NO, False, dialog)
+        scriptEngine.connect("answer yes to texttest " + alarmLevel, "clicked",
+                             yesButton, respondMethod, gtk.RESPONSE_YES, True, dialog)
+
+        contents = createDialogMessage(message, stockIcon)
+        dialog.vbox.pack_start(contents, expand=True, fill=True)
+        return dialog
+
+    def cleanDialog(self, dialog):
+        entrycompletion.manager.collectCompletions()
+        dialog.hide()
+        dialog.response(gtk.RESPONSE_NONE)
+
+    def respond(self, button, saidOK, dialog):
+        self.cleanDialog(dialog)
+        if saidOK:
+            self._runInteractive()
+        else:
+            self.cancel()
+    
     def getConfirmationMessage(self):
         return ""
 
-    def getDialogType(self): # The dialog type to launch on action execution.
-        self.confirmationMessage = self.getConfirmationMessage()
-        if self.confirmationMessage:
-            return ConfirmationDialog
-
+    def createConfigurationDialog(self, *args): # The dialog type to launch on action execution.
+        confirmationMessage = self.getConfirmationMessage()
+        if confirmationMessage:
+            return self.makeQueryDialog(self.getParentWindow(), confirmationMessage,
+                                        gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respond)
+    
     def runInteractive(self, *args):
         if self.busy: # If we're busy with some other action, ignore this one ...
             return
                 
         try:
-            dialogType = self.getDialogType()
-            if dialogType:
-                dialog = dialogType(self.topWindow, self._runInteractive, self.cancel, self)
-                dialog.run()
+            dialog = self.createConfigurationDialog()
+            if dialog:
+                dialog.show_all()
             else:
                 # Each time we perform an action we collect and save the current registered entries
                 # Actions showing dialogs will handle this in the dialog code.
@@ -684,41 +633,17 @@ class ActionResultDialogGUI(ActionGUI):
         self.dialog = self.createDialog()
         self.addContents()
         self.createButtons()
-        # Show if we've added something. This'll let us leave the dialog
-        # empty and e.g. pop up an error dialog if that is more suitable ...
-        if len(self.dialog.vbox.get_children()) > 2: # Separator and buttonbox are always there ...
-            self.dialog.show_all()
-
-    def isModal(self):
-        return True
+        self.dialog.show_all()
 
     def addContents(self):
         pass
-
-    def getDialogTitle(self):
-        return self.getTooltip()
-
-    def getParentWindow(self):
-        return self.topWindow
     
-    def createDialog(self):
-        if self.isModal():
-            dialog = gtk.Dialog(self.getDialogTitle(), self.getParentWindow(), flags=gtk.DIALOG_MODAL) 
-            dialog.set_modal(True)
-            return dialog
-        else:
-            return gtk.Dialog(self.getDialogTitle())
-        
     def createButtons(self):
         okButton = self.dialog.add_button(gtk.STOCK_CLOSE, gtk.RESPONSE_ACCEPT)       
-        scriptEngine.connect("press close", "clicked", okButton, self.respond, gtk.RESPONSE_ACCEPT, True)
-        self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+        scriptEngine.connect("press close", "clicked", okButton, self.respond, gtk.RESPONSE_ACCEPT, True, self.dialog)
 
-    def respond(self, *args):
-        entrycompletion.manager.collectCompletions()
-        self.dialog.hide()
-        self.dialog.response(gtk.RESPONSE_NONE)
-                
+    def respond(self, button, saidOK, dialog):
+        self.cleanDialog(dialog)
 
 class ComboBoxListFinder:
     def __init__(self, combobox):
@@ -733,71 +658,102 @@ class ComboBoxListFinder:
         entries.append(text)
 
 
-class ActionTabGUI(ActionGUI):
+class OptionGroupGUI(ActionGUI):
     def __init__(self, *args):
         ActionGUI.__init__(self, *args)
         self.optionGroup = plugins.OptionGroup(self.getTabTitle())
         # convenience shortcuts...
         self.addOption = self.optionGroup.addOption
         self.addSwitch = self.optionGroup.addSwitch
-        self.vbox = None
-        self.diag = plugins.getDiagnostics("Action Tabs")
-        self.sensitive = self.isActiveOnCurrent()
-        self.diag.info("Creating action tab for " + self.getTabTitle() + ", sensitive " + repr(self.sensitive))
         self.tooltips = gtk.Tooltips()
-    def shouldShowCurrent(self, *args):
-        return self.sensitive
-    def createView(self):
-        return self.addScrollBars(self.createVBox())
-    def setSensitivity(self, newValue):
-        ActionGUI.setSensitivity(self, newValue)
-        self.sensitive = newValue
-        self.diag.info("Sensitivity of " + self.getTabTitle() + " changed to " + repr(newValue))
-        if self.sensitive and self.updateOptions():
-            self.contentsChanged()        
+
     def updateOptions(self):
         return False     
 
-    def notifyReset(self):
-        self.optionGroup.reset()
-        self.contentsChanged()
-    def createVBox(self):
-        self.vbox = gtk.VBox()
-        if len(self.optionGroup.options) > 0:
-            # Creating 0-row table gives a warning ...
-            table = gtk.Table(len(self.optionGroup.options), 2, homogeneous=False)
-            table.set_row_spacings(1)
-            rowIndex = 0        
-            for option in self.optionGroup.options.values():
-                newValue = self.updateForConfig(option)
-                if newValue:
-                    option.addPossibleValue(newValue)
-                for extraOption in self.getConfigOptions(option):
-                    option.addPossibleValue(extraOption)
+    def updateForConfig(self, option):
+        fromConfig = guiConfig.getCompositeValue("gui_entry_overrides", option.name)
+        if fromConfig != "<not set>":
+            option.setValue(fromConfig)
+            return fromConfig
+    
+    def createOptionEntry(self, option, separator):
+        widget, entry = self.createOptionWidget(option)
+        label = gtk.EventBox()
+        label.add(gtk.Label(option.name + separator))
+        if option.description:
+            self.tooltips.set_tip(label, option.description)
+        scriptEngine.registerEntry(entry, "enter " + option.name.strip() + " =")
+        entry.set_text(option.getValue())
+        entrycompletion.manager.register(entry)
+        # Options in drop-down lists don't change, so we just add them once and for all.
+        for text in option.listPossibleValues():
+            entrycompletion.manager.addTextCompletion(text)
+        option.setMethods(entry.get_text, entry.set_text)
+        return label, widget, entry
 
-                label, entry = self.createOptionEntry(option)
-                if isinstance(label, gtk.Label):
-                    label.set_alignment(1.0, 0.5)
-                else:
-                    label.get_children()[0].set_alignment(1.0, 0.5)
-                table.attach(label, 0, 1, rowIndex, rowIndex + 1, xoptions=gtk.FILL, xpadding=1)
-                table.attach(entry, 1, 2, rowIndex, rowIndex + 1)
-                rowIndex += 1
-                table.show_all()
-            self.vbox.pack_start(table, expand=False, fill=False)
-        
+    def addValuesFromConfig(self, option):
+        newValue = self.updateForConfig(option)
+        if newValue:
+            option.addPossibleValue(newValue)
+        for extraOption in self.getConfigOptions(option):
+            option.addPossibleValue(extraOption)
+
+    def addSwitches(self, vbox):
         for switch in self.optionGroup.switches.values():
-            hbox = self.createSwitchBox(switch)
-            self.vbox.pack_start(hbox, expand=False, fill=False)
+            widget = self.createSwitchWidget(switch)
+            vbox.pack_start(widget, expand=False, fill=False)
 
-        button = self.createButton()
-        buttonbox = gtk.HBox()
-        buttonbox.pack_start(button, expand=True, fill=False)
-        buttonbox.show()
-        self.vbox.pack_start(buttonbox, expand=False, fill=False, padding=8)
-        self.vbox.show()
-        return self.vbox
-        
+    def createRadioButtonCollection(self, switch):
+        hbox = gtk.HBox()
+        label = gtk.EventBox()
+        label.add(gtk.Label(switch.name + ":"))
+        if switch.description:
+            self.tooltips.set_tip(label, switch.description)
+        hbox.pack_start(label, expand=False, fill=False)
+        for button in self.createRadioButtons(switch):
+            hbox.pack_start(button, expand=True, fill=True)
+        hbox.show_all()
+        return hbox
+
+    def createRadioButtons(self, switch):
+        buttons = []
+        mainRadioButton = None
+        for index in range(len(switch.options)):
+            option = switch.options[index]
+            cleanOption = option.split("\n")[0].replace("_", "")
+            if guiConfig.getCompositeValue("gui_entry_overrides", switch.name + ":" + cleanOption) == "1":
+                switch.setValue(index)
+            radioButton = gtk.RadioButton(mainRadioButton, option, use_underline=True)
+            buttons.append(radioButton)
+            scriptEngine.registerToggleButton(radioButton, "choose " + cleanOption)
+            if not mainRadioButton:
+                mainRadioButton = radioButton
+            if switch.defaultValue == index:
+                switch.resetMethod = radioButton.set_active
+            if switch.getValue() == index:
+                radioButton.set_active(True)
+            else:
+                radioButton.set_active(False)
+        indexer = RadioGroupIndexer(buttons)
+        switch.setMethods(indexer.getActiveIndex, indexer.setActiveIndex)
+        return buttons
+
+    def createSwitchWidget(self, switch):
+        if len(switch.options) >= 1:
+            return self.createRadioButtonCollection(switch)
+        else:
+            return self.createCheckBox(switch)
+
+    def createCheckBox(self, switch):
+        self.updateForConfig(switch)
+        checkButton = gtk.CheckButton(switch.name)
+        if int(switch.getValue()):
+            checkButton.set_active(True)
+        scriptEngine.registerToggleButton(checkButton, "check " + switch.name, "uncheck " + switch.name)
+        switch.setMethods(checkButton.get_active, checkButton.set_active)
+        checkButton.show()
+        return checkButton
+
     def createComboBox(self, option):
         combobox = gtk.combo_box_entry_new_text()
         entry = combobox.child
@@ -830,70 +786,90 @@ class ActionTabGUI(ActionGUI):
     def getConfigOptions(self, option):
         return guiConfig.getCompositeValue("gui_entry_options", option.name)    
 
-    def updateForConfig(self, option):
-        fromConfig = guiConfig.getCompositeValue("gui_entry_overrides", option.name)
-        if fromConfig != "<not set>":
-            option.setValue(fromConfig)
-            return fromConfig
-    
-    def createOptionEntry(self, option):
-        widget, entry = self.createOptionWidget(option)
-        label = gtk.EventBox()
-        label.add(gtk.Label(option.name + "  "))
-        if option.description:
-            self.tooltips.set_tip(label, option.description)
-        scriptEngine.registerEntry(entry, "enter " + option.name + " =")
-        scriptEngine.connect("activate from " + option.name, "activate", entry, self.runInteractive)
-        entry.set_text(option.getValue())
-        entrycompletion.manager.register(entry)
-        # Options in drop-down lists don't change, so we just add them once and for all.
-        for text in option.listPossibleValues():
-            entrycompletion.manager.addTextCompletion(text)
-        option.setMethods(entry.get_text, entry.set_text)
-        return label, widget
-    
-    def createSwitchBox(self, switch):
-        if len(switch.options) >= 1:
-            hbox = gtk.HBox()
-            label = gtk.EventBox()
-            label.add(gtk.Label(switch.name))
-            if switch.description:
-                self.tooltips.set_tip(label, switch.description)
-            hbox.pack_start(label, expand=False, fill=False)
-            count = 0
-            buttons = []
-            mainRadioButton = None
-            for index in range(len(switch.options)):
-                option = switch.options[index]
-                if guiConfig.getCompositeValue("gui_entry_overrides", switch.name + option) == "1":
-                    switch.setValue(index)
-                radioButton = gtk.RadioButton(mainRadioButton, option)
-                buttons.append(radioButton)
-                scriptEngine.registerToggleButton(radioButton, "choose " + option)
-                if not mainRadioButton:
-                    mainRadioButton = radioButton
-                if switch.defaultValue == index:
-                    switch.resetMethod = radioButton.set_active
-                if switch.getValue() == index:
-                    radioButton.set_active(True)
-                else:
-                    radioButton.set_active(False)
-                hbox.pack_start(radioButton, expand=True, fill=True)
-                count = count + 1
-            indexer = RadioGroupIndexer(buttons)
-            switch.setMethods(indexer.getActiveIndex, indexer.setActiveIndex)
-            hbox.show_all()
-            return hbox  
-        else:
-            self.updateForConfig(switch)
-            checkButton = gtk.CheckButton(switch.name)
-            if int(switch.getValue()):
-                checkButton.set_active(True)
-            scriptEngine.registerToggleButton(checkButton, "check " + switch.name, "uncheck " + switch.name)
-            switch.setMethods(checkButton.get_active, checkButton.set_active)
-            checkButton.show()
-            return checkButton
+    def describeOptionGroup(self):
+        for option in self.optionGroup.options.values():
+            guilog.info(self.getOptionDescription(option))
+        for switch in self.optionGroup.switches.values():
+            guilog.info(self.getSwitchDescription(switch))
 
+    def getOptionDescription(self, option):
+        value = option.getValue()
+        text = "Viewing entry for option '" + option.name.replace("\n", "\\n") + "'"
+        if len(value) > 0:
+            text += " (set to '" + value + "')"
+        if option.inqNofValues() > 1:
+            text += " (drop-down list containing " + repr(option.listPossibleValues()) + ")"
+        return text
+
+    def getSwitchDescription(self, switch):
+        value = switch.getValue()
+        if len(switch.options) >= 1:
+            text = "Viewing radio button for switch '" + switch.name + "', options "
+            text += "/".join(switch.options)
+            text += "'. Default value " + str(value) + "."
+        else:
+            text = "Viewing check button for switch '" + switch.name + "'"
+            if value:
+                text += " (checked)"
+        return text
+
+    
+class ActionTabGUI(OptionGroupGUI):
+    def __init__(self, *args):
+        OptionGroupGUI.__init__(self, *args)
+        self.vbox = None
+        self.sensitive = self.isActiveOnCurrent()
+        self.diag.info("Creating action tab for " + self.getTabTitle() + ", sensitive " + repr(self.sensitive))
+    def shouldShowCurrent(self, *args):
+        return self.sensitive
+    def createView(self):
+        self.vbox = self.createVBox()
+        self.createButtons()
+        return self.addScrollBars(self.vbox)
+    def setSensitivity(self, newValue):
+        ActionGUI.setSensitivity(self, newValue)
+        self.sensitive = newValue
+        self.diag.info("Sensitivity of " + self.getTabTitle() + " changed to " + repr(newValue))
+        if self.sensitive and self.updateOptions():
+            self.contentsChanged()        
+    
+    def notifyReset(self):
+        self.optionGroup.reset()
+        self.contentsChanged()
+
+    def createVBox(self):
+        self.vbox = gtk.VBox()
+        if len(self.optionGroup.options) > 0:
+            # Creating 0-row table gives a warning ...
+            table = gtk.Table(len(self.optionGroup.options), 2, homogeneous=False)
+            table.set_row_spacings(1)
+            rowIndex = 0        
+            for option in self.optionGroup.options.values():
+                self.addValuesFromConfig(option)
+
+                label, entryWidget, entry = self.createOptionEntry(option, separator="  ")
+                scriptEngine.connect("activate from " + option.name, "activate", entry, self.runInteractive)
+                if isinstance(label, gtk.Label):
+                    label.set_alignment(1.0, 0.5)
+                else:
+                    label.get_children()[0].set_alignment(1.0, 0.5)
+                table.attach(label, 0, 1, rowIndex, rowIndex + 1, xoptions=gtk.FILL, xpadding=1)
+                table.attach(entryWidget, 1, 2, rowIndex, rowIndex + 1)
+                rowIndex += 1
+                table.show_all()
+            self.vbox.pack_start(table, expand=False, fill=False)
+
+        self.addSwitches(self.vbox)
+        self.vbox.show()
+        return self.vbox
+
+    def createButtons(self):
+        button = self.createButton()
+        buttonbox = gtk.HBox()
+        buttonbox.pack_start(button, expand=True, fill=False)
+        buttonbox.show()
+        self.vbox.pack_start(buttonbox, expand=False, fill=False, padding=8)
+    
     def showDirectoryChooser(self, widget, entry, option):
         dialog = gtk.FileChooserDialog("Select a directory",
                                        self.vbox.get_toplevel(),
@@ -917,7 +893,7 @@ class ActionTabGUI(ActionGUI):
         dialog.set_modal(True)
         folders, defaultFolder = option.getDirectories()
         scriptEngine.registerOpenFileChooser(dialog, "select filter-file", "look in folder", 
-                                             "open selected file", "cancel file selection", self.respond, respondMethodArg=entry)
+                                             "open selected file", "cancel file selection", self.respondChooser, respondMethodArg=entry)
         # If current entry forms a valid path, set that as default
         currPath = entry.get_text()
         currDir, currFile = os.path.split(currPath)
@@ -929,41 +905,130 @@ class ActionTabGUI(ActionGUI):
             dialog.add_shortcut_folder(folders[i][1])
         dialog.set_default_response(gtk.RESPONSE_OK)
         dialog.show()
-    def respond(self, dialog, response, entry):
+    def respondChooser(self, dialog, response, entry):
         if response == gtk.RESPONSE_OK:
             entry.set_text(dialog.get_filename().replace("\\", "/"))
             entry.set_position(-1) # Sets position last, makes it possible to see the vital part of long paths 
         dialog.destroy()
-        
+
     def describe(self):
         guilog.info("Viewing notebook page for '" + self.getTabTitle() + "'")
-        for option in self.optionGroup.options.values():
-            guilog.info(self.getOptionDescription(option))
-        for switch in self.optionGroup.switches.values():
-            guilog.info(self.getSwitchDescription(switch))
-
+        self.describeOptionGroup()
         self.describeAction()
-        
-    def getOptionDescription(self, option):
-        value = option.getValue()
-        text = "Viewing entry for option '" + option.name + "'"
-        if len(value) > 0:
-            text += " (set to '" + value + "')"
-        if option.inqNofValues() > 1:
-            text += " (drop-down list containing " + repr(option.listPossibleValues()) + ")"
-        return text
     
-    def getSwitchDescription(self, switch):
-        value = switch.getValue()
-        if len(switch.options) >= 1:
-            text = "Viewing radio button for switch '" + switch.name + "', options "
-            text += "/".join(switch.options)
-            text += "'. Default value " + str(value) + "."
+
+class ActionDialogGUI(OptionGroupGUI):
+    def createConfigurationDialog(self):
+        dialog = self.createDialog()
+        alignment = self.createAlignment()
+        vbox = gtk.VBox()
+        fileChooser, scriptName = self.fillVBox(vbox)
+        alignment.add(vbox)
+        dialog.vbox.pack_start(alignment, expand=True, fill=True)
+        self.createButtons(dialog, fileChooser, scriptName)
+        guilog.info("Viewing dialog with title '" + dialog.get_title() + "'")
+        self.describeOptionGroup()
+        return dialog
+    
+    def setSensitivity(self, newValue):
+        ActionGUI.setSensitivity(self, newValue)
+        if newValue:
+            self.updateOptions()
+            
+    def createAlignment(self):
+        alignment = gtk.Alignment()
+        alignment.set(1.0, 1.0, 1.0, 1.0)
+        alignment.set_padding(5, 5, 5, 5)
+        return alignment
+
+    def getOkStock(self, fileChooser):
+        if fileChooser:
+            if fileChooser.get_property("action") == gtk.FILE_CHOOSER_ACTION_OPEN:
+                return "texttest-stock-load"
+            else:
+                return gtk.STOCK_SAVE
         else:
-            text = "Viewing check button for switch '" + switch.name + "'"
+            return gtk.STOCK_OK
+
+    def createButtons(self, dialog, fileChooser, scriptName):
+        cancelButton = dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL)
+        okButton = dialog.add_button(self.getOkStock(fileChooser), gtk.RESPONSE_ACCEPT)
+        dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+        if fileChooser:
+            if fileChooser.get_property("action") == gtk.FILE_CHOOSER_ACTION_OPEN:
+                scriptEngine.registerOpenFileChooser(fileChooser, scriptName,
+                                                     "look in folder", "press load", "press cancel", 
+                                                     self.respond, okButton, cancelButton, dialog)
+            else:
+                scriptEngine.registerSaveFileChooser(fileChooser, scriptName,
+                                                     "choose folder", "press save", "press cancel",
+                                                     self.respond, okButton, cancelButton, dialog)
+        else:
+            scriptEngine.connect("press cancel", "clicked", cancelButton, self.respond, gtk.RESPONSE_CANCEL, False, dialog)
+            scriptEngine.connect("press ok", "clicked", okButton, self.respond, gtk.RESPONSE_ACCEPT, True, dialog)
+
+    def fillVBox(self, vbox):
+        fileChooser, scriptName = None, ""
+        for option in self.optionGroup.options.values():
+            self.addValuesFromConfig(option)
+            
+            if option.selectFile or option.saveFile:
+                scriptName = option.name
+                fileChooser = self.createFileChooser(option)
+                vbox.pack_start(fileChooser, expand=True, fill=True)
+            else:
+                label, entryWidget, entry = self.createOptionEntry(option, separator=":")
+                entry.set_activates_default(True)
+                hbox2 = gtk.HBox()
+                hbox2.pack_start(label, expand=False, fill=False)        
+                vbox.pack_start(hbox2)
+                vbox.pack_start(entryWidget)
+                
+        self.addSwitches(vbox)            
+        return fileChooser, scriptName
+    
+    def createRadioButtonCollection(self, switch):
+        frame = gtk.Frame(switch.name)
+        frameBox = gtk.VBox()
+        for button in self.createRadioButtons(switch):
+            frameBox.pack_start(button)
+        frame.add(frameBox)
+        return frame
+    
+    def getFileChooserFlag(self, option):
+        if option.selectFile:
+            return gtk.FILE_CHOOSER_ACTION_OPEN
+        else:
+            return gtk.FILE_CHOOSER_ACTION_SAVE
+    def createFileChooser(self, option):
+        fileChooser = gtk.FileChooserWidget(self.getFileChooserFlag(option))
+        fileChooser.set_show_hidden(True)
+        folders, defaultFolder = option.getDirectories()
+        startFolder = os.getcwd() # Just to make sure we always have some dir ...
+        if defaultFolder and os.path.isdir(os.path.abspath(defaultFolder)):
+            startFolder = os.path.abspath(defaultFolder)
+            
+        # We want a filechooser dialog to let the user choose where, and
+        # with which name, to save the selection.
+        fileChooser.set_current_folder(startFolder)
+        for i in xrange(len(folders) - 1, -1, -1):
+            fileChooser.add_shortcut_folder(folders[i][1])
+            
+        fileChooser.set_local_only(True)
+        option.setMethods(fileChooser.get_filename, fileChooser.set_filename)
+        return fileChooser
+
+    def getOptionDescription(self, option):
+        if option.selectFile or option.saveFile:
+            text = "Viewing filechooser for option '" + option.name.replace("\n", "\\n") + "'"
+            value = option.getValue()
             if value:
-                text += " (checked)"
-        return text
+                text += " (set to '" + value + "')"
+            if len(option.possibleDirs):
+                text += " (choosing from directories " + repr(option.possibleDirs) + ")"
+            return text
+        else:
+            return OptionGroupGUI.getOptionDescription(self, option)
 
 
 # Placeholder for all classes. Remember to add them!

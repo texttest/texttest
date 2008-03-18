@@ -46,60 +46,14 @@ class SelectTests(default_gui.SelectTests):
             if self.optionGroup.getSwitchValue(feature, 0):
                 result.append(feature)
         return result
-
-
-# Dialog for performance report...
-class CreatePerformanceReportDialog(guiplugins.ActionConfirmationDialog):
-    def __init__(self, parent, okMethod, cancelMethod, plugin):
-        guiplugins.ActionConfirmationDialog.__init__(self, parent, okMethod, cancelMethod, plugin)
-        self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
-
-    def addContents(self):
-        # A simple entry for the path, and one for the versions ...
-        self.dirEntry = gtk.Entry()
-        self.versionsEntry = gtk.Entry()
-        self.objectiveTextEntry = gtk.Entry()
-        entrycompletion.manager.register(self.dirEntry)
-        entrycompletion.manager.register(self.versionsEntry)
-        entrycompletion.manager.register(self.objectiveTextEntry)
-        self.dirEntry.set_activates_default(True)
-        self.versionsEntry.set_activates_default(True)
-        self.objectiveTextEntry.set_activates_default(True)
-        self.dirEntry.set_text(self.plugin.rootDir)
-        self.versionsEntry.set_text(",".join(self.plugin.versions).rstrip(","))
-        self.objectiveTextEntry.set_text(self.plugin.objectiveText)
-        
-        table = gtk.Table(3, 2, homogeneous=False)
-        table.set_row_spacings(1)
-        table.attach(gtk.Label("Save in directory:"), 0, 1, 0, 1, xoptions=gtk.FILL, xpadding=1)
-        table.attach(gtk.Label("Compare versions:"), 0, 1, 1, 2, xoptions=gtk.FILL, xpadding=1)
-        table.attach(gtk.Label("Objective value text:"), 0, 1, 2, 3, xoptions=gtk.FILL, xpadding=1)
-        table.attach(self.dirEntry, 1, 2, 0, 1)
-        table.attach(self.versionsEntry, 1, 2, 1, 2)
-        table.attach(self.objectiveTextEntry, 1, 2, 2, 3)
-        guiplugins.scriptEngine.registerEntry(self.dirEntry, "choose directory ")
-        guiplugins.scriptEngine.registerEntry(self.versionsEntry, "choose versions ")
-        guiplugins.scriptEngine.registerEntry(self.objectiveTextEntry, "choose objective text ")
-        self.dialog.vbox.pack_start(table, expand = True, fill = True)
-        
-    def respond(self, button, saidOK, *args):
-        if saidOK:
-            self.plugin.setInfo(os.path.abspath(self.dirEntry.get_text()),
-                                self.versionsEntry.get_text().replace(" ", "").split(","),
-                                self.objectiveTextEntry.get_text())
-        guiplugins.ActionConfirmationDialog.respond(self, button, saidOK, *args)
     
 
-class CreatePerformanceReport(guiplugins.ActionGUI):
+class CreatePerformanceReport(guiplugins.ActionDialogGUI):
     def __init__(self, *args):
-        guiplugins.ActionGUI.__init__(self, *args)
-        self.rootDir = ""
-        self.versions = ["11", "12", "13", "14", "master" ]
-        self.objectiveText = "Total cost of plan"
-    def setInfo(self, rootDir, versions, objectiveText):
-        self.rootDir = rootDir
-        self.versions = versions
-        self.objectiveText = objectiveText
+        guiplugins.ActionDialogGUI.__init__(self, *args)
+        self.addOption("dir", "Save in directory")
+        self.addOption("ver", "\nCompare versions", "11,12,13,14,master")
+        self.addOption("obj", "\nObjective value text", "Total cost of plan")
     def correctTestClass(self):
         return "test-case"
     def inToolBar(self): 
@@ -108,8 +62,6 @@ class CreatePerformanceReport(guiplugins.ActionGUI):
         return "_Optimization"
     def separatorBeforeInMainMenu(self):
         return True
-    def getDialogType(self):
-        return CreatePerformanceReportDialog
     def _getTitle(self):
         return "Create Performance Report..."
     def getTooltip(self):
@@ -120,6 +72,8 @@ class CreatePerformanceReport(guiplugins.ActionGUI):
         self.apps = {}
         self.testPaths = []
         self.timeStamp = time()
+        self.versions = self.optionGroup.getOptionValue("ver").replace(" ", "").split(",")
+        self.rootDir = os.path.abspath(self.optionGroup.getOptionValue("dir"))
         self.createStyleFile()
     def performOnCurrent(self):
         self.initialize()
@@ -128,9 +82,8 @@ class CreatePerformanceReport(guiplugins.ActionGUI):
         self.createMainIndexFile()
     def collectTest(self, test):
         self.apps[test.app.fullName] = test.app.fullName
-        pathToTest = os.path.join(self.rootDir,
-                                  os.path.join(test.app.fullName.lower().replace(' ', '_'),
-                                               os.path.join(test.getRelPath(), "index.html")))
+        pathToTest = os.path.join(self.rootDir, test.app.fullName.lower().replace(' ', '_'),
+                                  test.getRelPath(), "index.html")
         dir, file = os.path.split(os.path.abspath(pathToTest))
         try:
             os.makedirs(dir)
@@ -144,7 +97,7 @@ class CreatePerformanceReport(guiplugins.ActionGUI):
         headerColor = "#C9CFEE"
         tableBackgroundColor = "#EEEEEE"
         
-        self.styleFilePath = os.path.join(self.rootDir, os.path.join("include", "performance_style.css"))
+        self.styleFilePath = os.path.join(self.rootDir, "include", "performance_style.css")
         try:
             os.makedirs(os.path.split(self.styleFilePath)[0])
         except:
@@ -305,7 +258,7 @@ class CreatePerformanceReport(guiplugins.ActionGUI):
             latestSolution = ""
             results = []
             for line in lines:
-                if line.find(self.objectiveText) != -1:
+                if line.find(self.optionGroup.getOptionValue("obj")) != -1:
                     latestCost = line[line.rfind(":") + 2:].strip(" \n")
                 elif line.find("Assignment percentage") != -1:
                     latestAssignment = line[line.rfind(":") + 2:].strip(" \n")
@@ -330,7 +283,7 @@ class CreatePerformanceReport(guiplugins.ActionGUI):
 
     def generateGraphs(self, dir, performance, terminal):
         self.generateGraphData(dir, performance)
-        return self.generateGraph(dir, "cost", "Time (minutes)", self.objectiveText, terminal), \
+        return self.generateGraph(dir, "cost", "Time (minutes)", self.optionGroup.getOptionValue("obj"), terminal), \
                self.generateGraph(dir, "assignment", "Time (minutes)", "Assignment percentage", terminal), \
                self.generateGraph(dir, "memory", "Time (minutes)", "Memory consumption (Mb)", terminal)
 

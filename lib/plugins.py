@@ -943,13 +943,15 @@ class Option:
             self.valueMethod = None
 
 class TextOption(Option):
-    def __init__(self, name, value="", possibleValues=[], allocateNofValues=-1, selectDir=False, selectFile=False, possibleDirs=[], description=""):
+    def __init__(self, name, value="", possibleValues=[], allocateNofValues=-1,
+                 selectDir=False, selectFile=False, saveFile=False, possibleDirs=[], description=""):
         Option.__init__(self, name, value, description)
         self.possValAppendMethod = None
         self.possValListMethod = None
         self.nofValues = allocateNofValues
         self.selectDir = selectDir
         self.selectFile = selectFile
+        self.saveFile = saveFile
         self.possibleDirs = possibleDirs
         self.clearMethod = None
         self.setPossibleValues(possibleValues)
@@ -1003,7 +1005,7 @@ class TextOption(Option):
         defaultDir = None
         for dir in self.possibleDirs:
             if os.path.isdir(os.path.abspath(dir[1])):
-                if len(os.listdir(os.path.abspath(dir[1]))) > 0 and \
+                if (self.saveFile or len(os.listdir(os.path.abspath(dir[1]))) > 0) and \
                        not defaultDir:                
                     defaultDir = dir[1]
                 existingDirs.append(dir)

@@ -1,6 +1,6 @@
 
 import gtk, plugins, texttest_version, os, string, sys, glob
-from guiplugins import scriptEngine, guilog, ActionResultDialogGUI, showErrorDialog
+from guiplugins import scriptEngine, guilog, ActionResultDialogGUI
 
 # Show useful info about TextTest.
 # I don't particularly like the standard gtk.AboutDialog, and we also want
@@ -146,7 +146,7 @@ class CreditsDialog(ActionResultDialogGUI):
             buffer = gtk.TextBuffer()
             buffer.set_text(creditsText)
         except Exception, e:
-            showErrorDialog("Failed to show AUTHORS file:\n" + str(e), self.parent)
+            self.showErrorDialog("Failed to show AUTHORS file:\n" + str(e))
             return
 
         textView = gtk.TextView(buffer)
@@ -180,7 +180,7 @@ class LicenseDialog(ActionResultDialogGUI):
             buffer = gtk.TextBuffer()
             buffer.set_text(licenseText)
         except Exception, e:
-            showErrorDialog("Failed to show LICENSE file:\n" + str(e), self.parent)
+            self.showErrorDialog("Failed to show LICENSE file:\n" + str(e))
             return
 
         textView = gtk.TextView(buffer)

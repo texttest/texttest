@@ -197,68 +197,7 @@ class ProcessTerminationMonitor(plugins.Observable):
             guilog.info("Killing '" + description + "' interactive process")
             JobProcess(process.pid).killAll(sig)
         
-
 processMonitor = ProcessTerminationMonitor()
-                       
-
-def destroyDialog(dialog, *args):
-    dialog.destroy()
-
-def createDialogMessage(message, stockIcon, scrollBars=False):
-    buffer = gtk.TextBuffer()
-    buffer.set_text(message)
-    textView = gtk.TextView(buffer)
-    textView.set_editable(False)
-    textView.set_cursor_visible(False)
-    textView.set_left_margin(5)
-    textView.set_right_margin(5)
-    hbox = gtk.HBox()
-    imageBox = gtk.VBox()
-    imageBox.pack_start(gtk.image_new_from_stock(stockIcon, gtk.ICON_SIZE_DIALOG), expand=False)
-    hbox.pack_start(imageBox, expand=False)
-    scrolledWindow = gtk.ScrolledWindow()
-    # What we would like is that the dialog expands without scrollbars
-    # until it reaches some maximum size, and then adds scrollbars. At
-    # the moment I cannot make this happen without setting a fixed window
-    # size, so I'll set the scrollbar policy to never instead.
-    if scrollBars:
-        scrolledWindow.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-    else:
-        scrolledWindow.set_policy(gtk.POLICY_NEVER, gtk.POLICY_NEVER)
-    scrolledWindow.add(textView)
-    scrolledWindow.set_shadow_type(gtk.SHADOW_IN)
-    hbox.pack_start(scrolledWindow, expand=True, fill=True)
-    alignment = gtk.Alignment()
-    alignment.set_padding(5, 5, 0, 5)
-    alignment.add(hbox)
-    return alignment
-
-def showErrorDialog(message, parent=None):
-    guilog.info("ERROR: " + message)
-    dialog = gtk.Dialog("TextTest Error", parent, buttons=(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
-    dialog.set_modal(True)
-    dialog.vbox.pack_start(createDialogMessage(message, gtk.STOCK_DIALOG_ERROR), expand=True, fill=True)
-    scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
-    dialog.show_all()
-    dialog.set_default_response(gtk.RESPONSE_ACCEPT)
-
-def showWarningDialog(message, parent=None):
-    guilog.info("WARNING: " + message)
-    dialog = gtk.Dialog("TextTest Warning", parent, buttons=(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
-    dialog.set_modal(True)
-    dialog.vbox.pack_start(createDialogMessage(message, gtk.STOCK_DIALOG_WARNING), expand=True, fill=True)
-    scriptEngine.connect("agree to texttest message", "response", dialog, destroyDialog, gtk.RESPONSE_ACCEPT)
-    dialog.show_all()
-    dialog.set_default_response(gtk.RESPONSE_ACCEPT)
-
-def showInformationDialog(message, parent=None):
-    guilog.info("INFORMATION: " + message)
-    dialog = gtk.Dialog("TextTest Information", parent, buttons=(gtk.STOCK_CLOSE, gtk.RESPONSE_CLOSE))
-    dialog.set_modal(True)
-    dialog.vbox.pack_start(createDialogMessage(message, gtk.STOCK_DIALOG_INFO), expand=True, fill=True)
-    scriptEngine.connect("press close", "response", dialog, destroyDialog, gtk.RESPONSE_CLOSE)
-    dialog.show_all()
-    dialog.set_default_response(gtk.RESPONSE_CLOSE)
 
 
 # base class for all "GUI" classes which manage parts of the display
@@ -423,7 +362,7 @@ class BasicActionGUI(SubGUI):
         self.setRelevantObservers(allObservers)
 
     def setRelevantObservers(self, observers):
-        signals = [ "Error", "Status", "ActionProgress" ] + self.getSignalsSent()
+        signals = [ "Status", "ActionProgress" ] + self.getSignalsSent()
         self.diag.info("Observing " + str(self.__class__) + " :")
         for observer in observers:
             for signal in signals:
@@ -434,13 +373,57 @@ class BasicActionGUI(SubGUI):
     def getSignalsSent(self):
         return [] # set up like this so every single derived class doesn't have to include it
 
-    def makeQueryDialog(self, parent, message, stockIcon, alarmLevel, respondMethod):
+    def createDialogMessage(self, message, stockIcon):
+        buffer = gtk.TextBuffer()
+        buffer.set_text(message)
+        textView = gtk.TextView(buffer)
+        textView.set_editable(False)
+        textView.set_cursor_visible(False)
+        textView.set_left_margin(5)
+        textView.set_right_margin(5)
+        hbox = gtk.HBox()
+        imageBox = gtk.VBox()
+        imageBox.pack_start(gtk.image_new_from_stock(stockIcon, gtk.ICON_SIZE_DIALOG), expand=False)
+        hbox.pack_start(imageBox, expand=False)
+        scrolledWindow = gtk.ScrolledWindow()
+        # What we would like is that the dialog expands without scrollbars
+        # until it reaches some maximum size, and then adds scrollbars. At
+        # the moment I cannot make this happen without setting a fixed window
+        # size, so I'll set the scrollbar policy to never instead.
+        scrolledWindow.set_policy(gtk.POLICY_NEVER, gtk.POLICY_NEVER)
+        scrolledWindow.add(textView)
+        scrolledWindow.set_shadow_type(gtk.SHADOW_IN)
+        hbox.pack_start(scrolledWindow, expand=True, fill=True)
+        alignment = gtk.Alignment()
+        alignment.set_padding(5, 5, 0, 5)
+        alignment.add(hbox)
+        return alignment
+
+    def showErrorDialog(self, message):
+        self.showErrorWarningDialog(message, gtk.STOCK_DIALOG_ERROR, "Error") 
+    def showWarningDialog(self, message):
+        self.showErrorWarningDialog(message, gtk.STOCK_DIALOG_WARNING, "Warning") 
+    def showErrorWarningDialog(self, message, stockIcon, alarmLevel):
+        dialog = self.createAlarmDialog(self.getParentWindow(), message, stockIcon, alarmLevel)
+        dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+        yesButton = dialog.add_button(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT)
+        scriptEngine.connect("agree to texttest message", "clicked", yesButton, self.cleanDialog,
+                             gtk.RESPONSE_ACCEPT, True, dialog)
+        dialog.show_all()
+
+    def createAlarmDialog(self, parent, message, stockIcon, alarmLevel):
         dialogTitle = "TextTest " + alarmLevel
         dialog = gtk.Dialog(dialogTitle, parent, flags=gtk.DIALOG_MODAL) 
         dialog.set_modal(True)
         guilog.info(alarmLevel.upper() + ": " + message)
+        
+        contents = self.createDialogMessage(message, stockIcon)
+        dialog.vbox.pack_start(contents, expand=True, fill=True)
+        return dialog
+    
+    def showQueryDialog(self, parent, message, stockIcon, alarmLevel, respondMethod):
+        dialog = self.createAlarmDialog(parent, message, stockIcon, alarmLevel)
         dialog.set_default_response(gtk.RESPONSE_NO)
-
         noButton = dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
         yesButton = dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
         scriptEngine.connect("answer no to texttest " + alarmLevel, "clicked",
@@ -448,17 +431,15 @@ class BasicActionGUI(SubGUI):
         scriptEngine.connect("answer yes to texttest " + alarmLevel, "clicked",
                              yesButton, respondMethod, gtk.RESPONSE_YES, True, dialog)
 
-        contents = createDialogMessage(message, stockIcon)
-        dialog.vbox.pack_start(contents, expand=True, fill=True)
-        return dialog
+        dialog.show_all()
 
-    def cleanDialog(self, dialog):
+    def cleanDialog(self, button, saidOK, dialog):
         entrycompletion.manager.collectCompletions()
         dialog.hide()
         dialog.response(gtk.RESPONSE_NONE)
 
     def respond(self, button, saidOK, dialog):
-        self.cleanDialog(dialog)
+        self.cleanDialog(button, saidOK, dialog)
         if saidOK:
             self._runInteractive()
         else:
@@ -467,27 +448,22 @@ class BasicActionGUI(SubGUI):
     def getConfirmationMessage(self):
         return ""
 
-    def createConfigurationDialog(self, *args): # The dialog type to launch on action execution.
-        confirmationMessage = self.getConfirmationMessage()
-        if confirmationMessage:
-            return self.makeQueryDialog(self.getParentWindow(), confirmationMessage,
-                                        gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respond)
-    
     def runInteractive(self, *args):
         if self.busy: # If we're busy with some other action, ignore this one ...
             return
                 
         try:
-            dialog = self.createConfigurationDialog()
-            if dialog:
-                dialog.show_all()
+            confirmationMessage = self.getConfirmationMessage()
+            if confirmationMessage:
+                self.showQueryDialog(self.getParentWindow(), confirmationMessage,
+                                     gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respond)    
             else:
                 # Each time we perform an action we collect and save the current registered entries
                 # Actions showing dialogs will handle this in the dialog code.
                 entrycompletion.manager.collectCompletions()
                 self._runInteractive()
         except plugins.TextTestError, e:
-            showErrorDialog(str(e))
+            self.showErrorDialog(str(e))
             
     def _runInteractive(self):
         try:
@@ -515,7 +491,7 @@ class BasicActionGUI(SubGUI):
             if message != None:
                 self.notify("Status", message)
         except plugins.TextTestError, e:
-            self.notify("Error", str(e))
+            self.showErrorDialog(str(e))
 
     def endPerform(self):
         self.notify("ActionStop", "")
@@ -640,10 +616,8 @@ class ActionResultDialogGUI(ActionGUI):
     
     def createButtons(self):
         okButton = self.dialog.add_button(gtk.STOCK_CLOSE, gtk.RESPONSE_ACCEPT)       
-        scriptEngine.connect("press close", "clicked", okButton, self.respond, gtk.RESPONSE_ACCEPT, True, self.dialog)
+        scriptEngine.connect("press close", "clicked", okButton, self.cleanDialog, gtk.RESPONSE_ACCEPT, True, self.dialog)
 
-    def respond(self, button, saidOK, dialog):
-        self.cleanDialog(dialog)
 
 class ComboBoxListFinder:
     def __init__(self, combobox):
@@ -918,7 +892,16 @@ class ActionTabGUI(OptionGroupGUI):
     
 
 class ActionDialogGUI(OptionGroupGUI):
-    def createConfigurationDialog(self):
+    def runInteractive(self, *args):
+        if self.busy: # If we're busy with some other action, ignore this one ...
+            return
+                
+        try:
+            self.showConfigurationDialog()
+        except plugins.TextTestError, e:
+            self.showErrorDialog(str(e))
+            
+    def showConfigurationDialog(self):
         dialog = self.createDialog()
         alignment = self.createAlignment()
         vbox = gtk.VBox()
@@ -928,7 +911,7 @@ class ActionDialogGUI(OptionGroupGUI):
         self.createButtons(dialog, fileChooser, scriptName)
         guilog.info("Viewing dialog with title '" + dialog.get_title() + "'")
         self.describeOptionGroup()
-        return dialog
+        dialog.show_all()
     
     def setSensitivity(self, newValue):
         ActionGUI.setSensitivity(self, newValue)

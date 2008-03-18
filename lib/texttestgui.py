@@ -467,12 +467,6 @@ class TopWindowGUI(ContainerGUI):
         self.notify("Exit")
         self.topWindow.destroy()
 
-    def notifyError(self, message):
-        guiplugins.showErrorDialog(message, self.topWindow)
-    def notifyWarning(self, message):
-        guiplugins.showWarningDialog(message, self.topWindow)
-    def notifyInformation(self, message):
-        guiplugins.showInformationDialog(message, self.topWindow)
     def adjustSize(self):
         if guiConfig.getWindowOption("maximize"):
             self.topWindow.maximize()
@@ -1723,11 +1717,7 @@ class FileViewGUI(guiplugins.SubGUI):
             # Don't crash on double clicking the header lines...
             return
         comparison = self.model.get_value(iter, 3)
-        try:
-            self.notify("ViewFile", fileName, comparison)
-        except plugins.TextTestError, e:
-            guiplugins.showErrorDialog(str(e), self.selection.get_tree_view().get_toplevel())
-
+        self.notify("ViewFile", fileName, comparison)
         self.selection.unselect_all()
     def notifyNewFile(self, fileName, overwrittenExisting):
         self.notify("ViewFile", fileName, None)

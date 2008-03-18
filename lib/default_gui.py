@@ -254,8 +254,8 @@ class FileViewAction(guiplugins.ActionGUI):
         self.notify("Status", 'Started "' + description + '" in background' + testDesc + '.')
         
     def handleNoFile(self, fileName):
-        self.notify("Error", "File '" + os.path.basename(fileName) + "' cannot be viewed"
-                    " as it has been removed in the file system." + self.noFileAdvice())
+        self.showErrorDialog("File '" + os.path.basename(fileName) + "' cannot be viewed"
+                             " as it has been removed in the file system." + self.noFileAdvice())
          
     def getViewTool(self, fileName):
         viewProgram = self.getViewToolName(fileName)
@@ -329,12 +329,14 @@ class ViewInEditor(FileViewAction):
                 if plugins.canExecute(viewProgram):
                     self.performOnFile(fileToView, comparison, viewProgram)
                 elif viewProgram:
-                    self.notify("Error", "Cannot find file viewing program '" + viewProgram + \
-                                "'.\nPlease install it somewhere on your PATH or\nchange the configuration entry 'view_program'.")
+                    self.showErrorDialog("Cannot find file viewing program '" + viewProgram + \
+                                         "'.\nPlease install it somewhere on your PATH or\n"
+                                         "change the configuration entry 'view_program'.")
                 else:
-                    self.notify("Warning", "No file viewing program is defined for files of type '" + \
-                                os.path.basename(fileToView).split(".")[0] + \
-                                "'.\nPlease point the configuration entry 'view_program' at a valid program to view the file.")
+                    self.showWarningDialog("No file viewing program is defined for files of type '" + \
+                                           os.path.basename(fileToView).split(".")[0] + \
+                                           "'.\nPlease point the configuration entry 'view_program'"
+                                           " at a valid program to view the file.")
             else:
                 self.handleNoFile(fileToView)
             
@@ -391,12 +393,14 @@ class ViewFilteredFileDifferences(ViewFileDifferences):
                 if plugins.canExecute(diffProgram):
                     self.performOnFile(tmpFile, comparison, diffProgram)
                 elif diffProgram:
-                    self.notify("Error", "Cannot find graphical difference program '" + diffProgram + \
-                                "'.\nPlease install it somewhere on your PATH or change the\nconfiguration entry 'diff_program'.")
+                    self.showErrorDialog("Cannot find graphical difference program '" + diffProgram + \
+                                         "'.\nPlease install it somewhere on your PATH or change the\n"
+                                         "configuration entry 'diff_program'.")
                 else:
-                    self.notify("Warning", "No graphical difference program is defined for files of type '" + \
-                                os.path.basename(tmpFile).split(".")[0] + \
-                                "'.\nPlease point the configuration entry 'diff_program' at a valid program to visualize the differences.")
+                    self.showWarningDialog("No graphical difference program is defined for files of type '" + \
+                                           os.path.basename(tmpFile).split(".")[0] + \
+                                           "'.\nPlease point the configuration entry 'diff_program' at a "
+                                           "valid program to visualize the differences.")
             else:
                 self.handleNoFile(tmpFile)
 
@@ -980,8 +984,7 @@ class SaveSelection(guiplugins.ActionDialogGUI):
         if fileName and saidOK and os.path.isfile(fileName):
             message = "\nThe file \n" + fileName.replace("\\", "/") +\
                       "\nalready exists.\n\nDo you want to overwrite it?\n"
-            newDialog = self.makeQueryDialog(dialog, message, gtk.STOCK_DIALOG_QUESTION, "Query", self.defaultRespond)
-            newDialog.show_all()
+            self.showQueryDialog(dialog, message, gtk.STOCK_DIALOG_QUESTION, "Query", self.defaultRespond)
         else:
             self.defaultRespond(button, saidOK, dialog)
     def defaultRespond(self, *args):
@@ -1063,6 +1066,10 @@ class RunningAction(guiplugins.ActionTabGUI):
             for group in app.optionGroups:
                 if group.name.startswith("Invisible"):
                     self.invisibleGroup = group
+    def setObservers(self, observers):
+        guiplugins.ActionTabGUI.setObservers(self, observers)
+        # so we can notify ourselves (!) about errors...
+        self.observers.append(self)
     def correctTestClass(self):
         return "test-case"
     def messageAfterPerform(self):
@@ -1151,11 +1158,15 @@ class RunningAction(guiplugins.ActionTabGUI):
 
         testSel[0].notify("CloseDynamic", usecase)
 
+    def notifyError(self, message):
+        self.showErrorDialog(message)
+        
     def checkErrorFile(self, errFile, testSel, usecase):
         if os.path.isfile(errFile):
             errText = open(errFile).read()
             if len(errText):
                 self.notify("Status", usecase.capitalize() + " run failed for " + repr(testSel[0]))
+                # We're in a funny thread, don't try to create the dialog directly
                 self.notify("Error", usecase.capitalize() + " run failed, with the following errors:\n" + errText)
                 return False
         return True
@@ -1485,7 +1496,7 @@ Are you sure you wish to proceed?\n"""
                 namesRemoved.append(test.name)
         self.notify("Status", "Removed test(s) " + ",".join(namesRemoved))
         if warnings:
-            self.notify("Warning", warnings)
+            self.showWarningDialog(warnings)
     def removeFiles(self):
         test = self.currTestSelection[0]
         warnings = ""
@@ -1502,7 +1513,7 @@ Are you sure you wish to proceed?\n"""
         self.notify("Status", "Removed " + self.getFilesDescription(removed) + " from the " +
                     test.classDescription() + " " + test.name + "")
         if warnings:
-            self.notify("Warning", warnings)
+            self.showWarningDialog(warnings)
     def messageAfterPerform(self):
         pass # do it as part of the method as currentTest will have changed by the end!
     
@@ -1692,7 +1703,7 @@ class SortTestSuiteFileAscending(guiplugins.ActionGUI):
         self.notify("Status", "Sorting " + repr(suite))
         self.notify("ActionProgress", "")
         if self.hasNonDefaultTests():
-            self.notify("Warning", "\nThe test suite\n'" + suite.name + "'\ncontains tests which are not present in the default version.\nTests which are only present in some versions will not be\nmixed with tests in the default version, which might lead to\nthe suite not looking entirely sorted.")
+            self.showWarningDialog("\nThe test suite\n'" + suite.name + "'\ncontains tests which are not present in the default version.\nTests which are only present in some versions will not be\nmixed with tests in the default version, which might lead to\nthe suite not looking entirely sorted.")
 
         suite.sortTests(ascending)
     def hasNonDefaultTests(self):
@@ -1862,9 +1873,9 @@ class RenameTest(guiplugins.ActionDialogGUI):
                 for test in self.currTestSelection:
                     test.rename(newName, newDesc)
         except IOError, e:
-            self.notify("Error", "Failed to rename test:\n" + str(e))
+            self.showErrorDialog("Failed to rename test:\n" + str(e))
         except OSError, e:
-            self.notify("Error", "Failed to rename test:\n" + str(e))
+            self.showErrorDialog("Failed to rename test:\n" + str(e))
         
  
 class ShowFileProperties(guiplugins.ActionResultDialogGUI):
@@ -1888,7 +1899,7 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
             self.processFile(file, properties, errors)
             
         if len(errors):
-            self.notify("Error", "Failed to get file properties:\n" + "\n".join(errors))
+            self.showErrorDialog("Failed to get file properties:\n" + "\n".join(errors))
 
         return properties
     def processFile(self, file, properties, errors):

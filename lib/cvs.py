@@ -1,7 +1,7 @@
 
 import os, gobject, datetime, time, subprocess, default_gui
 import gtk, plugins, custom_widgets, entrycompletion
-from guiplugins import scriptEngine, guilog, processMonitor, showErrorDialog, ActionResultDialogGUI
+from guiplugins import scriptEngine, guilog, processMonitor, ActionResultDialogGUI
 
 #
 # Todo/improvements:
@@ -117,8 +117,8 @@ class CVSAction(ActionResultDialogGUI):
         guilog.info("Viewing CVS differences for file '" + path + "' graphically ...")
         cvsDiffProgram = "tkdiff" # Hardcoded for now ...
         if not plugins.canExecute(cvsDiffProgram):
-            showErrorDialog("\nCannot find graphical CVS difference program '" + cvsDiffProgram + \
-                            "'.\nPlease install it somewhere on your $PATH.\n", dialog.dialog)
+            self.showErrorDialog("\nCannot find graphical CVS difference program '" + cvsDiffProgram + \
+                                 "'.\nPlease install it somewhere on your $PATH.\n")
         cmdArgs = [ cvsDiffProgram ] + self.getRevisionOptions() + [ path ]
         processMonitor.startProcess(cmdArgs, description="Graphical CVS diff for file " + path,
                                     stderr=open(os.devnull, "w"), scriptName="shows CVS differences graphically")

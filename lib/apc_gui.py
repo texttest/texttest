@@ -1,5 +1,5 @@
 
-import apc_basic_gui, optimization_gui, ravebased_gui, default_gui, guiplugins, plugins, os, sys, shutil, time
+import apc_basic_gui, optimization_gui, ravebased_gui, default_gui, guiplugins, plugins, os, sys, shutil, time, gtk
 from apc import readKPIGroupFileCommon
 
 class ViewApcLog(guiplugins.ActionGUI):
@@ -325,7 +325,7 @@ class CVSLogInGUI(guiplugins.ActionGUI):
             fileName = self.currTestSelection[0].getFileName(file)
             if fileName:
                 cvsInfo += self.getCVSInfo(path, os.path.basename(fileName))
-        self.notify("Information", "CVS Logs" + os.linesep + os.linesep + cvsInfo)
+        self.showInformationDialog("CVS Logs" + os.linesep + os.linesep + cvsInfo)
     def _getTitle(self):
         return "CVS _Log"
     def getCVSInfo(self, path, file):
@@ -352,6 +352,14 @@ class CVSLogInGUI(guiplugins.ActionGUI):
                     info += line
             info += os.linesep
         return info
+    def showInformationDialog(self, message):
+        dialog = self.createAlarmDialog(self.getParentWindow(), message, gtk.STOCK_DIALOG_INFO, "Information")
+        dialog.set_default_response(gtk.RESPONSE_CLOSE)
+        yesButton = dialog.add_button(gtk.STOCK_CLOSE, gtk.RESPONSE_CLOSE)
+        guiplugins.scriptEngine.connect("press close", "clicked", yesButton, self.cleanDialog,
+                                        gtk.RESPONSE_CLOSE, True, dialog)
+        dialog.show_all()
+
 
 class SelectTests(default_gui.SelectTests):
     def __init__(self, *args):

@@ -854,10 +854,13 @@ class PreviewGenerator:
         lines = [ line + "\n" for line in truncatedLines ]
         return self._getPreview(lines)
     def getWrappedLine(self, line):
-        if len(line) <= self.maxWidth:
-            return line
-        truncatedLine = line[:self.maxWidth]
-        return truncatedLine + "\n" + self.getWrappedLine(line[self.maxWidth:])
+        remaining = line
+        result = ""
+        while True:
+            if len(remaining) <= self.maxWidth:
+                return result + remaining
+            result += remaining[:self.maxWidth] + "\n"
+            remaining = remaining[self.maxWidth:]
     
 # Exception to throw. It's generally good to throw this internally
 class TextTestError(RuntimeError):

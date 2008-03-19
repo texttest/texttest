@@ -692,10 +692,13 @@ class OptionGroupGUI(ActionGUI):
     def createRadioButtons(self, switch):
         buttons = []
         mainRadioButton = None
-        for index in range(len(switch.options)):
-            option = switch.options[index]
+        for index, option in enumerate(switch.options):
             cleanOption = option.split("\n")[0].replace("_", "")
-            if guiConfig.getCompositeValue("gui_entry_overrides", switch.name + ":" + cleanOption) == "1":
+            if len(switch.name) > 0:
+                configName = switch.name + ":" + cleanOption
+            else:
+                configName = cleanOption
+            if guiConfig.getCompositeValue("gui_entry_overrides", configName) == "1":
                 switch.setValue(index)
             radioButton = gtk.RadioButton(mainRadioButton, option, use_underline=True)
             buttons.append(radioButton)

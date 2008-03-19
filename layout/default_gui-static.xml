@@ -17,6 +17,8 @@
       <menuitem name="Rename..." action="Rename..."/>
       <menuitem name="Remove..." action="Remove..."/>
       <separator/>
+      <menuitem action="Enter Failure Information"/>
+      <separator/>
       <menuitem name="Move to first" action="Move to first"/>
       <menuitem name="Move up" action="Move up"/>
       <menuitem name="Move down" action="Move down"/>
@@ -53,6 +55,8 @@
     <menuitem action="Paste"/>
     <menuitem action="Rename..."/>
     <menuitem action="Remove..."/>
+    <separator/>
+    <menuitem action="Enter Failure Information"/>
     <separator/>
     <menu action="reordermenu">
       <menuitem name="Move to first" action="Move to first"/>

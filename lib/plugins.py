@@ -994,6 +994,13 @@ class TextOption(Option):
     def clear(self):
         if self.clearMethod:
             self.clearMethod()
+    def getValue(self):
+        basic = Option.getValue(self)
+        if (self.selectFile or self.saveFile) and basic:
+            # If files are returned, turn the paths into UNIX format...
+            return basic.replace("\\", "/")
+        else:
+            return basic
     def getDirectories(self):
         for dir in self.possibleDirs:
             try:

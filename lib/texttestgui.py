@@ -1718,6 +1718,7 @@ class FileViewGUI(guiplugins.SubGUI):
             return
         comparison = self.model.get_value(iter, 3)
         self.notify("ViewFile", fileName, comparison)
+    def notifyViewerStarted(self):
         self.selection.unselect_all()
     def notifyNewFile(self, fileName, overwrittenExisting):
         self.notify("ViewFile", fileName, None)

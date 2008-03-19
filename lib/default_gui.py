@@ -246,13 +246,16 @@ class FileViewAction(guiplugins.ActionGUI):
             return " (from test " + self.currTestSelection[0].uniqueName + ")"
         else:
             return ""
+    def getSignalsSent(self):
+        return [ "ViewerStarted" ]
     def startViewer(self, cmdArgs, description, *args, **kwargs):
         testDesc = self.testDescription()
         fullDesc = description + testDesc
         nullFile = open(os.devnull, "w")
         guiplugins.processMonitor.startProcess(cmdArgs, fullDesc, stdout=nullFile, stderr=nullFile, *args, **kwargs)
         self.notify("Status", 'Started "' + description + '" in background' + testDesc + '.')
-        
+        self.notify("ViewerStarted")
+
     def handleNoFile(self, fileName):
         self.showErrorDialog("File '" + os.path.basename(fileName) + "' cannot be viewed"
                              " as it has been removed in the file system." + self.noFileAdvice())

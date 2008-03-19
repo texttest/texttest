@@ -282,6 +282,8 @@ class ViewInEditor(FileViewAction):
     def __init__(self, allApps, dynamic):
         FileViewAction.__init__(self, allApps)
         self.dynamic = dynamic
+    def _getStockId(self):
+        return "open"
     def _getTitle(self):
         return "View File"
     def getToolConfigEntry(self):
@@ -353,6 +355,8 @@ class ViewInEditor(FileViewAction):
             return False
 
 class ViewFilteredInEditor(ViewInEditor):
+    def _getStockId(self):
+        pass # don't use same stock for both
     def useFiltered(self):
         return True
     def _getTitle(self):
@@ -1267,6 +1271,8 @@ class RecordTest(RunningAction):
         self.addOption("c", "Checkout to use for recording") 
         self.addSwitch("rep", "Automatically replay test after recording it", 1)
         self.addSwitch("repgui", "", options = ["Auto-replay invisible", "Auto-replay in dynamic GUI"])
+    def _getStockId(self):
+        return "media-record"
     def singleTestOnly(self):
         return True
     def inMenuOrToolBar(self):
@@ -1539,30 +1545,28 @@ Are you sure you wish to proceed?\n"""
     def messageAfterPerform(self):
         pass # do it as part of the method as currentTest will have changed by the end!
     
-class ReportBugs(guiplugins.ActionTabGUI):
+class ReportBugs(guiplugins.ActionDialogGUI):
     def __init__(self, *args):
-        guiplugins.ActionTabGUI.__init__(self, *args)
+        guiplugins.ActionDialogGUI.__init__(self, *args)
         self.addOption("search_string", "Text or regexp to match")
         self.addOption("search_file", "File to search in")
-        self.addOption("version", "Version to report for")
+        self.addOption("version", "\nVersion to report for")
         self.addOption("execution_hosts", "Trigger only when run on machine(s)")
-        self.addOption("bug_system", "Extract info from bug system", "<none>", [ "bugzilla" ])
+        self.addOption("bug_system", "\nExtract info from bug system", "<none>", [ "bugzilla" ])
         self.addOption("bug_id", "Bug ID (only if bug system given)")
-        self.addOption("full_description", "Full description (no bug system)")
+        self.addOption("full_description", "\nFull description (no bug system)")
         self.addOption("brief_description", "Few-word summary (no bug system)")
         self.addSwitch("trigger_on_absence", "Trigger if given text is NOT present")
         self.addSwitch("internal_error", "Trigger even if other files differ (report as internal error)")
         self.addSwitch("trigger_on_success", "Trigger even if test would otherwise succeed")
+    def _getStockId(self):
+        return "info"
     def singleTestOnly(self):
         return True
-    def inMenuOrToolBar(self):
-        return False
     def _getTitle(self):
-        return "Report"
-    def getTooltip(self):
-        return "Report Described Bugs"
-    def getTabTitle(self):
-        return "Bugs"
+        return "Enter Failure Information"
+    def getDialogTitle(self):
+        return "Enter information for automatic interpretation of test failures"
     def updateOptions(self):
         self.optionGroup.setOptionValue("search_file", self.currTestSelection[0].app.getConfigValue("log_file"))
         self.optionGroup.setPossibleValues("search_file", self.getPossibleFileStems())
@@ -1601,6 +1605,10 @@ class ReportBugs(guiplugins.ActionTabGUI):
     def write(self, writeFile, message):
         writeFile.write(message)
         guiplugins.guilog.info(message)
+    def createButtons(self, dialog, *args):
+        guiplugins.ActionDialogGUI.createButtons(self, dialog, *args)
+        parentSize = self.topWindow.get_size()
+        dialog.resize(int(parentSize[0] / 1.4), int(parentSize[0] / 1.7))
     def performOnCurrent(self):
         self.checkSanity()
         fileName = self.getFileName()
@@ -1904,6 +1912,8 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
     def __init__(self, allApps, dynamic):
         self.dynamic = dynamic
         guiplugins.ActionGUI.__init__(self, allApps)
+    def _getStockId(self):
+        return "properties"
     def isActiveOnCurrent(self, *args):
         return ((not self.dynamic) or len(self.currTestSelection) == 1) and \
                len(self.currFileSelection) > 0

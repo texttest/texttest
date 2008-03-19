@@ -677,6 +677,7 @@ class Config:
         dict["reconnect"] = "<control><shift>r"
         dict["run"] = "<control>r"
         dict["rename"] = "<control>m"
+        dict["enter_failure_information"] = "<control>i"
         dict["move_down"] = "<control>Page_Down"
         dict["move_up"] = "<control>Page_Up"
         dict["move_to_first"] = "<control>Home"

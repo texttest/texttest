@@ -1805,6 +1805,12 @@ class TestFileGUI(FileViewGUI):
     def __init__(self, dynamic, popupGUI):
         FileViewGUI.__init__(self, dynamic, "", popupGUI)
         self.currentTest = None
+    def canSelect(self, path):
+        if self.dynamic:
+            return FileViewGUI.canSelect(self, path)
+        else:
+            return True
+
     def notifyNameChange(self, test, origRelPath):
         if test is self.currentTest:
             self.setName( [ test ], 1)
@@ -1874,12 +1880,41 @@ class TestFileGUI(FileViewGUI):
         scriptEngine.monitor("set file selection to", self.selection)
         self.selectionChanged(self.selection)
         self.selection.connect("changed", self.selectionChanged)
+
     def selectionChanged(self, selection):
         filelist = []
         selection.selected_foreach(self.fileSelected, filelist)
         self.notify("NewFileSelection", filelist)
+        if not self.dynamic:
+            if selection.count_selected_rows() == 1:
+                model, paths = selection.get_selected_rows()
+                selectedIter = self.model.get_iter(paths[0])
+                dirName = self.getDirectory(selectedIter)
+                fileType = self.getFileType(selectedIter)
+                self.notify("FileCreationInfo", dirName, fileType)
+            else:
+                self.notify("FileCreationInfo", None, None)
+
+    def getDirectory(self, iter):
+        fileName = self.model.get_value(iter, 2)
+        if os.path.isdir(fileName):
+            return fileName
+        else:
+            return os.path.dirname(fileName)
+
+    def getFileType(self, iter):
+        parent = self.model.iter_parent(iter)
+        if parent is not None:
+            return self.getFileType(parent)
+        else:
+            name = self.model.get_value(iter, 0)
+            return name.split()[0].lower()
+
     def fileSelected(self, treemodel, path, iter, filelist):
-        filelist.append((self.model.get_value(iter, 2), self.model.get_value(iter, 3)))
+        # files are leaves, not including the top level which might be empty headers
+        if self.model.iter_parent(iter) is not None and not self.model.iter_has_child(iter):
+            filelist.append((self.model.get_value(iter, 2), self.model.get_value(iter, 3)))
+
     def getState(self):
         if self.currentTest:
             return self.currentTest.state
@@ -1927,15 +1962,15 @@ class TestFileGUI(FileViewGUI):
     def addStaticFilesToModel(self, state):
         stdFiles, defFiles = self.currentTest.listStandardFiles(allVersions=True)
         if self.currentTest.classId() == "test-case":
-            stditer = self.model.insert_before(None, None)
-            self.model.set_value(stditer, 0, "Standard Files")
+            stditer = self.model.insert_before(None, None, self.getHeaderRow("Standard"))
             if len(stdFiles):
                 self.addStandardFilesUnderIter(state, stditer, stdFiles)
 
-        defiter = self.model.insert_before(None, None)
-        self.model.set_value(defiter, 0, "Definition Files")
+        defiter = self.model.insert_before(None, None, self.getHeaderRow("Definition"))
         self.addStandardFilesUnderIter(state, defiter, defFiles)
         self.addStaticDataFilesToModel()
+    def getHeaderRow(self, fileType):
+        return [ fileType + " Files", "white", self.currentTest.getDirectory(), None, "white" ]
     def getDisplayDataFiles(self):
         try:
             return self.currentTest.app.extraReadFiles(self.currentTest).items()
@@ -1945,15 +1980,12 @@ class TestFileGUI(FileViewGUI):
             plugins.printException()
             return seqdict()
     def addStaticDataFilesToModel(self):
-        dataFiles = self.currentTest.listDataFiles()
-        displayDataFiles = self.getDisplayDataFiles()
-        if len(dataFiles) == 0 and len(displayDataFiles) == 0:
+        if self.currentTest.getDataFileNames() == 0:
             return
-        datiter = self.model.insert_before(None, None)
-        self.model.set_value(datiter, 0, "Data Files")
+        datiter = self.model.insert_before(None, None, self.getHeaderRow("Data"))
         colour = self.getStaticColour()
-        self.addDataFilesUnderIter(datiter, dataFiles, colour)
-        for name, filelist in displayDataFiles:
+        self.addDataFilesUnderIter(datiter, self.currentTest.listDataFiles(), colour)
+        for name, filelist in self.getDisplayDataFiles():
             exiter = self.model.insert_before(datiter, None)
             self.model.set_value(exiter, 0, name)
             for file in filelist:

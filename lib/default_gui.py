@@ -1339,23 +1339,39 @@ class RecordTest(RunningAction):
         return "Record _Use-Case"
 
 
-class CreateDefinitionFile(guiplugins.ActionTabGUI):
+class CreateDefinitionFile(guiplugins.ActionDialogGUI):
     def __init__(self, *args):
-        guiplugins.ActionTabGUI.__init__(self, *args)
-        self.addOption("type", "Type of definition file to create", allocateNofValues=2)
+        self.creationDir = None
+        self.appendAppName = False
+        guiplugins.ActionDialogGUI.__init__(self, *args)
+        self.addOption("stem", "Type of definition file to create", allocateNofValues=2)
         self.addOption("v", "Version identifier to use")
     def singleTestOnly(self):
         return True
-    def inMenuOrToolBar(self):
-        return False
     def _getTitle(self):
         return "Create _File"
     def _getStockId(self):
         return "new" 
-    def getTabTitle(self):
+    def getDialogTitle(self):
         return "New File" 
     def getScriptTitle(self, tab):
         return "Create File"
+    def isActiveOnCurrent(self, *args):
+        return self.creationDir is not None and guiplugins.ActionDialogGUI.isActiveOnCurrent(self, *args) 
+    def notifyFileCreationInfo(self, creationDir, fileType):
+        self.creationDir = creationDir
+        newActive = creationDir is not None
+        self.setSensitivity(newActive)
+        if newActive:
+            self.updateStems(fileType)
+            self.appendAppName = (fileType == "definition" or fileType == "standard")
+    def findAllStems(self, fileType):
+        if fileType == "definition":
+            return self.getDefinitionFiles()
+        elif fileType == "data":
+            return self.currTestSelection[0].app.getDataFileNames()
+        elif fileType == "standard":
+            return self.getStandardFiles()
     def getDefinitionFiles(self):
         defFiles = []
         defFiles.append("environment")
@@ -1371,15 +1387,18 @@ class CreateDefinitionFile(guiplugins.ActionTabGUI):
         for defFile in self.currTestSelection[0].getConfigValue("definition_file_stems"):
             if not defFile in dontAppend:
                 defFiles.append(defFile)
-        return defFiles + self.currTestSelection[0].app.getDataFileNames()
-    def updateOptions(self):
-        defFiles = self.getDefinitionFiles()
-        self.optionGroup.setValue("type", defFiles[0])
-        self.optionGroup.setPossibleValues("type", defFiles)
-        return True
+        return defFiles
+    def getStandardFiles(self):
+        stdFiles = [ "output", "errors" ] + self.currTestSelection[0].getConfigValue("collate_file").keys()
+        discarded = [ "stacktrace" ] + self.currTestSelection[0].getConfigValue("discard_file")
+        return filter(lambda f: f not in discarded, stdFiles)
+    def updateStems(self, fileType):
+        stems = self.findAllStems(fileType)
+        self.optionGroup.setValue("stem", stems[0])
+        self.optionGroup.setPossibleValues("stem", stems)
     def getFileName(self, stem, version):
         fileName = stem
-        if stem in self.currTestSelection[0].getConfigValue("definition_file_stems"):
+        if self.appendAppName:
             fileName += "." + self.currTestSelection[0].app.name
         if version:
             fileName += "." + version
@@ -1396,7 +1415,7 @@ class CreateDefinitionFile(guiplugins.ActionTabGUI):
                 return currName
             test = test.parent
     def performOnCurrent(self):
-        stem = self.optionGroup.getOptionValue("type")
+        stem = self.optionGroup.getOptionValue("stem")
         version = self.optionGroup.getOptionValue("v")
         targetFileName = self.getFileName(stem, version)
         sourceFile = self.getSourceFile(stem, version, targetFileName)
@@ -1406,7 +1425,7 @@ class CreateDefinitionFile(guiplugins.ActionTabGUI):
             targetFileName = targetFileName.replace(stem, stemWithApp, 1)
             sourceFile = self.getSourceFile(stem, version, targetFileName)
             
-        targetFile = os.path.join(self.currTestSelection[0].getDirectory(), targetFileName)
+        targetFile = os.path.join(self.creationDir, targetFileName)
         plugins.ensureDirExistsForFile(targetFile)
         fileExisted = os.path.exists(targetFile)
         if sourceFile and os.path.isfile(sourceFile):

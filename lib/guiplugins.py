@@ -259,20 +259,69 @@ class SubGUI(plugins.Observable):
         else:
             window.add(widget)
 
-# Introduce an extra level without all the selection-dependent stuff, some actions want
-# to inherit from here and it provides a separation
-class BasicActionGUI(SubGUI):
-    busy = False
-    def __init__(self, *args):
-        SubGUI.__init__(self)
+class GtkActionWrapper:
+    def __init__(self):
         self.accelerator = None
-        self.topWindow = None
         self.diag = plugins.getDiagnostics("Interactive Actions")
         title = self.getTitle(includeMnemonics=True)
         actionName = self.getTitle(includeMnemonics=False)
         self.gtkAction = gtk.Action(actionName, title, \
                                     self.getTooltip(), self.getStockId())
         scriptEngine.connect(self.getTooltip(), "activate", self.gtkAction, self.runInteractive)
+        if not self.isActiveOnCurrent():
+            self.gtkAction.set_property("sensitive", False)
+
+    def getAccelerator(self):
+        realAcc = guiConfig.getCompositeValue("gui_accelerators", self.getTitle().rstrip("."))
+        if realAcc:
+            key, mod = gtk.accelerator_parse(realAcc)
+            if gtk.accelerator_valid(key, mod):
+                return realAcc
+            else:
+                plugins.printWarning("Keyboard accelerator '" + realAcc + "' for action '" \
+                                     + self.getTitle() + "' is not valid, ignoring ...")
+
+    def addToGroups(self, actionGroup, accelGroup):
+        self.accelerator = self.getAccelerator()
+        actionGroup.add_action_with_accel(self.gtkAction, self.accelerator)
+        self.gtkAction.set_accel_group(accelGroup)
+        self.gtkAction.connect_accelerator()
+
+    def setSensitivity(self, newValue):
+        oldValue = self.gtkAction.get_property("sensitive")
+        self.gtkAction.set_property("sensitive", newValue)
+        if oldValue != newValue:
+            guilog.info("Setting sensitivity of action '" + self.getTitle(includeMnemonics=True) + "' to " + repr(newValue))
+
+    def describeAction(self):
+        message = "Viewing action with title '" + self.gtkAction.get_property("label") + "'"
+        message += self.detailDescription()
+        guilog.info(message)
+
+    def detailDescription(self):
+        message = ""
+        stockId = self.gtkAction.get_property("stock-id")
+        if stockId:
+            message += ", stock id '" + repr(stockId) + "'"
+        if self.accelerator:
+            message += ", accelerator '" + repr(self.accelerator) + "'"
+        return message + self.sensitivityDescription()
+    
+    def sensitivityDescription(self):
+        if self.gtkAction.get_property("sensitive"):
+            return ""
+        else:
+            return " (greyed out)"
+
+
+# Introduce an extra level without all the selection-dependent stuff, some actions want
+# to inherit from here and it provides a separation
+class BasicActionGUI(SubGUI,GtkActionWrapper):
+    busy = False
+    def __init__(self, *args):
+        SubGUI.__init__(self)
+        GtkActionWrapper.__init__(self)
+        self.topWindow = None
 
     def notifyTopWindow(self, window):
         self.topWindow = window
@@ -283,6 +332,9 @@ class BasicActionGUI(SubGUI):
     def isModal(self):
         return True
 
+    def isActiveOnCurrent(self, *args):
+        return True
+    
     def getDialogTitle(self):
         return self.getTooltip()
 
@@ -306,6 +358,9 @@ class BasicActionGUI(SubGUI):
     def getTooltip(self):
         return self.getTitle(includeMnemonics=False)
 
+    def displayInTab(self):
+        return False
+    
     def getStockId(self):
         stockId = self._getStockId()
         if stockId:
@@ -320,48 +375,11 @@ class BasicActionGUI(SubGUI):
 
     def describe(self):
         self.describeAction()
-
-    def describeAction(self):
-        message = "Viewing action with title '" + self.getTitle(includeMnemonics=True) + "'"
-        message += self.detailDescription()
-        guilog.info(message)
-
-    def detailDescription(self):
-        message = ""
-        stockId = self.getStockId()
-        if stockId:
-            message += ", stock id '" + repr(stockId) + "'"
-        if self.accelerator:
-            message += ", accelerator '" + repr(self.accelerator) + "'"
-        return message
-
-    def addToGroups(self, actionGroup, accelGroup):
-        self.accelerator = self.getAccelerator()
-        actionGroup.add_action_with_accel(self.gtkAction, self.accelerator)
-        self.gtkAction.set_accel_group(accelGroup)
-        self.gtkAction.connect_accelerator()
-            
-    def getAccelerator(self):
-        realAcc = guiConfig.getCompositeValue("gui_accelerators", self.getTitle().rstrip("."))
-        if realAcc:
-            key, mod = gtk.accelerator_parse(realAcc)
-            if gtk.accelerator_valid(key, mod):
-                return realAcc
-            else:
-                plugins.printWarning("Keyboard accelerator '" + realAcc + "' for action '" \
-                                     + self.getTitle() + "' is not valid, ignoring ...")
-    
+                
     def setObservers(self, observers):
         if len(self.observers) > 0:
-            return # Can have several ActionGUIs for the same Action
-        allObservers = []
-        for observer in observers:
-            allObservers.append(observer)
-            if hasattr(observer, "action"):
-                allObservers.append(observer.action)
-        self.setRelevantObservers(allObservers)
-
-    def setRelevantObservers(self, observers):
+            return # still relevant?
+        
         signals = [ "Status", "ActionProgress" ] + self.getSignalsSent()
         self.diag.info("Observing " + str(self.__class__) + " :")
         for observer in observers:
@@ -509,7 +527,6 @@ class BasicActionGUI(SubGUI):
 class ActionGUI(BasicActionGUI):
     busy = False
     def __init__(self, allApps, *args):
-        BasicActionGUI.__init__(self)
         self.currTestSelection = []
         self.currFileSelection = []
         self.currAppSelection = []
@@ -517,9 +534,7 @@ class ActionGUI(BasicActionGUI):
         for app in allApps:
             self.validApps.append(app)
             self.validApps += app.extras    
-
-        if not self.isActiveOnCurrent():
-            self.gtkAction.set_property("sensitive", False)
+        BasicActionGUI.__init__(self)
         
     def notifyNewTestSelection(self, *args):
         newActive = self.updateSelection(*args)
@@ -562,20 +577,7 @@ class ActionGUI(BasicActionGUI):
 
     def isActiveOnCurrent(self, *args):
         return len(self.currTestSelection) > 0
-
-    def setSensitivity(self, newValue):
-        oldValue = self.gtkAction.get_property("sensitive")
-        self.gtkAction.set_property("sensitive", newValue)
-        if oldValue != newValue:
-            guilog.info("Setting sensitivity of action '" + self.getTitle(includeMnemonics=True) + "' to " + repr(newValue))
         
-    def detailDescription(self):
-        basic = BasicActionGUI.detailDescription(self)
-        if self.gtkAction.get_property("sensitive"):
-            return basic
-        else:
-            return basic + " (greyed out)"
-
     def singleTestOnly(self):
         return False        
 
@@ -809,6 +811,9 @@ class ActionTabGUI(OptionGroupGUI):
         self.diag.info("Sensitivity of " + self.getTabTitle() + " changed to " + repr(newValue))
         if self.sensitive and self.updateOptions():
             self.contentsChanged()        
+
+    def displayInTab(self):
+        return True
     
     def notifyReset(self):
         self.optionGroup.reset()
@@ -912,9 +917,41 @@ class ActionDialogGUI(OptionGroupGUI):
         alignment.add(vbox)
         dialog.vbox.pack_start(alignment, expand=True, fill=True)
         self.createButtons(dialog, fileChooser, scriptName)
+        self.tryResize(dialog)
         guilog.info("Viewing dialog with title '" + dialog.get_title() + "'")
         self.describeOptionGroup()
         dialog.show_all()
+
+    def getConfirmationDialogSettings(self):
+        return gtk.STOCK_DIALOG_WARNING, "Confirmation"
+    
+    def respond(self, button, saidOK, dialog):
+        if saidOK:
+            try:
+                message = self.getConfirmationMessage()
+                if message:
+                    stockId, level = self.getConfirmationDialogSettings()
+                    self.showQueryDialog(dialog, message, stockId, level, self.confirmationRespond)
+                else:
+                    self.defaultRespond(button, saidOK, dialog)
+            except plugins.TextTestError, e:
+                self.showErrorDialog(str(e))
+        else:
+            self.defaultRespond(button, saidOK, dialog)
+    def confirmationRespond(self, button, saidOK, dialog):
+        self.defaultRespond(button, saidOK, dialog)
+        if saidOK:
+            self.cleanDialog(button, saidOK, dialog.get_transient_for())
+    def defaultRespond(self, *args):
+        OptionGroupGUI.respond(self, *args)
+    def tryResize(self, dialog):
+        hordiv, verdiv = self.getResizeDivisors()
+        if hordiv is not None:
+            parentSize = self.topWindow.get_size()
+            dialog.resize(int(parentSize[0] / hordiv), int(parentSize[0] / verdiv))
+        
+    def getResizeDivisors(self):
+        return None, None
     
     def setSensitivity(self, newValue):
         ActionGUI.setSensitivity(self, newValue)
@@ -1017,6 +1054,46 @@ class ActionDialogGUI(OptionGroupGUI):
             return OptionGroupGUI.getOptionDescription(self, option)
 
 
+class MultiActionGUIForwarder(GtkActionWrapper):
+    def __init__(self, actionGUIs):
+        self.actionGUIs = actionGUIs
+        GtkActionWrapper.__init__(self)
+
+    def setObservers(self, observers):
+        for actionGUI in self.actionGUIs:
+            actionGUI.setObservers(observers)
+        
+    def notifyNewTestSelection(self, *args):
+        newActive = False
+        for actionGUI in self.actionGUIs:
+            if actionGUI.updateSelection(*args):
+                newActive = True
+
+        self.setSensitivity(newActive)
+
+    def addSuites(self, suites):
+        for actionGUI in self.actionGUIs:
+            if hasattr(actionGUI, "addSuites"):
+                actionGUI.addSuites(suites)
+            
+    def runInteractive(self, *args):
+        # otherwise it only gets computed once...
+        actionGUI = self.findActiveActionGUI()
+        self.diag.info("Forwarder executing " + str(actionGUI.__class__))
+        actionGUI.runInteractive(*args)
+        
+    def __getattr__(self, name):
+        actionGUI = self.findActiveActionGUI()
+        self.diag.info("Forwarding " + name + " to " + str(actionGUI.__class__))
+        return getattr(actionGUI, name)
+
+    def findActiveActionGUI(self):
+        for actionGUI in self.actionGUIs:
+            if actionGUI.allAppsValid():
+                return actionGUI
+        return self.actionGUIs[0]
+        
+
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:
     def __init__(self):
@@ -1044,7 +1121,7 @@ class InteractiveActionHandler:
         instances = self.getInstances(dynamic, allApps)
         defaultGUIs, buttonGUIs, actionTabGUIs = [], [], []
         for action in instances:
-            if isinstance(action, ActionTabGUI):
+            if action.displayInTab():
                 self.diag.info("Tab: " + str(action.__class__))
                 actionTabGUIs.append(action)
             else:
@@ -1072,9 +1149,19 @@ class InteractiveActionHandler:
             config = self.getIntvActionConfig(app)
             for className in config.getInteractiveActionClasses(dynamic):
                 if not className in classNames:
-                    for classToUse, relevantApps in self.findAllClasses(className, allApps, dynamic):
-                        instances.append(self.tryMakeInstance(classToUse, relevantApps, dynamic))
+                    allClasses = self.findAllClasses(className, allApps, dynamic)
+                    subinstances = self.makeAllInstances(allClasses, dynamic)
+                    if len(subinstances) == 1:
+                        instances.append(subinstances[0])
+                    else:
+                        instances.append(MultiActionGUIForwarder(subinstances))
                     classNames.append(className)
+        return instances
+    
+    def makeAllInstances(self, allClasses, dynamic):
+        instances = []
+        for classToUse, relevantApps in allClasses:
+            instances.append(self.tryMakeInstance(classToUse, relevantApps, dynamic))
         return instances
 
     def findAllClasses(self, className, allApps, dynamic):

@@ -621,9 +621,9 @@ class PasteTests(guiplugins.ActionGUI):
         return suite.addTestCase(os.path.basename(testDir), description, placement)
         
 # And a generic import test. Note acts on test suites
-class ImportTest(guiplugins.ActionTabGUI):
+class ImportTest(guiplugins.ActionDialogGUI):
     def __init__(self, *args):
-        guiplugins.ActionTabGUI.__init__(self, *args)
+        guiplugins.ActionDialogGUI.__init__(self, *args)
         self.optionGroup.addOption("name", self.getNameTitle())
         self.optionGroup.addOption("desc", self.getDescTitle(), description="Enter a description of the new " + self.testType().lower() + " which will be inserted as a comment in the testsuite file.")
         self.optionGroup.addOption("testpos", self.getPlaceTitle(), "last in suite", allocateNofValues=2, description="Where in the test suite should the test be placed?")
@@ -647,8 +647,6 @@ class ImportTest(guiplugins.ActionTabGUI):
             if len(parts) > 1 and parts[1] == app.name:
                 return True
         return False
-    def inMenuOrToolBar(self):
-        return False
     def singleTestOnly(self):
         return True
     def correctTestClass(self):
@@ -658,12 +656,13 @@ class ImportTest(guiplugins.ActionTabGUI):
     def getDescTitle(self):
         return self.testType() + " Description"
     def getPlaceTitle(self):
-        return "Place " + self.testType()
+        return "\nPlace " + self.testType()
     def updateOptions(self):
         self.optionGroup.setOptionValue("name", self.getDefaultName())
         self.optionGroup.setOptionValue("desc", self.getDefaultDesc())
         self.setPlacements(self.currTestSelection[0])
         return True
+
     def setPlacements(self, suite):
         # Add suite and its children
         placements = [ "first in suite" ]
@@ -677,8 +676,6 @@ class ImportTest(guiplugins.ActionTabGUI):
         return ""
     def getDefaultDesc(self):
         return ""
-    def getTabTitle(self):
-        return "Adding " + self.testType()
     def _getTitle(self):
         return "Add " + self.testType()
     def testType(self):
@@ -728,6 +725,8 @@ class ImportTestCase(ImportTest):
         self.addDefinitionFileOption()
     def testType(self):
         return "Test"
+    def _getStockId(self):
+        return "add"
     def addDefinitionFileOption(self):
         self.addOption("opt", "Command line options")
     def createTestContents(self, suite, testDir, description, placement):
@@ -771,6 +770,8 @@ class ImportTestSuite(ImportTest):
         self.addEnvironmentFileOptions()
     def testType(self):
         return "Suite"
+    def _getStockId(self):
+        return "directory"
     def createTestContents(self, suite, testDir, description, placement):
         return suite.addTestSuite(os.path.basename(testDir), description, placement, self.writeEnvironmentFiles)
     def addEnvironmentFileOptions(self):
@@ -986,16 +987,13 @@ class SaveSelection(guiplugins.ActionDialogGUI):
             return self.getTestPathFilterArg()
         else:
             return self.selectionCriteria
-    def respond(self, button, saidOK, dialog):
+    def getConfirmationMessage(self):    
         fileName = self.optionGroup.getOptionValue("f")    
-        if fileName and saidOK and os.path.isfile(fileName):
-            message = "\nThe file \n" + fileName.replace("\\", "/") +\
-                      "\nalready exists.\n\nDo you want to overwrite it?\n"
-            self.showQueryDialog(dialog, message, gtk.STOCK_DIALOG_QUESTION, "Query", self.defaultRespond)
-        else:
-            self.defaultRespond(button, saidOK, dialog)
-    def defaultRespond(self, *args):
-        guiplugins.ActionDialogGUI.respond(self, *args)
+        if fileName and os.path.isfile(fileName):
+            return "\nThe file \n" + fileName + "\nalready exists.\n\nDo you want to overwrite it?\n"
+
+    def getConfirmationDialogSettings(self):
+        return gtk.STOCK_DIALOG_QUESTION, "Query"    
 
     def notifySaveSelection(self, fileName):
         toSave = self.getTestPathFilterArg()
@@ -1055,10 +1053,9 @@ class LoadSelection(guiplugins.ActionDialogGUI):
             filters = suite.app.getFiltersFromFile(fileName)
             tests += suite.testCaseList(filters)
         return tests
-    def createButtons(self, dialog, *args):
-        guiplugins.ActionDialogGUI.createButtons(self, dialog, *args)
-        parentSize = self.topWindow.get_size()
-        dialog.resize(int(parentSize[0] / 1.2), int(parentSize[0] / 1.7))
+    def getResizeDivisors(self):
+        # size of the dialog
+        return 1.2, 1.7
 
     def messageBeforePerform(self):
         return "Loading test selection ..."
@@ -1605,10 +1602,9 @@ class ReportBugs(guiplugins.ActionDialogGUI):
     def write(self, writeFile, message):
         writeFile.write(message)
         guiplugins.guilog.info(message)
-    def createButtons(self, dialog, *args):
-        guiplugins.ActionDialogGUI.createButtons(self, dialog, *args)
-        parentSize = self.topWindow.get_size()
-        dialog.resize(int(parentSize[0] / 1.4), int(parentSize[0] / 1.7))
+    def getResizeDivisors(self):
+        # size of the dialog
+        return 1.4, 1.7
     def performOnCurrent(self):
         self.checkSanity()
         fileName = self.getFileName()

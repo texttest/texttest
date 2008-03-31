@@ -10,6 +10,9 @@
     </menu>
 
     <menu action="editmenu">
+      <menuitem action="Add Test"/>
+      <menuitem action="Add Suite"/>
+      <separator/>
       <menuitem action="Cut"/>
       <menuitem action="Copy"/>
       <menuitem action="Paste"/>
@@ -50,6 +53,9 @@
   </toolbar>
 
   <popup name="TestPopupMenu">
+    <menuitem action="Add Test"/>
+    <menuitem action="Add Suite"/>
+    <separator/>
     <menuitem action="Cut"/>
     <menuitem action="Copy"/>
     <menuitem action="Paste"/>

@@ -167,6 +167,7 @@ class PlotProfileInGUIAPC(guiplugins.ActionTabGUI):
         self.addOption("focus", "Focus on function", "")
         self.addOption("base", "Baseline profile version", "")
         self.addSwitch("aggregate", "Aggregate all selections")
+        self.addSwitch("hide_focus", "Hide all functions above focus")
         self.numPlottedTests = 0
     def _getTitle(self):
         return "_Plot Profile"
@@ -211,18 +212,19 @@ class PlotProfileInGUIAPC(guiplugins.ActionTabGUI):
         self.optionString = ""
         options["size"] = self.sizes[self.optionGroup.getSwitchValue("size")]
         options["focus"] = self.optionGroup.getOptionValue("focus")
-    
+        options["remove above focus"] = self.optionGroup.getSwitchValue("hide_focus")
+        
     def profileTest(self,data,extra_info,writeDir):
-        import sym_analyze2
+        import sym_analyze3
         if not os.path.isdir(writeDir):
             os.makedirs(writeDir)
-        ops = sym_analyze2.get_default_options();
+        ops = sym_analyze3.get_default_options();
         self.setPlotOptions(ops)
         ops["extra info"].extend(extra_info)
         if ops["focus"] != "" and not data.has_function_name(ops["focus"]):
             raise "Failed to find focus function"
         sin,sout = os.popen2("dot -Tps")
-        sym_analyze2.print_dot(data,ops,sin)
+        sym_analyze3.print_dot(data,ops,sin)
         sin.close()
         ofname = os.path.join(writeDir,"%s.ps"%extra_info[0])
         outfile = open(ofname,"w")
@@ -265,7 +267,7 @@ class PlotProfileInGUIAPC(guiplugins.ActionTabGUI):
         return rv
             
     def getProfileObj(self,test):
-        import sym_analyze2
+        import sym_analyze3
         profileStem = "symbolicdata"
         dataFile = ""
         if self.dynamic:
@@ -280,11 +282,11 @@ class PlotProfileInGUIAPC(guiplugins.ActionTabGUI):
         if dataFile == "" or dataFile == None:
                 raise "Did not find symbolic data file"
             
-        data = sym_analyze2.data_file(dataFile)
+        data = sym_analyze3.data_file(dataFile)
         if self.optionGroup.getOptionValue("base"):
             refFile = test.getFileName(profileStem,self.optionGroup.getOptionValue("base"))
             if refFile:
-                base = sym_analyze2.data_file(refFile)
+                base = sym_analyze3.data_file(refFile)
                 data.add_profile(base,-1)
             else:
                 raise "Did not find reference symbolic data file"

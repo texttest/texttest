@@ -266,11 +266,9 @@ class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
         if os.path.basename(sourceFile) != "rules":
             return False
 
-        overrides = self.getAllOverrides()
-        if len(overrides) == 0:
+        overridesWithSections = self.pairWithSections()
+        if len(overridesWithSections) == 0:
             return False
-
-        overridesWithSections = self.pairWithSections(overrides)
         overrideSections = filter(lambda section: len(overridesWithSections.get(section, [])) > 0, \
                                   overridesWithSections.keys())
         self.diag.info("Overrides with sections " + repr(overridesWithSections))
@@ -295,23 +293,20 @@ class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
         return True
     def isSection(self, line):
         return line.startswith("SECTION ") or (line.startswith("<") and line.endswith(">"))
-    def pairWithSections(self, overrides):
+    def pairWithSections(self):
         results = seqdict()
-        activeSection = "<PARAMETERS>"
-        results[activeSection] = []
-        for override in overrides:
-            if self.isSection(override.strip()):
-                activeSection = override.strip()
-                results[activeSection] = []
-            else:
-                results[activeSection].append(override)
-                self.diag.info("Adding '" + override + "' to section " + activeSection)
+        defaultActiveSection = "<PARAMETERS>"
+        results[defaultActiveSection] = []
+        for overrides in self.raveParameters:
+            activeSection = defaultActiveSection
+            for override in overrides:
+                if self.isSection(override.strip()):
+                    activeSection = override.strip()
+                    results[activeSection] = []
+                else:
+                    results[activeSection].append(override)
+                    self.diag.info("Adding '" + override + "' to section " + activeSection)
         return results
-    def getAllOverrides(self):
-        allOverrides = []
-        for overrideItems in self.raveParameters:
-            allOverrides += overrideItems
-        return allOverrides
     def readRaveParameters(self, fileName):
         self.raveParameters.append(open(fileName).readlines())
         self.diag.info("Added to list : " + repr(self.raveParameters))    

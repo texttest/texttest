@@ -141,13 +141,7 @@ class MultiEntryDictionary(seqdict):
             self.insertEntry(entryName, entry)
         else:
             if insert or not self.currDict is self:
-                dictValType = self.getDictionaryValueType()
-                if dictValType == types.ListType:
-                    self.currDict[entryName] = [ entry ]
-                elif dictValType == types.IntType:
-                    self.currDict[entryName] = int(entry)
-                else:
-                    self.currDict[entryName] = entry
+                self.currDict[entryName] = self.castEntry(entry)
             elif errorOnUnknown:
                 plugins.printWarning("Config entry name '" + entryName + "' not recognised.", stdout = False, stderr = True)
         # Make sure we reset...
@@ -159,6 +153,16 @@ class MultiEntryDictionary(seqdict):
             return types.StringType
         else:
             return type(val[0])
+
+    def castEntry(self, entry):
+        if type(entry) != types.StringType:
+            return entry
+        dictValType = self.getDictionaryValueType()
+        if dictValType == types.ListType:
+            return [ entry ]
+        else:
+            return dictValType(entry)
+    
     def insertEntry(self, entryName, entry):
         currType = type(self.currDict[entryName]) 
         if currType == types.ListType:
@@ -166,14 +170,13 @@ class MultiEntryDictionary(seqdict):
                 self.currDict[entryName] = []
             elif not entry in self.currDict[entryName]:
                 self.currDict[entryName].append(entry)
-        elif currType == types.IntType:
-            self.currDict[entryName] = int(entry)
         elif currType == types.DictType:
             self.currDict = self.currDict[entryName]
             self.insertEntry("default", entry)
             self.currDict = self
         else:
-            self.currDict[entryName] = entry        
+            self.currDict[entryName] = currType(entry)
+
     
 class Callable:
     def __init__(self, method, *args):

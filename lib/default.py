@@ -563,7 +563,7 @@ class Config:
         app.setConfigDefault("testoverview_colours", self.getDefaultTestOverviewColours(), "Colours to use for historical batch HTML reports")
         app.setConfigDefault("batch_sender", { "default" : self.getDefaultMailAddress() }, "Sender address to use sending mail in batch mode")
         app.setConfigDefault("batch_recipients", { "default" : self.getDefaultMailAddress() }, "Addresses to send mail to in batch mode")
-        app.setConfigDefault("batch_timelimit", { "default" : None }, "Maximum length of test to include in batch mode runs")
+        app.setConfigDefault("batch_timelimit", { "default" : "" }, "Maximum length of test to include in batch mode runs")
         app.setConfigDefault("batch_filter_file", { "default" : [] }, "Generic filter for batch session, more flexible than timelimit")
         app.setConfigDefault("batch_use_collection", { "default" : "false" }, "Do we collect multiple mails into one in batch mode")
         # Sample to show that values are lists
@@ -576,7 +576,7 @@ class Config:
         app.setConfigDefault("performance_logfile_extractor", {}, "What string to look for when collecting performance data")
         app.setConfigDefault("performance_test_machine", { "default" : [], "memory" : [ "any" ] }, \
                              "List of machines where performance can be collected")
-        app.setConfigDefault("performance_variation_%", { "default" : 10 }, "How much variation in performance is allowed")
+        app.setConfigDefault("performance_variation_%", { "default" : 10.0 }, "How much variation in performance is allowed")
         app.setConfigDefault("performance_test_minimum", { "default" : 0 }, \
                              "Minimum time/memory to be consumed before data is collected")
     def setUsecaseDefaults(self, app):

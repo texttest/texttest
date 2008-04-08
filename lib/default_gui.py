@@ -1469,10 +1469,21 @@ class RemoveTests(guiplugins.ActionGUI):
         numberOfFiles = len(self.currFileSelection)
         if number is not None:
             numberOfFiles = number
-        if numberOfFiles == 1:
-            return "1 file"
+        return self.pluralise(numberOfFiles, "file")
+    def pluralise(self, num, name):
+        if num == 1:
+            return "1 " + name
         else:
-            return str(numberOfFiles) + " files"
+            return str(num) + " " + name + "s"
+    def getTestCountDescription(self):
+        desc = self.pluralise(self.distinctTestCount, "test")
+        diff = len(self.currTestSelection) - self.distinctTestCount
+        if diff > 0:
+            desc += " (with " + self.pluralise(diff, "extra instance") + ")"
+        return desc
+    def updateSelection(self, tests, apps, rowCount, *args):
+        self.distinctTestCount = rowCount
+        return guiplugins.ActionGUI.updateSelection(self, tests, apps, rowCount, *args)
     def getConfirmationMessage(self):
         extraLines = """
 \nNote: This will remove files from the file system and hence may not be reversible.\n
@@ -1489,8 +1500,8 @@ Are you sure you wish to proceed?\n"""
                 return "\nYou are about to remove the entire test suite '" + currTest.name + \
                        "' and all " + str(currTest.size()) + " tests that it contains." + extraLines
         else:
-            return "\nYou are about to remove " + repr(len(self.currTestSelection)) + \
-                   " tests with associated files." + extraLines
+            return "\nYou are about to remove " + self.getTestCountDescription() + \
+                   " and all associated files." + extraLines
     def performOnCurrent(self):
         if len(self.currFileSelection) > 0:
             self.removeFiles()

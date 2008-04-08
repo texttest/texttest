@@ -62,19 +62,26 @@ class SocketResponder(Responder,plugins.Observable):
     def notifyLifecycleChange(self, test, state, changeDesc):
         testData = socketSerialise(test)
         pickleData = dumps(state)
+        fullData = str(os.getpid()) + os.linesep + testData + os.linesep + pickleData
+        for attempt in range(5):
+            try:
+                self.sendData(fullData)
+                return
+            except socket.error:
+                sleep(1)
+                
+        print "Terminating as failed to communicate with master process, got error :\n" + plugins.getExceptionString()
+    def sendData(self, fullData):
         sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect(sendSocket)
-        sendSocket.sendall(str(os.getpid()) + os.linesep + testData + os.linesep + pickleData)
+        sendSocket.sendall(fullData)
         sendSocket.shutdown(socket.SHUT_WR)
-        try:
-            response = sendSocket.makefile().read()
-            sendSocket.close()
-            if len(response) > 0:
-                appDesc, testPath = response.strip().split(":")
-                appParts = appDesc.split(".")
-                self.notify("ExtraTest", testPath, appParts[0], appParts[1:])
-        except socket.error:
-            print "Terminating as failed to read response from master process, got error :\n" + plugins.getExceptionString()
+        response = sendSocket.makefile().read()
+        sendSocket.close()
+        if len(response) > 0:
+            appDesc, testPath = response.strip().split(":")
+            appParts = appDesc.split(".")
+            self.notify("ExtraTest", testPath, appParts[0], appParts[1:])
             
 class QueueSystemConfig(default.Config):
     def addToOptionGroups(self, app, groups):

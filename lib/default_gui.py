@@ -1477,11 +1477,11 @@ class RemoveTests(guiplugins.ActionGUI):
         extraLines = """
 \nNote: This will remove files from the file system and hence may not be reversible.\n
 Are you sure you wish to proceed?\n"""
-        if len(self.currTestSelection) == 1:
-            currTest = self.currTestSelection[0]
-            if len(self.currFileSelection) > 0:
-                return "\nYou are about to remove " + self.getFilesDescription() + \
-                       " from the " + currTest.classDescription() + " '" + currTest.name + "'." + extraLines                
+        currTest = self.currTestSelection[0]
+        if len(self.currFileSelection) > 0:
+            return "\nYou are about to remove " + self.getFilesDescription() + \
+                   " from the " + currTest.classDescription() + " '" + currTest.name + "'." + extraLines
+        elif len(self.currTestSelection) == 1:                  
             if currTest.classId() == "test-case":
                 return "\nYou are about to remove the test '" + currTest.name + \
                        "' and all associated files." + extraLines

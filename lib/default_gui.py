@@ -1164,16 +1164,24 @@ class RunningAction(guiplugins.ActionTabGUI):
 
     def notifyError(self, message):
         self.showErrorDialog(message)
-        
+
+    def readAndFilter(self, errFile, testSel):
+        errText = ""
+        triggerGroup = plugins.TextTriggerGroup(testSel[0].getConfigValue("suppress_stderr_popup"))
+        for line in open(errFile).xreadlines():
+            if not triggerGroup.stringContainsText(line):
+                errText += line
+        return errText
     def checkErrorFile(self, errFile, testSel, usecase):
         if os.path.isfile(errFile):
-            errText = open(errFile).read()
+            errText = self.readAndFilter(errFile, testSel)
             if len(errText):
                 self.notify("Status", usecase.capitalize() + " run failed for " + repr(testSel[0]))
                 # We're in a funny thread, don't try to create the dialog directly
                 self.notify("Error", usecase.capitalize() + " run failed, with the following errors:\n" + errText)
                 return False
         return True
+    
     def handleCompletion(self, *args):
         pass # only used when recording
 

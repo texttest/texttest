@@ -723,6 +723,7 @@ class Config:
         app.setConfigDefault("gui_entry_completion_matching", 1, "Which matching type to use for entry completion. 0 means turn entry completions off, 1 means match the start of possible completions, 2 means match any part of possible completions")
         app.setConfigDefault("gui_entry_completion_inline", 0, "Automatically inline common completion prefix in entry.")
         app.setConfigDefault("gui_accelerators", self.getDefaultAccelerators(), "Custom action accelerators.")
+        app.setConfigDefault("suppress_stderr_popup", [], "List of patterns which, if written on stderr, should not produce a warning popup")
     def setMiscDefaults(self, app):
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
         app.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")

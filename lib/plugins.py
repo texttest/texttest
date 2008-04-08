@@ -312,19 +312,24 @@ class Filter:
     def acceptsTestSuiteContents(self, suite):
         return 1
 
-class TextFilter(Filter):
-    def __init__(self, filterText, *args):
-        self.texts = self.parseInput(filterText, *args)
+class TextTriggerGroup:
+    def __init__(self, texts):
+        self.texts = texts
         self.textTriggers = [ TextTrigger(text) for text in self.texts ]
-    def parseInput(self, filterText, *args):
-        return commasplit(filterText)
-    def containsText(self, test):
-        return self.stringContainsText(test.name)
+
     def stringContainsText(self, searchString):
         for trigger in self.textTriggers:
             if trigger.matches(searchString):
                 return True
         return False
+
+class TextFilter(Filter, TextTriggerGroup):
+    def __init__(self, filterText, *args):
+        TextTriggerGroup.__init__(self, self.parseInput(filterText, *args))
+    def parseInput(self, filterText, *args):
+        return commasplit(filterText)
+    def containsText(self, test):
+        return self.stringContainsText(test.name)
     def acceptsTestSuiteContents(self, suite):
         return not suite.isEmpty()
 

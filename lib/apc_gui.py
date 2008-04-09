@@ -310,58 +310,6 @@ class Quit(default_gui.Quit):
                     return "Tests have been runnning for %d minutes,\n are you sure you want to quit?" % elapsedTime
         return ""
 
-class CVSLogInGUI(guiplugins.ActionGUI):
-    def inMenuOrToolBar(self):
-        return False
-    def singleTestOnly(self):
-        return True
-    def correctTestClass(self):
-        return "test-case"
-    def performOnCurrent(self):
-        logFileStem = self.currTestSelection[0].app.getConfigValue("log_file")
-        files = [ logFileStem ]
-        files += self.currTestSelection[0].app.getConfigValue("cvs_log_for_files").split(",")
-        cvsInfo = ""
-        path = self.currTestSelection[0].getDirectory()
-        for file in files:
-            fileName = self.currTestSelection[0].getFileName(file)
-            if fileName:
-                cvsInfo += self.getCVSInfo(path, os.path.basename(fileName))
-        self.showInformationDialog("CVS Logs" + os.linesep + os.linesep + cvsInfo)
-    def _getTitle(self):
-        return "CVS _Log"
-    def getCVSInfo(self, path, file):
-        info = os.path.basename(file) + ":" + os.linesep
-        cvsCommand = "cd " + path + ";cvs log -N -rHEAD " + file
-        stdin, stdouterr = os.popen4(cvsCommand)
-        cvsLines = stdouterr.readlines()
-        if len(cvsLines) > 0:            
-            addLine = None
-            for line in cvsLines:
-                isMinusLine = None
-                if line.startswith("-----------------"):
-                    addLine = 1
-                    isMinusLine = 1
-                if line.startswith("================="):
-                    addLine = None
-                if line.find("nothing known about") != -1:
-                    info += "Not CVS controlled"
-                    break
-                if line.find("No CVSROOT specified") != -1:
-                    info += "No CVSROOT specified"
-                    break
-                if addLine and not isMinusLine:
-                    info += line
-            info += os.linesep
-        return info
-    def showInformationDialog(self, message):
-        dialog = self.createAlarmDialog(self.getParentWindow(), message, gtk.STOCK_DIALOG_INFO, "Information")
-        dialog.set_default_response(gtk.RESPONSE_CLOSE)
-        yesButton = dialog.add_button(gtk.STOCK_CLOSE, gtk.RESPONSE_CLOSE)
-        guiplugins.scriptEngine.connect("press close", "clicked", yesButton, self.cleanDialog,
-                                        gtk.RESPONSE_CLOSE, True, dialog)
-        dialog.show_all()
-
 
 class SelectTests(default_gui.SelectTests):
     def __init__(self, *args):
@@ -444,7 +392,7 @@ class InteractiveActionConfig(apc_basic_gui.InteractiveActionConfig):
         classes = apc_basic_gui.InteractiveActionConfig.getInteractiveActionClasses(self, dynamic)
         if dynamic:
             classes += [ ViewApcLog, SaveBestSolution ]
-        classes += [ CVSLogInGUI, SelectKPIGroup, PlotProfileInGUIAPC ]
+        classes += [ SelectKPIGroup, PlotProfileInGUIAPC ]
         return classes
 
     def getPlotClass(self):

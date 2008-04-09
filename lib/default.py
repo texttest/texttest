@@ -461,10 +461,22 @@ class Config:
             batchSession = self.optionMap.get("b")
             batchFilter = batch.BatchVersionFilter(batchSession)
             batchFilter.verifyVersions(suite.app)
+        # side effects really from here on :(
         if self.isReconnecting():
             reconnector = reconnect.ReconnectApp()
             self.reconnDir = reconnector.findReconnectDir(suite.app, self.optionValue("reconnect"))
-            
+        if self.isReconnecting() or self.optionMap.has_key("coll"):
+            # Reading stuff from stored pickle files, need to set up categories independently
+            self.setUpPerformanceCategories(suite.app)
+
+    def setUpPerformanceCategories(self, app):
+        # We don't create these in the normal way, so we don't know what they are.
+        allCategories = app.getConfigValue("performance_descriptor_decrease").values() + \
+                        app.getConfigValue("performance_descriptor_increase").values()
+        for cat in allCategories:
+            if cat:
+                plugins.addCategory(*plugins.commasplit(cat))
+                
     def checkExecutableExists(self, suite):
         executable = suite.getConfigValue("executable")
         if not executable:
@@ -577,8 +589,11 @@ class Config:
         app.setConfigDefault("performance_test_machine", { "default" : [], "memory" : [ "any" ] }, \
                              "List of machines where performance can be collected")
         app.setConfigDefault("performance_variation_%", { "default" : 10.0 }, "How much variation in performance is allowed")
-        app.setConfigDefault("performance_test_minimum", { "default" : 0 }, \
+        app.setConfigDefault("performance_test_minimum", { "default" : 0.0 }, \
                              "Minimum time/memory to be consumed before data is collected")
+        app.setConfigDefault("performance_descriptor_decrease", self.defaultPerfDecreaseDescriptors(), "Descriptions to be used when the numbers decrease in a performance file")
+        app.setConfigDefault("performance_descriptor_increase", self.defaultPerfIncreaseDescriptors(), "Descriptions to be used when the numbers increase in a performance file")
+        
     def setUsecaseDefaults(self, app):
         app.setConfigDefault("use_case_record_mode", "disabled", "Mode for Use-case recording (GUI, console or disabled)")
         app.setConfigDefault("use_case_recorder", "", "Which Use-case recorder is being used")
@@ -586,6 +601,21 @@ class Config:
         if os.name == "posix":
             app.setConfigDefault("virtual_display_machine", [ "localhost" ], \
                                  "(UNIX) List of machines to run virtual display server (Xvfb) on")
+
+    def defaultPerfDecreaseDescriptors(self):
+        descriptors = {}
+        descriptors["default"] = ""
+        descriptors["memory"] = "smaller, memory-, used less memory"
+        descriptors["cputime"] = "faster, faster, ran faster"
+        return descriptors
+
+    def defaultPerfIncreaseDescriptors(self):
+        descriptors = {}
+        descriptors["default"] = ""
+        descriptors["memory"] = "larger, memory+, used more memory"
+        descriptors["cputime"] = "slower, slower, ran slower"
+        return descriptors
+
     def defaultSeverities(self):
         severities = {}
         severities["errors"] = 1

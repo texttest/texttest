@@ -128,7 +128,7 @@ class CarmenSgeSubmissionRules(queuesystem.SubmissionRules):
     def getPerfCategoryFromTime(self, cpuTime):
         if cpuTime == -1:
             # This means we don't know, probably because it's not enabled
-            return "short"
+            return self.test.getConfigValue("queue_for_unknown_cputime")
         elif cpuTime < self.getShortQueueSeconds():
             return "short"
         elif cpuTime > 7200:
@@ -151,8 +151,10 @@ class CarmenSgeSubmissionRules(queuesystem.SubmissionRules):
             return "short"
         elif category == "medium" or self.nightjob:
             return "normal"
-        else:
+        elif category == "long":
             return "idle"
+        else:
+            return category
     def findPriority(self):
         if self.cpuTime == -1:
             # We don't know yet...
@@ -260,6 +262,7 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         app.setConfigDefault("default_architecture", "i386_linux", "Which Carmen architecture to run tests on by default")
         app.setConfigDefault("default_major_release", "master", "Which Carmen major release to run by default")
         app.setConfigDefault("maximum_cputime_for_short_queue", 10, "Maximum time a test can take and be sent to the short queue")
+        app.setConfigDefault("queue_for_unknown_cputime", "short", "Which queue to use when the time for the test cannot be estimated")
         app.addConfigEntry("bugzilla", "http://bugzilla.carmen.se/cli.cgi", "bug_system_script")
         # plenty of people use CVS at Carmen, best to ignore it in data
         app.addConfigEntry("default", "CVS", "test_data_ignore")

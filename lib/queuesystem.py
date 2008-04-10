@@ -656,13 +656,14 @@ class QueueSystemServer(BaseActionRunner):
         queueSystem = self.getQueueSystem(test)
         jobId, jobName = self.jobs[test]
         return queueSystem.getJobFailureInfo(jobId)
-    def getSlaveErrors(self, test):
+    def getSlaveErrors(self, test, name):
         slaveErrFile = self.getSlaveErrFile(test)
         if slaveErrFile:
-            errStr = open(slaveErrFile).read()
-            if errStr and errStr.find("Traceback") != -1:
-                return errStr
-
+            errors = open(slaveErrFile).read()
+            if errors:
+                return "-" * 10 + " Error messages written by " + name + " job " + "-" * 10 + \
+                       "\n" + errors
+ 
     def getSlaveErrFile(self, test):
         jobId, jobName = self.getJobInfo(test)
         if not jobName:
@@ -765,13 +766,13 @@ class QueueSystemServer(BaseActionRunner):
         self.cancel(test, briefText, freeText)
     def setSlaveLost(self, test, wantStatus):
         failReason = "no report, possibly killed with SIGKILL"
-        fullText = failReason + "\n" + self.getJobFailureInfo(test, wantStatus)
+        name = queueSystemName(test.app)
+        fullText = failReason + "\n" + self.getJobFailureInfo(test, name, wantStatus)
         self.changeState(test, plugins.TestState("killed", briefText=failReason, \
                                                  freeText=fullText, completed=1, lifecycleChange="complete"))
-    def getJobFailureInfo(self, test, wantStatus):
+    def getJobFailureInfo(self, test, name, wantStatus):
         if wantStatus:
-            name = queueSystemName(test.app)
-            return "Full accounting info from " + name + " follows:\n" + \
+            return "-" * 10 + " Full accounting info from " + name + " " + "-" * 10 + "\n" + \
                    self._getJobFailureInfo(test)
         else:
             # Job accounting info can take ages to find, don't do it from GUI quit
@@ -782,12 +783,14 @@ class QueueSystemServer(BaseActionRunner):
         fullText = failReason + "\n" + fullText
         self.changeState(test, plugins.Unrunnable(briefText=failReason, freeText=fullText, lifecycleChange="complete"))
     def getSlaveFailure(self, test, wantStatus):
-        slaveErrors = self.getSlaveErrors(test)
+        fullText = ""
+        name = queueSystemName(test.app)
+        slaveErrors = self.getSlaveErrors(test, name)
         if slaveErrors:
-            return "Slave exited", slaveErrors
-        else:
-            name = queueSystemName(test.app)
-            return name + "/system error", self.getJobFailureInfo(test, wantStatus)
+            fullText += slaveErrors
+
+        fullText += self.getJobFailureInfo(test, name, wantStatus)
+        return name + " job exited", fullText
     def getPostText(self, test, jobId):
         name = queueSystemName(test.app)
         return "in " + name + " (job " + jobId + ")"

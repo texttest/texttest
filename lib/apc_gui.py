@@ -23,7 +23,7 @@ class ViewApcLog(guiplugins.ActionGUI):
 
 class SaveBestSolution(guiplugins.ActionGUI):
     def inMenuOrToolBar(self):
-        return False
+        return True
     def singleTestOnly(self):
         return True
     def performOnCurrent(self):

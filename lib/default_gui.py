@@ -424,12 +424,12 @@ class FollowFile(FileViewAction):
         else:
             return fileName
     def getFollowCommand(self, followProgram, fileName):
-        basic = plugins.splitcmd(followProgram) + [ fileName ]
-        if followProgram.startswith("tail") and os.name == "posix":
+        if os.name == "posix":
             title = self.currTestSelection[0].name + " (" + os.path.basename(fileName) + ")"
-            return [ "xterm", "-bg", "white", "-T", title, "-e" ] + basic
+            remoteHost = self.currTestSelection[0].state.executionHosts[0]
+            return [ "xon", remoteHost, "xterm -bg white -T \"" + title + "\" -e " + followProgram + " " + fileName ]
         else:
-            return basic
+            return plugins.splitcmd(followProgram) + [ fileName ]
     def performOnFile(self, fileName, comparison, followProgram):
         useFile = self.fileToFollow(fileName, comparison)
         guiplugins.guilog.info("Following file " + useFile + " using '" + followProgram + "'")

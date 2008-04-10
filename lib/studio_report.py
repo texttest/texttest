@@ -11,6 +11,10 @@ class Config(ravebased.Config):
         return [ self.getSubplanRuleset(test) ]
 
     def _subPlanName(self, test):
-        opts = test.getWordsInFile("options")
-        if opts:
-            return os.path.expandvars(opts[-1][:-1], test.getEnvironment)
+        fromEnv = test.getEnvironment("CARMPLAN")
+        if fromEnv:
+            return fromEnv
+        else:
+            opts = test.getWordsInFile("options")
+            if opts:
+                return os.path.expandvars(opts[-1][:-1], test.getEnvironment)

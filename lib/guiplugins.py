@@ -360,6 +360,9 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
 
     def displayInTab(self):
         return False
+
+    def allAppsValid(self):
+        return True
     
     def getStockId(self):
         stockId = self._getStockId()

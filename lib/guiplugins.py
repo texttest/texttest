@@ -1067,6 +1067,9 @@ class MultiActionGUIForwarder(GtkActionWrapper):
             actionGUI.setObservers(observers)
         
     def notifyNewTestSelection(self, *args):
+        if not hasattr(self.actionGUIs[0], "notifyNewTestSelection"):
+            return
+        
         newActive = False
         for actionGUI in self.actionGUIs:
             if actionGUI.updateSelection(*args):

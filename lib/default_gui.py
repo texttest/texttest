@@ -7,6 +7,7 @@ from threading import Thread
 from glob import glob
 from stat import *
 from ndict import seqdict
+from socket import gethostname
 from log4py import LOGLEVEL_NORMAL
    
     
@@ -423,13 +424,25 @@ class FollowFile(FileViewAction):
             return comparison.tmpFile
         else:
             return fileName
+    def getFullDisplay(self, localhost):
+        display = os.getenv("DISPLAY", "")
+        if display.startswith(":"):
+            return localhost + display
+        else:
+            return display
     def getFollowCommand(self, followProgram, fileName):
+        basic = plugins.splitcmd(followProgram) + [ fileName ]
         if os.name == "posix":
             title = self.currTestSelection[0].name + " (" + os.path.basename(fileName) + ")"
             remoteHost = self.currTestSelection[0].state.executionHosts[0]
-            return [ "xon", remoteHost, "xterm -bg white -T \"" + title + "\" -e " + followProgram + " " + fileName ]
+            localhost = gethostname()
+            if remoteHost != localhost:
+                return [ "rsh", remoteHost, "env DISPLAY=" + self.getFullDisplay(localhost) + \
+                         " xterm -bg white -T \"" + title + "\" -e " + followProgram + " " + fileName ]
+            else:
+                return [ "xterm", "-bg", "white", "-T", title, "-e" ] + basic
         else:
-            return plugins.splitcmd(followProgram) + [ fileName ]
+            return basic
     def performOnFile(self, fileName, comparison, followProgram):
         useFile = self.fileToFollow(fileName, comparison)
         guiplugins.guilog.info("Following file " + useFile + " using '" + followProgram + "'")
@@ -1482,11 +1495,6 @@ class RemoveTests(guiplugins.ActionGUI):
         if number is not None:
             numberOfFiles = number
         return self.pluralise(numberOfFiles, "file")
-    def pluralise(self, num, name):
-        if num == 1:
-            return "1 " + name
-        else:
-            return str(num) + " " + name + "s"
     def getTestCountDescription(self):
         desc = self.pluralise(self.distinctTestCount, "test")
         diff = len(self.currTestSelection) - self.distinctTestCount
@@ -1644,73 +1652,47 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         writeFile.close()
         self.currTestSelection[0].filesChanged()
 
-class RecomputeTest(guiplugins.ActionGUI):
+class RecomputeTests(guiplugins.ActionGUI):
     def __init__(self, *args):
         guiplugins.ActionGUI.__init__(self, *args)
         self.recomputing = False
         self.chainReaction = False
-    def singleTestOnly(self):
-        return True
+        self.latestNumberOfRecomputations = 0
     def getState(self, state):
         if state:
             return state
         else:
             return self.currTestSelection[0].state
     def isActiveOnCurrent(self, test=None, state=None):
-        if not guiplugins.ActionGUI.isActiveOnCurrent(self):
-            return False
-        
-        useState = self.getState(state)
-        return useState.hasStarted() and not useState.isComplete()
-    def updateSelection(self, tests, apps, rowCount, *args):
-        newActive = guiplugins.ActionGUI.updateSelection(self, tests, apps, rowCount, *args)
+        for currTest in self.currTestSelection:
+            if currTest is test:
+                if test.needsRecalculation(state):
+                    return True
+            elif currTest.needsRecalculation():
+                return True
+        return False
+    def notifyNewTestSelection(self, tests, apps, rowCount, *args):
+        guiplugins.ActionGUI.notifyNewTestSelection(self, tests, apps, rowCount, *args)
         # Prevent recomputation triggering more...
         if self.recomputing:
             self.chainReaction = True
-            return newActive
-        if rowCount == 1 and self.currTestSelection[0].needsRecalculation():
+            return 
+        if rowCount == 1 and self.currTestSelection[0].state.isComplete() and self.currTestSelection[0].needsRecalculation():
             self.recomputing = True
             self.currTestSelection[0].refreshFiles()
             self.perform()
             self.recomputing = False
             if self.chainReaction:
                 self.chainReaction = False
-        return newActive
-    def inMenuOrToolBar(self):
-        return False
-    def _getTitle(self):
-        return "_Update Info"
-    def getTooltip(self):
-        return "Update test progress information and compare test files so far"
-    def messageBeforePerform(self):
-        return "Recomputing status of " + self.describeTests() + " ..."
-    def messageAfterPerform(self):
-        pass
-    def performOnCurrent(self):
-        test = self.currTestSelection[0] # recomputing can change selection, make sure we talk about the right one...
-        test.app.recomputeProgress(test, self.observers)
-        self.notify("Status", "Done recomputing status of " + repr(test) + ".")
-
-class RecomputeAllTests(guiplugins.ActionGUI):
-    def __init__(self, allApps, *args):
-        guiplugins.ActionGUI.__init__(self, allApps, *args)
-        self.latestNumberOfRecomputations = 0
-    def isActiveOnCurrent(self, test=None, state=None):
-        for test in self.currTestSelection:
-            if test.needsRecalculation():
-                return True
-        return False
     def _getTitle(self):
         return "Recompute Status"
+    def getTooltip(self):
+        return "Recompute test status, including progress information if appropriate"
     def messageAfterPerform(self):
         if self.latestNumberOfRecomputations == 0:            
             return "No test needed recomputation."
-        elif self.latestNumberOfRecomputations == 1:
-            return "Recomputed status of 1 test."
         else:
-            return "Recomputed status of " + str(self.latestNumberOfRecomputations) + " tests."
-    def getTooltip(self):
-        return "recompute status of all tests"
+            return "Recomputed status of " + self.pluralise(self.latestNumberOfRecomputations, "test") + "."
     def performOnCurrent(self):
         self.latestNumberOfRecomputations = 0
         for test in self.currTestSelection:
@@ -2018,8 +2000,8 @@ class InteractiveActionConfig:
         if dynamic:
             classes += [ ViewFilteredInEditor, ViewFileDifferences, 
                          ViewFilteredFileDifferences, FollowFile, 
-                         SaveTests, SaveSelection, RecomputeTest, 
-                         RecomputeAllTests, KillTests, MarkTest, UnmarkTest ]
+                         SaveTests, SaveSelection, KillTests,
+                         MarkTest, UnmarkTest, RecomputeTests ] # must keep RecomputeTests at the end!            
         else:
             classes += [ RecordTest, CopyTests, CutTests, 
                          PasteTests, ImportTestCase, ImportTestSuite, 

@@ -586,8 +586,11 @@ class TestCase(Test):
         return "\nDescription:\n" + desc + \
                performanceDescription + \
                memoryDescription    
-    def needsRecalculation(self):
-        return self.state.isComplete() and self.state.needsRecalculation()
+    def needsRecalculation(self, state=None):
+        if state is None:
+            state = self.state
+        return (state.hasStarted() and not state.isComplete()) or \
+               (state.isComplete() and state.needsRecalculation())
     def callAction(self, action):
         return action(self)
     def changeState(self, state):

@@ -592,6 +592,12 @@ class ActionGUI(BasicActionGUI):
 
     def correctTestClass(self):
         pass
+
+    def pluralise(self, num, name):
+        if num == 1:
+            return "1 " + name
+        else:
+            return str(num) + " " + name + "s"
     
     def createView(self):
         return self.createButton()
@@ -1076,6 +1082,10 @@ class MultiActionGUIForwarder(GtkActionWrapper):
                 newActive = True
 
         self.setSensitivity(newActive)
+
+    def notifyTopWindow(self, *args):
+        for actionGUI in self.actionGUIs:
+            actionGUI.notifyTopWindow(*args)
 
     def addSuites(self, suites):
         for actionGUI in self.actionGUIs:

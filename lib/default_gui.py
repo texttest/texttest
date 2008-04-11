@@ -641,6 +641,10 @@ class ImportTest(guiplugins.ActionDialogGUI):
                 return "Test directory already exists for '" + testName + "'\nAre you sure you want to use this name?"
         else:
             return ""
+    def getResizeDivisors(self):
+        # size of the dialog
+        return 1.5, 2.8
+
     def testFilesExist(self, dir, app):
         for fileName in os.listdir(dir):
             parts = fileName.split(".")

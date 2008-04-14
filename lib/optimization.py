@@ -214,7 +214,6 @@ class OptimizationConfig(ravebased.Config):
     def setApplicationDefaults(self, app):
         ravebased.Config.setApplicationDefaults(self, app)
         app.setConfigDefault(itemNamesConfigKey, self.itemNamesInFile, "Private: Item name map for optimization status file parsing")
-        app.setConfigDefault("cvs_log_for_files", "", "File list that should be displayed by CVS log functionality")
         app.setConfigDefault("kpi_cost_margin", 0.0, "Cost margin for the KPI calculations")
         app.setConfigDefault("skip_comparison_if_not_present", "error", "List of files that are compared only if they are created by the test, i.e. they will not be reported as missing")
         app.addConfigEntry("definition_file_stems", "raveparameters")

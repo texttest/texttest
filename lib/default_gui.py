@@ -261,6 +261,22 @@ class FileViewAction(guiplugins.ActionGUI):
             return " (from test " + self.currTestSelection[0].uniqueName + ")"
         else:
             return ""
+    def getRemoteHost(self):
+        if os.name == "posix" and len(self.currTestSelection) > 0:
+            state = self.currTestSelection[0].state
+            if hasattr(state, "executionHosts") and len(state.executionHosts) > 0:
+                remoteHost = state.executionHosts[0]
+                localhost = gethostname()
+                if remoteHost != localhost:
+                    return remoteHost
+
+    def getFullDisplay(self):
+        display = os.getenv("DISPLAY", "")
+        if display.startswith(":"):
+            return gethostname() + display
+        else:
+            return display
+
     def getSignalsSent(self):
         return [ "ViewerStarted" ]
     def startViewer(self, cmdArgs, description, *args, **kwargs):
@@ -315,6 +331,7 @@ class ViewInEditor(FileViewAction):
         # Doing this is unlikely to cause harm in any case
         if len(self.currTestSelection) > 0 and os.path.isabs(cmdArgs[0]):
             return self.currTestSelection[0].getRunEnvironment()
+    
     def getViewCommand(self, fileName, viewProgram):
         # viewProgram might have arguments baked into it...
         cmdArgs = plugins.splitcmd(viewProgram) + [ fileName ]
@@ -324,6 +341,10 @@ class ViewInEditor(FileViewAction):
         interpreter = plugins.getInterpreter(program)
         if interpreter:
             cmdArgs = [ interpreter ] + cmdArgs
+        remoteHost = self.getRemoteHost()
+        if remoteHost:
+            cmdArgs = [ "rsh", remoteHost, "env DISPLAY=" + self.getFullDisplay() + " " + " ".join(cmdArgs) ]
+
         return cmdArgs, descriptor, env
     
     def findExitHandlerInfo(self, fileName):
@@ -441,12 +462,6 @@ class FollowFile(FileViewAction):
             return comparison.tmpFile
         else:
             return fileName
-    def getFullDisplay(self, localhost):
-        display = os.getenv("DISPLAY", "")
-        if display.startswith(":"):
-            return localhost + display
-        else:
-            return display
     def isDefaultViewer(self, comparison):
         return not self.differencesActive(comparison) and guiplugins.guiConfig.getValue("follow_file_by_default")
     
@@ -454,10 +469,9 @@ class FollowFile(FileViewAction):
         basic = plugins.splitcmd(followProgram) + [ fileName ]
         if os.name == "posix":
             title = self.currTestSelection[0].name + " (" + os.path.basename(fileName) + ")"
-            remoteHost = self.currTestSelection[0].state.executionHosts[0]
-            localhost = gethostname()
-            if remoteHost != localhost:
-                return [ "rsh", remoteHost, "env DISPLAY=" + self.getFullDisplay(localhost) + \
+            remoteHost = self.getRemoteHost()
+            if remoteHost:
+                return [ "rsh", remoteHost, "env DISPLAY=" + self.getFullDisplay() + \
                          " xterm -bg white -T \"" + title + "\" -e " + followProgram + " " + fileName ]
             else:
                 return [ "xterm", "-bg", "white", "-T", title, "-e" ] + basic

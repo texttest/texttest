@@ -15,9 +15,11 @@ class Config(optimization.OptimizationConfig):
     def getTestRunner(self):
         baseRunner = optimization.OptimizationConfig.getTestRunner(self)
         if self.slaveRun():
-            return [ MarkApcLogDir(self.isExecutable, self.hasAutomaticCputimeChecking, baseRunner, self.optionMap), baseRunner ]
+            return [ self.getApcLogDirMarker(baseRunner), baseRunner ]
         else:
             return baseRunner
+    def getApcLogDirMarker(self, baseRunner):
+        return MarkApcLogDir(self.isExecutable, self.hasAutomaticCputimeChecking, baseRunner, self.optionMap)
     def isExecutable(self, process, test):
         # Process name starts with a dot and may be truncated or have
         # extra junk at the end added by APCbatch.sh
@@ -108,13 +110,12 @@ class MarkApcLogDir(RunWithParallelAction):
             self.makeLinks(test, apcLogDir)
     def makeLinks(self, test, apcTmpDir):
         linkTarget = test.makeTmpFileName("apc_tmp_dir", forComparison=0)
+        self.makeLink(apcTmpDir, linkTarget)
+    def makeLink(self, source, target):
         try:
-            os.symlink(apcTmpDir, linkTarget)
-            logFileName = os.path.join(apcTmpDir, "apclog")
-            apcLog = test.makeTmpFileName("apclog")
-            os.symlink(logFileName, apcLog)
+            os.symlink(source, target)
         except OSError:
-            print "Failed to create apc_tmp_dir or apclog link"
+            print "Failed to create link", os.path.basename(target)
 
     def performParallelAction(self, test, execProcess, parentProcess):
         apcTmpDir = self.getApcLogDir(test, str(parentProcess.pid))

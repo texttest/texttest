@@ -162,6 +162,8 @@ class ApcConfig(apc_basic.Config):
             listKPIs = [KPI.cSimplePairingOptTimeKPI]
             return [ optimization.WriteKPIData(self.optionValue("kpiData"), listKPIs) ]
         return apc_basic.Config.getActionSequence(self)
+    def getApcLogDirMarker(self, baseRunner):
+        return MarkApcLogDir(self.isExecutable, self.hasAutomaticCputimeChecking, baseRunner, self.optionMap)
     def getSlaveSwitches(self):
         return apc_basic.Config.getSlaveSwitches(self) + [ "rundebug", "extractlogs", "goprof" ]
     def getProgressReportBuilder(self):
@@ -238,6 +240,14 @@ class CheckFilesForApc(plugins.Action):
             print "Failed to find AirportFile in etables. Not verifying airportFile."
         verifyLogFileDir(test)
         os.environ["TEXTTEST_TEST_RELPATH"] = test.getRelPath()
+
+class MarkApcLogDir(apc_basic.MarkApcLogDir):
+    def makeLinks(self, test, apcTmpDir):
+        apc_basic.MarkApcLogDir.makeLinks(self, test, apcTmpDir)
+        logFileName = os.path.join(apcTmpDir, "apclog")
+        apcLog = test.makeTmpFileName("apclog")
+        self.makeLink(logFileName, apcLog)
+
 
 def verifyAirportFile(test):
     diag = plugins.getDiagnostics("APC airport")

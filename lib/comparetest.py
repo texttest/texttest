@@ -316,7 +316,7 @@ class ProgressTestComparison(BaseTestComparison):
         else:
             return ""
     def getSize(self, fileName):
-        if fileName:
+        if fileName and os.path.isfile(fileName):
             return os.path.getsize(fileName)
         else:
             return 0

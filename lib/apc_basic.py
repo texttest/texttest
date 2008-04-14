@@ -110,15 +110,12 @@ class MarkApcLogDir(RunWithParallelAction):
         linkTarget = test.makeTmpFileName("apc_tmp_dir", forComparison=0)
         try:
             os.symlink(apcTmpDir, linkTarget)
+            logFileName = os.path.join(apcTmpDir, "apclog")
+            apcLog = test.makeTmpFileName("apclog")
+            os.symlink(logFileName, apcLog)
         except OSError:
-            print "Failed to create apc_tmp_dir link"
-            
-        viewLogScript = test.makeTmpFileName("view_apc_log", forFramework=1)
-        file = open(viewLogScript, "w")
-        logFileName = os.path.join(apcTmpDir, "apclog")
-        cmdArgs = [ "xon", gethostname(), "xterm -bg white -T " + test.name + " -e less +F " + logFileName ]
-        file.write(repr(cmdArgs))
-        file.close()
+            print "Failed to create apc_tmp_dir or apclog link"
+
     def performParallelAction(self, test, execProcess, parentProcess):
         apcTmpDir = self.getApcLogDir(test, str(parentProcess.pid))
         self.diag.info("APC log directory is " + apcTmpDir + " based on process " + parentProcess.getName())

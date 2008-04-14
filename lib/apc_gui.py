@@ -2,25 +2,6 @@
 import apc_basic_gui, optimization_gui, ravebased_gui, default_gui, guiplugins, plugins, os, sys, shutil, time, gtk
 from apc import readKPIGroupFileCommon
 
-class ViewApcLog(guiplugins.ActionGUI):
-    def __repr__(self):
-        return "Viewing log of"
-    def singleTestOnly(self):
-        return True
-    def inMenuOrToolBar(self):
-        return False
-    def performOnCurrent(self):
-        viewLogScript = self.currTestSelection[0].makeTmpFileName("view_apc_log", forFramework=1)
-        if os.path.isfile(viewLogScript):
-            file = open(viewLogScript)
-            cmdArgs = eval(file.readlines()[0].strip())
-            file.close()
-            guiplugins.processMonitor.startProcess(cmdArgs, "APC log viewer", scriptName="views the APC log")
-        else:
-            raise plugins.TextTestError, "APC log file not yet available"
-    def _getTitle(self):
-        return "View APC Log"
-
 class SaveBestSolution(guiplugins.ActionGUI):
     def inMenuOrToolBar(self):
         return True
@@ -391,7 +372,7 @@ class InteractiveActionConfig(apc_basic_gui.InteractiveActionConfig):
     def getInteractiveActionClasses(self, dynamic):
         classes = apc_basic_gui.InteractiveActionConfig.getInteractiveActionClasses(self, dynamic)
         if dynamic:
-            classes += [ ViewApcLog, SaveBestSolution ]
+            classes += [ SaveBestSolution ]
         classes += [ SelectKPIGroup, PlotProfileInGUIAPC ]
         return classes
 

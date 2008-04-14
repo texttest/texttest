@@ -1758,9 +1758,10 @@ class ApplicationFileGUI(FileViewGUI):
                 for importedFile in self.getImportedFiles(file):
                     importedFiles[importedFile] = importedFile
 
-        for app in self.allApps:
+        allTitles = self.getApplicationTitles()
+        for index, app in enumerate(self.allApps):
             confiter = self.model.insert_before(None, None)
-            self.model.set_value(confiter, 0, "Files for " + app.fullName + app.versionSuffix())
+            self.model.set_value(confiter, 0, "Files for " + allTitles[index])
             for file in self.getConfigFiles(app):
                 self.addFileToModel(confiter, file, None, colour)
                 for importedFile in self.getImportedFiles(file, app):
@@ -1775,6 +1776,19 @@ class ApplicationFileGUI(FileViewGUI):
             sortedFiles.sort()
             for importedFile in sortedFiles:
                 self.addFileToModel(importediter, importedFile, None, colour)
+    def getApplicationTitles(self):
+        basicTitles = [ app.fullName + app.versionSuffix() for app in self.allApps ]
+        if self.areUnique(basicTitles):
+            return basicTitles
+        else:
+            return [ app.fullName + app.versionSuffix() + " (" + app.name + " under " +
+                     os.path.basename(app.getDirectory()) + ")" for app in self.allApps ]
+    def areUnique(self, names):
+        for index, name in enumerate(names):
+            for otherName in names[index + 1:]:
+                if name == otherName:
+                    return False
+        return True
                 
     def getConfigFiles(self, app):
         return app._getAllFileNames([ app.dircache ], "config", allVersions=True)

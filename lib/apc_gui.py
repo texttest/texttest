@@ -3,8 +3,6 @@ import apc_basic_gui, optimization_gui, ravebased_gui, default_gui, guiplugins, 
 from apc import readKPIGroupFileCommon
 
 class SaveBestSolution(guiplugins.ActionGUI):
-    def inMenuOrToolBar(self):
-        return True
     def singleTestOnly(self):
         return True
     def performOnCurrent(self):

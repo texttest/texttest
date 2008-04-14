@@ -1323,8 +1323,6 @@ class RecordTest(RunningAction):
         return "media-record"
     def singleTestOnly(self):
         return True
-    def inMenuOrToolBar(self):
-        return False
     def getTabTitle(self):
         return "Recording"
     def messageAfterPerform(self):

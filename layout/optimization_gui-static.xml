@@ -1,0 +1,13 @@
+<ui>
+
+  <menubar name="MainMenuBar">
+
+    <placeholder name="ExtraMenus">
+      <menu name="optimizationmenu" action="optimizationmenu">
+        <menuitem action="Start Studio"/>
+      </menu>
+    </placeholder>
+
+  </menubar>
+
+</ui>

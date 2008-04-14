@@ -36,6 +36,7 @@
       <menuitem action="Select"/>
       <menuitem action="Run"/>
       <menuitem action="Reconnect"/>
+      <menuitem action="Record Use-Case"/>
       <menuitem action="Reset"/>
     </menu>
     

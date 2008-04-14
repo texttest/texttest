@@ -372,10 +372,6 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
     def _getStockId(self): # The stock ID for the action, in toolbar and menu.
         pass
 
-    # Should we create a gtk.Action? (or connect to button directly ...)
-    def inMenuOrToolBar(self): 
-        return True
-
     def describe(self):
         self.describeAction()
                 
@@ -1135,28 +1131,24 @@ class InteractiveActionHandler:
 
     def getPluginGUIs(self, dynamic, allApps, uiManager):
         instances = self.getInstances(dynamic, allApps)
-        defaultGUIs, buttonGUIs, actionTabGUIs = [], [], []
+        defaultGUIs, actionTabGUIs = [], []
         for action in instances:
             if action.displayInTab():
                 self.diag.info("Tab: " + str(action.__class__))
                 actionTabGUIs.append(action)
             else:
-                if action.inMenuOrToolBar():
-                    self.diag.info("Menu/toolbar: " + str(action.__class__))
-                    # It's always active, always visible
-                    action.setActive(True)
-                    defaultGUIs.append(action)
-                else:
-                    self.diag.info("Button: " + str(action.__class__))
-                    buttonGUIs.append(action)
+                self.diag.info("Menu/toolbar: " + str(action.__class__))
+                # It's always active, always visible
+                action.setActive(True)
+                defaultGUIs.append(action)
 
         actionGroup = gtk.ActionGroup("AllActions")
         uiManager.insert_action_group(actionGroup, 0)
         accelGroup = uiManager.get_accel_group()
-        for actionGUI in defaultGUIs + buttonGUIs + actionTabGUIs:
+        for actionGUI in defaultGUIs + actionTabGUIs:
             actionGUI.addToGroups(actionGroup, accelGroup)
 
-        return defaultGUIs, buttonGUIs, actionTabGUIs
+        return defaultGUIs, actionTabGUIs
     
     def getInstances(self, dynamic, allApps):
         instances = []

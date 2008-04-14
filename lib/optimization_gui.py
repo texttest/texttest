@@ -103,14 +103,12 @@ class StartStudio(guiplugins.ActionTabGUI):
     def __init__(self, *args):
         guiplugins.ActionTabGUI.__init__(self, *args)
         self.addOption("sys", "Studio CARMSYS to use")
-    def inMenuOrToolBar(self):
-        return False
     def singleTestOnly(self):
         return True
     def correctTestClass(self):
         return "test-case"
     def _getTitle(self):
-        return "Studio"
+        return "Start Studio"
     def getTabTitle(self):
         return "Studio"
     def getTooltip(self):

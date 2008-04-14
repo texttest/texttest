@@ -204,7 +204,7 @@ class TextTestGUI(Responder, plugins.Observable):
         self.progressBarGUI = ProgressBarGUI(self.dynamic, testCount)
         self.idleManager = IdleHandlerManager()
         uiManager = gtk.UIManager()
-        self.defaultActionGUIs, self.buttonBarGUIs, self.actionTabGUIs = \
+        self.defaultActionGUIs, self.actionTabGUIs = \
                                 guiplugins.interactiveActionHandler.getPluginGUIs(self.dynamic, allApps, uiManager)
         self.menuBarGUI, self.toolBarGUI, testPopupGUI, testFilePopupGUI = self.createMenuAndToolBarGUIs(allApps, uiManager)
         self.testColumnGUI = TestColumnGUI(self.dynamic, testCount)
@@ -217,7 +217,7 @@ class TextTestGUI(Responder, plugins.Observable):
     def getTestTreeObservers(self):
         return [ self.testColumnGUI, self.testFileGUI, self.textInfoGUI ] + self.allActionGUIs() + self.notebookGUIs
     def allActionGUIs(self):
-        return self.defaultActionGUIs + self.buttonBarGUIs + self.actionTabGUIs
+        return self.defaultActionGUIs + self.actionTabGUIs
     def getLifecycleObservers(self):
         # only the things that want to know about lifecycle changes irrespective of what's selected,
         # otherwise we go via the test tree. Include add/remove as lifecycle, also final completion
@@ -296,9 +296,9 @@ class TextTestGUI(Responder, plugins.Observable):
         parts = [ self.menuBarGUI, self.toolBarGUI, mainWindowGUI, self.shortcutBarGUI, statusMonitor ]
         boxGUI = BoxGUI(parts, horizontal=False)
         return TopWindowGUI(boxGUI, self.dynamic, allApps)
+
     def createMenuAndToolBarGUIs(self, allApps, uiManager):
-        menuActions = filter(lambda gui: gui.inMenuOrToolBar(), self.allActionGUIs())
-        menu = MenuBarGUI(allApps, self.dynamic, uiManager, menuActions)
+        menu = MenuBarGUI(allApps, self.dynamic, uiManager, self.allActionGUIs())
         toolbar = ToolBarGUI(uiManager, self.progressBarGUI)
         testPopup = PopupMenuGUI("TestPopupMenu", uiManager)
         testFilePopup = PopupMenuGUI("TestFilePopupMenu", uiManager)
@@ -306,15 +306,13 @@ class TextTestGUI(Responder, plugins.Observable):
     
     def createRightWindowGUI(self):
         tabGUIs = [ self.appFileGUI, self.textInfoGUI, self.progressMonitor ] + self.actionTabGUIs
-        buttonBarGUI = BoxGUI(self.buttonBarGUIs, horizontal=True, reversed=True)
-        topTestViewGUI = BoxGUI([ self.testFileGUI, buttonBarGUI ], horizontal=False)
-
+        
         tabGUIs = filter(lambda tabGUI: tabGUI.shouldShow(), tabGUIs)
         subNotebookGUIs = self.createNotebookGUIs(tabGUIs)
         tabInfo = []
         for name, notebookGUI in subNotebookGUIs.items():
             if name == "Test":
-                tabInfo.append((name, PaneGUI(topTestViewGUI, notebookGUI, horizontal=False)))
+                tabInfo.append((name, PaneGUI(self.testFileGUI, notebookGUI, horizontal=False)))
             else:
                 tabInfo.append((name, notebookGUI))
 

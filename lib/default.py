@@ -29,8 +29,8 @@ class Config:
                 possibleDirs = self.getFilterFileDirectories([ app ], createDirs=False)
                 group.addOption("f", "Tests listed in file", possibleDirs=possibleDirs, selectFile=True)
                 group.addOption("desc", "Descriptions containing", description="Select tests for which the description (comment) matches the entered text. The text can be a regular expression.")
-                group.addOption("grep", "Result files containing")
-                group.addOption("grepfile", "Result file to search", app.getConfigValue("log_file"), self.getPossibleResultFiles(app))
+                group.addOption("grep", "Test-files containing")
+                group.addOption("grepfile", "Test-file to search", allocateNofValues=2)
                 group.addOption("r", "Execution time", description="Specify execution time limits, either as '<min>,<max>', or as a list of comma-separated expressions, such as >=0:45,<=1:00. Digit-only numbers are interpreted as minutes, while colon-separated numbers are interpreted as hours:minutes:seconds.")
             elif group.name.startswith("Basic"):
                 group.addOption("c", "Use checkout", app.checkout)
@@ -237,22 +237,6 @@ class Config:
                  catalogueCreator, collator, self.getTestEvaluator() ]
     def shouldIgnoreCatalogues(self):
         return self.optionMap.has_key("ignorecat") or self.optionMap.has_key("record")
-    def getPossibleResultFiles(self, app):
-        files = [ "output", "errors" ]
-        if app.getConfigValue("create_catalogues") == "true":
-            files.append("catalogue")
-        collateKeys = app.getConfigValue("collate_file").keys()
-        if "stacktrace" in collateKeys:
-            collateKeys.remove("stacktrace")
-        collateKeys.sort()
-        files += collateKeys
-        files += app.getConfigValue("performance_logfile_extractor").keys()
-        if self.hasAutomaticCputimeChecking(app):
-            files.append("performance")
-        for file in app.getConfigValue("discard_file"):
-            if file in files:
-                files.remove(file)
-        return files
     def hasPerformance(self, app):
         if len(app.getConfigValue("performance_logfile_extractor")) > 0:
             return True

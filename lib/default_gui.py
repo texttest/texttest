@@ -1,5 +1,5 @@
 
-import guiplugins, helpdialogs, plugins, os, sys, shutil, time, subprocess, operator, types, gtk, entrycompletion
+import guiplugins, helpdialogs, plugins, os, sys, shutil, time, subprocess, operator, types, gtk
 from jobprocess import JobProcess
 from sets import Set
 from copy import copy, deepcopy
@@ -868,6 +868,32 @@ class SelectTests(guiplugins.ActionTabGUI):
                 return group
     def addSuites(self, suites):
         self.rootTestSuites = suites
+    def notifyAllRead(self, *args):
+        allStems = self.findAllStems()
+        defaultTestFile = self.findDefaultTestFile(allStems)
+        self.optionGroup.setValue("grepfile", defaultTestFile)    
+        self.optionGroup.setPossibleValues("grepfile", allStems)
+        self.contentsChanged()
+
+    def findDefaultTestFile(self, allStems):
+        if len(allStems) == 0:
+            return "output"
+        for app in self.validApps:
+            logFile = app.getConfigValue("log_file")
+            if logFile in allStems:
+                return logFile
+        return allStems[0]
+
+    def findAllStems(self):
+        stems = {}
+        for suite in self.rootTestSuites:
+            for test in suite.testCaseList():
+                for stem in test.dircache.findAllStems():
+                    if stem in stems:
+                        stems[stem] += 1
+                    else:
+                        stems[stem] = 1
+        return sorted(stems.keys(), lambda x,y: cmp(stems.get(y), stems.get(x)))
     def getPossibleVersions(self, allApps):
         possVersions = []
         for app in allApps:

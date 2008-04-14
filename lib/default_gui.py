@@ -65,12 +65,15 @@ class SaveTests(guiplugins.ActionTabGUI):
         return filter(lambda test: test.state.isSaveable(), self.currTestSelection)       
     def updateOptions(self):
         defaultSaveOption = self.getDefaultSaveOption()
-        currOption = self.optionGroup.getOption("v").defaultValue
-        if defaultSaveOption == currOption:
+        versionOption = self.optionGroup.getOption("v")
+        currOption = versionOption.defaultValue
+        newVersions = self.getPossibleVersions()
+        currVersions = versionOption.possibleValues
+        if defaultSaveOption == currOption and newVersions == currVersions:
             return False
         self.optionGroup.setOptionValue("v", defaultSaveOption)
         self.diag.info("Setting default save version to " + defaultSaveOption)
-        self.optionGroup.setPossibleValues("v", self.getPossibleVersions())
+        self.optionGroup.setPossibleValues("v", newVersions)
         return True
     def getDefaultSaveOption(self):
         saveVersions = self.getSaveVersions()
@@ -88,6 +91,9 @@ class SaveTests(guiplugins.ActionTabGUI):
         extensions.append("")
         return extensions
     def getSaveVersions(self):
+        if self.isAllNew():
+            return ""
+
         saveVersions = []
         for app in self.currAppSelection:
             ver = self.getDefaultSaveVersion(app)
@@ -103,9 +109,12 @@ class SaveTests(guiplugins.ActionTabGUI):
         return False
     def getExactness(self):
         return int(self.optionGroup.getSwitchValue("ex", 1))
+    def isAllNew(self):
+        for test in self.getSaveableTests():
+            if not test.state.isAllNew():
+                return False
+        return True
     def getVersion(self, test):
-        if test.state.isAllNew():
-            return ""
         versionString = self.optionGroup.getOptionValue("v")
         if versionString.startswith("<default>"):
             return self.getDefaultSaveVersion(test.app)

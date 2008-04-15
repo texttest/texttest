@@ -1983,7 +1983,7 @@ class TestFileGUI(FileViewGUI):
         self.addStandardFilesUnderIter(state, defiter, defFiles)
         self.addStaticDataFilesToModel()
     def getHeaderRow(self, fileType):
-        return [ fileType + " Files", "white", self.currentTest.getDirectory(), None, "white" ]
+        return [ fileType + " Files", "white", self.currentTest.getDirectory(), None, "" ]
     def getDisplayDataFiles(self):
         try:
             return self.currentTest.app.extraReadFiles(self.currentTest).items()

@@ -295,8 +295,11 @@ class FileViewAction(guiplugins.ActionGUI):
         viewProgram = self.getViewToolName(fileName)
         if plugins.canExecute(viewProgram):
             return viewProgram
+    def getStem(self, fileName):
+        return os.path.basename(fileName).split(".")[0]
+        
     def getViewToolName(self, fileName):
-        stem = os.path.basename(fileName).split(".")[0]
+        stem = self.getStem(fileName)
         if len(self.currTestSelection) > 0:
             return self.currTestSelection[0].getCompositeConfigValue(self.getToolConfigEntry(), stem)
         else:
@@ -341,9 +344,11 @@ class ViewInEditor(FileViewAction):
         interpreter = plugins.getInterpreter(program)
         if interpreter:
             cmdArgs = [ interpreter ] + cmdArgs
-        remoteHost = self.getRemoteHost()
-        if remoteHost:
-            cmdArgs = [ "rsh", remoteHost, "env DISPLAY=" + self.getFullDisplay() + " " + " ".join(cmdArgs) ]
+
+        if guiplugins.guiConfig.getCompositeValue("view_file_on_remote_machine", self.getStem(fileName)):
+            remoteHost = self.getRemoteHost()
+            if remoteHost:
+                cmdArgs = [ "rsh", remoteHost, "env DISPLAY=" + self.getFullDisplay() + " " + " ".join(cmdArgs) ]
 
         return cmdArgs, descriptor, env
     

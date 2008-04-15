@@ -665,6 +665,7 @@ class Config:
         app.setConfigDefault("diff_program", { "default": "tkdiff" }, "External program to use for graphical file comparison")
         app.setConfigDefault("view_program", { "default": self.defaultViewProgram() },  \
                               "External program(s) to use for viewing and editing text files")
+        app.setConfigDefault("view_file_on_remote_machine", { "default" : 0 }, "If tests are run remotely, do we try to start viewing programs on that machine?")
         app.setConfigDefault("follow_program", { "default": self.defaultFollowProgram() }, "External program to use for following progress of a file")
         app.setConfigDefault("follow_file_by_default", 0, "When double-clicking running files, should we follow progress or just view them?")
         app.setConfigDefault("bug_system_script", { "default" : "" }, "The location of the script used to extract information from the bug system.")

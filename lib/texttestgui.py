@@ -1982,9 +1982,10 @@ class TestFileGUI(FileViewGUI):
         defiter = self.model.insert_before(None, None, self.getHeaderRow("Definition"))
         self.addStandardFilesUnderIter(state, defiter, defFiles)
         self.addStaticDataFilesToModel()
+        self.addExternalFilesToModel()
     def getHeaderRow(self, fileType):
         return [ fileType + " Files", "white", self.currentTest.getDirectory(), None, "" ]
-    def getDisplayDataFiles(self):
+    def getExternalDataFiles(self):
         try:
             return self.currentTest.app.extraReadFiles(self.currentTest).items()
         except:
@@ -1998,9 +1999,16 @@ class TestFileGUI(FileViewGUI):
         datiter = self.model.insert_before(None, None, self.getHeaderRow("Data"))
         colour = self.getStaticColour()
         self.addDataFilesUnderIter(datiter, self.currentTest.listDataFiles(), colour)
-        for name, filelist in self.getDisplayDataFiles():
+    def addExternalFilesToModel(self):
+        externalFiles = self.getExternalDataFiles()
+        if len(externalFiles) == 0:
+            return
+        datiter = self.model.insert_before(None, None, self.getHeaderRow("External"))
+        colour = self.getStaticColour()
+        for name, filelist in externalFiles:
             exiter = self.model.insert_before(datiter, None)
             self.model.set_value(exiter, 0, name)
+            self.model.set_value(exiter, 1, "white") # mostly to trigger output...
             for file in filelist:
                 self.addFileToModel(exiter, file, None, colour)
     def addDataFilesUnderIter(self, iter, files, colour):

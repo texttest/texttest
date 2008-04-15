@@ -1468,12 +1468,16 @@ class CreateDefinitionFile(guiplugins.ActionDialogGUI):
     def isActiveOnCurrent(self, *args):
         return self.creationDir is not None and guiplugins.ActionDialogGUI.isActiveOnCurrent(self, *args) 
     def notifyFileCreationInfo(self, creationDir, fileType):
-        self.creationDir = creationDir
-        newActive = creationDir is not None
-        self.setSensitivity(newActive)
-        if newActive:
-            self.updateStems(fileType)
-            self.appendAppName = (fileType == "definition" or fileType == "standard")
+        if fileType == "external":
+            self.creationDir = None
+            self.setSensitivity(False)
+        else:
+            self.creationDir = creationDir
+            newActive = creationDir is not None
+            self.setSensitivity(newActive)
+            if newActive:
+                self.updateStems(fileType)
+                self.appendAppName = (fileType == "definition" or fileType == "standard")
     def findAllStems(self, fileType):
         if fileType == "definition":
             return self.getDefinitionFiles()
@@ -1553,6 +1557,11 @@ class CreateDefinitionFile(guiplugins.ActionDialogGUI):
         pass
 
 class RemoveTests(guiplugins.ActionGUI):
+    def notifyFileCreationInfo(self, creationDir, fileType):
+        canRemove = fileType != "external" and \
+                    (creationDir is None or len(self.currFileSelection) > 0) and \
+                    self.isActiveOnCurrent()
+        self.setSensitivity(canRemove)
     def isActiveOnCurrent(self, *args):
         for test in self.currTestSelection:
             if test.parent:

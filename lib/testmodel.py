@@ -460,7 +460,14 @@ class Test(plugins.Observable):
         else:
             self.notify("Complete")
     def getRelPath(self):
-        return plugins.relpath(self.getDirectory(), self.app.getDirectory())
+        if self.parent:
+            parentPath = self.parent.getRelPath()
+            if parentPath:
+                return os.path.join(parentPath, self.name)
+            else:
+                return self.name
+        else:
+            return ""
     def getDirectory(self, temporary=False, forFramework=False):
         return self.dircache.dir
     def positionInParent(self):
@@ -489,8 +496,8 @@ class Test(plugins.Observable):
             newDir = self.parent.makeSubDirectory(newName)
             if os.path.isdir(self.getDirectory()):
                 self.moveFilesForRename(newDir)
-            self.name = newName
             origRelPath = self.getRelPath()
+            self.name = newName
             self.dircache = DirectoryCache(newDir)
             self.notify("NameChange", origRelPath)
             if self.parent.autoSortOrder:
@@ -735,7 +742,7 @@ class TestSuiteFileHandler:
         newEntry = seqdict()
         newEntry[testName] = description
         cache.insert(index, newEntry)
-
+        
     def remove(self, fileName, testName):
         cache = self.read(fileName)
         description, index = self.removeFromCache(cache, testName)
@@ -972,7 +979,17 @@ class TestSuite(Test):
             if not subSuite:
                 subSuite = self.addTestSuite(pathElements[0])
             return subSuite.addTestCaseWithPath(pathElements[1])
-    
+    def findSubtestWithPath(self, testPath):
+        if len(testPath) == 0:
+            return self
+        pathElements = testPath.split("/", 1)
+        subTest = self.findSubtest(pathElements[0])
+        if subTest:
+            if len(pathElements) > 1:
+                return subTest.findSubtestWithPath(pathElements[1])
+            else:
+                return subTest
+            
     def findSubtest(self, testName):
         for test in self.testcases:
             if test.name == testName:
@@ -1026,7 +1043,28 @@ class TestSuite(Test):
                 if ascending:
                     return cmp(a.lower(), b.lower())        
                 else:
-                    return cmp(b.lower(), a.lower())        
+                    return cmp(b.lower(), a.lower())
+
+    def copyTest(self, test, newName, newDesc, placement):
+        testDir = self.writeNewTest(newName, newDesc, placement)
+        self.copyTestContents(test, testDir)
+        return self.addTest(test.__class__, os.path.basename(testDir), newDesc, placement)
+
+    def copyTestContents(self, testToCopy, testDir):
+        stdFiles, defFiles = testToCopy.listStandardFiles(allVersions=True)
+        for sourceFile in stdFiles + defFiles:
+            dirname, local = os.path.split(sourceFile)
+            if dirname == testToCopy.getDirectory():
+                targetFile = os.path.join(testDir, local)
+                shutil.copy2(sourceFile, targetFile)
+        dataFiles = testToCopy.listDataFiles()
+        for sourcePath in dataFiles:
+            if os.path.isdir(sourcePath):
+                continue
+            targetPath = sourcePath.replace(testToCopy.getDirectory(), testDir)
+            plugins.ensureDirExistsForFile(targetPath)
+            shutil.copy2(sourcePath, targetPath)
+        
     def writeNewTest(self, testName, description, placement):
         contentFileName = self.getContentFileName()
         self.testSuiteFileHandler.add(contentFileName, testName, description, placement)
@@ -1368,8 +1406,12 @@ class Application:
         if len(fullVersion) == 0:
             return ""
         return "." + fullVersion
-    def makeTestSuite(self, responders):
-        suite = TestSuite(os.path.basename(self.dircache.dir), "Root test suite", self.dircache, self)
+    def makeTestSuite(self, responders, otherDir=None):
+        if otherDir:
+            dircache = DirectoryCache(otherDir)
+        else:
+            dircache = self.dircache
+        suite = TestSuite(os.path.basename(dircache.dir), "Root test suite", dircache, self)
         suite.setObservers(responders)
         return suite
     def createInitialTestSuite(self, responders):
@@ -1378,8 +1420,8 @@ class Application:
         # the suite's environment
         self.configObject.checkSanity(suite)
         return suite
-    def createExtraTestSuite(self, filters, responders=[]):
-        suite = self.makeTestSuite(responders)
+    def createExtraTestSuite(self, filters=[], responders=[], otherDir=None):
+        suite = self.makeTestSuite(responders, otherDir)
         suite.readContents(filters)
         return suite
     

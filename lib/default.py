@@ -1107,6 +1107,41 @@ class ReplaceText(plugins.ScriptWithArgs):
             self.logFile = app.getConfigValue("log_file")
         self.textDiffTool = app.getConfigValue("text_diff_program")
 
+class ExportTests(plugins.ScriptWithArgs):
+    scriptDoc = "Export the selected tests to a different test suite"
+    def __init__(self, args):
+        argDict = self.parseArguments(args)
+        self.otherTTHome = argDict.get("dest")
+        self.otherSuites = {}
+        self.placements = {}
+        if not self.otherTTHome:
+            raise plugins.TextTestError, "Must provide 'dest' argument to indicate where tests should be exported"
+    def __repr__(self):
+        return "Checking for export of"
+    def __call__(self, test):
+        self.tryExport(test)
+    def setUpSuite(self, suite):
+        self.placements[suite] = 0
+        if suite.parent:
+            self.tryExport(suite)
+    def tryExport(self, test):
+        otherRootSuite = self.otherSuites.get(test.app)
+        otherTest = otherRootSuite.findSubtestWithPath(test.getRelPath())
+        parent = test.parent
+        if otherTest:
+            self.describe(test, " - already exists")
+        else:
+            otherParent = otherRootSuite.findSubtestWithPath(parent.getRelPath())
+            if otherParent:
+                self.describe(test, " - CREATING...")
+                otherParent.copyTest(test, test.name, test.description, self.placements[parent])
+            else:
+                self.describe(test, " - COULDN'T FIND PARENT")
+        self.placements[parent] += 1
+
+    def setUpApplication(self, app):
+        self.otherSuites[app] = app.createExtraTestSuite(otherDir=self.otherTTHome)
+
 # A standalone action, we add description and generate the main file instead...
 class ExtractStandardPerformance(sandbox.ExtractPerformanceFiles):
     scriptDoc = "update the standard performance files from the standard log files"

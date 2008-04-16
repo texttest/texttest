@@ -650,8 +650,7 @@ class PasteTests(guiplugins.ActionGUI):
                 newTests.append(test)
             else:
                 newDesc = self.getNewDescription(test)
-                testDir = suite.writeNewTest(newName, newDesc, realPlacement)
-                testImported = self.createTestContents(test, suite, testDir, newDesc, realPlacement)
+                testImported = suite.copyTest(test, newName, newDesc, realPlacement)
                 if suiteDeltas.has_key(suite):
                     suiteDeltas[suite] += 1
                 else:
@@ -671,21 +670,6 @@ class PasteTests(guiplugins.ActionGUI):
     def getSignalsSent(self):
         return [ "SetTestSelection" ]
 
-    def createTestContents(self, testToCopy, suite, testDir, description, placement):
-        stdFiles, defFiles = testToCopy.listStandardFiles(allVersions=True)
-        for sourceFile in stdFiles + defFiles:
-            dirname, local = os.path.split(sourceFile)
-            if dirname == testToCopy.getDirectory():
-                targetFile = os.path.join(testDir, local)
-                shutil.copy2(sourceFile, targetFile)
-        dataFiles = testToCopy.listDataFiles()
-        for sourcePath in dataFiles:
-            if os.path.isdir(sourcePath):
-                continue
-            targetPath = sourcePath.replace(testToCopy.getDirectory(), testDir)
-            plugins.ensureDirExistsForFile(targetPath)
-            shutil.copy2(sourcePath, targetPath)
-        return suite.addTestCase(os.path.basename(testDir), description, placement)
         
 # And a generic import test. Note acts on test suites
 class ImportTest(guiplugins.ActionDialogGUI):
@@ -918,10 +902,9 @@ class SelectTests(guiplugins.ActionTabGUI):
     def getSignalsSent(self):
         return [ "SetTestSelection" ]
     def _getStockId(self):
-        return "refresh"
-        #return "find"
+        return "find"
     def _getTitle(self):
-        return "_Select"
+        return "_Select/Find"
     def getTooltip(self):
         return "Select indicated tests"
     def getTabTitle(self):
@@ -1773,6 +1756,8 @@ class RecomputeTests(guiplugins.ActionGUI):
                 self.chainReaction = False
     def _getTitle(self):
         return "Recompute Status"
+    def _getStockId(self):
+        return "refresh"
     def getTooltip(self):
         return "Recompute test status, including progress information if appropriate"
     def messageAfterPerform(self):

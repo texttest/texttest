@@ -683,7 +683,7 @@ class Config:
     def getDefaultAccelerators(self):
         dict = {}
         dict["quit"] = "<control>q"
-        dict["select"] = "<control>s"
+        dict["select/find"] = "<control>s"
         dict["save"] = "<control>s"
         dict["copy"] = "<control>c"
         dict["cut"] = "<control>x"

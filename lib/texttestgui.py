@@ -1910,10 +1910,11 @@ class TestFileGUI(FileViewGUI):
 
     def getDirectory(self, iter):
         fileName = self.model.get_value(iter, 2)
-        if os.path.isdir(fileName):
-            return fileName
-        else:
-            return os.path.dirname(fileName)
+        if fileName:
+            if os.path.isdir(fileName):
+                return fileName
+            else:
+                return os.path.dirname(fileName)
 
     def getFileType(self, iter):
         parent = self.model.iter_parent(iter)

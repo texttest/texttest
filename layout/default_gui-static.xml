@@ -33,7 +33,8 @@
     </menu>
 
     <menu action="actionsmenu">
-      <menuitem action="Select"/>
+      <menuitem action="Select/Find"/>
+      <menuitem action="Refresh"/>
       <menuitem action="Run"/>
       <menuitem action="Reconnect"/>
       <menuitem action="Record Use-Case"/>
@@ -45,7 +46,7 @@
   <toolbar name="MainToolBar">    
     <toolitem action="Quit"/>
     <separator/>
-    <toolitem action="Select"/>
+    <toolitem action="Select/Find"/>
     <toolitem action="Run"/>
     <placeholder name="AfterRun" />
     <separator/>

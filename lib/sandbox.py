@@ -373,8 +373,12 @@ class CollateFiles(plugins.Action):
     def removeUnwanted(self, test):
         for stem in self.discardFiles:
             filePath = test.makeTmpFileName(stem)
-            if os.path.isfile(filePath) or os.path.islink(filePath):
+            try:
+                # Checking for existence too dependent on file server (?)
                 os.remove(filePath)
+            except:
+                pass
+
     def collate(self, test):
         testCollations = self.expandCollations(test, self.collations)
         for targetStem, sourcePattern in testCollations.items():

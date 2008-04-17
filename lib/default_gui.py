@@ -297,7 +297,10 @@ class FileViewAction(guiplugins.ActionGUI):
             return viewProgram
     def getStem(self, fileName):
         return os.path.basename(fileName).split(".")[0]
-        
+    def testRunning(self):
+        return len(self.currTestSelection) > 0 and self.currTestSelection[0].state.hasStarted() and \
+               not self.currTestSelection[0].state.isComplete()
+    
     def getViewToolName(self, fileName):
         stem = self.getStem(fileName)
         if len(self.currTestSelection) > 0:
@@ -368,7 +371,8 @@ class ViewInEditor(FileViewAction):
         exitHandler, exitHandlerArgs = self.findExitHandlerInfo(fileName)
         return self.viewFile(fileName, viewTool, exitHandler, exitHandlerArgs)
     def isDefaultViewer(self, comparison):
-        return not self.differencesActive(comparison) and not guiplugins.guiConfig.getValue("follow_file_by_default")
+        return not self.differencesActive(comparison) and \
+               (not self.testRunning() or not guiplugins.guiConfig.getValue("follow_file_by_default"))
     def activateDefaultViewer(self, fileName, comparison):
         fileToView = self.getFileToView(fileName, comparison)
         if os.path.isfile(fileToView):
@@ -460,15 +464,16 @@ class FollowFile(FileViewAction):
         return "Follow File Progress"
     def getToolConfigEntry(self):
         return "follow_program"
-    def _isActiveForFile(self, fileName, comparison):
-        return self.currTestSelection[0].state.hasStarted() and not self.currTestSelection[0].state.isComplete()
+    def _isActiveForFile(self, *args):
+        return self.testRunning()
     def fileToFollow(self, fileName, comparison):
         if comparison:
             return comparison.tmpFile
         else:
             return fileName
     def isDefaultViewer(self, comparison):
-        return not self.differencesActive(comparison) and guiplugins.guiConfig.getValue("follow_file_by_default")
+        return not self.differencesActive(comparison) and self.testRunning() and \
+               guiplugins.guiConfig.getValue("follow_file_by_default")
     
     def getFollowCommand(self, followProgram, fileName):
         basic = plugins.splitcmd(followProgram) + [ fileName ]

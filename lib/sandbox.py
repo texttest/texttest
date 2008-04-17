@@ -52,6 +52,7 @@ class PrepareWriteDirectory(plugins.Action):
     def getSourcePath(self, test, configName):
         # These can refer to environment variables or to paths within the test structure
         fileName = self.getSourceFileName(configName, test)
+        self.diag.info("Found source file name for " + configName + " = " + fileName)
         if not fileName or os.path.isabs(fileName):
             return fileName
         

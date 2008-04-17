@@ -446,7 +446,9 @@ class Test(plugins.Observable):
     def pathNameMethod(self, stem, configName, method):
         if configName is None:
             configName = stem
-        return method(self.getDirCachesToRoot(configName), stem)
+        dirCaches = self.getDirCachesToRoot(configName)
+        self.diagnose("Directories to be searched: " + repr([ d.dir for d in dirCaches ]))
+        return method(dirCaches, stem)
     def getAllTestsToRoot(self):
         tests = [ self ]
         if self.parent:
@@ -456,6 +458,7 @@ class Test(plugins.Observable):
     def getDirCachesToRoot(self, configName):
         fromTests = [ test.dircache for test in self.getAllTestsToRoot() ]
         dirNames = self.getCompositeConfigValue("extra_search_directory", configName)
+        dirNames.reverse() # lowest priroity comes first, as above
         return self.app.getExtraDirCaches(dirNames) + fromTests
     
     def getAllFileNames(self, stem, refVersion = None):

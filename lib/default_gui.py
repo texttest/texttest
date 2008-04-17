@@ -1790,12 +1790,15 @@ class RefreshAll(guiplugins.BasicActionGUI):
         return "refresh"
     def getTooltip(self):
         return "Refresh the whole test suite so that it reflects file changes"
+    def messageBeforePerform(self):
+        return "Refreshing the whole test suite..."
     def messageAfterPerform(self):
         return "Refreshed the test suite from the files"
     def addSuites(self, suites):
         self.rootTestSuites = suites
     def performOnCurrent(self):
         for suite in self.rootTestSuites:
+            self.notify("ActionProgress", "")                
             filters = suite.app.getFilterList()
             suite.refresh(filters)
     

@@ -1773,8 +1773,28 @@ class RecomputeTests(guiplugins.ActionGUI):
                 self.notify("Status", "Recomputing status of " + repr(test) + " ...")
                 self.notify("ActionProgress", "")                
                 test.app.recomputeProgress(test, self.observers)
- 
 
+
+class RefreshAll(guiplugins.BasicActionGUI):
+    def __init__(self, *args):
+        guiplugins.BasicActionGUI.__init__(self, *args)
+        self.rootTestSuites = []
+    def _getTitle(self):
+        return "Refresh"
+    def _getStockId(self):
+        return "refresh"
+    def getTooltip(self):
+        return "Refresh the whole test suite so that it reflects file changes"
+    def messageAfterPerform(self):
+        return "Refreshed the test suite from the files"
+    def addSuites(self, suites):
+        self.rootTestSuites = suites
+    def performOnCurrent(self):
+        for suite in self.rootTestSuites:
+            filters = suite.app.getFilterList()
+            suite.refresh(filters)
+    
+    
 class SortTestSuiteFileAscending(guiplugins.ActionGUI):
     def singleTestOnly(self):
         return True
@@ -2077,7 +2097,7 @@ class InteractiveActionConfig:
         else:
             classes += [ RecordTest, CopyTests, CutTests, 
                          PasteTests, ImportTestCase, ImportTestSuite, 
-                         CreateDefinitionFile, ReportBugs, SelectTests, 
+                         CreateDefinitionFile, ReportBugs, SelectTests, RefreshAll,
                          RunTestsBasic, RunTestsAdvanced, ResetGroups, RenameTest, RemoveTests, 
                          SortTestSuiteFileAscending, SortTestSuiteFileDescending, 
                          RepositionTestFirst, RepositionTestUp,

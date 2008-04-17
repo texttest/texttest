@@ -293,6 +293,26 @@ class Test(plugins.Observable):
             return description
         else:
             return "<No description provided>"
+
+    def setName(self, newName):
+        # Create new directory, copy files if the new name is new (we might have
+        # changed only the comment ...) (we don't want to rename dir, that can confuse CVS ...)
+        if self.name != newName:
+            newDir = self.parent.makeSubDirectory(newName)
+            if os.path.isdir(self.getDirectory()):
+                self.moveFilesForRename(newDir)
+            origRelPath = self.getRelPath()
+            self.name = newName
+            self.dircache = DirectoryCache(newDir)
+            self.notify("NameChange", origRelPath)
+            if self.parent.autoSortOrder:
+                self.parent.updateOrder()
+        
+    def setDescription(self, newDesc):
+        if self.description != newDesc:
+            self.description = newDesc
+            self.refreshDescription()
+        
     def refreshDescription(self):
         oldDesc = self.state.freeText
         self.state.freeText = self.getDescription()
@@ -490,21 +510,9 @@ class Test(plugins.Observable):
         for testSuiteFileName in self.parent.findTestSuiteFiles():
             self.parent.testSuiteFileHandler.rename(testSuiteFileName, self.name, newName, newDescription)
 
-        # Create new directory, copy files if the new name is new (we might have
-        # changed only the comment ...) (we don't want to rename dir, that can confuse CVS ...)
-        if self.name != newName:
-            newDir = self.parent.makeSubDirectory(newName)
-            if os.path.isdir(self.getDirectory()):
-                self.moveFilesForRename(newDir)
-            origRelPath = self.getRelPath()
-            self.name = newName
-            self.dircache = DirectoryCache(newDir)
-            self.notify("NameChange", origRelPath)
-            if self.parent.autoSortOrder:
-                self.parent.updateOrder()
-        if self.description != newDescription:
-            self.description = newDescription
-            self.refreshDescription()
+        self.setName(newName)
+        self.setDescription(newDescription)
+
     def moveFilesForRename(self, newDir):
         stdFiles, defFiles = self.listStandardFiles(allVersions=True)
         for sourceFile in stdFiles + defFiles:
@@ -549,7 +557,10 @@ class Test(plugins.Observable):
         self.refreshFiles()
         self.refreshDescription()
         self.notify("FileChange")    
-
+    def refresh(self, filters):
+        self.refreshFiles()
+        self.notify("FileChange")
+    
 class TestCase(Test):
     def __init__(self, name, description, abspath, app, parent):
         Test.__init__(self, name, description, abspath, app, parent)
@@ -696,10 +707,12 @@ class TestSuiteFileHandler:
         if self.cache.has_key(fileName):
             del self.cache[fileName]
             
-    def read(self, fileName, warn=False):
-        cached = self.cache.get(fileName)
-        if cached:
-            return cached
+    def read(self, fileName, warn=False, ignoreCache=False):
+        if not ignoreCache:
+            cached = self.cache.get(fileName)
+            if cached:
+                return cached
+
         tests = plugins.readListWithComments(fileName, self.getDuplicateMethod(warn))
         self.cache[fileName] = tests
         return tests
@@ -799,9 +812,9 @@ class TestSuite(Test):
     def getDescription(self):
         return "\nDescription:\n" + Test.getDescription(self)
             
-    def readContents(self, filters):
+    def readContents(self, filters, initial=True):
         testNames = self.readTestNames()
-        self.createTestCases(filters, testNames)
+        self.createTestCases(filters, testNames, initial)
         if len(self.testcases) == 0 and len(testNames) > 0:
             # If the contents are filtered away, don't include the suite 
             return False
@@ -811,10 +824,10 @@ class TestSuite(Test):
                 self.diagnose("Contents rejected due to " + repr(filter))
                 return False
         return True
-    def readTestNames(self, warn=True):
+    def readTestNames(self, warn=True, ignoreCache=False):
         names = seqdict()
         fileName = self.getContentFileName()
-        for name, comment in self.testSuiteFileHandler.read(fileName, warn).items():
+        for name, comment in self.testSuiteFileHandler.read(fileName, warn, ignoreCache).items():
             self.diagnose("Read " + name)
             if warn and not self.fileExists(name):
                 plugins.printWarning("The test " + name + " could not be found.\nPlease check the file at " + fileName)
@@ -899,6 +912,24 @@ class TestSuite(Test):
         return size
     def maxIndex(self):
         return len(self.testcases) - 1
+    def refresh(self, filters):
+        Test.refresh(self, filters)
+        newTestNames = self.readTestNames(ignoreCache=True)
+        for test in self.testcases:
+            if test.name not in newTestNames:
+                self.testcases.remove(test)
+                test.notify("Remove")
+                
+        for testName, desc in newTestNames.items():
+            existingTest = self.findSubtest(testName)
+            if existingTest:
+                existingTest.setDescription(desc)
+                existingTest.refresh(filters)
+            else:
+                dirCache = self.createTestCache(testName)
+                self.createTestOrSuite(testName, desc, dirCache, filters, initial=False)
+        self.updateOrder(readTestNames=True)
+        
 # private:
     # Observe: orderedTestNames can be both list and seqdict ... (it will be seqdict if read from file)
     def getOrderedTestNames(self, orderedTestNames = None): # We assume that tests exists, we just want to re-order ...
@@ -911,15 +942,15 @@ class TestSuite(Test):
             else:
                 orderedTestNames.sort(lambda a, b: self.compareTests(False, testCaseNames, a, b))
         return orderedTestNames
-    def createTestCases(self, filters, testNames):
+    def createTestCases(self, filters, testNames, initial):
         if self.autoSortOrder:
-            self.createAndSortTestCases(filters, testNames)
+            self.createAndSortTestCases(filters, testNames, initial)
         else:
             for testName, desc in testNames.items():
                 dirCache = self.createTestCache(testName)
-                self.createTestOrSuite(testName, desc, dirCache, filters)
+                self.createTestOrSuite(testName, desc, dirCache, filters, initial)
 
-    def createAndSortTestCases(self, filters, testNames):
+    def createAndSortTestCases(self, filters, testNames, initial):
         orderedTestNames = testNames.keys()
         testCaches = {}
         for testName in orderedTestNames:
@@ -933,15 +964,15 @@ class TestSuite(Test):
 
         for testName in orderedTestNames:
             dirCache = testCaches[testName]
-            self.createTestOrSuite(testName, testNames[testName], dirCache, filters)
+            self.createTestOrSuite(testName, testNames[testName], dirCache, filters, initial)
 
-    def createTestOrSuite(self, testName, description, dirCache, filters):
+    def createTestOrSuite(self, testName, description, dirCache, filters, initial=True):
         className = self.getSubtestClass(dirCache)
         subTest = self.createSubtest(testName, description, dirCache, className)
         if subTest.isAcceptedByAll(filters) and \
-               (className is TestCase or subTest.readContents(filters)):
+               (className is TestCase or subTest.readContents(filters, initial)):
             self.testcases.append(subTest)
-            subTest.notify("Add", initial=True)
+            subTest.notify("Add", initial)
                 
     def createTestCache(self, testName):
         return DirectoryCache(os.path.join(self.getDirectory(), testName))
@@ -1070,11 +1101,11 @@ class TestSuite(Test):
         self.testSuiteFileHandler.add(contentFileName, testName, description, placement)
         return self.makeSubDirectory(testName)
     def getFollower(self, test):
-        position = self.testcases.index(test)
         try:
+            position = self.testcases.index(test)
             return self.testcases[position + 1]
-        except IndexError:
-            return None
+        except (ValueError, IndexError):
+            pass
     def removeTest(self, test, removeFromTestFile = True):
         try:
             test.removeFiles()
@@ -1093,6 +1124,7 @@ class TestSuite(Test):
         # test dir, it's useless to keep the test anywhere ... 
         for contentFileName in self.findTestSuiteFiles():
             self.testSuiteFileHandler.remove(contentFileName, testName)
+        
     
 class BadConfigError(RuntimeError):
     pass

@@ -1164,13 +1164,17 @@ class TestTreeGUI(ContainerGUI):
             self.addAdditional(iter, test)
             return iter
         suite = test.parent
-        suiteIter, followIter = None, None
+        suiteIter = None
         if suite:
             suiteIter = self.tryAddTest(suite, initial)
+        followIter = self.findFollowIter(suite, test, initial)
+        return self.addSuiteWithParent(test, suiteIter, followIter)
+    def findFollowIter(self, suite, test, initial):
         if not initial:
             follower = suite.getFollower(test)
-            followIter = self.itermap.getIterator(follower)
-        return self.addSuiteWithParent(test, suiteIter, followIter)
+            if follower:
+                return self.itermap.getIterator(follower)
+        
     def addAdditional(self, iter, test):
         currTests = self.model.get_value(iter, 2)
         if not test in currTests:

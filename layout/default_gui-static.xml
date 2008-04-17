@@ -34,7 +34,6 @@
 
     <menu action="actionsmenu">
       <menuitem action="Select/Find"/>
-      <menuitem action="Refresh"/>
       <menuitem action="Run"/>
       <menuitem action="Reconnect"/>
       <menuitem action="Record Use-Case"/>

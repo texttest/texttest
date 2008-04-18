@@ -796,19 +796,17 @@ def addLocalPrefix(fullPath, prefix):
     dir, file = os.path.split(fullPath)
     return os.path.join(dir, prefix + "_" + file)
 
-def ensureDirectoryExists(path):
-    if os.path.isdir(path):
-        return
-    try:
-        os.makedirs(path)
-    except OSError, detail:
+def ensureDirectoryExists(path, attempts=5):
+    # os.makedirs seems to be a bit flaky, especially if the file server is loaded
+    # or on silly platforms like powerpc. We give it five chances to do its stuff :)
+    for attempt in range(attempts):
         if os.path.isdir(path):
             return
-        detailStr = str(detail)
-        if detailStr.find("Interrupted system call") != -1 or detailStr.find("File exists") != -1:
-            return ensureDirectoryExists(path)
-        else:
-            raise
+        try:
+            os.makedirs(path)
+        except OSError, detail:
+            if attempt == attempts - 1:
+                raise
 
 def retryOnInterrupt(function, *args):
     try:

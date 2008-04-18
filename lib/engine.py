@@ -22,8 +22,16 @@ class UniqueNameFinder(Responder):
             self.diag.info("Storing test " + test.name)
             self.name2test[test.name] = test
     def notifyRemove(self, test):
-        if self.name2test.has_key(test.name):
-            del self.name2test[test.name]
+        self.removeName(test.name)
+    def removeName(self, name):
+        if self.name2test.has_key(name):
+            self.diag.info("Removing test " + name)
+            del self.name2test[name]
+
+    def notifyNameChange(self, test, origRelPath):
+        oldName = os.path.basename(origRelPath)
+        self.removeName(oldName)
+        self.notifyAdd(test)
     def findParentIdentifiers(self, oldTest, newTest):
         oldParentId = " at top level"
         if oldTest.parent:

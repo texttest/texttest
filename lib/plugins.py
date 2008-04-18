@@ -983,6 +983,10 @@ class TextOption(Option):
             return True
         else:
             return False
+    def setValue(self, value):
+        Option.setValue(self, value)
+        if self.inqNofValues() > 1:
+            self.setPossibleValues(self.possibleValues)
     def setPossibleValues(self, values):
         if self.defaultValue in values:
             self.possibleValues = values

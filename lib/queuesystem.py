@@ -749,10 +749,7 @@ class QueueSystemServer(BaseActionRunner):
         else:
             # might get here when the test completed since we checked...
             if not test.state.isComplete():
-                if startNotified:
-                    self.setSlaveLost(test, wantStatus)
-                else:
-                    self.setSlaveFailed(test, wantStatus)
+                self.setSlaveFailed(test, startNotified, wantStatus)
         return False
     def shouldWaitFor(self, test):
         return True
@@ -764,12 +761,7 @@ class QueueSystemServer(BaseActionRunner):
         freeText = "Test job was cancelled (while still pending in " + queueSystemName(test.app) +\
                    ") at " + timeStr
         self.cancel(test, briefText, freeText)
-    def setSlaveLost(self, test, wantStatus):
-        failReason = "no report, possibly killed with SIGKILL"
-        name = queueSystemName(test.app)
-        fullText = failReason + "\n" + self.getJobFailureInfo(test, name, wantStatus)
-        self.changeState(test, plugins.TestState("killed", briefText=failReason, \
-                                                 freeText=fullText, completed=1, lifecycleChange="complete"))
+
     def getJobFailureInfo(self, test, name, wantStatus):
         if wantStatus:
             return "-" * 10 + " Full accounting info from " + name + " " + "-" * 10 + "\n" + \
@@ -778,11 +770,12 @@ class QueueSystemServer(BaseActionRunner):
             # Job accounting info can take ages to find, don't do it from GUI quit
             return "No accounting info found as quitting..."
         
-    def setSlaveFailed(self, test, wantStatus):
-        failReason, fullText = self.getSlaveFailure(test, wantStatus)
+    def setSlaveFailed(self, test, startNotified, wantStatus):
+        failReason, fullText = self.getSlaveFailure(test, startNotified, wantStatus)
         fullText = failReason + "\n" + fullText
-        self.changeState(test, plugins.Unrunnable(briefText=failReason, freeText=fullText, lifecycleChange="complete"))
-    def getSlaveFailure(self, test, wantStatus):
+        self.changeState(test, self.getSlaveFailureState(startNotified, failReason, fullText))
+
+    def getSlaveFailure(self, test, startNotified, wantStatus):
         fullText = ""
         name = queueSystemName(test.app)
         slaveErrors = self.getSlaveErrors(test, name)
@@ -790,13 +783,29 @@ class QueueSystemServer(BaseActionRunner):
             fullText += slaveErrors
 
         fullText += self.getJobFailureInfo(test, name, wantStatus)
-        return name + " job exited", fullText
+        return self.getSlaveFailureBriefText(name, startNotified), fullText
+
+    def getSlaveFailureBriefText(self, name, startNotified):
+        if startNotified:
+            return "no report, possibly killed with SIGKILL"
+        else:
+            return name + " job exited"
+
+    def getSlaveFailureState(self, startNotified, failReason, fullText):
+        if startNotified:
+            return plugins.TestState("killed", briefText=failReason, \
+                              freeText=fullText, completed=1, lifecycleChange="complete")
+        else:
+            return plugins.Unrunnable(briefText=failReason, freeText=fullText, lifecycleChange="complete")
+        
     def getPostText(self, test, jobId):
         name = queueSystemName(test.app)
         return "in " + name + " (job " + jobId + ")"
+
     def describeJob(self, test, jobId, jobName):
         postText = self.getPostText(test, jobId)
         print "T: Cancelling", test, postText
+
 
 class Abandoned(plugins.TestState):
     def __init__(self, freeText):

@@ -163,7 +163,13 @@ class ApcConfig(apc_basic.Config):
             return [ optimization.WriteKPIData(self.optionValue("kpiData"), listKPIs) ]
         return apc_basic.Config.getActionSequence(self)
     def getApcLogDirMarker(self, baseRunner):
-        return MarkApcLogDir(self.isExecutable, self.hasAutomaticCputimeChecking, baseRunner, self.optionMap)
+        if self.batchMode():
+            # In batch mode we don't link to the APC log.
+            # This is because the file server, under load, seems to get confused about symbolic links
+            # and because the link is entirely there so it can be viewed from the GUI right now.
+            return apc_basic.Config.getApcLogDirMarker(self, baseRunner)
+        else:
+            return MarkApcLogDir(self.isExecutable, self.hasAutomaticCputimeChecking, baseRunner, self.optionMap)
     def getSlaveSwitches(self):
         return apc_basic.Config.getSlaveSwitches(self) + [ "rundebug", "extractlogs", "goprof" ]
     def getProgressReportBuilder(self):

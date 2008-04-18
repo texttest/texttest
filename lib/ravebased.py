@@ -500,7 +500,8 @@ class RuleBuildSubmitServer(QueueSystemServer):
     def setSlaveLost(self, test, wantStatus):
         if self.isRuleBuild(test):
             failReason = "no report from rule compilation (possibly killed with SIGKILL)"
-            fullText = failReason + "\n" + self.getJobFailureInfo(test, wantStatus)
+            name = queueSystemName(test.app)
+            fullText = failReason + "\n" + self.getJobFailureInfo(test, name, wantStatus)
             self.ruleBuildKilled(test, fullText)
             self.changeState(test, plugins.Unrunnable(fullText, failReason), previouslySubmitted=False)
         else:

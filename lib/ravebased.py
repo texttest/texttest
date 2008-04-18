@@ -428,9 +428,14 @@ class RuleBuildSubmitServer(QueueSystemServer):
         for ruleset in rulecomp.rulesetsForSelf:
             postText = submissionRules.getSubmitSuffix()
             print "R: Submitting Rule Compilation for ruleset", ruleset.name, "(for " + repr(test) + ")", postText
-            compileArgs = [ remoteCmd, ruleset.uniqueName, self.submitAddress ] + ruleset.getCompilationArgs(remote=True)
-            command = " ".join(compileArgs)
-            if not self.submitJob(test, submissionRules, command, rulecompEnv):
+            try:
+                compileArgs = [ remoteCmd, ruleset.uniqueName, self.submitAddress ] + ruleset.getCompilationArgs(remote=True)
+                command = " ".join(compileArgs)
+                if not self.submitJob(test, submissionRules, command, rulecompEnv):
+                    self.testsForRuleBuild -= 1
+            except plugins.TextTestError, e:
+                test.changeState(plugins.Unrunnable(str(e), "NO COMPILER"))
+                self.handleErrorState(test)
                 self.testsForRuleBuild -= 1
         else:
             self.associateJobs(test, rulecomp)            
@@ -445,6 +450,7 @@ class RuleBuildSubmitServer(QueueSystemServer):
     def associateJobs(self, test, rulecomp):
         for ruleset in rulecomp.rulesetsFromOthers:
             rulesetTests = FilterRuleBuilds.rulesetNamesToTests.get(ruleset.uniqueName, [])
+            self.diag.info("Found ruleset tests " + repr(rulesetTests))
             if len(rulesetTests) > 0 and self.isRuleBuild(rulesetTests[0]):
                 self.lock.acquire()
                 if self.exited:
@@ -800,7 +806,12 @@ class RuleSet:
     def getExecutable(self, remote):
         if remote:
             # Don't allow interception or path corruption
-            return os.path.join(self.envMethod("CARMSYS"), "bin", "crc_compile")
+            executable = os.path.join(self.envMethod("CARMSYS"), "bin", "crc_compile")
+            if not os.path.isfile(executable):
+                # The text is used elsewhere to decide if this was a rule compilation
+                # change only with care!!!
+                raise plugins.TextTestError, "Failed to submit rule compilation, no rule compiler found at " + executable
+            return executable
         else:
             # Let the traffic mechanism intercept local runs though
             return "crc_compile"

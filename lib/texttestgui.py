@@ -1886,7 +1886,7 @@ class TestFileGUI(FileViewGUI):
         realState = state
         if state.isMarked():
             realState = state.oldState
-        if realState.hasStarted():
+        if self.dynamic:
             if hasattr(realState, "correctResults"):
                 # failed on comparison
                 self.addComparisonsToModel(realState)
@@ -1963,36 +1963,39 @@ class TestFileGUI(FileViewGUI):
             self.addFileToModel(iter, file, comparison, colour)
     def getComparisonColour(self, state, fileComp):
         if not state.hasStarted():
-            return self.getStaticColour()
+            return self.getColour("not_started")
         if not state.isComplete():
             return self.getColour("running")
         if fileComp.hasSucceeded():
             return self.getColour("success")
         else:
             return self.getColour("failure")
-    def getStaticColour(self):
-        if self.dynamic:
-            return self.getColour("not_started")
-        else:
-            return self.getColour("static")
     def addTmpFilesToModel(self, state):
         tmpFiles = self.currentTest.listTmpFiles()
         tmpIter = self.model.insert_before(None, None)
         self.model.set_value(tmpIter, 0, "Temporary Files")
         self.addStandardFilesUnderIter(state, tmpIter, tmpFiles)
+        
+    def getRootIterAndColour(self, heading):
+        headerRow = [ heading + " Files", "white", self.currentTest.getDirectory(), None, "" ]
+        stditer = self.model.insert_before(None, None, headerRow)
+        colour =  guiConfig.getCompositeValue("file_colours", "static_" + heading.lower(), defaultKey="static")
+        return stditer, colour
+    
+    def addStaticFilesWithHeading(self, heading, stdFiles):
+        stditer, colour = self.getRootIterAndColour(heading)
+        for file in stdFiles:
+            self.addFileToModel(stditer, file, None, colour)
+
     def addStaticFilesToModel(self, state):
         stdFiles, defFiles = self.currentTest.listStandardFiles(allVersions=True)
         if self.currentTest.classId() == "test-case":
-            stditer = self.model.insert_before(None, None, self.getHeaderRow("Standard"))
-            if len(stdFiles):
-                self.addStandardFilesUnderIter(state, stditer, stdFiles)
+            self.addStaticFilesWithHeading("Standard", stdFiles)
 
-        defiter = self.model.insert_before(None, None, self.getHeaderRow("Definition"))
-        self.addStandardFilesUnderIter(state, defiter, defFiles)
+        self.addStaticFilesWithHeading("Definition", defFiles)
         self.addStaticDataFilesToModel()
         self.addExternalFilesToModel()
-    def getHeaderRow(self, fileType):
-        return [ fileType + " Files", "white", self.currentTest.getDirectory(), None, "" ]
+
     def getExternalDataFiles(self):
         try:
             return self.currentTest.app.extraReadFiles(self.currentTest).items()
@@ -2001,24 +2004,25 @@ class TestFileGUI(FileViewGUI):
                              "' configuration while requesting extra data files, not displaying any such files")
             plugins.printException()
             return seqdict()
+        
     def addStaticDataFilesToModel(self):
         if self.currentTest.getDataFileNames() == 0:
             return
-        datiter = self.model.insert_before(None, None, self.getHeaderRow("Data"))
-        colour = self.getStaticColour()
+        datiter, colour = self.getRootIterAndColour("Data")
         self.addDataFilesUnderIter(datiter, self.currentTest.listDataFiles(), colour)
+
     def addExternalFilesToModel(self):
         externalFiles = self.getExternalDataFiles()
         if len(externalFiles) == 0:
             return
-        datiter = self.model.insert_before(None, None, self.getHeaderRow("External"))
-        colour = self.getStaticColour()
+        datiter, colour = self.getRootIterAndColour("External")
         for name, filelist in externalFiles:
             exiter = self.model.insert_before(datiter, None)
             self.model.set_value(exiter, 0, name)
             self.model.set_value(exiter, 1, "white") # mostly to trigger output...
             for file in filelist:
                 self.addFileToModel(exiter, file, None, colour)
+
     def addDataFilesUnderIter(self, iter, files, colour):
         dirIters = { self.currentTest.getDirectory() : iter }
         parentIter = iter

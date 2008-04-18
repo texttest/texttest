@@ -1591,6 +1591,9 @@ class TextInfoGUI(guiplugins.SubGUI):
             if len(freeText) == 0:
                 self.text = self.text.replace(" :", "")
         self.text += str(freeText)
+        if state.hasStarted() and not state.isComplete():
+            self.text += "\n\nTo obtain the latest progress information and an up-to-date comparison of the files above, " + \
+                         "perform 'recompute status' (press '" + guiConfig.getCompositeValue("gui_accelerators", "recompute_status") + "')"
     def describe(self):
         guilog.info("---------- Text Info Window ----------")
         buffer = self.view.get_buffer()

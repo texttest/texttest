@@ -1692,10 +1692,8 @@ class ReportBugs(guiplugins.ActionDialogGUI):
     def getPossibleFileStems(self):
         stems = []
         for test in self.currTestSelection[0].testCaseList():
-            resultFiles, defFiles = test.listStandardFiles(allVersions=False)
-            for fileName in resultFiles:
-                stem = os.path.basename(fileName).split(".")[0]
-                if not stem in stems:
+            for stem in test.dircache.findAllStems():
+                if not stem in stems and not stem in self.currTestSelection[0].getConfigValue("definition_file_stems"):
                     stems.append(stem)
         # use for unrunnable tests...
         stems.append("free_text")

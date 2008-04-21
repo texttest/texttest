@@ -1454,7 +1454,21 @@ class CreateDefinitionFile(guiplugins.ActionDialogGUI):
     def getScriptTitle(self, tab):
         return "Create File"
     def isActiveOnCurrent(self, *args):
-        return self.creationDir is not None and guiplugins.ActionDialogGUI.isActiveOnCurrent(self, *args) 
+        return self.creationDir is not None and guiplugins.ActionDialogGUI.isActiveOnCurrent(self, *args)
+    def fillVBox(self, vbox):
+        header = gtk.Label()
+        test = self.currTestSelection[0]
+        dirText = self.getDirectoryText(test)
+        guiplugins.guilog.info("Adding text '" + dirText + "'")
+        header.set_markup("<b>" + dirText + "</b>\n")
+        vbox.pack_start(header)
+        return guiplugins.ActionDialogGUI.fillVBox(self, vbox)
+    def getDirectoryText(self, test):
+        relDir = plugins.relpath(self.creationDir, test.getDirectory())
+        if relDir:
+            return "Creating file in test subdirectory '" + relDir + "' for " + repr(test)
+        else:
+            return "Creating file in test directory for " + repr(test)
     def notifyFileCreationInfo(self, creationDir, fileType):
         if fileType == "external":
             self.creationDir = None

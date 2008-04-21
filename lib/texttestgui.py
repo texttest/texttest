@@ -1722,26 +1722,19 @@ class FileViewGUI(guiplugins.SubGUI):
             # Don't crash on double clicking the header lines...
             return
         comparison = self.model.get_value(iter, 3)
-        self.notify("ViewFile", fileName, comparison)
+        self.notify(self.getViewFileSignal(), fileName, comparison)
     def notifyViewerStarted(self):
         self.selection.unselect_all()
     def notifyNewFile(self, fileName, overwrittenExisting):
-        self.notify("ViewFile", fileName, None)
+        self.notify(self.getViewFileSignal(), fileName, None)
         if not overwrittenExisting:
             self.currentTest.refreshFiles()
             self.recreateModel(self.getState())
-    def addFileToModel(self, iter, name, comp, colour):
-        fciter = self.model.insert_before(iter, None)
-        baseName = os.path.basename(name)
-        self.model.set_value(fciter, 0, baseName)
-        self.model.set_value(fciter, 1, colour)
-        self.model.set_value(fciter, 2, name)
-        if comp:
-            self.model.set_value(fciter, 3, comp)
-            details = comp.getDetails()
-            if len(details) > 0:
-                self.model.set_value(fciter, 4, details)
-        return fciter
+    def addFileToModel(self, iter, fileName, colour, associatedObject=None, details=""):
+        baseName = os.path.basename(fileName)
+        row = [ baseName, colour, fileName, associatedObject, details ]
+        return self.model.insert_before(iter, None, row)
+
   
 class ApplicationFileGUI(FileViewGUI):
     def __init__(self, dynamic, allApps):
@@ -1751,6 +1744,8 @@ class ApplicationFileGUI(FileViewGUI):
         return not self.dynamic
     def getGroupTabTitle(self):
         return "Config"
+    def getViewFileSignal(self):
+        return "ViewApplicationFile"
     def monitorEvents(self):
         scriptEngine.connect("select application file", "row_activated", self.selection.get_tree_view(), self.fileActivated)
     def addFilesToModel(self, state):
@@ -1761,7 +1756,7 @@ class ApplicationFileGUI(FileViewGUI):
             persiter = self.model.insert_before(None, None)
             self.model.set_value(persiter, 0, "Personal Files")
             for file in personalFiles:
-                self.addFileToModel(persiter, file, None, colour)
+                self.addFileToModel(persiter, file, colour, self.allApps)
                 for importedFile in self.getImportedFiles(file):
                     importedFiles[importedFile] = importedFile
 
@@ -1770,7 +1765,7 @@ class ApplicationFileGUI(FileViewGUI):
             confiter = self.model.insert_before(None, None)
             self.model.set_value(confiter, 0, "Files for " + allTitles[index])
             for file in self.getConfigFiles(app):
-                self.addFileToModel(confiter, file, None, colour)
+                self.addFileToModel(confiter, file, colour, [ app ])
                 for importedFile in self.getImportedFiles(file, app):
                     importedFiles[importedFile] = importedFile
                     
@@ -1782,7 +1777,7 @@ class ApplicationFileGUI(FileViewGUI):
             sortedFiles = importedFiles.values()
             sortedFiles.sort()
             for importedFile in sortedFiles:
-                self.addFileToModel(importediter, importedFile, None, colour)
+                self.addFileToModel(importediter, importedFile, colour, self.allApps)
     def getApplicationTitles(self):
         basicTitles = [ app.fullName + app.versionSuffix() for app in self.allApps ]
         if self.areUnique(basicTitles):
@@ -1821,6 +1816,7 @@ class ApplicationFileGUI(FileViewGUI):
                     continue
         return imports
 
+
 class TestFileGUI(FileViewGUI):
     def __init__(self, dynamic, popupGUI):
         FileViewGUI.__init__(self, dynamic, "", popupGUI)
@@ -1831,6 +1827,8 @@ class TestFileGUI(FileViewGUI):
         else:
             return True
 
+    def getViewFileSignal(self):
+        return "ViewFile"
     def notifyNameChange(self, test, origRelPath):
         if test is self.currentTest:
             self.setName( [ test ], 1)
@@ -1960,7 +1958,10 @@ class TestFileGUI(FileViewGUI):
         for file in files:
             comparison = compMap.get(file)
             colour = self.getComparisonColour(state, comparison)
-            self.addFileToModel(iter, file, comparison, colour)
+            details = ""
+            if comparison:
+                details = comparison.getDetails()
+            self.addFileToModel(iter, file, colour, comparison, details)
     def getComparisonColour(self, state, fileComp):
         if not state.hasStarted():
             return self.getColour("not_started")
@@ -1985,7 +1986,7 @@ class TestFileGUI(FileViewGUI):
     def addStaticFilesWithHeading(self, heading, stdFiles):
         stditer, colour = self.getRootIterAndColour(heading)
         for file in stdFiles:
-            self.addFileToModel(stditer, file, None, colour)
+            self.addFileToModel(stditer, file, colour)
 
     def addStaticFilesToModel(self, state):
         stdFiles, defFiles = self.currentTest.listStandardFiles(allVersions=True)
@@ -2021,7 +2022,7 @@ class TestFileGUI(FileViewGUI):
             self.model.set_value(exiter, 0, name)
             self.model.set_value(exiter, 1, "white") # mostly to trigger output...
             for file in filelist:
-                self.addFileToModel(exiter, file, None, colour)
+                self.addFileToModel(exiter, file, colour)
 
     def addDataFilesUnderIter(self, iter, files, colour):
         dirIters = { self.currentTest.getDirectory() : iter }
@@ -2032,7 +2033,7 @@ class TestFileGUI(FileViewGUI):
             if parentIter is None:
                 subDirIters = self.addDataFilesUnderIter(iter, [ parent ], colour)
                 parentIter = subDirIters.get(parent)
-            newiter = self.addFileToModel(parentIter, file, None, colour)
+            newiter = self.addFileToModel(parentIter, file, colour)
             if os.path.isdir(file):
                 dirIters[file] = newiter
         return dirIters

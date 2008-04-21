@@ -215,41 +215,43 @@ class FileViewAction(guiplugins.ActionGUI):
     def isActiveOnCurrent(self, *args):
         if not guiplugins.ActionGUI.isActiveOnCurrent(self):
             return False
-        for fileName, comparison in self.currFileSelection:
-            if self.isActiveForFile(fileName, comparison):
+        for fileName, obj in self.currFileSelection:
+            if self.isActiveForFile(fileName, obj):
                 return True
         return False
-    def isActiveForFile(self, fileName, comparison):
+    def isActiveForFile(self, fileName, *args):
         if not self.viewTools.get(fileName):
             return False
-        return self._isActiveForFile(fileName, comparison)
-    def _isActiveForFile(self, fileName, comparison):
+        return self._isActiveForFile(fileName, *args)
+    def _isActiveForFile(self, *args):
         return True
     def updateFileSelection(self, files):
-        for fileName, comparison in files:
+        for fileName, obj in files:
             self.viewTools[fileName] = self.getViewTool(fileName)
         return guiplugins.ActionGUI.updateFileSelection(self, files)
     
     def useFiltered(self):
         return False
     def performOnCurrent(self):
-        for fileName, comparison in self.currFileSelection:
-            fileToView = self.getFileToView(fileName, comparison)
+        for fileName, associatedObject in self.currFileSelection:
+            fileToView = self.getFileToView(fileName, associatedObject)
             if os.path.isfile(fileToView) or os.path.islink(fileToView):
-                if self.isActiveForFile(fileName, comparison):
+                if self.isActiveForFile(fileName, associatedObject):
                     viewTool = self.viewTools.get(fileName)
-                    self.performOnFile(fileToView, comparison, viewTool)
+                    self.performOnFile(viewTool, fileToView, associatedObject)
             else:
                 self.handleNoFile(fileToView)
-    def isDefaultViewer(self, comparison):
+    def isDefaultViewer(self, *args):
         return False
-    def notifyViewFile(self, fileName, comparison):
-        if self.isDefaultViewer(comparison):
-            self.activateDefaultViewer(fileName, comparison)
-    def getFileToView(self, fileName, comparison):
-        if comparison:
-            return comparison.existingFile(self.useFiltered())
-        else:
+    def notifyViewFile(self, fileName, *args):
+        if self.isDefaultViewer(*args):
+            self.activateDefaultViewer(fileName, *args)
+    def getFileToView(self, fileName, associatedObject):
+        try:
+            # associatedObject might be a comparison object, but it might not
+            # Use the comparison if it's there
+            return associatedObject.existingFile(self.useFiltered())
+        except AttributeError:
             return fileName
     def noFileAdvice(self):
         if len(self.currAppSelection) > 0:
@@ -298,7 +300,7 @@ class FileViewAction(guiplugins.ActionGUI):
     def getStem(self, fileName):
         return os.path.basename(fileName).split(".")[0]
     def testRunning(self):
-        return len(self.currTestSelection) > 0 and self.currTestSelection[0].state.hasStarted() and \
+        return self.currTestSelection[0].state.hasStarted() and \
                not self.currTestSelection[0].state.isComplete()
     
     def getViewToolName(self, fileName):
@@ -321,8 +323,6 @@ class ViewInEditor(FileViewAction):
         self.dynamic = dynamic
     def _getStockId(self):
         return "open"
-    def _getTitle(self):
-        return "View File"
     def getToolConfigEntry(self):
         return "view_program"
     def viewFile(self, fileName, viewTool, exitHandler, exitHandlerArgs):
@@ -355,30 +355,15 @@ class ViewInEditor(FileViewAction):
 
         return cmdArgs, descriptor, env
     
-    def findExitHandlerInfo(self, fileName):
-        if self.dynamic:
-            return None, ()
-
-        # options file can change appearance of test (environment refs etc.)
-        if self.isTestDefinition("options", fileName):
-            return self.currTestSelection[0].filesChanged, ()
-        elif self.isTestDefinition("testsuite", fileName):
-            # refresh order of tests if this edited
-            return self.currTestSelection[0].contentChanged, (fileName,)
-        else:
-            return None, ()
-    def performOnFile(self, fileName, comparison, viewTool):
-        exitHandler, exitHandlerArgs = self.findExitHandlerInfo(fileName)
+    def performOnFile(self, viewTool, fileName, *args):
+        exitHandler, exitHandlerArgs = self.findExitHandlerInfo(fileName, *args)
         return self.viewFile(fileName, viewTool, exitHandler, exitHandlerArgs)
-    def isDefaultViewer(self, comparison):
-        return not self.differencesActive(comparison) and \
-               (not self.testRunning() or not guiplugins.guiConfig.getValue("follow_file_by_default"))
-    def activateDefaultViewer(self, fileName, comparison):
-        fileToView = self.getFileToView(fileName, comparison)
+    def activateDefaultViewer(self, fileName, *args):
+        fileToView = self.getFileToView(fileName, *args)
         if os.path.isfile(fileToView):
             viewProgram = self.getViewToolName(fileToView)
             if plugins.canExecute(viewProgram):
-                self.performOnFile(fileToView, comparison, viewProgram)
+                self.performOnFile(viewProgram, fileToView, *args)
             elif viewProgram:
                 self.showErrorDialog("Cannot find file viewing program '" + viewProgram + \
                                      "'.\nPlease install it somewhere on your PATH or\n"
@@ -391,16 +376,75 @@ class ViewInEditor(FileViewAction):
         else:
             self.handleNoFile(fileToView)
             
+    
+
+class ViewConfigFileInEditor(ViewInEditor):
+    def __init__(self, *args):
+        ViewInEditor.__init__(self, *args)
+        self.rootTestSuites = []
+
+    def _getTitle(self):
+        return "View In Editor"
+
+    def addSuites(self, suites):
+        self.rootTestSuites = suites
+
+    def isActiveOnCurrent(self, *args):
+        return False # only way to get at it is via the activation below...
+
+    def notifyViewApplicationFile(self, fileName, apps):
+        self.activateDefaultViewer(fileName, apps)
+
+    def findExitHandlerInfo(self, fileName, apps):
+        return self.configFileChanged, (apps,)
+
+    def configFileChanged(self, apps):
+        for app in apps:
+            app.setUpConfiguration()
+            suite = self.findSuite(app)
+            self.refreshFilesRecursively(suite)
+
+    def findSuite(self, app):
+        for suite in self.rootTestSuites:
+            if suite.app is app:
+                return suite
+            
+    def refreshFilesRecursively(self, suite):
+        suite.filesChanged()
+        if suite.classId() == "test-suite":
+            for subTest in suite.testcases:
+                self.refreshFilesRecursively(subTest)
+
+
+class ViewTestFileInEditor(ViewInEditor):
+    def _getTitle(self):
+        return "View File"
+
+    def isDefaultViewer(self, comparison):
+        return not self.differencesActive(comparison) and \
+               (not self.testRunning() or not guiplugins.guiConfig.getValue("follow_file_by_default"))
+
+    def findExitHandlerInfo(self, fileName, *args):
+        if self.dynamic:
+            return None, ()
+
+        # options file can change appearance of test (environment refs etc.)
+        if self.isTestDefinition("options", fileName):
+            return self.currTestSelection[0].filesChanged, ()
+        elif self.isTestDefinition("testsuite", fileName):
+            # refresh order of tests if this edited
+            return self.currTestSelection[0].contentChanged, (fileName,)
+        else:
+            return None, ()
+
     def isTestDefinition(self, stem, fileName):
-        if len(self.currTestSelection) == 0:
-            return False
         defFile = self.currTestSelection[0].getFileName(stem)
         if defFile:
             return plugins.samefile(fileName, defFile)
         else:
             return False
 
-class ViewFilteredInEditor(ViewInEditor):
+class ViewFilteredTestFileInEditor(ViewTestFileInEditor):
     def _getStockId(self):
         pass # don't use same stock for both
     def useFiltered(self):
@@ -422,7 +466,7 @@ class ViewFileDifferences(FileViewAction):
             if not (comparison.newResult() or comparison.missingResult()):
                 return True
         return False
-    def performOnFile(self, tmpFile, comparison, diffProgram):
+    def performOnFile(self, diffProgram, tmpFile, comparison):
         stdFile = comparison.getStdFile(self.useFiltered())
         description = diffProgram + " " + os.path.basename(stdFile) + " " + os.path.basename(tmpFile)
         guiplugins.guilog.info("Starting graphical difference comparison using '" + diffProgram + "':")
@@ -445,7 +489,7 @@ class ViewFilteredFileDifferences(ViewFileDifferences):
         if os.path.isfile(tmpFile):
             diffProgram = self.getViewToolName(tmpFile)
             if plugins.canExecute(diffProgram):
-                self.performOnFile(tmpFile, comparison, diffProgram)
+                self.performOnFile(diffProgram, tmpFile, comparison)
             elif diffProgram:
                 self.showErrorDialog("Cannot find graphical difference program '" + diffProgram + \
                                      "'.\nPlease install it somewhere on your PATH or change the\n"
@@ -487,7 +531,7 @@ class FollowFile(FileViewAction):
                 return [ "xterm", "-bg", "white", "-T", title, "-e" ] + basic
         else:
             return basic
-    def performOnFile(self, fileName, comparison, followProgram):
+    def performOnFile(self, followProgram, fileName, comparison):
         useFile = self.fileToFollow(fileName, comparison)
         guiplugins.guilog.info("Following file " + useFile + " using '" + followProgram + "'")
         description = followProgram + " " + os.path.basename(useFile)
@@ -497,7 +541,7 @@ class FollowFile(FileViewAction):
     def activateDefaultViewer(self, fileName, comparison):
         followProgram = self.getViewToolName(fileName)
         if plugins.canExecute(followProgram):
-            self.performOnFile(fileName, comparison, followProgram)
+            self.performOnFile(followProgram, fileName, comparison)
         elif followProgram:
             self.showErrorDialog("Cannot find file-following program '" + followProgram + \
                                  "'.\nPlease install it somewhere on your PATH or change the\n"
@@ -1509,7 +1553,10 @@ class CreateDefinitionFile(guiplugins.ActionDialogGUI):
         return filter(lambda f: f not in discarded, stdFiles)
     def updateStems(self, fileType):
         stems = self.findAllStems(fileType)
-        self.optionGroup.setValue("stem", stems[0])
+        if len(stems) > 0:
+            self.optionGroup.setValue("stem", stems[0])
+        else:
+            self.optionGroup.setValue("stem", "")
         self.optionGroup.setPossibleValues("stem", stems)
     def getFileName(self, stem, version):
         fileName = stem
@@ -1810,7 +1857,9 @@ class RefreshAll(guiplugins.BasicActionGUI):
         self.rootTestSuites = suites
     def performOnCurrent(self):
         for suite in self.rootTestSuites:
-            self.notify("ActionProgress", "")                
+            self.notify("ActionProgress", "")
+            suite.app.setUpConfiguration()
+            self.notify("ActionProgress", "")
             filters = suite.app.getFilterList()
             suite.refresh(filters)
     
@@ -2108,14 +2157,14 @@ class InteractiveActionConfig:
         return [ "file", "edit", "view", "actions", "site", "reorder", "help" ]
 
     def getInteractiveActionClasses(self, dynamic):
-        classes = [ Quit, ViewInEditor, ShowFileProperties ]
+        classes = [ Quit, ViewTestFileInEditor, ShowFileProperties ]
         if dynamic:
-            classes += [ ViewFilteredInEditor, ViewFileDifferences, 
+            classes += [ ViewFilteredTestFileInEditor, ViewFileDifferences, 
                          ViewFilteredFileDifferences, FollowFile, 
                          SaveTests, SaveSelection, KillTests,
                          MarkTest, UnmarkTest, RecomputeTests ] # must keep RecomputeTests at the end!            
         else:
-            classes += [ RecordTest, CopyTests, CutTests, 
+            classes += [ ViewConfigFileInEditor, RecordTest, CopyTests, CutTests, 
                          PasteTests, ImportTestCase, ImportTestSuite, 
                          CreateDefinitionFile, ReportBugs, SelectTests, RefreshAll,
                          RunTestsBasic, RunTestsAdvanced, ResetGroups, RenameTest, RemoveTests, 

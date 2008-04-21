@@ -1173,6 +1173,19 @@ class Application:
         self.versions = versions    
         self.diag = plugins.getDiagnostics("application")
         self.inputOptions = inputOptions
+        self.setUpConfiguration()
+        self.writeDirectory = self.getWriteDirectory()
+        self.rootTmpDir = os.path.dirname(self.writeDirectory)
+        self.diag.info("Write directory at " + self.writeDirectory)
+        self.checkout = self.configObject.setUpCheckout(self)
+        self.diag.info("Checkout set to " + self.checkout)
+        self.optionGroups = self.createOptionGroups(inputOptions)
+    def __repr__(self):
+        return self.fullName + self.versionSuffix()
+    def __hash__(self):
+        return id(self)
+
+    def setUpConfiguration(self):
         self.configDir = MultiEntryDictionary()
         self.configDocs = {}
         self.extraDirCaches = {}
@@ -1190,17 +1203,7 @@ class Application:
         if personalFile:
             self.configDir.readValues([ personalFile ], insert=0, errorOnUnknown=1)
         self.diag.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
-        self.writeDirectory = self.getWriteDirectory()
-        self.rootTmpDir = os.path.dirname(self.writeDirectory)
-        self.diag.info("Write directory at " + self.writeDirectory)
-        self.checkout = self.configObject.setUpCheckout(self)
-        self.diag.info("Checkout set to " + self.checkout)
-        self.optionGroups = self.createOptionGroups(inputOptions)
-    def __repr__(self):
-        return self.fullName + self.versionSuffix()
-    def __hash__(self):
-        return id(self)
-                
+        
     def makeExtraDirCache(self, envDir):
         if envDir == "":
             return

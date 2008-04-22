@@ -127,14 +127,15 @@ class TestComparison(BaseTestComparison):
         return self.category == "success"
     def warnOnSave(self):
         return bool(self.failedPrediction)
-    def needsRecalculation(self):
+    def getComparisonsForRecalculation(self):
+        comparisons = []
         for comparison in self.allResults:
             self.diag.info(comparison.stem + " dates " + comparison.modifiedDates())
             if comparison.needsRecalculation():
                 self.diag.info("Recalculation needed for file " + comparison.stem)
-                return 1
+                comparisons.append(comparison)
         self.diag.info("All file comparisons up to date")
-        return 0
+        return comparisons
     def getMostSevereFileComparison(self):
         worstSeverity = None
         worstResult = None
@@ -269,7 +270,7 @@ class TestComparison(BaseTestComparison):
         stdFiles = self.makeStemDict(resultFiles + defFiles)
         for fileComp in self.allResults:
             stdFile = stdFiles.get(fileComp.stem)
-            fileComp.findAndCompare(test, stdFile)
+            fileComp.recompute(test, stdFile)
     def filterComparisons(self, resultList, onlyStems):
         if len(onlyStems) == 0:
             return resultList

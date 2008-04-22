@@ -32,6 +32,7 @@ from respond import Responder
 from copy import copy
 from glob import glob
 from sets import Set
+from TreeViewTooltips import TreeViewTooltips
 
 
 def renderParentsBold(column, cell, model, iter):
@@ -430,6 +431,7 @@ class TopWindowGUI(ContainerGUI):
         self.topWindow.add(self.subguis[0].createView())
         self.windowSizeDescriptor = self.adjustSize()
         self.topWindow.show()
+
         self.notify("TopWindow", self.topWindow)
         scriptEngine.connect("close window", "delete_event", self.topWindow, self.notifyQuit)
         return self.topWindow
@@ -825,12 +827,29 @@ class TestIteratorMap:
         key = self.getKey(test)
         if self.dict.has_key(key):
             del self.dict[key]
+
+class RefreshTips(TreeViewTooltips):
+    def __init__(self, name, refreshColumn, refreshIndex):
+        TreeViewTooltips.__init__(self)
+        self.name = name
+        self.refreshColumn = refreshColumn
+        self.refreshIndex = refreshIndex
+        
+    def get_tooltip(self, view, column, path):
+        if column is self.refreshColumn:
+            model = view.get_model()
+            refreshIcon = model[path][self.refreshIndex]
+            if refreshIcon:
+                return "Indicates that this " + self.name + "'s saved result has changed since the status was calculated. " + \
+                       "It's therefore recommended to recompute the status."
+
         
 class TestTreeGUI(ContainerGUI):
     def __init__(self, dynamic, allApps, popupGUI, subGUI):
         ContainerGUI.__init__(self, [ subGUI ])
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,\
-                                   gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_BOOLEAN)
+                                   gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_BOOLEAN, \
+                                   gobject.TYPE_STRING)
         self.popupGUI = popupGUI
         self.itermap = TestIteratorMap(dynamic, allApps)
         self.selection = None
@@ -838,7 +857,7 @@ class TestTreeGUI(ContainerGUI):
         self.selectedTests = []
         self.dynamic = dynamic
         self.collapseStatic = self.getCollapseStatic()
-        self.successPerSuite = {} # map from suite to number succeeded
+        self.successPerSuite = {} # map from suite to tests succeeded
         self.collapsedRows = {}
         self.filteredModel = None
         self.treeView = None
@@ -894,7 +913,7 @@ class TestTreeGUI(ContainerGUI):
         nodeName = self.getNodeName(suite, parent)
         colour = guiConfig.getTestColour("not_started")
         visible = self.newTestsVisible or not suite.parent
-        row = [ nodeName, colour, [ suite ], "", colour, visible ] 
+        row = [ nodeName, colour, [ suite ], "", colour, visible, "" ] 
         iter = self.model.insert_before(parent, follower, row)
         storeIter = iter.copy()
         self.itermap.store(suite, storeIter)
@@ -913,13 +932,21 @@ class TestTreeGUI(ContainerGUI):
         self.selection.set_mode(gtk.SELECTION_MULTIPLE)
         if self.dynamic:
             self.selection.set_select_function(self.canSelect)
+            
         testsColumn = self.subguis[0].createView()
         self.treeView.append_column(testsColumn)
         if self.dynamic:
+            recalcRenderer = gtk.CellRendererPixbuf()
+            recalcColumn = gtk.TreeViewColumn("", recalcRenderer, cell_background=1, stock_id=6)
+            self.treeView.append_column(recalcColumn)
+            self.tips = RefreshTips("test", recalcColumn, 6)
+            self.tips.add_view(self.treeView)
+
             detailsRenderer = gtk.CellRendererText()
             perfColumn = gtk.TreeViewColumn("Details", detailsRenderer, text=3, background=4)
             perfColumn.set_resizable(True)
             self.treeView.append_column(perfColumn)
+
 
         scriptEngine.monitorExpansion(self.treeView, "show test suite", "hide test suite")
         self.treeView.connect('row-expanded', self.rowExpanded)
@@ -989,10 +1016,40 @@ class TestTreeGUI(ContainerGUI):
         newSelection = self.getSelected()
         if newSelection != self.selectedTests:
             self.sendSelectionNotification(newSelection, direct)
+            if self.dynamic:
+                self.selection.selected_foreach(self.updateRecalculationMarker)
+            
     def notifyRefreshTestSelection(self):
         # The selection hasn't changed, but we want to e.g.
         # recalculate the action sensitiveness.
         self.sendSelectionNotification(self.selectedTests)
+    def notifyRecomputed(self, test):
+        iter = self.findIter(test)
+        # If we've recomputed, clear the recalculation icons
+        self.setNewRecalculationStatus(iter, test, [])
+        
+    def updateRecalculationMarker(self, model, path, iter):
+        tests = model.get_value(iter, 2)
+        if not tests[0].state.isComplete():
+            return
+        
+        recalcComparisons = tests[0].state.getComparisonsForRecalculation()
+        self.setNewRecalculationStatus(iter, tests[0], recalcComparisons)
+
+    def setNewRecalculationStatus(self, iter, test, recalcComparisons):
+        oldVal = self.filteredModel.get_value(iter, 6)
+        newVal = self.getRecalculationIcon(recalcComparisons)
+        if newVal != oldVal:
+            guilog.info("Setting recalculation icon to '" + newVal + "'")
+            childIter = self.filteredModel.convert_iter_to_child_iter(iter)
+            self.model.set_value(childIter, 6, newVal)
+            self.notify("Recalculation", test, recalcComparisons, newVal)
+
+    def getRecalculationIcon(self, recalc):
+        if recalc:
+            return "gtk-refresh"
+        else:
+            return ""
     def getSelectedApps(self, tests):
         apps = []
         for test in tests:
@@ -1074,7 +1131,7 @@ class TestTreeGUI(ContainerGUI):
         self.model.set_value(iter, 4, colour2)
         self.diagnoseTest(test, iter)
         if updateSuccess:
-            self.updateSuiteSuccess(test.parent, colour1)
+            self.updateSuiteSuccess(test, colour1)
 
     def notifyLifecycleChange(self, test, *args):
         if test in self.selectedTests:
@@ -1086,15 +1143,17 @@ class TestTreeGUI(ContainerGUI):
         if test in self.selectedTests:
             self.notify("DescriptionChange", test, *args)
 
-    def updateSuiteSuccess(self, suite, colour):
-        successCount = self.successPerSuite.get(suite, 0) + 1
-        self.successPerSuite[suite] = successCount
-        suiteSize = suite.size()
+    def updateSuiteSuccess(self, test, colour):
+        suite = test.parent
+        if not suite:
+            return
+        
+        self.successPerSuite.setdefault(suite, Set()).add(test)
+        successCount = len(self.successPerSuite.get(suite))
+        suiteSize = len(suite.testcases)
         if successCount == suiteSize:
-            self.setAllSucceeded(suite, suiteSize, colour)
-
-        if suite.parent:
-            self.updateSuiteSuccess(suite.parent, colour)
+            self.setAllSucceeded(suite, colour)
+            self.updateSuiteSuccess(suite, colour)
             
     def diagnoseTest(self, test, iter):
         self.writeSeparator()
@@ -1103,10 +1162,10 @@ class TestTreeGUI(ContainerGUI):
         if secondColumnText:
             guilog.info("(Second column '" + secondColumnText + "' coloured " + self.model.get_value(iter, 4) + ")")
             
-    def setAllSucceeded(self, suite, suiteSize, colour):
+    def setAllSucceeded(self, suite, colour):
         # Print how many tests succeeded, color details column in success color,
         # collapse row, and try to collapse parent suite.
-        detailText = "All " + str(suiteSize) + " tests successful"
+        detailText = "All " + str(suite.size()) + " tests successful"
         iter = self.itermap.getIterator(suite)
         self.model.set_value(iter, 3, detailText)
         self.model.set_value(iter, 4, colour)
@@ -1642,7 +1701,7 @@ class FileViewGUI(guiplugins.SubGUI):
     def __init__(self, dynamic, title = "", popupGUI = None):
         guiplugins.SubGUI.__init__(self)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING,\
-                                   gobject.TYPE_PYOBJECT, gobject.TYPE_STRING)
+                                   gobject.TYPE_PYOBJECT, gobject.TYPE_STRING, gobject.TYPE_STRING)
         self.popupGUI = popupGUI
         self.dynamic = dynamic
         self.title = title
@@ -1678,6 +1737,9 @@ class FileViewGUI(guiplugins.SubGUI):
                 details = self.model.get_value(currIter, 4)
                 if details:
                     guilog.info("(Second column '" + details + "' coloured " + colour + ")")
+                recalcIcon = self.model.get_value(currIter, 5)
+                if recalcIcon:
+                    guilog.info("(Recalculation icon showing '" + recalcIcon + "')")
             if subIter:
                 self.describeLevel(subIter, self.model.get_value(currIter, 0))
             currIter = self.model.iter_next(currIter)
@@ -1695,6 +1757,13 @@ class FileViewGUI(guiplugins.SubGUI):
         self.nameColumn.set_cell_data_func(renderer, renderParentsBold)
         self.nameColumn.set_resizable(True)
         view.append_column(self.nameColumn)
+        if self.dynamic:
+            recalcRenderer = gtk.CellRendererPixbuf()
+            recalcColumn = gtk.TreeViewColumn("", recalcRenderer, cell_background=1, stock_id=5)
+            view.append_column(recalcColumn)
+            self.tips = RefreshTips("file", recalcColumn, 5)
+            self.tips.add_view(view)
+            
         detailsColumn = self.makeDetailsColumn(renderer)
         if detailsColumn:
             view.append_column(detailsColumn)
@@ -1732,7 +1801,7 @@ class FileViewGUI(guiplugins.SubGUI):
             self.recreateModel(self.getState())
     def addFileToModel(self, iter, fileName, colour, associatedObject=None, details=""):
         baseName = os.path.basename(fileName)
-        row = [ baseName, colour, fileName, associatedObject, details ]
+        row = [ baseName, colour, fileName, associatedObject, details, "" ]
         return self.model.insert_before(iter, None, row)
 
   
@@ -1845,6 +1914,16 @@ class TestFileGUI(FileViewGUI):
     def notifyLifecycleChange(self, test, state, changeDesc):
         if test is self.currentTest:
             self.recreateModel(state)
+    def notifyRecalculation(self, test, comparisons, newIcon):
+        if test is self.currentTest:
+            self.model.foreach(self.updateRecalculation, (comparisons, newIcon))
+            self.contentsChanged()
+    def updateRecalculation(self, model, path, iter, data):
+        comparisons, newIcon = data
+        comparison = model.get_value(iter, 3)
+        if comparison in comparisons:
+            model.set_value(iter, 5, newIcon)
+                            
     def forceVisible(self, rowCount):
         return rowCount == 1
     
@@ -1978,7 +2057,7 @@ class TestFileGUI(FileViewGUI):
         self.addStandardFilesUnderIter(state, tmpIter, tmpFiles)
         
     def getRootIterAndColour(self, heading):
-        headerRow = [ heading + " Files", "white", self.currentTest.getDirectory(), None, "" ]
+        headerRow = [ heading + " Files", "white", self.currentTest.getDirectory(), None, "", "" ]
         stditer = self.model.insert_before(None, None, headerRow)
         colour =  guiConfig.getCompositeValue("file_colours", "static_" + heading.lower(), defaultKey="static")
         return stditer, colour

@@ -13,7 +13,8 @@ class FileComparison:
         self.tmpFile = tmpFile
         self.tmpCmpFile = tmpFile
         self.stem = stem
-        self.differenceCache = False 
+        self.differenceCache = False
+        self.recalculationTime = None
         self.diag = plugins.getDiagnostics("FileComparison")
         self.severity = test.getCompositeConfigValue("failure_severity", self.stem)
         self.displayPriority = test.getCompositeConfigValue("failure_display_priority", self.stem)
@@ -42,16 +43,20 @@ class FileComparison:
         self.diag.info("File comparison std: " + repr(self.stdFile) + " tmp: " + repr(self.tmpFile))
         # subclasses may override if they don't want to store in this way
         self.cacheDifferences()
+    def recompute(self, test, stdFile):
+        self.findAndCompare(test, stdFile)
+        self.recalculationTime = time.time()
     def __getstate__(self):
         # don't pickle the diagnostics
         state = {}
         for var, value in self.__dict__.items():
-            if var != "diag":
+            if var != "diag" and var != "recalculationTime":
                 state[var] = value
         return state
     def __setstate__(self, state):
         self.__dict__ = state
         self.diag = plugins.getDiagnostics("TestComparison")
+        self.recalculationTime = None
         if not hasattr(self, "differenceCache"):
             self.differenceCache = self.differenceId
     def __repr__(self):
@@ -83,6 +88,11 @@ class FileComparison:
             return False
 
         stdModTime = plugins.modifiedTime(self.stdFile)
+        if self.recalculationTime:
+            self.diag.info("Already recalculated, checking if file updated since then : " + self.stdFile)
+            # If we're already recalculated, only do it again if standard file changes since then
+            return stdModTime > self.recalculationTime
+        
         tmpModTime = plugins.modifiedTime(self.tmpFile)
         if stdModTime is not None and tmpModTime is not None and stdModTime >= tmpModTime:
             self.diag.info("Standard result newer than generated result at " + self.stdFile)

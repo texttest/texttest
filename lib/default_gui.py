@@ -1789,41 +1789,23 @@ class ReportBugs(guiplugins.ActionDialogGUI):
 class RecomputeTests(guiplugins.ActionGUI):
     def __init__(self, *args):
         guiplugins.ActionGUI.__init__(self, *args)
-        self.recomputing = False
-        self.chainReaction = False
         self.latestNumberOfRecomputations = 0
-    def getState(self, state):
-        if state:
-            return state
-        else:
-            return self.currTestSelection[0].state
     def isActiveOnCurrent(self, test=None, state=None):
         for currTest in self.currTestSelection:
             if currTest is test:
-                if test.needsRecalculation(state):
+                if state.hasStarted():
                     return True
-            elif currTest.needsRecalculation():
+            elif currTest.state.hasStarted():
                 return True
         return False
-    def notifyNewTestSelection(self, tests, apps, rowCount, *args):
-        guiplugins.ActionGUI.notifyNewTestSelection(self, tests, apps, rowCount, *args)
-        # Prevent recomputation triggering more...
-        if self.recomputing:
-            self.chainReaction = True
-            return 
-        if rowCount == 1 and self.currTestSelection[0].state.isComplete() and self.currTestSelection[0].needsRecalculation():
-            self.recomputing = True
-            self.currTestSelection[0].refreshFiles()
-            self.perform()
-            self.recomputing = False
-            if self.chainReaction:
-                self.chainReaction = False
     def _getTitle(self):
         return "Recompute Status"
     def _getStockId(self):
         return "refresh"
     def getTooltip(self):
         return "Recompute test status, including progress information if appropriate"
+    def getSignalsSent(self):
+        return [ "Recomputed" ]
     def messageAfterPerform(self):
         if self.latestNumberOfRecomputations == 0:            
             return "No test needed recomputation."
@@ -1832,11 +1814,11 @@ class RecomputeTests(guiplugins.ActionGUI):
     def performOnCurrent(self):
         self.latestNumberOfRecomputations = 0
         for test in self.currTestSelection:
-            if test.needsRecalculation():
-                self.latestNumberOfRecomputations += 1
-                self.notify("Status", "Recomputing status of " + repr(test) + " ...")
-                self.notify("ActionProgress", "")                
-                test.app.recomputeProgress(test, self.observers)
+            self.latestNumberOfRecomputations += 1
+            self.notify("Status", "Recomputing status of " + repr(test) + " ...")
+            self.notify("ActionProgress", "")                
+            test.app.recomputeProgress(test, self.observers)
+            self.notify("Recomputed", test)
 
 
 class RefreshAll(guiplugins.BasicActionGUI):

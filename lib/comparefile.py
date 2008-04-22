@@ -44,8 +44,9 @@ class FileComparison:
         # subclasses may override if they don't want to store in this way
         self.cacheDifferences()
     def recompute(self, test, stdFile):
+        if self.needsRecalculation():
+            self.recalculationTime = time.time()
         self.findAndCompare(test, stdFile)
-        self.recalculationTime = time.time()
     def __getstate__(self):
         # don't pickle the diagnostics
         state = {}

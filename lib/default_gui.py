@@ -1061,6 +1061,42 @@ class SelectTests(guiplugins.ActionTabGUI):
                     combined += "." + appVer
         return combined
 
+class VisibilityAction(guiplugins.ActionGUI):
+    def __init__(self, *args):
+        guiplugins.ActionGUI.__init__(self, *args)
+        self.rootTestSuites = []
+    def addSuites(self, suites):
+        self.rootTestSuites = suites
+    def getSignalsSent(self):
+        return [ "Visibility" ]
+    
+
+class HideUnselected(VisibilityAction):
+    def _getTitle(self):
+        return "Show only selected"
+    def getTooltip(self):
+        return "Show only tests that are currently selected"
+    def getUnselectedTests(self):
+        unselected = []
+        for suite in self.rootTestSuites:
+            for test in suite.testCaseList():
+                if test not in self.currTestSelection:
+                    unselected.append(test)
+        return unselected
+    def performOnCurrent(self):
+        self.notify("Visibility", self.getUnselectedTests(), False)
+
+
+class ShowAll(VisibilityAction):
+    def _getTitle(self):
+        return "Show all"
+    def getTooltip(self):
+        return "Show all tests"
+    def performOnCurrent(self):
+        allTests = reduce(operator.add, (suite.testCaseList() for suite in self.rootTestSuites), [])
+        self.notify("Visibility", allTests, True)
+
+
 class ResetGroups(guiplugins.BasicActionGUI):
     def isActiveOnCurrent(self, *args):
         return True
@@ -2148,7 +2184,8 @@ class InteractiveActionConfig:
         else:
             classes += [ ViewConfigFileInEditor, RecordTest, CopyTests, CutTests, 
                          PasteTests, ImportTestCase, ImportTestSuite, 
-                         CreateDefinitionFile, ReportBugs, SelectTests, RefreshAll,
+                         CreateDefinitionFile, ReportBugs, SelectTests,
+                         RefreshAll, HideUnselected, ShowAll,
                          RunTestsBasic, RunTestsAdvanced, ResetGroups, RenameTest, RemoveTests, 
                          SortTestSuiteFileAscending, SortTestSuiteFileDescending, 
                          RepositionTestFirst, RepositionTestUp,

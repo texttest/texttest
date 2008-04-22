@@ -1043,7 +1043,7 @@ class TestTreeGUI(ContainerGUI):
         if newVal != oldVal:
             guilog.info("Setting recalculation icon to '" + newVal + "'")
             self.model.set_value(iter, 6, newVal)
-            self.notify("Recalculation", test, recalcComparisons, newVal)
+        self.notify("Recalculation", test, recalcComparisons, newVal)
 
     def getRecalculationIcon(self, recalc):
         if recalc:
@@ -1916,13 +1916,19 @@ class TestFileGUI(FileViewGUI):
             self.recreateModel(state)
     def notifyRecalculation(self, test, comparisons, newIcon):
         if test is self.currentTest:
-            self.model.foreach(self.updateRecalculation, (comparisons, newIcon))
-            self.contentsChanged()
-    def updateRecalculation(self, model, path, iter, data):
-        comparisons, newIcon = data
+            iterList = []
+            self.model.foreach(self.collectItersForRecalculate, (comparisons, newIcon, iterList))
+            for iter in iterList:
+                self.model.set_value(iter, 5, newIcon)
+            if len(iterList):
+                self.contentsChanged()
+    def collectItersForRecalculate(self, model, path, iter, data):
+        comparisons, newIcon, iterList = data
         comparison = model.get_value(iter, 3)
         if comparison in comparisons:
-            model.set_value(iter, 5, newIcon)
+            oldVal = model.get_value(iter, 5)
+            if oldVal != newIcon:
+                iterList.append(iter)
                             
     def forceVisible(self, rowCount):
         return rowCount == 1

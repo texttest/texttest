@@ -298,10 +298,11 @@ class Config:
         
     def getAbsoluteFilterFileName(self, filterFileName, app):
         if os.path.isabs(filterFileName):
-            return filterFileName
-
-        dirsToSearchIn = map(lambda pair: pair[1], self.getFilterFileDirectories([app], False))
-        return app.getFileName(dirsToSearchIn, filterFileName)
+            if os.path.isfile(filterFileName):
+                return filterFileName
+        else:
+            dirsToSearchIn = map(lambda pair: pair[1], self.getFilterFileDirectories([app], False))
+            return app.getFileName(dirsToSearchIn, filterFileName)
              
     def findFilterFileNames(self, app):
         if self.filterFileMap.has_key(app):

@@ -1024,25 +1024,25 @@ class TestTreeGUI(ContainerGUI):
         # recalculate the action sensitiveness.
         self.sendSelectionNotification(self.selectedTests)
     def notifyRecomputed(self, test):
-        iter = self.findIter(test)
+        iter = self.itermap.getIterator(test)
         # If we've recomputed, clear the recalculation icons
         self.setNewRecalculationStatus(iter, test, [])
-        
+    
     def updateRecalculationMarker(self, model, path, iter):
         tests = model.get_value(iter, 2)
         if not tests[0].state.isComplete():
             return
         
         recalcComparisons = tests[0].state.getComparisonsForRecalculation()
-        self.setNewRecalculationStatus(iter, tests[0], recalcComparisons)
+        childIter = self.filteredModel.convert_iter_to_child_iter(iter)
+        self.setNewRecalculationStatus(childIter, tests[0], recalcComparisons)
 
     def setNewRecalculationStatus(self, iter, test, recalcComparisons):
-        oldVal = self.filteredModel.get_value(iter, 6)
+        oldVal = self.model.get_value(iter, 6)
         newVal = self.getRecalculationIcon(recalcComparisons)
         if newVal != oldVal:
             guilog.info("Setting recalculation icon to '" + newVal + "'")
-            childIter = self.filteredModel.convert_iter_to_child_iter(iter)
-            self.model.set_value(childIter, 6, newVal)
+            self.model.set_value(iter, 6, newVal)
             self.notify("Recalculation", test, recalcComparisons, newVal)
 
     def getRecalculationIcon(self, recalc):

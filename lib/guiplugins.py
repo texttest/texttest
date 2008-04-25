@@ -530,11 +530,20 @@ class ActionGUI(BasicActionGUI):
         self.currFileSelection = []
         self.currAppSelection = []
         self.validApps = []
-        for app in allApps:
-            self.validApps.append(app)
-            self.validApps += app.extras    
         BasicActionGUI.__init__(self)
+        for app in allApps:
+            if self.isValidForApp(app):
+                self.validApps.append(app)
+                self.validApps += app.extras
+            else:
+                self.diag.info(str(self.__class__) + " invalid for " + repr(app))
         
+    def isValidForApp(self, app):
+        return True
+
+    def shouldShow(self):
+        return len(self.validApps) > 0
+    
     def notifyNewTestSelection(self, *args):
         newActive = self.updateSelection(*args)
         self.setSensitivity(newActive)
@@ -575,7 +584,7 @@ class ActionGUI(BasicActionGUI):
         return True
 
     def isActiveOnCurrent(self, *args):
-        return len(self.currTestSelection) > 0
+        return self.shouldShow() and len(self.currTestSelection) > 0
         
     def singleTestOnly(self):
         return False        
@@ -804,10 +813,9 @@ class ActionTabGUI(OptionGroupGUI):
     def __init__(self, *args):
         OptionGroupGUI.__init__(self, *args)
         self.vbox = None
-        self.sensitive = self.isActiveOnCurrent()
-        self.diag.info("Creating action tab for " + self.getTabTitle() + ", sensitive " + repr(self.sensitive))
+        self.diag.info("Creating action tab for " + self.getTabTitle() + ", sensitive " + repr(self.shouldShowCurrent()))
     def shouldShowCurrent(self, *args):
-        return self.sensitive
+        return self.gtkAction.get_property("sensitive")
     def createView(self):
         self.vbox = gtk.VBox()
         self.fillVBox(self.optionGroup)
@@ -816,9 +824,8 @@ class ActionTabGUI(OptionGroupGUI):
         return self.addScrollBars(self.vbox)
     def setSensitivity(self, newValue):
         ActionGUI.setSensitivity(self, newValue)
-        self.sensitive = newValue
         self.diag.info("Sensitivity of " + self.getTabTitle() + " changed to " + repr(newValue))
-        if self.sensitive and self.updateOptions():
+        if self.shouldShowCurrent() and self.updateOptions():
             self.contentsChanged()        
 
     def displayInTab(self):
@@ -1065,7 +1072,7 @@ class MultiActionGUIForwarder(GtkActionWrapper):
     def __init__(self, actionGUIs):
         self.actionGUIs = actionGUIs
         GtkActionWrapper.__init__(self)
-
+            
     def setObservers(self, observers):
         for actionGUI in self.actionGUIs:
             actionGUI.setObservers(observers)
@@ -1089,7 +1096,7 @@ class MultiActionGUIForwarder(GtkActionWrapper):
         for actionGUI in self.actionGUIs:
             if hasattr(actionGUI, "addSuites"):
                 actionGUI.addSuites(suites)
-            
+    
     def runInteractive(self, *args):
         # otherwise it only gets computed once...
         actionGUI = self.findActiveActionGUI()
@@ -1164,7 +1171,11 @@ class InteractiveActionHandler:
                     if len(subinstances) == 1:
                         instances.append(subinstances[0])
                     else:
-                        instances.append(MultiActionGUIForwarder(subinstances))
+                        showable = filter(lambda x: x.shouldShow(), subinstances)
+                        if len(showable) == 1:
+                            instances.append(showable[0])
+                        else:
+                            instances.append(MultiActionGUIForwarder(subinstances))
                     classNames.append(className)
         return instances
     

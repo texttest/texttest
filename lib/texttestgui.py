@@ -1434,6 +1434,7 @@ class NotebookGUI(guiplugins.SubGUI):
             self.diag.info("Adding page " + tabName)
             page = tabGUI.createView()
             if not tabGUI.shouldShowCurrent():
+                self.diag.info("Hiding page " + tabName)
                 page.hide()
             self.notebook.append_page(page, label)
 
@@ -1492,10 +1493,13 @@ class NotebookGUI(guiplugins.SubGUI):
         changed = False
         for pageNum, (name, tabGUI) in enumerate(self.tabInfo):
             page = self.notebook.get_nth_page(pageNum)
-            if tabGUI.shouldShowCurrent(*args) and not page.get_property("visible"):
-                self.diag.info("Showing page " + name)
-                page.show()
-                changed = True
+            if tabGUI.shouldShowCurrent(*args):
+                if not page.get_property("visible"):
+                    self.diag.info("Showing page " + name)
+                    page.show()
+                    changed = True
+            else:
+                self.diag.info("Remaining hidden " + name)
         return changed
     def setCurrentPage(self, newNum):
         newName, newTabGUI = self.tabInfo[newNum]

@@ -1512,9 +1512,9 @@ class RecordTest(RunningAction):
         self.startTextTestProcess("record", self.invisibleGroup.getCommandLines() + [ "-record" ])
     def getRecordMode(self):
         return self.currTestSelection[0].getConfigValue("use_case_record_mode")
-    def isActiveOnCurrent(self, *args):
-        return RunningAction.isActiveOnCurrent(self, *args) and self.getRecordMode() != "disabled" and \
-               self.currTestSelection[0].getConfigValue("use_case_recorder") != "none"
+    def isValidForApp(self, app):
+        return app.getConfigValue("use_case_record_mode") != "disabled" and \
+               app.getConfigValue("use_case_recorder") != "none"
     def updateOptions(self):
         if self.currentApp is not self.currAppSelection[0]:
             self.currentApp = self.currAppSelection[0]

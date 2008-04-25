@@ -681,6 +681,7 @@ class TestColumnGUI(guiplugins.SubGUI):
         self.totalNofTestsShown = 0
         self.column = None
         self.dynamic = dynamic
+        self.diag = plugins.getDiagnostics("Test Column GUI")
         self.allSuites = []
     def addSuites(self, suites):
         self.allSuites = suites
@@ -743,19 +744,22 @@ class TestColumnGUI(guiplugins.SubGUI):
             title += "All " + str(self.totalNofTests) + " selected"
         else:
             title += str(self.nofSelectedTests) + "/" + str(self.totalNofTests) + " selected"
-        if self.dynamic:
-            if self.totalNofTestsShown == self.totalNofTests:
-                title += ", none hidden"
-            elif self.totalNofTestsShown == 0:
-                title += ", all hidden"
-            else:
-                title += ", " + str(self.totalNofTests - self.totalNofTestsShown) + " hidden"
-        else:
+
+        if not self.dynamic:
             if self.totalNofDistinctTests != self.totalNofTests:
                 if self.nofDistinctSelectedTests == self.totalNofDistinctTests:
                     title += ", all " + str(self.totalNofDistinctTests) + " distinct"
                 else:
                     title += ", " + str(self.nofDistinctSelectedTests) + "/" + str(self.totalNofDistinctTests) + " distinct"
+        
+        if self.totalNofTestsShown == self.totalNofTests:
+            if self.dynamic and self.totalNofTests > 0:
+                title += ", none hidden"
+        elif self.totalNofTestsShown == 0:
+            title += ", all hidden"
+        else:
+            title += ", " + str(self.totalNofTests - self.totalNofTestsShown) + " hidden"
+            
         return title
     def updateTitle(self, initial=False):
         if self.column:
@@ -1206,7 +1210,7 @@ class TestTreeGUI(ContainerGUI):
     def notifyAdd(self, test, initial):
         if test.classId() == "test-case":
             self.notify("TestTreeCounters", initial=initial, totalDelta=1,
-                        totalShownDelta=int(self.newTestsVisible), totalRowsDelta=self.getTotalRowsDelta(test))
+                        totalShownDelta=self.getTotalShownDelta(), totalRowsDelta=self.getTotalRowsDelta(test))
 
         self.diag.info("Adding test " + repr(test))
         self.tryAddTest(test, initial)
@@ -1217,6 +1221,11 @@ class TestTreeGUI(ContainerGUI):
             return 0
         else:
             return 1
+    def getTotalShownDelta(self):
+        if self.dynamic:
+            return int(self.newTestsVisible)
+        else:
+            return 1 # we hide them temporarily for performance reasons, so can't do as above
     def tryAddTest(self, test, initial=False):
         iter = self.itermap.getIterator(test)
         if iter:
@@ -1294,6 +1303,7 @@ class TestTreeGUI(ContainerGUI):
 
         self.selecting = False
         if len(changedTests) > 0:
+            self.diag.info("Actually changed tests " + repr(changedTests))
             self.notify("Visibility", changedTests, newValue)
             if self.treeView:
                 self.updateVisibilityInViews(newValue)
@@ -1308,19 +1318,32 @@ class TestTreeGUI(ContainerGUI):
             self.selectionChanged(direct=False)
 
     def updateVisibilityInModel(self, test, newValue):
+        visibleTests = self.model.get_value(self.itermap.getIterator(test), 2)
+        isVisible = test in visibleTests
+        changed = False
+        if newValue and not isVisible:
+            visibleTests.append(test)
+            changed = True
+        elif not newValue and isVisible:
+            visibleTests.remove(test)
+            changed = True
+    
+        if (newValue and len(visibleTests) > 1) or (not newValue and len(visibleTests) > 0):
+            self.diag.info("Other tests mean no row visibility change : " + repr(test))
+            return changed
+        
         allIterators = self.findVisibilityIterators(test) # returns leaf-to-root order, good for hiding
         if newValue:
             allIterators.reverse()  # but when showing, we want to go root-to-leaf
 
         changed = False
-        for iterator in allIterators:
+        for iterator, currTest in allIterators:
             if newValue or not self.hasVisibleChildren(iterator):
-                changed |= self.setVisibility(iterator, newValue)
+                changed |= self.setVisibility(iterator, currTest, newValue)
         return changed
         
-    def setVisibility(self, iter, newValue):
+    def setVisibility(self, iter, test, newValue):
         oldValue = self.model.get_value(iter, 5)
-        test = self.model.get_value(iter, 2)[0]
         if oldValue == newValue:
             self.diag.info("Not changing test : " + repr(test))
             return False
@@ -1336,11 +1359,13 @@ class TestTreeGUI(ContainerGUI):
         iter = self.itermap.getIterator(test)
         parents = []
         parent = self.model.iter_parent(iter)
+        currTest = test
         while parent != None:
-            parents.append(parent)                    
+            currTest = currTest.parent
+            parents.append((parent, currTest))                    
             parent = self.model.iter_parent(parent)
         # Don't include the root which we never hide
-        return [ iter ] + parents[:-1]
+        return [ (iter, test) ] + parents[:-1]
 
     def hasVisibleChildren(self, iter):
         child = self.model.iter_children(iter)

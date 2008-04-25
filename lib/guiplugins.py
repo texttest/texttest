@@ -594,9 +594,6 @@ class ActionGUI(BasicActionGUI):
             return "1 " + name
         else:
             return str(num) + " " + name + "s"
-    
-    def createView(self):
-        return self.createButton()
 
     def createButton(self):
         button = gtk.Button()
@@ -679,8 +676,8 @@ class OptionGroupGUI(ActionGUI):
         for extraOption in self.getConfigOptions(option):
             option.addPossibleValue(extraOption)
 
-    def addSwitches(self, vbox):
-        for switch in self.optionGroup.switches.values():
+    def addSwitches(self, vbox, optionGroup):
+        for switch in optionGroup.switches.values():
             widget = self.createSwitchWidget(switch)
             vbox.pack_start(widget, expand=False, fill=False)
 
@@ -696,20 +693,25 @@ class OptionGroupGUI(ActionGUI):
         hbox.show_all()
         return hbox
 
+    def getNaming(self, switchName, cleanOption):
+        if len(switchName) > 0:
+            configName = switchName + ":" + cleanOption
+            useCaseName = cleanOption + " for " + switchName
+            return configName, useCaseName
+        else:
+            return cleanOption, cleanOption
+
     def createRadioButtons(self, switch):
         buttons = []
         mainRadioButton = None
         for index, option in enumerate(switch.options):
             cleanOption = option.split("\n")[0].replace("_", "")
-            if len(switch.name) > 0:
-                configName = switch.name + ":" + cleanOption
-            else:
-                configName = cleanOption
+            configName, useCaseName = self.getNaming(switch.name, cleanOption)
             if guiConfig.getCompositeValue("gui_entry_overrides", configName) == "1":
                 switch.setValue(index)
             radioButton = gtk.RadioButton(mainRadioButton, option, use_underline=True)
             buttons.append(radioButton)
-            scriptEngine.registerToggleButton(radioButton, "choose " + cleanOption)
+            scriptEngine.registerToggleButton(radioButton, "choose " + useCaseName)
             if not mainRadioButton:
                 mainRadioButton = radioButton
             if switch.defaultValue == index:
@@ -770,10 +772,10 @@ class OptionGroupGUI(ActionGUI):
     def getConfigOptions(self, option):
         return guiConfig.getCompositeValue("gui_entry_options", option.name)    
 
-    def describeOptionGroup(self):
-        for option in self.optionGroup.options.values():
+    def describeOptionGroup(self, optionGroup):
+        for option in optionGroup.options.values():
             guilog.info(self.getOptionDescription(option))
-        for switch in self.optionGroup.switches.values():
+        for switch in optionGroup.switches.values():
             guilog.info(self.getSwitchDescription(switch))
 
     def getOptionDescription(self, option):
@@ -807,8 +809,10 @@ class ActionTabGUI(OptionGroupGUI):
     def shouldShowCurrent(self, *args):
         return self.sensitive
     def createView(self):
-        self.vbox = self.createVBox()
+        self.vbox = gtk.VBox()
+        self.fillVBox(self.optionGroup)
         self.createButtons()
+        self.vbox.show_all()
         return self.addScrollBars(self.vbox)
     def setSensitivity(self, newValue):
         ActionGUI.setSensitivity(self, newValue)
@@ -824,14 +828,13 @@ class ActionTabGUI(OptionGroupGUI):
         self.optionGroup.reset()
         self.contentsChanged()
 
-    def createVBox(self):
-        self.vbox = gtk.VBox()
-        if len(self.optionGroup.options) > 0:
+    def fillVBox(self, optionGroup):
+        if len(optionGroup.options) > 0:
             # Creating 0-row table gives a warning ...
-            table = gtk.Table(len(self.optionGroup.options), 2, homogeneous=False)
+            table = gtk.Table(len(optionGroup.options), 2, homogeneous=False)
             table.set_row_spacings(1)
             rowIndex = 0        
-            for option in self.optionGroup.options.values():
+            for option in optionGroup.options.values():
                 self.addValuesFromConfig(option)
 
                 label, entryWidget, entry = self.createOptionEntry(option, separator="  ")
@@ -846,15 +849,14 @@ class ActionTabGUI(OptionGroupGUI):
                 table.show_all()
             self.vbox.pack_start(table, expand=False, fill=False)
 
-        self.addSwitches(self.vbox)
-        self.vbox.show()
-        return self.vbox
+        self.addSwitches(self.vbox, optionGroup)
 
     def createButtons(self):
-        button = self.createButton()
+        self.addCentralButton(self.createButton())
+
+    def addCentralButton(self, button):
         buttonbox = gtk.HBox()
         buttonbox.pack_start(button, expand=True, fill=False)
-        buttonbox.show()
         self.vbox.pack_start(buttonbox, expand=False, fill=False, padding=8)
     
     def showDirectoryChooser(self, widget, entry, option):
@@ -900,7 +902,7 @@ class ActionTabGUI(OptionGroupGUI):
 
     def describe(self):
         guilog.info("Viewing notebook page for '" + self.getTabTitle() + "'")
-        self.describeOptionGroup()
+        self.describeOptionGroup(self.optionGroup)
         self.describeAction()
     
 
@@ -924,7 +926,7 @@ class ActionDialogGUI(OptionGroupGUI):
         self.createButtons(dialog, fileChooser, scriptName)
         self.tryResize(dialog)
         guilog.info("Viewing dialog with title '" + dialog.get_title() + "'")
-        self.describeOptionGroup()
+        self.describeOptionGroup(self.optionGroup)
         dialog.show_all()
 
     def getConfirmationDialogSettings(self):
@@ -1012,7 +1014,7 @@ class ActionDialogGUI(OptionGroupGUI):
                 vbox.pack_start(hbox2)
                 vbox.pack_start(entryWidget)
                 
-        self.addSwitches(vbox)            
+        self.addSwitches(vbox, self.optionGroup)            
         return fileChooser, scriptName
     
     def createRadioButtonCollection(self, switch):

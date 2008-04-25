@@ -886,15 +886,29 @@ class ImportTestSuite(ImportTest):
             file = open(envFile, "w")
             file.write("# Dictionary of environment to variables to set in test suite\n")
 
-class SelectTests(guiplugins.ActionTabGUI):
+class AllTestsHandler:
+    def __init__(self):
+        self.rootTestSuites = []
+    def addSuites(self, suites):
+        self.rootTestSuites = suites
+    def findAllTests(self):
+        return reduce(operator.add, (suite.testCaseList() for suite in self.rootTestSuites), [])
+    def findTestsNotIn(self, tests):
+        return filter(lambda test: test not in tests, self.findAllTests())
+
+
+class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
     def __init__(self, allApps, *args):
         guiplugins.ActionTabGUI.__init__(self, allApps)
+        AllTestsHandler.__init__(self)
         self.selectDiag = plugins.getDiagnostics("Select Tests")
-        self.rootTestSuites = []
         self.addOption("vs", "Tests for version", description="Select tests for a specific version.",
                        possibleValues=self.getPossibleVersions(allApps))
         self.addSwitch("select_in_collapsed_suites", "Select in collapsed suites", 0, description="Select in currently collapsed suites as well?")
-        self.addSwitch("current_selection", "Current selection", options = [ "Discard", "Refine", "Extend", "Exclude"], description="How should we treat the currently selected tests?\n - Discard: Unselect all currently selected tests before applying the new selection criteria.\n - Refine: Apply the new selection criteria only to the currently selected tests, to obtain a subselection.\n - Extend: Keep the currently selected tests even if they do not match the new criteria, and extend the selection with all other tests which meet the new criteria.\n - Exclude: After applying the new selection criteria to all tests, unselect the currently selected tests, to exclude them from the new selection.")
+        self.selectionGroup = plugins.OptionGroup(self.getTabTitle())
+        self.selectionGroup.addSwitch("current_selection", "Current selection", options = [ "Discard", "Refine", "Extend", "Exclude"], description="How should we treat the currently selected tests?\n - Discard: Unselect all currently selected tests before applying the new selection criteria.\n - Refine: Apply the new selection criteria only to the currently selected tests, to obtain a subselection.\n - Extend: Keep the currently selected tests even if they do not match the new criteria, and extend the selection with all other tests which meet the new criteria.\n - Exclude: After applying the new selection criteria to all tests, unselect the currently selected tests, to exclude them from the new selection.")
+        self.filteringGroup = plugins.OptionGroup(self.getTabTitle())
+        self.filteringGroup.addSwitch("current_filtering", "Current filtering", options = [ "Discard", "Refine", "Extend" ])
         self.appKeys = Set()
         for app in allApps:
             appSelectGroup = self.findSelectGroup(app)
@@ -904,8 +918,6 @@ class SelectTests(guiplugins.ActionTabGUI):
         for group in app.optionGroups:
             if group.name.startswith("Select"):
                 return group
-    def addSuites(self, suites):
-        self.rootTestSuites = suites
     def notifyAllRead(self, *args):
         allStems = self.findAllStems()
         defaultTestFile = self.findDefaultTestFile(allStems)
@@ -949,7 +961,7 @@ class SelectTests(guiplugins.ActionTabGUI):
     def isActiveOnCurrent(self, *args):
         return True
     def getSignalsSent(self):
-        return [ "SetTestSelection" ]
+        return [ "SetTestSelection", "Visibility" ]
     def _getStockId(self):
         return "find"
     def _getTitle(self):
@@ -969,7 +981,14 @@ class SelectTests(guiplugins.ActionTabGUI):
         return app.getFilterList(self.optionGroup.getOptionValueMap())
     def makeNewSelection(self):
         # Get strategy. 0 = discard, 1 = refine, 2 = extend, 3 = exclude
-        strategy = self.optionGroup.getSwitchValue("current_selection")
+        strategy = self.selectionGroup.getSwitchValue("current_selection")
+        return self._makeNewSelection(strategy)
+    def notifyReset(self):
+        self.optionGroup.reset()
+        self.selectionGroup.reset()
+        self.filteringGroup.reset()
+        self.contentsChanged()
+    def _makeNewSelection(self, strategy=0):
         selectedTests = []
         suitesToTry = self.getSuitesToTry()
         for suite in self.rootTestSuites:
@@ -1061,40 +1080,79 @@ class SelectTests(guiplugins.ActionTabGUI):
                     combined += "." + appVer
         return combined
 
-class VisibilityAction(guiplugins.ActionGUI):
-    def __init__(self, *args):
-        guiplugins.ActionGUI.__init__(self, *args)
-        self.rootTestSuites = []
-    def addSuites(self, suites):
-        self.rootTestSuites = suites
-    def getSignalsSent(self):
-        return [ "Visibility" ]
-    
+    def filterTests(self, *args):
+        self.notify("Status", "Filtering tests ...")
+        self.notify("ActionStart")
+        newSelection = self._makeNewSelection()
+        strategy = self.filteringGroup.getSwitchValue("current_filtering")
+        toShow = self.findTestsToShow(newSelection, strategy)
+        self.notify("Visibility", toShow, True)
+        self.notify("ActionProgress", "")
+        toHide = self.findTestsToHide(newSelection, strategy)
+        self.notify("Visibility", toHide, False)
+        self.notify("ActionStop")
+        self.notify("Status", "Changed filtering by showing " + str(len(toShow)) +
+                    " tests and hiding " + str(len(toHide)) + ".")    
 
-class HideUnselected(VisibilityAction):
+    def findTestsToShow(self, newSelection, strategy):
+        if strategy == 0 or strategy == 2:
+            return newSelection
+        else:
+            return []
+
+    def findTestsToHide(self, newSelection, strategy):
+        if strategy == 0 or strategy == 1:
+            return self.findTestsNotIn(newSelection)
+        else:
+            return []
+    
+    def createFilterButton(self):
+        button = gtk.Button("Filter")
+        tooltip = "filter tests to show only those indicated"
+        guiplugins.scriptEngine.connect(tooltip, "clicked", button, self.filterTests)
+        button.set_image(gtk.image_new_from_stock(self.getStockId(), gtk.ICON_SIZE_BUTTON))
+        self.tooltips.set_tip(button, tooltip)
+        return button
+    
+    def createButtons(self):
+        self.vbox.pack_start(gtk.HSeparator(), fill=False, expand=False, padding=8)
+        self.fillVBox(self.selectionGroup)
+        guiplugins.ActionTabGUI.createButtons(self)
+        self.vbox.pack_start(gtk.HSeparator(), fill=False, expand=False, padding=8)
+        self.fillVBox(self.filteringGroup)
+        self.addCentralButton(self.createFilterButton())
+
+    def describe(self):
+        guiplugins.guilog.info("Viewing notebook page for '" + self.getTabTitle() + "'")
+        self.describeOptionGroup(self.optionGroup)
+        guiplugins.guilog.info("...........")
+        self.describeOptionGroup(self.selectionGroup)
+        self.describeAction()
+        guiplugins.guilog.info("...........")
+        self.describeOptionGroup(self.filteringGroup)
+        guiplugins.guilog.info("Showing filter button")
+
+
+class HideUnselected(guiplugins.ActionGUI,AllTestsHandler):
     def _getTitle(self):
         return "Show only selected"
     def getTooltip(self):
         return "Show only tests that are currently selected"
-    def getUnselectedTests(self):
-        unselected = []
-        for suite in self.rootTestSuites:
-            for test in suite.testCaseList():
-                if test not in self.currTestSelection:
-                    unselected.append(test)
-        return unselected
+    def getSignalsSent(self):
+        return [ "Visibility" ]
     def performOnCurrent(self):
-        self.notify("Visibility", self.getUnselectedTests(), False)
+        self.notify("Visibility", self.findTestsNotIn(self.currTestSelection), False)
 
 
-class ShowAll(VisibilityAction):
+class ShowAll(guiplugins.ActionGUI,AllTestsHandler):
     def _getTitle(self):
         return "Show all"
     def getTooltip(self):
         return "Show all tests"
+    def getSignalsSent(self):
+        return [ "Visibility" ]
     def performOnCurrent(self):
-        allTests = reduce(operator.add, (suite.testCaseList() for suite in self.rootTestSuites), [])
-        self.notify("Visibility", allTests, True)
+        self.notify("Visibility", self.findAllTests(), True)
 
 
 class ResetGroups(guiplugins.BasicActionGUI):

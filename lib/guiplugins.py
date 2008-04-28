@@ -246,9 +246,9 @@ class SubGUI(plugins.Observable):
     def forceVisible(self, rowCount):
         return False
 
-    def addScrollBars(self, view):
+    def addScrollBars(self, view, hpolicy=gtk.POLICY_AUTOMATIC, vpolicy=gtk.POLICY_AUTOMATIC):
         window = gtk.ScrolledWindow()
-        window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        window.set_policy(hpolicy, vpolicy)
         self.addToScrolledWindow(window, view)
         window.show()
         return window

@@ -292,8 +292,12 @@ class TextTestGUI(Responder, plugins.Observable):
         self.topWindowGUI.createView()
         self.topWindowGUI.activate()
         self.idleManager.enableHandler()
+    def shouldShrinkMainPanes(self):
+        # If we maximise there is no point in banning pane shrinking: there is nothing to gain anyway and
+        # it doesn't seem to work very well :)
+        return not self.dynamic or guiConfig.getWindowOption("maximize")
     def createTopWindowGUI(self, rightWindowGUI, allApps):
-        mainWindowGUI = PaneGUI(self.testTreeGUI, rightWindowGUI, horizontal=True)
+        mainWindowGUI = PaneGUI(self.testTreeGUI, rightWindowGUI, horizontal=True, shrink=self.shouldShrinkMainPanes())
         parts = [ self.menuBarGUI, self.toolBarGUI, mainWindowGUI, self.shortcutBarGUI, statusMonitor ]
         boxGUI = BoxGUI(parts, horizontal=False)
         return TopWindowGUI(boxGUI, self.dynamic, allApps)
@@ -431,6 +435,7 @@ class TopWindowGUI(ContainerGUI):
         self.topWindow.add(self.subguis[0].createView())
         self.windowSizeDescriptor = self.adjustSize()
         self.topWindow.show()
+        self.topWindow.set_default_size(-1, -1)
 
         self.notify("TopWindow", self.topWindow)
         scriptEngine.connect("close window", "delete_event", self.topWindow, self.notifyQuit)
@@ -474,7 +479,7 @@ class TopWindowGUI(ContainerGUI):
         else:
             width, widthDescriptor = self.getWindowDimension("width")
             height, heightDescriptor  = self.getWindowDimension("height")
-            self.topWindow.resize(width, height)
+            self.topWindow.set_default_size(width, height)
             return widthDescriptor + "\n" + heightDescriptor
     def getWindowDimension(self, dimensionName):
         pixelDimension = guiConfig.getWindowOption(dimensionName + "_pixels")
@@ -940,17 +945,18 @@ class TestTreeGUI(ContainerGUI):
         testsColumn = self.subguis[0].createView()
         self.treeView.append_column(testsColumn)
         if self.dynamic:
-            recalcRenderer = gtk.CellRendererPixbuf()
-            recalcColumn = gtk.TreeViewColumn("", recalcRenderer, cell_background=1, stock_id=6)
-            self.treeView.append_column(recalcColumn)
-            self.tips = RefreshTips("test", recalcColumn, 6)
-            self.tips.add_view(self.treeView)
-
             detailsRenderer = gtk.CellRendererText()
-            perfColumn = gtk.TreeViewColumn("Details", detailsRenderer, text=3, background=4)
-            perfColumn.set_resizable(True)
-            self.treeView.append_column(perfColumn)
-
+            recalcRenderer = gtk.CellRendererPixbuf()
+            detailsColumn = gtk.TreeViewColumn("Details")
+            detailsColumn.pack_start(detailsRenderer, expand=True)
+            detailsColumn.pack_start(recalcRenderer, expand=False)
+            detailsColumn.add_attribute(detailsRenderer, 'text', 3)
+            detailsColumn.add_attribute(detailsRenderer, 'background', 4)
+            detailsColumn.add_attribute(recalcRenderer, 'stock_id', 6)
+            detailsColumn.set_resizable(True)
+            self.tips = RefreshTips("test", detailsColumn, 6)
+            self.tips.add_view(self.treeView)
+            self.treeView.append_column(detailsColumn)
 
         scriptEngine.monitorExpansion(self.treeView, "show test suite", "hide test suite")
         self.treeView.connect('row-expanded', self.rowExpanded)
@@ -962,7 +968,7 @@ class TestTreeGUI(ContainerGUI):
         
         self.treeView.show()
         self.popupGUI.createView()
-        return self.addScrollBars(self.treeView)
+        return self.addScrollBars(self.treeView, hpolicy=gtk.POLICY_NEVER)
     def describeTree(self, *args):
         guiplugins.SubGUI.contentsChanged(self) # don't describe the column too...
 
@@ -1587,12 +1593,15 @@ class NotebookGUI(guiplugins.SubGUI):
         
           
 class PaneGUI(ContainerGUI):
-    def __init__(self, gui1, gui2 , horizontal):
+    def __init__(self, gui1, gui2 , horizontal, shrink=True):
         ContainerGUI.__init__(self, [ gui1, gui2 ])
         self.horizontal = horizontal
         self.panedTooltips = gtk.Tooltips()
         self.paned = None
         self.separatorHandler = None
+        self.position = 0
+        self.shrink = shrink
+        self.initialMaxSize = None
     def getSeparatorPositionFromConfig(self):
         if self.horizontal:
             return float(guiConfig.getWindowOption("vertical_separator_position"))
@@ -1637,27 +1646,55 @@ class PaneGUI(ContainerGUI):
             return message + "left edge"
         else:
             return message + "top"
+
     def contentsChanged(self):
         self.subguis[0].contentsChanged()
         self.describeSeparator()
         self.subguis[1].contentsChanged()
+
     def describeSeparator(self):
         guilog.info("")
         perc = self.getSeparatorPosition()
         guilog.info("Pane separator positioned " + self.positionDescription(perc))
+
     def getSeparatorPosition(self):
         # We print the real position if we have it, and the intended one if we don't
-        size = self.paned.get_property("max-position")
-        if size:
-            return float(self.paned.get_position()) / size
+        if self.initialMaxSize:
+            return float(self.paned.get_position()) / self.initialMaxSize
         else:
             return self.getSeparatorPositionFromConfig()
+
+    def getMaximimumSize(self):
+        if self.horizontal:
+            return self.paned.allocation.width
+        else:
+            return self.paned.allocation.height
+
     def adjustSeparator(self, *args):
-        pos = int(self.paned.get_property("max-position") * self.getSeparatorPositionFromConfig())
-        self.paned.set_position(pos)
+        self.initialMaxSize = self.paned.get_property("max-position")
+        self.paned.child_set_property(self.paned.get_child1(), "shrink", self.shrink)
+        self.paned.child_set_property(self.paned.get_child2(), "shrink", self.shrink)
+        self.position = int(self.initialMaxSize * self.getSeparatorPositionFromConfig())
+        self.paned.set_position(self.position)
         # Only want to do this once, providing we actually change something
-        if pos > 0:
+        if self.position > 0:
             self.paned.disconnect(self.separatorHandler)
+            # subsequent changes are hopefully manual, and in these circumstances we don't want to prevent shrinking
+            if not self.shrink:
+                self.paned.connect('notify::position', self.checkShrinkSetting)
+
+    def checkShrinkSetting(self, *args):
+        oldPos = self.position
+        self.position = self.paned.get_position()
+        if self.position > oldPos and self.position == self.paned.get_property("min-position"):
+            self.paned.set_position(self.position + 1)
+        elif self.position < oldPos and self.position == self.paned.get_property("max-position"):
+            self.paned.set_position(self.position - 1)
+        elif self.position <= oldPos and self.position <= self.paned.get_property("min-position"):
+            self.paned.child_set_property(self.paned.get_child1(), "shrink", True)
+        elif self.position >= oldPos and self.position >= self.paned.get_property("max-position"):
+            self.paned.child_set_property(self.paned.get_child2(), "shrink", True)
+        
     
 class TextInfoGUI(guiplugins.SubGUI):
     def __init__(self):
@@ -1785,17 +1822,13 @@ class FileViewGUI(guiplugins.SubGUI):
         self.nameColumn = gtk.TreeViewColumn(self.title, renderer, text=0, background=1)
         self.nameColumn.set_cell_data_func(renderer, renderParentsBold)
         self.nameColumn.set_resizable(True)
-        view.append_column(self.nameColumn)
-        if self.dynamic:
-            recalcRenderer = gtk.CellRendererPixbuf()
-            recalcColumn = gtk.TreeViewColumn("", recalcRenderer, cell_background=1, stock_id=5)
-            view.append_column(recalcColumn)
-            self.tips = RefreshTips("file", recalcColumn, 5)
-            self.tips.add_view(view)
-            
+        view.append_column(self.nameColumn)            
         detailsColumn = self.makeDetailsColumn(renderer)
         if detailsColumn:
             view.append_column(detailsColumn)
+            self.tips = RefreshTips("file", detailsColumn, 5)
+            self.tips.add_view(view)
+
         view.expand_all()
         self.monitorEvents()
         if self.popupGUI:
@@ -1810,9 +1843,16 @@ class FileViewGUI(guiplugins.SubGUI):
         return not self.model.iter_has_child(pathIter)
     def makeDetailsColumn(self, renderer):
         if self.dynamic:
-            column = gtk.TreeViewColumn("Details", renderer, text=4)
+            column = gtk.TreeViewColumn("Details")
             column.set_resizable(True)
+            recalcRenderer = gtk.CellRendererPixbuf()
+            column.pack_start(renderer, expand=True)
+            column.pack_start(recalcRenderer, expand=False)
+            column.add_attribute(renderer, 'text', 4)
+            column.add_attribute(renderer, 'background', 1)
+            column.add_attribute(recalcRenderer, 'stock_id', 5)
             return column
+
     def fileActivated(self, view, path, column, *args):
         iter = self.model.get_iter(path)
         fileName = self.model.get_value(iter, 2)
@@ -2269,7 +2309,7 @@ class TestProgressMonitor(guiplugins.SubGUI):
         toggleColumn.set_alignment(0.5)
         self.treeView.append_column(toggleColumn)
         self.treeView.show()
-        return self.addScrollBars(self.treeView)
+        return self.addScrollBars(self.treeView, hpolicy=gtk.POLICY_NEVER)
     def canSelect(self, path):
         pathIter = self.treeModel.get_iter(path)
         return self.treeModel.get_value(pathIter, 2)

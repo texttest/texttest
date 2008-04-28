@@ -687,22 +687,23 @@ class OptionGroupGUI(ActionGUI):
 
     def addSwitches(self, vbox, optionGroup):
         for switch in optionGroup.switches.values():
-            widget = self.createSwitchWidget(switch)
+            widget = self.createSwitchWidget(switch, optionGroup)
             vbox.pack_start(widget, expand=False, fill=False)
 
-    def createRadioButtonCollection(self, switch):
+    def createRadioButtonCollection(self, switch, optionGroup):
         hbox = gtk.HBox()
-        label = gtk.EventBox()
-        label.add(gtk.Label(switch.name + ":"))
-        if switch.description:
-            self.tooltips.set_tip(label, switch.description)
-        hbox.pack_start(label, expand=False, fill=False)
-        for button in self.createRadioButtons(switch):
-            hbox.pack_start(button, expand=True, fill=True)
+        if len(switch.name) > 0:
+            label = gtk.EventBox()
+            label.add(gtk.Label(switch.name + ":"))
+            if switch.description:
+                self.tooltips.set_tip(label, switch.description)
+            hbox.pack_start(label, expand=False, fill=False)
+        for button in self.createRadioButtons(switch, optionGroup):
+            hbox.pack_start(button, expand=True, fill=False)
         hbox.show_all()
         return hbox
 
-    def getNaming(self, switchName, cleanOption):
+    def getNaming(self, switchName, cleanOption, *args):
         if len(switchName) > 0:
             configName = switchName + ":" + cleanOption
             useCaseName = cleanOption + " for " + switchName
@@ -710,12 +711,12 @@ class OptionGroupGUI(ActionGUI):
         else:
             return cleanOption, cleanOption
 
-    def createRadioButtons(self, switch):
+    def createRadioButtons(self, switch, optionGroup):
         buttons = []
         mainRadioButton = None
         for index, option in enumerate(switch.options):
             cleanOption = option.split("\n")[0].replace("_", "")
-            configName, useCaseName = self.getNaming(switch.name, cleanOption)
+            configName, useCaseName = self.getNaming(switch.name, cleanOption, optionGroup)
             if guiConfig.getCompositeValue("gui_entry_overrides", configName) == "1":
                 switch.setValue(index)
             radioButton = gtk.RadioButton(mainRadioButton, option, use_underline=True)
@@ -733,9 +734,9 @@ class OptionGroupGUI(ActionGUI):
         switch.setMethods(indexer.getActiveIndex, indexer.setActiveIndex)
         return buttons
 
-    def createSwitchWidget(self, switch):
+    def createSwitchWidget(self, switch, optionGroup):
         if len(switch.options) >= 1:
-            return self.createRadioButtonCollection(switch)
+            return self.createRadioButtonCollection(switch, optionGroup)
         else:
             return self.createCheckBox(switch)
 
@@ -818,7 +819,7 @@ class ActionTabGUI(OptionGroupGUI):
         return self.gtkAction.get_property("sensitive")
     def createView(self):
         self.vbox = gtk.VBox()
-        self.fillVBox(self.optionGroup)
+        self.fillVBox(self.vbox, self.optionGroup)
         self.createButtons()
         self.vbox.show_all()
         return self.addScrollBars(self.vbox)
@@ -835,7 +836,7 @@ class ActionTabGUI(OptionGroupGUI):
         self.optionGroup.reset()
         self.contentsChanged()
 
-    def fillVBox(self, optionGroup):
+    def fillVBox(self, vbox, optionGroup):
         if len(optionGroup.options) > 0:
             # Creating 0-row table gives a warning ...
             table = gtk.Table(len(optionGroup.options), 2, homogeneous=False)
@@ -854,17 +855,17 @@ class ActionTabGUI(OptionGroupGUI):
                 table.attach(entryWidget, 1, 2, rowIndex, rowIndex + 1)
                 rowIndex += 1
                 table.show_all()
-            self.vbox.pack_start(table, expand=False, fill=False)
+            vbox.pack_start(table, expand=False, fill=False)
 
-        self.addSwitches(self.vbox, optionGroup)
+        self.addSwitches(vbox, optionGroup)
 
     def createButtons(self):
-        self.addCentralButton(self.createButton())
+        self.addCentralButton(self.vbox, self.createButton())
 
-    def addCentralButton(self, button):
+    def addCentralButton(self, vbox, button):
         buttonbox = gtk.HBox()
         buttonbox.pack_start(button, expand=True, fill=False)
-        self.vbox.pack_start(buttonbox, expand=False, fill=False, padding=8)
+        vbox.pack_start(buttonbox, expand=False, fill=False, padding=8)
     
     def showDirectoryChooser(self, widget, entry, option):
         dialog = gtk.FileChooserDialog("Select a directory",
@@ -1024,10 +1025,10 @@ class ActionDialogGUI(OptionGroupGUI):
         self.addSwitches(vbox, self.optionGroup)            
         return fileChooser, scriptName
     
-    def createRadioButtonCollection(self, switch):
+    def createRadioButtonCollection(self, switch, optionGroup):
         frame = gtk.Frame(switch.name)
         frameBox = gtk.VBox()
-        for button in self.createRadioButtons(switch):
+        for button in self.createRadioButtons(switch, optionGroup):
             frameBox.pack_start(button)
         frame.add(frameBox)
         return frame

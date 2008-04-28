@@ -1033,7 +1033,7 @@ class TextOption(Option):
         return (existingDirs, defaultDir)
         
 class Switch(Option):
-    def __init__(self, name, value=0, options=[], description=""):
+    def __init__(self, name="", value=0, options=[], description=""):
         Option.__init__(self, name, int(value), description)
         self.options = options
         self.resetMethod = None

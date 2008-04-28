@@ -906,9 +906,9 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
                        possibleValues=self.getPossibleVersions(allApps))
         self.addSwitch("select_in_collapsed_suites", "Select in collapsed suites", 0, description="Select in currently collapsed suites as well?")
         self.selectionGroup = plugins.OptionGroup(self.getTabTitle())
-        self.selectionGroup.addSwitch("current_selection", "Current selection", options = [ "Discard", "Refine", "Extend", "Exclude"], description="How should we treat the currently selected tests?\n - Discard: Unselect all currently selected tests before applying the new selection criteria.\n - Refine: Apply the new selection criteria only to the currently selected tests, to obtain a subselection.\n - Extend: Keep the currently selected tests even if they do not match the new criteria, and extend the selection with all other tests which meet the new criteria.\n - Exclude: After applying the new selection criteria to all tests, unselect the currently selected tests, to exclude them from the new selection.")
+        self.selectionGroup.addSwitch("current_selection", options = [ "Discard", "Refine", "Extend", "Exclude"], description="How should we treat the currently selected tests?\n - Discard: Unselect all currently selected tests before applying the new selection criteria.\n - Refine: Apply the new selection criteria only to the currently selected tests, to obtain a subselection.\n - Extend: Keep the currently selected tests even if they do not match the new criteria, and extend the selection with all other tests which meet the new criteria.\n - Exclude: After applying the new selection criteria to all tests, unselect the currently selected tests, to exclude them from the new selection.")
         self.filteringGroup = plugins.OptionGroup(self.getTabTitle())
-        self.filteringGroup.addSwitch("current_filtering", "Current filtering", options = [ "Discard", "Refine", "Extend" ])
+        self.filteringGroup.addSwitch("current_filtering", options = [ "Discard", "Refine", "Extend" ])
         self.appKeys = Set()
         for app in allApps:
             appSelectGroup = self.findSelectGroup(app)
@@ -1114,13 +1114,32 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         self.tooltips.set_tip(button, tooltip)
         return button
     
+    def createFrame(self, name, group, button):
+        frame = gtk.Frame(name)
+        frame.set_label_align(0.5, 0.5)
+        frame.set_shadow_type(gtk.SHADOW_IN)
+        frameBox = gtk.VBox()
+        self.fillVBox(frameBox, group)
+        self.addCentralButton(frameBox, button)
+        frame.add(frameBox)
+        return frame
+
+    def getNewSwitchName(self, switchName, optionGroup):
+        if optionGroup is self.selectionGroup:
+            return "Current selection"
+        elif optionGroup is self.filteringGroup:
+            return "Current filtering"
+        else:
+            return switchName
+
+    def getNaming(self, switchName, cleanOption, optionGroup):
+        return guiplugins.ActionTabGUI.getNaming(self, self.getNewSwitchName(switchName, optionGroup), cleanOption, optionGroup)
+        
     def createButtons(self):
-        self.vbox.pack_start(gtk.HSeparator(), fill=False, expand=False, padding=8)
-        self.fillVBox(self.selectionGroup)
-        guiplugins.ActionTabGUI.createButtons(self)
-        self.vbox.pack_start(gtk.HSeparator(), fill=False, expand=False, padding=8)
-        self.fillVBox(self.filteringGroup)
-        self.addCentralButton(self.createFilterButton())
+        selFrame = self.createFrame("Selection", self.selectionGroup, self.createButton())
+        self.vbox.pack_start(selFrame, fill=False, expand=False, padding=8)
+        filterFrame = self.createFrame("Filtering", self.filteringGroup, self.createFilterButton())
+        self.vbox.pack_start(filterFrame, fill=False, expand=False, padding=8)
 
     def describe(self):
         guiplugins.guilog.info("Viewing notebook page for '" + self.getTabTitle() + "'")
@@ -1498,7 +1517,7 @@ class RecordTest(RunningAction):
         self.addOption("v", "Version to record")
         self.addOption("c", "Checkout to use for recording") 
         self.addSwitch("rep", "Automatically replay test after recording it", 1)
-        self.addSwitch("repgui", "", options = ["Auto-replay invisible", "Auto-replay in dynamic GUI"])
+        self.addSwitch("repgui", options = ["Auto-replay invisible", "Auto-replay in dynamic GUI"])
     def _getStockId(self):
         return "media-record"
     def singleTestOnly(self):

@@ -904,8 +904,8 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         self.selectDiag = plugins.getDiagnostics("Select Tests")
         self.addOption("vs", "Tests for version", description="Select tests for a specific version.",
                        possibleValues=self.getPossibleVersions(allApps))
-        self.addSwitch("select_in_collapsed_suites", "Select in collapsed suites", 0, description="Select in currently collapsed suites as well?")
         self.selectionGroup = plugins.OptionGroup(self.getTabTitle())
+        self.selectionGroup.addSwitch("select_in_collapsed_suites", "Select in collapsed suites", 0, description="Select in currently collapsed suites as well?")
         self.selectionGroup.addSwitch("current_selection", options = [ "Discard", "Refine", "Extend", "Exclude"], description="How should we treat the currently selected tests?\n - Discard: Unselect all currently selected tests before applying the new selection criteria.\n - Refine: Apply the new selection criteria only to the currently selected tests, to obtain a subselection.\n - Extend: Keep the currently selected tests even if they do not match the new criteria, and extend the selection with all other tests which meet the new criteria.\n - Exclude: After applying the new selection criteria to all tests, unselect the currently selected tests, to exclude them from the new selection.")
         self.filteringGroup = plugins.OptionGroup(self.getTabTitle())
         self.filteringGroup.addSwitch("current_filtering", options = [ "Discard", "Refine", "Extend" ])
@@ -1006,7 +1006,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
     def performOnCurrent(self):
         newSelection = self.makeNewSelection()
         criteria = " ".join(self.optionGroup.getCommandLines(onlyKeys=self.appKeys))
-        self.notify("SetTestSelection", newSelection, criteria, self.optionGroup.getSwitchValue("select_in_collapsed_suites"))
+        self.notify("SetTestSelection", newSelection, criteria, self.selectionGroup.getSwitchValue("select_in_collapsed_suites"))
         
     def getSuitesToTry(self):
         # If only some of the suites present match the version selection, only consider them.
@@ -1125,7 +1125,9 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         return frame
 
     def getNewSwitchName(self, switchName, optionGroup):
-        if optionGroup is self.selectionGroup:
+        if len(switchName):
+            return switchName
+        elif optionGroup is self.selectionGroup:
             return "Current selection"
         elif optionGroup is self.filteringGroup:
             return "Current filtering"

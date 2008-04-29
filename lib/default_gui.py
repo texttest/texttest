@@ -1164,6 +1164,8 @@ class HideUnselected(guiplugins.ActionGUI,AllTestsHandler):
 
 
 class ShowAll(guiplugins.ActionGUI,AllTestsHandler):
+    def isActiveOnCurrent(self, *args):
+        return True
     def _getTitle(self):
         return "Show all"
     def getTooltip(self):

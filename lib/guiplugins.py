@@ -495,7 +495,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         pass
 
     def messageAfterPerform(self):
-        return "Performed '" + self.getTooltip() + "' on " + self.describeTests() + "."
+        return "Performed '" + self.getTooltip() + "'."
     
     def startPerform(self):
         message = self.messageBeforePerform()
@@ -603,6 +603,9 @@ class ActionGUI(BasicActionGUI):
             return "1 " + name
         else:
             return str(num) + " " + name + "s"
+
+    def messageAfterPerform(self):
+        return "Performed '" + self.getTooltip() + "' on " + self.describeTests() + "."
 
     def createButton(self):
         button = gtk.Button()

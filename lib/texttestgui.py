@@ -1060,6 +1060,13 @@ class TestTreeGUI(ContainerGUI):
             return "gtk-refresh"
         else:
             return ""
+    def checkRelatedForRecalculation(self, test):
+        self.filteredModel.foreach(self.checkRecalculationIfMatches, test)
+    def checkRecalculationIfMatches(self, model, path, iter, test):
+        tests = model.get_value(iter, 2)
+        if tests[0] is not test and tests[0].getRelPath() == test.getRelPath():
+            self.updateRecalculationMarker(model, path, iter)
+        
     def getSelectedApps(self, tests):
         apps = []
         for test in tests:
@@ -1134,7 +1141,7 @@ class TestTreeGUI(ContainerGUI):
                 view.expand_row(model.get_path(iter), open_all=False)
              
             iter = view.get_model().iter_next(iter)
-    def notifyTestAppearance(self, test, detailText, colour1, colour2, updateSuccess):
+    def notifyTestAppearance(self, test, detailText, colour1, colour2, updateSuccess, saved):
         iter = self.itermap.getIterator(test)
         self.model.set_value(iter, 1, colour1) 
         self.model.set_value(iter, 3, detailText)
@@ -1142,6 +1149,8 @@ class TestTreeGUI(ContainerGUI):
         self.diagnoseTest(test, iter)
         if updateSuccess:
             self.updateSuiteSuccess(test, colour1)
+        if saved:
+            self.checkRelatedForRecalculation(test)
 
     def notifyLifecycleChange(self, test, *args):
         if test in self.selectedTests:
@@ -2402,7 +2411,8 @@ class TestProgressMonitor(guiplugins.SubGUI):
         mainColour = guiConfig.getTestColour(catDesc, guiConfig.getTestColour(resultType))
         # Don't change suite states when unmarking tests
         updateSuccess = state.hasSucceeded() and changeDesc != "unmarked"
-        self.notify("TestAppearance", test, summary, mainColour, colour, updateSuccess)
+        saved = changeDesc.find("save") != -1
+        self.notify("TestAppearance", test, summary, mainColour, colour, updateSuccess, saved)
         self.notify("Visibility", [ test ], self.shouldBeVisible(test))
 
     def addTestForNode(self, test, defaultColour, defaultVisibility, nodeClassifier, classifiers, incrementCount, parentIter=None):

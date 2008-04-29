@@ -312,7 +312,7 @@ class ProgressTestComparison(BaseTestComparison):
         self.freeText = self.runningState.freeText + self.progressText()
     def progressText(self):
         perc = self.calculatePercentage()
-        if perc > 0:
+        if perc is not None:
             return "\nReckoned to be " + str(perc) + "% complete at " + plugins.localtime() + "."
         else:
             return ""
@@ -323,13 +323,12 @@ class ProgressTestComparison(BaseTestComparison):
             return 0
     def calculatePercentage(self):
         stdSize, tmpSize = 0, 0
-        for comparison in self.allResults:
+        for comparison in self.changedResults + self.correctResults:
             stdSize += self.getSize(comparison.stdFile)
             tmpSize += self.getSize(comparison.tmpFile)
 
-        if stdSize == 0:
-            return 0
-        return (tmpSize * 100) / stdSize 
+        if stdSize > 0:
+            return (tmpSize * 100) / stdSize 
 
 class MakeComparisons(plugins.Action):
     def __init__(self, testComparisonClass=None, progressComparisonClass=None):

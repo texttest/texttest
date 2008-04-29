@@ -901,6 +901,9 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
     def __init__(self, allApps, *args):
         guiplugins.ActionTabGUI.__init__(self, allApps)
         AllTestsHandler.__init__(self)
+        self.filterAction = gtk.Action("Filter", "Filter", \
+                                       self.getFilterTooltip(), self.getStockId())
+        guiplugins.scriptEngine.connect(self.getFilterTooltip(), "activate", self.filterAction, self.filterTests)
         self.selectDiag = plugins.getDiagnostics("Select Tests")
         self.addOption("vs", "Tests for version", description="Select tests for a specific version.",
                        possibleValues=self.getPossibleVersions(allApps))
@@ -914,10 +917,16 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
             appSelectGroup = self.findSelectGroup(app)
             self.appKeys.update(Set(appSelectGroup.keys()))
             self.optionGroup.mergeIn(appSelectGroup)
+            
+    def addToGroups(self, actionGroup, accelGroup):
+        guiplugins.ActionTabGUI.addToGroups(self, actionGroup, accelGroup)
+        self.filterAccel = self._addToGroups("Filter", self.filterAction, actionGroup, accelGroup)
+
     def findSelectGroup(self, app):
         for group in app.optionGroups:
             if group.name.startswith("Select"):
                 return group
+
     def notifyAllRead(self, *args):
         allStems = self.findAllStems()
         defaultTestFile = self.findDefaultTestFile(allStems)
@@ -1105,13 +1114,15 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
             return self.findTestsNotIn(newSelection)
         else:
             return []
+
+    def getFilterTooltip(self):
+        return "filter tests to show only those indicated"
     
     def createFilterButton(self):
-        button = gtk.Button("Filter")
-        tooltip = "filter tests to show only those indicated"
-        guiplugins.scriptEngine.connect(tooltip, "clicked", button, self.filterTests)
+        button = gtk.Button()
+        self.filterAction.connect_proxy(button)
         button.set_image(gtk.image_new_from_stock(self.getStockId(), gtk.ICON_SIZE_BUTTON))
-        self.tooltips.set_tip(button, tooltip)
+        self.tooltips.set_tip(button, self.getFilterTooltip())
         return button
     
     def createFrame(self, name, group, button):
@@ -1143,16 +1154,20 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         filterFrame = self.createFrame("Filtering", self.filteringGroup, self.createFilterButton())
         self.vbox.pack_start(filterFrame, fill=False, expand=False, padding=8)
 
+    def describeAction(self):
+        self._describeAction(self.gtkAction, self.accelerator)
+        self._describeAction(self.filterAction, self.filterAccel)
+
     def describe(self):
         guiplugins.guilog.info("Viewing notebook page for '" + self.getTabTitle() + "'")
         self.describeOptionGroup(self.optionGroup)
         guiplugins.guilog.info("...........")
         self.describeOptionGroup(self.selectionGroup)
-        self.describeAction()
+        self._describeAction(self.gtkAction, self.accelerator)
         guiplugins.guilog.info("...........")
         self.describeOptionGroup(self.filteringGroup)
-        guiplugins.guilog.info("Showing filter button")
-
+        self._describeAction(self.filterAction, self.filterAccel)
+        
 
 class HideUnselected(guiplugins.ActionGUI,AllTestsHandler):
     def _getTitle(self):

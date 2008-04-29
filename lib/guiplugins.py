@@ -271,22 +271,26 @@ class GtkActionWrapper:
         if not self.isActiveOnCurrent():
             self.gtkAction.set_property("sensitive", False)
 
-    def getAccelerator(self):
-        realAcc = guiConfig.getCompositeValue("gui_accelerators", self.getTitle().rstrip("."))
+    def getAccelerator(self, title):
+        realAcc = guiConfig.getCompositeValue("gui_accelerators", title)
         if realAcc:
             key, mod = gtk.accelerator_parse(realAcc)
             if gtk.accelerator_valid(key, mod):
                 return realAcc
             else:
                 plugins.printWarning("Keyboard accelerator '" + realAcc + "' for action '" \
-                                     + self.getTitle() + "' is not valid, ignoring ...")
+                                     + title + "' is not valid, ignoring ...")
 
     def addToGroups(self, actionGroup, accelGroup):
-        self.accelerator = self.getAccelerator()
-        actionGroup.add_action_with_accel(self.gtkAction, self.accelerator)
-        self.gtkAction.set_accel_group(accelGroup)
-        self.gtkAction.connect_accelerator()
+        self.accelerator = self._addToGroups(self.getTitle().rstrip("."), self.gtkAction, actionGroup, accelGroup)
 
+    def _addToGroups(self, title, gtkAction, actionGroup, accelGroup):
+        accelerator = self.getAccelerator(title)
+        actionGroup.add_action_with_accel(gtkAction, accelerator)
+        gtkAction.set_accel_group(accelGroup)
+        gtkAction.connect_accelerator()
+        return accelerator
+    
     def setSensitivity(self, newValue):
         oldValue = self.gtkAction.get_property("sensitive")
         self.gtkAction.set_property("sensitive", newValue)
@@ -294,21 +298,24 @@ class GtkActionWrapper:
             guilog.info("Setting sensitivity of action '" + self.getTitle(includeMnemonics=True) + "' to " + repr(newValue))
 
     def describeAction(self):
-        message = "Viewing action with title '" + self.gtkAction.get_property("label") + "'"
-        message += self.detailDescription()
+        self._describeAction(self.gtkAction, self.accelerator)
+
+    def _describeAction(self, gtkAction, accelerator):
+        message = "Viewing action with title '" + gtkAction.get_property("label") + "'"
+        message += self.detailDescription(gtkAction, accelerator)
         guilog.info(message)
 
-    def detailDescription(self):
+    def detailDescription(self, gtkAction, accelerator):
         message = ""
-        stockId = self.gtkAction.get_property("stock-id")
+        stockId = gtkAction.get_property("stock-id")
         if stockId:
             message += ", stock id '" + repr(stockId) + "'"
-        if self.accelerator:
-            message += ", accelerator '" + repr(self.accelerator) + "'"
-        return message + self.sensitivityDescription()
+        if accelerator:
+            message += ", accelerator '" + repr(accelerator) + "'"
+        return message + self.sensitivityDescription(gtkAction)
     
-    def sensitivityDescription(self):
-        if self.gtkAction.get_property("sensitive"):
+    def sensitivityDescription(self, gtkAction):
+        if gtkAction.get_property("sensitive"):
             return ""
         else:
             return " (greyed out)"
@@ -1080,6 +1087,11 @@ class MultiActionGUIForwarder(GtkActionWrapper):
     def setObservers(self, observers):
         for actionGUI in self.actionGUIs:
             actionGUI.setObservers(observers)
+            
+    def addToGroups(self, *args):
+        for actionGUI in self.actionGUIs:
+            actionGUI.addToGroups(*args)
+        GtkActionWrapper.addToGroups(self, *args)
         
     def notifyNewTestSelection(self, *args):
         if not hasattr(self.actionGUIs[0], "notifyNewTestSelection"):

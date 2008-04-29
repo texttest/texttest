@@ -685,6 +685,7 @@ class Config:
         dict = {}
         dict["quit"] = "<control>q"
         dict["select/find"] = "<control>s"
+        dict["filter"] = "<control>f"
         dict["save"] = "<control>s"
         dict["copy"] = "<control>c"
         dict["cut"] = "<control>x"

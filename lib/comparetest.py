@@ -266,6 +266,7 @@ class TestComparison(BaseTestComparison):
                 self.updateStatus(test, comparison, versionString)
                 comparison.overwrite(test, exact, versionString)
     def recalculateComparisons(self, test):
+        test.refreshFiles()
         resultFiles, defFiles = test.listStandardFiles(allVersions=False)
         stdFiles = self.makeStemDict(resultFiles + defFiles)
         for fileComp in self.allResults:

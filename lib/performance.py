@@ -80,24 +80,21 @@ class PerformanceConfigSettings:
         
 
 class PerformanceFileComparison(FileComparison):
-    def __init__(self, test, stem, standardFile, tmpFile, testInProgress=False):
-        FileComparison.__init__(self, test, stem, standardFile, tmpFile, testInProgress)
+    def cacheDifferences(self, test, testInProgress):
         # Don't allow process count of 0, which screws things up...
         self.perfComparison = None
-        if self.stdCmpFile:
-            oldPerf = getPerformance(self.stdCmpFile)
+        if self.stdFile and self.tmpFile:
+            oldPerf = getPerformance(self.stdFile)
             # If we didn't understand the old performance, overwrite it and behave like it didn't exist
             if (oldPerf < 0):
                 os.remove(self.stdFile)
             else:
-                newPerf = getPerformance(self.tmpCmpFile)
+                newPerf = getPerformance(self.tmpFile)
                 self.diag.info("Performance is " + str(oldPerf) + " and " + str(newPerf))
-                settings = PerformanceConfigSettings(test, stem)
+                settings = PerformanceConfigSettings(test, self.stem)
                 self.perfComparison = PerformanceComparison(oldPerf, newPerf, settings)
                 self.differenceCache = self.perfComparison.isSignificant(settings)
-    def cacheDifferences(self):
-        # Overriden from base class. Don't want to do this - we compare in a different way
-        pass
+    
     def __repr__(self):
         baseText = FileComparison.__repr__(self)
         if self.newResult():

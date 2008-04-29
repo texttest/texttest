@@ -31,18 +31,9 @@ class FileComparison:
     def findAndCompare(self, test, standardFile, testInProgress=False):
         self.stdFile = standardFile
         self.stdCmpFile = self.stdFile
-        filterFileBase = test.makeTmpFileName(self.stem + "." + test.app.name, forFramework=1)
-        origCmp = filterFileBase + "origcmp"
-        if os.path.isfile(origCmp):
-            self.stdCmpFile = origCmp
-        tmpCmpFileName = filterFileBase + "cmp"
-        if testInProgress:
-            tmpCmpFileName = filterFileBase + "partcmp"
-        if os.path.isfile(tmpCmpFileName):
-            self.tmpCmpFile = tmpCmpFileName
         self.diag.info("File comparison std: " + repr(self.stdFile) + " tmp: " + repr(self.tmpFile))
         # subclasses may override if they don't want to store in this way
-        self.cacheDifferences()
+        self.cacheDifferences(test, testInProgress)
     def recompute(self, test, stdFile):
         if self.needsRecalculation():
             self.recalculationTime = time.time()
@@ -140,7 +131,17 @@ class FileComparison:
             return self.getStdFile(filtered)
         else:
             return self.getTmpFile(filtered)
-    def cacheDifferences(self):
+    def cacheDifferences(self, test, testInProgress):
+        filterFileBase = test.makeTmpFileName(self.stem + "." + test.app.name, forFramework=1)
+        origCmp = filterFileBase + "origcmp"
+        if os.path.isfile(origCmp):
+            self.stdCmpFile = origCmp
+        tmpCmpFileName = filterFileBase + "cmp"
+        if testInProgress:
+            tmpCmpFileName = filterFileBase + "partcmp"
+        if os.path.isfile(tmpCmpFileName):
+            self.tmpCmpFile = tmpCmpFileName
+
         if self.stdCmpFile and self.tmpCmpFile:
             self.differenceCache = not filecmp.cmp(self.stdCmpFile, self.tmpCmpFile, 0)
     def getSummary(self, includeNumbers=True):

@@ -11,6 +11,7 @@
     <menu action="editmenu" />
     
     <menu action="viewmenu">
+      <placeholder name="FirstInViewMenu" />
       <menuitem name="Toolbar" action="Toolbar"/>
       <menuitem name="Shortcut bar" action="Shortcut bar"/>
       <menuitem name="Status bar" action="Status bar"/>

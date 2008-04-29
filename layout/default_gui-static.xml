@@ -32,10 +32,17 @@
       <separator/>
     </menu>
 
+    <menu action="viewmenu">
+      <placeholder name="FirstInViewMenu">
+        <menuitem action="Show only selected"/>
+        <menuitem action="Show all"/>
+        <separator/>
+      </placeholder>
+    </menu>
+    
     <menu action="actionsmenu">
       <menuitem action="Select/Find"/>
-      <menuitem action="Show only selected"/>
-      <menuitem action="Show all"/>
+      <menuitem action="Filter"/>
       <separator/>
       <menuitem action="Refresh"/>
       <menuitem action="Run"/>

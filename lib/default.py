@@ -196,7 +196,7 @@ class Config:
     def getWriteDirectory(self, app):
         return os.path.join(self.getRootTmpDir(), self.getWriteDirectoryName(app))
     def getWriteDirectoryName(self, app):
-        parts = self.getBasicRunDescriptors(app) + self.getDescriptors("v") + [ self.getTimeDescriptor() ]
+        parts = self.getBasicRunDescriptors(app) + self.getDescriptors("v") + [ self.getTimeDescriptor(), str(os.getpid()) ]
         return ".".join(parts)
     def getBasicRunDescriptors(self, app):
         appDescriptors = self.getDescriptors("a")

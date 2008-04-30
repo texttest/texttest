@@ -1565,10 +1565,11 @@ class Application:
         plugins.ensureDirectoryExists(dirToMake)
         self.diag.info("Made root directory at " + dirToMake)
     def cleanPreviousWriteDirs(self, rootDir):
-        searchParts = os.path.basename(self.writeDirectory).split(".")[:-1]
+        # Ignore the datetime and the pid at the end
+        searchParts = os.path.basename(self.writeDirectory).split(".")[:-2]
         for file in os.listdir(rootDir):
             fileParts = file.split(".")
-            if fileParts[:-1] == searchParts:
+            if fileParts[:-2] == searchParts:
                 previousWriteDir = os.path.join(rootDir, file)
                 if os.path.isdir(previousWriteDir) and not plugins.samefile(previousWriteDir, self.writeDirectory):
                     print "Removing previous write directory", previousWriteDir

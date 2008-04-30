@@ -28,8 +28,8 @@ class ReconnectApp:
         # If it doesn't match, return None
         parts = fileName.split(".")
         if len(parts) > 1 and parts[0] != "static_gui":
-            # drop the run descriptor at the start and the date/time at the end
-            return ImmutableSet(parts[1:-1])
+            # drop the run descriptor at the start and the date/time and pid at the end
+            return ImmutableSet(parts[1:-2])
     def getVersionSetSubDir(self, fileName, stem):
         # Show the framework how to find the version list given a file name
         # If it doesn't match, return None

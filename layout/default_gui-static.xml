@@ -41,7 +41,7 @@
     </menu>
     
     <menu action="actionsmenu">
-      <menuitem action="Select/Find"/>
+      <menuitem action="Select"/>
       <menuitem action="Filter"/>
       <separator/>
       <menuitem action="Refresh"/>
@@ -56,7 +56,7 @@
   <toolbar name="MainToolBar">    
     <toolitem action="Quit"/>
     <separator/>
-    <toolitem action="Select/Find"/>
+    <toolitem action="Select"/>
     <toolitem action="Run"/>
     <placeholder name="AfterRun" />
     <separator/>

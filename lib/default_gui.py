@@ -974,7 +974,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
     def _getStockId(self):
         return "find"
     def _getTitle(self):
-        return "_Select/Find"
+        return "_Select"
     def getTooltip(self):
         return "Select indicated tests"
     def getTabTitle(self):

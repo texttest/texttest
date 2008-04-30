@@ -791,6 +791,7 @@ class TestColumnGUI(guiplugins.SubGUI):
         if distinctTestCount > newCount:
             distinctTestCount = newCount
         if self.nofSelectedTests != newCount or self.nofDistinctSelectedTests != distinctTestCount:
+            self.diag.info("New selection " + repr(tests) + " distinct " + str(distinctTestCount))
             self.nofSelectedTests = newCount
             self.nofDistinctSelectedTests = distinctTestCount
             self.updateTitle()
@@ -2285,6 +2286,12 @@ class TestProgressMonitor(guiplugins.SubGUI):
         self.treeView = None
         self.dynamic = dynamic
         self.testCount = testCount
+        self.diffStore = {}
+        # It isn't really a gui configuration, and this could cause bugs when several apps
+        # using differnt diff tools are run together. However, this isn't very likely and we prefer not
+        # to recalculate all the time...
+        diffTool = guiConfig.getValue("text_diff_program")
+        self.diffFilterGroup = plugins.TextTriggerGroup(guiConfig.getCompositeValue("text_diff_program_filters", diffTool))
         if testCount > 0:
             colour = guiConfig.getTestColour("not_started")
             visibility = guiConfig.showCategoryByDefault("not_started")
@@ -2349,7 +2356,15 @@ class TestProgressMonitor(guiplugins.SubGUI):
             categoryName = state.category
         briefDesc, fullDesc = state.categoryDescriptions.get(categoryName, (categoryName, categoryName))
         return briefDesc.replace("_", " ").capitalize()
-    def getClassifiers(self, state):
+
+    def filterDiff(self, test, diff):
+        filteredDiff = ""
+        for line in diff.split("\n"):
+            if self.diffFilterGroup.stringContainsText(line):
+                filteredDiff += line + "\n"
+        return filteredDiff
+    
+    def getClassifiers(self, test, state):
         classifiers = ClassificationTree()
         catDesc = self.getCategoryDescription(state)
         if state.isMarked():
@@ -2372,7 +2387,17 @@ class TestProgressMonitor(guiplugins.SubGUI):
 
         comparisons = state.getComparisons()
         for fileComp in filter(lambda c: c.getType() == "failure", comparisons):
-            fileClass = [ "Failed", "Differences", fileComp.getSummary(includeNumbers=False) ]
+            summary = fileComp.getSummary(includeNumbers=False)
+            fileClass = [ "Failed", "Differences", summary ]
+
+            filteredDiff = self.filterDiff(test, fileComp.getFreeTextBody())
+            summaryDiffs = self.diffStore.setdefault(summary, seqdict())
+            testList = summaryDiffs.setdefault(filteredDiff, [])
+            if test not in testList:
+                testList.append(test)
+            if len(summaryDiffs.get(filteredDiff)) > 1:
+                group = summaryDiffs.index(filteredDiff) + 1
+                fileClass.append("Group " + str(group))
             self.diag.info("Adding file classification for " + repr(fileComp) + " = " + repr(fileClass))
             classifiers.addClassification(fileClass)
             
@@ -2392,10 +2417,11 @@ class TestProgressMonitor(guiplugins.SubGUI):
                 self.treeModel.set_value(iter, 4, "")
             allTests = self.treeModel.get_value(iter, 5)
             allTests.remove(test)
+            self.diag.info("Removing test " + repr(test) + " from node " + self.treeModel.get_value(iter, 0))
             self.treeModel.set_value(iter, 5, allTests)
     def insertTest(self, test, state, incrementCount):
         self.classifications[test] = []
-        classifiers = self.getClassifiers(state)
+        classifiers = self.getClassifiers(test, state)
         nodeClassifier = classifiers.keys()[0]
         defaultColour, defaultVisibility = self.getCategorySettings(state.category, nodeClassifier, classifiers)
         return self.addTestForNode(test, defaultColour, defaultVisibility, nodeClassifier, classifiers, incrementCount)
@@ -2415,17 +2441,32 @@ class TestProgressMonitor(guiplugins.SubGUI):
         self.notify("TestAppearance", test, summary, mainColour, colour, updateSuccess, saved)
         self.notify("Visibility", [ test ], self.shouldBeVisible(test))
 
+    def getInitialTestsForNode(self, test, parentIter, nodeClassifier):
+        try:
+            if nodeClassifier.startswith("Group "):
+                diffNumber = int(nodeClassifier[6:]) - 1 
+                parentName = self.treeModel.get_value(parentIter, 0)
+                testLists = self.diffStore.get(parentName)
+                return copy(testLists.values()[diffNumber])
+        except ValueError:
+            pass
+        return [ test ]
+    
     def addTestForNode(self, test, defaultColour, defaultVisibility, nodeClassifier, classifiers, incrementCount, parentIter=None):
-        self.diag.info("Adding " + repr(test) + " for node " + nodeClassifier + ", default visible = " + repr(defaultVisibility))
         nodeIter = self.findIter(nodeClassifier, parentIter)
         colour = guiConfig.getTestColour(nodeClassifier, defaultColour)
         visibility = guiConfig.showCategoryByDefault(nodeClassifier, defaultVisibility)
         if nodeIter:
+            self.diag.info("Adding " + repr(test) + " for node " + nodeClassifier + ", visible = " + repr(visibility))
             self.insertTestAtIter(nodeIter, test, colour, incrementCount)
+            self.classifications[test].append(nodeIter)
         else:
-            nodeIter = self.addNewIter(nodeClassifier, parentIter, colour, visibility, 1, [ test ])
+            initialTests = self.getInitialTestsForNode(test, parentIter, nodeClassifier)
+            nodeIter = self.addNewIter(nodeClassifier, parentIter, colour, visibility, len(initialTests), initialTests)
+            for initTest in initialTests:
+                self.diag.info("New node " + nodeClassifier + ", visible = " + repr(visibility) + " : add " + repr(initTest))
+                self.classifications[initTest].append(nodeIter)
 
-        self.classifications[test].append(nodeIter)
         subColours = []
         for subNodeClassifier in classifiers[nodeClassifier]:
             subColour = self.addTestForNode(test, colour, visibility, subNodeClassifier, classifiers, incrementCount, nodeIter)
@@ -2443,8 +2484,10 @@ class TestProgressMonitor(guiplugins.SubGUI):
             self.treeModel.set_value(iter, 4, "bold")
         if incrementCount:
             self.treeModel.set_value(iter, 1, testCount + 1)
+        self.diag.info("Tests for node " + self.treeModel.get_value(iter, 0) + " " + repr(allTests))
         allTests.append(test)
         self.treeModel.set_value(iter, 5, allTests)
+        self.diag.info("Tests for node " + self.treeModel.get_value(iter, 0) + " " + repr(allTests))
     def addNewIter(self, classifier, parentIter, colour, visibility, testCount, tests=[]):
         modelAttributes = [classifier, testCount, visibility, colour, "bold", tests]
         newIter = self.treeModel.append(parentIter, modelAttributes)
@@ -2465,10 +2508,27 @@ class TestProgressMonitor(guiplugins.SubGUI):
         self.updateTestAppearance(test, state, changeDesc, colourInserted)
         self.contentsChanged()
 
+    def removeParentIters(self, iters):
+        noParents = []
+        for iter1 in iters:
+            if not self.isParent(iter1, iters):
+                noParents.append(iter1)
+        return noParents
+
+    def isParent(self, iter1, iters):
+        path1 = self.treeModel.get_path(iter1)
+        for iter2 in iters:
+            parent = self.treeModel.iter_parent(iter2)
+            if parent is not None and self.treeModel.get_path(parent) == path1:
+                return True
+        return False
+
     def shouldBeVisible(self, test):
-        for nodeIter in self.findTestIterators(test):
-            if self.treeModel.iter_has_child(nodeIter):
-                continue # ignore the parent nodes where visibility is concerned
+        iters = self.findTestIterators(test)
+        # ignore the parent nodes where visibility is concerned
+        visibilityIters = self.removeParentIters(iters)
+        self.diag.info("Visibility for " + repr(test) + " : iters " + repr(map(self.treeModel.get_path, visibilityIters)))
+        for nodeIter in visibilityIters:
             visible = self.treeModel.get_value(nodeIter, 2)
             if visible:
                 return True

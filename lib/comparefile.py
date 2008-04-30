@@ -27,6 +27,7 @@ class FileComparison:
         self.previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength)
         self.textDiffTool = test.getConfigValue("text_diff_program")
         self.textDiffToolMaxSize = plugins.parseBytes(test.getConfigValue("text_diff_program_max_file_size"))
+        self.freeTextBody = None
         self.findAndCompare(test, standardFile, testInProgress)
     def findAndCompare(self, test, standardFile, testInProgress=False):
         self.stdFile = standardFile
@@ -37,6 +38,7 @@ class FileComparison:
     def recompute(self, test, stdFile):
         if self.needsRecalculation():
             self.recalculationTime = time.time()
+            self.freeTextBody = None
         self.findAndCompare(test, stdFile)
     def __getstate__(self):
         # don't pickle the diagnostics
@@ -51,6 +53,7 @@ class FileComparison:
         self.recalculationTime = None
         if not hasattr(self, "differenceCache"):
             self.differenceCache = self.differenceId
+        
     def __repr__(self):
         return self.stem
     def checkIfBinaryFile(self, test):
@@ -165,6 +168,10 @@ class FileComparison:
         titleText += " " + repr(self)
         return "-" * 10 + " " + titleText + " " + "-" * 10
     def getFreeTextBody(self):
+        if self.freeTextBody is None:
+            self.freeTextBody = self._getFreeTextBody()
+        return self.freeTextBody
+    def _getFreeTextBody(self):
         if self.binaryFile and \
                (self.newResult() or self.missingResult()):
             message = "Binary file, not showing any preview. " + \
@@ -186,7 +193,7 @@ class FileComparison:
                           " bytes. Double-click on the file to see the difference, or adjust the configuration entry 'text_diff_program_max_file_size'" + \
                           " and re-run to see the difference in this text view.\n"
                 return self.previewGenerator.getWrappedLine(message)
-            
+
             cmdLine = self.textDiffTool + ' "' + self.stdCmpFile + '" "' + self.tmpCmpFile + '"'
             stdout = os.popen(cmdLine)
             return self.previewGenerator.getPreview(stdout)

@@ -663,6 +663,7 @@ class Config:
         app.setConfigDefault("lines_of_text_difference", 30, "How many lines to present in textual previews of file diffs")
         app.setConfigDefault("max_width_text_difference", 500, "How wide lines can be in textual previews of file diffs")
         app.setConfigDefault("text_diff_program_max_file_size", "-1", "The maximum file size to use the text_diff_program, in bytes. -1 means no limit.")
+        app.setConfigDefault("text_diff_program_filters", { "default" : [], "diff" : [ "^<", "^>" ]}, "Filters that should be applied for particular diff tools to aid with grouping in dynamic GUI")
         app.setConfigDefault("diff_program", { "default": "tkdiff" }, "External program to use for graphical file comparison")
         app.setConfigDefault("view_program", { "default": self.defaultViewProgram() },  \
                               "External program(s) to use for viewing and editing text files")

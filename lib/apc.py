@@ -83,12 +83,23 @@ apc.PlotKPIGroups          - A specialization of optimization.PlotTest for APC w
                              that PlotTest supports, do however note that some of the options doesn't make sense
                              to use for several KPI groups, for example, p, print to file.
 
-apc.ExtractFromStatusFile <versions> [<filter>]
-                           - Extracts timing information from the last colgen solution in APC status file
-                             given by the version. Only statusfiles ending with the version identifier is used.
-                             If two versions are given, the values are compared, giving the difference in
-                             percent. If filter is used, only values matching the given regexp are printed.
-                               - Example: -s apc.ExtractFromStatusFile 13, 'Coordination time|cpu time'
+apc.ExtractFromStatusFile <options>
+                           - Extracts timing and memory information from the last colgen solution in APC status file
+                             and compare them pairwise, giving the difference in percent.
+                             Available options are:
+                             - v=<version>,...
+                               Select which versions of the status file to extract from. The status files ending
+                               with the given versions are used. Mandatory option
+                             - f=<filter>
+                               Only list data that matches the given filter regexp. Otherwise all timing/memory data
+                               is given.
+                             - el=<extremvalue limit>
+                               In the summary, the minimum and maximum relative difference is given for all measured data
+                               where at least one of the point is at least as big as the extreme value limit. Default
+                               value is 10.
+
+                             Example: -s apc.ExtractFromStatusFile v=13, f='Coordination time|cpu time' el=30
+
                              compares execution time and total cpu time data from status.apc.13 and status.apc.
                              At the end, the report gives accumulation of data for all the tests, as well
                              as for all the tests that exists in all the versions.
@@ -1825,30 +1836,49 @@ def stringify(data):
         return "%.1f"%data
     return repr(data)
         
-class ExtractFromStatusFile(plugins.Action):
-    def __init__(self, args = None):
+class ExtractFromStatusFile(plugins.Action): 
+    def __repr__(self):
+        return "APC status file extractor for versions ", self.versions
+
+    def __init__(self, args):
         self.versions = [ "" ]
         self.printOnlyMatch = ""
-        if args:
-            self.versions = args[0].split(",")
-            if len(args)>1:
-                self.printOnlyMatch = args[1]
-
+        self.extremeLimit = 10
+        for ar in args:
+            flag, val = ar.split("=")
+            if flag == "v":
+                self.versions = val.split(",")
+            elif flag == "f":
+                self.printOnlyMatch = val
+            elif flag == "el":
+                self.extremeLimit = int(val)
+            else:
+                print "ExtractFromStatusFile: Unknown option " + flag
         self.tsValues =  [ "Preprocessing time", "DH setup time",
                            "Network generation time", "Generation time", "Coordination time", "Conn fixing time",
-                           "DH post processing \(", "OC to DH time"]
+                           "DH post processing \(", "OC to DH time", "Total GT search time"]
 
         self.tsValues += [ "Preprocessing exec time", "DH setup exec time",
                            "Network generation exec time", "Generation exec time", "Coordination exec time", "Conn fixing exec time",
-                           "DH post processing exec time", "execution time"]
+                           "DH post processing exec time","Total GT search exec time", "execution time", "memory"]
+        prints = re.compile(self.printOnlyMatch)
+        self.printValues = []
+        for t in self.tsValues:
+            if prints.search(t):
+                self.printValues.append(t)
+        if prints.search("cpu time"):
+            self.printValues.append("cpu time")
+
         self.currentSuite = ""
-        self.accumulatedAll = [ {} for v in self.versions]
-        self.accumulatedCountAll = [ {} for v in self.versions]
-        self.accumulatedCommon = [ {} for v in self.versions]
-        self.accumulatedCountCommon = [ {} for v in self.versions]
+        self.accAll = [ {} for v in self.versions]
+        self.accCountAll = [ {} for v in self.versions]
+        self.accCommon = [ {} for v in self.versions]
+        self.accCountCommon = [ {} for v in self.versions]
+        self.minCommon = [{} for vix in xrange(0,len(self.versions)/2)]
+        self.maxCommon = [{} for vix in xrange(0,len(self.versions)/2)]
 
     def __call__(self, test):
-        allData = []
+        testData = []
         statusFiles = []
         for version in self.versions:
             logFileStem = test.app.getConfigValue("log_file")
@@ -1858,68 +1888,91 @@ class ExtractFromStatusFile(plugins.Action):
                 if statusFile:
                     isExactMatch = statusFile.endswith(version)
             if isExactMatch:
-                allData.append(self.extractColgenData(test.app, statusFile))
+                testData.append(self.extractColgenData(test.app, statusFile))
                 statusFiles.append(os.path.basename(statusFile))
             else:
                 statusFiles.append("Not Found")
-                allData.append({})
+                testData.append({})
+
+        accumulateData(self.accAll, self.accCountAll, testData)
+        accumulateCommonData(self.accCommon, self.accCountCommon, testData)
+
         if test.parent.name != self.currentSuite:
             self.currentSuite = test.parent.name
             print "============================== " + "%-32s"%self.currentSuite + "=============================="
-        self.printCase(test.parent.name + "/" +test.name,allData)
+        anyToPrint = True
+        testDataComp = []
+        for t in xrange(0, len(self.versions), 2):
+            td, ap = self.compareVersionsAccExtremes(testData, t, t+1)
+            testDataComp.append(td)
+            anyToPrint = anyToPrint or ap
+        self.printCase(test.parent.name + "/" +test.name,testData, testDataComp, anyToPrint)
         print "used statusfiles: " + ", ".join(statusFiles)
-        accumulateData(self.accumulatedAll, self.accumulatedCountAll, allData)
-        accumulateCommonData(self.accumulatedCommon, self.accumulatedCountCommon, allData)
 
     def __del__(self):
         print "============================== " + "%-32s"%"Total for all cases" + "=============================="
-        self.printCase("Accumulated values in testcases", self.accumulatedAll)
-        self.printCase("Count of all values in testcases", self.accumulatedCountAll)
-        self.printCase("Accumulated common values in testcases", self.accumulatedCommon)
-        self.printCase("Count of all common values in testcases", self.accumulatedCountCommon)
+        accAllComp = []
+        accCountAllComp = []
+        accCommonComp = []
+        accCountCommonComp = []
+        for vix in xrange(0, len(self.versions), 2):
+            accAllComp.append(self.compareVersionsAccExtremes(self.accAll, vix, vix + 1, False)[0])
+            accCountAllComp.append(self.compareVersionsAccExtremes(self.accCountAll, vix, vix + 1, False)[0])
+            accCommonComp.append(self.compareVersionsAccExtremes(self.accCommon, vix, vix + 1, False)[0])
+            accCountCommonComp.append(self.compareVersionsAccExtremes(self.accCountCommon, vix, vix + 1, False)[0])
+
+        self.printCase("Accumulated values in testcases", self.accAll, accAllComp)
+        self.printCase("Count of all values in testcases", self.accCountAll, accCountAllComp)
+        self.printCase("Accumulated common values in testcases", self.accCommon, accCommonComp, True, True)
+        self.printCase("Count of all common values in testcases", self.accCountCommon, accCountCommonComp)
         
-    def printCase(self,name,data):
+    def compareVersionsAccExtremes(self, data, v0, v1, doAccExtremes = True):
+        anyToPrint = False
+        result = {}
+        for t in self.printValues:
+            if data[v0].has_key(t) or data[v1].has_key(t):
+                anyToPrint = True
+            if data[v0].has_key(t) and data[v1].has_key(t) and float(data[v0][t]) > 0.0:
+                d0 = float(data[v0][t])
+                d1 = float(data[v1][t])
+                percDiff = 100*(d1 / d0 - 1);
+                result[t] = "%3.1f"%(percDiff)
+                # TODO, this is accumulation stuff, should be elsewhere?
+                if doAccExtremes and d0 >= self.extremeLimit or d1 >= self.extremeLimit:
+                    self.minCommon[v0/2][t] = min(percDiff, self.minCommon[v0/2].get(t, sys.maxint))
+                    self.maxCommon[v0/2][t] = max(percDiff, self.maxCommon[v0/2].get(t, -sys.maxint))
+            else:
+                result[t] = "-"
+        return result, anyToPrint
+
+    def printCase(self, name, data, dataComp, anyToPrint = True, printMaxMin = False):
         print "****************************** " + name
-        import copy
-        ver = copy.deepcopy(self.versions)
-        prints = re.compile(self.printOnlyMatch)
-        printValues = []
-        for t in self.tsValues:
-            if prints.search(t):
-                printValues.append(t)
-        if prints.search("cpu time"):
-            printValues.append("cpu time")
-        while len(data) < len(ver):
-            data.append({})
-        if len(ver) ==2:
-            ver.append("diff (%)")
-            data.append({})
-            anyToPrint = False
-            for t in printValues:
-                if data[0].has_key(t) or data[1].has_key(t):
-                    anyToPrint = True
-                if data[0].has_key(t) and data[1].has_key(t) and float(data[0][t]) > 0.0:
-                    data[2][t] = "%3.1f"%(100*(float(data[1][t])/float(data[0][t])-1))
-                else:
-                    data[2][t] = "-"
-        else:
-          anyToPrint = True;
         if anyToPrint:
             line = "%30s"%""
             line2 = "%30s"%""
             line2Added = 0
-            for v in ver:
-                line +=" %20s"%v[0:20]
-                line2 +=" %20s"%v[20:40]
+            for vix in  xrange(len(self.versions)):
+                v = self.versions[vix]
+                line += " %20s"%v[0:20]
+                line2 += " %20s"%v[20:40]
                 if v[20:40]:
-                    line2Added = 1;
+                    line2Added = True;
+                if vix%2:
+                    line += "  Diff (%)           "
+                    line2 += "                     "
             print line
             if line2Added:
                 print line2
-            for t in printValues:
+            for t in self.printValues:
                 line = "%30s"%t
-                for v in range(len(ver)):
+                for v in range(len(self.versions)):
                     line +=" %20s"%stringify(data[v].get(t,"-"))
+                    if v%2:
+                        line += " %8s"%stringify(dataComp[v/2].get(t,"-"))
+                        if printMaxMin:
+                            line += " %5s/%5s"%(stringify(self.minCommon[v/2].get(t,"-")), stringify(self.maxCommon[v/2].get(t,"-")))
+                        else:
+                            line +=" %11s"%""
                 print line
         else:
             print "------------------------------ No data"
@@ -1964,6 +2017,7 @@ def accumulateCommonData(toDictArr, toDictCountArr, fromDictArr):
                 if not type(fromDictArr[v].get(d,0)) == type(""):
                     toDictArr[v][d] += fromDictArr[v].get(d,0)
                     toDictCountArr[v][d] += 1
+
     
 # Override for webpage generation with APC-specific stuff in it
 class GenerateWebPages(optimization.GenerateWebPages):

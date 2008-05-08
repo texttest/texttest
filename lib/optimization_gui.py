@@ -129,7 +129,7 @@ class StartStudio(guiplugins.ActionTabGUI):
         studio = os.path.join(environ["CARMSYS"], "bin", "studio")
         if not os.path.isfile(studio):
             raise plugins.TextTestError, "Cannot start studio, no file at " + studio
-        cmdArgs = [ studio, "-w", "-p'CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + "\",0)'" ]
+        cmdArgs = [ studio, "-w", "-p CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + "\",0)" ]
         nullFile = open(os.devnull, "w")
         guiplugins.processMonitor.startProcess(cmdArgs, description="Studio on " + subPlan,
                                                stdout=nullFile, stderr=nullFile,

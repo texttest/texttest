@@ -585,7 +585,7 @@ class GoogleProfilePrepare(plugins.Action):
         os.environ["LD_LIBRARY_PATH"] += ";/carm/proj/apc/lib/"
         os.environ["CPUPROFILE"] = test.makeTmpFileName("profiledata", forFramework=0)
         if self.arg and self.arg.startswith("exppreload"):
-            os.environ["LD_PRELOAD"] = "/carm/proj/apc/lib/libprofiler.so"
+            os.environ["LD_PRELOAD"] = "/carm/proj/apc/lib/libprofiler_fixed.so"
         else:
             opts = test.getWordsInFile("options")
             binName = os.path.expandvars(opts[-2].replace("PUTS_ARCH_HERE", getArchitecture(test.app)), test.getEnvironment)
@@ -602,6 +602,7 @@ class GoogleProfileExtract(plugins.Action):
         binName = os.path.expandvars(opts[-2].replace("PUTS_ARCH_HERE", getArchitecture(test.app)), test.getEnvironment)
         symdumpfile = test.makeTmpFileName("symbolicdata", forFramework=0)
         command = "/carm/proj/apc/bin/pprof --dump " + binName + " " + datafile + "  | gzip > " + symdumpfile
+        #command = "/carm/proj/apc/bin/pprof --disasm=preprocess " + binName + " " + datafile + " > " + symdumpfile
         # Have to make sure it runs on a 32-bit machine.
         os.system("rsh abbeville \"" + command + "\"")
         if not (self.arg and self.arg.startswith("keepbindata")):

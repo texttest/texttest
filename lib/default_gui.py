@@ -139,11 +139,13 @@ class SaveTests(guiplugins.ActionTabGUI):
             saveDesc += ", overwriting both failed and succeeded files"
 
         tests = self.getSaveableTests()
+        # Calculate the versions beforehand, as saving tests can change the selection,
+        # which can affect the default version calculation...
+        testsWithVersions = [ (test, self.getVersion(test)) for test in tests ]
         testDesc = str(len(tests)) + " tests"
         self.notify("Status", "Saving " + testDesc + " ...")
         try:
-            for test in tests:
-                version = self.getVersion(test)
+            for test, version in testsWithVersions:
                 guiplugins.guilog.info("Saving " + repr(test) + " - version " + version + saveDesc)
                 testComparison = test.state
                 testComparison.setObservers(self.observers)

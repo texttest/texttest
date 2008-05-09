@@ -1162,12 +1162,12 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
 
     def describe(self):
         guiplugins.guilog.info("Viewing notebook page for '" + self.getTabTitle() + "'")
-        self.describeOptionGroup(self.optionGroup)
+        guiplugins.guilog.info(self.getOptionGroupDescription(self.optionGroup))
         guiplugins.guilog.info("...........")
-        self.describeOptionGroup(self.selectionGroup)
+        guiplugins.guilog.info(self.getOptionGroupDescription(self.selectionGroup))
         self._describeAction(self.gtkAction, self.accelerator)
         guiplugins.guilog.info("...........")
-        self.describeOptionGroup(self.filteringGroup)
+        guiplugins.guilog.info(self.getOptionGroupDescription(self.filteringGroup))
         self._describeAction(self.filterAction, self.filterAccel)
         
 
@@ -2213,7 +2213,6 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
     def processFile(self, file, properties, errors):
         try:
             prop = plugins.FileProperties(file)
-            guiplugins.guilog.info("Showing properties of the file " + file + ":\n" + prop.getUnixStringRepresentation())
             properties.append(prop)
         except Exception, e:
             errors.append(str(e))          
@@ -2228,11 +2227,12 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
 
     def addContents(self):
         dirToProperties = {}
-        for prop in self.getAllProperties():
+        props = self.getAllProperties()
+        for prop in props:
             dirToProperties.setdefault(prop.dir, []).append(prop)
-
         vbox = self.createVBox(dirToProperties)
-        self.dialog.vbox.pack_start(vbox, expand=True, fill=True)              
+        self.dialog.vbox.pack_start(vbox, expand=True, fill=True)
+        return "\n".join([ prop.getDescription() for prop in props ])
 
     def createVBox(self, dirToProperties):
         vbox = gtk.VBox()

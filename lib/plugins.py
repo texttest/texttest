@@ -1280,3 +1280,5 @@ class FileProperties:
                 self.inqModificationTime(), self.filename)
     def getUnixStringRepresentation(self):
         return "%s%s %3d %-8s %-8s %8d %s %s" % self.getUnixRepresentation()
+    def getDescription(self):
+        return "Showing properties of the file " + self.abspath + ":\n" + self.getUnixStringRepresentation()

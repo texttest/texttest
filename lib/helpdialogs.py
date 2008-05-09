@@ -1,6 +1,6 @@
 
 import gtk, plugins, texttest_version, os, string, sys, glob
-from guiplugins import scriptEngine, guilog, ActionResultDialogGUI
+from guiplugins import scriptEngine, ActionResultDialogGUI
 
 # Show useful info about TextTest.
 # I don't particularly like the standard gtk.AboutDialog, and we also want
@@ -38,7 +38,8 @@ class AboutTextTest(ActionResultDialogGUI):
         mainLabel = gtk.Label()
         mainLabel.set_markup("<span size='xx-large'>TextTest " + texttest_version.version + "</span>\n")
         messageLabel = gtk.Label()
-        messageLabel.set_markup("<i>TextTest is an application-independent tool for text-based\nfunctional testing. This means running a batch-mode program\nin lots of different ways, and using the text output produced\nas a means of controlling the behaviour of that application.</i>\n")
+        message = "TextTest is an application-independent tool for text-based\nfunctional testing. This means running a batch-mode program\nin lots of different ways, and using the text output produced\nas a means of controlling the behaviour of that application."
+        messageLabel.set_markup("<i>" + message + "</i>\n")
         messageLabel.set_justify(gtk.JUSTIFY_CENTER)
         urlLabel = gtk.Label()
         urlLabel.set_markup("<span foreground='blue' underline='single'>http://www.texttest.org/</span>\n")
@@ -51,6 +52,7 @@ class AboutTextTest(ActionResultDialogGUI):
         self.dialog.vbox.pack_start(urlLabel, expand=False, fill=False)
         self.dialog.vbox.pack_start(licenseLabel, expand=False, fill=False)
         self.dialog.set_resizable(False)
+        return message
 
     def showCredits(self, *args):
         newDialog = CreditsDialog(self.dialog, self.validApps)
@@ -82,9 +84,6 @@ class ShowVersions(ActionResultDialogGUI):
         pythonVersion = ".".join(map(lambda l: str(l), sys.version_info))
         gtkVersion = ".".join(map(lambda l: str(l), gtk.gtk_version))
         pygtkVersion = ".".join(map(lambda l: str(l), gtk.pygtk_version))
-        guilog.info("Showing component versions: \n TextTest: " + textTestVersion +
-                    "\n Python: " + pythonVersion + "\n GTK: " + gtkVersion +
-                    "\n PyGTK: " + pygtkVersion)
         
         table = gtk.Table(4, 2, homogeneous=False)
         table.set_row_spacings(1)
@@ -114,7 +113,10 @@ class ShowVersions(ActionResultDialogGUI):
         frame.set_padding(10, 10, 10, 10)
         frame.add(vbox)
         self.dialog.vbox.pack_start(frame, expand=True, fill=True)
-
+        return "Showing component versions: \n TextTest: " + textTestVersion + \
+               "\n Python: " + pythonVersion + "\n GTK: " + gtkVersion + \
+               "\n PyGTK: " + pygtkVersion
+        
     def justify(self, label, leftFill, markup = False):
         alignment = gtk.Alignment(leftFill, 0.0, 0.0, 0.0)
         if markup:
@@ -142,7 +144,6 @@ class CreditsDialog(ActionResultDialogGUI):
             unicodeInfo = plugins.decodeText("".join(authorFile.readlines()))           
             authorFile.close()
             creditsText = plugins.encodeToUTF(unicodeInfo)
-            guilog.info("Showing credits:\n" + creditsText)
             buffer = gtk.TextBuffer()
             buffer.set_text(creditsText)
         except Exception, e:
@@ -158,7 +159,8 @@ class CreditsDialog(ActionResultDialogGUI):
         notebook.append_page(textView, gtk.Label("Written by"))
         self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
         self.dialog.set_resizable(False)
-        
+        return "Showing credits:\n" + creditsText
+            
 class LicenseDialog(ActionResultDialogGUI):
     def __init__(self, parent, *args):
         ActionResultDialogGUI.__init__(self, *args)
@@ -176,7 +178,6 @@ class LicenseDialog(ActionResultDialogGUI):
             unicodeInfo = plugins.decodeText("".join(licenseFile.readlines()))           
             licenseFile.close()
             licenseText = plugins.encodeToUTF(unicodeInfo)
-            guilog.info("Showing license:\n" + licenseText)
             buffer = gtk.TextBuffer()
             buffer.set_text(licenseText)
         except Exception, e:
@@ -191,7 +192,8 @@ class LicenseDialog(ActionResultDialogGUI):
         notebook = gtk.Notebook()
         notebook.append_page(textView, gtk.Label("License"))
         self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
-
+        return "Showing license:\n" + licenseText
+            
 class ShowMigrationNotes(ActionResultDialogGUI):
     def isActiveOnCurrent(self, *args):
         return True
@@ -212,12 +214,13 @@ class ShowMigrationNotes(ActionResultDialogGUI):
         notes = glob.glob(os.path.join(plugins.installationDir("doc"), "MigrationNotes*"))
         notes.sort()
         notes.reverse() # We want the most recent file first ...
+        message = ""
         for note in notes:
             notesFile = open(note)
             unicodeInfo = plugins.decodeText("".join(notesFile.readlines()))           
             notesFile.close()
             notesText = plugins.encodeToUTF(unicodeInfo)
-            guilog.info("Adding migration notes from file '" + os.path.basename(note) + "':\n" + notesText)
+            message += "Adding migration notes from file '" + os.path.basename(note) + "':\n" + notesText + "\n"
 
             buffer = gtk.TextBuffer()
             buffer.set_text(notesText)
@@ -240,5 +243,6 @@ class ShowMigrationNotes(ActionResultDialogGUI):
             parentSize = self.topWindow.get_size()
             self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[0] * 0.7))
             self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
+            return message
 
 

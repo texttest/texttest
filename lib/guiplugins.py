@@ -423,6 +423,21 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         alignment.add(hbox)
         return alignment
 
+    def describeDialog(self, dialog, contents, stockIcon = None):
+        message = "-" * 10 + " Dialog '" + dialog.get_title() + "' " + "-" * 10
+        guilog.info(message)
+        defaultWidget = dialog.default_widget
+        if defaultWidget:
+            try:
+                guilog.info("Default action is labelled '" + defaultWidget.get_label() + "'")
+            except AttributeError:
+                guilog.info("Default widget unlabelled, type " + str(defaultWidget.__class__))
+        if stockIcon:
+            guilog.info("Using stock icon '" + stockIcon + "'")
+        # One blank line at the end
+        guilog.info(contents.strip())
+        guilog.info("-" * len(message))
+            
     def showErrorDialog(self, message):
         self.showErrorWarningDialog(message, gtk.STOCK_DIALOG_ERROR, "Error") 
     def showWarningDialog(self, message):
@@ -434,12 +449,12 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         scriptEngine.connect("agree to texttest message", "clicked", yesButton, self.cleanDialog,
                              gtk.RESPONSE_ACCEPT, True, dialog)
         dialog.show_all()
-
+        self.describeDialog(dialog, message, stockIcon)
+        
     def createAlarmDialog(self, parent, message, stockIcon, alarmLevel):
         dialogTitle = "TextTest " + alarmLevel
         dialog = gtk.Dialog(dialogTitle, parent, flags=gtk.DIALOG_MODAL) 
         dialog.set_modal(True)
-        guilog.info(alarmLevel.upper() + ": " + message)
         
         contents = self.createDialogMessage(message, stockIcon)
         dialog.vbox.pack_start(contents, expand=True, fill=True)
@@ -454,9 +469,9 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
                              noButton, respondMethod, gtk.RESPONSE_NO, False, dialog)
         scriptEngine.connect("answer yes to texttest " + alarmLevel, "clicked",
                              yesButton, respondMethod, gtk.RESPONSE_YES, True, dialog)
-
         dialog.show_all()
-
+        self.describeDialog(dialog, message, stockIcon)
+        
     def cleanDialog(self, button, saidOK, dialog):
         entrycompletion.manager.collectCompletions()
         dialog.hide()
@@ -630,15 +645,17 @@ class ActionGUI(BasicActionGUI):
 class ActionResultDialogGUI(ActionGUI):
     def performOnCurrent(self):
         self.dialog = self.createDialog()
-        self.addContents()
+        textContents = self.addContents()
         self.createButtons()
         self.dialog.show_all()
+        self.describeDialog(self.dialog, textContents)
 
     def addContents(self):
         pass
     
     def createButtons(self):
-        okButton = self.dialog.add_button(gtk.STOCK_CLOSE, gtk.RESPONSE_ACCEPT)       
+        okButton = self.dialog.add_button(gtk.STOCK_CLOSE, gtk.RESPONSE_ACCEPT)
+        self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
         scriptEngine.connect("press close", "clicked", okButton, self.cleanDialog, gtk.RESPONSE_ACCEPT, True, self.dialog)
 
 
@@ -792,11 +809,10 @@ class OptionGroupGUI(ActionGUI):
     def getConfigOptions(self, option):
         return guiConfig.getCompositeValue("gui_entry_options", option.name)    
 
-    def describeOptionGroup(self, optionGroup):
-        for option in optionGroup.options.values():
-            guilog.info(self.getOptionDescription(option))
-        for switch in optionGroup.switches.values():
-            guilog.info(self.getSwitchDescription(switch))
+    def getOptionGroupDescription(self, optionGroup):
+        messages = map(self.getOptionDescription, optionGroup.options.values()) + \
+                   map(self.getSwitchDescription, optionGroup.switches.values())
+        return "\n".join(messages)
 
     def getOptionDescription(self, option):
         value = option.getValue()
@@ -920,7 +936,7 @@ class ActionTabGUI(OptionGroupGUI):
 
     def describe(self):
         guilog.info("Viewing notebook page for '" + self.getTabTitle() + "'")
-        self.describeOptionGroup(self.optionGroup)
+        guilog.info(self.getOptionGroupDescription(self.optionGroup))
         self.describeAction()
     
 
@@ -943,9 +959,8 @@ class ActionDialogGUI(OptionGroupGUI):
         dialog.vbox.pack_start(alignment, expand=True, fill=True)
         self.createButtons(dialog, fileChooser, scriptName)
         self.tryResize(dialog)
-        guilog.info("Viewing dialog with title '" + dialog.get_title() + "'")
-        self.describeOptionGroup(self.optionGroup)
         dialog.show_all()
+        self.describeDialog(dialog, self.getOptionGroupDescription(self.optionGroup))
 
     def getConfirmationDialogSettings(self):
         return gtk.STOCK_DIALOG_WARNING, "Confirmation"

@@ -2408,7 +2408,8 @@ class TestProgressMonitor(guiplugins.SubGUI):
             classifiers.addClassification(fileClass)
             
         return classifiers
-    def removeTest(self, test):
+    
+    def removeFromModel(self, test):
         for iter in self.findTestIterators(test):
             testCount = self.treeModel.get_value(iter, 1)
             self.treeModel.set_value(iter, 1, testCount - 1)
@@ -2419,6 +2420,13 @@ class TestProgressMonitor(guiplugins.SubGUI):
             allTests.remove(test)
             self.diag.info("Removing test " + repr(test) + " from node " + self.treeModel.get_value(iter, 0))
             self.treeModel.set_value(iter, 5, allTests)
+
+    def removeFromDiffStore(self, test):
+        for fileInfo in self.diffStore.values():
+            for testList in fileInfo.values():
+                if test in testList:
+                    testList.remove(test)
+                    
     def insertTest(self, test, state, incrementCount):
         self.classifications[test] = []
         classifiers = self.getClassifiers(test, state)
@@ -2503,7 +2511,9 @@ class TestProgressMonitor(guiplugins.SubGUI):
             else:
                 iter = self.treeModel.iter_next(iter)
     def notifyLifecycleChange(self, test, state, changeDesc):
-        self.removeTest(test)
+        self.removeFromModel(test)
+        if changeDesc.find("save") != -1:
+            self.removeFromDiffStore(test)
         colourInserted = self.insertTest(test, state, incrementCount=True)
         self.updateTestAppearance(test, state, changeDesc, colourInserted)
         self.contentsChanged()

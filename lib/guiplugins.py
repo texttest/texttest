@@ -429,8 +429,8 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         self.showErrorWarningDialog(message, gtk.STOCK_DIALOG_WARNING, "Warning") 
     def showErrorWarningDialog(self, message, stockIcon, alarmLevel):
         dialog = self.createAlarmDialog(self.getParentWindow(), message, stockIcon, alarmLevel)
-        dialog.set_default_response(gtk.RESPONSE_ACCEPT)
         yesButton = dialog.add_button(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT)
+        dialog.set_default_response(gtk.RESPONSE_ACCEPT)
         scriptEngine.connect("agree to texttest message", "clicked", yesButton, self.cleanDialog,
                              gtk.RESPONSE_ACCEPT, True, dialog)
         dialog.show_all()

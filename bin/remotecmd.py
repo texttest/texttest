@@ -21,11 +21,22 @@ def getServerAddress():
     host, port = sys.argv[2].split(":")
     return host, int(port)
 
-def sendData(serverAddress, toSend):
+def _sendData(serverAddress, toSend):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect(serverAddress)
     sock.sendall(toSend)
     sock.close()
+
+def sendData(*args):
+    # allow for flaky networks, try five times before giving up
+    for attempt in range(5):
+        try:
+            _sendData(*args)
+            return
+        except socket.error:
+            from time import sleep
+            sleep(1)
+    
 
 name = sys.argv[1]
 serverAddress = getServerAddress()

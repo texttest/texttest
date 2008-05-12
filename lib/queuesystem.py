@@ -476,6 +476,8 @@ class QueueSystemServer(BaseActionRunner):
                 
         # Allowed a submitted job to terminate
         self.testsSubmitted -= 1
+        if self.exited and self.testsSubmitted == 0:
+            self.submitTerminators()
     def allowReuse(self, oldTest, newTest):
         oldRules = self.getSubmissionRules(oldTest)
         newRules = self.getSubmissionRules(newTest)

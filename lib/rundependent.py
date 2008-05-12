@@ -48,9 +48,10 @@ class FilterRecompute(FilterOriginal):
             if hasattr(test.state, "allResults"):
                 result = []
                 for fileComp in test.state.allResults:
-                    if fileComp.stdFile:
+                    # Either of these files might have disappeared
+                    if fileComp.stdFile and os.path.isfile(fileComp.stdFile):
                         result.append((fileComp.stdFile, "origcmp"))
-                    if fileComp.tmpFile:
+                    if fileComp.tmpFile and os.path.isfile(fileComp.tmpFile):
                         result.append((fileComp.tmpFile, "cmp"))
                 return result
             else:

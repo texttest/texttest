@@ -39,7 +39,8 @@ class FileComparison:
         if self.needsRecalculation():
             self.recalculationTime = time.time()
             self.freeTextBody = None
-        self.findAndCompare(test, stdFile)
+        if os.path.isfile(self.tmpFile):
+            self.findAndCompare(test, stdFile)
     def __getstate__(self):
         # don't pickle the diagnostics
         state = {}

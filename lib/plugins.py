@@ -1216,7 +1216,7 @@ except:
 
 class FileProperties:
     def __init__(self, path):
-        self.abspath = os.path.abspath(path)
+        self.abspath = path
         self.filename = os.path.basename(self.abspath)
         self.dir = os.path.dirname(self.abspath)
         self.status = os.stat(self.abspath)

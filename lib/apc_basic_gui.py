@@ -74,7 +74,7 @@ class ImportTestCase(optimization_gui.ImportTestCase):
         path = os.path.join("$" + carmdataVar, "LOCAL_PLAN", subplan, "APC_FILES")
         statusFile = os.path.join(path, "run_status")
         ruleSetPath = os.path.join("${CARMTMP}", "crc", "rule_set", application.upper(), "PUTS_ARCH_HERE")
-        ruleSetFile = os.path.join(ruleSetPath, ruleSet)
+        ruleSetFile = os.path.join(ruleSetPath, ruleSet + "${BIN_SUFFIX}")
         return path + " " + statusFile + " ${CARMSYS} " + ruleSetFile + " ${USER}"
 
 class InteractiveActionConfig(optimization_gui.InteractiveActionConfig):

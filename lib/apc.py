@@ -256,7 +256,9 @@ class CheckFilesForApc(plugins.Action):
         except TypeError:
             print "Failed to find AirportFile in etables. Not verifying airportFile."
         verifyLogFileDir(test)
-        os.environ["TEXTTEST_TEST_RELPATH"] = test.getRelPath()
+        test.setEnvironment("TEXTTEST_TEST_RELPATH", test.getRelPath())
+        if test.app.raveMode() == "-debug":
+            test.setEnvironment("BIN_SUFFIX", "_g")
 
 class MarkApcLogDir(apc_basic.MarkApcLogDir):
     def makeLinks(self, test, apcTmpDir):
@@ -426,8 +428,6 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
         opts = test.getWordsInFile("options")
         # Create execute command.
         binName = os.path.expandvars(opts[-2].replace("PUTS_ARCH_HERE", getArchitecture(test.app)), test.getEnvironment)
-        if test.app.raveMode() == "-debug":
-            binName += "_g"
         options = " -D -v1 -S " + opts[0] + " -I " + opts[1] + " -U " + opts[-1]
         return binName, options, opts[0] # Also return the subplan name.
     def createDebugArgsFile(self, test, apcbinOptions, apcLog, Dbx = False):
@@ -595,7 +595,7 @@ class GoogleProfilePrepare(plugins.Action):
     def __call__(self, test):
         os.environ["LD_LIBRARY_PATH"] += ";/carm/proj/apc/lib/"
         os.environ["CPUPROFILE"] = test.makeTmpFileName("profiledata", forFramework=0)
-        if self.arg and self.arg.startswith("exppreload"):
+        if self.arg and self.arg.find("exppreload") != -1:
             os.environ["LD_PRELOAD"] = "/carm/proj/apc/lib/libprofiler_fixed.so"
         else:
             opts = test.getWordsInFile("options")
@@ -616,7 +616,7 @@ class GoogleProfileExtract(plugins.Action):
         #command = "/carm/proj/apc/bin/pprof --disasm=preprocess " + binName + " " + datafile + " > " + symdumpfile
         # Have to make sure it runs on a 32-bit machine.
         os.system("rsh abbeville \"" + command + "\"")
-        if not (self.arg and self.arg.startswith("keepbindata")):
+        if not (self.arg and self.arg.find("keepbindata") != -1):
             os.remove(datafile)
             
 
@@ -1348,6 +1348,19 @@ class CVSBranchTests(plugins.Action):
                         self.describe(test, ": creating version " + self.version + " of " + file)
                         os.system("cvs -q upd -p " + fullFileName + " > " + fullFileNameNewVersion)
                         os.system("cvs add " + fullFileNameNewVersion)
+
+# Small script to add ${BIN_SUFFIX} in option files.
+class MigrateOptionFile(plugins.Action):
+    def __repr__(self):
+        return "Migrate option file for"
+    def __call__(self, test):
+        opts = test.getWordsInFile("options")
+        if opts[-2].find("${BIN_SUFFIX}") == -1:
+            opts[-2] += "${BIN_SUFFIX}"
+        optionFileName = test.getFileName("options")
+        optionFile = open(optionFileName, "w")
+        optionFile.write(string.join(opts))
+        optionFile.close()
                 
                 
 class CleanSubplans(plugins.Action):

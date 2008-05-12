@@ -1938,7 +1938,7 @@ class ExtractFromStatusFile(plugins.Action):
                 percDiff = 100*(d1 / d0 - 1);
                 result[t] = "%3.1f"%(percDiff)
                 # TODO, this is accumulation stuff, should be elsewhere?
-                if doAccExtremes and d0 >= self.extremeLimit or d1 >= self.extremeLimit:
+                if doAccExtremes and (d0 >= self.extremeLimit or d1 >= self.extremeLimit):
                     self.minCommon[v0/2][t] = min(percDiff, self.minCommon[v0/2].get(t, sys.maxint))
                     self.maxCommon[v0/2][t] = max(percDiff, self.maxCommon[v0/2].get(t, -sys.maxint))
             else:

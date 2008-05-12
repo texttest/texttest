@@ -825,6 +825,8 @@ class TestSuite(Test):
     def readTestNames(self, warn=True, ignoreCache=False):
         names = seqdict()
         fileName = self.getContentFileName()
+        if not fileName:
+            return names
         for name, comment in self.testSuiteFileHandler.read(fileName, warn, ignoreCache).items():
             self.diagnose("Read " + name)
             if warn and not self.fileExists(name):
@@ -911,19 +913,28 @@ class TestSuite(Test):
     def maxIndex(self):
         return len(self.testcases) - 1
     def refresh(self, filters):
+        self.diagnose("refreshing!")
         Test.refresh(self, filters)
         newTestNames = self.readTestNames(ignoreCache=True)
         for test in self.testcases:
             if test.name not in newTestNames:
+                self.diagnose("removing " + repr(test))
                 self.testcases.remove(test)
                 test.notify("Remove")
-                
+
         for testName, desc in newTestNames.items():
             existingTest = self.findSubtest(testName)
             if existingTest:
                 existingTest.setDescription(desc)
                 existingTest.refresh(filters)
+                testClass = self.getSubtestClass(existingTest.dircache)
+                if existingTest.__class__ != testClass:
+                     self.diagnose("changing type for " + repr(existingTest))
+                     self.testcases.remove(existingTest)
+                     existingTest.notify("Remove")
+                     self.createTestOrSuite(testName, desc, existingTest.dircache, filters, initial=False)
             else:
+                self.diagnose("creating new test called '" + testName + "'")
                 dirCache = self.createTestCache(testName)
                 self.createTestOrSuite(testName, desc, dirCache, filters, initial=False)
         self.updateOrder(readTestNames=True)
@@ -980,6 +991,7 @@ class TestSuite(Test):
             return TestSuite
         else:
             return TestCase
+
     def createSubtest(self, testName, description, cache, className):
         test = className(testName, description, cache, self.app, self)
         test.setObservers(self.observers)

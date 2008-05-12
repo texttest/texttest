@@ -1955,6 +1955,11 @@ class RecomputeTests(guiplugins.ActionGUI):
             return "Recomputed status of " + self.pluralise(self.latestNumberOfRecomputations, "test") + "."
     def performOnCurrent(self):
         self.latestNumberOfRecomputations = 0
+        for app in self.currAppSelection:
+            self.notify("Status", "Rereading configuration for " + repr(app) + " ...")
+            self.notify("ActionProgress", "")
+            app.setUpConfiguration()
+            
         for test in self.currTestSelection:
             self.latestNumberOfRecomputations += 1
             self.notify("Status", "Recomputing status of " + repr(test) + " ...")

@@ -58,6 +58,10 @@ class FilterRecompute(FilterOriginal):
         else:
             return self.constantPostfix(test.listTmpFiles(), "partcmp")
 
+    def shouldRemove(self, newFile, oldFile):
+        # Always recalculate when doing it explicitly
+        return os.path.isfile(newFile)
+
 class RunDependentTextFilter(plugins.Observable):
     def __init__(self, testId, runDepTexts, unorderedTexts):
         plugins.Observable.__init__(self)

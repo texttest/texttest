@@ -1169,7 +1169,17 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         guiplugins.guilog.info("...........")
         guiplugins.guilog.info(self.getOptionGroupDescription(self.filteringGroup))
         self._describeAction(self.filterAction, self.filterAccel)
-        
+
+class HideSelected(guiplugins.ActionGUI,AllTestsHandler):
+    def _getTitle(self):
+        return "Hide selected"
+    def getTooltip(self):
+        return "Hide all tests that are currently selected"
+    def getSignalsSent(self):
+        return [ "Visibility" ]
+    def performOnCurrent(self):
+        self.notify("Visibility", self.currTestSelection, False)
+
 
 class HideUnselected(guiplugins.ActionGUI,AllTestsHandler):
     def _getTitle(self):
@@ -2281,7 +2291,7 @@ class InteractiveActionConfig:
             classes += [ ViewConfigFileInEditor, RecordTest, CopyTests, CutTests, 
                          PasteTests, ImportTestCase, ImportTestSuite, 
                          CreateDefinitionFile, ReportBugs, SelectTests,
-                         RefreshAll, HideUnselected, ShowAll,
+                         RefreshAll, HideUnselected, HideSelected, ShowAll,
                          RunTestsBasic, RunTestsAdvanced, ResetGroups, RenameTest, RemoveTests, 
                          SortTestSuiteFileAscending, SortTestSuiteFileDescending, 
                          RepositionTestFirst, RepositionTestUp,

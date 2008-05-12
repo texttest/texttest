@@ -39,7 +39,11 @@ class Config(optimization.OptimizationConfig):
     def _getRuleSetNames(self, test):
         for option in test.getWordsInFile("options"):
             if option.find("crc" + os.sep + "rule_set") != -1:
-                return [ os.path.basename(option) ]
+                ruleSetName = os.path.basename(option)
+                hasBinSuf = ruleSetName.find("${BIN_SUFFIX}")
+                if hasBinSuf != -1:
+                    ruleSetName = ruleSetName[:hasBinSuf]
+                return [ ruleSetName ]
         return []
     def getFileExtractor(self):
         subActions = [ optimization.OptimizationConfig.getFileExtractor(self) ]

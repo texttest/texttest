@@ -26,7 +26,7 @@ try:
 except:
     raiseException("Unable to import module 'gobject'")
 
-import guiplugins, plugins, os, sys, operator
+import pango, guiplugins, plugins, os, sys, operator
 from ndict import seqdict
 from respond import Responder
 from copy import copy
@@ -119,7 +119,6 @@ class GUIStatusMonitor(guiplugins.SubGUI):
     def createView(self):
         hbox = gtk.HBox()
         self.label = gtk.Label()
-        import pango
         self.label.set_ellipsize(pango.ELLIPSIZE_END)
         # It seems difficult to say 'ellipsize when you'd otherwise need
         # to enlarge the window', so we'll have to settle for a fixed number
@@ -947,6 +946,8 @@ class TestTreeGUI(ContainerGUI):
         self.treeView.append_column(testsColumn)
         if self.dynamic:
             detailsRenderer = gtk.CellRendererText()
+            detailsRenderer.set_property('wrap-width', 350)
+            detailsRenderer.set_property('wrap-mode', pango.WRAP_WORD_CHAR)
             recalcRenderer = gtk.CellRendererPixbuf()
             detailsColumn = gtk.TreeViewColumn("Details")
             detailsColumn.pack_start(detailsRenderer, expand=True)
@@ -2307,6 +2308,8 @@ class TestProgressMonitor(guiplugins.SubGUI):
         selection.set_select_function(self.canSelect)
         selection.connect("changed", self.selectionChanged)
         textRenderer = gtk.CellRendererText()
+        textRenderer.set_property('wrap-width', 350)
+        textRenderer.set_property('wrap-mode', pango.WRAP_WORD_CHAR)
         numberRenderer = gtk.CellRendererText()
         numberRenderer.set_property('xalign', 1)
         statusColumn = gtk.TreeViewColumn("Status", textRenderer, text=0, background=3, font=4)

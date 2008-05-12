@@ -50,17 +50,12 @@ class Config(optimization.OptimizationConfig):
                     if line.startswith("153"):
                         return line.split(";")[3]
 
-    def filesFromRulesFile(self, test, rulesFile):
-        scriptFile = self.getScriptFileFromPyOption(test)
-        if not scriptFile:
-            scriptFile = self.getRuleSetting(test, "script_file_name")
-            useScriptFile = self.getRuleSetting(test, "use_script_file")
-            if useScriptFile and useScriptFile == "FALSE":
-                scriptFile = ""
+    def filesFromSubplan(self, test, subplanDir):
+        basicFiles = optimization.OptimizationConfig.filesFromSubplan(self, test, subplanDir)
+        scriptFile = self.getScriptFile(test)
         if scriptFile:
-            return [ ("Script", self.getScriptPath(test, scriptFile)) ]
-        else:
-            return []
+            basicFiles.append(("Script", [ scriptFile ]))
+        return basicFiles
 
     def getRuleSetting(self, test, paramName):
         raveParamName = "raveparameters." + test.app.name + test.app.versionSuffix()
@@ -82,7 +77,16 @@ class Config(optimization.OptimizationConfig):
                 continue
             if words[0].endswith(paramName):
                 return words[1]
-
+    def getScriptFile(self, test):
+        scriptFile = self.getScriptFileFromPyOption(test)
+        if not scriptFile:
+            scriptFile = self.getRuleSetting(test, "script_file_name")
+            useScriptFile = self.getRuleSetting(test, "use_script_file")
+            if useScriptFile and useScriptFile == "FALSE":
+                scriptFile = ""
+        if scriptFile:
+            return self.getScriptPath(test, scriptFile)
+        
     def getScriptFileFromPyOption(self, test):
         # Rollingstock has python script as '-py <file>' in options file ...
         pyFile = getOption(test, "-py")

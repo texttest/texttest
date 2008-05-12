@@ -194,14 +194,14 @@ class OptimizationConfig(ravebased.Config):
     def getWriteDirectoryPreparer(self, ignoreCatalogues):
         return PrepareCarmdataWriteDir(ignoreCatalogues, self._getSubPlanDirName)
     def filesFromSubplan(self, test, subplanDir):
-        rulesFile = os.path.join(subplanDir, "APC_FILES", "rules")
-        if not os.path.isfile(rulesFile):
+        allNames = sorted(test.getConfigValue("display_subplan_file"))
+        allFiles = [ os.path.join(subplanDir, "APC_FILES", name) for name in allNames ]
+        allFiles = filter(os.path.isfile, allFiles)
+        if len(allFiles) > 0:
+            return [ ("Subplan", allFiles) ]
+        else:
             return []
 
-        subplanFiles = [ ("Subplan", rulesFile ) ]
-        return subplanFiles + self.filesFromRulesFile(test, rulesFile)
-    def filesFromRulesFile(self, test, rulesFile):
-        return []
     def printHelpDescription(self):
         print helpDescription
         ravebased.Config.printHelpDescription(self)
@@ -216,6 +216,7 @@ class OptimizationConfig(ravebased.Config):
         app.setConfigDefault(itemNamesConfigKey, self.itemNamesInFile, "Private: Item name map for optimization status file parsing")
         app.setConfigDefault("kpi_cost_margin", 0.0, "Cost margin for the KPI calculations")
         app.setConfigDefault("skip_comparison_if_not_present", "error", "List of files that are compared only if they are created by the test, i.e. they will not be reported as missing")
+        app.setConfigDefault("display_subplan_file", [ "rules" ], "List of files that should be shown in static GUI if found in APC_FILES directory")
         app.addConfigEntry("definition_file_stems", "raveparameters")
         app.addConfigEntry("plot_graph", "<control>p", "gui_accelerators")
 

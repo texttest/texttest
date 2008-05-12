@@ -254,8 +254,8 @@ class Config(CarmenConfig):
         if test.classId() == "test-case":
             subplan = self._getSubPlanDirName(test)
             if subplan and os.path.isdir(subplan):
-                for title, fileName in self.filesFromSubplan(test, subplan):
-                    readDirs[title] = [ fileName ]
+                for title, fileNames in self.filesFromSubplan(test, subplan):
+                    readDirs[title] = fileNames
             try:
                 rulesets = [ os.path.join(test.getEnvironment("CARMUSR"), "crc", "source", name) \
                              for name in self.getRuleSetNames(test) ]

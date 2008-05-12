@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.21 2008/02/26 14:34:12 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.22 2008/05/12 09:15:06 geoff Exp $
 #
 import ravebased, sandbox, plugins, os, shutil
 
@@ -49,7 +49,7 @@ class StudioConfig(ravebased.Config):
         if not os.path.isfile(rulesFile):
             return []
 
-        return [ ("Subplan", rulesFile ) ]
+        return [ ("Subplan", [ rulesFile ]) ]
     def _subPlanName(self, test):
         macroLine = self.getSubPlanLineInMacro(test)
         if not macroLine:

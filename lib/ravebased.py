@@ -358,7 +358,7 @@ class PrepareCarmdataWriteDir(sandbox.PrepareWriteDirectory):
             self.collatePath(test, "$CARMUSR", self.partialCopyTestPath)
 
 def getCrcCompileVars():
-    return [ "CARMSYS", "CARMUSR", "CARMTMP", "CARMROLE", "CARMGROUP", "BITMODE", "_AUTOTEST__LOCAL_COMPILE_", "PATH", "USER" ] 
+    return [ "CARMSYS", "CARMUSR", "CARMTMP", "CARMROLE", "CARMGROUP", "BITMODE", "_AUTOTEST__LOCAL_COMPILE_", "PATH", "USER", "_AUTOTEST__DEBUG_" ] 
     
 class RuleBuildSubmitServer(QueueSystemServer):
     def __init__(self, *args):
@@ -431,6 +431,8 @@ class RuleBuildSubmitServer(QueueSystemServer):
             try:
                 compileArgs = [ remoteCmd, ruleset.uniqueName, self.submitAddress ] + ruleset.getCompilationArgs(remote=True)
                 command = " ".join(compileArgs)
+                if ruleset.modeString == "-debug":
+                    test.app.ensureDebugLibrariesExist(test)
                 if not self.submitJob(test, submissionRules, command, rulecompEnv):
                     self.testsForRuleBuild -= 1
             except plugins.TextTestError, e:

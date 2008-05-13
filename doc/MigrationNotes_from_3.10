@@ -50,6 +50,36 @@ As an additional note, if you're upgrading from TextTest 3.8 or earlier you don'
 all your files to be called "logging". Whatever they're called will work, just replace "logging"
 with the currently used name above.
 
+(2) GUI configuration files
+===========================
+You will need to do some tweaking if you have configured "interactive_action_module" or changed 
+the TextTest menu/toolbar layout by creating personal layout XML files.
+
+The config file setting "interactive_action_module" now works in the same way as "config_module", 
+i.e. it is a single entry, not a list any more. This may be less flexible but it was adequate for 
+all current known uses, and the whole point was to make the two configuration mechanisms separate 
+and similar.
+
+XML file naming conventions are now associated with the GUI configuration modules. Naming is now
+<GUI module>-dynamic.xml
+<GUI module>-static.xml
+<GUI module>.xml
+
+depending on which GUI should be affected. (See "layout" directory of the source for examples)
+(The _gui ending has no special meaning any more, so default_gui.xml still works, but refers 
+to the module default_gui.py and not default.py)
+
+(3) Batch collection scripts "batch.GenerateHistoricalReport" and "batch.CollectFiles" removed
+==============================================================================================
+Use -coll to build both the website and the email reports. To build just one of them,
+use -coll web or -coll mail, as appropriate. Use of both these scripts directly is deprecated,
+and batch.GenerateHistoricalReport is already removed.
+
+(4) Name of 'marked' category changed
+=====================================
+If you refer to category "marked by user" in [test_colours], [file_colours] or "hide_test-category"
+in configuration files, this should be changed to "marked" which is what the category is now called.
+
 =========================================================
 CHANGES IN DEFAULT BEHAVIOUR
 =========================================================
@@ -81,3 +111,70 @@ Hopefully such conflicting situations are fairly rare. But this might require so
 migration. Naturally, if in the above case you wish to preserve the 3.10 behaviour,
 copying the "environment.version" file to the test directory would achieve this.
  
+(2) "Update Info" and recomputing test results in the dynamic GUI
+=================================================================
+The "Update Info" button is gone, and is replaced by a new entry in the Actions menu,
+"Recompute status" (generally done by pressing 'F5'). 
+
+The automatic recomputation of completed tests when necessary is also gone, replaced 
+by the same action. When TextTest discovers that a test's results are out of date for 
+any reason, it will indicate this with a small refresh icon in the test tree view.
+The user can then recompute it by selecting it and pressing F5 as above. TextTest 
+checks this when tests are selected, and when they are saved.
+
+Recomputation takes account of many more things than it did before and should hence
+be more useful. 
+
+- It can be applied to many tests simultaneously.
+- It's possible to do it even if TextTest doesn't believe it's necessary.
+- It will take into account if files have been deleted since the original calculation.
+- It will behave correctly when a test is recomputed several times. 
+- It will take account of changes to the config file in the meantime.
+- It will work after a "fast" reconnect (the default version of reconnect)
+
+(3) Multiple versions of tests in the static GUI
+================================================
+
+In TextTest 3.10, the static GUI creates an amalgamated "generic test" for each distinct test in the test
+suite, irrespective of which versions the test actually applies to. This works OK, but the biggest problem
+was that the static GUI is rather blind when it comes to starting tests. Its model didn't allow it to accurately
+predict how many tests will be run, if any. This meant that
+
+- Numbers in the status bar for how many tests have been started were sometimes wrong.
+- It let you start inconsistent combinations and you only found out later that they were wrong.
+- The dynamic GUI didn't know how many tests it had got until it has read them all. It started running them as 
+they were read, which lead to the "hopping progress bar" phenomenon, where the speed
+and even direction of the progress bar depends on the relative speed of running and reading tests.
+
+TextTest 3.11's static GUI now reads the tests in the same way as the dynamic GUI but displays them in much
+the same way as 3.10, i.e. one row can refer to several tests. The difference is that this is made explicit,
+so the status bar messages now list both how many tests there are and how many of them are distinct. If such a 
+row is selected you will therefore see that you have selected "2 tests, 1 distinct". 
+
+Saving and Loading selections take account of this, so that it's possible to distinguish persistently
+which versions of a test should be selected. Also copying and pasting works as expected, i.e. if you copy
+a test in several versions the copy also exists in several versions. Previously it's been rather undefined
+what happened there.
+
+(4) File Creation in the static GUI
+===================================
+The "New File" tab is removed. Instead, there is an entry in the file view popup menu, which produces a dialog.
+This will create files of the type indicated by which part of the file view is chosen, so can present a
+more "focussed" drop-down list. It will also work for standard files which it didn't before. Files are
+generally created in the test directory as before, but can also be created in data file subdirectories
+if those are selected.
+
+(5) Combining knownbugs files when running with versions
+========================================================
+Say you have reported some bugs for the default version and some for a specific version,
+and thus have knownbugs.app and knownbugs.app.v1. Running version v1 would previously
+ignore the stuff in knownbugs.app. Now both files will be read.
+
+(6) Cosmetic and layout changes
+===============================
+"Adding Test" and "Adding Suite" tabs are removed and replaced with dialogs available 
+from the test popup menu and the Edit menu.
+"Bugs" tab is removed and replaced by "Enter Failure Information" in the same places.
+"Refresh" action has taken over the refresh icon, so "Select" now has a "Find" icon instead.
+"Result file" entries in selection tab now renamed to "test-file" as they work with any file
+

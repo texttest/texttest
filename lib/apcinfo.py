@@ -842,7 +842,15 @@ class PlotKPIGroupsAndGeneratePage(apc.PlotKPIGroups):
         
 class ExtractFromStatusFileHTML(apc.ExtractFromStatusFile):
     def __init__(self, args):
-        apc.ExtractFromStatusFile.__init__(self, args)
+        self.comparisonPage = "comparison.html"
+        argstoparent = []
+        for ar in args:
+           flag, val = ar.split("=")
+           if flag == "d":
+               self.comparisonPage = val
+           else:
+               argstoparent.append(ar)
+        apc.ExtractFromStatusFile.__init__(self, argstoparent)
         self.doc = HTMLgen.SimpleDocument(title="")
         self.table = HTMLgen.TableLite(border=1, cellpadding=1, cellspacing=1,width="100%")
         # Configuration
@@ -857,7 +865,7 @@ class ExtractFromStatusFileHTML(apc.ExtractFromStatusFile):
     def __del__(self):
         apc.ExtractFromStatusFile.__del__(self)
         self.doc.append(self.table)
-        self.doc.write("comparison.html")
+        self.doc.write(comparisonPage)
     def getColor(self, entry, value):
         if entry in self.coloring.keys() and value != "-":
             for low, high, category in self.coloring[entry]:

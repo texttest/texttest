@@ -1,6 +1,9 @@
 
-This file also details behaviour of TextTest 3.11 which will be different from TextTest 3.10. You can
-probably figure much of this out by just seeing what happens...
+There isn't so much migration to do for this release. The biggest impact is likely to be the
+log4x changes described below.
+
+Lower down, this file also details behaviour of TextTest 3.11 which will be different from 
+TextTest 3.10. You can probably figure much of this out by just seeing what happens...
 
 =========================================================
 COMPULSORY MIGRATION

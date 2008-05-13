@@ -206,14 +206,27 @@ class ShowMigrationNotes(ActionResultDialogGUI):
 
     def getDialogTitle(self):
         return "TextTest Migration Notes"
-
+    
+    def makeVersions(self, file):
+        versions = []
+        for stringVersion in file.split("_")[-1].split("."):
+            try:
+                versions.append(int(stringVersion))
+            except ValueError:
+                versions.append(stringVersion)
+        return versions
+                     
+    def cmpVersions(self, file1, file2):
+        v1 = self.makeVersions(file1)
+        v2 = self.makeVersions(file2)
+        return -cmp(v1, v2) # We want the most recent file first ...
+    
     def addContents(self):
         notebook = gtk.Notebook()
         notebook.set_scrollable(True)
         notebook.popup_enable()
         notes = glob.glob(os.path.join(plugins.installationDir("doc"), "MigrationNotes*"))
-        notes.sort()
-        notes.reverse() # We want the most recent file first ...
+        notes.sort(self.cmpVersions)
         message = ""
         for note in notes:
             notesFile = open(note)

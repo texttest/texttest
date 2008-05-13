@@ -33,6 +33,8 @@ class BaseTestComparison(plugins.TestState):
         firstLine = open(resultFile).readline()
         return firstLine != self.fakeMissingFileText()
     def makeComparisons(self, test):
+        # Might have saved some new ones or removed some old ones in the meantime...
+        test.refreshFiles()
         tmpFiles = self.makeStemDict(test.listTmpFiles())
         resultFiles, defFiles = test.listStandardFiles(allVersions=False)
         resultFilesToCompare = filter(self.shouldCompare, resultFiles)

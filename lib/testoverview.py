@@ -208,19 +208,16 @@ class TestTable:
         else:
             extraVersionName = version
         bgColour = colourFinder.find("column_header_bg")
-        columnHeader = HTMLgen.TH(extraVersionName, colspan = len(tagsFound) + 2, bgcolor=bgColour)
+        columnHeader = HTMLgen.TH(extraVersionName, colspan = len(tagsFound) + 1, bgcolor=bgColour)
         return HTMLgen.TR(columnHeader)
     def generateTestRow(self, test, pageVersion, version, extraVersion, results, tagsFound):
         bgColour = colourFinder.find("row_header_bg")
         row = [ HTMLgen.TD(HTMLgen.Container(HTMLgen.Name(version + test + extraVersion), test), bgcolor=bgColour) ]
-        analysis = []
         for tag in tagsFound:
             if results.has_key(tag):
                 state = results[tag]
                 type, detail = state.getTypeBreakdown()
                 category = state.category # Strange but correct..... (getTypeBreakdown gives "wrong" category)
-                if version.find("i386_linux") != -1:
-                    self.addToAnalysis(analysis, state)
                 fgcol, bgcol = self.getColors(category, detail)
                 filteredState = self.filterState(repr(state))
                 if category == "success":
@@ -232,7 +229,6 @@ class TestTable:
                 bgcol = colourFinder.find("no_results_bg")
                 cellContaint = "N/A"
             row.append(HTMLgen.TD(cellContaint, bgcolor = bgcol))
-        row.append(self.doAnalysis(analysis))
         return HTMLgen.TR(*row)
     def filterState(self, cellContent):
         result = cellContent
@@ -268,64 +264,12 @@ class TestTable:
         for tag in tagsFound:
             tagColour = self.findTagColour(tag)
             head.append(HTMLgen.TH(HTMLgen.Href(getDetailPageName(pageVersion, tag), HTMLgen.Font(getDisplayText(tag), color=tagColour))))
-        head.append(HTMLgen.TH("consistent"))
         heading = HTMLgen.TR()
         heading = heading + head
         cap = HTMLgen.Caption(HTMLgen.Font(version, size = 10))
         return HTMLgen.Container(cap, heading)
     def findTagColour(self, tag):
         return colourFinder.find("column_header_fg")
-    def addToAnalysis(self, analysis, state):
-        try:
-            resu = state.allResults
-            for res in resu:
-                if res.stem == "performance":
-                    analysis.append( (res.perfComparison.oldPerformance, res.perfComparison.newPerformance, res.differenceCache) )
-        except AttributeError:
-            pass
-    def doAnalysis(self, analysis):
-        if not analysis:
-            return HTMLgen.TD("", bgcolor = colourFinder.find("no_results_bg"))
-        mean = 1
-        firstRef, low , hasDiff = analysis[0]
-        high = low
-        sameRef = True
-        for ref, curr, diff in analysis:
-            if ref != firstRef:
-                sameRef = False
-                break
-            if diff:
-                hasDiff = True
-            if curr < low:
-                low = curr
-            if curr > high:
-                high = curr
-            if ref:
-                mean *= curr/ref
-            else:
-                print "Warning, zero ref", ref, curr
-        mean = mean**(1./len(analysis))
-        if hasDiff:
-            if len(analysis) < 5:
-                return HTMLgen.TD("To few results", bgcolor = colourFinder.find("no_results_bg"))
-            elif sameRef:
-                mi = 100*(low/ref-1)
-                ma = 100*(high/ref-1)
-                m = 100*(mean-1)
-                if abs(ma-mi) < 5:
-                    bgcol = colourFinder.find("success_bg")
-                else:
-                    bgcol = colourFinder.find("performance_bg")
-                fgcol = colourFinder.find("test_default_fg")
-                if abs(m) > 5 and abs(ma-mi) < abs(m) and ma*mi > 0:
-                    fgcol = colourFinder.find("performance_fg")
-                return HTMLgen.TD(HTMLgen.Font("Mean %.1f%%\nMin %.1f%%\nMax %.1f%%" % (m, mi, ma), color=fgcol),
-                                  bgcolor = bgcol)             
-            else:
-                return HTMLgen.TD("Ref changed", bgcolor = colourFinder.find("no_results_bg"))
-        else:
-            return HTMLgen.TD("Ok", bgcolor = colourFinder.find("success_bg"))
-
         
 class TestDetails:
     def generate(self, categoryHandler, version, tags, linkFromDetailsToOverview):

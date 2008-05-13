@@ -838,3 +838,46 @@ class PlotKPIGroupsAndGeneratePage(apc.PlotKPIGroups):
             return os.path.join(self.dir, plotName)
         else:
             return plotName
+
+        
+class ExtractFromStatusFileHTML(apc.ExtractFromStatusFile):
+    def __init__(self, args):
+        apc.ExtractFromStatusFile.__init__(self, args)
+        self.doc = HTMLgen.SimpleDocument(title="")
+        self.table = HTMLgen.TableLite(border=1, cellpadding=1, cellspacing=1,width="100%")
+        # Configuration
+        self.colors = {'BAD': 'TOMATO', 'ACCEPTABLE': 'LIGHTYELLOW', 'GOOD': 'LIGHTGREEN'
+}
+        execTime = [(-20.0,100000,"BAD"), (-30.0,-20.0, "ACCEPTABLE"), (-100000.0,-30,"GOOD") ]
+        cpuTime = [(20,100000000,"BAD"), (10,20, "ACCEPTABLE"), (-100000,10,"GOOD") ]
+        self.coloring = { 'Network generation exec time': execTime,
+                          'Generation exec time': execTime,
+                          'Network generation time': cpuTime,
+                          'Generation time': cpuTime }
+    def __del__(self):
+        apc.ExtractFromStatusFile.__del__(self)
+        self.doc.append(self.table)
+        self.doc.write("comparison.html")
+    def getColor(self, entry, value):
+        if entry in self.coloring.keys() and value != "-":
+            for low, high, category in self.coloring[entry]:
+                if float(value) >= low and float(value) < high:
+                    return self.colors[category]
+        return ""
+    def printCase(self, name, data, dataComp, anyToPrint = True, printMaxMin = False):
+        if not anyToPrint:
+            return
+        self.table.append(HTMLgen.TR() + [ HTMLgen.TD(name, colspan = 3*len(self.versions)/2+1, bgcolor="LIGHTGRAY") ])
+        for t in self.printValues:
+            row = [ HTMLgen.TD(t) ]
+            for v in range(len(self.versions)):
+               row.append(HTMLgen.TD("%s"%apc.stringify(data[v].get(t,"-"))))
+               if v%2:
+                   comp = dataComp[v/2].get(t,"-")
+                   color = self.getColor(t, comp)
+                   row.append(HTMLgen.TD("%s"%apc.stringify(comp), bgcolor = color))
+                   if printMaxMin:
+                       row.append(HTMLgen.TD("%s/%s"%(apc.stringify(self.minCommon[v/2].get(t,"-")), apc.stringify(self.maxCommon[v/2].get(t,"-")))))
+                   else:
+                       row.append(HTMLgen.TD("%s"%""))
+            self.table.append(HTMLgen.TR() + row)

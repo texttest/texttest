@@ -865,7 +865,7 @@ class ExtractFromStatusFileHTML(apc.ExtractFromStatusFile):
     def __del__(self):
         apc.ExtractFromStatusFile.__del__(self)
         self.doc.append(self.table)
-        self.doc.write(comparisonPage)
+        self.doc.write(self.comparisonPage)
     def getColor(self, entry, value):
         if entry in self.coloring.keys() and value != "-":
             for low, high, category in self.coloring[entry]:

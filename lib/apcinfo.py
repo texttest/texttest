@@ -880,11 +880,16 @@ class ExtractFromStatusFileHTML(apc.ExtractFromStatusFile):
             v = self.versions[vix]
             row.append(HTMLgen.TD(v, bgcolor="WhiteSmoke"))
             if vix%2:
-                row.append(HTMLgen.TD("Diff (%)", bgcolor="WhiteSmoke"))
-                if printMaxMin:
-                    row.append(HTMLgen.TD("Min/Max (%)", bgcolor="WhiteSmoke"))
+                diffCell = HTMLgen.TD("Diff (%)", bgcolor="WhiteSmoke", align = "center")
+                if not printMaxMin:
+                    row.append(diffCell)
                 else:
-                    row.append(HTMLgen.TD(""))
+                    miniTable = HTMLgen.TableLite(border=0, cellpadding=0, cellspacing=0, width="100%")
+                    diffCell.__setattr__("colspan", 2)
+                    miniTable.append(HTMLgen.TR() + [ diffCell ])
+                    miniTable.append(HTMLgen.TR() + [ HTMLgen.TD("Min (%)", bgcolor="WhiteSmoke", align = "center"),
+                                                      HTMLgen.TD("Max (%)", bgcolor="WhiteSmoke", align = "center") ])
+                    row.append(HTMLgen.TD(miniTable))
         self.table.append(HTMLgen.TR() + row)
         numValues = 0
         for t in self.printValues:
@@ -898,10 +903,19 @@ class ExtractFromStatusFileHTML(apc.ExtractFromStatusFile):
                if v%2:
                    comp = dataComp[v/2].get(t,"-")
                    color = self.getColor(t, comp)
-                   row.append(HTMLgen.TD("%s"%apc.stringify(comp), bgcolor = color, align = "center"))
-                   if printMaxMin:
-                       row.append(HTMLgen.TD("%s/%s"%(apc.stringify(self.minCommon[v/2].get(t,"-")), apc.stringify(self.maxCommon[v/2].get(t,"-"))), align = "center"))
+                   diffCell = HTMLgen.TD("%s"%apc.stringify(comp), bgcolor = color, align = "center")
+                   if not printMaxMin:
+                       row.append(diffCell)
                    else:
-                       row.append(HTMLgen.TD(""))
+                       miniTable = HTMLgen.TableLite(border=0, cellpadding=0, cellspacing=0, width="100%")
+                       diffCell.__setattr__("colspan", 2)
+                       miniTable.append(HTMLgen.TR() + [ diffCell ])
+                       mini = self.minCommon[v/2].get(t,"-")
+                       maxi = self.maxCommon[v/2].get(t,"-")
+                       miniColor = self.getColor(t, mini)
+                       maxiColor = self.getColor(t, maxi)
+                       miniTable.append(HTMLgen.TR() + [ HTMLgen.TD("%s"%apc.stringify(mini), bgcolor = miniColor, align = "center"),
+                                                         HTMLgen.TD("%s"%apc.stringify(maxi), bgcolor = maxiColor, align = "center") ])
+                       row.append(HTMLgen.TD(miniTable))
             self.table.append(HTMLgen.TR(bgcolor = defaultBGColor) + row)
             numValues += 1

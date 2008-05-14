@@ -82,14 +82,21 @@ class CreatePerformanceReport(guiplugins.ActionDialogGUI):
         self.createMainIndexFile()
     def collectTest(self, test):
         self.apps[test.app.fullName] = test.app.fullName
-        pathToTest = os.path.join(self.rootDir, test.app.fullName.lower().replace(' ', '_'),
-                                  test.getRelPath(), "index.html")
+        pathToTest = os.path.join(self.rootDir,
+                                  test.app.fullName.lower().replace(' ', '_'),
+                                  test.getRelPath(),
+                                  "index.html")
         dir, file = os.path.split(os.path.abspath(pathToTest))
         try:
             os.makedirs(dir)
         except:
             pass # Dir exists already ...
         self.testPaths.append((test, pathToTest))
+
+    def relativizeLink(self, link, currentDir):
+        if link == currentDir: # Special case when a test has an extra version :-(
+            return ""
+        return plugins.relativepath(currentDir, link)
         
     def createStyleFile(self):
         backgroundColor = "#000000"
@@ -133,7 +140,7 @@ class CreatePerformanceReport(guiplugins.ActionDialogGUI):
         file = open(self.mainIndexFile, "w")
         file.write("<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\" \"http://www.w3.org/TR/html4/loose.dtd\">\n")
         file.write("<html>\n <head>\n  <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\">\n")
-        file.write("  <title>Performance report created " + ctime(self.timeStamp) + "</title>\n  <link rel=\"stylesheet\" href=\"" + self.styleFilePath + "\" type=\"text/css\">\n </head>\n")
+        file.write("  <title>Performance report created " + ctime(self.timeStamp) + "</title>\n  <link rel=\"stylesheet\" href=\"" + self.relativizeLink(self.styleFilePath, self.rootDir) + "\" type=\"text/css\">\n </head>\n")
         file.write(" <body>\n")
         file.write("  <center><table width=\"80%\" border=\"0\"><tr><td align=\"center\">\n")
         file.write("   <div id=\"mainheader\"><h2>Performance report</h2><b>Applications:</b> ")
@@ -160,7 +167,7 @@ class CreatePerformanceReport(guiplugins.ActionDialogGUI):
             bestWorstColumnsCount[1][columnIndex] = 0
             bestWorstColumnsCount[2][columnIndex] = 0
             bestWorstColumnsCount[3][columnIndex] = 0
-            
+
         for i in xrange(0, len(self.testPaths), 1):
             self.notify("Status", "Creating report for " + self.testPaths[i][0].getRelPath())
             self.notify("ActionProgress", "")
@@ -169,10 +176,10 @@ class CreatePerformanceReport(guiplugins.ActionDialogGUI):
                 pathToPrev = self.testPaths[i - 1]
             pathToNext = None
             if i < len(self.testPaths) - 1:
-                pathToNext = self.testPaths[i + 1]
+                pathToNext = self.testPaths[i + 1]                
             performance, kpi = self.createTestFile(self.testPaths[i], pathToPrev, pathToNext, self.mainIndexFile)
 
-            file.write("    <tr><td align=\"left\" valign=\"middle\"><div id=\"maintablecell\"><a href=\"" + self.testPaths[i][1] + "\">" + self.testPaths[i][0].getRelPath() + "</div></a></td>")
+            file.write("    <tr><td align=\"left\" valign=\"middle\"><div id=\"maintablecell\"><a href=\"" + self.relativizeLink(self.testPaths[i][1], self.rootDir) + "\">" + self.testPaths[i][0].getRelPath() + "</div></a></td>")
             row = []
             for version in self.versions:
                 cost = "-"
@@ -224,14 +231,14 @@ class CreatePerformanceReport(guiplugins.ActionDialogGUI):
         file = open(pathToTest[1], "w")
         file.write("<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\" \"http://www.w3.org/TR/html4/loose.dtd\">\n")
         file.write("<html>\n <head>\n  <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\">\n")
-        file.write("  <title>Performance of test " + pathToTest[0].getRelPath() + "</title>\n  <link rel=\"stylesheet\" href=\"" + self.styleFilePath + "\" type=\"text/css\">\n </head>\n")
+        file.write("  <title>Performance of test " + pathToTest[0].getRelPath() + "</title>\n  <link rel=\"stylesheet\" href=\"" + self.relativizeLink(self.styleFilePath, os.path.dirname(pathToTest[1])) + "\" type=\"text/css\">\n </head>\n")
         file.write(" <body>\n  <center><table width=\"80%\"><tr><td align=\"center\"><div id=\"testpage\">\n")
         file.write("   <div id=\"navigationheader\"><table width=\"100%\" border=\"0\"><tr><td width=\"33%\" align=\"left\">")
         if pathToPrev:
-            file.write("<a href=\"" + pathToPrev[1] + "\"><< " + pathToPrev[0].getRelPath() + "</a>")
-        file.write("</td><td width=\"33%\" align=\"center\"><a href=\"" + pathToParent + "\">Up</a></td><td width=\"33%\" align=\"right\">")
+            file.write("<a href=\"" + self.relativizeLink(pathToPrev[1], os.path.dirname(pathToTest[1])) + "\"><< " + pathToPrev[0].getRelPath() + "</a>")
+        file.write("</td><td width=\"33%\" align=\"center\"><a href=\"" + self.relativizeLink(pathToParent, os.path.dirname(pathToTest[1])) + "\">Up</a></td><td width=\"33%\" align=\"right\">")
         if pathToNext:
-            file.write("<a href=\"" + pathToNext[1] + "\">" + pathToNext[0].getRelPath() + " >></a>")
+            file.write("<a href=\"" + self.relativizeLink(pathToNext[1], os.path.dirname(pathToTest[1])) + "\">" + pathToNext[0].getRelPath() + " >></a>")
         file.write("</td></tr></table></div>\n")
         file.write("   <div id=\"testheader\"><h2>Performance report</h2><b>Test:</b> " + pathToTest[0].getRelPath() + "</b><br><b>Created:</b> " + ctime(self.timeStamp) + "</div>\n")
 

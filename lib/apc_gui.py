@@ -83,7 +83,7 @@ class SelectKPIGroup(guiplugins.ActionGUI):
             self.notify("SetTestSelection", tests)
     def getTestsToSelect(self):
         suite = self.currTestSelection[0].parent
-        kpiGroupForTest, kpiGroups, percscale = readKPIGroupFileCommon(suite)
+        kpiGroupForTest, kpiGroups, percscale, dummy = readKPIGroupFileCommon(suite)
         if not kpiGroupForTest.has_key(self.currTestSelection[0].name):
             self.message = "Test " + self.currTestSelection[0].name +  " is not in an KPI group."
             return self.currTestSelection
@@ -122,7 +122,7 @@ class PlotTestInGUI(optimization_gui.PlotTestInGUI):
         # Plot KPI group
         currentTest = self.currTestSelection[0] # Only one test!
         suite = currentTest.parent
-        kpiGroupForTest, kpiGroups, percscale = readKPIGroupFileCommon(suite)
+        kpiGroupForTest, kpiGroups, percscale, dummy = readKPIGroupFileCommon(suite)
         if not kpiGroupForTest.has_key(currentTest.name):
             print "Test", currentTest.name, "is not in an KPI group."
             return [ currentTest ], None

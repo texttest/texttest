@@ -114,9 +114,10 @@ def readKPIGroupFileCommon(suite):
     kpiGroupForTest = {}
     kpiGroups = []
     kpiGroupsScale = {}
+    clientname = None
     kpiGroupsFileName = suite.getFileName("kpi_groups")
     if not kpiGroupsFileName:
-        return {}, [], {}
+        return {}, [], {}, clientname
     groupFile = open(kpiGroupsFileName)
     groupName = None
     groupScale = None
@@ -124,7 +125,9 @@ def readKPIGroupFileCommon(suite):
         if line[0] == '#' or not ':' in line:
             continue
         groupKey, groupValue = line.strip().split(":",1)
-        if groupKey.find("_") == -1:
+        if groupKey == "clientname":
+            clientname = groupValue
+        elif groupKey.find("_") == -1:
             if groupName:
                 groupKey = groupName
             testName = groupValue
@@ -144,7 +147,7 @@ def readKPIGroupFileCommon(suite):
             if item == "percscale":
                 groupScale = groupValue
     groupFile.close()
-    return kpiGroupForTest, kpiGroups, kpiGroupsScale
+    return kpiGroupForTest, kpiGroups, kpiGroupsScale, clientname
 
 def getConfig(optionMap):
     return ApcConfig(optionMap)
@@ -1489,7 +1492,7 @@ class PlotKPIGroups(plugins.Action):
                 self.timeDivision = 1
                 self.argsRem.remove(arg)
     def __call__(self, test):
-        kpiGroupForTest, kpiGroups, kpiGroupsScale = readKPIGroupFileCommon(test.parent)
+        kpiGroupForTest, kpiGroups, kpiGroupsScale, dummy = readKPIGroupFileCommon(test.parent)
         if kpiGroupForTest.has_key(test.name):
             testInGroup = kpiGroupForTest[test.name]
             if not self.groupsToPlot.has_key(testInGroup):

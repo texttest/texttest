@@ -255,11 +255,6 @@ class GenHTML(plugins.Action):
             self.profilesDirAsHtml = dict["profilesDirAsHtml"]
         
         self.RCFile = app.dircache.pathName("apcinfo.rc")
-        self.idoc = CarmenDocument(self.RCFile)
-        self.ilist = HTMLgen.List(style="compact")
-        self.idoc.append(self.ilist)
-        self.numberOfTests = 0
-        self.totalCPUtime = 0
 
         self.definingValues = [ "Network generation time", "Generation time", "Coordination time", "DH post processing" ]
         self.interestingValues = ["Conn fixing time", "OC to DH time"]
@@ -323,10 +318,16 @@ class GenHTML(plugins.Action):
         self.interParamsTable.heading.insert(0, "KPI group")
         self.interParamsTable.body = []
         self.interParamsDoc.append(self.interParamsTable)
+
+        self.clientSuiteList = {}
+        self.nonClientSuiteList = []
+        self.numberOfTests = 0
+        self.totalCPUtime = 0
         
         self.kpiGroupForTest = {}
         self.kpiGroups = []
         self.kpiGroupsList = {}
+        self.clientname = None
 
         self.suitePages = {}
 
@@ -348,17 +349,63 @@ class GenHTML(plugins.Action):
         self.chartRavedoc.append(self.chartRaveglob)
         self.chartRavedoc.append(HTMLgen.Paragraph())
         self.chartRavedoc.append(HTMLgen.Href('testindex.html', 'To test set page'))
- 
+
+    def createTable(self, suites):
+        table = HTMLgen.TableLite(border = 1)
+        table.append(HTMLgen.TR() + [HTMLgen.TH("Suite", rowspan = 2), HTMLgen.TH("KPI group/test", rowspan = 2), HTMLgen.TH("Description", colspan= 3 ), HTMLgen.TH("Created", rowspan = 2), HTMLgen.TH("Last update", rowspan = 2)])
+        table.append(HTMLgen.TR() + [HTMLgen.TH("COC/CAB"), HTMLgen.TH("Subproblem"), HTMLgen.TH("Daily/Weekly/Dated")])
+        for suite in suites:
+            suitename = suite["suitename"]
+            suitepagename = suitename + ".html"
+            suitedata = []
+            for group in suite["group"].keys():
+                grouplink = suitepagename + "#" + group
+                if group == "common":
+                    for test in suite["group"][group]["table"]:
+                        suitedata.append((HTMLgen.Href(grouplink, test[0]), "N/A", "N/A", "N/A", "N/A", test[-1])) 
+                else:
+                    grouptable = suite["group"][group]["table"]
+                    firsttestingroup = grouptable[0]
+                    period_start, timeper = suite["group"][group]["description"]
+                    suitedata.append((HTMLgen.Href(grouplink, HTMLgen.Strong(group + " (" + str(len(grouptable)) + ")")), "N/A", "N/A", timeper, period_start, firsttestingroup[-1]))
+            isFirst = True
+            for item, coccab,subprob, dwd, perstart, lastrun in suitedata:
+                row = []
+                if isFirst:
+                    row.append(HTMLgen.TD(HTMLgen.Href(suitepagename, suitename), rowspan = len(suitedata)))
+                    isFirst = False
+                row += [HTMLgen.TD(item), HTMLgen.TD(coccab), HTMLgen.TD(subprob), HTMLgen.TD(dwd), HTMLgen.TD(perstart), HTMLgen.TD(lastrun)]
+                table.append(HTMLgen.TR() + row)
+        return table
+
+    def writeIndexPage(self):
+        self.idoc = CarmenDocument(self.RCFile)
+        clients = self.clientSuiteList.keys()
+        clients.sort()
+        clientcontainer = HTMLgen.Container()
+        for clientname in clients:
+            clientcontainer.append(HTMLgen.Href("#" + clientname, clientname))
+        self.idoc.append(HTMLgen.Heading(2,clientcontainer))
+        self.idoc.append(HTMLgen.HR())
+        for clientname in clients:
+            suites = self.clientSuiteList[clientname]
+            self.idoc.append(HTMLgen.Name(clientname, HTMLgen.Heading(1, clientname)))
+            self.idoc.append(self.createTable(suites))
+        self.idoc.append(HTMLgen.Heading(1, "Non-client tests"))
+        self.idoc.append(self.createTable(self.nonClientSuiteList))
+
+        self.idoc.append(HTMLgen.Text("Number of tests: " + str(self.numberOfTests)))
+        self.idoc.append(HTMLgen.BR())
+        self.idoc.append(HTMLgen.Text("Total CPU time:  " + str("%.1f" % (self.totalCPUtime/60)) + "h"))
+        self.idoc.write(self.indexFile)
+         
     def __del__(self):
         # Don't write anything for 0 tests, not interesting
         if self.numberOfTests == 0:
             return
         
         # Write the main page.
-        self.idoc.append(HTMLgen.Text("Number of tests: " + str(self.numberOfTests)))
-        self.idoc.append(HTMLgen.BR())
-        self.idoc.append(HTMLgen.Text("Total CPU time:  " + str("%.1f" % (self.totalCPUtime/60)) + "h"))
-        self.idoc.write(self.indexFile)
+        self.writeIndexPage()
 
         # Write suite pages.                       
         for suites in self.suitePages.keys():
@@ -548,18 +595,22 @@ class GenHTML(plugins.Action):
             period_start, period_end = input[optimization.periodEntryName]
             date_start = time.mktime(time.strptime(period_start.strip(), "%Y%m%d"))
             date_end = time.mktime(time.strptime(period_end.strip(), "%Y%m%d"))
-            
+
+            timeper = None
             if date_start == date_end:
                 info.append("Daily")
+                timeper = "Daily"
             elif date_end == date_start + 6*1440*60:
                 info.append("Weekly")
+                timeper = "Weekly"
             else:
                 info.append("Dated (" + str(int((date_end-date_start)/1440/60) + 1) + " days)")
+                timeper = "Dated"
             info.append(" Num legs: ", input["legs\."])
             info.append(HTMLgen.BR())
         else:
             print "Failed to find input info"
-
+        self.currentSuitePage["group"][group]["description"] = period_start, timeper
 
         # Info from the 'rules' file
         interestingParametersFound = {}
@@ -586,27 +637,25 @@ class GenHTML(plugins.Action):
         self.currentSuitePage["group"][group]["interestingParameters"] = interestingParametersFound
     
     def readKPIGroupFile(self, suite):
-        self.kpiGroupForTest, self.kpiGroups, scales = apc.readKPIGroupFileCommon(suite)
+        self.kpiGroupForTest, self.kpiGroups, scales, self.clientname = apc.readKPIGroupFileCommon(suite)
         self.kpiGroupsList = {}
                 
     def setUpSuite(self, suite):
         if suite.name == "picador":
             return
-        # Top list for this suite.
-        self.suitePageName = suite.name + ".html"
-        self.ilist.append(HTMLgen.Href(self.suitePageName, HTMLgen.Text(suite.name)))
-        self.currentList = HTMLgen.List(style="compact")
-        self.ilist.append(self.currentList)
+        self.readKPIGroupFile(suite)
+        listtoappend = None
+        if not self.clientname:
+            listtoappend = self.nonClientSuiteList
+        else:
+            if not self.clientSuiteList.has_key(self.clientname):
+                self.clientSuiteList[self.clientname] = []
+            listtoappend = self.clientSuiteList[self.clientname]
         # Create page for suite.
-        self.currentSuitePage = self.suitePages[suite.name] = { 'page': CarmenDocument(self.RCFile) , 'group': {} }
+        self.currentSuitePage = self.suitePages[suite.name] = { 'suitename': suite.name, 'page': CarmenDocument(self.RCFile) , 'group': {} }
         self.currentSuitePage["page"].append(HTMLgen.Center(HTMLgen.Heading(1, suite.name)))
         self.currentSuite = suite
-        # Lists for the KPI groups.
-        self.readKPIGroupFile(suite)
-        for kpigr in self.kpiGroups:
-            self.currentList.append(HTMLgen.Href(self.suitePageName + "#" + kpigr, HTMLgen.Text("KPI group " + kpigr)))
-            self.kpiGroupsList[kpigr] = HTMLgen.List(style="compact")
-            self.currentList.append(self.kpiGroupsList[kpigr])
+        listtoappend.append(self.currentSuitePage)
             
     def __call__(self, test):
         self.describe(test)
@@ -615,15 +664,12 @@ class GenHTML(plugins.Action):
 
         # Add test to index list.
         if self.kpiGroupForTest.has_key(test.name):
-            self.kpiGroupsList[self.kpiGroupForTest[test.name]].append(title)
             group = self.kpiGroupForTest[test.name]
         else:
-            href  = HTMLgen.Href(self.suitePageName + "#" + test.name, title)
-            self.currentList.append(href)
             group = "common"
         # Create group if necessary.
         if not self.currentSuitePage["group"].has_key(group):
-            self.currentSuitePage["group"][group] = { 'info': None , 'barcharts': None , 'table': [] , 'profiling': {} , 'rulecheckfailureavg': 0 , 'numtests': 0, 'interestingParameters': None}
+            self.currentSuitePage["group"][group] = { 'info': None , 'barcharts': None , 'table': [] , 'profiling': {} , 'rulecheckfailureavg': 0 , 'numtests': 0, 'interestingParameters': None, 'description': None}
             if not group == "common":
                 self.createGroupInfo(group, test)
 

@@ -875,17 +875,33 @@ class ExtractFromStatusFileHTML(apc.ExtractFromStatusFile):
     def printCase(self, name, data, dataComp, anyToPrint = True, printMaxMin = False):
         if not anyToPrint:
             return
-        self.table.append(HTMLgen.TR() + [ HTMLgen.TD(name, colspan = 3*len(self.versions)/2+1, bgcolor="LIGHTGRAY") ])
+        row = [ HTMLgen.TD(name, bgcolor="LIGHTGRAY") ]
+        for vix in  xrange(len(self.versions)):
+            v = self.versions[vix]
+            row.append(HTMLgen.TD(v, bgcolor="WhiteSmoke"))
+            if vix%2:
+                row.append(HTMLgen.TD("Diff (%)", bgcolor="WhiteSmoke"))
+                if printMaxMin:
+                    row.append(HTMLgen.TD("Min/Max (%)", bgcolor="WhiteSmoke"))
+                else:
+                    row.append(HTMLgen.TD(""))
+        self.table.append(HTMLgen.TR() + row)
+        numValues = 0
         for t in self.printValues:
+            if numValues % 2:
+                defaultBGColor = "GhostWhite"
+            else:
+                defaultBGColor = ""            
             row = [ HTMLgen.TD(t) ]
             for v in range(len(self.versions)):
-               row.append(HTMLgen.TD("%s"%apc.stringify(data[v].get(t,"-"))))
+               row.append(HTMLgen.TD("%s"%apc.stringify(data[v].get(t,"-")), align = "center"))
                if v%2:
                    comp = dataComp[v/2].get(t,"-")
                    color = self.getColor(t, comp)
-                   row.append(HTMLgen.TD("%s"%apc.stringify(comp), bgcolor = color))
+                   row.append(HTMLgen.TD("%s"%apc.stringify(comp), bgcolor = color, align = "center"))
                    if printMaxMin:
-                       row.append(HTMLgen.TD("%s/%s"%(apc.stringify(self.minCommon[v/2].get(t,"-")), apc.stringify(self.maxCommon[v/2].get(t,"-")))))
+                       row.append(HTMLgen.TD("%s/%s"%(apc.stringify(self.minCommon[v/2].get(t,"-")), apc.stringify(self.maxCommon[v/2].get(t,"-"))), align = "center"))
                    else:
-                       row.append(HTMLgen.TD("%s"%""))
-            self.table.append(HTMLgen.TR() + row)
+                       row.append(HTMLgen.TD(""))
+            self.table.append(HTMLgen.TR(bgcolor = defaultBGColor) + row)
+            numValues += 1

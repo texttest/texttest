@@ -458,10 +458,11 @@ class RuleBuildSubmitServer(QueueSystemServer):
                 if self.exited:
                     self.cancel(test)
                 else:
-                    jobId, jobName = self.getJobInfo(rulesetTests[0])
-                    if jobId:
-                        self.diag.info("Associated " + repr(test) + " with job info " + repr((jobId, jobName)))
-                        self.jobs[test] = jobId, jobName
+                    jobInfo = self.getJobInfo(rulesetTests[0])
+                    if len(jobInfo) > 0:
+                        for jobId, jobName in jobInfo:
+                            self.diag.info("Associated " + repr(test) + " with job info " + repr((jobId, jobName)))
+                            self.jobs.setdefault(test, []).append((jobId, jobName))
                     else:
                         test.changeState(copy(rulesetTests[0].state))
                         self.diag.info("No previous job found, " + repr(test) + " changed to state " + test.state.category)

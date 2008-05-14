@@ -538,6 +538,7 @@ class QueueSystemServer(BaseActionRunner):
         command = self.getSlaveCommand(test, submissionRules)
         print "Q: Submitting", test, submissionRules.getSubmitSuffix()
         sys.stdout.flush()
+        self.jobs[test] = [] # Preliminary jobs aren't interesting any more
         if not self.submitJob(test, submissionRules, command, self.getSlaveEnvironment()):
             return
         
@@ -619,7 +620,7 @@ class QueueSystemServer(BaseActionRunner):
         if not errorMessage:
             jobId = queueSystem.findJobId(stdout)
             self.diag.info("Job created with id " + jobId)
-            self.jobs[test] = jobId, jobName
+            self.jobs.setdefault(test, []).append((jobId, jobName))
             self.lockDiag.info("Releasing lock for submission...")
             self.lock.release()
             return True
@@ -653,10 +654,12 @@ class QueueSystemServer(BaseActionRunner):
             bugchecker.setUpSuite(test.parent)
             self.setUpSuites(bugchecker, test.parent)
     def _getJobFailureInfo(self, test):
-        if not self.jobs.has_key(test):
+        jobInfo = self.getJobInfo(test)
+        if len(jobInfo) == 0:
             return "No job has been submitted to " + queueSystemName(test)
         queueSystem = self.getQueueSystem(test)
-        jobId, jobName = self.jobs[test]
+        # Take the most recent job, it's hopefully the most interesting
+        jobId, jobName = jobInfo[-1]
         return queueSystem.getJobFailureInfo(jobId)
     def getSlaveErrors(self, test, name):
         slaveErrFile = self.getSlaveErrFile(test)
@@ -667,15 +670,13 @@ class QueueSystemServer(BaseActionRunner):
                        "\n" + errors
  
     def getSlaveErrFile(self, test):
-        jobId, jobName = self.getJobInfo(test)
-        if not jobName:
-            return
-        errFile = os.path.join(self.getSlaveLogDir(test), jobName + ".errors")
-        if os.path.isfile(errFile):
-            return errFile
+        for jobId, jobName in self.getJobInfo(test):
+            errFile = os.path.join(self.getSlaveLogDir(test), jobName + ".errors")
+            if os.path.isfile(errFile):
+                return errFile
     
     def getJobInfo(self, test):
-        return self.jobs.get(test, (None, None))
+        return self.jobs.get(test, [])
     def killJob(self, test, jobId, jobName):
         prevTest, prevJobExisted = self.killedJobs.get(jobId, (None, False))
         # Killing the same job for other tests should result in the cached result being returned
@@ -706,10 +707,11 @@ class QueueSystemServer(BaseActionRunner):
         # all tests terminate. Otherwise we rely on them terminating naturally, and if they don't
         wantStatus = self.killSignal and self.killSignal != signal.SIGINT
         killedTests = []
-        for test, (jobId, jobName) in self.jobs.items():
+        for test, jobList in self.jobs.items():
             if not test.state.isComplete():
-                if self.killTest(test, jobId, jobName, wantStatus):
-                    killedTests.append((test, jobId))
+                for jobId, jobName in jobList:
+                    if self.killTest(test, jobId, jobName, wantStatus):
+                        killedTests.append((test, jobId))
         if wantStatus:
             self.waitForKill(killedTests)
 
@@ -731,9 +733,10 @@ class QueueSystemServer(BaseActionRunner):
 
     def killOrCancel(self, test):
         # Explicitly chose test to kill (from the GUI)
-        jobId, jobName = self.getJobInfo(test)
-        if jobId:
-            self.killTest(test, jobId, jobName, wantStatus=True)
+        jobInfo = self.getJobInfo(test)
+        if len(jobInfo) > 0:
+            for jobId, jobName in self.getJobInfo(test):
+                self.killTest(test, jobId, jobName, wantStatus=True)
         else:
             self.diag.info("No job info found from queue system server, changing state to cancelled")
             return self.cancel(test)

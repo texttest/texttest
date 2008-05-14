@@ -409,9 +409,7 @@ class GenHTML(plugins.Action):
 
         # Write suite pages.                       
         for suites in self.suitePages.keys():
-            self.buildSuitePage(self.suitePages[suites], suites)
-            self.suitePages[suites]["page"].title = "APC test suite user " + suites
-            self.suitePages[suites]["page"].write(self.htmlDir + os.sep + suites + ".html")
+            self.buildSuitePage(self.suitePages[suites])
 
         # Write the time spent page.
         totalMeans = self.timeSpentBC.doMeans(self.chartrelglob.datalist, "ALL")
@@ -448,8 +446,10 @@ class GenHTML(plugins.Action):
         return "Generating HTML info for"
 
     # Builds the actual content for the group.
-    def buildSuitePage(self, suitePage, name):
-        page = suitePage["page"]
+    def buildSuitePage(self, suitePage):
+        page = CarmenDocument(self.RCFile)
+        suitename = suitePage["suitename"]
+        page.append(HTMLgen.Center(HTMLgen.Heading(1, suitename)))
         for groups in suitePage["group"].keys():
             page.append(HTMLgen.HR())
             page.append(HTMLgen.Name(groups))
@@ -463,7 +463,7 @@ class GenHTML(plugins.Action):
                 page.append(suitePage["group"][groups]["info"])
 
             if not groups == "common":
-                linkToTest = HTMLgen.Href(name + ".html" + "#" + groups, groups)
+                linkToTest = HTMLgen.Href(suitename + ".html" + "#" + groups, groups)
                 
                 # append cost_spread to variationChart
                 cost_spread, meanvar = self.calcCostAndPerfMeanAndVariation(suitePage["group"][groups]["table"])
@@ -490,7 +490,7 @@ class GenHTML(plugins.Action):
             if suitePage["group"][groups]["barcharts"]:
                 charts = chartabs, chartrel = suitePage["group"][groups]["barcharts"]
                 if not groups == "common":
-                    self.timeSpentBC.createBarChartMeansRelAbs(charts, groups, self.chartrelglob, name + ".html" + "#" + groups)
+                    self.timeSpentBC.createBarChartMeansRelAbs(charts, groups, self.chartrelglob, suitename + ".html" + "#" + groups)
                 page.append(chartrel)
                 page.append(chartabs)
 
@@ -502,12 +502,14 @@ class GenHTML(plugins.Action):
                 page.append(chart)
                 page.append(HTMLgen.Paragraph())
                 if not groups == "common":
-                    self.raveBC.createBarChartMeans(data["ravebc"], groups, self.chartRaveglob, name + ".html" + "#" + groups)
+                    self.raveBC.createBarChartMeans(data["ravebc"], groups, self.chartRaveglob, suitename + ".html" + "#" + groups)
                 page.append(data["ravebc"])
                 page.append(HTMLgen.Paragraph())
                 page.append("Used tests for profiling results: ")
-                page.append(self.findProfilingGraph(name, data["tests"]))
-                self.profilingGroups.append(HTMLgen.Href(name + ".html" + "#" + groups, HTMLgen.Text(groups)))
+                page.append(self.findProfilingGraph(suitename, data["tests"]))
+                self.profilingGroups.append(HTMLgen.Href(suitename + ".html" + "#" + groups, HTMLgen.Text(groups)))
+        page.title = "APC test suite user " + suitename
+        page.write(self.htmlDir + os.sep + suitename + ".html")
 
     def findProfilingGraph(self, suite, tests):
         profTests = HTMLgen.Container()
@@ -583,7 +585,7 @@ class GenHTML(plugins.Action):
         meanvar.append("Performance, mean: " + str(int(perf_mean)) + ", scaled std. dev: " + str("%.4f" % perf_var) + ", spread: " + str("%.4f" % (100*perf_spread)) + "%")
         return cost_spread, meanvar
         
-    def createGroupInfo(self, group, test):
+    def extractTestInfo(self, group, test):
         subplanDir = test.app._getSubPlanDirName(test)
         info = HTMLgen.Paragraph()
 
@@ -610,7 +612,6 @@ class GenHTML(plugins.Action):
             info.append(HTMLgen.BR())
         else:
             print "Failed to find input info"
-        self.currentSuitePage["group"][group]["description"] = period_start, timeper
 
         # Info from the 'rules' file
         interestingParametersFound = {}
@@ -633,6 +634,7 @@ class GenHTML(plugins.Action):
                 else:
                     info.append(entry["text"] + ": 0 ")
 
+        self.currentSuitePage["group"][group]["description"] = period_start, timeper
         self.currentSuitePage["group"][group]["info"] = info
         self.currentSuitePage["group"][group]["interestingParameters"] = interestingParametersFound
     
@@ -652,8 +654,7 @@ class GenHTML(plugins.Action):
                 self.clientSuiteList[self.clientname] = []
             listtoappend = self.clientSuiteList[self.clientname]
         # Create page for suite.
-        self.currentSuitePage = self.suitePages[suite.name] = { 'suitename': suite.name, 'page': CarmenDocument(self.RCFile) , 'group': {} }
-        self.currentSuitePage["page"].append(HTMLgen.Center(HTMLgen.Heading(1, suite.name)))
+        self.currentSuitePage = self.suitePages[suite.name] = { 'suitename': suite.name, 'groupsandtests': {}, 'group': {} }
         self.currentSuite = suite
         listtoappend.append(self.currentSuitePage)
             
@@ -671,7 +672,7 @@ class GenHTML(plugins.Action):
         if not self.currentSuitePage["group"].has_key(group):
             self.currentSuitePage["group"][group] = { 'info': None , 'barcharts': None , 'table': [] , 'profiling': {} , 'rulecheckfailureavg': 0 , 'numtests': 0, 'interestingParameters': None, 'description': None}
             if not group == "common":
-                self.createGroupInfo(group, test)
+                self.extractTestInfo(group, test)
 
         tableDate = "-"
         tableUncovered = -1

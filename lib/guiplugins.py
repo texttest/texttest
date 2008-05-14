@@ -285,6 +285,11 @@ class GtkActionWrapper:
         self.accelerator = self._addToGroups(self.getTitle().rstrip("."), self.gtkAction, actionGroup, accelGroup)
 
     def _addToGroups(self, title, gtkAction, actionGroup, accelGroup):
+        # GTK 2.12 got fussy about this...
+        existingAction = actionGroup.get_action(gtkAction.get_name())
+        if existingAction:
+            actionGroup.remove_action(existingAction)
+            
         accelerator = self.getAccelerator(title)
         actionGroup.add_action_with_accel(gtkAction, accelerator)
         gtkAction.set_accel_group(accelGroup)

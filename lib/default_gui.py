@@ -1361,7 +1361,7 @@ class RunningAction(guiplugins.ActionTabGUI):
         guiplugins.guilog.info("Starting " + usecase + " run of TextTest with arguments " + repr(ttOptions))
         logFile = os.path.join(writeDir, "output.log")
         errFile = os.path.join(writeDir, "errors.log")
-        self.runNumber += 1
+        RunningAction.runNumber += 1
         description = "Dynamic GUI started at " + plugins.localtime()
         cmdArgs = self.getTextTestArgs() + ttOptions
         env = self.getNewUseCaseEnvironment(usecase)

@@ -1067,7 +1067,8 @@ Framework Enhancements:
     - Core file collection improved (interpretcore.py)
 	Summary of what binary and core were used is displayed, along with debug info if any
     - Bugzilla plugin no longer depends on perl (bugzilla.py)
-	But still requires the cli.cgi script to be installed.
+	But still requires the cli.cgi script to be present. 
+	Need to tell it how to find this via the config entry "bug_system_script". See migration notes.
     - Temporary directories now have a PID identifier (default.py)
 	Mainly to make it impossible for two runs to write to the same place.
     - New script default.ExportTests for exporting tests to a different suite (default.py)

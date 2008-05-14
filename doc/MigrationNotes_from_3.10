@@ -53,7 +53,18 @@ As an additional note, if you're upgrading from TextTest 3.8 or earlier you don'
 all your files to be called "logging". Whatever they're called will work, just replace "logging"
 with the currently used name above.
 
-(2) GUI configuration files
+(2) Bugzilla plugin
+===================
+If you're using the bugzilla plugin, you'll find it now works on machines that don't have perl
+installed, as it doesn't rely on the command line program "bugcli" any more (though it still
+needs the cli.cgi script). You therefore now need to tell TextTest how to find this script via
+the new config file entry "bug_system_script". For example:
+
+[bug_system_script]
+bugzilla:http://www.mysite.com/bugzilla/cli.cgi
+[end]
+
+(3) GUI configuration files
 ===========================
 You will need to do some tweaking if you have configured "interactive_action_module" or changed 
 the TextTest menu/toolbar layout by creating personal layout XML files.
@@ -72,13 +83,13 @@ depending on which GUI should be affected. (See "layout" directory of the source
 (The _gui ending has no special meaning any more, so default_gui.xml still works, but refers 
 to the module default_gui.py and not default.py)
 
-(3) Batch collection scripts "batch.GenerateHistoricalReport" and "batch.CollectFiles" removed
+(4) Batch collection scripts "batch.GenerateHistoricalReport" and "batch.CollectFiles" removed
 ==============================================================================================
 Use -coll to build both the website and the email reports. To build just one of them,
 use -coll web or -coll mail, as appropriate. Use of both these scripts directly is deprecated,
 and batch.GenerateHistoricalReport is already removed.
 
-(4) Name of 'marked' category changed
+(5) Name of 'marked' category changed
 =====================================
 If you refer to category "marked by user" in [test_colours], [file_colours] or "hide_test-category"
 in configuration files, this should be changed to "marked" which is what the category is now called.

@@ -132,7 +132,7 @@ class GenerateWebPages:
             version = ".".join(versions[i:])
             if version in self.extraVersions:
                 return version
-        return "None"
+        return ""
     def readState(self, stateFile):
         file = open(stateFile, "rU")
         try:
@@ -203,12 +203,11 @@ class TestTable:
         table.append(HTMLgen.BR())
         return table
     def generateExtraVersionHeader(self, extraVersion, version, tagsFound):
-        if extraVersion != "None":
-            extraVersionName = version + "." + extraVersion
-        else:
-            extraVersionName = version
+        fullName = version
+        if len(extraVersion):
+            fullName += "." + extraVersion
         bgColour = colourFinder.find("column_header_bg")
-        columnHeader = HTMLgen.TH(extraVersionName, colspan = len(tagsFound) + 1, bgcolor=bgColour)
+        columnHeader = HTMLgen.TH(fullName, colspan = len(tagsFound) + 1, bgcolor=bgColour)
         return HTMLgen.TR(columnHeader)
     def generateTestRow(self, test, pageVersion, version, extraVersion, results, tagsFound):
         bgColour = colourFinder.find("row_header_bg")

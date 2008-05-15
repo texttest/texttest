@@ -362,11 +362,13 @@ class GenHTML(plugins.Action):
                 grouplink = suitepagename + "#" + group
                 if group == "common":
                     for test in suite["group"][group]["table"]:
-                        suitedata.append((HTMLgen.Href(grouplink, test[0]), "N/A", "N/A", "N/A", "N/A", test[-1])) 
+                        testname = test[0]
+                        period_start, timeper = suite["groupsandtests"][testname]["description"]
+                        suitedata.append((HTMLgen.Href(grouplink, testname), "N/A", "N/A", timeper, period_start, test[-1])) 
                 else:
                     grouptable = suite["group"][group]["table"]
                     firsttestingroup = grouptable[0]
-                    period_start, timeper = suite["group"][group]["description"]
+                    period_start, timeper = suite["groupsandtests"][group]["description"]
                     suitedata.append((HTMLgen.Href(grouplink, HTMLgen.Strong(group + " (" + str(len(grouptable)) + ")")), "N/A", "N/A", timeper, period_start, firsttestingroup[-1]))
             isFirst = True
             for item, coccab,subprob, dwd, perstart, lastrun in suitedata:
@@ -592,13 +594,14 @@ class GenHTML(plugins.Action):
         # Info from status file
         logFile = test.getFileName(test.app.getConfigValue("log_file"))
         optRun = optimization.OptimizationRun(test.app, ["legs\.", optimization.periodEntryName] ,[] ,logFile)
+        periodStart = None
+        timeper = None
         if optRun.solutions:
             input = optRun.solutions[0]
             period_start, period_end = input[optimization.periodEntryName]
             date_start = time.mktime(time.strptime(period_start.strip(), "%Y%m%d"))
             date_end = time.mktime(time.strptime(period_end.strip(), "%Y%m%d"))
 
-            timeper = None
             if date_start == date_end:
                 info.append("Daily")
                 timeper = "Daily"
@@ -634,9 +637,10 @@ class GenHTML(plugins.Action):
                 else:
                     info.append(entry["text"] + ": 0 ")
 
-        self.currentSuitePage["group"][group]["description"] = period_start, timeper
-        self.currentSuitePage["group"][group]["info"] = info
-        self.currentSuitePage["group"][group]["interestingParameters"] = interestingParametersFound
+        if group:
+            self.currentSuitePage["group"][group]["info"] = info
+            self.currentSuitePage["group"][group]["interestingParameters"] = interestingParametersFound
+        return period_start, timeper
     
     def readKPIGroupFile(self, suite):
         self.kpiGroupForTest, self.kpiGroups, scales, self.clientname = apc.readKPIGroupFileCommon(suite)
@@ -665,14 +669,16 @@ class GenHTML(plugins.Action):
 
         # Add test to index list.
         if self.kpiGroupForTest.has_key(test.name):
-            group = self.kpiGroupForTest[test.name]
+            group = self.kpiGroupForTest[test.name]            
         else:
             group = "common"
         # Create group if necessary.
         if not self.currentSuitePage["group"].has_key(group):
-            self.currentSuitePage["group"][group] = { 'info': None , 'barcharts': None , 'table': [] , 'profiling': {} , 'rulecheckfailureavg': 0 , 'numtests': 0, 'interestingParameters': None, 'description': None}
-            if not group == "common":
-                self.extractTestInfo(group, test)
+            self.currentSuitePage["group"][group] = { 'info': None , 'barcharts': None , 'table': [] , 'profiling': {} , 'rulecheckfailureavg': 0 , 'numtests': 0, 'interestingParameters': None}
+            if not group == "common": 
+                self.currentSuitePage["groupsandtests"][group] = { 'description': self.extractTestInfo(group, test) }
+        if group == "common":
+            self.currentSuitePage["groupsandtests"][test.name] = { 'description': self.extractTestInfo(None, test) }
 
         tableDate = "-"
         tableUncovered = -1

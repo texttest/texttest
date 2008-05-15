@@ -1916,7 +1916,7 @@ class ExtractFromStatusFile(plugins.Action):
         if test.parent.name != self.currentSuite:
             self.currentSuite = test.parent.name
             print "============================== " + "%-32s"%self.currentSuite + "=============================="
-        anyToPrint = True
+        anyToPrint = False
         testDataComp = []
         for t in xrange(0, len(self.versions), 2):
             td, ap = self.compareVersionsAccExtremes(testData, t, t+1)

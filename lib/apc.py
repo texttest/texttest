@@ -1892,6 +1892,8 @@ class ExtractFromStatusFile(plugins.Action):
         self.accCountCommon = [ {} for v in self.versions]
         self.minCommon = [{} for vix in xrange(0,len(self.versions)/2)]
         self.maxCommon = [{} for vix in xrange(0,len(self.versions)/2)]
+        self.minCommonTag = [{} for vix in xrange(0,len(self.versions)/2)]
+        self.maxCommonTag = [{} for vix in xrange(0,len(self.versions)/2)]
 
     def __call__(self, test):
         testData = []
@@ -1918,11 +1920,12 @@ class ExtractFromStatusFile(plugins.Action):
             print "============================== " + "%-32s"%self.currentSuite + "=============================="
         anyToPrint = False
         testDataComp = []
+        nameTag = test.parent.name +"/"+ test.name
         for t in xrange(0, len(self.versions), 2):
-            td, ap = self.compareVersionsAccExtremes(testData, t, t+1)
+            td, ap = self.compareVersionsAccExtremes(testData, t, t+1, nameTag)
             testDataComp.append(td)
             anyToPrint = anyToPrint or ap
-        self.printCase(test.parent.name + "/" +test.name,testData, testDataComp, anyToPrint)
+        self.printCase(nameTag, testData, testDataComp, anyToPrint)
         print "used statusfiles: " + ", ".join(statusFiles)
 
     def __del__(self):
@@ -1932,17 +1935,17 @@ class ExtractFromStatusFile(plugins.Action):
         accCommonComp = []
         accCountCommonComp = []
         for vix in xrange(0, len(self.versions), 2):
-            accAllComp.append(self.compareVersionsAccExtremes(self.accAll, vix, vix + 1, False)[0])
-            accCountAllComp.append(self.compareVersionsAccExtremes(self.accCountAll, vix, vix + 1, False)[0])
-            accCommonComp.append(self.compareVersionsAccExtremes(self.accCommon, vix, vix + 1, False)[0])
-            accCountCommonComp.append(self.compareVersionsAccExtremes(self.accCountCommon, vix, vix + 1, False)[0])
+            accAllComp.append(self.compareVersionsAccExtremes(self.accAll, vix, vix + 1)[0])
+            accCountAllComp.append(self.compareVersionsAccExtremes(self.accCountAll, vix, vix + 1)[0])
+            accCommonComp.append(self.compareVersionsAccExtremes(self.accCommon, vix, vix + 1)[0])
+            accCountCommonComp.append(self.compareVersionsAccExtremes(self.accCountCommon, vix, vix + 1)[0])
 
         self.printCase("Accumulated values in testcases", self.accAll, accAllComp)
         self.printCase("Count of all values in testcases", self.accCountAll, accCountAllComp)
         self.printCase("Accumulated common values in testcases", self.accCommon, accCommonComp, True, True)
         self.printCase("Count of all common values in testcases", self.accCountCommon, accCountCommonComp)
         
-    def compareVersionsAccExtremes(self, data, v0, v1, doAccExtremes = True):
+    def compareVersionsAccExtremes(self, data, v0, v1, compareTag = ""):
         anyToPrint = False
         result = {}
         for t in self.printValues:
@@ -1954,9 +1957,16 @@ class ExtractFromStatusFile(plugins.Action):
                 percDiff = 100*(d1 / d0 - 1);
                 result[t] = "%3.1f"%(percDiff)
                 # TODO, this is accumulation stuff, should be elsewhere?
-                if doAccExtremes and (d0 >= self.extremeLimit or d1 >= self.extremeLimit):
-                    self.minCommon[v0/2][t] = min(percDiff, self.minCommon[v0/2].get(t, sys.maxint))
-                    self.maxCommon[v0/2][t] = max(percDiff, self.maxCommon[v0/2].get(t, -sys.maxint))
+                if compareTag and (d0 >= self.extremeLimit or d1 >= self.extremeLimit):
+                    oldmin = self.minCommon[v0/2].get(t, sys.maxint)
+                    if percDiff < oldmin:
+                        self.minCommon[v0/2][t] = percDiff
+                        self.minCommonTag[v0/2][t]= compareTag
+                    oldmax = self.maxCommon[v0/2].get(t, -sys.maxint)
+                    if percDiff > oldmax:
+                        self.maxCommon[v0/2][t] = percDiff
+                        self.maxCommonTag[v0/2][t]= compareTag
+
             else:
                 result[t] = "-"
         return result, anyToPrint

@@ -932,7 +932,7 @@ class ExtractFromStatusFileHTML(apc.ExtractFromStatusFile):
     def printCase(self, name, data, dataComp, anyToPrint = True, printMaxMin = False):
         if not anyToPrint:
             return
-        row = [ HTMLgen.TD(name, bgcolor="LIGHTGRAY") ]
+        row = [ HTMLgen.TD(HTMLgen.Name(name, text=name), bgcolor="LIGHTGRAY") ]
         for vix in  xrange(len(self.versions)):
             v = self.versions[vix]
             row.append(HTMLgen.TD(v, bgcolor="WhiteSmoke"))
@@ -969,10 +969,12 @@ class ExtractFromStatusFileHTML(apc.ExtractFromStatusFile):
                        miniTable.append(HTMLgen.TR() + [ diffCell ])
                        mini = self.minCommon[v/2].get(t,"-")
                        maxi = self.maxCommon[v/2].get(t,"-")
+                       mintag = "#" + self.minCommonTag[v/2].get(t,"-")
+                       maxtag = "#" + self.maxCommonTag[v/2].get(t,"-")
                        miniColor = self.getColor(t, mini)
                        maxiColor = self.getColor(t, maxi)
-                       miniTable.append(HTMLgen.TR() + [ HTMLgen.TD("%s"%apc.stringify(mini), bgcolor = miniColor, align = "center"),
-                                                         HTMLgen.TD("%s"%apc.stringify(maxi), bgcolor = maxiColor, align = "center") ])
+                       miniTable.append(HTMLgen.TR() + [ HTMLgen.TD(HTMLgen.Href(mintag, "%s"%apc.stringify(mini)), bgcolor = miniColor, align = "center"),
+                                                         HTMLgen.TD(HTMLgen.Href(maxtag,"%s"%apc.stringify(maxi)), bgcolor = maxiColor, align = "center") ])
                        row.append(HTMLgen.TD(miniTable))
             self.table.append(HTMLgen.TR(bgcolor = defaultBGColor) + row)
             numValues += 1

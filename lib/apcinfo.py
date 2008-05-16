@@ -933,13 +933,15 @@ class ExtractFromStatusFileHTML(apc.ExtractFromStatusFile):
                 if float(value) >= low and float(value) < high:
                     return self.colors[category]
         return ""
+    def formatVersionName(self, origName):
+        return origName.replace("_", " ")
     def printCase(self, name, data, dataComp, anyToPrint = True, printMaxMin = False):
         if not anyToPrint:
             return
-        row = [ HTMLgen.TD(HTMLgen.Name(name, text=name), bgcolor="LIGHTGRAY") ]
+        row = [ HTMLgen.TD(HTMLgen.Name(name, text=name), bgcolor="LightGray") ]
         for vix in  xrange(len(self.versions)):
             v = self.versions[vix]
-            row.append(HTMLgen.TD(v, bgcolor="WhiteSmoke"))
+            row.append(HTMLgen.TD(self.formatVersionName(v), bgcolor="WhiteSmoke", align = "Center"))
             if vix%2:
                 diffCell = HTMLgen.TD("Diff (%)", bgcolor="WhiteSmoke", align = "center")
                 if not printMaxMin:

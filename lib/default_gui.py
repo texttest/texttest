@@ -1347,6 +1347,8 @@ class RunningAction(guiplugins.ActionTabGUI):
         self.observers.append(self)
     def correctTestClass(self):
         return "test-case"
+    def getGroupTabTitle(self):
+        return "Running"
     def messageAfterPerform(self):
         return self.performedDescription() + " " + self.describeTests() + " at " + plugins.localtime() + "."
     
@@ -1456,14 +1458,24 @@ class RunningAction(guiplugins.ActionTabGUI):
     def handleCompletion(self, *args):
         pass # only used when recording
 
+    def getConfirmationMessage(self):
+        if len(self.currTestSelection) > 1:
+            multiTestWarning = self.getMultipleTestWarning()
+            if multiTestWarning:
+                return "You are trying to " + multiTestWarning + ".\nThis will mean lots of target application GUIs " + \
+                       "popping up and may be hard to follow.\nAre you sure you want to do this?"
+        return ""
+
+    def getMultipleTestWarning(self):
+        pass
+
+
 class ReconnectToTests(RunningAction):
     def __init__(self, *args):
         RunningAction.__init__(self, *args)
         self.addOption("v", "Version to reconnect to")
         self.addOption("reconnect", "Temporary result directory", os.getenv("TEXTTEST_TMP"), description="Specify a directory containing temporary texttest results. The reconnection will use a random subdirectory matching the version used.")
         self.addSwitch("reconnfull", "Results", 0, ["Display as they were", "Recompute from files"])
-    def getGroupTabTitle(self):
-        return "Running"
     def _getStockId(self):
         return "connect"
     def _getTitle(self):
@@ -1492,8 +1504,6 @@ class RunTests(RunningAction):
         return "execute"
     def getTooltip(self):
         return "Run selected tests"
-    def getGroupTabTitle(self):
-        return "Running"
     def getOptionGroups(self):
         return self.optionGroups
     def getTestCount(self):
@@ -1514,22 +1524,13 @@ class RunTests(RunningAction):
             return "Started"
     def getUseCaseName(self):
         return "dynamic"
-    def getInteractiveReplayDescription(self):
+    def getMultipleTestWarning(self):
         app = self.currTestSelection[0].app
         for group in self.optionGroups:
             for switchName, desc in app.getInteractiveReplayOptions():
                 if group.getSwitchValue(switchName, False):
-                    return desc
-    def getConfirmationMessage(self):
-        if len(self.currTestSelection) > 1:
-            interactiveDesc = self.getInteractiveReplayDescription()
-            if interactiveDesc:
-                return "You are trying to run " + str(len(self.currTestSelection)) + " tests with " + \
-                       interactiveDesc + " replay enabled.\nThis will mean lots of target application GUIs " + \
-                       "popping up and may be hard to follow.\nAre you sure you want to do this?"
-        else:
-            return ""
-
+                    return "run " + self.describeTests() + " with " + desc + " replay enabled"
+    
 class RunTestsBasic(RunTests):
     def getTabTitle(self):
         return "Basic"
@@ -1549,8 +1550,6 @@ class RecordTest(RunningAction):
         self.addSwitch("repgui", options = ["Auto-replay invisible", "Auto-replay in dynamic GUI"])
     def _getStockId(self):
         return "media-record"
-    def singleTestOnly(self):
-        return True
     def getTabTitle(self):
         return "Recording"
     def messageAfterPerform(self):
@@ -1597,7 +1596,8 @@ class RecordTest(RunningAction):
 
         parts = os.path.basename(file).split(".")
         return ".".join(parts[2:])
-    
+    def getMultipleTestWarning(self):
+        return "record " + self.describeTests() + " simultaneously"
     def handleCompletion(self, testSel, usecase):
         test = testSel[0]
         if usecase == "record":
@@ -2293,11 +2293,11 @@ class InteractiveActionConfig:
                          SaveTests, SaveSelection, KillTests,
                          MarkTest, UnmarkTest, RecomputeTests ] # must keep RecomputeTests at the end!            
         else:
-            classes += [ ViewConfigFileInEditor, RecordTest, CopyTests, CutTests, 
+            classes += [ ViewConfigFileInEditor, CopyTests, CutTests, 
                          PasteTests, ImportTestCase, ImportTestSuite, 
                          CreateDefinitionFile, ReportBugs, SelectTests,
                          RefreshAll, HideUnselected, HideSelected, ShowAll,
-                         RunTestsBasic, RunTestsAdvanced, ResetGroups, RenameTest, RemoveTests, 
+                         RunTestsBasic, RunTestsAdvanced, RecordTest, ResetGroups, RenameTest, RemoveTests, 
                          SortTestSuiteFileAscending, SortTestSuiteFileDescending, 
                          RepositionTestFirst, RepositionTestUp,
                          RepositionTestDown, RepositionTestLast,

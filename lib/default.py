@@ -702,6 +702,7 @@ class Config:
         dict["run"] = "<control>r"
         dict["rename"] = "<control>m"
         dict["refresh"] = "F5"
+        dict["record_use-case"] = "F9"
         dict["recompute_status"] = "F5"
         dict["add_test"] = "<control>n"
         dict["enter_failure_information"] = "<control>i"

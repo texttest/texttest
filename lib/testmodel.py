@@ -1424,7 +1424,9 @@ class Application:
                 raise BadConfigError, "unrecognised option -" + option
         return optionGroups
     def addToOptionGroup(self, group):
-        if group.name.startswith("Basic"):
+        if group.name.startswith("Select"):
+            group.addOption("a", "App names containing", description="Select tests for which the application name matches the entered text. The text can be a regular expression.")
+        elif group.name.startswith("Basic"):
             group.addOption("v", "Run this version", self.getFullVersion())
         elif group.name.startswith("Advanced"):
             group.addOption("xr", "Configure self-diagnostics from", self.inputOptions.getSelfDiagFile())
@@ -1432,7 +1434,6 @@ class Application:
             group.addSwitch("x", "Enable self-diagnostics")
         elif group.name.startswith("Invisible"):
             # Options that don't make sense with the GUI should be invisible there...
-            group.addOption("a", "Run Applications whose name contains")
             group.addOption("s", "Run this script")
             group.addOption("d", "Run as if TEXTTEST_HOME was")
             group.addSwitch("help", "Print configuration help text on stdout")

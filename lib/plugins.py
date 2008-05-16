@@ -333,6 +333,18 @@ class TextFilter(Filter, TextTriggerGroup):
     def acceptsTestSuiteContents(self, suite):
         return not suite.isEmpty()
 
+class ApplicationFilter(TextFilter):
+    option = "a"
+    def acceptsTestCase(self, test):
+        return self.acceptsApplication(test.app)
+    def acceptsTestSuite(self, suite):
+        return self.acceptsApplication(suite.app)
+    def acceptsApplication(self, app):
+        return self.stringContainsText(app.name + app.versionSuffix())
+    def acceptsTestSuiteContents(self, suite):
+        # Allow empty suites through
+        return True
+
 class TestPathFilter(TextFilter):
     option = "tp"
     def parseInput(self, filterText, app):
@@ -1082,6 +1094,13 @@ class OptionGroup:
             return False
         self.options[key] = TextOption(*args, **kwargs)
         return True
+    def moveOptionsToStart(self, keys):
+        for key in reversed(keys):
+            option = self.options.get(key)
+            toInsert = seqdict()
+            toInsert[key] = option
+            del self.options[key]
+            self.options.insert(0, toInsert)
     def mergeIn(self, group):
         for key, switch in group.switches.items():
             if not self.switches.has_key(key):

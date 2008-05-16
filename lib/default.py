@@ -25,13 +25,14 @@ class Config:
             if group.name.startswith("Select"):
                 group.addOption("t", "Test names containing", description="Select tests for which the name matches the entered text. The text can be a regular expression.")
                 group.addOption("ts", "Suite names containing", description="Select tests for which at least one parent suite name matches the entered text. The text can be a regular expression.")
-                group.addOption("app", "App names containing", description="Select tests for which the application name matches the entered text. The text can be a regular expression.")
                 possibleDirs = self.getFilterFileDirectories([ app ], createDirs=False)
                 group.addOption("f", "Tests listed in file", possibleDirs=possibleDirs, selectFile=True)
                 group.addOption("desc", "Descriptions containing", description="Select tests for which the description (comment) matches the entered text. The text can be a regular expression.")
                 group.addOption("grep", "Test-files containing")
                 group.addOption("grepfile", "Test-file to search", allocateNofValues=2)
                 group.addOption("r", "Execution time", description="Specify execution time limits, either as '<min>,<max>', or as a list of comma-separated expressions, such as >=0:45,<=1:00. Digit-only numbers are interpreted as minutes, while colon-separated numbers are interpreted as hours:minutes:seconds.")
+                # More logical order
+                group.moveOptionsToStart([ "t", "ts"])
             elif group.name.startswith("Basic"):
                 group.addOption("c", "Use checkout", app.checkout)
                 group.addOption("cp", "Times to run", "1", description="Set this to some number larger than 1 to run the same test multiple times, for example to try to catch indeterminism in the system under test")
@@ -289,7 +290,7 @@ class Config:
     def getFilterClasses(self):
         return [ TestNameFilter, plugins.TestPathFilter, \
                  TestSuiteFilter, TimeFilter, \
-                 ApplicationFilter, TestDescriptionFilter ]
+                 plugins.ApplicationFilter, TestDescriptionFilter ]
     def checkFilterFileSanity(self, app):
         # Turn any input relative files into absolute ones, throw if we can't
         for filterFileName in self.findFilterFileNames(app):
@@ -816,11 +817,6 @@ class GrepFilter(plugins.TextFilter):
                 return True
         return False
 
-
-class ApplicationFilter(plugins.TextFilter):
-    option = "app"
-    def acceptsTestCase(self, test):
-        return self.stringContainsText(test.app.name)
 
 class TestDescriptionFilter(plugins.TextFilter):
     option = "desc"

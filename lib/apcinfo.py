@@ -913,10 +913,10 @@ class ExtractFromStatusFileHTML(apc.ExtractFromStatusFile):
         self.doc = HTMLgen.SimpleDocument(title="")
         self.table = HTMLgen.TableLite(border=1, cellpadding=1, cellspacing=1,width="100%")
         # Configuration
-        self.colors = {'BAD': 'TOMATO', 'ACCEPTABLE': 'LIGHTYELLOW', 'GOOD': 'LIGHTGREEN'
-}
-        execTime = [(-20.0,100000,"BAD"), (-30.0,-20.0, "ACCEPTABLE"), (-100000.0,-30,"GOOD") ]
-        cpuTime = [(20,100000000,"BAD"), (10,20, "ACCEPTABLE"), (-100000,10,"GOOD") ]
+        self.colors = {'BAD': 'TOMATO', 'ACCEPTABLE': 'LIGHTYELLOW', 'GOOD': 'LIMEGREEN', 'SUPERB': 'LIME' }
+        
+        execTime = [(-20.0,100000,"BAD"), (-30.0,-20.0, "ACCEPTABLE"), (-50,-30,"GOOD"), (-100000.0,-50,"SUPERB") ]
+        cpuTime = [(20,100000000,"BAD"), (10,20, "ACCEPTABLE"), (0,10,"GOOD"), (-100000,0,"SUPERB") ]
         self.coloring = { 'Network generation exec time': execTime,
                           'Generation exec time': execTime,
                           'GT setup exec time': execTime, 

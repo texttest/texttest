@@ -919,8 +919,10 @@ class ExtractFromStatusFileHTML(apc.ExtractFromStatusFile):
         cpuTime = [(20,100000000,"BAD"), (10,20, "ACCEPTABLE"), (-100000,10,"GOOD") ]
         self.coloring = { 'Network generation exec time': execTime,
                           'Generation exec time': execTime,
+                          'GT setup exec time': execTime, 
                           'Network generation time': cpuTime,
-                          'Generation time': cpuTime }
+                          'Generation time': cpuTime,
+                          'GT setup time': cpuTime}
     def __del__(self):
         apc.ExtractFromStatusFile.__del__(self)
         self.doc.append(self.table)

@@ -1870,11 +1870,11 @@ class ExtractFromStatusFile(plugins.Action):
                 self.extremeLimit = int(val)
             else:
                 print "ExtractFromStatusFile: Unknown option " + flag
-        self.tsValues =  [ "Preprocessing time", "DH setup time",
+        self.tsValues =  [ "Preprocessing time", "GT setup time", "DH setup time",
                            "Network generation time", "Generation time", "Coordination time", "Conn fixing time",
                            "DH post processing \(", "OC to DH time", "Total GT search time"]
 
-        self.tsValues += [ "Preprocessing exec time", "DH setup exec time",
+        self.tsValues += [ "Preprocessing exec time", "GT setup exec time", "DH setup exec time",
                            "Network generation exec time", "Generation exec time", "Coordination exec time", "Conn fixing exec time",
                            "DH post processing exec time","Total GT search exec time", "execution time", "memory"]
         prints = re.compile(self.printOnlyMatch)

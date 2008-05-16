@@ -1056,12 +1056,16 @@ class DocumentOptions(plugins.Action):
 
 class DocumentConfig(plugins.Action):
     def setUpApplication(self, app):
-        entries = app.configDir.keys()
+        entries = app.configDir.keys() + app.configDir.aliases.keys()
         entries.sort()
         for key in entries:
-            docOutput = app.configDocs[key]
+            realKey = app.configDir.aliases.get(key, key)
+            if realKey == key:
+                docOutput = app.configDocs[realKey]
+            else:
+                docOutput = "Alias. See entry for '" + realKey + "'"
             if not docOutput.startswith("Private"):
-                value = app.configDir[key]
+                value = app.configDir[realKey]
                 print key + "|" + str(value) + "|" + docOutput  
 
 class DocumentScripts(plugins.Action):

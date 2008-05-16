@@ -354,6 +354,7 @@ class GenHTML(plugins.Action):
         table = HTMLgen.TableLite(border = 1, width = "100%")
         table.append(HTMLgen.TR() + [HTMLgen.TH("Suite", rowspan = 2), HTMLgen.TH("KPI group/test", rowspan = 2), HTMLgen.TH("Description", colspan= 3 ), HTMLgen.TH("Created", rowspan = 2), HTMLgen.TH("Last update", rowspan = 2)])
         table.append(HTMLgen.TR() + [HTMLgen.TH("COC/CAB"), HTMLgen.TH("Subproblem"), HTMLgen.TH("Daily/Weekly/Dated")])
+        numItems = 0
         for suite in suites:
             suitename = suite["suitename"]
             suitepagename = suitename + ".html"
@@ -370,10 +371,11 @@ class GenHTML(plugins.Action):
                     firsttestingroup = grouptable[0]
                     period_start, timeper = suite["groupsandtests"][group]["description"]
                     suitedata.append((HTMLgen.Href(grouplink, HTMLgen.Strong(group + " (" + str(len(grouptable)) + ")")), "N/A", "N/A", timeper, period_start, firsttestingroup[-1]))
-            numItems = 0
+            isFirst = True
             for item, coccab,subprob, dwd, perstart, lastrun in suitedata:
                 row = []
-                if numItems == 0:
+                if  isFirst:
+                    isFirst = False
                     row.append(HTMLgen.TD(HTMLgen.Href(suitepagename, suitename), rowspan = len(suitedata), bgcolor = "White"))
                 row += [HTMLgen.TD(item), HTMLgen.TD(coccab), HTMLgen.TD(subprob), HTMLgen.TD(dwd), HTMLgen.TD(perstart), HTMLgen.TD(lastrun)]
                 if numItems % 2:

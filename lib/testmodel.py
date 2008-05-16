@@ -1404,7 +1404,7 @@ class Application:
         self.setConfigDefault("unsaveable_version", [], "Versions which should not have results saved for them")
         self.setConfigDefault("version_priority", { "default": 99 }, \
                               "Mapping of version names to a priority order in case of conflict.") 
-        self.setConfigDefault("extra_search_directory", { "default" : [] }, "Additional directories to search for settings besides the test structure")
+        self.setConfigDefault("extra_search_directory", { "default" : [] }, "Additional directories to search for TextTest files")
         self.setConfigAlias("test_data_searchpath", "extra_search_directory")
         self.setConfigAlias("extra_config_directory", "extra_search_directory")
     def setDependentConfigDefaults(self):

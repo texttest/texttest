@@ -829,10 +829,14 @@ class CVSStatus(CVSAction):
         # Each unique info column (column 2) gets its own toggle action in the popup menu
         uniqueInfos = []
         self.treeModel.foreach(self.collectInfos, uniqueInfos)
+        actionGroup = self.uiManager.get_action_groups()[0]
         for info in uniqueInfos:
+            # Don't add the same action lots of time, GTK 2.12 protests...
+            if actionGroup.get_action(info):
+                continue
             action = gtk.ToggleAction(info, info, None, None)
             action.set_active(True)
-            self.uiManager.get_action_groups()[0].add_action(action)
+            actionGroup.add_action(action)
             self.uiManager.add_ui_from_string("<popup name='Info'><menuitem name='" + info + "' action='" + info + "'/></popup>")
             action.connect("toggled", self.toggleVisibility)
             scriptEngine.registerToggleButton(action, "show category " + action.get_name(), "hide category " + action.get_name())

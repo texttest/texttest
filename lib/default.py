@@ -93,7 +93,10 @@ class Config:
         extraVersions += fromConfig
         copyCount = int(self.optionMap.get("cp", 1))
         for copyNum in range(1, copyCount):
-            extraVersions.append("copy_" + str(copyNum))
+            copyVersion = "copy_" + str(copyNum)
+            extraVersions.append(copyVersion)
+            for extra in fromConfig:
+                extraVersions.append(copyVersion + "." + extra)
 
         return extraVersions
         

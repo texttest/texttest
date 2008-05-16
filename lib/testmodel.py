@@ -385,7 +385,10 @@ class Test(plugins.Observable):
         for dataFile in self.getDataFileNames():
             self.diagnose("Searching for data files called " + dataFile)
             for fileName in self.dircache.findAllFiles(dataFile):
-                existingDataFiles += self.listFiles(fileName, dataFile)
+                for fullPath in self.listFiles(fileName, dataFile):
+                    if not fullPath in existingDataFiles:
+                        existingDataFiles.append(fullPath)
+
         self.diagnose("Found data files as " + repr(existingDataFiles))
         return existingDataFiles
     def listFiles(self, fileName, dataFile):

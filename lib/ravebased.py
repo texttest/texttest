@@ -317,7 +317,7 @@ class Config(CarmenConfig):
         app.addConfigEntry("need_rulecompile", "white", "test_colours")
         app.addConfigEntry("pending_rulecompile", "white", "test_colours")
         app.addConfigEntry("running_rulecompile", "peach puff", "test_colours")
-        app.addConfigEntry("ruleset_compiled", "white", "test_colours")
+        app.addConfigEntry("complete_rulecompile", "white", "test_colours")
 
 def getCarmCmdAndEnv(cmdLine, test):
     runEnv = test.getRunEnvironment(getCrcCompileVars())
@@ -397,10 +397,11 @@ class RuleBuildSubmitServer(QueueSystemServer):
         else:
             QueueSystemServer.notifyAllRead(self, suites)
             
-    def notifyRulesetCompiled(self, test):
+    def notifyRulesetCompiled(self, test, hostname):
         if test.state.isComplete(): # failed
             self.handleLocalError(test, previouslySubmitted=False)
         else:
+            test.changeState(RuleCompilationComplete(test.state, hostname))
             queue = QueueSystemServer.findQueueForTest(self, test)
             queue.put(test)
 
@@ -508,7 +509,12 @@ class RuleBuildSubmitServer(QueueSystemServer):
             QueueSystemServer.setKilledPending(self, test)
         
     def setSlaveFailed(self, test, startNotified, wantStatus):
-        if startNotified and self.isRuleBuild(test):
+        if test.state.category == "complete_rulecompile":
+            timeStr =  plugins.localtime("%H:%M")
+            briefText = "cancelled at " + timeStr
+            freeText = "Test was cancelled after rule compilation was successful, at " + timeStr
+            self.cancel(test, freeText, briefText, previouslySubmitted=False)
+        elif startNotified and self.isRuleBuild(test):
             failReason = "no report from rule compilation (possibly killed with SIGKILL)"
             briefText, fullText = self.getSlaveFailure(test, startNotified, wantStatus)
             fullText = failReason + "\n" + fullText
@@ -550,7 +556,7 @@ class RuleBuildRequestHandler(SlaveRequestHandler):
                 else:
                     ruleset.failed(raveOutput)
                 if evaluator.buildsSucceeded(test) or test.state.isComplete():
-                    test.notify("RulesetCompiled")
+                    test.notify("RulesetCompiled", hostname)
 
         diag.info("Completed handling response for " + name)
     def findRuleset(self, name):
@@ -769,6 +775,7 @@ class PendingRuleCompilation(plugins.TestState):
         plugins.TestState.__init__(self, "pending_rulecompile", briefText=briefText, \
                                    freeText=freeText, lifecycleChange=lifecycleChange)
 
+
 class RunningRuleCompilation(plugins.TestState):
     def __init__(self, prevState, hostname = None):
         self.rulecomp = prevState.rulecomp
@@ -779,6 +786,18 @@ class RunningRuleCompilation(plugins.TestState):
         lifecycleChange = "start ruleset compilation"
         plugins.TestState.__init__(self, "running_rulecompile", briefText=briefText, \
                                    freeText=freeText, lifecycleChange=lifecycleChange)
+
+class RuleCompilationComplete(plugins.TestState):
+    def __init__(self, prevState, hostname = None):
+        self.rulecomp = prevState.rulecomp
+        if not hostname:
+            hostname = gethostname()
+        briefText = "READY"
+        freeText = "Ready for submission of test. Completed compilation of ruleset" + self.rulecomp.description() + " on " + hostname
+        lifecycleChange = "complete ruleset compilation"
+        plugins.TestState.__init__(self, "complete_rulecompile", briefText=briefText, \
+                                   freeText=freeText, lifecycleChange=lifecycleChange)
+
 
 class RuleSet:
     NOT_COMPILED = 0

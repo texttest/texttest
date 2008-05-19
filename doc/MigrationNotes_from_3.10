@@ -156,7 +156,7 @@ predict how many tests will be run, if any. This meant that
 
 - Numbers in the status bar for how many tests have been started were sometimes wrong.
 - It let you start inconsistent combinations and you only found out later that they were wrong.
-- The dynamic GUI didn't know how many tests it had got until it has read them all. It started running them as 
+- The dynamic GUI didn't know how many tests it had got until it had read them all. It started running them as 
 they were read, which lead to the "hopping progress bar" phenomenon, where the speed
 and even direction of the progress bar depends on the relative speed of running and reading tests.
 
@@ -184,7 +184,13 @@ Say you have reported some bugs for the default version and some for a specific 
 and thus have knownbugs.app and knownbugs.app.v1. Running version v1 would previously
 ignore the stuff in knownbugs.app. Now both files will be read.
 
-(6) Cosmetic and layout changes
+(6) Reconnect incompatibility
+=============================
+As often happens in releases TextTest 3.11 will not be able to reconnect to runs done by
+TextTest 3.10. Nor will it be able to clean them up. If you rely on the feature that each
+batch run wipes the previous one's log files you'll need to clean the last 3.10 run by hand.
+
+(7) Cosmetic and layout changes
 ===============================
 "Saving" tab is removed, replaced by "Save As" action in the File menu. "Save" still
 exists and behaves as before (i.e. uses the settings from last time you did "Save As",

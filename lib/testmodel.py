@@ -2,7 +2,6 @@
 import os, sys, types, string, plugins, exceptions, log4py, shutil, operator
 from time import time
 from fnmatch import fnmatch
-from usecase import ScriptEngine, UseCaseScriptError
 from ndict import seqdict
 from copy import copy
 from cPickle import Pickler, loads, UnpicklingError
@@ -332,6 +331,7 @@ class Test(plugins.Observable):
             return []
     def setUniqueName(self, newName):
         if newName != self.uniqueName:
+            self.notify("UniqueNameChange", newName)
             self.uniqueName = newName
     def setEnvironment(self, var, value, propFile=None):
         if propFile:
@@ -1775,6 +1775,9 @@ class ApplicationEventResponder(Responder):
         if initial and test.classId() == "test-case":
             eventName = "test " + test.uniqueName + " to be read"
             self.scriptEngine.applicationEvent(eventName, test.uniqueName)
+    def notifyUniqueNameChange(self, test, newName):
+        if test.classId() == "test-case":
+            self.scriptEngine.applicationEventRename("test " + test.uniqueName + " to", "test " + newName + " to")
     
     def getTimeDelay(self):
         try:

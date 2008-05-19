@@ -173,7 +173,7 @@ class QueueSystemConfig(default.Config):
             return default.Config.getResponderClasses(self, allApps)
     def getThreadActionClasses(self):
         if self.useQueueSystem():
-            return [ self.getQueueServerClass(), self.getSlaveServerClass() ] # don't use the action runner at all!
+            return [ self.getSlaveServerClass(), self.getQueueServerClass() ] # don't use the action runner at all!
         else:
             return default.Config.getThreadActionClasses(self)
     def getQueueServerClass(self):
@@ -348,6 +348,8 @@ class SlaveServerResponder(Responder, TCPServer):
         self.testClientInfo = {}
         self.diag = plugins.getDiagnostics("Slave Server")
         self.terminate = False
+    def addSuites(self, *args):
+        # use this as an opportunity to broadcast our address
         serverAddress = self.getAddress()
         self.diag.info("Starting slave server at " + serverAddress)
         # Tell the submission code where we are
@@ -476,7 +478,9 @@ class QueueSystemServer(BaseActionRunner):
                 
         # Allowed a submitted job to terminate
         self.testsSubmitted -= 1
+        self.diag.info("No reuse for " + repr(test) + " : " + repr(self.testsSubmitted) + " tests still submitted")
         if self.exited and self.testsSubmitted == 0:
+            self.diag.info("Forcing termination")
             self.submitTerminators()
     def allowReuse(self, oldTest, newTest):
         oldRules = self.getSubmissionRules(oldTest)

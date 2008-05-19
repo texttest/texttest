@@ -694,6 +694,8 @@ class Config:
         dict["save"] = "<control>s"
         dict["save_as"] = "<control><alt>s"
         dict["copy"] = "<control>c"
+        dict["kill"] = "<control>Delete"
+        dict["remove"] = "<control>Delete"
         dict["cut"] = "<control>x"
         dict["paste"] = "<control>v"
         dict["save_selection"] = "<control><shift>s"

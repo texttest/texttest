@@ -525,9 +525,9 @@ class QueueSystemServer(BaseActionRunner):
             return self.getTestForRunNormalMode()
 
     def getTestForRun(self):
-        if self.testsSubmitted < self.maxCapacity:
+        if self.testCount == 0 or (self.testsSubmitted < self.maxCapacity):
             return self.getTestForRunNormalMode()
-        elif self.testCount > 0:
+        else:
             return self.getTestForRunReuseOnlyMode()
     
     def cleanup(self):

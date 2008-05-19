@@ -297,10 +297,13 @@ class GtkActionWrapper:
         return accelerator
     
     def setSensitivity(self, newValue):
-        oldValue = self.gtkAction.get_property("sensitive")
-        self.gtkAction.set_property("sensitive", newValue)
+        self._setSensitivity(self.gtkAction, newValue)
+
+    def _setSensitivity(self, gtkAction, newValue):
+        oldValue = gtkAction.get_property("sensitive")
+        gtkAction.set_property("sensitive", newValue)
         if oldValue != newValue:
-            guilog.info("Setting sensitivity of action '" + self.getTitle(includeMnemonics=True) + "' to " + repr(newValue))
+            guilog.info("Setting sensitivity of action '" + gtkAction.get_property("label") + "' to " + repr(newValue))
 
     def describeAction(self):
         self._describeAction(self.gtkAction, self.accelerator)
@@ -478,12 +481,19 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         self.describeDialog(dialog, message, stockIcon)
         
     def cleanDialog(self, button, saidOK, dialog):
+        self._cleanDialog(dialog)
+
+    def _cleanDialog(self, dialog):
         entrycompletion.manager.collectCompletions()
         dialog.hide()
         dialog.response(gtk.RESPONSE_NONE)
 
     def respond(self, button, saidOK, dialog):
-        self.cleanDialog(button, saidOK, dialog)
+        self._respond(saidOK, dialog)
+
+    def _respond(self, saidOK, dialog):
+        if dialog:
+            self._cleanDialog(dialog)
         if saidOK:
             self._runInteractive()
         else:
@@ -970,25 +980,32 @@ class ActionDialogGUI(OptionGroupGUI):
     def getConfirmationDialogSettings(self):
         return gtk.STOCK_DIALOG_WARNING, "Confirmation"
     
-    def respond(self, button, saidOK, dialog):
+    def _respond(self, saidOK=True, dialog=None):
         if saidOK:
             try:
                 message = self.getConfirmationMessage()
                 if message:
                     stockId, level = self.getConfirmationDialogSettings()
-                    self.showQueryDialog(dialog, message, stockId, level, self.confirmationRespond)
+                    self.showQueryDialog(self.getQueryParentWindow(dialog), message, stockId, level, self.confirmationRespond)
                 else:
-                    self.defaultRespond(button, saidOK, dialog)
+                    self.defaultRespond(saidOK, dialog)
             except plugins.TextTestError, e:
                 self.showErrorDialog(str(e))
         else:
-            self.defaultRespond(button, saidOK, dialog)
+            self.defaultRespond(saidOK, dialog)
+    def getQueryParentWindow(self, dialog):
+        if dialog:
+            return dialog
+        else:
+            return self.getParentWindow()
     def confirmationRespond(self, button, saidOK, dialog):
-        self.defaultRespond(button, saidOK, dialog)
+        self.defaultRespond(saidOK, dialog)
         if saidOK:
-            self.cleanDialog(button, saidOK, dialog.get_transient_for())
+            parent = dialog.get_transient_for()
+            if isinstance(parent, gtk.Dialog):
+                self._cleanDialog(parent)
     def defaultRespond(self, *args):
-        OptionGroupGUI.respond(self, *args)
+        OptionGroupGUI._respond(self, *args)
     def tryResize(self, dialog):
         hordiv, verdiv = self.getResizeDivisors()
         if hordiv is not None:

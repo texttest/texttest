@@ -34,23 +34,50 @@ class Quit(guiplugins.BasicActionGUI):
 
         
 # Plugin for saving tests (standard)
-class SaveTests(guiplugins.ActionTabGUI):
+class SaveTests(guiplugins.ActionDialogGUI):
     def __init__(self, allApps, *args):
-        guiplugins.ActionTabGUI.__init__(self, allApps, *args)
+        guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
+        self.directAction = gtk.Action("Save", "_Save", \
+                                       self.getDirectTooltip(), self.getStockId())
+        guiplugins.scriptEngine.connect(self.getDirectTooltip(), "activate", self.directAction, self._respond)
+        self.directAction.set_property("sensitive", False)
         self.addOption("v", "Version to save")
         self.addSwitch("over", "Replace successfully compared files also", 0)
         if self.hasPerformance(allApps):
             self.addSwitch("ex", "Save", 1, ["Average performance", "Exact performance"])
+
+    def getDialogTitle(self):
+        stemsToSave = self.getStemsToSave()
+        saveDesc = "Saving " + str(len(self.currTestSelection)) + " tests"
+        if len(stemsToSave) > 0:
+            saveDesc += ", only files " + ",".join(stemsToSave)
+        return saveDesc
+    
     def _getStockId(self):
         return "save"
-    def getTabTitle(self):
-        return "Saving"
     def _getTitle(self):
-        return "_Save"
+        return "Save _As..."
     def getTooltip(self):
+        return "Save results with non-default settings"
+    def getDirectTooltip(self):
         return "Save results for selected tests"
     def messageAfterPerform(self):
         pass # do it in the method
+
+    def addToGroups(self, actionGroup, accelGroup):
+        self.directAccel = self._addToGroups("Save", self.directAction, actionGroup, accelGroup)
+        guiplugins.ActionDialogGUI.addToGroups(self, actionGroup, accelGroup)
+
+    def describeAction(self):
+        self._describeAction(self.directAction, self.directAccel)
+        self._describeAction(self.gtkAction, self.accelerator)
+
+    def setSensitivity(self, newValue):
+        self._setSensitivity(self.directAction, newValue)
+        self._setSensitivity(self.gtkAction, newValue)
+        if newValue:
+            self.updateOptions()
+
     def getConfirmationMessage(self):
         testsForWarn = filter(lambda test: test.state.warnOnSave(), self.currTestSelection)
         if len(testsForWarn) == 0:
@@ -129,9 +156,11 @@ class SaveTests(guiplugins.ActionTabGUI):
             if seltest is not test and seltest.state.isSaveable():
                 return True
         return False
+    def getStemsToSave(self):
+        return [ os.path.basename(fileName).split(".")[0] for fileName, comparison in self.currFileSelection ]
     def performOnCurrent(self):
         saveDesc = ", exactness " + str(self.getExactness())
-        stemsToSave = [ os.path.basename(fileName).split(".")[0] for fileName, comparison in self.currFileSelection ]
+        stemsToSave = self.getStemsToSave()
         if len(stemsToSave) > 0:
             saveDesc += ", only " + ",".join(stemsToSave)
         overwriteSuccess = self.optionGroup.getSwitchValue("over")

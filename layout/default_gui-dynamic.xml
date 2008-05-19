@@ -4,7 +4,8 @@
 
     <menu name="filemenu" action="filemenu">
       <placeholder name="FirstInFileMenu">
-        <menuitem name="Save" action="Save"/>
+        <menuitem action="Save"/>
+        <menuitem action="Save As..."/>
         <separator/>
       </placeholder>
     </menu>

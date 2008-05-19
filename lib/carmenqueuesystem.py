@@ -325,25 +325,29 @@ class RunWithParallelAction(plugins.Action):
         except plugins.TextTestError, e:
             self.diag.info("Caught no time available exception :\n" + str(e))
             self.handleNoTimeAvailable(test)
+
+    def waitForProcessStart(self):
+        while not self.baseRunner.currentProcess:
+            self.diag.info("No process yet, sleeping...")
+            time.sleep(0.1)
+
     def getTestProcess(self, test):
         state = test.state # cache to avoid race conditions
         if state.isComplete():
             raise plugins.TextTestError, "Job already finished; cannot perform process-related activities"
-        elif not self.baseRunner.currentProcess:
-            self.diag.info("No process yet, sleeping...")
-            time.sleep(0.1)
-            return self.getTestProcess(test)
-        else:
-            jobProc = JobProcess(self.baseRunner.currentProcess.pid)
-            if self.hasAutomaticCpuTimeChecking(test.app):
-                # Here we expect the given process to be "time"
-                for attempt in range(5):
-                    childProcs = jobProc.findChildProcesses()
-                    if len(childProcs) > 0:
-                        return childProcs[0]
-                    time.sleep(0.1)
-                raise plugins.TextTestError, "Child processes didn't look as expected when running with automatic CPU time checking"
-            return jobProc
+
+        self.waitForProcessStart()
+        jobProc = JobProcess(self.baseRunner.currentProcess.pid)
+        if self.hasAutomaticCpuTimeChecking(test.app):
+            # Here we expect the given process to be "time"
+            for attempt in range(5):
+                childProcs = jobProc.findChildProcesses()
+                if len(childProcs) > 0:
+                    return childProcs[0]
+                time.sleep(0.1)
+            raise plugins.TextTestError, "Child processes didn't look as expected when running with automatic CPU time checking"
+        return jobProc
+    
     def findProcessInfo(self, test):
         parentProcess = self.getTestProcess(test)
         while 1:

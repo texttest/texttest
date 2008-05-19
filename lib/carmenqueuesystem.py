@@ -326,17 +326,16 @@ class RunWithParallelAction(plugins.Action):
             self.diag.info("Caught no time available exception :\n" + str(e))
             self.handleNoTimeAvailable(test)
 
-    def waitForProcessStart(self):
+    def waitForProcessStart(self, test):
         while not self.baseRunner.currentProcess:
+            if test.state.isComplete():
+                raise plugins.TextTestError, "Job already finished; cannot perform process-related activities"
+
             self.diag.info("No process yet, sleeping...")
             time.sleep(0.1)
 
     def getTestProcess(self, test):
-        state = test.state # cache to avoid race conditions
-        if state.isComplete():
-            raise plugins.TextTestError, "Job already finished; cannot perform process-related activities"
-
-        self.waitForProcessStart()
+        self.waitForProcessStart(test)
         jobProc = JobProcess(self.baseRunner.currentProcess.pid)
         if self.hasAutomaticCpuTimeChecking(test.app):
             # Here we expect the given process to be "time"

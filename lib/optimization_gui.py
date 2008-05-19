@@ -99,9 +99,9 @@ class PlotTestInGUI(guiplugins.ActionTabGUI):
             self.testGraph = optimization.TestGraph(self.optionGroup)
 
     
-class StartStudio(guiplugins.ActionTabGUI):
+class StartStudio(guiplugins.ActionDialogGUI):
     def __init__(self, *args):
-        guiplugins.ActionTabGUI.__init__(self, *args)
+        guiplugins.ActionDialogGUI.__init__(self, *args)
         self.addOption("sys", "Studio CARMSYS to use")
     def singleTestOnly(self):
         return True
@@ -109,8 +109,6 @@ class StartStudio(guiplugins.ActionTabGUI):
         return "test-case"
     def _getTitle(self):
         return "Start Studio"
-    def getTabTitle(self):
-        return "Studio"
     def getTooltip(self):
         return "Start Studio"
     def updateOptions(self):

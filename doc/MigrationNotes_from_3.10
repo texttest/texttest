@@ -186,9 +186,17 @@ ignore the stuff in knownbugs.app. Now both files will be read.
 
 (6) Cosmetic and layout changes
 ===============================
+"Saving" tab is removed, replaced by "Save As" action in the File menu. "Save" still
+exists and behaves as before (i.e. uses the settings from last time you did "Save As",
+or the default ones as appropriate).
 "Adding Test" and "Adding Suite" tabs are removed and replaced with dialogs available 
 from the test popup menu and the Edit menu.
 "Bugs" tab is removed and replaced by "Enter Failure Information" in the same places.
+"Recording" tab has moved and can now be found under "Running" instead of under "Test".
+"Update Info" button is renamed to "Recompute Status" and lives in the actions menu instead.
+
 "Refresh" action has taken over the refresh icon, so "Select" now has a "Find" icon instead.
 "Result file" entries in selection tab now renamed to "test-file" as they work with any file
 
+There are therefore no more buttons between the file view and the textual info, and no more 
+tabs alongside the textual info.

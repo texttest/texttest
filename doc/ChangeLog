@@ -1002,6 +1002,8 @@ General GUI Enhancements:
     - GUI configuration modules separated from standard configuration modules (guiplugins.py)
 	"interactive_action_module" is no longer a list and works like "config_module". 
 	Naming scheme for layout XML files changed. See migration notes
+    - All actions now exist in the menus and can have accelerators. New default accelerators added (guiplugins.py)
+	Add Test = <ctrl>N, Remove and Kill = <ctrl>Del, Refresh/Recompute = F5, Record = F9, Enter failure info = <ctrl>I
     - Reworked how GUI handles multiple applications with different features/configurations (guiplugins.py/default_gui.py)
 	This should be better separated now.
     - Window will now auto-widen if there isn't enough room for all information (texttestgui.py)
@@ -1032,7 +1034,7 @@ Dynamic GUI Enhancements:
     - Colours and default visibility can now be configured via any name appearing in the Status window (texttestgui.py)
 	Previously only had a bunch of (hidden) names to go on.
     - Viewing files now deselects them (texttestgui.py)
-	Mostly prevent accidental partial saves. Viewing differences did this before.
+	Mostly to prevent accidental partial saves. Viewing differences did this before.
     - New tests now allow user to save with a version ID (default_gui.py)
 	Default is still not to do so though.
     - Progress number for running tests more accurate (comparetest.py)
@@ -1076,9 +1078,13 @@ Framework Enhancements:
 Batch Report Enhancements:
     - HTML report now allows several applications on the same page (testoverview.py)
 	Set the config value "historical_report_page_name" to the same thing for them all.
+    - Removed "None" suffices to anchors in pages (testoverview.py)
+	No visible difference but makes it easier to create other pages that link there
 Grid Engine (LSF/SGE) enhancements:
     - "Follow file" in dynamic GUI will run the viewer on the remote machine (default_gui.py)
 	This is generally more responsive
+    - Can configure "View file" to do likewise, per file-type (default_gui.py)
+	Use new config file entry "view_file_on_remote_machine"
     - "Kill" button will always fetch all relevant information when tests die (queuesystem.py)
 	Will always get both the slave logs and the grid engine info
     - Introduced retry when slaves fail to communicate with the master process (queuesystem.py)
@@ -1090,6 +1096,9 @@ Old functionality removed and API changes:
 	Caused trouble and seemed rather pointless
     - Removal of previous write directories with -keeptmp flag (engine.py)
 	This was deemed to be a gotcha and a historical hangover
+Installation and self-test changes:
+    - Test naming scheme further improved so that waiting events won't fail if the test changes name (testmodel.py)
+    - Various grid engine tests tightened up so that slower reading of tests couldn't cause different behaviour
 Bug Fixes:
     - Fixed cases where status message 'Started X tests' showed the wrong number (texttestgui.py)
     - "New File" on a "Standard File" (output/errors) now creates suffices correctly (default_gui.py)
@@ -1101,6 +1110,7 @@ Bug Fixes:
     - Cutting/copying + Pasting multiple tests now leaves them all selected (default_gui.py)
 	Previously only the last one was selected
     - Reconnecting to Windows runs from UNIX now works (line ending problems fixed) (reconnect.py)
+    - Fixed log structure from static GUI, dynamic runs now put their logs in a strictly increasing sequence (default_gui.py)
     - Empty entry in "performance_logfile_extractor" now disables extraction instead of stacktracing (performance.py)
     - Fix stack limit bug when trying to wrap extremely long lines (comparefile.py)
     - Can no longer mark running tests by selecting them together with completed tests (guiplugins.py)
@@ -1113,6 +1123,9 @@ Bug Fixes:
     - Fixed stacktrace when test with missing files saved before another version of that test completes (comparetest.py)
 Grid Engine bug fixes:
     - Fixed major bug which could lead to hanging when killing tests before all had finished (queuesystem.py)
+    - Fixed race condition bug which could lead to hanging
+	Triggered if grid capacity was low and reading tests was slower than running them (queuesystem.py)
+    - Fixed another race condition where tests could complete before reading them had been processed (queuesystem.py)
     - Absolute paths in link_test_path or copy_test_path no longer cause data deletion when using grid engines (testmodel.py)
     - Trying to run with a grid engine that isn't installed gives an error message rather than stracktrace (queuesystem.py)
     - If invalid resource given for "performance_test_resource", performance collection now disabled (queuesystem.py)

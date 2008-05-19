@@ -210,12 +210,12 @@ class TextTestGUI(Responder, plugins.Observable):
         self.testColumnGUI = TestColumnGUI(self.dynamic, testCount)
         self.testTreeGUI = TestTreeGUI(self.dynamic, allApps, testPopupGUI, self.testColumnGUI)
         self.testFileGUI = TestFileGUI(self.dynamic, testFilePopupGUI)
-        self.notebookGUIs, rightWindowGUI = self.createRightWindowGUI()
+        self.rightWindowGUI = self.createRightWindowGUI()
         self.shortcutBarGUI = ShortcutBarGUI()
-        self.topWindowGUI = self.createTopWindowGUI(rightWindowGUI, allApps)
+        self.topWindowGUI = self.createTopWindowGUI(allApps)
 
     def getTestTreeObservers(self):
-        return [ self.testColumnGUI, self.testFileGUI, self.textInfoGUI ] + self.allActionGUIs() + self.notebookGUIs
+        return [ self.testColumnGUI, self.testFileGUI, self.textInfoGUI ] + self.allActionGUIs() + [ self.rightWindowGUI ]
     def allActionGUIs(self):
         return self.defaultActionGUIs + self.actionTabGUIs
     def getLifecycleObservers(self):
@@ -291,12 +291,14 @@ class TextTestGUI(Responder, plugins.Observable):
         self.topWindowGUI.createView()
         self.topWindowGUI.activate()
         self.idleManager.enableHandler()
+        
     def shouldShrinkMainPanes(self):
         # If we maximise there is no point in banning pane shrinking: there is nothing to gain anyway and
         # it doesn't seem to work very well :)
         return not self.dynamic or guiConfig.getWindowOption("maximize")
-    def createTopWindowGUI(self, rightWindowGUI, allApps):
-        mainWindowGUI = PaneGUI(self.testTreeGUI, rightWindowGUI, horizontal=True, shrink=self.shouldShrinkMainPanes())
+
+    def createTopWindowGUI(self, allApps):
+        mainWindowGUI = PaneGUI(self.testTreeGUI, self.rightWindowGUI, horizontal=True, shrink=self.shouldShrinkMainPanes())
         parts = [ self.menuBarGUI, self.toolBarGUI, mainWindowGUI, self.shortcutBarGUI, statusMonitor ]
         boxGUI = BoxGUI(parts, horizontal=False)
         return TopWindowGUI(boxGUI, self.dynamic, allApps)
@@ -309,20 +311,12 @@ class TextTestGUI(Responder, plugins.Observable):
         return menu, toolbar, testPopup, testFilePopup
     
     def createRightWindowGUI(self):
-        tabGUIs = [ self.appFileGUI, self.textInfoGUI, self.progressMonitor ] + self.actionTabGUIs
+        testTab = PaneGUI(self.testFileGUI, self.textInfoGUI, horizontal=False)
+        tabGUIs = [ self.appFileGUI, testTab, self.progressMonitor ] + self.actionTabGUIs
         
         tabGUIs = filter(lambda tabGUI: tabGUI.shouldShow(), tabGUIs)
         subNotebookGUIs = self.createNotebookGUIs(tabGUIs)
-        tabInfo = []
-        for name, notebookGUI in subNotebookGUIs.items():
-            if name == "Test":
-                tabInfo.append((name, PaneGUI(self.testFileGUI, notebookGUI, horizontal=False)))
-            else:
-                tabInfo.append((name, notebookGUI))
-
-        notebookGUI = NotebookGUI(tabInfo, self.getNotebookScriptName("Top"))
-        allNotebookGUIs = [ notebookGUI ] + filter(lambda gui: isinstance(gui, NotebookGUI), subNotebookGUIs.values())
-        return allNotebookGUIs, notebookGUI
+        return ChangeableNotebookGUI(subNotebookGUIs, self.getNotebookScriptName("Top"))
     
     def getNotebookScriptName(self, tabName):
         if tabName == "Top":
@@ -340,14 +334,14 @@ class TextTestGUI(Responder, plugins.Observable):
                 tabNames.append(tabName)
         return tabNames
     def createNotebookGUIs(self, tabGUIs):
-        tabInfo = seqdict()
+        tabInfo = []
         for tabName in self.getGroupTabNames(tabGUIs):
             currTabGUIs = filter(lambda tabGUI: tabGUI.getGroupTabTitle() == tabName, tabGUIs)
             if len(currTabGUIs) > 1:
                 notebookGUI = NotebookGUI(self.classifyByTitle(currTabGUIs), self.getNotebookScriptName(tabName))
-                tabInfo[tabName] = notebookGUI
+                tabInfo.append((tabName, notebookGUI))
             elif len(currTabGUIs) == 1:
-                tabInfo[tabName] = currTabGUIs[0]
+                tabInfo.append((tabName, currTabGUIs[0]))
         return tabInfo
     def run(self):
         gtk.main()
@@ -1450,8 +1444,12 @@ class NotebookGUI(guiplugins.SubGUI):
         self.diag = plugins.getDiagnostics("GUI notebook")
         self.tabInfo = tabInfo
         self.notebook = None
-        self.currentTabGUI = None
+        tabName, self.currentTabGUI = self.findInitialCurrentTab()
+        self.diag.info("Current page set to '" + tabName + "'")
 
+    def findInitialCurrentTab(self):
+        return self.tabInfo[0]
+    
     def setActive(self, value):
         guiplugins.SubGUI.setActive(self, value)
         if self.currentTabGUI:
@@ -1463,38 +1461,23 @@ class NotebookGUI(guiplugins.SubGUI):
         if self.currentTabGUI:
             self.currentTabGUI.contentsChanged()
 
-    def shouldShowCurrent(self, *args):
-        for name, tabGUI in self.tabInfo:
-            if tabGUI.shouldShowCurrent(*args):
-                return True
-        return False
-
     def createView(self):
         self.notebook = gtk.Notebook()
         for tabName, tabGUI in self.tabInfo:
             label = gtk.Label(tabName)
-            self.diag.info("Adding page " + tabName)
-            page = tabGUI.createView()
-            if not tabGUI.shouldShowCurrent():
-                self.diag.info("Hiding page " + tabName)
-                page.hide()
+            page = self.createPage(tabGUI, tabName)
             self.notebook.append_page(page, label)
 
         scriptEngine.monitorNotebook(self.notebook, self.scriptTitle)
         self.notebook.set_scrollable(True)
-        tabName, self.currentTabGUI = self.findInitialCurrentTab()
-        self.diag.info("Current page set to '" + tabName + "'")
         self.notebook.connect("switch-page", self.handlePageSwitch)
         self.notebook.show()
         return self.notebook
 
-    def findInitialCurrentTab(self):
-        for tabName, tabGUI in self.tabInfo:
-            if tabGUI.shouldShowCurrent():
-                return tabName, tabGUI
+    def createPage(self, tabGUI, tabName):
+        self.diag.info("Adding page " + tabName)
+        return tabGUI.createView()
 
-        return self.tabInfo[0]
-            
     def handlePageSwitch(self, notebook, ptr, pageNum, *args):
         if not self.active:
             return
@@ -1517,14 +1500,40 @@ class NotebookGUI(guiplugins.SubGUI):
             return self.notebook.get_tab_label_text(page)
         else:
             return ""
-    def getVisiblePages(self):
-        return filter(lambda child: child.get_property("visible"), self.notebook.get_children())
-    def getTabNames(self):
-        return map(self.notebook.get_tab_label_text, self.getVisiblePages())
 
     def describe(self):
         guilog.info("Tabs showing : " + ", ".join(self.getTabNames()))
 
+    def getVisiblePages(self):
+        return filter(lambda child: child.get_property("visible"), self.notebook.get_children())
+
+    def getTabNames(self):
+        return map(self.notebook.get_tab_label_text, self.getVisiblePages())
+    
+    def shouldShowCurrent(self, *args):
+        for name, tabGUI in self.tabInfo:
+            if tabGUI.shouldShowCurrent(*args):
+                return True
+        return False
+    
+
+
+# Notebook GUI that adds and removes tabs as appropriate...
+class ChangeableNotebookGUI(NotebookGUI):
+    def createPage(self, tabGUI, tabName):
+        page = NotebookGUI.createPage(self, tabGUI, tabName)
+        if not tabGUI.shouldShowCurrent():
+            self.diag.info("Hiding page " + tabName)
+            page.hide()
+        return page
+
+    def findInitialCurrentTab(self):
+        for tabName, tabGUI in self.tabInfo:
+            if tabGUI.shouldShowCurrent():
+                return tabName, tabGUI
+
+        return self.tabInfo[0]
+            
     def findFirstRemaining(self, pagesRemoved):
         for page in self.getVisiblePages():
             pageNum = self.notebook.page_num(page)

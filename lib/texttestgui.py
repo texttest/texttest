@@ -1258,22 +1258,27 @@ class TestTreeGUI(ContainerGUI):
         currTests = self.model.get_value(iter, 2)
         if not test in currTests:
             currTests.append(test)
+            
     def notifyRemove(self, test):
         delta = -test.size()
         iter = self.itermap.getIterator(test)
-        if iter:
+        allTests = self.model.get_value(iter, 2)
+        if len(allTests) == 1:
             self.notify("TestTreeCounters", totalDelta=delta, totalShownDelta=delta, totalRowsDelta=delta)
             self.removeTest(test, iter)
             guilog.info("Removing test with path " + test.getRelPath())
         else:
             self.notify("TestTreeCounters", totalDelta=delta, totalShownDelta=delta, totalRowsDelta=0)
+            allTests.remove(test)
             guilog.info("Removing additional test from path " + test.getRelPath())
+
     def removeTest(self, test, iter):
         filteredIter = self.findIter(test)
         if self.selection.iter_is_selected(filteredIter):
             self.selection.unselect_iter(filteredIter)
         self.model.remove(iter)
         self.itermap.remove(test)
+
     def notifyNameChange(self, test, origRelPath):
         iter = self.itermap.updateIterator(test, origRelPath)
         self.model.set_value(iter, 0, test.name)

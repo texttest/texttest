@@ -348,12 +348,18 @@ class SlaveServerResponder(Responder, TCPServer):
         self.testClientInfo = {}
         self.diag = plugins.getDiagnostics("Slave Server")
         self.terminate = False
+        # Socket may have to be around for some time,
+        # enable the keepalive option in the hope that that will make it more resilient
+        # to network problems
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, True)
+        
     def addSuites(self, *args):
         # use this as an opportunity to broadcast our address
         serverAddress = self.getAddress()
         self.diag.info("Starting slave server at " + serverAddress)
         # Tell the submission code where we are
         QueueSystemServer.instance.setSlaveServerAddress(serverAddress)
+
     def handlerClass(self):
         return SlaveRequestHandler
     def canBeMainThread(self):

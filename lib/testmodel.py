@@ -1633,6 +1633,9 @@ class Application:
             return value
     def getCompositeConfigValue(self, key, subKey, expandVars=True, getenvFunc=os.getenv, defaultKey="default"):
         dict = self.getConfigValue(key, expandVars, getenvFunc)
+        # If it wasn't a dictionary, return None
+        if not hasattr(dict, "items"):
+            return None
         listVal = []
         for currSubKey, currValue in dict.items():
             if fnmatch(subKey, currSubKey):

@@ -218,6 +218,7 @@ class QueueSystemConfig(default.Config):
         default.Config.setApplicationDefaults(self, app)
         app.setConfigDefault("default_queue", "texttest_default", "Which queue to submit tests to by default")
         app.setConfigDefault("min_time_for_performance_force", -1, "Minimum CPU time for test to always run on performance machines")
+        app.setConfigDefault("view_file_on_remote_machine", { "default" : 0 }, "Do we try to start viewing programs on the test execution machine?")
         app.setConfigDefault("queue_system_module", "SGE", "Which queue system (grid engine) software to use. (\"SGE\" or \"LSF\")")
         app.setConfigDefault("performance_test_resource", { "default" : [] }, "Resources to request from queue system for performance testing")
         app.setConfigDefault("parallel_environment_name", "*", "(SGE) Which SGE parallel environment to use when SUT is parallel")

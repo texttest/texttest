@@ -1094,6 +1094,9 @@ Old functionality removed and API changes:
 	Use -coll [web|mail] instead.
     - Dynamic GUI 'static' file view for tests that haven't started (texttestgui.py)
 	Caused trouble and seemed rather pointless
+    - "trace_level_variable" - basic log-level functionality (sandbox.py)
+	This seemed rather specific to the application that originally created it and didn't seem
+	worth preserving in the general TextTest.
     - Removal of previous write directories with -keeptmp flag (engine.py)
 	This was deemed to be a gotcha and a historical hangover
 Installation and self-test changes:

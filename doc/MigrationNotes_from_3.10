@@ -9,8 +9,8 @@ TextTest 3.10. You can probably figure much of this out by just seeing what happ
 COMPULSORY MIGRATION
 =========================================================
 
-(1) log4x configuration files
-=============================
+(1) log4x configuration files (and 'trace level')
+=================================================
 If you're using TextTest's integration with log4x, the whole mechanism has been
 removed as everything needed by it can be covered by other existing functionality.
 This is mainly because the data files mechanism supports having application and version
@@ -52,6 +52,9 @@ as the Java environment mechanism.
 As an additional note, if you're upgrading from TextTest 3.8 or earlier you don't need to rename
 all your files to be called "logging". Whatever they're called will work, just replace "logging"
 with the currently used name above.
+
+The 'trace_level_variable' functionality that came with this has not been preserved, as it was deemed to
+specific to one environment. It's fairly easy to reproduce by hand anyway.
 
 (2) Bugzilla plugin
 ===================

@@ -230,9 +230,6 @@ class TestEnvironmentCreator:
                     virtualDisplay = VirtualDisplayResponder.instance.displayName
                     if virtualDisplay:
                         vars.append(("DISPLAY", virtualDisplay))
-            if self.runsTests() and self.optionMap.has_key("trace"):
-                traceVarName = self.test.getConfigValue("trace_level_variable")
-                vars.append((traceVarName, self.optionMap["trace"]))
         elif self.testCase():
             useCaseVars = self.getUseCaseVariables()
             if self.useJavaRecorder():

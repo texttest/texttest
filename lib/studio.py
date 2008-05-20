@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.22 2008/05/12 09:15:06 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.23 2008/05/20 13:07:06 geoff Exp $
 #
 import ravebased, sandbox, plugins, os, shutil
 
@@ -13,10 +13,17 @@ def getConfig(optionMap):
 
 class StudioConfig(ravebased.Config):
     def addToOptionGroups(self, app, groups):
+        group = self.findBasicGroup(groups)
+        # strange order, to keep the historical layout
+        group.addSwitch("stepmacro", "Step through macro using the Macro Recorder")
+        ravebased.Config.addToOptionGroups(self, app, groups)
+        group.addOption("trace", "Studio trace level")
+
+    def findBasicGroup(self, groups):
         for group in groups:
             if group.name.startswith("Basic"):
-                group.addSwitch("stepmacro", "Step through macro using the Macro Recorder")
-        ravebased.Config.addToOptionGroups(self, app, groups)
+                return group
+            
     def getWriteDirectoryPreparer(self, ignoreCatalogues):
         return ravebased.PrepareCarmdataWriteDir(ignoreCatalogues)
     def defaultBuildRules(self):
@@ -84,8 +91,11 @@ class StudioConfig(ravebased.Config):
         return False
     def getConfigEnvironment(self, test):
         baseEnv, props = ravebased.Config.getConfigEnvironment(self, test)
-        if not test.parent and self.optionMap.has_key("stepmacro"):
-            baseEnv.append(("USECASE_REPLAY_SINGLESTEP", "1"))
+        if not test.parent:
+            if self.optionMap.has_key("stepmacro"):
+                baseEnv.append(("USECASE_REPLAY_SINGLESTEP", "1"))
+            if self.optionMap.has_key("trace"):
+                baseEnv.append(("TRACE_ON", self.optionMap["trace"]))
         return baseEnv, props
     def getInteractiveReplayOptions(self):
         return ravebased.Config.getInteractiveReplayOptions(self) + [ ("stepmacro", "single-step") ]

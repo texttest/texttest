@@ -38,8 +38,6 @@ class Config:
                 group.addOption("cp", "Times to run", "1", description="Set this to some number larger than 1 to run the same test multiple times, for example to try to catch indeterminism in the system under test")
                 if recordsUseCases:
                     group.addSwitch("actrep", "Run with slow motion replay")
-                if app.getConfigValue("trace_level_variable"):
-                    group.addOption("trace", "Target application trace level")
                 if self.isolatesDataUsingCatalogues(app):
                     group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
             elif group.name.startswith("Advanced"):
@@ -758,7 +756,6 @@ class Config:
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
         app.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")
         app.setConfigDefault("default_filter_file", [], "Filter file to use by default, generally only useful for versions")
-        app.setConfigDefault("trace_level_variable", "", "Environment variable that sets a simple trace-log level")
         app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
         app.setConfigDefault("test_data_properties", { "default" : "" }, "Write the contents of test_data_environment to the given Java properties file")
         app.setConfigDefault("test_list_files_directory", [ "filter_files" ], "Default directories for test filter files, relative to an application directory.")

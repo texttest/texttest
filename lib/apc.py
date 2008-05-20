@@ -31,6 +31,11 @@ helpOptions = """-rundebug <options>
                Instruct valgrind to attach to a debugger when encountering
                a memory problem. Note that this option means that output will
                not be redirected.
+             - cachegrind
+               Run cachegrind on the problem. Cachegrind raw data is dumped in
+               the file cachegrinddata.
+             - cache_output
+               Dump cachegrind output in the file cachegrind.
              - strace
                Run strace on the problem, with some timing info for each traced call.
                (using strace -T -tt)
@@ -327,6 +332,7 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
         self.XEmacsTestingKill = None
         self.runPlain = None
         self.runValgrind = None
+        self.runCachegrind = None
         self.runStrace = None
         self.collectSummary = None
         self.useDbx = None
@@ -335,6 +341,7 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
         self.keepTmps = keepTmpFiles;
         self.valOutput = None
         self.valDebug = None
+        self.cacheOutput = None
         self.parseOptions(options)
     def parseOptions(self, options):
         opts = options.split(" ")
@@ -359,6 +366,10 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
                 self.valOutput = 1
             elif opt == "valdebug":
                 self.valDebug = 1
+            elif opt == "cachegrind":
+                self.runCachegrind = 1
+            elif opt.find("cache_output")==0:
+                self.cacheOutput = 1  
             elif opt == "strace":
                 self.runStrace = 1
             elif opt == "summary":
@@ -383,6 +394,8 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
         # Source the CONFIG file to get the environment correct and run gdb with the script.
         configFile = os.path.join(test.getEnvironment("CARMSYS"), "CONFIG")
         subprocess.call(". " + configFile + "; " + executeCommand, env=test.getRunEnvironment(), shell=True)
+        if self.runCachegrind:
+            self.extractCachegrindData(test)
         self.removeRunDebugFiles()
     def getExecuteCommand(self, test, binName, apcbinOptions, apcLog):
         if self.runPlain:
@@ -398,6 +411,12 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
                 valopt += " --db-attach=yes"
                 redir = ""
             executeCommand = self.getValgrind() + " --tool=memcheck -v " + valopt + " " + binName + apcbinOptions + redir
+        elif self.runCachegrind:
+            cacheopt = ""
+            if self.cacheOutput:
+                cacheout = test.makeTmpFileName("cachegrind")
+                cacheopt += " --log-file-exactly=" + cacheout
+            executeCommand = self.getValgrind() + " --tool=cachegrind -v " + cacheopt + " " + binName + apcbinOptions + " >& " + apcLog
         elif self.runStrace:
             outfile = test.makeTmpFileName("strace")
             if self.collectSummary:
@@ -518,17 +537,13 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
             return "valgrind64"
         else:
             return "valgrind"
-    def extractValgrindOutput(self, test):
-        # NOT used anymore-trying with --log-file-exactly
-        # Valgrind adds a .pid in the end of the output file, this makes texttest
-        # not extract the file. Now we simply change it back. In later versions of
-        # valgrind, there is an --log-file-exact, we shall remove this code and use
-        # that alternative when it becomes available.
-        if self.valOutput:
-            files = os.listdir(".")
-            for file in files:
-                if file.startswith(self.valOutput):
-                    os.rename(file, self.valOutput + "." + test.app.name)
+    def extractCachegrindData(self, test):
+        files = os.listdir(".")
+        for file in files:
+            if file.startswith("cachegrind.out."):
+                cachegrindData = test.makeTmpFileName("cachegrinddata")
+                os.rename(file, cachegrindData)
+                return
     def setUpSuite(self, suite):
         self.describe(suite)
     

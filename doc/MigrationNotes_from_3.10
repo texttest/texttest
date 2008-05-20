@@ -53,7 +53,7 @@ As an additional note, if you're upgrading from TextTest 3.8 or earlier you don'
 all your files to be called "logging". Whatever they're called will work, just replace "logging"
 with the currently used name above.
 
-The 'trace_level_variable' functionality that came with this has not been preserved, as it was deemed to
+The 'trace_level_variable' functionality that came with this has not been preserved, as it was deemed too
 specific to one environment. It's fairly easy to reproduce by hand anyway.
 
 (2) Bugzilla plugin

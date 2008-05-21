@@ -141,6 +141,8 @@ class PlotProfileInGUIAPC(guiplugins.ActionTabGUI):
             sys.path.append(path)
         guiplugins.ActionTabGUI.__init__(self, allApps, dynamic)
         self.dynamic = dynamic
+        self.allApps = allApps
+        self.addSwitch("flatprof", "Flat profile")
         self.sizes = ["a4","a4l","a3","a3l"]
         self.addSwitch("size", "Size of plot:     ", 0, self.sizes);
         self.addOption("focus", "Focus on function", "")
@@ -184,7 +186,7 @@ class PlotProfileInGUIAPC(guiplugins.ActionTabGUI):
             for test in tests:
                 extra_info = self.getExtraInfo(test,False);
                 data = self.getProfileObj(test)
-                self.profileTest(data,extra_info,writeDir)
+                self.profileTest(test,data,extra_info,writeDir)
                 self.numPlottedTests +=1
         
     def setPlotOptions(self,options):
@@ -193,24 +195,32 @@ class PlotProfileInGUIAPC(guiplugins.ActionTabGUI):
         options["focus"] = self.optionGroup.getOptionValue("focus")
         options["remove above focus"] = self.optionGroup.getSwitchValue("hide_focus")
         
-    def profileTest(self,data,extra_info,writeDir):
-        import sym_analyze3
+    def profileTest(self,test,data,extra_info,writeDir):
+        import sym_analyze4
         if not os.path.isdir(writeDir):
             os.makedirs(writeDir)
-        ops = sym_analyze3.get_default_options();
+        ops = sym_analyze4.get_default_options();
         self.setPlotOptions(ops)
         ops["extra info"].extend(extra_info)
         if ops["focus"] != "" and not data.has_function_name(ops["focus"]):
             raise "Failed to find focus function"
-        sin,sout = os.popen2("dot -Tps")
-        sym_analyze3.print_dot(data,ops,sin)
-        sin.close()
-        ofname = os.path.join(writeDir,"%s.ps"%extra_info[0])
-        outfile = open(ofname,"w")
-        outfile.writelines(sout.readlines())
-        outfile.close()
-        cmd = "ggv %s"%ofname
-        os.system(cmd)
+        if not self.optionGroup.getSwitchValue("flatprof"):
+            sin,sout = os.popen2("dot -Tps")
+            sym_analyze4.print_dot(data,ops,sin)
+            sin.close()
+            ofname = os.path.join(writeDir,"%s.ps"%extra_info[0])
+            outfile = open(ofname,"w")
+            outfile.writelines(sout.readlines())
+            outfile.close()
+            cmd = "ggv %s"%ofname
+            os.system(cmd)
+        else:
+            flat = test.makeTmpFileName("flatprof", forComparison=0, forFramwork=1)
+            flatFile = open(flat, 'w')
+            sym_analyze4.print_flat(data, ops, flatFile)
+            flatFile.close()
+            viewclass = default_gui.ViewTestFileInEditor(self.allApps, self.dynamic)
+            viewclass.activateDefaultViewer(flat, "")
     def getExtraInfo(self,test,aggregate):
         logFileStem = test.app.getConfigValue("log_file")
         rv = []

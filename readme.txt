@@ -7,20 +7,22 @@ Documentation Summary:
     In source/doc, you can find :
        a) For those upgrading from previous versions of TextTest, migration notes are available for each 
           version. These list not only necessary migrations (which are now kept to a minimum) but also
-          changes to the default behaviour of TextTest.
+          changes to the default behaviour of TextTest. These can also be viewed from the Help menu
+          in TextTest.
 
        b) A ChangeLog detailing all changes since the previous release (and all releases).
 
        c) Many people like to learn by example. There is a brief "quick start guide" based around reading the 
           self-tests, under source/doc/quickstart.txt 
 
-       d) A directory RHEL_upgrade, especially for people working on Red Hat Enterprise Linux
-          who are stuck with an old version of Python or PyGTK and a sysadmin group unwilling to
-          upgrade the central version.
+       d) A directory Upgrade_PyGTK_Enterprise_Linux, especially for people working on an Enterprise Linux
+          system such as Red Hat or SuSE, who are stuck with an old version of Python or PyGTK and a sysadmin 
+          group unwilling to upgrade the central version. This is basically a guide to building PyGTK from
+          source on Linux.
 
 Installation and System Requirements:
 
-    Read the installation guide at http:/www.texttest.org/TextTest/docs/install.html
+    Read the installation guide at http://www.texttest.org/index.php?page=documentation_3_11&n=install_texttest
     The lightning summary is that you need Python, PyGTK, tkdiff which are probably already
     installed if you're on UNIX. On Windows you'll probably need to download them. However
     you don't need special process management tools any more and it's sufficient to run PyGTK's installer
@@ -78,9 +80,9 @@ Other (non-standard) Open Source python modules used by TextTest and packaged wi
     log4py.py                   : logging/diagnostic tool (Martin  Preishuber, v1.3.1)
                                   Python now has a builtin "logging" module which is probably why this
                                   has been abandoned. I haven't yet migrated away from it though and
-a                                 am currently maintaining my own version of it.
+                                  am currently maintaining my own version of it.
     usecase.py,gtkusecase.py    : "PyUseCase", record/replay tool for PyGTK GUIs, of the kind you may well 
-                                  need if you test GUIs (Geoff Bache, v1.3)
+                                  need if you test GUIs (Geoff Bache, v1.4)
     HTMLgen.py,HTMLcolors.py,   : "HTMLGen", tool for generating HTML in Python, used for the historical report
     ImageH.py,ImagePaletteH.py,   webpages generated for batch runs (Robin Friedrich, v2.2.2)
     imgsize.py

@@ -204,7 +204,7 @@ class MailSender:
             mailContents += self.performForAll(app, batchDataList, BatchApplicationData.getDetails, sectionHeaders[1])
         if not self.isAllFailure(batchDataList):
             mailContents += self.performForAll(app, batchDataList, BatchApplicationData.getSuccessBrief, sectionHeaders[2])
-        self.sendOrStoreMail(app, mailContents, self.useCollection(app))
+        self.sendOrStoreMail(app, mailContents, self.useCollection(app), self.isAllSuccess(batchDataList))
     def performForAll(self, app, batchDataList, method, headline):
         contents = headline + " follows...\n" + \
                    "---------------------------------------------------------------------------------" + "\n"
@@ -222,18 +222,21 @@ class MailSender:
         file = plugins.openForWrite(collFile)
         file.write(mailContents)
         file.close()
-    def sendOrStoreMail(self, app, mailContents, useCollection=False):
+    def sendOrStoreMail(self, app, mailContents, useCollection=False, isAllSuccess=False):
         sys.stdout.write("At " + time.strftime("%H:%M") + " creating batch report for application " + app.fullName + " ...")
         sys.stdout.flush()
         if useCollection:
             self.storeMail(app, mailContents)
             sys.stdout.write("file written.")
         else:
-            errorMessage = self.sendMail(app, mailContents)
-            if errorMessage:
-                sys.stdout.write("FAILED. Details follow:\n" + errorMessage.strip())
+            if not isAllSuccess or app.getCompositeConfigValue("batch_mail_on_failure_only", self.sessionName) != "true":
+                errorMessage = self.sendMail(app, mailContents)
+                if errorMessage:
+                    sys.stdout.write("FAILED. Details follow:\n" + errorMessage.strip())
+                else:
+                    sys.stdout.write("done.")
             else:
-                sys.stdout.write("done.")
+                sys.stdout.write("not sent: all tests succeeded.")
         sys.stdout.write("\n")
     def exceptionOutput(self):
         exctype, value = sys.exc_info()[:2]

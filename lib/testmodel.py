@@ -1812,10 +1812,16 @@ class AllCompleteResponder(Responder,plugins.Observable):
         self.diag = plugins.getDiagnostics("test objects")
     def notifyAdd(self, test, initial):
         if test.classId() == "test-case":
+            # Locking long thought to be unnecessary
+            # but += 1 is not an atomic operation!!
+            # a = a + 1 and a = a - 1 from different threads do not guarantee "a" unchanged. 
+            self.lock.acquire()
             self.unfinishedTests += 1
+            self.lock.release()
     def notifyAllRead(self, *args):
         self.lock.acquire()
         if self.unfinishedTests == 0 and self.hadCompletion:
+            self.diag.info("All read -> notifying all complete")
             self.notify("AllComplete")
         else:
             self.checkInCompletion = True
@@ -1825,6 +1831,7 @@ class AllCompleteResponder(Responder,plugins.Observable):
         self.lock.acquire()
         self.unfinishedTests -= 1
         if self.checkInCompletion and self.unfinishedTests == 0:
+            self.diag.info("Final test read -> notifying all complete")
             self.notify("AllComplete")
         self.hadCompletion = True
         self.lock.release()

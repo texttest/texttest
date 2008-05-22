@@ -1076,6 +1076,8 @@ Framework Enhancements:
     - New script default.ExportTests for exporting tests to a different suite (default.py)
 	See documentation for it.
 Batch Report Enhancements:
+    - Can now tell it to send mail only when at least one test fails (batch.py)
+	Set "batch_mail_on_failure_only" to "true". Thanks to Michael Behrisch for this.
     - HTML report now allows several applications on the same page (testoverview.py)
 	Set the config value "historical_report_page_name" to the same thing for them all.
     - Removed "None" suffices to anchors in pages (testoverview.py)
@@ -1112,6 +1114,8 @@ Bug Fixes:
 	Previously they could end up in various funny orders.
     - Cutting/copying + Pasting multiple tests now leaves them all selected (default_gui.py)
 	Previously only the last one was selected
+    - Fixed long-standing race condition that could have a variety of effects (testmodel.py)
+	For example an HTML report generation doing nothing, or a grid engine run never terminating
     - Reconnecting to Windows runs from UNIX now works (line ending problems fixed) (reconnect.py)
     - Fixed log structure from static GUI, dynamic runs now put their logs in a strictly increasing sequence (default_gui.py)
     - Empty entry in "performance_logfile_extractor" now disables extraction instead of stacktracing (performance.py)

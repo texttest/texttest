@@ -239,12 +239,6 @@ class GenHTML(plugins.Action):
         self.profilesDir = "/carm/documents/Development/Optimization/APC/profiles"
         self.profilesDirAsHtml = "http://www-oint.carmen.se/Development/Optimization/APC/profiles"
         self.indexFile = self.htmlDir + os.sep + "testindex.html"
-        self.timeSpentFile = self.htmlDir + os.sep + "timespent.html"
-        self.raveSpentFile = self.htmlDir + os.sep + "ravespent.html"
-        self.hatedFcnsFile = self.htmlDir + os.sep + "hatedfcns.html"
-        self.variationFile = self.htmlDir + os.sep + "variation.html"
-        self.ruleFailureFile = self.htmlDir + os.sep + "rulefailures.html"
-        self.interParamsFile = self.htmlDir + os.sep + "deadheadparams.html"
         
     def setUpApplication(self, app):
         # Override some setting with what's specified in the config file.
@@ -273,51 +267,28 @@ class GenHTML(plugins.Action):
         self.timeSpentBC = BarChart(self.tsValues)
         
         # The global chart for relative times.
-        self.chartreldoc = CarmenDocument(self.RCFile)
-        self.chartreldoc.title = "Where does APC spend time?"
         self.chartrelglob = CarmenStackedBarChart()
         self.chartrelglob.title = "Relative times"
         self.chartrelglob.datalist = barchart.DataList()
         self.chartrelglob.datalist.segment_names = tuple(self.tsValues)
-        timeIntroFileName = os.path.join(self.htmlDir, 'timespent-intro-txt.html')
-        if os.path.isfile(timeIntroFileName):
-            self.chartreldoc.append_file(timeIntroFileName)
-        self.chartreldoc.append(self.chartrelglob)
-        self.chartreldoc.append(HTMLgen.Paragraph())
-        self.chartreldoc.append(HTMLgen.Href('testindex.html', 'To test set page'))
 
         # Variation
         self.variationChart = barchart.BarChart()
         self.variationChart.datalist = barchart.DataList()
         self.variationChart.thresholds = (5, 10)
         self.variationChart.title = "Variation in per mil"
-        self.variationDoc = CarmenDocument(self.RCFile)
-        self.variationDoc.title = "Cost variation for different groups"
-        variationIntroFileName = os.path.join(self.htmlDir, 'variation-intro-txt.html')
-        if os.path.isfile(variationIntroFileName):
-            self.variationDoc.append_file(variationIntroFileName)
-        self.variationDoc.append(self.variationChart)
         
         # Rule failures
         self.ruleFailureChart = barchart.BarChart()
         self.ruleFailureChart.datalist = barchart.DataList()
         self.ruleFailureChart.thresholds = (20, 60)
         self.ruleFailureChart.title = "Rule failures in percent"
-        self.ruleFailureDoc = CarmenDocument(self.RCFile)
-        self.ruleFailureDoc.title = "Rule failures for different groups"
-        ruleFailureIntroFileName = os.path.join(self.htmlDir, 'rulefailures-intro-txt.html')
-        if os.path.isfile(ruleFailureIntroFileName):
-            self.ruleFailureDoc.append_file(ruleFailureIntroFileName)
-        self.ruleFailureDoc.append(self.ruleFailureChart)
 
         # Table with interesting parameters
-        self.interParamsDoc = CarmenDocument(self.RCFile)
-        self.interParamsDoc.title = "Deadhead parameter settings"
         self.interParamsTable = HTMLgen.Table()
         self.interParamsTable.heading = copy.deepcopy(self.interestingParameters)
         self.interParamsTable.heading.insert(0, "KPI group")
         self.interParamsTable.body = []
-        self.interParamsDoc.append(self.interParamsTable)
 
         self.clientSuiteList = {}
         self.nonClientSuiteList = []
@@ -338,17 +309,10 @@ class GenHTML(plugins.Action):
         self.profilingGroups.append(HTMLgen.Text("Used groups: "))
 
         # Global chart for relative RAVE times.
-        self.chartRavedoc = CarmenDocument(self.RCFile)
-        self.chartRavedoc.title = "Relative time spent by RAVE in APC"
         self.chartRaveglob = CarmenStackedBarChart()
         self.chartRaveglob.title = "Relative time spent by RAVE in APC"
         self.chartRaveglob.datalist = barchart.DataList()
         self.chartRaveglob.datalist.segment_names = tuple(self.lprof.raveFunctions)
-        #self.chartreldoc.append_file(os.path.join(self.htmlDir, 'timespent-intro-txt.html'))
-        self.chartRavedoc.append(self.profilingGroups)
-        self.chartRavedoc.append(self.chartRaveglob)
-        self.chartRavedoc.append(HTMLgen.Paragraph())
-        self.chartRavedoc.append(HTMLgen.Href('testindex.html', 'To test set page'))
 
     def createTable(self, suites):
         table = HTMLgen.TableLite(border = 1, width = "100%")
@@ -406,7 +370,69 @@ class GenHTML(plugins.Action):
         self.idoc.append(HTMLgen.BR())
         self.idoc.append(HTMLgen.Text("Total CPU time:  " + str("%.1f" % (self.totalCPUtime/60)) + "h"))
         self.idoc.write(self.indexFile)
-         
+
+    def writeBasicSummaryPage(self, title, pagename, pagedata, introtext = None, explaintext = None):
+        doc = CarmenDocument(self.RCFile)
+        doc.title = title
+        if introtext:
+            introtextFile = os.path.join(self.htmlDir, introtext)
+            if os.path.isfile(introtextFile):
+                doc.append_file(introtextFile)
+                
+        doc.append(pagedata)
+
+        if explaintext:
+            explaintextFile = os.path.join(self.htmlDir, explaintext)
+            if os.path.isfile(explaintextFile):
+                doc.append_file(explaintextFile)
+        doc.write(os.path.join(self.htmlDir, pagename))
+    def createSummaryPages(self):
+        # Write the time spent page.
+        totalMeans = self.timeSpentBC.doMeans(self.chartrelglob.datalist, "ALL")
+        self.chartrelglob.datalist.load_tuple(tuple(totalMeans))
+
+        cont = HTMLgen.Container()
+        cont.append(self.chartrelglob)
+        cont.append(HTMLgen.Paragraph())
+        cont.append(HTMLgen.Href('testindex.html', 'To test set page'))
+        self.writeBasicSummaryPage("Where does APC spend time?", "timespent.html", \
+                                   cont, 'timespent-intro-txt.html', 'timespent-expl-txt.html')
+                                   
+
+        # Write the Rave spent page.
+        totalMeans = self.raveBC.doMeans(self.chartRaveglob.datalist, "ALL")
+        self.chartRaveglob.datalist.load_tuple(tuple(totalMeans))
+
+        cont = HTMLgen.Container()
+        cont.append(self.profilingGroups)
+        cont.append(self.chartRaveglob)
+        cont.append(HTMLgen.Paragraph())
+        cont.append(HTMLgen.Href('testindex.html', 'To test set page'))
+        self.writeBasicSummaryPage("Relative time spent by RAVE in APC", "ravespent.html", cont)
+
+        # Write variation page
+        if len(self.variationChart.datalist):
+            self.writeBasicSummaryPage("Cost variation for different groups", "variation.html", \
+                                       self.variationChart, 'variation-intro-txt.html')
+
+        # Write rule failure page
+        if len(self.ruleFailureChart.datalist):
+            self.writeBasicSummaryPage("Rule failures for different groups", "rulefailures.html", \
+                                       self.ruleFailureChart, 'rulefailures-intro-txt.html')
+
+        # Write interesting parameters page
+        if self.interParamsTable.body:
+            self.writeBasicSummaryPage("Deadhead parameter settings", "deadheadparams.html", \
+                                       self.interParamsTable)
+
+        # Write most hated page.
+        if self.lprof.hatedFunctions:
+            cont = HTMLgen.Container()
+            cont.append(self.profilingGroups)
+            cont.append(self.lprof.profileBarChart(self.lprof.hatedFunctions, 1))
+            self.writeBasicSummaryPage("The 10 most time consuming functions in APC", "hatedfcns.html", \
+                                       cont) 
+            
     def __del__(self):
         # Don't write anything for 0 tests, not interesting
         if self.numberOfTests == 0:
@@ -419,36 +445,7 @@ class GenHTML(plugins.Action):
         for suites in self.suitePages.keys():
             self.buildSuitePage(self.suitePages[suites])
 
-        # Write the time spent page.
-        totalMeans = self.timeSpentBC.doMeans(self.chartrelglob.datalist, "ALL")
-        self.chartrelglob.datalist.load_tuple(tuple(totalMeans))
-        timeExplFileName = os.path.join(self.htmlDir, 'timespent-expl-txt.html')
-        if os.path.isfile(timeExplFileName):
-            self.chartreldoc.append_file(timeExplFileName)
-        self.chartreldoc.write(self.timeSpentFile)
-
-        # Write the Rave spent page.
-        totalMeans = self.raveBC.doMeans(self.chartRaveglob.datalist, "ALL")
-        self.chartRaveglob.datalist.load_tuple(tuple(totalMeans))
-        #self.chartRavedoc.append_file(os.path.join(self.htmlDir, 'timespent-expl-txt.html'))
-        self.chartRavedoc.write(self.raveSpentFile)
-
-        # Write variation page
-        self.variationDoc.write(self.variationFile)
-
-        # Write rule failure page
-        self.ruleFailureDoc.write(self.ruleFailureFile)
-
-        # Write interesting parameters page
-        self.interParamsDoc.write(self.interParamsFile)
-
-        # Write most hated page.
-        hatedFcnsDoc = CarmenDocument(self.RCFile)
-        hatedFcnsDoc.title = "The 10 most time consuming functions in APC"
-        hatedFcnsDoc.append(self.profilingGroups)
-        chart = self.lprof.profileBarChart(self.lprof.hatedFunctions, 1)
-        hatedFcnsDoc.append(chart)
-        hatedFcnsDoc.write(self.hatedFcnsFile)
+        self.createSummaryPages()
         
     def __repr__(self):
         return "Generating HTML info for"

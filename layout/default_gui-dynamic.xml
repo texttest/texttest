@@ -28,6 +28,10 @@
   </toolbar>
 
   <popup name="TestPopupMenu">
+    <menuitem action="Save"/>
+    <menuitem action="Save As..."/>
+    <separator/>
+    <menuitem action="Kill"/>
     <menuitem action="Mark"/>
     <menuitem action="Unmark"/>
     <separator/>
@@ -46,6 +50,8 @@
     <separator/>
     <menuitem name="File Properties" action="File Properties"/>
     <separator/>
+    <menuitem action="Save"/>
+    <menuitem action="Save As..."/>
   </popup>
 
 </ui>

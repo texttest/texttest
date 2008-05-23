@@ -594,6 +594,10 @@ class GenHTML(plugins.Action):
         return cost_spread, meanvar
         
     def extractTestInfo(self, group, test):
+        # TODO
+        if test.app.name == "cas":
+            return "Something for Kruuse", "Oh yes"
+        
         subplanDir = test.app._getSubPlanDirName(test)
         info = HTMLgen.Paragraph()
 

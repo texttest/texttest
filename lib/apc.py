@@ -248,7 +248,6 @@ class ApcConfig(apc_basic.Config):
             self.itemNamesInFile[optimization.costEntryName] = "rule cost"
         app.setConfigDefault("link_libs", "")
         app.setConfigDefault("extract_logs", {})
-        app.setConfigDefault("apcinfo", {})
         app.setConfigDefault("quit_ask_for_confirm", -1)
         app.setConfigDefault("xml_script_file", "bin/APCcreatexml.sh", "")
         app.setConfigDefault("optinfo_xml_file", "data/apc/feedback/optinfo_html_xsl.xml", "")

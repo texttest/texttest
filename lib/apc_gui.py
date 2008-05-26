@@ -215,7 +215,7 @@ class PlotProfileInGUIAPC(guiplugins.ActionTabGUI):
             cmd = "ggv %s"%ofname
             os.system(cmd)
         else:
-            flat = test.makeTmpFileName("flatprof", forComparison=0, forFramwork=1)
+            flat = test.makeTmpFileName("flatprof", forComparison=0, forFramework=1)
             flatFile = open(flat, 'w')
             sym_analyze4.print_flat(data, ops, flatFile)
             flatFile.close()

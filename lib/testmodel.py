@@ -299,7 +299,9 @@ class Test(plugins.Observable):
         if self.name != newName:
             newDir = self.parent.makeSubDirectory(newName)
             if os.path.isdir(self.getDirectory()):
-                self.moveFilesForRename(newDir)
+                self.copyTestContents(newDir)
+                self.removeFiles()
+
             origRelPath = self.getRelPath()
             self.name = newName
             self.dircache = DirectoryCache(newDir)
@@ -394,7 +396,17 @@ class Test(plugins.Observable):
     def listFiles(self, fileName, dataFile):
         filesToIgnore = self.getCompositeConfigValue("test_data_ignore", dataFile)
         return self.listFilesFrom([ fileName ], filesToIgnore)
-    def listFilesFrom(self, files, filesToIgnore):
+    def fullPathList(self, dir):
+        return map(lambda file: os.path.join(dir, file), os.listdir(dir))
+    def listExternallyEditedFiles(self):
+        if self.dircache.exists("file_edits"):
+            rootDir = self.dircache.pathName("file_edits")
+            fileList = self.fullPathList(rootDir)
+            filesToIgnore = self.getCompositeConfigValue("test_data_ignore", "file_edits")
+            return rootDir, self.listFilesFrom(fileList, filesToIgnore)
+        else:
+            return None, []
+    def listFilesFrom(self, files, filesToIgnore=[]):
         files.sort()
         dataFiles = []
         dirs = []
@@ -408,8 +420,7 @@ class Test(plugins.Observable):
                 dataFiles.append(file)
         for subdir in dirs:
             dataFiles.append(subdir)
-            fileList = map(lambda file: os.path.join(subdir, file), os.listdir(subdir))
-            dataFiles += self.listFilesFrom(fileList, filesToIgnore)
+            dataFiles += self.listFilesFrom(self.fullPathList(subdir), filesToIgnore)
         return dataFiles
     def fileMatches(self, file, filesToIgnore):
         for ignFile in filesToIgnore:
@@ -518,22 +529,23 @@ class Test(plugins.Observable):
 
         self.setName(newName)
         self.setDescription(newDescription)
-
-    def moveFilesForRename(self, newDir):
+        
+    def copyTestContents(self, newDir):
         stdFiles, defFiles = self.listStandardFiles(allVersions=True)
         for sourceFile in stdFiles + defFiles:
             dirname, local = os.path.split(sourceFile)
             if dirname == self.getDirectory():
                 targetFile = os.path.join(newDir, local)
                 shutil.copy2(sourceFile, targetFile)
-        dataFiles = self.listDataFiles()
+        root, extFiles = self.listExternallyEditedFiles()
+        dataFiles = self.listDataFiles() + extFiles
         for sourcePath in dataFiles:
             if os.path.isdir(sourcePath):
                 continue
             targetPath = sourcePath.replace(self.getDirectory(), newDir)
             plugins.ensureDirExistsForFile(targetPath)
             shutil.copy2(sourcePath, targetPath)
-        self.removeFiles()
+
     def getRunEnvironment(self, onlyVars = []):
         return self.environment.getValues(onlyVars)
     def createPropertiesFiles(self):
@@ -663,7 +675,7 @@ class TestCase(Test):
         filelist = os.listdir(self.writeDirectory)
         filelist.sort()
         for file in filelist:
-            if file == "framework_tmp" or file.endswith("." + self.app.name):
+            if file == "framework_tmp" or file == "file_edits" or file.endswith("." + self.app.name):
                 continue
             fullPath = os.path.join(self.writeDirectory, file)
             paths += self.listFiles(fullPath, file)
@@ -1091,23 +1103,8 @@ class TestSuite(Test):
 
     def copyTest(self, test, newName, newDesc, placement):
         testDir = self.writeNewTest(newName, newDesc, placement)
-        self.copyTestContents(test, testDir)
+        test.copyTestContents(testDir)
         return self.addTest(test.__class__, os.path.basename(testDir), newDesc, placement)
-
-    def copyTestContents(self, testToCopy, testDir):
-        stdFiles, defFiles = testToCopy.listStandardFiles(allVersions=True)
-        for sourceFile in stdFiles + defFiles:
-            dirname, local = os.path.split(sourceFile)
-            if dirname == testToCopy.getDirectory():
-                targetFile = os.path.join(testDir, local)
-                shutil.copy2(sourceFile, targetFile)
-        dataFiles = testToCopy.listDataFiles()
-        for sourcePath in dataFiles:
-            if os.path.isdir(sourcePath):
-                continue
-            targetPath = sourcePath.replace(testToCopy.getDirectory(), testDir)
-            plugins.ensureDirExistsForFile(targetPath)
-            shutil.copy2(sourcePath, targetPath)
         
     def writeNewTest(self, testName, description, placement):
         contentFileName = self.getContentFileName()

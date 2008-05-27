@@ -1610,7 +1610,7 @@ class RecordTest(RunningAction):
         if newTime != self.recordTime:
             self.recordTime = newTime
             outerRecord = os.getenv("USECASE_RECORD_SCRIPT")
-            if outerRecord:
+            if outerRecord and not os.getenv("USECASE_DISABLE_TARGET_RECORD"):
                 # If we have an "outer" record going on, provide the result as a target recording...
                 target = plugins.addLocalPrefix(outerRecord, "target_record")
                 shutil.copyfile(file, target)
@@ -1702,6 +1702,8 @@ class CreateDefinitionFile(guiplugins.ActionDialogGUI):
             return self.currTestSelection[0].app.getDataFileNames()
         elif fileType == "standard":
             return self.getStandardFiles()
+        else:
+            return []
     def getDefinitionFiles(self):
         defFiles = []
         defFiles.append("environment")

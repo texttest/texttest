@@ -255,17 +255,27 @@ class TestComparison(BaseTestComparison):
     def save(self, test, exact=True, versionString="", overwriteSuccessFiles=False, newFilesAsDiags=False, onlyStems=[]):
         self.diag.info("Saving " + repr(test) + " stems " + repr(onlyStems))
         for comparison in self.filterComparisons(self.changedResults, onlyStems):
-            self.updateStatus(test, comparison, versionString)
+            self.updateStatus(test, str(comparison), versionString)
             comparison.overwrite(test, exact, versionString)
         for comparison in self.filterComparisons(self.newResults, onlyStems):
-            self.updateStatus(test, comparison, versionString)
+            self.updateStatus(test, str(comparison), versionString)
             comparison.saveNew(test, versionString, newFilesAsDiags)
         for comparison in self.filterComparisons(self.missingResults, onlyStems):
-            self.updateStatus(test, comparison, versionString)
+            self.updateStatus(test, str(comparison), versionString)
             comparison.saveMissing(versionString, self.fakeMissingFileText())
+        # Save any external file edits we may have made
+        tmpFileEditDir = test.makeTmpFileName("file_edits", forComparison=0)
+        if os.path.isdir(tmpFileEditDir):
+            for root, dirs, files in os.walk(tmpFileEditDir):
+                for file in files:
+                    fullPath = os.path.join(root, file)
+                    savePath = fullPath.replace(test.writeDirectory, test.getDirectory())
+                    self.updateStatus(test, "edited file " + file, versionString)
+                    plugins.ensureDirExistsForFile(savePath)
+                    shutil.copyfile(fullPath, savePath)
         if overwriteSuccessFiles:
             for comparison in self.filterComparisons(self.correctResults, onlyStems):
-                self.updateStatus(test, comparison, versionString)
+                self.updateStatus(test, str(comparison), versionString)
                 comparison.overwrite(test, exact, versionString)
     def recalculateComparisons(self, test):
         test.refreshFiles()
@@ -279,13 +289,13 @@ class TestComparison(BaseTestComparison):
             return resultList
         else:
             return filter(lambda comp: comp.stem in onlyStems, resultList)
-    def updateStatus(self, test, comparison, versionString):
+    def updateStatus(self, test, compStr, versionString):
         testRepr = "Saving " + repr(test) + " : "
         if versionString != "":
             versionRepr = ", version " + versionString
         else:
             versionRepr = ", no version"
-        self.notifyIfMainThread("Status", testRepr + str(comparison) + versionRepr)
+        self.notifyIfMainThread("Status", testRepr + compStr + versionRepr)
         self.notifyIfMainThread("ActionProgress", "")
     def makeNewState(self, app, lifeCycleDest):
         newState = TestComparison(self, app, "be " + lifeCycleDest)

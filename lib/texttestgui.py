@@ -2156,8 +2156,10 @@ class TestFileGUI(FileViewGUI):
         self.model.set_value(tmpIter, 0, "Temporary Files")
         self.addStandardFilesUnderIter(state, tmpIter, tmpFiles)
         
-    def getRootIterAndColour(self, heading):
-        headerRow = [ heading + " Files", "white", self.currentTest.getDirectory(), None, "", "" ]
+    def getRootIterAndColour(self, heading, rootDir=None):
+        if not rootDir:
+            rootDir = self.currentTest.getDirectory()
+        headerRow = [ heading + " Files", "white", rootDir, None, "", "" ]
         stditer = self.model.insert_before(None, None, headerRow)
         colour =  guiConfig.getCompositeValue("file_colours", "static_" + heading.lower(), defaultKey="static")
         return stditer, colour
@@ -2174,6 +2176,7 @@ class TestFileGUI(FileViewGUI):
 
         self.addStaticFilesWithHeading("Definition", defFiles)
         self.addStaticDataFilesToModel()
+        self.addExternallyEditedFilesToModel()
         self.addExternalFilesToModel()
 
     def getExternalDataFiles(self):
@@ -2189,7 +2192,7 @@ class TestFileGUI(FileViewGUI):
         if self.currentTest.getDataFileNames() == 0:
             return
         datiter, colour = self.getRootIterAndColour("Data")
-        self.addDataFilesUnderIter(datiter, self.currentTest.listDataFiles(), colour)
+        self.addDataFilesUnderIter(datiter, self.currentTest.listDataFiles(), colour, self.currentTest.getDirectory())
 
     def addExternalFilesToModel(self):
         externalFiles = self.getExternalDataFiles()
@@ -2203,14 +2206,20 @@ class TestFileGUI(FileViewGUI):
             for file in filelist:
                 self.addFileToModel(exiter, file, colour)
 
-    def addDataFilesUnderIter(self, iter, files, colour):
-        dirIters = { self.currentTest.getDirectory() : iter }
+    def addExternallyEditedFilesToModel(self):
+        root, files = self.currentTest.listExternallyEditedFiles()
+        if root:
+            datiter, colour = self.getRootIterAndColour("Externally Edited", root)
+            self.addDataFilesUnderIter(datiter, files, colour, root)
+
+    def addDataFilesUnderIter(self, iter, files, colour, root):
+        dirIters = { root : iter }
         parentIter = iter
         for file in files:
             parent, local = os.path.split(file)
             parentIter = dirIters.get(parent)
             if parentIter is None:
-                subDirIters = self.addDataFilesUnderIter(iter, [ parent ], colour)
+                subDirIters = self.addDataFilesUnderIter(iter, [ parent ], colour, root)
                 parentIter = subDirIters.get(parent)
             newiter = self.addFileToModel(parentIter, file, colour)
             if os.path.isdir(file):

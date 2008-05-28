@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os, sys, plugins, shutil, socket, subprocess
+import os, stat, sys, plugins, shutil, socket, subprocess
 from ndict import seqdict
 from SocketServer import TCPServer, StreamRequestHandler
 from threading import Thread
@@ -57,10 +57,16 @@ class Traffic:
     def __init__(self, text, responseFile):
         self.text = text
         self.responseFile = responseFile
+
+    def findPossibleFileEdits(self):
+        return []
+    
     def hasInfo(self):
         return len(self.text) > 0
+
     def getDescription(self):
         return self.direction + self.typeId + ":" + self.text
+
     def write(self, message):
         if self.responseFile:
             try:
@@ -75,8 +81,21 @@ class Traffic:
         if self.responseFile:
             self.responseFile.close()
         return []
+
+    def record(self, recordFile):
+        if not self.hasInfo():
+            return
+        desc = self.getDescription()
+        if not desc.endswith("\n"):
+            desc += "\n"
+        writeFile = open(recordFile, "a")
+        writeFile.write(desc)
+        writeFile.flush()
+        writeFile.close()
+
     def filterReplay(self, trafficList):
         return trafficList
+
     
 class ResponseTraffic(Traffic):
     direction = "->"
@@ -100,6 +119,29 @@ class SysExitTraffic(ResponseTraffic):
         self.exitStatus = int(status)
     def hasInfo(self):
         return self.exitStatus != 0
+
+class FileEditTraffic(ResponseTraffic):
+    typeId = "FIL"
+    def __init__(self, activeFile, storedFile, reproduce):
+        self.activeFile = activeFile
+        self.storedFile = storedFile
+        self.reproduce = reproduce
+        ResponseTraffic.__init__(self, os.path.basename(activeFile), None)
+        
+    def forwardToDestination(self):
+        self.write(self.text)
+        if self.reproduce:
+            plugins.ensureDirExistsForFile(self.activeFile)
+            shutil.copyfile(self.storedFile, self.activeFile)
+        return []
+        
+    def record(self, recordFile):
+        # Copy the file, as well as the fact it has been stored
+        ResponseTraffic.record(self, recordFile)
+        if not self.reproduce:
+            plugins.ensureDirExistsForFile(self.storedFile)
+            shutil.copyfile(self.activeFile, self.storedFile)
+        
     
 class ClientSocketTraffic(Traffic):
     destination = None
@@ -154,6 +196,7 @@ class CommandLineTraffic(Traffic):
         self.path = self.cmdEnviron.get("PATH")
         text = self.getEnvString() + self.commandName + " " + self.argStr
         Traffic.__init__(self, text, responseFile)
+        
     def filterEnvironment(self, cmdEnviron):
         interestingEnviron = []
         for var in self.currentTest.getCompositeConfigValue("collect_traffic_environment", self.commandName):
@@ -161,6 +204,7 @@ class CommandLineTraffic(Traffic):
             if value is not None and value != self.currentTest.getEnvironment(var):
                 interestingEnviron.append((var, value))
         return interestingEnviron
+
     def getEnvString(self):
         recStr = ""
         if not plugins.samefile(self.cmdCwd, self.currentTest.getDirectory(temporary=1)):
@@ -175,11 +219,13 @@ class CommandLineTraffic(Traffic):
                 recLine = recLine.replace(oldVal, "$" + var)
             recStr += recLine
         return recStr
+
     def getQuoteChar(self, char):
         if char == "\"" and os.name == "posix":
             return "'"
         else:
             return '"'
+
     def quote(self, arg):
         quoteChars = "'\"|* "
         for char in quoteChars:
@@ -187,6 +233,21 @@ class CommandLineTraffic(Traffic):
                 quoteChar = self.getQuoteChar(char)
                 return quoteChar + arg + quoteChar
         return arg
+        
+    def findPossibleFileEdits(self):
+        edits = []
+        for arg in self.cmdArgs:
+            if not arg.startswith("-"):
+                for word in arg.split():
+                    if os.path.isabs(word) and os.path.exists(word):
+                        edits.append(word)
+                    else:
+                        fullPath = os.path.join(self.cmdCwd, word)
+                        if os.path.exists(fullPath):
+                            edits.append(fullPath)
+        self.diag.info("Might edit in " + repr(edits))
+        return edits
+        
     def forwardToDestination(self):
         realCmd = self.findRealCommand()
         if realCmd:                
@@ -199,10 +260,12 @@ class CommandLineTraffic(Traffic):
             output, errors = proc.communicate()
             return self.makeResponse(output, errors, proc.returncode)
         else:
-            return self.makeResponse("", "ERROR: Traffic server could not find command '" + self.commandName + "' in PATH", 1)
+            return self.makeResponse("", "ERROR: Traffic server could not find command '" + self.commandName + "' in PATH\n", 1)
+
     def makeResponse(self, output, errors, exitCode):
         return [ StdoutTraffic(output, self.responseFile), StderrTraffic(errors, self.responseFile), \
                  SysExitTraffic(exitCode, self.responseFile) ]
+    
     def findRealCommand(self):
         # If we found a link already, use that, otherwise look on the path
         if self.realCommands.has_key(self.commandName):
@@ -214,9 +277,11 @@ class CommandLineTraffic(Traffic):
             fullPath = os.path.join(currDir, self.commandName)
             if self.isRealCommand(fullPath):
                 return fullPath
+
     def isRealCommand(self, fullPath):
         return os.path.isfile(fullPath) and os.access(fullPath, os.X_OK) and \
                not plugins.samefile(fullPath, self.fullCommand)
+    
     def filterReplay(self, trafficList):
         if len(trafficList) == 0 or not isinstance(trafficList[0], StdoutTraffic):
             trafficList.insert(0, StdoutTraffic("", self.responseFile))
@@ -256,6 +321,9 @@ class TrafficServer(TCPServer):
         self.thread.setDaemon(1)
         self.diag.info("Starting traffic server thread")
         self.thread.start()
+        self.fileEditData = seqdict()
+        self.currentTest = None
+        
     def setAddressVariable(self, test):
         host, port = self.socket.getsockname()
         address = host + ":" + str(port)
@@ -265,37 +333,79 @@ class TrafficServer(TCPServer):
     def setRealVersion(self, command, realCommand):
         self.diag.info("Storing faked command for " + command + " = " + realCommand) 
         CommandLineTraffic.realCommands[command] = realCommand
+
     def setState(self, recordFile, replayFile, test):
         self.recordFile = recordFile
         self.replayInfo = ReplayInfo(replayFile)
         if recordFile or replayFile:
             self.setAddressVariable(test)
         CommandLineTraffic.currentTest = test
+        self.currentTest = test
         ClientSocketTraffic.destination = None
         # Assume testing client until a server contacts us
         ClientSocketTraffic.direction = "<-"
         ServerTraffic.direction = "->"
         
+    def findLatestModification(self, file):
+        if os.path.isfile(file):
+            return os.stat(file)[stat.ST_MTIME]
+        elif os.path.isdir(file):
+            allFiles = [ file ]
+            for rootDir, dirs, files in os.walk(os.getcwd()):
+                allFiles += [ os.path.join(rootDir, dir) for dir in dirs ]
+                allFiles += [ os.path.join(rootDir, currFile) for currFile in files ]
+            times = [ os.stat(currFile)[stat.ST_MTIME] for currFile in allFiles ]
+            return max(times)
+
+    def addPossibleFileEdits(self, traffic):
+        for file in traffic.findPossibleFileEdits():
+            self.fileEditData[file] = self.findLatestModification(file)
+
     def process(self, traffic):
         self.diag.info("Processing traffic " + repr(traffic.__class__))
-        self.record(traffic)
-        for response in self.replayInfo.getResponses(traffic):
+        self.addPossibleFileEdits(traffic)
+        traffic.record(self.recordFile)
+        for response in self.getResponses(traffic):
             self.diag.info("Providing response " + repr(response.__class__))
-            self.record(response)
+            response.record(self.recordFile)
             for chainResponse in response.forwardToDestination():
                 self.process(chainResponse)
-            self.diag.info("Completed response " + repr(response.__class__))
-    def record(self, traffic):
-        if not traffic.hasInfo():
-            return
-        desc = traffic.getDescription()
-        if not desc.endswith("\n"):
-            desc += "\n"
-        self.diag.info("Recording " + repr(traffic.__class__) + " " + desc)
-        writeFile = open(self.recordFile, "a")
-        writeFile.write(desc)
-        writeFile.flush()
-        writeFile.close()
+            self.diag.info("Completed response " + repr(response.__class__))            
+
+    def getResponses(self, traffic):
+        if self.replayInfo.isActive():
+            replayedResponses = []
+            for responseClass, text in self.replayInfo.readReplayResponses(traffic):
+                responseTraffic = self.makeResponseTraffic(traffic, responseClass, text)
+                if responseTraffic:
+                    replayedResponses.append(responseTraffic)
+            return traffic.filterReplay(replayedResponses)
+        else:
+            return traffic.forwardToDestination() + self.getFileEditResponses()
+
+    def getFileEditPath(self, file):
+        return os.path.join("file_edits", os.path.basename(file))
+
+    def makeResponseTraffic(self, traffic, responseClass, text):
+        if responseClass is FileEditTraffic:
+            for file in self.fileEditData.keys():
+                if os.path.basename(file) == text.strip():
+                    storedFile = self.currentTest.getFileName(self.getFileEditPath(file))
+                    return FileEditTraffic(file, storedFile, reproduce=True)
+        else:
+            return responseClass(text, traffic.responseFile)
+
+    def getFileEditResponses(self):
+        traffic = []
+        for file, editInfo in self.fileEditData.items():
+            newEditInfo = self.findLatestModification(file)
+            if newEditInfo != editInfo:
+                storedFile = self.currentTest.makeTmpFileName(self.getFileEditPath(file), forComparison=0)
+                traffic.append(FileEditTraffic(file, storedFile, reproduce=False))
+                self.fileEditData[file] = newEditInfo
+        return traffic
+        
+
 
 class ReplayInfo:
     def __init__(self, replayFile):
@@ -303,6 +413,10 @@ class ReplayInfo:
         self.diag = plugins.getDiagnostics("Traffic Replay")
         if replayFile:
             self.readReplayFile(replayFile)
+            
+    def isActive(self):
+        return len(self.responseMap) > 0
+
     def readReplayFile(self, replayFile):
         trafficList = self.readIntoList(replayFile)
         currResponseHandler = None
@@ -318,6 +432,7 @@ class ReplayInfo:
             else:
                 currResponseHandler.addResponse(trafficStr)
         self.diag.info("Replay info " + repr(self.responseMap))
+
     def readIntoList(self, replayFile):
         trafficList = []
         currTraffic = ""
@@ -330,11 +445,7 @@ class ReplayInfo:
         if currTraffic:
             trafficList.append(currTraffic)
         return trafficList
-    def getResponses(self, traffic):
-        if len(self.responseMap) > 0:
-            return self.readReplayResponses(traffic)
-        else:
-            return traffic.forwardToDestination()
+    
     def readReplayResponses(self, traffic):
         # We return the response matching the traffic in if we can, otherwise
         # the one that is most similar to it
@@ -346,6 +457,7 @@ class ReplayInfo:
             return self.responseMap[bestMatchKey].makeResponses(traffic)
         else:
             return []
+
     def findBestMatch(self, desc):
         self.diag.info("Trying to match '" + desc + "'")
         if self.responseMap.has_key(desc):
@@ -404,12 +516,12 @@ class ReplayedResponseHandler:
         responses = []
         for trafficStr in trafficStrings:
             trafficType = trafficStr[2:5]
-            allClasses = [ ClientSocketTraffic, ServerTraffic, StdoutTraffic, StderrTraffic, SysExitTraffic ]
+            allClasses = [ ClientSocketTraffic, ServerTraffic, StdoutTraffic, StderrTraffic, SysExitTraffic, FileEditTraffic ]
             for trafficClass in allClasses:
                 if trafficClass.typeId == trafficType:
-                    responses.append(trafficClass(trafficStr[6:], traffic.responseFile))
+                    responses.append((trafficClass, trafficStr[6:]))
         self.timesChosen += 1
-        return traffic.filterReplay(responses)
+        return responses
 
 class ModifyTraffic(plugins.ScriptWithArgs):
     # For now, only bother with the client server traffic which is mostly what needs tweaking...

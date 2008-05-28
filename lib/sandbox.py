@@ -265,13 +265,10 @@ class TestEnvironmentCreator:
     def findReplayUseCase(self, usecaseFile):
         if self.isRecording():
             if os.environ.has_key("USECASE_REPLAY_SCRIPT"):
-                if os.getenv("USECASE_DISABLE_TARGET_RECORD"):
-                    return "" # clear the outer script
-                else:
-                    # For self-testing, to allow us to record TextTest performing recording
-                    targetReplayFile = plugins.addLocalPrefix(os.getenv("USECASE_REPLAY_SCRIPT"), "target")
-                    if os.path.isfile(targetReplayFile):
-                        return targetReplayFile
+                # For self-testing, to allow us to record TextTest performing recording
+                targetReplayFile = plugins.addLocalPrefix(os.getenv("USECASE_REPLAY_SCRIPT"), "target")
+                if os.path.isfile(targetReplayFile):
+                    return targetReplayFile
             else:
                 # Don't replay when recording - let the user do it...
                 return None

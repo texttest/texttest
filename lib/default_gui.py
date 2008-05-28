@@ -1610,7 +1610,7 @@ class RecordTest(RunningAction):
         if newTime != self.recordTime:
             self.recordTime = newTime
             outerRecord = os.getenv("USECASE_RECORD_SCRIPT")
-            if outerRecord and not os.getenv("USECASE_DISABLE_TARGET_RECORD"):
+            if outerRecord:
                 # If we have an "outer" record going on, provide the result as a target recording...
                 target = plugins.addLocalPrefix(outerRecord, "target_record")
                 shutil.copyfile(file, target)

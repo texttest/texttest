@@ -354,6 +354,8 @@ class Test(plugins.Observable):
         return ""
     def needsRecalculation(self):
         return False
+    def isEmpty(self):
+        return False
     def defFileStems(self):
         return self.getConfigValue("definition_file_stems")
     def resultFileStems(self):
@@ -828,7 +830,7 @@ class TestSuite(Test):
     def readContents(self, filters, initial=True):
         testNames = self.readTestNames()
         self.createTestCases(filters, testNames, initial)
-        if len(self.testcases) == 0 and len(testNames) > 0:
+        if self.isEmpty() and len(testNames) > 0:
             # If the contents are filtered away, don't include the suite 
             return False
 

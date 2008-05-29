@@ -1165,7 +1165,7 @@ class TestTreeGUI(ContainerGUI):
         
         self.successPerSuite.setdefault(suite, Set()).add(test)
         successCount = len(self.successPerSuite.get(suite))
-        suiteSize = len(suite.testcases)
+        suiteSize = len(filter(lambda subtest: not subtest.isEmpty(), suite.testcases))
         if successCount == suiteSize:
             self.setAllSucceeded(suite, colour)
             self.updateSuiteSuccess(suite, colour)
@@ -1222,6 +1222,8 @@ class TestTreeGUI(ContainerGUI):
         if test.classId() == "test-case":
             self.notify("TestTreeCounters", initial=initial, totalDelta=1,
                         totalShownDelta=self.getTotalShownDelta(), totalRowsDelta=self.getTotalRowsDelta(test))
+        elif self.dynamic and test.isEmpty():
+            return # don't show empty suites in the dynamic GUI
 
         self.diag.info("Adding test " + repr(test))
         self.tryAddTest(test, initial)

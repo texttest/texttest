@@ -933,11 +933,11 @@ class TestSuite(Test):
         self.diagnose("refreshing!")
         Test.refresh(self, filters)
         newTestNames = self.readTestNames(ignoreCache=True)
-        for test in self.testcases:
-            if test.name not in newTestNames:
-                self.diagnose("removing " + repr(test))
-                self.testcases.remove(test)
-                test.notify("Remove")
+        toRemove = filter(lambda test: test.name not in newTestNames, self.testcases)
+        for test in toRemove:
+            self.diagnose("removing " + repr(test))
+            self.testcases.remove(test)
+            test.notify("Remove")
 
         for testName, desc in newTestNames.items():
             existingTest = self.findSubtest(testName)

@@ -1136,3 +1136,22 @@ Grid Engine bug fixes:
     - Absolute paths in link_test_path or copy_test_path no longer cause data deletion when using grid engines (testmodel.py)
     - Trying to run with a grid engine that isn't installed gives an error message rather than stracktrace (queuesystem.py)
     - If invalid resource given for "performance_test_resource", performance collection now disabled (queuesystem.py)
+
+Trunk
+=====
+	
+Major Enhancements:
+General GUI Enhancements:
+Static GUI Enhancements:
+Dynamic GUI Enhancements:
+Framework Enhancements:
+Batch Report Enhancements:
+Grid Engine (LSF/SGE) enhancements:
+Old functionality removed and API changes:
+Installation and self-test changes:
+Bug Fixes:
+    - Saving edited files from PyUseCase's process monitoring mechanism now works correctly (comparetest.py)
+    - Fixed bug introduced in 3.11 where dynamic GUI makes a mess of empty test suites if started from the command line (testmodel.py)
+Grid Engine bug fixes:
+    - Fixed bug where local DISPLAY sent to remote processes (queuesystem.py)
+	Main effect was to prevent slow-motion replay mode for GUI testing working with a grid engine

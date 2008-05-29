@@ -127,20 +127,27 @@ class FileEditTraffic(ResponseTraffic):
         self.storedFile = storedFile
         self.reproduce = reproduce
         ResponseTraffic.__init__(self, os.path.basename(activeFile), None)
-        
+
+    def copy(self, src, target):
+        plugins.ensureDirExistsForFile(target)
+        if os.path.isfile(src):
+            shutil.copyfile(src, target)
+        else:
+            if os.path.exists(target):
+                shutil.rmtree(target)
+            shutil.copytree(src, target)
+            
     def forwardToDestination(self):
         self.write(self.text)
         if self.reproduce:
-            plugins.ensureDirExistsForFile(self.activeFile)
-            shutil.copyfile(self.storedFile, self.activeFile)
+            self.copy(self.storedFile, self.activeFile)
         return []
         
     def record(self, recordFile):
         # Copy the file, as well as the fact it has been stored
         ResponseTraffic.record(self, recordFile)
         if not self.reproduce:
-            plugins.ensureDirExistsForFile(self.storedFile)
-            shutil.copyfile(self.activeFile, self.storedFile)
+            self.copy(self.activeFile, self.storedFile)
         
     
 class ClientSocketTraffic(Traffic):
@@ -351,7 +358,7 @@ class TrafficServer(TCPServer):
             return os.stat(file)[stat.ST_MTIME]
         elif os.path.isdir(file):
             allFiles = [ file ]
-            for rootDir, dirs, files in os.walk(os.getcwd()):
+            for rootDir, dirs, files in os.walk(file):
                 allFiles += [ os.path.join(rootDir, dir) for dir in dirs ]
                 allFiles += [ os.path.join(rootDir, currFile) for currFile in files ]
             times = [ os.stat(currFile)[stat.ST_MTIME] for currFile in allFiles ]
@@ -359,8 +366,10 @@ class TrafficServer(TCPServer):
 
     def addPossibleFileEdits(self, traffic):
         for file in traffic.findPossibleFileEdits():
-            self.fileEditData[file] = self.findLatestModification(file)
-
+            modTime = self.findLatestModification(file)
+            self.fileEditData[file] = modTime
+            self.diag.info("Adding possible edit for " + file + " with mod time " + plugins.localtime(seconds=modTime))
+            
     def process(self, traffic):
         self.diag.info("Processing traffic " + repr(traffic.__class__))
         self.addPossibleFileEdits(traffic)

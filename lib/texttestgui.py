@@ -1813,28 +1813,27 @@ class FileViewGUI(guiplugins.SubGUI):
      
     def describe(self):
         self.describeName()
-        self.describeLevel(self.model.get_iter_root())
+        self.model.foreach(self.describeIter)
+
     def describeName(self):
         if self.nameColumn:
             guilog.info("Setting file-view title to '" + self.nameColumn.get_title() + "'")
-    def describeLevel(self, currIter, parentDesc=""): 
-        while currIter is not None:
-            subIter = self.model.iter_children(currIter)
-            if parentDesc:
-                fileName = self.model.get_value(currIter, 0)
-                colour = self.model.get_value(currIter, 1)
-                if colour:
-                    guilog.info("Adding file " + fileName + " under heading '" + parentDesc + "', coloured " + colour)
-                details = self.model.get_value(currIter, 4)
-                if details:
-                    guilog.info("(Second column '" + details + "' coloured " + colour + ")")
-                recalcIcon = self.model.get_value(currIter, 5)
-                if recalcIcon:
-                    guilog.info("(Recalculation icon showing '" + recalcIcon + "')")
-            if subIter:
-                self.describeLevel(subIter, self.model.get_value(currIter, 0))
-            currIter = self.model.iter_next(currIter)
-        
+            
+    def describeIter(self, model, path, currIter):
+        parentIter = self.model.iter_parent(currIter)
+        if parentIter:
+            fileName = self.model.get_value(currIter, 0)
+            colour = self.model.get_value(currIter, 1)
+            if colour:
+                parentDesc = self.model.get_value(parentIter, 0)
+                guilog.info("Adding file " + fileName + " under heading '" + parentDesc + "', coloured " + colour)
+            details = self.model.get_value(currIter, 4)
+            if details:
+                guilog.info("(Second column '" + details + "' coloured " + colour + ")")
+            recalcIcon = self.model.get_value(currIter, 5)
+            if recalcIcon:
+                guilog.info("(Recalculation icon showing '" + recalcIcon + "')")
+            
     def createView(self):
         self.model.clear()
         state = self.getState()
@@ -2189,7 +2188,7 @@ class TestFileGUI(FileViewGUI):
             return seqdict()
         
     def addStaticDataFilesToModel(self):
-        if self.currentTest.getDataFileNames() == 0:
+        if len(self.currentTest.getDataFileNames()) == 0:
             return
         datiter, colour = self.getRootIterAndColour("Data")
         self.addDataFilesUnderIter(datiter, self.currentTest.listDataFiles(), colour, self.currentTest.getDirectory())

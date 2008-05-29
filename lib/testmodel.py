@@ -387,15 +387,15 @@ class Test(plugins.Observable):
         for dataFile in self.getDataFileNames():
             self.diagnose("Searching for data files called " + dataFile)
             for fileName in self.dircache.findAllFiles(dataFile):
-                for fullPath in self.listFiles(fileName, dataFile):
+                for fullPath in self.listFiles(fileName, dataFile, followLinks=True):
                     if not fullPath in existingDataFiles:
                         existingDataFiles.append(fullPath)
 
         self.diagnose("Found data files as " + repr(existingDataFiles))
         return existingDataFiles
-    def listFiles(self, fileName, dataFile):
+    def listFiles(self, fileName, dataFile, followLinks):
         filesToIgnore = self.getCompositeConfigValue("test_data_ignore", dataFile)
-        return self.listFilesFrom([ fileName ], filesToIgnore)
+        return self.listFilesFrom([ fileName ], filesToIgnore, followLinks)
     def fullPathList(self, dir):
         return map(lambda file: os.path.join(dir, file), os.listdir(dir))
     def listExternallyEditedFiles(self):
@@ -403,10 +403,10 @@ class Test(plugins.Observable):
             rootDir = self.dircache.pathName("file_edits")
             fileList = self.fullPathList(rootDir)
             filesToIgnore = self.getCompositeConfigValue("test_data_ignore", "file_edits")
-            return rootDir, self.listFilesFrom(fileList, filesToIgnore)
+            return rootDir, self.listFilesFrom(fileList, filesToIgnore, followLinks=True)
         else:
             return None, []
-    def listFilesFrom(self, files, filesToIgnore=[]):
+    def listFilesFrom(self, files, filesToIgnore, followLinks):
         files.sort()
         dataFiles = []
         dirs = []
@@ -414,13 +414,13 @@ class Test(plugins.Observable):
         for file in files:
             if self.fileMatches(os.path.basename(file), filesToIgnore):
                 continue
-            if os.path.isdir(file) and not os.path.islink(file):
+            if os.path.isdir(file) and (followLinks or not os.path.islink(file)):
                 dirs.append(file)
             else:
                 dataFiles.append(file)
         for subdir in dirs:
             dataFiles.append(subdir)
-            dataFiles += self.listFilesFrom(self.fullPathList(subdir), filesToIgnore)
+            dataFiles += self.listFilesFrom(self.fullPathList(subdir), filesToIgnore, followLinks)
         return dataFiles
     def fileMatches(self, file, filesToIgnore):
         for ignFile in filesToIgnore:
@@ -678,7 +678,7 @@ class TestCase(Test):
             if file == "framework_tmp" or file == "file_edits" or file.endswith("." + self.app.name):
                 continue
             fullPath = os.path.join(self.writeDirectory, file)
-            paths += self.listFiles(fullPath, file)
+            paths += self.listFiles(fullPath, file, followLinks=False)
         return paths
     def loadState(self, file):
         loaded, state = self.getNewState(file)

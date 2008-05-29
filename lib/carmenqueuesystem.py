@@ -270,12 +270,25 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
             app.addConfigEntry(batchSession, "true", "batch_use_version_filtering")
         for var, value in self.getCarmenEnvironment(app):
             os.environ[var] = value
+
+    def addBaseVersionEntries(self, app):
+        majRel = getMajorReleaseVersion(app)
+        if majRel != "none" and majRel not in app.versions:
+            app.addConfigEntry("base_version", majRel)
+            app.addConfigEntry("unsaveable_version", majRel)
+        arch = getArchitecture(app)
+        if arch not in app.versions:
+            app.addConfigEntry("base_version", arch)
+            app.addConfigEntry("unsaveable_version", arch)
+            
     def defaultLoginShell(self):
         # All of carmen's login stuff is done in tcsh starter scripts...
         return "/bin/tcsh"
     def getConfigEnvironment(self, test):
         baseEnv, props = queuesystem.QueueSystemConfig.getConfigEnvironment(self, test)
         if test.parent is None:
+            # Cheat doing it here, but we need to have read the config file first!
+            self.addBaseVersionEntries(test.app)
             return baseEnv + self.getCarmenEnvironment(test.app) + self.getCleanedGtkEnvironment(), props
         else:
             return baseEnv, props

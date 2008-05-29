@@ -561,13 +561,22 @@ class QueueSystemServer(BaseActionRunner):
         if self.testsSubmitted == self.maxCapacity:
             self.sendServerState("Completed submission of tests up to capacity")
     def getSlaveEnvironment(self):
+        env = plugins.copyEnvironment()
+        self.fixUseCaseVariables(env)
+        return env
+
+    def fixUseCaseVariables(self, env):
         # Make sure we clear out the master scripts so the slave doesn't use them too,
         # otherwise just use the environment as is
-        if os.environ.has_key("USECASE_REPLAY_SCRIPT"):
-            env = plugins.copyEnvironment()
+        if env.has_key("USECASE_REPLAY_SCRIPT"):
             env["USECASE_REPLAY_SCRIPT"] = ""
             env["USECASE_RECORD_SCRIPT"] = ""
-            return env
+
+    def fixDisplay(self, env):
+        # Must make sure SGE jobs don't get a locally referencing DISPLAY
+        display = env.get("DISPLAY")
+        if display and display.startswith(":"):
+            env["DISPLAY"] = socket.gethostname() + display
 
     def getPendingState(self, test):
         freeText = "Job pending in " + queueSystemName(test.app)
@@ -612,6 +621,7 @@ class QueueSystemServer(BaseActionRunner):
             cmdArgs += plugins.splitcmd(extraArgs)
         cmdArgs.append(self.shellWrap(command))
         jobName = submissionRules.getJobName()
+        self.fixDisplay(slaveEnv)
         self.diag.info("Creating job " + jobName + " with command arguments : " + repr(cmdArgs))
         self.lock.acquire()
         if self.exited:

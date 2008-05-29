@@ -1152,6 +1152,7 @@ Installation and self-test changes:
 Bug Fixes:
     - Saving edited files from PyUseCase's process monitoring mechanism now works correctly (comparetest.py)
     - Fixed bug introduced in 3.11 where dynamic GUI makes a mess of empty test suites if started from the command line (testmodel.py)
+    - Fixed crash when a static GUI refresh triggers several test removals in the same suite (testmodel.py)
 Grid Engine bug fixes:
     - Fixed bug where local DISPLAY sent to remote processes (queuesystem.py)
 	Main effect was to prevent slow-motion replay mode for GUI testing working with a grid engine

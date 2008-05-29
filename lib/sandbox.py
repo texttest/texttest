@@ -73,7 +73,8 @@ class PrepareWriteDirectory(plugins.Action):
         if os.path.isfile(fullPath):
             self.copyfile(fullPath, target) 
         if os.path.isdir(fullPath):
-            self.copytree(fullPath, target)
+            filesToIgnore = test.getCompositeConfigValue("test_data_ignore", os.path.basename(target))
+            self.copytree(test, fullPath, target, filesToIgnore)
     def copytimes(self, src, dst):
         if os.path.isdir(src) and os.name == "nt":
             # Windows doesn't let you update modification times of directories!
@@ -82,20 +83,23 @@ class PrepareWriteDirectory(plugins.Action):
         st = os.stat(src)
         if hasattr(os, 'utime'):
             os.utime(dst, (st[stat.ST_ATIME], st[stat.ST_MTIME]))
-    def copytree(self, src, dst):
+    def copytree(self, test, src, dst, filesToIgnore):
         # Code is a copy of shutil.copytree, with copying modification times
         # so that we can tell when things change...
         names = os.listdir(src)
         if not os.path.exists(dst):
             os.mkdir(dst)
         for name in names:
+            if test.fileMatches(name, filesToIgnore):
+                continue
+            
             srcname = os.path.join(src, name)
             dstname = os.path.join(dst, name)
             try:
                 if os.path.islink(srcname):
                     self.copylink(srcname, dstname)
                 elif os.path.isdir(srcname):
-                    self.copytree(srcname, dstname)
+                    self.copytree(test, srcname, dstname, filesToIgnore)
                 else:
                     self.copyfile(srcname, dstname)
             except (IOError, os.error), why:

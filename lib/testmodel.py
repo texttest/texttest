@@ -552,7 +552,10 @@ class Test(plugins.Observable):
 
     def updateRelPathReferences(self, targetFile):
         oldRelPath = "/" + self.getRelPath()
-        newRelPath = "/" + plugins.relpath(os.path.dirname(targetFile), self.app.getDirectory())
+        newRelPath = plugins.relpath(os.path.dirname(targetFile), self.app.getDirectory())
+        if not newRelPath:
+            return # Can happen from ExportTests, but then the relative paths are the same anyway
+        newRelPath = "/" + newRelPath 
         tmpFile, tmpFileName = mkstemp()
         for line in open(targetFile).xreadlines():
             os.write(tmpFile, line.replace(oldRelPath, newRelPath))

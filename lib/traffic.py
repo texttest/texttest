@@ -424,22 +424,51 @@ class TrafficServer(TCPServer):
             return self.getFileEditResponses() + trafficResponses
 
     def getFileEditPath(self, file):
-        name = os.path.basename(file)
+        return os.path.join("file_edits", self.getFileEditName(os.path.basename(file)))
+
+    def getFileEditName(self, name):
         timesUsed = self.fileRequestCount.setdefault(name, 0) + 1
         self.fileRequestCount[name] = timesUsed
         if timesUsed > 1:
             name += ".edit_" + str(timesUsed)
-        return os.path.join("file_edits", name)
+        return name
 
     def editFilesToIgnore(self):
         return self.currentTest.getCompositeConfigValue("test_data_ignore", "file_edits")
 
+    def getFileBeingEdited(self, fileName):
+        bestMatch, bestScore = None, -1
+        for editedFile in self.fileEditData.keys():
+            editedName = os.path.basename(editedFile)
+            if editedName == fileName:
+                bestMatch = editedFile
+                break
+            else:
+                matchScore = self.getFileMatchScore(fileName, editedName)
+                if matchScore > bestScore:
+                    bestMatch, bestScore = editedFile, matchScore
+
+        self.diag.info("File being edited for '" + fileName + "' : chose " + bestMatch)
+        return bestMatch
+
+    def getFileMatchScore(self, givenName, actualName):
+        if actualName.find(".edit_") != -1:
+            return -1
+
+        return self._getFileMatchScore(givenName, actualName, lambda x: x) + \
+               self._getFileMatchScore(givenName, actualName, lambda x: -1 -x)
+    
+    def _getFileMatchScore(self, givenName, actualName, indexFunction):
+        score = 0
+        while len(givenName) > score and len(actualName) > score and givenName[indexFunction(score)] == actualName[indexFunction(score)]:
+            score += 1
+        return score
+
     def makeResponseTraffic(self, traffic, responseClass, text):
         if responseClass is FileEditTraffic:
-            for file in self.fileEditData.keys():
-                if os.path.basename(file) == text.strip():
-                    storedFile = self.currentTest.getFileName(self.getFileEditPath(file))
-                    return FileEditTraffic(file, storedFile, self.editFilesToIgnore(), reproduce=True)
+            editedFile = self.getFileBeingEdited(text.strip())
+            storedFile = self.currentTest.getFileName(self.getFileEditPath(text.strip()))
+            return FileEditTraffic(editedFile, storedFile, self.editFilesToIgnore(), reproduce=True)
         else:
             return responseClass(text, traffic.responseFile)
 

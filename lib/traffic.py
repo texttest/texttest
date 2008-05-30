@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os, stat, sys, plugins, shutil, socket, subprocess
+import os, stat, sys, plugins, shutil, socket, subprocess, filecmp
 from ndict import seqdict
 from SocketServer import TCPServer, StreamRequestHandler
 from threading import Thread
@@ -122,9 +122,10 @@ class SysExitTraffic(ResponseTraffic):
 
 class FileEditTraffic(ResponseTraffic):
     typeId = "FIL"
-    def __init__(self, activeFile, storedFile, reproduce):
+    def __init__(self, activeFile, storedFile, filesToIgnore, reproduce):
         self.activeFile = activeFile
         self.storedFile = storedFile
+        self.filesToIgnore = filesToIgnore
         self.reproduce = reproduce
         ResponseTraffic.__init__(self, os.path.basename(activeFile), None)
 
@@ -133,9 +134,18 @@ class FileEditTraffic(ResponseTraffic):
         if os.path.isfile(src):
             shutil.copyfile(src, target)
         else:
-            if os.path.exists(target):
-                shutil.rmtree(target)
-            shutil.copytree(src, target)
+            for srcroot, srcdirs, srcfiles in os.walk(src):
+                for fileToIgnore in self.filesToIgnore:
+                    if fileToIgnore in srcdirs:
+                        srcdirs.remove(fileToIgnore)
+                    if fileToIgnore in srcfiles:
+                        srcfiles.remove(fileToIgnore)
+                for srcfile in srcfiles:
+                    fullSrcPath = os.path.join(srcroot, srcfile)
+                    fullTargetPath = fullSrcPath.replace(src, target)
+                    if not os.path.exists(fullTargetPath) or not filecmp.cmp(fullSrcPath, fullTargetPath, 0):
+                        plugins.ensureDirExistsForFile(fullTargetPath)
+                        shutil.copyfile(fullSrcPath, fullTargetPath)
             
     def forwardToDestination(self):
         self.write(self.text)
@@ -395,12 +405,15 @@ class TrafficServer(TCPServer):
     def getFileEditPath(self, file):
         return os.path.join("file_edits", os.path.basename(file))
 
+    def editFilesToIgnore(self):
+        return self.currentTest.getCompositeConfigValue("test_data_ignore", "file_edits")
+
     def makeResponseTraffic(self, traffic, responseClass, text):
         if responseClass is FileEditTraffic:
             for file in self.fileEditData.keys():
                 if os.path.basename(file) == text.strip():
                     storedFile = self.currentTest.getFileName(self.getFileEditPath(file))
-                    return FileEditTraffic(file, storedFile, reproduce=True)
+                    return FileEditTraffic(file, storedFile, self.editFilesToIgnore(), reproduce=True)
         else:
             return responseClass(text, traffic.responseFile)
 
@@ -410,7 +423,7 @@ class TrafficServer(TCPServer):
             newEditInfo = self.findLatestModification(file)
             if newEditInfo != editInfo:
                 storedFile = self.currentTest.makeTmpFileName(self.getFileEditPath(file), forComparison=0)
-                traffic.append(FileEditTraffic(file, storedFile, reproduce=False))
+                traffic.append(FileEditTraffic(file, storedFile, self.editFilesToIgnore(), reproduce=False))
                 self.fileEditData[file] = newEditInfo
         return traffic
         

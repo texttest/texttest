@@ -1,4 +1,4 @@
-import os, shutil, plugins, re, stat, subprocess, glob
+import os, shutil, plugins, re, stat, subprocess, glob, types
 
 from jobprocess import JobProcess
 from socket import gethostname
@@ -73,8 +73,7 @@ class PrepareWriteDirectory(plugins.Action):
         if os.path.isfile(fullPath):
             self.copyfile(fullPath, target) 
         if os.path.isdir(fullPath):
-            filesToIgnore = test.getCompositeConfigValue("test_data_ignore", os.path.basename(target))
-            self.copytree(test, fullPath, target, filesToIgnore)
+            self.copytree(fullPath, target)
     def copytimes(self, src, dst):
         if os.path.isdir(src) and os.name == "nt":
             # Windows doesn't let you update modification times of directories!
@@ -83,23 +82,20 @@ class PrepareWriteDirectory(plugins.Action):
         st = os.stat(src)
         if hasattr(os, 'utime'):
             os.utime(dst, (st[stat.ST_ATIME], st[stat.ST_MTIME]))
-    def copytree(self, test, src, dst, filesToIgnore):
+    def copytree(self, src, dst):
         # Code is a copy of shutil.copytree, with copying modification times
         # so that we can tell when things change...
         names = os.listdir(src)
         if not os.path.exists(dst):
             os.mkdir(dst)
         for name in names:
-            if test.fileMatches(name, filesToIgnore):
-                continue
-            
             srcname = os.path.join(src, name)
             dstname = os.path.join(dst, name)
             try:
                 if os.path.islink(srcname):
                     self.copylink(srcname, dstname)
                 elif os.path.isdir(srcname):
-                    self.copytree(test, srcname, dstname, filesToIgnore)
+                    self.copytree(srcname, dstname)
                 else:
                     self.copyfile(srcname, dstname)
             except (IOError, os.error), why:
@@ -536,7 +532,10 @@ class CreateCatalogue(plugins.Action):
         allPaths = seqdict()
         for path in test.listUnownedTmpPaths():
             editInfo = self.getEditInfo(path)
-            self.diag.info("Path " + path + " edit info " + str(editInfo))
+            if type(editInfo) == types.IntType:
+                self.diag.info("Path " + path + " edit info " + plugins.localtime(seconds=editInfo))
+            else:
+                self.diag.info("Path " + path + " edit info " + str(editInfo))
             allPaths[path] = editInfo
         return allPaths
     def getEditInfo(self, fullPath):

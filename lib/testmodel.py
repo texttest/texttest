@@ -8,6 +8,7 @@ from cPickle import Pickler, loads, UnpicklingError
 from respond import Responder
 from threading import Lock
 from sets import Set, ImmutableSet
+from tempfile import mkstemp
 
 helpIntro = """
 Note: the purpose of this help is primarily to document derived configurations and how they differ from the
@@ -539,6 +540,7 @@ class Test(plugins.Observable):
             if dirname == self.getDirectory():
                 targetFile = os.path.join(newDir, local)
                 shutil.copy2(sourceFile, targetFile)
+                self.updateRelPathReferences(targetFile)
         root, extFiles = self.listExternallyEditedFiles()
         dataFiles = self.listDataFiles() + extFiles
         for sourcePath in dataFiles:
@@ -547,6 +549,15 @@ class Test(plugins.Observable):
             targetPath = sourcePath.replace(self.getDirectory(), newDir)
             plugins.ensureDirExistsForFile(targetPath)
             shutil.copy2(sourcePath, targetPath)
+
+    def updateRelPathReferences(self, targetFile):
+        oldRelPath = "/" + self.getRelPath()
+        newRelPath = "/" + plugins.relpath(os.path.dirname(targetFile), self.app.getDirectory())
+        tmpFile, tmpFileName = mkstemp()
+        for line in open(targetFile).xreadlines():
+            os.write(tmpFile, line.replace(oldRelPath, newRelPath))
+        os.close(tmpFile)
+        shutil.move(tmpFileName, targetFile)
 
     def getRunEnvironment(self, onlyVars = []):
         return self.environment.getValues(onlyVars)

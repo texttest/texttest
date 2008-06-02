@@ -448,7 +448,6 @@ class TrafficServer(TCPServer):
                 if matchScore > bestScore:
                     bestMatch, bestScore = editedFile, matchScore
 
-        self.diag.info("File being edited for '" + fileName + "' : chose " + bestMatch)
         return bestMatch
 
     def getFileMatchScore(self, givenName, actualName):

@@ -401,15 +401,15 @@ class TrafficServer(TCPServer):
                            plugins.localtime(seconds=modTime) + " and size " + str(modSize))
             
     def process(self, traffic):
-        self.diag.info("Processing traffic " + repr(traffic.__class__))
+        self.diag.info("Processing traffic " + str(traffic.__class__))
         self.addPossibleFileEdits(traffic)
         traffic.record(self.recordFile)
         for response in self.getResponses(traffic):
-            self.diag.info("Providing response " + repr(response.__class__))
+            self.diag.info("Providing response " + str(response.__class__))
             response.record(self.recordFile)
             for chainResponse in response.forwardToDestination():
                 self.process(chainResponse)
-            self.diag.info("Completed response " + repr(response.__class__))            
+            self.diag.info("Completed response " + str(response.__class__))            
 
     def getResponses(self, traffic):
         if self.replayInfo.isActive():
@@ -466,8 +466,10 @@ class TrafficServer(TCPServer):
 
     def makeResponseTraffic(self, traffic, responseClass, text):
         if responseClass is FileEditTraffic:
-            editedFile = self.getFileBeingEdited(text.strip())
-            storedFile = self.currentTest.getFileName(self.getFileEditPath(text.strip()))
+            fileName = text.strip()
+            editedFile = self.getFileBeingEdited(fileName)
+            storedFile = self.currentTest.getFileName(self.getFileEditPath(fileName))
+            self.diag.info("File being edited for '" + fileName + "' : will replace " + str(editedFile) + " with " + str(storedFile))
             return FileEditTraffic(editedFile, storedFile, self.editFilesToIgnore(), reproduce=True)
         else:
             return responseClass(text, traffic.responseFile)

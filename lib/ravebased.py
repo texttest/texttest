@@ -12,10 +12,6 @@ helpOptions = """
 
 -rulecomp  - Build all rulesets before running the tests
 
--rulecomp clean
-           - As '-rulecomp' above, but will attempt to remove ruleset files first, such that ruleset is
-             rebuilt 'from scratch'. This is sometimes useful when the RAVE compiler has depenedency bugs
-
 -build <t> - Prior to running any tests, build in the appropriate location specified by <t>. This is specified in
              the config file as the entries "build_targets". So if my config file contains the lines
              [build_targets]

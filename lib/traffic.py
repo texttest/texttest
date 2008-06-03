@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os, stat, sys, plugins, shutil, socket, subprocess, filecmp
+import os, stat, sys, plugins, shutil, socket, subprocess
 from ndict import seqdict
 from SocketServer import TCPServer, StreamRequestHandler
 from threading import Thread
@@ -122,31 +122,39 @@ class SysExitTraffic(ResponseTraffic):
 
 class FileEditTraffic(ResponseTraffic):
     typeId = "FIL"
-    def __init__(self, activeFile, storedFile, filesToIgnore, reproduce):
+    def __init__(self, activeFile, storedFile, changedPaths, reproduce):
         self.activeFile = activeFile
         self.storedFile = storedFile
-        self.filesToIgnore = filesToIgnore
+        self.changedPaths = changedPaths
         self.reproduce = reproduce
-        ResponseTraffic.__init__(self, os.path.basename(activeFile), None)
+        self.suffix = ".TEXTTEST_SYMLINK"
+        ResponseTraffic.__init__(self, os.path.basename(storedFile), None)
 
-    def copy(self, src, target):
-        plugins.ensureDirExistsForFile(target)
-        if os.path.isfile(src):
-            shutil.copyfile(src, target)
-        else:
-            for srcroot, srcdirs, srcfiles in os.walk(src):
-                for fileToIgnore in self.filesToIgnore:
-                    if fileToIgnore in srcdirs:
-                        srcdirs.remove(fileToIgnore)
-                    if fileToIgnore in srcfiles:
-                        srcfiles.remove(fileToIgnore)
-                for srcfile in srcfiles:
-                    fullSrcPath = os.path.join(srcroot, srcfile)
-                    fullTargetPath = fullSrcPath.replace(src, target)
-                    if not os.path.exists(fullTargetPath) or not filecmp.cmp(fullSrcPath, fullTargetPath, 0):
-                        plugins.ensureDirExistsForFile(fullTargetPath)
-                        shutil.copyfile(fullSrcPath, fullTargetPath)
-            
+    def copy(self, srcRoot, dstRoot):
+        for srcPath in self.changedPaths:
+            dstPath = srcPath.replace(srcRoot, dstRoot)
+            try:
+                plugins.ensureDirExistsForFile(dstPath)
+                if srcPath.endswith(self.suffix):
+                    self.restoreLink(srcPath, dstPath.replace(self.suffix, ""))
+                elif os.path.islink(srcPath):
+                    self.storeLinkAsFile(srcPath, dstPath + self.suffix)
+                else:
+                    shutil.copyfile(srcPath, dstPath)
+            except IOError:
+                print "Could not transfer", srcPath, "to", dstPath
+
+    def restoreLink(self, srcPath, dstPath):
+        linkTo = open(srcPath).read().strip()
+        if not os.path.islink(dstPath):
+            os.symlink(linkTo, dstPath)
+
+    def storeLinkAsFile(self, srcPath, dstPath):
+        writeFile = open(dstPath, "w")
+        # Record relative links as such
+        writeFile.write(os.readlink(srcPath).replace(os.path.dirname(srcPath) + "/", "") + "\n")
+        writeFile.close()
+
     def forwardToDestination(self):
         self.write(self.text)
         if self.reproduce:
@@ -254,16 +262,23 @@ class CommandLineTraffic(Traffic):
     def findPossibleFileEdits(self):
         edits = []
         for arg in self.cmdArgs:
-            if not arg.startswith("-"):
-                for word in arg.split():
-                    if os.path.isabs(word) and os.path.exists(word):
-                        edits.append(word)
-                    else:
-                        fullPath = os.path.join(self.cmdCwd, word)
-                        if os.path.exists(fullPath):
-                            edits.append(fullPath)
+            for word in self.getFileWordsFromArg(arg):
+                if os.path.isabs(word):
+                    edits.append(word)
+                else:
+                    fullPath = os.path.join(self.cmdCwd, word)
+                    if os.path.exists(fullPath):
+                        edits.append(fullPath)
         self.diag.info("Might edit in " + repr(edits))
         return edits
+
+    def getFileWordsFromArg(self, arg):
+        if arg.startswith("-"):
+            # look for something of the kind --logfile=/path
+            return arg.split("=")[1:]
+        else:
+            # otherwise assume we could have multiple words in quotes
+            return arg.split()
         
     def forwardToDestination(self):
         realCmd = self.findRealCommand()
@@ -349,9 +364,10 @@ class TrafficServer(TCPServer):
         self.thread.setDaemon(1)
         self.diag.info("Starting traffic server thread")
         self.thread.start()
-        self.fileEditData = seqdict()
+        self.topLevelForEdit = [] # contains only paths explicitly given. Always present.
+        self.fileEditData = seqdict() # contains all paths, including subpaths of the above. Empty when replaying.
         self.currentTest = None
-        self.fileRequestCount = {}
+        self.fileRequestCount = {} # also only for recording
         
     def setAddressVariable(self, test):
         host, port = self.socket.getsockname()
@@ -374,44 +390,72 @@ class TrafficServer(TCPServer):
         # Assume testing client until a server contacts us
         ClientSocketTraffic.direction = "<-"
         ServerTraffic.direction = "->"
-        
-    def findLatestModification(self, file):
-        if os.path.isfile(file):
-            statObj = os.stat(file)
-            return statObj[stat.ST_MTIME], statObj[stat.ST_SIZE]
-        elif os.path.isdir(file):
-            allFiles = [ file ]
-            for rootDir, dirs, files in os.walk(file):
-                allFiles += [ os.path.join(rootDir, dir) for dir in dirs ]
-                allFiles += [ os.path.join(rootDir, currFile) for currFile in files ]
-            times = []
-            totalSize = 0
-            for currFile in allFiles:
-                statObj = os.stat(currFile)
-                times.append(statObj[stat.ST_MTIME])
-                totalSize += statObj[stat.ST_SIZE]
-            return max(times), totalSize
 
+    def findFilesAndLinks(self, path):
+        if not os.path.exists(path):
+            return []
+        if os.path.isfile(path) or os.path.islink(path):
+            return [ path ]
+
+        paths = []
+        filesToIgnore = self.currentTest.getCompositeConfigValue("test_data_ignore", "file_edits")
+        for srcroot, srcdirs, srcfiles in os.walk(path):
+            for fileToIgnore in filesToIgnore:
+                if fileToIgnore in srcdirs:
+                    srcdirs.remove(fileToIgnore)
+                if fileToIgnore in srcfiles:
+                    srcfiles.remove(fileToIgnore)
+            for srcfile in srcfiles:
+                paths.append(os.path.join(srcroot, srcfile))
+
+            for srcdir in srcdirs:
+                fullSrcPath = os.path.join(srcroot, srcdir)
+                if os.path.islink(fullSrcPath):
+                    paths.append(fullSrcPath)
+        return paths
+
+    def getLatestModification(self, path):
+        if os.path.exists(path):
+            statObj = os.stat(path)
+            return statObj[stat.ST_MTIME], statObj[stat.ST_SIZE]
+        else:
+            return None, 0
+        
     def addPossibleFileEdits(self, traffic):
-        for file in traffic.findPossibleFileEdits():
-            modInfo = self.findLatestModification(file)
-            self.fileEditData[file] = modInfo
-            modTime, modSize = modInfo
-            self.diag.info("Adding possible edit for " + file + " with mod time " +
-                           plugins.localtime(seconds=modTime) + " and size " + str(modSize))
-            
+        allEdits = traffic.findPossibleFileEdits()
+        for file in allEdits:
+            if file not in self.topLevelForEdit:
+                self.topLevelForEdit.append(file)
+
+            # edit times are only interesting when recording
+            if not self.replayInfo.isActive():
+                for subPath in self.findFilesAndLinks(file):                
+                    modTime, modSize = self.getLatestModification(subPath)
+                    self.fileEditData[subPath] = modTime, modSize
+                    self.diag.info("Adding possible sub-path edit for " + subPath + " with mod time " +
+                                   plugins.localtime(seconds=modTime) + " and size " + str(modSize))
+        return len(allEdits) > 0
+    
     def process(self, traffic):
+        if not self.replayInfo.isActive():
+            # If we're recording, check for file changes before we do
+            # Must do this before as they may be a side effect of whatever it is we're processing
+            for fileTraffic in self.getLatestFileEdits():
+                self._process(fileTraffic)
+        self._process(traffic)
+
+    def _process(self, traffic):
         self.diag.info("Processing traffic " + str(traffic.__class__))
-        self.addPossibleFileEdits(traffic)
+        hasFileEdits = self.addPossibleFileEdits(traffic)
         traffic.record(self.recordFile)
-        for response in self.getResponses(traffic):
+        for response in self.getResponses(traffic, hasFileEdits):
             self.diag.info("Providing response " + str(response.__class__))
             response.record(self.recordFile)
             for chainResponse in response.forwardToDestination():
-                self.process(chainResponse)
+                self._process(chainResponse)
             self.diag.info("Completed response " + str(response.__class__))            
 
-    def getResponses(self, traffic):
+    def getResponses(self, traffic, hasFileEdits):
         if self.replayInfo.isActive():
             replayedResponses = []
             for responseClass, text in self.replayInfo.readReplayResponses(traffic):
@@ -421,7 +465,10 @@ class TrafficServer(TCPServer):
             return traffic.filterReplay(replayedResponses)
         else:
             trafficResponses = traffic.forwardToDestination()
-            return self.getFileEditResponses() + trafficResponses
+            if hasFileEdits: # Only if the traffic itself can produce file edits do we check here
+                return self.getLatestFileEdits() + trafficResponses
+            else:
+                return trafficResponses
 
     def getFileEditPath(self, file):
         return os.path.join("file_edits", self.getFileEditName(os.path.basename(file)))
@@ -433,12 +480,11 @@ class TrafficServer(TCPServer):
             name += ".edit_" + str(timesUsed)
         return name
 
-    def editFilesToIgnore(self):
-        return self.currentTest.getCompositeConfigValue("test_data_ignore", "file_edits")
-
-    def getFileBeingEdited(self, fileName):
+    def getFileBeingEdited(self, givenName):
+        # drop the suffix which is internal to TextTest
+        fileName = givenName.split(".edit_")[0]
         bestMatch, bestScore = None, -1
-        for editedFile in self.fileEditData.keys():
+        for editedFile in self.topLevelForEdit:
             editedName = os.path.basename(editedFile)
             if editedName == fileName:
                 bestMatch = editedFile
@@ -467,20 +513,26 @@ class TrafficServer(TCPServer):
         if responseClass is FileEditTraffic:
             fileName = text.strip()
             editedFile = self.getFileBeingEdited(fileName)
-            storedFile = self.currentTest.getFileName(self.getFileEditPath(fileName))
+            storedFile = self.currentTest.getFileName(os.path.join("file_edits", fileName))
             self.diag.info("File being edited for '" + fileName + "' : will replace " + str(editedFile) + " with " + str(storedFile))
-            return FileEditTraffic(editedFile, storedFile, self.editFilesToIgnore(), reproduce=True)
+            return FileEditTraffic(editedFile, storedFile, self.findFilesAndLinks(storedFile), reproduce=True)
         else:
             return responseClass(text, traffic.responseFile)
 
-    def getFileEditResponses(self):
+    def getLatestFileEdits(self):
         traffic = []
-        for file, editInfo in self.fileEditData.items():
-            newEditInfo = self.findLatestModification(file)
-            if newEditInfo != editInfo:
+        for file in self.topLevelForEdit:
+            changedPaths = []
+            for subPath in self.findFilesAndLinks(file):
+                newEditInfo = self.getLatestModification(subPath)
+                if newEditInfo != self.fileEditData.get(subPath):
+                    changedPaths.append(subPath)
+                    self.fileEditData[subPath] = newEditInfo
+                    
+            if len(changedPaths) > 0:
                 storedFile = self.currentTest.makeTmpFileName(self.getFileEditPath(file), forComparison=0)
-                traffic.append(FileEditTraffic(file, storedFile, self.editFilesToIgnore(), reproduce=False))
-                self.fileEditData[file] = newEditInfo
+                traffic.append(FileEditTraffic(file, storedFile, changedPaths, reproduce=False))    
+                
         return traffic
         
 

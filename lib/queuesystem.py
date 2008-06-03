@@ -606,7 +606,10 @@ class QueueSystemServer(BaseActionRunner):
         if self.optionMap.diagConfigFile:
             runOptions.append("-x")
             runOptions.append("-xr " + self.optionMap.diagConfigFile)
-            slaveWriteDir = os.path.join(self.optionMap.diagWriteDir, submissionRules.getJobName())
+            # The environment variable is mostly for self-testing
+            # so we can point all logs to the same place. 
+            slaveWriteDir = os.getenv("TEXTTEST_SLAVE_DIAGDIR",
+                                      os.path.join(self.optionMap.diagWriteDir, submissionRules.getJobName()))
             runOptions.append("-xw " + slaveWriteDir)
         return " ".join(runOptions)
     def getSlaveLogDir(self, test):

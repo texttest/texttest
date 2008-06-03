@@ -308,7 +308,7 @@ class FileViewAction(guiplugins.ActionGUI):
         if display.startswith(":"):
             return gethostname() + display
         else:
-            return display
+            return display.replace("localhost", gethostname())
 
     def getSignalsSent(self):
         return [ "ViewerStarted" ]

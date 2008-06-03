@@ -698,6 +698,8 @@ class TestCase(Test):
         return paths
     def loadState(self, file):
         loaded, state = self.getNewState(file)
+        state.updateAbsPath(self.app.getDirectory())
+        state.updateTmpPath(self.app.writeDirectory)
         self.changeState(state)
     def makeTmpFileName(self, stem, forComparison=1, forFramework=0):
         dir = self.getDirectory(temporary=1, forFramework=forFramework)

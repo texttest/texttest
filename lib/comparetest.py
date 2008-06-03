@@ -103,22 +103,28 @@ class TestComparison(BaseTestComparison):
             if var != "diag":
                 state[var] = value
         return state
+
     def __setstate__(self, state):
         self.__dict__ = state
         self.diag = plugins.getDiagnostics("TestComparison")
         # If loaded from old pickle files, can get out of date objects...
         if not hasattr(self, "missingResults"):
             self.missingResults = []
+
     def updateAbsPath(self, newPath):
-        self.diag.info("Updating abspath " + self.appAbsPath + " to " + newPath)
-        for comparison in self.allResults:
-            comparison.updatePaths(self.appAbsPath, newPath)
-        self.appAbsPath = newPath
+        if self.appAbsPath != newPath:
+            self.diag.info("Updating abspath " + self.appAbsPath + " to " + newPath)
+            for comparison in self.allResults:
+                comparison.updatePaths(self.appAbsPath, newPath)
+            self.appAbsPath = newPath
+
     def updateTmpPath(self, newPath):
-        self.diag.info("Updating abspath " + self.appWriteDir + " to " + newPath)
-        for comparison in self.allResults:
-            comparison.updatePaths(self.appWriteDir, newPath)
-        self.appAbsPath = newPath
+        if self.appWriteDir != newPath:
+            self.diag.info("Updating abspath " + self.appWriteDir + " to " + newPath)
+            for comparison in self.allResults:
+                comparison.updatePaths(self.appWriteDir, newPath)
+            self.appWriteDir = newPath
+
     def setFailedPrediction(self, prediction):
         self.diag.info("Setting failed prediction to " + str(prediction))
         self.failedPrediction = prediction

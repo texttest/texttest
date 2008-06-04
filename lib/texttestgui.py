@@ -2011,19 +2011,20 @@ class TestFileGUI(FileViewGUI):
             self.recreateModel(state)
     def notifyRecalculation(self, test, comparisons, newIcon):
         if test is self.currentTest:
-            iterList = []
-            self.model.foreach(self.collectItersForRecalculate, (comparisons, newIcon, iterList))
-            for iter in iterList:
-                self.model.set_value(iter, 5, newIcon)
-            if len(iterList):
+            # slightly ugly hack with "global data": this way we don't have to return any iterators
+            # and can avoid the bug in PyGTK 2.10.3 in this area
+            self.recalculationCausedChange = False
+            self.model.foreach(self.setRecalculateIcon, [ comparisons, newIcon ])
+            if self.recalculationCausedChange:
                 self.contentsChanged()
-    def collectItersForRecalculate(self, model, path, iter, data):
-        comparisons, newIcon, iterList = data
+    def setRecalculateIcon(self, model, path, iter, data):
+        comparisons, newIcon = data
         comparison = model.get_value(iter, 3)
         if comparison in comparisons:
             oldVal = model.get_value(iter, 5)
             if oldVal != newIcon:
-                iterList.append(iter)
+                self.model.set_value(iter, 5, newIcon)
+                self.recalculationCausedChange = True
                             
     def forceVisible(self, rowCount):
         return rowCount == 1

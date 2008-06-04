@@ -146,16 +146,19 @@ def installationDir(name):
 # so e.g. 144:5.3:0.01 is interpreted as 144 hours + 5.3 minutes + 0.01 seconds.
 def getNumberOfSeconds(timeString):
     parts = timeString.split(":")
-    if len(parts) > 3:
-        raise "Illegal time format '" + timeString + "' :  Use format HH:MM:SS or MM:SS, or a single number to denote a number of minutes."
-    if len(parts) == 1:  # Backwards compatible, assume single ints/floats means minutes
-        return 60 * float(timeString)
-    else:                # Assume format is HH:MM:SS ...
-        seconds = 0
-        for i in range(len(parts) - 1, -1, -1):
-            if (parts[i] != ""): # Handle empty strings (<=:10 gives empty minutes field, for example)
-                seconds += float(parts[i]) * pow(60, len(parts) - 1 - i)                
-        return seconds 
+    try:
+        if len(parts) == 1:  # Backwards compatible, assume single ints/floats means minutes
+            return 60 * float(timeString)
+        elif len(parts) <= 3:                # Assume format is HH:MM:SS ...
+            seconds = 0
+            for i in range(len(parts) - 1, -1, -1):
+                if (parts[i] != ""): # Handle empty strings (<=:10 gives empty minutes field, for example)
+                    seconds += float(parts[i]) * pow(60, len(parts) - 1 - i)                
+            return seconds
+    except ValueError:
+        pass
+    raise TextTestError, "Illegal time format '" + timeString + \
+          "' :  Use format HH:MM:SS or MM:SS, or a single number to denote a number of minutes."
 
 # Same as above, but gives minutes instead of seconds ...
 def getNumberOfMinutes(timeString):

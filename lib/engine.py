@@ -80,29 +80,33 @@ class Activator(Responder, plugins.Observable):
     
     def run(self):
         goodSuites = []
-        rejectedApps = Set()
+        rejectionInfo = seqdict()
         self.notify("StartRead")
         for suite in self.suites:
-            filters = suite.app.getFilterList()
-            self.diag.info("Creating test suite with filters " + repr(filters))
+            try:
+                filters = suite.app.getFilterList()
+                self.diag.info("Creating test suite with filters " + repr(filters))
         
-            suite.readContents(filters)
-            self.diag.info("SUCCESS: Created test suite of size " + str(suite.size()))
-            if suite.size() > 0 or self.allowEmpty:
-                goodSuites.append(suite)
-                suite.notify("Add", initial=True)
-            else:
-                rejectedApps.add(suite.app)
+                suite.readContents(filters)
+                self.diag.info("SUCCESS: Created test suite of size " + str(suite.size()))
+                if suite.size() > 0 or self.allowEmpty:
+                    goodSuites.append(suite)
+                    suite.notify("Add", initial=True)
+                else:
+                    rejectionInfo[suite.app] = "no tests matching the selection criteria found."
+            except plugins.TextTestError, e:
+                rejectionInfo[suite.app] = str(e)
 
         self.notify("AllRead", goodSuites)
             
-        if len(rejectedApps) > 0:
-            self.writeErrors(rejectedApps)
+        if len(rejectionInfo) > 0:
+            self.writeErrors(rejectionInfo)
         return goodSuites
     
-    def writeErrors(self, rejectedApps):
+    def writeErrors(self, rejectionInfo):
         # Don't write errors if only some of a group are rejected
         extras = []
+        rejectedApps = Set(rejectionInfo.keys())
         for suite in self.suites:
             app = suite.app
             if app in extras:
@@ -110,7 +114,7 @@ class Activator(Responder, plugins.Observable):
             extras += app.extras
             appGroup = Set([ app ] + app.extras)
             if appGroup.issubset(rejectedApps):
-                sys.stderr.write(app.rejectionMessage("no tests matching the selection criteria found."))
+                sys.stderr.write(app.rejectionMessage(rejectionInfo.get(app)))
 
 
 class TextTest(Responder, plugins.Observable):

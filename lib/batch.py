@@ -611,7 +611,8 @@ class CollectFiles(plugins.ScriptWithArgs):
         mailTitle = self.getTitle(app, totalValues)
         mailContents = self.mailSender.createMailHeaderForSend(self.runId, mailTitle, app)
         mailContents += self.getBody(fileBodies)
-        self.mailSender.sendOrStoreMail(app, mailContents)
+        allSuccess = len(totalValues.keys()) == 1 and totalValues.keys()[0] == "succeeded"
+        self.mailSender.sendOrStoreMail(app, mailContents, isAllSuccess=allSuccess)
     def matchesApp(self, dir, app):
         suffix = app.versionSuffix()
         return dir.startswith(app.name + suffix) or dir.startswith(self.batchSession + suffix)

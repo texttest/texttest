@@ -387,6 +387,9 @@ class TrafficServer(TCPServer):
         CommandLineTraffic.currentTest = test
         self.currentTest = test
         ClientSocketTraffic.destination = None
+        self.topLevelForEdit = []
+        self.fileEditData = seqdict()
+        self.fileRequestCount = {}
         # Assume testing client until a server contacts us
         ClientSocketTraffic.direction = "<-"
         ServerTraffic.direction = "->"

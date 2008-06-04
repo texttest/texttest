@@ -1202,6 +1202,8 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
 class HideSelected(guiplugins.ActionGUI,AllTestsHandler):
     def _getTitle(self):
         return "Hide selected"
+    def messageBeforePerform(self):
+        return "Hiding all tests that are currently selected ..."
     def getTooltip(self):
         return "Hide all tests that are currently selected"
     def getSignalsSent(self):
@@ -1213,6 +1215,8 @@ class HideSelected(guiplugins.ActionGUI,AllTestsHandler):
 class HideUnselected(guiplugins.ActionGUI,AllTestsHandler):
     def _getTitle(self):
         return "Show only selected"
+    def messageBeforePerform(self):
+        return "Showing only tests that are currently selected ..."
     def getTooltip(self):
         return "Show only tests that are currently selected"
     def getSignalsSent(self):
@@ -1224,6 +1228,8 @@ class HideUnselected(guiplugins.ActionGUI,AllTestsHandler):
 class ShowAll(guiplugins.BasicActionGUI,AllTestsHandler):
     def _getTitle(self):
         return "Show all"
+    def messageBeforePerform(self):
+        return "Showing all tests..."
     def getTooltip(self):
         return "Show all tests"
     def getSignalsSent(self):

@@ -540,6 +540,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
             self.notify("Status", message)
         self.notify("ActionStart", message)
         try:
+            self.notify("ActionProgress")
             self.performOnCurrent()
             message = self.messageAfterPerform()
             if message != None:

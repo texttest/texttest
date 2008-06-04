@@ -1137,22 +1137,25 @@ Grid Engine bug fixes:
     - Trying to run with a grid engine that isn't installed gives an error message rather than stracktrace (queuesystem.py)
     - If invalid resource given for "performance_test_resource", performance collection now disabled (queuesystem.py)
 
-Trunk
-=====
+Version 3.11.1
+==============
 	
-Major Enhancements:
-General GUI Enhancements:
-Static GUI Enhancements:
-Dynamic GUI Enhancements:
 Framework Enhancements:
-Batch Report Enhancements:
-Grid Engine (LSF/SGE) enhancements:
-Old functionality removed and API changes:
-Installation and self-test changes:
-Bug Fixes:
-    - Saving edited files from PyUseCase's process monitoring mechanism now works correctly (comparetest.py)
+    - Can now configure how the units of performance are described (sandbox.py)
+	See docs for "performance_unit"
+    - Command line traffic mechanism can now record and replay changes to files (traffic.py)
+	Previously only did standard output, standard error and exit codes
+Bug Fixes to 3.11:
     - Fixed bug introduced in 3.11 where dynamic GUI makes a mess of empty test suites if started from the command line (testmodel.py)
     - Fixed crash when a static GUI refresh triggers several test removals in the same suite (testmodel.py)
-Grid Engine bug fixes:
+    - Filtering actions in the View menu no longer freeze the GUI while executing (guiplugins.py)
+    - "batch_mail_on_failure_only" and "batch_use_collection" now work together. Thanks to Michael Behrisch again. (batch.py)
+    - 3.11's recomputation feature now works with PyGTK < 2.10.4 (texttestgui.py)
+	Worked around a bug in PyGTK 2.10.3
+Fixes for older bugs:
+    - Copying or renaming a test cannot cause it to fail now (testmodel.py)
+	We now update all result files that refer to the test path name so they refer to the new one
     - Fixed bug where local DISPLAY sent to remote processes (queuesystem.py)
 	Main effect was to prevent slow-motion replay mode for GUI testing working with a grid engine
+    - Saving edited files from PyUseCase's process monitoring mechanism now works correctly (comparetest.py)
+    - Incorrect time format to execution time filter (-r) now gives error instead of crashing/hanging (plugins.py)

@@ -581,6 +581,7 @@ class Config:
                              "Minimum time/memory to be consumed before data is collected")
         app.setConfigDefault("performance_descriptor_decrease", self.defaultPerfDecreaseDescriptors(), "Descriptions to be used when the numbers decrease in a performance file")
         app.setConfigDefault("performance_descriptor_increase", self.defaultPerfIncreaseDescriptors(), "Descriptions to be used when the numbers increase in a performance file")
+        app.setConfigDefault("performance_unit", self.defaultPerfUnits(), "Name to be used to identify the units in a performance file")
         
     def setUsecaseDefaults(self, app):
         app.setConfigDefault("use_case_record_mode", "disabled", "Mode for Use-case recording (GUI, console or disabled)")
@@ -589,6 +590,12 @@ class Config:
         if os.name == "posix":
             app.setConfigDefault("virtual_display_machine", [ "localhost" ], \
                                  "(UNIX) List of machines to run virtual display server (Xvfb) on")
+
+    def defaultPerfUnits(self):
+        units = {}
+        units["default"] = "seconds"
+        units["memory"] = "MB"
+        return units
 
     def defaultPerfDecreaseDescriptors(self):
         descriptors = {}

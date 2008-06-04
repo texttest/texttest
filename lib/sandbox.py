@@ -725,22 +725,23 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
         file.close()
     def makeFileContents(self, test, values, fileStem):
         # Round to accuracy 0.01
+        unit = test.getCompositeConfigValue("performance_unit", fileStem)
         if fileStem.find("mem") != -1:
-            return self.makeMemoryLine(values, fileStem) + "\n"
+            return self.makeMemoryLine(values, fileStem) + " " + unit + "\n"
         else:
-            return self.makeTimeLine(values, fileStem) + self.getMachineContents(test)
+            return self.makeTimeLine(values, fileStem) + " " + unit + self.getMachineContents(test)
     def getMachineContents(self, test):
         return " " + test.state.hostString() + "\n" + self.machineInfoFinder.getMachineInformation(test)
     def makeMemoryLine(self, values, fileStem):
         maxVal = max(values)
         roundedMaxVal = float(int(100*maxVal))/100
-        return "Max " + fileStem.capitalize() + "  :      " + str(roundedMaxVal) + " MB"
+        return "Max " + fileStem.capitalize() + "  :      " + str(roundedMaxVal)
     def makeTimeLine(self, values, fileStem):
         sum = 0.0
         for value in values:
             sum += value
         roundedSum = float(int(10*sum))/10
-        return "Total " + fileStem.capitalize() + "  :      " + str(roundedSum) + " seconds"
+        return "Total " + fileStem.capitalize() + "  :      " + str(roundedSum)
     def findValues(self, logFile, entryFinder):
         values = []
         for line in open(logFile).xreadlines():

@@ -197,7 +197,30 @@ class ServerStateTraffic(ServerTraffic):
             ServerTraffic.direction = "<-"
     def forwardToDestination(self):
         return []
+
+# Only works on UNIX
+class CommandLineKillTraffic(Traffic):
+    pidMap = {}
+    def __init__(self, inText, responseFile):
+        killStr, proxyPid = inText.split(":SUT_SEP:")
+        self.killSignal = int(killStr)
+        realProc = self.pidMap.get(proxyPid)
+        self.pid = None
+        if realProc:
+            self.pid = realProc.pid
+        Traffic.__init__(self, killStr, responseFile)
             
+    def forwardToDestination(self):
+        if self.pid:
+            os.kill(self.pid, self.killSignal)
+        return []
+
+    def hasInfo(self):
+        return False # no responses
+
+    def record(self, *args):
+        pass # We replay these entirely from the return code, so that replay works on Windows
+
 class CommandLineTraffic(Traffic):
     typeId = "CMD"
     direction = "<-"
@@ -205,10 +228,11 @@ class CommandLineTraffic(Traffic):
     realCommands = {}
     def __init__(self, inText, responseFile):
         self.diag = plugins.getDiagnostics("Traffic Server")
-        cmdText, environText, cmdCwd = inText.split(":SUT_SEP:")
+        cmdText, environText, cmdCwd, proxyPid = inText.split(":SUT_SEP:")
         argv = eval(cmdText)
         self.cmdEnviron = eval(environText)
         self.cmdCwd = cmdCwd
+        self.proxyPid = proxyPid
         self.diag.info("Received command with cwd = " + cmdCwd)
         self.fullCommand = argv[0].replace("\\", "/")
         self.commandName = os.path.basename(self.fullCommand)
@@ -303,9 +327,12 @@ class CommandLineTraffic(Traffic):
             if interpreter:
                 fullArgs = [ interpreter ] + fullArgs
             proc = subprocess.Popen(fullArgs, env=self.cmdEnviron, cwd=self.cmdCwd, 
-                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+            CommandLineKillTraffic.pidMap[self.proxyPid] = proc
             output, errors = proc.communicate()
-            return self.makeResponse(output, errors, proc.returncode)
+            response = self.makeResponse(output, errors, proc.returncode)
+            del CommandLineKillTraffic.pidMap[self.proxyPid]
+            return response
         else:
             return self.makeResponse("", "ERROR: Traffic server could not find command '" + self.commandName + "' in PATH\n", 1)
 
@@ -352,7 +379,9 @@ class CommandLineTraffic(Traffic):
     
                                
 class TrafficRequestHandler(StreamRequestHandler):
-    parseDict = { "SUT_SERVER" : ServerStateTraffic, "SUT_COMMAND_LINE" : CommandLineTraffic }
+    parseDict = { "SUT_SERVER" : ServerStateTraffic,
+                  "SUT_COMMAND_LINE" : CommandLineTraffic,
+                  "SUT_COMMAND_KILL" : CommandLineKillTraffic }
     def __init__(self, requestNumber, *args):
         self.requestNumber = requestNumber
         StreamRequestHandler.__init__(self, *args)
@@ -405,7 +434,7 @@ class TrafficServer(TCPServer):
         self.requestCount += 1
         t = Thread(target = self.process_request_thread,
                    args = (request, client_address, self.requestCount))
-        t.setDaemon (1)
+        t.setDaemon(1)
         t.start()
 
     def setAddressVariable(self, test):

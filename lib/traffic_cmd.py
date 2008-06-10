@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
-import sys, os
+import sys, os, signal
+
+gotSignal = False
 
 def makeSocket():
     import socket
@@ -19,6 +21,13 @@ def createSocket():
         sock.connect(serverAddress)
         return sock
 
+def readFromSocket(sock):
+    from socket import error
+    try:
+        return sock.makefile().read()
+    except error: # If we're interrupted, try again
+        return sock.makefile().read()
+
 def sendServerState(stateDesc):
     sock = createSocket()
     if sock:
@@ -27,22 +36,27 @@ def sendServerState(stateDesc):
 
 def createAndSend():
     sock = createSocket()
-    text = "SUT_COMMAND_LINE:" + repr(sys.argv) + ":SUT_SEP:" + repr(os.environ) + ":SUT_SEP:" + os.getcwd()
+    text = "SUT_COMMAND_LINE:" + repr(sys.argv) + ":SUT_SEP:" + repr(os.environ) + \
+           ":SUT_SEP:" + os.getcwd() + ":SUT_SEP:" + str(os.getpid())
     sock.sendall(text)
     return sock
 
-if __name__ == "__main__":
-    try:
-        sock = createAndSend()
-    except KeyboardInterrupt:
-        # Make sure we at least send the stuff if we get killed before we have time to respond
-        sock = createAndSend()
-        sock.close()
-        sys.stderr.write("Terminated\n")
-        sys.exit(1)
+def sendKill(sigNum, *args):
+    global gotSignal
+    gotSignal = True
+    sock = createSocket()
+    text = "SUT_COMMAND_KILL:" + str(sigNum) + ":SUT_SEP:" + str(os.getpid())
+    sock.sendall(text)
+    sock.close()
 
+if os.name == "posix":
+    signal.signal(signal.SIGINT, sendKill)
+    signal.signal(signal.SIGTERM, sendKill)
+
+if __name__ == "__main__":
+    sock = createAndSend()
     sock.shutdown(1)
-    response = sock.makefile().read()
+    response = readFromSocket(sock)
     sock.close()
     try:
         stdout, stderr, exitStr = response.split("|TT_CMD_SEP|")
@@ -50,7 +64,16 @@ if __name__ == "__main__":
         sys.stdout.flush()
         sys.stderr.write(stderr)
         sys.stderr.flush()
-        sys.exit(int(exitStr))
+        exitCode = int(exitStr)
+        if exitCode < 0 and not gotSignal:
+            # process was killed (on UNIX...)
+            # We should hang if we haven't been killed ourselves (though we might be replaying on Windows anyway)
+            if os.name == "posix":
+                signal.pause()
+            else:
+                import time
+                time.sleep(10000) # As best we can do on Windows where waiting for signals is concerned :)
+        sys.exit(exitCode)
     except ValueError:
         sys.stderr.write("Received unexpected communication from MIM server:\n " + response + "\n\n")
 

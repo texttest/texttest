@@ -230,9 +230,12 @@ class CommandLineTraffic(Traffic):
                 interestingEnviron.append((var, value))
         return interestingEnviron
 
+    def hasChangedWorkingDirectory(self):
+        return not plugins.samefile(self.cmdCwd, self.currentTest.getDirectory(temporary=1))
+
     def getEnvString(self):
         recStr = ""
-        if not plugins.samefile(self.cmdCwd, self.currentTest.getDirectory(temporary=1)):
+        if self.hasChangedWorkingDirectory():
             recStr += "cd " + self.cmdCwd + "; "
         if len(self.environ) == 0:
             return recStr
@@ -261,16 +264,31 @@ class CommandLineTraffic(Traffic):
         
     def findPossibleFileEdits(self):
         edits = []
+        changedCwd = self.hasChangedWorkingDirectory()
+        if changedCwd:
+            edits.append(self.cmdCwd)
         for arg in self.cmdArgs:
             for word in self.getFileWordsFromArg(arg):
                 if os.path.isabs(word):
                     edits.append(word)
-                else:
+                elif not changedCwd:
                     fullPath = os.path.join(self.cmdCwd, word)
                     if os.path.exists(fullPath):
                         edits.append(fullPath)
+        self.removeSubPaths(edits) # don't want to in effect mark the same file twice
         self.diag.info("Might edit in " + repr(edits))
         return edits
+
+    def removeSubPaths(self, paths):
+        subPaths = []
+        for path1 in paths:
+            for path2 in paths:
+                if path1 != path2 and path1.startswith(path2):
+                    subPaths.append(path1)
+                    break
+
+        for path in subPaths:
+            paths.remove(path)
 
     def getFileWordsFromArg(self, arg):
         if arg.startswith("-"):
@@ -427,8 +445,10 @@ class TrafficServer(TCPServer):
     def addPossibleFileEdits(self, traffic):
         allEdits = traffic.findPossibleFileEdits()
         for file in allEdits:
-            if file not in self.topLevelForEdit:
-                self.topLevelForEdit.append(file)
+            if file in self.topLevelForEdit:
+                self.topLevelForEdit.remove(file)
+            # Always move them to the beginning, most recent edits are most relevant
+            self.topLevelForEdit.insert(0, file)
 
             # edit times are only interesting when recording
             if not self.replayInfo.isActive():

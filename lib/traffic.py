@@ -3,7 +3,7 @@
 import os, stat, sys, plugins, shutil, socket, subprocess
 from ndict import seqdict
 from SocketServer import TCPServer, StreamRequestHandler
-from threading import Thread
+from threading import Thread, Lock
 from types import StringType
 
 class SetUpTrafficHandlers(plugins.Action):
@@ -82,16 +82,13 @@ class Traffic:
             self.responseFile.close()
         return []
 
-    def record(self, recordFile):
+    def record(self, recordFileHandler, reqNo):
         if not self.hasInfo():
             return
         desc = self.getDescription()
         if not desc.endswith("\n"):
             desc += "\n"
-        writeFile = open(recordFile, "a")
-        writeFile.write(desc)
-        writeFile.flush()
-        writeFile.close()
+        recordFileHandler.record(desc, reqNo)
 
     def filterReplay(self, trafficList):
         return trafficList
@@ -161,9 +158,9 @@ class FileEditTraffic(ResponseTraffic):
             self.copy(self.storedFile, self.activeFile)
         return []
         
-    def record(self, recordFile):
+    def record(self, *args):
         # Copy the file, as well as the fact it has been stored
-        ResponseTraffic.record(self, recordFile)
+        ResponseTraffic.record(self, *args)
         if not self.reproduce:
             self.copy(self.activeFile, self.storedFile)
         
@@ -356,12 +353,17 @@ class CommandLineTraffic(Traffic):
                                
 class TrafficRequestHandler(StreamRequestHandler):
     parseDict = { "SUT_SERVER" : ServerStateTraffic, "SUT_COMMAND_LINE" : CommandLineTraffic }
+    def __init__(self, requestNumber, *args):
+        self.requestNumber = requestNumber
+        StreamRequestHandler.__init__(self, *args)
+        
     def handle(self):
         self.server.diag.info("Received incoming request...")
         text = self.rfile.read()
         traffic = self.parseTraffic(text)
-        self.server.process(traffic)
+        self.server.process(traffic, self.requestNumber)
         self.server.diag.info("Finished processing incoming request")
+
     def parseTraffic(self, text):
         for key in self.parseDict.keys():
             prefix = key + ":"
@@ -373,8 +375,9 @@ class TrafficRequestHandler(StreamRequestHandler):
 class TrafficServer(TCPServer):
     instance = None
     def __init__(self):
-        self.recordFile = None
+        self.recordFileHandler = None
         self.replayInfo = None
+        self.requestCount = 0
         self.diag = plugins.getDiagnostics("Traffic Server")
         TrafficServer.instance = self
         TCPServer.__init__(self, (socket.gethostname(), 0), TrafficRequestHandler)
@@ -386,7 +389,25 @@ class TrafficServer(TCPServer):
         self.fileEditData = seqdict() # contains all paths, including subpaths of the above. Empty when replaying.
         self.currentTest = None
         self.fileRequestCount = {} # also only for recording
-        
+
+    def process_request_thread(self, request, client_address, requestCount):
+        # Copied from ThreadingMixin, more or less
+        # We store the order things appear in so we know what order they should go in the file
+        try:
+            TrafficRequestHandler(requestCount, request, client_address, self)
+            self.close_request(request)
+        except:
+            self.handle_error(request, client_address)
+            self.close_request(request)
+
+    def process_request(self, request, client_address):
+        """Start a new thread to process the request."""
+        self.requestCount += 1
+        t = Thread(target = self.process_request_thread,
+                   args = (request, client_address, self.requestCount))
+        t.setDaemon (1)
+        t.start()
+
     def setAddressVariable(self, test):
         host, port = self.socket.getsockname()
         address = host + ":" + str(port)
@@ -398,13 +419,14 @@ class TrafficServer(TCPServer):
         CommandLineTraffic.realCommands[command] = realCommand
 
     def setState(self, recordFile, replayFile, test):
-        self.recordFile = recordFile
+        self.recordFileHandler = RecordFileHandler(recordFile)
         self.replayInfo = ReplayInfo(replayFile)
         if recordFile or replayFile:
             self.setAddressVariable(test)
         CommandLineTraffic.currentTest = test
         self.currentTest = test
         ClientSocketTraffic.destination = None
+        self.requestCount = 0
         self.topLevelForEdit = []
         self.fileEditData = seqdict()
         self.fileRequestCount = {}
@@ -459,23 +481,24 @@ class TrafficServer(TCPServer):
                                    plugins.localtime(seconds=modTime) + " and size " + str(modSize))
         return len(allEdits) > 0
     
-    def process(self, traffic):
+    def process(self, traffic, reqNo):
         if not self.replayInfo.isActive():
             # If we're recording, check for file changes before we do
             # Must do this before as they may be a side effect of whatever it is we're processing
             for fileTraffic in self.getLatestFileEdits():
-                self._process(fileTraffic)
-        self._process(traffic)
+                self._process(fileTraffic, reqNo)
+        self._process(traffic, reqNo)
+        self.recordFileHandler.requestComplete(reqNo)
 
-    def _process(self, traffic):
+    def _process(self, traffic, reqNo):
         self.diag.info("Processing traffic " + str(traffic.__class__))
         hasFileEdits = self.addPossibleFileEdits(traffic)
-        traffic.record(self.recordFile)
+        traffic.record(self.recordFileHandler, reqNo)
         for response in self.getResponses(traffic, hasFileEdits):
             self.diag.info("Providing response " + str(response.__class__))
-            response.record(self.recordFile)
+            response.record(self.recordFileHandler, reqNo)
             for chainResponse in response.forwardToDestination():
-                self._process(chainResponse)
+                self._process(chainResponse, reqNo)
             self.diag.info("Completed response " + str(response.__class__))            
 
     def getResponses(self, traffic, hasFileEdits):
@@ -558,6 +581,52 @@ class TrafficServer(TCPServer):
                 
         return traffic
         
+# The basic point here is to make sure that traffic appears in the record
+# file in the order in which it comes in, not in the order in which it completes (which is indeterministic and
+# may be wrong next time around)
+class RecordFileHandler:
+    def __init__(self, file):
+        self.file = file
+        self.recordingRequest = 1
+        self.cache = {}
+        self.completedRequests = []
+        self.lock = Lock()
+
+    def requestComplete(self, requestNumber):
+        self.lock.acquire()
+        if requestNumber == self.recordingRequest:
+            self.recordingRequestComplete()
+        else:
+            self.completedRequests.append(requestNumber)
+        self.lock.release()
+
+    def writeFromCache(self):
+        text = self.cache.get(self.recordingRequest)
+        if text:
+            self.doRecord(text)
+            del self.cache[self.recordingRequest]
+            
+    def recordingRequestComplete(self):
+        self.writeFromCache()
+        self.recordingRequest += 1
+        if self.recordingRequest in self.completedRequests:
+            self.recordingRequestComplete()
+
+    def record(self, text, requestNumber):
+        self.lock.acquire()
+        if requestNumber == self.recordingRequest:
+            self.writeFromCache()
+            self.doRecord(text)
+        else:
+            self.cache.setdefault(requestNumber, "")
+            self.cache[requestNumber] += text
+        self.lock.release()
+
+    def doRecord(self, text):
+        writeFile = open(self.file, "a")
+        writeFile.write(text)
+        writeFile.flush()
+        writeFile.close()
 
 
 class ReplayInfo:

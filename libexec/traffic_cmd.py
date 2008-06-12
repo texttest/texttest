@@ -28,12 +28,6 @@ def readFromSocket(sock):
     except error: # If we're interrupted, try again
         return sock.makefile().read()
 
-def sendServerState(stateDesc):
-    sock = createSocket()
-    if sock:
-        sock.sendall("SUT_SERVER:" + stateDesc + "\n")
-        sock.close()
-
 def getCommandLine():
     if os.name == "posix":
         return sys.argv

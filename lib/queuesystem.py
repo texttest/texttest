@@ -6,7 +6,6 @@ from ndict import seqdict
 from copy import copy, deepcopy
 from cPickle import dumps
 from respond import Responder, TextDisplayResponder, InteractiveResponder
-from traffic_cmd import sendServerState
 from knownbugs import CheckForBugs
 from actionrunner import ActionRunner, BaseActionRunner
 from types import StringType
@@ -511,7 +510,15 @@ class QueueSystemServer(BaseActionRunner):
             return testOrStatus
     def sendServerState(self, state):
         self.diag.info("Sending server state '" + state + "'")
-        sendServerState(state)
+        mimServAddr = os.getenv("TEXTTEST_MIM_SERVER")
+        if mimServAddr:
+            host, port = mimServAddr.split(":")
+            serverAddress = (host, int(port))
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.connect(serverAddress)
+            sock.sendall("SUT_SERVER:" + state + "\n")
+            sock.close()
+            
     def getTestForRunNormalMode(self):
         self.reuseOnly = False
         reuseFailure = self.getItemFromQueue(self.reuseFailureQueue, block=False)

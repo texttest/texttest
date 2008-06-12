@@ -262,7 +262,7 @@ class CommandLineTraffic(Traffic):
     def getEnvString(self):
         recStr = ""
         if self.hasChangedWorkingDirectory():
-            recStr += "cd " + self.cmdCwd + "; "
+            recStr += "cd " + self.cmdCwd.replace("\\", "/") + "; "
         if len(self.environ) == 0:
             return recStr
         recStr += "env "
@@ -286,7 +286,7 @@ class CommandLineTraffic(Traffic):
             if char in arg:
                 quoteChar = self.getQuoteChar(char)
                 return quoteChar + arg + quoteChar
-        return arg
+        return arg.replace("\\", "/")
         
     def findPossibleFileEdits(self):
         edits = []

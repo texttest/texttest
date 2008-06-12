@@ -1159,3 +1159,18 @@ Fixes for older bugs:
 	Main effect was to prevent slow-motion replay mode for GUI testing working with a grid engine
     - Saving edited files from PyUseCase's process monitoring mechanism now works correctly (comparetest.py)
     - Incorrect time format to execution time filter (-r) now gives error instead of crashing/hanging (plugins.py)
+
+Version trunk
+=============
+Major Enhancements:
+General GUI Enhancements:
+Static GUI Enhancements:
+Dynamic GUI Enhancements:
+Framework Enhancements:
+Batch Report Enhancements:
+Grid Engine (LSF/SGE) enhancements:
+Old functionality removed and API changes:
+Installation and self-test changes:
+    - Self-tests don't need Java installed to be able to run any more
+Bug Fixes:
+Grid Engine bug fixes:

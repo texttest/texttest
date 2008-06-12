@@ -9,12 +9,15 @@ from types import StringType
 class SetUpTrafficHandlers(plugins.Action):
     def __init__(self, record):
         self.record = record
-        self.trafficFile = self.findTrafficFile()
-    def findTrafficFile(self):
-        for dir in sys.path:
-            fullPath = os.path.join(dir, "traffic_cmd.py")
-            if os.path.isfile(fullPath):
-                return fullPath
+        self.trafficFiles = self.findTrafficFiles()
+        
+    def findTrafficFiles(self):
+        libExecDir = plugins.installationDir("libexec") 
+        files = [ os.path.join(libExecDir, "traffic_cmd.py") ]
+        if os.name == "nt":
+            files.append(os.path.join(libExecDir, "traffic_cmd.exe"))
+        return files
+
     def __call__(self, test):
         if self.configureServer(test):
             self.makeIntercepts(test)
@@ -38,20 +41,22 @@ class SetUpTrafficHandlers(plugins.Action):
             TrafficServer.instance.setState(recordFile, replayFile, test)
     def makeIntercepts(self, test):
         for cmd in test.getConfigValue("collect_traffic"):
-            linkName = test.makeTmpFileName(cmd, forComparison=0)
-            self.intercept(test, linkName)
-    def intercept(self, test, linkName):
-        if os.path.exists(linkName):
+            interceptName = test.makeTmpFileName(cmd, forComparison=0)
+            self.intercept(test, interceptName)
+    def intercept(self, test, interceptName):
+        if os.path.exists(interceptName):
             # We might have written a fake version - store what it points to so we can
             # call it later, and remove the link
-            localName = os.path.basename(linkName)
+            localName = os.path.basename(interceptName)
             TrafficServer.instance.setRealVersion(localName, test.getPathName(localName))
-            os.remove(linkName)
-        # Linking doesn't exist on windows!
-        if os.name == "posix":
-            os.symlink(self.trafficFile, linkName)
-        else:
-            shutil.copy(self.trafficFile, linkName)
+            os.remove(interceptName)
+        for trafficFile in self.trafficFiles:
+            if os.name == "posix":
+                os.symlink(trafficFile, interceptName)
+            else:
+                # Rename the files as appropriate and hope for the best :)
+                extension = os.path.splitext(trafficFile)[-1]
+                shutil.copy(trafficFile, interceptName + extension)
 
 class Traffic:
     def __init__(self, text, responseFile):

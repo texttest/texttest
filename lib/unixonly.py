@@ -39,7 +39,6 @@ class VirtualDisplayResponder(Responder):
     def setHideWindows(self, suites):
         if len(suites) > 0 and not self.displayName:
             self.displayName = "HIDE_WINDOWS"
-            print "Tests will run with windows hidden"
 
     def getXvfbLogDir(self, guiSuites):
         if len(guiSuites) > 0:

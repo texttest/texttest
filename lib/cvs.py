@@ -46,11 +46,7 @@ class CVSAction(ActionResultDialogGUI):
         try:
             process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
         except OSError:
-            try:
-                # purely for testing on Windows...
-                process = subprocess.Popen([ "python" ] + args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
-            except OSError:
-                raise plugins.TextTestError, "Could not run CVS: make sure you have it installed locally"
+            raise plugins.TextTestError, "Could not run CVS: make sure you have it installed locally"
         return process.stdout.readlines()
     def updateSelection(self, *args):
         newActive = ActionResultDialogGUI.updateSelection(self, *args)

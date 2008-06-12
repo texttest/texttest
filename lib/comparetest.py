@@ -273,7 +273,7 @@ class TestComparison(BaseTestComparison):
         tmpFileEditDir = test.makeTmpFileName("file_edits", forComparison=0)
         if os.path.isdir(tmpFileEditDir):
             for root, dirs, files in os.walk(tmpFileEditDir):
-                for file in files:
+                for file in sorted(files):
                     fullPath = os.path.join(root, file)
                     savePath = fullPath.replace(test.writeDirectory, test.getDirectory())
                     self.updateStatus(test, "edited file " + file, versionString)

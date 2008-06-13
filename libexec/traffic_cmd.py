@@ -38,7 +38,7 @@ def getCommandLine():
 def createAndSend():
     sock = createSocket()
     text = "SUT_COMMAND_LINE:" + repr(getCommandLine()) + ":SUT_SEP:" + repr(os.environ) + \
-           ":SUT_SEP:" + os.getcwd().replace("\\", "/") + ":SUT_SEP:" + str(os.getpid())
+           ":SUT_SEP:" + os.getcwd() + ":SUT_SEP:" + str(os.getpid())
     sock.sendall(text)
     return sock
 

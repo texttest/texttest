@@ -326,7 +326,8 @@ class MigrateFiles(plugins.Action):
         newBugFile = open(newBugFileName, "w")
         self.writeNew(parser, newBugFile)
         newBugFile.close()
-        os.system("diff " + bugFileName + " " + newBugFileName)
+        print "Old File:\n" + open(bugFileName).read()
+        print "New File:\n" + open(newBugFileName).read()
         shutil.move(newBugFileName, bugFileName)
     def writeNew(self, parser, newBugFile):
         sectionNo = 0

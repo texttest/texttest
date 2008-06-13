@@ -622,6 +622,17 @@ class MarkedTestState(TestState):
     def getTypeBreakdown(self):
         return self.category, self.briefText
 
+def configureLog4py(configFile):
+    # Don't use the default locations, particularly current directory causes trouble
+    if len(log4py.CONFIGURATION_FILES) > 1:
+        del log4py.CONFIGURATION_FILES[1]
+    if configFile:
+        # To set new config files appears to require a constructor...
+        rootLogger = log4py.Logger(log4py.TRUE, configFile)
+    else:
+        rootLogger = log4py.Logger().get_root()        
+        rootLogger.set_loglevel(log4py.LOGLEVEL_NONE)
+
 # Simple handle to get diagnostics object. Better than using log4py directly,
 # as it ensures everything appears by default in a standard place with a standard name.
 def getDiagnostics(diagName):

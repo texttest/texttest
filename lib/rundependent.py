@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 
 import os, plugins
 from ndict import seqdict
@@ -14,7 +15,7 @@ class FilterAction(plugins.Action):
             runDepTexts = test.getCompositeConfigValue("run_dependent_text", stem)
             unorderedTexts = test.getCompositeConfigValue("unordered_text", stem)
             if len(runDepTexts) > 0 or len(unorderedTexts) > 0 or self.changedOs(test.app):
-                fileFilter= RunDependentTextFilter(test.getRelPath(), runDepTexts, unorderedTexts)
+                fileFilter= RunDependentTextFilter(runDepTexts, unorderedTexts, test.getRelPath())
                 filterFileBase = test.makeTmpFileName(stem + "." + test.app.name, forFramework=1)
                 newFileName = filterFileBase + postfix
                 if self.shouldRemove(newFileName, fileName):
@@ -64,7 +65,7 @@ class FilterRecompute(FilterOriginal):
         return os.path.isfile(newFile)
 
 class RunDependentTextFilter(plugins.Observable):
-    def __init__(self, testId, runDepTexts, unorderedTexts):
+    def __init__(self, runDepTexts, unorderedTexts=[], testId=""):
         plugins.Observable.__init__(self)
         self.diag = plugins.getDiagnostics("Run Dependent Text")
         regexp = self.getWriteDirRegexp(testId)
@@ -73,11 +74,16 @@ class RunDependentTextFilter(plugins.Observable):
         for text in unorderedTexts:
             orderFilter = LineFilter(text, regexp, self.diag)
             self.orderFilters[orderFilter] = []
+
     def filterFile(self, fileName, newFileName):
         self.diag.info("Filtering " + fileName + " to create " + newFileName)
+        file = open(fileName, "rU") # use universal newlines to simplify
         newFile = plugins.openForWrite(newFileName)
+        self.filterFileObject(file, newFile)
+        
+    def filterFileObject(self, file, newFile):
         lineNumber = 0
-        for line in open(fileName, "rU").xreadlines(): # use universal newlines to simplify
+        for line in file.xreadlines():
             # We don't want to stack up ActionProgreess calls in ThreaderNotificationHandler ...
             self.notifyIfMainThread("ActionProgress", "")
             lineNumber += 1
@@ -85,6 +91,7 @@ class RunDependentTextFilter(plugins.Observable):
             if filteredLine:
                 newFile.write(filteredLine)
         self.writeUnorderedText(newFile)
+
     def getFilteredLine(self, line, lineNumber):
         for contentFilter in self.contentFilters:
             changed, filteredLine = contentFilter.applyTo(line, lineNumber)
@@ -145,7 +152,7 @@ class LineFilter:
     def makeRegexTriggers(self, parameter):
         expression = self.internalExpressions.get(parameter, parameter)
         triggers = [ plugins.TextTrigger(expression) ]
-        if parameter == "writedir" and os.name != "posix":
+        if parameter == "writedir":
             triggers.append(plugins.TextTrigger(expression.replace("/", "\\\\")))
         return triggers
     def parseOriginalText(self):
@@ -271,3 +278,10 @@ class LineFilter:
                     return realWordNumber
                 wordNumber -= 1
         return len(words) + 1
+
+if __name__ == "__main__":
+    import sys
+    args = [ arg.split(",") for arg in sys.argv[1:3]] + sys.argv[3:]
+    plugins.configureLog4py(os.getenv("TEXTTEST_LOGCONFIG"))
+    runDepFilter = RunDependentTextFilter(*args)
+    runDepFilter.filterFileObject(sys.stdin, sys.stdout)

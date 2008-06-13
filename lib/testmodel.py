@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, sys, types, string, plugins, exceptions, log4py, shutil, operator
+import os, sys, types, string, plugins, exceptions, shutil, operator
 from time import time
 from fnmatch import fnmatch
 from ndict import seqdict
@@ -1698,10 +1698,15 @@ class OptionFinder(plugins.OptionFinder):
             self.diagConfigFile = os.getenv("TEXTTEST_LOGCONFIG")
             self.diagWriteDir = os.getenv("TEXTTEST_DIAGDIR", os.getcwd())
 
-        if self.diagConfigFile and not os.path.isfile(self.diagConfigFile):
-            print "Could not find diagnostic file at", self.diagConfigFile, ": cannot run with diagnostics"
-            self.diagConfigFile = None
-            self.diagWriteDir = None
+        if self.diagConfigFile:
+            if os.path.isfile(self.diagConfigFile):
+                # Assume log4py's configuration file refers to files relative to TEXTTEST_DIAGDIR
+                os.environ["TEXTTEST_DIAGDIR"] = self.diagWriteDir
+                print "TextTest will write diagnostics in", self.diagWriteDir, "based on file at", self.diagConfigFile
+            else:
+                print "Could not find diagnostic file at", self.diagConfigFile, ": cannot run with diagnostics"
+                self.diagConfigFile = None
+                self.diagWriteDir = None
 
         if self.diagWriteDir:
             plugins.ensureDirectoryExists(self.diagWriteDir)
@@ -1710,20 +1715,8 @@ class OptionFinder(plugins.OptionFinder):
                     if file.endswith(".diag"):
                         os.remove(os.path.join(self.diagWriteDir, file))
 
-        self.configureLog4py()
-    def configureLog4py(self):
-        # Don't use the default locations, particularly current directory causes trouble
-        if len(log4py.CONFIGURATION_FILES) > 1:
-            del log4py.CONFIGURATION_FILES[1]
-        if self.diagConfigFile:
-            # Assume log4py's configuration file refers to files relative to TEXTTEST_DIAGDIR
-            os.environ["TEXTTEST_DIAGDIR"] = self.diagWriteDir
-            print "TextTest will write diagnostics in", self.diagWriteDir, "based on file at", self.diagConfigFile
-            # To set new config files appears to require a constructor...
-            rootLogger = log4py.Logger(log4py.TRUE, self.diagConfigFile)
-        else:
-            rootLogger = log4py.Logger().get_root()        
-            rootLogger.set_loglevel(log4py.LOGLEVEL_NONE)
+        plugins.configureLog4py(self.diagConfigFile)
+
     def findVersionList(self):
         versionList = []
         for version in plugins.commasplit(self.get("v", "")):

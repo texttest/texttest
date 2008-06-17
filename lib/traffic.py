@@ -309,10 +309,10 @@ class CommandLineTraffic(Traffic):
     def removeSubPaths(paths):
         subPaths = []
         realPaths = map(os.path.realpath, paths)
-        for path1 in realPaths:
+        for index, path1 in enumerate(realPaths):
             for path2 in realPaths:
                 if path1 != path2 and path1.startswith(path2):
-                    subPaths.append(path1)
+                    subPaths.append(paths[index])
                     break
 
         for path in subPaths:
@@ -563,11 +563,15 @@ class TrafficServer(TCPServer):
             name += ".edit_" + str(timesUsed)
         return name
 
-    def getFileBeingEdited(self, givenName):
+    def getFileBeingEdited(self, givenName, directory):
         # drop the suffix which is internal to TextTest
         fileName = givenName.split(".edit_")[0]
         bestMatch, bestScore = None, -1
         for editedFile in self.topLevelForEdit:
+            if (directory and os.path.isfile(editedFile)) or \
+               (not directory and os.path.isdir(editedFile)):
+                continue
+            
             editedName = os.path.basename(editedFile)
             if editedName == fileName:
                 bestMatch = editedFile
@@ -595,8 +599,8 @@ class TrafficServer(TCPServer):
     def makeResponseTraffic(self, traffic, responseClass, text):
         if responseClass is FileEditTraffic:
             fileName = text.strip()
-            editedFile = self.getFileBeingEdited(fileName)
             storedFile = self.currentTest.getFileName(os.path.join("file_edits", fileName))
+            editedFile = self.getFileBeingEdited(fileName, os.path.isdir(storedFile))
             self.diag.info("File being edited for '" + fileName + "' : will replace " + str(editedFile) + " with " + str(storedFile))
             return FileEditTraffic(editedFile, storedFile, self.findFilesAndLinks(storedFile), reproduce=True)
         else:

@@ -668,7 +668,7 @@ class Config:
             return "notepad"
     def defaultFollowProgram(self):
         if os.name == "posix":
-            return "tail -f"
+            return "xterm -bg white -T $TEXTTEST_FOLLOW_FILE_TITLE -e tail -f"
         else:
             return "baretail"
     def setExternalToolDefaults(self, app):

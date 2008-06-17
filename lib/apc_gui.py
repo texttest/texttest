@@ -300,6 +300,53 @@ class Quit(default_gui.Quit):
         return ""
 
 
+class FeatureFilter(plugins.Filter):
+    def __init__(self, features,anyAll):
+        self.any = (anyAll == 0)
+        self.features = []
+        for feature,val in features:
+            tmp = feature.split()
+            vals = tmp[2].split(",")
+            self.features.append([tmp[0],tmp[1],int(vals[val])])
+    def checkCondition(self,op,val1,val2):
+        operators = ["=",">=","<=","!="]
+        if operators.count(op) == 0:
+            raise plugins.TextTestError, "Invalid operator "+op
+        if op == "=" and val1 == val2:
+            return True
+        if op == "!=" and val1 != val2:
+            return True
+        if op == ">=" and val1 >= val2:
+            return True
+        if op == "<=" and val1 <= val2:
+            return True
+        return False
+    def getFeatureMap(self,test):
+        featureFile = test.getFileName("features")
+        if not featureFile:
+            return {}
+        featureFileLines = plugins.readList(featureFile)
+        tmp = map(lambda x:x.split(),featureFileLines)
+        return dict(map(lambda x:(x[0],int(x[1])),tmp));
+    def acceptsTestCase(self, test):    
+        featureMap = self.getFeatureMap(test);
+        # no or empty feature file means that the test will not be selected
+        if len(featureMap) == 0:
+            return False
+        for feature in self.features:
+            key = feature[0]
+            if not featureMap.has_key(key):
+                raise plugins.TextTestError, "Case %s lacks feature %s"%(repr(test),key)
+            op = feature[1]
+            if self.checkCondition(op,featureMap[key],feature[2]):
+                if self.any:
+                    return True
+            else:
+                if not self.any:
+                    return False
+        return not self.any
+
+
 class SelectTests(default_gui.SelectTests):
     def __init__(self, *args):
         default_gui.SelectTests.__init__(self, *args)

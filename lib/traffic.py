@@ -58,7 +58,7 @@ class SetUpTrafficHandlers(plugins.Action):
                 extension = os.path.splitext(trafficFile)[-1]
                 shutil.copy(trafficFile, interceptName + extension)
 
-class Traffic:
+class Traffic(object):
     def __init__(self, text, responseFile):
         self.text = text
         self.responseFile = responseFile
@@ -246,7 +246,7 @@ class CommandLineTraffic(Traffic):
         self.environ = self.filterEnvironment(self.cmdEnviron)
         self.path = self.cmdEnviron.get("PATH")
         text = self.getEnvString() + self.commandName + " " + self.argStr
-        Traffic.__init__(self, text, responseFile)
+        super(CommandLineTraffic, self).__init__(text, responseFile)
         
     def filterEnvironment(self, cmdEnviron):
         interestingEnviron = []
@@ -305,10 +305,12 @@ class CommandLineTraffic(Traffic):
         self.diag.info("Might edit in " + repr(edits))
         return edits
 
-    def removeSubPaths(self, paths):
+    @staticmethod
+    def removeSubPaths(paths):
         subPaths = []
-        for path1 in paths:
-            for path2 in paths:
+        realPaths = map(os.path.realpath, paths)
+        for path1 in realPaths:
+            for path2 in realPaths:
                 if path1 != path2 and path1.startswith(path2):
                     subPaths.append(path1)
                     break
@@ -316,7 +318,8 @@ class CommandLineTraffic(Traffic):
         for path in subPaths:
             paths.remove(path)
 
-    def getFileWordsFromArg(self, arg):
+    @staticmethod
+    def getFileWordsFromArg(arg):
         if arg.startswith("-"):
             # look for something of the kind --logfile=/path
             return arg.split("=")[1:]

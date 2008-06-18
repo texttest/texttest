@@ -1800,16 +1800,60 @@ class FileViewGUI(guiplugins.SubGUI):
         self.title = title
         self.selection = None
         self.nameColumn = None
+        self.diag = plugins.getDiagnostics("File View GUI")
 
-    def recreateModel(self, state):
+    def recreateModel(self, state, preserveSelection):
         if not self.nameColumn:
             return
         # In theory we could do something clever here, but for now, just wipe and restart
-        # Need to re-expand after clearing...
+        # Need to re-expand and re-select after clearing...
+        if preserveSelection:
+            selectionStore = self.storeSelection()
+            self.diag.info("Storing " + repr(selectionStore))
+
         self.model.clear()
         self.addFilesToModel(state)
         self.selection.get_tree_view().expand_all()
+        if preserveSelection:
+            self.reselect(selectionStore)
         self.contentsChanged()
+
+    def storeSelection(self):
+        selectionStore = []
+        self.selection.selected_foreach(self.storeIter, selectionStore)
+        return selectionStore
+
+    def storeIter(self, model, path, iter, selectionStore):
+        selectionStore.append(self._storeIter(iter))
+
+    def _storeIter(self, iter):
+        if iter is not None:
+            parentStore = self._storeIter(self.model.iter_parent(iter))
+            parentStore.append(self.model.get_value(iter, 0))
+            return parentStore
+        else:
+            return []
+
+    def reselect(self, selectionStore):
+        for nameList in selectionStore:
+            iter = self.findIter(nameList, self.model.get_iter_root())
+            if iter is not None:
+                self.selection.select_iter(iter)
+
+    def findIter(self, nameList, iter):
+        self.diag.info("Looking for iter for " + repr(nameList))
+        while iter is not None:
+            name = self.model.get_value(iter, 0)
+            if name == nameList[0]:
+                if len(nameList) == 1:
+                    self.diag.info("Succeeded!")
+                    return iter
+                else:
+                    return self.findIter(nameList[1:], self.model.iter_children(iter))
+            else:
+                iter = self.model.iter_next(iter)
+        self.diag.info("Failed!")
+
     def getState(self):
         pass
      
@@ -1864,9 +1908,11 @@ class FileViewGUI(guiplugins.SubGUI):
         view.show()
         return self.addScrollBars(view)
         # only used in test view
+        
     def canSelect(self, path):
         pathIter = self.model.get_iter(path)
         return not self.model.iter_has_child(pathIter)
+
     def makeDetailsColumn(self, renderer):
         if self.dynamic:
             column = gtk.TreeViewColumn("Details")
@@ -1887,13 +1933,16 @@ class FileViewGUI(guiplugins.SubGUI):
             return
         comparison = self.model.get_value(iter, 3)
         self.notify(self.getViewFileSignal(), fileName, comparison)
+
     def notifyViewerStarted(self):
         self.selection.unselect_all()
+
     def notifyNewFile(self, fileName, overwrittenExisting):
         self.notify(self.getViewFileSignal(), fileName, None)
         if not overwrittenExisting:
             self.currentTest.refreshFiles()
-            self.recreateModel(self.getState())
+            self.recreateModel(self.getState(), preserveSelection=True)
+
     def addFileToModel(self, iter, fileName, colour, associatedObject=None, details=""):
         baseName = os.path.basename(fileName)
         row = [ baseName, colour, fileName, associatedObject, details, "" ]
@@ -1985,6 +2034,7 @@ class TestFileGUI(FileViewGUI):
     def __init__(self, dynamic, popupGUI):
         FileViewGUI.__init__(self, dynamic, "", popupGUI)
         self.currentTest = None
+
     def canSelect(self, path):
         if self.dynamic:
             return FileViewGUI.canSelect(self, path)
@@ -1993,22 +2043,27 @@ class TestFileGUI(FileViewGUI):
 
     def getViewFileSignal(self):
         return "ViewFile"
+
     def notifyNameChange(self, test, origRelPath):
         if test is self.currentTest:
             self.setName( [ test ], 1)
             self.model.foreach(self.updatePath, (origRelPath, test.getRelPath()))
             self.describeName()
+
     def updatePath(self, model, path, iter, data):
         origPath, newPath = data
         origFile = model.get_value(iter, 2)
         if origFile:
             model.set_value(iter, 2, origFile.replace(origPath, newPath))
+
     def notifyFileChange(self, test):
         if test is self.currentTest:
-            self.recreateModel(test.state)
+            self.recreateModel(test.state, preserveSelection=True)
+
     def notifyLifecycleChange(self, test, state, changeDesc):
         if test is self.currentTest:
-            self.recreateModel(state)
+            self.recreateModel(state, preserveSelection=changeDesc.find("save") == -1)
+
     def notifyRecalculation(self, test, comparisons, newIcon):
         if test is self.currentTest:
             # slightly ugly hack with "global data": this way we don't have to return any iterators
@@ -2017,6 +2072,7 @@ class TestFileGUI(FileViewGUI):
             self.model.foreach(self.setRecalculateIcon, [ comparisons, newIcon ])
             if self.recalculationCausedChange:
                 self.contentsChanged()
+
     def setRecalculateIcon(self, model, path, iter, data):
         comparisons, newIcon = data
         comparison = model.get_value(iter, 3)
@@ -2042,7 +2098,9 @@ class TestFileGUI(FileViewGUI):
             self.currentTest = tests[0]
             self.currentTest.refreshFiles()
             self.setName(tests, rowCount)
-            self.recreateModel(self.getState())
+            # New test selected, don't keep file selection
+            self.recreateModel(self.getState(), preserveSelection=False)
+
     def setName(self, tests, rowCount):
         self.title = self.getName(tests, rowCount)
         if self.nameColumn:

@@ -91,8 +91,8 @@ class RecordTest(default_gui.RecordTest):
             return []
     def isRuleSource(self, fileName):
         return not fileName.startswith(".")
-    def getCommandLineKeys(self):
-        return default_gui.RecordTest.getCommandLineKeys(self) + [ "rulecomp" ]
+    def getCommandLineKeys(self, *args):
+        return default_gui.RecordTest.getCommandLineKeys(self, *args) + [ "rulecomp" ]
     def getChangedUseCaseVersion(self, test):
         ret = default_gui.RecordTest.getChangedUseCaseVersion(self, test)
         self.changedUseCaseVersion = ret # cache the result, for using in our auto-replay

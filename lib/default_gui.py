@@ -1396,7 +1396,7 @@ class RunningAction(guiplugins.ActionTabGUI):
         writeDir = os.path.join(app.writeDirectory, "dynamic_run" + str(self.runNumber))
         plugins.ensureDirectoryExists(writeDir)
         filterFile = self.writeFilterFile(writeDir)
-        ttOptions = runModeOptions + self.getTextTestOptions(filterFile, app)
+        ttOptions = runModeOptions + self.getTextTestOptions(filterFile, app, usecase)
         guiplugins.guilog.info("Starting " + usecase + " run of TextTest with arguments " + repr(ttOptions))
         logFile = os.path.join(writeDir, "output.log")
         errFile = os.path.join(writeDir, "errors.log")
@@ -1439,15 +1439,15 @@ class RunningAction(guiplugins.ActionTabGUI):
             return [ plugins.textTestName ]
     def getOptionGroups(self):
         return [ self.optionGroup ]
-    def getTextTestOptions(self, filterFile, app):
+    def getTextTestOptions(self, filterFile, app, usecase):
         ttOptions = self.getCmdlineOptionForApps()
         for group in self.getOptionGroups():
-            ttOptions += group.getCommandLines(self.getCommandLineKeys())
+            ttOptions += group.getCommandLines(self.getCommandLineKeys(usecase))
         ttOptions += [ "-count", str(self.getTestCount()) ]
         ttOptions += [ "-f", filterFile ]
         ttOptions += [ "-fd", self.getTmpFilterDir(app) ]
         return ttOptions
-    def getCommandLineKeys(self):
+    def getCommandLineKeys(self, usecase):
         # assume everything by default
         return []
     def getTestCount(self):
@@ -1582,7 +1582,8 @@ class RecordTest(RunningAction):
         self.currentApp = None
         self.recordTime = None
         self.addOption("v", "Version to record")
-        self.addOption("c", "Checkout to use for recording") 
+        self.addOption("c", "Checkout to use for recording")
+        self.addSwitch("rectraffic", "Also record command-line or client-server traffic", 1)
         self.addSwitch("rep", "Automatically replay test after recording it", 1)
         self.addSwitch("repgui", options = ["Auto-replay invisible", "Auto-replay in dynamic GUI"])
     def _getStockId(self):
@@ -1635,6 +1636,7 @@ class RecordTest(RunningAction):
         return ".".join(parts[2:])
     def getMultipleTestWarning(self):
         return "record " + self.describeTests() + " simultaneously"
+
     def handleCompletion(self, testSel, usecase):
         test = testSel[0]
         if usecase == "record":
@@ -1648,13 +1650,19 @@ class RecordTest(RunningAction):
                 self.notify("Status", "Recording completed for " + repr(test) + ", not auto-replaying")
         else:
             self.notify("Status", "Recording and auto-replay completed for " + repr(test))
-    def getCommandLineKeys(self):
-        return [ "v", "c" ]
+
+    def getCommandLineKeys(self, usecase):
+        keys = [ "v", "c" ]
+        if usecase == "record":
+            keys.append("rectraffic")
+        return keys
+    
     def getReplayRunModeOptions(self, overwriteVersion):
         if self.optionGroup.getSwitchValue("repgui"):
             return self.invisibleGroup.getCommandLines() + [ "-autoreplay" ]
         else:
             return [ "-autoreplay", "-o", overwriteVersion ]
+
     def _getTitle(self):
         return "Record _Use-Case"
 

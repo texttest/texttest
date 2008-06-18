@@ -733,10 +733,6 @@ class TestCase(Test):
 class TestSuiteFileHandler:
     def __init__(self):
         self.cache = {}
-
-    def fileEdited(self, fileName):
-        if self.cache.has_key(fileName):
-            del self.cache[fileName]
             
     def read(self, fileName, warn=False, ignoreCache=False):
         if not ignoreCache:
@@ -917,13 +913,11 @@ class TestSuite(Test):
         file.write("# Ordered list of tests in test suite. Add as appropriate\n\n")
         file.close()
         self.dircache.refresh()
-    def contentChanged(self, fileEdit=""):
-        if fileEdit:
-            self.testSuiteFileHandler.fileEdited(fileEdit)
+    def contentChanged(self):
         # Here we assume that only order can change...
         self.refreshFiles()
-        self.updateOrder(True, fileEdit)            
-    def updateOrder(self, readTestNames=False, fileEdit=""):
+        self.updateOrder(readTestNames=True)            
+    def updateOrder(self, readTestNames=False):
         if readTestNames:
             orderedTestNames = self.getOrderedTestNames().keys()
         else:
@@ -937,7 +931,7 @@ class TestSuite(Test):
                     break
         if newList != self.testcases:
             self.testcases = newList
-            self.notify("ContentChange", fileEdit)
+            self.notify("ContentChange")
     def size(self):
         size = 0
         for testcase in self.testcases:
@@ -1801,11 +1795,8 @@ class ApplicationEventResponder(Responder):
         self.scriptEngine.applicationEvent("completion of test actions")
     def notifyCloseDynamic(self, test, name):
         self.scriptEngine.applicationEvent(name + " GUI to be closed")
-    def notifyContentChange(self, suite, fileEdit=""):
-        if fileEdit:
-            # Only bother with this if we're picking up a viewer process closing
-            eventName = "suite " + suite.uniqueName + " to change order"
-            self.scriptEngine.applicationEvent(eventName, suite.uniqueName)
+    def notifyAutoRefreshComplete(self, *args):
+        self.scriptEngine.applicationEvent("the automatic refresh to complete")
 
 # Simple responder that collects completion notifications and sends one out when
 # it thinks everything is done.

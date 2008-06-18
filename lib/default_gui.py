@@ -430,10 +430,14 @@ class ViewConfigFileInEditor(ViewInEditor):
         return self.configFileChanged, (apps,)
 
     def configFileChanged(self, apps):
+        suite = None
         for app in apps:
             app.setUpConfiguration()
             suite = self.findSuite(app)
             self.refreshFilesRecursively(suite)
+
+        if suite:
+            suite.notify("AutoRefreshComplete")
 
     def findSuite(self, app):
         for suite in self.rootTestSuites:
@@ -464,7 +468,7 @@ class ViewTestFileInEditor(ViewInEditor):
             return self.currTestSelection[0].filesChanged, ()
         elif self.isTestDefinition("testsuite", fileName):
             # refresh order of tests if this edited
-            return self.currTestSelection[0].contentChanged, (fileName,)
+            return self.handleTestSuiteEdit, (self.currTestSelection[0],)
         else:
             return None, ()
 
@@ -474,6 +478,10 @@ class ViewTestFileInEditor(ViewInEditor):
             return plugins.samefile(fileName, defFile)
         else:
             return False
+
+    def handleTestSuiteEdit(self, suite):
+        suite.refresh(suite.app.getFilterList())
+        suite.notify("AutoRefreshComplete")
 
 class ViewFilteredTestFileInEditor(ViewTestFileInEditor):
     def _getStockId(self):

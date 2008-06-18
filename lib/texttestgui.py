@@ -1288,7 +1288,7 @@ class TestTreeGUI(ContainerGUI):
         self.describeTree()
         if self.selection.iter_is_selected(filteredIter):
             self.notify("NameChange", test, origRelPath)
-    def notifyContentChange(self, suite, *args):
+    def notifyContentChange(self, suite):
         suiteIter = self.itermap.getIterator(suite)
         newOrder = self.findNewOrder(suite, suiteIter)
         self.model.reorder(suiteIter, newOrder)

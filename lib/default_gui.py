@@ -361,8 +361,8 @@ class ViewInEditor(FileViewAction):
         description = descriptor + " " + os.path.basename(fileName)
         refresh = bool(exitHandler)
         guiplugins.guilog.info("Viewing file " + fileName + " using '" + descriptor + "', refresh set to " + str(refresh))
-        self.startViewer(cmdArgs, description=description, scriptName="views and edits test files", env=env,
-                         filesEdited=[ fileName ], exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
+        self.startViewer(cmdArgs, description=description, env=env,
+                         exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
     def getViewerEnvironment(self, cmdArgs):
         # An absolute path to the viewer may indicate a custom tool, send the test environment along too
         # Doing this is unlikely to cause harm in any case
@@ -464,24 +464,36 @@ class ViewTestFileInEditor(ViewInEditor):
             return None, ()
 
         # options file can change appearance of test (environment refs etc.)
-        if self.isTestDefinition("options", fileName):
-            return self.currTestSelection[0].filesChanged, ()
-        elif self.isTestDefinition("testsuite", fileName):
-            # refresh order of tests if this edited
-            return self.handleTestSuiteEdit, (self.currTestSelection[0],)
-        else:
-            return None, ()
+        baseName = os.path.basename(fileName)
+        if baseName.startswith("options"):
+            tests = self.getTestsForFile("options", fileName)
+            if len(tests) > 0:
+                return self.handleOptionsEdit, (tests,)
+        elif baseName.startswith("testsuite"):
+            tests = self.getTestsForFile("testsuite", fileName)
+            if len(tests) > 0:
+                # refresh tests if this edited
+                return self.handleTestSuiteEdit, (tests,)
 
-    def isTestDefinition(self, stem, fileName):
-        defFile = self.currTestSelection[0].getFileName(stem)
-        if defFile:
-            return plugins.samefile(fileName, defFile)
-        else:
-            return False
+        return None, ()
 
-    def handleTestSuiteEdit(self, suite):
-        suite.refresh(suite.app.getFilterList())
-        suite.notify("AutoRefreshComplete")
+    def getTestsForFile(self, stem, fileName):
+        tests = []
+        for test in self.currTestSelection:
+            defFile = test.getFileName(stem)
+            if defFile and plugins.samefile(fileName, defFile):
+                tests.append(test)
+        return tests
+
+    def handleTestSuiteEdit(self, suites):
+        for suite in suites:
+            suite.refresh(suite.app.getFilterList())
+        suites[0].notify("AutoRefreshComplete")
+
+    def handleOptionsEdit(self, tests):
+        for test in tests:
+            test.filesChanged()
+        tests[0].notify("AutoRefreshComplete")
 
 class ViewFilteredTestFileInEditor(ViewTestFileInEditor):
     def _getStockId(self):
@@ -512,7 +524,7 @@ class ViewFileDifferences(FileViewAction):
         guiplugins.guilog.info("-- original file : " + stdFile)
         guiplugins.guilog.info("--  current file : " + tmpFile)
         cmdArgs = plugins.splitcmd(diffProgram) + [ stdFile, tmpFile ]
-        self.startViewer(cmdArgs, description=description, scriptName="shows graphical differences in test files")
+        self.startViewer(cmdArgs, description=description)
     
 class ViewFilteredFileDifferences(ViewFileDifferences):
     def _getTitle(self):
@@ -577,7 +589,7 @@ class FollowFile(FileViewAction):
         guiplugins.guilog.info("Following file " + useFile + " using '" + useProgram + "'")
         description = useProgram + " " + os.path.basename(useFile)
         cmdArgs = self.getFollowCommand(useProgram, useFile)
-        self.startViewer(cmdArgs, description=description, scriptName="follows progress of test files")
+        self.startViewer(cmdArgs, description=description)
 
     def activateDefaultViewer(self, fileName, comparison):
         followProgram = self.getViewToolName(fileName)

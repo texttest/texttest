@@ -178,11 +178,11 @@ class ProcessTerminationMonitor(plugins.Observable):
         return running
     
     def startProcess(self, cmdArgs, description = "", exitHandler=None, exitHandlerArgs=(),
-                     scriptName="", filesEdited = "", **kwargs):
+                     scriptName="", **kwargs):
         process = subprocess.Popen(cmdArgs, stdin=open(os.devnull), startupinfo=plugins.getProcessStartUpInfo(), **kwargs)
         self.addMonitoring(process, description, exitHandler, exitHandlerArgs)
         if scriptName:
-            scriptEngine.monitorProcess(scriptName, process, filesEdited)
+            scriptEngine.monitorProcess(scriptName, process)
         
     def getRunningProcesses(self):
         return filter(lambda (process, desc): process.poll() is None, self.processes)

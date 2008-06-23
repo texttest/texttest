@@ -346,7 +346,7 @@ class FileViewAction(guiplugins.ActionGUI):
         return comparison.hasDifferences()
     def messageAfterPerform(self):
         pass # provided by starting viewer, with message
-        
+
 
 class ViewInEditor(FileViewAction):
     def __init__(self, allApps, dynamic):
@@ -359,8 +359,8 @@ class ViewInEditor(FileViewAction):
     def viewFile(self, fileName, viewTool, exitHandler, exitHandlerArgs):
         cmdArgs, descriptor, env = self.getViewCommand(fileName, viewTool)
         description = descriptor + " " + os.path.basename(fileName)
-        refresh = bool(exitHandler)
-        guiplugins.guilog.info("Viewing file " + fileName + " using '" + descriptor + "', refresh set to " + str(refresh))
+        refresh = str(exitHandler != self.editingComplete)
+        guiplugins.guilog.info("Viewing file " + fileName + " using '" + descriptor + "', refresh set to " + refresh)
         self.startViewer(cmdArgs, description=description, env=env,
                          exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
     def getViewerEnvironment(self, cmdArgs):
@@ -406,8 +406,10 @@ class ViewInEditor(FileViewAction):
                                        " at a valid program to view the file.")
         else:
             self.handleNoFile(fileToView)
-            
-    
+
+    def editingComplete(self):
+        guiplugins.scriptEngine.applicationEvent("file editing operations to complete")
+                
 
 class ViewConfigFileInEditor(ViewInEditor):
     def __init__(self, *args):
@@ -430,14 +432,12 @@ class ViewConfigFileInEditor(ViewInEditor):
         return self.configFileChanged, (apps,)
 
     def configFileChanged(self, apps):
-        suite = None
         for app in apps:
             app.setUpConfiguration()
             suite = self.findSuite(app)
             self.refreshFilesRecursively(suite)
 
-        if suite:
-            suite.notify("AutoRefreshComplete")
+        self.editingComplete()
 
     def findSuite(self, app):
         for suite in self.rootTestSuites:
@@ -461,7 +461,7 @@ class ViewTestFileInEditor(ViewInEditor):
 
     def findExitHandlerInfo(self, fileName, *args):
         if self.dynamic:
-            return None, ()
+            return self.editingComplete, ()
 
         # options file can change appearance of test (environment refs etc.)
         baseName = os.path.basename(fileName)
@@ -475,7 +475,7 @@ class ViewTestFileInEditor(ViewInEditor):
                 # refresh tests if this edited
                 return self.handleTestSuiteEdit, (tests,)
 
-        return None, ()
+        return self.editingComplete, ()
 
     def getTestsForFile(self, stem, fileName):
         tests = []
@@ -488,12 +488,13 @@ class ViewTestFileInEditor(ViewInEditor):
     def handleTestSuiteEdit(self, suites):
         for suite in suites:
             suite.refresh(suite.app.getFilterList())
-        suites[0].notify("AutoRefreshComplete")
+        self.editingComplete()
 
     def handleOptionsEdit(self, tests):
         for test in tests:
             test.filesChanged()
-        tests[0].notify("AutoRefreshComplete")
+        self.editingComplete()
+        
 
 class ViewFilteredTestFileInEditor(ViewTestFileInEditor):
     def _getStockId(self):
@@ -517,6 +518,7 @@ class ViewFileDifferences(FileViewAction):
             if not (comparison.newResult() or comparison.missingResult()):
                 return True
         return False
+
     def performOnFile(self, diffProgram, tmpFile, comparison):
         stdFile = comparison.getStdFile(self.useFiltered())
         description = diffProgram + " " + os.path.basename(stdFile) + " " + os.path.basename(tmpFile)
@@ -524,7 +526,11 @@ class ViewFileDifferences(FileViewAction):
         guiplugins.guilog.info("-- original file : " + stdFile)
         guiplugins.guilog.info("--  current file : " + tmpFile)
         cmdArgs = plugins.splitcmd(diffProgram) + [ stdFile, tmpFile ]
-        self.startViewer(cmdArgs, description=description)
+        self.startViewer(cmdArgs, description=description, exitHandler=self.diffingComplete)
+        
+    def diffingComplete(self, *args):
+        guiplugins.scriptEngine.applicationEvent("the graphical diff program to terminate")
+
     
 class ViewFilteredFileDifferences(ViewFileDifferences):
     def _getTitle(self):

@@ -124,14 +124,17 @@ class StartStudio(guiplugins.ActionDialogGUI):
         lPos = fullSubPlanPath.find("LOCAL_PLAN/")
         subPlan = fullSubPlanPath[lPos + 11:]
         localPlan = os.sep.join(subPlan.split(os.sep)[0:-1])
-        studio = os.path.join(environ["CARMSYS"], "bin", "studio")
-        if not os.path.isfile(studio):
-            raise plugins.TextTestError, "Cannot start studio, no file at " + studio
-        cmdArgs = [ studio, "-w", "-p CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + "\",0)" ]
+        environ["PATH"] += ":" + os.path.join(environ["CARMSYS"], "bin")            
+        cmdArgs = [ "studio", "-w", "-p CuiOpenSubPlan(gpc_info,\"" + localPlan + "\",\"" + subPlan + "\",0)" ]
         nullFile = open(os.devnull, "w")
-        guiplugins.processMonitor.startProcess(cmdArgs, description="Studio on " + subPlan,
-                                               stdout=nullFile, stderr=nullFile,
-                                               env=environ, scriptName="runs studio")
+        try:
+            guiplugins.processMonitor.startProcess(cmdArgs, description="Studio on " + subPlan,
+                                                   stdout=nullFile, exitHandler=self.studioCompleted,
+                                                   stderr=nullFile, env=environ)
+        except OSError:
+            raise plugins.TextTestError, "Cannot start studio from CARMSYS " + environ.get("CARMSYS")
+    def studioCompleted(self):
+        guiplugins.scriptEngine.applicationEvent("studio process to terminate")
 
 class InteractiveActionConfig(cvs.InteractiveActionConfig):
     def getInteractiveActionClasses(self, dynamic):

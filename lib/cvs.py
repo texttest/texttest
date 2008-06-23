@@ -117,7 +117,8 @@ class CVSAction(ActionResultDialogGUI):
                                  "'.\nPlease install it somewhere on your $PATH.\n")
         cmdArgs = [ cvsDiffProgram ] + self.getRevisionOptions() + [ path ]
         processMonitor.startProcess(cmdArgs, description="Graphical CVS diff for file " + path,
-                                    stderr=open(os.devnull, "w"), scriptName="shows CVS differences graphically")
+                                    stderr=open(os.devnull, "w"))
+        
     def getCVSRoot(self):
         cvsRoot = os.getenv("CVSROOT")
         if cvsRoot:

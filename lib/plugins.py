@@ -453,7 +453,8 @@ class ThreadedNotificationHandler:
     def pollQueue(self):
         try:
             observable, args, kwargs = self.workQueue.get_nowait()
-            observable.notify(*args, **kwargs)
+            observable.diagnoseObs("From work queue", *args, **kwargs)
+            observable.performNotify(*args, **kwargs)
         except Empty:
             # Idle handler. We must sleep for a bit if we don't do anything, or we use the whole CPU (busy-wait)
             time.sleep(0.1)
@@ -464,36 +465,49 @@ class ThreadedNotificationHandler:
 class Observable:
     threadedNotificationHandler = ThreadedNotificationHandler()
     obsDiag = None
+    @classmethod
+    def diagnoseObs(klass, message, *args, **kwargs):
+        if not klass.obsDiag:
+            klass.obsDiag = getDiagnostics("Observable")
+        klass.obsDiag.info(message + " " + str(klass) + " " + repr(args) + repr(kwargs))
+
     def __init__(self, passSelf=False):
         self.observers = []
         self.passSelf = passSelf
+
     def addObserver(self, observer):
         self.observers.append(observer)
+
     def setObservers(self, observers):    
         self.observers = filter(lambda x: x is not self, observers)
+
     def inMainThread(self):
         return currentThread().getName() == "MainThread"
+    
     def notify(self, *args, **kwargs):
-        if not Observable.obsDiag:
-            Observable.obsDiag = getDiagnostics("Observable")
-
         if self.threadedNotificationHandler.active and not self.inMainThread():
-            self.obsDiag.info("To work queue " + str(self.__class__) + " " + repr(args) + repr(kwargs))
+            self.diagnoseObs("To work queue", *args, **kwargs)
             self.threadedNotificationHandler.transfer(self, *args, **kwargs)
         else:
-            self.obsDiag.info("Direct " + str(self.__class__) + " " + repr(args) + repr(kwargs))
+            self.diagnoseObs("Perform directly", *args, **kwargs)
             self.performNotify(*args, **kwargs)
+
     def notifyThreaded(self, *args, **kwargs):
         # join the idle handler queue even if we're the main thread
         if self.threadedNotificationHandler.active:
+            self.diagnoseObs("To work queue explicitly", *args, **kwargs)
             self.threadedNotificationHandler.transfer(self, *args, **kwargs)
         else:
+            self.diagnoseObs("Perform directly", *args, **kwargs)
             self.performNotify(*args, **kwargs)        
+
     def notifyIfMainThread(self, *args, **kwargs):
         if not self.inMainThread():
             return
         else:
+            self.diagnoseObs("Perform directly", *args, **kwargs)
             self.performNotify(*args, **kwargs)
+
     def performNotify(self, name, *args, **kwargs):
         methodName = "notify" + name
         for observer in self.observers:
@@ -501,6 +515,7 @@ class Observable:
                 retValue = self.notifyObserver(observer, methodName, *args, **kwargs)
                 if retValue is not None: # break off the chain if we get a non-None value back
                     break
+
     def notifyObserver(self, observer, methodName, *args, **kwargs):
         # doesn't matter if only some of the observers have the method
         method = eval("observer." + methodName)

@@ -1,9 +1,8 @@
 
-import gtk, entrycompletion, plugins, os, sys, shutil, time, subprocess, operator, types
+import gtk, gobject, entrycompletion, plugins, os, sys, shutil, time, subprocess, operator, types
 from gtkusecase import RadioGroupIndexer
 from jobprocess import JobProcess
 from copy import copy, deepcopy
-from threading import Thread
 from glob import glob
 from stat import *
 from ndict import seqdict
@@ -148,54 +147,47 @@ class GUIConfig:
 class ProcessTerminationMonitor(plugins.Observable):
     def __init__(self):
         plugins.Observable.__init__(self)
-        self.processes = []
-    def addMonitoring(self, process, description, exitHandler, exitHandlerArgs):
-        self.processes.append((process, description))
-        newThread = Thread(target=self.monitor, args=(process, exitHandler, exitHandlerArgs))
-        newThread.start()
-    def monitor(self, process, exitHandler, exitHandlerArgs):
-        try:
-            process.wait()
-            if exitHandler:
-                exitHandler(*exitHandlerArgs)
-        except OSError:
-            pass # Can be thrown by wait() sometimes when the process is killed
+        self.processes = seqdict()
+
     def listRunningProcesses(self):
         processesToCheck = guiConfig.getCompositeValue("query_kill_processes", "", modeDependent=True)
         running = []
         if len(processesToCheck) == 0:
             return running
-        for process, description in self.getRunningProcesses():
+        for pid, (description, exitHandler, exitHandlerArgs) in self.processes.items():
             for processToCheck in processesToCheck:
                 if plugins.isRegularExpression(processToCheck):
                     if plugins.findRegularExpression(processToCheck, description):
-                        running.append("PID " + str(process.pid) + " : " + description)
+                        running.append("PID " + str(pid) + " : " + description)
                         break
                 elif processToCheck.lower() == "all" or description.find(processToCheck) != -1:
-                    running.append("PID " + str(process.pid) + " : " + description)
+                    running.append("PID " + str(pid) + " : " + description)
                     break
 
         return running
-    
-    def startProcess(self, cmdArgs, description = "", exitHandler=None, exitHandlerArgs=(),
-                     scriptName="", **kwargs):
+
+    def startProcess(self, cmdArgs, description = "", exitHandler=None, exitHandlerArgs=(), **kwargs):
         process = subprocess.Popen(cmdArgs, stdin=open(os.devnull), startupinfo=plugins.getProcessStartUpInfo(), **kwargs)
-        self.addMonitoring(process, description, exitHandler, exitHandlerArgs)
-        if scriptName:
-            scriptEngine.monitorProcess(scriptName, process)
-        
-    def getRunningProcesses(self):
-        return filter(lambda (process, desc): process.poll() is None, self.processes)
+        self.processes[process.pid] = (description, exitHandler, exitHandlerArgs)
+        gobject.child_watch_add(process.pid, self.processExited)
+
+    def monitorProcess(self, pid, description, exitHandler, exitHandlerArgs):
+        self.processes[pid] = (description, exitHandler, exitHandlerArgs)
+
+    def processExited(self, pid, condition):
+        description, exitHandler, exitHandlerArgs = self.processes.pop(pid)
+        if exitHandler:
+            exitHandler(*exitHandlerArgs)
+    
     def notifyKillProcesses(self, sig=None):
         # Don't leak processes
-        runningProcesses = self.getRunningProcesses()
-        if len(runningProcesses) == 0:
+        if len(self.processes) == 0:
             return
         self.notify("Status", "Terminating all external viewers ...")
-        for process, description in runningProcesses:
+        for pid, (description, exitHandler, exitHandlerArgs) in self.processes.items():
             self.notify("ActionProgress", "")
             guilog.info("Killing '" + description + "' interactive process")
-            JobProcess(process.pid).killAll(sig)
+            JobProcess(pid).killAll(sig)
         
 processMonitor = ProcessTerminationMonitor()
 

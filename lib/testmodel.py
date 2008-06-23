@@ -1795,9 +1795,7 @@ class ApplicationEventResponder(Responder):
         self.scriptEngine.applicationEvent("completion of test actions")
     def notifyCloseDynamic(self, test, name):
         self.scriptEngine.applicationEvent(name + " GUI to be closed")
-    def notifyAutoRefreshComplete(self, *args):
-        self.scriptEngine.applicationEvent("the automatic refresh to complete")
-
+    
 # Simple responder that collects completion notifications and sends one out when
 # it thinks everything is done.
 class AllCompleteResponder(Responder,plugins.Observable):

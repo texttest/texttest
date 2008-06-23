@@ -379,7 +379,7 @@ class RuleBuildSubmitServer(QueueSystemServer):
         else:
             self.testsForRuleBuild += 1
             test.changeState(NeedRuleCompilation(rulecomp))
-            self.diag.info("Test submitted to queue for rule compilation")
+            self.diag.info("Test submitted to queue for rule compilation, tests for rule build now " + str(self.testsForRuleBuild))
             return self.ruleBuildQueue
 
     def setSlaveServerAddress(self, address):
@@ -389,6 +389,7 @@ class RuleBuildSubmitServer(QueueSystemServer):
     def notifyAllRead(self, suites):
         self.ruleBuildQueue.put(None)
         if self.testsForRuleBuild > 0:
+            self.diag.info("All read: " + str(self.testsForRuleBuild) + " test still waiting for rule build.")
             self.testQueue.put("Completed submission of all rule compilations and tests that don't require rule compilation")
         else:
             QueueSystemServer.notifyAllRead(self, suites)
@@ -431,11 +432,12 @@ class RuleBuildSubmitServer(QueueSystemServer):
                 if ruleset.modeString == "-debug":
                     test.app.ensureDebugLibrariesExist(test)
                 if not self.submitJob(test, submissionRules, command, rulecompEnv):
-                    self.testsForRuleBuild -= 1
+                    self.ruleBuildCompleted()
+                    self.diag.info("Rule compilation submission failed, tests for rule build now " + str(self.testsForRuleBuild))
             except plugins.TextTestError, e:
                 test.changeState(plugins.Unrunnable(str(e), "NO COMPILER"))
                 self.handleErrorState(test)
-                self.testsForRuleBuild -= 1
+                self.ruleBuildCompleted()
         else:
             self.associateJobs(test, rulecomp)            
         

@@ -166,15 +166,20 @@ class ProcessTerminationMonitor(plugins.Observable):
 
         return running
 
+    def getProcessIdentifier(self, process):
+        # Unfortunately the child_watch_add method needs different ways to
+        # identify the process on different platforms...
+        if os.name == "posix":
+            return process.pid
+        else:
+            return process._handle
+
     def startProcess(self, cmdArgs, description = "", exitHandler=None, exitHandlerArgs=(), **kwargs):
         process = subprocess.Popen(cmdArgs, stdin=open(os.devnull), startupinfo=plugins.getProcessStartUpInfo(), **kwargs)
         self.processes[process.pid] = (description, exitHandler, exitHandlerArgs)
-        gobject.child_watch_add(process.pid, self.processExited)
+        gobject.child_watch_add(self.getProcessIdentifier(process), self.processExited, process.pid)
 
-    def monitorProcess(self, pid, description, exitHandler, exitHandlerArgs):
-        self.processes[pid] = (description, exitHandler, exitHandlerArgs)
-
-    def processExited(self, pid, condition):
+    def processExited(self, pidOrHandle, condition, pid):
         description, exitHandler, exitHandlerArgs = self.processes.pop(pid)
         if exitHandler:
             exitHandler(*exitHandlerArgs)

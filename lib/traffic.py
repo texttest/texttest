@@ -600,9 +600,10 @@ class TrafficServer(TCPServer):
         if responseClass is FileEditTraffic:
             fileName = text.strip()
             storedFile = self.currentTest.getFileName(os.path.join("file_edits", fileName))
-            editedFile = self.getFileBeingEdited(fileName, os.path.isdir(storedFile))
-            self.diag.info("File being edited for '" + fileName + "' : will replace " + str(editedFile) + " with " + str(storedFile))
-            return FileEditTraffic(editedFile, storedFile, self.findFilesAndLinks(storedFile), reproduce=True)
+            if storedFile:
+                editedFile = self.getFileBeingEdited(fileName, os.path.isdir(storedFile))
+                self.diag.info("File being edited for '" + fileName + "' : will replace " + str(editedFile) + " with " + str(storedFile))
+                return FileEditTraffic(editedFile, storedFile, self.findFilesAndLinks(storedFile), reproduce=True)
         else:
             return responseClass(text, traffic.responseFile)
 

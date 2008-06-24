@@ -196,7 +196,7 @@ class FileComparison:
                 return self.previewGenerator.getWrappedLine(message)
 
             cmdArgs = plugins.splitcmd(self.textDiffTool) + [ self.stdCmpFile, self.tmpCmpFile ]
-            proc = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            proc = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
             return self.previewGenerator.getPreview(proc.stdout)
         except OSError:
             return "No difference report could be created: could not find textual difference tool '" + self.textDiffTool + "'"

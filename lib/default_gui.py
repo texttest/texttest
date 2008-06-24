@@ -238,11 +238,9 @@ class UnmarkTest(guiplugins.ActionGUI):
         return False
 
 class FileViewAction(guiplugins.ActionGUI):
-    def __init__(self, *args):
-        guiplugins.ActionGUI.__init__(self, *args)
-        self.viewTools = {}
     def singleTestOnly(self):
         return True
+
     def isActiveOnCurrent(self, *args):
         if not guiplugins.ActionGUI.isActiveOnCurrent(self):
             return False
@@ -250,33 +248,45 @@ class FileViewAction(guiplugins.ActionGUI):
             if self.isActiveForFile(fileName, obj):
                 return True
         return False
+
     def isActiveForFile(self, fileName, *args):
-        if not self.viewTools.get(fileName):
-            return False
-        return self._isActiveForFile(fileName, *args)
-    def _isActiveForFile(self, *args):
         return True
-    def updateFileSelection(self, files):
-        for fileName, obj in files:
-            self.viewTools[fileName] = self.getViewTool(fileName)
-        return guiplugins.ActionGUI.updateFileSelection(self, files)
     
     def useFiltered(self):
         return False
+
     def performOnCurrent(self):
         for fileName, associatedObject in self.currFileSelection:
-            fileToView = self.getFileToView(fileName, associatedObject)
-            if os.path.isfile(fileToView) or os.path.islink(fileToView):
-                if self.isActiveForFile(fileName, associatedObject):
-                    viewTool = self.viewTools.get(fileName)
-                    self.performOnFile(viewTool, fileToView, associatedObject)
+            if self.isActiveForFile(fileName, associatedObject):
+                self.performOnFile(fileName, associatedObject)
+
+    def performOnFile(self, fileName, associatedObject):
+        fileToView = self.getFileToView(fileName, associatedObject)
+        if os.path.isfile(fileToView) or os.path.islink(fileToView):
+            viewTool = self.getViewToolName(fileToView)
+            if viewTool:
+                try:
+                    self._performOnFile(viewTool, fileToView, associatedObject)
+                except OSError:
+                    self.showErrorDialog("Cannot find " + self.getToolDescription() + " '" + viewTool + \
+                                         "'.\nPlease install it somewhere on your PATH or\n"
+                                         "change the configuration entry '" + self.getToolConfigEntry() + "'.")
             else:
-                self.handleNoFile(fileToView)
+                self.showWarningDialog("No " + self.getToolDescription() + " is defined for files of type '" + \
+                                       os.path.basename(fileToView).split(".")[0] + \
+                                       "'.\nPlease point the configuration entry '" + self.getToolConfigEntry() + "'"
+                                       " at a valid program to view the file.")
+        else:
+            self.showErrorDialog("File '" + os.path.basename(fileName) + "' cannot be viewed"
+                                 " as it has been removed in the file system." + self.noFileAdvice())
+
     def isDefaultViewer(self, *args):
         return False
+
     def notifyViewFile(self, fileName, *args):
         if self.isDefaultViewer(*args):
-            self.activateDefaultViewer(fileName, *args)
+            self.performOnFile(fileName, *args)
+
     def getFileToView(self, fileName, associatedObject):
         try:
             # associatedObject might be a comparison object, but it might not
@@ -319,15 +329,7 @@ class FileViewAction(guiplugins.ActionGUI):
         guiplugins.processMonitor.startProcess(cmdArgs, fullDesc, stdout=nullFile, stderr=nullFile, *args, **kwargs)
         self.notify("Status", 'Started "' + description + '" in background' + testDesc + '.')
         self.notify("ViewerStarted")
-
-    def handleNoFile(self, fileName):
-        self.showErrorDialog("File '" + os.path.basename(fileName) + "' cannot be viewed"
-                             " as it has been removed in the file system." + self.noFileAdvice())
          
-    def getViewTool(self, fileName):
-        viewProgram = self.getViewToolName(fileName)
-        if plugins.canExecute(viewProgram):
-            return viewProgram
     def getStem(self, fileName):
         return os.path.basename(fileName).split(".")[0]
     def testRunning(self):
@@ -352,10 +354,16 @@ class ViewInEditor(FileViewAction):
     def __init__(self, allApps, dynamic):
         FileViewAction.__init__(self, allApps)
         self.dynamic = dynamic
+
     def _getStockId(self):
         return "open"
+
     def getToolConfigEntry(self):
         return "view_program"
+
+    def getToolDescription(self):
+        return "file viewing program"
+    
     def viewFile(self, fileName, viewTool, exitHandler, exitHandlerArgs):
         cmdArgs, descriptor, env = self.getViewCommand(fileName, viewTool)
         description = descriptor + " " + os.path.basename(fileName)
@@ -386,26 +394,9 @@ class ViewInEditor(FileViewAction):
 
         return cmdArgs, descriptor, env
     
-    def performOnFile(self, viewTool, fileName, *args):
+    def _performOnFile(self, viewTool, fileName, *args):
         exitHandler, exitHandlerArgs = self.findExitHandlerInfo(fileName, *args)
         return self.viewFile(fileName, viewTool, exitHandler, exitHandlerArgs)
-    def activateDefaultViewer(self, fileName, *args):
-        fileToView = self.getFileToView(fileName, *args)
-        if os.path.isfile(fileToView):
-            viewProgram = self.getViewToolName(fileToView)
-            if plugins.canExecute(viewProgram):
-                self.performOnFile(viewProgram, fileToView, *args)
-            elif viewProgram:
-                self.showErrorDialog("Cannot find file viewing program '" + viewProgram + \
-                                     "'.\nPlease install it somewhere on your PATH or\n"
-                                     "change the configuration entry 'view_program'.")
-            else:
-                self.showWarningDialog("No file viewing program is defined for files of type '" + \
-                                       os.path.basename(fileToView).split(".")[0] + \
-                                       "'.\nPlease point the configuration entry 'view_program'"
-                                       " at a valid program to view the file.")
-        else:
-            self.handleNoFile(fileToView)
 
     def editingComplete(self):
         guiplugins.scriptEngine.applicationEvent("file editing operations to complete")
@@ -426,7 +417,7 @@ class ViewConfigFileInEditor(ViewInEditor):
         return False # only way to get at it is via the activation below...
 
     def notifyViewApplicationFile(self, fileName, apps):
-        self.activateDefaultViewer(fileName, apps)
+        self.performOnFile(fileName, apps)
 
     def findExitHandlerInfo(self, fileName, apps):
         return self.configFileChanged, (apps,)
@@ -503,7 +494,7 @@ class ViewFilteredTestFileInEditor(ViewTestFileInEditor):
         return True
     def _getTitle(self):
         return "View Filtered File"
-    def _isActiveForFile(self, fileName, comparison):
+    def isActiveForFile(self, fileName, comparison):
         return bool(comparison)
     def isDefaultViewer(self, *args):
         return False
@@ -511,15 +502,20 @@ class ViewFilteredTestFileInEditor(ViewTestFileInEditor):
 class ViewFileDifferences(FileViewAction):
     def _getTitle(self):
         return "View Raw Differences"
+
     def getToolConfigEntry(self):
         return "diff_program"
-    def _isActiveForFile(self, fileName, comparison):
+
+    def getToolDescription(self):
+        return "graphical difference program"
+    
+    def isActiveForFile(self, fileName, comparison):
         if bool(comparison):
             if not (comparison.newResult() or comparison.missingResult()):
                 return True
         return False
 
-    def performOnFile(self, diffProgram, tmpFile, comparison):
+    def _performOnFile(self, diffProgram, tmpFile, comparison):
         stdFile = comparison.getStdFile(self.useFiltered())
         description = diffProgram + " " + os.path.basename(stdFile) + " " + os.path.basename(tmpFile)
         guiplugins.guilog.info("Starting graphical difference comparison using '" + diffProgram + "':")
@@ -535,43 +531,36 @@ class ViewFileDifferences(FileViewAction):
 class ViewFilteredFileDifferences(ViewFileDifferences):
     def _getTitle(self):
         return "View Differences"
+    
     def useFiltered(self):
         return True
-    def _isActiveForFile(self, fileName, comparison):
+
+    def isActiveForFile(self, fileName, comparison):
         return self.differencesActive(comparison)
+
     def isDefaultViewer(self, comparison):
         return self.differencesActive(comparison)
-    def activateDefaultViewer(self, fileName, comparison):
-        tmpFile = self.getFileToView(fileName, comparison)
-        if os.path.isfile(tmpFile):
-            diffProgram = self.getViewToolName(tmpFile)
-            if plugins.canExecute(diffProgram):
-                self.performOnFile(diffProgram, tmpFile, comparison)
-            elif diffProgram:
-                self.showErrorDialog("Cannot find graphical difference program '" + diffProgram + \
-                                     "'.\nPlease install it somewhere on your PATH or change the\n"
-                                     "configuration entry 'diff_program'.")
-            else:
-                self.showWarningDialog("No graphical difference program is defined for files of type '" + \
-                                       os.path.basename(tmpFile).split(".")[0] + \
-                                       "'.\nPlease point the configuration entry 'diff_program' at a "
-                                       "valid program to visualize the differences.")
-        else:
-            self.handleNoFile(tmpFile)
-
+    
 
 class FollowFile(FileViewAction):
     def _getTitle(self):
         return "Follow File Progress"
+
     def getToolConfigEntry(self):
         return "follow_program"
-    def _isActiveForFile(self, *args):
+
+    def getToolDescription(self):
+        return "file-following program"
+
+    def isActiveForFile(self, *args):
         return self.testRunning()
+
     def fileToFollow(self, fileName, comparison):
         if comparison:
             return comparison.tmpFile
         else:
             return fileName
+
     def isDefaultViewer(self, comparison):
         return not self.differencesActive(comparison) and self.testRunning() and \
                guiplugins.guiConfig.getValue("follow_file_by_default")
@@ -589,27 +578,13 @@ class FollowFile(FileViewAction):
         else:
             return plugins.splitcmd(program) + [ fileName ]        
 
-    def performOnFile(self, followProgram, fileName, comparison):
+    def _performOnFile(self, followProgram, fileName, comparison):
         useFile = self.fileToFollow(fileName, comparison)
         useProgram = self.getFollowProgram(followProgram, fileName)
         guiplugins.guilog.info("Following file " + useFile + " using '" + useProgram + "'")
         description = useProgram + " " + os.path.basename(useFile)
         cmdArgs = self.getFollowCommand(useProgram, useFile)
         self.startViewer(cmdArgs, description=description)
-
-    def activateDefaultViewer(self, fileName, comparison):
-        followProgram = self.getViewToolName(fileName)
-        if plugins.canExecute(followProgram):
-            self.performOnFile(followProgram, fileName, comparison)
-        elif followProgram:
-            self.showErrorDialog("Cannot find file-following program '" + followProgram + \
-                                 "'.\nPlease install it somewhere on your PATH or change the\n"
-                                 "configuration entry 'follow_program'.")
-        else:
-            self.showWarningDialog("No file-following program is defined for files of type '" + \
-                                   os.path.basename(fileName).split(".")[0] + \
-                                   "'.\nPlease point the configuration entry 'follow_program' at a "
-                                       "valid program to visualize the differences.")
         
 
 class KillTests(guiplugins.ActionGUI):

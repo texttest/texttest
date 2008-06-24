@@ -414,14 +414,6 @@ class CollateFiles(plugins.Action):
         currProc = None
         stdin = None
         for script in scripts:
-            if not plugins.canExecute(script):
-                errorMsg = "Could not find extract script '" + script + "', not extracting file at\n" + sourceFile + "\n"
-                stderr = open(collationErrFile, "w")
-                stderr.write(errorMsg)
-                print "WARNING : " + errorMsg.strip()
-                stderr.close()
-                return
-
             args = script.split()
             if os.name == "nt": # Windows isn't clever enough to know how to run Python/Java programs without some help...
                 interpreter = plugins.getInterpreter(args[0])
@@ -439,9 +431,21 @@ class CollateFiles(plugins.Action):
                 stdout = subprocess.PIPE
                 stderr = subprocess.STDOUT
 
-            currProc = subprocess.Popen(args, env=test.getRunEnvironment(), 
-                                        stdin=stdin, stdout=stdout, stderr=stderr,
-                                        cwd=test.getDirectory(temporary=1))
+            try:
+                currProc = subprocess.Popen(args, env=test.getRunEnvironment(), 
+                                            stdin=stdin, stdout=stdout, stderr=stderr,
+                                            cwd=test.getDirectory(temporary=1))
+            except OSError:
+                stderr.close()
+                stdout.close()
+                if os.path.isfile(targetFile):
+                    os.remove(targetFile)
+                errorMsg = "Could not find extract script '" + script + "', not extracting file at\n" + sourceFile + "\n"
+                stderr = open(collationErrFile, "w")
+                stderr.write(errorMsg)
+                print "WARNING : " + errorMsg.strip()
+                stderr.close()
+                return
             
         if currProc:
             currProc.wait()    

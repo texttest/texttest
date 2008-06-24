@@ -695,18 +695,6 @@ def relpath(fullpath, parentdir):
     else:
         return relPath
     
-def canExecute(program):
-    if not program:
-        return False
-    localName = program.split()[0]
-    if os.name == "nt" and localName.find(".") == -1:
-        localName += ".exe"
-    for dir in os.environ["PATH"].split(os.pathsep):
-        fullPath = os.path.join(dir, localName)
-        if os.path.isfile(fullPath):
-            return True
-    return False
-
 def getProcessStartUpInfo(getenvFunc=os.getenv):
     # Used for hiding the windows if we're on Windows!
     if os.name == "nt" and getenvFunc("DISPLAY") == "HIDE_WINDOWS":
@@ -894,7 +882,7 @@ class PreviewGenerator:
         lines = map(self.getWrappedLine, cutLines)
         return string.join(lines, "")
     def getPreviewFromText(self, text):
-        truncatedLines = text.split("\n")[:-1] # drop the final endline, don't get a new line after it
+        truncatedLines = text.splitlines() 
         lines = [ line + "\n" for line in truncatedLines ]
         return self._getPreview(lines)
     def getWrappedLine(self, line):

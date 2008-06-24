@@ -112,12 +112,13 @@ class CVSAction(ActionResultDialogGUI):
         path = self.filteredTreeModel.get_value(self.treeView.get_selection().get_selected()[1], 2)
         guilog.info("Viewing CVS differences for file '" + path + "' graphically ...")
         cvsDiffProgram = "tkdiff" # Hardcoded for now ...
-        if not plugins.canExecute(cvsDiffProgram):
+        try:
+            cmdArgs = [ cvsDiffProgram ] + self.getRevisionOptions() + [ path ]
+            processMonitor.startProcess(cmdArgs, description="Graphical CVS diff for file " + path,
+                                    stderr=open(os.devnull, "w"))
+        except OSError:
             self.showErrorDialog("\nCannot find graphical CVS difference program '" + cvsDiffProgram + \
                                  "'.\nPlease install it somewhere on your $PATH.\n")
-        cmdArgs = [ cvsDiffProgram ] + self.getRevisionOptions() + [ path ]
-        processMonitor.startProcess(cmdArgs, description="Graphical CVS diff for file " + path,
-                                    stderr=open(os.devnull, "w"))
         
     def getCVSRoot(self):
         cvsRoot = os.getenv("CVSROOT")

@@ -1,7 +1,7 @@
 #!/usr/local/bin/python
 
 
-import os, filecmp, plugins, time, stat
+import os, filecmp, plugins, time, stat, subprocess
 from ndict import seqdict
 from shutil import copyfile
 from fnmatch import fnmatch
@@ -183,7 +183,7 @@ class FileComparison:
         elif self.missingResult():
             return self.previewGenerator.getPreview(open(self.stdCmpFile))
 
-        if plugins.canExecute(self.textDiffTool):
+        try:
             stdFileSize = os.stat(self.stdCmpFile)[stat.ST_SIZE]
             tmpFileSize = os.stat(self.tmpCmpFile)[stat.ST_SIZE]
             if self.textDiffToolMaxSize >= 0 and \
@@ -195,10 +195,10 @@ class FileComparison:
                           " and re-run to see the difference in this text view.\n"
                 return self.previewGenerator.getWrappedLine(message)
 
-            cmdLine = self.textDiffTool + ' "' + self.stdCmpFile + '" "' + self.tmpCmpFile + '"'
-            stdout = os.popen(cmdLine)
-            return self.previewGenerator.getPreview(stdout)
-        else:
+            cmdArgs = plugins.splitcmd(self.textDiffTool) + [ self.stdCmpFile, self.tmpCmpFile ]
+            proc = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            return self.previewGenerator.getPreview(proc.stdout)
+        except OSError:
             return "No difference report could be created: could not find textual difference tool '" + self.textDiffTool + "'"
     def updatePaths(self, oldAbsPath, newAbsPath):
         if self.stdFile:

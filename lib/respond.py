@@ -113,10 +113,12 @@ class InteractiveResponder(Responder):
         if logFileComparison:
             tool, cmdArgs = self.getViewCmdInfo(test, logFileComparison)
             if tool:
-                if plugins.canExecute(tool):
+                try:
+                    proc = subprocess.Popen(cmdArgs, stdout=open(os.devnull, "w"),
+                                            stderr=subprocess.STDOUT, startupinfo=plugins.getProcessStartUpInfo())
                     print "<See also " + tool + " window for details of " + logFile + ">"
-                    return subprocess.Popen(cmdArgs, stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT, startupinfo=plugins.getProcessStartUpInfo())
-                else:
+                    return proc
+                except OSError:
                     print "<No window created - could not find graphical difference tool '" + tool + "'>"
     def askUser(self, test, allowView, process=None):      
         versions = test.app.getSaveableVersions()

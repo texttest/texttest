@@ -942,7 +942,7 @@ class TestSuite(Test):
     def refresh(self, filters):
         self.diagnose("refreshing!")
         Test.refresh(self, filters)
-        newTestNames = self.readTestNames(ignoreCache=True)
+        newTestNames = self.readTestNames(warn=False, ignoreCache=True)
         toRemove = filter(lambda test: test.name not in newTestNames, self.testcases)
         for test in toRemove:
             self.diagnose("removing " + repr(test))

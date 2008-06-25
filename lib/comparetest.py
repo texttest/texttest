@@ -290,6 +290,7 @@ class TestComparison(BaseTestComparison):
         for fileComp in self.allResults:
             stdFile = stdFiles.get(fileComp.stem)
             fileComp.recompute(test, stdFile)
+        return True
     def filterComparisons(self, resultList, onlyStems):
         if len(onlyStems) == 0:
             return resultList
@@ -366,9 +367,9 @@ class MakeComparisons(plugins.Action):
         self.describe(test, newState.getPostText())
     def recomputeProgress(self, test, observers):
         if test.state.isComplete():
-            test.state.recalculateComparisons(test)
-            newState = test.state.makeNewState(test.app, "recalculated")
-            test.changeState(newState)
+            if test.state.recalculateComparisons(test):
+                newState = test.state.makeNewState(test.app, "recalculated")
+                test.changeState(newState)
         else:
             newState = self.progressComparisonClass(test.state)
             newState.setObservers(observers)

@@ -38,7 +38,9 @@ def parseTimeExpression(timeExpression):
     if timeExpression.startswith(">="):
         return ">=", plugins.getNumberOfSeconds(timeExpression[2:])
     if timeExpression.startswith(">"):
-        return ">", plugins.getNumberOfSeconds(timeExpression[1:])  
+        return ">", plugins.getNumberOfSeconds(timeExpression[1:])
+    else:
+        raise plugins.TextTestError, "Could not parse time expression '" + timeExpression + "' : all expressions must begin with '<' or '>'." 
 
 class PerformanceConfigSettings:
     def __init__(self, test, stem):

@@ -425,21 +425,15 @@ class CollateFiles(plugins.Action):
                 args.append(sourceFile)
             self.diag.info("Opening extract process with args " + repr(args))
             if script is scripts[-1]:
-                stdout = open(targetFile, "w")
-                stderr = open(collationErrFile, "w")
+                stderr = subprocess.PIPE
             else:
-                stdout = subprocess.PIPE
                 stderr = subprocess.STDOUT
 
             try:
                 currProc = subprocess.Popen(args, env=test.getRunEnvironment(), 
-                                            stdin=stdin, stdout=stdout, stderr=stderr,
+                                            stdin=stdin, stdout=subprocess.PIPE, stderr=stderr,
                                             cwd=test.getDirectory(temporary=1))
             except OSError:
-                stderr.close()
-                stdout.close()
-                if os.path.isfile(targetFile):
-                    os.remove(targetFile)
                 errorMsg = "Could not find extract script '" + script + "', not extracting file at\n" + sourceFile + "\n"
                 stderr = open(collationErrFile, "w")
                 stderr.write(errorMsg)
@@ -448,7 +442,13 @@ class CollateFiles(plugins.Action):
                 return
             
         if currProc:
-            currProc.wait()    
+            output, errors = currProc.communicate()
+            stdout = open(targetFile, "w")
+            stdout.write(output)
+            stdout.close()
+            stderr = open(collationErrFile, "w")
+            stderr.write(errors)
+            stderr.close()
 
 class FindExecutionHosts(plugins.Action):
     def __call__(self, test):

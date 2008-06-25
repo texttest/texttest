@@ -1211,6 +1211,7 @@ class Application:
         self.setConfigDefaults()
         self.readConfigFiles(configModuleInitialised=False)
         self.readValues(self.configDir, "config", self.dircache, insert=0)
+        self.diag.info("Basic Config file settings are: " + "\n" + repr(self.configDir.dict))
         self.fullName = self.getConfigValue("full_name")
         self.diag.info("Found application " + repr(self))
         self.configObject = self.makeConfigObject()
@@ -1288,7 +1289,9 @@ class Application:
     def readExplicitConfigFiles(self, configModuleInitialised):
         self.readValues(self.configDir, "config", self.dircache, insert=False, errorOnUnknown=configModuleInitialised)
     def readImportedConfigFiles(self, configModuleInitialised):
-        self.configDir.readValues(self.getConfigFilesToImport(), insert=False, errorOnUnknown=configModuleInitialised)
+        importedFiles = self.getConfigFilesToImport()
+        self.diag.info("Reading imported config values from files : " + "\n".join(importedFiles))
+        self.configDir.readValues(importedFiles, insert=False, errorOnUnknown=configModuleInitialised)
     def readValues(self, multiEntryDict, stem, dircache, insert=True, errorOnUnknown=False):
         allFiles = self._getAllFileNames([ dircache ], stem)
         self.diag.info("Reading values for " + stem + " from files : " + "\n".join(allFiles))

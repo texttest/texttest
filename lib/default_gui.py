@@ -699,7 +699,7 @@ class PasteTests(guiplugins.ActionGUI):
             return name + "_copy"
     def getNewDescription(self, test):
         if len(test.description) or self.removeAfter:
-            return test.description
+            return plugins.extractComment(test.description)
         else:
             return "Copy of " + test.name
     def getRepositionPlacement(self, test, placement):

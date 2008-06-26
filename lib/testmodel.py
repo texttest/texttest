@@ -734,23 +734,27 @@ class TestSuiteFileHandler:
     def __init__(self):
         self.cache = {}
             
-    def read(self, fileName, warn=False, ignoreCache=False):
+    def read(self, fileName, warn=False, ignoreCache=False, filterMethod=None):
         if not ignoreCache:
             cached = self.cache.get(fileName)
-            if cached:
+            if cached is not None:
                 return cached
 
-        tests = plugins.readListWithComments(fileName, self.getDuplicateMethod(warn))
+        tests = plugins.readListWithComments(fileName, Callable(self.getExclusionReason, filterMethod, warn))
         self.cache[fileName] = tests
         return tests
-    
-    def getDuplicateMethod(self, warn):
-        if warn:
-            return self.warnDuplicateTest
 
-    def warnDuplicateTest(self, testName, fileName):
-        plugins.printWarning("The test " + testName + " was included several times in a test suite file.\n" + \
-                             "Please check the file at " + fileName)
+    def getExclusionReason(self, testName, existingTestNames, fileName, filterMethod, warn):
+        if existingTestNames.has_key(testName):
+            if warn:
+                plugins.printWarning("The test " + testName + " was included several times in a test suite file.\n" + \
+                                     "Please check the file at " + fileName)
+            return "repeated inclusion of the same test name"
+        if filterMethod and not filterMethod(testName):
+            if warn:
+                plugins.printWarning("The test " + testName + " could not be found.\nPlease check the file at " + fileName)
+            return "no test directory being found"
+        return ""
 
     def write(self, fileName, content):
         testEntries = self.makeWriteEntries(content)
@@ -840,7 +844,7 @@ class TestSuite(Test):
         return "\nDescription:\n" + Test.getDescription(self)
             
     def readContents(self, filters, initial=True):
-        testNames = self.readTestNames()
+        testNames = self.readTestNames(warn=True)
         self.createTestCases(filters, testNames, initial)
         if self.isEmpty() and len(testNames) > 0:
             # If the contents are filtered away, don't include the suite 
@@ -851,19 +855,14 @@ class TestSuite(Test):
                 self.diagnose("Contents rejected due to " + repr(filter))
                 return False
         return True
-    def readTestNames(self, warn=True, ignoreCache=False):
-        names = seqdict()
+
+    def readTestNames(self, warn=False, ignoreCache=False):
         fileName = self.getContentFileName()
-        if not fileName:
-            return names
-        for name, comment in self.testSuiteFileHandler.read(fileName, warn, ignoreCache).items():
-            self.diagnose("Read " + name)
-            if warn and not self.fileExists(name):
-                plugins.printWarning("The test " + name + " could not be found.\nPlease check the file at " + fileName)
-                continue
-            if not names.has_key(name):
-                names[name] = comment
-        return names
+        if fileName:
+            return self.testSuiteFileHandler.read(fileName, warn, ignoreCache, self.fileExists)
+        else:
+            return seqdict()
+
     def findTestCases(self, version):
         versionFile = self.getFileName("testsuite", version)        
         newTestNames = self.testSuiteFileHandler.read(versionFile)
@@ -916,15 +915,13 @@ class TestSuite(Test):
     def contentChanged(self):
         # Here we assume that only order can change...
         self.refreshFiles()
-        self.updateOrder(readTestNames=True)            
-    def updateOrder(self, readTestNames=False):
-        if readTestNames:
-            orderedTestNames = self.getOrderedTestNames().keys()
-        else:
-            orderedTestNames = self.getOrderedTestNames(map(lambda l: l.name, self.testcases))
+        self.updateOrder()
+    def updateOrder(self):
+        testNames = self.readTestNames().keys() # this is cached anyway
+        testCaseNames = map(lambda l: l.name, filter(lambda l: l.classId() == "test-case", self.testcases))
 
         newList = []
-        for testName in orderedTestNames:
+        for testName in self.getOrderedTestNames(testNames, testCaseNames):
             for testcase in self.testcases:
                 if testcase.name == testName:
                     newList.append(testcase)
@@ -942,7 +939,7 @@ class TestSuite(Test):
     def refresh(self, filters):
         self.diagnose("refreshing!")
         Test.refresh(self, filters)
-        newTestNames = self.readTestNames(warn=False, ignoreCache=True)
+        newTestNames = self.readTestNames(ignoreCache=True)
         toRemove = filter(lambda test: test.name not in newTestNames, self.testcases)
         for test in toRemove:
             self.diagnose("removing " + repr(test))
@@ -964,43 +961,31 @@ class TestSuite(Test):
                 self.diagnose("creating new test called '" + testName + "'")
                 dirCache = self.createTestCache(testName)
                 self.createTestOrSuite(testName, desc, dirCache, filters, initial=False)
-        self.updateOrder(readTestNames=True)
+        self.updateOrder()
         
 # private:
-    # Observe: orderedTestNames can be both list and seqdict ... (it will be seqdict if read from file)
-    def getOrderedTestNames(self, orderedTestNames = None): # We assume that tests exists, we just want to re-order ...
-        if orderedTestNames is None:
-            orderedTestNames = self.readTestNames(warn=False)
-        if self.autoSortOrder:
-            testCaseNames = map(lambda l: l.name, filter(lambda l: l.classId() == "test-case", self.testcases))
-            if self.autoSortOrder == 1:
-                orderedTestNames.sort(lambda a, b: self.compareTests(True, testCaseNames, a, b))
-            else:
-                orderedTestNames.sort(lambda a, b: self.compareTests(False, testCaseNames, a, b))
-        return orderedTestNames
+    def getOrderedTestNames(self, testNames, testCaseNames):
+        if self.autoSortOrder == 0:
+            return testNames
+        elif self.autoSortOrder == 1:
+            return sorted(testNames, lambda a, b: self.compareTests(True, testCaseNames, a, b))
+        else:
+            return sorted(testNames, lambda a, b: self.compareTests(False, testCaseNames, a, b))
+
     def createTestCases(self, filters, testNames, initial):
-        if self.autoSortOrder:
-            self.createAndSortTestCases(filters, testNames, initial)
-        else:
-            for testName, desc in testNames.items():
-                dirCache = self.createTestCache(testName)
-                self.createTestOrSuite(testName, desc, dirCache, filters, initial)
-
-    def createAndSortTestCases(self, filters, testNames, initial):
-        orderedTestNames = testNames.keys()
         testCaches = {}
-        for testName in orderedTestNames:
-            testCaches[testName] = self.createTestCache(testName)
+        testCaseNames = []
+        if self.autoSortOrder:
+            for testName in testNames.keys():
+                dircache = self.createTestCache(testName)
+                testCaches[testName] = dircache
+                if not dircache.hasStem("testsuite"):
+                    testCaseNames.append(testName)
 
-        testCaseNames = filter(lambda l: not testCaches[l].hasStem("testsuite"), orderedTestNames)
-        if self.autoSortOrder == 1:
-            orderedTestNames.sort(lambda a, b: self.compareTests(True, testCaseNames, a, b))
-        else:
-            orderedTestNames.sort(lambda a, b: self.compareTests(False, testCaseNames, a, b))
-
-        for testName in orderedTestNames:
-            dirCache = testCaches[testName]
-            self.createTestOrSuite(testName, testNames[testName], dirCache, filters, initial)
+        for testName in self.getOrderedTestNames(testNames.keys(), testCaseNames):
+            dirCache = testCaches.get(testName, self.createTestCache(testName))
+            desc = testNames.get(testName)
+            self.createTestOrSuite(testName, desc, dirCache, filters, initial)
 
     def createTestOrSuite(self, testName, description, dirCache, filters, initial=True):
         className = self.getSubtestClass(dirCache)
@@ -1068,7 +1053,7 @@ class TestSuite(Test):
         if not self.testSuiteFileHandler.reposition(testSuiteFileName, test.name, newIndex):
             return False
 
-        testNamesInOrder = self.readTestNames(warn=False)
+        testNamesInOrder = self.readTestNames()
         newList = []
         for testName in testNamesInOrder.keys():
             test = self.findSubtest(testName)
@@ -1086,7 +1071,7 @@ class TestSuite(Test):
             comparator = lambda a, b: self.compareTests(ascending, testNames, a, b)
             self.testSuiteFileHandler.sort(testSuiteFileName, comparator)
 
-        testNamesInOrder = self.readTestNames(warn=False)
+        testNamesInOrder = self.readTestNames()
         newList = []
         for testName in testNamesInOrder.keys():
             for test in self.testcases:

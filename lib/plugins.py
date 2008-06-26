@@ -771,7 +771,7 @@ def readList(filename):
 
 emptyLineSymbol = "__EMPTYLINE__"
   
-def readListWithComments(filename, duplicateMethod=None):
+def readListWithComments(filename, filterMethod=None):
     items = seqdict()
     currComment = ""
     for longline in open(filename).readlines():
@@ -783,15 +783,16 @@ def readListWithComments(filename, duplicateMethod=None):
         if line.startswith("#"):
             currComment += longline[1:].lstrip()
         else:
-            if items.has_key(line) and duplicateMethod:
-                duplicateMethod(line, filename)
-            else:
-                items[line] = currComment.strip()
+            if filterMethod:
+                failReason = filterMethod(line, items, filename)
+                if failReason:
+                    currComment += line + " (automatically commented due to " + failReason + ")\n" + emptyLineSymbol + "\n"
+                    continue
+            items[line] = currComment.strip()
             currComment = ""
     # Rescue dangling comments in the end (but put them before last test ...)
     if currComment and len(items) > 0:
-        lastPos = len(items) - 1
-        items[items.keys()[lastPos]] = currComment + items[items.keys()[lastPos]]
+        items[items.keys()[-1]] = currComment + items[items.keys()[-1]]
     return items
 
 # comment can contain lines with __EMPTYLINE__ (see above) as a separator

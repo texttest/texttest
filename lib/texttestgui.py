@@ -732,7 +732,7 @@ class TestColumnGUI(guiplugins.SubGUI):
             self.notify("Status", "Sorting suite " + suite.name + " ...")
             self.notify("ActionProgress")
             suite.autoSortOrder = order
-            suite.updateOrder(order == 0) # Re-read testsuite files if order is 0 ...
+            suite.updateOrder() 
             for test in suite.testcases:
                 if test.classId() == "test-suite":
                     self.setSortingOrder(order, test)

@@ -436,8 +436,15 @@ class CollateFiles(plugins.Action):
                                             stdin=stdin, stdout=stdout, stderr=stderr,
                                             cwd=test.getDirectory(temporary=1))
             except OSError:
-                stderr.close()
-                stdout.close()
+                if os.name == "posix":
+                    stdout.close()
+                    stderr.close()
+                else:
+                    # Workaround for Python bug on Windows which doesn't release process handles otherwise.
+                    # See http://bugs.python.org/issue3210 for details. 
+                    os.close(stdout.fileno())
+                    os.close(stderr.fileno())
+                    
                 if os.path.isfile(targetFile):
                     os.remove(targetFile)
                 errorMsg = "Could not find extract script '" + script + "', not extracting file at\n" + sourceFile + "\n"

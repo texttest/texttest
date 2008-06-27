@@ -943,9 +943,17 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
                        possibleValues=self.getPossibleVersions(allApps))
         self.selectionGroup = plugins.OptionGroup(self.getTabTitle())
         self.selectionGroup.addSwitch("select_in_collapsed_suites", "Select in collapsed suites", 0, description="Select in currently collapsed suites as well?")
-        self.selectionGroup.addSwitch("current_selection", options = [ "Discard", "Refine", "Extend", "Exclude"], description="How should we treat the currently selected tests?\n - Discard: Unselect all currently selected tests before applying the new selection criteria.\n - Refine: Apply the new selection criteria only to the currently selected tests, to obtain a subselection.\n - Extend: Keep the currently selected tests even if they do not match the new criteria, and extend the selection with all other tests which meet the new criteria.\n - Exclude: After applying the new selection criteria to all tests, unselect the currently selected tests, to exclude them from the new selection.")
+        currSelectDesc = ["Unselect all currently selected tests before applying the new selection criteria.",
+                          "Apply the new selection criteria only to the currently selected tests, to obtain a subselection.",
+                          "Keep the currently selected tests even if they do not match the new criteria, and extend the selection with all other tests which meet the new criteria.",
+                          "After applying the new selection criteria to all tests, unselect the currently selected tests, to exclude them from the new selection." ]
+        self.selectionGroup.addSwitch("current_selection", options = [ "Discard", "Refine", "Extend", "Exclude"],
+                                      description=currSelectDesc)
         self.filteringGroup = plugins.OptionGroup(self.getTabTitle())
-        self.filteringGroup.addSwitch("current_filtering", options = [ "Discard", "Refine", "Extend" ])
+        currFilterDesc = ["Show all tests which match the criteria, and hide all those that do not.",
+                          "Hide all tests which do not match the criteria. Do not show any tests that aren't already shown.",
+                          "Show all tests which match the criteria. Do not hide any tests that are currently shown." ]
+        self.filteringGroup.addSwitch("current_filtering", options = [ "Discard", "Refine", "Extend" ], description=currFilterDesc)
         self.appKeys = Set()
         for app in allApps:
             appSelectGroup = self.findSelectGroup(app)

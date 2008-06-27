@@ -565,6 +565,7 @@ class ActionGUI(BasicActionGUI):
         self.currFileSelection = []
         self.currAppSelection = []
         self.validApps = []
+        self.tooltips = gtk.Tooltips()
         BasicActionGUI.__init__(self)
         for app in allApps:
             if self.isValidForApp(app):
@@ -648,7 +649,6 @@ class ActionGUI(BasicActionGUI):
         # In theory all this should be automatic, but it appears not to work
         if self.getStockId():
             button.set_image(gtk.image_new_from_stock(self.getStockId(), gtk.ICON_SIZE_BUTTON))
-        self.tooltips = gtk.Tooltips()
         self.tooltips.set_tip(button, self.getTooltip())
         button.show()
         return button
@@ -692,8 +692,7 @@ class OptionGroupGUI(ActionGUI):
         # convenience shortcuts...
         self.addOption = self.optionGroup.addOption
         self.addSwitch = self.optionGroup.addSwitch
-        self.tooltips = gtk.Tooltips()
-
+        
     def updateOptions(self):
         return False     
 
@@ -735,7 +734,7 @@ class OptionGroupGUI(ActionGUI):
         if len(switch.name) > 0:
             label = gtk.EventBox()
             label.add(gtk.Label(switch.name + ":"))
-            if switch.description:
+            if switch.description and type(switch.description) == types.StringType:
                 self.tooltips.set_tip(label, switch.description)
             hbox.pack_start(label, expand=False, fill=False)
         for button in self.createRadioButtons(switch, optionGroup):
@@ -754,12 +753,16 @@ class OptionGroupGUI(ActionGUI):
     def createRadioButtons(self, switch, optionGroup):
         buttons = []
         mainRadioButton = None
+        individualToolTips = type(switch.description) == types.ListType
         for index, option in enumerate(switch.options):
             cleanOption = option.split("\n")[0].replace("_", "")
             configName, useCaseName = self.getNaming(switch.name, cleanOption, optionGroup)
             if guiConfig.getCompositeValue("gui_entry_overrides", configName) == "1":
                 switch.setValue(index)
             radioButton = gtk.RadioButton(mainRadioButton, option, use_underline=True)
+            if individualToolTips:
+                self.tooltips.set_tip(radioButton, switch.description[index])
+                
             buttons.append(radioButton)
             scriptEngine.registerToggleButton(radioButton, "choose " + useCaseName)
             if not mainRadioButton:
@@ -783,6 +786,9 @@ class OptionGroupGUI(ActionGUI):
     def createCheckBox(self, switch):
         self.updateForConfig(switch)
         checkButton = gtk.CheckButton(switch.name)
+        if switch.description:
+            self.tooltips.set_tip(checkButton, switch.description)
+        
         if int(switch.getValue()):
             checkButton.set_active(True)
         scriptEngine.registerToggleButton(checkButton, "check " + switch.name, "uncheck " + switch.name)

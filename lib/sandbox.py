@@ -405,6 +405,16 @@ class CollateFiles(plugins.Action):
         paths = glob.glob(pattern)
         paths.sort()
         return filter(os.path.isfile, paths)
+
+    def runCollationScript(self, args, test, stdin, stdout, stderr):
+        try:
+            return subprocess.Popen(args, env=test.getRunEnvironment(), 
+                                    stdin=stdin, stdout=stdout, stderr=stderr,
+                                    cwd=test.getDirectory(temporary=1))
+        except OSError:
+            stdout.close()
+            stderr.close()
+    
     def extract(self, test, sourceFile, targetFile, collationErrFile):
         stem = os.path.splitext(os.path.basename(targetFile))[0]
         scripts = test.getCompositeConfigValue("collate_script", stem)
@@ -431,20 +441,8 @@ class CollateFiles(plugins.Action):
                 stdout = subprocess.PIPE
                 stderr = subprocess.STDOUT
 
-            try:
-                currProc = subprocess.Popen(args, env=test.getRunEnvironment(), 
-                                            stdin=stdin, stdout=stdout, stderr=stderr,
-                                            cwd=test.getDirectory(temporary=1))
-            except OSError:
-                if os.name == "posix":
-                    stdout.close()
-                    stderr.close()
-                else:
-                    # Workaround for Python bug on Windows which doesn't release process handles otherwise.
-                    # See http://bugs.python.org/issue3210 for details. 
-                    os.close(stdout.fileno())
-                    os.close(stderr.fileno())
-                    
+            currProc = self.runCollationScript(args, test, stdin, stdout, stderr)
+            if not currProc:
                 if os.path.isfile(targetFile):
                     os.remove(targetFile)
                 errorMsg = "Could not find extract script '" + script + "', not extracting file at\n" + sourceFile + "\n"

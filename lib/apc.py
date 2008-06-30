@@ -111,7 +111,7 @@ apc.ExtractFromStatusFile <options>
 """
 
 import apc_basic, default, ravebased, queuesystem, performance, sandbox, os, copy, stat, shutil, KPI, optimization, plugins, math, filecmp, re, time, subprocess, testoverview
-from jobprocess import JobProcess
+from jobprocess import killSubProcessAndChildren
 from ndict import seqdict
 from carmenqueuesystem import getArchitecture, getMajorReleaseVersion
 
@@ -380,7 +380,7 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
     def __del__(self):
         # .nfs lock files are left if we don't kill the less process.
         if self.process:
-            JobProcess(self.process.pid).killAll()
+            killSubProcessAndChildren(self.process)
     def __call__(self, test):
         os.chdir(test.getDirectory(temporary=True)) # for backwards compatibility with when this was done by default...
         self.filesToRemove = []

@@ -521,6 +521,7 @@ class CreateCatalogue(plugins.Action):
         searchString = test.getConfigValue("catalogue_process_string")
         if len(searchString) == 0:
             return []
+        # Code untested and unlikely to work on Windows...
         processes = []
         logFile = test.makeTmpFileName(test.getConfigValue("log_file"))
         if not os.path.isfile(logFile):

@@ -4,7 +4,7 @@ import os, sys, plugins, sandbox, reconnect, respond, rundependent, comparetest,
 from threading import Lock
 from knownbugs import CheckForBugs, CheckForCrashes
 from traffic import SetUpTrafficHandlers
-from jobprocess import JobProcess
+from jobprocess import killSubProcessAndChildren
 from actionrunner import ActionRunner
 from performance import TimeFilter
 from time import sleep
@@ -937,8 +937,7 @@ class RunTest(plugins.Action):
         self.lock.release()
     def killProcess(self):
         print "Killing running test (process id", str(self.currentProcess.pid) + ")"
-        proc = JobProcess(self.currentProcess.pid)
-        proc.killAll()    
+        killSubProcessAndChildren(self.currentProcess)
     
     def wait(self, process):
         try:

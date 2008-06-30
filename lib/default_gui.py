@@ -1,6 +1,5 @@
 
 import guiplugins, helpdialogs, plugins, os, sys, shutil, time, subprocess, operator, types, gtk
-from jobprocess import JobProcess
 from sets import Set
 from copy import copy, deepcopy
 from threading import Thread

@@ -1,7 +1,7 @@
 
 import gtk, gobject, entrycompletion, plugins, os, sys, shutil, time, subprocess, operator, types
 from gtkusecase import RadioGroupIndexer
-from jobprocess import JobProcess
+from jobprocess import killSubProcessAndChildren
 from copy import copy, deepcopy
 from glob import glob
 from stat import *
@@ -154,14 +154,14 @@ class ProcessTerminationMonitor(plugins.Observable):
         running = []
         if len(processesToCheck) == 0:
             return running
-        for pid, (description, exitHandler, exitHandlerArgs) in self.processes.items():
+        for process, description, exitHandler, exitHandlerArgs in self.processes.values():
             for processToCheck in processesToCheck:
                 if plugins.isRegularExpression(processToCheck):
                     if plugins.findRegularExpression(processToCheck, description):
-                        running.append("PID " + str(pid) + " : " + description)
+                        running.append("PID " + str(process.pid) + " : " + description)
                         break
                 elif processToCheck.lower() == "all" or description.find(processToCheck) != -1:
-                    running.append("PID " + str(pid) + " : " + description)
+                    running.append("PID " + str(process.pid) + " : " + description)
                     break
 
         return running
@@ -176,11 +176,12 @@ class ProcessTerminationMonitor(plugins.Observable):
 
     def startProcess(self, cmdArgs, description = "", exitHandler=None, exitHandlerArgs=(), **kwargs):
         process = subprocess.Popen(cmdArgs, stdin=open(os.devnull), startupinfo=plugins.getProcessStartUpInfo(), **kwargs)
-        self.processes[process.pid] = (description, exitHandler, exitHandlerArgs)
-        gobject.child_watch_add(self.getProcessIdentifier(process), self.processExited, process.pid)
+        pidOrHandle = self.getProcessIdentifier(process)
+        self.processes[int(pidOrHandle)] = (process, description, exitHandler, exitHandlerArgs)
+        gobject.child_watch_add(pidOrHandle, self.processExited)
 
-    def processExited(self, pidOrHandle, condition, pid):
-        description, exitHandler, exitHandlerArgs = self.processes.pop(pid)
+    def processExited(self, pid, *args):
+        process, description, exitHandler, exitHandlerArgs = self.processes.pop(pid)
         if exitHandler:
             exitHandler(*exitHandlerArgs)
     
@@ -189,10 +190,10 @@ class ProcessTerminationMonitor(plugins.Observable):
         if len(self.processes) == 0:
             return
         self.notify("Status", "Terminating all external viewers ...")
-        for pid, (description, exitHandler, exitHandlerArgs) in self.processes.items():
+        for process, description, exitHandler, exitHandlerArgs in self.processes.values():
             self.notify("ActionProgress", "")
             guilog.info("Killing '" + description + "' interactive process")
-            JobProcess(pid).killAll(sig)
+            killSubProcessAndChildren(process, sig)
         
 processMonitor = ProcessTerminationMonitor()
 

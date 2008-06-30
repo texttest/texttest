@@ -1,7 +1,7 @@
 #!/usr/local/bin/python
 
 import sys, os, plugins, subprocess
-from jobprocess import JobProcess
+from jobprocess import killSubProcessAndChildren
 from usecase import ScriptEngine
 
 # Interface all responders must fulfil
@@ -142,5 +142,5 @@ class InteractiveResponder(Responder):
                     self.save(test, versions[i], exactSave)
         if process:
             print "Terminating graphical viewer..."
-            JobProcess(process.pid).killAll()
+            killSubProcessAndChildren(process)
         return 0

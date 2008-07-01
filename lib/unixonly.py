@@ -129,7 +129,13 @@ class VirtualDisplayResponder(Responder):
             return "python"
         
     def getDisplayName(self, machine, displayNumber):
-        return machine + ":" + str(displayNumber) + ".0"
+        # No point in using the port if we don't have to, this seems less reliable if the process is local
+        # X keeps track of these numbers internally and connecting to them works rather better.
+        displayStr = ":" + str(displayNumber) + ".0"
+        if machine == "localhost":
+            return displayStr
+        else:
+            return machine + displayStr
 
     def canRunVirtualServer(self, machine):
         # If it's not localhost, we need to make sure it exists and has Xvfb installed

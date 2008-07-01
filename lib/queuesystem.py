@@ -527,7 +527,12 @@ class QueueSystemServer(BaseActionRunner):
             return reuseFailure
         else:
             self.diag.info("Waiting for new tests...")
-            return self.getTest(block=True)
+            newTest = self.getTest(block=True)
+            if newTest:
+                return newTest
+            else:
+                # Make sure we pick up anything that failed in reuse while we were submitting the final test...
+                return self.getItemFromQueue(self.reuseFailureQueue, block=False)
     def getTestForRunReuseOnlyMode(self):
         self.reuseOnly = True
         self.diag.info("Waiting for reuse failures...")

@@ -583,7 +583,10 @@ class FollowFile(FileViewAction):
         guiplugins.guilog.info("Following file " + useFile + " using '" + useProgram + "'")
         description = useProgram + " " + os.path.basename(useFile)
         cmdArgs = self.getFollowCommand(useProgram, useFile)
-        self.startViewer(cmdArgs, description=description)
+        self.startViewer(cmdArgs, description=description, exitHandler=self.followComplete)
+        
+    def followComplete(self, *args):
+        guiplugins.scriptEngine.applicationEvent("the file-following program to terminate")
         
 
 class KillTests(guiplugins.ActionGUI):

@@ -525,6 +525,11 @@ class Test(plugins.Observable):
             return True
         else:
             return False
+
+    def removeFromMemory(self):
+        self.parent.testcases.remove(self)
+        self.notify("Remove")
+    
     def rename(self, newName, newDescription):
         # Correct all testsuite files ...
         for testSuiteFileName in self.parent.findTestSuiteFiles():
@@ -943,8 +948,7 @@ class TestSuite(Test):
         toRemove = filter(lambda test: test.name not in newTestNames, self.testcases)
         for test in toRemove:
             self.diagnose("removing " + repr(test))
-            self.testcases.remove(test)
-            test.notify("Remove")
+            test.removeFromMemory()
 
         for testName, desc in newTestNames.items():
             existingTest = self.findSubtest(testName)
@@ -1113,13 +1117,19 @@ class TestSuite(Test):
             return self.testcases[position + 1]
         except (ValueError, IndexError):
             pass
+
+    def removeFromMemory(self):
+        for test in self.testcases:
+            test.notify("Remove")
+        self.testcases = []
+        Test.removeFromMemory(self)
+        
     def removeTest(self, test, removeFromTestFile = True):
         try:
             test.removeFiles()
-            self.testcases.remove(test)
             if removeFromTestFile:
                 self.removeFromTestFile(test.name)
-            test.notify("Remove")
+            test.removeFromMemory()
         except OSError, e:
             errorStr = str(e)
             if errorStr.find("Permission") != -1:

@@ -913,7 +913,7 @@ class TestSuite(Test):
         if contentFile:
             return
         contentFile = self.dircache.pathName("testsuite." + self.app.name)
-        file = open(contentFile, "w")
+        file = open(contentFile, "a")
         file.write("# Ordered list of tests in test suite. Add as appropriate\n\n")
         file.close()
         self.dircache.refresh()

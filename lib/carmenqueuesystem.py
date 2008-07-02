@@ -250,7 +250,7 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         print helpOptions
     def printHelpDescription(self):
         print helpDescription
-    def defaultViewProgram(self):
+    def defaultViewProgram(self, homeOS):
         return "xemacs"
     def getFilteredBatchSessions(self):
         return [ "nightjob", "wkendjob", "release", "nightly_publish", "nightly_publish.lsf", \

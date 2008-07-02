@@ -1399,6 +1399,7 @@ class Application:
         self.setConfigDefault("config_module", "default", "Configuration module to use")
         self.setConfigDefault("import_config_file", [], "Extra config files to use")
         self.setConfigDefault("full_name", self.name.upper(), "Expanded name to use for application")
+        self.setConfigDefault("home_operating_system", "any", "Which OS the test results were originally collected on")
         self.setConfigDefault("base_version", [], "Versions to inherit settings from")
         # various varieties of test data
         self.setConfigDefault("partial_copy_test_path", [], "Paths to be part-copied, part-linked to the temporary directory")

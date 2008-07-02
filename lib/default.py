@@ -640,7 +640,7 @@ class Config:
             return { "default" : [], "stacktrace" : [ "interpretcore.py" ] }
         else:
             return { "default" : [] }
-    def setComparisonDefaults(self, app):
+    def setComparisonDefaults(self, app, homeOS):
         app.setConfigDefault("log_file", "output", "Result file to search, by default")
         app.setConfigDefault("failure_severity", self.defaultSeverities(), \
                              "Mapping of result files to how serious diffs in them are")
@@ -658,20 +658,26 @@ class Config:
         app.setConfigDefault("binary_file", [], "Which output files are known to be binary, and hence should not be shown/diffed?")
         
         app.setConfigDefault("discard_file", [], "List of generated result files which should not be compared")
-        app.setConfigDefault("home_operating_system", "any", "Which OS the test results were originally collected on")
         if self.optionMap.has_key("rectraffic"):
             app.addConfigEntry("base_version", "rectraffic")
-    def defaultViewProgram(self):
+        if homeOS != "any" and homeOS != os.name:
+            app.addConfigEntry("base_version", os.name)
+
+    def defaultViewProgram(self, homeOS):
         if os.name == "posix":
             return "emacs"
         else:
-            return "notepad"
+            if homeOS == "posix":
+                # Notepad cannot handle UNIX line-endings: for cross platform suites use wordpad by default...
+                return "wordpad"
+            else:
+                return "notepad"
     def defaultFollowProgram(self):
         if os.name == "posix":
             return "xterm -bg white -T $TEXTTEST_FOLLOW_FILE_TITLE -e tail -f"
         else:
             return "baretail"
-    def setExternalToolDefaults(self, app):
+    def setExternalToolDefaults(self, app, homeOS):
         app.setConfigDefault("text_diff_program", "diff", \
                              "External program to use for textual comparison of files")
         app.setConfigDefault("lines_of_text_difference", 30, "How many lines to present in textual previews of file diffs")
@@ -679,7 +685,7 @@ class Config:
         app.setConfigDefault("text_diff_program_max_file_size", "-1", "The maximum file size to use the text_diff_program, in bytes. -1 means no limit.")
         app.setConfigDefault("text_diff_program_filters", { "default" : [], "diff" : [ "^<", "^>" ]}, "Filters that should be applied for particular diff tools to aid with grouping in dynamic GUI")
         app.setConfigDefault("diff_program", { "default": "tkdiff" }, "External program to use for graphical file comparison")
-        app.setConfigDefault("view_program", { "default": self.defaultViewProgram() },  \
+        app.setConfigDefault("view_program", { "default": self.defaultViewProgram(homeOS) },  \
                               "External program(s) to use for viewing and editing text files")
         app.setConfigDefault("follow_program", { "default": self.defaultFollowProgram() }, "External program to use for following progress of a file")
         app.setConfigDefault("follow_file_by_default", 0, "When double-clicking running files, should we follow progress or just view them?")
@@ -778,8 +784,9 @@ class Config:
         app.addConfigEntry("definition_file_stems", "input")
         app.addConfigEntry("definition_file_stems", "knownbugs")
     def setApplicationDefaults(self, app):
-        self.setComparisonDefaults(app)
-        self.setExternalToolDefaults(app)
+        homeOS = app.getConfigValue("home_operating_system")
+        self.setComparisonDefaults(app, homeOS)
+        self.setExternalToolDefaults(app, homeOS)
         self.setInterfaceDefaults(app)
         self.setMiscDefaults(app)
         self.setBatchDefaults(app)

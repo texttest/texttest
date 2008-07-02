@@ -66,11 +66,10 @@ class PlotTestInGUI(guiplugins.ActionTabGUI):
         if stdFile:
             self.testGraph.createPlotObjects(None, None, stdFile, test, None)
     
-        if not self.dynamic:
-            for version in self.testGraph.getExtraVersions():
-                plotFile = test.getFileName(logFileStem, version)
-                if plotFile and plotFile.endswith(test.app.name + "." + version):
-                    self.testGraph.createPlotObjects(None, version, plotFile, test, None)
+        for version in self.testGraph.getExtraVersions():
+            plotFile = test.getFileName(logFileStem, version)
+            if plotFile and plotFile.endswith(test.app.name + "." + version):
+                self.testGraph.createPlotObjects(None, version, plotFile, test, None)
 
     def getTmpFile(self, test, logFileStem):
         if test.state.isComplete():

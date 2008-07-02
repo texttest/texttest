@@ -5,6 +5,7 @@ from ndict import seqdict
 from SocketServer import TCPServer, StreamRequestHandler
 from threading import Thread, Lock
 from types import StringType
+from jobprocess import JobProcess
 
 class SetUpTrafficHandlers(plugins.Action):
     def __init__(self, record):
@@ -217,7 +218,7 @@ class CommandLineKillTraffic(Traffic):
             
     def forwardToDestination(self):
         if self.pid:
-            os.kill(self.pid, self.killSignal)
+            JobProcess(self.pid).killAll(self.killSignal)
         return []
 
     def hasInfo(self):

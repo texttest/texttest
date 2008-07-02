@@ -381,13 +381,7 @@ class Config:
     def getWriteDirectoryPreparer(self, ignoreCatalogues):
         return sandbox.PrepareWriteDirectory(ignoreCatalogues)
     def getTestRunner(self):
-        if os.name == "posix":
-            # Use Xvfb to suppress GUIs
-            # UNIX time to collect system performance info.
-            from unixonly import RunTest as UNIXRunTest
-            return UNIXRunTest(self.hasAutomaticCputimeChecking)
-        else:
-            return RunTest()
+        return RunTest()
     def getTestEvaluator(self):
         return [ self.getFileExtractor(), rundependent.FilterTemporary(), self.getTestComparator(), self.getFailureExplainer() ]
     def getFileExtractor(self):
@@ -994,7 +988,12 @@ class RunTest(plugins.Action):
         return args
     def getExecuteCmdArgs(self, test):
         parts = self.getCmdParts(test)
-        return reduce(operator.add, map(plugins.splitcmd, parts))
+        basicArgs = reduce(operator.add, map(plugins.splitcmd, parts))
+        if test.app.hasAutomaticCputimeChecking():
+            perfFile = test.makeTmpFileName("unixperf", forFramework=1)
+            return [ "time", "-p", "-o", perfFile ] + basicArgs
+        else:
+            return basicArgs
     def makeFile(self, test, name):
         fileName = test.makeTmpFileName(name)
         return open(fileName, "w")

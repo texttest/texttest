@@ -19,7 +19,7 @@ def queueSystemName(app):
     return app.getConfigValue("queue_system_module")
 
 # Use a non-monitoring runTest, but the rest from unix
-class RunTestInSlave(unixonly.RunTest):
+class RunTestInSlave(default.RunTest):
     def getBriefText(self, execMachines):
         return "RUN (" + ",".join(execMachines) + ")"
     def getUserSignalKillInfo(self, test, userSignalNumber):
@@ -192,7 +192,7 @@ class QueueSystemConfig(default.Config):
             return default.Config.getTextDisplayResponderClass(self)
     def getTestRunner(self):
         if self.slaveRun():
-            return RunTestInSlave(self.hasAutomaticCputimeChecking)
+            return RunTestInSlave()
         else:
             return default.Config.getTestRunner(self)
     def showExecHostsInFailures(self):

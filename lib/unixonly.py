@@ -3,18 +3,6 @@
 import default, plugins, os, sys, subprocess, signal
 from respond import Responder
 from socket import gethostname
-                
-class RunTest(default.RunTest):
-    def __init__(self, hasAutomaticCputimeChecking):
-        default.RunTest.__init__(self)
-        self.hasAutomaticCputimeChecking = hasAutomaticCputimeChecking
-    def getExecuteCmdArgs(self, test):
-        origArgs = default.RunTest.getExecuteCmdArgs(self, test)
-        if self.hasAutomaticCputimeChecking(test.app):
-            perfFile = test.makeTmpFileName("unixperf", forFramework=1)
-            return [ "time", "-p", "-o", perfFile ] + origArgs
-        else:
-            return origArgs
         
 # Unlike earlier incarnations of this functionality,
 # we don't rely on sharing displays but create our own for each test run.

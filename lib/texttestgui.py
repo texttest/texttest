@@ -2169,9 +2169,11 @@ class TestFileGUI(FileViewGUI):
             return name.split()[0].lower()
 
     def fileSelected(self, treemodel, path, iter, filelist):
-        # files are leaves, not including the top level which might be empty headers
-        if self.model.iter_parent(iter) is not None and not self.model.iter_has_child(iter):
-            filelist.append((self.model.get_value(iter, 2), self.model.get_value(iter, 3)))
+        # Do not include the top level which are just headers that don't currently correspond to files
+        if self.model.iter_parent(iter) is not None:
+            filePath = self.model.get_value(iter, 2)
+            if filePath:
+                filelist.append((filePath, self.model.get_value(iter, 3)))
 
     def getState(self):
         if self.currentTest:

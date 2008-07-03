@@ -249,7 +249,7 @@ class FileViewAction(guiplugins.ActionGUI):
         return False
 
     def isActiveForFile(self, fileName, *args):
-        return True
+        return fileName and not os.path.isdir(fileName)
     
     def useFiltered(self):
         return False
@@ -1811,6 +1811,7 @@ class RemoveTests(guiplugins.ActionGUI):
                     (creationDir is None or len(self.currFileSelection) > 0) and \
                     self.isActiveOnCurrent()
         self.setSensitivity(canRemove)
+
     def isActiveOnCurrent(self, *args):
         for test in self.currTestSelection:
             if test.parent:
@@ -1820,33 +1821,34 @@ class RemoveTests(guiplugins.ActionGUI):
             return True
         else:
             return False
+
     def _getTitle(self):
         return "Remove..."
+
     def _getStockId(self):
         return "delete"
+
     def getTooltip(self):
         return "Remove selected files"
-    def getFilesDescription(self, number = None):
-        numberOfFiles = len(self.currFileSelection)
-        if number is not None:
-            numberOfFiles = number
-        return self.pluralise(numberOfFiles, "file")
+
     def getTestCountDescription(self):
         desc = self.pluralise(self.distinctTestCount, "test")
         diff = len(self.currTestSelection) - self.distinctTestCount
         if diff > 0:
             desc += " (with " + self.pluralise(diff, "extra instance") + ")"
         return desc
+
     def updateSelection(self, tests, apps, rowCount, *args):
         self.distinctTestCount = rowCount
         return guiplugins.ActionGUI.updateSelection(self, tests, apps, rowCount, *args)
+
     def getConfirmationMessage(self):
         extraLines = """
 \nNote: This will remove files from the file system and hence may not be reversible.\n
 Are you sure you wish to proceed?\n"""
         currTest = self.currTestSelection[0]
         if len(self.currFileSelection) > 0:
-            return "\nYou are about to remove " + self.getFilesDescription() + \
+            return "\nYou are about to remove " + self.pluralise(len(self.currFileSelection), self.getType(self.currFileSelection[0][0])) + \
                    " from the " + currTest.classDescription() + " '" + currTest.name + "'." + extraLines
         elif len(self.currTestSelection) == 1:                  
             if currTest.classId() == "test-case":
@@ -1858,11 +1860,13 @@ Are you sure you wish to proceed?\n"""
         else:
             return "\nYou are about to remove " + self.getTestCountDescription() + \
                    " and all associated files." + extraLines
+
     def performOnCurrent(self):
         if len(self.currFileSelection) > 0:
             self.removeFiles()
         else:
             self.removeTests()
+
     def getTestsToRemove(self, list):
         toRemove = []
         warnings = ""
@@ -1880,6 +1884,7 @@ Are you sure you wish to proceed?\n"""
                 toRemove.append(test)
 
         return toRemove, warnings
+
     def removeTests(self):
         namesRemoved = []
         toRemove, warnings = self.getTestsToRemove(self.currTestSelection)
@@ -1889,25 +1894,38 @@ Are you sure you wish to proceed?\n"""
         self.notify("Status", "Removed test(s) " + ",".join(namesRemoved))
         if warnings:
             self.showWarningDialog(warnings)
+
+    def getType(self, filePath):
+        if os.path.isdir(filePath):
+            return "directory"
+        else:
+            return "file"
+            
     def removeFiles(self):
         test = self.currTestSelection[0]
         warnings = ""
         removed = 0
         for filePath, comparison in self.currFileSelection:
+            fileType = self.getType(filePath)
             try:
-                self.notify("Status", "Removing file " + os.path.basename(filePath))
+                self.notify("Status", "Removing " + fileType + " " + os.path.basename(filePath))
                 self.notify("ActionProgress", "")
-                os.remove(filePath)
+                if fileType == "directory":
+                    shutil.rmtree(filePath)
+                else:
+                    os.remove(filePath)
                 removed += 1
             except OSError, e:
-                warnings += "Failed to remove file '" + filePath + "':\n" + str(e)
+                warnings += "Failed to remove " + fileType + " '" + filePath + "':\n" + str(e)
         test.filesChanged()
-        self.notify("Status", "Removed " + self.getFilesDescription(removed) + " from the " +
+        self.notify("Status", "Removed " + self.pluralise(removed, fileType) + " from the " +
                     test.classDescription() + " " + test.name + "")
         if warnings:
             self.showWarningDialog(warnings)
+
     def messageAfterPerform(self):
         pass # do it as part of the method as currentTest will have changed by the end!
+
     
 class ReportBugs(guiplugins.ActionDialogGUI):
     def __init__(self, *args):
@@ -2288,7 +2306,7 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
             prop = plugins.FileProperties(file)
             properties.append(prop)
         except Exception, e:
-            errors.append(str(e))          
+            errors.append(plugins.getExceptionString())          
 
     # xalign = 1.0 means right aligned, 0.0 means left aligned
     def justify(self, text, xalign = 0.0):

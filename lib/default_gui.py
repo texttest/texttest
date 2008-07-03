@@ -2214,8 +2214,6 @@ class RenameTest(guiplugins.ActionDialogGUI):
         self.addOption("desc", "\nNew description")
         self.oldName = ""
         self.oldDescription = ""
-    def correctTestClass(self):
-        return "test-case"
     def singleTestOnly(self):
         return True
     def updateOptions(self):

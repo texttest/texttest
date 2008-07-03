@@ -299,6 +299,10 @@ class Test(plugins.Observable):
         else:
             return "<No description provided>"
 
+    def changeDirectory(self, newDir, origRelPath):
+        self.dircache = DirectoryCache(newDir)
+        self.notify("NameChange", origRelPath)
+        
     def setName(self, newName):
         # Create new directory, copy files if the new name is new (we might have
         # changed only the comment ...) (we don't want to rename dir, that can confuse CVS ...)
@@ -310,8 +314,7 @@ class Test(plugins.Observable):
 
             origRelPath = self.getRelPath()
             self.name = newName
-            self.dircache = DirectoryCache(newDir)
-            self.notify("NameChange", origRelPath)
+            self.changeDirectory(newDir, origRelPath)
             if self.parent.autoSortOrder:
                 self.parent.updateOrder()
         
@@ -1106,6 +1109,20 @@ class TestSuite(Test):
                     return cmp(a.lower(), b.lower())        
                 else:
                     return cmp(b.lower(), a.lower())
+
+    def copyTestContents(self, newDir):
+        Test.copyTestContents(self, newDir)
+        for test in self.testcases:
+            testNewDir = os.path.join(newDir, test.name)
+            plugins.ensureDirectoryExists(testNewDir)
+            test.copyTestContents(testNewDir)
+
+    def changeDirectory(self, newDir, origRelPath):
+        Test.changeDirectory(self, newDir, origRelPath)
+        for test in self.testcases:
+            testNewDir = os.path.join(newDir, test.name)
+            testOrigRelPath = os.path.join(origRelPath, test.name)
+            test.changeDirectory(testNewDir, testOrigRelPath)
 
     def copyTest(self, test, newName, newDesc, placement):
         testDir = self.writeNewTest(newName, newDesc, placement)

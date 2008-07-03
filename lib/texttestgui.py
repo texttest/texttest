@@ -1283,11 +1283,16 @@ class TestTreeGUI(ContainerGUI):
 
     def notifyNameChange(self, test, origRelPath):
         iter = self.itermap.updateIterator(test, origRelPath)
-        self.model.set_value(iter, 0, test.name)
+        oldName = self.model.get_value(iter, 0)
+        # We may get this notification if one of the parent suites changes name : don't redescribe the test suite then
+        if test.name != oldName:
+            self.model.set_value(iter, 0, test.name)
+            self.describeTree()
+
         filteredIter = self.filteredModel.convert_child_iter_to_iter(iter)
-        self.describeTree()
         if self.selection.iter_is_selected(filteredIter):
             self.notify("NameChange", test, origRelPath)
+
     def notifyContentChange(self, suite):
         suiteIter = self.itermap.getIterator(suite)
         newOrder = self.findNewOrder(suite, suiteIter)
@@ -2046,9 +2051,9 @@ class TestFileGUI(FileViewGUI):
 
     def notifyNameChange(self, test, origRelPath):
         if test is self.currentTest:
-            self.setName( [ test ], 1)
             self.model.foreach(self.updatePath, (origRelPath, test.getRelPath()))
-            self.describeName()
+            if self.setName( [ test ], 1):
+                self.describeName()
 
     def updatePath(self, model, path, iter, data):
         origPath, newPath = data
@@ -2091,8 +2096,7 @@ class TestFileGUI(FileViewGUI):
             return
 
         if len(tests) > 1 and self.currentTest in tests:
-            self.setName(tests, rowCount)
-            if self.active:
+            if self.setName(tests, rowCount) and self.active:
                 self.describeName()
         else:
             self.currentTest = tests[0]
@@ -2102,9 +2106,14 @@ class TestFileGUI(FileViewGUI):
             self.recreateModel(self.getState(), preserveSelection=False)
 
     def setName(self, tests, rowCount):
-        self.title = self.getName(tests, rowCount)
-        if self.nameColumn:
-            self.nameColumn.set_title(self.title)
+        newTitle = self.getName(tests, rowCount)
+        if newTitle != self.title:
+            self.title = newTitle
+            if self.nameColumn:
+                self.nameColumn.set_title(self.title)
+            return True
+        else:
+            return False
 
     def getName(self, tests, rowCount):
         if rowCount > 1:

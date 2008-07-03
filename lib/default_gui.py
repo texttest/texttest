@@ -620,8 +620,6 @@ class KillTests(guiplugins.ActionGUI):
         self.notify("Status", "Killed " + testDesc + ".")
 
 class ClipboardAction(guiplugins.ActionGUI):
-    def correctTestClass(self):
-        return "test-case"
     def getSignalsSent(self):
         return [ "Clipboard" ]
     def _getStockId(self):
@@ -675,7 +673,7 @@ class PasteTests(guiplugins.ActionGUI):
         currTest = self.getCurrentTestMatchingApp(test)
         if currTest is None:
             return None, 0
-        if currTest.classId() == "test-suite":
+        if currTest.classId() == "test-suite" and currTest not in self.clipboardTests:
             return currTest, 0
         else:
             return currTest.parent, currTest.positionInParent() + 1

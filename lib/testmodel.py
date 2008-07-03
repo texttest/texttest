@@ -365,6 +365,8 @@ class Test(plugins.Observable):
         return False
     def isEmpty(self):
         return False
+    def readContents(self, *args, **kwargs):
+        return True
     def defFileStems(self):
         return self.getConfigValue("definition_file_stems")
     def resultFileStems(self):
@@ -856,7 +858,7 @@ class TestSuite(Test):
     def getDescription(self):
         return "\nDescription:\n" + Test.getDescription(self)
             
-    def readContents(self, filters, initial=True):
+    def readContents(self, filters=[], initial=True):
         testNames = self.readTestNames(warn=True)
         self.createTestCases(filters, testNames, initial)
         if self.isEmpty() and len(testNames) > 0:
@@ -1002,8 +1004,7 @@ class TestSuite(Test):
     def createTestOrSuite(self, testName, description, dirCache, filters, initial=True):
         className = self.getSubtestClass(dirCache)
         subTest = self.createSubtest(testName, description, dirCache, className)
-        if subTest.isAcceptedByAll(filters) and \
-               (className is TestCase or subTest.readContents(filters, initial)):
+        if subTest.isAcceptedByAll(filters) and subTest.readContents(filters, initial):
             self.testcases.append(subTest)
             subTest.notify("Add", initial)
                 
@@ -1031,6 +1032,7 @@ class TestSuite(Test):
         if postProcFunc:
             postProcFunc(test)
         self.testcases.insert(placement, test) 
+        test.readContents(initial=False)
         test.notify("Add", initial=False)
         return test
     def addTestCaseWithPath(self, testPath):

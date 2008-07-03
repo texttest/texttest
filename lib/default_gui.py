@@ -620,6 +620,12 @@ class KillTests(guiplugins.ActionGUI):
         self.notify("Status", "Killed " + testDesc + ".")
 
 class ClipboardAction(guiplugins.ActionGUI):
+    def isActiveOnCurrent(self, *args):
+        if guiplugins.ActionGUI.isActiveOnCurrent(self, *args):
+            for test in self.currTestSelection:
+                if test.parent:
+                    return True
+        return False
     def getSignalsSent(self):
         return [ "Clipboard" ]
     def _getStockId(self):
@@ -2212,6 +2218,9 @@ class RenameTest(guiplugins.ActionDialogGUI):
         self.addOption("desc", "\nNew description")
         self.oldName = ""
         self.oldDescription = ""
+    def isActiveOnCurrent(self, *args):
+        # Don't allow renaming of the root suite
+        return guiplugins.ActionGUI.isActiveOnCurrent(self, *args) and bool(self.currTestSelection[0].parent)
     def singleTestOnly(self):
         return True
     def updateOptions(self):

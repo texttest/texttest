@@ -159,17 +159,22 @@ class MultiEntryDictionary(seqdict):
             return entry
         dictValType = self.getDictionaryValueType()
         if dictValType == types.ListType:
-            return [ entry ]
+            return self.getListValue(entry)
         else:
             return dictValType(entry)
+
+    def getListValue(self, entry, currentList=[]):
+        if entry == "{CLEAR LIST}":
+            return []
+        elif entry not in currentList:
+            return currentList + [ entry ]
+        else:
+            return currentList
     
     def insertEntry(self, entryName, entry):
         currType = type(self.currDict[entryName]) 
         if currType == types.ListType:
-            if entry == "{CLEAR LIST}":
-                self.currDict[entryName] = []
-            elif not entry in self.currDict[entryName]:
-                self.currDict[entryName].append(entry)
+            self.currDict[entryName] = self.getListValue(entry, self.currDict[entryName])
         elif currType == types.DictType:
             self.currDict = self.currDict[entryName]
             self.insertEntry("default", entry)

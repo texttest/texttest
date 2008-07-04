@@ -11,6 +11,9 @@ from log4py import LOGLEVEL_NORMAL
    
     
 class Quit(guiplugins.BasicActionGUI):
+    def __init__(self, *args):
+        guiplugins.BasicActionGUI.__init__(self, *args)
+        self.annotation = ""
     def _getStockId(self):
         return "quit"
     def _getTitle(self):
@@ -21,15 +24,21 @@ class Quit(guiplugins.BasicActionGUI):
         return [ "Quit" ]
     def performOnCurrent(self):
         self.notify("Quit")
+    def notifyAnnotate(self, annotation):
+        self.annotation = annotation
     def messageAfterPerform(self):
         pass # GUI isn't there to show it
     def getConfirmationMessage(self):
+        message = ""
+        if self.annotation:
+            message = "You annotated this GUI, using the following message : \n" + self.annotation + "\n"
         runningProcesses = guiplugins.processMonitor.listRunningProcesses()
-        if len(runningProcesses) == 0:
-            return ""
-        else:
-            return "\nThese processes are still running, and will be terminated when quitting: \n\n   + " + \
-                   "\n   + ".join(runningProcesses) + "\n\nQuit anyway?\n"
+        if len(runningProcesses) > 0:
+            message += "\nThese processes are still running, and will be terminated when quitting: \n\n   + " + \
+                       "\n   + ".join(runningProcesses) + "\n"
+        if message:
+            message += "\nQuit anyway?\n"
+        return message
 
         
 # Plugin for saving tests (standard)
@@ -1274,7 +1283,29 @@ class ResetGroups(guiplugins.BasicActionGUI):
     def performOnCurrent(self):
         self.notify("Reset")
 
-    
+class AnnotateGUI(guiplugins.ActionDialogGUI):
+    def __init__(self, *args):
+        guiplugins.ActionDialogGUI.__init__(self, *args)
+        self.addOption("desc", "\nDescription of this run")
+    def isActiveOnCurrent(self, *args):
+        return True
+    def _getStockId(self):
+        return "index"
+    def _getTitle(self):
+        return "Annotate"
+    def messageAfterPerform(self):
+        pass
+    def getDialogTitle(self):
+        return "Annotate this run"
+    def getTooltip(self):
+        return "Provide an annotation for this run and warn before closing it"
+    def getSignalsSent(self):
+        return [ "Annotate" ]
+    def performOnCurrent(self):
+        description = self.optionGroup.getOptionValue("desc")
+        self.notify("Annotate", description)
+        self.notify("Status", "Annotated GUI as '" + description + "'")
+
 class SaveSelection(guiplugins.ActionDialogGUI):
     def __init__(self, allApps, dynamic):
         guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic)
@@ -2374,7 +2405,7 @@ class InteractiveActionConfig:
         if dynamic:
             classes += [ ViewFilteredTestFileInEditor, ViewFileDifferences, 
                          ViewFilteredFileDifferences, FollowFile, 
-                         SaveTests, SaveSelection, KillTests,
+                         SaveTests, SaveSelection, KillTests, AnnotateGUI,
                          MarkTest, UnmarkTest, RecomputeTests ] # must keep RecomputeTests at the end!            
         else:
             classes += [ ViewConfigFileInEditor, CopyTests, CutTests, 

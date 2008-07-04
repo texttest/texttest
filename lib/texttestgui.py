@@ -449,10 +449,12 @@ class TopWindowGUI(ContainerGUI):
     def forceQuit(self):
         self.exitStatus |= self.COMPLETION_NOTIFIED
         self.notifyQuit()
+        
     def notifyAllComplete(self, *args):
         self.exitStatus |= self.COMPLETION_NOTIFIED
         if self.exitStatus & self.EXIT_NOTIFIED:
             self.terminate()
+
     def notifyQuit(self, *args):
         self.exitStatus |= self.EXIT_NOTIFIED        
         self.notify("KillProcesses")
@@ -461,6 +463,11 @@ class TopWindowGUI(ContainerGUI):
         else:
             statusMonitor.notifyStatus("Waiting for all tests to terminate ...")
             # When they have, we'll get notifyAllComplete
+
+    def notifyAnnotate(self, annotation):
+        self.topWindow.set_title("TextTest dynamic GUI : " + annotation)
+        guilog.info("Top Window title is " + self.topWindow.get_title())
+        
     def terminate(self):
         self.notify("Exit")
         self.topWindow.destroy()

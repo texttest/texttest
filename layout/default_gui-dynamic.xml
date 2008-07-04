@@ -9,6 +9,13 @@
         <separator/>
       </placeholder>
     </menu>
+   
+    <menu action="viewmenu">
+      <placeholder name="FirstInViewMenu">
+        <menuitem action="Annotate"/>
+        <separator/>
+      </placeholder>
+    </menu>
 
     <menu action="actionsmenu">
       <menuitem action="Kill"/>

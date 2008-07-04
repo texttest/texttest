@@ -740,6 +740,9 @@ class PasteTests(guiplugins.ActionGUI):
             else:
                 newDesc = self.getNewDescription(test)
                 testImported = suite.copyTest(test, newName, newDesc, realPlacement)
+                # "testImported" might in fact be a suite: in which case we should read all the new subtests which
+                # might have also been copied
+                testImported.readContents(initial=False)    
                 if suiteDeltas.has_key(suite):
                     suiteDeltas[suite] += 1
                 else:

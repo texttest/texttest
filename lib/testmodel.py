@@ -1032,7 +1032,6 @@ class TestSuite(Test):
         if postProcFunc:
             postProcFunc(test)
         self.testcases.insert(placement, test) 
-        test.readContents(initial=False)
         test.notify("Add", initial=False)
         return test
     def addTestCaseWithPath(self, testPath):

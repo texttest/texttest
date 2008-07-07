@@ -1541,6 +1541,9 @@ class PlotEngineMPL(PlotEngineCommon):
             if printer:
                 self.doPrint(printer, printA3, absTargetFile)
         else:
+            # A hack to allow several plots; by default, the TkAgg backend
+            # only enters the TK.Main() loop for the first call to show().
+            show._needmain = True
             show()
     def plot(self, writeDir):
         xrange, yrange, targetFile, printer, colour, printA3, onlyAverage, plotPercentage, userTitle, noLegend, onlyLegendAverage, terminal, plotSize = self.testGraph.getPlotOptions()

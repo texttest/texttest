@@ -36,7 +36,7 @@ def sendData(*args):
         except socket.error:
             from time import sleep
             sleep(1)
-    
+    raise
 
 name = sys.argv[1]
 serverAddress = getServerAddress()

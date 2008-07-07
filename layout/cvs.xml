@@ -3,19 +3,19 @@
   <menubar name="MainMenuBar">
 
     <placeholder name="ExtraMenus">
-      <menu name="CVSmenu" action="CVSmenu">
-        <menuitem name="Log" action="Log"/>
-        <menuitem name="Log Recursive" action="Log Recursive"/>
-        <menuitem name="Log Latest" action="Log Latest"/>
+      <menu action="CVSmenu">
+        <menuitem action="CVS Log"/>
+        <menuitem action="CVS Log Recursive"/>
+        <menuitem action="CVS Log Latest"/>
         <separator/>
-        <menuitem name="Difference" action="Difference"/>
-        <menuitem name="Difference Recursive" action="Difference Recursive"/>
+        <menuitem action="CVS Difference"/>
+        <menuitem action="CVS Difference Recursive"/>
         <separator/>
-        <menuitem name="Status" action="Status"/>
-        <menuitem name="Status Recursive" action="Status Recursive"/>
+        <menuitem action="CVS Status"/>
+        <menuitem action="CVS Status Recursive"/>
         <separator/>
-        <menuitem name="Annotate" action="Annotate"/>
-        <menuitem name="Annotate Recursive" action="Annotate Recursive"/>
+        <menuitem action="CVS Annotate"/>
+        <menuitem action="CVS Annotate Recursive"/>
         <separator/>
       </menu>
     </placeholder>
@@ -23,37 +23,37 @@
   </menubar>
 
   <popup name="TestPopupMenu">
-    <menu name="CVSmenu" action="CVSmenu">
-      <menuitem name="Log" action="Log"/>
-      <menuitem name="Log Recursive" action="Log Recursive"/>
-      <menuitem name="Log Latest" action="Log Latest"/>
+    <menu action="CVSmenu">
+      <menuitem action="CVS Log"/>
+      <menuitem action="CVS Log Recursive"/>
+      <menuitem action="CVS Log Latest"/>
       <separator/>
-      <menuitem name="Difference" action="Difference"/>
-      <menuitem name="Difference Recursive" action="Difference Recursive"/>
+      <menuitem action="CVS Difference"/>
+      <menuitem action="CVS Difference Recursive"/>
       <separator/>
-      <menuitem name="Status" action="Status"/>
-      <menuitem name="Status Recursive" action="Status Recursive"/>
+      <menuitem action="CVS Status"/>
+      <menuitem action="CVS Status Recursive"/>
       <separator/>
-      <menuitem name="Annotate" action="Annotate"/>
-      <menuitem name="Annotate Recursive" action="Annotate Recursive"/>
+      <menuitem action="CVS Annotate"/>
+      <menuitem action="CVS Annotate Recursive"/>
       <separator/>
     </menu>
   </popup>
 
   <popup name="TestFilePopupMenu">
-    <menu name="CVSmenu" action="CVSmenu">
-      <menuitem name="Log" action="Log"/>
-      <menuitem name="Log Recursive" action="Log Recursive"/>
-      <menuitem name="Log Latest" action="Log Latest"/>
+    <menu action="CVSmenu">
+      <menuitem action="CVS Log"/>
+      <menuitem action="CVS Log Recursive"/>
+      <menuitem action="CVS Log Latest"/>
       <separator/>
-      <menuitem name="Difference" action="Difference"/>
-      <menuitem name="Difference Recursive" action="Difference Recursive"/>
+      <menuitem action="CVS Difference"/>
+      <menuitem action="CVS Difference Recursive"/>
       <separator/>
-      <menuitem name="Status" action="Status"/>
-      <menuitem name="Status Recursive" action="Status Recursive"/>
+      <menuitem action="CVS Status"/>
+      <menuitem action="CVS Status Recursive"/>
       <separator/>
-      <menuitem name="Annotate" action="Annotate"/>
-      <menuitem name="Annotate Recursive" action="Annotate Recursive"/>
+      <menuitem action="CVS Annotate"/>
+      <menuitem action="CVS Annotate Recursive"/>
       <separator/>
     </menu>
   </popup>

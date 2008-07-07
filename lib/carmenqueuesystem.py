@@ -221,6 +221,8 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
             return ["short", "normal", "idle"]
         else:
             return []
+    def runLocallyByDefault(self):
+        return os.name == "nt"
     def getTestRunner(self):
         baseRunner = queuesystem.QueueSystemConfig.getTestRunner(self)
         if self.optionMap.has_key("lprof"):
@@ -242,7 +244,10 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
             return CarmenSgeSubmissionRules(self.optionMap, test, self.isNightJob())
     def getDefaultTextTestTmp(self):
         # Have a special disk for this...
-        return os.path.join("/carm/proj/texttest-tmp/", os.getenv("USER"))
+        if os.name == "posix":
+            return os.path.join("/carm/proj/texttest-tmp/", os.getenv("USER"))
+        else:
+            return queuesystem.QueueSystemConfig.getDefaultTextTestTmp(self)
     def isNightJob(self):
         batchSession = self.optionValue("b")
         return batchSession != "release" and batchSession in self.getFilteredBatchSessions()
@@ -251,7 +256,10 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
     def printHelpDescription(self):
         print helpDescription
     def defaultViewProgram(self, homeOS):
-        return "xemacs"
+        if os.name == "posix":
+            return "xemacs"
+        else:
+            return queuesystem.QueueSystemConfig.defaultViewProgram(self, homeOS)
     def getFilteredBatchSessions(self):
         return [ "nightjob", "wkendjob", "release", "nightly_publish", "nightly_publish.lsf", \
                  "weekly_publish", "weekly_publish.lsf", "small_publish", "test_nightjob" ]
@@ -289,7 +297,7 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         if test.parent is None:
             # Cheat doing it here, but we need to have read the config file first!
             self.addBaseVersionEntries(test.app)
-            return baseEnv + self.getCarmenEnvironment(test.app) + self.getCleanedGtkEnvironment(), props
+            return baseEnv + self.getCarmenEnvironment(test.app) + self.getCleanedGtkEnvironment(test.app), props
         else:
             return baseEnv, props
     def cleanGtkEnvironment(self, var, value):
@@ -297,7 +305,9 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         allPaths = value.split(os.pathsep)
         filteredPaths = filter(lambda path: not path.startswith("/usr/local/tt-env"), allPaths)
         return os.pathsep.join(filteredPaths)
-    def getCleanedGtkEnvironment(self):
+    def getCleanedGtkEnvironment(self, app):
+        if os.name == "posix" and app.getConfigValue("interpreter") == "ttpython":
+            return [] # Use this convention to allow the tested app to use TextTest's environment also without lots of fuss...
         gtkEnvVars = [ "LD_LIBRARY_PATH", "PYTHONPATH", "GTK2_RC_FILES",
                        "GTK_PATH", "GTK_DATA_PREFIX", "XDG_DATA_DIRS" ]
         envVars = []

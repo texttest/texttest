@@ -88,7 +88,7 @@ class QueueSystemConfig(default.Config):
         queueSystem = queueSystemName(app)
         for group in groups:
             if group.name.startswith("Basic"):
-                group.addSwitch("l", "", value = 0, options = ["Submit tests to " + queueSystem, "Run tests locally"])
+                group.addSwitch("l", "", value = self.runLocallyByDefault(), options = ["Submit tests to " + queueSystem, "Run tests locally"])
             elif group.name.startswith("Advanced"):
                 group.addOption("R", "Request " + queueSystem + " resource", possibleValues = self.getPossibleResources(queueSystem))
                 group.addOption("q", "Request " + queueSystem + " queue", possibleValues = self.getPossibleQueues(queueSystem))
@@ -97,6 +97,8 @@ class QueueSystemConfig(default.Config):
             elif group.name.startswith("Invisible"):
                 group.addOption("slave", "Private: used to submit slave runs remotely")
                 group.addOption("servaddr", "Private: used to submit slave runs remotely")
+    def runLocallyByDefault(self):
+        return False
     def getPossibleQueues(self, queueSystem):
         return [] # placeholders for derived configurations
     def getPossibleResources(self, queueSystem):

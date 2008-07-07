@@ -976,7 +976,7 @@ class RunTest(plugins.Action):
     def getInterpreter(self, test):
         interpreter = test.getConfigValue("interpreter")
         if interpreter == "ttpython": # interpreted to mean "whatever python TextTest runs with"
-            return sys.executable
+            return sys.executable + " -u"
         return interpreter
     def getCmdParts(self, test):
         args = []

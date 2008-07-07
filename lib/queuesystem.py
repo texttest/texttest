@@ -600,7 +600,7 @@ class QueueSystemServer(BaseActionRunner):
         # it comes to noticing extra shells
         return "exec $SHELL -c \"exec " + command + "\""
     def getSlaveCommand(self, test, submissionRules):
-        return plugins.textTestName + " -d " + os.getenv("TEXTTEST_HOME") + \
+        return os.getenv("TEXTTEST_SLAVE_CMD", sys.argv[0]) + " -d " + os.getenv("TEXTTEST_HOME") + \
                " -a " + test.app.name + test.app.versionSuffix() + \
                " -l -tp " + test.getRelPath() + \
                self.getSlaveArgs(test) + " " + \

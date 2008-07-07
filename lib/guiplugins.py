@@ -286,6 +286,7 @@ class GtkActionWrapper:
         # GTK 2.12 got fussy about this...
         existingAction = actionGroup.get_action(gtkAction.get_name())
         if existingAction:
+            self.diag.info("Removing action with label " + existingAction.get_property("label"))
             actionGroup.remove_action(existingAction)
             
         accelerator = self.getAccelerator(title)

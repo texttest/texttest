@@ -134,8 +134,6 @@ def startTimeString():
     global globalStartTime
     return localtime(seconds=globalStartTime)
 
-textTestName = os.getenv("TEXTTEST_SLAVE_CMD", sys.argv[0])
-
 def installationDir(name):
     installationRoot = os.path.dirname(os.path.dirname(__file__))
     return os.path.join(installationRoot, name)

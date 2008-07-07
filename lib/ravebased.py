@@ -420,7 +420,7 @@ class RuleBuildSubmitServer(QueueSystemServer):
         return FilterRuleBuilds.rulesetNamesToTests.get(ruleset.uniqueName, [])
     def submitRuleCompilation(self, test):
         submissionRules = test.app.getRaveSubmissionRules(test)
-        remoteCmd = os.path.join(os.path.dirname(plugins.textTestName), "remotecmd.py")
+        remoteCmd = os.path.join(plugins.installationDir("bin"), "remotecmd.py")
         rulecompEnv = test.getRunEnvironment(getCrcCompileVars())
         rulecomp = test.state.rulecomp
         for ruleset in rulecomp.rulesetsForSelf:

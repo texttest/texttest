@@ -40,6 +40,13 @@ class CVSAction(ActionResultDialogGUI):
         self.cvsArgs = cvsArgs
         self.recursive = False
         self.dynamic = dynamic
+    def getTitle(self, includeMnemonics=False):
+        title = self._getTitle()
+        if includeMnemonics:
+            return title
+        else:
+            # distinguish these from other actions that may have these names
+            return "CVS " + title.replace("_", "")
     def getCVSCmdArgs(self):
         return [ "cvs", "-d", self.getCVSRoot() ] + self.cvsArgs
     def runCommand(self, args):

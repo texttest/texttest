@@ -1482,10 +1482,7 @@ class RunningAction(guiplugins.ActionTabGUI):
         self.notify("SaveSelection", filterFileName)
         return filterFileName
     def getTextTestArgs(self):
-        if os.name == "nt" and plugins.textTestName.endswith(".py"):
-            return [ "python", plugins.textTestName ] # Windows isn't clever enough to figure out how to run Python programs...
-        else:
-            return [ plugins.textTestName ]
+        return [ sys.executable, sys.argv[0] ]
     def getOptionGroups(self):
         return [ self.optionGroup ]
     def getTextTestOptions(self, filterFile, app, usecase):

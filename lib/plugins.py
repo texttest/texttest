@@ -1044,21 +1044,20 @@ class TextOption(Option):
     def getDirectories(self):
         for dir in self.possibleDirs:
             try:
-                os.makedirs(dir[1])
+                os.makedirs(dir)
             except:
                 pass # makedir throws if dir exists ...                    
         # Set first non-empty dir as default ...)
         existingDirs = []
         defaultDir = None
         for dir in self.possibleDirs:
-            if os.path.isdir(os.path.abspath(dir[1])):
-                if (self.saveFile or len(os.listdir(os.path.abspath(dir[1]))) > 0) and \
-                       not defaultDir:                
-                    defaultDir = dir[1]
+            if os.path.isdir(dir):
+                if (self.saveFile or len(os.listdir(dir)) > 0) and not defaultDir:                
+                    defaultDir = dir
                 existingDirs.append(dir)
 
         if not defaultDir:
-            defaultDir = self.possibleDirs[0][1]
+            defaultDir = self.possibleDirs[0]
             
         return (existingDirs, defaultDir)
         

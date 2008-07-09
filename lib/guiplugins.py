@@ -948,8 +948,8 @@ class ActionTabGUI(OptionGroupGUI):
             dialog.set_current_folder(currDir)
         elif defaultFolder and os.path.isdir(os.path.abspath(defaultFolder)):
             dialog.set_current_folder(os.path.abspath(defaultFolder))
-        for i in xrange(len(folders) - 1, -1, -1):
-            dialog.add_shortcut_folder(folders[i][1])
+        for folder in folders:
+            dialog.add_shortcut_folder(folder)
         dialog.set_default_response(gtk.RESPONSE_OK)
         dialog.show()
     def respondChooser(self, dialog, response, entry):
@@ -1117,8 +1117,8 @@ class ActionDialogGUI(OptionGroupGUI):
         # We want a filechooser dialog to let the user choose where, and
         # with which name, to save the selection.
         fileChooser.set_current_folder(startFolder)
-        for i in xrange(len(folders) - 1, -1, -1):
-            fileChooser.add_shortcut_folder(folders[i][1])
+        for folder in folders:
+            fileChooser.add_shortcut_folder(folder)
             
         fileChooser.set_local_only(True)
         option.setMethods(fileChooser.get_filename, fileChooser.set_filename)

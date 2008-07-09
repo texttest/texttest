@@ -267,30 +267,32 @@ class Config:
             if not tmpDir in dirs:
                 if createDirs:
                     try:
-                        os.makedirs(tmpDir[1])
+                        os.makedirs(tmpDir)
                     except:
                         pass # makedir throws if dir exists ...
                 dirs.append(tmpDir)            
             for dir in appDirs:
                 if os.path.isabs(dir) and os.path.isdir(dir):
-                    if not (dir, dir) in dirs:
-                        dirs.append((dir, dir))
+                    if dir not in dirs:
+                        dirs.append(dir)
                 else:
-                    newDir = (dir, os.path.join(app.getDirectory(), dir))
+                    newDir = os.path.join(app.getDirectory(), dir)
                     if createDirs:
                         try:
-                            os.makedirs(newDir[1])
+                            os.makedirs(newDir)
                         except:
                             pass # makedir throws if dir exists ...
                     if not newDir in dirs:
                         dirs.append(newDir)
         return dirs
+
     def getTmpFilterDir(self, app):
         cmdLineDir = self.optionValue("fd")
         if cmdLineDir:
-            return (os.path.split(cmdLineDir.rstrip(os.sep))[1], cmdLineDir)
+            return os.path.normpath(cmdLineDir)
         else:
-            return ("temporary_filter_files", os.path.join(app.writeDirectory, "temporary_filter_files"))
+            return os.path.join(app.writeDirectory, "temporary_filter_files")
+        
     def getFilterClasses(self):
         return [ TestNameFilter, plugins.TestPathFilter, \
                  TestSuiteFilter, TimeFilter, \
@@ -309,7 +311,7 @@ class Config:
             if os.path.isfile(filterFileName):
                 return filterFileName
         else:
-            dirsToSearchIn = map(lambda pair: pair[1], self.getFilterFileDirectories([app], False))
+            dirsToSearchIn = self.getFilterFileDirectories([app], False)
             return app.getFileName(dirsToSearchIn, filterFileName)
              
     def findFilterFileNames(self, app):

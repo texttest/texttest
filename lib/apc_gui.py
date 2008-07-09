@@ -441,3 +441,8 @@ class InteractiveActionConfig(apc_basic_gui.InteractiveActionConfig):
         rep[default_gui.ImportTestSuite] = ImportTestSuite
         rep[default_gui.Quit] = Quit
         return rep
+
+    def getDefaultAccelerators(self):
+        dict = apc_basic_gui.InteractiveActionConfig.getDefaultAccelerators(self)
+        dict["select_kpi_group"] = "<control>k"
+        return dict

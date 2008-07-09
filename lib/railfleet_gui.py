@@ -1,4 +1,4 @@
-import ravebased_gui, default_gui, cvs, ravebased, os, shutil, subprocess
+import ravebased_gui, default_gui, ravebased, os, shutil, subprocess
 
 # Allow manual specification of a ruleset, and two auto-replays needed for macro recorder...
 class RecordTest(default_gui.RecordTest):
@@ -14,6 +14,6 @@ class RecordTest(default_gui.RecordTest):
     def getCommandLineKeys(self, *args):
         return default_gui.RecordTest.getCommandLineKeys(self, *args) + [ "rulecomp" ]
 
-class InteractiveActionConfig(cvs.InteractiveActionConfig):
+class InteractiveActionConfig(ravebased_gui.InteractiveActionConfig):
     def getReplacements(self):
         return { default_gui.RecordTest      : RecordTest } 

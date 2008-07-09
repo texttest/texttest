@@ -310,11 +310,7 @@ class Config(CarmenConfig):
         app.setConfigDefault("lines_of_crc_compile", 30, "How many lines to present in textual previews of rave compilation failures")
         # dictionary of lists
         app.setConfigDefault("build_targets", { "" : [] }, "Directories to build in when -build specified")
-        app.addConfigEntry("need_rulecompile", "white", "test_colours")
-        app.addConfigEntry("pending_rulecompile", "white", "test_colours")
-        app.addConfigEntry("running_rulecompile", "peach puff", "test_colours")
-        app.addConfigEntry("complete_rulecompile", "white", "test_colours")
-
+        
 def getCarmCmdAndEnv(cmdLine, test):
     runEnv = test.getRunEnvironment(getCrcCompileVars())
     fullCmd = ". " + test.getEnvironment("CARMSYS") + "/CONFIG > /dev/null 2>&1; " + cmdLine

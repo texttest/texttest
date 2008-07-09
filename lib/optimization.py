@@ -218,7 +218,6 @@ class OptimizationConfig(ravebased.Config):
         app.setConfigDefault("skip_comparison_if_not_present", "error", "List of files that are compared only if they are created by the test, i.e. they will not be reported as missing")
         app.setConfigDefault("display_subplan_file", [ "rules" ], "List of files that should be shown in static GUI if found in APC_FILES directory")
         app.addConfigEntry("definition_file_stems", "raveparameters")
-        app.addConfigEntry("plot_graph", "<control>p", "gui_accelerators")
         app.setConfigDefault("apcinfo", {})
 
 # Insert the contents of all raveparameters into the temporary rules file

@@ -1,12 +1,17 @@
 
-import gtk, gobject, entrycompletion, plugins, os, sys, shutil, time, subprocess, operator, types
-from gtkusecase import RadioGroupIndexer
+import plugins, os, sys, shutil, time, subprocess, operator, types
 from jobprocess import killSubProcessAndChildren
 from copy import copy, deepcopy
 from glob import glob
 from stat import *
 from ndict import seqdict
 from log4py import LOGLEVEL_NORMAL
+
+try:
+    import gtk, gobject, entrycompletion
+    from gtkusecase import RadioGroupIndexer
+except ImportError:
+    pass # We might want to document the config entries, silly to fail on lack of GTK...
 
 guilog, guiConfig, scriptEngine = None, None, None
 
@@ -17,7 +22,7 @@ def setUpGlobals(dynamic, allApps):
         guilog = plugins.getDiagnostics("dynamic GUI behaviour")
     else:
         guilog = plugins.getDiagnostics("static GUI behaviour")
-    guiConfig = GUIConfig(dynamic, allApps)
+    guiConfig = GUIConfig(dynamic, allApps, guilog)
     scriptEngine = ScriptEngine(guilog, enableShortcuts=1)
     return guilog, guiConfig, scriptEngine
 
@@ -31,34 +36,51 @@ if os.name == "nt":
             
 
 class GUIConfig:
-    def __init__(self, dynamic, allApps):
+    def __init__(self, dynamic, allApps, entryCompletionLogger):
         self.apps = allApps
         self.dynamic = dynamic
-        self.hiddenCategories = map(self.getConfigName, self.getValue("hide_test_category"))
+        self.configDir = plugins.MultiEntryDictionary()
+        self.configDocs = {}
+        self.setConfigDefaults()
+        personalFile = plugins.getPersonalConfigFile()
+        if personalFile:
+            self.configDir.readValues([ personalFile ], insert=0, errorOnUnknown=0)
+
+        self.hiddenCategories = map(self.getConfigName, self.configDir.get("hide_test_category"))
         self.colourDict = self.makeColourDictionary()
-        self.setUpEntryCompletion()
+        if entryCompletionLogger:
+            self.setUpEntryCompletion(entryCompletionLogger)
+
     def makeColourDictionary(self):
         dict = {}
-        for app in self.apps:
-            for key, value in self.getColoursForApp(app):
-                if dict.has_key(key) and dict[key] != value:
-                    plugins.printWarning("Test colour for state '" + key +\
-                                     "' differs between applications, ignoring that from " + repr(app) + "\n" + \
-                                     "Value was " + repr(value) + ", change from " + repr(dict[key]))
-                else:
-                    dict[key] = value
+        for key, value in self.configDir.get("test_colours").items():
+            dict[self.getConfigName(key)] = value
         return dict
-    def getColoursForApp(self, app):
-        colours = seqdict()
-        for key, value in app.getConfigValue("test_colours").items():
-            colours[self.getConfigName(key)] = value
-        return colours.items()
-    def setUpEntryCompletion(self):
-        matching = self.getValue("gui_entry_completion_matching")
+
+    def setConfigDefaults(self):
+        colourDict = interactiveActionHandler.getColourDictionary(self.apps)
+        self.setConfigDefault("static_collapse_suites", 0, "Whether or not the static GUI will show everything collapsed")
+        self.setConfigDefault("test_colours", colourDict, "Colours to use for each test state")
+        self.setConfigDefault("file_colours", copy(colourDict), "Colours to use for each file state")
+        self.setConfigDefault("auto_collapse_successful", 1, "Automatically collapse successful test suites?")
+        self.setConfigDefault("window_size", self.getWindowSizeSettings(), "To set the initial size of the dynamic/static GUI.")
+        self.setConfigDefault("hide_gui_element", self.getDefaultHideWidgets(), "List of widgets to hide by default")
+        self.setConfigDefault("hide_test_category", [], "Categories of tests which should not appear in the dynamic GUI test view")
+        self.setConfigDefault("query_kill_processes", { "default" : [] }, "Ask about whether to kill these processes when exiting texttest.")
+        self.setConfigDefault("gui_accelerators", interactiveActionHandler.getDefaultAccelerators(self.apps), "Custom action accelerators.")        
+        self.setConfigDefault("gui_entry_completion_matching", 1, "Which matching type to use for entry completion. 0 means turn entry completions off, 1 means match the start of possible completions, 2 means match any part of possible completions")
+        self.setConfigDefault("gui_entry_completion_inline", 0, "Automatically inline common completion prefix in entry.")
+        
+    def setConfigDefault(self, key, value, docString):
+        self.configDir[key] = value
+        self.configDocs[key] = docString
+
+    def setUpEntryCompletion(self, entryCompletionLogger):
+        matching = self.configDir.get("gui_entry_completion_matching")
         if matching != 0:
-            inline = self.getValue("gui_entry_completion_inline")
+            inline = self.configDir.get("gui_entry_completion_inline")
             completions = self.getCompositeValue("gui_entry_completions", "", modeDependent=True)
-            entrycompletion.manager.start(matching, inline, completions, guilog)
+            entrycompletion.manager.start(matching, inline, completions, entryCompletionLogger)
     def _simpleValue(self, app, entryName):
         return app.getConfigValue(entryName)
     def _compositeValue(self, app, *args, **kwargs):
@@ -108,10 +130,16 @@ class GUIConfig:
         
     def getValue(self, entryName, modeDependent=False):
         nameToUse = self.getConfigName(entryName, modeDependent)
-        return self._getFromApps(self._simpleValue, nameToUse)
+        guiValue = self.configDir.get(nameToUse)
+        if guiValue is not None:
+            return guiValue
+        else:
+            return self._getFromApps(self._simpleValue, nameToUse)
     def getCompositeValue(self, sectionName, entryName, modeDependent=False, defaultKey="default"):
         nameToUse = self.getConfigName(entryName, modeDependent)
-        value = self._getFromApps(self._compositeValue, sectionName, nameToUse, defaultKey=defaultKey)
+        value = self.configDir.getComposite(sectionName, nameToUse, defaultKey)
+        if value is None:
+            value = self._getFromApps(self._compositeValue, sectionName, nameToUse, defaultKey=defaultKey)
         if modeDependent and value is None:
             return self.getCompositeValue(sectionName, entryName)
         else:
@@ -139,7 +167,26 @@ class GUIConfig:
             else:
                 return self.colourDict.get("failure")
         else:
-            return self.getCompositeValue("test_colours", "static")
+            return self.colourDict.get("static")
+
+    def getWindowSizeSettings(self):
+        dict = {}
+        dict["maximize"] = 0
+        dict["horizontal_separator_position"] = 0.46
+        dict["vertical_separator_position"] = 0.5
+        dict["height_pixels"] = "<not set>"
+        dict["width_pixels"] = "<not set>"
+        dict["height_screen"] = float(5.0) / 6
+        dict["width_screen"] = 0.6
+        return dict
+    
+    def getDefaultHideWidgets(self):
+        dict = {}
+        dict["status_bar"] = 0
+        dict["toolbar"] = 0
+        dict["shortcut_bar"] = 0
+        return dict
+    
     
 # The purpose of this class is to provide a means to monitor externally
 # started process, so that (a) code can be called when they exit, and (b)
@@ -244,9 +291,9 @@ class SubGUI(plugins.Observable):
     def forceVisible(self, rowCount):
         return False
 
-    def addScrollBars(self, view, hpolicy=gtk.POLICY_AUTOMATIC, vpolicy=gtk.POLICY_AUTOMATIC):
+    def addScrollBars(self, view, hpolicy):
         window = gtk.ScrolledWindow()
-        window.set_policy(hpolicy, vpolicy)
+        window.set_policy(hpolicy, gtk.POLICY_AUTOMATIC)
         self.addToScrolledWindow(window, view)
         window.show()
         return window
@@ -872,7 +919,7 @@ class ActionTabGUI(OptionGroupGUI):
         self.fillVBox(self.vbox, self.optionGroup)
         self.createButtons()
         self.vbox.show_all()
-        return self.addScrollBars(self.vbox)
+        return self.addScrollBars(self.vbox, hpolicy=gtk.POLICY_AUTOMATIC)
     def setSensitivity(self, newValue):
         ActionGUI.setSensitivity(self, newValue)
         self.diag.info("Sensitivity of " + self.getTabTitle() + " changed to " + repr(newValue))
@@ -1193,6 +1240,25 @@ class MultiActionGUIForwarder(GtkActionWrapper):
 class InteractiveActionHandler:
     def __init__(self):
         self.diag = plugins.getDiagnostics("Interactive Actions")
+
+    def getDefaultAccelerators(self, allApps):
+        return self.joinDictionaries(allApps, self._getDefaultAcceleratorsForApp)
+
+    def _getDefaultAcceleratorsForApp(self, app):
+        return app.getIntvActionConfig().getDefaultAccelerators()
+
+    def getColourDictionary(self, allApps):
+        return self.joinDictionaries(allApps, self._getColourDictionaryForApp)
+
+    def _getColourDictionaryForApp(self, app):
+        return app.getIntvActionConfig().getColourDictionary()
+
+    def joinDictionaries(self, allApps, method):
+        dict = {}
+        for app in allApps:
+            dict.update(method(app))
+        return dict
+        
     def getMenuNames(self, allApps):
         names = []
         for app in allApps:

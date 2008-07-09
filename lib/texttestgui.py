@@ -1197,7 +1197,7 @@ class TestTreeGUI(ContainerGUI):
         self.model.set_value(iter, 4, colour)
         guilog.info("Redrawing suite " + suite.name + " : second column '" + detailText +  "' coloured " + colour)
 
-        if suite.getConfigValue("auto_collapse_successful") == 1:
+        if guiConfig.getValue("auto_collapse_successful") == 1:
             self.collapseRow(iter)
 
     def isVisible(self, test):
@@ -1794,7 +1794,7 @@ class TextInfoGUI(guiplugins.SubGUI):
         self.view.set_wrap_mode(gtk.WRAP_WORD)
         self.updateViewFromText()
         self.view.show()
-        return self.addScrollBars(self.view)
+        return self.addScrollBars(self.view, hpolicy=gtk.POLICY_AUTOMATIC)
     def updateViewFromText(self):
         textbuffer = self.view.get_buffer()
         textToUse = self.getTextForView()
@@ -1922,7 +1922,7 @@ class FileViewGUI(guiplugins.SubGUI):
             self.popupGUI.createView()
 
         view.show()
-        return self.addScrollBars(view)
+        return self.addScrollBars(view, hpolicy=gtk.POLICY_AUTOMATIC)
         # only used in test view
         
     def canSelect(self, path):

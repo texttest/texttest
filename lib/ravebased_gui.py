@@ -1,5 +1,5 @@
 
-import default_gui, os
+import default_gui, os, cvs
 from guiplugins import guilog
 
 # Graphical import suite
@@ -59,3 +59,12 @@ class ImportTestSuite(default_gui.ImportTestSuite):
     def cacheCarmusrInfo(self, suite, file):
         pass # Used by studio module for default rulesets
     # getCarmtmpPath implemented by subclasses
+    
+class InteractiveActionConfig(cvs.InteractiveActionConfig):
+    def getColourDictionary(self):
+        dict = cvs.InteractiveActionConfig.getColourDictionary(self)
+        dict["need_rulecompile"] = "white"
+        dict["pending_rulecompile"] = "white"
+        dict["running_rulecompile"] = "peach puff"
+        dict["complete_rulecompile"] = "white"
+        return dict

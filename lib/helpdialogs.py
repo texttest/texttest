@@ -1,11 +1,11 @@
 
-import gtk, plugins, texttest_version, os, string, sys, glob
+import gtk, guiplugins, plugins, texttest_version, os, string, sys, glob
 from guiplugins import scriptEngine, ActionResultDialogGUI
 
 # Show useful info about TextTest.
 # I don't particularly like the standard gtk.AboutDialog, and we also want
 # to show pygtk/gtk/python versions in our dialog, so we create our own ...
-class AboutTextTest(ActionResultDialogGUI):
+class AboutTextTest(guiplugins.ActionResultDialogGUI):
     def getDialogTitle(self):
         return "About TextTest"
     def isActiveOnCurrent(self, *args):
@@ -23,10 +23,10 @@ class AboutTextTest(ActionResultDialogGUI):
         self.creditsButton = self.dialog.add_button('texttest-stock-credits', gtk.RESPONSE_NONE)
         self.licenseButton = self.dialog.add_button('_License', gtk.RESPONSE_NONE)
         self.versionsButton = self.dialog.add_button('_Versions', gtk.RESPONSE_NONE)
-        scriptEngine.connect("press credits", "clicked", self.creditsButton, self.showCredits)
-        scriptEngine.connect("press license", "clicked", self.licenseButton, self.showLicense)
-        scriptEngine.connect("press versions", "clicked", self.versionsButton, self.showVersions)
-        ActionResultDialogGUI.createButtons(self)
+        guiplugins.scriptEngine.connect("press credits", "clicked", self.creditsButton, self.showCredits)
+        guiplugins.scriptEngine.connect("press license", "clicked", self.licenseButton, self.showLicense)
+        guiplugins.scriptEngine.connect("press versions", "clicked", self.versionsButton, self.showVersions)
+        guiplugins.ActionResultDialogGUI.createButtons(self)
         
     def addContents(self):
         logo = gtk.Image()
@@ -66,7 +66,7 @@ class AboutTextTest(ActionResultDialogGUI):
         newDialog = ShowVersions(self.validApps)
         newDialog.performOnCurrent()
 
-class ShowVersions(ActionResultDialogGUI):
+class ShowVersions(guiplugins.ActionResultDialogGUI):
     def isActiveOnCurrent(self, *args):
         return True
     def _getTitle(self):
@@ -127,9 +127,9 @@ class ShowVersions(ActionResultDialogGUI):
             alignment.add(gtk.Label(label))
         return alignment
 
-class CreditsDialog(ActionResultDialogGUI):
+class CreditsDialog(guiplugins.ActionResultDialogGUI):
     def __init__(self, parent, *args):
-        ActionResultDialogGUI.__init__(self, *args)
+        guiplugins.ActionResultDialogGUI.__init__(self, *args)
         self.parent = parent
 
     def getParentWindow(self):
@@ -161,9 +161,9 @@ class CreditsDialog(ActionResultDialogGUI):
         self.dialog.set_resizable(False)
         return "Showing credits:\n" + creditsText
             
-class LicenseDialog(ActionResultDialogGUI):
+class LicenseDialog(guiplugins.ActionResultDialogGUI):
     def __init__(self, parent, *args):
-        ActionResultDialogGUI.__init__(self, *args)
+        guiplugins.ActionResultDialogGUI.__init__(self, *args)
         self.parent = parent
 
     def getParentWindow(self):
@@ -194,7 +194,7 @@ class LicenseDialog(ActionResultDialogGUI):
         self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
         return "Showing license:\n" + licenseText
             
-class ShowMigrationNotes(ActionResultDialogGUI):
+class ShowMigrationNotes(guiplugins.ActionResultDialogGUI):
     def isActiveOnCurrent(self, *args):
         return True
     def _getTitle(self):
@@ -252,7 +252,7 @@ class ShowMigrationNotes(ActionResultDialogGUI):
         if notebook.get_n_pages() == 0:
             raise plugins.TextTestError, "\nNo migration notes could be found in\n" + plugins.installationDir("doc") + "\n"
         else:
-            scriptEngine.monitorNotebook(notebook, "view migration notes in tab")
+            guiplugins.scriptEngine.monitorNotebook(notebook, "view migration notes in tab")
             parentSize = self.topWindow.get_size()
             self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[0] * 0.7))
             self.dialog.vbox.pack_start(notebook, expand=True, fill=True)

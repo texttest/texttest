@@ -1,5 +1,5 @@
 
-import os, plugins, guiplugins, default_gui, optimization, time, cvs
+import os, plugins, guiplugins, default_gui, optimization, time, ravebased_gui
 
 # Graphical import test
 class ImportTestCase(default_gui.ImportTestCase):
@@ -135,16 +135,21 @@ class StartStudio(guiplugins.ActionDialogGUI):
     def studioCompleted(self):
         guiplugins.scriptEngine.applicationEvent("studio process to terminate")
 
-class InteractiveActionConfig(cvs.InteractiveActionConfig):
+class InteractiveActionConfig(ravebased_gui.InteractiveActionConfig):
     def getInteractiveActionClasses(self, dynamic):
-        classes = cvs.InteractiveActionConfig.getInteractiveActionClasses(self, dynamic)
+        classes = ravebased_gui.InteractiveActionConfig.getInteractiveActionClasses(self, dynamic)
         classes.append(self.getPlotClass())
         if not dynamic:
             classes.append(StartStudio)
         return classes
     
     def getMenuNames(self):
-        return cvs.InteractiveActionConfig.getMenuNames(self) + [ "optimization" ]
+        return ravebased_gui.InteractiveActionConfig.getMenuNames(self) + [ "optimization" ]
 
     def getPlotClass(self):
         return PlotTestInGUI
+
+    def getDefaultAccelerators(self):
+        dict = ravebased_gui.InteractiveActionConfig.getDefaultAccelerators(self)
+        dict["plot_graph"] = "<control>p"
+        return dict

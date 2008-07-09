@@ -1,5 +1,5 @@
 
-import ravebased_gui, default_gui, cvs, ravebased, os, shutil, subprocess
+import ravebased_gui, default_gui, ravebased, os, shutil, subprocess
 
 # Graphical import suite. Basically the same as those used for optimizers
 class ImportTestSuite(ravebased_gui.ImportTestSuite):
@@ -106,7 +106,7 @@ class RecordTest(default_gui.RecordTest):
         else:
             default_gui.RecordTest.handleCompletion(self, testSel, usecase)
 
-class InteractiveActionConfig(cvs.InteractiveActionConfig):
+class InteractiveActionConfig(ravebased_gui.InteractiveActionConfig):
     def getReplacements(self):
         return { default_gui.ImportTestCase  : ImportTestCase,
                  default_gui.ImportTestSuite : ImportTestSuite,

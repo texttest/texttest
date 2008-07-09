@@ -251,7 +251,6 @@ class ApcConfig(apc_basic.Config):
         app.setConfigDefault("quit_ask_for_confirm", -1)
         app.setConfigDefault("xml_script_file", "bin/APCcreatexml.sh", "")
         app.setConfigDefault("optinfo_xml_file", "data/apc/feedback/optinfo_html_xsl.xml", "")
-        app.addConfigEntry("select_kpi_group", "<control>k", "gui_accelerators")
     def getPerformanceExtractor(self):
         return ExtractPerformanceFiles(self.getMachineInfoFinder())
 

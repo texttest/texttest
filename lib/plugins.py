@@ -1,11 +1,12 @@
 
-import sys, os, log4py, string, shutil, time, re, stat, locale, datetime, subprocess, shlex
+import sys, os, log4py, string, shutil, time, re, stat, locale, datetime, subprocess, shlex, types
 from ndict import seqdict
 from traceback import format_exception
 from threading import currentThread
 from Queue import Queue, Empty
 from copy import copy
 from sets import Set
+from fnmatch import fnmatch
 
 # We standardise around UNIX paths, it's all much easier that way. They work fine,
 # and they don't run into weird issues in being confused with escape characters
@@ -660,6 +661,13 @@ def getPersonalConfigDir():
     else:
         return os.path.normpath(os.path.expanduser("~/.texttest"))
 
+def getPersonalConfigFile():
+    personalDir = getPersonalConfigDir()
+    if personalDir:
+        personalFile = os.path.join(personalDir, "config")
+        if os.path.isfile(personalFile):
+            return personalFile
+
 # Hacking around os.path.getcwd not working with AMD automounter
 def abspath(relpath):
     if os.environ.has_key("PWD"):
@@ -952,6 +960,120 @@ class TextTrigger:
             return re.sub(self.text, newText, line)
         else:
             return line.replace(self.text, newText)
+
+# Used for application and personal configuration files
+class MultiEntryDictionary(seqdict):
+    def __init__(self):
+        seqdict.__init__(self)
+        self.currDict = self
+        self.aliases = {}
+    def setAlias(self, aliasName, realName):
+        self.aliases[aliasName] = realName
+    def getEntryName(self, fromConfig):
+        return self.aliases.get(fromConfig, fromConfig)
+    def readValues(self, fileNames, insert=True, errorOnUnknown=False):
+        self.currDict = self
+        for filename in fileNames:
+            for line in readList(filename):
+                self.parseConfigLine(line, insert, errorOnUnknown)
+            self.currDict = self
+    def parseConfigLine(self, line, insert, errorOnUnknown):
+        if line.startswith("[") and line.endswith("]"):
+            sectionName = self.getEntryName(line[1:-1])
+            self.currDict = self.changeSectionMarker(sectionName, errorOnUnknown)
+        elif line.find(":") != -1:
+            key, value = line.split(":", 1)
+            entryName = self.getEntryName(os.path.expandvars(key))
+            self.addEntry(entryName, value, "", insert, errorOnUnknown)
+        else:
+            printWarning("Could not parse config line " + line, stdout = False, stderr = True)
+    def changeSectionMarker(self, name, errorOnUnknown):
+        if name == "end":
+            return self
+        if self.has_key(name) and type(self[name]) == types.DictType:
+            return self[name]
+        if errorOnUnknown:
+            printWarning("Config section name '" + name + "' not recognised.", stdout = False, stderr = True)
+        return self
+    def getVarName(self, name):
+        if name.startswith("${"):
+            return name[2:-1]
+        else:
+            return name[1:]
+    def addEntry(self, entryName, entry, sectionName="", insert=0, errorOnUnknown=1):
+        if sectionName:
+            self.currDict = self[sectionName]
+        entryExists = self.currDict.has_key(entryName)
+        if entryExists:
+            self.insertEntry(entryName, entry)
+        else:
+            if insert or not self.currDict is self:
+                self.currDict[entryName] = self.castEntry(entry)
+            elif errorOnUnknown:
+                printWarning("Config entry name '" + entryName + "' not recognised.", stdout = False, stderr = True)
+        # Make sure we reset...
+        if sectionName:
+            self.currDict = self
+    def getDictionaryValueType(self):
+        val = self.currDict.values()
+        if len(val) == 0:
+            return types.StringType
+        else:
+            return type(val[0])
+
+    def castEntry(self, entry):
+        if type(entry) != types.StringType:
+            return entry
+        dictValType = self.getDictionaryValueType()
+        if dictValType == types.ListType:
+            return self.getListValue(entry)
+        else:
+            return dictValType(entry)
+
+    def getListValue(self, entry, currentList=[]):
+        if entry == "{CLEAR LIST}":
+            return []
+        elif entry not in currentList:
+            return currentList + [ entry ]
+        else:
+            return currentList
+    
+    def insertEntry(self, entryName, entry):
+        currType = type(self.currDict[entryName]) 
+        if currType == types.ListType:
+            self.currDict[entryName] = self.getListValue(entry, self.currDict[entryName])
+        elif currType == types.DictType:
+            self.currDict = self.currDict[entryName]
+            self.insertEntry("default", entry)
+            self.currDict = self
+        else:
+            self.currDict[entryName] = currType(entry)
+
+    def getComposite(self, key, subKey, defaultSubKey="default"):
+        dict = self.get(key)
+        # If it wasn't a dictionary, return None
+        if not hasattr(dict, "items"):
+            return None
+        listVal = []
+        for currSubKey, currValue in dict.items():
+            if fnmatch(subKey, currSubKey):
+                if type(currValue) == types.ListType:
+                    listVal += currValue
+                else:
+                    return currValue
+        # A certain amount of duplication here - hard to see how to avoid it
+        # without compromising performance though...
+        defValue = dict.get(defaultSubKey)
+        if defValue is not None:
+            if type(defValue) == types.ListType:
+                listVal += defValue
+                return listVal
+            else:
+                return defValue
+        else:
+            if len(listVal) > 0:
+                return listVal
+
     
 class Option:    
     def __init__(self, name, value, description):

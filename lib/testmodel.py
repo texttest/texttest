@@ -95,93 +95,6 @@ class DirectoryCache:
                 stems.append(stem)
         return stems
 
-class MultiEntryDictionary(seqdict):
-    def __init__(self):
-        seqdict.__init__(self)
-        self.currDict = self
-        self.aliases = {}
-    def setAlias(self, aliasName, realName):
-        self.aliases[aliasName] = realName
-    def getEntryName(self, fromConfig):
-        return self.aliases.get(fromConfig, fromConfig)
-    def readValues(self, fileNames, insert=True, errorOnUnknown=False):
-        self.currDict = self
-        for filename in fileNames:
-            for line in plugins.readList(filename):
-                self.parseConfigLine(line, insert, errorOnUnknown)
-            self.currDict = self
-    def parseConfigLine(self, line, insert, errorOnUnknown):
-        if line.startswith("[") and line.endswith("]"):
-            sectionName = self.getEntryName(line[1:-1])
-            self.currDict = self.changeSectionMarker(sectionName, errorOnUnknown)
-        elif line.find(":") != -1:
-            key, value = line.split(":", 1)
-            entryName = self.getEntryName(os.path.expandvars(key))
-            self.addEntry(entryName, value, "", insert, errorOnUnknown)
-        else:
-            plugins.printWarning("Could not parse config line " + line, stdout = False, stderr = True)
-    def changeSectionMarker(self, name, errorOnUnknown):
-        if name == "end":
-            return self
-        if self.has_key(name) and type(self[name]) == types.DictType:
-            return self[name]
-        if errorOnUnknown:
-            plugins.printWarning("Config section name '" + name + "' not recognised.", stdout = False, stderr = True)
-        return self
-    def getVarName(self, name):
-        if name.startswith("${"):
-            return name[2:-1]
-        else:
-            return name[1:]
-    def addEntry(self, entryName, entry, sectionName="", insert=0, errorOnUnknown=1):
-        if sectionName:
-            self.currDict = self[sectionName]
-        entryExists = self.currDict.has_key(entryName)
-        if entryExists:
-            self.insertEntry(entryName, entry)
-        else:
-            if insert or not self.currDict is self:
-                self.currDict[entryName] = self.castEntry(entry)
-            elif errorOnUnknown:
-                plugins.printWarning("Config entry name '" + entryName + "' not recognised.", stdout = False, stderr = True)
-        # Make sure we reset...
-        if sectionName:
-            self.currDict = self
-    def getDictionaryValueType(self):
-        val = self.currDict.values()
-        if len(val) == 0:
-            return types.StringType
-        else:
-            return type(val[0])
-
-    def castEntry(self, entry):
-        if type(entry) != types.StringType:
-            return entry
-        dictValType = self.getDictionaryValueType()
-        if dictValType == types.ListType:
-            return self.getListValue(entry)
-        else:
-            return dictValType(entry)
-
-    def getListValue(self, entry, currentList=[]):
-        if entry == "{CLEAR LIST}":
-            return []
-        elif entry not in currentList:
-            return currentList + [ entry ]
-        else:
-            return currentList
-    
-    def insertEntry(self, entryName, entry):
-        currType = type(self.currDict[entryName]) 
-        if currType == types.ListType:
-            self.currDict[entryName] = self.getListValue(entry, self.currDict[entryName])
-        elif currType == types.DictType:
-            self.currDict = self.currDict[entryName]
-            self.insertEntry("default", entry)
-            self.currDict = self
-        else:
-            self.currDict[entryName] = currType(entry)
-
     
 class Callable:
     def __init__(self, method, *args):
@@ -279,7 +192,7 @@ class Test(plugins.Observable):
         populateFunction = Callable(app.setEnvironment, self)
         self.environment = TestEnvironment(populateFunction)
         # Java equivalent of the environment mechanism...
-        self.properties = MultiEntryDictionary()
+        self.properties = plugins.MultiEntryDictionary()
         self.diag = plugins.getDiagnostics("test objects")
         # Test suites never change state, but it's convenient that they have one
         self.state = NotStarted(self.getDescription)
@@ -1223,7 +1136,7 @@ class Application:
         return id(self)
 
     def setUpConfiguration(self, configEntries={}):
-        self.configDir = MultiEntryDictionary()
+        self.configDir = plugins.MultiEntryDictionary()
         self.configDocs = {}
         self.extraDirCaches = {}
         self.setConfigDefaults()
@@ -1233,9 +1146,9 @@ class Application:
 
         # Read our pre-existing config files
         self.readApplicationConfigFiles()
-        personalFile = self.getPersonalConfigFile()
+        personalFile = plugins.getPersonalConfigFile()
         if personalFile:
-            self.configDir.readValues([ personalFile ], insert=0, errorOnUnknown=1)
+            self.configDir.readValues([ personalFile ], insert=0, errorOnUnknown=0)
         self.diag.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
 
     def readApplicationConfigFiles(self):
@@ -1349,7 +1262,7 @@ class Application:
         if self.envFiles.has_key(envFile):
             return self.envFiles[envFile]
 
-        envDir = MultiEntryDictionary()
+        envDir = plugins.MultiEntryDictionary()
         envDir.readValues([ envFile ])
         envVars = envDir.items()
         self.envFiles[envFile] = envVars
@@ -1419,12 +1332,6 @@ class Application:
                 return os.path.expanduser("~" + previousTmpInfo + "/texttesttmp")
             else:
                 return previousTmpInfo
-    def getPersonalConfigFile(self):
-        personalDir = plugins.getPersonalConfigDir()
-        if personalDir:
-            personalFile = os.path.join(personalDir, "config")
-            if os.path.isfile(personalFile):
-                return personalFile
     def findOtherAppNames(self):
         names = Set()
         for configFile in self.dircache.findAllFiles("config"):
@@ -1657,10 +1564,15 @@ class Application:
         header += "\n" + "-" * length
         print header
         self.configObject.printHelpText()
+
     def getConfigValue(self, key, expandVars=True, getenvFunc=os.getenv):
         value = self.configDir.get(key)
-        if not expandVars:
+        if expandVars:
+            return self.expandEnvironment(value, getenvFunc)
+        else:
             return value
+
+    def expandEnvironment(self, value, getenvFunc):
         if type(value) == types.StringType:
             # See top of plugins.py, we redefined this one so we can use a different environment
             return os.path.expandvars(value, getenvFunc)
@@ -1669,39 +1581,18 @@ class Application:
         elif type(value) == types.DictType:
             newDict = {}
             for key, val in value.items():
-                if type(val) == types.StringType:
-                    newDict[key] = os.path.expandvars(val, getenvFunc)
-                elif type(val) == types.ListType:
-                    newDict[key] = [ os.path.expandvars(element, getenvFunc) for element in val ]
-                else:
-                    newDict[key] = val
+                newDict[key] = self.expandEnvironment(val, getenvFunc)
             return newDict
         else:
             return value
+
     def getCompositeConfigValue(self, key, subKey, expandVars=True, getenvFunc=os.getenv, defaultKey="default"):
-        dict = self.getConfigValue(key, expandVars, getenvFunc)
-        # If it wasn't a dictionary, return None
-        if not hasattr(dict, "items"):
-            return None
-        listVal = []
-        for currSubKey, currValue in dict.items():
-            if fnmatch(subKey, currSubKey):
-                if type(currValue) == types.ListType:
-                    listVal += currValue
-                else:
-                    return currValue
-        # A certain amount of duplication here - hard to see how to avoid it
-        # without compromising performance though...
-        defValue = dict.get(defaultKey)
-        if defValue is not None:
-            if type(defValue) == types.ListType:
-                listVal += defValue
-                return listVal
-            else:
-                return defValue
+        value = self.configDir.getComposite(key, subKey, defaultKey)
+        if expandVars:
+            return self.expandEnvironment(value, getenvFunc)
         else:
-            if len(listVal) > 0:
-                return listVal
+            return value
+
     def addConfigEntry(self, key, value, sectionName = ""):
         self.configDir.addEntry(key, value, sectionName)
     def setConfigDefault(self, key, value, docString = ""):

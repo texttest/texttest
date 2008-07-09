@@ -1,7 +1,6 @@
 
-import os, gobject, datetime, time, subprocess, default_gui
+import os, gobject, guiplugins, datetime, time, subprocess, default_gui
 import gtk, plugins, custom_widgets, entrycompletion
-from guiplugins import scriptEngine, guilog, processMonitor, ActionResultDialogGUI
 
 #
 # Todo/improvements:
@@ -34,9 +33,9 @@ from guiplugins import scriptEngine, guilog, processMonitor, ActionResultDialogG
 #
 # Base class for all CVS actions.
 #
-class CVSAction(ActionResultDialogGUI):
+class CVSAction(guiplugins.ActionResultDialogGUI):
     def __init__(self, cvsArgs, allApps=[], dynamic=False):
-        ActionResultDialogGUI.__init__(self, allApps)
+        guiplugins.ActionResultDialogGUI.__init__(self, allApps)
         self.cvsArgs = cvsArgs
         self.recursive = False
         self.dynamic = dynamic
@@ -56,7 +55,7 @@ class CVSAction(ActionResultDialogGUI):
             raise plugins.TextTestError, "Could not run CVS: make sure you have it installed locally"
         return process.stdout.readlines()
     def updateSelection(self, *args):
-        newActive = ActionResultDialogGUI.updateSelection(self, *args)
+        newActive = guiplugins.ActionResultDialogGUI.updateSelection(self, *args)
         if not self.dynamic: # See bugzilla 17653
             self.currFileSelection = []
         return newActive
@@ -117,11 +116,11 @@ class CVSAction(ActionResultDialogGUI):
 
     def viewGraphicalDiff(self, button):
         path = self.filteredTreeModel.get_value(self.treeView.get_selection().get_selected()[1], 2)
-        guilog.info("Viewing CVS differences for file '" + path + "' graphically ...")
+        guiplugins.guilog.info("Viewing CVS differences for file '" + path + "' graphically ...")
         cvsDiffProgram = "tkdiff" # Hardcoded for now ...
         try:
             cmdArgs = [ cvsDiffProgram ] + self.getRevisionOptions() + [ path ]
-            processMonitor.startProcess(cmdArgs, description="Graphical CVS diff for file " + path,
+            guiplugins.processMonitor.startProcess(cmdArgs, description="Graphical CVS diff for file " + path,
                                     stderr=open(os.devnull, "w"))
         except OSError:
             self.showErrorDialog("\nCannot find graphical CVS difference program '" + cvsDiffProgram + \
@@ -240,17 +239,17 @@ class CVSAction(ActionResultDialogGUI):
 
     def addStatusWidget(self):
         button = gtk.Button("_Status")
-        scriptEngine.connect("show CVS status", "clicked", button, self.viewStatus)
+        guiplugins.scriptEngine.connect("show CVS status", "clicked", button, self.viewStatus)
         self.extraButtonArea.pack_start(button, expand=False, fill=False)        
 
     def addLogWidget(self):
         button = gtk.Button("_Log")
-        scriptEngine.connect("show CVS log", "clicked", button, self.viewLog)
+        guiplugins.scriptEngine.connect("show CVS log", "clicked", button, self.viewLog)
         self.extraButtonArea.pack_start(button, expand=False, fill=False)        
 
     def addAnnotateWidget(self):
         button = gtk.Button("_Annotate")
-        scriptEngine.connect("show CVS annotations", "clicked", button, self.viewAnnotations)
+        guiplugins.scriptEngine.connect("show CVS annotations", "clicked", button, self.viewAnnotations)
         self.extraButtonArea.pack_start(button, expand=False, fill=False)        
 
     def addDiffWidget(self):
@@ -266,18 +265,18 @@ class CVSAction(ActionResultDialogGUI):
         self.revision2.set_alignment(1.0)
         self.revision1.set_width_chars(6)
         self.revision2.set_width_chars(6)
-        scriptEngine.registerEntry(self.revision1, "set first revision to ")
-        scriptEngine.registerEntry(self.revision2, "set second revision to ")
+        guiplugins.scriptEngine.registerEntry(self.revision1, "set first revision to ")
+        guiplugins.scriptEngine.registerEntry(self.revision2, "set second revision to ")
         self.extraButtonArea.pack_start(diffButton, expand=False, fill=False)
         self.extraWidgetArea.pack_start(label1, expand=False, fill=False)
         self.extraWidgetArea.pack_start(self.revision1, expand=False, fill=False)
         self.extraWidgetArea.pack_start(label2, expand=False, fill=False)
         self.extraWidgetArea.pack_start(self.revision2, expand=False, fill=False)
-        scriptEngine.connect("show CVS diffs", "clicked", diffButton, self.viewDiffs)
+        guiplugins.scriptEngine.connect("show CVS diffs", "clicked", diffButton, self.viewDiffs)
 
     def addGraphicalDiffWidget(self):
         button = gtk.Button("_Graphical Diffs")
-        scriptEngine.connect("show CVS differences graphically", "clicked", button, self.viewGraphicalDiff)
+        guiplugins.scriptEngine.connect("show CVS differences graphically", "clicked", button, self.viewGraphicalDiff)
         self.extraButtonArea.pack_start(button, expand=False, fill=False)        
 
     def addHeader(self):
@@ -384,7 +383,7 @@ class CVSAction(ActionResultDialogGUI):
             message += "CVS tree view dialog: Showing two columns\n"
         self.treeView.get_selection().set_select_function(self.canSelect)
         self.treeView.expand_all()
-        scriptEngine.monitor("select", self.treeView.get_selection())
+        guiplugins.scriptEngine.monitor("select", self.treeView.get_selection())
 
         if len(self.pages) > 0:
             firstIter = self.filteredTreeModel.convert_child_iter_to_iter(labelMap[self.pages[0][0]])
@@ -405,7 +404,7 @@ class CVSAction(ActionResultDialogGUI):
         model, iter = selection.get_selected()
         if iter:
             text = self.updateForIter(iter)
-            guilog.info("CVS tree view dialog: Showing CVS output\n" + text)
+            guiplugins.guilog.info("CVS tree view dialog: Showing CVS output\n" + text)
         else:
             self.extraWidgetArea.set_sensitive(False)
 
@@ -613,7 +612,7 @@ class CVSLogLatest(CVSLog):
             message += "Adding notebook tab '" + label + "' with contents\n" + text + "\n"
             notebook.append_page(window, gtk.Label(label))
         notebook.show_all()
-        scriptEngine.monitorNotebook(notebook, "view tab")
+        guiplugins.scriptEngine.monitorNotebook(notebook, "view tab")
         if len(notebook.get_children()) > 0: # Resize to a nice-looking dialog window ...
             parentSize = self.topWindow.get_size()
             self.dialog.resize(int(parentSize[0] / 1.5), int(parentSize[0] / 2))
@@ -844,7 +843,7 @@ class CVSStatus(CVSAction):
             actionGroup.add_action(action)
             self.uiManager.add_ui_from_string("<popup name='Info'><menuitem name='" + info + "' action='" + info + "'/></popup>")
             action.connect("toggled", self.toggleVisibility)
-            scriptEngine.registerToggleButton(action, "show category " + action.get_name(), "hide category " + action.get_name())
+            guiplugins.scriptEngine.registerToggleButton(action, "show category " + action.get_name(), "hide category " + action.get_name())
         self.uiManager.ensure_update()
 
     def toggleVisibility(self, action):

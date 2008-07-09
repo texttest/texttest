@@ -686,84 +686,15 @@ class Config:
         app.setConfigDefault("follow_program", { "default": self.defaultFollowProgram() }, "External program to use for following progress of a file")
         app.setConfigDefault("follow_file_by_default", 0, "When double-clicking running files, should we follow progress or just view them?")
         app.setConfigDefault("bug_system_script", { "default" : "" }, "The location of the script used to extract information from the bug system.")
-    def getGuiColourDictionary(self):
-        dict = {}
-        dict["default"] = "red"
-        dict["success"] = "green"
-        dict["failure"] = "red"
-        dict["running"] = "yellow"
-        dict["not_started"] = "white"
-        dict["pending"] = "white"
-        dict["static"] = "grey90"
-        dict["marked"] = "orange"
-        return dict
-    def getDefaultAccelerators(self):
-        dict = {}
-        dict["quit"] = "<control>q"
-        dict["select"] = "<control>s"
-        dict["filter"] = "<control>f"
-        dict["save"] = "<control>s"
-        dict["save_as"] = "<control><alt>s"
-        dict["copy"] = "<control>c"
-        dict["kill"] = "<control>Delete"
-        dict["remove"] = "<control>Delete"
-        dict["cut"] = "<control>x"
-        dict["paste"] = "<control>v"
-        dict["save_selection"] = "<control><shift>s"
-        dict["load_selection"] = "<control><shift>o"
-        dict["reset"] = "<control>e"
-        dict["reconnect"] = "<control><shift>r"
-        dict["run"] = "<control>r"
-        dict["rename"] = "<control>m"
-        dict["refresh"] = "F5"
-        dict["record_use-case"] = "F9"
-        dict["recompute_status"] = "F5"
-        dict["add_test"] = "<control>n"
-        dict["enter_failure_information"] = "<control>i"
-        dict["move_down"] = "<control>Page_Down"
-        dict["move_up"] = "<control>Page_Up"
-        dict["move_to_first"] = "<control>Home"
-        dict["move_to_last"] = "<control>End"
-        dict["mark"] = "<control><shift>m"
-        dict["unmark"] = "<control><shift>u"
-        return dict
-    def getWindowSizeSettings(self):
-        dict = {}
-        dict["maximize"] = 0
-        dict["horizontal_separator_position"] = 0.46
-        dict["vertical_separator_position"] = 0.5
-        dict["height_pixels"] = "<not set>"
-        dict["width_pixels"] = "<not set>"
-        dict["height_screen"] = float(5.0) / 6
-        dict["width_screen"] = 0.6
-        return dict
-    
-    def getDefaultHideWidgets(self):
-        dict = {}
-        dict["status_bar"] = 0
-        dict["toolbar"] = 0
-        dict["shortcut_bar"] = 0
-        return dict
     def setInterfaceDefaults(self, app):
         app.setConfigDefault("default_interface", "static_gui", "Which interface to start if none of -con, -g and -gx are provided")
         # Do this here rather than from the GUI: if applications can be run with the GUI
         # anywhere it needs to be set up
-        app.setConfigDefault("static_collapse_suites", 0, "Whether or not the static GUI will show everything collapsed")
-        app.setConfigDefault("test_colours", self.getGuiColourDictionary(), "Colours to use for each test state")
-        app.setConfigDefault("file_colours", self.getGuiColourDictionary(), "Colours to use for each file state")
-        app.setConfigDefault("auto_collapse_successful", 1, "Automatically collapse successful test suites?")
         app.setConfigDefault("auto_sort_test_suites", 0, "Automatically sort test suites in alphabetical order. 1 means sort in ascending order, -1 means sort in descending order.")
         app.setConfigDefault("sort_test_suites_recursively", 1, "Sort subsuites when sorting test suites")
-        app.setConfigDefault("window_size", self.getWindowSizeSettings(), "To set the initial size of the dynamic/static GUI.")
-        app.setConfigDefault("hide_gui_element", self.getDefaultHideWidgets(), "List of widgets to hide by default")
-        app.setConfigDefault("hide_test_category", [], "Categories of tests which should not appear in the dynamic GUI test view")
-        app.setConfigDefault("query_kill_processes", { "default" : [] }, "Ask about whether to kill these processes when exiting texttest.")
         app.setConfigDefault("gui_entry_overrides", { "default" : "<not set>" }, "Default settings for entries in the GUI")
         app.setConfigDefault("gui_entry_options", { "default" : [] }, "Default drop-down box options for GUI entries")
         app.setConfigDefault("gui_entry_completions", { "default" : [] }, "Add these completions to the entry completion lists initially")
-        app.setConfigDefault("gui_entry_completion_matching", 1, "Which matching type to use for entry completion. 0 means turn entry completions off, 1 means match the start of possible completions, 2 means match any part of possible completions")
-        app.setConfigDefault("gui_entry_completion_inline", 0, "Automatically inline common completion prefix in entry.")
-        app.setConfigDefault("gui_accelerators", self.getDefaultAccelerators(), "Custom action accelerators.")
         app.setConfigDefault("suppress_stderr_popup", [], "List of patterns which, if written on stderr, should not produce a warning popup")
     def setMiscDefaults(self, app):
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")

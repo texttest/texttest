@@ -1969,6 +1969,7 @@ class ApplicationFileGUI(FileViewGUI):
     def __init__(self, dynamic, allApps):
         FileViewGUI.__init__(self, dynamic, "Configuration Files")
         self.allApps = copy(allApps)
+        self.extras = reduce(operator.add, (app.extras for app in allApps), [])
     def shouldShow(self):
         return not self.dynamic
     def getGroupTabTitle(self):
@@ -1979,7 +1980,7 @@ class ApplicationFileGUI(FileViewGUI):
         scriptEngine.connect("select application file", "row_activated", self.selection.get_tree_view(), self.fileActivated)
     def addSuites(self, suites):
         for suite in suites:
-            if suite.app not in self.allApps:
+            if suite.app not in self.allApps and suite.app not in self.extras:
                 self.allApps.append(suite.app)
                 self.recreateModel(self.getState(), preserveSelection=False)
             

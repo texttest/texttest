@@ -322,6 +322,9 @@ class TextTest(Responder, plugins.Observable):
                 return testSuite
 
         newApp = testmodel.Application(appName, self.makeDirectoryCache(appName), versions, self.inputOptions)
+        return self.createEmptySuite(newApp)
+
+    def createEmptySuite(self, newApp):
         emptySuite = newApp.createInitialTestSuite(self.observers)
         self.appSuites[newApp] = emptySuite
         self.addSuites([ emptySuite ])
@@ -340,7 +343,14 @@ class TextTest(Responder, plugins.Observable):
     def notifyExtraTest(self, testPath, appName, versions):
         rootSuite = self.getRootSuite(appName, versions)
         rootSuite.addTestCaseWithPath(testPath)
-            
+
+    def notifyNewApplication(self, appName, directory, configEntries):
+        dircache = testmodel.DirectoryCache(directory)
+        newApp = testmodel.Application(appName, dircache, [], self.inputOptions, configEntries)
+        dircache.refresh() # we created a config file...
+        suite = self.createEmptySuite(newApp)
+        suite.notify("Add", initial=False)
+        
     def findThreadRunners(self):
         allRunners = filter(lambda x: hasattr(x, "run"), self.observers)
         if len(allRunners) == 0:

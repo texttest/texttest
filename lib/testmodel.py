@@ -1200,7 +1200,7 @@ class ConfigurationCall:
         raise BadConfigError, message
     
 class Application:
-    def __init__(self, name, dircache, versions, inputOptions):
+    def __init__(self, name, dircache, versions, inputOptions, configEntries={}):
         self.name = name
         self.dircache = dircache
         # Place to store reference to extra_version applications
@@ -1210,7 +1210,7 @@ class Application:
         self.versions = versions    
         self.diag = plugins.getDiagnostics("application")
         self.inputOptions = inputOptions
-        self.setUpConfiguration()
+        self.setUpConfiguration(configEntries)
         self.writeDirectory = self.getWriteDirectory()
         self.rootTmpDir = os.path.dirname(self.writeDirectory)
         self.diag.info("Write directory at " + self.writeDirectory)
@@ -1222,11 +1222,23 @@ class Application:
     def __hash__(self):
         return id(self)
 
-    def setUpConfiguration(self):
+    def setUpConfiguration(self, configEntries={}):
         self.configDir = MultiEntryDictionary()
         self.configDocs = {}
         self.extraDirCaches = {}
         self.setConfigDefaults()
+        if len(configEntries):
+            # We've been given some entries, read them in and write them out to file
+            self.importAndWriteEntries(configEntries)
+
+        # Read our pre-existing config files
+        self.readApplicationConfigFiles()
+        personalFile = self.getPersonalConfigFile()
+        if personalFile:
+            self.configDir.readValues([ personalFile ], insert=0, errorOnUnknown=1)
+        self.diag.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
+
+    def readApplicationConfigFiles(self):
         self.readConfigFiles(configModuleInitialised=False)
         self.readValues(self.configDir, "config", self.dircache, insert=0)
         self.diag.info("Basic Config file settings are: " + "\n" + repr(self.configDir.dict))
@@ -1237,11 +1249,15 @@ class Application:
         self.configObject.setApplicationDefaults(self)
         self.setDependentConfigDefaults()
         self.readConfigFiles(configModuleInitialised=True)
-        personalFile = self.getPersonalConfigFile()
-        if personalFile:
-            self.configDir.readValues([ personalFile ], insert=0, errorOnUnknown=1)
-        self.diag.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
-        
+
+    def importAndWriteEntries(self, configEntries):
+        configFileName = self.dircache.pathName("config." + self.name)
+        configFile = open(configFileName, "w")
+        for key, value in configEntries.items():
+            self.configDir.addEntry(key, value, insert=0, errorOnUnknown=1)
+            configFile.write("# " + self.configDocs.get(key) + "\n")
+            configFile.write(key + ":" + value + "\n\n")
+                
     def makeExtraDirCache(self, envDir):
         if envDir == "":
             return
@@ -1692,8 +1708,23 @@ class Application:
         self.configDir[key] = value
         if len(docString) > 0:
             self.configDocs[key] = docString
+
     def setConfigAlias(self, aliasName, realName):
         self.configDir.setAlias(aliasName, realName)
+
+    def getIntvActionConfig(self):
+        module = self.getConfigValue("interactive_action_module")
+        try:
+            return self._getIntvActionConfig(module)
+        except ImportError:
+            return self._getIntvActionConfig("default_gui")
+
+    def _getIntvActionConfig(self, module):
+        command = "from " + module + " import InteractiveActionConfig"
+        exec command
+        return InteractiveActionConfig()
+
+
             
 class OptionFinder(plugins.OptionFinder):
     def __init__(self):

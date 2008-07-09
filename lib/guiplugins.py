@@ -488,16 +488,19 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         dialog.response(gtk.RESPONSE_NONE)
 
     def respond(self, button, saidOK, dialog):
-        self._respond(saidOK, dialog)
-
+        try:
+            self._respond(saidOK, dialog)
+        except plugins.TextTestError, e:
+            self.showErrorDialog(str(e))
+            
     def _respond(self, saidOK, dialog):
-        if dialog:
-            self._cleanDialog(dialog)
         if saidOK:
             self._runInteractive()
         else:
             self.cancel()
-    
+        if dialog:
+            self._cleanDialog(dialog)
+        
     def getConfirmationMessage(self):
         return ""
 
@@ -538,23 +541,14 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         if message != None:
             self.notify("Status", message)
         self.notify("ActionStart", message)
-        try:
-            self.notify("ActionProgress")
-            self.performOnCurrent()
-            message = self.messageAfterPerform()
-            if message != None:
-                self.notify("Status", message)
-        except plugins.TextTestError, e:
-            self.showErrorDialog(str(e))
-
+        self.notify("ActionProgress")
+        self.performOnCurrent()
+        message = self.messageAfterPerform()
+        if message != None:
+            self.notify("Status", message)
+        
     def endPerform(self):
         self.notify("ActionStop", "")
-
-    def perform(self):
-        try:
-            self.startPerform()
-        finally:
-            self.endPerform()
 
     def cancel(self):
         self.notify("Status", "Action cancelled.")
@@ -570,11 +564,19 @@ class ActionGUI(BasicActionGUI):
         self.tooltips = gtk.Tooltips()
         BasicActionGUI.__init__(self)
         for app in allApps:
-            if self.isValidForApp(app):
-                self.validApps.append(app)
-                self.validApps += app.extras
-            else:
-                self.diag.info(str(self.__class__) + " invalid for " + repr(app))
+            self.checkValid(app)
+            
+    def addSuites(self, suites):
+        for suite in suites:
+            if suite.app not in self.validApps and suite.app.getIntvActionConfig().isValid(self.__class__):
+                self.checkValid(suite.app)
+                
+    def checkValid(self, app):
+        if self.isValidForApp(app):
+            self.validApps.append(app)
+            self.validApps += app.extras
+        else:
+            self.diag.info(str(self.__class__) + " invalid for " + repr(app))
         
     def isValidForApp(self, app):
         return True
@@ -703,13 +705,17 @@ class OptionGroupGUI(ActionGUI):
         if fromConfig != "<not set>":
             option.setValue(fromConfig)
             return fromConfig
-    
-    def createOptionEntry(self, option, separator):
-        widget, entry = self.createOptionWidget(option)
+
+    def createLabelEventBox(self, option, separator):
         label = gtk.EventBox()
         label.add(gtk.Label(option.name + separator))
-        if option.description:
+        if option.description and type(option.description) == types.StringType:
             self.tooltips.set_tip(label, option.description)
+        return label
+
+    def createOptionEntry(self, option, separator):
+        widget, entry = self.createOptionWidget(option)
+        label = self.createLabelEventBox(option, separator)
         scriptEngine.registerEntry(entry, "enter " + option.name.strip() + " =")
         entry.set_text(option.getValue())
         entrycompletion.manager.register(entry)
@@ -734,10 +740,7 @@ class OptionGroupGUI(ActionGUI):
     def createRadioButtonCollection(self, switch, optionGroup):
         hbox = gtk.HBox()
         if len(switch.name) > 0:
-            label = gtk.EventBox()
-            label.add(gtk.Label(switch.name + ":"))
-            if switch.description and type(switch.description) == types.StringType:
-                self.tooltips.set_tip(label, switch.description)
+            label = self.createLabelEventBox(switch, ":")
             hbox.pack_start(label, expand=False, fill=False)
         for button in self.createRadioButtons(switch, optionGroup):
             hbox.pack_start(button, expand=True, fill=False)
@@ -1032,27 +1035,28 @@ class ActionDialogGUI(OptionGroupGUI):
         alignment.set_padding(5, 5, 5, 5)
         return alignment
 
-    def getOkStock(self, fileChooser):
-        if fileChooser:
-            if fileChooser.get_property("action") == gtk.FILE_CHOOSER_ACTION_OPEN:
-                return "texttest-stock-load"
-            else:
-                return gtk.STOCK_SAVE
+    def getOkStock(self, scriptName):
+        if scriptName.startswith("load"):
+            return "texttest-stock-load"
+        elif scriptName.startswith("save"):
+            return gtk.STOCK_SAVE
         else:
             return gtk.STOCK_OK
 
     def createButtons(self, dialog, fileChooser, scriptName):
         cancelButton = dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL)
-        okButton = dialog.add_button(self.getOkStock(fileChooser), gtk.RESPONSE_ACCEPT)
+        actionScriptName = self.getTooltip()
+        okButton = dialog.add_button(self.getOkStock(actionScriptName.lower()), gtk.RESPONSE_ACCEPT)
         dialog.set_default_response(gtk.RESPONSE_ACCEPT)
         if fileChooser:
+            buttonScriptName = "press " + actionScriptName.split()[0]
             if fileChooser.get_property("action") == gtk.FILE_CHOOSER_ACTION_OPEN:
                 scriptEngine.registerOpenFileChooser(fileChooser, scriptName,
-                                                     "look in folder", "press load", "press cancel", 
+                                                     "look in folder", buttonScriptName, "press cancel", 
                                                      self.respond, okButton, cancelButton, dialog)
             else:
                 scriptEngine.registerSaveFileChooser(fileChooser, scriptName,
-                                                     "choose folder", "press save", "press cancel",
+                                                     "choose folder", buttonScriptName, "press cancel",
                                                      self.respond, okButton, cancelButton, dialog)
         else:
             scriptEngine.connect("press cancel", "clicked", cancelButton, self.respond, gtk.RESPONSE_CANCEL, False, dialog)
@@ -1060,24 +1064,35 @@ class ActionDialogGUI(OptionGroupGUI):
 
     def fillVBox(self, vbox):
         fileChooser, scriptName = None, ""
-        for option in self.optionGroup.options.values():
+        allOptions = self.optionGroup.options.values()
+        for option in allOptions:
             self.addValuesFromConfig(option)
             
             if option.selectFile or option.saveFile:
                 scriptName = option.name
                 fileChooser = self.createFileChooser(option)
-                vbox.pack_start(fileChooser, expand=True, fill=True)
+                if len(allOptions) > 1: # If there is other stuff, add a frame round the file chooser so we can see what it's for
+                    label = self.createLabelEventBox(option, separator=":")
+                    self.addLabel(vbox, label)
+                    frame = gtk.Frame()
+                    frame.add(fileChooser)
+                    vbox.pack_start(frame, expand=True, fill=True)
+                else:
+                    vbox.pack_start(fileChooser, expand=True, fill=True)
             else:
                 label, entryWidget, entry = self.createOptionEntry(option, separator=":")
                 entry.set_activates_default(True)
-                hbox2 = gtk.HBox()
-                hbox2.pack_start(label, expand=False, fill=False)        
-                vbox.pack_start(hbox2)
+                self.addLabel(vbox, label)
                 vbox.pack_start(entryWidget)
                 
         self.addSwitches(vbox, self.optionGroup)            
         return fileChooser, scriptName
-    
+
+    def addLabel(self, vbox, label):
+        hbox = gtk.HBox()
+        hbox.pack_start(label, expand=False, fill=False)        
+        vbox.pack_start(hbox)
+                
     def createRadioButtonCollection(self, switch, optionGroup):
         frame = gtk.Frame(switch.name)
         frameBox = gtk.VBox()
@@ -1181,22 +1196,11 @@ class InteractiveActionHandler:
     def getMenuNames(self, allApps):
         names = []
         for app in allApps:
-            config = self.getIntvActionConfig(app)
-            for name in config.getMenuNames():
+            for name in app.getIntvActionConfig().getMenuNames():
                 if name not in names:
                     names.append(name)
         return names
-    def getIntvActionConfig(self, app):
-        module = app.getConfigValue("interactive_action_module")
-        try:
-            return self._getIntvActionConfig(module)
-        except ImportError:
-            return self._getIntvActionConfig("default_gui")
-    def _getIntvActionConfig(self, module):
-        command = "from " + module + " import InteractiveActionConfig"
-        exec command
-        return InteractiveActionConfig()
-
+    
     def getPluginGUIs(self, dynamic, allApps, uiManager):
         instances = self.getInstances(dynamic, allApps)
         defaultGUIs, actionTabGUIs = [], []
@@ -1222,8 +1226,7 @@ class InteractiveActionHandler:
         instances = []
         classNames = []
         for app in allApps:
-            config = self.getIntvActionConfig(app)
-            for className in config.getInteractiveActionClasses(dynamic):
+            for className in app.getIntvActionConfig().getInteractiveActionClasses(dynamic):
                 if not className in classNames:
                     allClasses = self.findAllClasses(className, allApps, dynamic)
                     subinstances = self.makeAllInstances(allClasses, dynamic)
@@ -1247,7 +1250,7 @@ class InteractiveActionHandler:
     def findAllClasses(self, className, allApps, dynamic):
         classNames = seqdict()
         for app in allApps:
-            config = self.getIntvActionConfig(app)
+            config = app.getIntvActionConfig()
             replacements = config.getReplacements()
             if className in config.getInteractiveActionClasses(dynamic):
                 realClassName = replacements.get(className, className)

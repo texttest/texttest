@@ -419,7 +419,8 @@ class ViewConfigFileInEditor(ViewInEditor):
         return "View In Editor"
 
     def addSuites(self, suites):
-        self.rootTestSuites = suites
+        ViewInEditor.addSuites(self, suites)
+        self.rootTestSuites += suites
 
     def isActiveOnCurrent(self, *args):
         return False # only way to get at it is via the activation below...
@@ -793,6 +794,8 @@ class ImportTest(guiplugins.ActionDialogGUI):
                 return "Test directory already exists for '" + testName + "'\nAre you sure you want to use this name?"
         else:
             return ""
+    def _getStockId(self):
+        return "add"
     def getResizeDivisors(self):
         # size of the dialog
         return 1.5, 2.8
@@ -881,8 +884,6 @@ class ImportTestCase(ImportTest):
         self.addDefinitionFileOption()
     def testType(self):
         return "Test"
-    def _getStockId(self):
-        return "add"
     def addDefinitionFileOption(self):
         self.addOption("opt", "Command line options")
     def createTestContents(self, suite, testDir, description, placement):
@@ -926,8 +927,6 @@ class ImportTestSuite(ImportTest):
         self.addEnvironmentFileOptions()
     def testType(self):
         return "Suite"
-    def _getStockId(self):
-        return "directory"
     def createTestContents(self, suite, testDir, description, placement):
         return suite.addTestSuite(os.path.basename(testDir), description, placement, self.writeEnvironmentFiles)
     def addEnvironmentFileOptions(self):
@@ -938,11 +937,68 @@ class ImportTestSuite(ImportTest):
             file = open(envFile, "w")
             file.write("# Dictionary of environment to variables to set in test suite\n")
 
+
+class ImportApplication(guiplugins.ActionDialogGUI):
+    def __init__(self, allApps, *args):
+        guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
+        self.textTestHome = os.getenv("TEXTTEST_HOME")
+        self.addOption("name", "Full name of application", description="Name of application to use in reports etc.")
+        self.addOption("ext", "\nFile extension to use for TextTest files associated with this application", description="Short space-free extension, to identify all TextTest's files associated with this application")
+        self.addOption("subdir", "\nSubdirectory of TEXTTEST_HOME to store the above application files under (leave blank for local storage)", possibleValues=self.findSubDirectories())
+        possibleDirs = [ (os.path.basename(app.getDirectory()), app.getDirectory()) for app in allApps ]
+        if len(possibleDirs) == 0:
+            possibleDirs = [ self.textTestHome ]
+        self.addOption("exec", "\nSelect executable program to test", description="The full path to the program you want to test", possibleDirs=possibleDirs, selectFile=True)
+
+    def findSubDirectories(self):
+        allFiles = [ os.path.join(self.textTestHome, f) for f in os.listdir(self.textTestHome) ]
+        allDirs = filter(os.path.isdir, allFiles)
+        allDirs.sort()
+        return map(os.path.basename, allDirs)
+
+    def isActiveOnCurrent(self):
+        return True
+    def _getStockId(self):
+        return "add"
+    def _getTitle(self):
+        return "Add Application"
+    def messageAfterPerform(self):
+        pass
+    def getTooltip(self):
+        return "Define a new tested application"
+    
+    def checkSanity(self, ext, executable, directory):
+        if not ext:
+            raise plugins.TextTestError, "Must provide a file extension for TextTest files"
+
+        if not executable or not os.path.isfile(executable):
+            raise plugins.TextTestError, "Must provide a valid path to a program to test"
+
+        if os.path.exists(os.path.join(directory, "config." + ext)):
+            raise plugins.TextTestError, "Test-application already exists at the indicated location with the indicated extension: please choose another name"
+
+    def getSignalsSent(self):
+        return [ "NewApplication" ]
+    
+    def performOnCurrent(self):
+        executable = self.optionGroup.getOptionValue("exec")
+        ext = self.optionGroup.getOptionValue("ext")
+        directory = os.path.normpath(os.path.join(self.textTestHome, self.optionGroup.getOptionValue("subdir")))
+        self.checkSanity(ext, executable, directory)
+        plugins.ensureDirectoryExists(directory)
+        configEntries = { "executable" : executable }
+        fullName = self.optionGroup.getOptionValue("name")
+        if fullName:
+            configEntries["full_name"] = fullName
+        self.notify("NewApplication", ext, directory, configEntries)
+        self.notify("Status", "Created new application with extension '" + ext + "'.")
+
+
 class AllTestsHandler:
     def __init__(self):
         self.rootTestSuites = []
     def addSuites(self, suites):
-        self.rootTestSuites = suites
+        self.rootTestSuites += suites
     def findAllTests(self):
         return reduce(operator.add, (suite.testCaseList() for suite in self.rootTestSuites), [])
     def findTestsNotIn(self, tests):
@@ -977,7 +1033,11 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
             appSelectGroup = self.findSelectGroup(app)
             self.appKeys.update(Set(appSelectGroup.keys()))
             self.optionGroup.mergeIn(appSelectGroup)
-            
+
+    def addSuites(self, suites):
+        guiplugins.ActionTabGUI.addSuites(self, suites)
+        AllTestsHandler.addSuites(self, suites)
+           
     def addToGroups(self, actionGroup, accelGroup):
         guiplugins.ActionTabGUI.addToGroups(self, actionGroup, accelGroup)
         self.filterAccel = self._addToGroups("Filter", self.filterAction, actionGroup, accelGroup)
@@ -1229,6 +1289,12 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         self._describeAction(self.filterAction, self.filterAccel)
 
 class HideSelected(guiplugins.ActionGUI,AllTestsHandler):
+    def __init__(self, *args):
+        guiplugins.ActionGUI.__init__(self, *args)
+        AllTestsHandler.__init__(self)
+    def addSuites(self, suites):
+        guiplugins.ActionGUI.addSuites(self, suites)
+        AllTestsHandler.addSuites(self, suites)
     def _getTitle(self):
         return "Hide selected"
     def messageBeforePerform(self):
@@ -1242,6 +1308,12 @@ class HideSelected(guiplugins.ActionGUI,AllTestsHandler):
 
 
 class HideUnselected(guiplugins.ActionGUI,AllTestsHandler):
+    def __init__(self, *args):
+        guiplugins.ActionGUI.__init__(self, *args)
+        AllTestsHandler.__init__(self)
+    def addSuites(self, suites):
+        guiplugins.ActionGUI.addSuites(self, suites)
+        AllTestsHandler.addSuites(self, suites)
     def _getTitle(self):
         return "Show only selected"
     def messageBeforePerform(self):
@@ -1255,6 +1327,9 @@ class HideUnselected(guiplugins.ActionGUI,AllTestsHandler):
 
 
 class ShowAll(guiplugins.BasicActionGUI,AllTestsHandler):
+    def __init__(self, *args):
+        guiplugins.BasicActionGUI.__init__(self, *args)
+        AllTestsHandler.__init__(self)
     def _getTitle(self):
         return "Show all"
     def messageBeforePerform(self):
@@ -1321,7 +1396,8 @@ class SaveSelection(guiplugins.ActionDialogGUI):
     def correctTestClass(self):
         return "test-case"
     def addSuites(self, suites):
-        self.rootTestSuites = suites
+        guiplugins.ActionDialogGUI.addSuites(self, suites)
+        self.rootTestSuites += suites
     def _getStockId(self):
         return "save-as"
     def _getTitle(self):
@@ -1381,7 +1457,8 @@ class LoadSelection(guiplugins.ActionDialogGUI):
         self.addOption("f", "select filter-file", possibleDirs=allApps[0].getFilterFileDirectories(allApps, createDirs=False), selectFile=True)
         self.rootTestSuites = []
     def addSuites(self, suites):
-        self.rootTestSuites = suites
+        guiplugins.ActionDialogGUI.addSuites(self, suites)
+        self.rootTestSuites += suites
     def isActiveOnCurrent(self, *args):
         return True
     def getSignalsSent(self):
@@ -2094,7 +2171,7 @@ class RefreshAll(guiplugins.BasicActionGUI):
     def messageAfterPerform(self):
         return "Refreshed the test suite from the files"
     def addSuites(self, suites):
-        self.rootTestSuites = suites
+        self.rootTestSuites += suites
     def performOnCurrent(self):
         for suite in self.rootTestSuites:
             self.notify("ActionProgress", "")
@@ -2406,7 +2483,7 @@ class InteractiveActionConfig:
                          MarkTest, UnmarkTest, RecomputeTests ] # must keep RecomputeTests at the end!            
         else:
             classes += [ ViewConfigFileInEditor, CopyTests, CutTests, 
-                         PasteTests, ImportTestCase, ImportTestSuite, 
+                         PasteTests, ImportTestCase, ImportTestSuite, ImportApplication, 
                          CreateDefinitionFile, ReportBugs, SelectTests,
                          RefreshAll, HideUnselected, HideSelected, ShowAll,
                          RunTestsBasic, RunTestsAdvanced, RecordTest, ResetGroups, RenameTest, RemoveTests, 
@@ -2420,3 +2497,12 @@ class InteractiveActionConfig:
     def getReplacements(self):
         # Return a dictionary mapping classes above to what to replace them with
         return {}
+
+    def isValid(self, className):
+        replacements = self.getReplacements()
+        if className in replacements.values():
+            return True
+        elif replacements.has_key(className):
+            return False
+        else:
+            return className in self.getInteractiveActionClasses(True) or className in self.getInteractiveActionClasses(False)

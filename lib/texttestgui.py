@@ -228,7 +228,7 @@ class TextTestGUI(Responder, plugins.Observable):
     def getFileViewObservers(self):
         return self.defaultActionGUIs + self.actionTabGUIs
     def isFrameworkExitObserver(self, obs):
-        return (hasattr(obs, "notifyExit") or hasattr(obs, "notifyKillProcesses")) and obs is not self
+        return hasattr(obs, "notifyExit") or hasattr(obs, "notifyKillProcesses")
     def getExitObservers(self, frameworkObservers):
         # Don't put ourselves in the observers twice or lots of weird stuff happens.
         # Important that closing the GUI is the last thing to be done, so make sure we go at the end...
@@ -240,7 +240,7 @@ class TextTestGUI(Responder, plugins.Observable):
     def getHideableGUIs(self):
         return [ self.toolBarGUI, self.shortcutBarGUI, statusMonitor ]
     def getAddSuitesObservers(self):
-        return [ self.testColumnGUI ] + filter(lambda obs: hasattr(obs, "addSuites"),
+        return [ self.testColumnGUI, self.appFileGUI ] + filter(lambda obs: hasattr(obs, "addSuites"),
                                                self.defaultActionGUIs + self.actionTabGUIs)
     def setObservers(self, frameworkObservers):
         # We don't actually have the framework observe changes here, this causes duplication. Just forward
@@ -262,14 +262,16 @@ class TextTestGUI(Responder, plugins.Observable):
             self.addObserver(observer) # forwarding of test observer mechanism
 
         actionGUIs = self.allActionGUIs()
-        observers = actionGUIs + self.getActionObservers()
+        # mustn't send ourselves here otherwise signals get duplicated...
+        frameworkObserversToUse = filter(lambda obs: obs is not self, frameworkObservers)
+        observers = actionGUIs + self.getActionObservers() + frameworkObserversToUse
         for actionGUI in actionGUIs:
             actionGUI.setObservers(observers)
 
         for observer in self.getHideableGUIs():
             self.menuBarGUI.addObserver(observer)
 
-        for observer in self.getExitObservers(frameworkObservers):
+        for observer in self.getExitObservers(frameworkObserversToUse):
             self.topWindowGUI.addObserver(observer)
     
     def readGtkRCFiles(self):
@@ -287,10 +289,12 @@ class TextTestGUI(Responder, plugins.Observable):
     def addSuites(self, suites):
         for observer in self.getAddSuitesObservers():
             observer.addSuites(suites)
-            
-        self.topWindowGUI.createView()
-        self.topWindowGUI.activate()
-        self.idleManager.enableHandler()
+
+        if not self.topWindowGUI.topWindow:
+            # only do this once, not when new suites are added...
+            self.topWindowGUI.createView()
+            self.topWindowGUI.activate()
+            self.idleManager.enableHandler()
         
     def shouldShrinkMainPanes(self):
         # If we maximise there is no point in banning pane shrinking: there is nothing to gain anyway and
@@ -1258,7 +1262,7 @@ class TestTreeGUI(ContainerGUI):
         followIter = self.findFollowIter(suite, test, initial)
         return self.addSuiteWithParent(test, suiteIter, followIter)
     def findFollowIter(self, suite, test, initial):
-        if not initial:
+        if not initial and suite:
             follower = suite.getFollower(test)
             if follower:
                 return self.itermap.getIterator(follower)
@@ -1964,7 +1968,7 @@ class FileViewGUI(guiplugins.SubGUI):
 class ApplicationFileGUI(FileViewGUI):
     def __init__(self, dynamic, allApps):
         FileViewGUI.__init__(self, dynamic, "Configuration Files")
-        self.allApps = allApps
+        self.allApps = copy(allApps)
     def shouldShow(self):
         return not self.dynamic
     def getGroupTabTitle(self):
@@ -1973,6 +1977,12 @@ class ApplicationFileGUI(FileViewGUI):
         return "ViewApplicationFile"
     def monitorEvents(self):
         scriptEngine.connect("select application file", "row_activated", self.selection.get_tree_view(), self.fileActivated)
+    def addSuites(self, suites):
+        for suite in suites:
+            if suite.app not in self.allApps:
+                self.allApps.append(suite.app)
+                self.recreateModel(self.getState(), preserveSelection=False)
+            
     def addFilesToModel(self, state):
         colour = guiConfig.getCompositeValue("file_colours", "static")
         personalFiles = self.getPersonalFiles()

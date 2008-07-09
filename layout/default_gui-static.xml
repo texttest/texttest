@@ -12,6 +12,7 @@
     <menu action="editmenu">
       <menuitem action="Add Test"/>
       <menuitem action="Add Suite"/>
+      <menuitem action="Add Application"/>
       <separator/>
       <menuitem action="Cut"/>
       <menuitem action="Copy"/>

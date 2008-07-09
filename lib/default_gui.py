@@ -951,7 +951,9 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         self.addOption("exec", "\nSelect executable program to test", description="The full path to the program you want to test", possibleDirs=possibleDirs, selectFile=True)
 
     def findSubDirectories(self):
-        allFiles = [ os.path.join(self.textTestHome, f) for f in os.listdir(self.textTestHome) ]
+        sourceControlDirs = [ "CVS", ".svn" ]
+        usableFiles = filter(lambda f: f not in sourceControlDirs, os.listdir(self.textTestHome))
+        allFiles = [ os.path.join(self.textTestHome, f) for f in usableFiles ]
         allDirs = filter(os.path.isdir, allFiles)
         allDirs.sort()
         return map(os.path.basename, allDirs)

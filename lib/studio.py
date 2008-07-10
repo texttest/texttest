@@ -4,7 +4,7 @@
 # This plug-in is derived from the ravebased configuration, to make use of CARMDATA isolation
 # and rule compilation, as well as Carmen's SGE queues.
 #
-# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.23 2008/05/20 13:07:06 geoff Exp $
+# $Header: /carm/2_CVS/Testing/TextTest/lib/studio.py,v 1.24 2008/07/10 15:23:47 geoff Exp $
 #
 import ravebased, sandbox, plugins, os, shutil
 
@@ -12,11 +12,11 @@ def getConfig(optionMap):
     return StudioConfig(optionMap)
 
 class StudioConfig(ravebased.Config):
-    def addToOptionGroups(self, app, groups):
+    def addToOptionGroups(self, apps, groups):
         group = self.findBasicGroup(groups)
         # strange order, to keep the historical layout
         group.addSwitch("stepmacro", "Step through macro using the Macro Recorder")
-        ravebased.Config.addToOptionGroups(self, app, groups)
+        ravebased.Config.addToOptionGroups(self, apps, groups)
         group.addOption("trace", "Studio trace level")
 
     def findBasicGroup(self, groups):

@@ -156,8 +156,8 @@ class OptimizationConfig(ravebased.Config):
         ravebased.Config.__init__(self, optionMap)
         #Probably different for APC and matador : static data for the text in the log file
         self.itemNamesInFile = {}
-    def addToOptionGroups(self, app, groups):
-        ravebased.Config.addToOptionGroups(self, app, groups)
+    def addToOptionGroups(self, apps, groups):
+        ravebased.Config.addToOptionGroups(self, apps, groups)
         for group in groups:
             if group.name.startswith("Invisible"):
                 # These need a better interface before they can be plugged in, really

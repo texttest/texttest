@@ -211,16 +211,13 @@ class CarmenSgeSubmissionRules(queuesystem.SubmissionRules):
             return False
 
 class CarmenConfig(queuesystem.QueueSystemConfig):
-    def addToOptionGroups(self, app, groups):
-        queuesystem.QueueSystemConfig.addToOptionGroups(self, app, groups)
+    def addToOptionGroups(self, apps, groups):
+        queuesystem.QueueSystemConfig.addToOptionGroups(self, apps, groups)
         for group in groups:
             if group.name.startswith("Advanced"):
                 group.addSwitch("lprof", "Run with LProf profiler")
-    def getPossibleQueues(self, queuesystem):
-        if queuesystem == "SGE":
-            return ["short", "normal", "idle"]
-        else:
-            return []
+    def getPossibleQueues(self):
+        return ["short", "normal", "idle"]
     def runLocallyByDefault(self):
         return os.name == "nt"
     def getTestRunner(self):

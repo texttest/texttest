@@ -83,15 +83,14 @@ class SocketResponder(Responder,plugins.Observable):
             self.notify("ExtraTest", testPath, appParts[0], appParts[1:])
             
 class QueueSystemConfig(default.Config):
-    def addToOptionGroups(self, app, groups):
-        default.Config.addToOptionGroups(self, app, groups)
-        queueSystem = queueSystemName(app)
+    def addToOptionGroups(self, apps, groups):
+        default.Config.addToOptionGroups(self, apps, groups)
         for group in groups:
             if group.name.startswith("Basic"):
-                group.addSwitch("l", "", value = self.runLocallyByDefault(), options = ["Submit tests to " + queueSystem, "Run tests locally"])
+                group.addSwitch("l", "", value = self.runLocallyByDefault(), options = ["Submit tests to grid", "Run tests locally"])
             elif group.name.startswith("Advanced"):
-                group.addOption("R", "Request " + queueSystem + " resource", possibleValues = self.getPossibleResources(queueSystem))
-                group.addOption("q", "Request " + queueSystem + " queue", possibleValues = self.getPossibleQueues(queueSystem))
+                group.addOption("R", "Request grid resource", possibleValues = self.getPossibleResources())
+                group.addOption("q", "Request grid queue", possibleValues = self.getPossibleQueues())
                 group.addSwitch("keepslave", "Keep data files and successful tests until termination")
                 group.addSwitch("perf", "Run on performance machines only")
             elif group.name.startswith("Invisible"):
@@ -99,9 +98,9 @@ class QueueSystemConfig(default.Config):
                 group.addOption("servaddr", "Private: used to submit slave runs remotely")
     def runLocallyByDefault(self):
         return False
-    def getPossibleQueues(self, queueSystem):
+    def getPossibleQueues(self):
         return [] # placeholders for derived configurations
-    def getPossibleResources(self, queueSystem):
+    def getPossibleResources(self):
         return []
     def useQueueSystem(self):
         for localFlag in [ "reconnect", "l", "gx", "s", "coll", "record", "autoreplay" ]:

@@ -19,23 +19,27 @@ class Config:
     def __init__(self, optionMap):
         self.optionMap = optionMap
         self.filterFileMap = {}
-    def addToOptionGroups(self, app, groups):
-        recordsUseCases = app.getConfigValue("use_case_record_mode") != "disabled"
-        useCatalogues = self.isolatesDataUsingCatalogues(app)
+    def addToOptionGroups(self, apps, groups):
+        recordsUseCases = reduce(operator.or_, (app.getConfigValue("use_case_record_mode") != "disabled" for app in apps), False)
+        useCatalogues = reduce(operator.or_, (self.isolatesDataUsingCatalogues(app) for app in apps), False)
         for group in groups:
             if group.name.startswith("Select"):
                 group.addOption("t", "Test names containing", description="Select tests for which the name matches the entered text. The text can be a regular expression.")
                 group.addOption("ts", "Suite names containing", description="Select tests for which at least one parent suite name matches the entered text. The text can be a regular expression.")
                 group.addOption("a", "App names containing", description="Select tests for which the application name matches the entered text. The text can be a regular expression.")
-                possibleDirs = self.getFilterFileDirectories([ app ], createDirs=False)
+                possibleDirs = self.getFilterFileDirectories(apps, createDirs=False)
                 group.addOption("f", "Tests listed in file", possibleDirs=possibleDirs, selectFile=True)
                 group.addOption("desc", "Descriptions containing", description="Select tests for which the description (comment) matches the entered text. The text can be a regular expression.")
                 group.addOption("grep", "Test-files containing")
                 group.addOption("grepfile", "Test-file to search", allocateNofValues=2)
                 group.addOption("r", "Execution time", description="Specify execution time limits, either as '<min>,<max>', or as a list of comma-separated expressions, such as >=0:45,<=1:00. Digit-only numbers are interpreted as minutes, while colon-separated numbers are interpreted as hours:minutes:seconds.")
             elif group.name.startswith("Basic"):
-                group.addOption("v", "Run this version", app.getFullVersion())
-                group.addOption("c", "Use checkout", app.checkout)
+                if len(apps) > 0:
+                    version, checkout = apps[0].getFullVersion(), apps[0].checkout
+                else:
+                    version, checkout = "", ""
+                group.addOption("v", "Run this version", version)
+                group.addOption("c", "Use checkout", checkout)
                 group.addOption("cp", "Times to run", "1", description="Set this to some number larger than 1 to run the same test multiple times, for example to try to catch indeterminism in the system under test")
                 if recordsUseCases:
                     group.addSwitch("actrep", "Run with slow motion replay")

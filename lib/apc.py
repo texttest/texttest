@@ -158,8 +158,8 @@ def getConfig(optionMap):
     return ApcConfig(optionMap)
 
 class ApcConfig(apc_basic.Config):
-    def addToOptionGroups(self, app, groups):
-        apc_basic.Config.addToOptionGroups(self, app, groups)
+    def addToOptionGroups(self, apps, groups):
+        apc_basic.Config.addToOptionGroups(self, apps, groups)
         for group in groups:
             if group.name.startswith("Basic"):
                 group.addOption("rundebug", "Run debugger")

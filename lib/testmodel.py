@@ -1370,7 +1370,7 @@ class Application:
     def createOptionGroups(self, inputOptions):
         groupNames = [ "Select Tests", "Basic", "Advanced", "Invisible" ]
         optionGroups = map(plugins.OptionGroup, groupNames)
-        self.configObject.addToOptionGroups(self, optionGroups)
+        self.configObject.addToOptionGroups([ self ], optionGroups)
         for option in inputOptions.keys():
             optionGroup = self.findOptionGroup(option, optionGroups)
             if not optionGroup:

@@ -38,7 +38,7 @@ helpScripts = """ravebased.TraverseCarmUsers   - Traverses all CARMUSR's associa
                              the specified time. Default time is 1440 minutes.
 """
 
-import os, string, shutil, plugins, sandbox, sys, stat, subprocess
+import os, string, shutil, plugins, sandbox, sys, stat, subprocess, operator
 from socket import gethostname, SHUT_WR
 from respond import Responder
 from copy import copy
@@ -124,13 +124,14 @@ class RaveSubmissionRules(CarmenSgeSubmissionRules):
             return []
 
 class Config(CarmenConfig):
-    def addToOptionGroups(self, app, groups):
-        CarmenConfig.addToOptionGroups(self, app, groups)
+    def addToOptionGroups(self, apps, groups):
+        CarmenConfig.addToOptionGroups(self, apps, groups)
         for group in groups:
             if group.name.startswith("Select"):
                 group.addOption("u", "CARMUSRs containing")
             elif group.name.startswith("Advanced"):
-                if self.buildRulesetsAlways(app):
+                useSkipSwitch = reduce(operator.and_, (self.buildRulesetsAlways(app) for app in apps), False)
+                if useSkipSwitch:
                     group.addSwitch("skip", "Skip ruleset builds")
                 else:
                     group.addSwitch("rulecomp", "Build all rulesets")

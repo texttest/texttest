@@ -908,8 +908,8 @@ class RunTest(plugins.Action):
             signal.signal(signum, signal.SIG_IGN)
     def getInterpreter(self, test):
         interpreter = test.getConfigValue("interpreter")
-        if interpreter == "ttpython": # interpreted to mean "whatever python TextTest runs with"
-            return sys.executable + " -u"
+        if interpreter.startswith("ttpython"): # interpreted to mean "whatever python TextTest runs with"
+            return interpreter.replace("ttpython", sys.executable + " -u")
         return interpreter
     def getCmdParts(self, test):
         args = []

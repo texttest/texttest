@@ -26,15 +26,15 @@ class Config:
             if group.name.startswith("Select"):
                 group.addOption("t", "Test names containing", description="Select tests for which the name matches the entered text. The text can be a regular expression.")
                 group.addOption("ts", "Suite names containing", description="Select tests for which at least one parent suite name matches the entered text. The text can be a regular expression.")
+                group.addOption("a", "App names containing", description="Select tests for which the application name matches the entered text. The text can be a regular expression.")
                 possibleDirs = self.getFilterFileDirectories([ app ], createDirs=False)
                 group.addOption("f", "Tests listed in file", possibleDirs=possibleDirs, selectFile=True)
                 group.addOption("desc", "Descriptions containing", description="Select tests for which the description (comment) matches the entered text. The text can be a regular expression.")
                 group.addOption("grep", "Test-files containing")
                 group.addOption("grepfile", "Test-file to search", allocateNofValues=2)
                 group.addOption("r", "Execution time", description="Specify execution time limits, either as '<min>,<max>', or as a list of comma-separated expressions, such as >=0:45,<=1:00. Digit-only numbers are interpreted as minutes, while colon-separated numbers are interpreted as hours:minutes:seconds.")
-                # More logical order
-                group.moveOptionsToStart([ "t", "ts"])
             elif group.name.startswith("Basic"):
+                group.addOption("v", "Run this version", app.getFullVersion())
                 group.addOption("c", "Use checkout", app.checkout)
                 group.addOption("cp", "Times to run", "1", description="Set this to some number larger than 1 to run the same test multiple times, for example to try to catch indeterminism in the system under test")
                 if recordsUseCases:
@@ -42,11 +42,17 @@ class Config:
                 if useCatalogues:
                     group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
             elif group.name.startswith("Advanced"):
+                group.addSwitch("x", "Enable self-diagnostics")
+                group.addOption("xr", "Configure self-diagnostics from", self.optionMap.getSelfDiagFile())
+                group.addOption("xw", "Write self-diagnostics to", self.optionMap.getSelfDiagWriteDir())
                 group.addOption("b", "Run batch mode session")
                 group.addSwitch("rectraffic", "(Re-)record command-line or client-server traffic")
                 group.addSwitch("keeptmp", "Keep temporary write-directories")
             elif group.name.startswith("Invisible"):
-                # Only relevant without the GUI
+                # Options that don't make sense with the GUI should be invisible there...
+                group.addOption("s", "Run this script")
+                group.addOption("d", "Run as if TEXTTEST_HOME was")
+                group.addSwitch("help", "Print configuration help text on stdout")
                 group.addSwitch("g", "use dynamic GUI", 1)
                 group.addSwitch("gx", "use static GUI")
                 group.addSwitch("con", "use console interface")

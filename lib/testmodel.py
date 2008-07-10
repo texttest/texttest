@@ -1369,31 +1369,14 @@ class Application:
         self.setConfigDefault("interpreter", plugins.getInterpreter(executable), "Program to use as interpreter for the SUT")
     def createOptionGroups(self, inputOptions):
         groupNames = [ "Select Tests", "Basic", "Advanced", "Invisible" ]
-        optionGroups = []
-        for name in groupNames:
-            group = plugins.OptionGroup(name)
-            self.addToOptionGroup(group)
-            optionGroups.append(group)
+        optionGroups = map(plugins.OptionGroup, groupNames)
         self.configObject.addToOptionGroups(self, optionGroups)
         for option in inputOptions.keys():
             optionGroup = self.findOptionGroup(option, optionGroups)
             if not optionGroup:
                 raise BadConfigError, "unrecognised option -" + option
         return optionGroups
-    def addToOptionGroup(self, group):
-        if group.name.startswith("Select"):
-            group.addOption("a", "App names containing", description="Select tests for which the application name matches the entered text. The text can be a regular expression.")
-        elif group.name.startswith("Basic"):
-            group.addOption("v", "Run this version", self.getFullVersion())
-        elif group.name.startswith("Advanced"):
-            group.addOption("xr", "Configure self-diagnostics from", self.inputOptions.getSelfDiagFile())
-            group.addOption("xw", "Write self-diagnostics to", self.inputOptions.getSelfDiagWriteDir())
-            group.addSwitch("x", "Enable self-diagnostics")
-        elif group.name.startswith("Invisible"):
-            # Options that don't make sense with the GUI should be invisible there...
-            group.addOption("s", "Run this script")
-            group.addOption("d", "Run as if TEXTTEST_HOME was")
-            group.addSwitch("help", "Print configuration help text on stdout")
+    
     def findOptionGroup(self, option, optionGroups):
         for optionGroup in optionGroups:
             if optionGroup.options.has_key(option) or optionGroup.switches.has_key(option):

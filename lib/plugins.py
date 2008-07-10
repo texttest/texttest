@@ -1076,12 +1076,13 @@ class MultiEntryDictionary(seqdict):
 
     
 class Option:    
-    def __init__(self, name, value, description):
+    def __init__(self, name, value, description, changeMethod):
         self.name = name
         self.defaultValue = value
         self.valueMethod = None
         self.updateMethod = None
         self.description = description
+        self.changeMethod = changeMethod
     def getValue(self):
         if self.valueMethod:
             return self.valueMethod()
@@ -1102,8 +1103,8 @@ class Option:
 
 class TextOption(Option):
     def __init__(self, name, value="", possibleValues=[], allocateNofValues=-1,
-                 selectDir=False, selectFile=False, saveFile=False, possibleDirs=[], description=""):
-        Option.__init__(self, name, value, description)
+                 selectDir=False, selectFile=False, saveFile=False, possibleDirs=[], description="", changeMethod = None):
+        Option.__init__(self, name, value, description, changeMethod)
         self.possValAppendMethod = None
         self.possValListMethod = None
         self.nofValues = allocateNofValues
@@ -1184,8 +1185,8 @@ class TextOption(Option):
         return (existingDirs, defaultDir)
         
 class Switch(Option):
-    def __init__(self, name="", value=0, options=[], description=""):
-        Option.__init__(self, name, int(value), description)
+    def __init__(self, name="", value=0, options=[], description="", changeMethod = None):
+        Option.__init__(self, name, int(value), description, changeMethod)
         self.options = options
         self.resetMethod = None
     def setValue(self, value):

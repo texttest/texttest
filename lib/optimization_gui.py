@@ -34,7 +34,8 @@ class PlotTestInGUI(guiplugins.ActionTabGUI):
     def __init__(self, allApps, dynamic):
         guiplugins.ActionTabGUI.__init__(self, allApps, dynamic)
         self.dynamic = dynamic
-        self.testGraph = optimization.TestGraph(self.optionGroup)
+        self.firstApp = allApps[0]
+        self.testGraph = optimization.TestGraph(self.firstApp, self.optionGroup)
     def correctTestClass(self):
         return "test-case"
     def _getTitle(self):
@@ -56,7 +57,7 @@ class PlotTestInGUI(guiplugins.ActionTabGUI):
             self.createGUIPlotObjects(test)
         self.plotGraph(self.currTestSelection[0].app.writeDirectory) # This is not correct if you plot multiple applications!
     def createGUIPlotObjects(self, test):
-        logFileStem = test.getConfigValue("log_file")
+        logFileStem = self.optionGroup.getOptionValue("l")
         if self.dynamic:
             tmpFile = self.getTmpFile(test, logFileStem)
             if tmpFile:
@@ -95,7 +96,7 @@ class PlotTestInGUI(guiplugins.ActionTabGUI):
                 guiplugins.scriptEngine.monitorProcess("plots graphs", plotProcess)
         finally:
             # The TestGraph is "used", create a new one so that the user can do another plot.
-            self.testGraph = optimization.TestGraph(self.optionGroup)
+            self.testGraph = optimization.TestGraph(self.firstApp, self.optionGroup)
 
     
 class StartStudio(guiplugins.ActionDialogGUI):

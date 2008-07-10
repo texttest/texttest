@@ -233,6 +233,8 @@ class ApcConfig(apc_basic.Config):
                 os.symlink(origLib, debugLib)
     def getWebPageGeneratorClass(self):
         return GenerateWebPages
+    def getPlotConfigurator(self):
+        return PlotConfigure
     def printHelpDescription(self):
         print helpDescription
         apc_basic.Config.printHelpDescription(self)
@@ -1517,10 +1519,11 @@ class PlotKPIGroups(plugins.Action):
         self.allGroups.sort()
         for group in self.allGroups:
             # Create a test graph
+            firstApp = self.groupsToPlot[group][0].app
             if not self.timeDivision:
-                testGraph = optimization.TestGraph()
+                testGraph = optimization.TestGraph(firstApp)
             else:
-                testGraph = TestGraphTimeDiv()
+                testGraph = TestGraphTimeDiv(firstApp)
             testGraph.readCommandLine(self.argsRem)
             testGraph.optionGroup.setValue("title", "APC user " + self.groupsToPlot[group][0].getRelPath().split(os.sep)[0] + " - KPI group " + group)
             if testGraph.optionGroup.getSwitchValue("per") and self.groupScale[group]:
@@ -1534,8 +1537,8 @@ class PlotKPIGroups(plugins.Action):
         pass
 
 class TestGraphTimeDiv(optimization.TestGraph):
-    def __init__(self):
-        optimization.TestGraph.__init__(self)
+    def __init__(self, firstApp):
+        optimization.TestGraph.__init__(self, firstApp)
         self.groupTimes = seqdict()
         self.numTests = {}
     def plot(self, writeDir):
@@ -1632,6 +1635,60 @@ class PlotEngineMPLTimeDiv(optimization.PlotEngineMPL):
 
         self.showOrSave(targetFile, writeDir, printer, printA3)
 
+class PlotConfigure(optimization.PlotConfigure):
+    def getLogFiles(self):
+        return [ self.app.getConfigValue("log_file"), "all" ]
+    def getLogFileParser(self, logFileStem):
+        if logFileStem == "status":
+            return optimization.OptimizationRun
+        elif logFileStem == "all":
+            return ApcLogParser
+        else:
+            return None
+    def getPossiblePlotItems(self, logFileStem):
+        if logFileStem == "status":
+            return [ optimization.costEntryName, "APC total rule cost", "extra overcover cost", \
+                     "global constraint excess cost", "base constraint excess cost", \
+                     "global constraint excess cost,base constraint excess cost", \
+                     "overcovers", "uncovered legs\.\.", "illegal trips........................", \
+                     "overcovers,uncovered legs\.\.,illegal trips........................",
+                     "apctimes","memory"]
+        elif logFileStem == "all":
+            return [ "OBJ,sLBD,pLBD" ]
+        else:
+            return [ "" ]
+    def getPossibleItemsToPlotAgainst(self, logFileStem):
+        if logFileStem == "status":
+            return [ optimization.timeEntryName, "Colgen iterations", optimization.execTimeEntryName]
+        elif logFileStem == "all":
+            return [ optimization.timeEntryName, "Colgen iterations"]
+        else:
+            return [ "" ]
+
+class ApcLogParser:
+    def __init__(self, app, definingItems, interestingItems, logFile):
+        self.solutions = []
+
+        allItems = definingItems + interestingItems
+        for line in open(logFile).xreadlines():
+            if line.find("Solving IP") != -1:
+                colgenIter = int(line.split()[2])
+                self.solutions.append({'Colgen iterations': colgenIter})
+                cgTime = float(line.split()[-1]) / 1000 / 60 # Should be in minutes.
+                self.solutions[-1][optimization.timeEntryName] = cgTime
+
+            for item in allItems:
+                if line.find(item) != -1:
+                    self.tryCalculateEntry(item, line)
+                    
+    def tryCalculateEntry(self, item, line):
+        val = None
+        if item == "OBJ" or item == "sLBD" or item == "pLBD":
+            val = float(line.strip().split('\t')[-1])
+        else:
+            val = int(line.split(' ')[-1])
+        if val:
+            self.solutions[-1][item] = val
 
 #
 # This class reads a CarmResources etab file and gives access to it

@@ -184,6 +184,8 @@ class OptimizationConfig(ravebased.Config):
         return MakeComparisons(OptimizationTestComparison, self.getProgressComparisonClass())
     def getWebPageGeneratorClass(self):
         return GenerateWebPages
+    def getPlotConfigurator(self):
+        return PlotConfigure
     def getProgressComparisonClass(self):
         pass # for APC
     def getProgressReportBuilder(self):
@@ -938,7 +940,7 @@ class DescribePlotTest(plugins.Action):
 class GraphPlotResponder(Responder):
     def __init__(self, optionMap, allApps):
         Responder.__init__(self, optionMap)
-        self.testGraph = TestGraph()
+        self.testGraph = TestGraph(allApps[0])
         plotStr = optionMap["plot"]
         if plotStr:
             self.testGraph.readCommandLine(plotStr.split())
@@ -964,7 +966,7 @@ class PlotSubplans(plugins.Action):
             return
         plotSubplanDone = 1
         # Create a test graph
-        testGraph = TestGraph()
+        testGraph = TestGraph(app)
         testGraph.optionGroup.addOption("sp", "Subplan")
         testGraph.readCommandLine(self.args)
         if not testGraph.optionGroup.getOptionValue("title"):
@@ -989,7 +991,7 @@ class PlotSubplans(plugins.Action):
         
 # TestGraph is the "real stuff", the PlotLine instances are created here and gnuplot is invoked here.
 class TestGraph:
-    def __init__(self, guiOptionGroup=None):
+    def __init__(self, firstApp, guiOptionGroup=None):
         self.plotLines = []
         self.pointTypes = {}
         self.lineTypes = {}
@@ -1001,25 +1003,26 @@ class TestGraph:
         self.plotAveragers = {}
         self.axisXLabel = None
         self.xScaleFactor = 1
+        plotConfigClass = firstApp.getPlotConfigurator()
+        self.plotConfig = plotConfigClass(firstApp)
+        logFiles = self.plotConfig.getLogFiles()
+        possiblePlotItems = self.plotConfig.getPossiblePlotItems(logFiles[0])
+        possibleItemsToPlotAgainst = self.plotConfig.getPossibleItemsToPlotAgainst(logFiles[0])
         # This is the options and switches that are common
         # both for the GUI and command line.
-        options = [ ("r", "Horizontal range", ["0:"]),
-                    ("yr", "Vertical range", [""]),
-                    ("ts", "Time scale to use", ["minutes", "hours", "days"]),
-                    ("p", "Absolute file to print to", [""]),
-                    ("pr", "Printer to print to", [""]),
-                    ("i", "Log file item to plot", [costEntryName, "APC total rule cost", "extra overcover cost", \
-                                                    "global constraint excess cost", "base constraint excess cost", \
-                                                    "global constraint excess cost,base constraint excess cost", \
-                                                    "overcovers", "uncovered legs\.\.", "illegal trips........................", \
-                                                    "overcovers,uncovered legs\.\.,illegal trips........................",
-                                                    "apctimes","memory"]),
-                    ("ix", "Log file item to plot against", [timeEntryName, "Colgen iterations", execTimeEntryName]),
-                    ("v", "Extra versions to plot", [""]),
-                    ("title", "Title of the plot", [""]),
-                    ("size", "size of the plot", [""]),
-                    ("terminal", "gnuplot print terminal", ["postscript", "png", "svg"]),
-                    ("engine", "Plot engine to use", ["gnuplot", "mpl"]) ]
+        options = [ ("r", "Horizontal range", ["0:"], None),
+                    ("yr", "Vertical range", [""], None),
+                    ("ts", "Time scale to use", ["minutes", "hours", "days"], None),
+                    ("p", "Absolute file to print to", [""], None),
+                    ("pr", "Printer to print to", [""], None),
+                    ("i", "Log file item to plot", possiblePlotItems, None),
+                    ("ix", "Log file item to plot against", possibleItemsToPlotAgainst, None),
+                    ("l", "Log file to use", logFiles, self.changePossibleItems),
+                    ("v", "Extra versions to plot", [""], None),
+                    ("title", "Title of the plot", [""], None),
+                    ("size", "size of the plot", [""], None),
+                    ("terminal", "gnuplot print terminal", ["postscript", "png", "svg"], None),
+                    ("engine", "Plot engine to use", ["gnuplot", "mpl"], None) ]
         switches = [ ("per", "Plot percentage"),
                      ("pc", "Print in colour"),
                      ("pa3", "Print in A3"),
@@ -1036,10 +1039,14 @@ class TestGraph:
             self.optionGroup.addSwitch("oem", "Only plot exactly matching versions")
             self.optionGroup.addSwitch("nt", "Don't search for temporary files")
         # Create the options and read the command line arguments.
-        for name, expl, values in options:
-            self.optionGroup.addOption(name, expl, values[0], possibleValues = values)
+        for name, expl, values, changem in options:
+            self.optionGroup.addOption(name, expl, values[0], possibleValues = values, changeMethod = changem)
         for name, expl in switches:
             self.optionGroup.addSwitch(name, expl)
+    def changePossibleItems(self, dummy):
+        logFile = self.optionGroup.getOptionValue("l")
+        self.optionGroup.setPossibleValues("i", self.plotConfig.getPossiblePlotItems(logFile))
+        self.optionGroup.setPossibleValues("ix", self.plotConfig.getPossibleItemsToPlotAgainst(logFile))
     def readCommandLine(self, args):
         self.optionGroup.readCommandLineArguments(args)
     def plot(self, writeDir):
@@ -1231,8 +1238,11 @@ class TestGraph:
         xItem = self.optionGroup.getOptionValue("ix").replace("_", " ")
         if not xItem:
             xItem = timeEntryName
-        
-        optRun = OptimizationRun(app, [ xItem ], plotItems, logFile)
+
+        parser = self.plotConfig.getLogFileParser(self.optionGroup.getOptionValue("l"))
+        if not parser:
+            raise plugins.TextTestError, "No parser available for log file " + logFile
+        optRun = parser(app, [ xItem ], plotItems, logFile)
         if len(optRun.solutions) == 0:
             return
 
@@ -1266,7 +1276,7 @@ class TestGraph:
         self.createPlotObjectsForItems(lineName, logFile, description, scaling, dir, test.app)
     def createPlotObjectsForTest(self, test):
         # for command-line plotting only
-        logFileStem = test.app.getConfigValue("log_file")
+        logFileStem = self.optionGroup.getOptionValue("l")
         searchInUser = self.optionGroup.getOptionValue("tu")
         onlyExactMatch = self.optionGroup.getSwitchValue("oem")
         noTmp = self.optionGroup.getSwitchValue("nt")
@@ -1762,6 +1772,18 @@ class PlotAverager(Averager):
             yValues.append(y)
             xx.append(xScaleFactor * xVal)
         return xx, yValues
+
+class PlotConfigure:
+    def __init__(self, app):
+        self.app = app
+    def getLogFiles(self):
+        return [ self.app.getConfigValue("log_file") ]
+    def getLogFileParser(self, logFileStem):
+        return OptimizationRun
+    def getPossiblePlotItems(self, logFileStem):
+        return [ costEntryName ]
+    def getPossibleItemsToPlotAgainst(self, logFileStem):
+        return [ timeEntryName ]
 
 ### End of plot stuff
 

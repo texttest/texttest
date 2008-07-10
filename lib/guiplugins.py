@@ -770,6 +770,8 @@ class OptionGroupGUI(ActionGUI):
         for text in option.listPossibleValues():
             entrycompletion.manager.addTextCompletion(text)
         option.setMethods(entry.get_text, entry.set_text)
+        if option.changeMethod:
+            entry.connect("changed", option.changeMethod)
         return label, widget, entry
 
     def addValuesFromConfig(self, option):

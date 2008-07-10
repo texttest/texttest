@@ -1706,12 +1706,17 @@ class RunTestsAdvanced(RunTests):
         return "Advanced"
 
 class RecordTest(RunningAction):
-    def __init__(self, *args):
-        RunningAction.__init__(self, *args)
+    def __init__(self, allApps, *args):
+        RunningAction.__init__(self, allApps, *args)
         self.currentApp = None
         self.recordTime = None
-        self.addOption("v", "Version to record")
-        self.addOption("c", "Checkout to use for recording")
+        defaultVersion, defaultCheckout = "", ""
+        if len(allApps) > 0:
+            self.currentApp = allApps[0]
+            defaultVersion = self.currentApp.getFullVersion(forSave=1)
+            defaultCheckout = self.currentApp.checkout
+        self.addOption("v", "Version to record", defaultVersion)
+        self.addOption("c", "Checkout to use for recording", defaultCheckout)
         self.addSwitch("rectraffic", "Also record command-line or client-server traffic", 1)
         self.addSwitch("rep", "Automatically replay test after recording it", 1)
         self.addSwitch("repgui", options = ["Auto-replay invisible", "Auto-replay in dynamic GUI"])

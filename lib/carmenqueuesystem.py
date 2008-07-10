@@ -306,7 +306,7 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         filteredPaths = filter(lambda path: not path.startswith("/usr/local/tt-env"), allPaths)
         return os.pathsep.join(filteredPaths)
     def getCleanedGtkEnvironment(self, app):
-        if os.name == "posix" and app.getConfigValue("interpreter") == "ttpython":
+        if os.name == "posix" and app.getConfigValue("interpreter").startswith("ttpython"):
             return [] # Use this convention to allow the tested app to use TextTest's environment also without lots of fuss...
         gtkEnvVars = [ "LD_LIBRARY_PATH", "PYTHONPATH", "GTK2_RC_FILES",
                        "GTK_PATH", "GTK_DATA_PREFIX", "XDG_DATA_DIRS" ]

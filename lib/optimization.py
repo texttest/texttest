@@ -1051,6 +1051,8 @@ class TestGraph:
         self.optionGroup.setPossibleValues("ix", self.plotConfig.getPossibleItemsToPlotAgainst(logFile))
     def readCommandLine(self, args):
         self.optionGroup.readCommandLineArguments(args)
+        self.optionGroup.setOptionValue("i", self.optionGroup.getOptionValue("i").replace("_", " "))
+        self.optionGroup.setOptionValue("ix", self.optionGroup.getOptionValue("ix").replace("_", " "))
     def plot(self, writeDir, gui = None):
         # Add the PlotAveragers last in the PlotLine list.
         for plotAverager in self.plotAveragers:
@@ -1236,10 +1238,10 @@ class TestGraph:
         # Find out what to plot.
         plotItemsText = self.optionGroup.getOptionValue("i")
         if plotItemsText == "apctimes":
-            plotItemsText = "DH_post_processing,Generation_time,Coordination_time,Conn_fixing_time,Optimization_time,Network_generation_time"
-        plotItems = plugins.commasplit(plotItemsText.replace("_", " "))
+            plotItemsText = "DH post processing,Generation time,Coordination time,Conn fixing time,Optimization time,Network generation time"
+        plotItems = plugins.commasplit(plotItemsText)
 
-        xItem = self.optionGroup.getOptionValue("ix").replace("_", " ")
+        xItem = self.optionGroup.getOptionValue("ix")
         if not xItem:
             xItem = timeEntryName
 

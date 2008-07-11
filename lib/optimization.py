@@ -462,7 +462,7 @@ class LogFileFinder:
         if thisRun:
             fromThisRun = self.test.makeTmpFileName(stem)
             self.diag.info("Looked for " + fromThisRun)
-            if os.path.isfile(fromThisRun): # Temp removed, doesn't work for matador. and fromThisRun.find(searchString) != -1:
+            if os.path.isfile(fromThisRun) and fromThisRun.find(searchString) != -1:
                 return fromThisRun, app.writeDirectory
         for subDir in os.listdir(root):
             fullDir = os.path.join(root, subDir)

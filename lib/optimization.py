@@ -1003,6 +1003,8 @@ class TestGraph:
         self.plotAveragers = {}
         self.axisXLabel = None
         self.xScaleFactor = 1
+        self.extraVersion = {}
+        self.usedExtraVersion = {}
         plotConfigClass = firstApp.getPlotConfigurator()
         self.plotConfig = plotConfigClass(firstApp)
         logFiles = self.plotConfig.getLogFiles()
@@ -1049,10 +1051,12 @@ class TestGraph:
         self.optionGroup.setPossibleValues("ix", self.plotConfig.getPossibleItemsToPlotAgainst(logFile))
     def readCommandLine(self, args):
         self.optionGroup.readCommandLineArguments(args)
-    def plot(self, writeDir):
+    def plot(self, writeDir, gui = None):
         # Add the PlotAveragers last in the PlotLine list.
         for plotAverager in self.plotAveragers:
             self.plotLines.append(self.plotAveragers[plotAverager])
+        # Time to check what extra versions that were used.
+        self.checkForUnusedExtraVersions(gui)
         engineOpt = self.optionGroup.getOptionValue("engine")
         if engineOpt == "gnuplot":
             engine = PlotEngine(self)
@@ -1274,6 +1278,17 @@ class TestGraph:
         dir = test.getDirectory(temporary=1, forFramework = 1).replace(test.app.writeDirectory, ".")
         description = self.getPlotLineDescriptionForTest(test, version)
         self.createPlotObjectsForItems(lineName, logFile, description, scaling, dir, test.app)
+    def checkForUnusedExtraVersions(self, gui):
+        unused = []
+        for version in self.extraVersion.keys():
+            if not self.usedExtraVersion.has_key(version):
+                unused.append(version)
+        if unused:
+            warning = "Warning: No logfiles were found for the folloing extra versions\nand they were so unused: " + string.join(unused)
+            if gui:
+                gui.showWarningDialog(warning)
+            else:
+                print warning
     def createPlotObjectsForExtraVersions(self, test):
         logFileStem = self.optionGroup.getOptionValue("l")
         searchInUser = self.optionGroup.getOptionValue("tu")
@@ -1295,12 +1310,14 @@ class TestGraph:
                     date = self.isDate(tmp[2])
                 else:
                     date = None
+            self.extraVersion[version] = 1
             # Plot temporary files.
             if not noTmp:
                 logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser=searchInUser)
                 foundTmp, logFileTmp = logFileFinder.findFile(version)
                 if foundTmp:
                     self.createPlotObjects("run", versionName, logFileTmp, test, scaling)
+                    self.usedExtraVersion[version] = 1
             # Plot "saved" files.
             logFile = test.getFileName(logFileStem, version)
             if version and not logFile.endswith(test.app.name + "." + version):
@@ -1318,8 +1335,10 @@ class TestGraph:
                         print os.path.basename(logFile), "is not in the CVS repository at", date
                         continue
                 self.createPlotObjects(None, "CVS " + date, CVSLogFileName, test, None)
+                self.usedExtraVersion[version] = 1
             else:
                 self.createPlotObjects(None, versionName, logFile, test, scaling)
+                self.usedExtraVersion[version] = 1                                   
     def createPlotObjectsForTest(self, test):
         # for command-line plotting only
         logFileStem = self.optionGroup.getOptionValue("l")

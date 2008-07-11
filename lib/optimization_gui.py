@@ -84,7 +84,7 @@ class PlotTestInGUI(guiplugins.ActionTabGUI):
         return test.makeTmpFileName(logFileStem)
     def plotGraph(self, writeDirectory):
         try:
-            plotProcess = self.testGraph.plot(writeDirectory)
+            plotProcess = self.testGraph.plot(writeDirectory, self)
             if plotProcess:
                 # Should really monitor this and close it when GUI closes,
                 # but it isn't a child process so this means ps and load on the machine

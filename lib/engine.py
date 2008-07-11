@@ -213,16 +213,19 @@ class TextTest(Responder, plugins.Observable):
             if extraApp:
                 app.extras.append(extraApp)
         return app, extraVersionsDuplicating
+    def getAllConfigObjects(self, allApps):
+        if len(allApps) > 0:
+            return allApps
+        else:
+            return [ plugins.importAndCall("default", "getConfig", self.inputOptions) ]
+        
     def createResponders(self, allApps):
         responderClasses = []
-        for app in allApps:
-            for respClass in app.getResponderClasses(allApps):
+        for configObject in self.getAllConfigObjects(allApps):
+            for respClass in configObject.getResponderClasses(allApps):
                 if not respClass in responderClasses:
                     self.diag.info("Adding responder " + repr(respClass))
                     responderClasses.append(respClass)
-        if len(allApps) == 0:
-            # If we don't have any applications, read the default configuration's responders
-            responderClasses += plugins.importAndCall("default", "getConfig", self.inputOptions).getResponderClasses(allApps)
         # Make sure we send application events when tests change state
         responderClasses += self.getBuiltinResponderClasses()
         filteredClasses = self.removeBaseClasses(responderClasses)
@@ -305,8 +308,6 @@ class TextTest(Responder, plugins.Observable):
                 self.notifyExit() # include the dud ones, possibly
 
     def inputOptionsValid(self, allApps):
-        if len(allApps) == 0:
-            return True # for now...
         validOptions = self.findAllValidOptions(allApps)
         for option in self.inputOptions.keys():
             if option not in validOptions:
@@ -316,8 +317,8 @@ class TextTest(Responder, plugins.Observable):
 
     def findAllValidOptions(self, allApps):
         validOptions = Set()
-        for app in allApps:
-            validOptions.update(Set(app.findAllValidOptions(allApps)))
+        for configObject in self.getAllConfigObjects(allApps):
+            validOptions.update(Set(configObject.findAllValidOptions(allApps)))
         return validOptions
                                  
     def createAndRunSuites(self, allApps):

@@ -169,6 +169,9 @@ class IdleHandlerManager:
     def notifyActionStop(self, *args):
         # Activate idle function again, see comment in notifyActionStart
         self.enableHandler()
+
+    def addSuites(self, *args):
+        self.enableHandler()
             
     def enableHandler(self):
         if self.sourceId == -1:
@@ -240,8 +243,8 @@ class TextTestGUI(Responder, plugins.Observable):
     def getHideableGUIs(self):
         return [ self.toolBarGUI, self.shortcutBarGUI, statusMonitor ]
     def getAddSuitesObservers(self):
-        return [ self.testColumnGUI, self.appFileGUI ] + filter(lambda obs: hasattr(obs, "addSuites"),
-                                               self.defaultActionGUIs + self.actionTabGUIs)
+        actionObservers = filter(lambda obs: hasattr(obs, "addSuites"), self.defaultActionGUIs + self.actionTabGUIs)
+        return [ self.testColumnGUI, self.appFileGUI ] + actionObservers + [ self.rightWindowGUI, self.topWindowGUI, self.idleManager ]
     def setObservers(self, frameworkObservers):
         # We don't actually have the framework observe changes here, this causes duplication. Just forward
         # them as appropriate to where they belong. This is a bit of a hack really.
@@ -289,12 +292,6 @@ class TextTestGUI(Responder, plugins.Observable):
     def addSuites(self, suites):
         for observer in self.getAddSuitesObservers():
             observer.addSuites(suites)
-
-        if not self.topWindowGUI.topWindow:
-            # only do this once, not when new suites are added...
-            self.topWindowGUI.createView()
-            self.topWindowGUI.activate()
-            self.idleManager.enableHandler()
         
     def shouldShrinkMainPanes(self):
         # If we maximise there is no point in banning pane shrinking: there is nothing to gain anyway and
@@ -390,7 +387,7 @@ class TopWindowGUI(ContainerGUI):
         ContainerGUI.__init__(self, [ contentGUI ])
         self.dynamic = dynamic
         self.topWindow = None
-        self.allApps = allApps
+        self.allApps = copy(allApps)
         self.windowSizeDescriptor = ""
         self.exitStatus = 0
         if not self.dynamic:
@@ -408,6 +405,18 @@ class TopWindowGUI(ContainerGUI):
             return " under " + allCheckouts[0]
         else:
             return " from various checkouts"
+
+    def addSuites(self, suites):
+        for suite in suites:
+            if suite.app.fullName not in [ app.fullName for app in self.allApps ]:
+                self.allApps.append(suite.app)
+                self.setWindowTitle()
+                self.describeTitle()
+                
+        if not self.topWindow:
+            # only do this once, not when new suites are added...
+            self.createView()
+            self.activate()
         
     def createView(self):
         # Create toplevel window to show it all.
@@ -419,15 +428,7 @@ class TopWindowGUI(ContainerGUI):
             plugins.printWarning("Failed to register texttest stock icons.")
             plugins.printException()
         self.topWindow.set_icon_from_file(self.getIcon())
-        allAppNames = [ app.fullName + app.versionSuffix() for app in self.allApps ]
-        appNames = ",".join(allAppNames)
-        if self.dynamic:
-            checkoutTitle = self.getCheckoutTitle()
-            self.topWindow.set_title("TextTest dynamic GUI : testing " + appNames + checkoutTitle + \
-                                     " (started at " + plugins.startTimeString() + ")")
-        else:
-            self.topWindow.set_title("TextTest static GUI : management of tests for " + \
-                                     appNames)
+        self.setWindowTitle()
             
         self.topWindow.add(self.subguis[0].createView())
         self.windowSizeDescriptor = self.adjustSize()
@@ -438,6 +439,18 @@ class TopWindowGUI(ContainerGUI):
         scriptEngine.connect("close window", "delete_event", self.topWindow, self.notifyQuit)
         return self.topWindow
 
+    def setWindowTitle(self):
+        allAppNames = [ app.fullName + app.versionSuffix() for app in self.allApps ]
+        appNameDesc = ",".join(allAppNames)
+        if self.dynamic:
+            checkoutTitle = self.getCheckoutTitle()
+            self.topWindow.set_title("TextTest dynamic GUI : testing " + appNameDesc + checkoutTitle + \
+                                     " (started at " + plugins.startTimeString() + ")")
+        else:
+            if len(appNameDesc) > 0:
+                appNameDesc = " for " + appNameDesc 
+            self.topWindow.set_title("TextTest static GUI : management of tests" + appNameDesc)
+
     def getIcon(self):
         imageDir = plugins.installationDir("images")
         if self.dynamic:
@@ -446,8 +459,10 @@ class TopWindowGUI(ContainerGUI):
             return os.path.join(imageDir, "texttest-icon-static.jpg")
     def writeSeparator(self):
         pass # Don't bother, we're at the top
-    def describe(self):
+    def describeTitle(self):
         guilog.info("Top Window title is " + self.topWindow.get_title())
+    def describe(self):
+        self.describeTitle()
         guilog.info("Default widget is " + str(self.topWindow.get_focus().__class__))
         guilog.info(self.windowSizeDescriptor)
     def forceQuit(self):
@@ -1609,30 +1624,34 @@ class ChangeableNotebookGUI(NotebookGUI):
             self.diag.info("Hiding page " + self.notebook.get_tab_label_text(page))
             page.hide()
         return True
+
     def updateCurrentPage(self, rowCount):
         for pageNum, (tabName, tabGUI) in enumerate(self.tabInfo):            
             if tabGUI.shouldShowCurrent() and tabGUI.forceVisible(rowCount):
                 self.setCurrentPage(pageNum)
 
     def notifyNewTestSelection(self, tests, apps, rowCount, direct):
+        self.diag.info("New selection with " + repr(tests) + ", adjusting '" + self.scriptTitle + "'")
+        # only change pages around if a test is directly selected
+        self.updatePages(rowCount=rowCount, changeCurrentPage=direct)
+
+    def updatePages(self, test=None, state=None, rowCount=0, changeCurrentPage=False):
         if not self.notebook:
             return
-        self.diag.info("New selection with " + repr(tests) + ", adjusting '" + self.scriptTitle + "'")
-        pagesShown = self.showNewPages()
-        pagesHidden = self.hideOldPages()
-        # only change pages around if a test is directly selected
-        if direct: 
+        pagesShown = self.showNewPages(test, state)
+        pagesHidden = self.hideOldPages(test, state)
+        if changeCurrentPage: 
             self.updateCurrentPage(rowCount)
   
         if pagesShown or pagesHidden:
             guiplugins.SubGUI.contentsChanged(self) # just the tabs will do here, the rest is described by other means
+
     def notifyLifecycleChange(self, test, state, changeDesc):
-        if not self.notebook:
-            return 
-        pagesShown = self.showNewPages(test, state)
-        pagesHidden = self.hideOldPages(test, state)
-        if pagesShown or pagesHidden:
-            guiplugins.SubGUI.contentsChanged(self) # just the tabs will do here, the rest is described by other means
+        self.updatePages(test, state)
+
+    def addSuites(self, suites):
+        self.updatePages()
+        
         
           
 class PaneGUI(ContainerGUI):
@@ -2400,15 +2419,16 @@ class TestProgressMonitor(guiplugins.SubGUI):
         self.dynamic = dynamic
         self.testCount = testCount
         self.diffStore = {}
-        # It isn't really a gui configuration, and this could cause bugs when several apps
-        # using differnt diff tools are run together. However, this isn't very likely and we prefer not
-        # to recalculate all the time...
-        diffTool = guiConfig.getValue("text_diff_program")
-        self.diffFilterGroup = plugins.TextTriggerGroup(guiConfig.getCompositeValue("text_diff_program_filters", diffTool))
-        if testCount > 0:
-            colour = guiConfig.getTestColour("not_started")
-            visibility = guiConfig.showCategoryByDefault("not_started")
-            self.addNewIter("Not started", None, colour, visibility, testCount)
+        if self.shouldShow():
+            # It isn't really a gui configuration, and this could cause bugs when several apps
+            # using differnt diff tools are run together. However, this isn't very likely and we prefer not
+            # to recalculate all the time...
+            diffTool = guiConfig.getValue("text_diff_program")
+            self.diffFilterGroup = plugins.TextTriggerGroup(guiConfig.getCompositeValue("text_diff_program_filters", diffTool))
+            if testCount > 0:
+                colour = guiConfig.getTestColour("not_started")
+                visibility = guiConfig.showCategoryByDefault("not_started")
+                self.addNewIter("Not started", None, colour, visibility, testCount)
     def getGroupTabTitle(self):
         return "Status"
     def shouldShow(self):

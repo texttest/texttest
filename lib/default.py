@@ -47,8 +47,9 @@ class Config:
                     group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
             elif group.name.startswith("Advanced"):
                 group.addSwitch("x", "Enable self-diagnostics")
-                group.addOption("xr", "Configure self-diagnostics from", self.optionMap.getSelfDiagFile())
-                group.addOption("xw", "Write self-diagnostics to", self.optionMap.getSelfDiagWriteDir())
+                defaultDiagDir = os.path.join(os.getenv("TEXTTEST_HOME"), "Diagnostics")
+                group.addOption("xr", "Configure self-diagnostics from", os.path.join(defaultDiagDir, "log4py.conf"))
+                group.addOption("xw", "Write self-diagnostics to", defaultDiagDir)
                 group.addOption("b", "Run batch mode session")
                 group.addSwitch("rectraffic", "(Re-)record command-line or client-server traffic")
                 group.addSwitch("keeptmp", "Keep temporary write-directories")
@@ -139,6 +140,8 @@ class Config:
         return basic
 
     def getDefaultInterface(self, allApps):
+        if len(allApps) == 0:
+            return "static_gui"
         defaultIntf = None
         for app in allApps:
             appIntf = app.getConfigValue("default_interface")
@@ -164,6 +167,10 @@ class Config:
         
         if not self.hasExplicitInterface():
             self.setDefaultInterface(allApps)
+
+        if not self.optionMap.has_key("gx") and len(allApps) == 0:
+            raise plugins.TextTestError, "Could not find any matching applications (files of the form config.<app>) under " + self.optionMap.directoryName
+
         # Put the GUI first ... first one gets the script engine - see respond module :)
         if self.useGUI():
             self.addGuiResponder(classes)
@@ -709,13 +716,9 @@ class Config:
         app.setConfigDefault("bug_system_script", { "default" : "" }, "The location of the script used to extract information from the bug system.")
     def setInterfaceDefaults(self, app):
         app.setConfigDefault("default_interface", "static_gui", "Which interface to start if none of -con, -g and -gx are provided")
-        # Do this here rather than from the GUI: if applications can be run with the GUI
-        # anywhere it needs to be set up
-        app.setConfigDefault("auto_sort_test_suites", 0, "Automatically sort test suites in alphabetical order. 1 means sort in ascending order, -1 means sort in descending order.")
-        app.setConfigDefault("sort_test_suites_recursively", 1, "Sort subsuites when sorting test suites")
+        # These configure the GUI but tend to have sensible defaults per application
         app.setConfigDefault("gui_entry_overrides", { "default" : "<not set>" }, "Default settings for entries in the GUI")
         app.setConfigDefault("gui_entry_options", { "default" : [] }, "Default drop-down box options for GUI entries")
-        app.setConfigDefault("gui_entry_completions", { "default" : [] }, "Add these completions to the entry completion lists initially")
         app.setConfigDefault("suppress_stderr_popup", [], "List of patterns which, if written on stderr, should not produce a warning popup")
     def setMiscDefaults(self, app):
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
@@ -726,6 +729,8 @@ class Config:
         app.setConfigDefault("test_list_files_directory", [ "filter_files" ], "Default directories for test filter files, relative to an application directory.")
         app.setConfigDefault("extra_version", [], "Versions to be run in addition to the one specified")
         app.setConfigDefault("batch_extra_version", { "default" : [] }, "Versions to be run in addition to the one specified, for particular batch sessions")
+        # Applies to any interface...
+        app.setConfigDefault("auto_sort_test_suites", 0, "Automatically sort test suites in alphabetical order. 1 means sort in ascending order, -1 means sort in descending order.")
         app.addConfigEntry("definition_file_stems", "options")
         app.addConfigEntry("definition_file_stems", "usecase")
         app.addConfigEntry("definition_file_stems", "traffic")

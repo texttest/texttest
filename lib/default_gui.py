@@ -953,7 +953,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         if len(possibleDirs) == 0:
             possibleDirs = [ self.textTestHome ]
         self.addOption("exec", "\nSelect executable program to test", description="The full path to the program you want to test", possibleDirs=possibleDirs, selectFile=True)
-
+        
     def findSubDirectories(self):
         sourceControlDirs = [ "CVS", ".svn" ]
         usableFiles = filter(lambda f: f not in sourceControlDirs, os.listdir(self.textTestHome))
@@ -962,6 +962,10 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         allDirs.sort()
         return map(os.path.basename, allDirs)
 
+    def notifyAllRead(self):
+        if self.noApps:
+            self.runInteractive()
+        
     def isActiveOnCurrent(self):
         return True
     def _getStockId(self):
@@ -1035,8 +1039,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
                           "Show all tests which match the criteria. Do not hide any tests that are currently shown." ]
         self.filteringGroup.addSwitch("current_filtering", options = [ "Discard", "Refine", "Extend" ], description=currFilterDesc)
         excludeKeys = Set(self.optionGroup.keys()) # remember these so we don't try and save them to selections
-        for app in allApps:
-            app.addToOptionGroups(allApps, [ self.optionGroup ])
+        self.addApplicationOptions(allApps)
         self.appKeys = Set(self.optionGroup.keys())
         self.appKeys.difference_update(excludeKeys)
 
@@ -1269,11 +1272,11 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
     def getNaming(self, switchName, cleanOption, optionGroup):
         return guiplugins.ActionTabGUI.getNaming(self, self.getNewSwitchName(switchName, optionGroup), cleanOption, optionGroup)
         
-    def createButtons(self):
+    def createButtons(self, vbox):
         selFrame = self.createFrame("Selection", self.selectionGroup, self.createButton())
-        self.vbox.pack_start(selFrame, fill=False, expand=False, padding=8)
+        vbox.pack_start(selFrame, fill=False, expand=False, padding=8)
         filterFrame = self.createFrame("Filtering", self.filteringGroup, self.createFilterButton())
-        self.vbox.pack_start(filterFrame, fill=False, expand=False, padding=8)
+        vbox.pack_start(filterFrame, fill=False, expand=False, padding=8)
 
     def describeAction(self):
         self._describeAction(self.gtkAction, self.accelerator)
@@ -1385,8 +1388,7 @@ class AnnotateGUI(guiplugins.ActionDialogGUI):
 class SaveSelection(guiplugins.ActionDialogGUI):
     def __init__(self, allApps, dynamic):
         guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic)
-        self.addOption("f", "enter filter-file name =",
-                       possibleDirs=allApps[0].getFilterFileDirectories(allApps, createDirs=False), saveFile=True)
+        self.addOption("f", "enter filter-file name =", possibleDirs=self.getFilterFileDirs(allApps), saveFile=True)
         if not dynamic:
             # In the static GUI case, we also want radiobuttons specifying 
             # whether we want to save the actual tests, or the selection criteria.
@@ -1455,8 +1457,9 @@ class SaveSelection(guiplugins.ActionDialogGUI):
 class LoadSelection(guiplugins.ActionDialogGUI):
     def __init__(self, allApps, *args):
         guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
-        self.addOption("f", "select filter-file", possibleDirs=allApps[0].getFilterFileDirectories(allApps, createDirs=False), selectFile=True)
+        self.addOption("f", "select filter-file", possibleDirs=self.getFilterFileDirs(allApps), selectFile=True)
         self.rootTestSuites = []
+
     def addSuites(self, suites):
         guiplugins.ActionDialogGUI.addSuites(self, suites)
         self.rootTestSuites += suites
@@ -1649,8 +1652,7 @@ class RunTests(RunningAction):
     def __init__(self, allApps, *args):
         RunningAction.__init__(self, allApps)
         self.optionGroups.append(self.optionGroup)
-        for app in allApps:
-            app.addToOptionGroups(allApps, [ self.optionGroup ])
+        self.addApplicationOptions(allApps)
 
     def _getTitle(self):
         return "_Run"
@@ -1717,6 +1719,8 @@ class RecordTest(RunningAction):
     def performOnCurrent(self):
         self.updateRecordTime(self.currTestSelection[0])
         self.startTextTestProcess("record", [ "-g", "-record" ])
+    def shouldShow(self):
+        return len(self.validApps) > 0 # override the default so it's disabled if there are no apps
     def getRecordMode(self):
         return self.currTestSelection[0].getConfigValue("use_case_record_mode")
     def isValidForApp(self, app):
@@ -2200,7 +2204,7 @@ class SortTestSuiteFileAscending(guiplugins.ActionGUI):
     def performRecursively(self, suite, ascending):        
         # First ask all sub-suites to sort themselves
         errors = ""
-        if self.currTestSelection[0].getConfigValue("sort_test_suites_recursively"):
+        if guiplugins.guiConfig.getValue("sort_test_suites_recursively"):
             for test in suite.testcases:
                 if test.classId() == "test-suite":
                     try:

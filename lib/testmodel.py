@@ -1200,11 +1200,11 @@ class Application:
                     self.extraDirCaches[dirName] = None # don't repeat the warning
                     plugins.printWarning("The directory '" + dirName + "' could not be found, ignoring 'extra_search_directory' config entry.")
         return dirCaches
+
     def makeConfigObject(self):
         moduleName = self.getConfigValue("config_module")
-        importCommand = "from " + moduleName + " import getConfig"
         try:
-            exec importCommand
+            return plugins.importAndCall(moduleName, "getConfig", self.inputOptions)
         except:
             if sys.exc_type == exceptions.ImportError:
                 errorString = "No module named " + moduleName
@@ -1214,7 +1214,7 @@ class Application:
                     raise BadConfigError, "module " + moduleName + " is not intended for use as a config_module"
             plugins.printException()
             raise BadConfigError, "config_module " + moduleName + " contained errors and could not be imported"
-        return getConfig(self.inputOptions)
+    
     def __getattr__(self, name): # If we can't find a method, assume the configuration has got one
         if hasattr(self.configObject, name):
             return ConfigurationCall(name, self)
@@ -1572,19 +1572,6 @@ class Application:
 
     def setConfigAlias(self, aliasName, realName):
         self.configDir.setAlias(aliasName, realName)
-
-    def getIntvActionConfig(self):
-        module = self.getConfigValue("interactive_action_module")
-        try:
-            return self._getIntvActionConfig(module)
-        except ImportError:
-            return self._getIntvActionConfig("default_gui")
-
-    def _getIntvActionConfig(self, module):
-        command = "from " + module + " import InteractiveActionConfig"
-        exec command
-        return InteractiveActionConfig()
-
 
             
 class OptionFinder(plugins.OptionFinder):

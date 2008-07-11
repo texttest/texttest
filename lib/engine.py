@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import plugins, os, sys, testmodel, signal
+import plugins, os, sys, testmodel, signal, operator
 from threading import Thread
 from ndict import seqdict
 from time import sleep
@@ -141,20 +141,32 @@ class TextTest(Responder, plugins.Observable):
             return True, []
         appList = []
         raisedError = False
+        selectedAppDict = self.inputOptions.findSelectedAppNames()
         for dir in self.findSearchDirs():
-            subRaisedError, apps = self.findAppsUnder(dir)
+            subRaisedError, apps = self.findAppsUnder(dir, selectedAppDict)
             appList += apps
             raisedError |= subRaisedError
+
+        if not raisedError:
+            for missingAppName in self.findMissingApps(appList, selectedAppDict.keys()):
+                sys.stderr.write("Could not read application '" + missingAppName + "'. No file named config." + missingAppName + " was found under " + root + ".\n")
+                raisedError = True
+            
         appList.sort(self.compareApps)
         self.diag.info("Found applications : " + repr(appList))
         return raisedError, appList
-    
+
+    def findMissingApps(self, appList, selectedApps):
+        return filter(lambda appName: self.appMissing(appName, appList), selectedApps)
+
+    def appMissing(self, appName, apps):
+        return reduce(operator.and_, (app.name != appName for app in apps), True)
+
     def compareApps(self, app1, app2):
         return cmp(app1.name, app2.name)
-    def findAppsUnder(self, dirName):
+    def findAppsUnder(self, dirName, selectedAppDict):
         appList = []
         raisedError = False
-        selectedAppDict = self.inputOptions.findSelectedAppNames()
         self.diag.info("Selecting apps in " + dirName + " according to dictionary :" + repr(selectedAppDict))
         dircache = testmodel.DirectoryCache(dirName)
         for f in dircache.findAllFiles("config"):
@@ -208,6 +220,9 @@ class TextTest(Responder, plugins.Observable):
                 if not respClass in responderClasses:
                     self.diag.info("Adding responder " + repr(respClass))
                     responderClasses.append(respClass)
+        if len(allApps) == 0:
+            # If we don't have any applications, read the default configuration's responders
+            responderClasses += plugins.importAndCall("default", "getConfig", self.inputOptions).getResponderClasses(allApps)
         # Make sure we send application events when tests change state
         responderClasses += self.getBuiltinResponderClasses()
         filteredClasses = self.removeBaseClasses(responderClasses)
@@ -229,6 +244,7 @@ class TextTest(Responder, plugins.Observable):
 
     def createTestSuites(self, allApps):
         appSuites = seqdict()
+        raisedError = False
         for app in allApps:
             errorMessages = []
             appGroup = [ app ] + app.extras
@@ -245,11 +261,12 @@ class TextTest(Responder, plugins.Observable):
                     plugins.printException()
             fullMsg = "".join(errorMessages)
             # If the whole group failed, we write to standard error, where the GUI will find it. Otherwise we just log in case anyone cares.
-            if len(errorMessages) == len(appGroup):
+            raisedError = len(errorMessages) == len(appGroup)
+            if raisedError:
                 sys.stderr.write(fullMsg)
             else:
                 sys.stdout.write(fullMsg)
-        return appSuites
+        return raisedError, appSuites
 
     def notifyExit(self):
         # Can get called several times, protect against this...
@@ -278,12 +295,9 @@ class TextTest(Responder, plugins.Observable):
                 print testmodel.helpIntro
             return
 
-        if len(allApps) == 0:
-            if appFindingWroteError:
-                return
-            else:
-                print "Could not find any matching applications (files of the form config.<app>) under", self.inputOptions.directoryName
-
+        if len(allApps) == 0 and appFindingWroteError:
+            return
+            
         if self.inputOptionsValid(allApps):
             try:
                 self.createAndRunSuites(allApps)
@@ -314,8 +328,8 @@ class TextTest(Responder, plugins.Observable):
             # do anything about them) and no way to get partial errors.
             sys.stderr.write(str(e) + "\n")
             return
-        self.appSuites = self.createTestSuites(allApps)
-        if len(self.appSuites) > 0:
+        raisedError, self.appSuites = self.createTestSuites(allApps)
+        if not raisedError or len(self.appSuites) > 0:
             self.addSuites(self.appSuites.values())
             self.runThreads()
 
@@ -336,7 +350,7 @@ class TextTest(Responder, plugins.Observable):
 
         suites = []
         for testSuite in emptySuites:
-            for responderClass in testSuite.app.getResponderClasses():
+            for responderClass in testSuite.app.getResponderClasses(self.appSuites.keys()):
                 if isinstance(observer, responderClass):
                     suites.append(testSuite)
                     break

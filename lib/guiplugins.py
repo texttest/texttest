@@ -70,6 +70,8 @@ class GUIConfig:
         self.setConfigDefault("gui_accelerators", interactiveActionHandler.getDefaultAccelerators(self.apps), "Custom action accelerators.")        
         self.setConfigDefault("gui_entry_completion_matching", 1, "Which matching type to use for entry completion. 0 means turn entry completions off, 1 means match the start of possible completions, 2 means match any part of possible completions")
         self.setConfigDefault("gui_entry_completion_inline", 0, "Automatically inline common completion prefix in entry.")
+        self.setConfigDefault("gui_entry_completions", { "default" : [] }, "Add these completions to the entry completion lists initially")
+        self.setConfigDefault("sort_test_suites_recursively", 1, "Sort subsuites when sorting test suites")
         
     def setConfigDefault(self, key, value, docString):
         self.configDir[key] = value
@@ -609,15 +611,18 @@ class ActionGUI(BasicActionGUI):
         self.currAppSelection = []
         self.validApps = []
         self.tooltips = gtk.Tooltips()
+        self.noApps = len(allApps) == 0
         BasicActionGUI.__init__(self)
         for app in allApps:
             self.checkValid(app)
             
     def addSuites(self, suites):
+        oldActive = self.isActiveOnCurrent()
         for suite in suites:
-            if suite.app not in self.validApps and suite.app.getIntvActionConfig().isValid(self.__class__):
+            if suite.app not in self.validApps and interactiveActionHandler.classValid(self.__class__, suite.app):
                 self.checkValid(suite.app)
-                
+        self.noApps = len(suites) == 0
+            
     def checkValid(self, app):
         if self.isValidForApp(app):
             self.validApps.append(app)
@@ -629,7 +634,7 @@ class ActionGUI(BasicActionGUI):
         return True
 
     def shouldShow(self):
-        return len(self.validApps) > 0
+        return self.noApps or len(self.validApps) > 0
     
     def notifyNewTestSelection(self, *args):
         newActive = self.updateSelection(*args)
@@ -749,7 +754,7 @@ class OptionGroupGUI(ActionGUI):
 
     def updateForConfig(self, option):
         fromConfig = guiConfig.getCompositeValue("gui_entry_overrides", option.name)
-        if fromConfig != "<not set>":
+        if fromConfig is not None and fromConfig != "<not set>":
             option.setValue(fromConfig)
             return fromConfig
 
@@ -880,7 +885,10 @@ class OptionGroupGUI(ActionGUI):
         return (box, entry)
   
     def getConfigOptions(self, option):
-        return guiConfig.getCompositeValue("gui_entry_options", option.name)    
+        fromConfig = guiConfig.getCompositeValue("gui_entry_options", option.name)
+        if fromConfig is None: #Happens on initial startup with no apps...
+            return []
+        return fromConfig
 
     def getOptionGroupDescription(self, optionGroup):
         messages = map(self.getOptionDescription, optionGroup.options.values()) + \
@@ -912,16 +920,15 @@ class OptionGroupGUI(ActionGUI):
 class ActionTabGUI(OptionGroupGUI):
     def __init__(self, *args):
         OptionGroupGUI.__init__(self, *args)
-        self.vbox = None
         self.diag.info("Creating action tab for " + self.getTabTitle() + ", sensitive " + repr(self.shouldShowCurrent()))
     def shouldShowCurrent(self, *args):
         return self.gtkAction.get_property("sensitive")
     def createView(self):
-        self.vbox = gtk.VBox()
-        self.fillVBox(self.vbox, self.optionGroup)
-        self.createButtons()
-        self.vbox.show_all()
-        return self.addScrollBars(self.vbox, hpolicy=gtk.POLICY_AUTOMATIC)
+        vbox = gtk.VBox()
+        self.fillVBox(vbox, self.optionGroup)
+        self.createButtons(vbox)
+        vbox.show_all()
+        return self.addScrollBars(vbox, hpolicy=gtk.POLICY_AUTOMATIC)
     def setSensitivity(self, newValue):
         ActionGUI.setSensitivity(self, newValue)
         self.diag.info("Sensitivity of " + self.getTabTitle() + " changed to " + repr(newValue))
@@ -958,8 +965,8 @@ class ActionTabGUI(OptionGroupGUI):
 
         self.addSwitches(vbox, optionGroup)
 
-    def createButtons(self):
-        self.addCentralButton(self.vbox, self.createButton())
+    def createButtons(self, vbox):
+        self.addCentralButton(vbox, self.createButton())
 
     def addCentralButton(self, vbox, button):
         buttonbox = gtk.HBox()
@@ -968,7 +975,7 @@ class ActionTabGUI(OptionGroupGUI):
     
     def showDirectoryChooser(self, widget, entry, option):
         dialog = gtk.FileChooserDialog("Select a directory",
-                                       self.vbox.get_toplevel(),
+                                       self.getParentWindow(),
                                        gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER,
                                        (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
                                         gtk.STOCK_OPEN, gtk.RESPONSE_OK))
@@ -976,7 +983,7 @@ class ActionTabGUI(OptionGroupGUI):
 
     def showFileChooser(self, widget, entry, option):
         dialog = gtk.FileChooserDialog("Select a file",
-                                       self.vbox.get_toplevel(),
+                                       self.getParentWindow(),
                                        gtk.FILE_CHOOSER_ACTION_OPEN,
                                        (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,                                        
                                         gtk.STOCK_OPEN, gtk.RESPONSE_OK))
@@ -1011,7 +1018,15 @@ class ActionTabGUI(OptionGroupGUI):
         guilog.info("Viewing notebook page for '" + self.getTabTitle() + "'")
         guilog.info(self.getOptionGroupDescription(self.optionGroup))
         self.describeAction()
-    
+
+    def addApplicationOptions(self, allApps):
+        if len(allApps) > 0:
+            for app in allApps:
+                app.addToOptionGroups(allApps, [ self.optionGroup ])
+        else:
+            configObject = plugins.importAndCall("default", "getConfig", {}) # don't care about inputOptions as we're trying to read them!
+            configObject.addToOptionGroups(allApps, [ self.optionGroup ])
+            
 
 class ActionDialogGUI(OptionGroupGUI):
     def runInteractive(self, *args):
@@ -1185,6 +1200,13 @@ class ActionDialogGUI(OptionGroupGUI):
         else:
             return OptionGroupGUI.getOptionDescription(self, option)
 
+    def getFilterFileDirs(self, allApps):
+        if len(allApps) > 0:
+            return allApps[0].getFilterFileDirectories(allApps, createDirs=False)
+        else:
+            return []
+        
+
 
 class MultiActionGUIForwarder(GtkActionWrapper):
     def __init__(self, actionGUIs):
@@ -1244,27 +1266,27 @@ class InteractiveActionHandler:
         self.diag = plugins.getDiagnostics("Interactive Actions")
 
     def getDefaultAccelerators(self, allApps):
-        return self.joinDictionaries(allApps, self._getDefaultAcceleratorsForApp)
-
-    def _getDefaultAcceleratorsForApp(self, app):
-        return app.getIntvActionConfig().getDefaultAccelerators()
+        return self.joinDictionaries(allApps, lambda x: x.getDefaultAccelerators())
 
     def getColourDictionary(self, allApps):
-        return self.joinDictionaries(allApps, self._getColourDictionaryForApp)
-
-    def _getColourDictionaryForApp(self, app):
-        return app.getIntvActionConfig().getColourDictionary()
+        return self.joinDictionaries(allApps, lambda x: x.getColourDictionary())
 
     def joinDictionaries(self, allApps, method):
+        if len(allApps) == 0:
+            return method(self._getIntvActionConfig())
+
         dict = {}
         for app in allApps:
-            dict.update(method(app))
+            config = self.getIntvActionConfig(app)
+            dict.update(method(config))
         return dict
         
     def getMenuNames(self, allApps):
+        if len(allApps) == 0:
+            return self._getIntvActionConfig().getMenuNames()
         names = []
         for app in allApps:
-            for name in app.getIntvActionConfig().getMenuNames():
+            for name in self.getIntvActionConfig(app).getMenuNames():
                 if name not in names:
                     names.append(name)
         return names
@@ -1289,24 +1311,43 @@ class InteractiveActionHandler:
             actionGUI.addToGroups(actionGroup, accelGroup)
 
         return defaultGUIs, actionTabGUIs
+
+    def getIntvActionConfig(self, app):
+        module = app.getConfigValue("interactive_action_module")
+        try:
+            return self._getIntvActionConfig(module)
+        except ImportError:
+            return self._getIntvActionConfig()
+
+    def _getIntvActionConfig(self, module="default_gui"):
+        return plugins.importAndCall(module, "InteractiveActionConfig")
     
     def getInstances(self, dynamic, allApps):
+        if len(allApps) == 0:
+            config = self._getIntvActionConfig()
+            return self.getInstancesFromConfig(config, dynamic, allApps)
         instances = []
         classNames = []
         for app in allApps:
-            for className in app.getIntvActionConfig().getInteractiveActionClasses(dynamic):
-                if not className in classNames:
-                    allClasses = self.findAllClasses(className, allApps, dynamic)
-                    subinstances = self.makeAllInstances(allClasses, dynamic)
-                    if len(subinstances) == 1:
-                        instances.append(subinstances[0])
+            config = self.getIntvActionConfig(app)
+            instances += self.getInstancesFromConfig(config, dynamic, allApps, classNames)
+        return instances
+
+    def getInstancesFromConfig(self, config, dynamic, allApps, classNames=[]):
+        instances = []
+        for className in config.getInteractiveActionClasses(dynamic):
+            if className not in classNames:
+                allClasses = self.findAllClasses(className, allApps, dynamic)
+                subinstances = self.makeAllInstances(allClasses, dynamic)
+                if len(subinstances) == 1:
+                    instances.append(subinstances[0])
+                else:
+                    showable = filter(lambda x: x.shouldShow(), subinstances)
+                    if len(showable) == 1:
+                        instances.append(showable[0])
                     else:
-                        showable = filter(lambda x: x.shouldShow(), subinstances)
-                        if len(showable) == 1:
-                            instances.append(showable[0])
-                        else:
-                            instances.append(MultiActionGUIForwarder(subinstances))
-                    classNames.append(className)
+                        instances.append(MultiActionGUIForwarder(subinstances))
+                classNames.append(className)
         return instances
     
     def makeAllInstances(self, allClasses, dynamic):
@@ -1316,14 +1357,17 @@ class InteractiveActionHandler:
         return instances
 
     def findAllClasses(self, className, allApps, dynamic):
-        classNames = seqdict()
-        for app in allApps:
-            config = app.getIntvActionConfig()
-            replacements = config.getReplacements()
-            if className in config.getInteractiveActionClasses(dynamic):
-                realClassName = replacements.get(className, className)
-                classNames.setdefault(realClassName, []).append(app)
-        return classNames.items()
+        if len(allApps) == 0:
+            return [ (className, []) ]
+        else:
+            classNames = seqdict()
+            for app in allApps:
+                config = self.getIntvActionConfig(app)
+                replacements = config.getReplacements()
+                if className in config.getInteractiveActionClasses(dynamic):
+                    realClassName = replacements.get(className, className)
+                    classNames.setdefault(realClassName, []).append(app)
+            return classNames.items()
     
     def tryMakeInstance(self, className, apps, dynamic):
         # Basically a workaround for crap error message with variable className from python...
@@ -1335,6 +1379,9 @@ class InteractiveActionHandler:
             # If some invalid interactive action is provided, need to know which
             sys.stderr.write("Error with interactive action " + str(className.__name__) + "\n")
             raise
+
+    def classValid(self, className, app):
+        return self.getIntvActionConfig(app).isValid(className)
         
         
 interactiveActionHandler = InteractiveActionHandler()

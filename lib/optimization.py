@@ -1036,7 +1036,7 @@ class TestGraph:
         if not self.optionGroup:
             self.optionGroup = plugins.OptionGroup("Plot")
             self.optionGroup.addOption("tu", "Search for tmp files in user", "")
-            self.optionGroup.addSwitch("oem", "Only plot exactly matching versions")
+            self.optionGroup.addSwitch("oem", "Obsolete")
             self.optionGroup.addSwitch("nt", "Don't search for temporary files")
         # Create the options and read the command line arguments.
         for name, expl, values, changem in options:
@@ -1274,20 +1274,10 @@ class TestGraph:
         dir = test.getDirectory(temporary=1, forFramework = 1).replace(test.app.writeDirectory, ".")
         description = self.getPlotLineDescriptionForTest(test, version)
         self.createPlotObjectsForItems(lineName, logFile, description, scaling, dir, test.app)
-    def createPlotObjectsForTest(self, test):
-        # for command-line plotting only
+    def createPlotObjectsForExtraVersions(self, test):
         logFileStem = self.optionGroup.getOptionValue("l")
         searchInUser = self.optionGroup.getOptionValue("tu")
-        onlyExactMatch = self.optionGroup.getSwitchValue("oem")
         noTmp = self.optionGroup.getSwitchValue("nt")
-        if not noTmp:
-            logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser=searchInUser)
-            foundTmp, logFile = logFileFinder.findFile()
-            if foundTmp:
-                self.createPlotObjects("this run", None, logFile, test, None)
-        stdFile = test.getFileName(logFileStem)
-        if stdFile:
-            self.createPlotObjects(None, None, stdFile, test, None)
         for versionItem in self.getExtraVersions():
             if versionItem.find(":") == -1:
                 versionName = version = versionItem
@@ -1305,8 +1295,17 @@ class TestGraph:
                     date = self.isDate(tmp[2])
                 else:
                     date = None
+            # Plot temporary files.
+            if not noTmp:
+                logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser=searchInUser)
+                foundTmp, logFileTmp = logFileFinder.findFile(version)
+                if foundTmp:
+                    self.createPlotObjects("run", versionName, logFileTmp, test, scaling)
+            # Plot "saved" files.
+            logFile = test.getFileName(logFileStem, version)
+            if version and not logFile.endswith(test.app.name + "." + version):
+                continue
             if date:
-                originalLogFileName = test.getFileName(logFileStem, version)
                 CVSLogFileName = test.makeTmpFileName(logFileStem + "_" + date)
                 # We may already have checked out the file.
                 if not os.path.isfile(CVSLogFileName):
@@ -1314,23 +1313,28 @@ class TestGraph:
                         os.makedirs(os.path.dirname(CVSLogFileName))
                     except OSError:
                         pass
-                    stdin, stdout, stderr = os.popen3("cvs -q upd -p -D " + date + " " + originalLogFileName + " > " + CVSLogFileName)
+                    stdin, stdout, stderr = os.popen3("cvs -q upd -p -D " + date + " " + logFile + " > " + CVSLogFileName)
                     if len(stderr.readlines()) > 0:
-                        print os.path.basename(originalLogFileName), "is not in the CVS repository at", date
+                        print os.path.basename(logFile), "is not in the CVS repository at", date
                         continue
                 self.createPlotObjects(None, "CVS " + date, CVSLogFileName, test, None)
             else:
-                if not noTmp:
-                    logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser=searchInUser)
-                    foundTmp, logFile = logFileFinder.findFile(version)
-                    if foundTmp:
-                        self.createPlotObjects("run", versionName, logFile, test, scaling)
-                logFile = test.getFileName(logFileStem, version)
-                isExactMatch = logFile.endswith(version)
-                if not onlyExactMatch and not isExactMatch:
-                    print "Using log file", os.path.basename(logFile), "to print test", test.name, "version", version
-                if not (onlyExactMatch and not isExactMatch):
-                    self.createPlotObjects(None, versionName, logFile, test, scaling)
+                self.createPlotObjects(None, versionName, logFile, test, scaling)
+    def createPlotObjectsForTest(self, test):
+        # for command-line plotting only
+        logFileStem = self.optionGroup.getOptionValue("l")
+        searchInUser = self.optionGroup.getOptionValue("tu")
+        noTmp = self.optionGroup.getSwitchValue("nt")
+        if not noTmp:
+            logFileFinder = LogFileFinder(test, tryTmpFile = 1, searchInUser=searchInUser)
+            foundTmp, logFile = logFileFinder.findFile()
+            if foundTmp:
+                self.createPlotObjects("this run", None, logFile, test, None)
+        stdFile = test.getFileName(logFileStem)
+        if stdFile:
+            self.createPlotObjects(None, None, stdFile, test, None)
+        self.createPlotObjectsForExtraVersions(test)
+
 
 class PlotEngineCommon:
     def __init__(self, testGraph):

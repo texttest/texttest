@@ -57,7 +57,7 @@ class Config:
                 group.addOption("s", "Run this script")
                 group.addOption("d", "Run as if TEXTTEST_HOME was")
                 group.addSwitch("help", "Print configuration help text on stdout")
-                group.addSwitch("g", "use dynamic GUI", 1)
+                group.addSwitch("g", "use dynamic GUI")
                 group.addSwitch("gx", "use static GUI")
                 group.addSwitch("con", "use console interface")
                 group.addSwitch("coll", "Collect results for batch mode session")
@@ -78,6 +78,17 @@ class Config:
                     group.addSwitch("actrep", "Run with slow motion replay")
                 if not useCatalogues:
                     group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
+
+    def createOptionGroups(self, allApps):
+        groupNames = [ "Selection", "Basic", "Advanced", "Invisible" ]
+        optionGroups = map(plugins.OptionGroup, groupNames)
+        self.addToOptionGroups(allApps, optionGroups)
+        return optionGroups
+    
+    def findAllValidOptions(self, allApps):
+        groups = self.createOptionGroups(allApps)
+        return reduce(operator.add, (g.keys() for g in groups), [])
+    
     def getActionSequence(self):
         if self.optionMap.has_key("coll"):
             arg = self.optionMap.get("coll")
@@ -970,13 +981,11 @@ class CountTest(plugins.Action):
 
 class DocumentOptions(plugins.Action):
     def setUpApplication(self, app):
-        keys = []
-        for group in app.optionGroups:
-            keys += group.options.keys()
-            keys += group.switches.keys()
+        groups = app.createOptionGroups([ app ])
+        keys = reduce(operator.add, (g.keys() for g in groups), [])
         keys.sort()
         for key in keys:
-            self.displayKey(key, app.optionGroups)
+            self.displayKey(key, groups)
     def displayKey(self, key, groups):
         for group in groups:
             if group.options.has_key(key):

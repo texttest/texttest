@@ -1034,11 +1034,11 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
                           "Hide all tests which do not match the criteria. Do not show any tests that aren't already shown.",
                           "Show all tests which match the criteria. Do not hide any tests that are currently shown." ]
         self.filteringGroup.addSwitch("current_filtering", options = [ "Discard", "Refine", "Extend" ], description=currFilterDesc)
-        self.appKeys = Set()
+        excludeKeys = Set(self.optionGroup.keys()) # remember these so we don't try and save them to selections
         for app in allApps:
-            appSelectGroup = self.findSelectGroup(app)
-            self.appKeys.update(Set(appSelectGroup.keys()))
-            self.optionGroup.mergeIn(appSelectGroup)
+            app.addToOptionGroups(allApps, [ self.optionGroup ])
+        self.appKeys = Set(self.optionGroup.keys())
+        self.appKeys.difference_update(excludeKeys)
 
     def addSuites(self, suites):
         guiplugins.ActionTabGUI.addSuites(self, suites)
@@ -1047,11 +1047,6 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
     def addToGroups(self, actionGroup, accelGroup):
         guiplugins.ActionTabGUI.addToGroups(self, actionGroup, accelGroup)
         self.filterAccel = self._addToGroups("Filter", self.filterAction, actionGroup, accelGroup)
-
-    def findSelectGroup(self, app):
-        for group in app.optionGroups:
-            if group.name.startswith("Select"):
-                return group
 
     def notifyAllRead(self, *args):
         allStems = self.findAllStems()
@@ -1504,12 +1499,6 @@ class LoadSelection(guiplugins.ActionDialogGUI):
     
 class RunningAction(guiplugins.ActionTabGUI):
     runNumber = 1
-    def __init__(self, allApps, *args):
-        guiplugins.ActionTabGUI.__init__(self, allApps)
-        for app in allApps:
-            for group in app.optionGroups:
-                if group.name.startswith("Invisible"):
-                    self.invisibleGroup = group
     def setObservers(self, observers):
         guiplugins.ActionTabGUI.setObservers(self, observers)
         # so we can notify ourselves (!) about errors...
@@ -1522,7 +1511,7 @@ class RunningAction(guiplugins.ActionTabGUI):
         return self.performedDescription() + " " + self.describeTests() + " at " + plugins.localtime() + "."
     
     def performOnCurrent(self):
-        self.startTextTestProcess(self.getUseCaseName(), self.invisibleGroup.getCommandLines())
+        self.startTextTestProcess(self.getUseCaseName(), [ "-g" ])
     def startTextTestProcess(self, usecase, runModeOptions):
         app = self.currAppSelection[0]
         writeDir = os.path.join(app.writeDirectory, "dynamic_run" + str(self.runNumber))
@@ -1661,9 +1650,8 @@ class RunTests(RunningAction):
         RunningAction.__init__(self, allApps)
         self.optionGroups.append(self.optionGroup)
         for app in allApps:
-            for group in app.optionGroups:
-                if group.name == self.getTabTitle():
-                    self.optionGroup.mergeIn(group)
+            app.addToOptionGroups(allApps, [ self.optionGroup ])
+
     def _getTitle(self):
         return "_Run"
     def _getStockId(self):
@@ -1728,7 +1716,7 @@ class RecordTest(RunningAction):
         return "Started record session for " + self.describeTests()
     def performOnCurrent(self):
         self.updateRecordTime(self.currTestSelection[0])
-        self.startTextTestProcess("record", self.invisibleGroup.getCommandLines() + [ "-record" ])
+        self.startTextTestProcess("record", [ "-g", "-record" ])
     def getRecordMode(self):
         return self.currTestSelection[0].getConfigValue("use_case_record_mode")
     def isValidForApp(self, app):
@@ -1793,7 +1781,7 @@ class RecordTest(RunningAction):
     
     def getReplayRunModeOptions(self, overwriteVersion):
         if self.optionGroup.getSwitchValue("repgui"):
-            return self.invisibleGroup.getCommandLines() + [ "-autoreplay" ]
+            return [ "-autoreplay", "-g" ]
         else:
             return [ "-autoreplay", "-o", overwriteVersion ]
 

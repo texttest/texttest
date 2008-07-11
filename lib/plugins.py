@@ -1234,20 +1234,6 @@ class OptionGroup:
             return False
         self.options[key] = TextOption(*args, **kwargs)
         return True
-    def moveOptionsToStart(self, keys):
-        for key in reversed(keys):
-            option = self.options.get(key)
-            toInsert = seqdict()
-            toInsert[key] = option
-            del self.options[key]
-            self.options.insert(0, toInsert)
-    def mergeIn(self, group):
-        for key, switch in group.switches.items():
-            if not self.switches.has_key(key):
-                self.switches[key] = copy(switch)
-        for key, option in group.options.items():
-            if not self.options.has_key(key):
-                self.options[key] = copy(option)
     def getSwitchValue(self, key, defValue = None):
         if self.switches.has_key(key):
             return self.switches[key].getValue()

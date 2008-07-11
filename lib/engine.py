@@ -138,7 +138,7 @@ class TextTest(Responder, plugins.Observable):
         root = self.inputOptions.directoryName
         if not os.path.isdir(root):
             sys.stderr.write("Test suite root directory does not exist: " + root + "\n")
-            return []
+            return True, []
         appList = []
         raisedError = False
         for dir in self.findSearchDirs():
@@ -147,9 +147,8 @@ class TextTest(Responder, plugins.Observable):
             raisedError |= subRaisedError
         appList.sort(self.compareApps)
         self.diag.info("Found applications : " + repr(appList))
-        if len(appList) == 0 and not raisedError:
-            print "Could not find any matching applications (files of the form config.<app>) under", root
-        return appList
+        return raisedError, appList
+    
     def compareApps(self, app1, app2):
         return cmp(app1.name, app2.name)
     def findAppsUnder(self, dirName):
@@ -266,21 +265,47 @@ class TextTest(Responder, plugins.Observable):
             self._run()
         except KeyboardInterrupt:
             pass # already written about this
+
     def _run(self):
-        allApps = self.findApps()
+        appFindingWroteError, allApps = self.findApps()
         if self.inputOptions.helpMode():
             if len(allApps) > 0:
                 allApps[0].printHelpText()
             else:
-                print testmodel.helpIntro
                 print "TextTest didn't find any valid test applications - you probably need to tell it where to find them."
                 print "The most common way to do this is to set the environment variable TEXTTEST_HOME."
                 print "If this makes no sense, read the online documentation..."
+                print testmodel.helpIntro
             return
-        try:
-            self.createAndRunSuites(allApps)
-        finally:
-            self.notifyExit() # include the dud ones, possibly
+
+        if len(allApps) == 0:
+            if appFindingWroteError:
+                return
+            else:
+                print "Could not find any matching applications (files of the form config.<app>) under", self.inputOptions.directoryName
+
+        if self.inputOptionsValid(allApps):
+            try:
+                self.createAndRunSuites(allApps)
+            finally:        
+                self.notifyExit() # include the dud ones, possibly
+
+    def inputOptionsValid(self, allApps):
+        if len(allApps) == 0:
+            return True # for now...
+        validOptions = self.findAllValidOptions(allApps)
+        for option in self.inputOptions.keys():
+            if option not in validOptions:
+                sys.stderr.write("texttest.py: unrecognised option '-" + option + "'\n")
+                return False
+        return True
+
+    def findAllValidOptions(self, allApps):
+        validOptions = Set()
+        for app in allApps:
+            validOptions.update(Set(app.findAllValidOptions(allApps)))
+        return validOptions
+                                 
     def createAndRunSuites(self, allApps):
         try:
             self.createResponders(allApps)

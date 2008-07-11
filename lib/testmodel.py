@@ -1129,7 +1129,6 @@ class Application:
         self.diag.info("Write directory at " + self.writeDirectory)
         self.checkout = self.configObject.setUpCheckout(self)
         self.diag.info("Checkout set to " + self.checkout)
-        self.optionGroups = self.createOptionGroups(inputOptions)
     def __repr__(self):
         return self.fullName + self.versionSuffix()
     def __hash__(self):
@@ -1339,6 +1338,7 @@ class Application:
             if appName != self.name:
                 names.add(appName)
         return names
+
     def setConfigDefaults(self):
         self.setConfigDefault("executable", "", "Full path to the System Under Test")
         self.setConfigAlias("binary", "executable")
@@ -1361,26 +1361,13 @@ class Application:
         self.setConfigDefault("extra_search_directory", { "default" : [] }, "Additional directories to search for TextTest files")
         self.setConfigAlias("test_data_searchpath", "extra_search_directory")
         self.setConfigAlias("extra_config_directory", "extra_search_directory")
+
     def setDependentConfigDefaults(self):
         executable = self.getConfigValue("executable")
         # Set values which default to other values
         self.setConfigDefault("interactive_action_module", self.getConfigValue("config_module") + "_gui",
                               "Module to search for InteractiveActions for the GUI")
         self.setConfigDefault("interpreter", plugins.getInterpreter(executable), "Program to use as interpreter for the SUT")
-    def createOptionGroups(self, inputOptions):
-        groupNames = [ "Select Tests", "Basic", "Advanced", "Invisible" ]
-        optionGroups = map(plugins.OptionGroup, groupNames)
-        self.configObject.addToOptionGroups([ self ], optionGroups)
-        for option in inputOptions.keys():
-            optionGroup = self.findOptionGroup(option, optionGroups)
-            if not optionGroup:
-                raise BadConfigError, "unrecognised option -" + option
-        return optionGroups
-    
-    def findOptionGroup(self, option, optionGroups):
-        for optionGroup in optionGroups:
-            if optionGroup.options.has_key(option) or optionGroup.switches.has_key(option):
-                return optionGroup
     
     def getFullVersion(self, forSave = 0):
         versionsToUse = self.versions

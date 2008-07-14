@@ -1632,7 +1632,7 @@ class ReconnectToTests(RunningAction):
     def __init__(self, *args):
         RunningAction.__init__(self, *args)
         self.addOption("v", "Version to reconnect to")
-        self.addOption("reconnect", "Temporary result directory", os.getenv("TEXTTEST_TMP"), description="Specify a directory containing temporary texttest results. The reconnection will use a random subdirectory matching the version used.")
+        self.addOption("reconnect", "Temporary result directory", os.getenv("TEXTTEST_TMP", ""), description="Specify a directory containing temporary texttest results. The reconnection will use a random subdirectory matching the version used.")
         self.addSwitch("reconnfull", "Results", 0, ["Display as they were", "Recompute from files"])
     def _getStockId(self):
         return "connect"

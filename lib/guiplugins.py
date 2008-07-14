@@ -37,7 +37,7 @@ if os.name == "nt":
 
 class GUIConfig:
     def __init__(self, dynamic, allApps, entryCompletionLogger):
-        self.apps = allApps
+        self.apps = copy(allApps)
         self.dynamic = dynamic
         self.configDir = plugins.MultiEntryDictionary()
         self.configDocs = {}
@@ -50,6 +50,12 @@ class GUIConfig:
         self.colourDict = self.makeColourDictionary()
         if entryCompletionLogger:
             self.setUpEntryCompletion(entryCompletionLogger)
+
+    def addSuites(self, suites):
+        fullNames = [ app.fullName for app in self.apps ]
+        for suite in suites:
+            if suite.app.fullName not in fullNames:
+                self.apps.append(suite.app)
 
     def makeColourDictionary(self):
         dict = {}

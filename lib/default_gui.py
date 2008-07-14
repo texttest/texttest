@@ -2534,7 +2534,7 @@ class InteractiveActionConfig:
         dict["remove"] = "<control>Delete"
         dict["cut"] = "<control>x"
         dict["paste"] = "<control>v"
-        dict["save_selection"] = "<control><shift>s"
+        dict["save_selection"] = "<control>d"
         dict["load_selection"] = "<control><shift>o"
         dict["reset"] = "<control>e"
         dict["reconnect"] = "<control><shift>r"

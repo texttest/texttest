@@ -2527,10 +2527,13 @@ class TestProgressMonitor(guiplugins.SubGUI):
 
             filteredDiff = self.filterDiff(test, fileComp.getFreeTextBody())
             summaryDiffs = self.diffStore.setdefault(summary, seqdict())
-            testList = summaryDiffs.setdefault(filteredDiff, [])
+            testList, hasGroup = summaryDiffs.setdefault(filteredDiff, ([], False))
             if test not in testList:
                 testList.append(test)
-            if len(summaryDiffs.get(filteredDiff)) > 1:
+            if len(testList) > 1 and not hasGroup:
+                hasGroup = True
+                summaryDiffs[filteredDiff] = (testList, hasGroup)
+            if hasGroup:
                 group = summaryDiffs.index(filteredDiff) + 1
                 fileClass.append("Group " + str(group))
             self.diag.info("Adding file classification for " + repr(fileComp) + " = " + repr(fileClass))
@@ -2558,7 +2561,7 @@ class TestProgressMonitor(guiplugins.SubGUI):
 
     def removeFromDiffStore(self, test):
         for fileInfo in self.diffStore.values():
-            for testList in fileInfo.values():
+            for testList, hasGroup in fileInfo.values():
                 if test in testList:
                     testList.remove(test)
                     
@@ -2590,7 +2593,8 @@ class TestProgressMonitor(guiplugins.SubGUI):
                 diffNumber = int(nodeClassifier[6:]) - 1 
                 parentName = self.treeModel.get_value(parentIter, 0)
                 testLists = self.diffStore.get(parentName)
-                return copy(testLists.values()[diffNumber])
+                testList, hasGroup = testLists.values()[diffNumber]
+                return copy(testList)
         except ValueError:
             pass
         return [ test ]
@@ -2647,7 +2651,7 @@ class TestProgressMonitor(guiplugins.SubGUI):
                 iter = self.treeModel.iter_next(iter)
     def notifyLifecycleChange(self, test, state, changeDesc):
         self.removeFromModel(test)
-        if changeDesc.find("save") != -1:
+        if changeDesc.find("save") != -1 or changeDesc.find("marked") != -1 or changeDesc.find("recalculated") != -1:
             self.removeFromDiffStore(test)
         colourInserted = self.insertTest(test, state, incrementCount=True)
         self.updateTestAppearance(test, state, changeDesc, colourInserted)

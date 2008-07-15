@@ -166,6 +166,10 @@ class IdleHandlerManager:
         # process isn't run. We hence remove that for a while here ...
         if lock:
             self.disableHandler()
+
+    def shouldShow(self):
+        return True # nothing to show, but we need to observe...
+    
     def notifyActionProgress(self, *args):
         if self.sourceId >= 0:
             raise plugins.TextTestError, "No Action currently exists to have progress on!"
@@ -256,7 +260,8 @@ class TextTestGUI(Responder, plugins.Observable):
         # We don't actually have the framework observe changes here, this causes duplication. Just forward
         # them as appropriate to where they belong. This is a bit of a hack really.
         for observer in self.getTestTreeObservers():
-            self.testTreeGUI.addObserver(observer)
+            if observer.shouldShow():
+                self.testTreeGUI.addObserver(observer)
 
         for observer in self.getTestColumnObservers():
             self.testColumnGUI.addObserver(observer)
@@ -268,8 +273,9 @@ class TextTestGUI(Responder, plugins.Observable):
         # watch for category selections
         self.progressMonitor.addObserver(self.testTreeGUI)
         guiplugins.processMonitor.addObserver(statusMonitor)
-        for observer in self.getLifecycleObservers():        
-            self.addObserver(observer) # forwarding of test observer mechanism
+        for observer in self.getLifecycleObservers():
+            if observer.shouldShow():
+                self.addObserver(observer) # forwarding of test observer mechanism
 
         actionGUIs = self.allActionGUIs()
         # mustn't send ourselves here otherwise signals get duplicated...

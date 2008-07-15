@@ -2593,7 +2593,9 @@ class TestProgressMonitor(guiplugins.SubGUI):
         self.notify("SetTestSelection", tests)
     def selectCorrespondingTests(self, treemodel, path, iter, tests , *args):
         guilog.info("Selecting all " + str(treemodel.get_value(iter, 1)) + " tests in category " + treemodel.get_value(iter, 0))
-        tests += treemodel.get_value(iter, 5)
+        for test in treemodel.get_value(iter, 5):
+            if test not in tests:
+                tests.append(test)
     def findTestIterators(self, test):
         return self.classifications.get(test, [])
     def getCategoryDescription(self, state, categoryName=None):

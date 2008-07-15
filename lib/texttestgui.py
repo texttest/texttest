@@ -237,7 +237,7 @@ class TextTestGUI(Responder, plugins.Observable):
         return [ self.progressBarGUI, self.progressMonitor, self.testTreeGUI, 
                  statusMonitor, self.runInfoGUI, self.idleManager, self.topWindowGUI ]
     def getActionObservers(self):
-        return [ self.testTreeGUI, self.testFileGUI, statusMonitor, self.idleManager, self.topWindowGUI ]
+        return [ self.testTreeGUI, self.testFileGUI, statusMonitor, self.runInfoGUI, self.idleManager, self.topWindowGUI ]
     def getFileViewObservers(self):
         return self.defaultActionGUIs + self.actionTabGUIs
     def isFrameworkExitObserver(self, obs):
@@ -1839,6 +1839,10 @@ class RunInfoGUI(TextViewGUI):
         textToUse += "Executable       : " + suite.getConfigValue("executable") + "\n"
         return textToUse
 
+    def notifyAnnotate(self, text):
+        self.text += "Annotated        : " + text
+        self.updateView()
+        
     def notifyAllRead(self, suites):
         self.text = "\n".join(map(self.appInfo, suites)) + "\n"
         self.text += "Command line     : " + plugins.commandLineString(sys.argv) + "\n\n"

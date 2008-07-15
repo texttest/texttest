@@ -182,6 +182,16 @@ class OptimizationConfig(ravebased.Config):
             return ravebased.Config.getResponderClasses(self, allApps)
     def getTestComparator(self):
         return MakeComparisons(OptimizationTestComparison, self.getProgressComparisonClass())
+
+    def getRunDescription(self, test):
+        text = ravebased.Config.getRunDescription(self, test)
+        raveParamFiles = test.getAllPathNames("raveparameters")
+        if len(raveParamFiles) == 0:
+            return text
+        text += "\nRAVE parameters :\n"
+        text += "--\n".join((open(fileName).read() for fileName in raveParamFiles)) + "\n"
+        return text
+    
     def getWebPageGeneratorClass(self):
         return GenerateWebPages
     def getPlotConfigurator(self):

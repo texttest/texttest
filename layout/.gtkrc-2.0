@@ -5,4 +5,4 @@ style "_TextInfo"
 }
 
 widget "*.Text Info" style "_TextInfo"
-
+widget "*.*Run Info" style "_TextInfo"

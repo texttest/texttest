@@ -1502,10 +1502,6 @@ class LoadSelection(guiplugins.ActionDialogGUI):
     
 class RunningAction(guiplugins.ActionTabGUI):
     runNumber = 1
-    def setObservers(self, observers):
-        guiplugins.ActionTabGUI.setObservers(self, observers)
-        # so we can notify ourselves (!) about errors...
-        self.observers.append(self)
     def correctTestClass(self):
         return "test-case"
     def getGroupTabTitle(self):
@@ -1593,9 +1589,6 @@ class RunningAction(guiplugins.ActionTabGUI):
 
         testSel[0].notify("CloseDynamic", usecase)
 
-    def notifyError(self, message):
-        self.showErrorDialog(message)
-
     def readAndFilter(self, errFile, testSel):
         errText = ""
         triggerGroup = plugins.TextTriggerGroup(testSel[0].getConfigValue("suppress_stderr_popup"))
@@ -1608,8 +1601,7 @@ class RunningAction(guiplugins.ActionTabGUI):
             errText = self.readAndFilter(errFile, testSel)
             if len(errText):
                 self.notify("Status", usecase.capitalize() + " run failed for " + repr(testSel[0]))
-                # We're in a funny thread, don't try to create the dialog directly
-                self.notify("Error", usecase.capitalize() + " run failed, with the following errors:\n" + errText)
+                self.showErrorDialog(usecase.capitalize() + " run failed, with the following errors:\n" + errText)
                 return False
         return True
     

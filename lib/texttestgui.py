@@ -203,6 +203,7 @@ class TextTestGUI(Responder, plugins.Observable):
         
         self.appFileGUI = ApplicationFileGUI(self.dynamic, allApps)
         self.textInfoGUI = TextInfoGUI()
+        self.runInfoGUI = RunInfoGUI(self.dynamic)
         self.progressMonitor = TestProgressMonitor(self.dynamic, testCount)
         self.progressBarGUI = ProgressBarGUI(self.dynamic, testCount)
         self.idleManager = IdleHandlerManager()
@@ -225,7 +226,7 @@ class TextTestGUI(Responder, plugins.Observable):
         # only the things that want to know about lifecycle changes irrespective of what's selected,
         # otherwise we go via the test tree. Include add/remove as lifecycle, also final completion
         return [ self.progressBarGUI, self.progressMonitor, self.testTreeGUI, 
-                 statusMonitor, self.idleManager, self.topWindowGUI ]
+                 statusMonitor, self.runInfoGUI, self.idleManager, self.topWindowGUI ]
     def getActionObservers(self):
         return [ self.testTreeGUI, self.testFileGUI, statusMonitor, self.idleManager, self.topWindowGUI ]
     def getFileViewObservers(self):
@@ -314,7 +315,7 @@ class TextTestGUI(Responder, plugins.Observable):
     
     def createRightWindowGUI(self):
         testTab = PaneGUI(self.testFileGUI, self.textInfoGUI, horizontal=False)
-        tabGUIs = [ self.appFileGUI, testTab, self.progressMonitor ] + self.actionTabGUIs
+        tabGUIs = [ self.appFileGUI, testTab, self.progressMonitor, self.runInfoGUI ] + self.actionTabGUIs
         
         tabGUIs = filter(lambda tabGUI: tabGUI.shouldShow(), tabGUIs)
         subNotebookGUIs = self.createNotebookGUIs(tabGUIs)
@@ -1758,15 +1759,87 @@ class PaneGUI(ContainerGUI):
         elif self.position >= oldPos and self.position >= self.paned.get_property("max-position"):
             self.paned.child_set_property(self.paned.get_child2(), "shrink", True)
         
-    
-class TextInfoGUI(guiplugins.SubGUI):
+
+class TextViewGUI(guiplugins.SubGUI):
     def __init__(self):
         guiplugins.SubGUI.__init__(self)
-        self.currentTest = None
         self.text = ""
         self.view = None
+
     def shouldShowCurrent(self, *args):
         return len(self.text) > 0
+
+    def describe(self):
+        header = "---------- " + self.getTabTitle() + " Window ----------"
+        guilog.info(header)
+        buffer = self.view.get_buffer()
+        guilog.info(plugins.encodeToLocale(buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter()), guilog).strip())
+        guilog.info("-" * len(header))
+
+    def updateView(self):
+        if self.view:
+            self.updateViewFromText()
+            self.contentsChanged()
+
+    def createView(self):
+        self.view = gtk.TextView()
+        self.view.set_name(self.getTabTitle())
+        self.view.set_editable(False)
+        self.view.set_cursor_visible(False)
+        self.view.set_wrap_mode(gtk.WRAP_WORD)
+        self.updateViewFromText()
+        self.view.show()
+        return self.addScrollBars(self.view, hpolicy=gtk.POLICY_AUTOMATIC)
+
+    def updateViewFromText(self):
+        textbuffer = self.view.get_buffer()
+        textToUse = self.getTextForView()
+        textbuffer.set_text(textToUse)        
+
+    def getTextForView(self):
+        # Encode to UTF-8, necessary for gtk.TextView
+        # First decode using most appropriate encoding ...
+        unicodeInfo = plugins.decodeText(self.text, guilog)
+        return plugins.encodeToUTF(unicodeInfo, guilog)
+
+
+class RunInfoGUI(TextViewGUI):
+    def __init__(self, dynamic):
+        TextViewGUI.__init__(self)
+        self.dynamic = dynamic
+        self.text = "Information will be available here when all tests have been read..."
+        
+    def getTabTitle(self):
+        return "Run Info"
+
+    def getGroupTabTitle(self):
+        return self.getTabTitle()
+
+    def shouldShow(self):
+        return self.dynamic
+
+    def appInfo(self, suite):
+        textToUse  = "Application name : " + suite.app.fullName + "\n"
+        textToUse += "Version          : " + suite.app.getFullVersion() + "\n"
+        textToUse += "Number of tests  : " + str(suite.size()) + "\n"
+        textToUse += "Executable       : " + suite.getConfigValue("executable") + "\n"
+        return textToUse
+
+    def notifyAllRead(self, suites):
+        self.text = "\n".join(map(self.appInfo, suites)) + "\n"
+        self.text += "Command line     : " + " ".join(sys.argv) + "\n\n"
+        self.text += "Start time       : " + plugins.startTimeString() + "\n"
+        self.updateView()
+
+    def notifyAllComplete(self):
+        self.text += "End time         : " + plugins.localtime() + "\n"
+        self.updateView()
+
+    
+class TextInfoGUI(TextViewGUI):
+    def __init__(self):
+        TextViewGUI.__init__(self)
+        self.currentTest = None
     def getTabTitle(self):
         return "Text Info"
     def forceVisible(self, rowCount):
@@ -1781,12 +1854,9 @@ class TextInfoGUI(guiplugins.SubGUI):
         self.text += str(freeText)
         if state.hasStarted() and not state.isComplete():
             self.text += "\n\nTo obtain the latest progress information and an up-to-date comparison of the files above, " + \
-                         "perform 'recompute status' (press '" + guiConfig.getCompositeValue("gui_accelerators", "recompute_status") + "')"
-    def describe(self):
-        guilog.info("---------- Text Info Window ----------")
-        buffer = self.view.get_buffer()
-        guilog.info(plugins.encodeToLocale(buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter()), guilog).strip())
-        guilog.info("--------------------------------------")
+                         "perform 'recompute status' (press '" + \
+                         guiConfig.getCompositeValue("gui_accelerators", "recompute_status") + "')"
+
     def notifyNewTestSelection(self, tests, *args):
         if len(tests) == 0:
             self.currentTest = None
@@ -1794,37 +1864,17 @@ class TextInfoGUI(guiplugins.SubGUI):
             self.currentTest = tests[0]
             self.resetText(self.currentTest.state)
             self.updateView()
+
     def notifyDescriptionChange(self, test):
         self.resetText(self.currentTest.state)
         self.updateView()
-    def updateView(self):
-        if self.view:
-            self.updateViewFromText()
-            self.contentsChanged()
+
     def notifyLifecycleChange(self, test, state, changeDesc):
         if not test is self.currentTest:
             return
         self.resetText(state)
         self.updateView()
-    def createView(self):
-        self.view = gtk.TextView()
-        self.view.set_name(self.getTabTitle())
-        self.view.set_editable(False)
-        self.view.set_cursor_visible(False)
-        self.view.set_wrap_mode(gtk.WRAP_WORD)
-        self.updateViewFromText()
-        self.view.show()
-        return self.addScrollBars(self.view, hpolicy=gtk.POLICY_AUTOMATIC)
-    def updateViewFromText(self):
-        textbuffer = self.view.get_buffer()
-        textToUse = self.getTextForView()
-        textbuffer.set_text(textToUse)        
-    def getTextForView(self):
-        # Encode to UTF-8, necessary for gtk.TextView
-        # First decode using most appropriate encoding ...
-        unicodeInfo = plugins.decodeText(self.text, guilog)
-        return plugins.encodeToUTF(unicodeInfo, guilog)
-
+    
         
 class FileViewGUI(guiplugins.SubGUI):
     def __init__(self, dynamic, title = "", popupGUI = None):

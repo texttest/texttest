@@ -243,7 +243,7 @@ class CommandLineTraffic(Traffic):
         self.fullCommand = argv[0].replace("\\", "/")
         self.commandName = os.path.basename(self.fullCommand)
         self.cmdArgs = argv[1:]
-        self.argStr = " ".join(map(self.quote, argv[1:]))
+        self.argStr = plugins.commandLineString(argv[1:])
         self.environ = self.filterEnvironment(self.cmdEnviron)
         self.path = self.cmdEnviron.get("PATH")
         text = self.getEnvString() + self.commandName + " " + self.argStr
@@ -274,20 +274,6 @@ class CommandLineTraffic(Traffic):
                 recLine = recLine.replace(oldVal, "$" + var)
             recStr += recLine
         return recStr
-
-    def getQuoteChar(self, char):
-        if char == "\"" and os.name == "posix":
-            return "'"
-        else:
-            return '"'
-
-    def quote(self, arg):
-        quoteChars = "'\"|* "
-        for char in quoteChars:
-            if char in arg:
-                quoteChar = self.getQuoteChar(char)
-                return quoteChar + arg + quoteChar
-        return arg.replace("\\", "/")
         
     def findPossibleFileEdits(self):
         edits = []

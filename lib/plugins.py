@@ -697,6 +697,23 @@ def getInterpreter(executable):
     else:   
         return ""
 
+def commandLineString(cmdArgs):
+    def getQuoteChar(char):
+        if char == "\"" and os.name == "posix":
+            return "'"
+        else:
+            return '"'
+
+    def quote(arg):
+        quoteChars = "'\"|* "
+        for char in quoteChars:
+            if char in arg:
+                quoteChar = getQuoteChar(char)
+                return quoteChar + arg + quoteChar
+        return arg.replace("\\", "/")
+
+    return " ".join(map(quote, cmdArgs))
+
 def relpath(fullpath, parentdir):
     normFull = os.path.normpath(fullpath)
     relPath = normFull.replace(os.path.normpath(parentdir), "")

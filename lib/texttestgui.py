@@ -53,27 +53,31 @@ class ContainerGUI(guiplugins.SubGUI):
     def __init__(self, subguis):
         guiplugins.SubGUI.__init__(self)
         self.subguis = subguis
+
     def forceVisible(self, rowCount):
-        for subgui in self.subguis:
-            if subgui.forceVisible(rowCount):
-                return True
-        return False
-    
+        return reduce(operator.or_, (subgui.forceVisible(rowCount) for subgui in self.subguis))
+
+    def shouldShow(self):
+        return reduce(operator.or_, (subgui.shouldShow() for subgui in self.subguis))
+
     def shouldShowCurrent(self, *args):
-        for subgui in self.subguis:
-            if not subgui.shouldShowCurrent(*args):
-                return False
-        return True
+        return reduce(operator.and_, (subgui.shouldShowCurrent(*args) for subgui in self.subguis))
+
     def shouldDescribe(self):
         return self.active
+
     def setActive(self, value):
         guiplugins.SubGUI.setActive(self, value)
         for subgui in self.subguis:
             subgui.setActive(value)
+
     def contentsChanged(self):
         guiplugins.SubGUI.contentsChanged(self)
         for subgui in self.subguis:
             subgui.contentsChanged()
+
+    def getGroupTabTitle(self):
+        return self.subguis[0].getGroupTabTitle()
                     
 #
 # A class responsible for putting messages in the status bar.
@@ -204,6 +208,7 @@ class TextTestGUI(Responder, plugins.Observable):
         self.appFileGUI = ApplicationFileGUI(self.dynamic, allApps)
         self.textInfoGUI = TextInfoGUI()
         self.runInfoGUI = RunInfoGUI(self.dynamic)
+        self.testRunInfoGUI = TestRunInfoGUI(self.dynamic)
         self.progressMonitor = TestProgressMonitor(self.dynamic, testCount)
         self.progressBarGUI = ProgressBarGUI(self.dynamic, testCount)
         self.idleManager = IdleHandlerManager()
@@ -219,7 +224,7 @@ class TextTestGUI(Responder, plugins.Observable):
         self.topWindowGUI = self.createTopWindowGUI(allApps)
 
     def getTestTreeObservers(self):
-        return [ self.testColumnGUI, self.testFileGUI, self.textInfoGUI ] + self.allActionGUIs() + [ self.rightWindowGUI ]
+        return [ self.testColumnGUI, self.testFileGUI, self.textInfoGUI, self.testRunInfoGUI ] + self.allActionGUIs() + [ self.rightWindowGUI ]
     def allActionGUIs(self):
         return self.defaultActionGUIs + self.actionTabGUIs
     def getLifecycleObservers(self):
@@ -315,7 +320,8 @@ class TextTestGUI(Responder, plugins.Observable):
     
     def createRightWindowGUI(self):
         testTab = PaneGUI(self.testFileGUI, self.textInfoGUI, horizontal=False)
-        tabGUIs = [ self.appFileGUI, testTab, self.progressMonitor, self.runInfoGUI ] + self.actionTabGUIs
+        runInfoTab = PaneGUI(self.runInfoGUI, self.testRunInfoGUI, horizontal=False)
+        tabGUIs = [ self.appFileGUI, testTab, self.progressMonitor, runInfoTab ] + self.actionTabGUIs
         
         tabGUIs = filter(lambda tabGUI: tabGUI.shouldShow(), tabGUIs)
         subNotebookGUIs = self.createNotebookGUIs(tabGUIs)
@@ -630,6 +636,8 @@ class ToolBarGUI(ContainerGUI):
     def ensureVisible(self, toolbar):
         for item in toolbar.get_children(): 
             item.set_is_important(True) # Or newly added children without stock ids won't be visible in gtk.TOOLBAR_BOTH_HORIZ style
+    def shouldShow(self):
+        return True # don't care about whether we have a progress bar or not
     def createView(self):
         self.uiManager.ensure_update()
         toolbar = self.uiManager.get_widget("/MainToolBar")
@@ -1827,7 +1835,7 @@ class RunInfoGUI(TextViewGUI):
 
     def notifyAllRead(self, suites):
         self.text = "\n".join(map(self.appInfo, suites)) + "\n"
-        self.text += "Command line     : " + " ".join(sys.argv) + "\n\n"
+        self.text += "Command line     : " + plugins.commandLineString(sys.argv) + "\n\n"
         self.text += "Start time       : " + plugins.startTimeString() + "\n"
         self.updateView()
 
@@ -1835,15 +1843,56 @@ class RunInfoGUI(TextViewGUI):
         self.text += "End time         : " + plugins.localtime() + "\n"
         self.updateView()
 
+
+class TestRunInfoGUI(TextViewGUI):
+    def __init__(self, dynamic):
+        TextViewGUI.__init__(self)
+        self.dynamic = dynamic
+        self.currentTest = None
+        self.resetText()
+
+    def shouldShow(self):
+        return self.dynamic
+        
+    def getTabTitle(self):
+        return "Test Run Info"
+
+    def getGroupTabTitle(self):
+        return "Run Info"
+
+    def notifyNewTestSelection(self, tests, *args):
+        if len(tests) == 0:
+            self.currentTest = None
+            self.resetText()
+        elif self.currentTest not in tests:
+            self.currentTest = tests[0]
+            self.resetText()
+
+    def resetText(self):
+        self.text = "Selected test  : "
+        if self.currentTest:
+            self.text += self.currentTest.name + "\n"
+            self.appendTestInfo(self.currentTest)
+        else:
+            self.text += "none\n"
+        self.updateView()
+
+    def appendTestInfo(self, test):
+        self.text += test.getDescription() + "\n\n"
+        self.text += test.app.getRunDescription(test)
+        
     
 class TextInfoGUI(TextViewGUI):
     def __init__(self):
         TextViewGUI.__init__(self)
         self.currentTest = None
+        
     def getTabTitle(self):
         return "Text Info"
+
     def forceVisible(self, rowCount):
         return rowCount == 1
+
     def resetText(self, state):
         self.text = ""
         freeText = state.getFreeText()

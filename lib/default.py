@@ -545,12 +545,14 @@ class Config:
         else:
             # old-style: infer expansion in default checkout
             return os.path.join(fullLocation, checkout)
-    # For display in the GUI
     def recomputeProgress(self, test, observers):
         fileFilter = rundependent.FilterRecompute()
         fileFilter(test)
         comparator = self.getTestComparator()
         comparator.recomputeProgress(test, observers)
+    def getRunDescription(self, test):
+        return RunTest().getRunDescription(test)
+    # For display in the GUI
     def extraReadFiles(self, test):
         return {}
     def printHelpScripts(self):
@@ -918,6 +920,22 @@ class RunTest(plugins.Action):
                 self.diag.info("Environment: " + var + " = " + value)
             self.diag.info("Running test with args : " + repr(commandArgs))
 
+    def getRunDescription(self, test):
+        commandArgs = self.getExecuteCmdArgs(test)
+        text =  "Command Line   : " + plugins.commandLineString(commandArgs) + "\n"
+        interestingVars = []
+        testEnv = test.getRunEnvironment()
+        for var, value in testEnv.items():
+            if value != os.getenv(var):
+                interestingVars.append(var)
+        if len(interestingVars) == 0:
+            return text
+        text += "\nEnvironment variables :\n"
+        interestingVars.sort()
+        for var in interestingVars:
+            text += var + ": " + testEnv.get(var) + "\n"
+        return text
+        
     def getTestProcess(self, test):
         commandArgs = self.getExecuteCmdArgs(test)
         testEnv = test.getRunEnvironment()

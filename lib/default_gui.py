@@ -1500,7 +1500,7 @@ class LoadSelection(guiplugins.ActionDialogGUI):
     def messageAfterPerform(self):
         pass
     
-class RunningAction(guiplugins.ActionTabGUI):
+class RunningAction:
     runNumber = 1
     def correctTestClass(self):
         return "test-case"
@@ -1620,9 +1620,9 @@ class RunningAction(guiplugins.ActionTabGUI):
         pass
 
 
-class ReconnectToTests(RunningAction):
+class ReconnectToTests(RunningAction,guiplugins.ActionTabGUI):
     def __init__(self, *args):
-        RunningAction.__init__(self, *args)
+        guiplugins.ActionTabGUI.__init__(self, *args)
         self.addOption("v", "Version to reconnect to")
         self.addOption("reconnect", "Temporary result directory", os.getenv("TEXTTEST_TMP", ""), description="Specify a directory containing temporary texttest results. The reconnection will use a random subdirectory matching the version used.")
         self.addSwitch("reconnfull", "Results", 0, ["Display as they were", "Recompute from files"])
@@ -1639,10 +1639,10 @@ class ReconnectToTests(RunningAction):
     def getUseCaseName(self):
         return "reconnect"
     
-class RunTests(RunningAction):
+class RunTests(RunningAction,guiplugins.ActionTabGUI):
     optionGroups = []
     def __init__(self, allApps, *args):
-        RunningAction.__init__(self, allApps)
+        guiplugins.ActionTabGUI.__init__(self, allApps)
         self.optionGroups.append(self.optionGroup)
         self.addApplicationOptions(allApps)
 
@@ -1687,9 +1687,9 @@ class RunTestsAdvanced(RunTests):
     def getTabTitle(self):
         return "Advanced"
 
-class RecordTest(RunningAction):
+class RecordTest(RunningAction,guiplugins.ActionTabGUI):
     def __init__(self, allApps, *args):
-        RunningAction.__init__(self, allApps, *args)
+        guiplugins.ActionTabGUI.__init__(self, allApps, *args)
         self.currentApp = None
         self.recordTime = None
         defaultVersion, defaultCheckout = "", ""

@@ -1,8 +1,9 @@
 
-import os, sys, plugins, sandbox, reconnect, respond, rundependent, comparetest, batch, subprocess, operator, glob, signal, testoverview
+import os, sys, plugins, sandbox, respond, rundependent, comparetest, batch, subprocess, operator, glob, signal, testoverview
 
 from threading import Lock
 from knownbugs import CheckForBugs, CheckForCrashes
+from reconnect import ReconnectConfig
 from traffic import SetUpTrafficHandlers
 from jobprocess import killSubProcessAndChildren
 from actionrunner import ActionRunner
@@ -19,6 +20,7 @@ class Config:
     def __init__(self, optionMap):
         self.optionMap = optionMap
         self.filterFileMap = {}
+        self.reconnectConfig = ReconnectConfig(optionMap)
     def addToOptionGroups(self, apps, groups):
         recordsUseCases = reduce(operator.or_, (app.getConfigValue("use_case_record_mode") != "disabled" for app in apps), False)
         useCatalogues = reduce(operator.or_, (self.isolatesDataUsingCatalogues(app) for app in apps), False)
@@ -262,7 +264,7 @@ class Config:
         from texttestgui import TextTestGUI
         classes.append(TextTestGUI)
     def getReconnectSequence(self):
-        actions = [ reconnect.ReconnectTest(self.reconnDir, self.optionMap.has_key("reconnfull")) ]
+        actions = [ self.reconnectConfig.getReconnectAction() ]
         actions += [ rundependent.FilterOriginal(), rundependent.FilterTemporary(), \
                      self.getTestComparator(), self.getFailureExplainer() ]
         return actions
@@ -485,8 +487,7 @@ class Config:
             batchFilter.verifyVersions(suite.app)
         # side effects really from here on :(
         if self.isReconnecting():
-            reconnector = reconnect.ReconnectApp()
-            self.reconnDir = reconnector.findReconnectDir(suite.app, self.optionValue("reconnect"))
+            self.reconnectConfig.setUpReconnectDir(suite.app)
         if self.isReconnecting() or self.optionMap.has_key("coll"):
             # Reading stuff from stored pickle files, need to set up categories independently
             self.setUpPerformanceCategories(suite.app)

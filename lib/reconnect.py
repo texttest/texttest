@@ -3,25 +3,31 @@ import os, shutil, plugins
 from sets import ImmutableSet
 
 # Trawl around for a suitable dir to reconnect to if we haven't been told one
-class ReconnectApp:
-    def __init__(self):
+class ReconnectConfig:
+    def __init__(self, optionMap):
+        self.fullRecalculate = optionMap.has_key("reconnfull")
         self.diag = plugins.getDiagnostics("Reconnection")
+        self.reconnectTmpInfo = optionMap.get("reconnect")
+        self.reconnDir = None
+
+    def getReconnectAction(self):
+        return ReconnectTest(self.reconnDir, self.fullRecalculate)
     
-    def findReconnectDir(self, app, reconnectTmpInfo):
-        if reconnectTmpInfo: # See if this is an explicitly provided run directory
-            self.diag.info("Finding reconnect directory for " + repr(app) + " under " + reconnectTmpInfo)
-            currVersionSet = self.getVersionSetTopDir(os.path.basename(reconnectTmpInfo))
+    def setUpReconnectDir(self, app):
+        if self.reconnectTmpInfo: # See if this is an explicitly provided run directory
+            self.diag.info("Finding reconnect directory for " + repr(app) + " under " + self.reconnectTmpInfo)
+            currVersionSet = self.getVersionSetTopDir(os.path.basename(self.reconnectTmpInfo))
             self.diag.info("Directory has versions " + repr(currVersionSet))
             if currVersionSet is not None and ImmutableSet(app.versions).issuperset(currVersionSet):
-                appRoot = self.findReconnectDirUnder(app, reconnectTmpInfo)
-                if appRoot:
-                    return appRoot
+                self.reconnDir = self.findReconnectDirUnder(app, self.reconnectTmpInfo)
+                if self.reconnDir:
+                    return
 
-        fetchDir, runDirs = self.getReconnectRunDirs(app, reconnectTmpInfo)
+        fetchDir, runDirs = self.getReconnectRunDirs(app)
         for rootDirToCopy in runDirs:
-            appRoot = self.findReconnectDirUnder(app, rootDirToCopy)
-            if appRoot:
-                return appRoot
+            self.reconnDir = self.findReconnectDirUnder(app, rootDirToCopy)
+            if self.reconnDir:
+                return
 
         raise plugins.TextTestError, "Could not find an application directory matching " + app.description() + \
               " for any of the runs found under " + fetchDir
@@ -29,13 +35,13 @@ class ReconnectApp:
     def findReconnectDirUnder(self, app, rootDirToCopy):
         return app.getFileName([ rootDirToCopy ], app.name, self.getVersionSetSubDir)
 
-    def getReconnectRunDirs(self, app, reconnectTmpInfo):
-        fetchDir = app.getPreviousWriteDirInfo(reconnectTmpInfo)
+    def getReconnectRunDirs(self, app):
+        fetchDir = app.getPreviousWriteDirInfo(self.reconnectTmpInfo)
         if not os.path.isdir(fetchDir):
-            if fetchDir == reconnectTmpInfo or not reconnectTmpInfo:
+            if fetchDir == self.reconnectTmpInfo or not self.reconnectTmpInfo:
                 raise plugins.TextTestError, "Could not find TextTest temporary directory at " + fetchDir
             else:
-                raise plugins.TextTestError, "Could not find TextTest temporary directory for " + reconnectTmpInfo + " at " + fetchDir
+                raise plugins.TextTestError, "Could not find TextTest temporary directory for " + self.reconnectTmpInfo + " at " + fetchDir
 
         rootDirs = app.getAllFileNames([ fetchDir ], "", self.getVersionSetTopDir)
         if len(rootDirs) == 0:

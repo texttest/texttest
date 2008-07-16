@@ -139,6 +139,10 @@ class TextTest(Responder, plugins.Observable):
         if not os.path.isdir(root):
             sys.stderr.write("Test suite root directory does not exist: " + root + "\n")
             return True, []
+
+        if self.inputOptions.has_key("new"):
+            return False, []
+        
         appList = []
         raisedError = False
         selectedAppDict = self.inputOptions.findSelectedAppNames()

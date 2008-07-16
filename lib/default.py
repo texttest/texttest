@@ -70,6 +70,7 @@ class Config:
                 group.addOption("reconnect", "Reconnect to previous run")
                 group.addSwitch("reconnfull", "Recompute file filters when reconnecting")
                 group.addSwitch("n", "Create new results files (overwrite everything)")
+                group.addSwitch("new", "Start static GUI with no applications loaded")
                 group.addOption("bx", "Use extra versions as for batch mode session")
                 if recordsUseCases:
                     group.addSwitch("record", "Private: Record usecase rather than replay what is present")
@@ -140,7 +141,7 @@ class Config:
         return basic
 
     def getDefaultInterface(self, allApps):
-        if len(allApps) == 0:
+        if len(allApps) == 0 or self.optionMap.has_key("new"):
             return "static_gui"
         defaultIntf = None
         for app in allApps:
@@ -168,9 +169,12 @@ class Config:
         if not self.hasExplicitInterface():
             self.setDefaultInterface(allApps)
 
-        if not self.optionMap.has_key("gx") and len(allApps) == 0:
-            raise plugins.TextTestError, "Could not find any matching applications (files of the form config.<app>) under " + self.optionMap.directoryName
-
+        if not self.optionMap.has_key("gx"):
+            if self.optionMap.has_key("new"):
+                raise plugins.TextTestError, "'--new' option can only be provided with the static GUI"
+            elif len(allApps) == 0:
+                raise plugins.TextTestError, "Could not find any matching applications (files of the form config.<app>) under " + self.optionMap.directoryName
+            
         # Put the GUI first ... first one gets the script engine - see respond module :)
         if self.useGUI():
             self.addGuiResponder(classes)

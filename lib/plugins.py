@@ -1160,7 +1160,7 @@ class TextOption(Option):
             return False
     def setValue(self, value):
         Option.setValue(self, value)
-        if self.inqNofValues() > 1:
+        if self.usePossibleValues():
             self.setPossibleValues(self.possibleValues)
     def setPossibleValues(self, values):
         if self.defaultValue in values:
@@ -1169,11 +1169,14 @@ class TextOption(Option):
             self.possibleValues = [ self.defaultValue ] + values
         self.clear()
         self.updatePossibleValues()
-    def inqNofValues(self): 
-        if self.nofValues > 0:
-            return self.nofValues
+    def getPossibleDirs(self):
+        if self.selectDir:
+            return self.possibleValues
         else:
-            return len(self.possibleValues)
+            return self.possibleDirs
+            
+    def usePossibleValues(self): 
+        return self.selectDir or self.nofValues > 1 or len(self.possibleValues) > 1
     def setClearMethod(self, clearMethod):
         self.clearMethod = clearMethod
     def clear(self):
@@ -1186,25 +1189,21 @@ class TextOption(Option):
             return basic.replace("\\", "/")
         else:
             return basic
-    def getDirectories(self):
-        for dir in self.possibleDirs:
-            try:
-                os.makedirs(dir)
-            except:
-                pass # makedir throws if dir exists ...                    
-        # Set first non-empty dir as default ...)
-        existingDirs = []
-        defaultDir = None
-        for dir in self.possibleDirs:
-            if os.path.isdir(dir):
-                if (self.saveFile or len(os.listdir(dir)) > 0) and not defaultDir:                
-                    defaultDir = dir
-                existingDirs.append(dir)
 
-        if not defaultDir:
-            defaultDir = self.possibleDirs[0]
+    def getDirectories(self):
+        allDirs = self.getPossibleDirs()
+        for dir in allDirs:
+            ensureDirectoryExists(dir)
             
-        return (existingDirs, defaultDir)
+        return allDirs, self.findDefaultDirectory(allDirs)
+
+    def findDefaultDirectory(self, allDirs):
+        # Set first non-empty dir as default ...)
+        for dir in allDirs:
+            if self.saveFile or len(os.listdir(dir)) > 0:                
+                return dir
+                    
+        return allDirs[0]
         
 class Switch(Option):
     def __init__(self, name="", value=0, options=[], description="", changeMethod = None):

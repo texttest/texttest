@@ -4,7 +4,32 @@ from sets import ImmutableSet
 
 # Trawl around for a suitable dir to reconnect to if we haven't been told one
 class ReconnectApp:
+    def __init__(self):
+        self.diag = plugins.getDiagnostics("Reconnection")
+    
     def findReconnectDir(self, app, reconnectTmpInfo):
+        if reconnectTmpInfo: # See if this is an explicitly provided run directory
+            self.diag.info("Finding reconnect directory for " + repr(app) + " under " + reconnectTmpInfo)
+            currVersionSet = self.getVersionSetTopDir(os.path.basename(reconnectTmpInfo))
+            self.diag.info("Directory has versions " + repr(currVersionSet))
+            if currVersionSet is not None and ImmutableSet(app.versions).issuperset(currVersionSet):
+                appRoot = self.findReconnectDirUnder(app, reconnectTmpInfo)
+                if appRoot:
+                    return appRoot
+
+        fetchDir, runDirs = self.getReconnectRunDirs(app, reconnectTmpInfo)
+        for rootDirToCopy in runDirs:
+            appRoot = self.findReconnectDirUnder(app, rootDirToCopy)
+            if appRoot:
+                return appRoot
+
+        raise plugins.TextTestError, "Could not find an application directory matching " + app.description() + \
+              " for any of the runs found under " + fetchDir
+
+    def findReconnectDirUnder(self, app, rootDirToCopy):
+        return app.getFileName([ rootDirToCopy ], app.name, self.getVersionSetSubDir)
+
+    def getReconnectRunDirs(self, app, reconnectTmpInfo):
         fetchDir = app.getPreviousWriteDirInfo(reconnectTmpInfo)
         if not os.path.isdir(fetchDir):
             if fetchDir == reconnectTmpInfo or not reconnectTmpInfo:
@@ -15,19 +40,14 @@ class ReconnectApp:
         rootDirs = app.getAllFileNames([ fetchDir ], "", self.getVersionSetTopDir)
         if len(rootDirs) == 0:
             raise plugins.TextTestError, "Could not find any runs matching " + app.description() + " under " + fetchDir
-
-        for rootDirToCopy in reversed(rootDirs):
-            appRoot = app.getFileName([ rootDirToCopy ], app.name, self.getVersionSetSubDir)
-            if appRoot:
-                return appRoot
-
-        raise plugins.TextTestError, "Could not find an application directory matching " + app.description() + \
-              " for any of the runs found under " + fetchDir
+        rootDirs.reverse()
+        return fetchDir, rootDirs
+        
     def getVersionSetTopDir(self, fileName, *args):
         # Show the framework how to find the version list given a file name
         # If it doesn't match, return None
         parts = fileName.split(".")
-        if len(parts) > 1 and parts[0] != "static_gui":
+        if len(parts) > 2 and parts[0] != "static_gui":
             # drop the run descriptor at the start and the date/time and pid at the end
             return ImmutableSet(parts[1:-2])
     def getVersionSetSubDir(self, fileName, stem):

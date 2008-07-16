@@ -871,24 +871,13 @@ class OptionGroupGUI(ActionGUI):
 
     def createOptionWidget(self, option):
         box = gtk.HBox()
-        if option.inqNofValues() > 1:
+        if option.usePossibleValues():
             (widget, entry) = self.createComboBox(option)
             box.pack_start(widget, expand=True, fill=True)
         else:
             entry = gtk.Entry()
             box.pack_start(entry, expand=True, fill=True)
-        
-        if option.selectDir:
-            button = gtk.Button("...")
-            box.pack_start(button, expand=False, fill=False)
-            scriptEngine.connect("search for directories for '" + option.name + "'",
-                                 "clicked", button, self.showDirectoryChooser, None, entry, option)
-        elif option.selectFile:
-            button = gtk.Button("...")
-            box.pack_start(button, expand=False, fill=False)
-            scriptEngine.connect("search for files for '" + option.name + "'",
-                                 "clicked", button, self.showFileChooser, None, entry, option)
-        return (box, entry)
+        return box, entry
   
     def getConfigOptions(self, option):
         fromConfig = guiConfig.getCompositeValue("gui_entry_options", option.name)
@@ -906,7 +895,7 @@ class OptionGroupGUI(ActionGUI):
         text = "Viewing entry for option '" + option.name.replace("\n", "\\n") + "'"
         if len(value) > 0:
             text += " (set to '" + value + "')"
-        if option.inqNofValues() > 1:
+        if option.usePossibleValues():
             text += " (drop-down list containing " + repr(option.listPossibleValues()) + ")"
         return text
 
@@ -978,6 +967,20 @@ class ActionTabGUI(OptionGroupGUI):
         buttonbox = gtk.HBox()
         buttonbox.pack_start(button, expand=True, fill=False)
         vbox.pack_start(buttonbox, expand=False, fill=False, padding=8)
+
+    def createOptionWidget(self, option):
+        box, entry = OptionGroupGUI.createOptionWidget(self, option)
+        if option.selectDir:
+            button = gtk.Button("...")
+            box.pack_start(button, expand=False, fill=False)
+            scriptEngine.connect("search for directories for '" + option.name + "'",
+                                 "clicked", button, self.showDirectoryChooser, None, entry, option)
+        elif option.selectFile:
+            button = gtk.Button("...")
+            box.pack_start(button, expand=False, fill=False)
+            scriptEngine.connect("search for files for '" + option.name + "'",
+                                 "clicked", button, self.showFileChooser, None, entry, option)
+        return (box, entry)
     
     def showDirectoryChooser(self, widget, entry, option):
         dialog = gtk.FileChooserDialog("Select a directory",
@@ -1120,13 +1123,13 @@ class ActionDialogGUI(OptionGroupGUI):
         dialog.set_default_response(gtk.RESPONSE_ACCEPT)
         if fileChooser:
             buttonScriptName = "press " + actionScriptName.split()[0]
-            if fileChooser.get_property("action") == gtk.FILE_CHOOSER_ACTION_OPEN:
-                scriptEngine.registerOpenFileChooser(fileChooser, scriptName,
-                                                     "look in folder", buttonScriptName, "press cancel", 
-                                                     self.respond, okButton, cancelButton, dialog)
-            else:
+            if fileChooser.get_property("action") == gtk.FILE_CHOOSER_ACTION_SAVE:
                 scriptEngine.registerSaveFileChooser(fileChooser, scriptName,
                                                      "choose folder", buttonScriptName, "press cancel",
+                                                     self.respond, okButton, cancelButton, dialog)
+            else:
+                scriptEngine.registerOpenFileChooser(fileChooser, scriptName,
+                                                     "look in folder", buttonScriptName, "press cancel", 
                                                      self.respond, okButton, cancelButton, dialog)
         else:
             scriptEngine.connect("press cancel", "clicked", cancelButton, self.respond, gtk.RESPONSE_CANCEL, False, dialog)
@@ -1138,7 +1141,7 @@ class ActionDialogGUI(OptionGroupGUI):
         for option in allOptions:
             self.addValuesFromConfig(option)
             
-            if option.selectFile or option.saveFile:
+            if option.selectFile or option.selectDir or option.saveFile:
                 scriptName = option.name
                 fileChooser = self.createFileChooser(option)
                 if len(allOptions) > 1: # If there is other stuff, add a frame round the file chooser so we can see what it's for
@@ -1174,6 +1177,8 @@ class ActionDialogGUI(OptionGroupGUI):
     def getFileChooserFlag(self, option):
         if option.selectFile:
             return gtk.FILE_CHOOSER_ACTION_OPEN
+        elif option.selectDir:
+            return gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER
         else:
             return gtk.FILE_CHOOSER_ACTION_SAVE
     def createFileChooser(self, option):
@@ -1195,13 +1200,14 @@ class ActionDialogGUI(OptionGroupGUI):
         return fileChooser
 
     def getOptionDescription(self, option):
-        if option.selectFile or option.saveFile:
+        if option.selectFile or option.selectDir or option.saveFile:
             text = "Viewing filechooser for option '" + option.name.replace("\n", "\\n") + "'"
             value = option.getValue()
             if value:
                 text += " (set to '" + value + "')"
-            if len(option.possibleDirs):
-                text += " (choosing from directories " + repr(option.possibleDirs) + ")"
+            possDirs = option.getPossibleDirs()
+            if len(possDirs):
+                text += " (choosing from directories " + repr(possDirs) + ")"
             return text
         else:
             return OptionGroupGUI.getOptionDescription(self, option)

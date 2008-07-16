@@ -1624,7 +1624,7 @@ class ReconnectToTests(RunningAction,guiplugins.ActionDialogGUI):
     def __init__(self, *args):
         guiplugins.ActionDialogGUI.__init__(self, *args)
         self.addOption("v", "Version to reconnect to")
-        self.addOption("reconnect", "TextTest temporary result directory (the reconnection will use any subdirectory matching the application and version)", os.getenv("TEXTTEST_TMP", ""))
+        self.addOption("reconnect", "Temporary result directory", os.getenv("TEXTTEST_TMP", ""), selectDir=True, description="Specify a directory containing temporary texttest results. The reconnection will use a random subdirectory matching the version used.")
         self.addSwitch("reconnfull", "Recomputation", 0, ["Display results exactly as they were in the original run", "Use raw data from the original run, but recompute run-dependent text, known bug information etc."])
     def _getStockId(self):
         return "connect"

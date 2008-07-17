@@ -485,11 +485,13 @@ class Test(plugins.Observable):
             return # Can happen from ExportTests, but then the relative paths are the same anyway
         newRelPath = "/" + newRelPath 
         tmpFile, tmpFileName = mkstemp()
-        for line in open(targetFile).xreadlines():
+        # Binary mode, otherwise Windows line endings get transformed to UNIX ones (even on Windows!)
+        # which will cause the test to fail...
+        for line in open(targetFile, "rb").xreadlines():
             os.write(tmpFile, line.replace(oldRelPath, newRelPath))
         os.close(tmpFile)
         shutil.move(tmpFileName, targetFile)
-
+        
     def getRunEnvironment(self, onlyVars = []):
         return self.environment.getValues(onlyVars)
     def createPropertiesFiles(self):

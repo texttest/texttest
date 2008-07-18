@@ -1,6 +1,7 @@
 
 import os, sys, plugins, sandbox, respond, rundependent, comparetest, batch, subprocess, operator, glob, signal, testoverview
 
+from copy import copy
 from threading import Lock
 from knownbugs import CheckForBugs, CheckForCrashes
 from reconnect import ReconnectConfig
@@ -118,17 +119,22 @@ class Config:
     def getExtraVersions(self, app):
         if not self.useExtraVersions():
             return []
-        extraVersions = []
         fromConfig = self.getExtraVersionsFromConfig(app)
-        extraVersions += fromConfig
-        copyCount = int(self.optionMap.get("cp", 1))
-        for copyNum in range(1, copyCount):
-            copyVersion = "copy_" + str(copyNum)
-            extraVersions.append(copyVersion)
+        fromCmd = self.getExtraVersionsFromCmdLine(app)
+        extraVersions = copy(fromConfig)        
+        for cmdVersion in fromCmd:
+            extraVersions.append(cmdVersion)
             for extra in fromConfig:
-                extraVersions.append(copyVersion + "." + extra)
+                extraVersions.append(cmdVersion + "." + extra)
 
         return extraVersions
+
+    def getExtraVersionsFromCmdLine(self, app):
+        if self.isReconnecting():
+            return self.reconnectConfig.getExtraVersions(app)
+        else:
+            copyCount = int(self.optionMap.get("cp", 1))
+            return [ "copy_" + str(i) for i in range(1, copyCount) ]
         
     def getExtraVersionsFromConfig(self, app):
         basic = app.getConfigValue("extra_version")
@@ -485,9 +491,9 @@ class Config:
             batchSession = self.optionMap.get("b")
             batchFilter = batch.BatchVersionFilter(batchSession)
             batchFilter.verifyVersions(suite.app)
-        # side effects really from here on :(
         if self.isReconnecting():
-            self.reconnectConfig.setUpReconnectDir(suite.app)
+            self.reconnectConfig.checkSanity(suite.app)
+        # side effects really from here on :(
         if self.isReconnecting() or self.optionMap.has_key("coll"):
             # Reading stuff from stored pickle files, need to set up categories independently
             self.setUpPerformanceCategories(suite.app)

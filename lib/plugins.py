@@ -1329,9 +1329,20 @@ def decodeText(text, log = None):
             if log:
                 log.info("WARNING: Failed to decode string '" + text + \
                          "' using default locale encoding " + repr(localeEncoding) + \
-                         ". Trying strict UTF-8 encoding ...")
+                         ". Trying ISO8859-1 encoding ...")
                 
-    return decodeUtf8Text(text, localeEncoding, log)
+            return decodeISO88591Text(text, localeEncoding, log)
+
+def decodeISO88591Text(text, localeEncoding, log = None):
+    try:
+        return unicode(text, 'ISO8859-1', errors="strict")
+    except:
+        if log:
+            log.info("WARNING: Failed to decode string '" + text + \
+                     "' using ISO8859-1 encoding " + repr(localeEncoding) + \
+                     ". Trying strict UTF-8 encoding ...")
+            
+        return decodeUtf8Text(text, localeEncoding, log)
 
 def decodeUtf8Text(text, localeEncoding, log = None):
     try:

@@ -1146,8 +1146,8 @@ class ActionDialogGUI(OptionGroupGUI):
                 fileChooser = self.createFileChooser(option)
                 if len(allOptions) > 1: # If there is other stuff, add a frame round the file chooser so we can see what it's for
                     label = self.createLabelEventBox(option, separator=":")
-                    self.addLabel(vbox, label)
                     frame = gtk.Frame()
+                    frame.set_label_widget(label)
                     frame.add(fileChooser)
                     vbox.pack_start(frame, expand=True, fill=True)
                 else:
@@ -1156,7 +1156,7 @@ class ActionDialogGUI(OptionGroupGUI):
                 label, entryWidget, entry = self.createOptionEntry(option, separator=":")
                 entry.set_activates_default(True)
                 self.addLabel(vbox, label)
-                vbox.pack_start(entryWidget)
+                vbox.pack_start(entryWidget, expand=False, fill=False)
                 
         self.addSwitches(vbox, self.optionGroup)            
         return fileChooser, scriptName
@@ -1164,7 +1164,7 @@ class ActionDialogGUI(OptionGroupGUI):
     def addLabel(self, vbox, label):
         hbox = gtk.HBox()
         hbox.pack_start(label, expand=False, fill=False)        
-        vbox.pack_start(hbox)
+        vbox.pack_start(hbox, expand=False, fill=False)
                 
     def createRadioButtonCollection(self, switch, optionGroup):
         frame = gtk.Frame(switch.name)

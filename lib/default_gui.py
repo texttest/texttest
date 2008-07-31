@@ -2335,7 +2335,7 @@ class RenameTest(guiplugins.ActionDialogGUI):
     def fillVBox(self, vbox):
         header = gtk.Label()
         header.set_markup("<b>" + plugins.convertForMarkup(self.oldName) + "</b>")
-        vbox.pack_start(header)
+        vbox.pack_start(header, expand=False, fill=False)
         return guiplugins.ActionDialogGUI.fillVBox(self, vbox)
     def _getStockId(self):
         return "italic"

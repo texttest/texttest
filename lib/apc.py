@@ -1687,7 +1687,7 @@ class ApcLogParser:
             val = float(line.strip().split('\t')[-1])
         else:
             val = int(line.split(' ')[-1])
-        if val:
+        if val and self.solutions: # An interesting text might come before the first "solution", we then ignore it.
             self.solutions[-1][item] = val
 
 #

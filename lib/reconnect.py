@@ -29,6 +29,7 @@ class ReconnectConfig:
         self.runDirCache[key] = runDir
 
     def findRunDir(self, app):
+        self.diag.info("Searching for run directory for " + repr(app))
         return self.runDirCache.get(repr(app), self.runDirCache.get(app.fullName))
 
     def getExtraVersions(self, app):
@@ -84,14 +85,19 @@ class ReconnectConfig:
             return True
         else:
             return len(glob(appDirRoot + ".*")) > 0
-            
-    def getVersionSetTopDir(self, fileName):
+
+    def getVersionsTopDir(self, fileName):
         # Show the framework how to find the version list given a file name
         # If it doesn't match, return None
         parts = os.path.basename(fileName).split(".")
         if len(parts) > 2 and parts[0] != "static_gui":
             # drop the run descriptor at the start and the date/time and pid at the end
-            return ImmutableSet(parts[1:-2])
+            return parts[1:-2]
+            
+    def getVersionSetTopDir(self, fileName):
+        versions = self.getVersionsTopDir(fileName)
+        if versions is not None:
+            return ImmutableSet(versions)
         
     def getVersionSetSubDir(self, fileName, stem):
         # Show the framework how to find the version list given a file name
@@ -104,9 +110,9 @@ class ReconnectConfig:
     def getVersionsFromDirs(self, app, dirs):
         versions = []
         appVersions = Set(app.versions)
-        for versionSet, groupDirIter in groupby(dirs, self.getVersionSetTopDir):
-            extraVersion = ".".join(versionSet.difference(appVersions))
-            version = ".".join(versionSet)
+        for versionList, groupDirIter in groupby(dirs, self.getVersionsTopDir):
+            extraVersion = ".".join(ImmutableSet(versionList).difference(appVersions))
+            version = ".".join(versionList)
             groupDirs = list(groupDirIter)
             if extraVersion:
                 if len(groupDirs) == 1:
@@ -136,6 +142,8 @@ class ReconnectConfig:
             raise plugins.TextTestError, self.errorMessage
 
         runDir = self.findRunDir(app)
+        if not runDir:
+            raise plugins.TextTestError, "Could not find any runs matching " + app.description() 
         self.diag.info("Found run directory " + repr(runDir))
         self.reconnDir = self.findAppDirUnder(app, runDir)        
         self.diag.info("Found application directory " + repr(self.reconnDir))

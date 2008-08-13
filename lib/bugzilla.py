@@ -11,6 +11,8 @@ def findBugText(scriptLocation, bugId):
 
     if len(reply) == 1 and reply[0] == "":
         return "Bug " + bugId + "could not be found."
+    elif len(reply) < 8:
+        return "Could not parse reply from bugzilla script, maybe incompatible interface. Text of reply follows : \n" + reply[0]
 
     return "******************************************************\n" + \
            "BugId: " + bugId + "          Assigned: " + reply[6] + "\n" + \
@@ -24,7 +26,7 @@ def findBugText(scriptLocation, bugId):
 def findStatus(description):
     if len(description) == 0:
         return "UNKNOWN"
-    if description.startswith("Failed to open URL"):
+    if description.startswith("Failed to open URL") or description.startswith("Could not parse"):
         return "BAD SCRIPT"
     for line in description.split("\n"):
         words = line.split()

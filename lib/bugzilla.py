@@ -1,40 +1,56 @@
 #!/usr/bin/env python
 
-import urllib2
+# Plugin for bugzilla version 3.x that uses the new webservice interface. Tested for version 3.0.4
+# but tried to make it a bit future-proof. The older "bugcli" interface is discontinued but there is
+# a plugin for it too, see bugzillav2.py. Documentation can be found at e.g.
+# http://www.astrogrid.org/bugzilla/docs/html/api/
 
-def findBugText(scriptLocation, bugId):
-    bugzillaRequest = scriptLocation + "?bug=" + bugId
-    try:
-        reply = urllib2.urlopen(bugzillaRequest).read().split(':jaeger:')
-    except Exception, e:
-        return "Failed to open URL '" + bugzillaRequest + "': " + str(e) + ".\n\nPlease make sure that the configuration entry 'bug_system_script' points to the correct script to run to extract bugzilla information. The current value is '" + scriptLocation + "'.\n\nNormally, the entry should be the DEFAULT_SERVER + DIRECTORY + CLI_URI set in the beginning of the 'bugcli' script."
+# The webservice interface is still fairly primitive, there is for example no way to extract the initial
+# comment. But at least it's officially part of bugzilla so will hopefully hang around for longer than
+# bugcli did, and there are clearly plans to move it forward.
 
-    if len(reply) == 1 and reply[0] == "":
-        return "Bug " + bugId + "could not be found."
-    elif len(reply) < 8:
-        return "Could not parse reply from bugzilla script, maybe incompatible interface. Text of reply follows : \n" + reply[0]
+import xmlrpclib
 
-    return "******************************************************\n" + \
-           "BugId: " + bugId + "          Assigned: " + reply[6] + "\n" + \
-           "Severity: " + reply[5] + "  Status: " + reply[4] + "\n" + \
-           "Priority: " + reply[1] + "     Created: " + reply[3] + "\n" + \
-           "Component: " + reply[0] + "\n" + \
-           "Summary: " + reply[2] + "\n" + \
-           "Description:\n" + reply[7] + "\n" + \
-           "******************************************************"
+def getEntry(dict, key):
+    return dict.get(key, "UNKNOWN")
 
-def findStatus(description):
-    if len(description) == 0:
-        return "UNKNOWN"
-    if description.startswith("Failed to open URL") or description.startswith("Could not parse"):
-        return "BAD SCRIPT"
-    for line in description.split("\n"):
-        words = line.split()
-        if len(words) < 4:
-            continue
-        if words[2].startswith("Status"):
-            return words[3]
-    return "NONEXISTENT"
+def filterInternals(internals, alreadyMentioned):
+    accepted = []
+    boringValues = [ 0, "", "---", "all", "All", "unspecified" ] + alreadyMentioned
+    for key, value in internals.items():
+        if key.find("accessible") == -1 and value not in boringValues:
+            accepted.append((key.replace("_", " ").capitalize(), value))
+    accepted.sort()
+    return accepted
 
 def isResolved(status):
     return status == "RESOLVED" or status == "CLOSED"
+
+def parseReply(reply):
+    try:
+        bugInfo = reply["bugs"][0]
+        internals = bugInfo["internals"] # This is marked unstable: we won't rely on its contents containing anything in particular
+        bugId = getEntry(bugInfo, "id")
+        summary = getEntry(bugInfo, "summary")
+        status = getEntry(internals, "bug_status")
+        internals = filterInternals(internals, [ bugId, summary, status ])
+        ruler = "*" * 30 + "\n"
+        message = ruler + "Summary: " + summary + "\nBug Status: " + status + "\n\n" 
+        for fieldName, value in internals:
+            message += fieldName + ": " + str(value) + "\n"
+        message += ruler
+        return status, message, isResolved(status)
+    except (IndexError, KeyError):
+        message = "Could not parse reply from bugzilla's web service, maybe incompatible interface. Text of reply follows : \n" + str(reply)
+        return "BAD SCRIPT", message, False
+    
+def findBugInfo(location, bugId):
+    scriptLocation = location + "/xmlrpc.cgi"
+    proxy = xmlrpclib.ServerProxy(scriptLocation)
+    try:
+        return parseReply(proxy.Bug.get_bugs({ "ids" : [ bugId ]}))
+    except xmlrpclib.Fault, e:
+        return "NONEXISTENT", e.faultString, False
+    except Exception, e:
+        message = "Failed to communicate with '" + scriptLocation + "': " + str(e) + ".\n\nPlease make sure that the configuration entry 'bug_system_location' points to a correct location of a Bugzilla version 3.x installation. The current value is '" + location + "'."
+        return "BAD SCRIPT", message, False

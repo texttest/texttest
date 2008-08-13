@@ -2041,7 +2041,7 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         self.addOption("search_file", "File to search in")
         self.addOption("version", "\nVersion to report for")
         self.addOption("execution_hosts", "Trigger only when run on machine(s)")
-        self.addOption("bug_system", "\nExtract info from bug system", "<none>", [ "bugzilla" ])
+        self.addOption("bug_system", "\nExtract info from bug system", "<none>", [ "bugzilla", "bugzillav2" ])
         self.addOption("bug_id", "Bug ID (only if bug system given)")
         self.addOption("full_description", "\nFull description (no bug system)")
         self.addOption("brief_description", "Few-word summary (no bug system)")

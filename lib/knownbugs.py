@@ -29,19 +29,11 @@ class BugSystemBug(Bug):
         self.bugId = bugId
         self.bugSystem = bugSystem
     def findInfo(self, script):
-        exec "from " + self.bugSystem + " import findBugText, findStatus, isResolved"
-        bugText = findBugText(script, self.bugId)
-        status = findStatus(bugText)
-        category = self.findCategory(isResolved(status))
+        exec "from " + self.bugSystem + " import findBugInfo as _findBugInfo"
+        status, bugText, isResolved = _findBugInfo(script, self.bugId)
+        category = self.findCategory(isResolved)
         briefText = "bug " + self.bugId + " (" + status + ")"
-        return category, briefText, self.getFullText(status, bugText)
-    def getFullText(self, status, description):
-        if status == "UNKNOWN":
-            return "Could not contact " + self.bugSystem + " to extract information about bug " + self.bugId
-        elif status == "NONEXISTENT":
-            return "Bug " + self.bugId + " does not exist in " + self.bugSystem
-        else:
-            return description
+        return category, briefText, bugText
     
 class UnreportedBug(Bug):
     def __init__(self, fullText, briefText, internalError):
@@ -246,7 +238,7 @@ class CheckForBugs(plugins.Action):
         for stem, fileBugData in activeBugs.items():
             bug = self.findBug(test, stem, fileBugData, multipleDiffs)
             if bug:
-                category, briefText, fullText = bug.findInfo(test.getCompositeConfigValue("bug_system_script", bug.bugSystem))
+                category, briefText, fullText = bug.findInfo(test.getCompositeConfigValue("bug_system_location", bug.bugSystem))
                 self.diag.info("Changing to " + category + " with text " + briefText)
                 bugState = FailedPrediction(category, fullText, briefText, completed=1)
                 self.changeState(test, bugState)

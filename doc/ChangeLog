@@ -1160,17 +1160,77 @@ Fixes for older bugs:
     - Saving edited files from PyUseCase's process monitoring mechanism now works correctly (comparetest.py)
     - Incorrect time format to execution time filter (-r) now gives error instead of crashing/hanging (plugins.py)
 
-Version trunk
-=============
+Version 3.12
+============
+System requirements (see Migration Notes):
+    - TextTest GUI now requires at least Python 2.5.1 on Windows.
+	Python 2.4 still supported on UNIX only. 
+    	This allowed removing all hacks for killing processes on Windows, so "pskill" is no longer required on Windows 2000.
 Major Enhancements:
+    - Can now define new applications from the static GUI, and hence start TextTest without creating anything beforehand (testmodel.py)
+	Edit / Add application produces this dialog. Also texttest.py --new, or starting with an empty TEXTTEST_HOME.
 General GUI Enhancements:
+    - Default accelerator for Save Selection is now ctrl-D instead of ctrl-shift-S(default_gui.py)
+	This to prevent confusion with Save-As, which is ctrl-alt-s and produces a similar looking dialog
+    - View actions no longer greyed out if the relevant viewer isn't present (texttestgui.py)
+	...because this doesn't say why they can't be used. Replaced with error message.
 Static GUI Enhancements:
+    - Reconnect interface totally revamped (reconnect.py)
+	Now uses a directory chooser in a dialog. See Migration notes for details.
+    - Renaming, moving and copying test suites now possible (default_gui.py)
+	Previously only test cases could be acted on in these ways.
+    - Can now remove test data directories (default_gui.py)
+	"Remove" used to be greyed out on directories
+    - Recording a use-case when GUI testing will now also record command-line traffic if appropriate (default_gui.py)
+	There is a checkbox which can be disabled if necessary, but this is usually what you want
 Dynamic GUI Enhancements:
+    - New "Run Info" tab in right window
+	This gives you detailed information on the TextTest run and the currently selected test run.
+    - "follow_program" setting for the dynamic GUI file view no longer magically inserts 'xterm' prefixes on UNIX (default_gui.py)
+	What you see is what you get now. See Migration Notes.
+    - When a known bug in bugzilla is triggered, a "hyperlink" to that bug in bugzilla appears in the Text Info window. (testoverview.py)
+	This will open that bug in your default browser on Windows. 
+	On Unix, it uses the $BROWSER environment variable for this, and tries to start "firefox" if it isn't defined
+    - New "Annotate" feature in Edit menu (default_gui.py)
+	This is essentially a post-it note on a run reminding you why it's there and not to kill it lightly.
+	Causes the window header to change and a warning to be produced on quitting.
 Framework Enhancements:
+    - Traffic mechanism is now concurrent (traffic.py)
+	Can have more than one external process interacting with it at once
+    - Command line traffic mechanism can now handle external programs that get killed (traffic.py)
+	Can essentially record and replay UNIX signals sent to them. On Windows, replaying a signal will just terminate
+	the process, and record is not supported.
+    - Traffic mechanism works much better on Windows (traffic.py)
+	Before it usually needed hacking in the application code to make it work properly with non-python programs. 
+	Now there is a .exe file which Windows likes better.
+    - Bugzilla plugin upgraded to Bugzilla 3.x, and no longer needs external software (bugzilla.py)
+	Uses the new webservice interface. Bugzilla 2.x plugin is now called bugzillav2. See Migration Notes.
 Batch Report Enhancements:
-Grid Engine (LSF/SGE) enhancements:
-Old functionality removed and API changes:
+    - When a known bug in bugzilla is triggered, HTML report now provides a link to that bug in bugzilla. (testoverview.py)
 Installation and self-test changes:
-    - Self-tests don't need Java installed to be able to run any more
+    - configure_tests.py script removed. Self-tests no longer assume the presence of any external software - removed
+	dependency on Java, Xvfb, emacs, notepad, tkdiff, baretail
 Bug Fixes:
+    - The tooltips are back! These accidentally disappeared in 3.11. They still aren't tested though (texttestgui.py)
+    - Copying or renaming a test cannot cause it to fail now on Windows either (testmodel.py)
+	The fix on Windows in 3.11.1 caused all tests to fail on Windows when renamed or copied.
+    - Recomputing the status of tests with missing files no longer causes a stacktrace (comparetest.py)
+    - File selections are no longer lost when the file view is refreshed for some reason (texttestgui.py)
+    - "gui_entry_override" now also works for the controls on the Recording tab (default_gui.py)
+    - File edits recorded by the traffic mechanism are ignored instead of crashing if the new version isn't there (traffic.py)
+    - Refresh no longer writes to standard output if there are bogus entries in the testsuite files (testmodel.py)
+	Could occasionally cause hangs in some remote environments.
+    - Fixed bug where tests were pasted in the wrong position if there are bogus entries in the testsuite file (testmodel.py)
+	Bad references are now auto-commented by TextTest in this case.
+    - Fixed traceback when entering ambiguous format "<10,60" to execution time filter (-r on command line) (performance.py)
+    - When we create empty test suite files, append rather than overwrite (testmodel.py)
+	This prevents us accidentally wiping files in the presence of flaky file servers
+    - Fixed bug in config file parsing where {CLEAR LIST} as the first entry in a list was interpreted naturally (testmodel.py)
+    - Fixed bug where test suites being removed and re-added via static GUI refresh caused a stack trace (testmodel.py)
+    - Fixed bug where recomputation and/or marking tests while others were running occasionally confused the grouping in the status view (texttestgui.py)
+    - Selecting multiple rows referring to the same test no longer screws up the selection count in the dynamic GUI (texttestgui.py) 
+    - UNIX Virtual display handling doesn't refer to 'localhost' any more in DISPLAY names (unixonly.py)
+	More robust to just use a blank machine name, then we remain within the X internal mechanisms
+    - Authors now appear with Swedish characters uncorrupted even in non-Swedish locales! (helpdialogs.py)
 Grid Engine bug fixes:
+    - Fixed race condition bug which could lead to tests with different resource requirements being "forgotten" (queuesystem.py)

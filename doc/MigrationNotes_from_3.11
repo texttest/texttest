@@ -1,0 +1,86 @@
+
+You need to do migration if you 
+a) use Windows and Python 2.4
+b) use the Bugzilla plugin
+c) use UNIX and have set the "follow_program" entry in your config files
+
+Otherwise, this file also details behaviour of TextTest 3.12 which will be different from 
+TextTest 3.11 by default. This might be worth a quick scan if you do much reconnecting to
+previous runs.
+
+=========================================================
+COMPULSORY MIGRATION
+=========================================================
+
+(1) At least Python 2.5.1 now required on Windows (but pskill isn't) 
+====================================================================
+Python 2.5 is hardly new any more so this should be easy. 2.5.1 specified because there are known
+bugs in Python 2.5.0 around subprocess handling which TextTest is obviously heavily reliant on.
+
+This is because Python 2.5 allows a way to natively kill processes on Windows without needing
+to write new code for every Windows version. The dependency on the "pskill" tool on Windows 2000
+is therefore gone.
+
+(2) Bugzilla plugin changes
+===========================
+The "bugzilla" plugin now refers to Bugzilla version 3. If you're still using Bugzilla
+version 2 you need to update all references to 'bugzilla' in existing knownbugs files to
+refer to "bugzillav2" (and choose that when reporting new ones of course). The advantage
+is that the new plugin does not require any special CGI scripts to be installed on the bugzilla
+server, as we're now calling the official Bugzilla web service.
+
+Also, the config file entry "bug_system_script" introduced by version 3.11 has changed to handle different
+scripts on the same product. Instead of
+
+[bug_system_script]
+bugzilla:http://www.mysite.com/bugzilla/cli.cgi
+
+you now write
+
+[bug_system_location]
+bugzilla:http://www.mysite.com/bugzilla
+
+(the cli.cgi bit is hardcoded in bugzillav2.py)
+
+(3) "follow_program" config file entry on UNIX
+==============================================
+Previously this was set (on UNIX only) to things like "tail -f" or "less +F" and 
+TextTest magically wrapped this in an xterm command. Now the xterm
+is included explicitly to give greater flexibility and less surprises.
+
+The default is therefore
+
+follow_program:xterm -bg white -T $TEXTTEST_FOLLOW_FILE_TITLE -e tail -f
+
+where $TEXTTEST_FOLLOW_FILE_TITLE is replaced by a suitable title based on the test and file
+name that is inserted by TextTest. If you set this to something else on UNIX you'll need
+to include a similar prefix now.
+
+=========================================================
+CHANGES IN DEFAULT BEHAVIOUR
+=========================================================
+
+(1) Reconnecting to previous runs from the static GUI
+=====================================================
+I have revamped and hopefully improved the functionality that "reconnects" to previous runs. There are three main differences:
+
+a) It's now in a dialog not a tab. It can be found via the "Actions" menu or via the <control><shift>r shortcut by
+default.
+
+b) It now uses a directory chooser to select the directory containing the temporary files you are looking for. This can
+be used in two ways. You can either explicitly choose a run directory to reconnect to (if there are several), or you can
+leave the "root" selected and use the version identifier to find them as before. Entries that were previously in the drop-down
+list will appear as "shortcuts" to the left.
+
+c) If you do it "the old way" (i.e. don't explicitly select a run directory as described in (b)) it will reconnect to *all* the runs
+it finds for the given version or a more *specific* one. Previously it picked *a random* run that had the given version or a more
+*general* one. As an example, if you specify "foo" it will now pick up foo.bar,foo.blah etc., but it won't pick up runs without a version ID as it did before. If there are several runs which differ only in date, these dates will be used as versions when the run is displayed. So if you don't select a version or a run directory, it will show you all runs for all versions of the tests you've selected.
+ 
+(2) Default accelerator for Save Selection is now ctrl-D instead of ctrl-shift-S
+================================================================================
+Avoids confusion with Save-as with is ctrl-alt-s. You can of course override this in your personal config file.
+
+(3) Recording a GUI usecase will also record command-line and client-server traffic simultaneously, if applicable
+=================================================================================================================
+There may be cases where you don't want to do this, but usually you will. There is a check box on the
+record tab which can be used to restore the old behaviour when desired

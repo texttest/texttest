@@ -26,7 +26,7 @@ def filterInternals(internals, alreadyMentioned):
 def isResolved(status):
     return status == "RESOLVED" or status == "CLOSED"
 
-def parseReply(reply):
+def parseReply(reply, location):
     try:
         bugInfo = reply["bugs"][0]
         internals = bugInfo["internals"] # This is marked unstable: we won't rely on its contents containing anything in particular
@@ -39,6 +39,7 @@ def parseReply(reply):
         for fieldName, value in internals:
             message += fieldName + ": " + str(value) + "\n"
         message += ruler
+        message += "\nView bug " + str(bugId) + " using bugzilla URL=" + location + "/show_bug.cgi?id=" + str(bugId) + "\n"
         return status, message, isResolved(status)
     except (IndexError, KeyError):
         message = "Could not parse reply from bugzilla's web service, maybe incompatible interface. Text of reply follows : \n" + str(reply)
@@ -48,7 +49,7 @@ def findBugInfo(location, bugId):
     scriptLocation = location + "/xmlrpc.cgi"
     proxy = xmlrpclib.ServerProxy(scriptLocation)
     try:
-        return parseReply(proxy.Bug.get_bugs({ "ids" : [ bugId ]}))
+        return parseReply(proxy.Bug.get_bugs({ "ids" : [ bugId ]}), location)
     except xmlrpclib.Fault, e:
         return "NONEXISTENT", e.faultString, False
     except Exception, e:

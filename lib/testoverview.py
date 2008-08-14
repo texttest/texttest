@@ -305,12 +305,30 @@ class TestDetails:
             for testName, state, extraVersion in tests:
                 fullText.append(HTMLgen.Name(version + testName + extraVersion))
             fullText.append(self.getHeaderLine(tests, version, linkFromDetailsToOverview))
-            freeText = freeText.replace("<", "&lt;").replace(">", "&gt;")
-            fullText.append(HTMLgen.RawText("<PRE>" + freeText + "</PRE>"))
+            self.appendFreeText(fullText, freeText)
             if len(tests) > 1:
                 for line in self.getTestLines(tests, version, linkFromDetailsToOverview):
                     fullText.append(line)                            
         return fullText
+    
+    def appendFreeText(self, fullText, freeText):
+        freeText = freeText.replace("<", "&lt;").replace(">", "&gt;")
+        linkMarker = "URL=http://"
+        if freeText.find(linkMarker) != -1:
+            currFreeText = ""
+            for line in freeText.splitlines():
+                if line.find(linkMarker) != -1:
+                    fullText.append(HTMLgen.RawText("<PRE>" + currFreeText.strip() + "</PRE>"))
+                    currFreeText = ""
+                    words = line.strip().split()
+                    linkTarget = words[-1][4:] # strip off the URL=
+                    newLine = " ".join(words[:-1]) + "\n"
+                    fullText.append(HTMLgen.Href(linkTarget, newLine))
+                else:
+                    currFreeText += line + "\n"
+        else:
+            fullText.append(HTMLgen.RawText("<PRE>" + freeText + "</PRE>"))
+    
     def getHeaderLine(self, tests, version, linkFromDetailsToOverview):
         testName, state, extraVersion = tests[0]
         if len(tests) == 1:

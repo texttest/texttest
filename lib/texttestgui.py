@@ -26,7 +26,7 @@ try:
 except:
     raiseException("Unable to import module 'gobject'")
 
-import pango, guiplugins, plugins, os, sys, operator
+import pango, guiplugins, plugins, os, sys, operator, subprocess
 from ndict import seqdict
 from respond import Responder
 from copy import copy
@@ -1775,11 +1775,15 @@ class PaneGUI(ContainerGUI):
         
 
 class TextViewGUI(guiplugins.SubGUI):
+    hovering_over_link = False
+    hand_cursor = gtk.gdk.Cursor(gtk.gdk.HAND2)
+    regular_cursor = gtk.gdk.Cursor(gtk.gdk.XTERM)
+
     def __init__(self):
         guiplugins.SubGUI.__init__(self)
         self.text = ""
         self.view = None
-
+    
     def shouldShowCurrent(self, *args):
         return len(self.text) > 0
 
@@ -1808,8 +1812,95 @@ class TextViewGUI(guiplugins.SubGUI):
     def updateViewFromText(self):
         textbuffer = self.view.get_buffer()
         textToUse = self.getTextForView()
-        textbuffer.set_text(textToUse)        
+        if textToUse.find("http://") != -1:
+            self.view.connect("event-after", self.event_after)
+            self.view.connect("motion-notify-event", self.motion_notify_event)
+            self.setHyperlinkText(textbuffer, textToUse)
+        else:
+            textbuffer.set_text(textToUse)        
 
+    # Links can be activated by clicking. Low-level code lifted from Maik Hertha's
+    # GTK hypertext demo
+    def event_after(self, text_view, event):
+        if event.type != gtk.gdk.BUTTON_RELEASE:
+            return False
+        if event.button != 1:
+            return False
+        buffer = text_view.get_buffer()
+
+        # we shouldn't follow a link if the user has selected something
+        try:
+            start, end = buffer.get_selection_bounds()
+        except ValueError:
+            # If there is nothing selected, None is return
+            pass
+        else:
+            if start.get_offset() != end.get_offset():
+                return False
+
+        x, y = text_view.window_to_buffer_coords(gtk.TEXT_WINDOW_WIDGET, int(event.x), int(event.y))
+        iter = text_view.get_iter_at_location(x, y)
+        target = self.findLinkTarget(iter)
+        if target:
+            if os.name == "nt" and not os.environ.has_key("BROWSER"):
+                os.startfile(target)
+            else:
+                browser = os.getenv("BROWSER", "firefox")
+                subprocess.Popen([ browser, target ])    
+                
+        return False
+
+    # Looks at all tags covering the position (x, y) in the text view,
+    # and if one of them is a link, change the cursor to the "hands" cursor
+    # typically used by web browsers.
+    def set_cursor_if_appropriate(self, text_view, x, y):
+        hovering = False
+
+        buffer = text_view.get_buffer()
+        iter = text_view.get_iter_at_location(x, y)
+
+        hovering = bool(self.findLinkTarget(iter))
+        if hovering != self.hovering_over_link:
+            self.hovering_over_link = hovering
+
+        if self.hovering_over_link:
+            text_view.get_window(gtk.TEXT_WINDOW_TEXT).set_cursor(self.hand_cursor)
+        else:
+            text_view.get_window(gtk.TEXT_WINDOW_TEXT).set_cursor(self.regular_cursor)
+
+    def findLinkTarget(self, iter):
+        tags = iter.get_tags()
+        for tag in tags:
+            target = tag.get_data("target")
+            if target:
+                return target
+
+    # Update the cursor image if the pointer moved.
+    def motion_notify_event(self, text_view, event):
+        x, y = text_view.window_to_buffer_coords(gtk.TEXT_WINDOW_WIDGET,
+            int(event.x), int(event.y))
+        self.set_cursor_if_appropriate(text_view, x, y)
+        text_view.window.get_pointer()
+        return False
+
+    def setHyperlinkText(self, buffer, text):
+        buffer.set_text("", 0)
+        iter = buffer.get_iter_at_offset(0)
+        for line in text.splitlines():
+            if line.find("URL=http://") != -1:
+                self.insertLinkLine(buffer, iter, line)
+            else:
+                buffer.insert(iter, line + "\n")
+
+    def insertLinkLine(self, buffer, iter, line):
+        # Assumes text description followed by link
+        tag = buffer.create_tag(None, foreground="blue", underline=pango.UNDERLINE_SINGLE)
+        words = line.strip().split()
+        linkTarget = words[-1][4:] # strip off the URL=
+        newLine = " ".join(words[:-1]) + "\n"
+        tag.set_data("target", linkTarget)
+        buffer.insert_with_tags(iter, newLine, tag)
+    
     def getTextForView(self):
         # Encode to UTF-8, necessary for gtk.TextView
         # First decode using most appropriate encoding ...

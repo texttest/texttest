@@ -1174,6 +1174,9 @@ General GUI Enhancements:
 	This to prevent confusion with Save-As, which is ctrl-alt-s and produces a similar looking dialog
     - View actions no longer greyed out if the relevant viewer isn't present (texttestgui.py)
 	...because this doesn't say why they can't be used. Replaced with error message.
+    - Now explicitly define certain config file entries as only appropriate for personal preferences (texttestgui.py)
+	This is because they need to work when no applications are loaded, and also because defining things
+	like colours on the application level is considered harmful...
 Static GUI Enhancements:
     - Reconnect interface totally revamped (reconnect.py)
 	Now uses a directory chooser in a dialog. See Migration notes for details.

@@ -3,6 +3,7 @@ You need to do migration if you
 a) use Windows and Python 2.4
 b) use the Bugzilla plugin
 c) use UNIX and have set the "follow_program" entry in your config files
+4) have entered GUI appearance configuration in your application config file
 
 Otherwise, this file also details behaviour of TextTest 3.12 which will be different from 
 TextTest 3.11 by default. This might be worth a quick scan if you do much reconnecting to
@@ -55,6 +56,35 @@ follow_program:xterm -bg white -T $TEXTTEST_FOLLOW_FILE_TITLE -e tail -f
 where $TEXTTEST_FOLLOW_FILE_TITLE is replaced by a suitable title based on the test and file
 name that is inserted by TextTest. If you set this to something else on UNIX you'll need
 to include a similar prefix now.
+
+(4) Some config file entries are now explicitly defined as personal preferences
+===============================================================================
+
+The following config file entries can no longer be set in ordinary config files, 
+but only in personal preference files. The documentation therefore now lists these in separate tables.
+
+auto_collapse_successful
+file_colours
+gui_accelerators
+gui_entry_completion_inline
+gui_entry_completion_matching
+gui_entry_completions
+hide_gui_element
+hide_test_category
+query_kill_processes
+sort_test_suites_recursively
+static_collapse_suites
+test_colours
+window_size
+
+The main reason is that they need to work with no applications loaded (now that the static GUI
+is capable of doing that) and great confusion can arise if they are defined differently for different
+applications. None of them affect the operation of TextTest, just its appearance. This is
+the first step towards being able to define application settings and personal preferences separately
+from the GUI.
+
+Note that settings not in this list will still work fine in personal configuration files (though not
+all of them make sense of course)
 
 =========================================================
 CHANGES IN DEFAULT BEHAVIOUR

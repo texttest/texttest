@@ -353,6 +353,9 @@ class SlaveServerResponder(Responder, TCPServer):
         # enable the keepalive option in the hope that that will make it more resilient
         # to network problems
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, True)
+        # Default value of 5 isn't very much...
+        # There doesn't seem to be any disadvantage of allowing a longer queue, so we will increase it by a lot...
+        self.request_queue_size = 50
         
     def addSuites(self, *args):
         # use this as an opportunity to broadcast our address

@@ -22,11 +22,15 @@ class ReconnectConfig:
         return ReconnectTest(self.reconnDir, self.fullRecalculate)
 
     def cacheRunDir(self, app, runDir, version=""):
-        key = app.fullName
         if version:
-            key += "." + version
-        self.diag.info("Caching " + key + " = " + runDir)
-        self.runDirCache[key] = runDir
+            keys = [ app.fullName + "." + version ]
+        else:
+            keys = [ app.fullName ] + app.versions
+        for i in range(len(keys)):
+            subKey = ".".join(keys[:i+1])
+            if i == len(keys) - 1 or not self.runDirCache.has_key(subKey):
+                self.runDirCache[subKey] = runDir
+                self.diag.info("Caching " + subKey + " = " + runDir)
 
     def findRunDir(self, app):
         self.diag.info("Searching for run directory for " + repr(app))

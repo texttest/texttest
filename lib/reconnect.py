@@ -33,8 +33,16 @@ class ReconnectConfig:
                 self.diag.info("Caching " + subKey + " = " + runDir)
 
     def findRunDir(self, app):
-        self.diag.info("Searching for run directory for " + repr(app))
-        return self.runDirCache.get(repr(app), self.runDirCache.get(app.fullName))
+        return self._findRunDir(repr(app))
+
+    def _findRunDir(self, searchKey):
+        self.diag.info("Searching for run directory for " + searchKey)
+        entry = self.runDirCache.get(searchKey)
+        if entry:
+            return entry
+        parts = searchKey.split(".")
+        if len(parts) > 1:
+            return self._findRunDir(".".join(parts[:-1]))
 
     def getExtraVersions(self, app):
         self.diag.info("Finding reconnect directory for " + repr(app) + " under " + repr(self.reconnectTmpInfo))

@@ -1237,3 +1237,19 @@ Bug Fixes:
     - Authors now appear with Swedish characters uncorrupted even in non-Swedish locales! (helpdialogs.py)
 Grid Engine bug fixes:
     - Fixed race condition bug which could lead to tests with different resource requirements being "forgotten" (queuesystem.py)
+
+Version trunk
+=============
+System requirements (see Migration Notes):
+Major Enhancements:
+General GUI Enhancements:
+Static GUI Enhancements:
+Dynamic GUI Enhancements:
+Framework Enhancements:
+Batch Report Enhancements:
+Installation and self-test changes:
+Bug Fixes:
+    - Reconnecting to several runs simultaneously with extra versions will find all extra versions correctly (reconnect.py)
+Grid Engine bug fixes:
+
+	

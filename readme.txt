@@ -1,7 +1,7 @@
 Documentation Summary:
 
     There is some stuff in source/doc here in this download, but the main documentation is kept at 
-    www.texttest.org/TextTest/docs. At the bottom of this file there is also
+    http://www.texttest.org. At the bottom of this file there is also
     a brief summary of what TextTest is and what it can do for you.
 
     In source/doc, you can find :
@@ -41,13 +41,8 @@ TEXTTEST_HOME and the Self-Tests:
     Your tests should be placed in product-specific subdirectories alongside the "texttest" and "Diagnostics"
     directories.
 
-    The expected results provided are those from my own environment (RHEL4 Linux, currently). Unless your 
-    environment is identical you should transform the test suite to be suited to the environment and OS 
-    you are running in by running the script configure_tests.py which is included with these tests 
-    (under tests/texttest).
-
-    Note that the self-tests expect that Java is installed on your machine (it mostly is by default) and also
-    a couple of tests rely on the "optional" baretail program on Windows.
+    The self-tests have been made much more independent of environment since TextTest 3.11 and shouldn't depend
+    on any particular software being present any more. It should be possible to just run them "out of the box".
 
     If you plan to change the code you are strongly recommended to run the self-tests and test your changes. 
     They also function as working examples as described above, read source/doc/quickstart.txt for more 
@@ -76,29 +71,32 @@ Bugs and Support:
 
 Other (non-standard) Open Source python modules used by TextTest and packaged with it:
 
-    ndict.py                    : sequential dictionaries. (Wolfgang Grafen, v0.2)
-    log4py.py                   : logging/diagnostic tool (Martin  Preishuber, v1.3.1)
+    ndict.py                    : sequential dictionaries. (Wolfgang Grafen, v0.3.2)
+    log4py.py                   : logging/diagnostic tool (Martin  Preishuber, v1.3.1 + various hacks of mine)
                                   Python now has a builtin "logging" module which is probably why this
                                   has been abandoned. I haven't yet migrated away from it though and
                                   am currently maintaining my own version of it.
     usecase.py,gtkusecase.py    : "PyUseCase", record/replay tool for PyGTK GUIs, of the kind you may well 
-                                  need if you test GUIs (Geoff Bache, v1.4)
+                                  need if you test GUIs (Geoff Bache, v1.4.1)
     HTMLgen.py,HTMLcolors.py,   : "HTMLGen", tool for generating HTML in Python, used for the historical report
     ImageH.py,ImagePaletteH.py,   webpages generated for batch runs (Robin Friedrich, v2.2.2)
     imgsize.py
 
 Plugins included:
 
-    cvs.py      :   integration with CVS for version control
-    sge.py      :   integration with Sun Grid Engine
-    lsf.py      :   integration with LSF - note LSF is not free! (see www.platform.com)
-    bugzilla.py :   integration with Bugzilla, using the Perl command-line interface program bugcli (Dennis Cox, v0.6)
-                    See http:://www.bugzilla.org and http://quigley.durrow.com/bugzilla.html 
-                    Bugcli also appears to have been abandoned but I haven't had any trouble with it...
-    unixonly.py :   integration with Xvfb, UNIX virtual display tool, useful for stopping tested GUIs 
-                    popping up all the time.
+    cvs.py        :   integration with CVS for version control
+    sge.py        :   integration with Sun Grid Engine
+    lsf.py        :   integration with LSF - note LSF is not free! (see www.platform.com)
+    bugzilla.py   :   integration with Bugzilla version 3.x, using its native webservice API (see www.bugzilla.org)
+    bugzillav2.py :   integration with Bugzilla version 2.x, using the command-line interface 
+                      program bugcli (Dennis Cox, v0.6)
+                      See http:://www.bugzilla.org and http://quigley.durrow.com/bugzilla.html 
+                      Bugcli also appears to have been abandoned but I haven't had any trouble with it. It doesn't work on
+                      Bugzilla 3.x though so it will get progressively less important...
+    unixonly.py :     integration with Xvfb, UNIX virtual display tool, useful for stopping tested GUIs 
+                      popping up all the time.
 
-Summary of Texttest:
+Summary of Texttest (see www.texttest.org for more info):
 
 TextTest is an application-independent tool for text-based functional testing. In other words, it
 provides support for regression testing by means of comparing program output files against a 
@@ -109,13 +107,13 @@ their own tools, custom comparators, reports etc. into. (Framework-wise, it is c
 core engine for handling the text files consituting a test suite, and various extendable configurations
 that actually do things with them).
 
-As is, it will allow the user to define various runs of particular binaries using command line 
+As is, it will allow the user to define various runs of particular executables using command line 
 options, environment variables and standard input redirects, along with standard results for 
 those runs. These are then the testcases.  It then provides means to subselect these testcases, and 
 compare the files produced (by default using line-based comparators such as 'diff'), to ensure that 
 behaviour changes in the target binary can be controlled. 
 
-It is currently supported on all flavours of UNIX and Windows XP.
+It is currently supported on all flavours of UNIX and Windows XP. Development is funded by Jeppesen AB.
 
 A configuration for the load balancing software Sun Grid Engine (which is free and open source) and LSF, 
 available for a fee from Platform Computing, is also available. This will enable the tests to be run in 

@@ -104,7 +104,10 @@ list will appear as "shortcuts" to the left.
 
 c) If you do it "the old way" (i.e. don't explicitly select a run directory as described in (b)) it will reconnect to *all* the runs
 it finds for the given version or a more *specific* one. Previously it picked *a random* run that had the given version or a more
-*general* one. As an example, if you specify "foo" it will now pick up foo.bar,foo.blah etc., but it won't pick up runs without a version ID as it did before. If there are several runs which differ only in date, these dates will be used as versions when the run is displayed. So if you don't select a version or a run directory, it will show you all runs for all versions of the tests you've selected.
+*general* one. As an example, if you specify "foo" it will now pick up foo.bar,foo.blah etc., but it won't pick up runs without a 
+version ID as it did before. If there are several runs which differ only in date, these dates will be used as versions when the run 
+is displayed. So if you don't select a version or a run directory, it will show you all runs for all versions of the tests you've 
+selected.
  
 (2) Default accelerator for Save Selection is now ctrl-D instead of ctrl-shift-S
 ================================================================================

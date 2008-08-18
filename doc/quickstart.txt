@@ -10,7 +10,8 @@ texttest -con (console interface)
 
 To understand the test suite, there is always a file called config.<app> (and maybe a few more for 
 versions). This tells texttest about the application in question. If nothing else it will have an 
-entry called "binary" to tell you what executable is being tested.
+entry called "executable" (or "binary", which is a back-compatibility alias) to tell you what 
+executable is being tested.
 
 There will also be a file called testsuite.<app>. This lists subdirectories to be considered either 
 as test cases or test suites themselves. Applies recursively you can find the directories which 
@@ -70,6 +71,9 @@ TestSelf/BaseVersions/TargetApp            : shows how to get version settings t
 TestSelf/ExtraVersions/TargetApp           : shows how to automatically run other versions than the default
                                                when running normally.
 
+TestSelf/UITesting/GUI/TargetApp           : useful for understanding TextTest's integration with Use Case
+                                               Recorders such as PyUseCase and JUseCase for GUI testing.
+
 GUI/DynamicGUI/Filtering/TargetApp         : useful for exploring the status tab from the dynamic GUI and what
                                              it can do.
 
@@ -79,9 +83,6 @@ GUI/StaticGUI/TargetApp                    : fairly large suite that's a residue
 
 GUI/StaticGUI/StartFromScratch/TargetApp   : useful for getting a handle on what a totally empty test suite
                                                should look like
-
-GUI/StaticGUI/UseCaseRecording/TargetApp   : useful for understadning TextTest's integration with Use Case
-                                               Recorders such as PyUseCase and JUseCase for GUI testing.
 
 TestSelf/TrafficInterception/TargetApp     : useful for understanding how TextTest can record and replay
                                                results from "third-party" programs run on the command line

@@ -1250,6 +1250,7 @@ Batch Report Enhancements:
 Installation and self-test changes:
 Bug Fixes:
     - Reconnecting to several runs simultaneously with extra versions will find all extra versions correctly (reconnect.py)
+    - Reconnecting to extra version tests only now works correctly in the static GUI (default_gui.py)
 Grid Engine bug fixes:
 
 	

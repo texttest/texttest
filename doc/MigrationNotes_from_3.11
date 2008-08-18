@@ -6,8 +6,8 @@ c) use UNIX and have set the "follow_program" entry in your config files
 4) have entered GUI appearance configuration in your application config file
 
 Otherwise, this file also details behaviour of TextTest 3.12 which will be different from 
-TextTest 3.11 by default. This might be worth a quick scan if you do much reconnecting to
-previous runs.
+TextTest 3.11 by default. This is worth a quick scan as the important functionality of creating
+new applications and reconnecting to previous runs has changed somewhat.
 
 =========================================================
 COMPULSORY MIGRATION
@@ -87,7 +87,7 @@ Note that settings not in this list will still work fine in personal configurati
 all of them make sense of course)
 
 =========================================================
-CHANGES IN DEFAULT BEHAVIOUR
+CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
 =========================================================
 
 (1) Reconnecting to previous runs from the static GUI
@@ -117,3 +117,11 @@ Avoids confusion with Save-as with is ctrl-alt-s. You can of course override thi
 =================================================================================================================
 There may be cases where you don't want to do this, but usually you will. There is a check box on the
 record tab which can be used to restore the old behaviour when desired
+
+(4) Can now create new test-applications from the GUI
+=====================================================
+You don't need to drop out to the command line and create config files by hand to do this any more. You can do it 
+from a dialog within the GUI (Edit/Add Application). This dialog is also produced if the static GUI doesn't find 
+any applications, or if you provide --new on the command line. In the last case it will not load any existing 
+applications first.
+

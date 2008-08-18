@@ -1231,7 +1231,7 @@ Bug Fixes:
     - Fixed bug in config file parsing where {CLEAR LIST} as the first entry in a list was interpreted naturally (testmodel.py)
     - Fixed bug where test suites being removed and re-added via static GUI refresh caused a stack trace (testmodel.py)
     - Fixed bug where recomputation and/or marking tests while others were running occasionally confused the grouping in the status view (texttestgui.py)
-    - Selecting multiple rows referring to the same test no longer screws up the selection count in the dynamic GUI (texttestgui.py) 
+    - Selecting multiple rows referring to the same test in the status view no longer screws up the selection count in the dynamic GUI (texttestgui.py) 
     - UNIX Virtual display handling doesn't refer to 'localhost' any more in DISPLAY names (unixonly.py)
 	More robust to just use a blank machine name, then we remain within the X internal mechanisms
     - Authors now appear with Swedish characters uncorrupted even in non-Swedish locales! (helpdialogs.py)

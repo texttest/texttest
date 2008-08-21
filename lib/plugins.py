@@ -1,5 +1,5 @@
 
-import sys, os, log4py, string, shutil, time, re, stat, locale, datetime, subprocess, shlex, types
+import sys, os, log4py, string, shutil, time, re, stat, locale, subprocess, shlex, types
 from ndict import seqdict
 from traceback import format_exception
 from threading import currentThread
@@ -167,31 +167,6 @@ def getNumberOfSeconds(timeString):
 # Same as above, but gives minutes instead of seconds ...
 def getNumberOfMinutes(timeString):
     return getNumberOfSeconds(timeString) / 60
-
-# Show a human readable time difference string. Diffs larger than farAwayLimit are
-# written as the actual 'to' time, while other diffs are written e.g. 'X days ago'.
-# If markup is True, diffs less than closeLimit are boldified and diffs the same
-# day are red as well.
-def getTimeDifference(now, then, markup = True, \
-                      closeLimit = datetime.timedelta(days=3), \
-                      farAwayLimit = datetime.timedelta(days=7)):
-    difference = now - then # Assume this is positive ...
-    if difference > farAwayLimit:
-        return then.ctime()
-
-    stringDiff = str(difference.days) + " days ago"
-    yesterday = now - datetime.timedelta(days=1)
-    if now.day == then.day:
-        stringDiff = "Today at " + then.strftime("%H:%M:%S")
-        if markup:
-            stringDiff = "<span weight='bold' foreground='red'>" + stringDiff + "</span>"
-    elif yesterday.day == then.day and yesterday.month == then.month and yesterday.year == then.year:
-        stringDiff = "Yesterday at " + then.strftime("%H:%M:%S")
-        if markup:
-            stringDiff = "<span weight='bold'>" + stringDiff + "</span>"
-    elif difference <= closeLimit and markup:
-        stringDiff = "<span weight='bold'>" + stringDiff + "</span>"
-    return stringDiff
 
 def printWarning(message, stdout = True, stderr = False):
     if stdout:
@@ -611,7 +586,7 @@ class TestState(Observable):
         return self.lifecycleChange == "complete"
     def isSaveable(self):
         return self.hasFailed() and self.hasResults()
-    def warnOnSave(self):
+    def warnOnSave(self): #pragma : no cover - only called on saveable tests usually
         return False
     def updateAbsPath(self, newAbsPath):
         pass
@@ -1017,11 +992,6 @@ class MultiEntryDictionary(seqdict):
         if errorOnUnknown:
             printWarning("Config section name '" + name + "' not recognised.", stdout = False, stderr = True)
         return self
-    def getVarName(self, name):
-        if name.startswith("${"):
-            return name[2:-1]
-        else:
-            return name[1:]
     def addEntry(self, entryName, entry, sectionName="", insert=0, errorOnUnknown=1):
         if sectionName:
             self.currDict = self[sectionName]
@@ -1228,10 +1198,6 @@ class OptionGroup:
         self.name = name
         self.options = seqdict()
         self.switches = seqdict()
-    def __repr__(self):
-        return "OptionGroup " + self.name + "\n" + repr(self.options) + "\n" + repr(self.switches)
-    def empty(self):
-        return len(self.options) == 0 and len(self.switches) == 0
     def reset(self):
         for option in self.options.values():
             option.reset()
@@ -1244,7 +1210,7 @@ class OptionGroup:
         elif self.switches.has_key(key):
             self.switches[key].setValue(value)
             return 1
-        return 0
+        return 0 #pragma : no cover - should never happen
     def addSwitch(self, key, *args, **kwargs):
         if self.switches.has_key(key):
             return False
@@ -1265,17 +1231,12 @@ class OptionGroup:
             return self.options[key].getValue()
         else:
             return defValue
-    def setSwitchValue(self, key, value):
-        if self.switches.has_key(key):
-            self.switches[key].setValue(value)
     def setPossibleValues(self, key, possibleValues):
         option = self.options.get(key)
         if option:
             option.setPossibleValues(possibleValues)
     def getOption(self, key):
         return self.options.get(key)
-    def getSwitch(self, key):
-        return self.switches.get(key)
     def setOptionValue(self, key, value):
         if self.options.has_key(key):
             return self.options[key].setValue(value)
@@ -1462,12 +1423,8 @@ class FileProperties:
         else:
             timeFormat = "%b %d %H:%M"
         return time.strftime(timeFormat, time.localtime(timeStamp))
-    def inqCTime(self):
-        return self.formatTime(self.status[stat.ST_CTIME])
     def inqModificationTime(self):
         return self.formatTime(self.status[stat.ST_MTIME])
-    def inqAccessTime(self):
-        return self.formatTime(self.status[stat.ST_ATIME])
     # Return the *nix type format:
     # -rwxr--r--    1 mattias carm       1675 Nov 16  1998 .xinitrc_old
     def getUnixRepresentation(self):

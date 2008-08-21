@@ -71,14 +71,10 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
         return "Information"
     def getResultDialogTitle(self):
         return self.getTooltip()
-    def getResultDialogIconType(self):
+    def getResultDialogIconType(self): # pragma: no cover - implemented in all subclasses
         return gtk.STOCK_DIALOG_INFO
-    def getSelectionDialogIconType(self):
-        return gtk.STOCK_DIALOG_INFO
-    def getSelectionDialogTwoColumnsInTreeView(self):
-        return False
-    def extraResultDialogWidgets(self):
-        return []
+    def extraResultDialogWidgets(self): # pragma: no cover - implemented in all subclasses
+        return [] 
     def getSelectedFile(self):
         return self.filteredTreeModel.get_value(self.treeView.get_selection().get_selected()[1], 3)
     def viewStatus(self, button):
@@ -491,13 +487,39 @@ class CVSLog(CVSAction):
                 currentFile = line[14:]
             if line.startswith("date:") and currentLastDate == "":
                 then = datetime.datetime(*(time.strptime(line[6:25], "%Y/%m/%d %H:%M:%S")[0:6]))
-                currentLastDate = plugins.getTimeDifference(now, then)
+                currentLastDate = self.getTimeDifference(now, then)
             currentOutput += line                
             prevLine = line
         if currentFile:
             relativeFilePath = self.getRelativePath(currentFile, rootDir)
             self.fileToTest[relativeFilePath] = test
             self.pages.append((relativeFilePath, currentOutput, currentLastDate))
+
+    # Show a human readable time difference string. Diffs larger than farAwayLimit are
+    # written as the actual 'to' time, while other diffs are written e.g. 'X days ago'.
+    # If markup is True, diffs less than closeLimit are boldified and diffs the same
+    # day are red as well.
+    def getTimeDifference(self, now, then, markup = True, \
+                          closeLimit = datetime.timedelta(days=3), \
+                          farAwayLimit = datetime.timedelta(days=7)):
+        difference = now - then # Assume this is positive ...
+        if difference > farAwayLimit:
+            return then.ctime()
+
+        stringDiff = str(difference.days) + " days ago"
+        yesterday = now - datetime.timedelta(days=1)
+        if now.day == then.day:
+            stringDiff = "Today at " + then.strftime("%H:%M:%S")
+            if markup:
+                stringDiff = "<span weight='bold' foreground='red'>" + stringDiff + "</span>"
+        elif yesterday.day == then.day and yesterday.month == then.month and yesterday.year == then.year:
+            stringDiff = "Yesterday at " + then.strftime("%H:%M:%S")
+            if markup:
+                stringDiff = "<span weight='bold'>" + stringDiff + "</span>"
+        elif difference <= closeLimit and markup:
+            stringDiff = "<span weight='bold'>" + stringDiff + "</span>"
+        return stringDiff
+
 
 class CVSLogRecursive(CVSLog):
     def __init__(self, *args, **kwargs):
@@ -517,8 +539,6 @@ class CVSLogLatest(CVSLog):
         return "Log Latest"
     def getTooltip(self):
         return "cvs log latest for the selected test"
-    def getResultDialogType(self):
-        return CVSNotebookDialog
     def getResultDialogMessage(self):
         message = "Showing latest log entries for the CVS controlled files.\nCVS log command used: " + " ".join(self.cvsArgs)
         if not self.recursive:

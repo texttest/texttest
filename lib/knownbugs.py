@@ -66,8 +66,6 @@ class BugTrigger:
             return BugSystemBug(bugSystem, getOption("bug_id"))
         else:
             return UnreportedBug(getOption("full_description"), getOption("brief_description"), self.ignoreOtherErrors)
-    def hasText(self, bugText):
-        return self.textTrigger.text == bugText
     def matchesText(self, line):
         return self.textTrigger.matches(line)
     def findBug(self, execHosts, isChanged, multipleDiffs, line=None):
@@ -105,20 +103,6 @@ class FileBugData:
             self.absentList.append(bugTrigger)
         else:
             self.presentList.append(bugTrigger)
-    def add(self, bugData):
-        self.presentList += bugData.presentList
-        self.absentList += bugData.absentList
-        self.checkUnchanged |= bugData.checkUnchanged
-    def remove(self, bugData):
-        for trigger in bugData.presentList:
-            self.presentList.remove(trigger)
-        for trigger in bugData.absentList:
-            self.absentList.remove(trigger)
-        if bugData.checkUnchanged:
-            self.checkUnchanged = False
-            for trigger in self.presentList + self.absentList:
-                if trigger.checkUnchanged:
-                    self.checkUnchanged = True
     def findBug(self, fileName, execHosts, isChanged, multipleDiffs):
         self.diag.info("Looking for bugs in " + fileName)
         if not self.checkUnchanged and not isChanged:
@@ -185,16 +169,8 @@ class BugMap(seqdict):
             if not self.has_key(fileStem):
                 self[fileStem] = FileBugData()
             self[fileStem].addBugTrigger(getOption)
-    def add(self, bugMap):
-        for fileStem, testBugData in bugMap.items():
-            if self.has_key(fileStem):
-                self[fileStem].add(testBugData)
-            else:
-                self[fileStem] = testBugData
-    def remove(self, bugMap):
-        for fileStem, testBugData in bugMap.items():
-            self[fileStem].remove(testBugData)
 
+    
 class CheckForCrashes(plugins.Action):
     def __init__(self):
         self.diag = plugins.getDiagnostics("check for crashes")

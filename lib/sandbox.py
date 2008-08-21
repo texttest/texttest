@@ -217,9 +217,6 @@ class TestEnvironmentCreator:
         self.test = test
         self.optionMap = optionMap
         self.diag = plugins.getDiagnostics("Environment Creator")
-    def runsTests(self):
-        return not self.optionMap.has_key("gx") and not self.optionMap.has_key("s") and \
-               not self.optionMap.has_key("reconnect")
     def getVariables(self):
         vars, props = [], []
         if self.topLevel():

@@ -516,10 +516,16 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
         if not self.keepTmps:
             self.filesToRemove += [ apcLog ]
         if not test.app.slaveRun() and self.showLogFile:
-            cmdArgs = [ "xterm", "-bg", "white", "-fg", "black", "-T", "APCLOG-" + test.name, "-e", "less +F " + apcLog ]
-            self.process = subprocess.Popen(cmdArgs)
-            print "Created process : log file viewer :", self.process.pid
+            self.showApcLog(test, apcLog)
         return apcLog
+    def showApcLog(self, test, apcLog):
+        # This is similar to what happens in FollowFile in default_gui, would be nice to reuse.
+        followProgram = test.getCompositeConfigValue("follow_program", "apclog")
+        envDir = { "TEXTTEST_FOLLOW_FILE_TITLE" :  "APCLOG-" + test.name }
+        prog = os.path.expandvars(followProgram, envDir.get)
+        cmdArgs = plugins.splitcmd(prog) + [ apcLog ]
+        self.process = subprocess.Popen(cmdArgs)
+        print "Created process : log file viewer :", self.process.pid
     def setupOutputFile(self, test, subplan):
         # Create an output file. This file is read by LogFileFinder if we use PlotTest.
         out = test.makeTmpFileName("output")

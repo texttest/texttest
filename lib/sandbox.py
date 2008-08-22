@@ -1,6 +1,6 @@
 import os, shutil, plugins, re, stat, subprocess, glob, types
 
-from jobprocess import JobProcess
+from jobprocess import killArbitaryProcess
 from socket import gethostname
 from ndict import seqdict
 
@@ -530,9 +530,8 @@ class CreateCatalogue(plugins.Action):
                     processId = int(parts[-1])
                 except ValueError:
                     continue
-                process = JobProcess(processId)
                 self.diag.info("Found process ID " + str(processId))
-                if process.killAll():
+                if killArbitaryProcess(processId):
                     processes.append(parts[1])
         return processes
     def findAllPaths(self, test):

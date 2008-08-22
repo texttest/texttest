@@ -793,7 +793,7 @@ class ModifyTraffic(plugins.ScriptWithArgs):
                 for item in replayInfo.readIntoList(fileName):
                     self.writeTraffic(newFile, item, test.getDirectory())
                 newFile.close()
-                os.rename(newFileName, fileName)
+                shutil.move(newFileName, fileName)
         except plugins.TextTestError, e:
             print e
             
@@ -803,7 +803,8 @@ class ModifyTraffic(plugins.ScriptWithArgs):
     def getModified(self, fullLine, dir):
         trafficType = fullLine[2:5]
         if trafficType in [ "CLI", "SRV" ]:
-            proc = subprocess.Popen([ self.script, fullLine[6:]], cwd=dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            proc = subprocess.Popen([ self.script, fullLine[6:]], cwd=dir,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=os.name=="nt")
             stdout, stderr = proc.communicate()
             if len(stderr) > 0:
                 raise plugins.TextTestError, "Couldn't modify traffic :\n " + stderr

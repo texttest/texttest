@@ -551,8 +551,6 @@ class TestState(Observable):
     def getComparisonsForRecalculation(self):
         # Is some aspect of the state out of date
         return []
-    def recalculateComparisons(self, test):
-        return False
     # Used by text interface to print states
     def description(self):
         if self.freeText:

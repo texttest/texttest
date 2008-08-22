@@ -283,14 +283,21 @@ class TestComparison(BaseTestComparison):
             for comparison in self.filterComparisons(self.correctResults, onlyStems):
                 self.updateStatus(test, str(comparison), versionString)
                 comparison.overwrite(test, exact, versionString)
-    def recalculateComparisons(self, test):
+                
+    def recalculateStdFiles(self, test):
+        self.diag.info("Recalculating standard files for " + repr(test))
         test.refreshFiles()
         resultFiles, defFiles = test.listStandardFiles(allVersions=False)
         stdFiles = self.makeStemDict(resultFiles + defFiles)
         for fileComp in self.allResults:
             stdFile = stdFiles.get(fileComp.stem)
-            fileComp.recompute(test, stdFile)
-        return True
+            self.diag.info("Recomputing against " + repr(stdFile))
+            fileComp.setStandardFile(stdFile)
+        
+    def recalculateComparisons(self, test):
+        for fileComp in self.allResults:
+            fileComp.recompute(test)
+            
     def filterComparisons(self, resultList, onlyStems):
         if len(onlyStems) == 0:
             return resultList
@@ -366,14 +373,9 @@ class MakeComparisons(plugins.Action):
         newState.computeFor(test)
         self.describe(test, newState.getPostText())
     def recomputeProgress(self, test, observers):
-        if test.state.isComplete():
-            if test.state.recalculateComparisons(test):
-                newState = test.state.makeNewState(test.app, "recalculated")
-                test.changeState(newState)
-        else:
-            newState = self.progressComparisonClass(test.state)
-            newState.setObservers(observers)
-            newState.computeFor(test)        
+        newState = self.progressComparisonClass(test.state)
+        newState.setObservers(observers)
+        newState.computeFor(test)        
     def setUpSuite(self, suite):
         self.describe(suite)
     

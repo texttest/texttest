@@ -43,26 +43,28 @@ class FilterTemporary(FilterAction):
     def filesToFilter(self, test):
         return self.constantPostfix(test.listTmpFiles(), "cmp")
 
-class FilterRecompute(FilterOriginal):
-    def filesToFilter(self, test):
-        if test.state.isComplete():
-            if hasattr(test.state, "allResults"):
-                result = []
-                for fileComp in test.state.allResults:
-                    # Either of these files might have disappeared
-                    if fileComp.stdFile and os.path.isfile(fileComp.stdFile):
-                        result.append((fileComp.stdFile, "origcmp"))
-                    if fileComp.tmpFile and os.path.isfile(fileComp.tmpFile):
-                        result.append((fileComp.tmpFile, "cmp"))
-                return result
-            else:
-                return []
-        else:
-            return self.constantPostfix(test.listTmpFiles(), "partcmp")
 
+class FilterRecompute(FilterOriginal):
     def shouldRemove(self, newFile, oldFile):
         # Always recalculate when doing it explicitly
         return os.path.isfile(newFile)
+
+
+class FilterProgressRecompute(FilterRecompute):
+    def filesToFilter(self, test):
+        return self.constantPostfix(test.listTmpFiles(), "partcmp")
+
+
+class FilterResultRecompute(FilterRecompute):
+    def filesToFilter(self, test):
+        result = []
+        for fileComp in test.state.allResults:
+            # Either of these files might have disappeared
+            if fileComp.stdFile and os.path.isfile(fileComp.stdFile):
+                result.append((fileComp.stdFile, "origcmp"))
+            if fileComp.tmpFile and os.path.isfile(fileComp.tmpFile):
+                result.append((fileComp.tmpFile, "cmp"))
+        return result
 
 class RunDependentTextFilter(plugins.Observable):
     def __init__(self, runDepTexts, unorderedTexts=[], testId=""):

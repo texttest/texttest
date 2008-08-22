@@ -28,19 +28,23 @@ class FileComparison:
         self.textDiffTool = test.getConfigValue("text_diff_program")
         self.textDiffToolMaxSize = plugins.parseBytes(test.getConfigValue("text_diff_program_max_file_size"))
         self.freeTextBody = None
-        self.findAndCompare(test, standardFile, testInProgress)
-    def findAndCompare(self, test, standardFile, testInProgress=False):
-        self.stdFile = standardFile
-        self.stdCmpFile = self.stdFile
-        self.diag.info("File comparison std: " + repr(self.stdFile) + " tmp: " + repr(self.tmpFile))
         # subclasses may override if they don't want to store in this way
         self.cacheDifferences(test, testInProgress)
-    def recompute(self, test, stdFile):
+        self.diag.info("Created file comparison std: " + repr(self.stdFile) + " tmp: " +
+                       repr(self.tmpFile) + " diff: " + repr(self.differenceCache))
+
+    def setStandardFile(self, standardFile):
+        self.stdFile = standardFile
+        self.stdCmpFile = self.stdFile
+        self.diag.info("Setting standard file for " + self.stem + " to " + repr(standardFile))
+        
+    def recompute(self, test):
         if self.needsRecalculation():
             self.recalculationTime = time.time()
             self.freeTextBody = None
         if self.tmpFile and os.path.isfile(self.tmpFile):
-            self.findAndCompare(test, stdFile)
+            self.cacheDifferences(test, False)
+
     def __getstate__(self):
         # don't pickle the diagnostics
         state = {}
@@ -148,6 +152,8 @@ class FileComparison:
 
         if self.stdCmpFile and self.tmpCmpFile:
             self.differenceCache = not filecmp.cmp(self.stdCmpFile, self.tmpCmpFile, 0)
+            self.diag.info("Caching differences " + repr(self.stdCmpFile) + " " + repr(self.tmpCmpFile) + " = " + repr(self.differenceCache))
+
     def getSummary(self, includeNumbers=True):
         if self.newResult():
             return self.stem + " new"

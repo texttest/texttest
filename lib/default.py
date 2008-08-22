@@ -556,11 +556,23 @@ class Config:
         else:
             # old-style: infer expansion in default checkout
             return os.path.join(fullLocation, checkout)
+
     def recomputeProgress(self, test, observers):
-        fileFilter = rundependent.FilterRecompute()
-        fileFilter(test)
-        comparator = self.getTestComparator()
-        comparator.recomputeProgress(test, observers)
+        state = test.state
+        if state.isComplete():
+            if state.hasResults():
+                state.recalculateStdFiles(test)
+                fileFilter = rundependent.FilterResultRecompute()
+                fileFilter(test)
+                state.recalculateComparisons(test)
+                newState = state.makeNewState(test.app, "recalculated")
+                test.changeState(newState)
+        else:
+            fileFilter = rundependent.FilterProgressRecompute()
+            fileFilter(test)
+            comparator = self.getTestComparator()
+            comparator.recomputeProgress(test, observers)
+
     def getRunDescription(self, test):
         return RunTest().getRunDescription(test)
     # For display in the GUI

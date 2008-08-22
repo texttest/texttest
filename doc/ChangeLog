@@ -1248,6 +1248,7 @@ Bug Fixes to 3.12:
     - Reconnecting to several runs simultaneously with extra versions will find all extra versions correctly (reconnect.py)
     - Reconnecting to extra version tests only now works correctly in the static GUI (default_gui.py)
     - Fixed bug where multiple reconnected runs might not be grouped correctly - relates to Ubuntu tests above (reconnect.py)
+    - When viewing bugzilla bugs in the browser from the UI, update the status bar correctly (texttestgui.py)
 Fixes for older bugs:
     - Fixed problem where recompute needed pressing twice if changing baseline file with run-dependent text (default.py)
     - "catalogue_process_string" setting now works on Windows (sandbox.py)

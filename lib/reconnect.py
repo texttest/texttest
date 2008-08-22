@@ -88,6 +88,7 @@ class ReconnectConfig:
     
     def getReconnectRunDirs(self, app, fetchDir):
         correctNames = filter(lambda f: self.versionsCorrect(app, f), os.listdir(fetchDir))
+        correctNames.sort() # Need to do this for determinism, and because itertools.groupby (lower down) requires it
         fullPaths = [ os.path.join(fetchDir, d) for d in correctNames ]
         return filter(lambda d: self.isRunDirectoryFor(app, d), fullPaths)
 

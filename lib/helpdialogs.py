@@ -146,7 +146,7 @@ class CreditsDialog(guiplugins.ActionResultDialogGUI):
             creditsText = plugins.encodeToUTF(unicodeInfo)
             buffer = gtk.TextBuffer()
             buffer.set_text(creditsText)
-        except Exception, e:
+        except Exception, e: #pragma : no cover - should never happen
             self.showErrorDialog("Failed to show AUTHORS file:\n" + str(e))
             return
 
@@ -180,7 +180,7 @@ class LicenseDialog(guiplugins.ActionResultDialogGUI):
             licenseText = plugins.encodeToUTF(unicodeInfo)
             buffer = gtk.TextBuffer()
             buffer.set_text(licenseText)
-        except Exception, e:
+        except Exception, e: #pragma : no cover - should never happen
             self.showErrorDialog("Failed to show LICENSE file:\n" + str(e))
             return
 
@@ -249,7 +249,7 @@ class ShowMigrationNotes(guiplugins.ActionResultDialogGUI):
             notesVersion = os.path.basename(note).replace("MigrationNotes_", "").replace("_", " ")
             notebook.append_page(scrolledWindow, gtk.Label(notesVersion))
 
-        if notebook.get_n_pages() == 0:
+        if notebook.get_n_pages() == 0: #pragma : no cover - should never happen
             raise plugins.TextTestError, "\nNo migration notes could be found in\n" + plugins.installationDir("doc") + "\n"
         else:
             guiplugins.scriptEngine.monitorNotebook(notebook, "view migration notes in tab")

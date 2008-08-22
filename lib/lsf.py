@@ -49,7 +49,7 @@ class QueueSystem:
                 return self.getJobId(line)
             else:
                 print "Unexpected output from bsub :", line.strip()
-        return ""
+        return "" #pragma : no cover, should never happen... 
     def getResourceArg(self, submissionRules):
         resourceList = submissionRules.findResourceList()
         if len(resourceList) == 0:

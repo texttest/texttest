@@ -57,6 +57,26 @@ def repeatedOpen(fileName, *args, **kwargs):
     return origOpen(fileName, *args, **kwargs)
 
 __builtin__.open = repeatedOpen
+
+# And all files should be deleted 5 times before we conclude something is wrong
+origRemove = os.remove
+
+def repeatedRemove(fileName, *args, **kwargs):
+    for attempt in range(4):
+        try:
+            return origRemove(fileName, *args, **kwargs)
+        except OSError, e:
+            errMsg = str(e)
+            if errMsg.find("Permission denied") != -1:
+                raise
+            else:
+                from socket import gethostname
+                print "Failed to remove file", fileName, ": assuming automount trouble and trying again!"
+                print "(Automount trouble:" + plugins.localtime() + ":" + gethostname() + ":" + errMsg + ")"
+                time.sleep(0.5)
+    return origRemove(fileName, *args, **kwargs)
+
+os.remove = repeatedRemove
             
 def getConfig(optionMap):
     return CarmenConfig(optionMap)

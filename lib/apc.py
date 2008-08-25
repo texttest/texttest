@@ -271,9 +271,10 @@ class CheckFilesForApc(plugins.Action):
 class MarkApcLogDir(apc_basic.MarkApcLogDir):
     def makeLinks(self, test, apcTmpDir):
         apc_basic.MarkApcLogDir.makeLinks(self, test, apcTmpDir)
-        logFileName = os.path.join(apcTmpDir, "apclog")
-        apcLog = test.makeTmpFileName("apclog")
-        self.makeLink(logFileName, apcLog)
+        if self.baseRunner.currentProcess: # We're in a thread, don't know if test has finished
+            logFileName = os.path.join(apcTmpDir, "apclog")
+            apcLog = test.makeTmpFileName("apclog")
+            self.makeLink(logFileName, apcLog)
 
 
 def verifyAirportFile(test):

@@ -445,9 +445,6 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         self.describeAction()
                 
     def setObservers(self, observers):
-        if len(self.observers) > 0:
-            return # still relevant?
-        
         signals = [ "Status", "ActionProgress" ] + self.getSignalsSent()
         self.diag.info("Observing " + str(self.__class__) + " :")
         for observer in observers:
@@ -773,7 +770,7 @@ class OptionGroupGUI(ActionGUI):
 
     def createOptionEntry(self, option, separator):
         widget, entry = self.createOptionWidget(option)
-        label = self.createLabelEventBox(option, separator)
+        labelEventBox = self.createLabelEventBox(option, separator)
         scriptEngine.registerEntry(entry, "enter " + option.name.strip() + " =")
         entry.set_text(option.getValue())
         entrycompletion.manager.register(entry)
@@ -783,7 +780,7 @@ class OptionGroupGUI(ActionGUI):
         option.setMethods(entry.get_text, entry.set_text)
         if option.changeMethod:
             entry.connect("changed", option.changeMethod)
-        return label, widget, entry
+        return labelEventBox, widget, entry
 
     def addValuesFromConfig(self, option):
         newValue = self.updateForConfig(option)
@@ -946,13 +943,10 @@ class ActionTabGUI(OptionGroupGUI):
             for option in optionGroup.options.values():
                 self.addValuesFromConfig(option)
 
-                label, entryWidget, entry = self.createOptionEntry(option, separator="  ")
+                labelEventBox, entryWidget, entry = self.createOptionEntry(option, separator="  ")
                 scriptEngine.connect("activate from " + option.name, "activate", entry, self.runInteractive)
-                if isinstance(label, gtk.Label):
-                    label.set_alignment(1.0, 0.5)
-                else:
-                    label.get_children()[0].set_alignment(1.0, 0.5)
-                table.attach(label, 0, 1, rowIndex, rowIndex + 1, xoptions=gtk.FILL, xpadding=1)
+                labelEventBox.get_children()[0].set_alignment(1.0, 0.5)
+                table.attach(labelEventBox, 0, 1, rowIndex, rowIndex + 1, xoptions=gtk.FILL, xpadding=1)
                 table.attach(entryWidget, 1, 2, rowIndex, rowIndex + 1)
                 rowIndex += 1
                 table.show_all()
@@ -970,26 +964,13 @@ class ActionTabGUI(OptionGroupGUI):
 
     def createOptionWidget(self, option):
         box, entry = OptionGroupGUI.createOptionWidget(self, option)
-        if option.selectDir:
-            button = gtk.Button("...")
-            box.pack_start(button, expand=False, fill=False)
-            scriptEngine.connect("search for directories for '" + option.name + "'",
-                                 "clicked", button, self.showDirectoryChooser, None, entry, option)
-        elif option.selectFile:
+        if option.selectFile:
             button = gtk.Button("...")
             box.pack_start(button, expand=False, fill=False)
             scriptEngine.connect("search for files for '" + option.name + "'",
                                  "clicked", button, self.showFileChooser, None, entry, option)
         return (box, entry)
     
-    def showDirectoryChooser(self, widget, entry, option):
-        dialog = gtk.FileChooserDialog("Select a directory",
-                                       self.getParentWindow(),
-                                       gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER,
-                                       (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
-                                        gtk.STOCK_OPEN, gtk.RESPONSE_OK))
-        self.startChooser(dialog, entry, option)
-
     def showFileChooser(self, widget, entry, option):
         dialog = gtk.FileChooserDialog("Select a file",
                                        self.getParentWindow(),
@@ -1145,17 +1126,17 @@ class ActionDialogGUI(OptionGroupGUI):
                 scriptName = option.name
                 fileChooser = self.createFileChooser(option)
                 if len(allOptions) > 1: # If there is other stuff, add a frame round the file chooser so we can see what it's for
-                    label = self.createLabelEventBox(option, separator=":")
+                    labelEventBox = self.createLabelEventBox(option, separator=":")
                     frame = gtk.Frame()
-                    frame.set_label_widget(label)
+                    frame.set_label_widget(labelEventBox)
                     frame.add(fileChooser)
                     vbox.pack_start(frame, expand=True, fill=True)
                 else:
                     vbox.pack_start(fileChooser, expand=True, fill=True)
             else:
-                label, entryWidget, entry = self.createOptionEntry(option, separator=":")
+                labelEventBox, entryWidget, entry = self.createOptionEntry(option, separator=":")
                 entry.set_activates_default(True)
-                self.addLabel(vbox, label)
+                self.addLabel(vbox, labelEventBox)
                 vbox.pack_start(entryWidget, expand=False, fill=False)
                 
         self.addSwitches(vbox, self.optionGroup)            

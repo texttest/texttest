@@ -98,7 +98,7 @@ class GUIStatusMonitor(guiplugins.SubGUI):
         guilog.info("Changing GUI status to: '" + self.label.get_text() + "'")        
     def notifyActionStart(self, message="", lock = True):        
         if self.throbber:
-            if self.pixbuf: # We didn't do ActionStop ...
+            if self.pixbuf: # pragma: no cover : Only occurs if some code forgot to do ActionStop ...
                 self.notifyActionStop()
             self.pixbuf = self.throbber.get_pixbuf()
             self.throbber.set_from_animation(self.animation)
@@ -621,13 +621,6 @@ class MenuBarGUI(guiplugins.SubGUI):
             moduleName = baseName[:-4]
         self.diag.info("Checking if we loaded module " + moduleName)
         return sys.modules.has_key(moduleName)
-    def correctMode(self, mode):
-        if mode == "static":
-            return not self.dynamic
-        elif mode == "dynamic":
-            return self.dynamic
-        else:
-            return True
     def describe(self):
         for toggleAction in self.toggleActions:
             guilog.info("Viewing toggle action with title '" + toggleAction.get_property("label") + "'")
@@ -854,8 +847,6 @@ class TestIteratorMap:
     def store(self, test, iter):
         self.dict[self.getKey(test)] = iter
     def updateIterator(self, test, oldRelPath):
-        if self.dynamic:
-            return self.getIterator(test)
         # relative path of test has changed
         key = self.parentApps.get(test.app), oldRelPath
         iter = self.dict.get(key)
@@ -881,7 +872,7 @@ class RefreshTips(TreeViewTooltips):
         self.refreshColumn = refreshColumn
         self.refreshIndex = refreshIndex
         
-    def get_tooltip(self, view, column, path):
+    def get_tooltip(self, view, column, path): #pragma : no cover - can't test tooltips (future?) 
         if column is self.refreshColumn:
             model = view.get_model()
             refreshIcon = model[path][self.refreshIndex]
@@ -1016,10 +1007,6 @@ class TestTreeGUI(ContainerGUI):
         test = self.filteredModel.get_value(pathIter, 2)[0]
         return test.classId() == "test-case"
 
-    def rowCollapsed(self, treeview, iter, path):
-        if self.dynamic:
-            realPath = self.filteredModel.convert_path_to_child_path(path)
-            self.collapsedRows[realPath] = 1
     def rowExpanded(self, treeview, iter, path):
         if self.dynamic:
             realPath = self.filteredModel.convert_path_to_child_path(path)
@@ -1822,7 +1809,7 @@ class TextViewGUI(guiplugins.SubGUI):
 
     # Links can be activated by clicking. Low-level code lifted from Maik Hertha's
     # GTK hypertext demo
-    def event_after(self, text_view, event):
+    def event_after(self, text_view, event): # pragma : no cover - external code and untested browser code
         if event.type != gtk.gdk.BUTTON_RELEASE:
             return False
         if event.button != 1:
@@ -1857,7 +1844,7 @@ class TextViewGUI(guiplugins.SubGUI):
     # Looks at all tags covering the position (x, y) in the text view,
     # and if one of them is a link, change the cursor to the "hands" cursor
     # typically used by web browsers.
-    def set_cursor_if_appropriate(self, text_view, x, y):
+    def set_cursor_if_appropriate(self, text_view, x, y): # pragma : no cover - external code
         hovering = False
 
         buffer = text_view.get_buffer()
@@ -1872,7 +1859,7 @@ class TextViewGUI(guiplugins.SubGUI):
         else:
             text_view.get_window(gtk.TEXT_WINDOW_TEXT).set_cursor(self.regular_cursor)
 
-    def findLinkTarget(self, iter):
+    def findLinkTarget(self, iter): # pragma : no cover - called by external code
         tags = iter.get_tags()
         for tag in tags:
             target = tag.get_data("target")
@@ -1880,7 +1867,7 @@ class TextViewGUI(guiplugins.SubGUI):
                 return target
 
     # Update the cursor image if the pointer moved.
-    def motion_notify_event(self, text_view, event):
+    def motion_notify_event(self, text_view, event): # pragma : no cover - external code
         x, y = text_view.window_to_buffer_coords(gtk.TEXT_WINDOW_WIDGET,
             int(event.x), int(event.y))
         self.set_cursor_if_appropriate(text_view, x, y)
@@ -2455,8 +2442,6 @@ class TestFileGUI(FileViewGUI):
                 details = comparison.getDetails()
             self.addFileToModel(iter, file, colour, comparison, details)
     def getComparisonColour(self, state, fileComp):
-        if not state.hasStarted():
-            return self.getColour("not_started")
         if not state.isComplete():
             return self.getColour("running")
         if fileComp.hasSucceeded():

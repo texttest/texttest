@@ -811,10 +811,6 @@ class TestSuite(Test):
         for case in self.testcases:
             list += case.testCaseList(filters)
         return list
-    def getRunningTests(self):
-        runningTests = filter(lambda test: not test.state.isComplete(), self.testCaseList())
-        runningTests.reverse() # Best to start at the end to avoid race conditions
-        return runningTests
     def classId(self):
         return "test-suite"
     def isEmpty(self):
@@ -834,9 +830,6 @@ class TestSuite(Test):
     def getContentFileName(self):
         return self.getFileName("testsuite")
     def createContentFile(self):
-        contentFile = self.getContentFileName()
-        if contentFile:
-            return
         contentFile = self.dircache.pathName("testsuite." + self.app.name)
         file = open(contentFile, "a")
         file.write("# Ordered list of tests in test suite. Add as appropriate\n\n")
@@ -1291,9 +1284,6 @@ class Application:
     def getFileName(self, dirList, stem, versionSetMethod=None):
         dircaches = map(lambda dir: DirectoryCache(dir), dirList)
         return self._getFileName(dircaches, stem, versionSetMethod=versionSetMethod)
-    def getAllFileNames(self, dirList, stem, versionSetMethod=None):
-        dircaches = map(lambda dir: DirectoryCache(dir), dirList)
-        return self._getAllFileNames(dircaches, stem, versionSetMethod=versionSetMethod)
     def _getFileName(self, dircaches, stem, versionSetMethod=None):
         allFiles = self._getAllFileNames(dircaches, stem, versionSetMethod=versionSetMethod)
         if len(allFiles):

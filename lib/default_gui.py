@@ -1473,8 +1473,6 @@ class LoadSelection(guiplugins.ActionDialogGUI):
         return "_Load Selection..."
     def getTooltip(self):
         return "Load test selection from file"
-    def getDirectories(self):
-        return self.optionGroup.getOption("f").getDirectories()
     def performOnCurrent(self):
         fileName = self.optionGroup.getOptionValue("f")
         if fileName:
@@ -1706,8 +1704,6 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
         self.startTextTestProcess("record", [ "-g", "-record" ])
     def shouldShow(self):
         return len(self.validApps) > 0 # override the default so it's disabled if there are no apps
-    def getRecordMode(self):
-        return self.currTestSelection[0].getConfigValue("use_case_record_mode")
     def isValidForApp(self, app):
         return app.getConfigValue("use_case_record_mode") != "disabled" and \
                app.getConfigValue("use_case_recorder") != "none"
@@ -1793,8 +1789,6 @@ class CreateDefinitionFile(guiplugins.ActionDialogGUI):
         return "new" 
     def getDialogTitle(self):
         return "New File" 
-    def getScriptTitle(self, tab):
-        return "Create File"
     def isActiveOnCurrent(self, *args):
         return self.creationDir is not None and guiplugins.ActionDialogGUI.isActiveOnCurrent(self, *args)
     def fillVBox(self, vbox):

@@ -328,10 +328,6 @@ class ProgressTestComparison(BaseTestComparison):
             self.runningState = previousInfo.runningState
         else:
             self.runningState = previousInfo
-    def processCompleted(self):
-        return self.runningState.processCompleted()
-    def killProcess(self):
-        self.runningState.killProcess()
     def createFileComparison(self, test, stem, standardFile, tmpFile):
         return FileComparison(test, stem, standardFile, tmpFile, testInProgress=1, observers=self.observers)
     def categorise(self):

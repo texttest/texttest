@@ -226,8 +226,6 @@ class TestRunner:
         self.currentAction = None
         self.lock = Lock()
         self.setActionSequence(appRunner.actionSequence)
-    def __repr__(self):
-        return repr(self.test)
     def setActionSequence(self, actionSequence):
         self.actionSequence = []
         # Copy the action sequence, so we can edit it and mark progress

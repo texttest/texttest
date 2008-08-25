@@ -387,8 +387,9 @@ class Config:
     def getFiltersFromMap(self, optionMap, app):
         filters = []
         for filterClass in self.getFilterClasses():
-            if optionMap.has_key(filterClass.option):
-                filters.append(filterClass(optionMap[filterClass.option], app))
+            argument = optionMap.get(filterClass.option)
+            if argument:
+                filters.append(filterClass(argument, app))
         batchSession = self.optionMap.get("b")
         if batchSession:
             timeLimit = app.getCompositeConfigValue("batch_timelimit", batchSession)

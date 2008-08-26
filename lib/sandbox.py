@@ -30,7 +30,7 @@ class PrepareWriteDirectory(plugins.Action):
         self.diag.info("Collating " + configName + " from " + repr(sourcePath) + "\nto " + repr(target))
         if sourcePath:
             self.collateExistingPath(test, sourcePath, target, collateMethod)
-            
+
         envVarToSet, propFileName = self.findDataEnvironment(test, configName)
         if envVarToSet:
             self.diag.info("Setting env. variable " + envVarToSet + " to " + target)
@@ -55,7 +55,7 @@ class PrepareWriteDirectory(plugins.Action):
         self.diag.info("Found source file name for " + configName + " = " + fileName)
         if not fileName or os.path.isabs(fileName):
             return fileName
-        
+
         return test.getPathName(fileName, configName)
     def getSourceFileName(self, configName, test):
         if configName.startswith("$"):
@@ -71,7 +71,7 @@ class PrepareWriteDirectory(plugins.Action):
         return envVarDict.get(configName), propFile
     def copyTestPath(self, test, fullPath, target):
         if os.path.isfile(fullPath):
-            self.copyfile(fullPath, target) 
+            self.copyfile(fullPath, target)
         if os.path.isdir(fullPath):
             self.copytree(fullPath, target)
     def copytimes(self, src, dst):
@@ -121,7 +121,7 @@ class PrepareWriteDirectory(plugins.Action):
         if os.path.exists(fullPath):
             if not os.path.exists(target):
                 os.symlink(fullPath, target)
-            else:
+            else: #pragma : no cover
                 raise plugins.TextTestError, "File already existed at " + target + "\nTrying to link to " + fullPath
     def partialCopyTestPath(self, test, sourcePath, targetPath):
         # Linking doesn't exist on windows!
@@ -169,7 +169,7 @@ class PrepareWriteDirectory(plugins.Action):
     def handleReadOnly(self, sourceFile, targetFile):
         try:
             self.copylink(sourceFile, targetFile)
-        except OSError:
+        except OSError: #pragma : no cover
             print "Failed to create symlink " + targetFile
     def isWriteDir(self, targetPath, modPaths):
         for modPath in modPaths:
@@ -239,7 +239,7 @@ class TestEnvironmentCreator:
         return self.test.parent is None
     def testCase(self):
         return self.test.classId() == "test-case"
-    
+
     def getUseCaseVariables(self):
         # Here we assume the application uses either PyUseCase or JUseCase
         # PyUseCase reads environment variables, but you can't do that from java,
@@ -256,7 +256,7 @@ class TestEnvironmentCreator:
             # Re-record if recorded files are already present or recording explicitly requested
             vars.append(self.getRecordScriptVariable(self.test.makeTmpFileName("usecase")))
         return vars
-    
+
     def isRecording(self):
         return self.optionMap.has_key("record")
     def findReplayUseCase(self, usecaseFile):
@@ -274,10 +274,10 @@ class TestEnvironmentCreator:
                 return usecaseFile
             elif os.environ.has_key("USECASE_REPLAY_SCRIPT") and not self.useJavaRecorder():
                 return "" # Clear our own script, if any, for further apps wanting to use PyUseCase
-            
+
     def useJavaRecorder(self):
         return self.test.getConfigValue("use_case_recorder") == "jusecase"
-    def getReplayScriptVariable(self, replayScript):        
+    def getReplayScriptVariable(self, replayScript):
         if self.useJavaRecorder():
             return "replay", replayScript, "jusecase"
         else:
@@ -296,7 +296,7 @@ class TestEnvironmentCreator:
             return "USECASE_RECORD_SCRIPT", recordScript
     def getPathVariables(self):
         testDir = self.test.getDirectory(temporary=1)
-        vars = [("TEXTTEST_SANDBOX", testDir)] 
+        vars = [("TEXTTEST_SANDBOX", testDir)]
         # Always include the working directory of the test in PATH, to pick up fake
         # executables provided as test data. Allow for later expansion...
         for pathVar in self.getPathVars():
@@ -312,9 +312,9 @@ class TestEnvironmentCreator:
             elif (dataFile.endswith(".jar") or dataFile.endswith(".class")) and "CLASSPATH" not in pathVars:
                 pathVars.append("CLASSPATH")
         return pathVars
-    
 
-    
+
+
 class CollateFiles(plugins.Action):
     def __init__(self):
         self.collations = {}
@@ -405,13 +405,13 @@ class CollateFiles(plugins.Action):
 
     def runCollationScript(self, args, test, stdin, stdout, stderr):
         try:
-            return subprocess.Popen(args, env=test.getRunEnvironment(), 
+            return subprocess.Popen(args, env=test.getRunEnvironment(),
                                     stdin=stdin, stdout=stdout, stderr=stderr,
                                     cwd=test.getDirectory(temporary=1))
         except OSError:
             stdout.close()
             stderr.close()
-    
+
     def extract(self, test, sourceFile, targetFile, collationErrFile):
         stem = os.path.splitext(os.path.basename(targetFile))[0]
         scripts = test.getCompositeConfigValue("collate_script", stem)
@@ -448,9 +448,9 @@ class CollateFiles(plugins.Action):
                 print "WARNING : " + errorMsg.strip()
                 stderr.close()
                 return
-            
+
         if currProc:
-            currProc.wait()    
+            currProc.wait()
 
 class FindExecutionHosts(plugins.Action):
     def __call__(self, test):
@@ -492,7 +492,7 @@ class CreateCatalogue(plugins.Action):
             self.writeFileStructure(file, pathsLost)
         if len(processesGained) > 0:
             file.write("\nThe following processes were created:\n")
-            self.writeProcesses(file, processesGained) 
+            self.writeProcesses(file, processesGained)
         file.close()
     def writeProcesses(self, file, processesGained):
         for process in processesGained:
@@ -588,7 +588,7 @@ class CreateCatalogue(plugins.Action):
     def outputPathName(self, path, writeDir):
         self.diag.info("Output name for " + path)
         return path.replace(writeDir, "<Test Directory>")
-                    
+
 class MachineInfoFinder:
     def findPerformanceMachines(self, app, fileStem):
         return app.getCompositeConfigValue("performance_test_machine", fileStem)
@@ -611,7 +611,7 @@ class PerformanceFileCreator(plugins.Action):
         self.diag.info("Found performance machines as " + repr(performanceMachines))
         if "any" in performanceMachines:
             return True
-        
+
         for host in test.state.executionHosts:
             if host not in performanceMachines:
                 self.diag.info("Real host rejected for performance " + host)
@@ -630,7 +630,7 @@ class UNIXPerformanceInfoFinder:
         self.diag.info("Reading performance file " + tmpFile)
         if not os.path.isfile(tmpFile):
             return None, None
-            
+
         file = open(tmpFile)
         cpuTime = None
         realTime = None
@@ -671,7 +671,7 @@ class MakePerformanceFile(PerformanceFileCreator):
         if cpuTime == None:
             print "Not writing performance file for", test
             return
-        
+
         fileToWrite = test.makeTmpFileName("performance")
         self.writeFile(test, cpuTime, realTime, fileToWrite)
     def timeString(self, timeVal):
@@ -760,7 +760,7 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
         # locates the first whitespace after an occurrence of entryFinder in line,
         # and scans the rest of the string after that whitespace
         pattern = '.*' + entryFinder + r'\S*\s(?P<restofline>.*)'
-        regExp = re.compile(pattern)        
+        regExp = re.compile(pattern)
         match = regExp.match(line)
         if not match:
             return

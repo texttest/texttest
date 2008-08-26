@@ -53,7 +53,7 @@ def posixexpandvars(path, getenvFunc=os.getenv):
     return path
 
 # Copied from ntpath
-def ntexpandvars(path, getenvFunc=os.getenv):
+def ntexpandvars(path, getenvFunc=os.getenv): # pragma: no cover
     """Expand shell variables of form $var and ${var}.
 
     Unknown variables are left unchanged."""
@@ -157,7 +157,7 @@ def getNumberOfSeconds(timeString):
             seconds = 0
             for i in range(len(parts) - 1, -1, -1):
                 if (parts[i] != ""): # Handle empty strings (<=:10 gives empty minutes field, for example)
-                    seconds += float(parts[i]) * pow(60, len(parts) - 1 - i)                
+                    seconds += float(parts[i]) * pow(60, len(parts) - 1 - i)
             return seconds
     except ValueError:
         pass
@@ -173,9 +173,9 @@ def printWarning(message, stdout = True, stderr = False):
         print "WARNING: " + message
     if stderr:
         sys.stderr.write("WARNING: " + message + "\n")
-        
+
 # Useful stuff to handle regular expressions
-regexChars = re.compile("[\^\$\[\]\{\}\\\*\?\|\+]")    
+regexChars = re.compile("[\^\$\[\]\{\}\\\*\?\|\+]")
 def isRegularExpression(text):
     return (regexChars.search(text) != None)
 def findRegularExpression(expr, text):
@@ -187,15 +187,15 @@ def findRegularExpression(expr, text):
 
 # Parse the string as a byte expression.
 # Mb/mb/megabytes/mbytes
-def parseBytes(text):
+def parseBytes(text): # pragma: no cover
     lcText = text.lower()
     try:
         # Try this first, to save time if it works
         try:
-            return float(text) 
+            return float(text)
         except:
             pass
-        
+
         if lcText.endswith("kb") or lcText.endswith("kbytes") or lcText.endswith("k") or lcText.endswith("kilobytes"):
             splitText = lcText.split('k')
             if len(splitText) > 2:
@@ -209,7 +209,7 @@ def parseBytes(text):
         elif lcText.endswith("mb") or lcText.endswith("mbytes") or lcText.endswith("m") or lcText.endswith("megabytes"):
             splitText = lcText.split('m')
             if len(splitText) > 2:
-                raise 
+                raise
             return 1000000 * float(splitText[0])
         elif lcText.endswith("mib") or lcText.endswith("mebibytes"):
             splitText = lcText.split('m')
@@ -277,7 +277,7 @@ def parseBytes(text):
                 raise
             return 2**80 * float(splitText[0])
         else:
-            return float(text) 
+            return float(text)
     except:
         raise "Illegal byte format '" + text + "'"
 
@@ -359,7 +359,7 @@ class TestPathFilter(TextFilter):
                 bestHeader = header
                 bestVersionSet = currVersionSet
         return bestHeader
-    
+
     def isBetterMatch(self, curr, best, mine):
         # We want the most in common with mine, and the least not in common
         currCommon = curr.intersection(mine)
@@ -457,12 +457,12 @@ class Observable:
     def addObserver(self, observer):
         self.observers.append(observer)
 
-    def setObservers(self, observers):    
+    def setObservers(self, observers):
         self.observers = filter(lambda x: x is not self, observers)
 
     def inMainThread(self):
         return currentThread().getName() == "MainThread"
-    
+
     def notify(self, *args, **kwargs):
         if self.threadedNotificationHandler.active and not self.inMainThread():
             self.diagnoseObs("To work queue", *args, **kwargs)
@@ -478,7 +478,7 @@ class Observable:
             self.threadedNotificationHandler.transfer(self, *args, **kwargs)
         else:
             self.diagnoseObs("Perform directly", *args, **kwargs)
-            self.performNotify(*args, **kwargs)        
+            self.performNotify(*args, **kwargs)
 
     def notifyIfMainThread(self, *args, **kwargs):
         if not self.inMainThread():
@@ -504,7 +504,7 @@ class Observable:
             return method(self, *args, **kwargs)
         else:
             return method(*args, **kwargs)
-            
+
 # Generic state which tests can be in, should be overridden by subclasses
 # Acts as a static state for tests which have not run (yet)
 # Free text is text of arbitrary length: it will appear in the "Text Info" GUI window when the test is viewed
@@ -624,7 +624,7 @@ def configureLog4py(configFile):
         # To set new config files appears to require a constructor...
         rootLogger = log4py.Logger(log4py.TRUE, configFile)
     else:
-        rootLogger = log4py.Logger().get_root()        
+        rootLogger = log4py.Logger().get_root()
         rootLogger.set_loglevel(log4py.LOGLEVEL_NONE)
 
 # Simple handle to get diagnostics object. Better than using log4py directly,
@@ -667,7 +667,7 @@ def getInterpreter(executable):
         return "ruby"
     elif executable.endswith(".jar"):
         return "java -jar"
-    else:   
+    else:
         return ""
 
 def commandLineString(cmdArgs):
@@ -697,7 +697,7 @@ def relpath(fullpath, parentdir):
         return relPath[1:]
     else:
         return relPath
-    
+
 def getProcessStartUpInfo(getenvFunc=os.getenv):
     # Used for hiding the windows if we're on Windows!
     if os.name == "nt" and getenvFunc("DISPLAY") == "HIDE_WINDOWS":
@@ -760,7 +760,7 @@ def rmtree(dir, attempts=100):
                     printException()
                 else:
                     print "Problems removing directory", dir, "- waiting 1 second to retry..."
-                    time.sleep(1)                
+                    time.sleep(1)
 
 def readList(filename):
     items = []
@@ -771,7 +771,7 @@ def readList(filename):
     return items
 
 emptyLineSymbol = "__EMPTYLINE__"
-  
+
 def readListWithComments(filename, filterMethod=None):
     items = seqdict()
     currComment = ""
@@ -868,11 +868,11 @@ class PreviewGenerator:
     def getCutLines(self, lines):
         if len(lines) < self.cutFromEnd + self.cutFromStart:
             return lines
-        
+
         cutLines = lines[:self.cutFromStart]
         if self.cutFromEnd > 0:
             cutLines.append("... extra data truncated by TextTest ...\n")
-            cutLines += lines[-self.cutFromEnd:]    
+            cutLines += lines[-self.cutFromEnd:]
         return cutLines
     def getPreview(self, file):
         fileLines = retryOnInterrupt(self.getFileLines, file)
@@ -886,7 +886,7 @@ class PreviewGenerator:
         lines = map(self.getWrappedLine, cutLines)
         return string.join(lines, "")
     def getPreviewFromText(self, text):
-        truncatedLines = text.splitlines() 
+        truncatedLines = text.splitlines()
         lines = [ line + "\n" for line in truncatedLines ]
         return self._getPreview(lines)
     def getWrappedLine(self, line):
@@ -897,7 +897,7 @@ class PreviewGenerator:
                 return result + remaining
             result += remaining[:self.maxWidth] + "\n"
             remaining = remaining[self.maxWidth:]
-    
+
 # Exception to throw. It's generally good to throw this internally
 class TextTestError(RuntimeError):
     pass
@@ -906,7 +906,7 @@ class TextTestWarning(RuntimeError):
     pass
 
 # Sort of a workaround to get e.g. CVSLogInGUI to show a message in a simple info dialog
-class TextTestInformation(RuntimeError): 
+class TextTestInformation(RuntimeError):
     pass
 
 # Yes, we know that getopt exists. However it throws exceptions when it finds unrecognised things, and we can't do that...
@@ -915,9 +915,9 @@ class OptionFinder(seqdict):
         seqdict.__init__(self)
         self.buildOptions(args, defaultKey)
     def buildOptions(self, args, defaultKey):
-        optionKey = None                                                                                         
-        for item in args:    
-            if item.startswith("-"):                         
+        optionKey = None
+        for item in args:
+            if item.startswith("-"):
                 optionKey = self.stripMinuses(item)
                 self[optionKey] = None
             elif optionKey:
@@ -933,7 +933,7 @@ class OptionFinder(seqdict):
             return item[2:].strip()
         else:
             return item[1:].strip()
-    
+
 class TextTrigger:
     def __init__(self, text):
         self.text = text
@@ -990,6 +990,7 @@ class MultiEntryDictionary(seqdict):
         if errorOnUnknown:
             printWarning("Config section name '" + name + "' not recognised.", stdout = False, stderr = True)
         return self
+
     def addEntry(self, entryName, entry, sectionName="", insert=0, errorOnUnknown=1):
         if sectionName:
             self.currDict = self[sectionName]
@@ -1027,9 +1028,9 @@ class MultiEntryDictionary(seqdict):
             return currentList + [ entry ]
         else:
             return currentList
-    
+
     def insertEntry(self, entryName, entry):
-        currType = type(self.currDict[entryName]) 
+        currType = type(self.currDict[entryName])
         if currType == types.ListType:
             self.currDict[entryName] = self.getListValue(entry, self.currDict[entryName])
         elif currType == types.DictType:
@@ -1064,8 +1065,8 @@ class MultiEntryDictionary(seqdict):
             if len(listVal) > 0:
                 return listVal
 
-    
-class Option:    
+
+class Option:
     def __init__(self, name, value, description, changeMethod):
         self.name = name
         self.defaultValue = value
@@ -1142,8 +1143,8 @@ class TextOption(Option):
             return self.possibleValues
         else:
             return self.possibleDirs
-            
-    def usePossibleValues(self): 
+
+    def usePossibleValues(self):
         return self.selectDir or self.nofValues > 1 or len(self.possibleValues) > 1
     def setClearMethod(self, clearMethod):
         self.clearMethod = clearMethod
@@ -1162,17 +1163,17 @@ class TextOption(Option):
         allDirs = self.getPossibleDirs()
         for dir in allDirs:
             ensureDirectoryExists(dir)
-            
+
         return allDirs, self.findDefaultDirectory(allDirs)
 
     def findDefaultDirectory(self, allDirs):
         # Set first non-empty dir as default ...)
         for dir in allDirs:
-            if self.saveFile or len(os.listdir(dir)) > 0:                
+            if self.saveFile or len(os.listdir(dir)) > 0:
                 return dir
-                    
+
         return allDirs[0]
-        
+
 class Switch(Option):
     def __init__(self, name="", value=0, options=[], description="", changeMethod = None):
         Option.__init__(self, name, int(value), description, changeMethod)
@@ -1214,7 +1215,7 @@ class OptionGroup:
             return False
         self.switches[key] = Switch(*args, **kwargs)
         return True
-    def addOption(self, key, *args, **kwargs): 
+    def addOption(self, key, *args, **kwargs):
         if self.options.has_key(key):
             return False
         self.options[key] = TextOption(*args, **kwargs)
@@ -1278,7 +1279,7 @@ class OptionGroup:
                     self.switches[arg].defaultValue = 1 - oldValue
                 else:
                     raise TextTestError, self.name + " does not support switch '" + arg + "'"
- 
+
 def decodeText(text, log = None):
     localeEncoding = locale.getdefaultlocale()[1]
     if localeEncoding:
@@ -1289,7 +1290,7 @@ def decodeText(text, log = None):
                 log.info("WARNING: Failed to decode string '" + text + \
                          "' using default locale encoding " + repr(localeEncoding) + \
                          ". Trying ISO8859-1 encoding ...")
-                
+
             return decodeISO88591Text(text, localeEncoding, log)
 
 def decodeISO88591Text(text, localeEncoding, log = None):
@@ -1300,7 +1301,7 @@ def decodeISO88591Text(text, localeEncoding, log = None):
             log.info("WARNING: Failed to decode string '" + text + \
                      "' using ISO8859-1 encoding " + repr(localeEncoding) + \
                      ". Trying strict UTF-8 encoding ...")
-            
+
         return decodeUtf8Text(text, localeEncoding, log)
 
 def decodeUtf8Text(text, localeEncoding, log = None):
@@ -1330,7 +1331,7 @@ def encodeToUTF(unicodeInfo, log = None):
                          "' using both strict UTF-8 encoding and UTF-8 encoding with " + \
                          "replacement. Showing error message instead.")
             return "Failed to encode Unicode string."
-        
+
 def encodeToLocale(unicodeInfo, log = None):
     localeEncoding = locale.getdefaultlocale()[1]
     if localeEncoding:
@@ -1403,20 +1404,20 @@ class FileProperties:
             uid = self.status[stat.ST_UID]
             return str(pwd.getpwuid(uid)[0])
         except:
-            return "?"        
-    def inqGroup(self):        
+            return "?"
+    def inqGroup(self):
         try:
             gid = self.status[stat.ST_GID]
             return str(grp.getgrgid(gid)[0])
         except:
-            return "?"        
+            return "?"
     def inqSize(self):
         return self.status[stat.ST_SIZE]
     def formatTime(self, timeStamp):
         # %e is more appropriate than %d below, as it fills with space
         # rather than 0, but it is not supported on Windows, it seems.
         if timeStamp < self.recent or \
-               timeStamp > self.now: 
+               timeStamp > self.now:
             timeFormat = "%b %d  %Y"
         else:
             timeFormat = "%b %d %H:%M"

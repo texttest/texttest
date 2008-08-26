@@ -57,7 +57,7 @@ def repeatedOpen(fileName, *args, **kwargs):
     return origOpen(fileName, *args, **kwargs)
 
 __builtin__.open = repeatedOpen
-            
+
 def getConfig(optionMap):
     return CarmenConfig(optionMap)
 
@@ -76,7 +76,7 @@ def getMajorReleaseVersion(app):
     # If we disable this, don't re-enable it whatever the versions are...
     if defaultMajRelease == "none":
         return defaultMajRelease
-    
+
     for version in app.versions + app.getConfigValue("base_version"):
         if version in majorReleases:
             return version
@@ -183,7 +183,7 @@ class CarmenSgeSubmissionRules(queuesystem.SubmissionRules):
         majRelResource = self.getMajorReleaseResource()
         if majRelResource:
             resources.append(majRelResource)
-            
+
         resources += self.getBasicResources()
         return resources
     def findResourceList(self):
@@ -285,7 +285,7 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         if arch not in app.versions:
             app.addConfigEntry("base_version", arch)
             app.addConfigEntry("unsaveable_version", arch)
-            
+
     def defaultLoginShell(self):
         # All of carmen's login stuff is done in tcsh starter scripts...
         return "/bin/tcsh"
@@ -320,7 +320,7 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
             envVars += [ ("MAJOR_RELEASE_VERSION", majReleaseVersion), \
                          ("MAJOR_RELEASE_ID", fullVersionName(majReleaseVersion)) ]
         return envVars
-    
+
 class RunWithParallelAction(plugins.Action):
     def __init__(self, isExecutable, hasAutomaticCpuTimeChecking, baseRunner):
         self.isExecutable = isExecutable
@@ -333,7 +333,7 @@ class RunWithParallelAction(plugins.Action):
         for runner in baseRunner:
             if hasattr(runner, "currentProcess"):
                 return runner
-            
+
     def __call__(self, test):
         parallelActionThread = Thread(target=self.runParallelAction, args=(test,))
         parallelActionThread.setDaemon(True)
@@ -366,7 +366,7 @@ class RunWithParallelAction(plugins.Action):
                 time.sleep(0.1)
             raise plugins.TextTestError, "Child processes didn't look as expected when running with automatic CPU time checking"
         return jobProc
-    
+
     def findProcessInfo(self, test):
         parentProcess = self.getTestProcess(test)
         while 1:
@@ -382,7 +382,7 @@ class RunWithParallelAction(plugins.Action):
         childProcesses = process.findChildProcesses()
         if len(childProcesses) != 1:
             return
-        
+
         executableProcessName = childProcesses[0].getName()
         if len(executableProcessName) == 0:
             return# process already complete
@@ -394,7 +394,7 @@ class RunWithParallelAction(plugins.Action):
     def handleNoTimeAvailable(self, test):
         # Do nothing by default
         pass
-                
+
 class RunLprof(RunWithParallelAction):
     def __repr__(self):
         return "Running Lprof profiler on"
@@ -405,7 +405,7 @@ class RunLprof(RunWithParallelAction):
         os.system(runLine)
     def handleNoTimeAvailable(self, test):
         raise plugins.TextTestError, "Lprof information not collected, test did not run long enough to connect to it"
-    
+
 class ProcessProfilerResults(plugins.Action):
     def __call__(self, test):
         processLine = "/users/lennart/bin/process_gprof -t 0.5 prof.*" + " > " + test.makeTmpFileName("lprof")
@@ -414,5 +414,5 @@ class ProcessProfilerResults(plugins.Action):
         cmdLine = "gzip prof.[0-9]*;mv prof.[0-9]*.gz " + test.makeTmpFileName("prof", forFramework=1)
         os.system(cmdLine)
     def __repr__(self):
-        return "Profiling"    
+        return "Profiling"
 

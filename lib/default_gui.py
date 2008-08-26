@@ -12,8 +12,8 @@ try:
     import gtk, helpdialogs
 except ImportError:
     pass # don't fail on scripts : we should already have imported it anyway
-   
-    
+
+
 class Quit(guiplugins.BasicActionGUI):
     def __init__(self, *args):
         guiplugins.BasicActionGUI.__init__(self, *args)
@@ -44,7 +44,7 @@ class Quit(guiplugins.BasicActionGUI):
             message += "\nQuit anyway?\n"
         return message
 
-        
+
 # Plugin for saving tests (standard)
 class SaveTests(guiplugins.ActionDialogGUI):
     def __init__(self, allApps, *args):
@@ -64,7 +64,7 @@ class SaveTests(guiplugins.ActionDialogGUI):
         if len(stemsToSave) > 0:
             saveDesc += ", only files " + ",".join(stemsToSave)
         return saveDesc
-    
+
     def _getStockId(self):
         return "save"
     def _getTitle(self):
@@ -99,9 +99,9 @@ class SaveTests(guiplugins.ActionDialogGUI):
             message += "  Test '" + test.uniqueName + "' " + test.state.categoryRepr() + "\n"
         message += "Are you sure you want to do this?\n"
         return message
-    
+
     def getSaveableTests(self):
-        return filter(lambda test: test.state.isSaveable(), self.currTestSelection)       
+        return filter(lambda test: test.state.isSaveable(), self.currTestSelection)
     def updateOptions(self):
         defaultSaveOption = self.getDefaultSaveOption()
         versionOption = self.optionGroup.getOption("v")
@@ -204,7 +204,7 @@ class SaveTests(guiplugins.ActionDialogGUI):
             else:
                 raise plugins.TextTestError, errorStr
 
-        
+
 class MarkTest(guiplugins.ActionDialogGUI):
     def __init__(self, *args):
         guiplugins.ActionDialogGUI.__init__(self, *args)
@@ -223,7 +223,7 @@ class MarkTest(guiplugins.ActionDialogGUI):
                 newState = plugins.MarkedTestState(self.optionGroup.getOptionValue("free"),
                                                    self.optionGroup.getOptionValue("brief"), oldState)
                 test.changeState(newState)
-                self.notify("ActionProgress", "") # Just to update gui ...            
+                self.notify("ActionProgress", "") # Just to update gui ...
     def isActiveOnCurrent(self, test=None, state=None):
         if state and state.isComplete():
             return True
@@ -242,7 +242,7 @@ class UnmarkTest(guiplugins.ActionGUI):
             if test.state.isMarked():
                 test.state.oldState.lifecycleChange = "unmarked" # To avoid triggering completion ...
                 test.changeState(test.state.oldState)
-                self.notify("ActionProgress", "") # Just to update gui ...            
+                self.notify("ActionProgress", "") # Just to update gui ...
     def isActiveOnCurrent(self, *args):
         for test in self.currTestSelection:
             if test.state.isMarked():
@@ -263,7 +263,7 @@ class FileViewAction(guiplugins.ActionGUI):
 
     def isActiveForFile(self, fileName, *args):
         return fileName and not os.path.isdir(fileName)
-    
+
     def useFiltered(self):
         return False
 
@@ -341,13 +341,13 @@ class FileViewAction(guiplugins.ActionGUI):
         guiplugins.processMonitor.startProcess(cmdArgs, fullDesc, stdout=nullFile, stderr=nullFile, *args, **kwargs)
         self.notify("Status", 'Started "' + description + '" in background' + testDesc + '.')
         self.notify("ViewerStarted")
-         
+
     def getStem(self, fileName):
         return os.path.basename(fileName).split(".")[0]
     def testRunning(self):
         return self.currTestSelection[0].state.hasStarted() and \
                not self.currTestSelection[0].state.isComplete()
-    
+
     def getViewToolName(self, fileName):
         stem = self.getStem(fileName)
         if len(self.currTestSelection) > 0:
@@ -355,7 +355,7 @@ class FileViewAction(guiplugins.ActionGUI):
         else:
             return guiplugins.guiConfig.getCompositeValue(self.getToolConfigEntry(), stem)
     def differencesActive(self, comparison):
-        if not comparison or comparison.newResult() or comparison.missingResult(): 
+        if not comparison or comparison.newResult() or comparison.missingResult():
             return False
         return comparison.hasDifferences()
     def messageAfterPerform(self):
@@ -375,7 +375,7 @@ class ViewInEditor(FileViewAction):
 
     def getToolDescription(self):
         return "file viewing program"
-    
+
     def viewFile(self, fileName, viewTool, exitHandler, exitHandlerArgs):
         cmdArgs, descriptor, env = self.getViewCommand(fileName, viewTool)
         description = descriptor + " " + os.path.basename(fileName)
@@ -388,7 +388,7 @@ class ViewInEditor(FileViewAction):
         # Doing this is unlikely to cause harm in any case
         if len(self.currTestSelection) > 0 and os.path.isabs(cmdArgs[0]):
             return self.currTestSelection[0].getRunEnvironment()
-    
+
     def getViewCommand(self, fileName, viewProgram):
         # viewProgram might have arguments baked into it...
         cmdArgs = plugins.splitcmd(viewProgram) + [ fileName ]
@@ -405,14 +405,14 @@ class ViewInEditor(FileViewAction):
                 cmdArgs = [ "rsh", remoteHost, "env DISPLAY=" + self.getFullDisplay() + " " + " ".join(cmdArgs) ]
 
         return cmdArgs, descriptor, env
-    
+
     def _performOnFile(self, viewTool, fileName, *args):
         exitHandler, exitHandlerArgs = self.findExitHandlerInfo(fileName, *args)
         return self.viewFile(fileName, viewTool, exitHandler, exitHandlerArgs)
 
     def editingComplete(self):
         guiplugins.scriptEngine.applicationEvent("file editing operations to complete")
-                
+
 
 class ViewConfigFileInEditor(ViewInEditor):
     def __init__(self, *args):
@@ -447,7 +447,7 @@ class ViewConfigFileInEditor(ViewInEditor):
         for suite in self.rootTestSuites:
             if suite.app is app:
                 return suite
-            
+
     def refreshFilesRecursively(self, suite):
         suite.filesChanged()
         if suite.classId() == "test-suite":
@@ -498,7 +498,7 @@ class ViewTestFileInEditor(ViewInEditor):
         for test in tests:
             test.filesChanged()
         self.editingComplete()
-        
+
 
 class ViewFilteredTestFileInEditor(ViewTestFileInEditor):
     def _getStockId(self):
@@ -511,7 +511,7 @@ class ViewFilteredTestFileInEditor(ViewTestFileInEditor):
         return bool(comparison)
     def isDefaultViewer(self, *args):
         return False
-        
+
 class ViewFileDifferences(FileViewAction):
     def _getTitle(self):
         return "View Raw Differences"
@@ -521,7 +521,7 @@ class ViewFileDifferences(FileViewAction):
 
     def getToolDescription(self):
         return "graphical difference program"
-    
+
     def isActiveForFile(self, fileName, comparison):
         if bool(comparison):
             if not (comparison.newResult() or comparison.missingResult()):
@@ -536,15 +536,15 @@ class ViewFileDifferences(FileViewAction):
         guiplugins.guilog.info("--  current file : " + tmpFile)
         cmdArgs = plugins.splitcmd(diffProgram) + [ stdFile, tmpFile ]
         self.startViewer(cmdArgs, description=description, exitHandler=self.diffingComplete)
-        
+
     def diffingComplete(self, *args):
         guiplugins.scriptEngine.applicationEvent("the graphical diff program to terminate")
 
-    
+
 class ViewFilteredFileDifferences(ViewFileDifferences):
     def _getTitle(self):
         return "View Differences"
-    
+
     def useFiltered(self):
         return True
 
@@ -553,7 +553,7 @@ class ViewFilteredFileDifferences(ViewFileDifferences):
 
     def isDefaultViewer(self, comparison):
         return self.differencesActive(comparison)
-    
+
 
 class FollowFile(FileViewAction):
     def _getTitle(self):
@@ -583,13 +583,13 @@ class FollowFile(FileViewAction):
         envDir = { "TEXTTEST_FOLLOW_FILE_TITLE" : title }
         return os.path.expandvars(followProgram, envDir.get)
 
-    def getFollowCommand(self, program, fileName):        
+    def getFollowCommand(self, program, fileName):
         remoteHost = self.getRemoteHost()
         if remoteHost:
             return [ "rsh", remoteHost, "env DISPLAY=" + self.getFullDisplay() + " " + \
                      program + " " + fileName ]
         else:
-            return plugins.splitcmd(program) + [ fileName ]        
+            return plugins.splitcmd(program) + [ fileName ]
 
     def _performOnFile(self, followProgram, fileName, comparison):
         useFile = self.fileToFollow(fileName, comparison)
@@ -598,10 +598,10 @@ class FollowFile(FileViewAction):
         description = useProgram + " " + os.path.basename(useFile)
         cmdArgs = self.getFollowCommand(useProgram, useFile)
         self.startViewer(cmdArgs, description=description, exitHandler=self.followComplete)
-        
+
     def followComplete(self, *args):
         guiplugins.scriptEngine.applicationEvent("the file-following program to terminate")
-        
+
 
 class KillTests(guiplugins.ActionGUI):
     def _getStockId(self):
@@ -651,13 +651,13 @@ class ClipboardAction(guiplugins.ActionGUI):
     def performOnCurrent(self):
         self.notify("Clipboard", self.currTestSelection, cut=self.shouldCut())
 
-    
+
 class CopyTests(ClipboardAction):
     def getName(self):
         return "copy"
     def shouldCut(self):
         return False
-    
+
 class CutTests(ClipboardAction):
     def getName(self):
         return "cut"
@@ -688,7 +688,7 @@ class PasteTests(guiplugins.ActionGUI):
         for currTest in self.currTestSelection:
             if currTest.app == test.app:
                 return currTest
-            
+
     def getDestinationInfo(self, test):
         currTest = self.getCurrentTestMatchingApp(test)
         if currTest is None:
@@ -756,7 +756,7 @@ class PasteTests(guiplugins.ActionGUI):
                 testImported = suite.copyTest(test, newName, newDesc, realPlacement)
                 # "testImported" might in fact be a suite: in which case we should read all the new subtests which
                 # might have also been copied
-                testImported.readContents(initial=False)    
+                testImported.readContents(initial=False)
                 if suiteDeltas.has_key(suite):
                     suiteDeltas[suite] += 1
                 else:
@@ -776,7 +776,7 @@ class PasteTests(guiplugins.ActionGUI):
     def getSignalsSent(self):
         return [ "SetTestSelection" ]
 
-        
+
 # And a generic import test. Note acts on test suites
 class ImportTest(guiplugins.ActionDialogGUI):
     def __init__(self, *args):
@@ -834,7 +834,7 @@ class ImportTest(guiplugins.ActionDialogGUI):
         placements.append("last in suite")
 
         self.optionGroup.setPossibleValues("testpos", placements)
-        self.optionGroup.getOption("testpos").reset()                    
+        self.optionGroup.getOption("testpos").reset()
     def getDefaultName(self):
         return ""
     def getDefaultDesc(self):
@@ -852,7 +852,7 @@ class ImportTest(guiplugins.ActionDialogGUI):
     def performOnCurrent(self):
         testName = self.getNewTestName()
         suite = self.getDestinationSuite()
-            
+
         guiplugins.guilog.info("Adding " + self.testType() + " " + testName + " under test suite " + \
                     repr(suite) + ", placed " + self.optionGroup.getOptionValue("testpos"))
         placement = self.getPlacement()
@@ -880,8 +880,8 @@ class ImportTest(guiplugins.ActionDialogGUI):
             if test.name == testName:
                 raise plugins.TextTestError, "A " + self.testType() + " with the name '" + \
                       testName + "' already exists, please choose another name"
-        
-    
+
+
 class ImportTestCase(ImportTest):
     def __init__(self, *args):
         ImportTest.__init__(self, *args)
@@ -953,7 +953,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         if len(possibleDirs) == 0:
             possibleDirs = [ self.textTestHome ]
         self.addOption("exec", "\nSelect executable program to test", description="The full path to the program you want to test", possibleDirs=possibleDirs, selectFile=True)
-        
+
     def findSubDirectories(self):
         sourceControlDirs = [ "CVS", ".svn" ]
         usableFiles = filter(lambda f: f not in sourceControlDirs, os.listdir(self.textTestHome))
@@ -965,7 +965,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
     def notifyAllRead(self):
         if self.noApps:
             self.runInteractive()
-        
+
     def isActiveOnCurrent(self):
         return True
     def _getStockId(self):
@@ -976,7 +976,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         pass
     def getTooltip(self):
         return "Define a new tested application"
-    
+
     def checkSanity(self, ext, executable, directory):
         if not ext:
             raise plugins.TextTestError, "Must provide a file extension for TextTest files"
@@ -989,7 +989,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
 
     def getSignalsSent(self):
         return [ "NewApplication" ]
-    
+
     def performOnCurrent(self):
         executable = self.optionGroup.getOptionValue("exec")
         ext = self.optionGroup.getOptionValue("ext")
@@ -1046,7 +1046,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
     def addSuites(self, suites):
         guiplugins.ActionTabGUI.addSuites(self, suites)
         AllTestsHandler.addSuites(self, suites)
-           
+
     def addToGroups(self, actionGroup, accelGroup):
         guiplugins.ActionTabGUI.addToGroups(self, actionGroup, accelGroup)
         self.filterAccel = self._addToGroups("Filter", self.filterAction, actionGroup, accelGroup)
@@ -1054,7 +1054,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
     def notifyAllRead(self, *args):
         allStems = self.findAllStems()
         defaultTestFile = self.findDefaultTestFile(allStems)
-        self.optionGroup.setValue("grepfile", defaultTestFile)    
+        self.optionGroup.setValue("grepfile", defaultTestFile)
         self.optionGroup.setPossibleValues("grepfile", allStems)
         self.contentsChanged()
 
@@ -1108,7 +1108,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
     def messageBeforePerform(self):
         return "Selecting tests ..."
     def messageAfterPerform(self):
-        return "Selected " + self.describeTests() + "."    
+        return "Selected " + self.describeTests() + "."
     # No messageAfterPerform necessary - we update the status bar when the selection changes inside TextTestGUI
     def getFilterList(self, app):
         return app.getFilterList(self.optionGroup.getOptionValueMap())
@@ -1126,12 +1126,12 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         suitesToTry = self.getSuitesToTry()
         for suite in self.rootTestSuites:
             if suite in suitesToTry:
-                filters = self.getFilterList(suite.app)            
+                filters = self.getFilterList(suite.app)
                 reqTests = self.getRequestedTests(suite, filters)
                 newTests = self.combineWithPrevious(reqTests, suite.app, strategy)
             else:
                 newTests = self.combineWithPrevious([], suite.app, strategy)
-                
+
             guiplugins.guilog.info("Selected " + str(len(newTests)) + " out of a possible " + str(suite.size()))
             selectedTests += newTests
         return selectedTests
@@ -1140,7 +1140,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         newSelection = self.makeNewSelection()
         criteria = " ".join(self.optionGroup.getCommandLines(onlyKeys=self.appKeys))
         self.notify("SetTestSelection", newSelection, criteria, self.selectionGroup.getSwitchValue("select_in_collapsed_suites"))
-        
+
     def getSuitesToTry(self):
         # If only some of the suites present match the version selection, only consider them.
         # If none of them do, try to filter them all
@@ -1166,7 +1166,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
                     return False
         return True
     def getRequestedTests(self, suite, filters):
-        self.notify("ActionProgress", "") # Just to update gui ...            
+        self.notify("ActionProgress", "") # Just to update gui ...
         if not suite.isAcceptedByAll(filters):
             return []
         if suite.classId() == "test-suite":
@@ -1190,7 +1190,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
                 selectedThisApp = filter(lambda test: test.app is app, self.currTestSelection)
                 return extraRequested + selectedThisApp
             elif strategy == 3:
-                return extraRequested 
+                return extraRequested
     def findTestCaseList(self, suite):
         version = self.optionGroup.getOptionValue("vs")
         if len(version) == 0:
@@ -1200,7 +1200,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
             version = ""
 
         fullVersion = suite.app.getFullVersion()
-        versionToUse = self.findCombinedVersion(version, fullVersion)       
+        versionToUse = self.findCombinedVersion(version, fullVersion)
         self.selectDiag.info("Trying to get test cases for " + repr(suite) + ", version " + versionToUse)
         return suite.findTestCases(versionToUse)
 
@@ -1225,7 +1225,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         self.notify("Visibility", toHide, False)
         self.notify("ActionStop")
         self.notify("Status", "Changed filtering by showing " + str(len(toShow)) +
-                    " tests and hiding " + str(len(toHide)) + ".")    
+                    " tests and hiding " + str(len(toHide)) + ".")
 
     def findTestsToShow(self, newSelection, strategy):
         if strategy == 0 or strategy == 2:
@@ -1241,14 +1241,14 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
 
     def getFilterTooltip(self):
         return "filter tests to show only those indicated"
-    
+
     def createFilterButton(self):
         button = gtk.Button()
         self.filterAction.connect_proxy(button)
         button.set_image(gtk.image_new_from_stock(self.getStockId(), gtk.ICON_SIZE_BUTTON))
         self.tooltips.set_tip(button, self.getFilterTooltip())
         return button
-    
+
     def createFrame(self, name, group, button):
         frame = gtk.Frame(name)
         frame.set_label_align(0.5, 0.5)
@@ -1271,7 +1271,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
 
     def getNaming(self, switchName, cleanOption, optionGroup):
         return guiplugins.ActionTabGUI.getNaming(self, self.getNewSwitchName(switchName, optionGroup), cleanOption, optionGroup)
-        
+
     def createButtons(self, vbox):
         selFrame = self.createFrame("Selection", self.selectionGroup, self.createButton())
         vbox.pack_start(selFrame, fill=False, expand=False, padding=8)
@@ -1390,7 +1390,7 @@ class SaveSelection(guiplugins.ActionDialogGUI):
         guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic)
         self.addOption("f", "enter filter-file name =", possibleDirs=self.getFilterFileDirs(allApps), saveFile=True)
         if not dynamic:
-            # In the static GUI case, we also want radiobuttons specifying 
+            # In the static GUI case, we also want radiobuttons specifying
             # whether we want to save the actual tests, or the selection criteria.
             self.addSwitch("tests", "Save", options= [ "_List of selected tests", "C_riteria entered in the Selection tab\n(Might not match current selection, if it has been modified)" ])
         self.selectionCriteria = ""
@@ -1423,13 +1423,13 @@ class SaveSelection(guiplugins.ActionDialogGUI):
             return self.getTestPathFilterArg()
         else:
             return self.selectionCriteria
-    def getConfirmationMessage(self):    
-        fileName = self.optionGroup.getOptionValue("f")    
+    def getConfirmationMessage(self):
+        fileName = self.optionGroup.getOptionValue("f")
         if fileName and os.path.isfile(fileName):
             return "\nThe file \n" + fileName + "\nalready exists.\n\nDo you want to overwrite it?\n"
 
     def getConfirmationDialogSettings(self):
-        return gtk.STOCK_DIALOG_QUESTION, "Query"    
+        return gtk.STOCK_DIALOG_QUESTION, "Query"
 
     def notifySaveSelection(self, fileName):
         toSave = self.getTestPathFilterArg()
@@ -1497,7 +1497,7 @@ class LoadSelection(guiplugins.ActionDialogGUI):
         return "Loading test selection ..."
     def messageAfterPerform(self):
         pass
-    
+
 class RunningAction:
     runNumber = 1
     def correctTestClass(self):
@@ -1506,7 +1506,7 @@ class RunningAction:
         return "Running"
     def messageAfterPerform(self):
         return self.performedDescription() + " " + self.describeTests() + " at " + plugins.localtime() + "."
-    
+
     def performOnCurrent(self):
         self.startTextTestProcess(self.getUseCaseName(), [ "-g" ])
     def startTextTestProcess(self, usecase, runModeOptions):
@@ -1524,7 +1524,7 @@ class RunningAction:
         env = self.getNewUseCaseEnvironment(usecase)
         guiplugins.processMonitor.startProcess(cmdArgs, description, env=env,
                                                stdout=open(logFile, "w"), stderr=open(errFile, "w"),
-                                               exitHandler=self.checkTestRun, 
+                                               exitHandler=self.checkTestRun,
                                                exitHandlerArgs=(errFile,self.currTestSelection,usecase))
 
     def getNewUseCaseEnvironment(self, usecase):
@@ -1551,7 +1551,7 @@ class RunningAction:
         self.notify("SaveSelection", filterFileName)
         return filterFileName
     def getTextTestArgs(self):
-        return [ sys.executable, sys.argv[0] ]
+        return [ sys.executable ] + plugins.splitcmd(os.getenv("TEXTTEST_DYNAMIC_GUI_PYARGS", "")) + [ sys.argv[0] ]
     def getOptionGroups(self):
         return [ self.optionGroup ]
     def getTextTestOptions(self, filterFile, app, usecase):
@@ -1566,7 +1566,7 @@ class RunningAction:
         # assume everything by default
         return []
     def getTestCount(self):
-        return len(self.currTestSelection) 
+        return len(self.currTestSelection)
     def getTmpFilterDir(self, app):
         return os.path.join(app.writeDirectory, "temporary_filter_files")
     def getCmdlineOptionForApps(self):
@@ -1595,7 +1595,7 @@ class RunningAction:
                 self.showErrorDialog(usecase.capitalize() + " run failed, with the following errors:\n" + errText)
                 return False
         return True
-    
+
     def handleCompletion(self, *args):
         pass # only used when recording
 
@@ -1629,7 +1629,7 @@ class ReconnectToTests(RunningAction,guiplugins.ActionDialogGUI):
         return "Reconnected to"
     def getUseCaseName(self):
         return "reconnect"
-    
+
 class RunTests(RunningAction,guiplugins.ActionTabGUI):
     optionGroups = []
     def __init__(self, allApps, *args):
@@ -1669,7 +1669,7 @@ class RunTests(RunningAction,guiplugins.ActionTabGUI):
             for switchName, desc in app.getInteractiveReplayOptions():
                 if group.getSwitchValue(switchName, False):
                     return "run " + self.describeTests() + " with " + desc + " replay enabled"
-    
+
 class RunTestsBasic(RunTests):
     def getTabTitle(self):
         return "Basic"
@@ -1763,7 +1763,7 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
         if usecase == "record":
             keys.append("rectraffic")
         return keys
-    
+
     def getReplayRunModeOptions(self, overwriteVersion):
         if self.optionGroup.getSwitchValue("repgui"):
             return [ "-autoreplay", "-g" ]
@@ -1786,9 +1786,9 @@ class CreateDefinitionFile(guiplugins.ActionDialogGUI):
     def _getTitle(self):
         return "Create _File"
     def _getStockId(self):
-        return "new" 
+        return "new"
     def getDialogTitle(self):
-        return "New File" 
+        return "New File"
     def isActiveOnCurrent(self, *args):
         return self.creationDir is not None and guiplugins.ActionDialogGUI.isActiveOnCurrent(self, *args)
     def fillVBox(self, vbox):
@@ -1880,7 +1880,7 @@ class CreateDefinitionFile(guiplugins.ActionDialogGUI):
         if sourceFile and os.path.basename(sourceFile).startswith(stemWithApp) and not targetFileName.startswith(stemWithApp):
             targetFileName = targetFileName.replace(stem, stemWithApp, 1)
             sourceFile = self.getSourceFile(stem, version, targetFileName)
-            
+
         targetFile = os.path.join(self.creationDir, targetFileName)
         plugins.ensureDirExistsForFile(targetFile)
         fileExisted = os.path.exists(targetFile)
@@ -1944,7 +1944,7 @@ Are you sure you wish to proceed?\n"""
         if len(self.currFileSelection) > 0:
             return "\nYou are about to remove " + self.pluralise(len(self.currFileSelection), self.getType(self.currFileSelection[0][0])) + \
                    " from the " + currTest.classDescription() + " '" + currTest.name + "'." + extraLines
-        elif len(self.currTestSelection) == 1:                  
+        elif len(self.currTestSelection) == 1:
             if currTest.classId() == "test-case":
                 return "\nYou are about to remove the test '" + currTest.name + \
                        "' and all associated files." + extraLines
@@ -1994,7 +1994,7 @@ Are you sure you wish to proceed?\n"""
             return "directory"
         else:
             return "file"
-            
+
     def removeFiles(self):
         test = self.currTestSelection[0]
         warnings = ""
@@ -2020,7 +2020,7 @@ Are you sure you wish to proceed?\n"""
     def messageAfterPerform(self):
         pass # do it as part of the method as currentTest will have changed by the end!
 
-    
+
 class ReportBugs(guiplugins.ActionDialogGUI):
     def __init__(self, *args):
         guiplugins.ActionDialogGUI.__init__(self, *args)
@@ -2119,7 +2119,7 @@ class RecomputeTests(guiplugins.ActionGUI):
     def getSignalsSent(self):
         return [ "Recomputed" ]
     def messageAfterPerform(self):
-        if self.latestNumberOfRecomputations == 0:            
+        if self.latestNumberOfRecomputations == 0:
             return "No test needed recomputation."
         else:
             return "Recomputed status of " + self.pluralise(self.latestNumberOfRecomputations, "test") + "."
@@ -2129,11 +2129,11 @@ class RecomputeTests(guiplugins.ActionGUI):
             self.notify("Status", "Rereading configuration for " + repr(app) + " ...")
             self.notify("ActionProgress", "")
             app.setUpConfiguration()
-            
+
         for test in self.currTestSelection:
             self.latestNumberOfRecomputations += 1
             self.notify("Status", "Recomputing status of " + repr(test) + " ...")
-            self.notify("ActionProgress", "")                
+            self.notify("ActionProgress", "")
             test.app.recomputeProgress(test, self.observers)
             self.notify("Recomputed", test)
 
@@ -2161,8 +2161,8 @@ class RefreshAll(guiplugins.BasicActionGUI):
             self.notify("ActionProgress", "")
             filters = suite.app.getFilterList()
             suite.refresh(filters)
-    
-    
+
+
 class SortTestSuiteFileAscending(guiplugins.ActionGUI):
     def singleTestOnly(self):
         return True
@@ -2180,7 +2180,7 @@ class SortTestSuiteFileAscending(guiplugins.ActionGUI):
         return "sort testsuite file for the selected test suite in alphabetical order"
     def performOnCurrent(self):
         self.performRecursively(self.currTestSelection[0], True)
-    def performRecursively(self, suite, ascending):        
+    def performRecursively(self, suite, ascending):
         # First ask all sub-suites to sort themselves
         errors = ""
         if guiplugins.guiConfig.getValue("sort_test_suites_recursively"):
@@ -2189,7 +2189,7 @@ class SortTestSuiteFileAscending(guiplugins.ActionGUI):
                     try:
                         self.performRecursively(test, ascending)
                     except Exception, e:
-                        errors += str(e) + "\n" 
+                        errors += str(e) + "\n"
 
         self.notify("Status", "Sorting " + repr(suite))
         self.notify("ActionProgress", "")
@@ -2235,7 +2235,7 @@ class RepositionTest(guiplugins.ActionGUI):
             self.notify("RefreshTestSelection")
         else:
             raise plugins.TextTestError, "\nThe test\n'" + self.currTestSelection[0].name + "'\nis not present in the default version\nand hence cannot be reordered.\n"
-    
+
 class RepositionTestDown(RepositionTest):
     def _getStockId(self):
         return "go-down"
@@ -2300,7 +2300,7 @@ class RepositionTestLast(RepositionTest):
             return False
         currLastTest = self.currTestSelection[0].parent.testcases[len(self.currTestSelection[0].parent.testcases) - 1]
         return currLastTest != self.currTestSelection[0]
-    
+
 class RenameTest(guiplugins.ActionDialogGUI):
     def __init__(self, *args):
         guiplugins.ActionDialogGUI.__init__(self, *args)
@@ -2368,8 +2368,8 @@ class RenameTest(guiplugins.ActionDialogGUI):
             self.showErrorDialog("Failed to rename test:\n" + str(e))
         except OSError, e:
             self.showErrorDialog("Failed to rename test:\n" + str(e))
-        
- 
+
+
 class ShowFileProperties(guiplugins.ActionResultDialogGUI):
     def __init__(self, allApps, dynamic):
         self.dynamic = dynamic
@@ -2391,7 +2391,7 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
             if self.dynamic and comp:
                 self.processFile(comp.tmpFile, properties, errors)
             self.processFile(file, properties, errors)
-            
+
         if len(errors):
             self.showErrorDialog("Failed to get file properties:\n" + "\n".join(errors))
 
@@ -2401,7 +2401,7 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
             prop = plugins.FileProperties(file)
             properties.append(prop)
         except Exception, e:
-            errors.append(plugins.getExceptionString())          
+            errors.append(plugins.getExceptionString())
 
     # xalign = 1.0 means right aligned, 0.0 means left aligned
     def justify(self, text, xalign = 0.0):
@@ -2451,7 +2451,7 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
             vbox.pack_start(border, expand=False, fill=False)
         return vbox
 
-    
+
 class InteractiveActionConfig:
     def getMenuNames(self):
         return [ "file", "edit", "view", "actions", "site", "reorder", "help" ]
@@ -2459,17 +2459,17 @@ class InteractiveActionConfig:
     def getInteractiveActionClasses(self, dynamic):
         classes = [ Quit, ViewTestFileInEditor, ShowFileProperties ]
         if dynamic:
-            classes += [ ViewFilteredTestFileInEditor, ViewFileDifferences, 
-                         ViewFilteredFileDifferences, FollowFile, 
+            classes += [ ViewFilteredTestFileInEditor, ViewFileDifferences,
+                         ViewFilteredFileDifferences, FollowFile,
                          SaveTests, SaveSelection, KillTests, AnnotateGUI,
-                         MarkTest, UnmarkTest, RecomputeTests ] # must keep RecomputeTests at the end!            
+                         MarkTest, UnmarkTest, RecomputeTests ] # must keep RecomputeTests at the end!
         else:
-            classes += [ ViewConfigFileInEditor, CopyTests, CutTests, 
-                         PasteTests, ImportTestCase, ImportTestSuite, ImportApplication, 
+            classes += [ ViewConfigFileInEditor, CopyTests, CutTests,
+                         PasteTests, ImportTestCase, ImportTestSuite, ImportApplication,
                          CreateDefinitionFile, ReportBugs, SelectTests,
                          RefreshAll, HideUnselected, HideSelected, ShowAll,
-                         RunTestsBasic, RunTestsAdvanced, RecordTest, ResetGroups, RenameTest, RemoveTests, 
-                         SortTestSuiteFileAscending, SortTestSuiteFileDescending, 
+                         RunTestsBasic, RunTestsAdvanced, RecordTest, ResetGroups, RenameTest, RemoveTests,
+                         SortTestSuiteFileAscending, SortTestSuiteFileDescending,
                          RepositionTestFirst, RepositionTestUp,
                          RepositionTestDown, RepositionTestLast,
                          ReconnectToTests, LoadSelection, SaveSelection ]
@@ -2500,7 +2500,7 @@ class InteractiveActionConfig:
         dict["static"] = "grey90"
         dict["marked"] = "orange"
         return dict
-    
+
     def getDefaultAccelerators(self):
         dict = {}
         dict["quit"] = "<control>q"

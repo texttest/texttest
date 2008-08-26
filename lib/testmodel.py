@@ -14,7 +14,7 @@ helpIntro = """
 Note: the purpose of this help is primarily to document derived configurations and how they differ from the
 defaults. To find information on the configurations provided with texttest, consult the documentation at
 http://www.texttest.org
-"""            
+"""
 
 class DirectoryCache:
     def __init__(self, dir):
@@ -62,7 +62,7 @@ class DirectoryCache:
             fileStem, versions = self.splitStem(fileName[len(stem):])
             if len(fileStem) == 0:
                 return versions
-            
+
     def findVersionSetMethod(self, versionSetMethod):
         if versionSetMethod:
             return versionSetMethod
@@ -72,13 +72,13 @@ class DirectoryCache:
     def findAllFiles(self, stem, extensionPred=None):
         versionSets = self.findVersionSets(stem, extensionPred)
         return reduce(operator.add, versionSets.values(), [])
-    
+
     def findVersionSets(self, stem, predicate, versionSetMethod=None):
         if stem.find("/") != -1:
             root, local = os.path.split(stem)
             newCache = DirectoryCache(os.path.join(self.dir, root))
             return newCache.findVersionSets(local, predicate, versionSetMethod)
-            
+
         methodToUse = self.findVersionSetMethod(versionSetMethod)
         versionSets = seqdict()
         for fileName in self.contents:
@@ -86,7 +86,7 @@ class DirectoryCache:
             if versionSet is not None and (predicate is None or predicate(versionSet)):
                 versionSets.setdefault(versionSet, []).append(self.pathName(fileName))
         return versionSets
-       
+
     def findAllStems(self):
         stems = []
         for file in self.contents:
@@ -95,7 +95,7 @@ class DirectoryCache:
                 stems.append(stem)
         return stems
 
-    
+
 class Callable:
     def __init__(self, method, *args):
         self.method = method
@@ -128,7 +128,7 @@ class TestEnvironment(seqdict):
             if not values.has_key(var):
                 values[var] = value
         return values
-    
+
     def getSingleValue(self, var, defaultValue=None):
         self.checkPopulated()
         return self._getSingleValue(var, defaultValue)
@@ -165,7 +165,7 @@ class TestEnvironment(seqdict):
                 expanded = True
                 self.diag.info("Expanded " + var + " = " + newValue)
                 self[var] = newValue
-        return expanded    
+        return expanded
 
 # Have the description as our free text, for display in the static GUI
 class NotStarted(plugins.TestState):
@@ -176,7 +176,7 @@ class NotStarted(plugins.TestState):
         if len(self.freeText) == 0:
             self.freeText = self.freeTextMethod()
         return self.freeText
-        
+
 # Base class for TestCase and TestSuite
 class Test(plugins.Observable):
     def __init__(self, name, description, dircache, app, parent = None):
@@ -215,7 +215,7 @@ class Test(plugins.Observable):
     def changeDirectory(self, newDir, origRelPath):
         self.dircache = DirectoryCache(newDir)
         self.notify("NameChange", origRelPath)
-        
+
     def setName(self, newName):
         # Create new directory, copy files if the new name is new (we might have
         # changed only the comment ...) (we don't want to rename dir, that can confuse CVS ...)
@@ -230,12 +230,12 @@ class Test(plugins.Observable):
             self.changeDirectory(newDir, origRelPath)
             if self.parent.autoSortOrder:
                 self.parent.updateOrder()
-        
+
     def setDescription(self, newDesc):
         if self.description != newDesc:
             self.description = newDesc
             self.refreshDescription()
-        
+
     def refreshDescription(self):
         oldDesc = self.state.freeText
         self.state.freeText = self.getDescription()
@@ -243,7 +243,7 @@ class Test(plugins.Observable):
             self.notify("DescriptionChange")
     def classDescription(self):
         return self.classId().replace("-", " ")
-    
+
     def diagnose(self, message):
         self.diag.info("In test " + self.uniqueName + " : " + message)
     def getWordsInFile(self, stem):
@@ -266,7 +266,7 @@ class Test(plugins.Observable):
         if not self.properties.has_key(propFile):
             self.properties.addEntry(propFile, {}, insert=1)
         self.properties.addEntry(var, value, sectionName = propFile, insert=1)
-            
+
     def getEnvironment(self, var, defaultValue=None):
         return self.environment.getSingleValue(var, defaultValue)
     def hasEnvironment(self, var):
@@ -274,7 +274,7 @@ class Test(plugins.Observable):
     def getTestRelPath(self, file):
         # test suites don't use this mechanism currently
         return ""
-    def needsRecalculation(self):
+    def needsRecalculation(self): #pragma : no cover - completeness only
         return False
     def isEmpty(self):
         return False
@@ -394,13 +394,13 @@ class Test(plugins.Observable):
         if self.parent:
             tests = self.parent.getAllTestsToRoot() + tests
         return tests
-        
+
     def getDirCachesToRoot(self, configName):
         fromTests = [ test.dircache for test in self.getAllTestsToRoot() ]
         dirNames = self.getCompositeConfigValue("extra_search_directory", configName)
         dirNames.reverse() # lowest priroity comes first, as above
         return self.app.getExtraDirCaches(dirNames) + fromTests
-    
+
     def getAllFileNames(self, stem, refVersion = None):
         self.diagnose("Getting file from " + stem)
         appToUse = self.app
@@ -452,7 +452,7 @@ class Test(plugins.Observable):
     def removeFromMemory(self):
         self.parent.testcases.remove(self)
         self.notify("Remove")
-    
+
     def rename(self, newName, newDescription):
         # Correct all testsuite files ...
         for testSuiteFileName in self.parent.findTestSuiteFiles():
@@ -460,7 +460,7 @@ class Test(plugins.Observable):
 
         self.setName(newName)
         self.setDescription(newDescription)
-        
+
     def copyTestContents(self, newDir):
         stdFiles, defFiles = self.listStandardFiles(allVersions=True)
         for sourceFile in stdFiles + defFiles:
@@ -483,7 +483,7 @@ class Test(plugins.Observable):
         newRelPath = plugins.relpath(os.path.dirname(targetFile), self.app.getDirectory())
         if not newRelPath:
             return # Can happen from ExportTests, but then the relative paths are the same anyway
-        newRelPath = "/" + newRelPath 
+        newRelPath = "/" + newRelPath
         tmpFile, tmpFileName = mkstemp()
         # Binary mode, otherwise Windows line endings get transformed to UNIX ones (even on Windows!)
         # which will cause the test to fail...
@@ -491,7 +491,7 @@ class Test(plugins.Observable):
             os.write(tmpFile, line.replace(oldRelPath, newRelPath))
         os.close(tmpFile)
         shutil.move(tmpFileName, targetFile)
-        
+
     def getRunEnvironment(self, onlyVars = []):
         return self.environment.getValues(onlyVars)
     def createPropertiesFiles(self):
@@ -506,7 +506,7 @@ class Test(plugins.Observable):
         if not len(relPath):
             return ""
         dirCount = string.count(relPath, "/") + 1
-        return " " * (dirCount * 2) 
+        return " " * (dirCount * 2)
     def isAcceptedByAll(self, filters):
         for filter in filters:
             if not self.isAcceptedBy(filter):
@@ -520,16 +520,16 @@ class Test(plugins.Observable):
     def filesChanged(self):
         self.refreshFiles()
         self.refreshDescription()
-        self.notify("FileChange")    
+        self.notify("FileChange")
     def refresh(self, filters):
         self.refreshFiles()
         self.notify("FileChange")
-    
+
 class TestCase(Test):
     def __init__(self, name, description, abspath, app, parent):
         Test.__init__(self, name, description, abspath, app, parent)
         # Directory where test executes from and hopefully where all its files end up
-        self.writeDirectory = os.path.join(app.writeDirectory, app.name + app.versionSuffix(), self.getRelPath())       
+        self.writeDirectory = os.path.join(app.writeDirectory, app.name + app.versionSuffix(), self.getRelPath())
     def classId(self):
         return "test-case"
     def testCaseList(self, filters=[]):
@@ -567,7 +567,7 @@ class TestCase(Test):
         desc = Test.getDescription(self)
         return "\nDescription:\n" + desc + \
                performanceDescription + \
-               memoryDescription    
+               memoryDescription
     def callAction(self, action):
         return action(self)
     def changeState(self, state):
@@ -580,7 +580,7 @@ class TestCase(Test):
             if state.lifecycleChange == "complete":
                 notifyMethod("Complete")
     def getNotifyMethod(self, isCompletion):
-        if isCompletion: 
+        if isCompletion:
             return self.notifyThreaded # use the idle handlers to avoid things in the wrong order
         else:
             # might as well do it instantly if the test isn't still "active"
@@ -588,7 +588,7 @@ class TestCase(Test):
     def getStateFile(self):
         return self.makeTmpFileName("teststate", forFramework=True)
     def setWriteDirectory(self, newDir):
-        self.writeDirectory = newDir        
+        self.writeDirectory = newDir
     def makeWriteDirectory(self):
         self.diagnose("Created writedir at " + self.writeDirectory)
         plugins.ensureDirectoryExists(self.writeDirectory)
@@ -663,7 +663,7 @@ class TestCase(Test):
 class TestSuiteFileHandler:
     def __init__(self):
         self.cache = {}
-            
+
     def read(self, fileName, warn=False, ignoreCache=False, filterMethod=None):
         if not ignoreCache:
             cached = self.cache.get(fileName)
@@ -716,7 +716,7 @@ class TestSuiteFileHandler:
         newEntry = seqdict()
         newEntry[testName] = description
         cache.insert(index, newEntry)
-        
+
     def remove(self, fileName, testName):
         cache = self.read(fileName)
         description, index = self.removeFromCache(cache, testName)
@@ -731,7 +731,7 @@ class TestSuiteFileHandler:
             return description, index
         else:
             return None, None
-        
+
     def rename(self, fileName, oldName, newName, newDescription):
         cache = self.read(fileName)
         description, index = self.removeFromCache(cache, oldName)
@@ -743,7 +743,7 @@ class TestSuiteFileHandler:
         self.addToCache(cache, newName, descToUse, index)
         self.write(fileName, cache)
         return True
-    
+
     def reposition(self, fileName, testName, newIndex):
         cache = self.read(fileName)
         description, index = self.removeFromCache(cache, testName)
@@ -759,8 +759,8 @@ class TestSuiteFileHandler:
         tests.sort(comparator)
         self.write(fileName, tests)
 
-    
-            
+
+
 class TestSuite(Test):
     testSuiteFileHandler = TestSuiteFileHandler()
     def __init__(self, name, description, dircache, app, parent=None):
@@ -772,12 +772,12 @@ class TestSuite(Test):
         self.autoSortOrder = self.getConfigValue("auto_sort_test_suites")
     def getDescription(self):
         return "\nDescription:\n" + Test.getDescription(self)
-            
+
     def readContents(self, filters=[], initial=True):
         testNames = self.readTestNames(warn=True)
         self.createTestCases(filters, testNames, initial)
         if self.isEmpty() and len(testNames) > 0:
-            # If the contents are filtered away, don't include the suite 
+            # If the contents are filtered away, don't include the suite
             return False
 
         for filter in filters:
@@ -794,7 +794,7 @@ class TestSuite(Test):
             return seqdict()
 
     def findTestCases(self, version):
-        versionFile = self.getFileName("testsuite", version)        
+        versionFile = self.getFileName("testsuite", version)
         newTestNames = self.testSuiteFileHandler.read(versionFile)
         newTestList = []
         for testCase in self.testcases:
@@ -884,7 +884,7 @@ class TestSuite(Test):
                 dirCache = self.createTestCache(testName)
                 self.createTestOrSuite(testName, desc, dirCache, filters, initial=False)
         self.updateOrder()
-        
+
 # private:
     def getOrderedTestNames(self, testNames, testCaseNames):
         if self.autoSortOrder == 0:
@@ -915,7 +915,7 @@ class TestSuite(Test):
         if subTest.isAcceptedByAll(filters) and subTest.readContents(filters, initial):
             self.testcases.append(subTest)
             subTest.notify("Add", initial)
-                
+
     def createTestCache(self, testName):
         return DirectoryCache(os.path.join(self.getDirectory(), testName))
     def getSubtestClass(self, cache):
@@ -929,7 +929,7 @@ class TestSuite(Test):
         test = className(testName, description, cache, self.app, self)
         test.setObservers(self.observers)
         return test
-    
+
     def addTestCase(self, *args, **kwargs):
         return self.addTest(TestCase, *args, **kwargs)
     def addTestSuite(self, *args, **kwargs):
@@ -939,7 +939,7 @@ class TestSuite(Test):
         test = self.createSubtest(testName, description, cache, className)
         if postProcFunc:
             postProcFunc(test)
-        self.testcases.insert(placement, test) 
+        self.testcases.insert(placement, test)
         test.notify("Add", initial=False)
         return test
     def addTestCaseWithPath(self, testPath):
@@ -963,7 +963,7 @@ class TestSuite(Test):
                 return subTest.findSubtestWithPath(pathElements[1])
             else:
                 return subTest
-            
+
     def findSubtest(self, testName):
         for test in self.testcases:
             if test.name == testName:
@@ -980,7 +980,7 @@ class TestSuite(Test):
             test = self.findSubtest(testName)
             if test:
                 newList.append(test)
-                    
+
         self.testcases = newList
         self.notify("ContentChange")
         return True
@@ -1015,7 +1015,7 @@ class TestSuite(Test):
                 return 1
             else:
                 if ascending:
-                    return cmp(a.lower(), b.lower())        
+                    return cmp(a.lower(), b.lower())
                 else:
                     return cmp(b.lower(), a.lower())
 
@@ -1037,7 +1037,7 @@ class TestSuite(Test):
         testDir = self.writeNewTest(newName, newDesc, placement)
         test.copyTestContents(testDir)
         return self.addTest(test.__class__, os.path.basename(testDir), newDesc, placement)
-        
+
     def writeNewTest(self, testName, description, placement):
         contentFileName = self.getContentFileName()
         self.testSuiteFileHandler.add(contentFileName, testName, description, placement)
@@ -1054,7 +1054,7 @@ class TestSuite(Test):
             test.notify("Remove")
         self.testcases = []
         Test.removeFromMemory(self)
-        
+
     def removeTest(self, test, removeFromTestFile = True):
         try:
             test.removeFiles()
@@ -1069,11 +1069,11 @@ class TestSuite(Test):
                 raise plugins.TextTestError, errorStr
     def removeFromTestFile(self, testName):
         # Remove from all versions, since we've removed the actual
-        # test dir, it's useless to keep the test anywhere ... 
+        # test dir, it's useless to keep the test anywhere ...
         for contentFileName in self.findTestSuiteFiles():
             self.testSuiteFileHandler.remove(contentFileName, testName)
-        
-    
+
+
 class BadConfigError(RuntimeError):
     pass
 
@@ -1106,16 +1106,16 @@ class ConfigurationCall:
         else:
             plugins.printException()
         raise BadConfigError, message
-    
+
 class Application:
     def __init__(self, name, dircache, versions, inputOptions, configEntries={}):
         self.name = name
         self.dircache = dircache
         # Place to store reference to extra_version applications
-        self.extras = [] 
+        self.extras = []
         # Cache all environment files in the whole suite to stop constantly re-reading them
         self.envFiles = {}
-        self.versions = versions    
+        self.versions = versions
         self.diag = plugins.getDiagnostics("application")
         self.inputOptions = inputOptions
         self.setUpConfiguration(configEntries)
@@ -1164,11 +1164,11 @@ class Application:
             self.configDir.addEntry(key, value, insert=0, errorOnUnknown=1)
             configFile.write("# " + self.configDocs.get(key) + "\n")
             configFile.write(key + ":" + value + "\n\n")
-                
+
     def makeExtraDirCache(self, envDir):
         if envDir == "":
             return
-            
+
         if os.path.isabs(envDir) and os.path.isdir(envDir):
             return DirectoryCache(envDir)
 
@@ -1209,12 +1209,12 @@ class Application:
                     raise BadConfigError, "module " + moduleName + " is not intended for use as a config_module"
             plugins.printException()
             raise BadConfigError, "config_module " + moduleName + " contained errors and could not be imported"
-    
+
     def __getattr__(self, name): # If we can't find a method, assume the configuration has got one
         if hasattr(self.configObject, name):
             return ConfigurationCall(name, self)
         else:
-            raise AttributeError, "No such Application method : " + name 
+            raise AttributeError, "No such Application method : " + name
     def getIndent(self):
         # Useful for printing with tests
         return ""
@@ -1274,7 +1274,7 @@ class Application:
         if not configPath:
             raise BadConfigError, "Cannot find file '" + fileName + "' to import config file settings from"
         return os.path.normpath(configPath)
-    
+
     def getDataFileNames(self, getenvFunc=os.getenv):
         allNames = self.getConfigValue("link_test_path", getenvFunc=getenvFunc) + \
                    self.getConfigValue("copy_test_path", getenvFunc=getenvFunc) + \
@@ -1349,7 +1349,7 @@ class Application:
                               "files to be shown as definition files by the static GUI")
         self.setConfigDefault("unsaveable_version", [], "Versions which should not have results saved for them")
         self.setConfigDefault("version_priority", { "default": 99 }, \
-                              "Mapping of version names to a priority order in case of conflict.") 
+                              "Mapping of version names to a priority order in case of conflict.")
         self.setConfigDefault("extra_search_directory", { "default" : [] }, "Additional directories to search for TextTest files")
         self.setConfigAlias("test_data_searchpath", "extra_search_directory")
         self.setConfigAlias("extra_config_directory", "extra_search_directory")
@@ -1360,7 +1360,7 @@ class Application:
         self.setConfigDefault("interactive_action_module", self.getConfigValue("config_module") + "_gui",
                               "Module to search for InteractiveActions for the GUI")
         self.setConfigDefault("interpreter", plugins.getInterpreter(executable), "Program to use as interpreter for the SUT")
-    
+
     def getFullVersion(self, forSave = 0):
         versionsToUse = self.versions
         if forSave:
@@ -1389,7 +1389,7 @@ class Application:
         suite = self.makeTestSuite(responders, otherDir)
         suite.readContents(filters)
         return suite
-    
+
     def description(self, includeCheckout = False):
         description = "Application " + self.fullName
         if len(self.versions):
@@ -1419,7 +1419,7 @@ class Application:
             return -1
         elif vset2.issubset(vset1):
             return 1
-        
+
         extraVersions = self.getExtraVersions()
         extraIndex1 = self.extraVersionIndex(vset1, extraVersions)
         extraIndex2 = self.extraVersionIndex(vset2, extraVersions)
@@ -1437,7 +1437,7 @@ class Application:
                 return 1
             elif vset2.issuperset(versionSet):
                 return -1
-            
+
         explicitVersions = Set([ self.name ] + self.versions)
         priority1 = self.getVersionSetPriority(vset1)
         priority2 = self.getVersionSetPriority(vset2)
@@ -1445,7 +1445,7 @@ class Application:
         if priority1 != priority2:
             self.diag.info("Version priority " + repr(priority1) + " vs " + repr(priority2))
             return cmp(priority2, priority1)
-        
+
         versionCount1 = len(vset1.intersection(explicitVersions))
         versionCount2 = len(vset2.intersection(explicitVersions))
         if versionCount1 != versionCount2:
@@ -1459,7 +1459,7 @@ class Application:
         self.diag.info("Base count " + repr(baseCount1) + " vs " + repr(baseCount2))
         # More base versions implies higher priority
         return cmp(baseCount1, baseCount2)
-        
+
     def getVersionSetPriority(self, vlist):
         if len(vlist) == 0:
             return 99
@@ -1565,7 +1565,7 @@ class Application:
     def setConfigAlias(self, aliasName, realName):
         self.configDir.setAlias(aliasName, realName)
 
-            
+
 class OptionFinder(plugins.OptionFinder):
     def __init__(self):
         plugins.OptionFinder.__init__(self, sys.argv[1:])
@@ -1658,7 +1658,7 @@ class OptionFinder(plugins.OptionFinder):
             return plugins.abspath(os.environ["TEXTTEST_HOME"])
         else:
             return os.getcwd()
-    
+
 # Compulsory responder to generate application events. Always present. See respond module
 class ApplicationEventResponder(Responder):
     def notifyLifecycleChange(self, test, state, changeDesc):
@@ -1676,7 +1676,7 @@ class ApplicationEventResponder(Responder):
     def notifyUniqueNameChange(self, test, newName):
         if test.classId() == "test-case":
             self.scriptEngine.applicationEventRename("test " + test.uniqueName + " to", "test " + newName + " to")
-    
+
     def getTimeDelay(self):
         try:
             return int(os.getenv("TEXTTEST_FILEWAIT_SLEEP", 1))
@@ -1688,7 +1688,7 @@ class ApplicationEventResponder(Responder):
         self.scriptEngine.applicationEvent("completion of test actions")
     def notifyCloseDynamic(self, test, name):
         self.scriptEngine.applicationEvent(name + " GUI to be closed")
-    
+
 # Simple responder that collects completion notifications and sends one out when
 # it thinks everything is done.
 class AllCompleteResponder(Responder,plugins.Observable):
@@ -1704,7 +1704,7 @@ class AllCompleteResponder(Responder,plugins.Observable):
         if test.classId() == "test-case":
             # Locking long thought to be unnecessary
             # but += 1 is not an atomic operation!!
-            # a = a + 1 and a = a - 1 from different threads do not guarantee "a" unchanged. 
+            # a = a + 1 and a = a - 1 from different threads do not guarantee "a" unchanged.
             self.lock.acquire()
             self.unfinishedTests += 1
             self.lock.release()
@@ -1725,4 +1725,4 @@ class AllCompleteResponder(Responder,plugins.Observable):
             self.notify("AllComplete")
         self.hadCompletion = True
         self.lock.release()
-        
+

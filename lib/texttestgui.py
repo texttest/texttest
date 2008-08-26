@@ -47,7 +47,7 @@ def renderSuitesBold(column, cell, model, iter):
     else:
         cell.set_property('font', "bold")
 
-    
+
 # base class for managing containers
 class ContainerGUI(guiplugins.SubGUI):
     def __init__(self, subguis):
@@ -78,12 +78,12 @@ class ContainerGUI(guiplugins.SubGUI):
 
     def getGroupTabTitle(self):
         return self.subguis[0].getGroupTabTitle()
-                    
+
 #
 # A class responsible for putting messages in the status bar.
 # It is also responsible for keeping the throbber rotating
 # while actions are under way.
-# 
+#
 class GUIStatusMonitor(guiplugins.SubGUI):
     def __init__(self):
         guiplugins.SubGUI.__init__(self)
@@ -91,12 +91,12 @@ class GUIStatusMonitor(guiplugins.SubGUI):
         self.animation = None
         self.pixbuf = None
         self.label = None
-        
+
     def getWidgetName(self):
         return "_Status bar"
     def describe(self):
-        guilog.info("Changing GUI status to: '" + self.label.get_text() + "'")        
-    def notifyActionStart(self, message="", lock = True):        
+        guilog.info("Changing GUI status to: '" + self.label.get_text() + "'")
+    def notifyActionStart(self, message="", lock = True):
         if self.throbber:
             if self.pixbuf: # pragma: no cover : Only occurs if some code forgot to do ActionStop ...
                 self.notifyActionStop()
@@ -104,7 +104,7 @@ class GUIStatusMonitor(guiplugins.SubGUI):
             self.throbber.set_from_animation(self.animation)
             if lock:
                 self.throbber.grab_add()
-            
+
     def notifyActionProgress(self, message=""):
         while gtk.events_pending():
             gtk.main_iteration(False)
@@ -113,13 +113,13 @@ class GUIStatusMonitor(guiplugins.SubGUI):
         if self.throbber:
             self.throbber.set_from_pixbuf(self.pixbuf)
             self.pixbuf = None
-            self.throbber.grab_remove()            
-        
+            self.throbber.grab_remove()
+
     def notifyStatus(self, message):
         if self.label:
             self.label.set_markup(plugins.convertForMarkup(message))
             self.contentsChanged()
-            
+
     def createView(self):
         hbox = gtk.HBox()
         self.label = gtk.Label()
@@ -169,7 +169,7 @@ class IdleHandlerManager:
 
     def shouldShow(self):
         return True # nothing to show, but we need to observe...
-    
+
     def notifyActionProgress(self, *args):
         if self.sourceId >= 0:
             raise plugins.TextTestError, "No Action currently exists to have progress on!"
@@ -180,12 +180,12 @@ class IdleHandlerManager:
 
     def addSuites(self, *args):
         self.enableHandler()
-            
+
     def enableHandler(self):
         if self.sourceId == -1:
             self.sourceId = plugins.Observable.threadedNotificationHandler.enablePoll(gobject.idle_add)
             self.diag.info("Adding idle handler")
-            
+
     def disableHandler(self):
         if self.sourceId >= 0:
             self.diag.info("Removing idle handler")
@@ -197,8 +197,8 @@ class IdleHandlerManager:
         plugins.Observable.threadedNotificationHandler.disablePoll()
     def notifyExit(self):
         self.disableHandler()
-        
-    
+
+
 class TextTestGUI(Responder, plugins.Observable):
     def __init__(self, optionMap, allApps):
         self.readGtkRCFiles()
@@ -208,7 +208,7 @@ class TextTestGUI(Responder, plugins.Observable):
         Responder.__init__(self, optionMap)
         plugins.Observable.__init__(self)
         testCount = int(optionMap.get("count", 0))
-        
+
         self.appFileGUI = ApplicationFileGUI(self.dynamic, allApps)
         self.textInfoGUI = TextInfoGUI()
         self.runInfoGUI = RunInfoGUI(self.dynamic)
@@ -234,7 +234,7 @@ class TextTestGUI(Responder, plugins.Observable):
     def getLifecycleObservers(self):
         # only the things that want to know about lifecycle changes irrespective of what's selected,
         # otherwise we go via the test tree. Include add/remove as lifecycle, also final completion
-        return [ self.progressBarGUI, self.progressMonitor, self.testTreeGUI, 
+        return [ self.progressBarGUI, self.progressMonitor, self.testTreeGUI,
                  statusMonitor, self.runInfoGUI, self.idleManager, self.topWindowGUI ]
     def getActionObservers(self):
         return [ self.testTreeGUI, self.testFileGUI, statusMonitor, self.runInfoGUI, self.idleManager, self.topWindowGUI ]
@@ -247,7 +247,7 @@ class TextTestGUI(Responder, plugins.Observable):
         # Important that closing the GUI is the last thing to be done, so make sure we go at the end...
         frameworkExitObservers = filter(self.isFrameworkExitObserver, frameworkObservers)
         return self.defaultActionGUIs + [ guiplugins.processMonitor, statusMonitor ] + \
-               frameworkExitObservers + [ self.idleManager, self ] 
+               frameworkExitObservers + [ self.idleManager, self ]
     def getTestColumnObservers(self):
         return [ self.testTreeGUI, statusMonitor, self.idleManager ]
     def getHideableGUIs(self):
@@ -269,7 +269,7 @@ class TextTestGUI(Responder, plugins.Observable):
         for observer in self.getFileViewObservers():
             self.testFileGUI.addObserver(observer)
             self.appFileGUI.addObserver(observer)
-            
+
         # watch for category selections
         self.progressMonitor.addObserver(self.testTreeGUI)
         guiplugins.processMonitor.addObserver(statusMonitor)
@@ -290,7 +290,7 @@ class TextTestGUI(Responder, plugins.Observable):
 
         for observer in self.getExitObservers(frameworkObserversToUse):
             self.topWindowGUI.addObserver(observer)
-    
+
     def readGtkRCFiles(self):
         self.readGtkRCFile(plugins.installationDir("layout"))
         self.readGtkRCFile(plugins.getPersonalConfigDir())
@@ -302,11 +302,11 @@ class TextTestGUI(Responder, plugins.Observable):
         file = os.path.join(configDir, ".gtkrc-2.0")
         if os.path.isfile(file):
             gtk.rc_add_default_file(file)
-    
+
     def addSuites(self, suites):
         for observer in self.getAddSuitesObservers():
             observer.addSuites(suites)
-        
+
     def shouldShrinkMainPanes(self):
         # If we maximise there is no point in banning pane shrinking: there is nothing to gain anyway and
         # it doesn't seem to work very well :)
@@ -324,16 +324,16 @@ class TextTestGUI(Responder, plugins.Observable):
         testPopup = PopupMenuGUI("TestPopupMenu", uiManager)
         testFilePopup = PopupMenuGUI("TestFilePopupMenu", uiManager)
         return menu, toolbar, testPopup, testFilePopup
-    
+
     def createRightWindowGUI(self):
         testTab = PaneGUI(self.testFileGUI, self.textInfoGUI, horizontal=False)
         runInfoTab = PaneGUI(self.runInfoGUI, self.testRunInfoGUI, horizontal=False)
         tabGUIs = [ self.appFileGUI, testTab, self.progressMonitor, runInfoTab ] + self.actionTabGUIs
-        
+
         tabGUIs = filter(lambda tabGUI: tabGUI.shouldShow(), tabGUIs)
         subNotebookGUIs = self.createNotebookGUIs(tabGUIs)
         return ChangeableNotebookGUI(subNotebookGUIs, self.getNotebookScriptName("Top"))
-    
+
     def getNotebookScriptName(self, tabName):
         if tabName == "Top":
             return "view options for"
@@ -385,7 +385,7 @@ class TextTestGUI(Responder, plugins.Observable):
         if self.dynamic and len(suites) == 0:
             guilog.info("There weren't any tests to run, terminating...")
             self.topWindowGUI.forceQuit()
-            
+
     def notifyAdd(self, *args, **kwargs):
         self.notify("Add", *args, **kwargs)
     def notifyStatus(self, *args, **kwargs):
@@ -394,7 +394,7 @@ class TextTestGUI(Responder, plugins.Observable):
         self.notify("Remove", test)
     def notifyAllComplete(self):
         self.notify("AllComplete")
-    
+
 class TopWindowGUI(ContainerGUI):
     EXIT_NOTIFIED = 1
     COMPLETION_NOTIFIED = 2
@@ -427,24 +427,24 @@ class TopWindowGUI(ContainerGUI):
                 self.allApps.append(suite.app)
                 self.setWindowTitle()
                 self.describeTitle()
-                
+
         if not self.topWindow:
             # only do this once, not when new suites are added...
             self.createView()
             self.activate()
-        
+
     def createView(self):
         # Create toplevel window to show it all.
-        self.topWindow = gtk.Window(gtk.WINDOW_TOPLEVEL)        
+        self.topWindow = gtk.Window(gtk.WINDOW_TOPLEVEL)
         try:
             import stockitems
             stockitems.register(self.topWindow)
-        except:
+        except: #pragma : no cover - should never happen
             plugins.printWarning("Failed to register texttest stock icons.")
             plugins.printException()
         self.topWindow.set_icon_from_file(self.getIcon())
         self.setWindowTitle()
-            
+
         self.topWindow.add(self.subguis[0].createView())
         self.windowSizeDescriptor = self.adjustSize()
         self.topWindow.show()
@@ -463,7 +463,7 @@ class TopWindowGUI(ContainerGUI):
                                      " (started at " + plugins.startTimeString() + ")")
         else:
             if len(appNameDesc) > 0:
-                appNameDesc = " for " + appNameDesc 
+                appNameDesc = " for " + appNameDesc
             self.topWindow.set_title("TextTest static GUI : management of tests" + appNameDesc)
 
     def getIcon(self):
@@ -483,14 +483,14 @@ class TopWindowGUI(ContainerGUI):
     def forceQuit(self):
         self.exitStatus |= self.COMPLETION_NOTIFIED
         self.notifyQuit()
-        
+
     def notifyAllComplete(self, *args):
         self.exitStatus |= self.COMPLETION_NOTIFIED
         if self.exitStatus & self.EXIT_NOTIFIED:
             self.terminate()
 
     def notifyQuit(self, *args):
-        self.exitStatus |= self.EXIT_NOTIFIED        
+        self.exitStatus |= self.EXIT_NOTIFIED
         self.notify("KillProcesses")
         if self.exitStatus & self.COMPLETION_NOTIFIED:
             self.terminate()
@@ -501,7 +501,7 @@ class TopWindowGUI(ContainerGUI):
     def notifyAnnotate(self, annotation):
         self.topWindow.set_title("TextTest dynamic GUI : " + annotation)
         guilog.info("Top Window title is " + self.topWindow.get_title())
-        
+
     def terminate(self):
         self.notify("Exit")
         self.topWindow.destroy()
@@ -525,7 +525,7 @@ class TopWindowGUI(ContainerGUI):
             proportion = float(guiConfig.getWindowOption(dimensionName + "_screen"))
             descriptor = "Setting window " + dimensionName + " to " + repr(int(100.0 * proportion)) + "% of screen."
             return int(fullSize * proportion), descriptor
-        
+
 
 class MenuBarGUI(guiplugins.SubGUI):
     def __init__(self, allApps, dynamic, uiManager, actionGUIs):
@@ -580,12 +580,12 @@ class MenuBarGUI(guiplugins.SubGUI):
                 realMenuName = menuName.capitalize()
             self.actionGroup.add_action(gtk.Action(menuName + "menu", "_" + realMenuName, None, None))
         self.createToggleActions()
-        
+
         for file in self.getGUIDescriptionFileNames():
             try:
                 self.diag.info("Reading UI from file " + file)
                 self.uiManager.add_ui_from_file(file)
-            except Exception, e: 
+            except Exception, e:
                 raise plugins.TextTestError, "Failed to parse GUI description file '" + file + "': " + str(e)
         self.uiManager.ensure_update()
         self.widget = self.uiManager.get_widget("/MainMenuBar")
@@ -634,7 +634,7 @@ class ToolBarGUI(ContainerGUI):
     def getWidgetName(self):
         return "_Toolbar"
     def ensureVisible(self, toolbar):
-        for item in toolbar.get_children(): 
+        for item in toolbar.get_children():
             item.set_is_important(True) # Or newly added children without stock ids won't be visible in gtk.TOOLBAR_BOTH_HORIZ style
     def shouldShow(self):
         return True # don't care about whether we have a progress bar or not
@@ -642,7 +642,7 @@ class ToolBarGUI(ContainerGUI):
         self.uiManager.ensure_update()
         toolbar = self.uiManager.get_widget("/MainToolBar")
         self.ensureVisible(toolbar)
-  
+
         self.widget = gtk.HandleBox()
         self.widget.add(toolbar)
         toolbar.set_orientation(gtk.ORIENTATION_HORIZONTAL)
@@ -658,7 +658,7 @@ class ToolBarGUI(ContainerGUI):
             toolItem.add(alignment)
             toolItem.set_expand(True)
             toolbar.insert(toolItem, -1)
-            
+
         self.widget.show_all()
         return self.widget
     def describe(self):
@@ -734,7 +734,7 @@ class TestColumnGUI(guiplugins.SubGUI):
         elif guiConfig.getValue("auto_sort_test_suites") == -1:
             guilog.info("Initially sorting tests in descending alphabetical order.")
             self.column.set_sort_indicator(True)
-            self.column.set_sort_order(gtk.SORT_DESCENDING)                
+            self.column.set_sort_order(gtk.SORT_DESCENDING)
         return self.column
     def columnClicked(self, treeviewcolumn):
         if not self.column.get_sort_indicator():
@@ -749,7 +749,7 @@ class TestColumnGUI(guiplugins.SubGUI):
             else:
                 self.column.set_sort_indicator(False)
                 order = 0
-        
+
         self.notify("ActionStart", "")
         self.setSortingOrder(order)
         if order == 1:
@@ -768,7 +768,7 @@ class TestColumnGUI(guiplugins.SubGUI):
             self.notify("Status", "Sorting suite " + suite.name + " ...")
             self.notify("ActionProgress")
             suite.autoSortOrder = order
-            suite.updateOrder() 
+            suite.updateOrder()
             for test in suite.testcases:
                 if test.classId() == "test-suite":
                     self.setSortingOrder(order, test)
@@ -785,7 +785,7 @@ class TestColumnGUI(guiplugins.SubGUI):
                     title += ", all " + str(self.totalNofDistinctTests) + " distinct"
                 else:
                     title += ", " + str(self.nofDistinctSelectedTests) + "/" + str(self.totalNofDistinctTests) + " distinct"
-        
+
         if self.totalNofTestsShown == self.totalNofTests:
             if self.dynamic and self.totalNofTests > 0:
                 title += ", none hidden"
@@ -793,7 +793,7 @@ class TestColumnGUI(guiplugins.SubGUI):
             title += ", all hidden"
         else:
             title += ", " + str(self.totalNofTests - self.totalNofTestsShown) + " hidden"
-            
+
         return title
     def updateTitle(self, initial=False):
         if self.column:
@@ -813,7 +813,7 @@ class TestColumnGUI(guiplugins.SubGUI):
         if self.addedCount != self.totalNofTests:
             self.totalNofTests = self.addedCount
             self.updateTitle()
-      
+
     def notifyNewTestSelection(self, tests, apps, distinctTestCount, direct=False):
         testcases = filter(lambda test: test.classId() == "test-case", tests)
         newCount = len(testcases)
@@ -856,7 +856,7 @@ class TestIteratorMap:
             return iter
         else:
             return self.getIterator(test)
-    
+
     def getIterator(self, test):
         return self.dict.get(self.getKey(test))
 
@@ -871,8 +871,8 @@ class RefreshTips(TreeViewTooltips):
         self.name = name
         self.refreshColumn = refreshColumn
         self.refreshIndex = refreshIndex
-        
-    def get_tooltip(self, view, column, path): #pragma : no cover - can't test tooltips (future?) 
+
+    def get_tooltip(self, view, column, path): #pragma : no cover - can't test tooltips (future?)
         if column is self.refreshColumn:
             model = view.get_model()
             refreshIcon = model[path][self.refreshIndex]
@@ -880,7 +880,7 @@ class RefreshTips(TreeViewTooltips):
                 return "Indicates that this " + self.name + "'s saved result has changed since the status was calculated. " + \
                        "It's therefore recommended to recompute the status."
 
-        
+
 class TestTreeGUI(ContainerGUI):
     def __init__(self, dynamic, allApps, popupGUI, subGUI):
         ContainerGUI.__init__(self, [ subGUI ])
@@ -902,7 +902,7 @@ class TestTreeGUI(ContainerGUI):
         self.diag = plugins.getDiagnostics("Test Tree")
     def notifyDefaultVisibility(self, newValue):
         self.newTestsVisible = newValue
-        
+
     def setActive(self, value):
         # avoid the quit button getting initial focus, give it to the tree view (why not?)
         ContainerGUI.setActive(self, value)
@@ -945,12 +945,12 @@ class TestTreeGUI(ContainerGUI):
             if appName != nodeName:
                 nodeName += " (" + appName + ")"
         return nodeName
-    
+
     def addSuiteWithParent(self, suite, parent, follower=None):
         nodeName = self.getNodeName(suite, parent)
         colour = guiConfig.getTestColour("not_started")
         visible = self.newTestsVisible or not suite.parent
-        row = [ nodeName, colour, [ suite ], "", colour, visible, "" ] 
+        row = [ nodeName, colour, [ suite ], "", colour, visible, "" ]
         iter = self.model.insert_before(parent, follower, row)
         storeIter = iter.copy()
         self.itermap.store(suite, storeIter)
@@ -969,7 +969,7 @@ class TestTreeGUI(ContainerGUI):
         self.selection.set_mode(gtk.SELECTION_MULTIPLE)
         if self.dynamic:
             self.selection.set_select_function(self.canSelect)
-            
+
         testsColumn = self.subguis[0].createView()
         self.treeView.append_column(testsColumn)
         if self.dynamic:
@@ -992,10 +992,10 @@ class TestTreeGUI(ContainerGUI):
         self.treeView.connect('row-expanded', self.rowExpanded)
         self.expandLevel(self.treeView, self.filteredModel.get_iter_root())
         self.treeView.connect("button_press_event", self.popupGUI.showMenu)
-        
+
         scriptEngine.monitor("set test selection to", self.selection)
         self.selection.connect("changed", self.userChangedSelection)
-        
+
         self.treeView.show()
         self.popupGUI.createView()
         return self.addScrollBars(self.treeView, hpolicy=gtk.POLICY_NEVER)
@@ -1020,7 +1020,7 @@ class TestTreeGUI(ContainerGUI):
             return
         path = self.filteredModel.get_path(iter)
         realPath = self.filteredModel.convert_path_to_child_path(path)
-        
+
         # Iterate over children, call self if they have children
         if not self.collapsedRows.has_key(realPath):
             self.diag.info("Expanding path at " + repr(realPath))
@@ -1031,7 +1031,7 @@ class TestTreeGUI(ContainerGUI):
                 if self.filteredModel.iter_has_child(childIter):
                     self.expandRow(childIter, True)
                 childIter = self.filteredModel.iter_next(childIter)
-                
+
     def collapseRow(self, iter):
         # To make sure that the path is marked as 'collapsed' even if the row cannot be collapsed
         # (if the suite is empty, or not shown at all), we set self.collapsedRow manually, instead of
@@ -1054,7 +1054,7 @@ class TestTreeGUI(ContainerGUI):
             self.sendSelectionNotification(newSelection, direct)
             if self.dynamic:
                 self.selection.selected_foreach(self.updateRecalculationMarker)
-            
+
     def notifyRefreshTestSelection(self):
         # The selection hasn't changed, but we want to e.g.
         # recalculate the action sensitiveness.
@@ -1063,12 +1063,12 @@ class TestTreeGUI(ContainerGUI):
         iter = self.itermap.getIterator(test)
         # If we've recomputed, clear the recalculation icons
         self.setNewRecalculationStatus(iter, test, [])
-    
+
     def updateRecalculationMarker(self, model, path, iter):
         tests = model.get_value(iter, 2)
         if not tests[0].state.isComplete():
             return
-        
+
         recalcComparisons = tests[0].state.getComparisonsForRecalculation()
         childIter = self.filteredModel.convert_iter_to_child_iter(iter)
         self.setNewRecalculationStatus(childIter, tests[0], recalcComparisons)
@@ -1092,7 +1092,7 @@ class TestTreeGUI(ContainerGUI):
         tests = model.get_value(iter, 2)
         if tests[0] is not test and tests[0].getRelPath() == test.getRelPath():
             self.updateRecalculationMarker(model, path, iter)
-        
+
     def getSelectedApps(self, tests):
         apps = []
         for test in tests:
@@ -1128,8 +1128,8 @@ class TestTreeGUI(ContainerGUI):
     def notifySetTestSelection(self, selTests, criteria="", selectCollapsed=True):
         actualSelection = self.selectTestRows(selTests, selectCollapsed)
         guilog.info("Marking " + str(self.selection.count_selected_rows()) + " tests as selected")
-        # Here it's been set via some indirect mechanism, might want to behave differently 
-        self.sendSelectionNotification(actualSelection, direct=False) 
+        # Here it's been set via some indirect mechanism, might want to behave differently
+        self.sendSelectionNotification(actualSelection, direct=False)
     def selectTestRows(self, selTests, selectCollapsed=True):
         self.selecting = True # don't respond to each individual programmatic change here
         self.selection.unselect_all()
@@ -1142,7 +1142,7 @@ class TestTreeGUI(ContainerGUI):
                 continue
 
             actuallySelected.append(test)
-            path = self.filteredModel.get_path(iter) 
+            path = self.filteredModel.get_path(iter)
             if not firstPath:
                 firstPath = path
             if selectCollapsed:
@@ -1165,11 +1165,11 @@ class TestTreeGUI(ContainerGUI):
         while (iter != None):
             if recursive:
                 view.expand_row(model.get_path(iter), open_all=False)
-             
+
             iter = view.get_model().iter_next(iter)
     def notifyTestAppearance(self, test, detailText, colour1, colour2, updateSuccess, saved):
         iter = self.itermap.getIterator(test)
-        self.model.set_value(iter, 1, colour1) 
+        self.model.set_value(iter, 1, colour1)
         self.model.set_value(iter, 3, detailText)
         self.model.set_value(iter, 4, colour2)
         self.diagnoseTest(test, iter)
@@ -1192,21 +1192,21 @@ class TestTreeGUI(ContainerGUI):
         suite = test.parent
         if not suite:
             return
-        
+
         self.successPerSuite.setdefault(suite, Set()).add(test)
         successCount = len(self.successPerSuite.get(suite))
         suiteSize = len(filter(lambda subtest: not subtest.isEmpty(), suite.testcases))
         if successCount == suiteSize:
             self.setAllSucceeded(suite, colour)
             self.updateSuiteSuccess(suite, colour)
-            
+
     def diagnoseTest(self, test, iter):
         self.writeSeparator()
         guilog.info("Redrawing test " + test.name + " coloured " + self.model.get_value(iter, 1))
         secondColumnText = self.model.get_value(iter, 3)
         if secondColumnText:
             guilog.info("(Second column '" + secondColumnText + "' coloured " + self.model.get_value(iter, 4) + ")")
-            
+
     def setAllSucceeded(self, suite, colour):
         # Print how many tests succeeded, color details column in success color,
         # collapse row, and try to collapse parent suite.
@@ -1240,14 +1240,14 @@ class TestTreeGUI(ContainerGUI):
             test = allTests[0]
             if self.isVisible(test):
                 return test
-            
+
     def notifyAllComplete(self):
         test = self.getTestForAutoSelect()
         if test:
             guilog.info("Only one test found, selecting " + test.uniqueName)
             actualSelection = self.selectTestRows([ test ])
             self.sendSelectionNotification(actualSelection)
-    
+
     def notifyAdd(self, test, initial):
         if test.classId() == "test-case":
             self.notify("TestTreeCounters", initial=initial, totalDelta=1,
@@ -1285,12 +1285,12 @@ class TestTreeGUI(ContainerGUI):
             follower = suite.getFollower(test)
             if follower:
                 return self.itermap.getIterator(follower)
-        
+
     def addAdditional(self, iter, test):
         currTests = self.model.get_value(iter, 2)
         if not test in currTests:
             currTests.append(test)
-            
+
     def notifyRemove(self, test):
         delta = -test.size()
         iter = self.itermap.getIterator(test)
@@ -1344,7 +1344,7 @@ class TestTreeGUI(ContainerGUI):
                 if oldIndex not in newOrder:
                     newOrder.append(oldIndex)
         return newOrder
-    
+
     def notifyVisibility(self, tests, newValue):
         self.diag.info("Visibility change for " + repr(tests) + " to " + repr(newValue))
         if not newValue:
@@ -1380,11 +1380,11 @@ class TestTreeGUI(ContainerGUI):
         elif not newValue and isVisible:
             visibleTests.remove(test)
             changed = True
-    
+
         if (newValue and len(visibleTests) > 1) or (not newValue and len(visibleTests) > 0):
             self.diag.info("Other tests mean no row visibility change : " + repr(test))
             return changed
-        
+
         allIterators = self.findVisibilityIterators(test) # returns leaf-to-root order, good for hiding
         if newValue:
             allIterators.reverse()  # but when showing, we want to go root-to-leaf
@@ -1394,7 +1394,7 @@ class TestTreeGUI(ContainerGUI):
             if newValue or not self.hasVisibleChildren(iterator):
                 changed |= self.setVisibility(iterator, currTest, newValue)
         return changed
-        
+
     def setVisibility(self, iter, test, newValue):
         oldValue = self.model.get_value(iter, 5)
         if oldValue == newValue:
@@ -1415,7 +1415,7 @@ class TestTreeGUI(ContainerGUI):
         currTest = test
         while parent != None:
             currTest = currTest.parent
-            parents.append((parent, currTest))                    
+            parents.append((parent, currTest))
             parent = self.model.iter_parent(parent)
         # Don't include the root which we never hide
         return [ (iter, test) ] + parents[:-1]
@@ -1428,8 +1428,8 @@ class TestTreeGUI(ContainerGUI):
             else:
                 child = self.model.iter_next(child)
         return False
-    
-    
+
+
 class BoxGUI(ContainerGUI):
     def __init__(self, subguis, horizontal, reversed=False):
         ContainerGUI.__init__(self, subguis)
@@ -1459,7 +1459,7 @@ class BoxGUI(ContainerGUI):
     def contentsChanged(self):
         if not self.active:
             return
-        
+
         if self.horizontal:
             guilog.info("")
             for subgui in self.subguis:
@@ -1474,10 +1474,10 @@ class BoxGUI(ContainerGUI):
             view = subgui.createView()
             expand = view.__class__ in self.getExpandWidgets()
             packMethod(view, expand=expand, fill=expand)
-            
+
         box.show()
         return box
-        
+
 
 class NotebookGUI(guiplugins.SubGUI):
     def __init__(self, tabInfo, scriptTitle):
@@ -1491,7 +1491,7 @@ class NotebookGUI(guiplugins.SubGUI):
 
     def findInitialCurrentTab(self):
         return self.tabInfo[0]
-    
+
     def setActive(self, value):
         guiplugins.SubGUI.setActive(self, value)
         if self.currentTabGUI:
@@ -1526,7 +1526,7 @@ class NotebookGUI(guiplugins.SubGUI):
         newPageName, newTabGUI = self.tabInfo[pageNum]
         if newTabGUI is self.currentTabGUI:
             return
-        self.currentTabGUI = newTabGUI 
+        self.currentTabGUI = newTabGUI
         self.diag.info("Switching to page " + newPageName)
         for tabName, tabGUI in self.tabInfo:
             if tabGUI is self.currentTabGUI:
@@ -1551,13 +1551,13 @@ class NotebookGUI(guiplugins.SubGUI):
 
     def getTabNames(self):
         return map(self.notebook.get_tab_label_text, self.getVisiblePages())
-    
+
     def shouldShowCurrent(self, *args):
         for name, tabGUI in self.tabInfo:
             if tabGUI.shouldShowCurrent(*args):
                 return True
         return False
-    
+
 
 
 # Notebook GUI that adds and removes tabs as appropriate...
@@ -1575,13 +1575,13 @@ class ChangeableNotebookGUI(NotebookGUI):
                 return tabName, tabGUI
 
         return self.tabInfo[0]
-            
+
     def findFirstRemaining(self, pagesRemoved):
         for page in self.getVisiblePages():
             pageNum = self.notebook.page_num(page)
             if not pagesRemoved.has_key(pageNum):
                 return pageNum
-    
+
     def showNewPages(self, *args):
         changed = False
         for pageNum, (name, tabGUI) in enumerate(self.tabInfo):
@@ -1602,7 +1602,7 @@ class ChangeableNotebookGUI(NotebookGUI):
         # Must do this afterwards, otherwise the above change doesn't propagate
         self.currentTabGUI = newTabGUI
         self.diag.info("Resetting done.")
-        
+
     def findPagesToHide(self, *args):
         pages = seqdict()
         for pageNum, (name, tabGUI) in enumerate(self.tabInfo):
@@ -1610,7 +1610,7 @@ class ChangeableNotebookGUI(NotebookGUI):
             if not tabGUI.shouldShowCurrent(*args) and page.get_property("visible"):
                 pages[pageNum] = page
         return pages
-        
+
     def hideOldPages(self, *args):
         # Must reset the current page before removing it if we're viewing a removed page
         # otherwise we can output lots of pages we don't really look at
@@ -1622,7 +1622,7 @@ class ChangeableNotebookGUI(NotebookGUI):
             newCurrentPageNum = self.findFirstRemaining(pagesToHide)
             if newCurrentPageNum is not None:
                 self.setCurrentPage(newCurrentPageNum)
-            
+
         # remove from the back, so we don't momentarily view them all if removing everything
         for page in reversed(pagesToHide.values()):
             self.diag.info("Hiding page " + self.notebook.get_tab_label_text(page))
@@ -1630,7 +1630,7 @@ class ChangeableNotebookGUI(NotebookGUI):
         return True
 
     def updateCurrentPage(self, rowCount):
-        for pageNum, (tabName, tabGUI) in enumerate(self.tabInfo):            
+        for pageNum, (tabName, tabGUI) in enumerate(self.tabInfo):
             if tabGUI.shouldShowCurrent() and tabGUI.forceVisible(rowCount):
                 self.setCurrentPage(pageNum)
 
@@ -1644,9 +1644,9 @@ class ChangeableNotebookGUI(NotebookGUI):
             return
         pagesShown = self.showNewPages(test, state)
         pagesHidden = self.hideOldPages(test, state)
-        if changeCurrentPage: 
+        if changeCurrentPage:
             self.updateCurrentPage(rowCount)
-  
+
         if pagesShown or pagesHidden:
             guiplugins.SubGUI.contentsChanged(self) # just the tabs will do here, the rest is described by other means
 
@@ -1655,9 +1655,9 @@ class ChangeableNotebookGUI(NotebookGUI):
 
     def addSuites(self, suites):
         self.updatePages()
-        
-        
-          
+
+
+
 class PaneGUI(ContainerGUI):
     def __init__(self, gui1, gui2 , horizontal, shrink=True):
         ContainerGUI.__init__(self, [ gui1, gui2 ])
@@ -1684,7 +1684,7 @@ class PaneGUI(ContainerGUI):
             return "drag vertical pane separator so left half uses"
         else:
             return "drag horizonal pane separator so top half uses"
-        
+
     def createView(self):
         self.paned = self.createPaned()
         self.separatorHandler = self.paned.connect('notify::max-position', self.adjustSeparator)
@@ -1705,7 +1705,7 @@ class PaneGUI(ContainerGUI):
         self.paned.pack2(frames[1], resize=True)
         self.paned.show()
         return self.paned
-        
+
     def positionDescription(self, proportion):
         message = str(int(100 * proportion + 0.5)) + "% from the "
         if self.horizontal:
@@ -1760,7 +1760,7 @@ class PaneGUI(ContainerGUI):
             self.paned.child_set_property(self.paned.get_child1(), "shrink", True)
         elif self.position >= oldPos and self.position >= self.paned.get_property("max-position"):
             self.paned.child_set_property(self.paned.get_child2(), "shrink", True)
-        
+
 
 class TextViewGUI(guiplugins.SubGUI):
     hovering_over_link = False
@@ -1771,7 +1771,7 @@ class TextViewGUI(guiplugins.SubGUI):
         guiplugins.SubGUI.__init__(self)
         self.text = ""
         self.view = None
-    
+
     def shouldShowCurrent(self, *args):
         return len(self.text) > 0
 
@@ -1805,7 +1805,7 @@ class TextViewGUI(guiplugins.SubGUI):
             self.view.connect("motion-notify-event", self.motion_notify_event)
             self.setHyperlinkText(textbuffer, textToUse)
         else:
-            textbuffer.set_text(textToUse)        
+            textbuffer.set_text(textToUse)
 
     # Links can be activated by clicking. Low-level code lifted from Maik Hertha's
     # GTK hypertext demo
@@ -1837,8 +1837,8 @@ class TextViewGUI(guiplugins.SubGUI):
                 browser = os.getenv("BROWSER", "firefox")
                 cmdArgs = [ browser, target ]
                 self.notify("Status", 'Started "' + " ".join(cmdArgs) + '" in background.')
-                subprocess.Popen(cmdArgs)    
-                
+                subprocess.Popen(cmdArgs)
+
         return False
 
     # Looks at all tags covering the position (x, y) in the text view,
@@ -1891,7 +1891,7 @@ class TextViewGUI(guiplugins.SubGUI):
         newLine = " ".join(words[:-1]) + "\n"
         tag.set_data("target", linkTarget)
         buffer.insert_with_tags(iter, newLine, tag)
-    
+
     def getTextForView(self):
         # Encode to UTF-8, necessary for gtk.TextView
         # First decode using most appropriate encoding ...
@@ -1904,7 +1904,7 @@ class RunInfoGUI(TextViewGUI):
         TextViewGUI.__init__(self)
         self.dynamic = dynamic
         self.text = "Information will be available here when all tests have been read..."
-        
+
     def getTabTitle(self):
         return "Run Info"
 
@@ -1924,7 +1924,7 @@ class RunInfoGUI(TextViewGUI):
     def notifyAnnotate(self, text):
         self.text += "Annotated        : " + text
         self.updateView()
-        
+
     def notifyAllRead(self, suites):
         self.text = "\n".join(map(self.appInfo, suites)) + "\n"
         self.text += "Command line     : " + plugins.commandLineString(sys.argv) + "\n\n"
@@ -1945,7 +1945,7 @@ class TestRunInfoGUI(TextViewGUI):
 
     def shouldShow(self):
         return self.dynamic
-        
+
     def getTabTitle(self):
         return "Test Run Info"
 
@@ -1972,13 +1972,13 @@ class TestRunInfoGUI(TextViewGUI):
     def appendTestInfo(self, test):
         self.text += test.getDescription() + "\n\n"
         self.text += test.app.getRunDescription(test)
-        
-    
+
+
 class TextInfoGUI(TextViewGUI):
     def __init__(self):
         TextViewGUI.__init__(self)
         self.currentTest = None
-        
+
     def getTabTitle(self):
         return "Text Info"
 
@@ -2015,8 +2015,8 @@ class TextInfoGUI(TextViewGUI):
             return
         self.resetText(state)
         self.updateView()
-    
-        
+
+
 class FileViewGUI(guiplugins.SubGUI):
     def __init__(self, dynamic, title = "", popupGUI = None):
         guiplugins.SubGUI.__init__(self)
@@ -2083,7 +2083,7 @@ class FileViewGUI(guiplugins.SubGUI):
 
     def getState(self):
         pass
-     
+
     def describe(self):
         self.describeName()
         self.model.foreach(self.describeIter)
@@ -2091,7 +2091,7 @@ class FileViewGUI(guiplugins.SubGUI):
     def describeName(self):
         if self.nameColumn:
             guilog.info("Setting file-view title to '" + self.nameColumn.get_title() + "'")
-            
+
     def describeIter(self, model, path, currIter):
         parentIter = self.model.iter_parent(currIter)
         if parentIter:
@@ -2106,7 +2106,7 @@ class FileViewGUI(guiplugins.SubGUI):
             recalcIcon = self.model.get_value(currIter, 5)
             if recalcIcon:
                 guilog.info("(Recalculation icon showing '" + recalcIcon + "')")
-            
+
     def createView(self):
         self.model.clear()
         state = self.getState()
@@ -2119,7 +2119,7 @@ class FileViewGUI(guiplugins.SubGUI):
         self.nameColumn = gtk.TreeViewColumn(self.title, renderer, text=0, background=1)
         self.nameColumn.set_cell_data_func(renderer, renderParentsBold)
         self.nameColumn.set_resizable(True)
-        view.append_column(self.nameColumn)            
+        view.append_column(self.nameColumn)
         detailsColumn = self.makeDetailsColumn(renderer)
         if detailsColumn:
             view.append_column(detailsColumn)
@@ -2135,7 +2135,7 @@ class FileViewGUI(guiplugins.SubGUI):
         view.show()
         return self.addScrollBars(view, hpolicy=gtk.POLICY_AUTOMATIC)
         # only used in test view
-        
+
     def canSelect(self, path):
         pathIter = self.model.get_iter(path)
         return not self.model.iter_has_child(pathIter)
@@ -2175,7 +2175,7 @@ class FileViewGUI(guiplugins.SubGUI):
         row = [ baseName, colour, fileName, associatedObject, details, "" ]
         return self.model.insert_before(iter, None, row)
 
-  
+
 class ApplicationFileGUI(FileViewGUI):
     def __init__(self, dynamic, allApps):
         FileViewGUI.__init__(self, dynamic, "Configuration Files")
@@ -2194,7 +2194,7 @@ class ApplicationFileGUI(FileViewGUI):
             if suite.app not in self.allApps and suite.app not in self.extras:
                 self.allApps.append(suite.app)
                 self.recreateModel(self.getState(), preserveSelection=False)
-            
+
     def addFilesToModel(self, state):
         colour = guiConfig.getCompositeValue("file_colours", "static")
         personalFiles = self.getPersonalFiles()
@@ -2215,9 +2215,9 @@ class ApplicationFileGUI(FileViewGUI):
                 self.addFileToModel(confiter, file, colour, [ app ])
                 for importedFile in self.getImportedFiles(file, app):
                     importedFiles[importedFile] = importedFile
-                    
+
         # Handle recursive imports here ...
-        
+
         if len(importedFiles) > 0:
             importediter = self.model.insert_before(None, None)
             self.model.set_value(importediter, 0, "Imported Files")
@@ -2238,7 +2238,7 @@ class ApplicationFileGUI(FileViewGUI):
                 if name == otherName:
                     return False
         return True
-                
+
     def getConfigFiles(self, app):
         return app._getAllFileNames([ app.dircache ], "config", allVersions=True)
     def getPersonalFiles(self):
@@ -2315,10 +2315,10 @@ class TestFileGUI(FileViewGUI):
             if oldVal != newIcon:
                 self.model.set_value(iter, 5, newIcon)
                 self.recalculationCausedChange = True
-                            
+
     def forceVisible(self, rowCount):
         return rowCount == 1
-    
+
     def notifyNewTestSelection(self, tests, apps, rowCount, *args):
         if len(tests) == 0 or (not self.dynamic and rowCount > 1): # multiple tests in static GUI result in removal
             self.currentTest = None
@@ -2354,7 +2354,7 @@ class TestFileGUI(FileViewGUI):
 
     def shouldShowCurrent(self, *args):
         return self.currentTest is not None
-            
+
     def addFilesToModel(self, state):
         if not state:
             return
@@ -2432,7 +2432,7 @@ class TestFileGUI(FileViewGUI):
             fileCompMap[file] = comp
             filelist.append(file)
         filelist.sort()
-        self.addStandardFilesUnderIter(state, iter, filelist, fileCompMap)    
+        self.addStandardFilesUnderIter(state, iter, filelist, fileCompMap)
     def addStandardFilesUnderIter(self, state, iter, files, compMap = {}):
         for file in files:
             comparison = compMap.get(file)
@@ -2453,7 +2453,7 @@ class TestFileGUI(FileViewGUI):
         tmpIter = self.model.insert_before(None, None)
         self.model.set_value(tmpIter, 0, "Temporary Files")
         self.addStandardFilesUnderIter(state, tmpIter, tmpFiles)
-        
+
     def getRootIterAndColour(self, heading, rootDir=None):
         if not rootDir:
             rootDir = self.currentTest.getDirectory()
@@ -2461,7 +2461,7 @@ class TestFileGUI(FileViewGUI):
         stditer = self.model.insert_before(None, None, headerRow)
         colour =  guiConfig.getCompositeValue("file_colours", "static_" + heading.lower(), defaultKey="static")
         return stditer, colour
-    
+
     def addStaticFilesWithHeading(self, heading, stdFiles):
         stditer, colour = self.getRootIterAndColour(heading)
         for file in stdFiles:
@@ -2485,7 +2485,7 @@ class TestFileGUI(FileViewGUI):
                              "' configuration while requesting extra data files, not displaying any such files")
             plugins.printException()
             return seqdict()
-        
+
     def addStaticDataFilesToModel(self):
         if len(self.currentTest.getDataFileNames()) == 0:
             return
@@ -2532,7 +2532,7 @@ class ProgressBarGUI(guiplugins.SubGUI):
         self.addedCount = 0
         self.nofCompletedTests = 0
         self.widget = None
-        
+
     def shouldShow(self):
         return self.dynamic
     def shouldDescribe(self):
@@ -2570,7 +2570,7 @@ class ProgressBarGUI(guiplugins.SubGUI):
             return float(self.nofCompletedTests) / float(self.totalNofTests)
         else:
             return 0 # No tests yet, haven't read them in
-    
+
     def resetBar(self):
         if self.widget:
             self.widget.set_text(self.getFractionMessage())
@@ -2592,14 +2592,14 @@ class ClassificationTree(seqdict):
             if prevElement and element not in self[prevElement]:
                 self[prevElement].append(element)
             prevElement = element
-        
+
 # Class that keeps track of (and possibly shows) the progress of
 # pending/running/completed tests
 class TestProgressMonitor(guiplugins.SubGUI):
     def __init__(self, dynamic, testCount):
         guiplugins.SubGUI.__init__(self)
         self.classifications = {} # map from test to list of iterators where it exists
-                
+
         # Each row has 'type', 'number', 'show', 'tests'
         self.treeModel = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_INT, gobject.TYPE_BOOLEAN, \
                                        gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
@@ -2690,7 +2690,7 @@ class TestProgressMonitor(guiplugins.SubGUI):
             if self.diffFilterGroup.stringContainsText(line):
                 filteredDiff += line + "\n"
         return filteredDiff
-    
+
     def getClassifiers(self, test, state):
         classifiers = ClassificationTree()
         catDesc = self.getCategoryDescription(state)
@@ -2730,15 +2730,15 @@ class TestProgressMonitor(guiplugins.SubGUI):
                 fileClass.append("Group " + str(group))
             self.diag.info("Adding file classification for " + repr(fileComp) + " = " + repr(fileClass))
             classifiers.addClassification(fileClass)
-            
+
         for fileComp in filter(lambda c: c.getType() != "failure", comparisons):
             summary = fileComp.getSummary(includeNumbers=False)
             fileClass = [ "Failed", "Performance differences", self.getCategoryDescription(state, summary) ]
             self.diag.info("Adding file classification for " + repr(fileComp) + " = " + repr(fileClass))
             classifiers.addClassification(fileClass)
-            
+
         return classifiers
-    
+
     def removeFromModel(self, test):
         for iter in self.findTestIterators(test):
             testCount = self.treeModel.get_value(iter, 1)
@@ -2756,7 +2756,7 @@ class TestProgressMonitor(guiplugins.SubGUI):
             for testList, hasGroup in fileInfo.values():
                 if test in testList:
                     testList.remove(test)
-                    
+
     def insertTest(self, test, state, incrementCount):
         self.classifications[test] = []
         classifiers = self.getClassifiers(test, state)
@@ -2782,7 +2782,7 @@ class TestProgressMonitor(guiplugins.SubGUI):
     def getInitialTestsForNode(self, test, parentIter, nodeClassifier):
         try:
             if nodeClassifier.startswith("Group "):
-                diffNumber = int(nodeClassifier[6:]) - 1 
+                diffNumber = int(nodeClassifier[6:]) - 1
                 parentName = self.treeModel.get_value(parentIter, 0)
                 testLists = self.diffStore.get(parentName)
                 testList, hasGroup = testLists.values()[diffNumber]
@@ -2790,7 +2790,7 @@ class TestProgressMonitor(guiplugins.SubGUI):
         except ValueError:
             pass
         return [ test ]
-    
+
     def addTestForNode(self, test, defaultColour, defaultVisibility, nodeClassifier, classifiers, incrementCount, parentIter=None):
         nodeIter = self.findIter(nodeClassifier, parentIter)
         colour = guiConfig.getTestColour(nodeClassifier, defaultColour)
@@ -2810,7 +2810,7 @@ class TestProgressMonitor(guiplugins.SubGUI):
         for subNodeClassifier in classifiers[nodeClassifier]:
             subColour = self.addTestForNode(test, colour, visibility, subNodeClassifier, classifiers, incrementCount, nodeIter)
             subColours.append(subColour)
-            
+
         if len(subColours) > 0:
             return subColours[0]
         else:
@@ -2888,7 +2888,7 @@ class TestProgressMonitor(guiplugins.SubGUI):
         while len(childIters) > 0:
             childIter = childIters[0]
             # If this iter has children, add these to the list to be treated
-            if self.treeModel.iter_has_child(childIter):                            
+            if self.treeModel.iter_has_child(childIter):
                 subChildIter = self.treeModel.iter_children(childIter)
                 pos = 1
                 while subChildIter != None:
@@ -2913,7 +2913,7 @@ class TestProgressMonitor(guiplugins.SubGUI):
             depth = depth + 1
             parent = self.treeModel.iter_parent(parent)
         return depth
-   
+
     def getAllChildIters(self, iter):
          # Toggle all children too
         childIters = []
@@ -2935,7 +2935,7 @@ class TestProgressMonitor(guiplugins.SubGUI):
             guilog.info("Selecting to show tests in the '" + categoryName + "' category.")
         else:
             guilog.info("Selecting not to show tests in the '" + categoryName + "' category.")
-            
+
         for childIter in self.getAllChildIters(iter):
             self.treeModel.set_value(childIter, 2, newValue)
 

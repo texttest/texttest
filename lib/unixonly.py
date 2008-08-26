@@ -95,7 +95,7 @@ class VirtualDisplayResponder(Responder):
             displayNum, pid = map(int, line.strip().split(","))
             proc.stdout.close()
             return self.getDisplayName(machine, displayNum), pid
-        except ValueError:
+        except ValueError: #pragma : no cover - should never happen, just a fail-safe
             print "Failed to parse line :\n " + line + proc.stdout.read()
             return None, None
             
@@ -113,7 +113,7 @@ class VirtualDisplayResponder(Responder):
         localPointer = os.path.join(binDir, "ttpython")
         if os.path.isfile(localPointer):
             return localPointer
-        else:
+        else: # pragma : no cover -there is one in our local installation whether we like it or not...
             return "python"
         
     def getDisplayName(self, machine, displayNumber):

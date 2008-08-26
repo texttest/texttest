@@ -420,7 +420,7 @@ class TrafficServer(TCPServer):
         try:
             TrafficRequestHandler(requestCount, request, client_address, self)
             self.close_request(request)
-        except:
+        except: # pragma : no cover - interpreter code in theory...
             self.handle_error(request, client_address)
             self.close_request(request)
 

@@ -841,7 +841,7 @@ class ImportTest(guiplugins.ActionDialogGUI):
         return ""
     def _getTitle(self):
         return "Add " + self.testType()
-    def testType(self):
+    def testType(self): #pragma : no cover - doc only
         return ""
     def messageAfterPerform(self):
         if self.testImported:

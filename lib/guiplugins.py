@@ -278,7 +278,7 @@ class SubGUI(plugins.Observable):
             self.writeSeparator()
             self.describe()
 
-    def describe(self):
+    def describe(self): #pragma : no cover - for documentation only
         pass
 
     def createView(self):
@@ -489,7 +489,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         if defaultWidget:
             try:
                 guilog.info("Default action is labelled '" + defaultWidget.get_label() + "'")
-            except AttributeError:
+            except AttributeError: #pragma : no cover, should probably never happen...
                 guilog.info("Default widget unlabelled, type " + str(defaultWidget.__class__))
         if stockIcon:
             guilog.info("Using stock icon '" + stockIcon + "'")

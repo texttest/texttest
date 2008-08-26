@@ -55,7 +55,7 @@ class UniqueNameFinder(Responder):
         elif oldTest.app.getFullVersion() != newTest.app.getFullVersion():
             self.storeBothWays(oldTest.name + " version " + self.getVersionName(oldTest), oldTest)
             self.storeBothWays(newTest.name + " version " + self.getVersionName(newTest), newTest)
-        else:
+        else: #pragma: no cover - this statement should be unreachable, is there for completeness
             raise plugins.TextTestError, "Could not find unique name for tests with name " + oldTest.name
     def getVersionName(self, test):
         version = test.app.getFullVersion()

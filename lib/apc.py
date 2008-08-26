@@ -81,6 +81,13 @@ apc.CVSBranchTests         - This script is useful when two versions of a test s
                              For all relevant APC files in the current testselection, it check if the
                              files are CVS modified. If they are, the check-in result is stored in version v.
                              Example: texttest -a apc -s apc.CVSBranchTests 11
+
+                             It can also handle already checked in results, by giving a time that cvs interprets.
+                             In this case, it checks if there is a difference in the file for the given time
+                             compared to now. If there is, the file at the given time is stored in version v.
+                             Example: texttest -a apc -s apc.CVSBranchTests 14 yesterday
+                                      texttest -a apc -s apc.CVSBranchTests 14 20080824
+                             Note: Texttest will split arguments whitespace, so the time can't contain any.
                              
 apc.PlotKPIGroups          - A specialization of optimization.PlotTest for APC where the main feature is that tests grouped
                              in an KPI group is plotted in one window, and that one get a window per KPI group.
@@ -1350,9 +1357,12 @@ class CopyEnvironment(plugins.Action):
 
 class CVSBranchTests(plugins.Action):
     def __init__(self, args = []):
-        if not len(args) == 1:
-            raise plugins.TextTestError, "CVSBranchTests accepts exactly one argument (version)"
+        if len(args) < 1 or len(args) > 2:
+            raise plugins.TextTestError, "CVSBranchTests accepts one or two arguments (version [branchtime])"
         self.version = args[0]
+        self.branchdate = None
+        if len(args) > 1:
+            self.branchdate = args[1]
     def __repr__(self):
         return "CVS Branch test for"
     def __call__(self, test):
@@ -1365,14 +1375,24 @@ class CVSBranchTests(plugins.Action):
             if os.path.isfile(fullFileNameNewVersion):
                 self.describe(test, ": version " + self.version + " already exists of " + file)
                 continue
-            stdin, stdout, stderr = os.popen3("cvs -q upd " + fullFileName)
-            lines = stdout.readlines()
-            if lines:
-                for line in lines:
-                    if line[0] == "M":
-                        self.describe(test, ": creating version " + self.version + " of " + file)
-                        os.system("cvs -q upd -p " + fullFileName + " > " + fullFileNameNewVersion)
-                        os.system("cvs add " + fullFileNameNewVersion)
+            if self.branchdate:
+                fd = os.popen("cvs diff --brief -D "
+                              + self.branchdate + " -D 'now' " + fullFileName)
+                fd.readlines()
+                if fd.close():
+                    self.describe(test, ": creating version " + self.version + " of " + file)
+                    os.system("cvs -q upd -p -D " + self.branchdate + " "
+                              + fullFileName + " > " + fullFileNameNewVersion)
+                    os.system("cvs add " + fullFileNameNewVersion)
+            else:
+                stdin, stdout, stderr = os.popen3("cvs -q upd " + fullFileName)
+                lines = stdout.readlines()
+                if lines:
+                    for line in lines:
+                        if line[0] == "M":
+                            self.describe(test, ": creating version " + self.version + " of " + file)
+                            os.system("cvs -q upd -p " + fullFileName + " > " + fullFileNameNewVersion)
+                            os.system("cvs add " + fullFileNameNewVersion)
 
 # Small script to add ${BIN_SUFFIX} in option files.
 class MigrateOptionFile(plugins.Action):

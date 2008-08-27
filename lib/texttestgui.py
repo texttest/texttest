@@ -11,8 +11,8 @@ def raiseException(msg):
 
 try:
     import gtk
-except:
-    raiseException("Unable to import module 'gtk'")
+except Exception, e:
+    raiseException("Unable to import module 'gtk' - " + str(e))
 
 pygtkVersion = gtk.pygtk_version
 requiredPygtkVersion = texttest_version.required_pygtk_version

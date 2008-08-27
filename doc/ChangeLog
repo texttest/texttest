@@ -1243,7 +1243,7 @@ Version 3.12.1
 Installation and self-test changes:
     - ViewHelp self-test fixed, oversight in 3.12 release
     - 2 reconnect self-tests fixed on Ubuntu that worked on both RHEL and Windows...
-    - Self-test coverage work: tests added, dead code removed, no-coverage pragmas added. Coverage now 97.8% 
+    - Self-test coverage work: tests added, dead code removed, no-coverage pragmas added. Coverage now 97.2% 
 Bug Fixes to 3.12:
     - Reconnecting to several runs simultaneously with extra versions will find all extra versions correctly (reconnect.py)
     - Reconnecting to extra version tests only now works correctly in the static GUI (default_gui.py)
@@ -1253,4 +1253,5 @@ Fixes for older bugs:
     - Fixed problem where recompute needed pressing twice if changing baseline file with run-dependent text (default.py)
     - "catalogue_process_string" setting now works on Windows (sandbox.py)
     - traffic.ModifyTraffic script now works on Windows (traffic.py)
-	
+    - Fixed crash when providing filter arguments without options on command line, e.g. "texttest.py -t" (default.py)
+    - Error message when PyGTK not found is now more informative (texttestgui.py)

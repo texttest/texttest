@@ -303,12 +303,15 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         # Remove all paths from our tested GTK environment, so that tested apps get the system defaults
         allPaths = value.split(os.pathsep)
         filteredPaths = filter(lambda path: not path.startswith("/usr/local/tt-env"), allPaths)
-        return os.pathsep.join(filteredPaths)
+        fullValue = os.pathsep.join(filteredPaths)
+        if fullValue:
+            return fullValue
+        # returning None implies remove this variable from the environment
     def getCleanedGtkEnvironment(self, app):
         if os.name == "posix" and app.getConfigValue("interpreter").startswith("ttpython"):
             return [] # Use this convention to allow the tested app to use TextTest's environment also without lots of fuss...
         gtkEnvVars = [ "LD_LIBRARY_PATH", "PYTHONPATH", "GTK2_RC_FILES",
-                       "GTK_PATH", "GTK_DATA_PREFIX", "XDG_DATA_DIRS" ]
+                       "GTK_PATH", "GTK_DATA_PREFIX", "XDG_DATA_DIRS", "GDK_PIXBUF_MODULE_FILE" ]
         envVars = []
         for envVar in gtkEnvVars:
             # Put the method itself in the list, to transform the variable after expansion

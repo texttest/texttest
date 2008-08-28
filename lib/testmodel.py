@@ -120,12 +120,18 @@ class TestEnvironment(seqdict):
     def getValues(self, onlyVars = []):
         self.checkPopulated()
         values = {}
+        removed = []
         for key, value in self.items():
-            if len(onlyVars) == 0 or key in onlyVars:
-                values[key] = value
+            # Anything set to none is to not to be set in the target environment
+            if value is not None:
+                if len(onlyVars) == 0 or key in onlyVars:
+                    values[key] = value
+            else:
+                removed.append(key)
+        self.diag.info("Removing variables " + repr(removed))
         # copy in the external environment last
         for var, value in os.environ.items():
-            if not values.has_key(var):
+            if not values.has_key(var) and var not in removed:
                 values[var] = value
         return values
 
@@ -145,9 +151,9 @@ class TestEnvironment(seqdict):
     def storeVariables(self, vars):
         for var, valueOrMethod in vars:
             newValue = self.expandSelfReferences(var, valueOrMethod)
-            self.diag.info("Storing " + var + " = " + newValue)
+            self.diag.info("Storing " + var + " = " + repr(newValue))
             self[var] = newValue
-
+                
         while self.expandVariables():
             pass
     def expandSelfReferences(self, var, valueOrMethod):
@@ -159,12 +165,13 @@ class TestEnvironment(seqdict):
     def expandVariables(self):
         expanded = False
         for var, value in self.items():
-            getenvFunc = Callable(self.getSingleValueNoSelfRef, var)
-            newValue = os.path.expandvars(value, getenvFunc)
-            if newValue != value:
-                expanded = True
-                self.diag.info("Expanded " + var + " = " + newValue)
-                self[var] = newValue
+            if value is not None:
+                getenvFunc = Callable(self.getSingleValueNoSelfRef, var)
+                newValue = os.path.expandvars(value, getenvFunc)
+                if newValue != value:
+                    expanded = True
+                    self.diag.info("Expanded " + var + " = " + newValue)
+                    self[var] = newValue
         return expanded
 
 # Have the description as our free text, for display in the static GUI

@@ -629,12 +629,6 @@ class GoogleProfilePrepare(plugins.Action):
         os.environ["CPUPROFILE"] = test.makeTmpFileName("profiledata", forFramework=0)
         if self.arg and self.arg.find("exppreload") != -1:
             os.environ["LD_PRELOAD"] = "/carm/proj/apc/lib/libprofiler_fixed.so"
-        else:
-            opts = test.getWordsInFile("options")
-            binName = os.path.expandvars(opts[-2].replace("PUTS_ARCH_HERE", getArchitecture(test.app)), test.getEnvironment)
-            profilerStartSymbol = os.popen("nm " + binName + "|grep ProfilerStart").readlines()
-            if not profilerStartSymbol:
-                raise plugins.TextTestError, "goprof option selected, but Google profiler is not linked and exppreload is not used." 
 
 class GoogleProfileExtract(plugins.Action):
     def __init__(self,arg):
@@ -644,11 +638,10 @@ class GoogleProfileExtract(plugins.Action):
         opts = test.getWordsInFile("options")
         binName = os.path.expandvars(opts[-2].replace("PUTS_ARCH_HERE", getArchitecture(test.app)), test.getEnvironment)
         symdumpfile = test.makeTmpFileName("symbolicdata", forFramework=0)
-        command = "/carm/proj/apc/bin/pprof --dump " + binName + " " + datafile + "  | gzip > " + symdumpfile
+	command = "/carm/proj/optimization/googleprofiler/google-perftools-0.98/src/pprof.dump --dump " + binName + " " + datafile + "  | gzip > " + symdumpfile
         #command = "/carm/proj/apc/bin/pprof --disasm=preprocess " + binName + " " + datafile + " > " + symdumpfile
-        # Have to make sure it runs on a 32-bit machine.
-        os.system("rsh abbeville \"" + command + "\"")
-        if not (self.arg and self.arg.find("keepbindata") != -1):
+	os.system(command)
+	if not (self.arg and self.arg.find("keepbindata") != -1):
             os.remove(datafile)
             
 

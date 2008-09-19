@@ -1291,7 +1291,7 @@ def decodeText(text, log = None):
                          "' using default locale encoding " + repr(localeEncoding) + \
                          ". Trying ISO8859-1 encoding ...")
 
-            return decodeISO88591Text(text, localeEncoding, log)
+    return decodeISO88591Text(text, localeEncoding, log)
 
 def decodeISO88591Text(text, localeEncoding, log = None):
     try:

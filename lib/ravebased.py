@@ -324,6 +324,8 @@ def getEnvVarFromCONFIG(var, test):
 
 def getRaveNames(test):
     raveNameDir = test.getConfigValue("rave_name")
+    if test.hasEnvironment("COMPILE_RULES_FOR"):
+        return raveNameDir["default"] + [test.getEnvironment("COMPILE_RULES_FOR")]
     if len(raveNameDir) == 1:
         return raveNameDir["default"]
     else:

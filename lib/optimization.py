@@ -331,7 +331,8 @@ class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
 
         names = [ "input", "status", "colgen_analysis.example_rotations", "hostname", "best_solution"]                  
         prefixes = [ "Solution_", "core", "run_status", "optinfo", "optrun",
-                     "composition_solution", "rotation_solution", "depotplanning_solution" ]
+                     "composition_solution", "rotation_solution", "depotplanning_solution",
+                     "depotplanning_relaxed_solution", "best_rotation_solution", "best_compostion_solution","best_depot_solution"]
         postfixes = [ ".log" ]
         if file in names:
             return False

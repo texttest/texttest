@@ -65,6 +65,7 @@ architectures = [ "i386_linux", "sparc", "sparc_64", "powerpc", "parisc_2_0", "p
                   "i386_solaris", "ia64_hpux", "x86_64_linux", "x86_64_solaris" ]
 majorReleases = [ "11", "12", "13", "14", "15", "master", "TRACKING_1" ]
 
+
 def getArchitecture(app):
     for version in app.versions:
         if version in architectures:
@@ -80,6 +81,9 @@ def getMajorReleaseVersion(app):
     for version in app.versions + app.getConfigValue("base_version"):
         if version in majorReleases:
             return version
+        
+        if version == "CMSSTD_1":
+            return "15"
     return defaultMajRelease
 
 def getMajorReleaseId(app):

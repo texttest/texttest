@@ -79,11 +79,17 @@ def getMajorReleaseVersion(app):
         return defaultMajRelease
 
     for version in app.versions + app.getConfigValue("base_version"):
+        configuratedVersion = app.getCompositeConfigValue("carmen_resource_configuration", version)
+        if configuratedVersion:
+            if configuratedVersion[0] in majorReleases:
+                return configuratedVersion[0]
+            else:
+                plugins.printWarning("Resource configuration " +  configuratedVersion[0] + " does not exists - skipping it" , stdout = False, stderr = True)
         if version in majorReleases:
             return version
         
         if version == "CMSSTD_1":
-            return "15"
+            return "15"     
     return defaultMajRelease
 
 def getMajorReleaseId(app):
@@ -274,6 +280,7 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         app.setConfigDefault("default_major_release", "master", "Which Carmen major release to run by default")
         app.setConfigDefault("maximum_cputime_for_short_queue", 10, "Maximum time a test can take and be sent to the short queue")
         app.setConfigDefault("queue_for_unknown_cputime", "short", "Which queue to use when the time for the test cannot be estimated")
+        app.setConfigDefault("carmen_resource_configuration", { "default" : []}, "Which resource configuration to use")
         app.addConfigEntry("bugzilla", "http://bugzilla.carmen.se", "bug_system_location")
         # plenty of people use CVS at Carmen, best to ignore it in data
         app.addConfigEntry("default", "CVS", "test_data_ignore")

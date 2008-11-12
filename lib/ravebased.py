@@ -112,6 +112,8 @@ class RaveSubmissionRules(CarmenSgeSubmissionRules):
         self.testRuleName = basicName
         return basicName
     def getUserParentName(self, test):
+        if not test.parent:
+            return "root"
         if isUserSuite(test.parent):
             return test.parent.name
         return self.getUserParentName(test.parent)

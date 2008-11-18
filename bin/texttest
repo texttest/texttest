@@ -14,18 +14,21 @@ abspath()
     esac
 }
 
+
 abspath $0 fullpath
 
 if [ -f "/etc/redhat-release" ]; then
     export TEXTTEST_SLAVE_CMD=$fullpath 
+
+
+    if [ -d "/usr/local/tt-env" ]; then
+        # Sets gtk/pygtk environmet variables and sets PYTHON_TO_RUN 
+        # to point to the full name of the python binary to run.
+        . /usr/local/tt-env/gtk2.10/bin/setup_python_gtk.sh
+        exec ttpython -u ${fullpath}.py "$@"
+    else
+        exec python -u ${fullpath}.py "$@"
 fi
-
-if [ -d "/usr/local/tt-env" ]; then
-    # Sets gtk/pygtk environment variables and sets PYTHON_TO_RUN 
-    # to point to the full name of the python binary to run.
-    . /usr/local/tt-env/gtk2.10/bin/setup_python_gtk.sh
-
-    exec ttpython -u ${fullpath}.py "$@"
 else
     ARCH=`arch`
     PATH=/usr/local/bin/carmen/master/:$PATH

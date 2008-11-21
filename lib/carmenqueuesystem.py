@@ -88,8 +88,6 @@ def getMajorReleaseVersion(app):
         if version in majorReleases:
             return version
         
-        if version == "CMSSTD_1":
-            return "15"     
     return defaultMajRelease
 
 def getMajorReleaseId(app):

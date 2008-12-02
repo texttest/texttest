@@ -186,6 +186,10 @@ class CarmenSgeSubmissionRules(queuesystem.SubmissionRules):
     def getBasicResources(self):
         return queuesystem.SubmissionRules.findResourceList(self)
     def findConcreteResources(self):
+        type = self.getMajorReleaseResourceType()
+        resourceOverride = self.test.getEnvironment("TEXTTEST_OVERRIDE_CONCRETE_RESOURCES_" + type.upper(), "")
+        if resourceOverride:
+            return [ resourceOverride ]
         # architecture resources
         resources = []
         if self.archToUse != "none":

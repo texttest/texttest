@@ -127,7 +127,7 @@ optimization.PlotSubplans
 """
 
 
-import ravebased, os, sys, string, shutil, plugins, math, re, unixonly, copy, testoverview, time, testmodel, subprocess
+import ravebased, os, sys, string, shutil, plugins, math, re, unixonly, copy, testoverview, time, testmodel, subprocess, fnmatch
 from ndict import seqdict
 from time import sleep
 from respond import Responder
@@ -229,6 +229,7 @@ class OptimizationConfig(ravebased.Config):
         app.setConfigDefault("kpi_cost_margin", 0.0, "Cost margin for the KPI calculations")
         app.setConfigDefault("skip_comparison_if_not_present", "error", "List of files that are compared only if they are created by the test, i.e. they will not be reported as missing")
         app.setConfigDefault("display_subplan_file", [ "rules" ], "List of files that should be shown in static GUI if found in APC_FILES directory")
+        app.setConfigDefault("from_apc_files_dont_link", { "default" : []}, "List of files that shouldn't be linked in the APC_FILES directory ")
         app.addConfigEntry("definition_file_stems", "raveparameters")
         app.setConfigDefault("apcinfo", {})
 
@@ -238,7 +239,11 @@ class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
     def __init__(self, ignoreCatalogues, subplanFunction):
         ravebased.PrepareCarmdataWriteDir.__init__(self, ignoreCatalogues)
         self.subplanFunction = subplanFunction
+        self.ignoreFilesInApcDir = {}
         self.raveParameters = []
+    def __call__(self, test):
+        self.ignoreFilesInApcDir = test.app.getCompositeConfigValue("from_apc_files_dont_link","default")
+        ravebased.PrepareCarmdataWriteDir.__call__(self, test)
     def partialCopyTestPath(self, test, carmdataSource, carmdataTarget):
         for fileName in test.getAllPathNames("raveparameters"):
             self.readRaveParameters(fileName)
@@ -328,12 +333,16 @@ class PrepareCarmdataWriteDir(ravebased.PrepareCarmdataWriteDir):
             return True
         if os.path.basename(dirname) != "APC_FILES":
             return False
-
+        for pattern in self.ignoreFilesInApcDir:
+            if fnmatch.fnmatchcase(file,pattern):
+                return False
+            
         names = [ "input", "status", "colgen_analysis.example_rotations", "hostname", "best_solution"]                  
         prefixes = [ "Solution_", "core", "run_status", "optinfo", "optrun",
                      "composition_solution", "rotation_solution", "depotplanning_solution",
                      "depotplanning_relaxed_solution", "best_rotation_solution", "best_compostion_solution","best_depot_solution"]
         postfixes = [ ".log" ]
+        
         if file in names:
             return False
         for prefix in prefixes:

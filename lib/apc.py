@@ -16,6 +16,8 @@ helpOptions = """-rundebug <options>
              continues as usual. If the run fails, the buffer is flushed and one are left 
              in the debugger. To enter the debugger during the run, type C-c.
              The following options are avaliable:
+             - emacs
+               The debugger is run in emacs, in the default GUD mode.
              - xemacs
                The debugger is run in xemacs, in gdbsrc mode.
              - norun
@@ -336,8 +338,9 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
     def __init__(self, options, keepTmpFiles):
         default.RunTest.__init__(self)
         self.process = None
+        self.inEmacs = None
         self.inXEmacs = None
-        self.XEmacsTestingKill = None
+        self.EmacsTestingKill = None
         self.runPlain = None
         self.runValgrind = None
         self.runCachegrind = None
@@ -356,10 +359,12 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
         if opts[0] == "":
             return
         for opt in opts:
-            if opt == "xemacs":
+            if opt == "emacs":
+                self.inEmacs = 1
+            elif opt == "xemacs":
                 self.inXEmacs = 1
-            elif opt == "xemacstestingkill":
-                self.XEmacsTestingKill = 1
+            elif opt == "emacstestingkill":
+                self.EmacsTestingKill = 1
             elif opt == "nolog":
                 self.showLogFile = None
             elif opt == "plain":
@@ -436,9 +441,12 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
             dbxArgs = self.createDebugArgsFile(test, apcbinOptions, apcLog, Dbx = True)
             executeCommand = "dbx -c runapc -s" + dbxArgs + " " + binName
         else:
-            # We will run gbd, either in the console or in xemacs.
+            # We will run gbd, either in the console, in emacs or in xemacs.
             gdbArgs = self.createDebugArgsFile(test, apcbinOptions, apcLog)
-            if self.inXEmacs:
+            if self.inEmacs:
+                gdbStart = self.runInEmacs(test, binName, gdbArgs)
+                executeCommand = "emacs -l " + gdbStart + " -f gdbwargs"
+            elif self.inXEmacs:
                 gdbStart = self.runInXEmacs(test, binName, gdbArgs)
                 executeCommand = "xemacs -l " + gdbStart + " -f gdbwargs"
             else:
@@ -496,6 +504,18 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
         debugArgsFile.close()
         self.filesToRemove += [ debugArgs ]
         return debugArgs
+    def runInEmacs(self, test, binName, gdbArgs):
+        gdbStart = test.makeTmpFileName("gdb_start")
+        gdbStartFile = open(gdbStart, "w")
+        gdbStartFile.write("(defun gdbwargs () \"\"" + os.linesep)
+        gdbStartFile.write("(gdb \"gdb -x " +  gdbArgs + " " + binName + "\")" + os.linesep)
+        if self.EmacsTestingKill:
+            gdbStartFile.write("(sit-for 20)" + os.linesep)
+            gdbStartFile.write("(kill-emacs)" + os.linesep)
+        gdbStartFile.write(")" + os.linesep)    
+        gdbStartFile.close()
+        self.filesToRemove += [ gdbStart ]
+        return gdbStart
     def runInXEmacs(self, test, binName, gdbArgs):
         gdbStart = test.makeTmpFileName("gdb_start")
         gdbWithArgs = test.makeTmpFileName("gdb_w_args")
@@ -503,7 +523,7 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
         gdbStartFile.write("(defun gdbwargs () \"\"" + os.linesep)
         gdbStartFile.write("(setq gdb-command-name \"" + gdbWithArgs + "\")" + os.linesep)
         gdbStartFile.write("(gdbsrc \"" + binName + "\")" + os.linesep)
-        if self.XEmacsTestingKill:
+        if self.EmacsTestingKill:
             gdbStartFile.write("(sit-for 20)" + os.linesep)
             gdbStartFile.write("(kill-emacs)" + os.linesep)
         gdbStartFile.write(")" + os.linesep)
@@ -513,7 +533,7 @@ class RunApcTestInDebugger(queuesystem.RunTestInSlave):
         gdbWithArgsFile.write("gdb -x " + gdbArgs + " $*" + os.linesep)
         gdbWithArgsFile.close()
         os.chmod(gdbWithArgs, stat.S_IXUSR | stat.S_IRWXU)
-        self.filesToRemove += [ gdbStart, gdbWithArgs]
+        self.filesToRemove += [ gdbStart, gdbWithArgs ]
         return gdbStart
     def setupApcLog(self, test):
         # Create and show the log file.

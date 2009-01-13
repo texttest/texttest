@@ -21,7 +21,7 @@ if [ -f "/etc/redhat-release" ]; then
     export TEXTTEST_SLAVE_CMD=$fullpath 
 
 
-    if [ -d "/usr/local/tt-env" ]; then
+    if [ -f "/usr/local/tt-env/gtk2.10/bin/setup_python_gtk.sh" ]; then
         # Sets gtk/pygtk environmet variables and sets PYTHON_TO_RUN 
         # to point to the full name of the python binary to run.
         . /usr/local/tt-env/gtk2.10/bin/setup_python_gtk.sh

@@ -463,7 +463,7 @@ class Config:
     def optionValue(self, option):
         return self.optionMap.get(option, "")
     def ignoreExecutable(self):
-        return self.optionMap.runScript() or self.isReconnecting()
+        return self.optionMap.runScript() or self.isReconnecting() or self.optionMap.has_key("coll")
     def setUpCheckout(self, app):
         if self.ignoreExecutable():
             return ""

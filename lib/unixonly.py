@@ -13,6 +13,8 @@ class VirtualDisplayResponder(Responder):
         self.displayName = None
         self.displayMachine = None
         self.displayPid = None
+        self.displayProc = None
+        self.guiSuites = []
         self.diag = plugins.getDiagnostics("virtual display")
         VirtualDisplayResponder.instance = self
         
@@ -40,6 +42,7 @@ class VirtualDisplayResponder(Responder):
             self.displayName = display
             self.displayMachine = machine
             self.displayPid = pid
+            self.guiSuites = guiSuites
             print "Tests will run with DISPLAY variable set to", display
         elif len(machines) > 0:
             plugins.printWarning("Failed to start virtual display on " + ",".join(machines) + " - using real display.")
@@ -60,7 +63,13 @@ class VirtualDisplayResponder(Responder):
                 if not machine in allMachines:
                     allMachines.append(machine)
         return allMachines
-    
+
+    def notifyExtraTest(self, *args):
+        # Called when a slave is given an extra test to solve
+        if self.displayProc is not None and self.displayProc.poll() is not None:
+            # If Xvfb has terminated, we need to restart it
+            self.setUpVirtualDisplay(self.guiSuites)
+            
     def notifyAllComplete(self):
         self.cleanXvfb()
     def notifyKillProcesses(self, *args):
@@ -89,14 +98,14 @@ class VirtualDisplayResponder(Responder):
         plugins.ensureDirectoryExists(logDir)
         startArgs = self.getVirtualServerArgs(machine, logDir)
         self.diag.info("Starting Xvfb using args " + repr(startArgs))
-        proc = subprocess.Popen(startArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        line = plugins.retryOnInterrupt(proc.stdout.readline)
+        self.displayProc = subprocess.Popen(startArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        line = plugins.retryOnInterrupt(self.displayProc.stdout.readline)
         try:
             displayNum, pid = map(int, line.strip().split(","))
-            proc.stdout.close()
+            self.displayProc.stdout.close()
             return self.getDisplayName(machine, displayNum), pid
         except ValueError: #pragma : no cover - should never happen, just a fail-safe
-            print "Failed to parse line :\n " + line + proc.stdout.read()
+            print "Failed to parse line :\n " + line + self.displayProc.stdout.read()
             return None, None
             
     def getVirtualServerArgs(self, machine, logDir):

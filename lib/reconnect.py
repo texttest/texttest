@@ -66,9 +66,6 @@ class ReconnectConfig:
         if len(runDirs) == 0:
             self.errorMessage = "Could not find any runs matching " + app.description() + " under " + fetchDir
             return []
-        elif len(runDirs) == 1:
-            self.cacheRunDir(app, runDirs[0])
-            return []
         else:
             return self.getVersionsFromDirs(app, runDirs)
 

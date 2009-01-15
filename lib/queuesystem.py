@@ -656,7 +656,7 @@ class QueueSystemServer(BaseActionRunner):
             stdout, stderr = process.communicate()
             errorMessage = self.findErrorMessage(stderr, queueSystem)
         except OSError:
-            errorMessage = "local machine is not a submit host"
+            errorMessage = "local machine is not a submit host: running '" + cmdArgs[0] + "' failed."
         if not errorMessage:
             jobId = queueSystem.findJobId(stdout)
             self.diag.info("Job created with id " + jobId)

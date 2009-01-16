@@ -949,7 +949,10 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         self.addOption("name", "Full name of application", description="Name of application to use in reports etc.")
         self.addOption("ext", "\nFile extension to use for TextTest files associated with this application", description="Short space-free extension, to identify all TextTest's files associated with this application")
         self.addOption("subdir", "\nSubdirectory of TEXTTEST_HOME to store the above application files under (leave blank for local storage)", possibleValues=self.findSubDirectories())
-        possibleDirs = [ app.getDirectory() for app in allApps ]
+        possibleDirs = []
+        for app in allApps:
+            if app.getDirectory() not in possibleDirs:
+                possibleDirs.append(app.getDirectory())
         if len(possibleDirs) == 0:
             possibleDirs = [ self.textTestHome ]
         self.addOption("exec", "\nSelect executable program to test", description="The full path to the program you want to test", possibleDirs=possibleDirs, selectFile=True)

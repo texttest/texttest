@@ -50,8 +50,9 @@ class Config:
                     group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
             elif group.name.startswith("Advanced"):
                 group.addSwitch("x", "Enable self-diagnostics")
-                defaultDiagDir = os.path.join(os.getenv("TEXTTEST_HOME"), "Diagnostics")
-                group.addOption("xr", "Configure self-diagnostics from", os.path.join(defaultDiagDir, "log4py.conf"))
+                defaultDiagDir = os.path.join(plugins.getPersonalConfigDir(), "log")
+                group.addOption("xr", "Configure self-diagnostics from", os.path.join(defaultDiagDir, "log4py.conf"),
+                                possibleValues=[ os.path.join(plugins.installationDir("log"), "log4py.conf") ])
                 group.addOption("xw", "Write self-diagnostics to", defaultDiagDir)
                 group.addOption("b", "Run batch mode session")
                 group.addSwitch("rectraffic", "(Re-)record command-line or client-server traffic")

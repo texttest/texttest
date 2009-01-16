@@ -1655,9 +1655,9 @@ class OptionFinder(plugins.OptionFinder):
     def getSelfDiagFile(self):
         return self.get("xr", os.path.join(self.getDefaultSelfDiagDir(), "log4py.conf"))
     def getSelfDiagWriteDir(self):
-        return self.get("xw", self.getDefaultSelfDiagDir())
+        return self.get("xw", self.getDefaultSelfDiagDir())            
     def getDefaultSelfDiagDir(self):
-        return os.path.join(self.directoryName, "Diagnostics")
+        return os.path.join(plugins.getPersonalConfigDir(), "log")
     def findDirectoryName(self):
         if self.has_key("d"):
             return plugins.abspath(self["d"])

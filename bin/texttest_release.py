@@ -2,17 +2,14 @@
 
 # texttest_release.py
 
-# Extracts the code and tests from Jeppesen's CVS into a zip file
+# Extracts the code and tests from Jeppesen's source control into a zip file
 # and removes everything that is Jeppesen-specific
 # Not useful outside Jeppesen currently
 
-# Usage texttest_release.py [ -v <release_name> ] [ -x ] [ -d <working_dir> ] [ -D <export_date> ] 
+# Usage texttest_release.py [ -v <release_name> ] [ -x ] [ -d <working_dir> ]
 
 # <working_dir> indicates where temporary files are written and the final zip file will end up.
 # It defaults to the current working directory.
-
-# <export_date> indicates the date tag to use from CVS when exporting. It defaults to a date in 2030,
-# i.e. as up to date as possible.
 
 # <release_name> defaults to "current" and should be overridden when making external releases
 
@@ -22,31 +19,19 @@ import os, sys, shutil
 from glob import glob
 from getopt import getopt
 
-def exportDir(dirName, date, localOnly=False):
-    cmd = "cvs -d /carm/2_CVS/ export -D " + date
-    if localOnly:
-        cmd += " -l"
-    cmdLine = cmd + " Testing/" + dirName
+def exportDir(dirName, targetName, dest):
+    destDir = os.path.join(dest, targetName)
+    cmdLine = "bzr checkout --lightweight " + os.path.join(os.getenv("BZRROOT"), dirName, "branches/HEAD") + " " + destDir
     print cmdLine
     os.system(cmdLine)
+    shutil.rmtree(os.path.join(destDir, ".bzr"))
 
-def exportFromCvs(date):
-    for dirName in [ "TextTest", "PyUseCase", "Automatic/Diagnostics" ]:
-        exportDir(dirName, date)
-    exportDir("Automatic/texttest", date, localOnly=True)
-    for subDirName in getTestSubDirs():
-        exportDir(os.path.join("Automatic/texttest", subDirName), date)
-
-def getTestSubDirs():
-    checkDir = "/users/geoff/work/master/Testing/Automatic/texttest"
-    ignoreDirs = [ "CVS", "carmen", "ReleaseTests" ]
-    subDirs = []
-    for fileName in os.listdir(checkDir):
-        fullPath = os.path.join(checkDir, fileName)
-        if os.path.isdir(fullPath) and fileName not in ignoreDirs:
-            subDirs.append(fileName)
-    return subDirs
-
+def exportFromBzr(dest):
+    exportDir("TextTest/source", "source", dest)
+    os.mkdir(os.path.join(dest, "tests"))
+    exportDir("TextTest/tests", "tests/texttest", dest)
+    exportDir("PyUseCase/source", "PyUseCase", dest)
+        
 def pruneFilesWithExtensions(dir, extensions):
     for fileName in os.listdir(dir):
         fullPath = os.path.join(dir, fileName)
@@ -58,31 +43,26 @@ def pruneFilesWithExtensions(dir, extensions):
                 print "Removing", fullPath
                 os.remove(fullPath)
 
-def getNames(fileName, key):
-    sourceDir, local = os.path.split(fileName)
-    for line in open(fileName).xreadlines():
-        if line.startswith(key):
-            fileStr = line.strip().split("=")[-1]
-            return [ os.path.join(sourceDir, fileName) for fileName in fileStr.split() ]
+jeppesenPrefixes = [ "optimization", "apc", "matador", "studio" ]
+jeppesenFiles = [ "texttest", "texttest_release.py", "ttpython", "remotecmd.py", ".bzrignore", "carmenqueuesystem.py", "ravebased.py", "barchart.py", "ddts.py" ]
 
-disallowedPrefixes = [ "optimization", "apc", "matador", "studio" ]
-disallowedFiles = [ "texttest", "texttest_release.py", "ttpython", "remotecmd.py", ".cvsignore", "carmenqueuesystem.py", "ravebased.py", "barchart.py", "ddts.py" ]
-
-def isAllowed(file):
-    if file in disallowedFiles:
-        return False
-    for prefix in disallowedPrefixes:
+def isJeppesen(file):
+    if file in jeppesenFiles:
+        return True
+    for prefix in jeppesenPrefixes:
         if file.startswith(prefix):
-            return False
-    return True
+            return True
+    return False
 
-def getFrameworkFiles():
-    sourceDir = "Testing/TextTest"
-    fullFiles = []
+def pruneJeppesenSource(reldir):
+    sourceDir = os.path.join(reldir, "source")
+    toRemove = []
     for dirpath, subdirs, files in os.walk(sourceDir):
-        allowedFiles = filter(isAllowed, files)
-        fullFiles += [ os.path.join(dirpath, file) for file in allowedFiles ]
-    return fullFiles
+        jeppFiles = filter(isJeppesen, files)
+        toRemove += [ os.path.join(dirpath, file) for file in jeppFiles ]
+    for file in toRemove:
+        print "Removing", file
+        os.remove(file)
 
 def updateConfigFile(configFile):
     newFileName = configFile + ".new"
@@ -96,27 +76,29 @@ def updateConfigFile(configFile):
     newFile.close()
     os.rename(newFileName, configFile)
 
-def createTests(reldir):
-    testDir = os.path.join(reldir, "tests")
-    os.rename("Testing/Automatic", testDir)
-    updateConfigFile(os.path.join(testDir, "texttest", "config.texttest"))
-    extensions = [ "parisc_2_0", "powerpc", "sparc", "nonlinux", "carmen", "rhel3", "rhel5", "newgtk", "cover", "ttrel" ]
+def createTests(testDir):
+    updateConfigFile(os.path.join(testDir, "config.texttest"))
+    for dirName in [ "carmen", "ReleaseTests" ]:
+        fullName = os.path.join(testDir, dirName)
+        print "Removing", fullName
+        shutil.rmtree(fullName)
+    extensions = [ "x86_64_solaris", "parisc_2_0", "powerpc", "sparc", "nonlinux", "carmen", "rhel4", "cover", "ttrel" ]
     pruneFilesWithExtensions(testDir, extensions)
 
-def createSource(reldir):
-    if os.path.isdir(reldir):
-        shutil.rmtree(reldir)
-    sourceDir = os.path.join(reldir, "source")
-    os.makedirs(sourceDir)
-    for fileName in glob("Testing/PyUseCase/*.py") + getFrameworkFiles():
+def mergePyUseCase(reldir):    
+    for fileName in glob(os.path.join(reldir, "PyUseCase/*.py")):
         print "Copying", fileName
-        targetPath = fileName.replace("Testing", reldir).replace("TextTest", "source").replace("PyUseCase", "source/lib")
-        dirName = os.path.dirname(targetPath)
-        if not os.path.isdir(dirName):
-            os.makedirs(dirName)
-
+        targetPath = fileName.replace("PyUseCase", "source/lib")
         shutil.copy(fileName, targetPath)
+    shutil.rmtree(os.path.join(reldir, "PyUseCase"))
 
+def createSource(reldir):
+    mergePyUseCase(reldir)
+    pruneJeppesenSource(reldir)
+    versionFile = os.path.join(reldir, "source", "lib", "texttest_version.py")
+    updateVersionFile(versionFile, releaseName)
+    os.rename(os.path.join(reldir, "source", "readme.txt"), os.path.join(reldir, "readme.txt"))
+    
 def updateVersionFile(versionFile, releaseName):
     newFileName = versionFile + ".new"
     newFile = open(newFileName, "w")
@@ -126,28 +108,26 @@ def updateVersionFile(versionFile, releaseName):
     os.rename(newFileName, versionFile)
 
 def getCommandLine():
-    options, leftovers = getopt(sys.argv[1:], "d:D:v:x")
+    options, leftovers = getopt(sys.argv[1:], "d:v:x")
     optDict = dict(options)
-    return optDict.get("-d", os.getcwd()), optDict.get("-D", "2030-01-01"), optDict.get("-v", "current"), optDict.has_key("-x")
+    return optDict.get("-d", os.getcwd()), optDict.get("-v", "current"), optDict.has_key("-x")
     
 if __name__ == "__main__":
-    rootDir, cvsDate, releaseName, leaveDir = getCommandLine()
-    os.chdir(rootDir)
-    if os.path.isdir("Testing"):
-        shutil.rmtree("Testing")
-    exportFromCvs(cvsDate)
-
+    rootDir, releaseName, leaveDir = getCommandLine()
     reldir = "texttest-" + releaseName
-    createSource(reldir)
-    versionFile = os.path.join(reldir, "source", "lib", "texttest_version.py")
-    updateVersionFile(versionFile, releaseName)
-    os.rename(os.path.join(reldir, "source", "readme.txt"), os.path.join(reldir, "readme.txt"))
-    createTests(reldir)
+    actualRoot = os.path.join(rootDir, reldir)
+    if os.path.isdir(actualRoot):
+        shutil.rmtree(actualRoot)
+    os.makedirs(actualRoot)
     
-    shutil.rmtree("Testing")
-    zipName = reldir + ".zip"
+    exportFromBzr(actualRoot)
+    createSource(actualRoot)
+    createTests(os.path.join(actualRoot, "tests", "texttest"))
+    
+    zipName = actualRoot + ".zip"
     if os.path.isfile(zipName):
         os.remove(zipName)
-    os.system("zip -r " + zipName + " " + reldir)
+    print "Creating zip file", zipName
+    os.system("zip -r " + zipName + " " + actualRoot)
     if not leaveDir:
-        shutil.rmtree(reldir)
+        shutil.rmtree(actualRoot)

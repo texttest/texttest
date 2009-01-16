@@ -843,7 +843,7 @@ class TestIteratorMap:
         if self.dynamic:
             return test
         elif test is not None:
-            return self.parentApps.get(test.app), test.getRelPath()
+            return self.parentApps.get(test.app, test.app), test.getRelPath()
     def store(self, test, iter):
         self.dict[self.getKey(test)] = iter
     def updateIterator(self, test, oldRelPath):
@@ -948,6 +948,7 @@ class TestTreeGUI(ContainerGUI):
 
     def addSuiteWithParent(self, suite, parent, follower=None):
         nodeName = self.getNodeName(suite, parent)
+        self.diag.info("Adding node with name " + nodeName)
         colour = guiConfig.getTestColour("not_started")
         visible = self.newTestsVisible or not suite.parent
         row = [ nodeName, colour, [ suite ], "", colour, visible, "" ]
@@ -1273,6 +1274,7 @@ class TestTreeGUI(ContainerGUI):
         iter = self.itermap.getIterator(test)
         if iter:
             self.addAdditional(iter, test)
+            self.diag.info("Adding additional test to node " + self.model.get_value(iter, 0))
             return iter
         suite = test.parent
         suiteIter = None

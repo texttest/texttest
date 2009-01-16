@@ -78,11 +78,10 @@ def updateConfigFile(configFile):
 
 def createTests(testDir):
     updateConfigFile(os.path.join(testDir, "config.texttest"))
-    for dirName in [ "carmen", "ReleaseTests" ]:
-        fullName = os.path.join(testDir, dirName)
-        print "Removing", fullName
-        shutil.rmtree(fullName)
-    extensions = [ "x86_64_solaris", "parisc_2_0", "powerpc", "sparc", "nonlinux", "carmen", "rhel4", "cover", "ttrel" ]
+    fullName = os.path.join(testDir, "carmen")
+    print "Removing", fullName
+    shutil.rmtree(fullName)
+    extensions = [ "x86_64_solaris", "parisc_2_0", "powerpc", "sparc", "nonlinux", "carmen", "rhel4", "cover" ]
     pruneFilesWithExtensions(testDir, extensions)
 
 def mergePyUseCase(reldir):    

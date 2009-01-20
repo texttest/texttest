@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, performance, plugins, respond, sys, string, time, types, shutil
+import os, performance, plugins, respond, sys, string, time, types, shutil, datetime
 from ndict import seqdict
 from cPickle import Pickler
 from sets import Set
@@ -616,6 +616,7 @@ class CollectFiles(plugins.ScriptWithArgs):
     def matchesApp(self, dir, app):
         suffix = app.versionSuffix()
         return dir.startswith(app.name + suffix) or dir.startswith(self.batchSession + suffix)
+
     def parseDirectory(self, fullDir, app, totalValues):
         prefix = "batchreport." + app.name + app.versionSuffix()
         # Don't collect to more collections!
@@ -627,18 +628,35 @@ class CollectFiles(plugins.ScriptWithArgs):
             if filename.startswith(prefix):
                 fullname = os.path.join(fullDir, filename)
                 fileBody = self.parseFile(fullname, app, totalValues)
-                fileBodies.append(fileBody)
+                if fileBody:
+                    fileBodies.append(fileBody)
         return fileBodies
+
+    @staticmethod
+    def runIsRelevant(runId, maxDays):
+        try:
+            runDate = datetime.date.fromtimestamp(time.mktime(time.strptime(runId, "%d%b%Y")))
+        except ValueError:
+            return True # Isn't necessarily a date, in which case we have no grounds for rejecting it
+        todaysDate = datetime.date.today()
+        timeElapsed = todaysDate - runDate
+        return timeElapsed.days <= maxDays
+
     def parseFile(self, fullname, app, totalValues):
         localName = os.path.basename(fullname)
         print "Found file called", localName
         file = open(fullname)
         valuesLine = file.readline()
         self.runId = file.readline().strip()
-        self.addValuesToTotal(localName, valuesLine, totalValues)
-        fileBody = self.runId + " " + file.read()
-        file.close()
-        return fileBody
+        maxDays = app.getCompositeConfigValue("batch_collect_max_age_days", self.batchSession)
+        if self.runIsRelevant(self.runId, maxDays):
+            self.addValuesToTotal(localName, valuesLine, totalValues)
+            fileBody = self.runId + " " + file.read()
+            file.close()
+            return fileBody
+        else:
+            print "Not including", localName, "as run is more than", maxDays, "days old (as determined by batch_collect_max_age_days)."
+        
     def addValuesToTotal(self, localName, valuesLine, totalValues):
         catValues = plugins.commasplit(valuesLine.strip())
         try:

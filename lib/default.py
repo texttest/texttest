@@ -613,6 +613,8 @@ class Config:
         return pageName
     def getDefaultCollectMaxAges(self):
         return { "default" : 100000 }
+    def getDefaultCollectCompulsoryVersions(self):
+        return { "default" : [] }
     def setBatchDefaults(self, app):
         # Batch values. Maps from session name to values
         app.setConfigDefault("smtp_server", "localhost", "Server to use for sending mail in batch mode")
@@ -626,6 +628,7 @@ class Config:
         app.setConfigDefault("batch_filter_file", { "default" : [] }, "Generic filter for batch session, more flexible than timelimit")
         app.setConfigDefault("batch_use_collection", { "default" : "false" }, "Do we collect multiple mails into one in batch mode")
         app.setConfigDefault("batch_collect_max_age_days", self.getDefaultCollectMaxAges(), "When collecting multiple messages, what is the maximum age of run that we should accept?")
+        app.setConfigDefault("batch_collect_compulsory_version", self.getDefaultCollectCompulsoryVersions(), "When collecting multiple messages, which versions should be expected and give an error if not present?")
         app.setConfigDefault("batch_mail_on_failure_only", { "default" : "false" }, "Send mails only if at least one test fails")
         app.setConfigDefault("batch_use_version_filtering", { "default" : "false" }, "Which batch sessions use the version filtering mechanism")
         app.setConfigDefault("batch_version", { "default" : [] }, "List of versions to allow if batch_use_version_filtering enabled")

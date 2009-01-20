@@ -600,17 +600,23 @@ class CollectFiles(plugins.ScriptWithArgs):
             return
         dirlist = os.listdir(rootDir)
         dirlist.sort()
+        compulsoryVersions = Set(app.getCompositeConfigValue("batch_collect_compulsory_version", self.batchSession))
+        versionsFound = Set()
         for dir in dirlist:
             fullDir = os.path.join(rootDir, dir)
             if os.path.isdir(fullDir) and self.matchesApp(dir, app):
-                fileBodies += self.parseDirectory(fullDir, app, totalValues)
+                currBodies, currVersions = self.parseDirectory(fullDir, app, totalValues)
+                fileBodies += currBodies
+                versionsFound.update(currVersions)
         if len(fileBodies) == 0:
             self.diag.info("No information found in " + rootDir)
             return
-        
+
+        missingVersions = compulsoryVersions.difference(versionsFound)
+
         mailTitle = self.getTitle(app, totalValues)
         mailContents = self.mailSender.createMailHeaderForSend(self.runId, mailTitle, app)
-        mailContents += self.getBody(fileBodies)
+        mailContents += self.getBody(fileBodies, missingVersions)
         allSuccess = len(totalValues.keys()) == 1 and totalValues.keys()[0] == "succeeded"
         self.mailSender.sendOrStoreMail(app, mailContents, isAllSuccess=allSuccess)
     def matchesApp(self, dir, app):
@@ -624,13 +630,16 @@ class CollectFiles(plugins.ScriptWithArgs):
         filelist = os.listdir(fullDir)
         filelist.sort()
         fileBodies = []
+        versionsFound = Set()
         for filename in filelist:
             if filename.startswith(prefix):
                 fullname = os.path.join(fullDir, filename)
                 fileBody = self.parseFile(fullname, app, totalValues)
                 if fileBody:
                     fileBodies.append(fileBody)
-        return fileBodies
+                    versionsFound.update(Set(filename.replace(prefix, "").split(".")))
+
+        return fileBodies, versionsFound
 
     @staticmethod
     def runIsRelevant(runId, maxDays):
@@ -694,11 +703,13 @@ class CollectFiles(plugins.ScriptWithArgs):
         section = body[0:headerLoc].strip()
         newBody = body[nextLine:].strip()
         return section, newBody
-    def getBody(self, bodies):
-        if len(bodies) == 1:
-            return bodies[0]
-
+    def getBody(self, bodies, missingVersions):
         totalBody = ""
+        for version in sorted(missingVersions):
+            totalBody += "ERROR : No sufficiently recent run matching compulsory version '" + version + "' was found.\n"
+        if len(bodies) == 1:
+            return totalBody + bodies[0]
+
         parsedBodies = []
         for subBody in bodies:
             header, parsedSubBody = self.extractHeader(subBody)

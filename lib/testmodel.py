@@ -1136,6 +1136,10 @@ class Application:
     def __hash__(self):
         return id(self)
 
+    def getPersonalConfigFiles(self):
+        dircache = DirectoryCache(plugins.getPersonalConfigDir())
+        return self._getAllFileNames([ dircache ], "config")
+        
     def setUpConfiguration(self, configEntries={}):
         self.configDir = plugins.MultiEntryDictionary()
         self.configDocs = {}
@@ -1147,9 +1151,7 @@ class Application:
 
         # Read our pre-existing config files
         self.readApplicationConfigFiles()
-        personalFile = plugins.getPersonalConfigFile()
-        if personalFile:
-            self.configDir.readValues([ personalFile ], insert=0, errorOnUnknown=0)
+        self.configDir.readValues(self.getPersonalConfigFiles(), insert=False, errorOnUnknown=False)
         self.diag.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
 
     def readApplicationConfigFiles(self):
@@ -1234,8 +1236,8 @@ class Application:
             self.readExplicitConfigFiles(configModuleInitialised)
         self.readImportedConfigFiles(configModuleInitialised)
         self.readExplicitConfigFiles(configModuleInitialised)
-    def readExplicitConfigFiles(self, configModuleInitialised):
-        self.readValues(self.configDir, "config", self.dircache, insert=False, errorOnUnknown=configModuleInitialised)
+    def readExplicitConfigFiles(self, errorOnUnknown):
+        self.readValues(self.configDir, "config", self.dircache, insert=False, errorOnUnknown=errorOnUnknown)
     def readImportedConfigFiles(self, configModuleInitialised):
         importedFiles = self.getConfigFilesToImport()
         self.diag.info("Reading imported config values from files : " + "\n".join(importedFiles))

@@ -42,15 +42,21 @@ class GUIConfig:
         self.configDir = plugins.MultiEntryDictionary()
         self.configDocs = {}
         self.setConfigDefaults()
-        personalFile = plugins.getPersonalConfigFile()
-        if personalFile:
-            self.configDir.readValues([ personalFile ], insert=0, errorOnUnknown=0)
+        self.configDir.readValues(self.getAllPersonalConfigFiles(), insert=0, errorOnUnknown=0)
 
         self.hiddenCategories = map(self.getConfigName, self.configDir.get("hide_test_category"))
         self.colourDict = self.makeColourDictionary()
         if entryCompletionLogger:
             self.setUpEntryCompletion(entryCompletionLogger)
 
+    def getAllPersonalConfigFiles(self):
+        allPersonalFiles = []
+        for app in self.apps:
+            for fileName in app.getPersonalConfigFiles():
+                if not fileName in allPersonalFiles:
+                    allPersonalFiles.append(fileName)
+        return allPersonalFiles
+    
     def addSuites(self, suites):
         fullNames = [ app.fullName for app in self.apps ]
         for suite in suites:

@@ -639,13 +639,6 @@ def getPersonalConfigDir():
     else:
         return os.path.normpath(os.path.expanduser("~/.texttest"))
 
-def getPersonalConfigFile():
-    personalDir = getPersonalConfigDir()
-    if personalDir:
-        personalFile = os.path.join(personalDir, "config")
-        if os.path.isfile(personalFile):
-            return personalFile
-
 # Hacking around os.path.getcwd not working with AMD automounter
 def abspath(relpath):
     if os.environ.has_key("PWD"):

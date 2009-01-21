@@ -53,7 +53,10 @@ class PerformanceConfigSettings:
             return "cputime"
         else:
             return stem
-        
+
+    def flagSet(self, configEntry):
+        return self.configMethod(configEntry, self.configName) == "true"
+    
     def aboveMinimum(self, value, configEntry):
         minimum = self.processCount * self.configMethod(configEntry, self.configName)
         return value < 0 or value > minimum
@@ -127,9 +130,16 @@ class PerformanceComparison:
     def __init__(self, oldPerf, newPerf, settings):
         self.oldPerformance = oldPerf
         self.newPerformance = newPerf
-        self.percentageChange = self.calculatePercentageIncrease()
+        self.percentageChange = self.calculatePercentageChange(settings)
         self.descriptor = self.getDescriptor(settings)
-    def calculatePercentageIncrease(self):        
+        
+    def calculatePercentageChange(self, settings):
+        if settings.flagSet("performance_use_normalised_%"):
+            return self.calculatePercentageNormalised()
+        else:
+            return self.calculatePercentageStandard()
+
+    def calculatePercentageNormalised(self):        
         largest = max(self.oldPerformance, self.newPerformance)
         smallest = min(self.oldPerformance, self.newPerformance)
         if smallest == 0.0:
@@ -138,6 +148,16 @@ class PerformanceComparison:
             else:
                 return -1
         return ((largest - smallest) / smallest) * 100
+
+    def calculatePercentageStandard(self):        
+        if self.oldPerformance == 0.0:
+            if self.newPerformance == 0.0:
+                return 0
+            else:
+                return -1
+        diff = abs(self.newPerformance - self.oldPerformance)
+        return (diff / self.oldPerformance) * 100
+
     def getDescriptor(self, settings):
         if self.newPerformance < self.oldPerformance:
             return settings.getDescriptor("performance_descriptor_decrease")

@@ -1,7 +1,7 @@
 # Code to generate HTML report of historical information. This report generated
 # either via the -coll flag, or via -s 'batch.GenerateHistoricalReport <batchid>'
 
-import os, plugins, time, re, HTMLgen, HTMLcolors
+import os, plugins, time, re, HTMLgen, HTMLcolors, operator
 from cPickle import Pickler, loads, UnpicklingError
 from ndict import seqdict
 HTMLgen.PRINTECHO = 0
@@ -67,7 +67,7 @@ class GenerateWebPages:
     
             if len(loggedTests.keys()) > 0:
                 tagsFound.sort(lambda x, y: cmp(self.getTagTimeInSeconds(x), self.getTagTimeInSeconds(y)))
-                selectors = map(lambda selClass : selClass(tagsFound), self.getSelectorClasses())
+                selectors = reduce(operator.add, (cls.makeInstances(tagsFound) for cls in self.getSelectorClasses()), [])
                 linkFromDetailsToOverview = seqdict()
                 for sel in selectors:
                     if not usedSelectors.has_key(repr(sel)):
@@ -407,7 +407,10 @@ def getDetailPageName(pageVersion, tag):
     return "test_" + pageVersion + "_" + tag + ".html"
 
 
-class Selector:
+class Selector(object):
+    @classmethod
+    def makeInstances(cls, tags):
+        return [ cls(tags) ]
     def __init__(self, tags):
         self.selectedTags = tags
     def getSelectedTags(self):
@@ -416,10 +419,12 @@ class Selector:
         return ""
 
 class SelectorLast6Days(Selector):
-    def __init__(self, tags):
+    @classmethod
+    def makeInstances(cls, tags):
         if len(tags) > 6:
-            tags = tags[-6:]
-        Selector.__init__(self, tags)
+            return [ SelectorLast6Days(tags[-6:]) ]
+        else:
+            return super(cls, SelectorLast6Days).makeInstances(tags)
     def __repr__(self):
         return "Last six days"
 

@@ -1851,8 +1851,9 @@ class TestTable(testoverview.TestTable):
             return testoverview.TestTable.findTagColour(self, tag)
 
 class SelectorWeekend(testoverview.Selector):
-    def __init__(self, tags):
-        self.selectedTags = filter(isWeekend, tags)
+    @classmethod
+    def makeInstances(cls, tags):
+        return [ SelectorWeekend(filter(isWeekend, tags)) ]
     def getFileNameExtension(self):
         return "_weekend"
     def __repr__(self):

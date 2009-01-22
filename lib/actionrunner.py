@@ -12,6 +12,7 @@ class Cancelled(plugins.TestState):
         plugins.TestState.__init__(self, "cancelled", briefText=briefText, freeText=freeText, \
                                    started=1, completed=1, lifecycleChange="complete")
 
+# We're set up for running in a thread but we don't do so by default, for simplicity
 class BaseActionRunner(Responder, plugins.Observable):
     def __init__(self, optionMap, diag):
         Responder.__init__(self)
@@ -30,13 +31,16 @@ class BaseActionRunner(Responder, plugins.Observable):
             self.addTest(test)
     def addTest(self, test):
         self.testQueue.put(test)
+
     def notifyAllRead(self, suites):
         self.diag.info("All read, adding terminator")
         self.testQueue.put(None)    
-    def run(self):
+
+    def runAllTests(self):
         self.runQueue(self.getTestForRun, self.runTest, "running")
         self.cleanup()
         self.diag.info("Terminating")
+
     def notifyAllComplete(self):
         self.allComplete = True
     
@@ -101,10 +105,17 @@ class ActionRunner(BaseActionRunner):
         self.previousTestRunner = None
         self.script = optionMap.runScript()
         self.appRunners = seqdict()
+
     def addSuite(self, suite):
         print "Using", suite.app.description(includeCheckout=True)
         appRunner = ApplicationRunner(suite, self.script, self.diag)
         self.appRunners[suite.app] = appRunner
+
+    def notifyAllReadAndNotified(self):
+        # kicks off processing. Don't use notifyAllRead as we end up running all the tests before
+        # everyone's been notified of the reading.
+        self.runAllTests() 
+
     def runTest(self, test):
         # We have the lock coming in to here...
         appRunner = self.appRunners.get(test.app)
@@ -119,9 +130,11 @@ class ActionRunner(BaseActionRunner):
             self.lock.acquire()
             self.currentTestRunner = None
             self.lock.release()
+
     def killTests(self):
         if self.currentTestRunner:
             self.currentTestRunner.kill(self.killSignal)
+
     def killOrCancel(self, test):
         if self.currentTestRunner and self.currentTestRunner.test is test:
             self.currentTestRunner.kill()

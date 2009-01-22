@@ -437,6 +437,7 @@ class QueueSystemServer(BaseActionRunner):
         self.reuseOnly = False
         self.submitAddress = None
         QueueSystemServer.instance = self
+        
     def addSuites(self, suites):
         for suite in suites:
             suite.app.makeWriteDirectory("slavelogs")
@@ -444,6 +445,7 @@ class QueueSystemServer(BaseActionRunner):
             if currCap < self.maxCapacity:
                 self.maxCapacity = currCap
             print "Using", queueSystemName(suite.app), "queues for", suite.app.description(includeCheckout=True)
+
     def setSlaveServerAddress(self, address):
         self.submitAddress = os.getenv("TEXTTEST_MIM_SERVER", address)
         self.testQueue.put("TextTest slave server started on " + address)
@@ -453,6 +455,10 @@ class QueueSystemServer(BaseActionRunner):
         queue = self.findQueueForTest(test)
         if queue:
             queue.put(test)
+
+    def run(self): # picked up by core to indicate running in a thread
+        self.runAllTests()
+
     def findQueueForTest(self, test):
         # If we've gone into reuse mode and there are no active tests for reuse, use the "reuse failure queue"
         if self.reuseOnly and self.testsSubmitted == 0:

@@ -95,13 +95,17 @@ class GenerateWebPages:
             if os.path.isdir(extraDir):
                 dirs.append(extraDir)
         for dir in dirs:
-            for testStateFile in self.findTestStateFiles(dir):
+            self.diag.info("Looking for teststate files under " + dir)
+            files = self.findTestStateFiles(dir)
+            self.diag.info("Found " + repr(len(files)) + " teststate files in " + dir)
+            for testStateFile in files:
                 self.processTestStateFile(testStateFile, categoryHandler, loggedTests, tagsFound, dir)
     def findTestStateFiles(self, dir):
         allFiles = []
         for root, dirs, files in os.walk(dir):
-            currFiles = filter(lambda file: file.startswith("teststate"), files)
-            allFiles += [ os.path.join(root, file) for file in currFiles ]
+            for file in files:
+                if file.startswith("teststate"):
+                    allFiles.append(os.path.join(root, file))
         allFiles.sort()
         return allFiles
     def removePageVersion(self, version):

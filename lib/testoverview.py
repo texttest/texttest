@@ -1,7 +1,7 @@
 # Code to generate HTML report of historical information. This report generated
 # either via the -coll flag, or via -s 'batch.GenerateHistoricalReport <batchid>'
 
-import os, plugins, time, re, HTMLgen, HTMLcolors
+import os, plugins, time, re, HTMLgen, HTMLcolors, operator
 from cPickle import Pickler, loads, UnpicklingError
 from ndict import seqdict
 HTMLgen.PRINTECHO = 0
@@ -53,7 +53,7 @@ class GenerateWebPages:
         # Hook for configurations to inherit from
         return TestTable()
     def getSelectorClasses(self):
-        return [ SelectorLast6Days, SelectorAll ]
+        return [ SelectorByMonth, SelectorLast6Days ]
     def generate(self, repositoryDirs):            
         foundMinorVersions = HTMLgen.Container()
         details = TestDetails()
@@ -67,15 +67,18 @@ class GenerateWebPages:
     
             if len(loggedTests.keys()) > 0:
                 tagsFound.sort(lambda x, y: cmp(self.getTagTimeInSeconds(x), self.getTagTimeInSeconds(y)))
-                selectors = map(lambda selClass : selClass(tagsFound), self.getSelectorClasses())
-                linkFromDetailsToOverview = seqdict()
+                selectors = reduce(operator.add, (cls.makeInstances(tagsFound) for cls in self.getSelectorClasses()), [])
                 for sel in selectors:
                     if not usedSelectors.has_key(repr(sel)):
                         usedSelectors[repr(sel)] = sel.getFileNameExtension()
-                    linkFromDetailsToOverview[repr(sel)] = self.getOverviewPageName(sel.getFileNameExtension())
                     testTable = self.createTestTable()
                     table = testTable.generate(categoryHandler, self.pageVersion, version, loggedTests, sel.getSelectedTags())
                     self.addOverviewPages(sel.getFileNameExtension(), version, table)
+
+                linkFromDetailsToOverview = seqdict()
+                for sel in reversed(selectors): # put them in reverse order, most relevant first
+                    linkFromDetailsToOverview[repr(sel)] = self.getOverviewPageName(sel.getFileNameExtension())
+                    
                 det = details.generate(categoryHandler, version, tagsFound, linkFromDetailsToOverview)
                 self.addDetailPages(det)
                 foundMinorVersions.append(HTMLgen.Href("#" + version, self.removePageVersion(version)))
@@ -407,7 +410,10 @@ def getDetailPageName(pageVersion, tag):
     return "test_" + pageVersion + "_" + tag + ".html"
 
 
-class Selector:
+class Selector(object):
+    @classmethod
+    def makeInstances(cls, tags):
+        return [ cls(tags) ]
     def __init__(self, tags):
         self.selectedTags = tags
     def getSelectedTags(self):
@@ -416,15 +422,34 @@ class Selector:
         return ""
 
 class SelectorLast6Days(Selector):
-    def __init__(self, tags):
+    @classmethod
+    def makeInstances(cls, tags):
         if len(tags) > 6:
-            tags = tags[-6:]
-        Selector.__init__(self, tags)
+            return [ SelectorLast6Days(tags[-6:]) ]
+        else:
+            return super(cls, SelectorLast6Days).makeInstances(tags)
     def __repr__(self):
         return "Last six days"
 
-class SelectorAll(Selector):
-    def getFileNameExtension(self):
-        return "_all"
+class SelectorByMonth(Selector):
+    @classmethod
+    def makeInstances(cls, tags):
+        allSelectors = {}
+        for tag in tags:
+            month = tag[2:9]
+            allSelectors.setdefault(month, SelectorByMonth(month)).add(tag)
+        return sorted(allSelectors.values())
+    def __init__(self, month):
+        self.month = month
+        self.selectedTags = []
+    def add (self, tag):
+        self.selectedTags.append(tag)
+    def getMonthTime(self):
+        return time.mktime(time.strptime(self.month, "%b%Y"))
+    def __cmp__(self, other):
+        return cmp(self.getMonthTime(), other.getMonthTime())
     def __repr__(self):
-        return "All"
+        return self.month
+    def getFileNameExtension(self):
+        return "_all_" + self.month
+

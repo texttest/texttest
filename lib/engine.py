@@ -343,6 +343,10 @@ class TextTest(Responder, plugins.Observable):
         raisedError, self.appSuites = self.createTestSuites(allApps)
         if not raisedError or len(self.appSuites) > 0:
             self.addSuites(self.appSuites.values())
+            # Set the signal handlers to use when running, if we actually plan to do any
+            if not self.ignoreAllExecutables():
+                self.setSignalHandlers(self.handleSignal)
+        
             self.runThreads()
 
     def addSuites(self, emptySuites):
@@ -407,9 +411,9 @@ class TextTest(Responder, plugins.Observable):
         mainThreadRunner = filter(lambda x: x.canBeMainThread(), allRunners)[0]
         allRunners.remove(mainThreadRunner)
         return mainThreadRunner, allRunners
+    def ignoreAllExecutables(self):
+        return reduce(operator.and_, (app.ignoreExecutable() for app in self.appSuites.keys()), True)
     def runThreads(self):
-        # Set the signal handlers to use when running
-        self.setSignalHandlers(self.handleSignal)
         # Run the first one as the main thread and the rest in subthreads
         # Make sure all of them are finished before we stop
         mainThreadRunner, subThreadRunners = self.findThreadRunners()

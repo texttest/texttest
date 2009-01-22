@@ -120,6 +120,9 @@ class Activator(Responder, plugins.Observable):
 class TextTest(Responder, plugins.Observable):
     def __init__(self):
         plugins.Observable.__init__(self)
+        if os.name == "posix":
+            # To aid in debugging tests that hang...
+            signal.signal(signal.SIGQUIT, self.printStackTrace) 
         self.setSignalHandlers(self.handleSignalWhileStarting)
         if os.environ.has_key("FAKE_OS"):
             os.name = os.environ["FAKE_OS"]
@@ -129,6 +132,9 @@ class TextTest(Responder, plugins.Observable):
         # Set USECASE_HOME for the use-case recorders we expect people to use for their tests...
         if not os.environ.has_key("USECASE_HOME"):
             os.environ["USECASE_HOME"] = os.path.join(self.inputOptions.directoryName, "usecases")
+    def printStackTrace(self, *args):
+        from traceback import print_stack
+        print_stack()
     def findSearchDirs(self):
         root = self.inputOptions.directoryName
         self.diag.info("Using test suite at " + root)
@@ -397,7 +403,7 @@ class TextTest(Responder, plugins.Observable):
         
     def findThreadRunners(self):
         allRunners = filter(lambda x: hasattr(x, "run"), self.observers)
-        mainThreadRunner = filter(lambda x: x.canBeMainThread(), allRunners)[0]
+        mainThreadRunner = filter(lambda x: x.canBeMainThread(), allRunners)[-1]
         allRunners.remove(mainThreadRunner)
         return mainThreadRunner, allRunners
     def runThreads(self):

@@ -1835,7 +1835,7 @@ class PlotConfigure:
 # Override for webpage generation with generation of weekend page in it
 class GenerateWebPages(testoverview.GenerateWebPages):
     def getSelectorClasses(self):
-        return [ testoverview.SelectorByMonth, SelectorWeekend, testoverview.SelectorLast6Days ]
+        return super(GenerateWebPages, self).getSelectorClasses() + [ SelectorWeekend ]
     def createTestTable(self):
         return TestTable()
 
@@ -1851,10 +1851,9 @@ class TestTable(testoverview.TestTable):
             return testoverview.TestTable.findTagColour(self, tag)
 
 class SelectorWeekend(testoverview.Selector):
-    @classmethod
-    def makeInstances(cls, tags):
-        return [ SelectorWeekend(filter(isWeekend, tags)) ]
+    def __init__(self, tags=[]):
+        return super(SelectorWeekend, self).__init__(filter(isWeekend, tags))
     def getFileNameExtension(self):
         return "_weekend"
-    def __repr__(self):
+    def linkName(self):
         return "Weekend"

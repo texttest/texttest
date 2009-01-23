@@ -5,6 +5,7 @@ import os, plugins, time, re, HTMLgen, HTMLcolors, operator
 from cPickle import Pickler, loads, UnpicklingError
 from ndict import seqdict
 from sets import Set
+from glob import glob
 HTMLgen.PRINTECHO = 0
 
 class ColourFinder:
@@ -61,25 +62,31 @@ class GenerateWebPages(object):
         allMonthSelectors = Set()
         for repositoryDir, version in repositoryDirs:
             self.diag.info("Generating " + version)
-            loggedTests = seqdict()
-            tagsFound = []
-            categoryHandler = CategoryHandler()
-            self.processTestStateFiles(categoryHandler, loggedTests, tagsFound, repositoryDir)
-    
-            if len(loggedTests.keys()) > 0:
-                tagsFound.sort(lambda x, y: cmp(self.getTagTimeInSeconds(x), self.getTagTimeInSeconds(y)))
-                selectors = [ cls(tagsFound) for cls in self.getSelectorClasses() ]
+            allFiles, tags = self.findTestStateFilesAndTags(repositoryDir)
+            if len(allFiles) > 0:
+                selectors = [ cls(tags) for cls in self.getSelectorClasses() ]
+                monthSelectors = SelectorByMonth.makeInstances(tags)
+                allMonthSelectors.update(monthSelectors)
+                allSelectors = selectors + list(reversed(monthSelectors))
+                # If we already have month pages, we only regenerate the current one
+                if len(self.getExistingMonthPages()) == 0:
+                    selectors = allSelectors
+                else:
+                    selectors.append(monthSelectors[-1])
+                    tags = list(reduce(Set.union, (Set(selector.selectedTags) for selector in selectors), Set()))
+                    tags.sort(self.compareTags)
+
+                loggedTests = seqdict()
+                categoryHandler = CategoryHandler()
+                for stateFile, repository in allFiles:
+                    self.processTestStateFile(stateFile, categoryHandler, loggedTests, repository, tags)
+                        
                 for sel in selectors:
                     self.generateAndAddTable(categoryHandler, version, loggedTests, sel)
 
-                monthSelectors = SelectorByMonth.makeInstances(tagsFound)
-                allMonthSelectors.update(monthSelectors)
-                for sel in monthSelectors:
-                    self.generateAndAddTable(categoryHandler, version, loggedTests, sel)
-
                 # put them in reverse order, most relevant first
-                linkFromDetailsToOverview = [ sel.getLinkInfo(self.pageVersion) for sel in selectors + list(reversed(monthSelectors)) ]
-                det = details.generate(categoryHandler, version, tagsFound, linkFromDetailsToOverview)
+                linkFromDetailsToOverview = [ sel.getLinkInfo(self.pageVersion) for sel in allSelectors ]
+                det = details.generate(categoryHandler, version, tags, linkFromDetailsToOverview)
                 self.addDetailPages(det)
                 foundMinorVersions.append(HTMLgen.Href("#" + version, self.removePageVersion(version)))
 
@@ -100,38 +107,38 @@ class GenerateWebPages(object):
             page.prepend(HTMLgen.Heading(1, "Test results for ", self.pageTitle, align = 'center'))
 
         self.writePages()
-    def processTestStateFiles(self, categoryHandler, loggedTests, tagsFound, repositoryDir):
+        
+    def getExistingMonthPages(self):
+        return glob(os.path.join(self.pageDir, "test_" + self.pageVersion + "_all_???[0-9][0-9][0-9][0-9].html"))
+
+    def findAllRepositories(self, repositoryDir):
         dirs = [ repositoryDir ]
         for extra in self.extraVersions:
             extraDir = repositoryDir + "." + extra
             if os.path.isdir(extraDir):
                 dirs.append(extraDir)
-        for dir in dirs:
-            self.diag.info("Looking for teststate files under " + dir)
-            files = self.findTestStateFiles(dir)
-            self.diag.info("Found " + repr(len(files)) + " teststate files in " + dir)
-            for testStateFile in files:
-                self.processTestStateFile(testStateFile, categoryHandler, loggedTests, tagsFound, dir)
-    def findTestStateFiles(self, dir):
+        return dirs
+
+    def compareTags(self, x, y):
+        return cmp(self.getTagTimeInSeconds(x), self.getTagTimeInSeconds(y))
+        
+    def findTestStateFilesAndTags(self, repositoryDir):
         allFiles = []
-        for root, dirs, files in os.walk(dir):
-            for file in files:
-                if file.startswith("teststate"):
-                    allFiles.append(os.path.join(root, file))
-        allFiles.sort()
-        return allFiles
-    def removePageVersion(self, version):
-        leftVersions = []
-        pageSubVersions = self.pageVersion.split(".")
-        for subVersion in version.split("."):
-            if not subVersion in pageSubVersions:
-                leftVersions.append(subVersion)
-        return ".".join(leftVersions)
-    def processTestStateFile(self, stateFile, categoryHandler, loggedTests, tagsFound, repository):
-        state = self.readState(stateFile)
+        allTags = Set()
+        for dir in self.findAllRepositories(repositoryDir):
+            for root, dirs, files in os.walk(dir):
+                for file in files:
+                    if file.startswith("teststate_"):
+                        allFiles.append((os.path.join(root, file), dir))
+                        allTags.add(file.replace("teststate_", ""))
+                                
+        return allFiles, sorted(allTags, self.compareTags)
+                          
+    def processTestStateFile(self, stateFile, categoryHandler, loggedTests, repository, useTags):
         tag = os.path.basename(stateFile).replace("teststate_", "")
-        if tagsFound.count(tag) == 0:
-            tagsFound.append(tag)
+        if len(useTags) > 0 and tag not in useTags:
+            return
+        state = self.readState(stateFile)
         key = self.getTestIdentifier(stateFile, repository)
         self.diag.info(tag + " : reading " + key)
         keyExtraVersion = self.findExtraVersion(repository)
@@ -142,6 +149,7 @@ class GenerateWebPages(object):
 
         loggedTests[keyExtraVersion][key][tag] = state
         categoryHandler.registerInCategory(tag, key, state, keyExtraVersion)
+
     def findExtraVersion(self, repository):
         versions = os.path.basename(repository).split(".")
         for i in xrange(len(versions)):
@@ -149,6 +157,7 @@ class GenerateWebPages(object):
             if version in self.extraVersions:
                 return version
         return ""
+
     def readState(self, stateFile):
         file = open(stateFile, "rU")
         try:
@@ -161,13 +170,22 @@ class GenerateWebPages(object):
                 return self.readErrorState("Incorrect type for state object.")
         except (UnpicklingError, ImportError, EOFError, AttributeError), e:
             return self.readErrorState("Stack info follows:\n" + str(e))
+
     def readErrorState(self, errMsg):
         freeText = "Failed to read results file, possibly deprecated format. " + errMsg
         return plugins.Unrunnable(freeText, "read error")
 
+    def removePageVersion(self, version):
+        leftVersions = []
+        pageSubVersions = self.pageVersion.split(".")
+        for subVersion in version.split("."):
+            if not subVersion in pageSubVersions:
+                leftVersions.append(subVersion)
+        return ".".join(leftVersions)
+
     def generateAndAddTable(self, categoryHandler, version, loggedTests, selector):
         testTable = self.createTestTable()
-        table = testTable.generate(categoryHandler, self.pageVersion, version, loggedTests, selector.getSelectedTags())
+        table = testTable.generate(categoryHandler, self.pageVersion, version, loggedTests, selector.selectedTags)
         fileName = selector.getLinkInfo(self.pageVersion)[0]
         self.addOverviewPages(fileName, version, table)
     
@@ -426,8 +444,6 @@ def getDetailPageName(pageVersion, tag):
 class Selector(object):
     def __init__(self, tags=[]):
         self.selectedTags = tags
-    def getSelectedTags(self):
-        return self.selectedTags
     def getLinkInfo(self, pageVersion):
         return "test_" + pageVersion + self.getFileNameExtension() + ".html", self.linkName()
     def getFileNameExtension(self):

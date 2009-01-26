@@ -366,7 +366,13 @@ class RuleBuildSubmitServer(QueueSystemServer):
     def findQueueForTest(self, test):
         # push the non-rules tests last, to avoid indeterminism and decrease total time as these need two
         # SGE submissions
-        rulecomp = self.getRuleCompilation(test)
+        try:
+            rulecomp = self.getRuleCompilation(test)
+        except OSError, e:
+            test.changeState(plugins.Unrunnable(str(e), "NO PERMISSION"))
+            self.handleLocalError(test, previouslySubmitted=False)
+            return
+
         if not rulecomp or rulecomp.allSucceeded():
             self.diag.info("Inserting new test into normal queue")
             return QueueSystemServer.findQueueForTest(self, test)

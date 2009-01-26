@@ -16,6 +16,7 @@ abspath()
 
 
 abspath $0 fullpath
+fullpath=`echo $fullpath | sed 's:/site/:/:'`
 
 if [ -f "/etc/redhat-release" ]; then
     export TEXTTEST_SLAVE_CMD=$fullpath 

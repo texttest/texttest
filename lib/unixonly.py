@@ -109,7 +109,7 @@ class VirtualDisplayResponder(Responder):
             return None, None
             
     def getVirtualServerArgs(self, machine, logDir):
-        binDir = plugins.installationDir("bin")
+        binDir = plugins.installationDir("libexec")
         fullPath = os.path.join(binDir, "startXvfb.py")
         if machine == "localhost":
             return [ sys.executable, fullPath, logDir ]

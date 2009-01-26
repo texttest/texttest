@@ -43,27 +43,6 @@ def pruneFilesWithExtensions(dir, extensions):
                 print "Removing", fullPath
                 os.remove(fullPath)
 
-jeppesenPrefixes = [ "optimization", "apc", "matador", "studio" ]
-jeppesenFiles = [ "texttest", "texttest_release.py", "ttpython", "remotecmd.py", ".bzrignore", "carmenqueuesystem.py", "ravebased.py", "barchart.py", "ddts.py" ]
-
-def isJeppesen(file):
-    if file in jeppesenFiles:
-        return True
-    for prefix in jeppesenPrefixes:
-        if file.startswith(prefix):
-            return True
-    return False
-
-def pruneJeppesenSource(reldir):
-    sourceDir = os.path.join(reldir, "source")
-    toRemove = []
-    for dirpath, subdirs, files in os.walk(sourceDir):
-        jeppFiles = filter(isJeppesen, files)
-        toRemove += [ os.path.join(dirpath, file) for file in jeppFiles ]
-    for file in toRemove:
-        print "Removing", file
-        os.remove(file)
-
 def updateConfigFile(configFile):
     newFileName = configFile + ".new"
     newFile = open(newFileName, "w")
@@ -93,7 +72,7 @@ def mergePyUseCase(reldir):
 
 def createSource(reldir):
     mergePyUseCase(reldir)
-    pruneJeppesenSource(reldir)
+    shutil.rmtree(os.path.join(reldir, "source", "site"))
     versionFile = os.path.join(reldir, "source", "lib", "texttest_version.py")
     updateVersionFile(versionFile, releaseName)
     os.rename(os.path.join(reldir, "source", "readme.txt"), os.path.join(reldir, "readme.txt"))

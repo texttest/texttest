@@ -144,6 +144,13 @@ def installationDir(name):
     installationRoot = os.path.dirname(os.path.dirname(__file__))
     return os.path.join(installationRoot, name)
 
+def installationFile(name, subdir):
+    installationRoot = os.path.dirname(os.path.dirname(__file__))
+    for location in [ os.path.join("site", subdir), subdir ]:
+        instFile = os.path.join(installationRoot, location, name)
+        if os.path.isfile(instFile):
+            return instFile
+
 # Parse a time string, either a HH:MM:SS string, or a single int/float,
 # which is interpreted as a number of minutes, for backwards compatibility.
 # Observe that in either 'field' in the HH:MM:SS case, any number is allowed,

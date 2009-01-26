@@ -412,6 +412,19 @@ class CollateFiles(plugins.Action):
             stdout.close()
             stderr.close()
 
+    def getScriptArgs(self, script):
+        args = script.split()
+        scriptName = args[0]
+        instScript = plugins.installationFile(scriptName, "libexec")
+        if instScript:
+            args = [ instScript ] + args[1:]
+            
+        if os.name == "nt": # Windows isn't clever enough to know how to run Python/Java programs without some help...
+            interpreter = plugins.getInterpreter(scriptName)
+            if interpreter:
+                args = [ interpreter ] + args
+        return args
+    
     def extract(self, test, sourceFile, targetFile, collationErrFile):
         stem = os.path.splitext(os.path.basename(targetFile))[0]
         scripts = test.getCompositeConfigValue("collate_script", stem)
@@ -421,11 +434,7 @@ class CollateFiles(plugins.Action):
         currProc = None
         stdin = None
         for script in scripts:
-            args = script.split()
-            if os.name == "nt": # Windows isn't clever enough to know how to run Python/Java programs without some help...
-                interpreter = plugins.getInterpreter(args[0])
-                if interpreter:
-                    args = [ interpreter ] + args
+            args = self.getScriptArgs(script)
             if currProc:
                 stdin = currProc.stdout
             else:

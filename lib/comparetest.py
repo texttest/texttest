@@ -258,17 +258,17 @@ class TestComparison(BaseTestComparison):
         comparison, newList = self.findComparison(stem)
         newList.remove(comparison)
         self.allResults.remove(comparison)
-    def save(self, test, exact=True, versionString="", overwriteSuccessFiles=False, newFilesAsDiags=False, onlyStems=[]):
+    def save(self, test, exact=True, versionString="", overwriteSuccessFiles=False, onlyStems=[], backupVersionString=""):
         self.diag.info("Saving " + repr(test) + " stems " + repr(onlyStems))
         for comparison in self.filterComparisons(self.changedResults, onlyStems):
             self.updateStatus(test, str(comparison), versionString)
-            comparison.overwrite(test, exact, versionString)
+            comparison.overwrite(test, exact, versionString, backupVersionString)
         for comparison in self.filterComparisons(self.newResults, onlyStems):
             self.updateStatus(test, str(comparison), versionString)
-            comparison.saveNew(test, versionString, newFilesAsDiags)
+            comparison.saveNew(test, versionString)
         for comparison in self.filterComparisons(self.missingResults, onlyStems):
             self.updateStatus(test, str(comparison), versionString)
-            comparison.saveMissing(versionString, self.fakeMissingFileText())
+            comparison.saveMissing(versionString, self.fakeMissingFileText(), backupVersionString)
         # Save any external file edits we may have made
         tmpFileEditDir = test.makeTmpFileName("file_edits", forComparison=0)
         if os.path.isdir(tmpFileEditDir):
@@ -282,7 +282,7 @@ class TestComparison(BaseTestComparison):
         if overwriteSuccessFiles:
             for comparison in self.filterComparisons(self.correctResults, onlyStems):
                 self.updateStatus(test, str(comparison), versionString)
-                comparison.overwrite(test, exact, versionString)
+                comparison.overwrite(test, exact, versionString, backupVersionString)
                 
     def recalculateStdFiles(self, test):
         self.diag.info("Recalculating standard files for " + repr(test))

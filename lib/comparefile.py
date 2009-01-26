@@ -235,16 +235,25 @@ class FileComparison:
         else:
             stdRoot = self.getStdRootVersionFile()
             return self.versionise(stdRoot, versionString)
-    def overwrite(self, test, exact, versionString):
+
+    def backupOrRemove(self, fileName, backupVersionString):
+        if os.path.isfile(fileName):
+            if backupVersionString:
+                backupFile = self.getStdFileForSave(backupVersionString)
+                os.rename(fileName, backupFile)
+            else:
+                os.remove(fileName)
+
+    def overwrite(self, test, exact, versionString, backupVersionString):
         self.diag.info("save file from " + self.tmpFile)
         self.stdFile = self.getStdFileForSave(versionString)
-        if os.path.isfile(self.stdFile):
-            os.remove(self.stdFile)
-
+        self.backupOrRemove(self.stdFile, backupVersionString)
         self.saveTmpFile(exact)
-    def saveNew(self, test, versionString, diags):
+        
+    def saveNew(self, test, versionString):
         self.stdFile = os.path.join(test.getDirectory(), self.versionise(self.stem + "." + test.app.name, versionString))
         self.saveTmpFile()
+
     def saveTmpFile(self, exact=True):
         self.diag.info("Saving tmp file to " + self.stdFile)
         plugins.ensureDirExistsForFile(self.stdFile)
@@ -259,11 +268,10 @@ class FileComparison:
         self.differenceCache = False
         self.tmpFile = self.stdFile
         self.tmpCmpFile = self.stdFile
-    def saveMissing(self, versionString, autoGenText):
+    def saveMissing(self, versionString, autoGenText, backupVersionString):
         stdRoot = self.getStdRootVersionFile()
         targetFile = self.versionise(stdRoot, versionString)
-        if os.path.isfile(targetFile):
-            os.remove(targetFile)
+        self.backupOrRemove(targetFile, backupVersionString)
 
         self.stdFile = None
         self.stdCmpFile = None

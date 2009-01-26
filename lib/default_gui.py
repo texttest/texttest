@@ -54,6 +54,7 @@ class SaveTests(guiplugins.ActionDialogGUI):
         guiplugins.scriptEngine.connect(self.getDirectTooltip(), "activate", self.directAction, self._respond)
         self.directAction.set_property("sensitive", False)
         self.addOption("v", "Version to save")
+        self.addOption("old", "Version to save previous results as")
         self.addSwitch("over", "Replace successfully compared files also", 0)
         if self.hasPerformance(allApps):
             self.addSwitch("ex", "Save", 1, ["Average performance", "Exact performance"])
@@ -159,8 +160,6 @@ class SaveTests(guiplugins.ActionDialogGUI):
             return self.getDefaultSaveVersion(test.app)
         else:
             return versionString
-    def newFilesAsDiags(self):
-        return int(self.optionGroup.getSwitchValue("newdiag", 0))
     def isActiveOnCurrent(self, test=None, state=None):
         if state and state.isSaveable():
             return True
@@ -171,6 +170,10 @@ class SaveTests(guiplugins.ActionDialogGUI):
     def getStemsToSave(self):
         return [ os.path.basename(fileName).split(".")[0] for fileName, comparison in self.currFileSelection ]
     def performOnCurrent(self):
+        backupVersion = self.optionGroup.getOptionValue("old")
+        if backupVersion and backupVersion == self.optionGroup.getOptionValue("v"):
+            raise plugins.TextTestError, "Cannot backup to the same version we're trying to save! Choose another name."
+        
         saveDesc = ", exactness " + str(self.getExactness())
         stemsToSave = self.getStemsToSave()
         if len(stemsToSave) > 0:
@@ -190,7 +193,7 @@ class SaveTests(guiplugins.ActionDialogGUI):
                 guiplugins.guilog.info("Saving " + repr(test) + " - version " + version + saveDesc)
                 testComparison = test.state
                 testComparison.setObservers(self.observers)
-                testComparison.save(test, self.getExactness(), version, overwriteSuccess, self.newFilesAsDiags(), stemsToSave)
+                testComparison.save(test, self.getExactness(), version, overwriteSuccess, stemsToSave, backupVersion)
                 newState = testComparison.makeNewState(test.app, "saved")
                 test.changeState(newState)
 

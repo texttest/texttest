@@ -10,9 +10,10 @@ except ImportError:
 import sys, os
 
 install_root = os.path.dirname(os.path.dirname(os.path.normpath(sys.argv[0])))
-libDir = os.path.abspath(os.path.join(install_root, "lib"))
-if os.path.isdir(libDir):
-    sys.path.insert(0, libDir)
+for subdir in [ "lib", "site/lib" ]:
+    libDir = os.path.abspath(os.path.join(install_root, subdir))
+    if os.path.isdir(libDir):
+        sys.path.insert(0, libDir)
 
 import texttest_version
 

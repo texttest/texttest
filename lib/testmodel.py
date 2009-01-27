@@ -1151,12 +1151,12 @@ class Application:
 
         # Read our pre-existing config files
         self.readApplicationConfigFiles()
-        self.configDir.readValues(self.getPersonalConfigFiles(), insert=False, errorOnUnknown=False)
+        if not self.inputOptions.has_key("vanilla"):
+            self.configDir.readValues(self.getPersonalConfigFiles(), insert=False, errorOnUnknown=False)
         self.diag.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
 
     def readApplicationConfigFiles(self):
         self.readConfigFiles(configModuleInitialised=False)
-        self.readValues(self.configDir, "config", self.dircache, insert=0)
         self.diag.info("Basic Config file settings are: " + "\n" + repr(self.configDir.dict))
         self.fullName = self.getConfigValue("full_name")
         self.diag.info("Found application " + repr(self))
@@ -1232,10 +1232,16 @@ class Application:
     def getDirectory(self):
         return self.dircache.dir
     def readConfigFiles(self, configModuleInitialised):
+        if not self.inputOptions.has_key("vanilla"):
+            self.readDefaultConfigFiles()
         if not configModuleInitialised:
             self.readExplicitConfigFiles(configModuleInitialised)
         self.readImportedConfigFiles(configModuleInitialised)
         self.readExplicitConfigFiles(configModuleInitialised)
+    def readDefaultConfigFiles(self):
+        dirCache = DirectoryCache(plugins.installationDir("site/etc"))
+        # don't error check as there might be settings there for all sorts of config modules...
+        self.readValues(self.configDir, "config", dirCache, insert=False, errorOnUnknown=False)
     def readExplicitConfigFiles(self, errorOnUnknown):
         self.readValues(self.configDir, "config", self.dircache, insert=False, errorOnUnknown=errorOnUnknown)
     def readImportedConfigFiles(self, configModuleInitialised):

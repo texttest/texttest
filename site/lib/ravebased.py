@@ -169,7 +169,7 @@ class Config(CarmenConfig):
     def buildRulesetsAlways(self, app):
         return app.getConfigValue("build_rulesets_always") == "true"
     def rebuildAllRulesets(self, app):
-        return self.isNightJob() or self.optionMap.has_key("rulecomp") or self.buildRulesetsAlways(app)
+        return self.isNightJob(app) or self.optionMap.has_key("rulecomp") or self.buildRulesetsAlways(app)
     def buildRules(self):
         if self.optionMap.has_key("skip") or self.isReconnecting() or self.optionMap.has_key("autoreplay"):
             return 0

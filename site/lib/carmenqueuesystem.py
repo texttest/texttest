@@ -252,33 +252,22 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         if queuesystem.queueSystemName(test.app) == "LSF":
             return queuesystem.QueueSystemConfig.getSubmissionRules(self, test)
         else:
-            return CarmenSgeSubmissionRules(self.optionMap, test, self.isNightJob())
+            return CarmenSgeSubmissionRules(self.optionMap, test, self.isNightJob(test.app))
     def getDefaultTextTestTmp(self):
         # Have a special disk for this...
         if os.name == "posix":
             return os.path.join("/carm/proj/texttest-tmp/", os.getenv("USER"))
         else:
             return queuesystem.QueueSystemConfig.getDefaultTextTestTmp(self)
-    def isNightJob(self):
+    def isNightJob(self, app):
         batchSession = self.optionValue("b")
-        return batchSession != "release" and batchSession in self.getFilteredBatchSessions()
+        return not batchSession.startswith("release") and \
+               app.getCompositeConfigValue("batch_use_version_filtering", batchSession) == "true"
     def printHelpOptions(self):
         print helpOptions
     def printHelpDescription(self):
         print helpDescription
-    def defaultViewProgram(self, homeOS):
-        if os.name == "posix":
-            return "xemacs"
-        else:
-            return queuesystem.QueueSystemConfig.defaultViewProgram(self, homeOS)
-    def getFilteredBatchSessions(self):
-        return [ "nightjob", "wkendjob", "release", "nightly_publish", "nightly_publish.lsf", \
-                 "weekly_publish", "weekly_publish.lsf", "small_publish", "test_nightjob" ]
-    def getDefaultCollectMaxAges(self):
-        return { "default" : 100000, "nightjob" : 1, "wkendjob": 3, "nightly_publish" : 1,
-                 "weekly_publish" : 3, "nightly_publish.lsf" : 1, "weekly_publish.lsf" : 3 }
-    def getDefaultMaxCapacity(self):
-        return 70 # roughly number of R&D i386_linux machines, with a bit extra for luck
+
     def setApplicationDefaults(self, app):
         queuesystem.QueueSystemConfig.setApplicationDefaults(self, app)
         app.setConfigDefault("default_architecture", "i386_linux", "Which Carmen architecture to run tests on by default")
@@ -286,11 +275,6 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
         app.setConfigDefault("maximum_cputime_for_short_queue", 10, "Maximum time a test can take and be sent to the short queue")
         app.setConfigDefault("queue_for_unknown_cputime", "short", "Which queue to use when the time for the test cannot be estimated")
         app.setConfigDefault("carmen_resource_configuration", { "default" : []}, "Which resource configuration to use")
-        app.addConfigEntry("bugzilla", "http://bugzilla.carmen.se", "bug_system_location")
-        # plenty of people use CVS at Carmen, best to ignore it in data
-        app.addConfigEntry("default", "CVS", "test_data_ignore")
-        for batchSession in self.getFilteredBatchSessions():
-            app.addConfigEntry(batchSession, "true", "batch_use_version_filtering")
         for var, value in self.getCarmenEnvironment(app):
             os.environ[var] = value
 
@@ -304,9 +288,6 @@ class CarmenConfig(queuesystem.QueueSystemConfig):
             app.addConfigEntry("base_version", arch)
             app.addConfigEntry("unsaveable_version", arch)
 
-    def defaultLoginShell(self):
-        # All of carmen's login stuff is done in tcsh starter scripts...
-        return "/bin/tcsh"
     def getConfigEnvironment(self, test):
         baseEnv, props = queuesystem.QueueSystemConfig.getConfigEnvironment(self, test)
         if test.parent is None:

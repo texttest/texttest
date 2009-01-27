@@ -209,8 +209,6 @@ class QueueSystemConfig(default.Config):
             return MachineInfoFinder()
         else:
             return default.Config.getMachineInfoFinder(self)
-    def getDefaultMaxCapacity(self):
-        return 100000
     def printHelpDescription(self):
         print """The queuesystem configuration is a published configuration, 
                documented online at http://www.texttest.org/TextTest/docs/queuesystem"""
@@ -222,7 +220,7 @@ class QueueSystemConfig(default.Config):
         app.setConfigDefault("queue_system_module", "SGE", "Which queue system (grid engine) software to use. (\"SGE\" or \"LSF\")")
         app.setConfigDefault("performance_test_resource", { "default" : [] }, "Resources to request from queue system for performance testing")
         app.setConfigDefault("parallel_environment_name", "*", "(SGE) Which SGE parallel environment to use when SUT is parallel")
-        app.setConfigDefault("queue_system_max_capacity", self.getDefaultMaxCapacity(), "Maximum possible number of parallel similar jobs in the available grid")
+        app.setConfigDefault("queue_system_max_capacity", 100000, "Maximum possible number of parallel similar jobs in the available grid")
 
 class SubmissionRules:
     def __init__(self, optionMap, test):

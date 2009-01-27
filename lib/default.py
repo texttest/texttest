@@ -61,6 +61,7 @@ class Config:
                 # Options that don't make sense with the GUI should be invisible there...
                 group.addOption("s", "Run this script")
                 group.addOption("d", "Run as if TEXTTEST_HOME was")
+                group.addSwitch("vanilla", "Ignore site-specific and personal configuration")
                 group.addSwitch("help", "Print configuration help text on stdout")
                 group.addSwitch("g", "use dynamic GUI")
                 group.addSwitch("gx", "use static GUI")
@@ -611,8 +612,6 @@ class Config:
         if fullVersion:
             pageName += " - version " + fullVersion
         return pageName
-    def getDefaultCollectMaxAges(self):
-        return { "default" : 100000 }
     def getDefaultCollectCompulsoryVersions(self):
         return { "default" : [] }
     def setBatchDefaults(self, app):
@@ -627,7 +626,7 @@ class Config:
         app.setConfigDefault("batch_timelimit", { "default" : "" }, "Maximum length of test to include in batch mode runs")
         app.setConfigDefault("batch_filter_file", { "default" : [] }, "Generic filter for batch session, more flexible than timelimit")
         app.setConfigDefault("batch_use_collection", { "default" : "false" }, "Do we collect multiple mails into one in batch mode")
-        app.setConfigDefault("batch_collect_max_age_days", self.getDefaultCollectMaxAges(), "When collecting multiple messages, what is the maximum age of run that we should accept?")
+        app.setConfigDefault("batch_collect_max_age_days", { "default" : 100000 }, "When collecting multiple messages, what is the maximum age of run that we should accept?")
         app.setConfigDefault("batch_collect_compulsory_version", self.getDefaultCollectCompulsoryVersions(), "When collecting multiple messages, which versions should be expected and give an error if not present?")
         app.setConfigDefault("batch_mail_on_failure_only", { "default" : "false" }, "Send mails only if at least one test fails")
         app.setConfigDefault("batch_use_version_filtering", { "default" : "false" }, "Which batch sessions use the version filtering mechanism")

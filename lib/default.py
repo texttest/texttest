@@ -361,7 +361,7 @@ class Config:
             return self.filterFileMap[app]
         names = []
         if self.optionMap.has_key("f"):
-            names.append(self.optionMap["f"])
+            names += plugins.commasplit(self.optionMap["f"])
         names += app.getConfigValue("default_filter_file")
         if self.batchMode():
             names += app.getCompositeConfigValue("batch_filter_file", self.optionMap["b"])
@@ -375,7 +375,13 @@ class Config:
         else:
             filters = self.getFiltersFromMap(options, app)
             if options.has_key("f"):
-                filters += self.getFiltersFromFile(app, options.get("f"))
+                for fileName in plugins.commasplit(options.get("f")):
+                    absName = self.getAbsoluteFilterFileName(fileName, app)
+                    if absName:
+                        nameToUse = absName
+                    else:
+                        nameToUse = fileName
+                    filters += self.getFiltersFromFile(app, nameToUse)
         return filters
         
     def getFiltersFromFile(self, app, filename):        
@@ -384,7 +390,7 @@ class Config:
 
         fileData = ",".join(plugins.readList(filename))
         optionFinder = plugins.OptionFinder(fileData.split(), defaultKey="t")
-        return self.getFiltersFromMap(optionFinder, app)
+        return self.getFilterList(app, optionFinder)
     
     def getFiltersFromMap(self, optionMap, app):
         filters = []

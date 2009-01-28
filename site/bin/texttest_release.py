@@ -102,10 +102,11 @@ if __name__ == "__main__":
     createSource(actualRoot)
     createTests(os.path.join(actualRoot, "tests", "texttest"))
     
-    zipName = actualRoot + ".zip"
+    os.chdir(rootDir)
+    zipName = reldir + ".zip"
     if os.path.isfile(zipName):
         os.remove(zipName)
     print "Creating zip file", zipName
-    os.system("zip -r " + zipName + " " + actualRoot)
+    os.system("zip -r " + zipName + " " + reldir)
     if not leaveDir:
-        shutil.rmtree(actualRoot)
+        shutil.rmtree(reldir)

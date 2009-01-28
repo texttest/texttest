@@ -4,8 +4,8 @@
 # plenty of people use CVS at Jeppesen, best to ignore it in data
 test_data_ignore:CVS
 
-# roughly number of R&D Linux machines, with a bit extra for luck
-queue_system_max_capacity:70 
+# roughly number of R&D Linux RHEL5 machines open to everyone, with a bit extra for luck
+queue_system_max_capacity:60 
 
 [bug_system_location]
 bugzilla:http://bugzilla.carmen.se

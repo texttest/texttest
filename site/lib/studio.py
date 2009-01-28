@@ -110,11 +110,13 @@ class ExtractPerformanceFiles(sandbox.ExtractPerformanceFiles):
             if not line.startswith("cslDispatcher"):
                 continue
             if line.find("returnvalue") != -1:
-                print "line=",line
-                cpuTime = int(line.split()[-2])
-                realTime = int(line.split()[-6])
-                if currOperations[-1]:
-                    values.append( (cpuTime, realTime) )
+                try:
+                    cpuTime = int(line.split()[-2])
+                    realTime = int(line.split()[-6])
+                    if currOperations[-1]:
+                        values.append( (cpuTime, realTime) )
+                except ValueError: # don't throw if the numbers don't appear where we expect them, just go on to the next one
+                    pass
                 del currOperations[-1]
             elif line.find(entryFinder) == -1:
                 currOperations.append("")

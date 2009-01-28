@@ -42,11 +42,12 @@ def getDisplayText(tag):
         return tag
 
 class GenerateWebPages(object):
-    def __init__(self, pageTitle, pageVersion, pageDir, extraVersions, colourDict):
+    def __init__(self, pageTitle, pageVersion, pageDir, extraVersions, colourDict, buildAllPage):
         self.pageTitle = pageTitle
         self.pageVersion = pageVersion
         self.extraVersions = extraVersions
         self.pageDir = pageDir
+        self.buildAllPage = buildAllPage
         self.pagesOverview = seqdict()
         self.pagesDetails = seqdict()
         self.diag = plugins.getDiagnostics("GenerateWebPages")
@@ -55,7 +56,10 @@ class GenerateWebPages(object):
         # Hook for configurations to inherit from
         return TestTable()
     def getSelectorClasses(self):
-        return [ SelectorLast6Days ]
+        if self.buildAllPage:
+            return [ SelectorLast6Days, SelectorAll ]
+        else:
+            return [ SelectorLast6Days ]
     def generate(self, repositoryDirs):            
         foundMinorVersions = HTMLgen.Container()
         details = TestDetails()
@@ -65,11 +69,11 @@ class GenerateWebPages(object):
             allFiles, tags = self.findTestStateFilesAndTags(repositoryDir)
             if len(allFiles) > 0:
                 selectors = [ cls(tags) for cls in self.getSelectorClasses() ]
-                monthSelectors = SelectorByMonth.makeInstances(tags)
+                monthSelectors = SelectorByMonth.makeInstances(tags, self.buildAllPage)
                 allMonthSelectors.update(monthSelectors)
                 allSelectors = selectors + list(reversed(monthSelectors))
                 # If we already have month pages, we only regenerate the current one
-                if len(self.getExistingMonthPages()) == 0:
+                if self.buildAllPage or len(self.getExistingMonthPages()) == 0:
                     selectors = allSelectors
                 else:
                     selectors.append(monthSelectors[-1])
@@ -101,7 +105,8 @@ class GenerateWebPages(object):
             monthContainer.append(HTMLgen.Href(target, linkName))
             
         for page in self.pagesOverview.values():
-            page.prepend(HTMLgen.Heading(2, monthContainer, align = 'center'))
+            if len(monthContainer.contents) > 0:
+                page.prepend(HTMLgen.Heading(2, monthContainer, align = 'center'))
             page.prepend(HTMLgen.Heading(2, selContainer, align = 'center'))
             page.prepend(HTMLgen.Heading(1, foundMinorVersions, align = 'center'))
             page.prepend(HTMLgen.Heading(1, "Test results for ", self.pageTitle, align = 'center'))
@@ -461,9 +466,17 @@ class SelectorLast6Days(Selector):
     def linkName(self):
         return "Last six days"
 
+class SelectorAll(Selector):
+    def linkName(self):
+        return "All"
+    def getFileNameExtension(self):
+        return "_all"
+
 class SelectorByMonth(Selector):
     @classmethod
-    def makeInstances(cls, tags):
+    def makeInstances(cls, tags, buildAllPage):
+        if buildAllPage:
+            return [] # Don't do the months if we build an All page currently...
         allSelectors = {}
         for tag in tags:
             month = tag[2:9]

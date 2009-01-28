@@ -550,8 +550,10 @@ class WebPageResponder(respond.Responder):
 
     def generateWebPages(self, pageDir, app, extraVersions, relevantSubDirs, pageTitle):
         webPageGeneratorClass = app.getWebPageGeneratorClass()
+        colourDict = app.getConfigValue("testoverview_colours")
+        buildAllPage = app.getCompositeConfigValue("historical_report_all_page", self.batchSession) == "true"
         generator = webPageGeneratorClass(pageTitle, getVersionName(app), pageDir,
-                                          extraVersions, app.getConfigValue("testoverview_colours"))
+                                          extraVersions, colourDict, buildAllPage)
         generator.generate(relevantSubDirs)
 
     def findRelevantSubdirectories(self, repository, app, extraVersions):

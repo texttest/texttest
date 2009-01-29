@@ -1201,7 +1201,7 @@ class ActionDialogGUI(OptionGroupGUI):
 
     def getFilterFileDirs(self, allApps):
         if len(allApps) > 0:
-            return allApps[0].getFilterFileDirectories(allApps, createDirs=False)
+            return allApps[0].getFilterFileDirectories(allApps, useOwnTmpDir=True)
         else:
             return []
         

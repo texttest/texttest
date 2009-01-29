@@ -30,7 +30,7 @@ class Config:
                 group.addOption("t", "Test names containing", description="Select tests for which the name matches the entered text. The text can be a regular expression.")
                 group.addOption("ts", "Suite names containing", description="Select tests for which at least one parent suite name matches the entered text. The text can be a regular expression.")
                 group.addOption("a", "App names containing", description="Select tests for which the application name matches the entered text. The text can be a regular expression.")
-                possibleDirs = self.getFilterFileDirectories(apps, createDirs=False)
+                possibleDirs = self.getFilterFileDirectories(apps, useOwnTmpDir=True)
                 group.addOption("f", "Tests listed in file", possibleDirs=possibleDirs, selectFile=True)
                 group.addOption("desc", "Descriptions containing", description="Select tests for which the description (comment) matches the entered text. The text can be a regular expression.")
                 group.addOption("grep", "Test-files containing")
@@ -293,7 +293,7 @@ class Config:
         return self.hasAutomaticCputimeChecking(app)
     def hasAutomaticCputimeChecking(self, app):
         return len(app.getCompositeConfigValue("performance_test_machine", "cputime")) > 0
-    def getFilterFileDirectories(self, apps, createDirs = True):
+    def getFilterFileDirectories(self, apps, useOwnTmpDir):
         # 
         # - For each application, collect
         #   - temporary filter dir
@@ -305,34 +305,25 @@ class Config:
         dirs = []
         for app in apps:
             appDirs = app.getConfigValue("test_list_files_directory")
-            tmpDir = self.getTmpFilterDir(app)
-            if not tmpDir in dirs:
-                if createDirs:
-                    try:
-                        os.makedirs(tmpDir)
-                    except:
-                        pass # makedir throws if dir exists ...
-                dirs.append(tmpDir)            
+            tmpDir = self.getTmpFilterDir(app, useOwnTmpDir)
+            if tmpDir and tmpDir not in dirs:
+                dirs.append(tmpDir)
+
             for dir in appDirs:
                 if os.path.isabs(dir) and os.path.isdir(dir):
                     if dir not in dirs:
                         dirs.append(dir)
                 else:
                     newDir = os.path.join(app.getDirectory(), dir)
-                    if createDirs:
-                        try:
-                            os.makedirs(newDir)
-                        except:
-                            pass # makedir throws if dir exists ...
                     if not newDir in dirs:
                         dirs.append(newDir)
         return dirs
 
-    def getTmpFilterDir(self, app):
+    def getTmpFilterDir(self, app, useOwnTmpDir):
         cmdLineDir = self.optionValue("fd")
         if cmdLineDir:
             return os.path.normpath(cmdLineDir)
-        else:
+        elif useOwnTmpDir:
             return os.path.join(app.writeDirectory, "temporary_filter_files")
         
     def getFilterClasses(self):
@@ -340,57 +331,54 @@ class Config:
                  TestSuiteFilter, TimeFilter, \
                  plugins.ApplicationFilter, TestDescriptionFilter ]
     def checkFilterFileSanity(self, app):
-        # Turn any input relative files into absolute ones, throw if we can't
-        for filterFileName in self.findFilterFileNames(app):
-            absName = self.getAbsoluteFilterFileName(filterFileName, app)
-            if absName:
-                self.filterFileMap.setdefault(app, []).append(absName)
-            else:
-                raise plugins.TextTestError, "filter file '" + filterFileName + "' could not be found."
-        
+        # This will cache all the filter set-up from the input, and throw if it can't.
+        # This is basically because we don't want to throw in a thread when we actually need the filters
+        # if they aren't sensible for some reason
+        self.getFilterList(app)
+            
     def getAbsoluteFilterFileName(self, filterFileName, app):
         if os.path.isabs(filterFileName):
             if os.path.isfile(filterFileName):
                 return filterFileName
+            else:
+                raise plugins.TextTestError, "Could not find filter file at '" + filterFileName + "'"
         else:
-            dirsToSearchIn = self.getFilterFileDirectories([app], False)
-            return app.getFileName(dirsToSearchIn, filterFileName)
+            dirsToSearchIn = self.getFilterFileDirectories([app], useOwnTmpDir=False)
+            absName = app.getFileName(dirsToSearchIn, filterFileName)
+            if absName:
+                return absName
+            else:
+                raise plugins.TextTestError, "No filter file named '" + filterFileName + "' found in :\n" + \
+                      "\n".join(dirsToSearchIn)
              
-    def findFilterFileNames(self, app):
-        if self.filterFileMap.has_key(app):
-            return self.filterFileMap[app]
+    def findFilterFileNames(self, app, options, includeConfig):
         names = []
-        if self.optionMap.has_key("f"):
-            names += plugins.commasplit(self.optionMap["f"])
-        names += app.getConfigValue("default_filter_file")
-        if self.batchMode():
-            names += app.getCompositeConfigValue("batch_filter_file", self.optionMap["b"])
+        if options.has_key("f"):
+            names += plugins.commasplit(options["f"])
+
+        if includeConfig:
+            names += app.getConfigValue("default_filter_file")
+            if self.batchMode():
+                names += app.getCompositeConfigValue("batch_filter_file", self.optionMap["b"])
         return names
 
     def getFilterList(self, app, options=None):
         if options is None:
-            filters = self.getFiltersFromMap(self.optionMap, app)
-            for filterFileName in self.findFilterFileNames(app):
-                filters += self.getFiltersFromFile(app, filterFileName)
+            return self.filterFileMap.setdefault(app, self._getFilterList(app, self.optionMap, includeConfig=True))
         else:
-            filters = self.getFiltersFromMap(options, app)
-            if options.has_key("f"):
-                for fileName in plugins.commasplit(options.get("f")):
-                    absName = self.getAbsoluteFilterFileName(fileName, app)
-                    if absName:
-                        nameToUse = absName
-                    else:
-                        nameToUse = fileName
-                    filters += self.getFiltersFromFile(app, nameToUse)
+            return self._getFilterList(app, options, includeConfig=False)
+        
+    def _getFilterList(self, app, options, includeConfig):
+        filters = self.getFiltersFromMap(options, app)
+        for filterFileName in self.findFilterFileNames(app, options, includeConfig):
+            absName = self.getAbsoluteFilterFileName(filterFileName, app)
+            filters += self.getFiltersFromFile(app, absName)
         return filters
         
     def getFiltersFromFile(self, app, filename):        
-        if not os.path.isfile(filename):
-            raise plugins.TextTestError, "\nCould not find filter file at '" + filename + "'"
-
         fileData = ",".join(plugins.readList(filename))
         optionFinder = plugins.OptionFinder(fileData.split(), defaultKey="t")
-        return self.getFilterList(app, optionFinder)
+        return self._getFilterList(app, optionFinder, includeConfig=False)
     
     def getFiltersFromMap(self, optionMap, app):
         filters = []
@@ -406,6 +394,7 @@ class Config:
         if optionMap.has_key("grep"):
             filters.append(GrepFilter(optionMap["grep"], self.getGrepFile(optionMap, app)))
         return filters
+
     def getGrepFile(self, optionMap, app):
         if optionMap.has_key("grepfile"):
             return optionMap["grepfile"]

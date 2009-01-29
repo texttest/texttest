@@ -1093,7 +1093,7 @@ class ConfigurationCall:
     def __call__(self, *args, **kwargs):
         try:
             return self.targetCall(*args, **kwargs)
-        except TypeError:
+        except (TypeError, AttributeError):
             if self.firstAttemptException:
                 self.raiseException()
             else:

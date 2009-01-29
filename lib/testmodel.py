@@ -1282,6 +1282,7 @@ class Application:
         if os.path.isabs(fileName):
             return fileName
         dirCacheNames = self.getCompositeConfigValue("extra_search_directory", fileName)
+        dirCacheNames.reverse() # lowest-priority comes first, so it can be overridden
         dirCacheNames.append(".") # pick up the root directory
         dirCaches = self.getExtraDirCaches(dirCacheNames)
         dirCaches.append(self.dircache)

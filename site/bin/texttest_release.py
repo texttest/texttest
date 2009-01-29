@@ -32,36 +32,10 @@ def exportFromBzr(dest):
     exportDir("TextTest/tests", "tests/texttest", dest)
     exportDir("PyUseCase/source", "PyUseCase", dest)
         
-def pruneFilesWithExtensions(dir, extensions):
-    for fileName in os.listdir(dir):
-        fullPath = os.path.join(dir, fileName)
-        if os.path.isdir(fullPath):
-            pruneFilesWithExtensions(fullPath, extensions)
-        else:
-            extension = fileName.split(".")[-1]
-            if extension in extensions:
-                print "Removing", fullPath
-                os.remove(fullPath)
-
-def updateConfigFile(configFile):
-    newFileName = configFile + ".new"
-    newFile = open(newFileName, "w")
-    writeSection = False
-    for line in open(configFile).xreadlines():
-        if line.startswith("## ==="):
-            writeSection = not writeSection
-        elif writeSection:
-            newFile.write(line)
-    newFile.close()
-    os.rename(newFileName, configFile)
-
 def createTests(testDir):
-    updateConfigFile(os.path.join(testDir, "config.texttest"))
-    fullName = os.path.join(testDir, "carmen")
+    fullName = os.path.join(testDir, "site")
     print "Removing", fullName
     shutil.rmtree(fullName)
-    extensions = [ "x86_64_solaris", "parisc_2_0", "powerpc", "sparc", "nonlinux", "carmen", "rhel4", "cover" ]
-    pruneFilesWithExtensions(testDir, extensions)
 
 def mergePyUseCase(reldir):    
     for fileName in glob(os.path.join(reldir, "PyUseCase/*.py")):

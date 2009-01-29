@@ -68,6 +68,9 @@ class Config:
                 group.addSwitch("con", "use console interface")
                 group.addSwitch("coll", "Collect results for batch mode session")
                 group.addOption("tp", "Private: Tests with exact path") # use for internal communication
+                group.addOption("finverse", "Tests not listed in file")
+                group.addOption("fintersect", "Tests in all files")
+                group.addOption("funion", "Tests in any of files")
                 group.addOption("fd", "Private: Directory to search for filter files in")
                 group.addOption("count", "Private: How many tests we believe there will be")
                 group.addOption("name", "Batch run not identified by date, but by name")
@@ -350,16 +353,19 @@ class Config:
             else:
                 raise plugins.TextTestError, "No filter file named '" + filterFileName + "' found in :\n" + \
                       "\n".join(dirsToSearchIn)
-             
-    def findFilterFileNames(self, app, options, includeConfig):
-        names = []
-        if options.has_key("f"):
-            names += plugins.commasplit(options["f"])
 
+    def optionListValue(self, options, key):
+        if options.has_key(key):
+            return plugins.commasplit(options[key])
+        else:
+            return []
+
+    def findFilterFileNames(self, app, options, includeConfig):
+        names = self.optionListValue(options, "f") + self.optionListValue(options, "fintersect")
         if includeConfig:
             names += app.getConfigValue("default_filter_file")
             if self.batchMode():
-                names += app.getCompositeConfigValue("batch_filter_file", self.optionMap["b"])
+                names += app.getCompositeConfigValue("batch_filter_file", options["b"])
         return names
 
     def getFilterList(self, app, options=None):
@@ -371,12 +377,22 @@ class Config:
     def _getFilterList(self, app, options, includeConfig):
         filters = self.getFiltersFromMap(options, app)
         for filterFileName in self.findFilterFileNames(app, options, includeConfig):
-            absName = self.getAbsoluteFilterFileName(filterFileName, app)
-            filters += self.getFiltersFromFile(app, absName)
+            filters += self.getFiltersFromFile(app, filterFileName)
+
+        orFilterFiles = self.optionListValue(options, "funion")
+        if len(orFilterFiles) > 0:
+            orFilterLists = [ self.getFiltersFromFile(app, f) for f in orFilterFiles ]
+            filters.append(OrFilter(orFilterLists))
+
+        notFilterFile = options.get("finverse")
+        if notFilterFile:
+            filters.append(NotFilter(self.getFiltersFromFile(app, notFilterFile)))
+
         return filters
         
     def getFiltersFromFile(self, app, filename):        
-        fileData = ",".join(plugins.readList(filename))
+        absName = self.getAbsoluteFilterFileName(filename, app)
+        fileData = ",".join(plugins.readList(absName))
         optionFinder = plugins.OptionFinder(fileData.split(), defaultKey="t")
         return self._getFilterList(app, optionFinder, includeConfig=False)
     
@@ -778,6 +794,26 @@ class Config:
         self.setUsecaseDefaults(app)
         if not plugins.TestState.showExecHosts:
             plugins.TestState.showExecHosts = self.showExecHostsInFailures()
+
+class OrFilter(plugins.Filter):
+    def __init__(self, filterLists):
+        self.filterLists = filterLists
+    def accepts(self, test):
+        return reduce(operator.or_, (test.isAcceptedByAll(filters) for filters in self.filterLists), False)
+    def acceptsTestCase(self, test):
+        return self.accepts(test)
+    def acceptsTestSuite(self, suite):
+        return self.accepts(suite)
+    def acceptsTestSuiteContents(self, suite):
+        return reduce(operator.or_, (self.contentsAccepted(suite, filters) for filters in self.filterLists), False)
+    def contentsAccepted(self, suite, filters):
+        return reduce(operator.and_, (filter.acceptsTestSuiteContents(suite) for filter in filters), True)
+
+class NotFilter(plugins.Filter):
+    def __init__(self, filters):
+        self.filters = filters
+    def acceptsTestCase(self, test):
+        return not test.isAcceptedByAll(self.filters)
     
 class TestNameFilter(plugins.TextFilter):
     option = "t"

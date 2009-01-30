@@ -141,7 +141,7 @@ def importAndCall(moduleName, callableName, *args):
     return _callable(*args)
 
 def installationDir(name):
-    installationRoot = os.path.dirname(os.path.dirname(__file__))
+    installationRoot = os.path.dirname(os.path.dirname(__file__)).replace("\\", "/")
     return os.path.join(installationRoot, name)
 
 def installationFile(name, subdir):

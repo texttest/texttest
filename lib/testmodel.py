@@ -1141,7 +1141,7 @@ class Application:
         return self._getAllFileNames([ dircache ], "config")
         
     def setUpConfiguration(self, configEntries={}):
-        self.configDir = plugins.MultiEntryDictionary()
+        self.configDir = plugins.MultiEntryDictionary(importKey="import_config_file", importFileFinder=self.configPath)
         self.configDocs = {}
         self.extraDirCaches = {}
         self.setConfigDefaults()
@@ -1234,9 +1234,6 @@ class Application:
     def readConfigFiles(self, configModuleInitialised):
         if not self.inputOptions.has_key("vanilla"):
             self.readDefaultConfigFiles()
-        if not configModuleInitialised:
-            self.readExplicitConfigFiles(configModuleInitialised)
-        self.readImportedConfigFiles(configModuleInitialised)
         self.readExplicitConfigFiles(configModuleInitialised)
     def readDefaultConfigFiles(self):
         dirCache = DirectoryCache(plugins.installationDir("site/etc"))
@@ -1244,10 +1241,6 @@ class Application:
         self.readValues(self.configDir, "config", dirCache, insert=False, errorOnUnknown=False)
     def readExplicitConfigFiles(self, errorOnUnknown):
         self.readValues(self.configDir, "config", self.dircache, insert=False, errorOnUnknown=errorOnUnknown)
-    def readImportedConfigFiles(self, configModuleInitialised):
-        importedFiles = self.getConfigFilesToImport()
-        self.diag.info("Reading imported config values from files : " + "\n".join(importedFiles))
-        self.configDir.readValues(importedFiles, insert=False, errorOnUnknown=configModuleInitialised)
     def readValues(self, multiEntryDict, stem, dircache, insert=True, errorOnUnknown=False):
         allFiles = self._getAllFileNames([ dircache ], stem)
         self.diag.info("Reading values for " + stem + " from files : " + "\n".join(allFiles))
@@ -1276,8 +1269,6 @@ class Application:
         envVars = envDir.items()
         self.envFiles[envFile] = envVars
         return envVars
-    def getConfigFilesToImport(self):
-        return map(self.configPath, self.getConfigValue("import_config_file"))
     def configPath(self, fileName):
         if os.path.isabs(fileName):
             return fileName

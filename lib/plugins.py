@@ -958,21 +958,30 @@ class TextTrigger:
 
 # Used for application and personal configuration files
 class MultiEntryDictionary(seqdict):
-    def __init__(self):
+    def __init__(self, importKey="", importFileFinder=None):
         seqdict.__init__(self)
         self.currDict = self
         self.aliases = {}
+        self.importKey = importKey
+        self.importFileFinder= importFileFinder
+        
     def setAlias(self, aliasName, realName):
         self.aliases[aliasName] = realName
+
     def getEntryName(self, fromConfig):
         return self.aliases.get(fromConfig, fromConfig)
-    def readValues(self, fileNames, insert=True, errorOnUnknown=False):
+
+    def readValues(self, fileNames, *args, **kwargs):
         self.currDict = self
         for filename in fileNames:
-            for line in readList(filename):
-                self.parseConfigLine(line, insert, errorOnUnknown)
-            self.currDict = self
-    def parseConfigLine(self, line, insert, errorOnUnknown):
+            self.readFromFile(filename, *args, **kwargs)
+
+    def readFromFile(self, filename, *args, **kwargs):
+        for line in readList(filename):
+            self.parseConfigLine(line, *args, **kwargs)
+        self.currDict = self
+
+    def parseConfigLine(self, line, insert=True, errorOnUnknown=False):
         if line.startswith("[") and line.endswith("]"):
             sectionName = self.getEntryName(line[1:-1])
             self.currDict = self.changeSectionMarker(sectionName, errorOnUnknown)
@@ -980,8 +989,11 @@ class MultiEntryDictionary(seqdict):
             key, value = line.split(":", 1)
             entryName = self.getEntryName(os.path.expandvars(key))
             self.addEntry(entryName, value, "", insert, errorOnUnknown)
+            if key and key == self.importKey:
+                self.readFromFile(self.importFileFinder(os.path.expandvars(value)))
         else:
             printWarning("Could not parse config line " + line, stdout = False, stderr = True)
+            
     def changeSectionMarker(self, name, errorOnUnknown):
         if name == "end":
             return self

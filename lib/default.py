@@ -1108,10 +1108,17 @@ class DocumentOptions(plugins.Action):
         return "-" + key + " " + filledPart
 
 class DocumentConfig(plugins.Action):
+    def __init__(self, args=[]):
+        self.onlyEntries = args
+
+    def getEntriesToUse(self, app):
+        if len(self.onlyEntries) > 0:
+            return self.onlyEntries
+        else:
+            return sorted(app.configDir.keys() + app.configDir.aliases.keys())
+        
     def setUpApplication(self, app):
-        entries = app.configDir.keys() + app.configDir.aliases.keys()
-        entries.sort()
-        for key in entries:
+        for key in self.getEntriesToUse(app):
             realKey = app.configDir.aliases.get(key, key)
             if realKey == key:
                 docOutput = app.configDocs[realKey]

@@ -353,7 +353,7 @@ class SlaveServerResponder(Responder, TCPServer):
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, True)
         # Default value of 5 isn't very much...
         # There doesn't seem to be any disadvantage of allowing a longer queue, so we will increase it by a lot...
-        self.request_queue_size = 50
+        self.request_queue_size = 500
         
     def addSuites(self, *args):
         # use this as an opportunity to broadcast our address

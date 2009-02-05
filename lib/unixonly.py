@@ -118,7 +118,7 @@ class VirtualDisplayResponder(Responder):
             return [ "rsh", machine, remotePython + " -u " + fullPath + " " + logDir ]
 
     def findRemotePython(self):
-        binDir = plugins.installationDir("bin")
+        binDir = os.path.join(plugins.installationDir("site"),"bin")
         # In case it isn't the default, allow for a ttpython script in the installation
         localPointer = os.path.join(binDir, "ttpython")
         if os.path.isfile(localPointer):

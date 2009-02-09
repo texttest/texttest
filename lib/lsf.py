@@ -99,9 +99,10 @@ class MachineInfo:
         jobs = []
         for line in os.popen("bjobs -m " + machine + " -u all -w 2>&1 | grep RUN").xreadlines():
             fields = line.split()
+            jobId = fields[0]
             user = fields[1]
             jobName = fields[6]
-            jobs.append((user, jobName))
+            jobs.append((user, jobId, jobName))
         return jobs
 
 # Interpret what the limit signals mean...

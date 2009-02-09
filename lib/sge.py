@@ -103,16 +103,21 @@ class MachineInfo:
         return machines
     def findRunningJobs(self, machine):
         jobs = []
-        user = ""
-        for line in os.popen("qstat -r -s r -l hostname='" + machine + "'").xreadlines():
+        user, jobId = "", ""
+        myJobId = os.path.basename(os.getenv("SGE_JOB_SPOOL_DIR", "")).split(".")[0]
+        for line in os.popen("qstat -r -s r -u '*' -l hostname='" + machine + "'").xreadlines():
             if line.startswith("job") or line.startswith("----"):
                 continue
             if line[0] in string.digits:
                 fields = line.split()
-                user = fields[-6]
-            elif line.find("Full jobname") != -1:
+                if fields[0] != myJobId:
+                    user = fields[-6]
+                    jobId = fields[0]
+                else:
+                    user, jobId = "", ""
+            elif jobId and line.find("Full jobname") != -1:
                 jobName = line.split(":")[-1].strip()
-                jobs.append((user, jobName))
+                jobs.append((user, jobId, jobName))
         return jobs
 
 # Interpret what the limit signals mean...

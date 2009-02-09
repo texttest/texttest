@@ -905,6 +905,6 @@ class MachineInfoFinder(sandbox.MachineInfoFinder):
         # for himself if performance is likely to be affected...
         jobsFromQueue = self.queueMachineInfo.findRunningJobs(machine)
         jobs = []
-        for user, jobName in jobsFromQueue:
-            jobs.append("Also on " + machine + " : " + user + "'s job '" + jobName + "'")
+        for user, jobId, jobName in jobsFromQueue:
+            jobs.append("Also on " + machine + " : " + user + "'s job " + jobId + " '" + jobName + "'")
         return jobs    

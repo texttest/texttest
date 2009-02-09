@@ -267,8 +267,8 @@ class Config:
         return plugins.startTimeString().replace(":", "")
     def getDescriptors(self, key):
         givenVersion = self.optionValue(key)
-        if givenVersion and givenVersion.find(",") == -1:
-            return [ givenVersion ]
+        if givenVersion:
+            return [ givenVersion.replace(",", "_AND_") ]
         else:
             return []
     def addGuiResponder(self, classes):

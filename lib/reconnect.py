@@ -1,5 +1,5 @@
 
-import os, shutil, plugins
+import os, shutil, plugins, operator
 from glob import glob
 from sets import ImmutableSet, Set
 from itertools import groupby
@@ -70,9 +70,12 @@ class ReconnectConfig:
             return self.getVersionsFromDirs(app, runDirs)
 
     def versionsCorrect(self, app, dirName):
-        versionSet = self.getVersionSetTopDir(dirName)
-        self.diag.info("Directory has versions " + repr(versionSet))   
-        return versionSet is not None and ImmutableSet(app.versions).issubset(versionSet)
+        versionSets = self.getVersionSetsTopDir(dirName)
+        self.diag.info("Directory has version sets " + repr(versionSets))
+        if versionSets is None:
+            return False
+        appVersionSet = ImmutableSet(app.versions)
+        return reduce(operator.or_, (appVersionSet.issubset(s) for s in versionSets), False)
     
     def findAppDirUnder(self, app, runDir):
         # Don't pay attention to dated versions here...
@@ -96,18 +99,19 @@ class ReconnectConfig:
         else:
             return len(glob(appDirRoot + ".*")) > 0
 
-    def getVersionsTopDir(self, fileName):
+    def getVersionListsTopDir(self, fileName):
         # Show the framework how to find the version list given a file name
         # If it doesn't match, return None
         parts = os.path.basename(fileName).split(".")
         if len(parts) > 2 and parts[0] != "static_gui":
             # drop the run descriptor at the start and the date/time and pid at the end
-            return parts[1:-2]
+            versionParts = ".".join(parts[1:-2]).split("_AND_")
+            return [ part.split(".") for part in versionParts ]
             
-    def getVersionSetTopDir(self, fileName):
-        versions = self.getVersionsTopDir(fileName)
-        if versions is not None:
-            return ImmutableSet(versions)
+    def getVersionSetsTopDir(self, fileName):
+        vlists = self.getVersionListsTopDir(fileName)
+        if vlists is not None:
+            return [ ImmutableSet(vlist) for vlist in vlists ]
         
     def getVersionSetSubDir(self, fileName, stem):
         # Show the framework how to find the version list given a file name
@@ -120,30 +124,31 @@ class ReconnectConfig:
     def getVersionsFromDirs(self, app, dirs):
         versions = []
         appVersions = Set(app.versions)
-        for versionList, groupDirIter in groupby(dirs, self.getVersionsTopDir):
-            extraVersion = ".".join(ImmutableSet(versionList).difference(appVersions))
-            version = ".".join(versionList)
-            groupDirs = list(groupDirIter)
-            if extraVersion:
-                if len(groupDirs) == 1:
-                    versions.append(extraVersion)
-                    self.cacheRunDir(app, groupDirs[0], version)
+        for versionLists, groupDirIter in groupby(dirs, self.getVersionListsTopDir):
+            for versionList in versionLists:
+                extraVersion = ".".join(ImmutableSet(versionList).difference(appVersions))
+                version = ".".join(versionList)
+                groupDirs = list(groupDirIter)
+                if extraVersion:
+                    if len(groupDirs) == 1:
+                        versions.append(extraVersion)
+                        self.cacheRunDir(app, groupDirs[0], version)
+                    else:
+                        for dir in groupDirs:
+                            datedVersion = os.path.basename(dir).split(".")[-2]
+                            self.datedVersions.add(datedVersion)
+                            versions.append(extraVersion + "." + datedVersion)
+                            self.cacheRunDir(app, dir, version + "." + datedVersion)
                 else:
-                    for dir in groupDirs:
+                    self.cacheRunDir(app, groupDirs[0])
+                    for dir in groupDirs[1:]:
                         datedVersion = os.path.basename(dir).split(".")[-2]
                         self.datedVersions.add(datedVersion)
-                        versions.append(extraVersion + "." + datedVersion)
-                        self.cacheRunDir(app, dir, version + "." + datedVersion)
-            else:
-                self.cacheRunDir(app, groupDirs[0])
-                for dir in groupDirs[1:]:
-                    datedVersion = os.path.basename(dir).split(".")[-2]
-                    self.datedVersions.add(datedVersion)
-                    versions.append(datedVersion)
-                    if version:
-                        self.cacheRunDir(app, dir, version + "." + datedVersion)
-                    else:
-                        self.cacheRunDir(app, dir, datedVersion)
+                        versions.append(datedVersion)
+                        if version:
+                            self.cacheRunDir(app, dir, version + "." + datedVersion)
+                        else:
+                            self.cacheRunDir(app, dir, datedVersion)
         versions.sort()
         return versions
 

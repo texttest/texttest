@@ -1121,7 +1121,7 @@ class DocumentConfig(plugins.Action):
         for key in self.getEntriesToUse(app):
             realKey = app.configDir.aliases.get(key, key)
             if realKey == key:
-                docOutput = app.configDocs[realKey]
+                docOutput = app.configDocs.get(realKey, "NO DOCS PROVIDED")
             else:
                 docOutput = "Alias. See entry for '" + realKey + "'"
             if not docOutput.startswith("Private"):

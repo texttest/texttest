@@ -1,6 +1,6 @@
 
 import os, string, subprocess
-from plugins import getDiagnostics, localtime
+from plugins import getDiagnostics, localtime, gethostname
 from time import sleep
 
 # Used by master process for submitting, deleting and monitoring slave jobs
@@ -126,7 +126,6 @@ def getUserSignalKillInfo(userSignalNumber, explicitKillMethod):
 def getExecutionMachines():
     hostFile = os.getenv("PE_HOSTFILE")
     if not hostFile or not os.path.isfile(hostFile):
-        from socket import gethostname
         return [ gethostname() ]
     hostlines = open(hostFile).readlines()
     hostlist = []

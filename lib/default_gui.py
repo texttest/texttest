@@ -6,7 +6,6 @@ from threading import Thread
 from glob import glob
 from stat import *
 from ndict import seqdict
-from socket import gethostname
 from log4py import LOGLEVEL_NORMAL
 try:
     import gtk, helpdialogs
@@ -324,16 +323,16 @@ class FileViewAction(guiplugins.ActionGUI):
             state = self.currTestSelection[0].state
             if hasattr(state, "executionHosts") and len(state.executionHosts) > 0:
                 remoteHost = state.executionHosts[0]
-                localhost = gethostname()
+                localhost = plugins.gethostname()
                 if remoteHost != localhost:
                     return remoteHost
 
     def getFullDisplay(self):
         display = os.getenv("DISPLAY", "")
         if display.startswith(":"):
-            return gethostname() + display
+            return plugins.gethostname() + display
         else:
-            return display.replace("localhost", gethostname())
+            return display.replace("localhost", plugins.gethostname())
 
     def getSignalsSent(self):
         return [ "ViewerStarted" ]

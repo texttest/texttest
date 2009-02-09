@@ -1,7 +1,6 @@
 import os, shutil, plugins, re, stat, subprocess, glob, types
 
 from jobprocess import killArbitaryProcess
-from socket import gethostname
 from ndict import seqdict
 
 class MakeWriteDirectory(plugins.Action):
@@ -465,7 +464,7 @@ class FindExecutionHosts(plugins.Action):
     def __call__(self, test):
         test.state.executionHosts = self.getExecutionMachines(test)
     def getExecutionMachines(self, test):
-        return [ gethostname() ]
+        return [ plugins.gethostname() ]
 
 class CreateCatalogue(plugins.Action):
     def __init__(self):

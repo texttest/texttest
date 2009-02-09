@@ -596,7 +596,7 @@ class QueueSystemServer(BaseActionRunner):
         # Must make sure SGE jobs don't get a locally referencing DISPLAY
         display = env.get("DISPLAY")
         if display and display.startswith(":"):
-            env["DISPLAY"] = socket.gethostname() + display
+            env["DISPLAY"] = plugins.gethostname() + display
 
     def getPendingState(self, test):
         freeText = "Job pending in " + queueSystemName(test.app)

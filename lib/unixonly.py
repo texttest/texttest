@@ -2,7 +2,6 @@
 
 import default, plugins, os, sys, subprocess, signal
 from respond import Responder
-from socket import gethostname
         
 # Unlike earlier incarnations of this functionality,
 # we don't rely on sharing displays but create our own for each test run.

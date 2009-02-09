@@ -1,5 +1,5 @@
 
-import sys, os, log4py, string, shutil, time, re, stat, locale, subprocess, shlex, types
+import sys, os, log4py, string, shutil, socket, time, re, stat, locale, subprocess, shlex, types
 from ndict import seqdict
 from traceback import format_exception
 from threading import currentThread
@@ -645,6 +645,11 @@ def getPersonalConfigDir():
         return fromEnv
     else:
         return os.path.normpath(os.path.expanduser("~/.texttest"))
+
+# Return the hostname, guaranteed to be just the hostname...
+def gethostname():
+    fullname = socket.gethostname()
+    return fullname.split(".")[0]
 
 # Hacking around os.path.getcwd not working with AMD automounter
 def abspath(relpath):

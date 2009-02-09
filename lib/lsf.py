@@ -117,5 +117,5 @@ def getExecutionMachines():
         hosts = os.environ["LSB_HOSTS"].split()
         return [ host.split(".")[0] for host in hosts ]
     else:
-        from socket import gethostname
+        from plugins import gethostname
         return [ gethostname() ]

@@ -1,4 +1,4 @@
-#!/usr/bin/env /usr/local/share/texttest/bin/ttpython
+#!/usr/bin/env /usr/local/share/texttest/site/bin/ttpython
 
 # Basic program to run a command line, and notify a remote server when it starts and ends, along
 # with its result
@@ -38,11 +38,17 @@ def sendData(*args):
             sleep(1)
     raise
 
+def runAndSend(serverAddress, prefix, cmdArgs, **kwargs):
+    proc = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
+    stdout, stderr = proc.communicate() 
+    sendData(serverAddress, prefix + "exitcode=" + str(proc.returncode) + "\n" + stdout + "|STD_ERR|" + stderr)
+
 name = sys.argv[1]
 serverAddress = getServerAddress()
 cmdArgs = sys.argv[3:]
-sendData(serverAddress, ":".join([ "remotecmd.py", name, "start" ]) + "\n")
-proc = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-stdout, stderr = proc.communicate() 
-sendData(serverAddress, ":".join([ "remotecmd.py", name, "exitcode=" + str(proc.returncode) ]) + \
-         "\n" + stdout + "|STD_ERR|" + stderr)
+prefix = "remotecmd.py:" + name + ":"
+sendData(serverAddress, prefix + "start\n")
+try:
+    runAndSend(serverAddress, prefix, cmdArgs)
+except OSError:
+    runAndSend(serverAddress, prefix, cmdArgs, shell=True) # to pick up the shell's return code and exit code

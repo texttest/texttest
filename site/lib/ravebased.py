@@ -451,9 +451,12 @@ class RuleBuildSubmitServer(QueueSystemServer):
         if test.state.category == "need_rulecompile":
             test.changeState(PendingRuleCompilation(rulecomp))
     def getFullSubmitError(self, test, errorMessage, cmdArgs):
-        qname = queueSystemName(test.app)
-        return "Failed to submit rule compilation to " + qname + " (" + errorMessage.strip() + ")\n" + \
-               "Submission command was '" + " ".join(cmdArgs[:-1]) + " ... '\n"
+        if cmdArgs[-1].find("remotecmd.py") != -1:
+            qname = queueSystemName(test.app)
+            return "Failed to submit rule compilation to " + qname + " (" + errorMessage.strip() + ")\n" + \
+                   "Submission command was '" + " ".join(cmdArgs[:-1]) + " ... '\n"
+        else:
+            return QueueSystemServer.getFullSubmitError(self, test, errorMessage, cmdArgs)
         
     def associateJobs(self, test, rulecomp):
         for ruleset in rulecomp.rulesetsFromOthers:

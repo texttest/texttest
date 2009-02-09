@@ -58,11 +58,15 @@ def getBinary(corefile):
         return binary
     dirname, local = os.path.split(binary)
     parts = local.split(".")
-    # pick up temporary binaries (Carmen-hack...)
-    if len(parts) > 2 and len(parts[0]) == 0 and parts[-2] == os.getenv("USER"):
-        return os.path.join(dirname, ".".join(parts[1:-2]))
-    else:
-        return binary
+    # pick up temporary binaries (Jeppesen-hack, should not be here...)
+    if len(parts) > 2 and len(parts[0]) == 0:
+        user = os.getenv("USER")
+        try:
+            pos = parts.index(user)
+            return os.path.join(dirname, ".".join(parts[1:pos]))
+        except ValueError:
+            pass
+    return binary
 
 def writeCmdFile():
     fileName = mktemp("coreCommands.gdb")

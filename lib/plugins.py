@@ -129,7 +129,20 @@ def localtime(format= "%d%b%H:%M:%S", seconds=None):
         seconds = time.time()
     return time.strftime(format, time.localtime(seconds))
 
+def findInstallationRoots():
+    installationRoot = os.path.dirname(os.path.dirname(__file__)).replace("\\", "/")
+    if os.path.basename(installationRoot) == "generic":
+        siteRoot = os.path.dirname(installationRoot)
+        return [ installationRoot, siteRoot ]
+    else:
+        siteDir = os.path.join(installationRoot, "site")
+        if os.path.isdir(siteDir):
+            return [ installationRoot, siteDir ]
+        else:
+            return [ installationRoot ]
+
 globalStartTime = time.time()
+installationRoots = findInstallationRoots()
 
 def startTimeString():
     global globalStartTime
@@ -141,15 +154,14 @@ def importAndCall(moduleName, callableName, *args):
     return _callable(*args)
 
 def installationDir(name):
-    installationRoot = os.path.dirname(os.path.dirname(__file__)).replace("\\", "/")
-    return os.path.join(installationRoot, name)
+    # Generic modules only, we're confident we know where they are
+    return os.path.join(installationRoots[0], name)
 
-def installationFile(name, subdir):
-    installationRoot = os.path.dirname(os.path.dirname(__file__))
-    for location in [ os.path.join("site", subdir), subdir ]:
-        instFile = os.path.join(installationRoot, location, name)
-        if os.path.isfile(instFile):
-            return instFile
+def installationPath(subpath):
+    for instRoot in installationRoots:
+        instPath = os.path.join(instRoot, subpath)
+        if os.path.exists(instPath):
+            return instPath
 
 # Parse a time string, either a HH:MM:SS string, or a single int/float,
 # which is interpreted as a number of minutes, for backwards compatibility.

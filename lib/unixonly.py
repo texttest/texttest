@@ -117,10 +117,9 @@ class VirtualDisplayResponder(Responder):
             return [ "rsh", machine, remotePython + " -u " + fullPath + " " + logDir ]
 
     def findRemotePython(self):
-        binDir = os.path.join(plugins.installationDir("site"),"bin")
         # In case it isn't the default, allow for a ttpython script in the installation
-        localPointer = os.path.join(binDir, "ttpython")
-        if os.path.isfile(localPointer):
+        localPointer = plugins.installationPath("bin/ttpython")
+        if localPointer:
             return localPointer
         else: # pragma : no cover -there is one in our local installation whether we like it or not...
             return "python"

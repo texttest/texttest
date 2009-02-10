@@ -1236,7 +1236,7 @@ class Application:
             self.readDefaultConfigFiles()
         self.readExplicitConfigFiles(configModuleInitialised)
     def readDefaultConfigFiles(self):
-        dirCache = DirectoryCache(plugins.installationDir("site/etc"))
+        dirCache = DirectoryCache(plugins.installationPath("etc"))
         # don't error check as there might be settings there for all sorts of config modules...
         self.readValues(self.configDir, "config", dirCache, insert=False, errorOnUnknown=False)
     def readExplicitConfigFiles(self, errorOnUnknown):

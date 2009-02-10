@@ -10,7 +10,10 @@ except ImportError:
 import sys, os
 
 install_root = os.path.dirname(os.path.dirname(os.path.normpath(sys.argv[0])))
-for subdir in [ "lib", "site/lib" ]:
+# We pick up the basic libraries.
+# Also accept a setup with a "site" subdirectory containing local modules,
+# or a "generic" directory containing the TextTest core with local modules in the root
+for subdir in [ "lib", "site/lib", "generic/lib" ]:
     libDir = os.path.abspath(os.path.join(install_root, subdir))
     if os.path.isdir(libDir):
         sys.path.insert(0, libDir)

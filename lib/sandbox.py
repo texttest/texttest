@@ -414,7 +414,7 @@ class CollateFiles(plugins.Action):
     def getScriptArgs(self, script):
         args = script.split()
         scriptName = args[0]
-        instScript = plugins.installationFile(scriptName, "libexec")
+        instScript = plugins.installationPath(os.path.join("libexec", scriptName))
         if instScript:
             args = [ instScript ] + args[1:]
             

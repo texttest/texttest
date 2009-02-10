@@ -4,3 +4,4 @@ lib/log4py.py
 lib/ndict.py
 lib/setup.py
 lib/usecase.py
+generic

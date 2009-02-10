@@ -2459,7 +2459,7 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
 
 class InteractiveActionConfig:
     def getMenuNames(self):
-        return [ "file", "edit", "view", "actions", "site", "reorder", "help" ]
+        return [ "file", "edit", "view", "actions", "reorder", "help" ]
 
     def getInteractiveActionClasses(self, dynamic):
         classes = [ Quit, ViewTestFileInEditor, ShowFileProperties ]

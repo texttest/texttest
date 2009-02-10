@@ -966,6 +966,7 @@ class MultiEntryDictionary(seqdict):
     def __init__(self, importKey="", importFileFinder=None):
         seqdict.__init__(self)
         self.currDict = self
+        self.diag = getDiagnostics("MultiEntryDictionary")
         self.aliases = {}
         self.importKey = importKey
         self.importFileFinder= importFileFinder
@@ -982,6 +983,7 @@ class MultiEntryDictionary(seqdict):
             self.readFromFile(filename, *args, **kwargs)
 
     def readFromFile(self, filename, *args, **kwargs):
+        self.diag.info("Reading file " + filename)
         for line in readList(filename):
             self.parseConfigLine(line, *args, **kwargs)
         self.currDict = self
@@ -995,7 +997,7 @@ class MultiEntryDictionary(seqdict):
             entryName = self.getEntryName(os.path.expandvars(key))
             self.addEntry(entryName, value, "", insert, errorOnUnknown)
             if key and key == self.importKey:
-                self.readFromFile(self.importFileFinder(os.path.expandvars(value)))
+                self.readFromFile(self.importFileFinder(os.path.expandvars(value)), insert, errorOnUnknown)
         else:
             printWarning("Could not parse config line " + line, stdout = False, stderr = True)
             
@@ -1013,9 +1015,11 @@ class MultiEntryDictionary(seqdict):
             self.currDict = self[sectionName]
         entryExists = self.currDict.has_key(entryName)
         if entryExists:
+            self.diag.info("Entry existed, setting " + entryName + "=" + entry)
             self.insertEntry(entryName, entry)
         else:
             if insert or not self.currDict is self:
+                self.diag.info("Inserting " + entryName + "=" + repr(entry))
                 self.currDict[entryName] = self.castEntry(entry)
             elif errorOnUnknown:
                 printWarning("Config entry name '" + entryName + "' not recognised.", stdout = False, stderr = True)

@@ -40,9 +40,9 @@ class FileComparison:
         self.diag.info("Setting standard file for " + self.stem + " to " + repr(standardFile))
         
     def recompute(self, test):
+        self.freeTextBody = None
         if self.needsRecalculation():
             self.recalculationTime = time.time()
-            self.freeTextBody = None
         if self.tmpFile and os.path.isfile(self.tmpFile):
             self.cacheDifferences(test, False)
 

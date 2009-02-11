@@ -763,7 +763,8 @@ class OptionGroupGUI(ActionGUI):
 
     def updateForConfig(self, option):
         fromConfig = guiConfig.getCompositeValue("gui_entry_overrides", option.name)
-        if fromConfig is not None and fromConfig != "<not set>":
+        # only do this if it hasn't previously been manually overwritten
+        if fromConfig is not None and fromConfig != "<not set>" and option.getValue() == option.defaultValue:
             option.setValue(fromConfig)
             return fromConfig
 

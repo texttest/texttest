@@ -1201,8 +1201,7 @@ class Application:
                     self.extraDirCaches[dirName] = dirCache
                     dirCaches.append(dirCache)
                 else:
-                    self.extraDirCaches[dirName] = None # don't repeat the warning
-                    plugins.printWarning("The directory '" + dirName + "' could not be found, ignoring 'extra_search_directory' config entry.")
+                    self.extraDirCaches[dirName] = None # don't look for it again
         return dirCaches
 
     def makeConfigObject(self):

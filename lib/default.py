@@ -249,10 +249,10 @@ class Config:
     def getWriteDirectory(self, app):
         return os.path.join(self.getRootTmpDir(), self.getWriteDirectoryName(app))
     def getWriteDirectoryName(self, app):
-        parts = self.getBasicRunDescriptors(app) + self.getDescriptors("v") + [ self.getTimeDescriptor(), str(os.getpid()) ]
+        parts = self.getBasicRunDescriptors(app) + self.getVersionDescriptors() + [ self.getTimeDescriptor(), str(os.getpid()) ]
         return ".".join(parts)
     def getBasicRunDescriptors(self, app):
-        appDescriptors = self.getDescriptors("a")
+        appDescriptors = self.getAppDescriptors()
         if self.useStaticGUI(app):
             return [ "static_gui" ] + appDescriptors
         elif appDescriptors:
@@ -265,10 +265,16 @@ class Config:
             return [ "console" ]
     def getTimeDescriptor(self):
         return plugins.startTimeString().replace(":", "")
-    def getDescriptors(self, key):
-        givenVersion = self.optionValue(key)
+    def getAppDescriptors(self):
+        givenAppDescriptor = self.optionValue("a")
+        if givenAppDescriptor and givenAppDescriptor.find(",") == -1:
+            return [ givenAppDescriptor ]
+        else:
+            return []
+    def getVersionDescriptors(self):
+        givenVersion = self.optionValue("v")
         if givenVersion:
-            return [ givenVersion.replace(",", "_AND_") ]
+            return [ givenVersion ]
         else:
             return []
     def addGuiResponder(self, classes):

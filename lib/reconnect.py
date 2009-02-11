@@ -105,7 +105,7 @@ class ReconnectConfig:
         parts = os.path.basename(fileName).split(".")
         if len(parts) > 2 and parts[0] != "static_gui":
             # drop the run descriptor at the start and the date/time and pid at the end
-            versionParts = ".".join(parts[1:-2]).split(",")
+            versionParts = ".".join(parts[1:-2]).split("++")
             return [ part.split(".") for part in versionParts ]
             
     def getVersionSetsTopDir(self, fileName):

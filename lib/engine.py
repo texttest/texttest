@@ -181,6 +181,8 @@ class TextTest(Responder, plugins.Observable):
         self.diag.info("Selecting apps in " + dirName + " according to dictionary :" + repr(selectedAppDict))
         dircache = testmodel.DirectoryCache(dirName)
         for f in dircache.findAllFiles("config"):
+            if not os.path.isfile(f):
+                continue # ignore broken links and directories
             components = os.path.basename(f).split('.')
             if len(components) != 2:
                 continue

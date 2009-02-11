@@ -780,12 +780,15 @@ def rmtree(dir, attempts=100):
                     time.sleep(1)
 
 def readList(filename):
-    items = []
-    for longline in open(filename).readlines():
-        line = longline.strip()
-        if len(line) > 0 and not line.startswith("#"):
-            items.append(line)
-    return items
+    try:
+        items = []
+        for longline in open(filename).readlines():
+            line = longline.strip()
+            if len(line) > 0 and not line.startswith("#"):
+                items.append(line)
+        return items
+    except IOError:
+        return [] # It could be a broken link: don't bail out if so...
 
 emptyLineSymbol = "__EMPTYLINE__"
 

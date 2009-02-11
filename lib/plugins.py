@@ -1195,8 +1195,11 @@ class TextOption(Option):
     def getDirectories(self):
         allDirs = self.getPossibleDirs()
         for dir in allDirs:
-            ensureDirectoryExists(dir)
-
+            try:
+                ensureDirectoryExists(dir)
+            except OSError: # Might not have permissions
+                allDirs.remove(dir)
+                
         return allDirs, self.findDefaultDirectory(allDirs)
 
     def findDefaultDirectory(self, allDirs):

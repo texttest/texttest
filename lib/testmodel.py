@@ -1236,9 +1236,10 @@ class Application:
             self.readDefaultConfigFiles()
         self.readExplicitConfigFiles(configModuleInitialised)
     def readDefaultConfigFiles(self):
-        dirCache = DirectoryCache(plugins.installationPath("etc"))
-        # don't error check as there might be settings there for all sorts of config modules...
-        self.readValues(self.configDir, "config", dirCache, insert=False, errorOnUnknown=False)
+        etcPath = plugins.installationPath("etc")
+        if etcPath:
+            # don't error check as there might be settings there for all sorts of config modules...
+            self.readValues(self.configDir, "config", DirectoryCache(etcPath), insert=False, errorOnUnknown=False)
     def readExplicitConfigFiles(self, errorOnUnknown):
         self.readValues(self.configDir, "config", self.dircache, insert=False, errorOnUnknown=errorOnUnknown)
     def readValues(self, multiEntryDict, stem, dircache, insert=True, errorOnUnknown=False):

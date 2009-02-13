@@ -277,7 +277,7 @@ class Config:
             # Commas in path names are a bit dangerous, some applications may have arguments like
             # -path path1,path2 and just do split on the path argument.
             # We try something more obscure instead...
-            return [ givenVersion.replace(",", "++") ]
+            return [ "++".join(plugins.commasplit(givenVersion)) ]
         else:
             return []
     def addGuiResponder(self, classes):

@@ -3,7 +3,7 @@
 # It's in a separate file to make it easy to find.
 
 import os
-version = "master"
+version = "trunk"
 
 # Note: Decided it's not a good idea to require debug versions here. Even if we have Python 2.4.3 it's
 # pretty likely 2.4.2 works OK unless we know otherwise. The interface shouldn't be different at least.

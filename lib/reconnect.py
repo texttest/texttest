@@ -46,10 +46,12 @@ class ReconnectConfig:
 
     def getExtraVersions(self, app):
         self.diag.info("Finding reconnect directory for " + repr(app) + " under " + repr(self.reconnectTmpInfo))
-        # See if this is an explicitly provided run directory
-        if self.reconnectTmpInfo and self.versionsCorrect(app, self.reconnectTmpInfo):
-            self.cacheRunDir(app, self.reconnectTmpInfo)
-            return []
+        if self.reconnectTmpInfo and os.path.isdir(self.reconnectTmpInfo):
+            # See if this is an explicitly provided run directory
+            versionSets = self.getVersionSetsTopDir(self.reconnectTmpInfo)
+            self.diag.info("Directory has version sets " + repr(versionSets))
+            if versionSets is not None:
+                return self.getVersionsFromDirs(app, [ self.reconnectTmpInfo ])
 
         fetchDir = app.getPreviousWriteDirInfo(self.reconnectTmpInfo)
         if not os.path.isdir(fetchDir):

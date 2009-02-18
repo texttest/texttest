@@ -126,20 +126,35 @@ class Config:
             return []
         fromConfig = self.getExtraVersionsFromConfig(app)
         fromCmd = self.getExtraVersionsFromCmdLine(app)
-        extraVersions = copy(fromConfig)        
-        for cmdVersion in fromCmd:
-            extraVersions.append(cmdVersion)
-            for extra in fromConfig:
-                extraVersions.append(cmdVersion + "." + extra)
+        return self.createComposites(fromConfig, fromCmd)
 
-        return extraVersions
+    def createComposites(self, vlist1, vlist2):
+        allVersions = copy(vlist1)        
+        for v2 in vlist2:
+            allVersions.append(v2)
+            for v1 in vlist1:
+                allVersions.append(v2 + "." + v1)
+
+        return allVersions
 
     def getExtraVersionsFromCmdLine(self, app):
         if self.isReconnecting():
             return self.reconnectConfig.getExtraVersions(app)
         else:
-            copyCount = int(self.optionMap.get("cp", 1))
-            return [ "copy_" + str(i) for i in range(1, copyCount) ]
+            copyVersions = self.getCopyExtraVersions()
+            checkoutVersions = self.getCheckoutExtraVersions()
+            return self.createComposites(checkoutVersions, copyVersions)
+
+    def getCopyExtraVersions(self):
+        copyCount = int(self.optionMap.get("cp", 1))
+        return [ "copy_" + str(i) for i in range(1, copyCount) ]
+
+    def versionNameFromCheckout(self, c):
+        return c.replace("\\", "_").replace("/", "_").replace(".", "_")
+
+    def getCheckoutExtraVersions(self):    
+        checkoutNames = plugins.commasplit(self.optionValue("c"))[1:]
+        return map(self.versionNameFromCheckout, checkoutNames)
         
     def getExtraVersionsFromConfig(self, app):
         basic = app.getConfigValue("extra_version")
@@ -569,7 +584,12 @@ class Config:
             return checkout
     def getCheckout(self, app):
         if self.optionMap.has_key("c"):
-            return self.optionMap["c"]
+            allCheckouts = plugins.commasplit(self.optionMap["c"])
+            for checkout in allCheckouts[1:]:
+                versionName = self.versionNameFromCheckout(checkout)
+                if versionName in app.versions:
+                    return checkout
+            return allCheckouts[0]
 
         # Under some circumstances infer checkout from batch session
         batchSession = self.optionValue("b")

@@ -1,0 +1,43 @@
+
+There is almost certainly no migration needed. But a few things in TextTest 3.13
+will be different from 3.12 by default. This is worth a quick scan in case any of
+this applies to you.
+
+=========================================================
+CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
+=========================================================
+
+(1) The HTML historical batch report now looks a bit different by default
+=========================================================================
+Instead of generating an "All" page it will generate one page per month. The basic point is
+to speed up generation of the pages once there is lots of data, as the older pages won't need
+to be regenerated. Also to avoid creating a huge All page that the browser can't really handle.
+
+If you really miss your All page the behaviour from 3.12 can be restored by setting the config
+file setting "historical_report_all_page" to "true".
+
+(2) import_config_file now behaves like "import" in Python or #include in C
+===========================================================================
+The basic effect is that it is exactly equivalent to pasting the contents of the imported file into your 
+config file at that point.
+
+Obviously this isn't guaranteed to behave the same as in version 3.12, where settings in the config file always
+had priority over those in the imported file. Now it depends on where the file is imported which setting will be
+used.
+
+It's obviously more flexible (imported files can import other files, for example) and should be more
+intuitive but it's possible your config files aren't back-compatible.
+ 
+(3) Extra syntax checking on your config file
+=============================================
+It's possible you may get warnings/popups which you didn't get before. But hopefully you
+will deserve them... in particular mistakenly missing [end] markers will create warnings now.
+
+(4) TextTest's default location for its internal logging is now ~/.texttest/log
+===============================================================================
+Instead of $TEXTTEST_HOME/Diagnostics. But it is still configurable as before. The configuration file
+lives with the source in the log subdirectory and should probably be copied to the above location
+and edited as desired if you need to debug TextTest this way.
+
+
+

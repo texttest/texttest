@@ -348,28 +348,49 @@ class ApplicationFilter(TextFilter):
 
 class TestPathFilter(TextFilter):
     option = "tp"
-    def parseInput(self, filterText, app):
-        allEntries = TextFilter.parseInput(self, filterText, app)
+    def __init__(self, *args):
+        self.diag = getDiagnostics("TestPathFilter")
+        TextFilter.__init__(self, *args)
+    def parseInput(self, filterText, app, suites):
+        allEntries = TextFilter.parseInput(self, filterText, app, suites)
         if allEntries[0].startswith("appdata="):
             # chopped up per application
-            return self.parseForApp(allEntries, app)
+            return self.parseForApp(allEntries, app, suites)
         else:
             # old style, one size fits all
             return allEntries
-    def parseForApp(self, allEntries, app):
+    def parseForApp(self, allEntries, app, suites):
         active = False
         myEntries = []
-        toFind = self.getSectionToFind(allEntries, app)
+        toFind = self.getSectionsToFind(allEntries, app, suites)
         for entry in allEntries:
-            if entry == toFind:
+            if entry in toFind:
                 active = True
             elif entry.startswith("appdata="):
                 active = False
             elif active:
                 myEntries.append(entry)
         return myEntries
-    def getSectionToFind(self, allEntries, app):
+    def getSectionsToFind(self, allEntries, app, suites):        
         allHeaders = filter(lambda entry: entry.startswith("appdata=" + app.name), allEntries)
+        if len(allHeaders) == 1:
+            return allHeaders[0]
+        allApps = filter(lambda a: a.name == app.name, [ suite.app for suite in suites ])
+        sections = []
+        for header in allHeaders:
+            bestApp = self.findAppMatchingSection(header, allApps)
+            self.diag.info("Best app for " + header + " = " + repr(bestApp))
+            if bestApp is app:
+                sections.append(header)
+
+        if len(sections) == 0:
+            # We aren't a best-fit for any of them, so we do our best to find one anyway...
+            return [ self.findSectionMatchingApp(app, allHeaders) ]
+                     
+        self.diag.info("Sections for " + repr(app) + " = " + repr(sections))
+        return sections
+
+    def findSectionMatchingApp(self, app, allHeaders):
         myVersionSet = Set(app.versions)
         bestVersionSet, bestHeader = None, None
         for header in allHeaders:
@@ -379,14 +400,25 @@ class TestPathFilter(TextFilter):
                 bestVersionSet = currVersionSet
         return bestHeader
 
+    def findAppMatchingSection(self, header, allApps):
+        bestVersionSet, bestApp = None, None
+        myVersionSet = Set(header.split(".")[1:])
+        self.diag.info("Looking for app matching " + repr(myVersionSet))
+        for app in allApps:
+            appVersionSet = Set(app.versions)
+            if bestVersionSet is None or self.isBetterMatch(appVersionSet, bestVersionSet, myVersionSet):
+                bestApp = app
+                bestVersionSet = appVersionSet
+        return bestApp
+
     def isBetterMatch(self, curr, best, mine):
         # We want the most in common with mine, and the least not in common
         currCommon = curr.intersection(mine)
         bestCommon = best.intersection(mine)
         if len(currCommon) > len(bestCommon):
             return True
-        currDiff = curr.difference(mine)
-        bestDiff = best.difference(mine)
+        currDiff = curr.symmetric_difference(mine)
+        bestDiff = best.symmetric_difference(mine)
         return len(currDiff) < len(bestDiff)
 
     def acceptsTestCase(self, test):

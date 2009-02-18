@@ -84,7 +84,7 @@ class Activator(Responder, plugins.Observable):
         self.notify("StartRead")
         for suite in self.suites:
             try:
-                filters = suite.app.getFilterList()
+                filters = suite.app.getFilterList(self.suites)
                 self.diag.info("Creating test suite with filters " + repr(filters))
         
                 suite.readContents(filters)

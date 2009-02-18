@@ -342,11 +342,6 @@ class Config:
         return [ TestNameFilter, plugins.TestPathFilter, \
                  TestSuiteFilter, TimeFilter, \
                  plugins.ApplicationFilter, TestDescriptionFilter ]
-    def checkFilterFileSanity(self, app):
-        # This will cache all the filter set-up from the input, and throw if it can't.
-        # This is basically because we don't want to throw in a thread when we actually need the filters
-        # if they aren't sensible for some reason
-        self.getFilterList(app)
             
     def getAbsoluteFilterFileName(self, filterFileName, app):
         if os.path.isabs(filterFileName):
@@ -377,40 +372,58 @@ class Config:
                 names += app.getCompositeConfigValue("batch_filter_file", options["b"])
         return names
 
-    def getFilterList(self, app, options=None):
+    def findAllFilterFileNames(self, app, options, includeConfig):
+        return self.findFilterFileNames(app, options, includeConfig) + \
+               self.optionListValue(options, "funion") + self.optionListValue(options, "finverse")
+
+    def getFilterList(self, app, suites, options=None):
         if options is None:
-            return self.filterFileMap.setdefault(app, self._getFilterList(app, self.optionMap, includeConfig=True))
+            return self.filterFileMap.setdefault(app, self._getFilterList(app, self.optionMap, suites, includeConfig=True))
         else:
-            return self._getFilterList(app, options, includeConfig=False)
+            return self._getFilterList(app, options, suites, includeConfig=False)
         
-    def _getFilterList(self, app, options, includeConfig):
-        filters = self.getFiltersFromMap(options, app)
+    def checkFilterFileSanity(self, suite):
+        # This will check all the files for existence from the input, and throw if it can't.
+        # This is basically because we don't want to throw in a thread when we actually need the filters
+        # if they aren't sensible for some reason
+        self._checkFilterFileSanity(suite.app, self.optionMap, includeConfig=True)
+
+    def _checkFilterFileSanity(self, app, options, includeConfig=False):
+        for filterFileName in self.findAllFilterFileNames(app, options, includeConfig):
+            optionFinder = self.makeOptionFinder(app, filterFileName)
+            self._checkFilterFileSanity(app, optionFinder)
+    
+    def _getFilterList(self, app, options, suites, includeConfig):
+        filters = self.getFiltersFromMap(options, app, suites)
         for filterFileName in self.findFilterFileNames(app, options, includeConfig):
-            filters += self.getFiltersFromFile(app, filterFileName)
+            filters += self.getFiltersFromFile(app, filterFileName, suites)
 
         orFilterFiles = self.optionListValue(options, "funion")
         if len(orFilterFiles) > 0:
-            orFilterLists = [ self.getFiltersFromFile(app, f) for f in orFilterFiles ]
+            orFilterLists = [ self.getFiltersFromFile(app, f, suites) for f in orFilterFiles ]
             filters.append(OrFilter(orFilterLists))
 
         notFilterFile = options.get("finverse")
         if notFilterFile:
-            filters.append(NotFilter(self.getFiltersFromFile(app, notFilterFile)))
+            filters.append(NotFilter(self.getFiltersFromFile(app, notFilterFile, suites)))
 
         return filters
-        
-    def getFiltersFromFile(self, app, filename):        
+
+    def makeOptionFinder(self, app, filename):
         absName = self.getAbsoluteFilterFileName(filename, app)
         fileData = ",".join(plugins.readList(absName))
-        optionFinder = plugins.OptionFinder(fileData.split(), defaultKey="t")
-        return self._getFilterList(app, optionFinder, includeConfig=False)
+        return plugins.OptionFinder(fileData.split(), defaultKey="t")
+        
+    def getFiltersFromFile(self, app, filename, suites):
+        optionFinder = self.makeOptionFinder(app, filename)
+        return self._getFilterList(app, optionFinder, suites, includeConfig=False)
     
-    def getFiltersFromMap(self, optionMap, app):
+    def getFiltersFromMap(self, optionMap, app, suites):
         filters = []
         for filterClass in self.getFilterClasses():
             argument = optionMap.get(filterClass.option)
             if argument:
-                filters.append(filterClass(argument, app))
+                filters.append(filterClass(argument, app, suites))
         batchSession = self.optionMap.get("b")
         if batchSession:
             timeLimit = app.getCompositeConfigValue("batch_timelimit", batchSession)
@@ -508,7 +521,7 @@ class Config:
         if not self.ignoreExecutable() and not self.optionMap.has_key("gx"):
             self.checkExecutableExists(suite)
 
-        self.checkFilterFileSanity(suite.app)
+        self.checkFilterFileSanity(suite)
         self.checkConfigSanity(suite.app)
         if self.batchMode():
             batchSession = self.optionMap.get("b")

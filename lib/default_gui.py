@@ -493,7 +493,7 @@ class ViewTestFileInEditor(ViewInEditor):
 
     def handleTestSuiteEdit(self, suites):
         for suite in suites:
-            suite.refresh(suite.app.getFilterList())
+            suite.refresh(suite.app.getFilterList(suites))
         self.editingComplete()
 
     def handleOptionsEdit(self, tests):
@@ -1116,7 +1116,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         return "Selected " + self.describeTests() + "."
     # No messageAfterPerform necessary - we update the status bar when the selection changes inside TextTestGUI
     def getFilterList(self, app):
-        return app.getFilterList(self.optionGroup.getOptionValueMap())
+        return app.getFilterList(self.rootTestSuites, self.optionGroup.getOptionValueMap())
     def makeNewSelection(self):
         # Get strategy. 0 = discard, 1 = refine, 2 = extend, 3 = exclude
         strategy = self.selectionGroup.getSwitchValue("current_selection")
@@ -1491,7 +1491,7 @@ class LoadSelection(guiplugins.ActionDialogGUI):
     def makeNewSelection(self, fileName):
         tests = []
         for suite in self.rootTestSuites:
-            filters = suite.app.getFiltersFromFile(fileName)
+            filters = suite.app.getFiltersFromFile(fileName, self.rootTestSuites)
             tests += suite.testCaseList(filters)
         return tests
     def getResizeDivisors(self):
@@ -2164,7 +2164,7 @@ class RefreshAll(guiplugins.BasicActionGUI):
             self.notify("ActionProgress", "")
             suite.app.setUpConfiguration()
             self.notify("ActionProgress", "")
-            filters = suite.app.getFilterList()
+            filters = suite.app.getFilterList(self.rootTestSuites)
             suite.refresh(filters)
 
 

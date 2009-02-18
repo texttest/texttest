@@ -2796,12 +2796,13 @@ class TestProgressMonitor(guiplugins.SubGUI):
     def addTestForNode(self, test, defaultColour, defaultVisibility, nodeClassifier, classifiers, incrementCount, parentIter=None):
         nodeIter = self.findIter(nodeClassifier, parentIter)
         colour = guiConfig.getTestColour(nodeClassifier, defaultColour)
-        visibility = guiConfig.showCategoryByDefault(nodeClassifier, defaultVisibility)
         if nodeIter:
+            visibility = self.treeModel.get_value(nodeIter, 2)
             self.diag.info("Adding " + repr(test) + " for node " + nodeClassifier + ", visible = " + repr(visibility))
             self.insertTestAtIter(nodeIter, test, colour, incrementCount)
             self.classifications[test].append(nodeIter)
         else:
+            visibility = guiConfig.showCategoryByDefault(nodeClassifier, parentHidden=not defaultVisibility)
             initialTests = self.getInitialTestsForNode(test, parentIter, nodeClassifier)
             nodeIter = self.addNewIter(nodeClassifier, parentIter, colour, visibility, len(initialTests), initialTests)
             for initTest in initialTests:

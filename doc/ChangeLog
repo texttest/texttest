@@ -1268,10 +1268,20 @@ Dynamic GUI Enhancements:
 Framework Enhancements:
     - Can now have application-specific personal configuration files (testmodel.py)
 	Files called ~/.texttest/config.<app> will be picked up as well as ~/.texttest/config now.
+    - Can now combine filter files with each other and refer to them from each other. (default.py)
+	New settings --fintersect, --funion and --finverse. See website documentation of these.
     - Can now disable normalisation of percentage differences for performance (performance.py)
 	New config file setting "performance_use_normalised_%". See website docs on this subject.
+    - import_config_file now works like import statements in programming languages (testmodel.py)
+	It's now exactly equivalent to pasting the contents into the file at that point.
+    - Can now provide several checkouts on the command line with -c <checkout1>,<checkout2>
+	Internally a version is generated for all except the first one
+    - Config file error handling improved (plugins.py)
+	Now get a wider range of warnings and don't get the same warning lots of time. 
+	Looks for missing [end] statements.
     - Self-diagnostics moved to ~/.texttest/log by default (engine.py)
 	But still fully configurable. Default log config file now lives with the source under log subdirectory.
+	Along with a script to regenerate it if desired.
     - Site-specific configuration files now read from site/etc/config if present (testmodel.py)
     - New command-line option --vanilla which starts TextTest without personal (or site-specific) configuration. (testmodel.py)
     - Can now get stacktraces from running TextTest processes on UNIX (engine.py)
@@ -1285,15 +1295,31 @@ Batch Report Enhancements:
 	This is used to prevent the email report finding old results if the new ones are not present (batch.py)
     - New config file setting "batch_collect_compulsory_version"
 	This is used to generate error messages in the email report if results are not found for some version (batch.py)
+Grid Engine (LSF/SGE) enhancements:
+    - Information about other processes on the machine improved (queuesystem.py)
+	Doesn't report itself, picks up processes from other users (SGE) and reports the job ID
 Installation and self-test changes:
 Bug Fixes:
+    - Reconnecting to runs done with -v v1,v2 is now possible (reconnect.py)
+	Though they generate rather longer temporary path names to make this possible
+    - Reconnecting explicitly to versioned runs is never rejected (reconnect.py)
+	Previously you had to fill in the version in the matching field.
     - Fixed problem where scripts such as the HTML report builder could not be interrupted (engine.py)
 	They now respond appropriately to signals.
+    - When the same dialog is created twice, start with previously hand-entered values in preference to those from gui_entry_override (guiplugins.py)
     - Can now add two applications from the static GUI as part of the same run (texttestgui.py)
+    - Can now load selections from multiple version runs into a single-version run, usually static GUI (plugins.py)
+    - When a parent category is hidden in the dynamic GUI status view, new children of it will also start hidden (texttestgui.py)
     - Fixed shortcut stacktrace when adding a third application from the static GUI when two already exist (default_gui.py)
     - Saving version b.a will now overwrite <file>.a.b instead of creating <file>.b.a. (comparefile.py)
     - Reconnecting to version a will now pick up a single run with version a.b, as well as multiple ones! (reconnect.py)
     - No longer fail if executable missing when trying to reconnect (default.py)
-    - Fixed crash with LANG=C, introduced in 3.12 when trying to make Swedish authors come out right! (plugins.py) 
+    - extra_search_directory entries are now searched in the right order when looking for imported config files (testmodel.py)
+    - Don't crash if config file is a directory or a dead link (engine.py)
+    - warning removed if extra_search_directory can't be found: this is after all equivalent to $PATH (testmodel.py)
+    - Recomputation always recreates the Text Info window now, even if TextTest didn't believe it was necessary (comparefile.py)
+    - Don't crash creating "Save Selection" dialog if no permissions to create filter_files directory (plugins.py)
+    - No longer rely on gethostname() returning a simple name (plugins.py)
+    - Fixed crash with LANG=C, introduced in 3.12 when trying to make Swedish authors come out right! (plugins.py)
 Grid Engine bug fixes:
     - Clearer error message when the grid engine (qsub/bsub) cannot be found (queuesystem.py)

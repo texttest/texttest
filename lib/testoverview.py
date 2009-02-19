@@ -125,7 +125,11 @@ class GenerateWebPages(object):
         return dirs
 
     def compareTags(self, x, y):
-        return cmp(self.getTagTimeInSeconds(x), self.getTagTimeInSeconds(y))
+        timeCmp = cmp(self.getTagTimeInSeconds(x), self.getTagTimeInSeconds(y))
+        if timeCmp:
+            return timeCmp
+        else:
+            return cmp(x, y) # If the timing is the same, sort alphabetically
         
     def findTestStateFilesAndTags(self, repositoryDir):
         allFiles = []

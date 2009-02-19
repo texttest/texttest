@@ -1295,6 +1295,8 @@ Batch Report Enhancements:
 	This is used to prevent the email report finding old results if the new ones are not present (batch.py)
     - New config file setting "batch_collect_compulsory_version"
 	This is used to generate error messages in the email report if results are not found for some version (batch.py)
+    - Now include date of generation in page title (testoverview.py)
+    - HTML table headers are now 13-point font and should be easier to read (testoverview.py)
 Grid Engine (LSF/SGE) enhancements:
     - Information about other processes on the machine improved (queuesystem.py)
 	Doesn't report itself, picks up processes from other users (SGE) and reports the job ID
@@ -1315,11 +1317,13 @@ Bug Fixes:
     - Reconnecting to version a will now pick up a single run with version a.b, as well as multiple ones! (reconnect.py)
     - No longer fail if executable missing when trying to reconnect (default.py)
     - extra_search_directory entries are now searched in the right order when looking for imported config files (testmodel.py)
+    - HTML report columns for named batch runs done on the same day will now be sorted sensibly (testoverview.py)
     - Don't crash if config file is a directory or a dead link (engine.py)
     - warning removed if extra_search_directory can't be found: this is after all equivalent to $PATH (testmodel.py)
     - Recomputation always recreates the Text Info window now, even if TextTest didn't believe it was necessary (comparefile.py)
     - Don't crash creating "Save Selection" dialog if no permissions to create filter_files directory (plugins.py)
     - No longer rely on gethostname() returning a simple name (plugins.py)
+    - Running virtual server remotely won't generate spurious stacktraces in logs any more (unixonly.py)
     - Fixed crash with LANG=C, introduced in 3.12 when trying to make Swedish authors come out right! (plugins.py)
 Grid Engine bug fixes:
     - Clearer error message when the grid engine (qsub/bsub) cannot be found (queuesystem.py)

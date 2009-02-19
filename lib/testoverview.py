@@ -207,7 +207,7 @@ class GenerateWebPages(object):
     
     def addOverviewPages(self, fileName, version, table):
         if not self.pagesOverview.has_key(fileName):
-            style = "body,td,th {color: #000000;font-size: 11px;font-family: Helvetica;}"
+            style = "body,td {color: #000000;font-size: 11px;font-family: Helvetica;} th {color: #000000;font-size: 13px;font-family: Helvetica;}"
             title = TitleWithDateStamp("Test results for " + self.pageTitle) 
             self.pagesOverview[fileName] = HTMLgen.SimpleDocument(title=title, style=style)
         self.pagesOverview[fileName].append(HTMLgen.Name(version))

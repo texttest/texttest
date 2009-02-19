@@ -41,6 +41,13 @@ def getDisplayText(tag):
     else:
         return tag
 
+class TitleWithDateStamp:
+    def __init__(self, title):
+        self.title = title + " (generated at "
+    def __str__(self):
+        return self.title + plugins.localtime(format="%d%b%H:%M") + ")"
+            
+
 class GenerateWebPages(object):
     def __init__(self, pageTitle, pageVersion, pageDir, extraVersions, colourDict, buildAllPage):
         self.pageTitle = pageTitle
@@ -109,7 +116,7 @@ class GenerateWebPages(object):
                 page.prepend(HTMLgen.Heading(2, monthContainer, align = 'center'))
             page.prepend(HTMLgen.Heading(2, selContainer, align = 'center'))
             page.prepend(HTMLgen.Heading(1, foundMinorVersions, align = 'center'))
-            page.prepend(HTMLgen.Heading(1, "Test results for ", self.pageTitle, align = 'center'))
+            page.prepend(HTMLgen.Heading(1, "Test results for " + self.pageTitle, align = 'center'))
 
         self.writePages()
         
@@ -200,17 +207,18 @@ class GenerateWebPages(object):
     
     def addOverviewPages(self, fileName, version, table):
         if not self.pagesOverview.has_key(fileName):
-            pageOverviewTitle = "Test results for " + self.pageTitle
-            self.pagesOverview[fileName] = HTMLgen.SimpleDocument(title = pageOverviewTitle,
-                                                              style = "body,td,th {color: #000000;font-size: 11px;font-family: Helvetica;}")
+            style = "body,td,th {color: #000000;font-size: 11px;font-family: Helvetica;}"
+            title = TitleWithDateStamp("Test results for " + self.pageTitle) 
+            self.pagesOverview[fileName] = HTMLgen.SimpleDocument(title=title, style=style)
         self.pagesOverview[fileName].append(HTMLgen.Name(version))
         self.pagesOverview[fileName].append(table)
+        
     def addDetailPages(self, details):
         for tag in details.keys():
             if not self.pagesDetails.has_key(tag):
                 tagText = getDisplayText(tag)
                 pageDetailTitle = "Detailed test results for " + self.pageTitle + ": " + tagText
-                self.pagesDetails[tag] = HTMLgen.SimpleDocument(title = pageDetailTitle)
+                self.pagesDetails[tag] = HTMLgen.SimpleDocument(title=TitleWithDateStamp(pageDetailTitle))
                 self.pagesDetails[tag].append(HTMLgen.Heading(1, tagText + " - detailed test results for ", self.pageTitle, align = 'center'))
             self.pagesDetails[tag].append(details[tag])
     def writePages(self):

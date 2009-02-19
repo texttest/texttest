@@ -476,7 +476,7 @@ class SelectorLast6Days(Selector):
             self.selectedTags = tags
             
     def linkName(self):
-        return "Last six days"
+        return "Last six runs"
 
 class SelectorAll(Selector):
     def linkName(self):

@@ -134,10 +134,13 @@ class VirtualDisplayResponder(Responder):
             return machine + displayStr
 
     def canRunVirtualServer(self, machine):
-        # If it's not localhost, we need to make sure it exists and has Xvfb installed
         whichArgs = [ "which", "Xvfb" ]
-        if machine != "localhost":
-            whichArgs = [ "rsh", machine ] + whichArgs
-        whichProc = subprocess.Popen(whichArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        outStr, errStr = whichProc.communicate()
-        return len(errStr) == 0 and outStr.find("not found") == -1
+        if machine == "localhost":
+            returnCode = subprocess.call(whichArgs, stdin=open(os.devnull), stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
+            return returnCode == 0
+        else:
+            searchStr = "found an Xvfb"
+            whichArgs = [ "rsh", machine ] + whichArgs + [ "&&", "echo", searchStr ]
+            proc = subprocess.Popen(whichArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            output = proc.communicate()[0]
+            return output.find(searchStr) != -1

@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 
 import os, stat, sys, plugins, shutil, socket, subprocess
 from ndict import seqdict
@@ -6,6 +5,7 @@ from SocketServer import TCPServer, StreamRequestHandler
 from threading import Thread, Lock
 from types import StringType
 from jobprocess import JobProcess
+from sets import Set
 
 class SetUpTrafficHandlers(plugins.Action):
     def __init__(self, record):
@@ -714,33 +714,48 @@ class ReplayInfo:
         if self.responseMap.has_key(desc):
             self.diag.info("Found exact match")
             return desc
-        bestMatchPerc, bestMatch, fewestTimesChosen = 0.0, None, 100000
+
+        descWords = self.getWords(desc)
+        bestMatch = None
+        bestMatchInfo = Set(), 100000
         for currDesc, responseHandler in self.responseMap.items():
-            if not self.sameType(desc, currDesc):
-                continue
-            matchPerc = self.findMatchPercentage(currDesc, desc)
-            self.diag.info("Match percentage " + repr(matchPerc) + " with '" + currDesc + "'")
-            if matchPerc > bestMatchPerc or (matchPerc == bestMatchPerc and responseHandler.timesChosen < fewestTimesChosen):
-                bestMatchPerc, bestMatch, fewestTimesChosen = matchPerc, currDesc, responseHandler.timesChosen
+            if self.sameType(desc, currDesc):
+                matchInfo = self.getWords(currDesc), responseHandler.timesChosen
+                if self.isBetterMatch(matchInfo, bestMatchInfo, descWords):
+                    bestMatchInfo = matchInfo
+                    bestMatch = currDesc
+
         if bestMatch is not None:
             self.diag.info("Best match chosen as '" + bestMatch + "'")
             return bestMatch
+
     def sameType(self, desc1, desc2):
         return desc1[2:5] == desc2[2:5]
+
     def getWords(self, desc):
         words = []
         for part in desc.split("/"):
             words += part.split()
-        return words
-    def findMatchPercentage(self, traffic1, traffic2):
-        words1 = self.getWords(traffic1)
-        words2 = self.getWords(traffic2)
-        matches = 0
-        for word in words1:
-            if word in words2:
-                matches += 1
-        nomatches = len(words1) + len(words2) - (2 * matches)
-        return 100.0 * float(matches) / float(nomatches + matches)
+        return Set(words)
+
+    def isBetterMatch(self, info1, info2, targetWords):
+        words1, count1 = info1
+        words2, count2 = info2
+        common1 = len(words1.intersection(targetWords))
+        common2 = len(words2.intersection(targetWords))
+        if common1 > common2:
+            return True
+        elif common1 < common2:
+            return False
+
+        lengthDiff1 = abs(len(words1) - len(targetWords))
+        lengthDiff2 = abs(len(words2) - len(targetWords))
+        if lengthDiff1 < lengthDiff2:
+            return True
+        elif lengthDiff1 > lengthDiff2:
+            return False
+
+        return count1 < count2
     
 
 # Need to handle multiple replies to the same question

@@ -550,7 +550,7 @@ class WebPageResponder(respond.Responder):
 
     def generateWebPages(self, pageDir, app, extraVersions, relevantSubDirs, pageTitle):
         webPageGeneratorClass = app.getWebPageGeneratorClass()
-        colourDict = app.getConfigValue("testoverview_colours")
+        colourDict = app.getConfigValue("historical_report_colours")
         buildAllPage = app.getCompositeConfigValue("historical_report_all_page", self.batchSession) == "true"
         generator = webPageGeneratorClass(pageTitle, getVersionName(app), pageDir,
                                           extraVersions, colourDict, buildAllPage)

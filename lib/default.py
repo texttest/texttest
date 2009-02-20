@@ -674,7 +674,7 @@ class Config:
         app.setConfigDefault("historical_report_location", { "default" : "" }, "Directory to create reports on historical batch data under")
         app.setConfigDefault("historical_report_page_name", { "default" : self.getDefaultPageName(app) }, "Header for page on which this application should appear")
         app.setConfigDefault("historical_report_all_page", { "default" : "false" }, "Build an All page instead of the month pages as in days of old...")
-        app.setConfigDefault("testoverview_colours", self.getDefaultTestOverviewColours(), "Colours to use for historical batch HTML reports")
+        app.setConfigDefault("historical_report_colours", self.getDefaultTestOverviewColours(), "Colours to use for historical batch HTML reports")
         app.setConfigDefault("batch_sender", { "default" : self.getDefaultMailAddress() }, "Sender address to use sending mail in batch mode")
         app.setConfigDefault("batch_recipients", { "default" : self.getDefaultMailAddress() }, "Addresses to send mail to in batch mode")
         app.setConfigDefault("batch_timelimit", { "default" : "" }, "Maximum length of test to include in batch mode runs")
@@ -685,7 +685,7 @@ class Config:
         app.setConfigDefault("batch_mail_on_failure_only", { "default" : "false" }, "Send mails only if at least one test fails")
         app.setConfigDefault("batch_use_version_filtering", { "default" : "false" }, "Which batch sessions use the version filtering mechanism")
         app.setConfigDefault("batch_version", { "default" : [] }, "List of versions to allow if batch_use_version_filtering enabled")
-        
+        app.setConfigAlias("testoverview_colours", "historical_report_colours")
     def setPerformanceDefaults(self, app):
         # Performance values
         app.setConfigDefault("cputime_include_system_time", 0, "Include system time when measuring CPU time?")

@@ -8,6 +8,12 @@ from sets import Set
 from glob import glob
 HTMLgen.PRINTECHO = 0
 
+# Don't read these from Python as the names depend on the locale!
+weekdays = [ "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday" ]
+
+def getWeekDayNumber(tag):
+    return time.strptime(tag.split("_")[0], "%d%b%Y")[6]
+    
 class ColourFinder:
     def setColourDict(self, colourDict):
         self.colourDict = colourDict
@@ -20,7 +26,8 @@ class ColourFinder:
         return colourName
     def getDefaultDict(self):
         colours = {}
-        colours["column_header_fg"] = "black"
+        for wkday in weekdays:
+            colours["run_" + wkday + "_fg"] = "black"
         colours["column_header_bg"] = "gray1"
         colours["row_header_bg"] = "#FFFFCC"
         colours["performance_fg"] = "red6"
@@ -323,7 +330,8 @@ class TestTable:
         cap = HTMLgen.Caption(HTMLgen.Font(version, size = 10))
         return HTMLgen.Container(cap, heading)
     def findTagColour(self, tag):
-        return colourFinder.find("column_header_fg")
+        wkDayNo = getWeekDayNumber(tag)
+        return colourFinder.find("run_" + weekdays[wkDayNo] + "_fg")
         
 class TestDetails:
     def generate(self, categoryHandler, version, tags, linkFromDetailsToOverview):

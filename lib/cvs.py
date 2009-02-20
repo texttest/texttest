@@ -130,7 +130,7 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
             return self.getCVSFileContents("Root")
     def getCVSFileContents(self, name):
         # Create a means of putting the CVS directories elsewhere so the tests still work even if not CVS controlled...
-        fullPath = os.path.join(self.getApplicationPath(), os.getenv("TEXTTEST_CVS_DIR", "CVS"), name)
+        fullPath = os.path.join(self.getApplicationPath(), "CVS", name)
         if not os.path.isfile(fullPath):
             raise plugins.TextTestError, "No CVS file found at " + fullPath    
 
@@ -408,6 +408,31 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
         return not self.treeModel.iter_has_child(
             self.treeModel.get_iter(self.filteredTreeModel.convert_path_to_child_path(path)))
 
+    def getFileNames(self, fileArg):
+        if os.path.isfile(fileArg):
+            return [ fileArg ]
+        elif os.path.isdir(fileArg):
+            if self.recursive:
+                return self.getFilesFromDirRecursive(fileArg)
+            else:
+                return self.getFilesFromDir(fileArg)
+            
+    def getFilesFromDir(self, dirName):
+        files = []
+        for f in sorted(os.listdir(dirName)):
+            fullPath = os.path.join(dirName, f)
+            if os.path.isfile(fullPath):
+                files.append(fullPath)
+        return files
+
+    def getFilesFromDirRecursive(self, dirName):
+        allFiles = []
+        for root, dirs, files in os.walk(dirName):
+            dirs.remove("CVS")
+            for f in sorted(files):
+                allFiles.append(os.path.join(root, f))
+        return allFiles
+
 #
 # 1 - First the methods which just check the repository and checked out files.
 #
@@ -486,7 +511,7 @@ class CVSLog(CVSAction):
             if line.startswith("Working file:"):
                 currentFile = line[14:]
             if line.startswith("date:") and currentLastDate == "":
-                then = datetime.datetime(*(time.strptime(line[6:25], "%Y/%m/%d %H:%M:%S")[0:6]))
+                then = datetime.datetime(*(self.parseCvsDateTime(line[6:25])[0:6]))
                 currentLastDate = self.getTimeDifference(now, then)
             currentOutput += line                
             prevLine = line
@@ -494,6 +519,12 @@ class CVSLog(CVSAction):
             relativeFilePath = self.getRelativePath(currentFile, rootDir)
             self.fileToTest[relativeFilePath] = test
             self.pages.append((relativeFilePath, currentOutput, currentLastDate))
+    def parseCvsDateTime(self, input):
+        # Different CVS versions produce different formats...
+        try:
+            return time.strptime(input, "%Y/%m/%d %H:%M:%S")
+        except ValueError:
+            return time.strptime(input, "%Y-%m-%d %H:%M:%S")
 
     # Show a human readable time difference string. Diffs larger than farAwayLimit are
     # written as the actual 'to' time, while other diffs are written e.g. 'X days ago'.
@@ -788,24 +819,20 @@ class CVSStatus(CVSAction):
         self.needsAttention = False
         if len(self.currTestSelection) > 0:
             rootDir = self.getRootPath()
-            cvsRepository = self.getCVSRepository()
-            self.diag.info("Found CVS repository as " + cvsRepository)
         for test in self.currTestSelection:
             fileArgs = self.getFilesForCVS(test)
             if len(fileArgs) > 0:
                 self.notify("Status", "Getting status for " + test.getRelPath())
                 self.notify("ActionProgress", "")
-                cvsArgs = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...            
-                self.parseOutput(self.runCommand(cvsArgs), rootDir, cvsRepository, test)
-    def parseOutput(self, outputLines, rootDir, cvsRepository, test):
-        # The section for each dir starts with
-        # cvs status: Examining <dir>
-        # ========================
+                for fileArg in fileArgs:
+                    for fileName in self.getFileNames(fileArg):
+                        args = self.getCVSCmdArgs() + [ fileName ] 
+                        self.parseOutput(self.runCommand(args), fileName, rootDir, test)
+
+    def parseOutput(self, outputLines, fileName, rootDir, test):
         # RCS file: ...
         # To get the correct path in the treeview, we also
         # need to add the prefix to <file>
-        currentOutput = ""
-        currentFile = ""
         prevLine = ""
         for line in outputLines:
             if line.startswith("cvs status: Examining "):
@@ -818,37 +845,18 @@ class CVSStatus(CVSAction):
                 elif info in self.cvsErrorStates:
                     info = "<span weight='bold' foreground='red'>" + info + "</span>"
                     self.needsAttention = True
-            # It is a bit hackish to find the file via the repository, but
-            # unfortunately cvs status doesn't output the proper filename ...
-            if line.find("Repository revision:") != -1:
-                if line.find("No revision control file") == -1:
-                    
-                    currentFile = line.strip(" \n\t").replace(",v", "").replace(cvsRepository, "###")
-                    currentFile = currentFile[currentFile.find("###"):].replace("###/", "")
-                    currentFile = os.path.join(self.getApplicationPath(), currentFile)
-                    self.diag.info("Found file as " + currentFile)
-                else:
-                    currentFile = ""
             if line.find("there is no version here; do ") != -1:
                 dir = prevLine[prevLine.find("in directory ") + 13:-2]
                 self.fileToTest[self.getRelativePath(dir, rootDir)] = test
                 self.pages.append((self.getRelativePath(dir, rootDir), prevLine + line, "<span weight='bold'>Not under CVS control.</span>"))
                 self.needsAttention = True
-            if line.startswith("==============="):
-                if currentFile:
-                    relativeFilePath = self.getRelativePath(currentFile, rootDir)
-                    self.fileToTest[relativeFilePath] = test
-                    self.pages.append((relativeFilePath, currentOutput, info))
-                    self.notify("Status", "Analyzing status for " + relativeFilePath.strip('\n'))
-                    self.notify("ActionProgress", "")
-                currentOutput = ""
-                info = ""
-                continue
-            currentOutput += line
             prevLine = line
-        if currentFile:
-            self.fileToTest[self.getRelativePath(currentFile, rootDir)] = test
-            self.pages.append((self.getRelativePath(currentFile, rootDir), currentOutput, info))    
+        relativeFilePath = self.getRelativePath(fileName, rootDir)
+        self.fileToTest[relativeFilePath] = test
+        self.pages.append((relativeFilePath, "".join(outputLines), info))
+        self.notify("Status", "Analyzing status for " + relativeFilePath.strip('\n'))
+        self.notify("ActionProgress", "")
+            
     def addToggleItems(self):
         # Each unique info column (column 2) gets its own toggle action in the popup menu
         uniqueInfos = []
@@ -970,20 +978,6 @@ class CVSAnnotate(CVSAction):
         self.notify("Status", "Analyzing annotations of " + relativeFilePath.strip('\n'))
         self.notify("ActionProgress", "")
 
-    def getFileNames(self, fileArg):
-        if os.path.isfile(fileArg):
-            return [ fileArg ]
-        elif os.path.isdir(fileArg):
-            return self.getFilesFromDir(fileArg)
-
-    def getFilesFromDir(self, dirName):
-        files = []
-        for f in sorted(os.listdir(dirName)):
-            fullPath = os.path.join(dirName, f)
-            if os.path.isfile(fullPath):
-                files.append(fullPath)
-        return files
-
         
 class CVSAnnotateRecursive(CVSAnnotate):
     def __init__(self, *args):
@@ -994,12 +988,7 @@ class CVSAnnotateRecursive(CVSAnnotate):
         return "Annotate Recursive"
     def getTooltip(self):
         return "recursive " + CVSAnnotate.getTooltip(self)
-    def getFilesFromDir(self, dirName):
-        allFiles = []
-        for root, dirs, files in os.walk(dirName):
-            for f in sorted(files):
-                allFiles.append(os.path.join(root, f))
-        return allFiles
+    
 
 
 #

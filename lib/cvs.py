@@ -957,38 +957,34 @@ class CVSAnnotate(CVSAction):
             if len(fileArgs) > 0:
                 self.notify("Status", "Getting annotations of " + test.getRelPath())
                 self.notify("ActionProgress", "")
-                args = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...
-                self.parseOutput(self.runCommand(args), rootDir, test)            
-    def parseOutput(self, outputLines, rootDir, test):
-        # The section for each file starts with
-        # Annotations for <file>
-        # ***************
-        currentOutput = ""
-        currentFile = ""
-        prevLine = ""
-        for line in outputLines:
-            if line.find("there is no version here; do ") != -1:
-                dir = prevLine[prevLine.find("in directory ") + 13:-2]
-                relPath = self.getRelativePath(dir, rootDir)
-                self.fileToTest[relPath] = test
-                self.pages.append((relPath, "Not under CVS control", ""))
-                self.notInRepository = True
-            if line.startswith("Annotations for"):                
-                if currentFile:
-                    relativeFilePath = self.getRelativePath(currentFile, rootDir)                    
-                    self.fileToTest[relativeFilePath] = test
-                    self.pages.append((relativeFilePath, currentOutput, currentFile))
-                    self.notify("Status", "Analyzing annotations of " + relativeFilePath.strip('\n'))
-                    self.notify("ActionProgress", "")
-                currentOutput = ""
-                currentFile = line[16:]
-            currentOutput += line
-            prevLine = line
-        if currentFile:
-            relPath = self.getRelativePath(currentFile, rootDir)
-            self.fileToTest[relPath] = test
-            self.pages.append((relPath, currentOutput, currentFile))
+                for fileArg in fileArgs:
+                    for fileName in self.getFileNames(fileArg):
+                        args = self.getCVSCmdArgs() + [ fileName ] 
+                        self.parseOutput(self.runCommand(args), fileName, rootDir, test)
+                        
+    def parseOutput(self, outputLines, fileName, rootDir, test):
+        currentOutput = "".join(outputLines)
+        relativeFilePath = self.getRelativePath(fileName, rootDir)
+        self.fileToTest[relativeFilePath] = test
+        self.pages.append((relativeFilePath, currentOutput, fileName))
+        self.notify("Status", "Analyzing annotations of " + relativeFilePath.strip('\n'))
+        self.notify("ActionProgress", "")
 
+    def getFileNames(self, fileArg):
+        if os.path.isfile(fileArg):
+            return [ fileArg ]
+        elif os.path.isdir(fileArg):
+            return self.getFilesFromDir(fileArg)
+
+    def getFilesFromDir(self, dirName):
+        files = []
+        for f in sorted(os.listdir(dirName)):
+            fullPath = os.path.join(dirName, f)
+            if os.path.isfile(fullPath):
+                files.append(fullPath)
+        return files
+
+        
 class CVSAnnotateRecursive(CVSAnnotate):
     def __init__(self, *args):
         CVSAnnotate.__init__(self, *args)
@@ -998,6 +994,12 @@ class CVSAnnotateRecursive(CVSAnnotate):
         return "Annotate Recursive"
     def getTooltip(self):
         return "recursive " + CVSAnnotate.getTooltip(self)
+    def getFilesFromDir(self, dirName):
+        allFiles = []
+        for root, dirs, files in os.walk(dirName):
+            for f in sorted(files):
+                allFiles.append(os.path.join(root, f))
+        return allFiles
 
 
 #

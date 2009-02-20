@@ -8,11 +8,8 @@ from sets import Set
 from glob import glob
 HTMLgen.PRINTECHO = 0
 
-# Don't read these from Python as the names depend on the locale!
-weekdays = [ "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday" ]
-
 def getWeekDay(tag):
-    return weekdays[time.strptime(tag.split("_")[0], "%d%b%Y")[6]]
+    return plugins.weekdays[time.strptime(tag.split("_")[0], "%d%b%Y")[6]]
     
 class ColourFinder:
     def setColourDict(self, colourDict):
@@ -24,20 +21,6 @@ class ColourFinder:
         if not colourName.startswith("#"):
             exec "colourName = HTMLcolors." + colourName.upper()
         return colourName
-    def getDefaultDict(self):
-        colours = {}
-        for wkday in weekdays:
-            colours["run_" + wkday + "_fg"] = "black"
-        colours["column_header_bg"] = "gray1"
-        colours["row_header_bg"] = "#FFFFCC"
-        colours["performance_fg"] = "red6"
-        colours["memory_bg"] = "pink"
-        colours["success_bg"] = "#CEEFBD"
-        colours["failure_bg"] = "#FF3118"
-        colours["no_results_bg"] = "gray2"
-        colours["performance_bg"] = "#FFC6A5"
-        colours["test_default_fg"] = "black"
-        return colours
 
 colourFinder = ColourFinder()
 
@@ -56,19 +39,29 @@ class TitleWithDateStamp:
             
 
 class GenerateWebPages(object):
-    def __init__(self, pageTitle, pageVersion, pageDir, extraVersions, colourDict):
+    def __init__(self, pageTitle, pageVersion, pageDir, extraVersions, app):
         self.pageTitle = pageTitle
         self.pageVersion = pageVersion
         self.extraVersions = extraVersions
         self.pageDir = pageDir
         self.pagesOverview = seqdict()
         self.pagesDetails = seqdict()
+        self.app = app
         self.diag = plugins.getDiagnostics("GenerateWebPages")
-        colourFinder.setColourDict(colourDict)
-    def createTestTable(self):
-        # Hook for configurations to inherit from
-        return TestTable()
-    def generate(self, repositoryDirs, selectors):
+        colourFinder.setColourDict(app.getConfigValue("historical_report_colours"))
+
+    def makeSelectors(self, subPageNames, tags=[]):
+        allSelectors = []
+        firstSubPageName = self.app.getCompositeConfigValue("historical_report_subpages", "default")[0]
+        for subPageName in subPageNames:
+            if subPageName == firstSubPageName:
+                suffix = ""
+            else:
+                suffix = "_" + subPageName.lower()
+            allSelectors.append(Selector(subPageName, suffix, self.app, tags))
+        return allSelectors
+    
+    def generate(self, repositoryDirs, subPageNames):
         foundMinorVersions = HTMLgen.Container()
         details = TestDetails()
         allMonthSelectors = Set()
@@ -76,17 +69,16 @@ class GenerateWebPages(object):
             self.diag.info("Generating " + version)
             allFiles, tags = self.findTestStateFilesAndTags(repositoryDir)
             if len(allFiles) > 0:
-                for selector in selectors:
-                    selector.setTags(tags)
+                selectors = self.makeSelectors(subPageNames, tags)
                 monthSelectors = SelectorByMonth.makeInstances(tags)
                 allMonthSelectors.update(monthSelectors)
                 allSelectors = selectors + list(reversed(monthSelectors))
                 # If we already have month pages, we only regenerate the current one
                 if len(self.getExistingMonthPages()) == 0:
-                    selectorsToUse = allSelectors
+                    selectors = allSelectors
                 else:
-                    selectorsToUse = selectors + [ monthSelectors[-1] ]
-                    tags = list(reduce(Set.union, (Set(selector.selectedTags) for selector in selectorsToUse), Set()))
+                    selectors.append(monthSelectors[-1])
+                    tags = list(reduce(Set.union, (Set(selector.selectedTags) for selector in selectors), Set()))
                     tags.sort(self.compareTags)
 
                 loggedTests = seqdict()
@@ -94,7 +86,7 @@ class GenerateWebPages(object):
                 for stateFile, repository in allFiles:
                     self.processTestStateFile(stateFile, categoryHandler, loggedTests, repository, tags)
                         
-                for sel in selectorsToUse:
+                for sel in selectors:
                     self.generateAndAddTable(categoryHandler, version, loggedTests, sel)
 
                 # put them in reverse order, most relevant first
@@ -104,7 +96,7 @@ class GenerateWebPages(object):
                 foundMinorVersions.append(HTMLgen.Href("#" + version, self.removePageVersion(version)))
 
         selContainer = HTMLgen.Container()
-        for sel in selectors:
+        for sel in self.makeSelectors(subPageNames):
             target, linkName = sel.getLinkInfo(self.pageVersion)
             selContainer.append(HTMLgen.Href(target, linkName))
 
@@ -202,7 +194,7 @@ class GenerateWebPages(object):
         return ".".join(leftVersions)
 
     def generateAndAddTable(self, categoryHandler, version, loggedTests, selector):
-        testTable = self.createTestTable()
+        testTable = TestTable(self.app)
         table = testTable.generate(categoryHandler, self.pageVersion, version, loggedTests, selector.selectedTags)
         fileName = selector.getLinkInfo(self.pageVersion)[0]
         self.addOverviewPages(fileName, version, table)
@@ -241,6 +233,8 @@ class GenerateWebPages(object):
         return time.mktime(time.strptime(timePart, "%d%b%Y"))
 
 class TestTable:
+    def __init__(self, app):
+        self.app = app
     def generate(self, categoryHandler, pageVersion, version, loggedTests, tagsFound):
         table = HTMLgen.TableLite(border=0, cellpadding=4, cellspacing=2,width="100%")
         table.append(self.generateTableHead(pageVersion, version, tagsFound))
@@ -272,11 +266,10 @@ class TestTable:
         for tag in tagsFound:
             if results.has_key(tag):
                 state = results[tag]
-                type, detail = state.getTypeBreakdown()
-                category = state.category # Strange but correct..... (getTypeBreakdown gives "wrong" category)
-                fgcol, bgcol = self.getColors(category, detail)
+                fgcol, bgcol = self.getColours(state)
                 filteredState = self.filterState(repr(state))
-                if category == "success":
+                detail = state.getTypeBreakdown()[1]
+                if state.category == "success":
                     cellContaint =  HTMLgen.Font(filteredState + detail, color = fgcol)
                 else:
                     cellContaint = HTMLgen.Href(getDetailPageName(pageVersion, tag) + "#" + version + test + extraVersion,
@@ -301,20 +294,24 @@ class TestTable:
         result = re.sub('faster\([^ ]+\) ','', result)
         result = re.sub('slower\([^ ]+\) ','', result)
         return result
-    
-    def getColors(self, type, detail):
+
+    def getColours(self, state):
+        bgcol = colourFinder.find("failure_bg")
         fgcol = colourFinder.find("test_default_fg")
-        if type == "faster" or type == "slower":
+        category = state.category
+        if category.startswith("faster") or category.startswith("slower"):
             bgcol = colourFinder.find("performance_bg")
-            fgcol = colourFinder.find("performance_fg")
-        elif type == "smaller" or type == "larger":
+            if self.getPercent(state) >= self.app.getCompositeConfigValue("performance_variation_serious_%", "cputime"):
+                fgcol = colourFinder.find("performance_fg")
+        elif category == "smaller" or category == "larger":
             bgcol = colourFinder.find("memory_bg")
-            fgcol = colourFinder.find("performance_fg")
-        elif type == "success":
+            if self.getPercent(state) >= self.app.getCompositeConfigValue("performance_variation_serious_%", "memory"):
+                fgcol = colourFinder.find("performance_fg")
+        elif category == "success":
             bgcol = colourFinder.find("success_bg")
-        else:
-            bgcol = colourFinder.find("failure_bg")
         return fgcol, bgcol
+    def getPercent(self, state):
+        return state.getMostSevereFileComparison().perfComparison.percentageChange
     def generateTableHead(self, pageVersion, version, tagsFound):
         head = [ HTMLgen.TH("Test") ]
         for tag in tagsFound:
@@ -472,16 +469,13 @@ class BaseSelector(object):
 
 
 class Selector(BaseSelector):
-    def __init__(self, linkName, suffix, cutoff, weekdays):
+    def __init__(self, linkName, suffix, app, tags):
         super(Selector, self).__init__(linkName, suffix)
-        self.cutoff = cutoff
-        self.weekdays = weekdays
-    def setTags(self, tags):
-        self.selectedTags = tags[-self.cutoff:]
-        if len(self.weekdays) > 0:
-            self.selectedTags = filter(self.matchesWeekday, self.selectedTags)
-    def matchesWeekday(self, tag):
-        return getWeekDay(tag) in self.weekdays
+        cutoff = app.getCompositeConfigValue("historical_report_subpage_cutoff", linkName)
+        weekdays = app.getCompositeConfigValue("historical_report_subpage_weekdays", linkName)
+        self.selectedTags = tags[-cutoff:]
+        if len(weekdays) > 0:
+            self.selectedTags = filter(lambda tag: getWeekDay(tag) in weekdays, self.selectedTags)
     
 
 class SelectorByMonth(BaseSelector):

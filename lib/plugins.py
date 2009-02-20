@@ -143,6 +143,8 @@ def findInstallationRoots():
 
 globalStartTime = time.time()
 installationRoots = findInstallationRoots()
+# Don't read these from Python as the names depend on the locale!
+weekdays = [ "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday" ]
 
 def startTimeString():
     global globalStartTime

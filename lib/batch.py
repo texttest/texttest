@@ -549,25 +549,11 @@ class WebPageResponder(respond.Responder):
             plugins.printException()
 
     def generateWebPages(self, pageDir, app, extraVersions, relevantSubDirs, pageTitle):
-        webPageGeneratorClass = app.getWebPageGeneratorClass()
-        colourDict = app.getConfigValue("historical_report_colours")
-        generator = webPageGeneratorClass(pageTitle, getVersionName(app), pageDir,
-                                          extraVersions, colourDict)
-        generator.generate(relevantSubDirs, self.makeSelectors(app))
+        generator = testoverview.GenerateWebPages(pageTitle, getVersionName(app), pageDir,
+                                                  extraVersions, app)
+        subPageNames = app.getCompositeConfigValue("historical_report_subpages", self.batchSession)
+        generator.generate(relevantSubDirs, subPageNames)
 
-    def makeSelectors(self, app):
-        allSelectors = []
-        firstSubPageName = app.getCompositeConfigValue("historical_report_subpages", "default")[0]
-        for subPageName in app.getCompositeConfigValue("historical_report_subpages", self.batchSession):
-            cutoff = app.getCompositeConfigValue("historical_report_subpage_cutoff", subPageName)
-            weekdays = app.getCompositeConfigValue("historical_report_subpage_weekdays", subPageName)
-            if subPageName == firstSubPageName:
-                suffix = ""
-            else:
-                suffix = "_" + subPageName.lower()
-            allSelectors.append(testoverview.Selector(subPageName, suffix, cutoff, weekdays))
-        return allSelectors
-    
     def findRelevantSubdirectories(self, repository, app, extraVersions):
         subdirs = []
         dirlist = os.listdir(repository)

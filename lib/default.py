@@ -1,5 +1,5 @@
 
-import os, sys, plugins, sandbox, respond, rundependent, comparetest, batch, subprocess, operator, glob, signal, testoverview
+import os, sys, plugins, sandbox, respond, rundependent, comparetest, batch, subprocess, operator, glob, signal
 
 from copy import copy
 from threading import Lock
@@ -651,14 +651,21 @@ class Config:
     def getDefaultMailAddress(self):
         user = os.getenv("USER", "$USER")
         return user + "@localhost"
-    def getWebPageGeneratorClass(self):
-        return testoverview.GenerateWebPages
     def getDefaultTestOverviewColours(self):
-        try:
-            from testoverview import colourFinder
-            return colourFinder.getDefaultDict()
-        except:
-            return {}
+        colours = {}
+        for wkday in plugins.weekdays:
+            colours["run_" + wkday + "_fg"] = "black"
+        colours["column_header_bg"] = "gray1"
+        colours["row_header_bg"] = "#FFFFCC"
+        colours["performance_fg"] = "red6"
+        colours["memory_bg"] = "pink"
+        colours["success_bg"] = "#CEEFBD"
+        colours["failure_bg"] = "#FF3118"
+        colours["no_results_bg"] = "gray2"
+        colours["performance_bg"] = "#FFC6A5"
+        colours["test_default_fg"] = "black"
+        return colours
+
     def getDefaultPageName(self, app):
         pageName = app.fullName
         fullVersion = app.getFullVersion()
@@ -696,6 +703,7 @@ class Config:
         app.setConfigDefault("performance_test_machine", { "default" : [], "memory" : [ "any" ] }, \
                              "List of machines where performance can be collected")
         app.setConfigDefault("performance_variation_%", { "default" : 10.0 }, "How much variation in performance is allowed")
+        app.setConfigDefault("performance_variation_serious_%", { "default" : 0.0 }, "Additional cutoff to performance_variation_% for extra highlighting")                
         app.setConfigDefault("performance_use_normalised_%", { "default" : "true" }, \
                              "Do we interpret performance percentage changes as normalised (symmetric) values?")
         app.setConfigDefault("performance_test_minimum", { "default" : 0.0 }, \

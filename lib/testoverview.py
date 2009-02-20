@@ -11,8 +11,8 @@ HTMLgen.PRINTECHO = 0
 # Don't read these from Python as the names depend on the locale!
 weekdays = [ "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday" ]
 
-def getWeekDayNumber(tag):
-    return time.strptime(tag.split("_")[0], "%d%b%Y")[6]
+def getWeekDay(tag):
+    return weekdays[time.strptime(tag.split("_")[0], "%d%b%Y")[6]]
     
 class ColourFinder:
     def setColourDict(self, colourDict):
@@ -56,12 +56,11 @@ class TitleWithDateStamp:
             
 
 class GenerateWebPages(object):
-    def __init__(self, pageTitle, pageVersion, pageDir, extraVersions, colourDict, buildAllPage):
+    def __init__(self, pageTitle, pageVersion, pageDir, extraVersions, colourDict):
         self.pageTitle = pageTitle
         self.pageVersion = pageVersion
         self.extraVersions = extraVersions
         self.pageDir = pageDir
-        self.buildAllPage = buildAllPage
         self.pagesOverview = seqdict()
         self.pagesDetails = seqdict()
         self.diag = plugins.getDiagnostics("GenerateWebPages")
@@ -69,12 +68,7 @@ class GenerateWebPages(object):
     def createTestTable(self):
         # Hook for configurations to inherit from
         return TestTable()
-    def getSelectorClasses(self):
-        if self.buildAllPage:
-            return [ SelectorLast6Days, SelectorAll ]
-        else:
-            return [ SelectorLast6Days ]
-    def generate(self, repositoryDirs):            
+    def generate(self, repositoryDirs, selectors):
         foundMinorVersions = HTMLgen.Container()
         details = TestDetails()
         allMonthSelectors = Set()
@@ -82,16 +76,17 @@ class GenerateWebPages(object):
             self.diag.info("Generating " + version)
             allFiles, tags = self.findTestStateFilesAndTags(repositoryDir)
             if len(allFiles) > 0:
-                selectors = [ cls(tags) for cls in self.getSelectorClasses() ]
-                monthSelectors = SelectorByMonth.makeInstances(tags, self.buildAllPage)
+                for selector in selectors:
+                    selector.setTags(tags)
+                monthSelectors = SelectorByMonth.makeInstances(tags)
                 allMonthSelectors.update(monthSelectors)
                 allSelectors = selectors + list(reversed(monthSelectors))
                 # If we already have month pages, we only regenerate the current one
-                if self.buildAllPage or len(self.getExistingMonthPages()) == 0:
-                    selectors = allSelectors
+                if len(self.getExistingMonthPages()) == 0:
+                    selectorsToUse = allSelectors
                 else:
-                    selectors.append(monthSelectors[-1])
-                    tags = list(reduce(Set.union, (Set(selector.selectedTags) for selector in selectors), Set()))
+                    selectorsToUse = selectors + [ monthSelectors[-1] ]
+                    tags = list(reduce(Set.union, (Set(selector.selectedTags) for selector in selectorsToUse), Set()))
                     tags.sort(self.compareTags)
 
                 loggedTests = seqdict()
@@ -99,7 +94,7 @@ class GenerateWebPages(object):
                 for stateFile, repository in allFiles:
                     self.processTestStateFile(stateFile, categoryHandler, loggedTests, repository, tags)
                         
-                for sel in selectors:
+                for sel in selectorsToUse:
                     self.generateAndAddTable(categoryHandler, version, loggedTests, sel)
 
                 # put them in reverse order, most relevant first
@@ -109,8 +104,8 @@ class GenerateWebPages(object):
                 foundMinorVersions.append(HTMLgen.Href("#" + version, self.removePageVersion(version)))
 
         selContainer = HTMLgen.Container()
-        for selClass in self.getSelectorClasses():
-            target, linkName = selClass().getLinkInfo(self.pageVersion)
+        for sel in selectors:
+            target, linkName = sel.getLinkInfo(self.pageVersion)
             selContainer.append(HTMLgen.Href(target, linkName))
 
         monthContainer = HTMLgen.Container()
@@ -330,8 +325,7 @@ class TestTable:
         cap = HTMLgen.Caption(HTMLgen.Font(version, size = 10))
         return HTMLgen.Container(cap, heading)
     def findTagColour(self, tag):
-        wkDayNo = getWeekDayNumber(tag)
-        return colourFinder.find("run_" + weekdays[wkDayNo] + "_fg")
+        return colourFinder.find("run_" + getWeekDay(tag) + "_fg")
         
 class TestDetails:
     def generate(self, categoryHandler, version, tags, linkFromDetailsToOverview):
@@ -466,56 +460,45 @@ def getDetailPageName(pageVersion, tag):
     return "test_" + pageVersion + "_" + tag + ".html"
 
 
-class Selector(object):
-    def __init__(self, tags=[]):
-        self.selectedTags = tags
+class BaseSelector(object):
+    def __init__(self, linkName, suffix):
+        self.selectedTags = []
+        self.linkName = linkName
+        self.suffix = suffix
+    def add(self, tag):
+        self.selectedTags.append(tag)
     def getLinkInfo(self, pageVersion):
-        return "test_" + pageVersion + self.getFileNameExtension() + ".html", self.linkName()
-    def getFileNameExtension(self):
-        return ""
-    def linkName(self):
-        return ""
+        return "test_" + pageVersion + self.suffix + ".html", self.linkName
 
-class SelectorLast6Days(Selector):
-    def __init__(self, tags=[]):
-        if len(tags) > 6:
-            self.selectedTags = tags[-6:]
-        else:
-            self.selectedTags = tags
-            
-    def linkName(self):
-        return "Last six runs"
 
-class SelectorAll(Selector):
-    def linkName(self):
-        return "All"
-    def getFileNameExtension(self):
-        return "_all"
+class Selector(BaseSelector):
+    def __init__(self, linkName, suffix, cutoff, weekdays):
+        super(Selector, self).__init__(linkName, suffix)
+        self.cutoff = cutoff
+        self.weekdays = weekdays
+    def setTags(self, tags):
+        self.selectedTags = tags[-self.cutoff:]
+        if len(self.weekdays) > 0:
+            self.selectedTags = filter(self.matchesWeekday, self.selectedTags)
+    def matchesWeekday(self, tag):
+        return getWeekDay(tag) in self.weekdays
+    
 
-class SelectorByMonth(Selector):
+class SelectorByMonth(BaseSelector):
     @classmethod
-    def makeInstances(cls, tags, buildAllPage):
-        if buildAllPage:
-            return [] # Don't do the months if we build an All page currently...
+    def makeInstances(cls, tags):
         allSelectors = {}
         for tag in tags:
             month = tag[2:9]
             allSelectors.setdefault(month, SelectorByMonth(month)).add(tag)
         return sorted(allSelectors.values())
     def __init__(self, month):
-        self.month = month
-        self.selectedTags = []
-    def add (self, tag):
-        self.selectedTags.append(tag)
+        super(SelectorByMonth, self).__init__(month, "_all_" + month)
     def getMonthTime(self):
-        return time.mktime(time.strptime(self.month, "%b%Y"))
+        return time.mktime(time.strptime(self.linkName, "%b%Y"))
     def __cmp__(self, other):
         return cmp(self.getMonthTime(), other.getMonthTime())
-    def linkName(self):
-        return self.month
-    def getFileNameExtension(self):
-        return "_all_" + self.month
     def __eq__(self, other):
-        return self.month == other.month
+        return self.linkName == other.linkName
     def __hash__(self):
-        return self.month.__hash__()
+        return self.linkName.__hash__()

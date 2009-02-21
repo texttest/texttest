@@ -137,9 +137,6 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
         info = open(fullPath).read()  
         return info.strip().rstrip(os.sep)
             
-    def getCVSRepository(self):
-        # Join the dir/CVS/Root and dir/CVS/Repository files.
-        return os.path.join(self.getCVSRoot(), self.getCVSFileContents("Repository"))
     def getApplicationPath(self):
         return self.currTestSelection[0].app.getDirectory()
     def getRootPath(self):
@@ -918,7 +915,7 @@ class CVSStatus(CVSAction):
         return message
     
     def showPopupMenu(self, treeview, event):
-        if event.button == 3:
+        if event.button == 3: # pragma: no cover - replaying doesn't actually press the button
             self.popupMenu.popup(None, None, None, event.button, event.time)
             return True
 

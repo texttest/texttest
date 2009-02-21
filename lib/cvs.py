@@ -113,7 +113,8 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
     def viewGraphicalDiff(self, button):
         path = self.filteredTreeModel.get_value(self.treeView.get_selection().get_selected()[1], 2)
         guiplugins.guilog.info("Viewing CVS differences for file '" + path + "' graphically ...")
-        cvsDiffProgram = "tkdiff" # Hardcoded for now ...
+        pathStem = os.path.basename(path).split(".")[0]
+        cvsDiffProgram = guiplugins.guiConfig.getCompositeValue("diff_program", pathStem)
         try:
             cmdArgs = [ cvsDiffProgram ] + self.getRevisionOptions() + [ path ]
             guiplugins.processMonitor.startProcess(cmdArgs, description="Graphical CVS diff for file " + path,

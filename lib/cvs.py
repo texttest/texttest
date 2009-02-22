@@ -426,7 +426,8 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
     def getFilesFromDirRecursive(self, dirName):
         allFiles = []
         for root, dirs, files in os.walk(dirName):
-            dirs.remove("CVS")
+            if "CVS" in dirs:
+                dirs.remove("CVS")
             for f in sorted(files):
                 allFiles.append(os.path.join(root, f))
         return allFiles
@@ -833,8 +834,6 @@ class CVSStatus(CVSAction):
         # need to add the prefix to <file>
         prevLine = ""
         for line in outputLines:
-            if line.startswith("cvs status: Examining "):
-                continue
             if line.startswith("File: "):
                 spaceAfterNamePos = line.find("\t", 7)
                 info = line[spaceAfterNamePos:].replace("Status: ", "").strip(" \n\t")

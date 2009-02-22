@@ -6,3 +6,4 @@ lib/setup.py
 lib/usecase.py
 generic
 site
+coverage_tmp

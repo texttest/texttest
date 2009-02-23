@@ -87,7 +87,10 @@ class GenerateWebPages(object):
                     self.processTestStateFile(stateFile, categoryHandler, loggedTests, repository, tags)
                         
                 for sel in selectors:
-                    self.generateAndAddTable(categoryHandler, version, loggedTests, sel)
+                    page = self.getPage(sel)
+                    if len(repositoryDirs) > 1:
+                        self.addVersionHeader(page, version)
+                    self.addTable(page, categoryHandler, version, loggedTests, sel)
 
                 # put them in reverse order, most relevant first
                 linkFromDetailsToOverview = [ sel.getLinkInfo(self.pageVersion) for sel in allSelectors ]
@@ -193,19 +196,28 @@ class GenerateWebPages(object):
                 leftVersions.append(subVersion)
         return ".".join(leftVersions)
 
-    def generateAndAddTable(self, categoryHandler, version, loggedTests, selector):
-        testTable = TestTable(self.app)
-        table = testTable.generate(categoryHandler, self.pageVersion, version, loggedTests, selector.selectedTags)
+    def getPage(self, selector):
         fileName = selector.getLinkInfo(self.pageVersion)[0]
-        self.addOverviewPages(fileName, version, table)
-    
-    def addOverviewPages(self, fileName, version, table):
-        if not self.pagesOverview.has_key(fileName):
-            style = "body,td {color: #000000;font-size: 11px;font-family: Helvetica;} th {color: #000000;font-size: 13px;font-family: Helvetica;}"
-            title = TitleWithDateStamp("Test results for " + self.pageTitle) 
-            self.pagesOverview[fileName] = HTMLgen.SimpleDocument(title=title, style=style)
-        self.pagesOverview[fileName].append(HTMLgen.Name(version))
-        self.pagesOverview[fileName].append(table)
+        return self.pagesOverview.setdefault(fileName, self.createPage())
+        
+    def createPage(self):
+        style = "body,td {color: #000000;font-size: 11px;font-family: Helvetica;} th {color: #000000;font-size: 13px;font-family: Helvetica;}"
+        title = TitleWithDateStamp("Test results for " + self.pageTitle)
+        return HTMLgen.SimpleDocument(title=title, style=style)
+
+    def addVersionHeader(self, page, version):
+        page.append(HTMLgen.HR())
+        page.append(HTMLgen.Name(version))
+        page.append(HTMLgen.U(HTMLgen.Heading(1, version, align = 'center')))
+        
+    def addTable(self, page, categoryHandler, version, loggedTests, selector):
+        testTable = TestTable(self.app)
+        extraVersions = loggedTests.keys()[1:]
+        if len(extraVersions) > 0:
+            page.append(testTable.generateExtraVersionLinks(version, extraVersions))
+
+        table = testTable.generate(categoryHandler, self.pageVersion, version, loggedTests, selector.selectedTags)
+        page.append(table)
         
     def addDetailPages(self, details):
         for tag in details.keys():
@@ -235,31 +247,43 @@ class GenerateWebPages(object):
 class TestTable:
     def __init__(self, app):
         self.app = app
+
     def generate(self, categoryHandler, pageVersion, version, loggedTests, tagsFound):
         table = HTMLgen.TableLite(border=0, cellpadding=4, cellspacing=2,width="100%")
         table.append(self.generateTableHead(pageVersion, version, tagsFound))
         table.append(categoryHandler.generateSummaries(pageVersion, version, tagsFound))
-        extraVersions = loggedTests.keys()
-        for extraVersion in extraVersions:
+        firstVersion = loggedTests.keys()[0]
+        for extraVersion, testInfo in loggedTests.items():
             # Add an extra line in the table only if there are several versions.
-            if len(extraVersions) > 1:
-                table.append(self.generateExtraVersionHeader(extraVersion, version, tagsFound))
+            if extraVersion != firstVersion:
+                fullVersion = self.getCompositeVersion(version, extraVersion)
+                table.append(self.generateExtraVersionHeader(fullVersion, tagsFound))
 
-            tests = loggedTests[extraVersion].keys()
-            tests.sort()
-            for test in tests:
-                results = loggedTests[extraVersion][test]
+            for test in sorted(testInfo.keys()):
+                results = testInfo[test]
                 table.append(self.generateTestRow(test, pageVersion, version, extraVersion, results, tagsFound))
 
         table.append(HTMLgen.BR())
         return table
-    def generateExtraVersionHeader(self, extraVersion, version, tagsFound):
-        fullName = version
-        if len(extraVersion):
-            fullName += "." + extraVersion
+
+    def generateExtraVersionLinks(self, version, extraVersions):
+        cont = HTMLgen.Container()
+        for extra in extraVersions:
+            fullName = self.getCompositeVersion(version, extra)
+            cont.append(HTMLgen.Href("#" + fullName, extra))
+        return HTMLgen.Heading(2, cont, align='center')
+    
+    def getCompositeVersion(self, v1, v2):
+        if len(v2):
+            return v1 + "." + v2
+        else:
+            return v1
+    
+    def generateExtraVersionHeader(self, extraVersion, tagsFound):
         bgColour = colourFinder.find("column_header_bg")
-        columnHeader = HTMLgen.TH(fullName, colspan = len(tagsFound) + 1, bgcolor=bgColour)
-        return HTMLgen.TR(columnHeader)
+        columnHeader = HTMLgen.TH(extraVersion, colspan = len(tagsFound) + 1, bgcolor=bgColour)
+        return HTMLgen.Container(HTMLgen.Name(extraVersion), HTMLgen.TR(columnHeader))
+    
     def generateTestRow(self, test, pageVersion, version, extraVersion, results, tagsFound):
         bgColour = colourFinder.find("row_header_bg")
         row = [ HTMLgen.TD(HTMLgen.Container(HTMLgen.Name(version + test + extraVersion), test), bgcolor=bgColour) ]
@@ -310,8 +334,13 @@ class TestTable:
         elif category == "success":
             bgcol = colourFinder.find("success_bg")
         return fgcol, bgcol
+
     def getPercent(self, state):
         return state.getMostSevereFileComparison().perfComparison.percentageChange
+
+    def findTagColour(self, tag):
+        return colourFinder.find("run_" + getWeekDay(tag) + "_fg")
+
     def generateTableHead(self, pageVersion, version, tagsFound):
         head = [ HTMLgen.TH("Test") ]
         for tag in tagsFound:
@@ -319,10 +348,8 @@ class TestTable:
             head.append(HTMLgen.TH(HTMLgen.Href(getDetailPageName(pageVersion, tag), HTMLgen.Font(getDisplayText(tag), color=tagColour))))
         heading = HTMLgen.TR()
         heading = heading + head
-        cap = HTMLgen.Caption(HTMLgen.Font(version, size = 10))
-        return HTMLgen.Container(cap, heading)
-    def findTagColour(self, tag):
-        return colourFinder.find("run_" + getWeekDay(tag) + "_fg")
+        return heading
+
         
 class TestDetails:
     def generate(self, categoryHandler, version, tags, linkFromDetailsToOverview):

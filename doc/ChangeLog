@@ -1258,10 +1258,6 @@ Fixes for older bugs:
 
 Version 3.13
 ============
-System requirements (see Migration Notes):
-Major Enhancements:
-General GUI Enhancements:
-Static GUI Enhancements:
 Dynamic GUI Enhancements:
     - "Save As" dialog has a new field "Version to save previous results as"
 	Means old default results can be preserved as a version, for example after a branch of the codebase
@@ -1284,23 +1280,30 @@ Framework Enhancements:
 	Along with a script to regenerate it if desired.
     - Site-specific configuration files now read from site/etc/config if present (testmodel.py)
     - New command-line option --vanilla which starts TextTest without personal (or site-specific) configuration. (testmodel.py)
+    - Traffic mechanism's algorithm for inexact matches with previous commands improved (traffic.py)
+	It previously tended to prefer arguments to disappear entirely than to change to something else.
     - Can now get stacktraces from running TextTest processes on UNIX (engine.py)
 	Send it SIGQUIT. Thread structure simplified also to make this more useful.
     - We now restart Xvfb (virtual server on UNIX) if it crashes before its time (unixonly.py)
 	This prevents one Xvfb crash causing multiple test failures.
-Batch Report Enhancements:
+Historical HTML Batch Report Enhancements:
     - HTML report now organises history into months instead of generating an "All" page (testoverview.py)
-	The old behaviour can however be restored by setting "historical_report_all_page" to "true".
+	It's much more flexible now and the old behaviour can be restored. See Migration notes and website.
+    - Now creates links to "extra versions" from the top of each major version (testoverview.py)
+    - Now include date of generation in page title (testoverview.py)
+    - HTML table headers are now 13-point font and should be easier to read (testoverview.py)
+    - "Last Six Days" page is now called "Last Six Runs" for consistency with named runs (testoverview.py)
+Email Batch Report Enhancements:
     - New config file setting "batch_collect_max_age_days"
 	This is used to prevent the email report finding old results if the new ones are not present (batch.py)
     - New config file setting "batch_collect_compulsory_version"
 	This is used to generate error messages in the email report if results are not found for some version (batch.py)
-    - Now include date of generation in page title (testoverview.py)
-    - HTML table headers are now 13-point font and should be easier to read (testoverview.py)
 Grid Engine (LSF/SGE) enhancements:
     - Information about other processes on the machine improved (queuesystem.py)
 	Doesn't report itself, picks up processes from other users (SGE) and reports the job ID
 Installation and self-test changes:
+    - Self-tests (and source code) are now available from Launchpad, if you're changing the code you should get them from there 
+    - CVS browser tests greatly improved and come with an entire CVS repository. (cvs.py)
 Bug Fixes:
     - Reconnecting to runs done with -v v1,v2 is now possible (reconnect.py)
 	Though they generate rather longer temporary path names to make this possible
@@ -1308,6 +1311,11 @@ Bug Fixes:
 	Previously you had to fill in the version in the matching field.
     - Fixed problem where scripts such as the HTML report builder could not be interrupted (engine.py)
 	They now respond appropriately to signals.
+    - Don't fail to cleanup sandbox if the SUT creates readonly files (plugins.py)
+	We change permissions if needed before removing now.
+    - "CVS log" now handles date format produced by CVS 1.12 (cvs.py)
+	Previously only tested on CVS 1.11
+    - "tkdiff" no longer hardcoded as graphical difference tool in CVS browser, uses "diff_program" as it should (cvs.py)
     - When the same dialog is created twice, start with previously hand-entered values in preference to those from gui_entry_override (guiplugins.py)
     - Can now add two applications from the static GUI as part of the same run (texttestgui.py)
     - Can now load selections from multiple version runs into a single-version run, usually static GUI (plugins.py)

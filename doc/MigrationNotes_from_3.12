@@ -1,6 +1,7 @@
 
-There is almost certainly no migration needed. But a few things in TextTest 3.13
-will be different from 3.12 by default. This is worth a quick scan in case any of
+There is almost certainly no migration needed. There are very few GUI changes at all: version 3.12
+has concentrated on the HTML report and various internal things. A few things in TextTest 3.13
+will be different from 3.12 by default : this is worth a quick scan in case any of
 this applies to you.
 
 =========================================================
@@ -14,7 +15,12 @@ to speed up generation of the pages once there is lots of data, as the older pag
 to be regenerated. Also to avoid creating a huge All page that the browser can't really handle.
 
 If you really miss your All page the behaviour from 3.12 can be restored by setting the config
-file setting "historical_report_all_page" to "true".
+file setting "historical_report_subpages" to "All".
+
+There are quite a few things you can do that you can't do before. You can specify your own subpages:
+the above is not a magic name: it just tells it to create a page called "All" with no filtering. You
+can also create pages for certain weekdays and with certain cutoffs back in time (as in the "Last Six
+Runs" page which is present by default). See the website for how to do this.
 
 (2) import_config_file now behaves like "import" in Python or #include in C
 ===========================================================================
@@ -23,10 +29,10 @@ config file at that point.
 
 Obviously this isn't guaranteed to behave the same as in version 3.12, where settings in the config file always
 had priority over those in the imported file. Now it depends on where the file is imported which setting will be
-used.
+preferred in the case of a conflict.
 
 It's obviously more flexible (imported files can import other files, for example) and should be more
-intuitive but it's possible your config files aren't back-compatible.
+intuitive but there's a small possibibility your config files aren't completely back-compatible.
  
 (3) Extra syntax checking on your config file
 =============================================
@@ -38,6 +44,3 @@ will deserve them... in particular mistakenly missing [end] markers will create 
 Instead of $TEXTTEST_HOME/Diagnostics. But it is still configurable as before. The configuration file
 lives with the source in the log subdirectory and should probably be copied to the above location
 and edited as desired if you need to debug TextTest this way.
-
-
-

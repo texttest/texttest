@@ -847,7 +847,7 @@ class CVSStatus(CVSAction):
       </popup>
     </ui>'''
     def __init__(self, *args):
-        CVSAction.__init__(self, [ "status", "-l" ], *args)
+        CVSAction.__init__(self, [ "status" ], *args)
         self.uiManager = gtk.UIManager()
         self.popupMenu = None
     def _getTitle(self):
@@ -943,13 +943,6 @@ class CVSStatus(CVSAction):
             self.popupMenu.popup(None, None, None, event.button, event.time)
             return True
 
-class CVSStatusRecursive(CVSStatus):
-    recursive = True
-    def __init__(self, *args):
-        CVSStatus.__init__(self, *args)
-        self.cvsArgs = [ "status" ]
-
-
 class CVSAnnotate(CVSAction):
     def __init__(self, *args):
         CVSAction.__init__(self, [ "annotate" ], *args)
@@ -958,6 +951,8 @@ class CVSAnnotate(CVSAction):
     def getResultTitle(self):
         return "annotations"
 
+class CVSStatusRecursive(CVSStatus):
+    recursive = True
         
 class CVSAnnotateRecursive(CVSAnnotate):
     recursive = True    

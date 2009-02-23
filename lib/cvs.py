@@ -39,22 +39,50 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
         guiplugins.ActionResultDialogGUI.__init__(self, allApps)
         self.cvsArgs = cvsArgs
         self.dynamic = dynamic
-    def getTitle(self, includeMnemonics=False):
+        self.needsAttention = False
+        self.notInRepository = False
+    def getTitle(self, includeMnemonics=False, adjectiveAfter=True):
         title = self._getTitle()
-        if self.recursive:
-            title = title.replace("_", "") + " Recursive"
-        if includeMnemonics:
-            return title
-        else:
+        if self.recursive or not includeMnemonics:
+            title = title.replace("_", "")
+        if not includeMnemonics:
             # distinguish these from other actions that may have these names
-            return "CVS " + title.replace("_", "")
-        
-    def getTooltip(self):
+            title = "CVS " + title
         if self.recursive:
-            return "recursive " + self._getTooltip()
-        else:
-            return self._getTooltip()
+            if adjectiveAfter:
+                title += " Recursive"
+            else:
+                title = "Recursive " + title
+        return title
+            
+    def getTooltip(self):
+        return self.getTitle(adjectiveAfter=False).lower() + " for the selected " + self.actsOn()
 
+    def actsOn(self):
+        return "files"
+
+    def getResultDialogIconType(self):
+        if self.notInRepository or self.needsAttention:
+            return gtk.STOCK_DIALOG_WARNING
+        else:
+            return gtk.STOCK_DIALOG_INFO
+
+    def getResultDialogMessage(self):
+        message = "CVS " + self.getResultTitle() + " shown below."
+        if self.needsAttention:
+            message += "\nCVS " + self.getResultTitle() + " found files which are not up-to-date or which have conflicts"
+        if self.notInRepository:
+            message += "\nSome files/directories were not under CVS control."
+        message += "\nCVS command used: " + " ".join(self.getCVSCmdArgs())
+        if not self.recursive:
+            message += "\nSubdirectories were ignored, use " + self.getTitle() + " Recursive to get the " + self.getResultTitle() + " for all subdirectories."
+        return message
+
+    def extraResultDialogWidgets(self):
+        all = ["log", "status", "diff", "annotate" ]
+        all.remove(self.cvsArgs[0])
+        return all
+    
     def getCVSCmdArgs(self):
         cvsRoot = os.getenv("CVSROOT")
         if cvsRoot:
@@ -130,10 +158,6 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
         return "Information"
     def getResultDialogTitle(self):
         return self.getTooltip()
-    def getResultDialogIconType(self): # pragma: no cover - implemented in all subclasses
-        return gtk.STOCK_DIALOG_INFO
-    def extraResultDialogWidgets(self): # pragma: no cover - implemented in all subclasses
-        return [] 
     def getSelectedFile(self):
         return self.filteredTreeModel.get_value(self.treeView.get_selection().get_selected()[1], 3)
     def viewStatus(self, button):
@@ -319,7 +343,7 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
         self.extraWidgetArea.pack_start(self.revision1, expand=False, fill=False)
         self.extraWidgetArea.pack_start(label2, expand=False, fill=False)
         self.extraWidgetArea.pack_start(self.revision2, expand=False, fill=False)
-        guiplugins.scriptEngine.connect("show CVS diffs", "clicked", diffButton, self.viewDiffs)
+        guiplugins.scriptEngine.connect("show CVS differences", "clicked", diffButton, self.viewDiffs)
 
     def addGraphicalDiffWidget(self):
         button = gtk.Button("_Graphical Diffs")
@@ -496,13 +520,6 @@ class CVSLog(CVSAction):
         self.ignorePresence = ignorePresence
     def _getTitle(self):
         return "_Log"
-    def _getTooltip(self):
-        return "cvs log for the selected files"
-    def getResultDialogIconType(self):
-        if not self.notInRepository:           
-            return gtk.STOCK_DIALOG_INFO
-        else:
-            return gtk.STOCK_DIALOG_WARNING
     def getResultDialogMessage(self):
         if self.notInRepository:
             message = "Showing logs for the CVS controlled files.\nSome directories were not under CVS control.\nCVS log command used: " + " ".join(self.getCVSCmdArgs())
@@ -515,8 +532,6 @@ class CVSLog(CVSAction):
         return True
     def getResultDialogSecondColumnTitle(self):
         return "Last revision committed (UTC)"
-    def extraResultDialogWidgets(self):
-        return ["status", "annotate", "diff"]
     def runAndParse(self):
         self.notInRepository = False
         if len(self.currTestSelection) > 0:
@@ -617,8 +632,8 @@ class CVSLogLatest(CVSLog):
         self.cvsArgs = [ "log", "-N", "-l", "-rHEAD" ]
     def _getTitle(self):
         return "Log Latest"
-    def _getTooltip(self):
-        return "cvs log latest for the selected test"
+    def actsOn(self):
+        return "test"
     def getResultDialogMessage(self):
         message = "Showing latest log entries for the CVS controlled files.\nCVS log command used: " + " ".join(self.cvsArgs)
         if not self.recursive:
@@ -731,8 +746,6 @@ class CVSDiff(CVSAction):
         self.revision2 = rev2
     def _getTitle(self):
         return "_Difference"
-    def _getTooltip(self):
-        return "cvs diff for the selected files" 
     def getResultDialogIconType(self):
         if len(self.pages) == 0 and not self.notInRepository:            
             return gtk.STOCK_DIALOG_INFO
@@ -766,7 +779,7 @@ class CVSDiff(CVSAction):
             message += "\nSubdirectories were ignored, use CVS Difference Recursive to see differences for all subdirectories."
         return message
     def extraResultDialogWidgets(self):
-        return ["status", "log", "annotate", "graphical_diff"]
+        return CVSAction.extraResultDialogWidgets(self) + ["graphical_diff"]
     def runAndParse(self):
         self.notInRepository = False
         if len(self.currTestSelection) > 0:
@@ -839,26 +852,8 @@ class CVSStatus(CVSAction):
         self.popupMenu = None
     def _getTitle(self):
         return "_Status"
-    def _getTooltip(self):
-        return "cvs status for the selected files"
     def getResultDialogTwoColumnsInTreeView(self):
         return True
-    def getResultDialogIconType(self):
-        if self.needsAttention:            
-            return gtk.STOCK_DIALOG_WARNING
-        else:
-            return gtk.STOCK_DIALOG_INFO
-    def getResultDialogMessage(self):
-        if self.needsAttention:
-            message = "CVS status found files which are not up-to-date or which have conflicts, or\ndirectories which are not under CVS control."
-        else:
-            message = "CVS status shown below."
-        message += "\nCVS command used: " + " ".join(self.getCVSCmdArgs())
-        if not self.recursive:
-            message += "\nSubdirectories were ignored, use CVS Status Recursive to get the status for all subdirectories."
-        return message
-    def extraResultDialogWidgets(self):
-        return ["log", "annotate", "diff"]
     
     def findStatus(self, output):
         for line in output.splitlines():
@@ -877,7 +872,9 @@ class CVSStatus(CVSAction):
  
     def parseOutput(self, output, fileName):
         status = self.findStatus(output)
-        if status in self.cvsErrorStates:
+        if status == "Unknown":
+            self.notInRepository = True
+        elif status in self.cvsErrorStates:
             self.needsAttention = True
         return self.getStatusMarkup(status)
             
@@ -955,36 +952,15 @@ class CVSStatusRecursive(CVSStatus):
 
 class CVSAnnotate(CVSAction):
     def __init__(self, *args):
-        CVSAction.__init__(self, [ "annotate", "-l" ], *args)
+        CVSAction.__init__(self, [ "annotate" ], *args)
     def _getTitle(self):
         return "A_nnotate"
     def getResultTitle(self):
         return "annotations"
-    def _getTooltip(self):
-        return "cvs annotate for the selected files"
-    def getResultDialogIconType(self):
-        if not self.notInRepository:           
-            return gtk.STOCK_DIALOG_INFO
-        else:
-            return gtk.STOCK_DIALOG_WARNING
-    def getResultDialogMessage(self):
-        message = "CVS annotations shown below."
-        if self.notInRepository:
-            message += "\nSome files/directories were not under CVS control."
-        message += "\nCVS command used: " + " ".join(self.getCVSCmdArgs())
-        if not self.recursive:
-            message += "\nSubdirectories were ignored, use CVS Annotate Recursive to get the annotations for all subdirectories."
-        return message
-    def extraResultDialogWidgets(self):
-        return ["log", "status", "diff"]
 
         
 class CVSAnnotateRecursive(CVSAnnotate):
-    recursive = True
-    def __init__(self, *args):
-        CVSAnnotate.__init__(self, *args)
-        self.cvsArgs = [ "annotate" ]
-    
+    recursive = True    
 
 
 #

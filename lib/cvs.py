@@ -34,18 +34,27 @@ import gtk, plugins, custom_widgets, entrycompletion
 # Base class for all CVS actions.
 #
 class CVSAction(guiplugins.ActionResultDialogGUI):
+    recursive = False
     def __init__(self, cvsArgs, allApps=[], dynamic=False):
         guiplugins.ActionResultDialogGUI.__init__(self, allApps)
         self.cvsArgs = cvsArgs
-        self.recursive = False
         self.dynamic = dynamic
     def getTitle(self, includeMnemonics=False):
         title = self._getTitle()
+        if self.recursive:
+            title = title.replace("_", "") + " Recursive"
         if includeMnemonics:
             return title
         else:
             # distinguish these from other actions that may have these names
             return "CVS " + title.replace("_", "")
+        
+    def getTooltip(self):
+        if self.recursive:
+            return "recursive " + self._getTooltip()
+        else:
+            return self._getTooltip()
+
     def getCVSCmdArgs(self):
         cvsRoot = os.getenv("CVSROOT")
         if cvsRoot:
@@ -54,12 +63,56 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
             cvsRoot = self.getCVSFileContents("Root")
             return [ "cvs", "-d", cvsRoot ] + self.cvsArgs
         
-    def runCommand(self, args):
+    def runCommandOld(self, args):
         try:
             process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
         except OSError:
             raise plugins.TextTestError, "Could not run CVS: make sure you have it installed locally"
         return process.stdout.readlines()
+
+    def runCommand(self, args):
+        try:
+            process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        except OSError:
+            raise plugins.TextTestError, "Could not run CVS: make sure you have it installed locally"
+
+        stdout, stderr = process.communicate()
+        if process.returncode:
+            self.notInRepository = True
+            return stderr
+        else:
+            return stdout
+
+    def getResultTitle(self):
+        return self._getTitle().replace("_", "").lower()
+
+    def runAndParse(self):
+        self.notInRepository = False
+        self.needsAttention = False
+        if len(self.currTestSelection) > 0:
+            rootDir = self.getRootPath()
+        for test in self.currTestSelection:
+            fileArgs = self.getFilesForCVS(test)
+            if len(fileArgs) > 0:
+                self.notify("Status", "Getting " + self.getResultTitle() + " for " + test.getRelPath())
+                self.notify("ActionProgress", "")
+                for fileArg in fileArgs:
+                    for fileName in self.getFileNames(fileArg):
+                        self.runAndParseFile(fileName, rootDir, test)
+
+    def runAndParseFile(self, fileName, rootDir, test):
+        args = self.getCVSCmdArgs() + [ fileName ]
+        output = self.runCommand(args)
+        info = self.parseOutput(output, fileName)
+        relativeFilePath = self.getRelativePath(fileName, rootDir)
+        self.fileToTest[relativeFilePath] = test
+        self.pages.append((relativeFilePath, output, info))
+        self.notify("Status", "Analyzing " + self.getResultTitle() + " for " + relativeFilePath.strip('\n'))
+        self.notify("ActionProgress", "")
+                        
+    def parseOutput(self, output, fileName):
+        return fileName        
+    
     def updateSelection(self, *args):
         newActive = guiplugins.ActionResultDialogGUI.updateSelection(self, *args)
         if not self.dynamic: # See bugzilla 17653
@@ -443,7 +496,7 @@ class CVSLog(CVSAction):
         self.ignorePresence = ignorePresence
     def _getTitle(self):
         return "_Log"
-    def getTooltip(self):
+    def _getTooltip(self):
         return "cvs log for the selected files"
     def getResultDialogIconType(self):
         if not self.notInRepository:           
@@ -474,7 +527,7 @@ class CVSLog(CVSAction):
                 self.notify("Status", "Logging " + test.getRelPath())
                 self.notify("ActionProgress", "")
                 args = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...
-                self.parseOutput(self.runCommand(args), rootDir, test)
+                self.parseOutput(self.runCommandOld(args), rootDir, test)
         
     def parseOutput(self, outputLines, rootDir, test):
         # The section for each file starts with
@@ -552,22 +605,19 @@ class CVSLog(CVSAction):
 
 
 class CVSLogRecursive(CVSLog):
+    recursive = True
     def __init__(self, *args, **kwargs):
         CVSLog.__init__(self, *args, **kwargs)
         self.cvsArgs = [ "log", "-N" ]
-        self.recursive = True
-    def _getTitle(self):
-        return "Log Recursive"
-    def getTooltip(self):
-        return "recursive " + CVSLog.getTooltip(self)
-
+        
+     
 class CVSLogLatest(CVSLog):
     def __init__(self, *args):
         CVSLog.__init__(self, *args)
         self.cvsArgs = [ "log", "-N", "-l", "-rHEAD" ]
     def _getTitle(self):
         return "Log Latest"
-    def getTooltip(self):
+    def _getTooltip(self):
         return "cvs log latest for the selected test"
     def getResultDialogMessage(self):
         message = "Showing latest log entries for the CVS controlled files.\nCVS log command used: " + " ".join(self.cvsArgs)
@@ -586,7 +636,7 @@ class CVSLogLatest(CVSLog):
                 self.notify("Status", "Logging " + test.getRelPath())
                 self.notify("ActionProgress", "")
                 cmdArgs = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...
-                self.parseOutput(self.runCommand(cmdArgs), rootDir, test)
+                self.parseOutput(self.runCommandOld(cmdArgs), rootDir, test)
     def parseOutput(self, outputLines, rootDir, test):
         # Each file has something like:
         #
@@ -674,7 +724,6 @@ class CVSLogLatest(CVSLog):
 class CVSDiff(CVSAction):
     def __init__(self, *args):
         CVSAction.__init__(self, [ "diff", "-N", "-l" ], *args)
-        self.recursive = False
         self.revision1 = ""
         self.revision2 = ""
     def setRevisions(self, rev1, rev2):
@@ -682,7 +731,7 @@ class CVSDiff(CVSAction):
         self.revision2 = rev2
     def _getTitle(self):
         return "_Difference"
-    def getTooltip(self):
+    def _getTooltip(self):
         return "cvs diff for the selected files" 
     def getResultDialogIconType(self):
         if len(self.pages) == 0 and not self.notInRepository:            
@@ -728,7 +777,7 @@ class CVSDiff(CVSAction):
                 self.notify("Status", "Diffing " + test.getRelPath())
                 self.notify("ActionProgress", "")
                 args = self.getCVSCmdArgs() + self.getRevisionOptions() + fileArgs # Popen doesn't like spaces in args ...
-                self.parseOutput(self.runCommand(args), rootDir, test)
+                self.parseOutput(self.runCommandOld(args), rootDir, test)
 
     def parseOutput(self, outputLines, rootDir, test):
         # The section for each file starts with
@@ -769,15 +818,11 @@ class CVSDiff(CVSAction):
             self.pages.append((relPath, currentOutput, currentFile))
 
 class CVSDiffRecursive(CVSDiff):
+    recursive = True
     def __init__(self, *args):
         CVSDiff.__init__(self, *args)
         self.cvsArgs = [ "diff", "-N" ]
-        self.recursive = True
-    def _getTitle(self):
-        return "Difference Recursive"
-    def getTooltip(self):
-        return "recursive " + CVSDiff.getTooltip(self)
-
+        
 
 class CVSStatus(CVSAction):
     # Googled up.
@@ -794,7 +839,7 @@ class CVSStatus(CVSAction):
         self.popupMenu = None
     def _getTitle(self):
         return "_Status"
-    def getTooltip(self):
+    def _getTooltip(self):
         return "cvs status for the selected files"
     def getResultDialogTwoColumnsInTreeView(self):
         return True
@@ -814,22 +859,9 @@ class CVSStatus(CVSAction):
         return message
     def extraResultDialogWidgets(self):
         return ["log", "annotate", "diff"]
-    def runAndParse(self):
-        self.needsAttention = False
-        if len(self.currTestSelection) > 0:
-            rootDir = self.getRootPath()
-        for test in self.currTestSelection:
-            fileArgs = self.getFilesForCVS(test)
-            if len(fileArgs) > 0:
-                self.notify("Status", "Getting status for " + test.getRelPath())
-                self.notify("ActionProgress", "")
-                for fileArg in fileArgs:
-                    for fileName in self.getFileNames(fileArg):
-                        args = self.getCVSCmdArgs() + [ fileName ] 
-                        self.parseOutput(self.runCommand(args), fileName, rootDir, test)
-
-    def findStatus(self, outputLines):
-        for line in outputLines:
+    
+    def findStatus(self, output):
+        for line in output.splitlines():
             if line.startswith("File: "):
                 spaceAfterNamePos = line.find("\t", 7)
                 return line[spaceAfterNamePos:].replace("Status: ", "").strip(" \n\t")
@@ -843,16 +875,11 @@ class CVSStatus(CVSAction):
         else:
             return status
  
-    def parseOutput(self, outputLines, fileName, rootDir, test):
-        status = self.findStatus(outputLines)
+    def parseOutput(self, output, fileName):
+        status = self.findStatus(output)
         if status in self.cvsErrorStates:
             self.needsAttention = True
-
-        relativeFilePath = self.getRelativePath(fileName, rootDir)
-        self.fileToTest[relativeFilePath] = test
-        self.pages.append((relativeFilePath, "".join(outputLines), self.getStatusMarkup(status)))
-        self.notify("Status", "Analyzing status for " + relativeFilePath.strip('\n'))
-        self.notify("ActionProgress", "")
+        return self.getStatusMarkup(status)
             
     def addToggleItems(self):
         # Each unique info column (column 2) gets its own toggle action in the popup menu
@@ -920,14 +947,10 @@ class CVSStatus(CVSAction):
             return True
 
 class CVSStatusRecursive(CVSStatus):
+    recursive = True
     def __init__(self, *args):
         CVSStatus.__init__(self, *args)
         self.cvsArgs = [ "status" ]
-        self.recursive = True
-    def _getTitle(self):
-        return "Status Recursive"
-    def getTooltip(self):
-        return "recursive " + CVSStatus.getTooltip(self)
 
 
 class CVSAnnotate(CVSAction):
@@ -935,7 +958,9 @@ class CVSAnnotate(CVSAction):
         CVSAction.__init__(self, [ "annotate", "-l" ], *args)
     def _getTitle(self):
         return "A_nnotate"
-    def getTooltip(self):
+    def getResultTitle(self):
+        return "annotations"
+    def _getTooltip(self):
         return "cvs annotate for the selected files"
     def getResultDialogIconType(self):
         if not self.notInRepository:           
@@ -952,40 +977,13 @@ class CVSAnnotate(CVSAction):
         return message
     def extraResultDialogWidgets(self):
         return ["log", "status", "diff"]
-    def runAndParse(self):
-        self.notInRepository = False
-        self.needsAttention = False
-        if len(self.currTestSelection) > 0:
-            rootDir = self.getRootPath()
-        for test in self.currTestSelection:
-            fileArgs = self.getFilesForCVS(test)
-            if len(fileArgs) > 0:
-                self.notify("Status", "Getting annotations of " + test.getRelPath())
-                self.notify("ActionProgress", "")
-                for fileArg in fileArgs:
-                    for fileName in self.getFileNames(fileArg):
-                        args = self.getCVSCmdArgs() + [ fileName ] 
-                        self.parseOutput(self.runCommand(args), fileName, rootDir, test)
-                        
-    def parseOutput(self, outputLines, fileName, rootDir, test):
-        currentOutput = "".join(outputLines)
-        self.notInRepository = currentOutput.find("cannot open CVS/Entries") != -1
-        relativeFilePath = self.getRelativePath(fileName, rootDir)
-        self.fileToTest[relativeFilePath] = test
-        self.pages.append((relativeFilePath, currentOutput, fileName))
-        self.notify("Status", "Analyzing annotations of " + relativeFilePath.strip('\n'))
-        self.notify("ActionProgress", "")
 
         
 class CVSAnnotateRecursive(CVSAnnotate):
+    recursive = True
     def __init__(self, *args):
         CVSAnnotate.__init__(self, *args)
         self.cvsArgs = [ "annotate" ]
-        self.recursive = True
-    def _getTitle(self):
-        return "Annotate Recursive"
-    def getTooltip(self):
-        return "recursive " + CVSAnnotate.getTooltip(self)
     
 
 

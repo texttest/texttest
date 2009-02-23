@@ -787,6 +787,12 @@ def samefile(writeDir, currDir):
         # do a simpler version
         return os.path.normpath(writeDir.replace("\\", "/")) == os.path.normpath(currDir.replace("\\", "/"))
 
+def makeWriteable(path):
+    currMode = os.stat(path)[stat.ST_MODE]
+    currPerm = stat.S_IMODE(currMode)
+    newPerm = currPerm | 0220
+    os.chmod(path, newPerm)
+    
 # Version of rmtree not prone to crashing if directory in use or externally removed
 def rmtree(dir, attempts=100):
     realDir = os.path.realpath(dir)
@@ -804,7 +810,17 @@ def rmtree(dir, attempts=100):
         try:
             shutil.rmtree(realDir)
             return
-        except OSError:
+        except OSError, e:
+            if str(e).find("Permission") != -1:
+                # We own this stuff, don't respect readonly flags set by ourselves, it might just be the SUT doing so...
+                for root, dirs, files in os.walk(realDir):
+                    for path in dirs + files:
+                        try:
+                            makeWriteable(os.path.join(root, path))
+                        except OSError, e:
+                            print "Could not change permissions to be able to remove directory", dir, ": -", str(e)
+                            return
+                continue
             if os.path.isdir(realDir):
                 if i == attempts - 1:
                     print "Unable to remove directory", dir, ":"

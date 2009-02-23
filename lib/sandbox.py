@@ -109,10 +109,7 @@ class PrepareWriteDirectory(plugins.Action):
     def copyfile(self, srcname, dstname):
         # Basic aim is to keep the permission bits and times where possible, but ensure it is writeable
         shutil.copy2(srcname, dstname)
-        currMode = os.stat(dstname)[stat.ST_MODE]
-        currPerm = stat.S_IMODE(currMode)
-        newPerm = currPerm | 0220
-        os.chmod(dstname, newPerm)
+        plugins.makeWriteable(dstname)
     def linkTestPath(self, test, fullPath, target):
         # Linking doesn't exist on windows!
         if os.name != "posix":

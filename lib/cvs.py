@@ -945,7 +945,7 @@ class CVSAnnotate(CVSAction):
     def getResultDialogMessage(self):
         message = "CVS annotations shown below."
         if self.notInRepository:
-            message += "\nSome directories were not under CVS control."
+            message += "\nSome files/directories were not under CVS control."
         message += "\nCVS command used: " + " ".join(self.getCVSCmdArgs())
         if not self.recursive:
             message += "\nSubdirectories were ignored, use CVS Annotate Recursive to get the annotations for all subdirectories."
@@ -969,6 +969,7 @@ class CVSAnnotate(CVSAction):
                         
     def parseOutput(self, outputLines, fileName, rootDir, test):
         currentOutput = "".join(outputLines)
+        self.notInRepository = currentOutput.find("cannot open CVS/Entries") != -1
         relativeFilePath = self.getRelativePath(fileName, rootDir)
         self.fileToTest[relativeFilePath] = test
         self.pages.append((relativeFilePath, currentOutput, fileName))

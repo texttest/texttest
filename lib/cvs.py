@@ -47,7 +47,13 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
             # distinguish these from other actions that may have these names
             return "CVS " + title.replace("_", "")
     def getCVSCmdArgs(self):
-        return [ "cvs", "-d", self.getCVSRoot() ] + self.cvsArgs
+        cvsRoot = os.getenv("CVSROOT")
+        if cvsRoot:
+            return [ "cvs" ] + self.cvsArgs
+        else:
+            cvsRoot = self.getCVSFileContents("Root")
+            return [ "cvs", "-d", cvsRoot ] + self.cvsArgs
+        
     def runCommand(self, args):
         try:
             process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
@@ -123,12 +129,6 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
             self.showErrorDialog("\nCannot find graphical CVS difference program '" + cvsDiffProgram + \
                                  "'.\nPlease install it somewhere on your $PATH.\n")
         
-    def getCVSRoot(self):
-        cvsRoot = os.getenv("CVSROOT")
-        if cvsRoot:
-            return cvsRoot.rstrip(os.sep) # Don't strictly need this, but for testing purposes we'll keep it
-        else:
-            return self.getCVSFileContents("Root")
     def getCVSFileContents(self, name):
         # Create a means of putting the CVS directories elsewhere so the tests still work even if not CVS controlled...
         fullPath = os.path.join(self.getApplicationPath(), "CVS", name)
@@ -428,9 +428,9 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
         for root, dirs, files in os.walk(dirName):
             if "CVS" in dirs:
                 dirs.remove("CVS")
-            for f in sorted(files):
+            for f in files:
                 allFiles.append(os.path.join(root, f))
-        return allFiles
+        return sorted(allFiles)
 
 #
 # 1 - First the methods which just check the repository and checked out files.

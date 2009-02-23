@@ -281,8 +281,9 @@ class TestTable:
     
     def generateExtraVersionHeader(self, extraVersion, tagsFound):
         bgColour = colourFinder.find("column_header_bg")
-        columnHeader = HTMLgen.TH(extraVersion, colspan = len(tagsFound) + 1, bgcolor=bgColour)
-        return HTMLgen.Container(HTMLgen.Name(extraVersion), HTMLgen.TR(columnHeader))
+        extraVersionElement = HTMLgen.Container(HTMLgen.Name(extraVersion), extraVersion)
+        columnHeader = HTMLgen.TH(extraVersionElement, colspan = len(tagsFound) + 1, bgcolor=bgColour)
+        return HTMLgen.TR(columnHeader)
     
     def generateTestRow(self, test, pageVersion, version, extraVersion, results, tagsFound):
         bgColour = colourFinder.find("row_header_bg")

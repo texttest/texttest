@@ -324,14 +324,14 @@ class Config:
         # 
         # - For each application, collect
         #   - temporary filter dir
-        #   - all dirs in test_list_files_directory
+        #   - all dirs in filter_file_directory
         #
         # Add these to a list. Never add the same dir twice. The first item will
         # be the default save/open dir, and the others will be added as shortcuts.
         #
         dirs = []
         for app in apps:
-            appDirs = app.getConfigValue("test_list_files_directory")
+            appDirs = app.getConfigValue("filter_file_directory")
             tmpDir = self.getTmpFilterDir(app, useOwnTmpDir)
             if tmpDir and tmpDir not in dirs:
                 dirs.append(tmpDir)
@@ -825,7 +825,7 @@ class Config:
         app.setConfigDefault("default_filter_file", [], "Filter file to use by default, generally only useful for versions")
         app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
         app.setConfigDefault("test_data_properties", { "default" : "" }, "Write the contents of test_data_environment to the given Java properties file")
-        app.setConfigDefault("test_list_files_directory", [ "filter_files" ], "Default directories for test filter files, relative to an application directory.")
+        app.setConfigDefault("filter_file_directory", [ "filter_files" ], "Default directories for test filter files, relative to an application directory.")
         app.setConfigDefault("extra_version", [], "Versions to be run in addition to the one specified")
         app.setConfigDefault("batch_extra_version", { "default" : [] }, "Versions to be run in addition to the one specified, for particular batch sessions")
         # Applies to any interface...
@@ -835,6 +835,7 @@ class Config:
         app.addConfigEntry("definition_file_stems", "traffic")
         app.addConfigEntry("definition_file_stems", "input")
         app.addConfigEntry("definition_file_stems", "knownbugs")
+        app.setConfigAlias("test_list_files_directory", "filter_file_directory")
     def setApplicationDefaults(self, app):
         homeOS = app.getConfigValue("home_operating_system")
         self.setComparisonDefaults(app, homeOS)

@@ -1286,6 +1286,8 @@ Framework Enhancements:
 	Send it SIGQUIT. Thread structure simplified also to make this more useful.
     - We now restart Xvfb (virtual server on UNIX) if it crashes before its time (unixonly.py)
 	This prevents one Xvfb crash causing multiple test failures.
+    - Config file settings "test_list_files_directory" and "testoverview_colours" renamed for consistency (default.py)
+	They are now "filter_file_directory" and "historical_report_colours" respectively. The old names still work as aliases.
 Historical HTML Batch Report Enhancements:
     - HTML report now organises history into months instead of generating an "All" page (testoverview.py)
 	It's much more flexible now and the old behaviour can be restored. See Migration notes and website.

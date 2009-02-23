@@ -828,29 +828,29 @@ class CVSStatus(CVSAction):
                         args = self.getCVSCmdArgs() + [ fileName ] 
                         self.parseOutput(self.runCommand(args), fileName, rootDir, test)
 
-    def parseOutput(self, outputLines, fileName, rootDir, test):
-        # RCS file: ...
-        # To get the correct path in the treeview, we also
-        # need to add the prefix to <file>
-        prevLine = ""
+    def findStatus(self, outputLines):
         for line in outputLines:
             if line.startswith("File: "):
                 spaceAfterNamePos = line.find("\t", 7)
-                info = line[spaceAfterNamePos:].replace("Status: ", "").strip(" \n\t")
-                if info in self.cvsWarningStates:
-                    info = "<span weight='bold'>" + info + "</span>"
-                elif info in self.cvsErrorStates:
-                    info = "<span weight='bold' foreground='red'>" + info + "</span>"
-                    self.needsAttention = True
-            if line.find("there is no version here; do ") != -1:
-                dir = prevLine[prevLine.find("in directory ") + 13:-2]
-                self.fileToTest[self.getRelativePath(dir, rootDir)] = test
-                self.pages.append((self.getRelativePath(dir, rootDir), prevLine + line, "<span weight='bold'>Not under CVS control.</span>"))
-                self.needsAttention = True
-            prevLine = line
+                return line[spaceAfterNamePos:].replace("Status: ", "").strip(" \n\t")
+        return "Parse Failure"
+
+    def getStatusMarkup(self, status):
+        if status in self.cvsWarningStates:
+            return "<span weight='bold'>" + status + "</span>"
+        elif status in self.cvsErrorStates:
+            return "<span weight='bold' foreground='red'>" + status + "</span>"
+        else:
+            return status
+ 
+    def parseOutput(self, outputLines, fileName, rootDir, test):
+        status = self.findStatus(outputLines)
+        if status in self.cvsErrorStates:
+            self.needsAttention = True
+
         relativeFilePath = self.getRelativePath(fileName, rootDir)
         self.fileToTest[relativeFilePath] = test
-        self.pages.append((relativeFilePath, "".join(outputLines), info))
+        self.pages.append((relativeFilePath, "".join(outputLines), self.getStatusMarkup(status)))
         self.notify("Status", "Analyzing status for " + relativeFilePath.strip('\n'))
         self.notify("ActionProgress", "")
             

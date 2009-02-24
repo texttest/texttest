@@ -1,11 +1,12 @@
 
-import os, stat, sys, plugins, shutil, socket, subprocess
+import os, stat, sys, plugins, shutil, socket, subprocess, rundependent
 from ndict import seqdict
 from SocketServer import TCPServer, StreamRequestHandler
 from threading import Thread, Lock
 from types import StringType
 from jobprocess import JobProcess
 from sets import Set
+from copy import copy
 
 class SetUpTrafficHandlers(plugins.Action):
     def __init__(self, record):
@@ -72,6 +73,9 @@ class Traffic(object):
 
     def getDescription(self):
         return self.direction + self.typeId + ":" + self.text
+
+    def getFilteredDescription(self):
+        return self.getDescription(), None
 
     def write(self, message):
         if self.responseFile:
@@ -274,6 +278,19 @@ class CommandLineTraffic(Traffic):
                 recLine = recLine.replace(oldVal, "$" + var)
             recStr += recLine
         return recStr
+
+    def getFilteredDescription(self):
+        desc = self.getDescription()
+        writeDirs = set([ self.currentTest.writeDirectory ])
+        writeDirs.add(os.path.realpath(self.currentTest.writeDirectory))
+        filteredDesc = desc
+        for dir in writeDirs:
+            filteredDesc = filteredDesc.replace(dir, "<sandbox>")
+        if filteredDesc != desc:
+            filter = rundependent.LineFilter("{INTERNAL writedir}{REPLACE <sandbox>}", self.currentTest.getRelPath(), self.diag)
+            return filteredDesc, filter
+        else:
+            return desc, None
         
     def findPossibleFileEdits(self):
         edits = []
@@ -702,14 +719,14 @@ class ReplayInfo:
         # the one that is most similar to it
         if not traffic.hasInfo():
             return []
-        desc = traffic.getDescription()
-        bestMatchKey = self.findBestMatch(desc)
+        desc, filter = traffic.getFilteredDescription()
+        bestMatchKey = self.findBestMatch(desc, filter)
         if bestMatchKey:
             return self.responseMap[bestMatchKey].makeResponses(traffic)
         else:
             return []
 
-    def findBestMatch(self, desc):
+    def findBestMatch(self, desc, filter):
         self.diag.info("Trying to match '" + desc + "'")
         if self.responseMap.has_key(desc):
             self.diag.info("Found exact match")
@@ -720,8 +737,15 @@ class ReplayInfo:
         bestMatchInfo = Set(), 100000
         for currDesc, responseHandler in self.responseMap.items():
             if self.sameType(desc, currDesc):
-                self.diag.info("Comparing with '" + currDesc + "'")
-                matchInfo = self.getWords(currDesc), responseHandler.timesChosen
+                descToCompare = currDesc
+                if filter:
+                    changed, descToCompare = filter.applyTo(currDesc)
+                    if changed and descToCompare == desc:
+                        self.diag.info("Found exact match")
+                        return currDesc
+                    
+                self.diag.info("Comparing with '" + descToCompare + "'")
+                matchInfo = self.getWords(descToCompare), responseHandler.timesChosen
                 if self.isBetterMatch(matchInfo, bestMatchInfo, descWords):
                     bestMatchInfo = matchInfo
                     bestMatch = currDesc
@@ -737,13 +761,23 @@ class ReplayInfo:
         words = []
         for part in desc.split("/"):
             words += part.split()
-        return Set(words)
+        return words
 
+    def commonElementCount(self, list1, list2):
+        # Unfortunately we can't use sets as we need to handle repeated elements properly
+        ref = copy(list2)
+        count = 0
+        for item in list1:
+            if item in ref:
+                count += 1
+                ref.remove(item)
+        return count
+            
     def isBetterMatch(self, info1, info2, targetWords):
         words1, count1 = info1
         words2, count2 = info2
-        common1 = len(words1.intersection(targetWords))
-        common2 = len(words2.intersection(targetWords))
+        common1 = self.commonElementCount(words1, targetWords)
+        common2 = self.commonElementCount(words2, targetWords)
         self.diag.info("Words in common " + repr(common1) + " vs " + repr(common2))
         if common1 > common2:
             return True

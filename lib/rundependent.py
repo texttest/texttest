@@ -70,11 +70,10 @@ class RunDependentTextFilter(plugins.Observable):
     def __init__(self, runDepTexts, unorderedTexts=[], testId=""):
         plugins.Observable.__init__(self)
         self.diag = plugins.getDiagnostics("Run Dependent Text")
-        regexp = self.getWriteDirRegexp(testId)
-        self.contentFilters = [ LineFilter(text, regexp, self.diag) for text in runDepTexts ]
+        self.contentFilters = [ LineFilter(text, testId, self.diag) for text in runDepTexts ]
         self.orderFilters = seqdict()
         for text in unorderedTexts:
-            orderFilter = LineFilter(text, regexp, self.diag)
+            orderFilter = LineFilter(text, testId, self.diag)
             self.orderFilters[orderFilter] = []
 
     def filterFile(self, fileName, newFileName):
@@ -119,9 +118,6 @@ class RunDependentTextFilter(plugins.Observable):
                 newFile.write(line)
             newFile.write("\n")
             self.orderFilters[filter] = []
-    def getWriteDirRegexp(self, testId):
-        # Some stuff, a date, and the testId (ignore the appId as we don't know when or where)
-        return "[^ \"=]*/[^ \"=]*[0-3][0-9][A-Za-z][a-z][a-z][0-9]{6}[^ \"=]*/" + testId
 
 class LineNumberTrigger:
     def __init__(self, lineNumber):
@@ -139,7 +135,7 @@ class LineFilter:
     matcherStrings = [ "{LINE ", "{INTERNAL " ]
     # All syntax that affects what is done when a match is found
     matchModifierStrings = [ "{WORD ", "{REPLACE ", "{LINES " ]
-    def __init__(self, text, writeDirRegexp, diag):
+    def __init__(self, text, testId, diag):
         self.originalText = text
         self.diag = diag
         self.triggers = []
@@ -149,14 +145,20 @@ class LineFilter:
         self.wordNumber = None
         self.replaceText = None
         self.removeWordsAfter = 0
-        self.internalExpressions = { "writedir" : writeDirRegexp }
+        self.internalExpressions = { "writedir" : self.getWriteDirRegexp(testId) }
         self.parseOriginalText()
+
+    def getWriteDirRegexp(self, testId):
+        # Some stuff, a date, and the testId (ignore the appId as we don't know when or where)
+        return "[^ \"=]*/[^ \"=]*[0-3][0-9][A-Za-z][a-z][a-z][0-9]{6}[^ \"=]*/" + testId
+
     def makeRegexTriggers(self, parameter):
         expression = self.internalExpressions.get(parameter, parameter)
         triggers = [ plugins.TextTrigger(expression) ]
         if parameter == "writedir":
             triggers.append(plugins.TextTrigger(expression.replace("/", "\\\\")))
         return triggers
+
     def parseOriginalText(self):
         dividerPoint = self.originalText.find(self.divider)
         if dividerPoint != -1:
@@ -210,7 +212,7 @@ class LineFilter:
             return self.makeRegexTriggers(parameter)
         else:
             return [ plugins.TextTrigger(parameter) ]
-    def applyTo(self, line, lineNumber):
+    def applyTo(self, line, lineNumber=0):
         if self.autoRemove:
             return self.applyAutoRemove(line)
 

@@ -96,9 +96,17 @@ class VirtualDisplayResponder(Responder):
 
         plugins.ensureDirectoryExists(logDir)
         startArgs = self.getVirtualServerArgs(machine, logDir)
+        return self.startXvfb(startArgs, machine)
+
+    def startXvfb(self, startArgs, machine):
         self.diag.info("Starting Xvfb using args " + repr(startArgs))
         self.displayProc = subprocess.Popen(startArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         line = plugins.retryOnInterrupt(self.displayProc.stdout.readline)
+        if line.find("Time Out!") != -1:
+            self.displayProc.wait()
+            self.displayProc.stdout.close()
+            # We try again and hope for a better process ID!
+            return self.startXvfb(startArgs, machine)
         try:
             displayNum, pid = map(int, line.strip().split(","))
             self.displayProc.stdout.close()

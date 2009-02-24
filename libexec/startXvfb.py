@@ -74,15 +74,17 @@ def runXvfb(logDir):
             signal.alarm(int(os.getenv("TEXTTEST_XVFB_WAIT", 30)))
             signal.pause() # Wait until we know Xvfb is ready to be connected to before proceeding, or we time out
     except ConnectionTimeout:
-        # Just kill it and try again. This should only happen very rarely and it will probably work next time round...
+        # Kill it and tell TextTest we timed out. It will then start a new startXvfb.py process, with a new process ID
+        # that will hopefully work better
         os.kill(proc.pid, signal.SIGTERM)
-        return runXvfb(logDir)
+        ignoreSignals()
+        sys.stdout.write("Time Out!\n")
+        sys.stdout.flush()
     except ConnectionComplete:
-        pass
-
-    ignoreSignals()
-    sys.stdout.write(displayNum + "," + str(proc.pid) + "\n")
-    sys.stdout.flush()
+        ignoreSignals()
+        sys.stdout.write(displayNum + "," + str(proc.pid) + "\n")
+        sys.stdout.flush()
+    
     proc.wait()
     cleanLeakedLockFiles(displayNum)
 

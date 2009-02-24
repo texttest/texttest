@@ -1282,6 +1282,7 @@ Framework Enhancements:
     - New command-line option --vanilla which starts TextTest without personal (or site-specific) configuration. (testmodel.py)
     - Traffic mechanism's algorithm for inexact matches with previous commands improved (traffic.py)
 	It previously tended to prefer arguments to disappear entirely than to change to something else.
+	It also handle's TextTest's sandbox directly now.
     - Can now get stacktraces from running TextTest processes on UNIX (engine.py)
 	Send it SIGQUIT. Thread structure simplified also to make this more useful.
     - We now restart Xvfb (virtual server on UNIX) if it crashes before its time (unixonly.py)
@@ -1334,6 +1335,7 @@ Bug Fixes:
     - Don't crash creating "Save Selection" dialog if no permissions to create filter_files directory (plugins.py)
     - No longer rely on gethostname() returning a simple name (plugins.py)
     - Running virtual server remotely won't generate spurious stacktraces in logs any more (unixonly.py)
+    - TextTest won't hang any more if a previous virtual server process leaks its lock file (unixonly.py)
     - Fixed crash with LANG=C, introduced in 3.12 when trying to make Swedish authors come out right! (plugins.py)
 Grid Engine bug fixes:
     - Clearer error message when the grid engine (qsub/bsub) cannot be found (queuesystem.py)

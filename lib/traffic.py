@@ -720,6 +720,7 @@ class ReplayInfo:
         bestMatchInfo = Set(), 100000
         for currDesc, responseHandler in self.responseMap.items():
             if self.sameType(desc, currDesc):
+                self.diag.info("Comparing with '" + currDesc + "'")
                 matchInfo = self.getWords(currDesc), responseHandler.timesChosen
                 if self.isBetterMatch(matchInfo, bestMatchInfo, descWords):
                     bestMatchInfo = matchInfo
@@ -743,6 +744,7 @@ class ReplayInfo:
         words2, count2 = info2
         common1 = len(words1.intersection(targetWords))
         common2 = len(words2.intersection(targetWords))
+        self.diag.info("Words in common " + repr(common1) + " vs " + repr(common2))
         if common1 > common2:
             return True
         elif common1 < common2:
@@ -750,6 +752,7 @@ class ReplayInfo:
 
         lengthDiff1 = abs(len(words1) - len(targetWords))
         lengthDiff2 = abs(len(words2) - len(targetWords))
+        self.diag.info("Length difference " + repr(lengthDiff1) + " vs " + repr(lengthDiff2))
         if lengthDiff1 < lengthDiff2:
             return True
         elif lengthDiff1 > lengthDiff2:

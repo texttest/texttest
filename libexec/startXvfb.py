@@ -59,6 +59,13 @@ def cleanLeakedLockFiles(displayNum):
             except:
                 pass
 
+def writeAndWait(text, proc, displayNum):
+    ignoreSignals()
+    sys.stdout.write(text + "\n")
+    sys.stdout.flush()
+    proc.wait()
+    cleanLeakedLockFiles(displayNum)
+
 def runXvfb(logDir):
     ignoreSignals()
     signal.signal(signal.SIGUSR1, setReadyFlag)
@@ -77,17 +84,12 @@ def runXvfb(logDir):
         # Kill it and tell TextTest we timed out. It will then start a new startXvfb.py process, with a new process ID
         # that will hopefully work better
         os.kill(proc.pid, signal.SIGTERM)
-        ignoreSignals()
-        sys.stdout.write("Time Out!\n")
-        sys.stdout.flush()
+        return writeAndWait("Time Out!", proc, displayNum)
     except ConnectionComplete:
-        ignoreSignals()
-        sys.stdout.write(displayNum + "," + str(proc.pid) + "\n")
-        sys.stdout.flush()
+        pass
+
+    writeAndWait(displayNum + "," + str(proc.pid), proc, displayNum)
     
-    proc.wait()
-    cleanLeakedLockFiles(displayNum)
-
-
+    
 if __name__ == "__main__":
     runXvfb(sys.argv[1])

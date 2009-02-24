@@ -30,7 +30,6 @@ import pango, guiplugins, plugins, os, sys, operator, subprocess
 from ndict import seqdict
 from respond import Responder
 from copy import copy
-from glob import glob
 from sets import Set
 from TreeViewTooltips import TreeViewTooltips
 
@@ -201,7 +200,8 @@ class IdleHandlerManager:
 
 class TextTestGUI(Responder, plugins.Observable):
     def __init__(self, optionMap, allApps):
-        self.readGtkRCFiles()
+        vanilla = optionMap.has_key("vanilla")
+        self.readGtkRCFiles(vanilla)
         self.dynamic = not optionMap.has_key("gx")
         global guilog, guiConfig, scriptEngine
         guilog, guiConfig, scriptEngine = guiplugins.setUpGlobals(self.dynamic, allApps)
@@ -219,7 +219,7 @@ class TextTestGUI(Responder, plugins.Observable):
         uiManager = gtk.UIManager()
         self.defaultActionGUIs, self.actionTabGUIs = \
                                 guiplugins.interactiveActionHandler.getPluginGUIs(self.dynamic, allApps, uiManager)
-        self.menuBarGUI, self.toolBarGUI, testPopupGUI, testFilePopupGUI = self.createMenuAndToolBarGUIs(allApps, uiManager)
+        self.menuBarGUI, self.toolBarGUI, testPopupGUI, testFilePopupGUI = self.createMenuAndToolBarGUIs(allApps, vanilla, uiManager)
         self.testColumnGUI = TestColumnGUI(self.dynamic, testCount)
         self.testTreeGUI = TestTreeGUI(self.dynamic, allApps, testPopupGUI, self.testColumnGUI)
         self.testFileGUI = TestFileGUI(self.dynamic, testFilePopupGUI)
@@ -291,16 +291,8 @@ class TextTestGUI(Responder, plugins.Observable):
         for observer in self.getExitObservers(frameworkObserversToUse):
             self.topWindowGUI.addObserver(observer)
 
-    def readGtkRCFiles(self):
-        self.readGtkRCFile(plugins.installationDir("layout"))
-        self.readGtkRCFile(plugins.getPersonalConfigDir())
-
-    def readGtkRCFile(self, configDir):
-        if not configDir:
-            return
-
-        file = os.path.join(configDir, ".gtkrc-2.0")
-        if os.path.isfile(file):
+    def readGtkRCFiles(self, vanilla):
+        for file in plugins.findDataPaths(".gtkrc-2.0", vanilla, includePersonal=True):
             gtk.rc_add_default_file(file)
 
     def addSuites(self, suites):
@@ -318,8 +310,8 @@ class TextTestGUI(Responder, plugins.Observable):
         boxGUI = BoxGUI(parts, horizontal=False)
         return TopWindowGUI(boxGUI, self.dynamic, allApps)
 
-    def createMenuAndToolBarGUIs(self, allApps, uiManager):
-        menu = MenuBarGUI(allApps, self.dynamic, uiManager, self.allActionGUIs())
+    def createMenuAndToolBarGUIs(self, allApps, vanilla, uiManager):
+        menu = MenuBarGUI(allApps, self.dynamic, vanilla, uiManager, self.allActionGUIs())
         toolbar = ToolBarGUI(uiManager, self.progressBarGUI)
         testPopup = PopupMenuGUI("TestPopupMenu", uiManager)
         testFilePopup = PopupMenuGUI("TestFilePopupMenu", uiManager)
@@ -528,11 +520,12 @@ class TopWindowGUI(ContainerGUI):
 
 
 class MenuBarGUI(guiplugins.SubGUI):
-    def __init__(self, allApps, dynamic, uiManager, actionGUIs):
+    def __init__(self, allApps, dynamic, vanilla, uiManager, actionGUIs):
         guiplugins.SubGUI.__init__(self)
         # Create GUI manager, and a few default action groups
         self.menuNames = guiplugins.interactiveActionHandler.getMenuNames(allApps)
         self.dynamic = dynamic
+        self.vanilla = vanilla
         self.uiManager = uiManager
         self.actionGUIs = actionGUIs
         self.actionGroup = self.uiManager.get_action_groups()[0]
@@ -591,13 +584,10 @@ class MenuBarGUI(guiplugins.SubGUI):
         self.widget = self.uiManager.get_widget("/MainMenuBar")
         return self.widget
     def getGUIDescriptionFileNames(self):
-        return self.getDescriptionFilesInDir(plugins.installationDir("layout")) + \
-               self.getDescriptionFilesInDir(plugins.getPersonalConfigDir())
-    def getDescriptionFilesInDir(self, layoutDir):
-        allFiles = os.path.join(layoutDir, "*.xml")
+        allFiles = plugins.findDataPaths("*.xml", self.vanilla, includePersonal=True)
         self.diag.info("All description files : " + repr(allFiles))
         # Pick up all GUI descriptions corresponding to modules we've loaded
-        loadFiles = filter(self.shouldLoad, glob(allFiles))
+        loadFiles = filter(self.shouldLoad, allFiles)
         loadFiles.sort(self.cmpDescFiles)
         return loadFiles
     def cmpDescFiles(self, file1, file2):

@@ -1,5 +1,5 @@
 
-import sys, os, log4py, string, shutil, socket, time, re, stat, locale, subprocess, shlex, types
+import sys, os, log4py, string, shutil, socket, time, re, stat, locale, subprocess, shlex, types, operator
 from ndict import seqdict
 from traceback import format_exception
 from threading import currentThread
@@ -7,6 +7,7 @@ from Queue import Queue, Empty
 from copy import copy
 from sets import Set
 from fnmatch import fnmatch
+from glob import glob
 
 # We standardise around UNIX paths, it's all much easier that way. They work fine,
 # and they don't run into weird issues in being confused with escape characters
@@ -165,6 +166,16 @@ def installationPath(subpath):
         if os.path.exists(instPath):
             return instPath
 
+def findDataPaths(filePattern="", vanilla=False, includePersonal=False):
+    if vanilla:
+        return glob(os.path.join(installationRoots[0], "etc", filePattern))
+    else:
+        dirs = [ os.path.join(instRoot, "etc") for instRoot in installationRoots ]
+        if includePersonal:
+            dirs.append(getPersonalConfigDir())
+
+        return reduce(operator.add, (glob(os.path.join(d, filePattern)) for d in dirs), [])
+        
 # Parse a time string, either a HH:MM:SS string, or a single int/float,
 # which is interpreted as a number of minutes, for backwards compatibility.
 # Observe that in either 'field' in the HH:MM:SS case, any number is allowed,

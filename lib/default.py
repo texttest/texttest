@@ -57,11 +57,11 @@ class Config:
                 group.addOption("b", "Run batch mode session")
                 group.addSwitch("rectraffic", "(Re-)record command-line or client-server traffic")
                 group.addSwitch("keeptmp", "Keep temporary write-directories")
+                group.addSwitch("vanilla", "Ignore site-specific and personal configuration", self.optionMap.has_key("vanilla"))
             elif group.name.startswith("Invisible"):
                 # Options that don't make sense with the GUI should be invisible there...
                 group.addOption("s", "Run this script")
                 group.addOption("d", "Run as if TEXTTEST_HOME was")
-                group.addSwitch("vanilla", "Ignore site-specific and personal configuration")
                 group.addSwitch("help", "Print configuration help text on stdout")
                 group.addSwitch("g", "use dynamic GUI")
                 group.addSwitch("gx", "use static GUI")

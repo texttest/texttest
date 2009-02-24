@@ -1137,8 +1137,11 @@ class Application:
         return id(self)
 
     def getPersonalConfigFiles(self):
-        dircache = DirectoryCache(plugins.getPersonalConfigDir())
-        return self._getAllFileNames([ dircache ], "config")
+        if self.inputOptions.has_key("vanilla"):
+            return []
+        else:
+            dircache = DirectoryCache(plugins.getPersonalConfigDir())
+            return self._getAllFileNames([ dircache ], "config")
         
     def setUpConfiguration(self, configEntries={}):
         self.configDir = plugins.MultiEntryDictionary(importKey="import_config_file", importFileFinder=self.configPath)
@@ -1151,8 +1154,7 @@ class Application:
 
         # Read our pre-existing config files
         self.readApplicationConfigFiles()
-        if not self.inputOptions.has_key("vanilla"):
-            self.configDir.readValues(self.getPersonalConfigFiles(), insert=False, errorOnUnknown=False)
+        self.configDir.readValues(self.getPersonalConfigFiles(), insert=False, errorOnUnknown=False)
         self.diag.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
 
     def readApplicationConfigFiles(self):
@@ -1231,14 +1233,12 @@ class Application:
     def getDirectory(self):
         return self.dircache.dir
     def readConfigFiles(self, configModuleInitialised):
-        if not self.inputOptions.has_key("vanilla"):
-            self.readDefaultConfigFiles()
+        self.readDefaultConfigFiles()
         self.readExplicitConfigFiles(configModuleInitialised)
     def readDefaultConfigFiles(self):
-        etcPath = plugins.installationPath("etc")
-        if etcPath:
+        for dataPath in plugins.findDataPaths(vanilla=self.inputOptions.has_key("vanilla")):
             # don't error check as there might be settings there for all sorts of config modules...
-            self.readValues(self.configDir, "config", DirectoryCache(etcPath), insert=False, errorOnUnknown=False)
+            self.readValues(self.configDir, "config", DirectoryCache(dataPath), insert=False, errorOnUnknown=False)
     def readExplicitConfigFiles(self, errorOnUnknown):
         self.readValues(self.configDir, "config", self.dircache, insert=False, errorOnUnknown=errorOnUnknown)
     def readValues(self, multiEntryDict, stem, dircache, insert=True, errorOnUnknown=False):

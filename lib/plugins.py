@@ -376,6 +376,7 @@ class TestPathFilter(TextFilter):
         active = False
         myEntries = []
         toFind = self.getSectionsToFind(allEntries, app, suites)
+        self.diag.info("Sections for " + repr(app) + " = " + repr(toFind))
         for entry in allEntries:
             if entry in toFind:
                 active = True
@@ -383,11 +384,12 @@ class TestPathFilter(TextFilter):
                 active = False
             elif active:
                 myEntries.append(entry)
+        self.diag.info("Found " + repr(myEntries) + " from " + repr(allEntries))
         return myEntries
     def getSectionsToFind(self, allEntries, app, suites):        
         allHeaders = filter(lambda entry: entry.startswith("appdata=" + app.name), allEntries)
         if len(allHeaders) == 1:
-            return allHeaders[0]
+            return allHeaders
         allApps = filter(lambda a: a.name == app.name, [ suite.app for suite in suites ])
         sections = []
         for header in allHeaders:
@@ -400,7 +402,6 @@ class TestPathFilter(TextFilter):
             # We aren't a best-fit for any of them, so we do our best to find one anyway...
             return [ self.findSectionMatchingApp(app, allHeaders) ]
                      
-        self.diag.info("Sections for " + repr(app) + " = " + repr(sections))
         return sections
 
     def findSectionMatchingApp(self, app, allHeaders):

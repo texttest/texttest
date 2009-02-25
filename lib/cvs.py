@@ -1,6 +1,7 @@
 
 import os, gobject, guiplugins, datetime, time, subprocess, default_gui
 import gtk, plugins, custom_widgets, entrycompletion
+from ndict import seqdict
 
 #
 # Todo/improvements:
@@ -56,10 +57,7 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
         return title
             
     def getTooltip(self):
-        return self.getTitle(adjectiveAfter=False).lower() + " for the selected " + self.actsOn()
-
-    def actsOn(self):
-        return "files"
+        return self.getTitle(adjectiveAfter=False).lower() + " for the selected files"
 
     def showWarning(self):
         return self.notInRepository or self.needsAttention
@@ -113,6 +111,12 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
     def getResultTitle(self):
         return self._getTitle().replace("_", "").lower()
 
+    def getTestDescription(self, test):
+        relpath = test.getRelPath()
+        if relpath:
+            return relpath
+        else:
+            return "the root test suite"
     def runAndParse(self):
         self.notInRepository = False
         self.needsAttention = False
@@ -121,7 +125,7 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
         for test in self.currTestSelection:
             fileArgs = self.getFilesForCVS(test)
             if len(fileArgs) > 0:
-                self.notify("Status", "Getting " + self.getResultTitle() + " for " + test.getRelPath())
+                self.notify("Status", "Getting " + self.getResultTitle() + " for " + self.getTestDescription(test))
                 self.notify("ActionProgress", "")
                 for fileArg in fileArgs:
                     for fileName in self.getFileNames(fileArg):
@@ -527,7 +531,7 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
 
 class CVSLog(CVSAction):
     def __init__(self, allApps, dynamic, ignorePresence=False):
-        CVSAction.__init__(self, [ "log", "-N", "-l" ], allApps, dynamic)
+        CVSAction.__init__(self, [ "log", "-N" ], allApps, dynamic)
         self.ignorePresence = ignorePresence
     def _getTitle(self):
         return "_Log"
@@ -537,60 +541,15 @@ class CVSLog(CVSAction):
         return True
     def getResultDialogSecondColumnTitle(self):
         return "Last revision committed (UTC)"
-    def runAndParse(self):
-        self.notInRepository = False
-        if len(self.currTestSelection) > 0:
-            rootDir = self.getRootPath()
-        for test in self.currTestSelection:
-            fileArgs = self.getFilesForCVS(test, self.ignorePresence)
-            if len(fileArgs) > 0:
-                self.notify("Status", "Logging " + test.getRelPath())
-                self.notify("ActionProgress", "")
-                args = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...
-                self.parseOutput(self.runCommandOld(args), rootDir, test)
         
-    def parseOutput(self, outputLines, rootDir, test):
-        # The section for each file starts with
-        # RCS file: ...
-        # Working file: <file>
-        # and ends with
-        # ========================
-        # To get the correct path in the treeview, we also
-        # need to add the prefix to <file>
-        currentOutput = ""
-        currentFile = ""
-        currentLastDate = ""
-        now = datetime.datetime.utcnow()
-        prevLine = ""
-        for line in outputLines:
-            if line.find("there is no version here; do ") != -1:
-                dir = prevLine[prevLine.find("in directory ") + 13:-2]
-                relativeFilePath = self.getRelativePath(dir, rootDir)
-                self.fileToTest[relativeFilePath] = test
-                self.pages.append((relativeFilePath, "Not under CVS control.", "Not under CVS control."))
-                self.notInRepository = True
-            if line.startswith("==========") or line.startswith("cvs log: Logging"):
-                continue
-            if line.startswith("RCS file:"):
-                if currentFile:
-                    relativeFilePath = self.getRelativePath(currentFile, rootDir)
-                    self.fileToTest[relativeFilePath] = test
-                    self.pages.append((relativeFilePath, currentOutput, currentLastDate))
-                    self.notify("Status", "Analyzing log for " + relativeFilePath.strip('\n'))
-                    self.notify("ActionProgress", "")
-                currentOutput = ""
-                currentLastDate = ""                
-            if line.startswith("Working file:"):
-                currentFile = line[14:]
-            if line.startswith("date:") and currentLastDate == "":
+    def parseOutput(self, output, fileName):
+        for line in output.splitlines():
+            if line.startswith("date:"):
                 then = datetime.datetime(*(self.parseCvsDateTime(line[6:25])[0:6]))
-                currentLastDate = self.getTimeDifference(now, then)
-            currentOutput += line                
-            prevLine = line
-        if currentFile:
-            relativeFilePath = self.getRelativePath(currentFile, rootDir)
-            self.fileToTest[relativeFilePath] = test
-            self.pages.append((relativeFilePath, currentOutput, currentLastDate))
+                now = datetime.datetime.utcnow()
+                return self.getTimeDifference(now, then)
+        return "Not in CVS"
+
     def parseCvsDateTime(self, input):
         # Different CVS versions produce different formats...
         try:
@@ -622,42 +581,21 @@ class CVSLog(CVSAction):
         elif difference <= closeLimit and markup:
             stringDiff = "<span weight='bold'>" + stringDiff + "</span>"
         return stringDiff
-
-
-class CVSLogRecursive(CVSLog):
-    recursive = True
-    def __init__(self, *args, **kwargs):
-        CVSLog.__init__(self, *args, **kwargs)
-        self.cvsArgs = [ "log", "-N" ]
         
      
 class CVSLogLatest(CVSLog):
     def __init__(self, *args):
         CVSLog.__init__(self, *args)
-        self.cvsArgs = [ "log", "-N", "-l", "-rHEAD" ]
+        self.cvsArgs = [ "log", "-N", "-rHEAD" ]
     def _getTitle(self):
         return "Log Latest"
-    def actsOn(self):
-        return "test"
     def getResultDialogMessage(self):
         message = "Showing latest log entries for the CVS controlled files.\nCVS log command used: " + " ".join(self.cvsArgs)
         if not self.recursive:
             message += "\nSubdirectories were ignored."            
         return message
-    def runAndParse(self):
-        self.pages = []
-        self.fileToTest = {}
-        self.notInRepository = False
-        if len(self.currTestSelection) > 0:
-            rootDir = self.getRootPath()
-        for test in self.currTestSelection:
-            fileArgs = self.getFilesForCVS(test)
-            if len(fileArgs) > 0:
-                self.notify("Status", "Logging " + test.getRelPath())
-                self.notify("ActionProgress", "")
-                cmdArgs = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...
-                self.parseOutput(self.runCommandOld(cmdArgs), rootDir, test)
-    def parseOutput(self, outputLines, rootDir, test):
+
+    def storeResult(self, fileName, rootDir, output, test):
         # Each file has something like:
         #
         # RCS file ...
@@ -674,9 +612,9 @@ class CVSLogLatest(CVSLog):
         # We only want to show the Working file and the stuff from ----- to ===== ...        
         linesToShow = ""
         enabled = False
-        for line in outputLines:
+        for line in output.splitlines():
             if line.startswith("Working file"):
-                linesToShow += "\nFile: " + os.path.basename(line[14:])
+                linesToShow += "\nFile: " + os.path.basename(line[14:]) + "\n"
                 continue
             if line.startswith("--------------------"):
                 enabled = True
@@ -684,13 +622,13 @@ class CVSLogLatest(CVSLog):
                 linesToShow += "====================\n"
                 enabled = False
             if enabled:
-                linesToShow += line
-        self.pages.append((test.uniqueName, linesToShow))
+                linesToShow += line + "\n"
+        self.pages.setdefault(test.uniqueName, "")
+        self.pages[test.uniqueName] += linesToShow
     
     def addContents(self):
-        self.pages = []
-        self.fileToTest = {}
-        self.runAndParse() # will write to the above two structures
+        self.pages = seqdict()
+        self.runAndParse() 
         self.vbox = gtk.VBox()
         headerMessage = self.addHeader()
         notebookMessage = self.addNotebook()
@@ -717,7 +655,7 @@ class CVSLogLatest(CVSLog):
         notebook.set_scrollable(True)
         notebook.popup_enable()
         message = ""
-        for label, content in self.pages:
+        for label, content in self.pages.items():
             buffer = gtk.TextBuffer()
             # Encode to UTF-8, necessary for gtk.TextView
             # First decode using most appropriate encoding ...
@@ -900,6 +838,9 @@ class CVSAnnotate(CVSAction):
         return "A_nnotate"
     def getResultTitle(self):
         return "annotations"
+
+class CVSLogRecursive(CVSLog):
+    recursive = True
 
 class CVSDiffRecursive(CVSDiff):
     recursive = True

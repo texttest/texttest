@@ -230,29 +230,19 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
         testPath = test.getDirectory()
         if len(self.currFileSelection) == 0:
             if self.dynamic:
-                return self.getDynamicGUIFiles(test)
+                return sorted([ fileComp.stdFile for fileComp in self.getComparisons(test) ])
             else:
                 return [ testPath ]
         else:
             return [ self.getAbsPath(f, testPath) for f, comp in self.currFileSelection ]
 
-    def getDynamicGUIFiles(self, test):
-        tmpFiles = map(lambda l: os.path.basename(l) + test.app.versionSuffix(), test.getAllTmpFiles())
-        testPath = test.getDirectory()
-        correctedTmpFiles = []
-        # The tmp files don't have correct version suffixes, so we'll find the
-        # existing file with the best match, e.g. output.tas.apa when running
-        # version 'apa.bepa'
-        for tmpFile in tmpFiles:
-            adjustedFile = tmpFile        
-            while not os.path.exists(os.path.join(testPath, adjustedFile)):
-                lastPeriod = adjustedFile.rfind(".")
-                if lastPeriod == -1:
-                    break
-                adjustedFile = adjustedFile[:lastPeriod]
-            if os.path.exists(os.path.join(testPath, adjustedFile)):
-                correctedTmpFiles.append(self.getAbsPath(adjustedFile, testPath))
-        return correctedTmpFiles
+    def getComparisons(self, test):
+        try:
+            # Leave out new ones
+            return test.state.changedResults + test.state.correctResults + test.state.missingResults
+        except AttributeError:
+            raise plugins.TextTestError, "No file comparison information available, cannot run CVS"
+            
     def getAbsPath(self, filePath, testPath):
         if os.path.isabs(filePath):
             return filePath
@@ -748,6 +738,9 @@ class CVSStatus(CVSAction):
         self.treeModel.foreach(self.collectInfos, uniqueInfos)
         actionGroup = self.uiManager.get_action_groups()[0]
         for info in uniqueInfos:
+            # Don't add the same action lots of time, GTK 2.12 protests...
+            if actionGroup.get_action(info):
+                continue
             action = gtk.ToggleAction(info, info, None, None)
             action.set_active(True)
             actionGroup.add_action(action)

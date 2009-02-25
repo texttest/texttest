@@ -531,14 +531,8 @@ class CVSLog(CVSAction):
         self.ignorePresence = ignorePresence
     def _getTitle(self):
         return "_Log"
-    def getResultDialogMessage(self):
-        if self.notInRepository:
-            message = "Showing logs for the CVS controlled files.\nSome directories were not under CVS control.\nCVS log command used: " + " ".join(self.getCVSCmdArgs())
-        else:
-            message = "Showing logs for the CVS controlled files.\nCVS log command used: " + " ".join(self.getCVSCmdArgs())
-        if not self.recursive:
-            message += "\nSubdirectories were ignored, use CVS Log Recursive to see logs for all subdirectories."            
-        return message
+    def getResultTitle(self):
+        return "logs"
     def getResultDialogTwoColumnsInTreeView(self):
         return True
     def getResultDialogSecondColumnTitle(self):

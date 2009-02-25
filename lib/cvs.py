@@ -241,7 +241,9 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
             # Leave out new ones
             return test.state.changedResults + test.state.correctResults + test.state.missingResults
         except AttributeError:
-            raise plugins.TextTestError, "No file comparison information available, cannot run CVS"
+            raise plugins.TextTestError, "Cannot establish which files should be compared as no comparison information exists.\n" + \
+                  "To create this information, perform 'recompute status' (press '" + \
+                         guiplugins.guiConfig.getCompositeValue("gui_accelerators", "recompute_status") + "') and try again."
             
     def getAbsPath(self, filePath, testPath):
         if os.path.isabs(filePath):

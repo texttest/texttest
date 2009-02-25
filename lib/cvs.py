@@ -92,7 +92,7 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
         if cvsRoot:
             return [ "cvs" ] + self.cvsArgs
         else:
-            cvsRoot = self.getCVSFileContents("Root")
+            cvsRoot = self.getCvsRootFromFile()
             return [ "cvs", "-d", cvsRoot ] + self.cvsArgs
         
     def commandHadError(self, retcode, stderr):
@@ -214,11 +214,10 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
             self.showErrorDialog("\nCannot find graphical CVS difference program '" + cvsDiffProgram + \
                                  "'.\nPlease install it somewhere on your $PATH.\n")
         
-    def getCVSFileContents(self, name):
-        # Create a means of putting the CVS directories elsewhere so the tests still work even if not CVS controlled...
-        fullPath = os.path.join(self.getApplicationPath(), "CVS", name)
+    def getCvsRootFromFile(self):
+        fullPath = os.path.join(self.getApplicationPath(), "CVS", "Root")
         if not os.path.isfile(fullPath):
-            raise plugins.TextTestError, "No CVS file found at " + fullPath    
+            raise plugins.TextTestError, "Could not determine $CVSROOT: environment variable not set and no file present at:\n" + fullPath    
 
         info = open(fullPath).read()  
         return info.strip().rstrip(os.sep)
@@ -749,9 +748,6 @@ class CVSStatus(CVSAction):
         self.treeModel.foreach(self.collectInfos, uniqueInfos)
         actionGroup = self.uiManager.get_action_groups()[0]
         for info in uniqueInfos:
-            # Don't add the same action lots of time, GTK 2.12 protests...
-            if actionGroup.get_action(info):
-                continue
             action = gtk.ToggleAction(info, info, None, None)
             action.set_active(True)
             actionGroup.add_action(action)
@@ -783,8 +779,11 @@ class CVSStatus(CVSAction):
         
     def collectInfos(self, model, path, iter, infos):
         info = model.get_value(iter, 2)
-        if info != "" and info not in infos:
-            infos.append(info.lstrip("<span weight='bold'>").lstrip("<span weight='bold' foreground='red'>").rstrip("</span>").strip(" "))
+        if info != "":
+            rawInfo = info.replace("<span weight='bold'>", "").replace("<span weight='bold' foreground='red'>",
+                                                                       "").replace("</span>", "").strip()
+            if rawInfo not in infos:
+                infos.append(rawInfo)
             
     def notifyTopWindow(self, topWindow):
         CVSAction.notifyTopWindow(self, topWindow)

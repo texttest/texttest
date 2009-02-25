@@ -61,14 +61,20 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
     def actsOn(self):
         return "files"
 
+    def showWarning(self):
+        return self.notInRepository or self.needsAttention
+
     def getResultDialogIconType(self):
-        if self.notInRepository or self.needsAttention:
+        if self.showWarning():
             return gtk.STOCK_DIALOG_WARNING
         else:
             return gtk.STOCK_DIALOG_INFO
 
+    def getFullResultTitle(self):
+        return self.getResultTitle()
+    
     def getResultDialogMessage(self):
-        message = "CVS " + self.getResultTitle() + " shown below."
+        message = "CVS " + self.getFullResultTitle() + " shown below."
         if self.needsAttention:
             message += "\nCVS " + self.getResultTitle() + " found files which are not up-to-date or which have conflicts"
         if self.notInRepository:
@@ -96,20 +102,13 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
             process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
         except OSError:
             raise plugins.TextTestError, "Could not run CVS: make sure you have it installed locally"
-        return process.stdout.readlines()
+        return process.stdout.readlines()        
 
-    def runCommand(self, args):
-        try:
-            process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-        except OSError:
-            raise plugins.TextTestError, "Could not run CVS: make sure you have it installed locally"
+    def commandHadError(self, retcode, stderr):
+        return retcode
 
-        stdout, stderr = process.communicate()
-        if process.returncode:
-            self.notInRepository = True
-            return stderr
-        else:
-            return stdout
+    def outputIsInteresting(self, stdout):
+        return True
 
     def getResultTitle(self):
         return self._getTitle().replace("_", "").lower()
@@ -127,10 +126,22 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
                 for fileArg in fileArgs:
                     for fileName in self.getFileNames(fileArg):
                         self.runAndParseFile(fileName, rootDir, test)
-
+        
     def runAndParseFile(self, fileName, rootDir, test):
         args = self.getCVSCmdArgs() + [ fileName ]
-        output = self.runCommand(args)
+        try:
+            process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        except OSError:
+            raise plugins.TextTestError, "Could not run CVS: make sure you have it installed locally"
+
+        stdout, stderr = process.communicate()
+        if self.commandHadError(process.returncode, stderr):
+            self.notInRepository = True
+            self.storeResult(fileName, rootDir, stderr, test)
+        elif self.outputIsInteresting(stdout):
+            self.storeResult(fileName, rootDir, stdout, test)
+
+    def storeResult(self, fileName, rootDir, output, test):
         info = self.parseOutput(output, fileName)
         relativeFilePath = self.getRelativePath(fileName, rootDir)
         self.fileToTest[relativeFilePath] = test
@@ -738,7 +749,7 @@ class CVSLogLatest(CVSLog):
 
 class CVSDiff(CVSAction):
     def __init__(self, *args):
-        CVSAction.__init__(self, [ "diff", "-N", "-l" ], *args)
+        CVSAction.__init__(self, [ "diff", "-N" ], *args)
         self.revision1 = ""
         self.revision2 = ""
     def setRevisions(self, rev1, rev2):
@@ -746,11 +757,18 @@ class CVSDiff(CVSAction):
         self.revision2 = rev2
     def _getTitle(self):
         return "_Difference"
-    def getResultDialogIconType(self):
-        if len(self.pages) == 0 and not self.notInRepository:            
-            return gtk.STOCK_DIALOG_INFO
-        else:
-            return gtk.STOCK_DIALOG_WARNING
+    def getResultTitle(self):
+        return "differences"
+    def getFullResultTitle(self):
+        return "differences " + self.getRevisionMessage()
+    def showWarning(self):
+        return len(self.pages) > 0
+    def commandHadError(self, retcode, stderr):
+        # Diff returns an error code for differences, not just for errors
+        return retcode and len(stderr) > 0
+    def outputIsInteresting(self, stdout):
+        # Don't show diffs if they're empty
+        return len(stdout) > 0
     def getRevisionOptions(self):
         options = []
         if self.revision1:
@@ -771,76 +789,10 @@ class CVSDiff(CVSAction):
     def getCVSCmdArgs(self):
         return CVSAction.getCVSCmdArgs(self) + self.getRevisionOptions()
     
-    def getResultDialogMessage(self):
-        if len(self.pages) > 0:
-            if self.notInRepository:
-                message = "Showing differences " + self.getRevisionMessage() + " for CVS controlled files.\nSome directories were not under CVS control.\nCVS command used: " + " ".join(self.getCVSCmdArgs())
-            else:
-                message = "Showing differences " + self.getRevisionMessage() + " for CVS controlled files.\nCVS command used: " + " ".join(self.getCVSCmdArgs())
-        else:
-            message = "All CVS controlled files are up-to-date and unmodified compared to the latest repository version."
-        if not self.recursive:
-            message += "\nSubdirectories were ignored, use CVS Difference Recursive to see differences for all subdirectories."
-        return message
     def extraResultDialogWidgets(self):
         return CVSAction.extraResultDialogWidgets(self) + ["graphical_diff"]
-    def runAndParse(self):
-        self.notInRepository = False
-        if len(self.currTestSelection) > 0:
-            rootDir = self.getRootPath()
-        for test in self.currTestSelection:
-            fileArgs = self.getFilesForCVS(test)
-            if len(fileArgs) > 0:
-                self.notify("Status", "Diffing " + test.getRelPath())
-                self.notify("ActionProgress", "")
-                args = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...
-                self.parseOutput(self.runCommandOld(args), rootDir, test)
 
-    def parseOutput(self, outputLines, rootDir, test):
-        # The section for each file starts with
-        # Index: <file>
-        # ========================
-        # RCS file: ...
-        # To get the correct path in the treeview, we also
-        # need to add the prefix to <file>
-        currentOutput = ""
-        currentFile = ""
-        prevLine = ""
-        for line in outputLines:
-            if line.find("there is no version here; do ") != -1:
-                dir = prevLine[prevLine.find("in directory ") + 13:-2]
-                relPath = self.getRelativePath(dir, rootDir)
-                self.fileToTest[relPath] = test
-                self.pages.append((relPath, "Not under CVS control.", ""))
-                self.notInRepository = True
-            if line.startswith("==========") or \
-                   line.startswith("cvs diff: Diffing") or \
-                   line.startswith("cvs diff: cannot find"):
-                continue
-            if line.startswith("Index:"):
-                if currentFile:
-                    relativeFilePath = self.getRelativePath(currentFile, rootDir)
-                    self.fileToTest[relativeFilePath] = test
-                    self.pages.append((relativeFilePath, currentOutput, currentFile))
-                    self.notify("Status", "Analyzing differences for " + relativeFilePath.strip('\n'))
-                    self.notify("ActionProgress", "")
-                currentOutput = ""
-                currentFile = line[7:].strip(" \n")
-                continue
-            currentOutput += line
-            prevLine = line
-        if currentFile:
-            relPath = self.getRelativePath(currentFile, rootDir)
-            self.fileToTest[relPath] = test
-            self.pages.append((relPath, currentOutput, currentFile))
-
-class CVSDiffRecursive(CVSDiff):
-    recursive = True
-    def __init__(self, *args):
-        CVSDiff.__init__(self, *args)
-        self.cvsArgs = [ "diff", "-N" ]
         
-
 class CVSStatus(CVSAction):
     # Googled up.
     cvsWarningStates = [ "Locally Modified", "Locally Removed", "Locally Added" ]
@@ -954,6 +906,9 @@ class CVSAnnotate(CVSAction):
         return "A_nnotate"
     def getResultTitle(self):
         return "annotations"
+
+class CVSDiffRecursive(CVSDiff):
+    recursive = True
 
 class CVSStatusRecursive(CVSStatus):
     recursive = True

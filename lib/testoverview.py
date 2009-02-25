@@ -256,7 +256,7 @@ class TestTable:
         for extraVersion, testInfo in loggedTests.items():
             # Add an extra line in the table only if there are several versions.
             if extraVersion != firstVersion:
-                fullVersion = self.getCompositeVersion(version, extraVersion)
+                fullVersion = version + "." + extraVersion
                 table.append(self.generateExtraVersionHeader(fullVersion, tagsFound))
 
             for test in sorted(testInfo.keys()):
@@ -269,16 +269,10 @@ class TestTable:
     def generateExtraVersionLinks(self, version, extraVersions):
         cont = HTMLgen.Container()
         for extra in extraVersions:
-            fullName = self.getCompositeVersion(version, extra)
+            fullName = version + "." + extra
             cont.append(HTMLgen.Href("#" + fullName, extra))
         return HTMLgen.Heading(2, cont, align='center')
-    
-    def getCompositeVersion(self, v1, v2):
-        if len(v2):
-            return v1 + "." + v2
-        else:
-            return v1
-    
+        
     def generateExtraVersionHeader(self, extraVersion, tagsFound):
         bgColour = colourFinder.find("column_header_bg")
         extraVersionElement = HTMLgen.Container(HTMLgen.Name(extraVersion), extraVersion)

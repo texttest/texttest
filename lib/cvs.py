@@ -662,6 +662,12 @@ class CVSDiff(CVSAction):
         return "_Difference"
     def getResultTitle(self):
         return "differences"
+    def getResultDialogMessage(self):
+        if len(self.pages) == 0:
+            return "All files are up-to-date and unmodified compared to the latest repository version."
+        else:
+            return CVSAction.getResultDialogMessage(self)
+
     def getFullResultTitle(self):
         return "differences " + self.getRevisionMessage()
     def showWarning(self):

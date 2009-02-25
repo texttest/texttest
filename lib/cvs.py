@@ -178,7 +178,7 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
 
     def viewLog(self, button):
         file = self.getSelectedFile()
-        logger = CVSLog(self.validApps, self.dynamic, ignorePresence=True)
+        logger = CVSLog(self.validApps, self.dynamic)
         logger.topWindow = self.topWindow
         logger.currTestSelection = [ self.fileToTest[file] ]
         logger.currFileSelection = [ (file, None) ]
@@ -227,7 +227,7 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
         return self.currTestSelection[0].app.getDirectory()
     def getRootPath(self):
         return os.path.split(self.getApplicationPath().rstrip(os.sep))[0]
-    def getFilesForCVS(self, test, ignorePresence=False):
+    def getFilesForCVS(self, test):
         testPath = test.getDirectory()
         if len(self.currFileSelection) == 0:
             if self.dynamic:
@@ -235,13 +235,8 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
             else:
                 return [ testPath ]
         else:
-            allFiles = []
-            for filePath, comparison in self.currFileSelection:
-                allFiles.append(self.getAbsPath(filePath, testPath))
-            if ignorePresence:
-                return allFiles
-            else:
-                return filter(os.path.exists, allFiles)
+            return [ self.getAbsPath(f, testPath) for f, comp in self.currFileSelection ]
+
     def getDynamicGUIFiles(self, test):
         tmpFiles = map(lambda l: os.path.basename(l) + test.app.versionSuffix(), test.getAllTmpFiles())
         testPath = test.getDirectory()
@@ -507,9 +502,8 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
 
 
 class CVSLog(CVSAction):
-    def __init__(self, allApps, dynamic, ignorePresence=False):
-        CVSAction.__init__(self, [ "log", "-N" ], allApps, dynamic)
-        self.ignorePresence = ignorePresence
+    def __init__(self, *args):
+        CVSAction.__init__(self, [ "log", "-N" ], *args)
     def _getTitle(self):
         return "_Log"
     def getResultTitle(self):
@@ -725,7 +719,7 @@ class CVSStatus(CVSAction):
             if line.startswith("File: "):
                 spaceAfterNamePos = line.find("\t", 7)
                 return line[spaceAfterNamePos:].replace("Status: ", "").strip(" \n\t")
-        return "Parse Failure"
+        return "Parse Failure" # pragma: no cover - should never reach here unless CVS output format changes
 
     def getStatusMarkup(self, status):
         if status in self.cvsWarningStates:

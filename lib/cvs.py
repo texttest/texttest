@@ -95,13 +95,6 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
             cvsRoot = self.getCVSFileContents("Root")
             return [ "cvs", "-d", cvsRoot ] + self.cvsArgs
         
-    def runCommandOld(self, args):
-        try:
-            process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
-        except OSError:
-            raise plugins.TextTestError, "Could not run CVS: make sure you have it installed locally"
-        return process.stdout.readlines()        
-
     def commandHadError(self, retcode, stderr):
         return retcode
 
@@ -147,7 +140,7 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
 
     def storeResult(self, fileName, rootDir, output, test):
         info = self.parseOutput(output, fileName)
-        relativeFilePath = self.getRelativePath(fileName, rootDir)
+        relativeFilePath = plugins.relpath(fileName.strip(), rootDir)
         self.fileToTest[relativeFilePath] = test
         self.pages.append((relativeFilePath, output, info))
         self.notify("Status", "Analyzing " + self.getResultTitle() + " for " + relativeFilePath.strip('\n'))
@@ -234,22 +227,6 @@ class CVSAction(guiplugins.ActionResultDialogGUI):
         return self.currTestSelection[0].app.getDirectory()
     def getRootPath(self):
         return os.path.split(self.getApplicationPath().rstrip(os.sep))[0]
-    def getRelativePath(self, path, root):
-        usepath = path.strip()
-        relpath = plugins.relpath(usepath, root)
-        if relpath:
-            return relpath
-        else:
-            return self._findExistingRelative(usepath.split("/")[1:], root)
-    def _findExistingRelative(self, pathParts, root):
-        relPath = "/".join(pathParts)
-        fullPath = os.path.join(root, relPath)
-        if os.path.exists(fullPath):
-            return relPath
-        elif len(pathParts) > 1:
-            return self._findExistingRelative(pathParts[1:], root)
-        else:
-            return ""
     def getFilesForCVS(self, test, ignorePresence=False):
         testPath = test.getDirectory()
         if len(self.currFileSelection) == 0:

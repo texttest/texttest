@@ -767,12 +767,16 @@ class CVSDiff(CVSAction):
             return "between revision " + self.revision1 + " and the local file"
         else:
             return "between revisions " + self.revision1 + " and " + self.revision2
+
+    def getCVSCmdArgs(self):
+        return CVSAction.getCVSCmdArgs(self) + self.getRevisionOptions()
+    
     def getResultDialogMessage(self):
         if len(self.pages) > 0:
             if self.notInRepository:
-                message = "Showing differences " + self.getRevisionMessage() + " for CVS controlled files.\nSome directories were not under CVS control.\nCVS command used: " + " ".join(self.getCVSCmdArgs() + self.getRevisionOptions())
+                message = "Showing differences " + self.getRevisionMessage() + " for CVS controlled files.\nSome directories were not under CVS control.\nCVS command used: " + " ".join(self.getCVSCmdArgs())
             else:
-                message = "Showing differences " + self.getRevisionMessage() + " for CVS controlled files.\nCVS command used: " + " ".join(self.getCVSCmdArgs() + self.getRevisionOptions())
+                message = "Showing differences " + self.getRevisionMessage() + " for CVS controlled files.\nCVS command used: " + " ".join(self.getCVSCmdArgs())
         else:
             message = "All CVS controlled files are up-to-date and unmodified compared to the latest repository version."
         if not self.recursive:
@@ -789,7 +793,7 @@ class CVSDiff(CVSAction):
             if len(fileArgs) > 0:
                 self.notify("Status", "Diffing " + test.getRelPath())
                 self.notify("ActionProgress", "")
-                args = self.getCVSCmdArgs() + self.getRevisionOptions() + fileArgs # Popen doesn't like spaces in args ...
+                args = self.getCVSCmdArgs() + fileArgs # Popen doesn't like spaces in args ...
                 self.parseOutput(self.runCommandOld(args), rootDir, test)
 
     def parseOutput(self, outputLines, rootDir, test):

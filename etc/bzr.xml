@@ -1,0 +1,58 @@
+<ui>
+
+  <menubar name="MainMenuBar">
+
+    <placeholder name="ExtraMenus">
+      <menu action="Bazaarmenu">
+        <menuitem action="Bazaar Log"/>
+        <menuitem action="Bazaar Log Recursive"/>
+        <separator/>
+        <menuitem action="Bazaar Difference"/>
+        <menuitem action="Bazaar Difference Recursive"/>
+        <separator/>
+        <menuitem action="Bazaar Status"/>
+        <menuitem action="Bazaar Status Recursive"/>
+        <separator/>
+        <menuitem action="Bazaar Annotate"/>
+        <menuitem action="Bazaar Annotate Recursive"/>
+        <separator/>
+      </menu>
+    </placeholder>
+
+  </menubar>
+
+  <popup name="TestPopupMenu">
+    <menu action="Bazaarmenu">
+      <menuitem action="Bazaar Log"/>
+      <menuitem action="Bazaar Log Recursive"/>
+      <separator/>
+      <menuitem action="Bazaar Difference"/>
+      <menuitem action="Bazaar Difference Recursive"/>
+      <separator/>
+      <menuitem action="Bazaar Status"/>
+      <menuitem action="Bazaar Status Recursive"/>
+      <separator/>
+      <menuitem action="Bazaar Annotate"/>
+      <menuitem action="Bazaar Annotate Recursive"/>
+      <separator/>
+    </menu>
+  </popup>
+
+  <popup name="TestFilePopupMenu">
+    <menu action="Bazaarmenu">
+      <menuitem action="Bazaar Log"/>
+      <menuitem action="Bazaar Log Recursive"/>
+      <separator/>
+      <menuitem action="Bazaar Difference"/>
+      <menuitem action="Bazaar Difference Recursive"/>
+      <separator/>
+      <menuitem action="Bazaar Status"/>
+      <menuitem action="Bazaar Status Recursive"/>
+      <separator/>
+      <menuitem action="Bazaar Annotate"/>
+      <menuitem action="Bazaar Annotate Recursive"/>
+      <separator/>
+    </menu>
+  </popup>
+
+</ui>

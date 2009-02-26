@@ -1342,8 +1342,11 @@ class InteractiveActionHandler:
             return self._getVcsModule(os.getenv("TEXTTEST_HOME"))
 
     def _getVcsModule(self, directory):
-        if os.path.isdir(os.path.join(directory, "CVS")):
-            return "cvs"
+        for dir in [ directory, os.path.dirname(directory) ]:
+            if os.path.isdir(os.path.join(dir, "CVS")):
+                return "cvs"
+            elif os.path.isdir(os.path.join(dir, ".bzr")):
+                return "bzr"
         
     def _getIntvActionConfig(self, module):
         try:

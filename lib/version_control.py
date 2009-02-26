@@ -5,11 +5,12 @@ import gtk, gobject, guiplugins, default_gui, plugins, custom_widgets, entrycomp
 
 # All VCS specific stuff goes in this class
 class VersionControlInterface:
-    def __init__(self, program, name, warningStates, errorStates, controlDirName = ""):
+    def __init__(self, program, name, warningStates, errorStates, latestRevisionName, controlDirName = ""):
         self.name = name
         self.program = program
         self.warningStates = warningStates
         self.errorStates = errorStates
+        self.latestRevisionName = latestRevisionName
         self.defaultArgs = {}
         if controlDirName:
             self.controlDirName = controlDirName
@@ -18,15 +19,21 @@ class VersionControlInterface:
 
     def getDefaultArgs(self, cmdArgs):
         return self.defaultArgs.get(cmdArgs[0], [])
+
+    def getGraphicalDiffArgs(self, diffProgram):
+        return [ diffProgram ] # brittle but general...
     
     def getCmdArgs(self, appPath, cmdArgs):
         return [ self.program ] + cmdArgs + self.getDefaultArgs(cmdArgs)
 
     def getDateFromLog(self, output):
-        pass
+        pass # pragma: no cover - implemented in all derived classes
 
     def parseStateFromStatus(self, output):
-        pass
+        pass # pragma: no cover - implemented in all derived classes
+
+    def getRevisionOptions(self, r1, r2):
+        return [] # pragma: no cover - implemented in all derived classes
 
 
 # Base class for all version control actions.
@@ -200,14 +207,18 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         guiplugins.guilog.info("Viewing " + self.vcs.name + " differences for file '" + path + "' graphically ...")
         pathStem = os.path.basename(path).split(".")[0]
         diffProgram = guiplugins.guiConfig.getCompositeValue("diff_program", pathStem)
+        revOptions = self.vcs.getRevisionOptions(self.revision1, self.revision2)
+        graphDiffArgs = self.vcs.getGraphicalDiffArgs(diffProgram)
         try:
-            cmdArgs = [ diffProgram ] + self.getRevisionOptions() + [ path ]
+            if not graphDiffArgs[0] == diffProgram:
+                subprocess.call([ diffProgram, "--help" ], stderr=open(os.devnull, "w"), stdout=open(os.devnull, "w"))
+            cmdArgs = graphDiffArgs + revOptions + [ path ]
             guiplugins.processMonitor.startProcess(cmdArgs, description="Graphical " + self.vcs.name + " diff for file " + path,
-                                    stderr=open(os.devnull, "w"))
+                                                   stderr=open(os.devnull, "w"), stdout=open(os.devnull, "w"))
         except OSError:
             self.showErrorDialog("\nCannot find graphical " + self.vcs.name + " difference program '" + diffProgram + \
-                                 "'.\nPlease install it somewhere on your $PATH.\n")
-                    
+                                     "'.\nPlease install it somewhere on your $PATH.\n")
+                                
     def getApplicationPath(self):
         return self.currTestSelection[0].app.getDirectory()
     def getRootPath(self):
@@ -293,7 +304,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         label2 = gtk.Label(" and ")
         self.revision1 = gtk.Entry()
         entrycompletion.manager.register(self.revision1)
-        self.revision1.set_text("HEAD")
+        self.revision1.set_text(self.vcs.latestRevisionName)
         self.revision2 = gtk.Entry()
         entrycompletion.manager.register(self.revision2)
         self.revision1.set_alignment(1.0)
@@ -525,7 +536,7 @@ class LogGUI(VersionControlDialogGUI):
 
 class DiffGUI(VersionControlDialogGUI):
     def __init__(self, *args):
-        VersionControlDialogGUI.__init__(self, [ "diff", "-N" ], *args)
+        VersionControlDialogGUI.__init__(self, [ "diff" ], *args)
         self.revision1 = ""
         self.revision2 = ""
     def setRevisions(self, rev1, rev2):
@@ -551,13 +562,6 @@ class DiffGUI(VersionControlDialogGUI):
     def outputIsInteresting(self, stdout):
         # Don't show diffs if they're empty
         return len(stdout) > 0
-    def getRevisionOptions(self):
-        options = []
-        if self.revision1:
-            options += [ "-r", self.revision1 ]
-        if self.revision2:
-            options += [ "-r", self.revision2 ]
-        return options
     def getRevisionMessage(self):
         if self.revision1 == "" and self.revision2 == "":
             return "compared to the latest revision"
@@ -569,7 +573,7 @@ class DiffGUI(VersionControlDialogGUI):
             return "between revisions " + self.revision1 + " and " + self.revision2
 
     def getCmdArgs(self):
-        return VersionControlDialogGUI.getCmdArgs(self) + self.getRevisionOptions()
+        return VersionControlDialogGUI.getCmdArgs(self) + self.vcs.getRevisionOptions(self.revision1, self.revision2) 
     
     def extraResultDialogWidgets(self):
         return VersionControlDialogGUI.extraResultDialogWidgets(self) + ["graphical_diff"]

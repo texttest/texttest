@@ -37,9 +37,10 @@ class CVSInterface(version_control.VersionControlInterface):
         cvsWarningStates = [ "Locally Modified", "Locally Removed", "Locally Added" ]
         cvsErrorStates = [ "File had conflicts on merge", "Needs Checkout", "Unresolved Conflicts", "Needs Patch",
                            "Needs Merge", "Entry Invalid", "Unknown", "PROHIBITED" ]
-        version_control.VersionControlInterface.__init__(self, "cvs", "CVS", cvsWarningStates, cvsErrorStates, "CVS")
+        version_control.VersionControlInterface.__init__(self, "cvs", "CVS", cvsWarningStates, cvsErrorStates, "HEAD", "CVS")
         self.defaultArgs["log"] = [ "-N" ]
-
+        self.defaultArgs["diff"] = [ "-N" ]
+    
     def getCmdArgs(self, appPath, cmdArgs):
         cvsRoot = os.getenv("CVSROOT")
         if cvsRoot:
@@ -73,7 +74,14 @@ class CVSInterface(version_control.VersionControlInterface):
             if line.startswith("File: "):
                 spaceAfterNamePos = line.find("\t", 7)
                 return line[spaceAfterNamePos:].replace("Status: ", "").strip(" \n\t")
-
+    
+    def getRevisionOptions(self, r1, r2):
+        options = []
+        if r1:
+            options += [ "-r", r1 ]
+        if r2:
+            options += [ "-r", r2 ]
+        return options
 
 
 version_control.VersionControlDialogGUI.vcs = CVSInterface()

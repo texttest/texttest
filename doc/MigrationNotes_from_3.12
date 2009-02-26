@@ -37,7 +37,8 @@ intuitive but there's a small possibibility your config files aren't completely 
 (3) The CVS browser is now enabled automatically if your tests are in CVS
 =========================================================================
 If you previously enabled it by setting "interactive_action_module:cvs" in your config file
-you should remove this line.
+you should remove this line. It will be silently ignored (via a back-compatibility hack) but
+it may confuse future generations...
 
 (4) Command-line traffic matching algorithm improved and is a bit different
 ===========================================================================

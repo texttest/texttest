@@ -1327,7 +1327,11 @@ class InteractiveActionHandler:
 
     def getExplicitConfigModule(self, app=None):
         if app:
-            return app.getConfigValue("interactive_action_module")
+            module = app.getConfigValue("interactive_action_module")
+            if module == "cvs": # for back compatibility...
+                return "default_gui"
+            else:
+                return module
         else:
             return "default_gui"
 

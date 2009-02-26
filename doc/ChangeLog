@@ -1301,6 +1301,15 @@ Email Batch Report Enhancements:
 	This is used to prevent the email report finding old results if the new ones are not present (batch.py)
     - New config file setting "batch_collect_compulsory_version"
 	This is used to generate error messages in the email report if results are not found for some version (batch.py)
+CVS Browser Enhancements/bug fixes:
+    - Now enabled automatically if tests are CVS-controlled, don't need to set interactive_action_module (cvs.py)
+    - Never ignores non CVS-controlled files now (cvs.py)
+    - Finds versions correctly in dynamic GUI now and can be called on running tests (cvs.py)
+    - Category "Unknown" no longer shown as "Unknow" (cvs.py)
+    - "tkdiff" no longer hardcoded as graphical difference tool in CVS browser, uses "diff_program" as it should (cvs.py)
+    - Error messages improved and standardised (cvs.py)
+    - "CVS log" now handles date format produced by CVS 1.12 (cvs.py)
+	Previously only tested on CVS 1.11
 Grid Engine (LSF/SGE) enhancements:
     - Information about other processes on the machine improved (queuesystem.py)
 	Doesn't report itself, picks up processes from other users (SGE) and reports the job ID
@@ -1316,9 +1325,6 @@ Bug Fixes:
 	They now respond appropriately to signals.
     - Don't fail to cleanup sandbox if the SUT creates readonly files (plugins.py)
 	We change permissions if needed before removing now.
-    - "CVS log" now handles date format produced by CVS 1.12 (cvs.py)
-	Previously only tested on CVS 1.11
-    - "tkdiff" no longer hardcoded as graphical difference tool in CVS browser, uses "diff_program" as it should (cvs.py)
     - When the same dialog is created twice, start with previously hand-entered values in preference to those from gui_entry_override (guiplugins.py)
     - Can now add two applications from the static GUI as part of the same run (texttestgui.py)
     - Can now load selections from multiple version runs into a single-version run, usually static GUI (plugins.py)

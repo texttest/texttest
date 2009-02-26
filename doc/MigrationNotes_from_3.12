@@ -34,7 +34,12 @@ preferred in the case of a conflict.
 It's obviously more flexible (imported files can import other files, for example) and should be more
 intuitive but there's a small possibibility your config files aren't completely back-compatible.
  
-(3) Command-line traffic matching algorithm improved and is a bit different
+(3) The CVS browser is now enabled automatically if your tests are in CVS
+=========================================================================
+If you previously enabled it by setting "interactive_action_module:cvs" in your config file
+you should remove this line.
+
+(4) Command-line traffic matching algorithm improved and is a bit different
 ===========================================================================
 If you've recorded command-line traffic and your tests don't reproduce the commands exactly,
 the procedure for finding the correct recorded traffic is a bit different. It will tend to prefer
@@ -42,12 +47,12 @@ arguments to change than to disappear entirely now, which is reckoned to be pref
 especially with path names. It will also handle the TextTest sandbox directly, so if your traffic
 contains absolute paths there it should have an easier time matching up different sandbox paths.
 
-(4) Extra syntax checking on your config file
+(5) Extra syntax checking on your config file
 =============================================
 It's possible you may get warnings/popups which you didn't get before. But hopefully you
 will deserve them... in particular mistakenly missing [end] markers will create warnings now.
 
-(5) TextTest's default location for its internal logging is now ~/.texttest/log
+(6) TextTest's default location for its internal logging is now ~/.texttest/log
 ===============================================================================
 Instead of $TEXTTEST_HOME/Diagnostics. But it is still configurable as before. The configuration file
 lives with the source in the log subdirectory and should probably be copied to the above location

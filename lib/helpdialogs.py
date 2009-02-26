@@ -230,10 +230,11 @@ class ShowMigrationNotes(guiplugins.ActionResultDialogGUI):
         message = ""
         for note in notes:
             notesFile = open(note)
-            unicodeInfo = plugins.decodeText("".join(notesFile.readlines()))           
+            unicodeInfo = plugins.decodeText(notesFile.read())           
             notesFile.close()
             notesText = plugins.encodeToUTF(unicodeInfo)
-            message += "Adding migration notes from file '" + os.path.basename(note) + "':\n" + notesText + "\n"
+            endFirstSentence = notesText.find(".")
+            message += "Adding migration notes from file '" + os.path.basename(note) + "':\nFirst sentence :" + notesText[:endFirstSentence + 1] + "\n"
 
             buffer = gtk.TextBuffer()
             buffer.set_text(notesText)

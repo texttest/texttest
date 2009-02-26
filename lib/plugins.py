@@ -1173,24 +1173,26 @@ class MultiEntryDictionary(seqdict):
         if not hasattr(dict, "items"):
             return None
         listVal = []
+        usingList = False
         for currSubKey, currValue in dict.items():
             if fnmatch(subKey, currSubKey):
                 if type(currValue) == types.ListType:
                     listVal += currValue
+                    usingList = True
                 else:
                     return currValue
         # A certain amount of duplication here - hard to see how to avoid it
         # without compromising performance though...
-        defValue = dict.get(defaultSubKey)
-        if defValue is not None:
-            if type(defValue) == types.ListType:
-                listVal += defValue
-                return listVal
-            else:
-                return defValue
-        else:
-            if len(listVal) > 0:
-                return listVal
+        if subKey != defaultSubKey:
+            defValue = dict.get(defaultSubKey)
+            if defValue is not None:
+                if type(defValue) == types.ListType:
+                    listVal += defValue
+                    return listVal
+                else:
+                    return defValue
+        if usingList:
+            return listVal
 
 
 class Option:

@@ -828,17 +828,10 @@ class CVSAnnotateRecursive(CVSAnnotate):
 #
 class InteractiveActionConfig(default_gui.InteractiveActionConfig):
     def getMenuNames(self):
-        return default_gui.InteractiveActionConfig.getMenuNames(self) + [ "CVS" ]
+        return [ "CVS" ]
 
     def getInteractiveActionClasses(self, dynamic):
-        return default_gui.InteractiveActionConfig.getInteractiveActionClasses(self, dynamic) + \
-               [ CVSLog, CVSLogRecursive, CVSLogLatest, CVSDiff, CVSDiffRecursive, CVSStatus,
+        return [ CVSLog, CVSLogRecursive, CVSLogLatest, CVSDiff, CVSDiffRecursive, CVSStatus,
                  CVSStatusRecursive, CVSAnnotate, CVSAnnotateRecursive ]
 
-#
-#
-# Only dialogs and their utilities below.
-#
-#
-    
 

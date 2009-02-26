@@ -1272,24 +1272,37 @@ class InteractiveActionHandler:
         return self.joinDictionaries(allApps, lambda x: x.getColourDictionary())
 
     def joinDictionaries(self, allApps, method):
-        if len(allApps) == 0:
-            return method(self._getIntvActionConfig())
-
         dict = {}
-        for app in allApps:
-            config = self.getIntvActionConfig(app)
+        for config in self.getAllIntvConfigs(allApps):
             dict.update(method(config))
         return dict
-        
+
     def getMenuNames(self, allApps):
-        if len(allApps) == 0:
-            return self._getIntvActionConfig().getMenuNames()
-        names = []
+        return reduce(set.union, (c.getMenuNames() for c in self.getAllIntvConfigs(allApps)), set())
+    
+    def getAllIntvConfigs(self, allApps):
+        return self.getAllConfigs(allApps, self.getExplicitConfigModule) + \
+               self.getAllConfigs(allApps, self.getVcsModule)
+
+    def getAllConfigs(self, allApps, getModule):
+        configs = []
+        modules = set()
         for app in allApps:
-            for name in self.getIntvActionConfig(app).getMenuNames():
-                if name not in names:
-                    names.append(name)
-        return names
+            module = getModule(app)
+            if module and module not in modules:
+                modules.add(module)
+                config = self._getIntvActionConfig(module)
+                if config:
+                    configs.append(config)
+        if len(configs) == 0:
+            defaultModule = getModule()
+            if defaultModule:
+                defaultConfig = self._getIntvActionConfig(defaultModule)
+                if defaultConfig:
+                    return [ defaultConfig ]
+                else:
+                    return []
+        return configs                                
     
     def getPluginGUIs(self, dynamic, allApps, uiManager):
         instances = self.getInstances(dynamic, allApps)
@@ -1312,24 +1325,32 @@ class InteractiveActionHandler:
 
         return defaultGUIs, actionTabGUIs
 
-    def getIntvActionConfig(self, app):
-        module = app.getConfigValue("interactive_action_module")
-        try:
-            return self._getIntvActionConfig(module)
-        except ImportError:
-            return self._getIntvActionConfig()
+    def getExplicitConfigModule(self, app=None):
+        if app:
+            return app.getConfigValue("interactive_action_module")
+        else:
+            return "default_gui"
 
-    def _getIntvActionConfig(self, module="default_gui"):
-        return plugins.importAndCall(module, "InteractiveActionConfig")
-    
+    def getVcsModule(self, app=None):
+        if app:
+            return self._getVcsModule(app.getDirectory())
+        else:
+            return self._getVcsModule(os.getenv("TEXTTEST_HOME"))
+
+    def _getVcsModule(self, directory):
+        if os.path.isdir(os.path.join(directory, "CVS")):
+            return "cvs"
+        
+    def _getIntvActionConfig(self, module):
+        try:
+            return plugins.importAndCall(module, "InteractiveActionConfig")
+        except ImportError:
+            pass
+        
     def getInstances(self, dynamic, allApps):
-        if len(allApps) == 0:
-            config = self._getIntvActionConfig()
-            return self.getInstancesFromConfig(config, dynamic, allApps)
         instances = []
         classNames = []
-        for app in allApps:
-            config = self.getIntvActionConfig(app)
+        for config in self.getAllIntvConfigs(allApps):
             instances += self.getInstancesFromConfig(config, dynamic, allApps, classNames)
         return instances
 
@@ -1362,11 +1383,11 @@ class InteractiveActionHandler:
         else:
             classNames = seqdict()
             for app in allApps:
-                config = self.getIntvActionConfig(app)
-                replacements = config.getReplacements()
-                if className in config.getInteractiveActionClasses(dynamic):
-                    realClassName = replacements.get(className, className)
-                    classNames.setdefault(realClassName, []).append(app)
+                for config in self.getAllIntvConfigs([ app ]):
+                    replacements = config.getReplacements()
+                    if className in config.getInteractiveActionClasses(dynamic):
+                        realClassName = replacements.get(className, className)
+                        classNames.setdefault(realClassName, []).append(app)
             return classNames.items()
     
     def tryMakeInstance(self, className, apps, dynamic):
@@ -1381,7 +1402,10 @@ class InteractiveActionHandler:
             raise
 
     def classValid(self, className, app):
-        return self.getIntvActionConfig(app).isValid(className)
+        for config in self.getAllIntvConfigs([ app ]):
+            if not config.isValid(className):
+                return False
+        return True
         
         
 interactiveActionHandler = InteractiveActionHandler()

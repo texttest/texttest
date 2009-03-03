@@ -1345,3 +1345,17 @@ Bug Fixes:
     - Fixed crash with LANG=C, introduced in 3.12 when trying to make Swedish authors come out right! (plugins.py)
 Grid Engine bug fixes:
     - Clearer error message when the grid engine (qsub/bsub) cannot be found (queuesystem.py)
+
+Version 3.14
+============
+Dynamic GUI Enhancements:
+Framework Enhancements:
+    - Can now remove certain elements from versioned config files (plugins.py)
+	New syntax {CLEAR <item>}
+Historical HTML Batch Report Enhancements:
+Email Batch Report Enhancements:
+CVS Browser Enhancements/bug fixes:
+    - Now supports Bazaar as well as CVS (bzr.py/version_control.py)
+Grid Engine (LSF/SGE) enhancements:
+Installation and self-test changes:
+Bug Fixes:

@@ -1144,17 +1144,27 @@ class MultiEntryDictionary(seqdict):
             return entry
         dictValType = self.getDictionaryValueType()
         if dictValType == types.ListType:
-            return self.getListValue(entry)
+            return self.getBasicList(entry)
         else:
             return dictValType(entry)
 
-    def getListValue(self, entry, currentList=[]):
+    def getBasicList(self, entry):
+        if entry.startswith("{CLEAR"):
+            return []
+        else:
+            return [ entry ]
+
+    def getListValue(self, entry, currentList):
         if entry == "{CLEAR LIST}":
             return []
+        elif entry.startswith("{CLEAR"):
+            itemToRemove = entry[7:-1]
+            if itemToRemove in currentList:
+                currentList.remove(itemToRemove)
         elif entry not in currentList:
-            return currentList + [ entry ]
-        else:
-            return currentList
+            self.diag.info("Get list value for " + entry + repr(currentList))
+            currentList.append(entry)
+        return currentList
 
     def insertEntry(self, entryName, entry):
         currType = type(self.currDict[entryName])

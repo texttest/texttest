@@ -62,14 +62,19 @@ class SocketResponder(Responder,plugins.Observable):
         testData = socketSerialise(test)
         pickleData = dumps(state)
         fullData = str(os.getpid()) + os.linesep + testData + os.linesep + pickleData
-        for attempt in range(5):
+        sleepTime = 1
+        for attempt in range(9):
             try:
                 self.sendData(fullData)
                 return
             except socket.error:
-                sleep(1)
+                print "Failed to communicate with master process - waiting", sleepTime, "seconds and then trying again."
+                sleep(sleepTime)
+                sleepTime *= 2
                 
-        print "Terminating as failed to communicate with master process, got error :\n" + plugins.getExceptionString()
+        print "Terminating as failed to communicate with master process."
+        plugins.printException()
+        
     def sendData(self, fullData):
         sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect(sendSocket)

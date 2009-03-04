@@ -1040,15 +1040,15 @@ class TestSuite(Test):
             testOrigRelPath = os.path.join(origRelPath, test.name)
             test.changeDirectory(testNewDir, testOrigRelPath)
 
+    def registerTest(self, *args):
+        self.testSuiteFileHandler.add(self.getContentFileName(), *args)
+
     def copyTest(self, test, newName, newDesc, placement):
-        testDir = self.writeNewTest(newName, newDesc, placement)
+        self.registerTest(newName, newDesc, placement)
+        testDir = self.makeSubDirectory(newName)
         test.copyTestContents(testDir)
         return self.addTest(test.__class__, os.path.basename(testDir), newDesc, placement)
 
-    def writeNewTest(self, testName, description, placement):
-        contentFileName = self.getContentFileName()
-        self.testSuiteFileHandler.add(contentFileName, testName, description, placement)
-        return self.makeSubDirectory(testName)
     def getFollower(self, test):
         try:
             position = self.testcases.index(test)

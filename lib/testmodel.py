@@ -223,7 +223,7 @@ class Test(plugins.Observable):
         self.dircache = DirectoryCache(newDir)
         self.notify("NameChange", origRelPath)
 
-    def setName(self, newName):
+    def moveFiles(self, newName):
         # Create new directory, copy files if the new name is new (we might have
         # changed only the comment ...) (we don't want to rename dir, that can confuse CVS ...)
         if self.name != newName:
@@ -231,7 +231,10 @@ class Test(plugins.Observable):
             if os.path.isdir(self.getDirectory()):
                 self.copyTestContents(newDir)
                 self.removeFiles()
-
+            return newDir
+    
+    def setName(self, newName, newDir):
+        if self.name != newName:
             origRelPath = self.getRelPath()
             self.name = newName
             self.changeDirectory(newDir, origRelPath)
@@ -461,11 +464,15 @@ class Test(plugins.Observable):
         self.notify("Remove")
 
     def rename(self, newName, newDescription):
+        # Do this first, so that if we fail we won't update the test suite files either
+        newDir = self.moveFiles(newName)
+
         # Correct all testsuite files ...
         for testSuiteFileName in self.parent.findTestSuiteFiles():
             self.parent.testSuiteFileHandler.rename(testSuiteFileName, self.name, newName, newDescription)
 
-        self.setName(newName)
+        # Change the structures and notify the outside world...
+        self.setName(newName, newDir)
         self.setDescription(newDescription)
 
     def copyTestContents(self, newDir):
@@ -1044,9 +1051,10 @@ class TestSuite(Test):
         self.testSuiteFileHandler.add(self.getContentFileName(), *args)
 
     def copyTest(self, test, newName, newDesc, placement):
-        self.registerTest(newName, newDesc, placement)
+        # Do this first, so that if it fails due to e.g. full disk, we won't register the test either...
         testDir = self.makeSubDirectory(newName)
         test.copyTestContents(testDir)
+        self.registerTest(newName, newDesc, placement)
         return self.addTest(test.__class__, os.path.basename(testDir), newDesc, placement)
 
     def getFollower(self, test):

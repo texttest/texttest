@@ -129,23 +129,35 @@ class SysExitTraffic(ResponseTraffic):
 
 class FileEditTraffic(ResponseTraffic):
     typeId = "FIL"
-    def __init__(self, activeFile, storedFile, changedPaths, reproduce):
+    linkSuffix = ".TEXTTEST_SYMLINK"
+    deleteSuffix = ".TEXTTEST_DELETION"
+    def __init__(self, fileName, activeFile, storedFile, changedPaths, reproduce):
         self.activeFile = activeFile
         self.storedFile = storedFile
         self.changedPaths = changedPaths
         self.reproduce = reproduce
-        self.suffix = ".TEXTTEST_SYMLINK"
-        ResponseTraffic.__init__(self, os.path.basename(storedFile), None)
+        ResponseTraffic.__init__(self, fileName, None)
+
+    @classmethod
+    def getFile(cls, fileName, method):
+        for name in [ fileName, fileName + cls.linkSuffix, fileName + cls.deleteSuffix ]:
+            candidate = method(os.path.join("file_edits", name))
+            if candidate:
+                return candidate
 
     def copy(self, srcRoot, dstRoot):
         for srcPath in self.changedPaths:
             dstPath = srcPath.replace(srcRoot, dstRoot)
             try:
                 plugins.ensureDirExistsForFile(dstPath)
-                if srcPath.endswith(self.suffix):
-                    self.restoreLink(srcPath, dstPath.replace(self.suffix, ""))
+                if srcPath.endswith(self.linkSuffix):
+                    self.restoreLink(srcPath, dstPath.replace(self.linkSuffix, ""))
                 elif os.path.islink(srcPath):
-                    self.storeLinkAsFile(srcPath, dstPath + self.suffix)
+                    self.storeLinkAsFile(srcPath, dstPath + self.linkSuffix)
+                elif srcPath.endswith(self.deleteSuffix):
+                    os.remove(dstPath.replace(self.deleteSuffix, ""))
+                elif not os.path.exists(srcPath):
+                    open(dstPath + self.deleteSuffix, "w").close()
                 else:
                     shutil.copyfile(srcPath, dstPath)
             except IOError:
@@ -603,11 +615,12 @@ class TrafficServer(TCPServer):
     def makeResponseTraffic(self, traffic, responseClass, text):
         if responseClass is FileEditTraffic:
             fileName = text.strip()
-            storedFile = self.currentTest.getFileName(os.path.join("file_edits", fileName))
+            storedFile = FileEditTraffic.getFile(fileName, self.currentTest.getFileName)
             if storedFile:
                 editedFile = self.getFileBeingEdited(fileName, os.path.isdir(storedFile))
                 self.diag.info("File being edited for '" + fileName + "' : will replace " + str(editedFile) + " with " + str(storedFile))
-                return FileEditTraffic(editedFile, storedFile, self.findFilesAndLinks(storedFile), reproduce=True)
+                changedPaths = self.findFilesAndLinks(storedFile)
+                return FileEditTraffic(fileName, editedFile, storedFile, changedPaths, reproduce=True)
         else:
             return responseClass(text, traffic.responseFile)
 
@@ -615,15 +628,25 @@ class TrafficServer(TCPServer):
         traffic = []
         for file in self.topLevelForEdit:
             changedPaths = []
-            for subPath in self.findFilesAndLinks(file):
+            newPaths = self.findFilesAndLinks(file)
+            for subPath in newPaths:
                 newEditInfo = self.getLatestModification(subPath)
                 if newEditInfo != self.fileEditData.get(subPath):
                     changedPaths.append(subPath)
                     self.fileEditData[subPath] = newEditInfo
+
+            for oldPath in self.fileEditData.keys():
+                if (oldPath == file or oldPath.startswith(file + "/")) and oldPath not in newPaths:
+                    changedPaths.append(oldPath)
+                    self.fileEditData[oldPath] = None, 0
                     
             if len(changedPaths) > 0:
                 storedFile = self.currentTest.makeTmpFileName(self.getFileEditPath(file), forComparison=0)
-                traffic.append(FileEditTraffic(file, storedFile, changedPaths, reproduce=False))    
+                fileName = os.path.basename(storedFile)
+                self.diag.info("File being edited for '" + fileName + "' : will store " + str(file) + " as " + str(storedFile))
+                for path in changedPaths:
+                    self.diag.info("- changed " + path)
+                traffic.append(FileEditTraffic(fileName, file, storedFile, changedPaths, reproduce=False))    
                 
         return traffic
         

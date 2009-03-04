@@ -382,8 +382,8 @@ class CommandLineTraffic(Traffic):
     
     def filterReplay(self, trafficList):
         insertIndex = 0
-        if len(trafficList) > 0 and isinstance(trafficList[0], FileEditTraffic):
-            insertIndex = 1
+        while len(trafficList) > insertIndex and isinstance(trafficList[insertIndex], FileEditTraffic):
+            insertIndex += 1
         
         if len(trafficList) == insertIndex or not isinstance(trafficList[insertIndex], StdoutTraffic):
             trafficList.insert(insertIndex, StdoutTraffic("", self.responseFile))

@@ -27,16 +27,9 @@ class BzrInterface(version_control.VersionControlInterface):
                 return line[:-1].capitalize()
         return "Unchanged"
 
-    def getRevisionOptions(self, r1, r2):
-        if r1 and r2:
-            return [ "-r", r1 + ".." + r2 ]
-        elif r1:
-            return [ "-r", r1 ]
-        elif r2:
-            return [ "-r", r2 ]
-        else:
-            return []
-
+    def getCombinedRevisionOptions(self, r1, r2):
+        return [ "-r", r1 + ".." + r2 ]
+        
 
 version_control.VersionControlDialogGUI.vcs = BzrInterface()
 

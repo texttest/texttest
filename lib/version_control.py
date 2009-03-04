@@ -32,7 +32,7 @@ class VersionControlInterface:
     def parseStateFromStatus(self, output):
         pass # pragma: no cover - implemented in all derived classes
 
-    def getRevisionOptions(self, r1, r2):
+    def getCombinedRevisionOptions(self, r1, r2):
         return [] # pragma: no cover - implemented in all derived classes
 
 
@@ -202,12 +202,22 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         differ.currFileSelection = [ (file, None) ]
         differ.performOnCurrent()
 
+    def getRevisionOptions(self):
+        if self.revision1 and self.revision2:
+            return self.vcs.getCombinedRevisionOptions(self.revision1, self.revision2)
+        elif self.revision1:
+            return [ "-r", self.revision1 ]
+        elif self.revision2:
+            return [ "-r", self.revision2 ]
+        else:
+            return []
+
     def viewGraphicalDiff(self, button):
         path = self.filteredTreeModel.get_value(self.treeView.get_selection().get_selected()[1], 2)
         guiplugins.guilog.info("Viewing " + self.vcs.name + " differences for file '" + path + "' graphically ...")
         pathStem = os.path.basename(path).split(".")[0]
         diffProgram = guiplugins.guiConfig.getCompositeValue("diff_program", pathStem)
-        revOptions = self.vcs.getRevisionOptions(self.revision1, self.revision2)
+        revOptions = self.getRevisionOptions()
         graphDiffArgs = self.vcs.getGraphicalDiffArgs(diffProgram)
         try:
             if not graphDiffArgs[0] == diffProgram:
@@ -573,7 +583,7 @@ class DiffGUI(VersionControlDialogGUI):
             return "between revisions " + self.revision1 + " and " + self.revision2
 
     def getCmdArgs(self):
-        return VersionControlDialogGUI.getCmdArgs(self) + self.vcs.getRevisionOptions(self.revision1, self.revision2) 
+        return VersionControlDialogGUI.getCmdArgs(self) + self.getRevisionOptions()
     
     def extraResultDialogWidgets(self):
         return VersionControlDialogGUI.extraResultDialogWidgets(self) + ["graphical_diff"]

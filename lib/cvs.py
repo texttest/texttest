@@ -75,13 +75,8 @@ class CVSInterface(version_control.VersionControlInterface):
                 spaceAfterNamePos = line.find("\t", 7)
                 return line[spaceAfterNamePos:].replace("Status: ", "").strip(" \n\t")
     
-    def getRevisionOptions(self, r1, r2):
-        options = []
-        if r1:
-            options += [ "-r", r1 ]
-        if r2:
-            options += [ "-r", r2 ]
-        return options
+    def getCombinedRevisionOptions(self, r1, r2):
+        return [ "-r", r1, "-r", r2 ]
 
 
 version_control.VersionControlDialogGUI.vcs = CVSInterface()

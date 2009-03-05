@@ -471,7 +471,9 @@ class Test(plugins.Observable):
                 targetFile = os.path.join(newDir, local)
                 shutil.copy2(sourceFile, targetFile)
                 newRelPath = plugins.relpath(newDir, self.app.getDirectory())
-                self.updateRelPathReferences(targetFile, self.getRelPath(), newRelPath)
+                if newRelPath: # Check needed from ExportTests, but then the relative paths are the same anyway
+                    self.updateRelPathReferences(targetFile, self.getRelPath(), newRelPath)
+
         root, extFiles = self.listExternallyEditedFiles()
         dataFiles = self.listDataFiles() + extFiles
         for sourcePath in dataFiles:
@@ -482,18 +484,17 @@ class Test(plugins.Observable):
             shutil.copy2(sourcePath, targetPath)
 
     def updateRelPathReferences(self, targetFile, oldRelPath, newRelPath):
-        if not newRelPath:
-            return # Can happen from ExportTests, but then the relative paths are the same anyway
         oldRelPath = "/" + oldRelPath
         newRelPath = "/" + newRelPath
-        tmpFile, tmpFileName = mkstemp()
         # Binary mode, otherwise Windows line endings get transformed to UNIX ones (even on Windows!)
         # which will cause the test to fail...
-        for line in open(targetFile, "rb").xreadlines():
-            os.write(tmpFile, line.replace(oldRelPath, newRelPath))
-        os.close(tmpFile)
-        shutil.move(tmpFileName, targetFile)
-
+        contents = open(targetFile, "rb").read()
+        if oldRelPath in contents:
+            tmpFile, tmpFileName = mkstemp()
+            os.write(tmpFile, contents.replace(oldRelPath, newRelPath))
+            os.close(tmpFile)
+            shutil.move(tmpFileName, targetFile)
+            
     def getRunEnvironment(self, onlyVars = []):
         return self.environment.getValues(onlyVars)
     def createPropertiesFiles(self):

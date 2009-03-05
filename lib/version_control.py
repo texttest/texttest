@@ -716,9 +716,9 @@ class RenameTest(default_gui.RenameTest):
             # Wasn't in version control, probably
             default_gui.RenameTest.renameDir(self, oldDir, newDir)
 
-    def callVcs(self, cmdArgs):
+    def callVcs(self, cmdArgs, **kwargs):
         return subprocess.call([ VersionControlDialogGUI.vcs.program ] + cmdArgs,
-                               stdout=open(os.devnull, "w"), stderr=open(os.devnull, "w"))
+                               stdout=open(os.devnull, "w"), stderr=open(os.devnull, "w"), **kwargs)
 
 
 #

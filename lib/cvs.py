@@ -201,7 +201,7 @@ class RenameTest(version_control.RenameTest):
                 dirs.remove("CVS")
                 shutil.rmtree(os.path.join(root, "CVS"))
                 self.callVcs([ "add", root ])
-                for file in files:
+                for file in sorted(files):
                      self.callVcs([ "add", os.path.join(root, file) ])
             
 #

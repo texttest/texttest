@@ -190,6 +190,8 @@ class RenameTest(version_control.RenameTest):
         if os.path.isdir(oldDir):
             # CVS doesn't remove files it doesn't control, finish the job for it
             for root, dirs, files in os.walk(oldDir):
+                if "CVS" in dirs:
+                    dirs.remove("CVS")
                 for file in files:
                     os.remove(os.path.join(root, file))
 

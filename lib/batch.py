@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, performance, plugins, respond, sys, string, time, types, shutil, datetime, testoverview
+import os, plugins, respond, sys, string, time, types, shutil, datetime, testoverview
 from ndict import seqdict
 from cPickle import Pickler
 from sets import Set

@@ -626,6 +626,7 @@ class TrafficServer(TCPServer):
 
     def getLatestFileEdits(self):
         traffic = []
+        removedPaths = []
         for file in self.topLevelForEdit:
             changedPaths = []
             newPaths = self.findFilesAndLinks(file)
@@ -638,7 +639,7 @@ class TrafficServer(TCPServer):
             for oldPath in self.fileEditData.keys():
                 if (oldPath == file or oldPath.startswith(file + "/")) and oldPath not in newPaths:
                     changedPaths.append(oldPath)
-                    del self.fileEditData[oldPath]
+                    removedPaths.append(oldPath)
                     
             if len(changedPaths) > 0:
                 storedFile = self.currentTest.makeTmpFileName(self.getFileEditPath(file), forComparison=0)
@@ -647,7 +648,10 @@ class TrafficServer(TCPServer):
                 for path in changedPaths:
                     self.diag.info("- changed " + path)
                 traffic.append(FileEditTraffic(fileName, file, storedFile, changedPaths, reproduce=False))    
-                
+
+        for path in removedPaths:
+            del self.fileEditData[path]
+
         return traffic
         
 # The basic point here is to make sure that traffic appears in the record

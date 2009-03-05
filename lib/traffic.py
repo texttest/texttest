@@ -350,6 +350,7 @@ class CommandLineTraffic(Traffic):
             interpreter = plugins.getInterpreter(realCmd)
             if interpreter:
                 fullArgs = [ interpreter ] + fullArgs
+            self.diag.info("Running real command with args : " + repr(fullArgs))
             proc = subprocess.Popen(fullArgs, env=self.cmdEnviron, cwd=self.cmdCwd, 
                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
             CommandLineKillTraffic.pidMap[self.proxyPid] = proc

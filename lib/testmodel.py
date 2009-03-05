@@ -323,8 +323,8 @@ class Test(plugins.Observable):
     def fullPathList(self, dir):
         return map(lambda file: os.path.join(dir, file), os.listdir(dir))
     def listExternallyEditedFiles(self):
-        if self.dircache.exists("file_edits"):
-            rootDir = self.dircache.pathName("file_edits")
+        rootDir = self.getFileName("file_edits")
+        if rootDir:
             fileList = self.fullPathList(rootDir)
             filesToIgnore = self.getCompositeConfigValue("test_data_ignore", "file_edits")
             return rootDir, self.listFilesFrom(fileList, filesToIgnore, followLinks=True)

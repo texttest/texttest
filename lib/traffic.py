@@ -139,11 +139,12 @@ class FileEditTraffic(ResponseTraffic):
         ResponseTraffic.__init__(self, fileName, None)
 
     @classmethod
-    def getFile(cls, fileName, method):
-        for name in [ fileName, fileName + cls.linkSuffix, fileName + cls.deleteSuffix ]:
-            candidate = method(os.path.join("file_edits", name))
-            if candidate:
-                return candidate
+    def getFile(cls, fileName, fileEditDir):
+        if fileEditDir:
+            for name in [ fileName, fileName + cls.linkSuffix, fileName + cls.deleteSuffix ]:
+                candidate = os.path.join(fileEditDir, name)
+                if os.path.exists(candidate):
+                    return candidate
 
     def copy(self, srcRoot, dstRoot):
         for srcPath in self.changedPaths:
@@ -616,7 +617,8 @@ class TrafficServer(TCPServer):
     def makeResponseTraffic(self, traffic, responseClass, text):
         if responseClass is FileEditTraffic:
             fileName = text.strip()
-            storedFile = FileEditTraffic.getFile(fileName, self.currentTest.getFileName)
+            fileEditDir = self.currentTest.getFileName("file_edits")
+            storedFile = FileEditTraffic.getFile(fileName, fileEditDir)
             if storedFile:
                 editedFile = self.getFileBeingEdited(fileName, os.path.isdir(storedFile))
                 self.diag.info("File being edited for '" + fileName + "' : will replace " + str(editedFile) + " with " + str(storedFile))

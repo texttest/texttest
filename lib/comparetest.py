@@ -269,21 +269,27 @@ class TestComparison(BaseTestComparison):
         for comparison in self.filterComparisons(self.missingResults, onlyStems):
             self.updateStatus(test, str(comparison), versionString)
             comparison.saveMissing(versionString, self.fakeMissingFileText(), backupVersionString)
-        # Save any external file edits we may have made
-        tmpFileEditDir = test.makeTmpFileName("file_edits", forComparison=0)
-        if os.path.isdir(tmpFileEditDir):
-            for root, dirs, files in os.walk(tmpFileEditDir):
-                for file in sorted(files):
-                    fullPath = os.path.join(root, file)
-                    savePath = fullPath.replace(test.writeDirectory, test.getDirectory())
-                    self.updateStatus(test, "edited file " + file, versionString)
-                    plugins.ensureDirExistsForFile(savePath)
-                    shutil.copyfile(fullPath, savePath)
+        if len(onlyStems) == 0:  # Save any external file edits we may have made. Don't do this on partial saves.
+            self.saveFileEdits(test, versionString)
         if overwriteSuccessFiles:
             for comparison in self.filterComparisons(self.correctResults, onlyStems):
                 self.updateStatus(test, str(comparison), versionString)
                 comparison.overwrite(test, exact, versionString, backupVersionString)
-                
+
+    def saveFileEdits(self, test, versionString):
+        tmpFileEditDir = test.makeTmpFileName("file_edits", forComparison=0)
+        fileEditDir = test.dircache.pathName("file_edits")
+        if versionString:
+            fileEditDir += "." + versionString
+        if os.path.isdir(tmpFileEditDir):
+            for root, dirs, files in os.walk(tmpFileEditDir):
+                for file in sorted(files):
+                    fullPath = os.path.join(root, file)
+                    savePath = fullPath.replace(tmpFileEditDir, fileEditDir)
+                    self.updateStatus(test, "edited file " + file, versionString)
+                    plugins.ensureDirExistsForFile(savePath)
+                    shutil.copyfile(fullPath, savePath)
+
     def recalculateStdFiles(self, test):
         self.diag.info("Recalculating standard files for " + repr(test))
         test.refreshFiles()

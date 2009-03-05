@@ -1390,8 +1390,8 @@ class InteractiveActionHandler:
         else:
             classNames = seqdict()
             for app in allApps:
+                replacements = self.joinDictionaries([ app ], lambda x: x.getReplacements())
                 for config in self.getAllIntvConfigs([ app ]):
-                    replacements = config.getReplacements()
                     if className in config.getInteractiveActionClasses(dynamic):
                         realClassName = replacements.get(className, className)
                         classNames.setdefault(realClassName, []).append(app)

@@ -1,5 +1,5 @@
 
-import gtk, version_control, guiplugins, plugins, datetime, time, os
+import gtk, version_control, default_gui, guiplugins, plugins, datetime, shutil, time, os
 from ndict import seqdict
 
 #
@@ -175,10 +175,40 @@ class CVSLogLatest(version_control.LogGUI):
         self.dialog.vbox.pack_start(self.vbox, expand=True, fill=True)
         return message
 
+# Rename in source control also. In CVS this implies a remove and then an add
+class RenameTest(version_control.RenameTest):
+    def renameDir(self, oldDir, newDir):
+        if not os.path.isdir(os.path.join(oldDir, "CVS")):
+            return default_gui.RenameTest.renameDir(self, oldDir, newDir)
 
+        shutil.copytree(oldDir, newDir)
+        self.removeOldDir(oldDir)
+        self.addNewDir(newDir)
+
+    def removeOldDir(self, oldDir):
+        self.callVcs([ "rm", "-f", oldDir ])
+        if os.path.isdir(oldDir):
+            # CVS doesn't remove files it doesn't control, finish the job for it
+            for root, dirs, files in os.walk(oldDir):
+                for file in files:
+                    os.remove(os.path.join(root, file))
+
+    def addNewDir(self, newDir):
+        for root, dirs, files in os.walk(newDir):
+            if "CVS" in dirs:
+                dirs.remove("CVS")
+                shutil.rmtree(os.path.join(root, "CVS"))
+                self.callVcs([ "add", root ])
+                for file in files:
+                     self.callVcs([ "add", os.path.join(root, file) ])
+            
 #
 # Configuration for the Interactive Actions
 #
 class InteractiveActionConfig(version_control.InteractiveActionConfig):
     def getInteractiveActionClasses(self, dynamic):
         return version_control.InteractiveActionConfig.getInteractiveActionClasses(self, dynamic) + [ CVSLogLatest ]
+
+    def getReplacements(self):
+        return { default_gui.RenameTest : RenameTest }
+    

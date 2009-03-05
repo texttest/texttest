@@ -2369,11 +2369,26 @@ class RenameTest(guiplugins.ActionDialogGUI):
             newDesc = self.optionGroup.getOptionValue("desc")
             if newName != self.oldName or newDesc != self.oldDescription:
                 for test in self.currTestSelection:
+                    # Do this first, so that if we fail we won't update the test suite files either
+                    self.moveFiles(test, newName)
                     test.rename(newName, newDesc)
         except IOError, e:
             self.showErrorDialog("Failed to rename test:\n" + str(e))
         except OSError, e:
             self.showErrorDialog("Failed to rename test:\n" + str(e))
+
+    def moveFiles(self, test, newName):
+        # Create new directory, copy files if the new name is new (we might have
+        # changed only the comment ...)
+        if test.name != newName:
+            oldDir = test.getDirectory()
+            newDir = test.getNewDirectoryName(newName)
+            if os.path.isdir(oldDir):
+                self.renameDir(oldDir, newDir)
+
+    def renameDir(self, oldDir, newDir):
+        # overridden by version control modules
+        os.rename(oldDir, newDir)
 
 
 class ShowFileProperties(guiplugins.ActionResultDialogGUI):

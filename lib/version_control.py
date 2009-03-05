@@ -707,6 +707,19 @@ class StatusGUIRecursive(StatusGUI):
 class AnnotateGUIRecursive(AnnotateGUI):
     recursive = True    
 
+# Rename in source control also.
+# Most systems can do this directly, override again for CVS
+class RenameTest(default_gui.RenameTest):
+    def renameDir(self, oldDir, newDir):
+        retCode = self.callVcs([ "mv", oldDir, newDir ])
+        if retCode > 0:
+            # Wasn't in version control, probably
+            default_gui.RenameTest.renameDir(self, oldDir, newDir)
+
+    def callVcs(self, cmdArgs):
+        return subprocess.call([ VersionControlDialogGUI.vcs.program ] + cmdArgs,
+                               stdout=open(os.devnull, "w"), stderr=open(os.devnull, "w"))
+
 
 #
 # Configuration for the Interactive Actions
@@ -719,4 +732,5 @@ class InteractiveActionConfig(default_gui.InteractiveActionConfig):
         return [ LogGUI, LogGUIRecursive, DiffGUI, DiffGUIRecursive, StatusGUI,
                  StatusGUIRecursive, AnnotateGUI, AnnotateGUIRecursive ]
 
-
+    def getReplacements(self):
+        return { default_gui.RenameTest : RenameTest }

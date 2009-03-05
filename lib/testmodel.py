@@ -222,22 +222,15 @@ class Test(plugins.Observable):
     def changeDirectory(self, newDir, origRelPath):
         self.dircache = DirectoryCache(newDir)
         self.notify("NameChange", origRelPath)
-
-    def moveFiles(self, newName):
-        # Create new directory, copy files if the new name is new (we might have
-        # changed only the comment ...) (we don't want to rename dir, that can confuse CVS ...)
-        if self.name != newName:
-            newDir = self.parent.makeSubDirectory(newName)
-            if os.path.isdir(self.getDirectory()):
-                self.copyTestContents(newDir)
-                self.removeFiles()
-            return newDir
     
-    def setName(self, newName, newDir):
+    def setName(self, newName):
         if self.name != newName:
             origRelPath = self.getRelPath()
             self.name = newName
-            self.changeDirectory(newDir, origRelPath)
+            self.changeDirectory(self.getNewDirectoryName(newName), origRelPath)
+            stdFiles, defFiles = self.listStandardFiles(allVersions=True)
+            for file in stdFiles + defFiles:
+                self.updateRelPathReferences(file, origRelPath, self.getRelPath())
             if self.parent.autoSortOrder:
                 self.parent.updateOrder()
 
@@ -463,16 +456,16 @@ class Test(plugins.Observable):
         self.parent.testcases.remove(self)
         self.notify("Remove")
 
+    def getNewDirectoryName(self, newName):
+        return self.parent.dircache.pathName(newName)
+    
     def rename(self, newName, newDescription):
-        # Do this first, so that if we fail we won't update the test suite files either
-        newDir = self.moveFiles(newName)
-
         # Correct all testsuite files ...
         for testSuiteFileName in self.parent.findTestSuiteFiles():
             self.parent.testSuiteFileHandler.rename(testSuiteFileName, self.name, newName, newDescription)
 
         # Change the structures and notify the outside world...
-        self.setName(newName, newDir)
+        self.setName(newName)
         self.setDescription(newDescription)
 
     def copyTestContents(self, newDir):
@@ -482,7 +475,8 @@ class Test(plugins.Observable):
             if dirname == self.getDirectory():
                 targetFile = os.path.join(newDir, local)
                 shutil.copy2(sourceFile, targetFile)
-                self.updateRelPathReferences(targetFile)
+                newRelPath = plugins.relpath(newDir, self.app.getDirectory())
+                self.updateRelPathReferences(targetFile, self.getRelPath(), newRelPath)
         root, extFiles = self.listExternallyEditedFiles()
         dataFiles = self.listDataFiles() + extFiles
         for sourcePath in dataFiles:
@@ -492,11 +486,10 @@ class Test(plugins.Observable):
             plugins.ensureDirExistsForFile(targetPath)
             shutil.copy2(sourcePath, targetPath)
 
-    def updateRelPathReferences(self, targetFile):
-        oldRelPath = "/" + self.getRelPath()
-        newRelPath = plugins.relpath(os.path.dirname(targetFile), self.app.getDirectory())
+    def updateRelPathReferences(self, targetFile, oldRelPath, newRelPath):
         if not newRelPath:
             return # Can happen from ExportTests, but then the relative paths are the same anyway
+        oldRelPath = "/" + oldRelPath
         newRelPath = "/" + newRelPath
         tmpFile, tmpFileName = mkstemp()
         # Binary mode, otherwise Windows line endings get transformed to UNIX ones (even on Windows!)

@@ -638,7 +638,7 @@ class TrafficServer(TCPServer):
             for oldPath in self.fileEditData.keys():
                 if (oldPath == file or oldPath.startswith(file + "/")) and oldPath not in newPaths:
                     changedPaths.append(oldPath)
-                    self.fileEditData[oldPath] = None, 0
+                    del self.fileEditData[oldPath]
                     
             if len(changedPaths) > 0:
                 storedFile = self.currentTest.makeTmpFileName(self.getFileEditPath(file), forComparison=0)

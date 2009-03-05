@@ -1350,9 +1350,11 @@ class InteractiveActionHandler:
         
     def _getIntvActionConfig(self, module):
         try:
-            return plugins.importAndCall(module, "InteractiveActionConfig")
+            exec "from " + module + " import InteractiveActionConfig"
+            return InteractiveActionConfig()
         except ImportError:
-            pass
+            if module == "default_gui":
+                raise
         
     def getInstances(self, dynamic, allApps):
         instances = []

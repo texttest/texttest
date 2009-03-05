@@ -123,7 +123,7 @@ class PrepareWriteDirectory(plugins.Action):
         # Linking doesn't exist on windows!
         if os.name != "posix":
             return self.copyTestPath(test, sourcePath, targetPath)
-        modifiedPaths = self.getModifiedPaths(test, sourcePath)
+        modifiedPaths = self.getModifiedPaths(test, sourcePath, os.path.basename(targetPath))
         if modifiedPaths is None:
             # If we don't know, assume anything can change...
             self.copyTestPath(test, sourcePath, targetPath)
@@ -172,7 +172,7 @@ class PrepareWriteDirectory(plugins.Action):
             if not os.path.isdir(modPath):
                 return True
         return False
-    def getModifiedPaths(self, test, sourcePath):
+    def getModifiedPaths(self, test, sourcePath, sourceNameInCatalogue):
         catFile = test.getFileName("catalogue")
         if not catFile or self.ignoreCatalogues:
             # This means we don't know
@@ -185,6 +185,10 @@ class PrepareWriteDirectory(plugins.Action):
             fileName, indent = self.parseCatalogue(line)
             if not fileName:
                 continue
+
+            if fileName == sourceNameInCatalogue and indent == 1:
+                fileName = os.path.basename(sourcePath)
+                
             prevPath = currentPaths[indent - 1]
             fullPath = os.path.join(prevPath, fileName)
             if indent >= len(currentPaths):

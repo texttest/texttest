@@ -1075,8 +1075,9 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
     def findAllStems(self):
         stems = {}
         for suite in self.rootTestSuites:
+            exclude = suite.app.getDataFileNames()
             for test in suite.testCaseList():
-                for stem in test.dircache.findAllStems():
+                for stem in test.dircache.findAllStems(exclude):
                     if stem in stems:
                         stems[stem] += 1
                     else:
@@ -2056,8 +2057,8 @@ class ReportBugs(guiplugins.ActionDialogGUI):
     def getPossibleFileStems(self):
         stems = []
         for test in self.currTestSelection[0].testCaseList():
-            for stem in test.dircache.findAllStems():
-                if not stem in stems and not stem in self.currTestSelection[0].getConfigValue("definition_file_stems"):
+            for stem in test.dircache.findAllStems(self.currTestSelection[0].getConfigValue("definition_file_stems")):
+                if not stem in stems:
                     stems.append(stem)
         # use for unrunnable tests...
         stems.append("free_text")

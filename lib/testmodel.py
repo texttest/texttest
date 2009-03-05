@@ -87,11 +87,11 @@ class DirectoryCache:
                 versionSets.setdefault(versionSet, []).append(self.pathName(fileName))
         return versionSets
 
-    def findAllStems(self):
+    def findAllStems(self, exclude):
         stems = []
         for file in self.contents:
             stem, versionSet = self.splitStem(file)
-            if len(stem) > 0 and len(versionSet) > 0 and not stem in stems:
+            if len(stem) > 0 and len(versionSet) > 0 and stem not in stems and stem not in exclude:
                 stems.append(stem)
         return stems
 
@@ -289,19 +289,14 @@ class Test(plugins.Observable):
         return True
     def defFileStems(self):
         return self.getConfigValue("definition_file_stems")
-    def resultFileStems(self):
-        stems = []
-        exclude = self.defFileStems() + self.app.getDataFileNames()
-        for stem in self.dircache.findAllStems():
-            if not stem in exclude:
-                stems.append(stem)
-        return stems
     def listStandardFiles(self, allVersions):
         resultFiles, defFiles = [],[]
         self.diagnose("Looking for all standard files")
-        for stem in self.defFileStems():
+        defFileStems = self.defFileStems()
+        for stem in defFileStems:
             defFiles += self.listStdFilesWithStem(stem, allVersions)
-        for stem in self.resultFileStems():
+        exclude = defFileStems + self.app.getDataFileNames()
+        for stem in self.dircache.findAllStems(exclude):
             resultFiles += self.listStdFilesWithStem(stem, allVersions)
         self.diagnose("Found " + repr(resultFiles) + " and " + repr(defFiles))
         return resultFiles, defFiles

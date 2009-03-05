@@ -1076,7 +1076,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
     def findAllStems(self):
         stems = {}
         for suite in self.rootTestSuites:
-            exclude = suite.app.getDataFileNames()
+            exclude = suite.app.getDataFileNames() + [ "file_edits" ]
             for test in suite.testCaseList():
                 for stem in test.dircache.findAllStems(exclude):
                     if stem in stems:

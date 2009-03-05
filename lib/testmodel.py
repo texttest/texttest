@@ -291,7 +291,7 @@ class Test(plugins.Observable):
         defFileStems = self.defFileStems()
         for stem in defFileStems:
             defFiles += self.listStdFilesWithStem(stem, allVersions)
-        exclude = defFileStems + self.app.getDataFileNames()
+        exclude = defFileStems + self.app.getDataFileNames() + [ "file_edits" ]
         for stem in self.dircache.findAllStems(exclude):
             resultFiles += self.listStdFilesWithStem(stem, allVersions)
         self.diagnose("Found " + repr(resultFiles) + " and " + repr(defFiles))

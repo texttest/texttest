@@ -770,7 +770,7 @@ class PasteTests(guiplugins.ActionGUI):
                     suiteDeltas[suite] = 1
                 newTests.append(testImported)
                 if self.removeAfter:
-                    test.remove()
+                    test.remove(removeFiles=False) # We already moved the files somewhere else
 
         guiplugins.guilog.info("Selecting new tests : " + repr(newTests))
         self.notify("SetTestSelection", newTests)

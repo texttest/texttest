@@ -438,9 +438,9 @@ class Test(plugins.Observable):
         dir = self.getDirectory()
         if os.path.isdir(dir):
             shutil.rmtree(dir)
-    def remove(self, removeFromTestFile=True):
+    def remove(self, removeFiles=True):
         if self.parent: # might have already removed the enclosing suite
-            self.parent.removeTest(self, removeFromTestFile)
+            self.parent.removeTest(self, removeFiles)
             return True
         else:
             return False
@@ -1042,11 +1042,11 @@ class TestSuite(Test):
         self.testcases = []
         Test.removeFromMemory(self)
 
-    def removeTest(self, test, removeFromTestFile = True):
+    def removeTest(self, test, removeFiles=True):
         try:
-            test.removeFiles()
-            if removeFromTestFile:
-                self.removeFromTestFile(test.name)
+            if removeFiles:
+                test.removeFiles()
+            self.removeFromTestFile(test.name)
             test.removeFromMemory()
         except OSError, e:
             errorStr = str(e)

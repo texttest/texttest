@@ -1291,6 +1291,7 @@ class TestTreeGUI(ContainerGUI):
             self.notify("TestTreeCounters", totalDelta=delta, totalShownDelta=delta, totalRowsDelta=delta)
             self.removeTest(test, iter)
             guilog.info("Removing test with path " + test.getRelPath())
+            self.describeTree()
         else:
             self.notify("TestTreeCounters", totalDelta=delta, totalShownDelta=delta, totalRowsDelta=0)
             allTests.remove(test)

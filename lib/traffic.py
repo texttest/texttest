@@ -77,6 +77,9 @@ class Traffic(object):
     def getFilteredDescription(self):
         return self.getDescription(), None
 
+    def makesAsynchronousEdits(self):
+        return False
+    
     def write(self, message):
         if self.responseFile:
             try:
@@ -322,6 +325,9 @@ class CommandLineTraffic(Traffic):
         self.diag.info("Might edit in " + repr(edits))
         return edits
 
+    def makesAsynchronousEdits(self):
+        return self.commandName in self.currentTest.getConfigValue("asynchronous_file_edits")
+    
     @staticmethod
     def removeSubPaths(paths):
         subPaths = []
@@ -443,6 +449,7 @@ class TrafficServer(TCPServer):
         self.topLevelForEdit = [] # contains only paths explicitly given. Always present.
         self.fileEditData = seqdict() # contains all paths, including subpaths of the above. Empty when replaying.
         self.currentTest = None
+        self.hasAsynchronousEdits = False
         self.fileRequestCount = {} # also only for recording
 
     def process_request_thread(self, request, client_address, requestCount):
@@ -544,7 +551,12 @@ class TrafficServer(TCPServer):
                 self._process(fileTraffic, reqNo)
         self._process(traffic, reqNo)
         self.recordFileHandler.requestComplete(reqNo)
-
+        self.hasAsynchronousEdits |= traffic.makesAsynchronousEdits()
+        if not self.hasAsynchronousEdits:
+            # Unless we've marked it as asynchronous we start again for the next traffic.
+            self.topLevelForEdit = []
+            self.fileEditData = seqdict()
+        
     def _process(self, traffic, reqNo):
         self.diag.info("Processing traffic " + str(traffic.__class__))
         hasFileEdits = self.addPossibleFileEdits(traffic)
@@ -559,8 +571,9 @@ class TrafficServer(TCPServer):
     def getResponses(self, traffic, hasFileEdits):
         if self.replayInfo.isActive():
             replayedResponses = []
+            filesMatched = []
             for responseClass, text in self.replayInfo.readReplayResponses(traffic):
-                responseTraffic = self.makeResponseTraffic(traffic, responseClass, text)
+                responseTraffic = self.makeResponseTraffic(traffic, responseClass, text, filesMatched)
                 if responseTraffic:
                     replayedResponses.append(responseTraffic)
             return traffic.filterReplay(replayedResponses)
@@ -581,7 +594,7 @@ class TrafficServer(TCPServer):
             name += ".edit_" + str(timesUsed)
         return name
 
-    def getFileBeingEdited(self, givenName, directory):
+    def getFileBeingEdited(self, givenName, directory, filesMatched):
         # drop the suffix which is internal to TextTest
         fileName = givenName.split(".edit_")[0]
         bestMatch, bestScore = None, -1
@@ -589,9 +602,10 @@ class TrafficServer(TCPServer):
             if (directory and os.path.isfile(editedFile)) or \
                (not directory and os.path.isdir(editedFile)):
                 continue
-            
+
             editedName = os.path.basename(editedFile)
-            if editedName == fileName:
+            if editedName == fileName and editedFile not in filesMatched:
+                filesMatched.append(editedFile)
                 bestMatch = editedFile
                 break
             else:
@@ -614,13 +628,13 @@ class TrafficServer(TCPServer):
             score += 1
         return score
 
-    def makeResponseTraffic(self, traffic, responseClass, text):
+    def makeResponseTraffic(self, traffic, responseClass, text, filesMatched):
         if responseClass is FileEditTraffic:
             fileName = text.strip()
             fileEditDir = self.currentTest.getFileName("file_edits")
             storedFile = FileEditTraffic.getFile(fileName, fileEditDir)
             if storedFile:
-                editedFile = self.getFileBeingEdited(fileName, os.path.isdir(storedFile))
+                editedFile = self.getFileBeingEdited(fileName, os.path.isdir(storedFile), filesMatched)
                 self.diag.info("File being edited for '" + fileName + "' : will replace " + str(editedFile) + " with " + str(storedFile))
                 changedPaths = self.findFilesAndLinks(storedFile)
                 return FileEditTraffic(fileName, editedFile, storedFile, changedPaths, reproduce=True)

@@ -222,15 +222,13 @@ class Test(plugins.Observable):
     def changeDirectory(self, newDir, origRelPath):
         self.dircache = DirectoryCache(newDir)
         self.notify("NameChange", origRelPath)
-    
+        
     def setName(self, newName):
         if self.name != newName:
             origRelPath = self.getRelPath()
             self.name = newName
-            self.changeDirectory(self.getNewDirectoryName(newName), origRelPath)
-            stdFiles, defFiles = self.listStandardFiles(allVersions=True)
-            for file in stdFiles + defFiles:
-                self.updateRelPathReferences(file, origRelPath, self.getRelPath())
+            self.changeDirectory(self.parent.getNewDirectoryName(newName), origRelPath)
+            self.updateAllRelPaths(origRelPath)
             if self.parent.autoSortOrder:
                 self.parent.updateOrder()
 
@@ -452,7 +450,7 @@ class Test(plugins.Observable):
         self.notify("Remove")
 
     def getNewDirectoryName(self, newName):
-        return self.parent.dircache.pathName(newName)
+        return self.dircache.pathName(newName)
     
     def rename(self, newName, newDescription):
         # Correct all testsuite files ...
@@ -462,26 +460,6 @@ class Test(plugins.Observable):
         # Change the structures and notify the outside world...
         self.setName(newName)
         self.setDescription(newDescription)
-
-    def copyTestContents(self, newDir):
-        stdFiles, defFiles = self.listStandardFiles(allVersions=True)
-        for sourceFile in stdFiles + defFiles:
-            dirname, local = os.path.split(sourceFile)
-            if dirname == self.getDirectory():
-                targetFile = os.path.join(newDir, local)
-                shutil.copy2(sourceFile, targetFile)
-                newRelPath = plugins.relpath(newDir, self.app.getDirectory())
-                if newRelPath: # Check needed from ExportTests, but then the relative paths are the same anyway
-                    self.updateRelPathReferences(targetFile, self.getRelPath(), newRelPath)
-
-        root, extFiles = self.listExternallyEditedFiles()
-        dataFiles = self.listDataFiles() + extFiles
-        for sourcePath in dataFiles:
-            if os.path.isdir(sourcePath):
-                continue
-            targetPath = sourcePath.replace(self.getDirectory(), newDir)
-            plugins.ensureDirExistsForFile(targetPath)
-            shutil.copy2(sourcePath, targetPath)
 
     def updateRelPathReferences(self, targetFile, oldRelPath, newRelPath):
         oldRelPath = "/" + oldRelPath
@@ -548,6 +526,13 @@ class TestCase(Test):
                 return self.writeDirectory
         else:
             return self.dircache.dir
+
+    def updateAllRelPaths(self, origRelPath):
+        stdFiles, defFiles = self.listStandardFiles(allVersions=True)
+        newRelPath = self.getRelPath()
+        for file in stdFiles + defFiles:
+            self.updateRelPathReferences(file, origRelPath, newRelPath)
+            
     def getDescription(self):
         performanceFileName = self.getFileName("performance")
         if performanceFileName:
@@ -842,6 +827,11 @@ class TestSuite(Test):
         # Here we assume that only order can change...
         self.refreshFiles()
         self.updateOrder()
+
+    def updateAllRelPaths(self, origRelPath):
+        for subTest in self.testcases:
+            subTest.updateAllRelPaths(os.path.join(origRelPath, subTest.name))
+
     def updateOrder(self):
         testNames = self.readTestNames().keys() # this is cached anyway
         testCaseNames = map(lambda l: l.name, filter(lambda l: l.classId() == "test-case", self.testcases))
@@ -1038,13 +1028,6 @@ class TestSuite(Test):
 
     def registerTest(self, *args):
         self.testSuiteFileHandler.add(self.getContentFileName(), *args)
-
-    def copyTest(self, test, newName, newDesc, placement):
-        # Do this first, so that if it fails due to e.g. full disk, we won't register the test either...
-        testDir = self.makeSubDirectory(newName)
-        test.copyTestContents(testDir)
-        self.registerTest(newName, newDesc, placement)
-        return self.addTest(test.__class__, os.path.basename(testDir), newDesc, placement)
 
     def getFollower(self, test):
         try:

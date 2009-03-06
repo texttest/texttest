@@ -1,5 +1,5 @@
 
-import os, sys, plugins, sandbox, respond, rundependent, comparetest, batch, subprocess, operator, glob, signal
+import os, sys, plugins, sandbox, respond, rundependent, comparetest, batch, subprocess, operator, glob, signal, shutil
 
 from copy import copy
 from threading import Lock
@@ -1258,10 +1258,34 @@ class ExportTests(plugins.ScriptWithArgs):
             otherParent = otherRootSuite.findSubtestWithPath(parent.getRelPath())
             if otherParent:
                 self.describe(test, " - CREATING...")
-                otherParent.copyTest(test, test.name, test.description, self.placements[parent])
+                self.copyTest(test, otherParent, self.placements[parent])
             else:
                 self.describe(test, " - COULDN'T FIND PARENT")
         self.placements[parent] += 1
+
+    def copyTest(self, test, otherParent, placement):
+        # Do this first, so that if it fails due to e.g. full disk, we won't register the test either...
+        testDir = otherParent.makeSubDirectory(test.name)
+        self.copyTestContents(test, testDir)
+        otherParent.registerTest(test.name, test.description, placement)
+        otherParent.addTest(test.__class__, test.name, test.description, placement)
+
+    def copyTestContents(self, test, newDir):
+        stdFiles, defFiles = test.listStandardFiles(allVersions=True)
+        for sourceFile in stdFiles + defFiles:
+            dirname, local = os.path.split(sourceFile)
+            if dirname == test.getDirectory():
+                targetFile = os.path.join(newDir, local)
+                shutil.copy2(sourceFile, targetFile)
+
+        root, extFiles = test.listExternallyEditedFiles()
+        dataFiles = test.listDataFiles() + extFiles
+        for sourcePath in dataFiles:
+            if os.path.isdir(sourcePath):
+                continue
+            targetPath = sourcePath.replace(test.getDirectory(), newDir)
+            plugins.ensureDirExistsForFile(targetPath)
+            shutil.copy2(sourcePath, targetPath)
 
     def setUpApplication(self, app):
         self.otherSuites[app] = app.createExtraTestSuite(otherDir=self.otherTTHome)

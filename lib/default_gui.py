@@ -755,10 +755,15 @@ class PasteTests(guiplugins.ActionGUI):
                 newTests.append(test)
             else:
                 newDesc = self.getNewDescription(test)
-                testImported = suite.copyTest(test, newName, newDesc, realPlacement)
+                # Create test files first, so that if it fails due to e.g. full disk, we won't register the test either...
+                testDir = suite.getNewDirectoryName(newName)
+                self.moveOrCopy(test, testDir)
+                suite.registerTest(newName, newDesc, realPlacement)
+                testImported = suite.addTest(test.__class__, os.path.basename(testDir), newDesc, realPlacement)
                 # "testImported" might in fact be a suite: in which case we should read all the new subtests which
                 # might have also been copied
                 testImported.readContents(initial=False)
+                testImported.updateAllRelPaths(test.getRelPath())
                 if suiteDeltas.has_key(suite):
                     suiteDeltas[suite] += 1
                 else:
@@ -775,8 +780,28 @@ class PasteTests(guiplugins.ActionGUI):
             self.removeAfter = False
         for suite, placement in destInfo.values():
             suite.contentChanged()
+
     def getSignalsSent(self):
         return [ "SetTestSelection" ]
+
+    def moveOrCopy(self, test, newDirName):
+        # If it exists it's because a previous copy has already taken across the directory
+        if not os.path.isdir(newDirName):
+            oldDirName = test.getDirectory()
+            if self.removeAfter:
+                self.moveDirectory(oldDirName, newDirName)
+            else:
+                self.copyDirectory(oldDirName, newDirName)
+
+    # Methods overridden by version control
+    @staticmethod
+    def moveDirectory(oldDirName, newDirName):
+        os.rename(oldDirName, newDirName)
+
+    @staticmethod
+    def copyDirectory(oldDirName, newDirName):
+        shutil.copytree(oldDirName, newDirName)
+    
 
 
 # And a generic import test. Note acts on test suites
@@ -961,8 +986,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         self.addOption("exec", "\nSelect executable program to test", description="The full path to the program you want to test", possibleDirs=possibleDirs, selectFile=True)
 
     def findSubDirectories(self):
-        sourceControlDirs = [ "CVS", ".svn" ]
-        usableFiles = filter(lambda f: f not in sourceControlDirs, os.listdir(self.textTestHome))
+        usableFiles = filter(lambda f: f not in plugins.controlDirNames, os.listdir(self.textTestHome))
         allFiles = [ os.path.join(self.textTestHome, f) for f in usableFiles ]
         allDirs = filter(os.path.isdir, allFiles)
         allDirs.sort()
@@ -2383,11 +2407,12 @@ class RenameTest(guiplugins.ActionDialogGUI):
         # changed only the comment ...)
         if test.name != newName:
             oldDir = test.getDirectory()
-            newDir = test.getNewDirectoryName(newName)
+            newDir = test.parent.getNewDirectoryName(newName)
             if os.path.isdir(oldDir):
-                self.renameDir(oldDir, newDir)
+                self.moveDirectory(oldDir, newDir)
 
-    def renameDir(self, oldDir, newDir):
+    @staticmethod
+    def moveDirectory(oldDir, newDir):
         # overridden by version control modules
         os.rename(oldDir, newDir)
 

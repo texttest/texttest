@@ -4,10 +4,11 @@ from ndict import seqdict
 
 
 class BzrInterface(version_control.VersionControlInterface):
-    def __init__(self):
+    def __init__(self, controlDir):
         warningStates = [ "Modified", "Removed", "Added", "Renamed" ]
         errorStates = [ "Unknown", "Conflicts", "Kind changed" ]
-        version_control.VersionControlInterface.__init__(self, "bzr", "Bazaar", warningStates, errorStates, "-1")
+        version_control.VersionControlInterface.__init__(self, controlDir, "Bazaar", warningStates, errorStates, "-1")
+        self.recursiveSettings["add"] = (False, True) # not recursive, but apply to directories
 
     def getDateFromLog(self, output):
         for line in output.splitlines():
@@ -31,7 +32,6 @@ class BzrInterface(version_control.VersionControlInterface):
         return [ "-r", r1 + ".." + r2 ]
         
 
-version_control.VersionControlDialogGUI.vcs = BzrInterface()
-
+version_control.VersionControlDialogGUI.vcsClass = BzrInterface
 
 from version_control import InteractiveActionConfig

@@ -32,31 +32,39 @@ from ndict import seqdict
 
 
 class CVSInterface(version_control.VersionControlInterface):
-    def __init__(self):
+    def __init__(self, cvsDir):
         # Googled up.
         cvsWarningStates = [ "Locally Modified", "Locally Removed", "Locally Added" ]
         cvsErrorStates = [ "File had conflicts on merge", "Needs Checkout", "Unresolved Conflicts", "Needs Patch",
                            "Needs Merge", "Entry Invalid", "Unknown", "PROHIBITED" ]
-        version_control.VersionControlInterface.__init__(self, "cvs", "CVS", cvsWarningStates, cvsErrorStates, "HEAD", "CVS")
+        version_control.VersionControlInterface.__init__(self, cvsDir, "CVS", cvsWarningStates, cvsErrorStates, "HEAD")
         self.defaultArgs["log"] = [ "-N" ]
         self.defaultArgs["diff"] = [ "-N" ]
+        self.recursiveSettings["add"] = (True, True)
+        self.programArgs, self.errorMessage = self.setProgramArgs(cvsDir)
+
+    def getProgramArgs(self):
+        if self.errorMessage:
+            raise plugins.TextTestError, self.errorMessage
+        else:
+            return self.programArgs
     
-    def getCmdArgs(self, appPath, cmdArgs):
+    def setProgramArgs(self, cvsDir):
         cvsRoot = os.getenv("CVSROOT")
         if cvsRoot:
-            return version_control.VersionControlInterface.getCmdArgs(self, appPath, cmdArgs)
+            return [ "cvs" ], ""
         else:
-            cvsRoot = self.getCvsRootFromFile(appPath)
-            return [ "cvs", "-d", cvsRoot ] + cmdArgs + self.getDefaultArgs(cmdArgs)
+            rootFile = os.path.join(cvsDir, "Root")
+            if os.path.isfile(rootFile):
+                cvsRoot = self.getCvsRootFromFile(rootFile)
+                return [ "cvs", "-d", cvsRoot ], ""
+            else:
+                return [], "Could not determine $CVSROOT: environment variable not set and no file present at:\n" + rootFile
 
-    def getCvsRootFromFile(self, appPath):
-        fullPath = os.path.join(appPath, "CVS", "Root")
-        if not os.path.isfile(fullPath):
-            raise plugins.TextTestError, "Could not determine $CVSROOT: environment variable not set and no file present at:\n" + fullPath    
-
-        info = open(fullPath).read()  
+    def getCvsRootFromFile(self, rootFile):
+        info = open(rootFile).read()  
         return info.strip().rstrip(os.sep)
-
+        
     def getDateFromLog(self, output):
         for line in output.splitlines():
             if line.startswith("date:"):
@@ -78,18 +86,48 @@ class CVSInterface(version_control.VersionControlInterface):
     def getCombinedRevisionOptions(self, r1, r2):
         return [ "-r", r1, "-r", r2 ]
 
+    # Move in source control also. In CVS this implies a remove and then an add
+    def moveDirectory(self, oldDir, newDir):
+        if os.path.isdir(os.path.join(oldDir, "CVS")):
+            self.copyDirectory(oldDir, newDir)
+            self.remove(oldDir)
+            self.callProgramOnFiles("add", newDir, cwd=os.path.dirname(newDir)) # Just so we can find the CVS dirs in traffic mechanism..
+        else:
+            os.rename(oldDir, newDir)
 
-version_control.VersionControlDialogGUI.vcs = CVSInterface()
+    def copyDirectory(self, oldDir, newDir):
+        shutil.copytree(oldDir, newDir)
+        self.cleanControlDirs(newDir)
+
+    def remove(self, oldDir):
+        self.callProgram([ "rm", "-f", oldDir ])
+        if os.path.isdir(oldDir):
+            # CVS doesn't remove files it doesn't control, finish the job for it
+            for root, dirs, files in os.walk(oldDir):
+                if "CVS" in dirs:
+                    dirs.remove("CVS")
+                for file in files:
+                    os.remove(os.path.join(root, file))
+
+    def cleanControlDirs(self, newDir):
+        for root, dirs, files in os.walk(newDir):
+            if "CVS" in dirs:
+                dirs.remove("CVS")
+                shutil.rmtree(os.path.join(root, "CVS"))
+        
 
      
 class CVSLogLatest(version_control.LogGUI):
     def __init__(self, *args):
         version_control.LogGUI.__init__(self, *args)
-        self.cmdArgs = [ "log", "-rHEAD" ]
+        self.cmdName = "log"
+    def getExtraArgs(self):
+        return [ "-rHEAD" ]
     def _getTitle(self):
         return "Log Latest"
     def getResultDialogMessage(self):
-        message = "Showing latest log entries for the CVS controlled files.\nCVS command used: " + " ".join(self.getCmdArgs())
+        cmdArgs = self.vcs.getCmdArgs(self.cmdName, self.getExtraArgs())
+        message = "Showing latest log entries for the CVS controlled files.\nCVS command used: " + " ".join(cmdArgs)
         if not self.recursive:
             message += "\nSubdirectories were ignored."            
         return message
@@ -175,34 +213,7 @@ class CVSLogLatest(version_control.LogGUI):
         self.dialog.vbox.pack_start(self.vbox, expand=True, fill=True)
         return message
 
-# Rename in source control also. In CVS this implies a remove and then an add
-class RenameTest(version_control.RenameTest):
-    def renameDir(self, oldDir, newDir):
-        if not os.path.isdir(os.path.join(oldDir, "CVS")):
-            return default_gui.RenameTest.renameDir(self, oldDir, newDir)
-
-        shutil.copytree(oldDir, newDir)
-        self.removeOldDir(oldDir)
-        self.addNewDir(newDir)
-
-    def removeOldDir(self, oldDir):
-        self.callVcs([ "rm", "-f", oldDir ])
-        if os.path.isdir(oldDir):
-            # CVS doesn't remove files it doesn't control, finish the job for it
-            for root, dirs, files in os.walk(oldDir):
-                if "CVS" in dirs:
-                    dirs.remove("CVS")
-                for file in files:
-                    os.remove(os.path.join(root, file))
-
-    def addNewDir(self, newDir):
-        for root, dirs, files in os.walk(newDir):
-            if "CVS" in dirs:
-                dirs.remove("CVS")
-                shutil.rmtree(os.path.join(root, "CVS"))
-                self.callVcs([ "add", root ])
-                for file in sorted(files):
-                     self.callVcs([ "add", os.path.join(root, file) ])
+version_control.VersionControlDialogGUI.vcsClass = CVSInterface
             
 #
 # Configuration for the Interactive Actions
@@ -210,7 +221,4 @@ class RenameTest(version_control.RenameTest):
 class InteractiveActionConfig(version_control.InteractiveActionConfig):
     def getInteractiveActionClasses(self, dynamic):
         return version_control.InteractiveActionConfig.getInteractiveActionClasses(self, dynamic) + [ CVSLogLatest ]
-
-    def getReplacements(self):
-        return { default_gui.RenameTest : RenameTest }
     

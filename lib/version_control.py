@@ -1,30 +1,81 @@
 
 # Generic interface to version control systems. We try to keep it as general as possible.
 
-import gtk, gobject, guiplugins, default_gui, plugins, custom_widgets, entrycompletion, os, datetime, subprocess
+import gtk, gobject, guiplugins, default_gui, plugins, custom_widgets, entrycompletion, os, datetime, subprocess, shutil
 
 # All VCS specific stuff goes in this class
 class VersionControlInterface:
-    def __init__(self, program, name, warningStates, errorStates, latestRevisionName, controlDirName = ""):
+    def __init__(self, controlDir, name, warningStates, errorStates, latestRevisionName):
         self.name = name
-        self.program = program
+        self.controlDirName = os.path.basename(controlDir)
+        self.program = os.path.basename(controlDir).lower().replace(".", "")
         self.warningStates = warningStates
         self.errorStates = errorStates
         self.latestRevisionName = latestRevisionName
         self.defaultArgs = {}
-        if controlDirName:
-            self.controlDirName = controlDirName
-        else:
-            self.controlDirName = "." + self.program
+        self.recursiveSettings = {}
 
-    def getDefaultArgs(self, cmdArgs):
-        return self.defaultArgs.get(cmdArgs[0], [])
+    def callProgram(self, cmdArgs, **kwargs):
+        return subprocess.call([ self.program ] + cmdArgs,
+                               stdout=open(os.devnull, "w"), stderr=open(os.devnull, "w"), **kwargs)
+
+    def callProgramOnFiles(self, cmdName, fileArg, recursive=False,
+                           extraArgs=[], outputHandler=None, outputHandlerArgs=(), **kwargs):
+        basicArgs = self.getCmdArgs(cmdName, extraArgs)
+        _recursive, includeDirs = self.recursiveSettings.get(cmdName, (recursive, False))
+        for fileName in self.getFileNames(fileArg, _recursive, includeDirs):
+            args = basicArgs + [ fileName ]
+            try:
+                process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, **kwargs)
+            except OSError:
+                raise plugins.TextTestError, "Could not run " + self.name + ": make sure you have it installed locally"
+
+            stdout, stderr = process.communicate()
+            if outputHandler:
+                outputHandler(process.returncode, stdout, stderr, fileName, *outputHandlerArgs)         
+
+    def getFileNames(self, fileArg, recursive, includeDirs):
+        if os.path.isfile(fileArg):
+            return [ fileArg ]
+        elif os.path.isdir(fileArg):
+            if recursive:
+                return self.getFilesFromDirRecursive(fileArg, includeDirs)
+            else:
+                return self.getFilesFromDir(fileArg, includeDirs)
+            
+    def getFilesFromDir(self, dirName, includeDirs):
+        if includeDirs:
+            return [ dirName ]
+
+        files = []
+        for f in sorted(os.listdir(dirName)):
+            fullPath = os.path.join(dirName, f)
+            if os.path.isfile(fullPath):
+                files.append(fullPath)
+        return files
+
+    def getFilesFromDirRecursive(self, dirName, includeDirs):
+        allFiles = []
+        if includeDirs:
+            allFiles.append(dirName)
+        for root, dirs, files in os.walk(dirName):
+            if self.controlDirName in dirs:
+                dirs.remove(self.controlDirName)
+            toAdd = files
+            if includeDirs:
+                toAdd += dirs
+            for f in toAdd:
+                allFiles.append(os.path.join(root, f))
+        return sorted(allFiles)
+
+    def getProgramArgs(self):
+        return [ self.program ]
 
     def getGraphicalDiffArgs(self, diffProgram):
         return [ diffProgram ] # brittle but general...
     
-    def getCmdArgs(self, appPath, cmdArgs):
-        return [ self.program ] + cmdArgs + self.getDefaultArgs(cmdArgs)
+    def getCmdArgs(self, cmdName, extraArgs):
+        return self.getProgramArgs() + [ cmdName ] + self.defaultArgs.get(cmdName, []) + extraArgs 
 
     def getDateFromLog(self, output):
         pass # pragma: no cover - implemented in all derived classes
@@ -35,14 +86,29 @@ class VersionControlInterface:
     def getCombinedRevisionOptions(self, r1, r2):
         return [] # pragma: no cover - implemented in all derived classes
 
+    def copyDirectory(self, oldDir, newDir):
+        shutil.copytree(oldDir, newDir)
+
+    def moveDirectory(self, oldDir, newDir):
+        retCode = self.callProgram([ "mv", oldDir, newDir ])
+        if retCode > 0:
+            # Wasn't in version control, probably
+            os.rename(oldDir, newDir)
+
+
+
 
 # Base class for all version control actions.
 class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
     recursive = False
-    vcs = None
-    def __init__(self, cmdArgs, allApps=[], dynamic=False):
+    vcsClass, vcs = None, None
+    @classmethod
+    def createVCS(cls, controlDir):
+        cls.vcs = cls.vcsClass(controlDir)
+    
+    def __init__(self, allApps=[], dynamic=False):
         guiplugins.ActionResultDialogGUI.__init__(self, allApps)
-        self.cmdArgs = cmdArgs
+        self.cmdName = self._getTitle().replace("_", "").lower()
         self.dynamic = dynamic
         self.needsAttention = False
         self.notInRepository = False
@@ -76,6 +142,9 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         else:
             return gtk.STOCK_DIALOG_INFO
 
+    def getExtraArgs(self):
+        return []
+    
     def getFullResultTitle(self):
         return self.getResultTitle()
     
@@ -85,19 +154,17 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
             message += "\n" + self.vcs.name + " " + self.getResultTitle() + " found files which are not up-to-date or which have conflicts"
         if self.notInRepository:
             message += "\nSome files/directories were not under " + self.vcs.name + " control."
-        message += "\n" + self.vcs.name + " command used: " + " ".join(self.getCmdArgs())
+        cmdArgs = self.vcs.getCmdArgs(self.cmdName, self.getExtraArgs())
+        message += "\n" + self.vcs.name + " command used: " + " ".join(cmdArgs)
         if not self.recursive:
             message += "\nSubdirectories were ignored, use " + self.getTitle() + " Recursive to get the " + self.getResultTitle() + " for all subdirectories."
         return message
 
     def extraResultDialogWidgets(self):
         all = ["log", "status", "diff", "annotate" ]
-        all.remove(self.cmdArgs[0])
+        all.remove(self.cmdName)
         return all
-    
-    def getCmdArgs(self):
-        return self.vcs.getCmdArgs(self.getApplicationPath(), self.cmdArgs)
-        
+            
     def commandHadError(self, retcode, stderr):
         return retcode
 
@@ -118,24 +185,18 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         self.needsAttention = False
         if len(self.currTestSelection) > 0:
             rootDir = self.getRootPath()
+        extraArgs = self.getExtraArgs()
         for test in self.currTestSelection:
             fileArgs = self.getFilesForCmd(test)
             if len(fileArgs) > 0:
                 self.notify("Status", "Getting " + self.getResultTitle() + " for " + self.getTestDescription(test))
                 self.notify("ActionProgress", "")
                 for fileArg in fileArgs:
-                    for fileName in self.getFileNames(fileArg):
-                        self.runAndParseFile(fileName, rootDir, test)
-        
-    def runAndParseFile(self, fileName, rootDir, test):
-        args = self.getCmdArgs() + [ fileName ]
-        try:
-            process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-        except OSError:
-            raise plugins.TextTestError, "Could not run " + self.vcs.name + ": make sure you have it installed locally"
-
-        stdout, stderr = process.communicate()
-        if self.commandHadError(process.returncode, stderr):
+                    self.vcs.callProgramOnFiles(self.cmdName, fileArg, self.recursive, extraArgs,
+                                                self.handleVcsOutput, (rootDir, test))
+                    
+    def handleVcsOutput(self, retcode, stdout, stderr, fileName, rootDir, test):
+        if self.commandHadError(retcode, stderr):
             self.notInRepository = True
             self.storeResult(fileName, rootDir, stderr, test)
         elif self.outputIsInteresting(stdout):
@@ -202,22 +263,12 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         differ.currFileSelection = [ (file, None) ]
         differ.performOnCurrent()
 
-    def getRevisionOptions(self):
-        if self.revision1 and self.revision2:
-            return self.vcs.getCombinedRevisionOptions(self.revision1, self.revision2)
-        elif self.revision1:
-            return [ "-r", self.revision1 ]
-        elif self.revision2:
-            return [ "-r", self.revision2 ]
-        else:
-            return []
-
     def viewGraphicalDiff(self, button):
         path = self.filteredTreeModel.get_value(self.treeView.get_selection().get_selected()[1], 2)
         guiplugins.guilog.info("Viewing " + self.vcs.name + " differences for file '" + path + "' graphically ...")
         pathStem = os.path.basename(path).split(".")[0]
         diffProgram = guiplugins.guiConfig.getCompositeValue("diff_program", pathStem)
-        revOptions = self.getRevisionOptions()
+        revOptions = self.getExtraArgs()
         graphDiffArgs = self.vcs.getGraphicalDiffArgs(diffProgram)
         try:
             if not graphDiffArgs[0] == diffProgram:
@@ -229,10 +280,10 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
             self.showErrorDialog("\nCannot find graphical " + self.vcs.name + " difference program '" + diffProgram + \
                                      "'.\nPlease install it somewhere on your $PATH.\n")
                                 
-    def getApplicationPath(self):
-        return self.currTestSelection[0].app.getDirectory()
     def getRootPath(self):
-        return os.path.split(self.getApplicationPath().rstrip(os.sep))[0]
+        appPath = self.currTestSelection[0].app.getDirectory()
+        return os.path.split(appPath.rstrip(os.sep))[0]
+    
     def getFilesForCmd(self, test):
         testPath = test.getDirectory()
         if len(self.currFileSelection) == 0:
@@ -467,31 +518,6 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         return not self.treeModel.iter_has_child(
             self.treeModel.get_iter(self.filteredTreeModel.convert_path_to_child_path(path)))
 
-    def getFileNames(self, fileArg):
-        if os.path.isfile(fileArg):
-            return [ fileArg ]
-        elif os.path.isdir(fileArg):
-            if self.recursive:
-                return self.getFilesFromDirRecursive(fileArg)
-            else:
-                return self.getFilesFromDir(fileArg)
-            
-    def getFilesFromDir(self, dirName):
-        files = []
-        for f in sorted(os.listdir(dirName)):
-            fullPath = os.path.join(dirName, f)
-            if os.path.isfile(fullPath):
-                files.append(fullPath)
-        return files
-
-    def getFilesFromDirRecursive(self, dirName):
-        allFiles = []
-        for root, dirs, files in os.walk(dirName):
-            if self.vcs.controlDirName in dirs:
-                dirs.remove(self.vcs.controlDirName)
-            for f in files:
-                allFiles.append(os.path.join(root, f))
-        return sorted(allFiles)
 
 #
 # 1 - First the methods which just check the repository and checked out files.
@@ -499,8 +525,6 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
 
 
 class LogGUI(VersionControlDialogGUI):
-    def __init__(self, *args):
-        VersionControlDialogGUI.__init__(self, [ "log" ], *args)
     def _getTitle(self):
         return "_Log"
     def getResultTitle(self):
@@ -546,7 +570,8 @@ class LogGUI(VersionControlDialogGUI):
 
 class DiffGUI(VersionControlDialogGUI):
     def __init__(self, *args):
-        VersionControlDialogGUI.__init__(self, [ "diff" ], *args)
+        VersionControlDialogGUI.__init__(self, *args)
+        self.cmdName = "diff"
         self.revision1 = ""
         self.revision2 = ""
     def setRevisions(self, rev1, rev2):
@@ -582,9 +607,16 @@ class DiffGUI(VersionControlDialogGUI):
         else:
             return "between revisions " + self.revision1 + " and " + self.revision2
 
-    def getCmdArgs(self):
-        return VersionControlDialogGUI.getCmdArgs(self) + self.getRevisionOptions()
-    
+    def getExtraArgs(self):
+        if self.revision1 and self.revision2:
+            return self.vcs.getCombinedRevisionOptions(self.revision1, self.revision2)
+        elif self.revision1:
+            return [ "-r", self.revision1 ]
+        elif self.revision2:
+            return [ "-r", self.revision2 ]
+        else:
+            return []
+
     def extraResultDialogWidgets(self):
         return VersionControlDialogGUI.extraResultDialogWidgets(self) + ["graphical_diff"]
 
@@ -595,7 +627,7 @@ class StatusGUI(VersionControlDialogGUI):
       </popup>
     </ui>'''
     def __init__(self, *args):
-        VersionControlDialogGUI.__init__(self, [ "status" ], *args)
+        VersionControlDialogGUI.__init__(self, *args)
         self.uiManager = gtk.UIManager()
         self.popupMenu = None
     def _getTitle(self):
@@ -688,8 +720,6 @@ class StatusGUI(VersionControlDialogGUI):
             return True
 
 class AnnotateGUI(VersionControlDialogGUI):
-    def __init__(self, *args):
-        VersionControlDialogGUI.__init__(self, [ "annotate" ], *args)
     def _getTitle(self):
         return "A_nnotate"
     def getResultTitle(self):
@@ -707,30 +737,20 @@ class StatusGUIRecursive(StatusGUI):
 class AnnotateGUIRecursive(AnnotateGUI):
     recursive = True    
 
-# Rename in source control also.
-# Most systems can do this directly, override again for CVS
-class RenameTest(default_gui.RenameTest):
-    def renameDir(self, oldDir, newDir):
-        retCode = self.callVcs([ "mv", oldDir, newDir ])
-        if retCode > 0:
-            # Wasn't in version control, probably
-            default_gui.RenameTest.renameDir(self, oldDir, newDir)
-
-    def callVcs(self, cmdArgs, **kwargs):
-        return subprocess.call([ VersionControlDialogGUI.vcs.program ] + cmdArgs,
-                               stdout=open(os.devnull, "w"), stderr=open(os.devnull, "w"), **kwargs)
-
-
 #
 # Configuration for the Interactive Actions
 #
 class InteractiveActionConfig(default_gui.InteractiveActionConfig):
+    def __init__(self, controlDir):
+        VersionControlDialogGUI.createVCS(controlDir)
+        # Do some monkey-patching :)
+        for cls in [ default_gui.RenameTest, default_gui.PasteTests ]:
+            cls.moveDirectory = VersionControlDialogGUI.vcs.moveDirectory
+            cls.copyDirectory = VersionControlDialogGUI.vcs.copyDirectory
+
     def getMenuNames(self):
         return [ VersionControlDialogGUI.vcs.name ]
 
     def getInteractiveActionClasses(self, dynamic):
         return [ LogGUI, LogGUIRecursive, DiffGUI, DiffGUIRecursive, StatusGUI,
                  StatusGUIRecursive, AnnotateGUI, AnnotateGUIRecursive ]
-
-    def getReplacements(self):
-        return { default_gui.RenameTest : RenameTest }

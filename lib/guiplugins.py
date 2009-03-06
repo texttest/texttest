@@ -1288,16 +1288,16 @@ class InteractiveActionHandler:
         configs = []
         modules = set()
         for app in allApps:
-            module = getModule(app)
+            module, extraArgs = getModule(app)
             if module and module not in modules:
                 modules.add(module)
-                config = self._getIntvActionConfig(module)
+                config = self._getIntvActionConfig(module, *extraArgs)
                 if config:
                     configs.append(config)
         if len(configs) == 0:
-            defaultModule = getModule()
+            defaultModule, extraArgs = getModule()
             if defaultModule:
-                defaultConfig = self._getIntvActionConfig(defaultModule)
+                defaultConfig = self._getIntvActionConfig(defaultModule, *extraArgs)
                 if defaultConfig:
                     return [ defaultConfig ]
                 else:
@@ -1329,11 +1329,11 @@ class InteractiveActionHandler:
         if app:
             module = app.getConfigValue("interactive_action_module")
             if module == "cvs": # for back compatibility...
-                return "default_gui"
+                return "default_gui", ()
             else:
-                return module
+                return module, ()
         else:
-            return "default_gui"
+            return "default_gui", ()
 
     def getVcsModule(self, app=None):
         if app:
@@ -1343,15 +1343,16 @@ class InteractiveActionHandler:
 
     def _getVcsModule(self, directory):
         for dir in [ directory, os.path.dirname(directory) ]:
-            if os.path.isdir(os.path.join(dir, "CVS")):
-                return "cvs"
-            elif os.path.isdir(os.path.join(dir, ".bzr")):
-                return "bzr"
-        
-    def _getIntvActionConfig(self, module):
+            for controlDirName in plugins.controlDirNames:
+                controlDir = os.path.join(dir, controlDirName)
+                if os.path.isdir(controlDir):
+                    return controlDirName.lower().replace(".", ""), (controlDir,)
+        return None, ()
+    
+    def _getIntvActionConfig(self, module, *args):
         try:
             exec "from " + module + " import InteractiveActionConfig"
-            return InteractiveActionConfig()
+            return InteractiveActionConfig(*args)
         except ImportError:
             if module == "default_gui":
                 raise

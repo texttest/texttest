@@ -16,6 +16,8 @@
         <menuitem action="Bazaar Annotate"/>
         <menuitem action="Bazaar Annotate Recursive"/>
         <separator/>
+        <menuitem action="Bazaar Add"/>
+        <separator/>
       </menu>
     </placeholder>
 
@@ -35,6 +37,8 @@
       <menuitem action="Bazaar Annotate"/>
       <menuitem action="Bazaar Annotate Recursive"/>
       <separator/>
+      <menuitem action="Bazaar Add"/>
+      <separator/>
     </menu>
   </popup>
 
@@ -51,6 +55,8 @@
       <separator/>
       <menuitem action="Bazaar Annotate"/>
       <menuitem action="Bazaar Annotate Recursive"/>
+      <separator/>
+      <menuitem action="Bazaar Add"/>
       <separator/>
     </menu>
   </popup>

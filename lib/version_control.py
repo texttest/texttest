@@ -24,7 +24,7 @@ class VersionControlInterface:
         basicArgs = self.getCmdArgs(cmdName, extraArgs)
         _recursive, includeDirs = self.recursiveSettings.get(cmdName, (recursive, False))
         for fileName in self.getFileNames(fileArg, _recursive, includeDirs):
-            args = basicArgs + [ fileName ]
+            args = self.getArgsForFile(basicArgs, fileName)
             try:
                 process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, **kwargs)
             except OSError:
@@ -33,6 +33,10 @@ class VersionControlInterface:
             stdout, stderr = process.communicate()
             if outputHandler:
                 outputHandler(process.returncode, stdout, stderr, fileName, *outputHandlerArgs)         
+
+    def getArgsForFile(self, basicArgs, fileName):
+        # Overridden by Bazaar to work around symlink bug
+        return basicArgs + [ fileName ]
 
     def getFileNames(self, fileArg, recursive, includeDirs):
         if os.path.isfile(fileArg):
@@ -65,7 +69,11 @@ class VersionControlInterface:
             if includeDirs:
                 toAdd += dirs
             for f in toAdd:
-                allFiles.append(os.path.join(root, f))
+                fullPath = os.path.join(root, f)
+                if os.path.isdir(fullPath) and os.path.islink(fullPath):
+                    allFiles += self.getFilesFromDirRecursive(fullPath, includeDirs)
+                else:
+                    allFiles.append(fullPath)
         return sorted(allFiles)
 
     def getProgramArgs(self):
@@ -162,7 +170,8 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
 
     def extraResultDialogWidgets(self):
         all = ["log", "status", "diff", "annotate" ]
-        all.remove(self.cmdName)
+        if self.cmdName in all:
+            all.remove(self.cmdName)
         return all
             
     def commandHadError(self, retcode, stderr):
@@ -230,6 +239,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         return self.filteredTreeModel.get_value(self.treeView.get_selection().get_selected()[1], 3)
     def viewStatus(self, button):
         file = self.getSelectedFile()
+        self.diag.info("Viewing status on file " + file)
         status = StatusGUI()
         status.notifyTopWindow(self.topWindow)
         status.currTestSelection = [ self.fileToTest[file] ]
@@ -300,7 +310,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
             raise plugins.TextTestError, "Cannot establish which files should be compared as no comparison information exists.\n" + \
                   "To create this information, perform 'recompute status' (press '" + \
                          guiplugins.guiConfig.getCompositeValue("gui_accelerators", "recompute_status") + "') and try again."
-                    
+
     def isModal(self):
         return False
     
@@ -723,6 +733,16 @@ class AnnotateGUI(VersionControlDialogGUI):
     def getResultTitle(self):
         return "annotations"
 
+class AddGUI(VersionControlDialogGUI):
+    def _getTitle(self):
+        return "A_dd"
+    def getResultDialogMessage(self):
+        return "Output from '" + self.vcs.name + " add' shown below."
+    def commandHadError(self, retcode, stderr):
+        # Particularly CVS likes to write add output on stderr for some reason...
+        return len(stderr) > 0
+    
+        
 class LogGUIRecursive(LogGUI):
     recursive = True
 
@@ -751,4 +771,4 @@ class InteractiveActionConfig(default_gui.InteractiveActionConfig):
 
     def getInteractiveActionClasses(self, dynamic):
         return [ LogGUI, LogGUIRecursive, DiffGUI, DiffGUIRecursive, StatusGUI,
-                 StatusGUIRecursive, AnnotateGUI, AnnotateGUIRecursive ]
+                 StatusGUIRecursive, AnnotateGUI, AnnotateGUIRecursive, AddGUI ]

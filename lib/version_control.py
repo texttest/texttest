@@ -183,8 +183,6 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
     def runAndParse(self):
         self.notInRepository = False
         self.needsAttention = False
-        if len(self.currTestSelection) > 0:
-            rootDir = self.getRootPath()
         extraArgs = self.getExtraArgs()
         for test in self.currTestSelection:
             fileArgs = self.getFilesForCmd(test)
@@ -193,25 +191,25 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
                 self.notify("ActionProgress", "")
                 for fileArg in fileArgs:
                     self.vcs.callProgramOnFiles(self.cmdName, fileArg, self.recursive, extraArgs,
-                                                self.handleVcsOutput, (rootDir, test))
+                                                self.handleVcsOutput, (test,))
                     
-    def handleVcsOutput(self, retcode, stdout, stderr, fileName, rootDir, test):
+    def handleVcsOutput(self, retcode, stdout, stderr, fileName, test):
         if self.commandHadError(retcode, stderr):
             self.notInRepository = True
-            self.storeResult(fileName, rootDir, stderr, test)
+            self.storeResult(fileName, stderr, test)
         elif self.outputIsInteresting(stdout):
-            self.storeResult(fileName, rootDir, stdout, test)
+            self.storeResult(fileName, stdout, test)
 
-    def storeResult(self, fileName, rootDir, output, test):
-        info = self.parseOutput(output, fileName)
-        relativeFilePath = plugins.relpath(fileName.strip(), rootDir)
-        self.fileToTest[relativeFilePath] = test
-        self.pages.append((relativeFilePath, output, info))
-        self.notify("Status", "Analyzing " + self.getResultTitle() + " for " + relativeFilePath.strip('\n'))
+    def storeResult(self, fileName, output, test):
+        info = self.parseOutput(output)
+        self.fileToTest[fileName] = test
+        self.pages.append((fileName, output, info))
+        dirName, local = os.path.split(fileName)
+        self.notify("Status", "Analyzing " + self.getResultTitle() + " for " + local + " in test " + os.path.basename(dirName))
         self.notify("ActionProgress", "")
                         
-    def parseOutput(self, output, fileName):
-        return fileName        
+    def parseOutput(self, output):
+        return ""
     
     def updateSelection(self, *args):
         newActive = guiplugins.ActionResultDialogGUI.updateSelection(self, *args)
@@ -264,7 +262,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         differ.performOnCurrent()
 
     def viewGraphicalDiff(self, button):
-        path = self.filteredTreeModel.get_value(self.treeView.get_selection().get_selected()[1], 2)
+        path = self.filteredTreeModel.get_value(self.treeView.get_selection().get_selected()[1], 3)
         guiplugins.guilog.info("Viewing " + self.vcs.name + " differences for file '" + path + "' graphically ...")
         pathStem = os.path.basename(path).split(".")[0]
         diffProgram = guiplugins.guiConfig.getCompositeValue("diff_program", pathStem)
@@ -292,7 +290,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
             else:
                 return [ testPath ]
         else:
-            return [ self.getAbsPath(f, testPath) for f, comp in self.currFileSelection ]
+            return [ f for (f, comp) in self.currFileSelection ]
 
     def getComparisons(self, test):
         try:
@@ -302,14 +300,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
             raise plugins.TextTestError, "Cannot establish which files should be compared as no comparison information exists.\n" + \
                   "To create this information, perform 'recompute status' (press '" + \
                          guiplugins.guiConfig.getCompositeValue("gui_accelerators", "recompute_status") + "') and try again."
-            
-    def getAbsPath(self, filePath, testPath):
-        if os.path.isabs(filePath):
-            return filePath
-        else:
-            # internal structures store relative paths
-            return os.path.join(testPath, os.path.basename(filePath))
-        
+                    
     def isModal(self):
         return False
     
@@ -429,51 +420,57 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
             self.vbox.pack_start(hpaned, expand=True, fill=True)
         self.dialog.vbox.pack_start(self.vbox, expand=True, fill=True)
         return messages
-    
+
+    def parentOutput(self, prevIter):
+        if prevIter:
+            return "child of " + self.treeModel.get_value(prevIter, 3)
+        else:
+            return "root"
+        
     def createTreeView(self):
         # Columns are: 0 - Tree node name
         #              1 - Content (output from VCS) for the corresponding file
         #              2 - Info. If the plugin wants to show two columns, this
-        #                  is shown in the second column. If not, ignore.
-        #              3 - Relative path of the node. Mainly for testing as recorded traffic
-        #                  from CVS could give paths other than the local test tree, of course.
-        #                  We don't use that any more but this still seems necessary...
+        #                  is shown in the second column. If not it should be empty.
+        #              3 - Full path to the file corresponding to the node
         #              4 - Should the row be visible?
         self.treeModel = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING,
                                        gobject.TYPE_STRING, gobject.TYPE_STRING,
                                        gobject.TYPE_BOOLEAN)
         self.filteredTreeModel = self.treeModel.filter_new()
         self.filteredTreeModel.set_visible_column(4)
+        if len(self.currTestSelection) > 0:
+            rootDir = self.getRootPath()
         
-        labelMap = {}
+        fileToIter = {}
         message = ""
-        for label, content, info in self.pages:
+        for fileName, content, info in self.pages:
+            label = plugins.relpath(fileName, rootDir)
+            self.diag.info("Adding info for file " + label)
             utfContent = plugins.encodeToUTF(plugins.decodeText(content))
             path = label.split(os.sep)
-            currentPath = ""
-            previousPath = ""
+            currentFile = rootDir
+            prevIter = None
             for element in path:
-                previousPath = currentPath
-                currentPath = os.path.join(currentPath, element)
+                currentFile = os.path.join(currentFile, element)
                 currentInfo = ""
                 currentElement = element.strip(" \n")
-                if currentPath == label:
+                if currentFile == fileName:
                     currentInfo = info
                 else:
                     currentElement = "<span weight='bold'>" + currentElement + "</span>"
-                if not labelMap.has_key(currentPath):
-                    if labelMap.has_key(previousPath):
-                        message += self.vcs.name + " tree view dialog: Adding " + currentPath + \
-                                   " as child of " + previousPath + ", info " + info.strip() + "\n"
-                        labelMap[currentPath] = self.treeModel.append(labelMap[previousPath],
-                                                                      (currentElement, utfContent,
-                                                                       currentInfo, currentPath.strip(" \n"), True))
-                    else:
-                        message += self.vcs.name + " tree view dialog: Adding " + currentPath + " as root, info " + info.strip() + "\n"
-                        labelMap[currentPath] = self.treeModel.append(None,
-                                                                      (currentElement, utfContent,
-                                                                       currentInfo, currentPath.strip(" \n"), True))
-
+                currIter = fileToIter.get(currentFile)
+                if currIter is None:
+                    newRow = (currentElement, utfContent, currentInfo, currentFile, True)
+                    message += self.vcs.name + " tree view dialog: Adding " + currentElement + \
+                               " as " + self.parentOutput(prevIter)
+                    if info:
+                        message += ", info " + info
+                    message += "\n"
+                    currIter = self.treeModel.append(prevIter, newRow)
+                    fileToIter[currentFile] = currIter
+                prevIter = currIter
+                        
         self.treeView = gtk.TreeView(self.filteredTreeModel)
         self.treeView.set_enable_search(False)
         fileRenderer = gtk.CellRendererText()
@@ -492,7 +489,8 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         guiplugins.scriptEngine.monitor("select", self.treeView.get_selection())
 
         if len(self.pages) > 0:
-            firstIter = self.filteredTreeModel.convert_child_iter_to_iter(labelMap[self.pages[0][0]])
+            firstFile = self.pages[0][0]
+            firstIter = self.filteredTreeModel.convert_child_iter_to_iter(fileToIter[firstFile])
             text = self.updateForIter(firstIter)
             self.treeView.get_selection().select_iter(firstIter)
             message += self.vcs.name + " tree view dialog: Showing " + self.vcs.name + " output\n" + text + "\n"
@@ -534,7 +532,7 @@ class LogGUI(VersionControlDialogGUI):
     def getResultDialogSecondColumnTitle(self):
         return "Last revision committed (UTC)"
         
-    def parseOutput(self, output, fileName):
+    def parseOutput(self, output):
         then = self.vcs.getDateFromLog(output)
         if then is None:
             return "Not in " + self.vcs.name
@@ -643,7 +641,7 @@ class StatusGUI(VersionControlDialogGUI):
         else:
             return status
  
-    def parseOutput(self, output, fileName):
+    def parseOutput(self, output):
         status = self.vcs.getStateFromStatus(output)
         if status == "Unknown":
             self.notInRepository = True

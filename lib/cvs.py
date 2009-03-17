@@ -132,7 +132,7 @@ class CVSLogLatest(version_control.LogGUI):
             message += "\nSubdirectories were ignored."            
         return message
 
-    def storeResult(self, fileName, rootDir, output, test):
+    def storeResult(self, fileName, output, test):
         # Each file has something like:
         #
         # RCS file ...

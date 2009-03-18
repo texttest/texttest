@@ -14,9 +14,9 @@ class VersionControlInterface:
         self.latestRevisionName = latestRevisionName
         self.defaultArgs = {}
 
-    def callProgram(self, cmdArgs, **kwargs):
-        return subprocess.call([ self.program ] + cmdArgs,
-                               stdout=open(os.devnull, "w"), stderr=open(os.devnull, "w"))
+    def callProgram(self, cmdName, fileArgs, **kwargs):
+        return subprocess.call(self.getCmdArgs(cmdName, fileArgs),
+                               stdout=open(os.devnull, "w"), stderr=open(os.devnull, "w"), **kwargs)
 
     def callProgramOnFiles(self, cmdName, fileArg, recursive=False, extraArgs=[], **kwargs):
         basicArgs = self.getCmdArgs(cmdName, extraArgs)
@@ -92,12 +92,18 @@ class VersionControlInterface:
         shutil.copytree(oldDir, newDir)
 
     def moveDirectory(self, oldDir, newDir):
-        retCode = self.callProgram([ "mv", oldDir, newDir ])
+        retCode = self.callProgram("mv", [ oldDir, newDir ])
         if retCode > 0:
             # Wasn't in version control, probably
             os.rename(oldDir, newDir)
 
-
+    def removePath(self, path):
+        retCode = self.callProgram("rm", [ path ])
+        if retCode > 0:
+            # Wasn't in version control, probably
+            return plugins.removePath(path)
+        else:
+            return True
 
 
 # Base class for all version control actions.
@@ -761,6 +767,8 @@ class InteractiveActionConfig(default_gui.InteractiveActionConfig):
         for cls in [ default_gui.RenameTest, default_gui.PasteTests ]:
             cls.moveDirectory = VersionControlDialogGUI.vcs.moveDirectory
             cls.copyDirectory = VersionControlDialogGUI.vcs.copyDirectory
+
+        default_gui.RemoveTests.removePath = VersionControlDialogGUI.vcs.removePath
 
     def getMenuNames(self):
         return [ VersionControlDialogGUI.vcs.name ]

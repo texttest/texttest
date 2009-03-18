@@ -771,6 +771,16 @@ def getProcessStartUpInfo(getenvFunc=os.getenv):
         info.wShowWindow = subprocess.SW_HIDE
         return info
 
+def removePath(path):
+    if os.path.exists(path):
+        if os.path.isdir(path):
+            shutil.rmtree(path)
+        else:
+            os.remove(path)
+        return True
+    else:
+        return False
+
 # Useful utility, free text input as comma-separated list which may have spaces
 def commasplit(input):
     return map(string.strip, input.split(","))

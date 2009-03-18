@@ -2015,7 +2015,9 @@ Are you sure you wish to proceed?\n"""
         toRemove, warnings = self.getTestsToRemove(self.currTestSelection)
         permMessage = "Failed to remove test: didn't have sufficient write permission to the test files"
         for test in toRemove:
-            plugins.tryFileChange(self.removeDirectory, permMessage, test.getDirectory())
+            dir = test.getDirectory()
+            if os.path.isdir(dir):
+                plugins.tryFileChange(self.removePath, permMessage, dir)
             if plugins.tryFileChange(test.remove, permMessage):
                 namesRemoved.append(test.name)
         self.notify("Status", "Removed test(s) " + ",".join(namesRemoved))
@@ -2023,9 +2025,8 @@ Are you sure you wish to proceed?\n"""
             self.showWarningDialog(warnings)
 
     @staticmethod
-    def removeDirectory(dir):
-        if os.path.isdir(dir):
-            shutil.rmtree(dir)
+    def removePath(dir):
+        return plugins.removePath(dir)
     
     def getType(self, filePath):
         if os.path.isdir(filePath):
@@ -2039,16 +2040,12 @@ Are you sure you wish to proceed?\n"""
         removed = 0
         for filePath, comparison in self.currFileSelection:
             fileType = self.getType(filePath)
-            try:
-                self.notify("Status", "Removing " + fileType + " " + os.path.basename(filePath))
-                self.notify("ActionProgress", "")
-                if fileType == "directory":
-                    shutil.rmtree(filePath)
-                else:
-                    os.remove(filePath)
+            self.notify("Status", "Removing " + fileType + " " + os.path.basename(filePath))
+            self.notify("ActionProgress", "")
+            permMessage = "Insufficient permissions to remove " + fileType + " '" + filePath + "'"
+            if plugins.tryFileChange(self.removePath, permMessage, filePath):
                 removed += 1
-            except OSError, e:
-                warnings += "Failed to remove " + fileType + " '" + filePath + "':\n" + str(e)
+
         test.filesChanged()
         self.notify("Status", "Removed " + self.pluralise(removed, fileType) + " from the " +
                     test.classDescription() + " " + test.name + "")

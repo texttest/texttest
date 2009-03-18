@@ -40,6 +40,7 @@ class CVSInterface(version_control.VersionControlInterface):
         version_control.VersionControlInterface.__init__(self, cvsDir, "CVS", cvsWarningStates, cvsErrorStates, "HEAD")
         self.defaultArgs["log"] = [ "-N" ]
         self.defaultArgs["diff"] = [ "-N" ]
+        self.defaultArgs["rm"] = [ "-f" ]
         self.programArgs, self.errorMessage = self.setProgramArgs(cvsDir)
 
     def getProgramArgs(self):
@@ -89,24 +90,35 @@ class CVSInterface(version_control.VersionControlInterface):
     def moveDirectory(self, oldDir, newDir):
         if os.path.isdir(os.path.join(oldDir, "CVS")):
             self.copyDirectory(oldDir, newDir)
-            self.remove(oldDir)
+            self.removePath(oldDir)
             self.callProgramOnFiles("add", newDir)
         else:
             os.rename(oldDir, newDir)
 
     def copyDirectory(self, oldDir, newDir):
-        shutil.copytree(oldDir, newDir)
+        version_control.VersionControlInterface.copyDirectory(self, oldDir, newDir)
         self.cleanControlDirs(newDir)
 
-    def remove(self, oldDir):
-        self.callProgram([ "rm", "-f", oldDir ])
-        if os.path.isdir(oldDir):
-            # CVS doesn't remove files it doesn't control, finish the job for it
-            for root, dirs, files in os.walk(oldDir):
-                if "CVS" in dirs:
-                    dirs.remove("CVS")
-                for file in files:
-                    os.remove(os.path.join(root, file))
+    def removePath(self, path):
+        if os.path.isdir(path):
+            retCode = self.callProgram("rm", [ path ])
+        else:
+            # removing a file affects the directory it lives in, whereas removing a directory shouldn't
+            # affect the parent...
+            retCode = self.callProgram("rm", [ path ], cwd=os.path.dirname(path))
+        if retCode > 0:
+            # Wasn't in version control, probably
+            return plugins.removePath(path)
+        else:
+            self.cleanUnknownFiles(path)
+            return True
+
+    def cleanUnknownFiles(self, oldDir):
+        for root, dirs, files in os.walk(oldDir):
+            if "CVS" in dirs:
+                dirs.remove("CVS")
+            for file in files:
+                os.remove(os.path.join(root, file))
 
     def cleanControlDirs(self, newDir):
         for root, dirs, files in os.walk(newDir):

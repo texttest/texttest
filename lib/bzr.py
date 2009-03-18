@@ -8,6 +8,7 @@ class BzrInterface(version_control.VersionControlInterface):
         warningStates = [ "Modified", "Removed", "Added", "Renamed" ]
         errorStates = [ "Unknown", "Conflicts", "Kind changed" ]
         version_control.VersionControlInterface.__init__(self, controlDir, "Bazaar", warningStates, errorStates, "-1")
+        self.defaultArgs["rm"] = [ "--force" ]
         
     def getDateFromLog(self, output):
         for line in output.splitlines():

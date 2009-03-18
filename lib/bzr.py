@@ -8,8 +8,7 @@ class BzrInterface(version_control.VersionControlInterface):
         warningStates = [ "Modified", "Removed", "Added", "Renamed" ]
         errorStates = [ "Unknown", "Conflicts", "Kind changed" ]
         version_control.VersionControlInterface.__init__(self, controlDir, "Bazaar", warningStates, errorStates, "-1")
-        self.recursiveSettings["add"] = (True, False) # recursive, don't need directories
-
+        
     def getDateFromLog(self, output):
         for line in output.splitlines():
             if line.startswith("timestamp:"):
@@ -32,11 +31,13 @@ class BzrInterface(version_control.VersionControlInterface):
         return [ "-r", r1 + ".." + r2 ]
 
     # Hack for bug in Bazaar, which can't handle symbolic links to the branch...
-    def getArgsForFile(self, basicArgs, fileName):
-        if basicArgs[1] == "add":
-            return basicArgs + [ os.path.realpath(fileName) ]
+    def callProgramOnFiles(self, cmdName, fileArg, recursive=False, extraArgs=[], **kwargs):
+        if cmdName == "add":
+            basicArgs = self.getCmdArgs(cmdName, extraArgs)
+            for fileName in self.getFileNames(fileArg, recursive):
+                self.callProgramWithHandler(fileName, basicArgs + [ os.path.realpath(fileName) ], **kwargs)
         else:
-            return basicArgs + [ fileName ]
+            version_control.VersionControlInterface.callProgramOnFiles(self, cmdName, fileArg, recursive, extraArgs, **kwargs)
         
 
 version_control.VersionControlDialogGUI.vcsClass = BzrInterface

@@ -13,44 +13,40 @@ class VersionControlInterface:
         self.errorStates = errorStates
         self.latestRevisionName = latestRevisionName
         self.defaultArgs = {}
-        self.recursiveSettings = {}
 
     def callProgram(self, cmdArgs, **kwargs):
         return subprocess.call([ self.program ] + cmdArgs,
-                               stdout=open(os.devnull, "w"), stderr=open(os.devnull, "w"), **kwargs)
+                               stdout=open(os.devnull, "w"), stderr=open(os.devnull, "w"))
 
-    def callProgramOnFiles(self, cmdName, fileArg, recursive=False,
-                           extraArgs=[], outputHandler=None, outputHandlerArgs=(), **kwargs):
+    def callProgramOnFiles(self, cmdName, fileArg, recursive=False, extraArgs=[], **kwargs):
         basicArgs = self.getCmdArgs(cmdName, extraArgs)
-        _recursive, includeDirs = self.recursiveSettings.get(cmdName, (recursive, False))
-        for fileName in self.getFileNames(fileArg, _recursive, includeDirs):
-            args = self.getArgsForFile(basicArgs, fileName)
-            try:
-                process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, **kwargs)
-            except OSError:
-                raise plugins.TextTestError, "Could not run " + self.name + ": make sure you have it installed locally"
+        for fileName in self.getFileNames(fileArg, recursive):
+            self.callProgramWithHandler(fileName, basicArgs + [ fileName ], **kwargs)
 
-            stdout, stderr = process.communicate()
-            if outputHandler:
-                outputHandler(process.returncode, stdout, stderr, fileName, *outputHandlerArgs)         
+    def callProgramWithHandler(self, fileName, args, outputHandler=None, outputHandlerArgs=(), **kwargs):
+        try:
+            process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, **kwargs)
+        except OSError:
+            raise plugins.TextTestError, "Could not run " + self.name + ": make sure you have it installed locally"
 
-    def getArgsForFile(self, basicArgs, fileName):
-        # Overridden by Bazaar to work around symlink bug
-        return basicArgs + [ fileName ]
+        stdout, stderr = process.communicate()
+        if outputHandler:
+            outputHandler(process.returncode, stdout, stderr, fileName, *outputHandlerArgs)         
 
-    def getFileNames(self, fileArg, recursive, includeDirs):
+    def getFileNames(self, fileArg, recursive, includeDirs=False):
         if os.path.isfile(fileArg):
             return [ fileArg ]
         elif os.path.isdir(fileArg):
-            if recursive:
-                return self.getFilesFromDirRecursive(fileArg, includeDirs)
+            if includeDirs:
+                baseFiles = [ fileArg ]
             else:
-                return self.getFilesFromDir(fileArg, includeDirs)
+                baseFiles = []
+            if recursive:
+                return baseFiles + self.getFilesFromDirRecursive(fileArg, includeDirs)
+            else:
+                return baseFiles + self.getFilesFromDir(fileArg)
             
-    def getFilesFromDir(self, dirName, includeDirs):
-        if includeDirs:
-            return [ dirName ]
-
+    def getFilesFromDir(self, dirName):
         files = []
         for f in sorted(os.listdir(dirName)):
             fullPath = os.path.join(dirName, f)
@@ -60,8 +56,6 @@ class VersionControlInterface:
 
     def getFilesFromDirRecursive(self, dirName, includeDirs):
         allFiles = []
-        if includeDirs:
-            allFiles.append(dirName)
         for root, dirs, files in os.walk(dirName):
             if self.controlDirName in dirs:
                 dirs.remove(self.controlDirName)
@@ -70,10 +64,10 @@ class VersionControlInterface:
                 toAdd += dirs
             for f in toAdd:
                 fullPath = os.path.join(root, f)
+                allFiles.append(fullPath)
                 if os.path.isdir(fullPath) and os.path.islink(fullPath):
                     allFiles += self.getFilesFromDirRecursive(fullPath, includeDirs)
-                else:
-                    allFiles.append(fullPath)
+                    
         return sorted(allFiles)
 
     def getProgramArgs(self):
@@ -167,7 +161,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         if not self.recursive:
             message += "\nSubdirectories were ignored, use " + self.getTitle() + " Recursive to get the " + self.getResultTitle() + " for all subdirectories."
         return message
-
+            
     def extraResultDialogWidgets(self):
         all = ["log", "status", "diff", "annotate" ]
         if self.cmdName in all:
@@ -194,13 +188,9 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         self.needsAttention = False
         extraArgs = self.getExtraArgs()
         for test in self.currTestSelection:
-            fileArgs = self.getFilesForCmd(test)
-            if len(fileArgs) > 0:
-                self.notify("Status", "Getting " + self.getResultTitle() + " for " + self.getTestDescription(test))
-                self.notify("ActionProgress", "")
-                for fileArg in fileArgs:
-                    self.vcs.callProgramOnFiles(self.cmdName, fileArg, self.recursive, extraArgs,
-                                                self.handleVcsOutput, (test,))
+            for fileArg in self.getFilesForCmd(test):
+                self.vcs.callProgramOnFiles(self.cmdName, fileArg, self.recursive, extraArgs,
+                                            outputHandler=self.handleVcsOutput, outputHandlerArgs=(test,))
                     
     def handleVcsOutput(self, retcode, stdout, stderr, fileName, test):
         if self.commandHadError(retcode, stderr):
@@ -737,7 +727,10 @@ class AddGUI(VersionControlDialogGUI):
     def _getTitle(self):
         return "A_dd"
     def getResultDialogMessage(self):
-        return "Output from '" + self.vcs.name + " add' shown below."
+        message = "Output from '" + self.vcs.name + " add' shown below."
+        if not self.recursive:
+            message += "\nSubdirectories were ignored, use " + self.getTitle() + " Recursive to add the files from all subdirectories."
+        return message
     def commandHadError(self, retcode, stderr):
         # Particularly CVS likes to write add output on stderr for some reason...
         return len(stderr) > 0
@@ -755,6 +748,9 @@ class StatusGUIRecursive(StatusGUI):
 class AnnotateGUIRecursive(AnnotateGUI):
     recursive = True    
 
+class AddGUIRecursive(AddGUI):
+    recursive = True
+
 #
 # Configuration for the Interactive Actions
 #
@@ -770,5 +766,5 @@ class InteractiveActionConfig(default_gui.InteractiveActionConfig):
         return [ VersionControlDialogGUI.vcs.name ]
 
     def getInteractiveActionClasses(self, dynamic):
-        return [ LogGUI, LogGUIRecursive, DiffGUI, DiffGUIRecursive, StatusGUI,
-                 StatusGUIRecursive, AnnotateGUI, AnnotateGUIRecursive, AddGUI ]
+        return [ LogGUI, LogGUIRecursive, DiffGUI, DiffGUIRecursive, StatusGUI, StatusGUIRecursive,
+                 AnnotateGUI, AnnotateGUIRecursive, AddGUI, AddGUIRecursive ]

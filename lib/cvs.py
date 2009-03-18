@@ -40,7 +40,6 @@ class CVSInterface(version_control.VersionControlInterface):
         version_control.VersionControlInterface.__init__(self, cvsDir, "CVS", cvsWarningStates, cvsErrorStates, "HEAD")
         self.defaultArgs["log"] = [ "-N" ]
         self.defaultArgs["diff"] = [ "-N" ]
-        self.recursiveSettings["add"] = (True, True)
         self.programArgs, self.errorMessage = self.setProgramArgs(cvsDir)
 
     def getProgramArgs(self):
@@ -91,7 +90,7 @@ class CVSInterface(version_control.VersionControlInterface):
         if os.path.isdir(os.path.join(oldDir, "CVS")):
             self.copyDirectory(oldDir, newDir)
             self.remove(oldDir)
-            self.callProgramOnFiles("add", newDir, cwd=os.path.dirname(newDir)) # Just so we can find the CVS dirs in traffic mechanism..
+            self.callProgramOnFiles("add", newDir)
         else:
             os.rename(oldDir, newDir)
 
@@ -114,6 +113,17 @@ class CVSInterface(version_control.VersionControlInterface):
             if "CVS" in dirs:
                 dirs.remove("CVS")
                 shutil.rmtree(os.path.join(root, "CVS"))
+
+    # CVS add doesn't implicitly add directories, and it modifies its control dirs which are spread
+    # throughout the tree (hence we need to change cwd so our traffic mechanism picks this up when testing)
+    def callProgramOnFiles(self, cmdName, fileArg, recursive=False, extraArgs=[], **kwargs):
+        if cmdName == "add":
+            basicArgs = self.getCmdArgs(cmdName, extraArgs)
+            for fileName in self.getFileNames(fileArg, recursive, includeDirs=True):
+                self.callProgramWithHandler(fileName, basicArgs + [ fileName ], cwd=os.path.dirname(fileName), **kwargs)
+        else:
+            version_control.VersionControlInterface.callProgramOnFiles(self, cmdName, fileArg, recursive, extraArgs, **kwargs)
+
         
 
      

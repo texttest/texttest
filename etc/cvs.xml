@@ -18,6 +18,7 @@
         <menuitem action="CVS Annotate Recursive"/>
         <separator/>
         <menuitem action="CVS Add"/>
+        <menuitem action="CVS Add Recursive"/>
         <separator/>
       </menu>
     </placeholder>
@@ -40,6 +41,7 @@
       <menuitem action="CVS Annotate Recursive"/>
       <separator/>
       <menuitem action="CVS Add"/>
+      <menuitem action="CVS Add Recursive"/>
       <separator/>
     </menu>
   </popup>
@@ -60,6 +62,7 @@
       <menuitem action="CVS Annotate Recursive"/>
       <separator/>
       <menuitem action="CVS Add"/>
+      <menuitem action="CVS Add Recursive"/>
       <separator/>
     </menu>
   </popup>

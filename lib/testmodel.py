@@ -434,13 +434,11 @@ class Test(plugins.Observable):
             return self.parent.testcases.index(self)
         else:
             return 0
-    def removeFiles(self):
-        dir = self.getDirectory()
-        if os.path.isdir(dir):
-            shutil.rmtree(dir)
-    def remove(self, removeFiles=True):
+
+    def remove(self):
         if self.parent: # might have already removed the enclosing suite
-            self.parent.removeTest(self, removeFiles)
+            self.parent.removeFromTestFile(self.name)
+            self.removeFromMemory()
             return True
         else:
             return False
@@ -1042,18 +1040,6 @@ class TestSuite(Test):
         self.testcases = []
         Test.removeFromMemory(self)
 
-    def removeTest(self, test, removeFiles=True):
-        try:
-            if removeFiles:
-                test.removeFiles()
-            self.removeFromTestFile(test.name)
-            test.removeFromMemory()
-        except OSError, e:
-            errorStr = str(e)
-            if errorStr.find("Permission") != -1:
-                raise plugins.TextTestError, "Failed to remove test: didn't have sufficient write permission to the test files"
-            else:
-                raise plugins.TextTestError, errorStr
     def removeFromTestFile(self, testName):
         # Remove from all versions, since we've removed the actual
         # test dir, it's useless to keep the test anywhere ...

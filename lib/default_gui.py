@@ -770,8 +770,8 @@ class PasteTests(guiplugins.ActionGUI):
                     suiteDeltas[suite] = 1
                 newTests.append(testImported)
                 if self.removeAfter:
-                    test.remove(removeFiles=False) # We already moved the files somewhere else
-
+                    plugins.tryFileChange(test.remove, "Failed to remove old test: didn't have sufficient write permission to the test files. Test copied instead of moved.")
+                    
         guiplugins.guilog.info("Selecting new tests : " + repr(newTests))
         self.notify("SetTestSelection", newTests)
         if self.removeAfter:
@@ -2013,13 +2013,20 @@ Are you sure you wish to proceed?\n"""
     def removeTests(self):
         namesRemoved = []
         toRemove, warnings = self.getTestsToRemove(self.currTestSelection)
+        permMessage = "Failed to remove test: didn't have sufficient write permission to the test files"
         for test in toRemove:
-            if test.remove():
+            plugins.tryFileChange(self.removeDirectory, permMessage, test.getDirectory())
+            if plugins.tryFileChange(test.remove, permMessage):
                 namesRemoved.append(test.name)
         self.notify("Status", "Removed test(s) " + ",".join(namesRemoved))
         if warnings:
             self.showWarningDialog(warnings)
 
+    @staticmethod
+    def removeDirectory(dir):
+        if os.path.isdir(dir):
+            shutil.rmtree(dir)
+    
     def getType(self, filePath):
         if os.path.isdir(filePath):
             return "directory"

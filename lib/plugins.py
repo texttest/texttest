@@ -934,6 +934,16 @@ def retryOnInterrupt(function, *args):
         else:
             raise
 
+def tryFileChange(function, permissionMessage, *args):
+    try:
+        return function(*args)
+    except OSError, e:
+        errorStr = str(e)
+        if "Permission" in errorStr:
+            raise TextTestError, permissionMessage
+        else:
+            raise TextTestError, errorStr
+
 def getExceptionString():
     type, value, traceback = sys.exc_info()
     return "".join(format_exception(type, value, traceback))

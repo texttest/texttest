@@ -1352,9 +1352,15 @@ Dynamic GUI Enhancements:
 Framework Enhancements:
     - Can now remove certain elements from versioned config files (plugins.py)
 	New syntax {CLEAR <item>}
+    - Config file setting "performance_use_normalised_%" renamed for generic application (default.py)
+	Now called "use_normalised_percentage_change" to reflect possible usage for other purposes. Old name aliased.
 Historical HTML Batch Report Enhancements:
 Email Batch Report Enhancements:
-CVS Browser Enhancements/bug fixes:
+Version Control Browser Enhancements/bug fixes:
+    - Administration operations update the VCS correctly (version_control.py)
+	Rename,Move and Remove will also do so in the VCS for tests under VCS-control
+    - Can now add to the VCS via TextTest (version_control.py)
+	Separate action on appropriate menu
     - Now supports Bazaar as well as CVS (bzr.py/version_control.py)
 Grid Engine (LSF/SGE) enhancements:
 Installation and self-test changes:

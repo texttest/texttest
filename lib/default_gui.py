@@ -1967,10 +1967,11 @@ class RemoveTests(guiplugins.ActionGUI):
         self.distinctTestCount = rowCount
         return guiplugins.ActionGUI.updateSelection(self, tests, apps, rowCount, *args)
 
+    def getFileRemoveWarning(self):
+        return "This will remove files from the file system and hence may not be reversible."
+        
     def getConfirmationMessage(self):
-        extraLines = """
-\nNote: This will remove files from the file system and hence may not be reversible.\n
-Are you sure you wish to proceed?\n"""
+        extraLines = "\n\nNote: " + self.getFileRemoveWarning() + "\n\nAre you sure you wish to proceed?\n"""
         currTest = self.currTestSelection[0]
         if len(self.currFileSelection) > 0:
             return "\nYou are about to remove " + self.pluralise(len(self.currFileSelection), self.getType(self.currFileSelection[0][0])) + \

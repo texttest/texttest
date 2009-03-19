@@ -740,6 +740,16 @@ class AddGUI(VersionControlDialogGUI):
     def commandHadError(self, retcode, stderr):
         # Particularly CVS likes to write add output on stderr for some reason...
         return len(stderr) > 0
+
+class RemoveTests(default_gui.RemoveTests):
+    @staticmethod
+    def removePath(path):
+        return VersionControlDialogGUI.vcs.removePath(path)
+
+    def getFileRemoveWarning(self):
+        name = VersionControlDialogGUI.vcs.name
+        return "Any " + name + "-controlled files will be removed in " + name + ".\n" + \
+               "Any files that are not version controlled will be removed from the file system and hence may not be recoverable."
     
         
 class LogGUIRecursive(LogGUI):
@@ -768,11 +778,12 @@ class InteractiveActionConfig(default_gui.InteractiveActionConfig):
             cls.moveDirectory = VersionControlDialogGUI.vcs.moveDirectory
             cls.copyDirectory = VersionControlDialogGUI.vcs.copyDirectory
 
-        default_gui.RemoveTests.removePath = VersionControlDialogGUI.vcs.removePath
-
     def getMenuNames(self):
         return [ VersionControlDialogGUI.vcs.name ]
 
     def getInteractiveActionClasses(self, dynamic):
         return [ LogGUI, LogGUIRecursive, DiffGUI, DiffGUIRecursive, StatusGUI, StatusGUIRecursive,
                  AnnotateGUI, AnnotateGUIRecursive, AddGUI, AddGUIRecursive ]
+
+    def getReplacements(self):
+        return { default_gui.RemoveTests : RemoveTests }

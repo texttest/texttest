@@ -1354,6 +1354,8 @@ Framework Enhancements:
 	New syntax {CLEAR <item>}
     - Config file setting "performance_use_normalised_%" renamed for generic application (default.py)
 	Now called "use_normalised_percentage_change" to reflect possible usage for other purposes. Old name aliased.
+    - Traffic mechanism does not assume asynchronous file edits are possible any more (traffic.py)
+	Need to explicitly list programs that might do this in new "asynchronous_file_edits" config file setting.
 Historical HTML Batch Report Enhancements:
 Email Batch Report Enhancements:
 Version Control Browser Enhancements/bug fixes:

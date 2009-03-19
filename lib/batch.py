@@ -624,7 +624,8 @@ class CollectFiles(plugins.ScriptWithArgs):
         return dir.startswith(app.name + suffix) or dir.startswith(self.batchSession + suffix)
 
     def parseDirectory(self, fullDir, app, totalValues):
-        prefix = "batchreport." + app.name + app.versionSuffix()
+        basicPrefix = "batchreport." + app.name
+        prefix = basicPrefix + app.versionSuffix()
         # Don't collect to more collections!
         self.diag.info("Setting up application " + app.name + " looking for " + prefix) 
         filelist = os.listdir(fullDir)
@@ -637,7 +638,7 @@ class CollectFiles(plugins.ScriptWithArgs):
                 fileBody = self.parseFile(fullname, app, totalValues)
                 if fileBody:
                     fileBodies.append(fileBody)
-                    versionsFound.update(Set(filename.replace(prefix, "").split(".")))
+                    versionsFound.update(Set(filename.replace(basicPrefix, "").split(".")))
 
         return fileBodies, versionsFound
 

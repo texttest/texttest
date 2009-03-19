@@ -200,7 +200,8 @@ class ReconnectTest(plugins.Action):
         stateToUse = None
         stateFile = os.path.join(location, "framework_tmp", "teststate")
         if os.path.isfile(stateFile):
-            loaded, newState = test.getNewState(open(stateFile, "rU"))
+            newTmpPath = os.path.dirname(self.rootDirToCopy)
+            loaded, newState = test.getNewState(open(stateFile, "rU"), updatePaths=True, newTmpPath=newTmpPath)
             if loaded and self.modifyState(test, newState): # if we can't read it, recompute it
                 stateToUse = newState
 
@@ -215,11 +216,7 @@ class ReconnectTest(plugins.Action):
             if os.path.isfile(fullPath):
                 shutil.copyfile(fullPath, test.makeTmpFileName(file, forComparison=0))
 
-    def modifyState(self, test, newState):            
-        # State will refer to TEXTTEST_HOME in the original (which we may not have now,
-        # and certainly don't want to save), try to fix this...
-        newState.updateAbsPath(test.app.getDirectory())
-
+    def modifyState(self, test, newState):
         if self.fullRecalculate:                
             # Only pick up errors here, recalculate the rest. Don't notify until
             # we're done with recalculation.
@@ -231,7 +228,6 @@ class ReconnectTest(plugins.Action):
                 newState.lifecycleChange = "" # otherwise it's regarded as complete
                 return True
         else:
-            newState.updateTmpPath(os.path.dirname(self.rootDirToCopy))
             return True
     def setUpApplication(self, app):
         print "Reconnecting to test results in directory", self.rootDirToCopy

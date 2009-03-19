@@ -178,6 +178,7 @@ class GenerateWebPages(object):
             # http://sourceforge.net/tracker/index.php?func=detail&aid=1724366&group_id=5470&atid=105470
             state = loads(file.read())
             if isinstance(state, plugins.TestState):
+                state.updateAfterLoad(self.app)
                 return state
             else:
                 return self.readErrorState("Incorrect type for state object.")

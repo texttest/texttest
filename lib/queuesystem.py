@@ -322,7 +322,9 @@ class SlaveRequestHandler(StreamRequestHandler):
         if self.server.clientCorrect(test, (hostname, identifier)):
             if not test.state.isComplete(): # we might have killed it already...
                 oldBt = test.state.briefText
-                test.loadState(self.rfile)
+                # The updates are only for testing against old slave traffic,
+                # a bit sad we can't disable them when not testing...
+                test.loadState(self.rfile, updatePaths=True)
                 self.connection.shutdown(socket.SHUT_RD)
                 self.server.diag.info("Changed from '" + oldBt + "' to '" + test.state.briefText + "'")
                 if test.state.isComplete():

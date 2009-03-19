@@ -111,19 +111,24 @@ class TestComparison(BaseTestComparison):
         if not hasattr(self, "missingResults"):
             self.missingResults = []
 
-    def updateAbsPath(self, newPath):
-        if self.appAbsPath != newPath:
-            self.diag.info("Updating abspath " + self.appAbsPath + " to " + newPath)
-            for comparison in self.allResults:
-                comparison.updatePaths(self.appAbsPath, newPath)
-            self.appAbsPath = newPath
+    def updateAfterLoad(self, app, updatePaths=False, newTmpPath=None):
+        pathsToChange = []
+        if updatePaths:
+            newAbsPath = app.getDirectory()
+            if newAbsPath != self.appAbsPath:
+                self.diag.info("Updating abspath " + self.appAbsPath + " to " + newAbsPath)
+                pathsToChange.append((self.appAbsPath, newAbsPath))
+                self.appAbsPath = newAbsPath
 
-    def updateTmpPath(self, newPath):
-        if self.appWriteDir != newPath:
-            self.diag.info("Updating abspath " + self.appWriteDir + " to " + newPath)
-            for comparison in self.allResults:
-                comparison.updatePaths(self.appWriteDir, newPath)
-            self.appWriteDir = newPath
+            if newTmpPath is None:
+                newTmpPath = app.writeDirectory
+            if self.appWriteDir != newTmpPath:
+                self.diag.info("Updating tmppath " + self.appWriteDir + " to " + newTmpPath)
+                pathsToChange.append((self.appWriteDir, newTmpPath))
+                self.appWriteDir = newTmpPath
+
+        for comparison in self.allResults:
+            comparison.updateAfterLoad(app, pathsToChange)
 
     def setFailedPrediction(self, prediction):
         self.diag.info("Setting failed prediction to " + str(prediction))

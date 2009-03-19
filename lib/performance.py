@@ -134,29 +134,10 @@ class PerformanceComparison:
         self.descriptor = self.getDescriptor(settings)
         
     def calculatePercentageChange(self, settings):
-        if settings.flagSet("performance_use_normalised_%"):
-            return self.calculatePercentageNormalised()
+        if settings.flagSet("use_normalised_percentage_change"):
+            return plugins.calculatePercentageNormalised(self.oldPerformance, self.newPerformance)
         else:
-            return self.calculatePercentageStandard()
-
-    def calculatePercentageNormalised(self):        
-        largest = max(self.oldPerformance, self.newPerformance)
-        smallest = min(self.oldPerformance, self.newPerformance)
-        if smallest == 0.0:
-            if largest == 0.0:
-                return 0
-            else:
-                return -1
-        return ((largest - smallest) / smallest) * 100
-
-    def calculatePercentageStandard(self):        
-        if self.oldPerformance == 0.0:
-            if self.newPerformance == 0.0:
-                return 0
-            else:
-                return -1
-        diff = abs(self.newPerformance - self.oldPerformance)
-        return (diff / self.oldPerformance) * 100
+            return plugins.calculatePercentageStandard(self.oldPerformance, self.newPerformance)
 
     def getDescriptor(self, settings):
         if self.newPerformance < self.oldPerformance:

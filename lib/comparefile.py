@@ -207,13 +207,15 @@ class FileComparison:
             return self.previewGenerator.getPreview(proc.stdout)
         except OSError:
             return "No difference report could be created: could not find textual difference tool '" + self.textDiffTool + "'"
-    def updatePaths(self, oldAbsPath, newAbsPath):
-        if self.stdFile:
-            self.stdFile = self.stdFile.replace(oldAbsPath, newAbsPath)
-            self.stdCmpFile = self.stdCmpFile.replace(oldAbsPath, newAbsPath)
-        if self.tmpFile:
-            self.tmpCmpFile = self.tmpCmpFile.replace(oldAbsPath, newAbsPath)
-            self.tmpFile = self.tmpFile.replace(oldAbsPath, newAbsPath)
+    def updateAfterLoad(self, app, changedPaths):
+        for oldPath, newPath in changedPaths:
+            if self.stdFile:
+                self.stdFile = self.stdFile.replace(oldPath, newPath)
+                self.stdCmpFile = self.stdCmpFile.replace(oldPath, newPath)
+            if self.tmpFile:
+                self.tmpCmpFile = self.tmpCmpFile.replace(oldPath, newPath)
+                self.tmpFile = self.tmpFile.replace(oldPath, newPath)
+                
     def versionise(self, fileName, versionString):
         if len(versionString):
             return fileName + "." + versionString

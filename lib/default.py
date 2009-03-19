@@ -704,13 +704,14 @@ class Config:
                              "List of machines where performance can be collected")
         app.setConfigDefault("performance_variation_%", { "default" : 10.0 }, "How much variation in performance is allowed")
         app.setConfigDefault("performance_variation_serious_%", { "default" : 0.0 }, "Additional cutoff to performance_variation_% for extra highlighting")                
-        app.setConfigDefault("performance_use_normalised_%", { "default" : "true" }, \
+        app.setConfigDefault("use_normalised_percentage_change", { "default" : "true" }, \
                              "Do we interpret performance percentage changes as normalised (symmetric) values?")
         app.setConfigDefault("performance_test_minimum", { "default" : 0.0 }, \
                              "Minimum time/memory to be consumed before data is collected")
         app.setConfigDefault("performance_descriptor_decrease", self.defaultPerfDecreaseDescriptors(), "Descriptions to be used when the numbers decrease in a performance file")
         app.setConfigDefault("performance_descriptor_increase", self.defaultPerfIncreaseDescriptors(), "Descriptions to be used when the numbers increase in a performance file")
         app.setConfigDefault("performance_unit", self.defaultPerfUnits(), "Name to be used to identify the units in a performance file")
+        app.setConfigAlias("performance_use_normalised_%", "use_normalised_percentage_change")
         
     def setUsecaseDefaults(self, app):
         app.setConfigDefault("use_case_record_mode", "disabled", "Mode for Use-case recording (GUI, console or disabled)")

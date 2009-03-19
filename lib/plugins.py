@@ -653,11 +653,10 @@ class TestState(Observable):
         return self.hasFailed() and self.hasResults()
     def warnOnSave(self): #pragma : no cover - only called on saveable tests usually
         return False
-    def updateAbsPath(self, newAbsPath):
+    def updateAfterLoad(self, app, **kwargs):
         pass
-    def updateTmpPath(self, newTmpPath):
-        pass
-
+    
+            
 addCategory("unrunnable", "unrunnable", "could not be run")
 addCategory("marked", "marked", "was marked by the user")
 
@@ -963,6 +962,26 @@ def printException():
     exceptionString = getExceptionString()
     sys.stderr.write(exceptionString)
     return exceptionString
+
+def calculatePercentageNormalised(oldVal, newVal):        
+    largest = max(oldVal, newVal)
+    smallest = min(oldVal, newVal)
+    if smallest == 0.0:
+        if largest == 0.0:
+            return 0
+        else:
+            return -1
+    return ((largest - smallest) / smallest) * 100
+
+def calculatePercentageStandard(oldVal, newVal):        
+    if oldVal == 0.0:
+        if newVal == 0.0:
+            return 0
+        else:
+            return -1
+    diff = abs(newVal - oldVal)
+    return (diff / oldVal) * 100
+
 
 class PreviewGenerator:
     def __init__(self, maxWidth, maxLength, startEndRatio=1):

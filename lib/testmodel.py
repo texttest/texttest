@@ -612,10 +612,8 @@ class TestCase(Test):
             fullPath = os.path.join(self.writeDirectory, file)
             paths += self.listFiles(fullPath, file, followLinks=False)
         return paths
-    def loadState(self, file):
-        loaded, state = self.getNewState(file)
-        state.updateAbsPath(self.app.getDirectory())
-        state.updateTmpPath(self.app.writeDirectory)
+    def loadState(self, file, **updateArgs):
+        loaded, state = self.getNewState(file, **updateArgs)
         self.changeState(state)
     def makeTmpFileName(self, stem, forComparison=1, forFramework=0):
         dir = self.getDirectory(temporary=1, forFramework=forFramework)
@@ -623,11 +621,12 @@ class TestCase(Test):
             return os.path.join(dir, stem + "." + self.app.name)
         else:
             return os.path.join(dir, stem)
-    def getNewState(self, file):
+    def getNewState(self, file, **updateArgs):
         try:
             # Would like to do load(file) here... but it doesn't work with universal line endings, see Python bug 1724366
             # http://sourceforge.net/tracker/index.php?func=detail&aid=1724366&group_id=5470&atid=105470
             newState = loads(file.read())
+            newState.updateAfterLoad(self.app, **updateArgs)
             return True, newState
         except UnpicklingError:
             return False, plugins.Unrunnable(briefText="read error", \

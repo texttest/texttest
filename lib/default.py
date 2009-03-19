@@ -513,20 +513,27 @@ class Config:
     def optionValue(self, option):
         return self.optionMap.get(option, "")
     def ignoreExecutable(self):
-        return self.optionMap.has_key("s") or self.isReconnecting() or self.optionMap.has_key("coll")
+        return self.optionMap.has_key("s") or self.ignoreCheckout() or self.optionMap.has_key("coll") or self.optionMap.has_key("gx")
+    def ignoreCheckout(self):
+        return self.isReconnecting() # No use of checkouts has yet been thought up when reconnecting :)
     def setUpCheckout(self, app):
-        if self.ignoreExecutable():
-            return ""
+        if self.ignoreCheckout():
+            return "" 
         checkoutPath = self.getGivenCheckoutPath(app)
-        # Allow empty checkout, means no checkout is set, basically
-        if len(checkoutPath) > 0:
-            # don't fail to start the static GUI because of checkouts, can be fixed from there
-            if not self.optionMap.has_key("gx"): 
-                self.verifyCheckoutValid(checkoutPath)
-            if checkoutPath:
-                os.environ["TEXTTEST_CHECKOUT"] = checkoutPath
+        if not checkoutPath:
+            return "" # Allow empty checkout, means no checkout is set, basically
+        
+        try: 
+            self.verifyCheckoutValid(checkoutPath)
+            os.environ["TEXTTEST_CHECKOUT"] = checkoutPath
+            return checkoutPath
+        except plugins.TextTestError, e:
+            if self.ignoreExecutable():
+                print "WARNING: " + str(e) + " - ignoring checkout."
+                return ""
+            else:
+                raise
     
-        return checkoutPath
     def verifyCheckoutValid(self, checkoutPath):
         if not os.path.isabs(checkoutPath):
             raise plugins.TextTestError, "could not create absolute checkout from relative path '" + checkoutPath + "'"

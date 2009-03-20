@@ -2366,8 +2366,8 @@ class RenameTest(guiplugins.ActionDialogGUI):
     def getTooltip(self):
         return "Rename selected test"
     def messageAfterPerform(self):
-        newName = self.optionGroup.getOptionValue("name")
-        newDesc = self.optionGroup.getOptionValue("desc")
+        pass # Use method below instead.
+    def getChangeMessage(self, newName, newDesc):
         if self.oldName != newName:
             message = "Renamed test " + self.oldName + " to " + newName
             if self.oldDescription != newDesc:
@@ -2396,11 +2396,15 @@ class RenameTest(guiplugins.ActionDialogGUI):
             newName = self.optionGroup.getOptionValue("name")
             self.checkNewName(newName)
             newDesc = self.optionGroup.getOptionValue("desc")
+            changeMessage = self.getChangeMessage(newName, newDesc)
             if newName != self.oldName or newDesc != self.oldDescription:
                 for test in self.currTestSelection:
                     # Do this first, so that if we fail we won't update the test suite files either
                     self.moveFiles(test, newName)
                     test.rename(newName, newDesc)
+                self.oldName = newName
+                self.oldDescription = newDesc
+            self.notify("Status", changeMessage)
         except IOError, e:
             self.showErrorDialog("Failed to rename test:\n" + str(e))
         except OSError, e:

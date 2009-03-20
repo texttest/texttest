@@ -42,9 +42,13 @@ class SetUpTrafficHandlers(plugins.Action):
         if TrafficServer.instance:
             TrafficServer.instance.setState(recordFile, replayFile, test)
     def makeIntercepts(self, test):
-        for cmd in test.getConfigValue("collect_traffic"):
+        for cmd in self.getCommandsForInterception(test):
             interceptName = test.makeTmpFileName(cmd, forComparison=0)
             self.intercept(test, interceptName)
+    def getCommandsForInterception(self, test):
+        # This gets all names in collect_traffic, not just those marked
+        # "asynchronous"! (it will also pick up "default").
+        return test.getCompositeConfigValue("collect_traffic", "asynchronous")
     def intercept(self, test, interceptName):
         if os.path.exists(interceptName):
             # We might have written a fake version - store what it points to so we can
@@ -326,7 +330,7 @@ class CommandLineTraffic(Traffic):
         return edits
 
     def makesAsynchronousEdits(self):
-        return self.commandName in self.currentTest.getConfigValue("asynchronous_file_edits")
+        return self.commandName in self.currentTest.getConfigValue("collect_traffic").get("asynchronous")
     
     @staticmethod
     def removeSubPaths(paths):

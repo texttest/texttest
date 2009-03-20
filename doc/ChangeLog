@@ -1355,7 +1355,12 @@ Framework Enhancements:
     - Config file setting "performance_use_normalised_%" renamed for generic application (default.py)
 	Now called "use_normalised_percentage_change" to reflect possible usage for other purposes. Old name aliased.
     - Traffic mechanism does not assume asynchronous file edits are possible any more (traffic.py)
-	Need to explicitly list programs that might do this in new "asynchronous_file_edits" config file setting.
+	Need to explicitly list programs that might do this : key with "asynchronous" in "collect_traffic" 
+	config file setting, which is now a dictionary.
+    - No longer ignores missing traffic and usecase files. (default.py)
+	"definition_file_stems" is now a dictionary, where items like these can be keyed "regenerate"
+    - Now set up the checkout if we can when running scripts, including website generation (default.py)
+	Means repository location can depend on TEXTTEST_CHECKOUT.
 Historical HTML Batch Report Enhancements:
 Email Batch Report Enhancements:
 Version Control Browser Enhancements/bug fixes:
@@ -1367,3 +1372,4 @@ Version Control Browser Enhancements/bug fixes:
 Grid Engine (LSF/SGE) enhancements:
 Installation and self-test changes:
 Bug Fixes:
+    - No longer flag runs as missing if batch_collect_compulsory_version overlaps with versions given on command line (batch.py)

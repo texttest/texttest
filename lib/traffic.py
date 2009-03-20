@@ -146,12 +146,22 @@ class FileEditTraffic(ResponseTraffic):
         ResponseTraffic.__init__(self, fileName, None)
 
     @classmethod
-    def getFile(cls, fileName, fileEditDir):
+    def getFileWithType(cls, fileName, fileEditDir):
         if fileEditDir:
             for name in [ fileName, fileName + cls.linkSuffix, fileName + cls.deleteSuffix ]:
                 candidate = os.path.join(fileEditDir, name)
                 if os.path.exists(candidate):
-                    return candidate
+                    return candidate, cls.getFileType(candidate)
+        return None, "unknown"
+
+    @classmethod
+    def getFileType(cls, fileName):
+        if fileName.endswith(cls.deleteSuffix):
+            return "unknown"
+        elif os.path.isdir(fileName):
+            return "directory"
+        else:
+            return "file"
 
     def copy(self, srcRoot, dstRoot):
         for srcPath in self.changedPaths:
@@ -163,7 +173,7 @@ class FileEditTraffic(ResponseTraffic):
                 elif os.path.islink(srcPath):
                     self.storeLinkAsFile(srcPath, dstPath + self.linkSuffix)
                 elif srcPath.endswith(self.deleteSuffix):
-                    os.remove(dstPath.replace(self.deleteSuffix, ""))
+                    plugins.removePath(dstPath.replace(self.deleteSuffix, ""))
                 elif not os.path.exists(srcPath):
                     open(dstPath + self.deleteSuffix, "w").close()
                 else:
@@ -598,13 +608,13 @@ class TrafficServer(TCPServer):
             name += ".edit_" + str(timesUsed)
         return name
 
-    def getFileBeingEdited(self, givenName, directory, filesMatched):
+    def getFileBeingEdited(self, givenName, fileType, filesMatched):
         # drop the suffix which is internal to TextTest
         fileName = givenName.split(".edit_")[0]
         bestMatch, bestScore = None, -1
         for editedFile in self.topLevelForEdit:
-            if (directory and os.path.isfile(editedFile)) or \
-               (not directory and os.path.isdir(editedFile)):
+            if (fileType == "directory" and os.path.isfile(editedFile)) or \
+               (fileType == "file" and os.path.isdir(editedFile)):
                 continue
 
             editedName = os.path.basename(editedFile)
@@ -636,14 +646,23 @@ class TrafficServer(TCPServer):
         if responseClass is FileEditTraffic:
             fileName = text.strip()
             fileEditDir = self.currentTest.getFileName("file_edits")
-            storedFile = FileEditTraffic.getFile(fileName, fileEditDir)
+            storedFile, fileType = FileEditTraffic.getFileWithType(fileName, fileEditDir)
             if storedFile:
-                editedFile = self.getFileBeingEdited(fileName, os.path.isdir(storedFile), filesMatched)
+                editedFile = self.getFileBeingEdited(fileName, fileType, filesMatched)
                 self.diag.info("File being edited for '" + fileName + "' : will replace " + str(editedFile) + " with " + str(storedFile))
                 changedPaths = self.findFilesAndLinks(storedFile)
                 return FileEditTraffic(fileName, editedFile, storedFile, changedPaths, reproduce=True)
         else:
             return responseClass(text, traffic.responseFile)
+
+    def findRemovedPath(self, removedPath):
+        # We know this path is removed, what about its parents?
+        # We want to store the most concise removal.
+        parent = os.path.dirname(removedPath)
+        if os.path.exists(parent):
+            return removedPath
+        else:
+            return self.findRemovedPath(parent)
 
     def getLatestFileEdits(self):
         traffic = []
@@ -659,8 +678,11 @@ class TrafficServer(TCPServer):
 
             for oldPath in self.fileEditData.keys():
                 if (oldPath == file or oldPath.startswith(file + "/")) and oldPath not in newPaths:
-                    changedPaths.append(oldPath)
+                    removedPath = self.findRemovedPath(oldPath)
+                    self.diag.info("Deletion of " + oldPath + "\n - registering " + removedPath)
                     removedPaths.append(oldPath)
+                    if removedPath not in changedPaths:
+                        changedPaths.append(removedPath)
                     
             if len(changedPaths) > 0:
                 storedFile = self.currentTest.makeTmpFileName(self.getFileEditPath(file), forComparison=0)

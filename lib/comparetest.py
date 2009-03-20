@@ -36,7 +36,7 @@ class BaseTestComparison(plugins.TestState):
         # Might have saved some new ones or removed some old ones in the meantime...
         test.refreshFiles()
         tmpFiles = self.makeStemDict(test.listTmpFiles())
-        resultFiles, defFiles = test.listStandardFiles(allVersions=False)
+        resultFiles, defFiles = test.listStandardFiles(allVersions=False, defFileCategory="regenerate")
         resultFilesToCompare = filter(self.shouldCompare, resultFiles)
         stdFiles = self.makeStemDict(resultFilesToCompare + defFiles)
         for tmpStem, tmpFile in tmpFiles.items():
@@ -46,8 +46,8 @@ class BaseTestComparison(plugins.TestState):
             comparison = self.createFileComparison(test, tmpStem, stdFile, tmpFile)
             if comparison:
                 self.addComparison(comparison)
-        self.makeMissingComparisons(test, stdFiles, tmpFiles, defFiles)
-    def makeMissingComparisons(self, test, stdFiles, tmpFiles, defFiles):
+        self.makeMissingComparisons(test, stdFiles, tmpFiles)
+    def makeMissingComparisons(self, test, stdFiles, tmpFiles):
         pass
 
     def addComparison(self, comparison):
@@ -217,10 +217,10 @@ class TestComparison(BaseTestComparison):
             else:
                 baseNames.append(os.path.basename(comparison.stdFile))
         return string.join(baseNames, ",")
-    def makeMissingComparisons(self, test, stdFiles, tmpFiles, defFiles):
+    def makeMissingComparisons(self, test, stdFiles, tmpFiles):
         for stdStem, stdFile in stdFiles.items():
             self.notifyIfMainThread("ActionProgress", "")
-            if not tmpFiles.has_key(stdStem) and not stdFile in defFiles:
+            if not tmpFiles.has_key(stdStem):
                 comparison = self.createFileComparison(test, stdStem, stdFile, None)
                 if comparison:
                     self.addComparison(comparison)

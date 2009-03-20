@@ -1866,12 +1866,11 @@ class CreateDefinitionFile(guiplugins.ActionDialogGUI):
                 defFiles.append("input")
             else:
                 defFiles.append("usecase")
-        # these are created via the GUI, not manually via text editors (or are already handled above)
-        dontAppend = [ "testsuite", "knownbugs", "traffic", "input", "usecase", "environment", "options" ]
-        for defFile in self.currTestSelection[0].getConfigValue("definition_file_stems"):
-            if not defFile in dontAppend:
-                defFiles.append(defFile)
-        return defFiles
+        # We only want to create files this way that
+        # (a) are not created and understood by TextTest itself ("builtin")
+        # (b) are not auto-generated ("regenerate")
+        # That leaves the rest ("default")
+        return defFiles + self.currTestSelection[0].defFileStems("default")
     def getStandardFiles(self):
         stdFiles = [ "output", "errors" ] + self.currTestSelection[0].getConfigValue("collate_file").keys()
         discarded = [ "stacktrace" ] + self.currTestSelection[0].getConfigValue("discard_file")
@@ -2087,7 +2086,7 @@ class ReportBugs(guiplugins.ActionDialogGUI):
     def getPossibleFileStems(self):
         stems = []
         for test in self.currTestSelection[0].testCaseList():
-            for stem in test.dircache.findAllStems(self.currTestSelection[0].getConfigValue("definition_file_stems")):
+            for stem in test.dircache.findAllStems(self.currTestSelection[0].defFileStems()):
                 if not stem in stems:
                     stems.append(stem)
         # use for unrunnable tests...

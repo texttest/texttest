@@ -839,11 +839,11 @@ class Config:
         app.setConfigDefault("batch_extra_version", { "default" : [] }, "Versions to be run in addition to the one specified, for particular batch sessions")
         # Applies to any interface...
         app.setConfigDefault("auto_sort_test_suites", 0, "Automatically sort test suites in alphabetical order. 1 means sort in ascending order, -1 means sort in descending order.")
-        app.addConfigEntry("definition_file_stems", "options")
-        app.addConfigEntry("definition_file_stems", "usecase")
-        app.addConfigEntry("definition_file_stems", "traffic")
-        app.addConfigEntry("definition_file_stems", "input")
-        app.addConfigEntry("definition_file_stems", "knownbugs")
+        app.addConfigEntry("builtin", "options", "definition_file_stems")
+        app.addConfigEntry("regenerate", "usecase", "definition_file_stems")
+        app.addConfigEntry("regenerate", "traffic", "definition_file_stems")
+        app.addConfigEntry("builtin", "input", "definition_file_stems")
+        app.addConfigEntry("builtin", "knownbugs", "definition_file_stems")
         app.setConfigAlias("test_list_files_directory", "filter_file_directory")
     def setApplicationDefaults(self, app):
         homeOS = app.getConfigValue("home_operating_system")

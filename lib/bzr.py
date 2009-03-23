@@ -41,6 +41,5 @@ class BzrInterface(version_control.VersionControlInterface):
             version_control.VersionControlInterface.callProgramOnFiles(self, cmdName, fileArg, recursive, extraArgs, **kwargs)
         
 
-version_control.VersionControlDialogGUI.vcsClass = BzrInterface
-
-from version_control import InteractiveActionConfig
+version_control.vcsClass = BzrInterface
+InteractiveActionConfig = version_control.InteractiveActionConfig

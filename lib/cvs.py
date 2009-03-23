@@ -96,8 +96,18 @@ class CVSInterface(version_control.VersionControlInterface):
             os.rename(oldDir, newDir)
 
     def copyDirectory(self, oldDir, newDir):
-        version_control.VersionControlInterface.copyDirectory(self, oldDir, newDir)
-        self.cleanControlDirs(newDir)
+        if os.path.isdir(newDir):
+            # After a remove, possibly...
+            for path in os.listdir(oldDir):
+                oldPath = os.path.join(oldDir, path)
+                newPath = os.path.join(newDir, path)
+                if os.path.isdir(oldPath):
+                    self.copyDirectory(oldPath, newPath)
+                else:
+                    shutil.copyfile(oldPath, newPath)
+        else:
+            version_control.VersionControlInterface.copyDirectory(self, oldDir, newDir)
+            self.cleanControlDirs(newDir)
 
     def removePath(self, path):
         if os.path.isdir(path):
@@ -148,7 +158,7 @@ class CVSLogLatest(version_control.LogGUI):
     def _getTitle(self):
         return "Log Latest"
     def getResultDialogMessage(self):
-        cmdArgs = self.vcs.getCmdArgs(self.cmdName, self.getExtraArgs())
+        cmdArgs = version_control.vcs.getCmdArgs(self.cmdName, self.getExtraArgs())
         message = "Showing latest log entries for the CVS controlled files.\nCVS command used: " + " ".join(cmdArgs)
         if not self.recursive:
             message += "\nSubdirectories were ignored."            
@@ -235,8 +245,18 @@ class CVSLogLatest(version_control.LogGUI):
         self.dialog.vbox.pack_start(self.vbox, expand=True, fill=True)
         return message
 
-version_control.VersionControlDialogGUI.vcsClass = CVSInterface
-            
+version_control.vcsClass = CVSInterface
+
+class RenameTest(version_control.RenameTest):
+    def handleExistingDirectory(self, dir):
+        if os.listdir(dir) == [ "CVS" ]:
+            # There is only a CVS control dir, i.e. it's probably been removed in CVS.
+            # Revert it in CVS and continue
+            shutil.rmtree(dir)
+            dirname, local = os.path.split(dir)
+            version_control.vcs.callProgram("update", [ "-dP", local ], cwd=dirname)
+        else:
+            version_control.RenameTest.handleExistingDirectory(self, dir)
 #
 # Configuration for the Interactive Actions
 #
@@ -244,3 +264,7 @@ class InteractiveActionConfig(version_control.InteractiveActionConfig):
     def getInteractiveActionClasses(self, dynamic):
         return version_control.InteractiveActionConfig.getInteractiveActionClasses(self, dynamic) + [ CVSLogLatest ]
     
+    def getReplacements(self):
+        replacements = version_control.InteractiveActionConfig.getReplacements(self)
+        replacements[default_gui.RenameTest] = RenameTest
+        return replacements

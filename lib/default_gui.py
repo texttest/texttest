@@ -2390,7 +2390,11 @@ class RenameTest(guiplugins.ActionDialogGUI):
                     raise plugins.TextTestError, "The name '" + newName + "' is already taken, please choose another name."
             newDir = os.path.join(self.currTestSelection[0].parent.getDirectory(), newName)
             if os.path.isdir(newDir):
-                raise plugins.TextTestError, "The directory " + newDir + " already exists, please choose another name."
+                self.handleExistingDirectory(newDir)
+
+    def handleExistingDirectory(self, newDir): # In CVS we might need to override this...
+        raise plugins.TextTestError, "The directory " + newDir + " already exists, please choose another name."
+
     def performOnCurrent(self):
         try:
             newName = self.optionGroup.getOptionValue("name")

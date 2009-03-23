@@ -1,4 +1,3 @@
-#!/usr/local/bin/python
 
 import sys, os, plugins, subprocess
 from jobprocess import killSubProcessAndChildren

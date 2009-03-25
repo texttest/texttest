@@ -1,0 +1,27 @@
+
+There is almost certainly no migration needed...
+
+=========================================================
+CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
+=========================================================
+
+(1) Missing "traffic" or "usecase" files
+========================================
+Both of these files are expected to be regenerated, either by TextTest itself ("traffic") or
+your GUI simulation tool of choice ("usecase"). But previously TextTest has never complained
+if they have not been regenerated.
+
+This is now changed, so on running TextTest 3.14 you might get a load of tests reporting
+"missing traffic" or "missing usecase" that have worked previously.
+
+In all probability the files in question were simply not used before and can safely be removed. 
+If however they were needed but are not regenerated for some reason, you can restore the old 
+handling via the following in your config file.
+
+# Don't complain if the traffic file is missing...
+[definition_file_stems]
+regenerate:{CLEAR traffic}
+builtin:traffic
+[end]
+
+Obviously you can swap "traffic" for "usecase" if appropriate. 

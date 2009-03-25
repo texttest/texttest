@@ -11,6 +11,7 @@ from copy import copy
 class SetUpTrafficHandlers(plugins.Action):
     def __init__(self, record):
         self.record = record
+        self.trafficServer = None
         self.trafficFiles = self.findTrafficFiles()
         
     def findTrafficFiles(self):
@@ -21,40 +22,40 @@ class SetUpTrafficHandlers(plugins.Action):
         return files
 
     def __call__(self, test):
-        if self.configureServer(test):
-            self.makeIntercepts(test)
-    def configureServer(self, test):
+        if self.trafficServer:
+            # After the test is complete we shut down the traffic server and allow it to flush itself
+            self.trafficServer.shutdown()
+            self.trafficServer = None
+        else:
+            self.trafficServer = self.makeTrafficServer(test)
+            if self.trafficServer:
+                self.makeIntercepts(test)
+            
+    def makeTrafficServer(self, test):
         recordFile = test.makeTmpFileName("traffic")
         if self.record:
-            self.setServerState(recordFile, None, test)
-            return True
+            return TrafficServer(test, recordFile)
         else:
             trafficReplay = test.getFileName("traffic")
             if trafficReplay:
-                self.setServerState(recordFile, trafficReplay, test)
-                return True
-            else:
-                self.setServerState(None, None, test)
-                return False
-    def setServerState(self, recordFile, replayFile, test):
-        if (recordFile or replayFile) and not TrafficServer.instance:
-            TrafficServer.instance = TrafficServer()
-        if TrafficServer.instance:
-            TrafficServer.instance.setState(recordFile, replayFile, test)
+                return TrafficServer(test, recordFile, trafficReplay)
+            
     def makeIntercepts(self, test):
         for cmd in self.getCommandsForInterception(test):
             interceptName = test.makeTmpFileName(cmd, forComparison=0)
             self.intercept(test, interceptName)
+
     def getCommandsForInterception(self, test):
         # This gets all names in collect_traffic, not just those marked
         # "asynchronous"! (it will also pick up "default").
         return test.getCompositeConfigValue("collect_traffic", "asynchronous")
+
     def intercept(self, test, interceptName):
         if os.path.exists(interceptName):
             # We might have written a fake version - store what it points to so we can
             # call it later, and remove the link
             localName = os.path.basename(interceptName)
-            TrafficServer.instance.setRealVersion(localName, test.getPathName(localName))
+            self.trafficServer.setRealVersion(localName, test.getPathName(localName))
             os.remove(interceptName)
         for trafficFile in self.trafficFiles:
             if os.name == "posix":
@@ -265,6 +266,7 @@ class CommandLineTraffic(Traffic):
     typeId = "CMD"
     direction = "<-"
     currentTest = None
+    diag = None
     realCommands = {}
     def __init__(self, inText, responseFile):
         self.diag = plugins.getDiagnostics("Traffic Server")
@@ -391,9 +393,9 @@ class CommandLineTraffic(Traffic):
         if self.realCommands.has_key(self.commandName):
             return self.realCommands[self.commandName]
         # Find the first one in the path that isn't us :)
-        TrafficServer.instance.diag.info("Finding real command to replace " + self.fullCommand)
+        self.diag.info("Finding real command to replace " + self.fullCommand)
         for currDir in self.path.split(os.pathsep):
-            TrafficServer.instance.diag.info("Searching " + currDir)
+            self.diag.info("Searching " + currDir)
             fullPath = os.path.join(currDir, self.commandName)
             if self.isRealCommand(fullPath):
                 return fullPath
@@ -435,9 +437,10 @@ class TrafficRequestHandler(StreamRequestHandler):
     def handle(self):
         self.server.diag.info("Received incoming request...")
         text = self.rfile.read()
-        traffic = self.parseTraffic(text)
-        self.server.process(traffic, self.requestNumber)
-        self.server.diag.info("Finished processing incoming request")
+        if not text.startswith("TERMINATE_SERVER"):
+            traffic = self.parseTraffic(text)
+            self.server.process(traffic, self.requestNumber)
+            self.server.diag.info("Finished processing incoming request")
 
     def parseTraffic(self, text):
         for key in self.parseDict.keys():
@@ -448,24 +451,48 @@ class TrafficRequestHandler(StreamRequestHandler):
         return ClientSocketTraffic(text, self.wfile)
             
 class TrafficServer(TCPServer):
-    instance = None
-    def __init__(self):
-        self.recordFileHandler = None
-        self.replayInfo = None
+    def __init__(self, test, recordFile, replayFile=None):
+        self.test = test
+        self.recordFileHandler = RecordFileHandler(recordFile)
+        self.replayInfo = ReplayInfo(replayFile)
         self.requestCount = 0
         self.diag = plugins.getDiagnostics("Traffic Server")
-        TrafficServer.instance = self
-        TCPServer.__init__(self, (socket.gethostname(), 0), TrafficRequestHandler)
-        self.thread = Thread(target=self.serve_forever)
-        self.thread.setDaemon(1)
-        self.diag.info("Starting traffic server thread")
-        self.thread.start()
+        CommandLineTraffic.currentTest = test
+        CommandLineTraffic.diag = self.diag
         self.topLevelForEdit = [] # contains only paths explicitly given. Always present.
         self.fileEditData = seqdict() # contains all paths, including subpaths of the above. Empty when replaying.
-        self.currentTest = None
+        self.terminate = False
         self.hasAsynchronousEdits = False
         self.fileRequestCount = {} # also only for recording
-
+        # Assume testing client until a server contacts us
+        ClientSocketTraffic.destination = None
+        ClientSocketTraffic.direction = "<-"
+        ServerTraffic.direction = "->"
+        TCPServer.__init__(self, (socket.gethostname(), 0), TrafficRequestHandler)
+        self.setAddressVariable(test)
+        self.allThreads = [ Thread(target=self.run) ]
+        self.diag.info("Starting traffic server thread")
+        self.allThreads[0].start()
+        
+    def run(self):
+        while not self.terminate:
+            self.handle_request()
+        
+    def notifyAllRead(self, suites):
+        if len(self.testMap) == 0:
+            self.notifyAllComplete()
+            
+    def shutdown(self):
+        self.diag.info("Told to shut down!")
+        self.terminate = True
+        sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sendSocket.connect(self.socket.getsockname())
+        sendSocket.sendall("TERMINATE_SERVER\n")
+        sendSocket.close()
+        for t in self.allThreads:
+            t.join()
+        self.diag.info("Shut down traffic server")
+        
     def process_request_thread(self, request, client_address, requestCount):
         # Copied from ThreadingMixin, more or less
         # We store the order things appear in so we know what order they should go in the file
@@ -481,8 +508,8 @@ class TrafficServer(TCPServer):
         self.requestCount += 1
         t = Thread(target = self.process_request_thread,
                    args = (request, client_address, self.requestCount))
-        t.setDaemon(1)
         t.start()
+        self.allThreads.append(t)
 
     def setAddressVariable(self, test):
         host, port = self.socket.getsockname()
@@ -494,22 +521,6 @@ class TrafficServer(TCPServer):
         self.diag.info("Storing faked command for " + command + " = " + realCommand) 
         CommandLineTraffic.realCommands[command] = realCommand
 
-    def setState(self, recordFile, replayFile, test):
-        self.recordFileHandler = RecordFileHandler(recordFile)
-        self.replayInfo = ReplayInfo(replayFile)
-        if recordFile or replayFile:
-            self.setAddressVariable(test)
-        CommandLineTraffic.currentTest = test
-        self.currentTest = test
-        ClientSocketTraffic.destination = None
-        self.requestCount = 0
-        self.topLevelForEdit = []
-        self.fileEditData = seqdict()
-        self.fileRequestCount = {}
-        # Assume testing client until a server contacts us
-        ClientSocketTraffic.direction = "<-"
-        ServerTraffic.direction = "->"
-
     def findFilesAndLinks(self, path):
         if not os.path.exists(path):
             return []
@@ -517,7 +528,7 @@ class TrafficServer(TCPServer):
             return [ path ]
 
         paths = []
-        filesToIgnore = self.currentTest.getCompositeConfigValue("test_data_ignore", "file_edits")
+        filesToIgnore = self.test.getCompositeConfigValue("test_data_ignore", "file_edits")
         for srcroot, srcdirs, srcfiles in os.walk(path):
             for fileToIgnore in filesToIgnore:
                 if fileToIgnore in srcdirs:
@@ -645,7 +656,7 @@ class TrafficServer(TCPServer):
     def makeResponseTraffic(self, traffic, responseClass, text, filesMatched):
         if responseClass is FileEditTraffic:
             fileName = text.strip()
-            fileEditDir = self.currentTest.getFileName("file_edits")
+            fileEditDir = self.test.getFileName("file_edits")
             storedFile, fileType = FileEditTraffic.getFileWithType(fileName, fileEditDir)
             if storedFile:
                 editedFile = self.getFileBeingEdited(fileName, fileType, filesMatched)
@@ -685,7 +696,7 @@ class TrafficServer(TCPServer):
                         changedPaths.append(removedPath)
                     
             if len(changedPaths) > 0:
-                storedFile = self.currentTest.makeTmpFileName(self.getFileEditPath(file), forComparison=0)
+                storedFile = self.test.makeTmpFileName(self.getFileEditPath(file), forComparison=0)
                 fileName = os.path.basename(storedFile)
                 self.diag.info("File being edited for '" + fileName + "' : will store " + str(file) + " as " + str(storedFile))
                 for path in changedPaths:

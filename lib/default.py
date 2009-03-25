@@ -307,11 +307,11 @@ class Config:
         catalogueCreator = self.getCatalogueCreator()
         ignoreCatalogues = self.shouldIgnoreCatalogues()
         collator = self.getTestCollator()
+        trafficHandler = SetUpTrafficHandlers(self.optionMap.has_key("rectraffic"))
         return [ self.getExecHostFinder(), self.getWriteDirectoryMaker(), \
                  self.getWriteDirectoryPreparer(ignoreCatalogues), \
-                 SetUpTrafficHandlers(self.optionMap.has_key("rectraffic")), \
-                 catalogueCreator, collator, rundependent.FilterOriginal(), self.getTestRunner(), \
-                 catalogueCreator, collator, self.getTestEvaluator() ]
+                 trafficHandler, catalogueCreator, collator, rundependent.FilterOriginal(), self.getTestRunner(), \
+                 trafficHandler, catalogueCreator, collator, self.getTestEvaluator() ]
     def shouldIgnoreCatalogues(self):
         return self.optionMap.has_key("ignorecat") or self.optionMap.has_key("record")
     def hasPerformance(self, app):

@@ -2,6 +2,7 @@
 import sys, os, plugins, subprocess
 from jobprocess import killSubProcessAndChildren
 from usecase import ScriptEngine
+from time import sleep
 
 # Interface all responders must fulfil
 class Responder:
@@ -102,6 +103,7 @@ class InteractiveResponder(Responder):
             tool = test.getCompositeConfigValue("diff_program", comparison.stem)
             cmdArgs = [ tool, comparison.stdCmpFile, comparison.tmpCmpFile ]
         return tool, cmdArgs        
+
     def viewTest(self, test):
         outputText = test.state.freeText
         sys.stdout.write(outputText)
@@ -119,6 +121,7 @@ class InteractiveResponder(Responder):
                     return proc
                 except OSError:
                     print "<No window created - could not find graphical difference tool '" + tool + "'>"
+
     def askUser(self, test, allowView, process=None):      
         versions = test.app.getSaveableVersions()
         options = ""
@@ -140,6 +143,7 @@ class InteractiveResponder(Responder):
                 if response.startswith(versionOption):
                     self.save(test, versions[i], exactSave)
         if process:
+            sleep(int(os.getenv("TEXTTEST_KILL_GRAPHICAL_CONSOLE_DELAY", "0")))
             print "Terminating graphical viewer..."
             killSubProcessAndChildren(process)
         return 0

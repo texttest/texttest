@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
-import sys, os, signal
+import signal, os
 
-gotSignal = 0
+gotSignal, sentInfo = 0, False
 
 def makeSocket():
     import socket
@@ -21,6 +21,22 @@ def createSocket():
         sock.connect(serverAddress)
         return sock
 
+def sendKill():
+    sock = createSocket()
+    text = "SUT_COMMAND_KILL:" + str(gotSignal) + ":SUT_SEP:" + str(os.getpid())
+    sock.sendall(text)
+    sock.close()
+
+def handleKill(sigNum, *args):
+    global gotSignal
+    gotSignal = sigNum
+    if sentInfo:
+        sendKill()
+
+if os.name == "posix":
+    signal.signal(signal.SIGINT, handleKill)
+    signal.signal(signal.SIGTERM, handleKill)
+
 def readFromSocket(sock):
     from socket import error
     try:
@@ -29,11 +45,12 @@ def readFromSocket(sock):
         return sock.makefile().read()
 
 def getCommandLine():
+    from sys import argv
     if os.name == "posix":
-        return sys.argv
+        return argv
     else:
-        base = os.path.splitext(sys.argv[0])[0]
-        return [ base ] + sys.argv[1:]
+        base = os.path.splitext(argv[0])[0]
+        return [ base ] + argv[1:]
 
 def createAndSend():
     sock = createSocket()
@@ -42,25 +59,21 @@ def createAndSend():
     sock.sendall(text)
     return sock
 
-def sendKill(sigNum, *args):
-    global gotSignal
-    gotSignal = sigNum
-    sock = createSocket()
-    text = "SUT_COMMAND_KILL:" + str(sigNum) + ":SUT_SEP:" + str(os.getpid())
-    sock.sendall(text)
-    sock.close()
-
-if os.name == "posix":
-    signal.signal(signal.SIGINT, sendKill)
-    signal.signal(signal.SIGTERM, sendKill)
-
+def infoSent():
+    global sentInfo
+    if gotSignal:
+        sendKill()
+    sentInfo = True
+        
 if __name__ == "__main__":
     sock = createAndSend()
     sock.shutdown(1)
+    infoSent()
     response = readFromSocket(sock)
     sock.close()
     try:
         stdout, stderr, exitStr = response.split("|TT_CMD_SEP|")
+        import sys
         sys.stdout.write(stdout)
         sys.stdout.flush()
         sys.stderr.write(stderr)

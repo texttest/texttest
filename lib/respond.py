@@ -143,7 +143,7 @@ class InteractiveResponder(Responder):
                 if response.startswith(versionOption):
                     self.save(test, versions[i], exactSave)
         if process:
-            sleep(int(os.getenv("TEXTTEST_KILL_GRAPHICAL_CONSOLE_DELAY", "0")))
+            sleep(int(os.getenv("TEXTTEST_KILL_GRAPHICAL_CONSOLE_SLEEP", "0")))
             print "Terminating graphical viewer..."
             killSubProcessAndChildren(process)
         return 0

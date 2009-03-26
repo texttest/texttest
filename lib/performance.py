@@ -144,11 +144,12 @@ class PerformanceComparison:
             return settings.getDescriptor("performance_descriptor_decrease")
         else:
             return settings.getDescriptor("performance_descriptor_increase")
+
     def getSummary(self, includeNumbers=True):
         if self.newPerformance < 0:
             return "Performance comparison failed"
 
-        perc = self.getRoundedPercentage()
+        perc = plugins.roundPercentage(self.percentageChange)
         if perc == 0:
             return ""
         elif perc == -1:
@@ -157,19 +158,16 @@ class PerformanceComparison:
             return str(perc) + "% " + self.descriptor
         else:
             return self.descriptor
-    def getRoundedPercentage(self):
-        perc = int(self.percentageChange)
-        if perc == 0:
-            return float("%.0e" % self.percentageChange) # Print one significant figure
-        else:
-            return perc
+
     def isSignificant(self, settings):
         longEnough = settings.aboveMinimum(self.newPerformance, "performance_test_minimum") or \
                      settings.aboveMinimum(self.oldPerformance, "performance_test_minimum")
         varianceEnough = settings.aboveMinimum(self.percentageChange, "performance_variation_%")
         return longEnough and varianceEnough
+
     def getAverage(self):
         return round((self.oldPerformance + self.newPerformance) / 2.0, 2)
+
 
 class TimeFilter(plugins.Filter):
     option = "r"

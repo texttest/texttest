@@ -982,6 +982,13 @@ def calculatePercentageStandard(oldVal, newVal):
     diff = abs(newVal - oldVal)
     return (diff / oldVal) * 100
 
+def roundPercentage(val):
+    perc = int(val)
+    if perc == 0:
+        return float("%.0e" % val) # Print one significant figure
+    else:
+        return perc
+
 
 class PreviewGenerator:
     def __init__(self, maxWidth, maxLength, startEndRatio=1):

@@ -276,10 +276,14 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
                 subprocess.call([ diffProgram, "--help" ], stderr=open(os.devnull, "w"), stdout=open(os.devnull, "w"))
             cmdArgs = graphDiffArgs + revOptions + [ path ]
             guiplugins.processMonitor.startProcess(cmdArgs, description="Graphical " + vcs.name + " diff for file " + path,
+                                                   exitHandler = self.diffingComplete,
                                                    stderr=open(os.devnull, "w"), stdout=open(os.devnull, "w"))
         except OSError:
             self.showErrorDialog("\nCannot find graphical " + vcs.name + " difference program '" + diffProgram + \
                                      "'.\nPlease install it somewhere on your $PATH.\n")
+    
+    def diffingComplete(self, *args):
+        guiplugins.scriptEngine.applicationEvent("the version-control graphical diff program to terminate")
                                 
     def getRootPath(self):
         appPath = self.currTestSelection[0].app.getDirectory()

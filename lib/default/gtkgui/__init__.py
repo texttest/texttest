@@ -610,7 +610,7 @@ class MenuBarGUI(guiplugins.SubGUI):
         else:
             moduleName = baseName[:-4]
         self.diag.info("Checking if we loaded module " + moduleName)
-        return sys.modules.has_key(moduleName)
+        return sys.modules.has_key(moduleName) or sys.modules.has_key(__name__ + "." + moduleName)
     def describe(self):
         for toggleAction in self.toggleActions:
             guilog.info("Viewing toggle action with title '" + toggleAction.get_property("label") + "'")

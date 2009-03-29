@@ -1,4 +1,4 @@
-import os, sys, default, sandbox, unixonly, performance, plugins, socket, subprocess, operator, signal
+import os, sys, default, plugins, socket, subprocess, operator, signal
 from Queue import Queue, Empty
 from SocketServer import TCPServer, StreamRequestHandler
 from time import sleep
@@ -6,8 +6,10 @@ from ndict import seqdict
 from copy import copy, deepcopy
 from cPickle import dumps
 from respond import Responder, TextDisplayResponder, InteractiveResponder
-from knownbugs import CheckForBugs
-from actionrunner import ActionRunner, BaseActionRunner
+from default.knownbugs import CheckForBugs
+from default.actionrunner import ActionRunner, BaseActionRunner
+from default.unixonly import VirtualDisplayResponder
+from default.performance import getTestPerformance
 from types import StringType
 
 plugins.addCategory("abandoned", "abandoned", "were abandoned")
@@ -28,7 +30,7 @@ class RunTestInSlave(default.RunTest):
         exec command
         return _getUserSignalKillInfo(userSignalNumber, self.getExplicitKillInfo)
 
-class FindExecutionHosts(sandbox.FindExecutionHosts):
+class FindExecutionHosts(default.sandbox.FindExecutionHosts):
     def getExecutionMachines(self, test):
         moduleName = queueSystemName(test.app).lower()
         command = "from " + moduleName + " import getExecutionMachines as _getExecutionMachines"
@@ -166,9 +168,9 @@ class QueueSystemConfig(default.Config):
         else:
             return default.Config.getExecHostFinder(self)
     def getSlaveResponderClasses(self):
-        classes = [ SocketResponder, default.ActionRunner ]
+        classes = [ SocketResponder, ActionRunner ]
         if not self.isActionReplay():
-            classes.append(unixonly.VirtualDisplayResponder)
+            classes.append(VirtualDisplayResponder)
         return classes
 
     def getResponderClasses(self, allApps):
@@ -299,7 +301,7 @@ class SubmissionRules:
             return 1
 
         minTimeForce = plugins.getNumberOfSeconds(str(self.test.getConfigValue("min_time_for_performance_force")))
-        if minTimeForce >= 0 and performance.getTestPerformance(self.test) > minTimeForce:
+        if minTimeForce >= 0 and getTestPerformance(self.test) > minTimeForce:
             return 1
         # If we haven't got a log_file yet, we should do this so we collect performance reliably
         logFile = self.test.getFileName(self.test.getConfigValue("log_file"))
@@ -870,7 +872,7 @@ class Abandoned(plugins.TestState):
     def shouldAbandon(self):
         return 1
         
-class MachineInfoFinder(sandbox.MachineInfoFinder):
+class MachineInfoFinder(default.sandbox.MachineInfoFinder):
     def __init__(self):
         self.queueMachineInfo = None
     def findPerformanceMachines(self, app, fileStem):
@@ -879,7 +881,7 @@ class MachineInfoFinder(sandbox.MachineInfoFinder):
         for resource in resources:
             perfMachines += plugins.retryOnInterrupt(self.queueMachineInfo.findResourceMachines, resource)
 
-        rawPerfMachines = sandbox.MachineInfoFinder.findPerformanceMachines(self, app, fileStem)
+        rawPerfMachines = default.sandbox.MachineInfoFinder.findPerformanceMachines(self, app, fileStem)
         for machine in rawPerfMachines:
             if machine != "any":
                 perfMachines += self.queueMachineInfo.findActualMachines(machine)
@@ -888,7 +890,7 @@ class MachineInfoFinder(sandbox.MachineInfoFinder):
         else:
             return perfMachines
     def setUpApplication(self, app):
-        sandbox.MachineInfoFinder.setUpApplication(self, app)
+        default.sandbox.MachineInfoFinder.setUpApplication(self, app)
         moduleName = queueSystemName(app).lower()
         command = "from " + moduleName + " import MachineInfo as _MachineInfo"
         exec command

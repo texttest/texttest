@@ -201,12 +201,12 @@ class ApplicationRunner:
         actionCom = script.split(" ")[0]
         actionArgs = script.split(" ")[1:]
         actionOption = actionCom.split(".")
-        if len(actionOption) != 2:
+        if len(actionOption) < 2:
             sys.stderr.write("Plugin scripts must be of the form <module_name>.<script>\n")
             return []
 
-                
-        module, pclass = actionOption
+        module = ".".join(actionOption[:-1])
+        pclass = actionOption[-1]
         importCommand = "from " + module + " import " + pclass + " as _pclass"
         try:
             exec importCommand

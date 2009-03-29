@@ -1,8 +1,8 @@
 # Code to generate HTML report of historical information. This report generated
 # either via the -coll flag, or via -s 'batch.GenerateHistoricalReport <batchid>'
 
-import os, plugins, time, re, HTMLgen, HTMLcolors, operator
-from cPickle import Pickler, loads, UnpicklingError
+import os, plugins, time, re, HTMLgen, HTMLcolors, operator, sys
+from cPickle import Pickler, Unpickler, UnpicklingError
 from ndict import seqdict
 from sets import Set
 from glob import glob
@@ -171,12 +171,33 @@ class GenerateWebPages(object):
                 return version
         return ""
 
+    def findGlobal(self, modName, className):
+        try:
+            exec "from " + modName + " import " + className + " as _class"
+            return _class
+        except ImportError:
+            for loadedMod in sys.modules.keys():
+                if "." in loadedMod:
+                    packageName = ".".join(loadedMod.split(".")[:-1] + [ modName ])
+                    try:
+                        exec "from " + packageName + " import " + className + " as _class" 
+                        return _class
+                    except ImportError:
+                        pass
+            raise
+        
+    def getNewState(self, file):
+        # Would like to do load(file) here... but it doesn't work with universal line endings, see Python bug 1724366
+        from cStringIO import StringIO
+        unpickler = Unpickler(StringIO(file.read()))
+        # Magic to keep us backward compatible in the face of packages changing...
+        unpickler.find_global = self.findGlobal
+        return unpickler.load()
+        
     def readState(self, stateFile):
         file = open(stateFile, "rU")
         try:
-            # Would like to do load(file) here... but it doesn't work, see Python bug 1724366
-            # http://sourceforge.net/tracker/index.php?func=detail&aid=1724366&group_id=5470&atid=105470
-            state = loads(file.read())
+            state = self.getNewState(file)
             if isinstance(state, plugins.TestState):
                 state.updateAfterLoad(self.app)
                 return state

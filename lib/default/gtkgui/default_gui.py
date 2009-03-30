@@ -582,7 +582,7 @@ class FollowFile(FileViewAction):
 
     def getFollowProgram(self, followProgram, fileName):
         title = '"' + self.currTestSelection[0].name + " (" + os.path.basename(fileName) + ')"'
-        envDir = { "TEXTTEST_FOLLOW_FILE_TITLE" : title }
+        envDir = { "TEXTTEST_FOLLOW_FILE_TITLE" : title } # Title of the window when following file progress
         return os.path.expandvars(followProgram, envDir.get)
 
     def getFollowCommand(self, program, fileName):
@@ -1582,7 +1582,8 @@ class RunningAction:
         self.notify("SaveSelection", filterFileName)
         return filterFileName
     def getTextTestArgs(self):
-        return [ sys.executable ] + plugins.splitcmd(os.getenv("TEXTTEST_DYNAMIC_GUI_PYARGS", "")) + [ sys.argv[0] ]
+        extraArgs = plugins.splitcmd(os.getenv("TEXTTEST_DYNAMIC_GUI_PYARGS", "")) # Additional python arguments for dynamic GUI : mostly useful for coverage
+        return [ sys.executable ] + extraArgs + [ sys.argv[0] ]
     def getOptionGroups(self):
         return [ self.optionGroup ]
     def getTextTestOptions(self, filterFile, app, usecase):

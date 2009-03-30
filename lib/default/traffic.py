@@ -514,7 +514,7 @@ class TrafficServer(TCPServer):
     def setAddressVariable(self, test):
         host, port = self.socket.getsockname()
         address = host + ":" + str(port)
-        test.setEnvironment("TEXTTEST_MIM_SERVER", address)
+        test.setEnvironment("TEXTTEST_MIM_SERVER", address) # Address of TextTest's server for recording client/server traffic
         self.diag.info("Setting traffic server address to '" + address + "'")
         
     def setRealVersion(self, command, realCommand):

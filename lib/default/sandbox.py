@@ -281,22 +281,22 @@ class TestEnvironmentCreator:
         if self.useJavaRecorder():
             return "replay", replayScript, "jusecase"
         else:
-            return "USECASE_REPLAY_SCRIPT", replayScript
+            return "USECASE_REPLAY_SCRIPT", replayScript # Full path to the script to replay in GUI tests
     def getReplayDelayVariable(self):
         replaySpeed = str(self.test.getConfigValue("slow_motion_replay_speed"))
         if self.useJavaRecorder():
             return "delay", replaySpeed, "jusecase"
         else:
-            return "USECASE_REPLAY_DELAY", replaySpeed
+            return "USECASE_REPLAY_DELAY", replaySpeed # Time to wait between each action in GUI tests
     def getRecordScriptVariable(self, recordScript):
         self.diag.info("Enabling recording")
         if self.useJavaRecorder():
             return "record", recordScript, "jusecase"
         else:
-            return "USECASE_RECORD_SCRIPT", recordScript
+            return "USECASE_RECORD_SCRIPT", recordScript # Full path to the script to record in GUI tests
     def getPathVariables(self):
         testDir = self.test.getDirectory(temporary=1)
-        vars = [("TEXTTEST_SANDBOX", testDir)]
+        vars = [("TEXTTEST_SANDBOX", testDir)] # Full path to the sandbox directory
         # Always include the working directory of the test in PATH, to pick up fake
         # executables provided as test data. Allow for later expansion...
         for pathVar in self.getPathVars():

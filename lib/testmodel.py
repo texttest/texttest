@@ -1546,27 +1546,42 @@ class Application:
 
 class OptionFinder(plugins.OptionFinder):
     def __init__(self):
+        # Note: the comments in this method will be extracted for documenting environment variables!
         plugins.OptionFinder.__init__(self, sys.argv[1:])
-        self.directoryName = os.path.normpath(self.findDirectoryName()).replace("\\", "/")
-        os.environ["TEXTTEST_HOME"] = self.directoryName
-        self.diagConfigFile = None
-        self.diagWriteDir = None
+        self.directoryName = self.setPathFromOptionsOrEnv("TEXTTEST_HOME", ".", "d") # Root directory of the test suite
+        self.setPathFromOptionsOrEnv("USECASE_HOME", "$TEXTTEST_HOME/usecases") # Location to store shortcuts from the GUI
+        
+        self.setPathFromOptionsOrEnv("TEXTTEST_PERSONAL_CONFIG", "~/.texttest") # Location of personal configuration
+        self.setPathFromOptionsOrEnv("TEXTTEST_TMP", "$TEXTTEST_PERSONAL_CONFIG/tmp") # Location of temporary files from test runs
+        self.diagWriteDir = self.setPathFromOptionsOrEnv("TEXTTEST_DIAGDIR", "$TEXTTEST_PERSONAL_CONFIG/log", "xw", "x") # Location to write TextTest's internal logs
+        self.diagConfigFile = self.setPathFromOptionsOrEnv("TEXTTEST_LOGCONFIG", "$TEXTTEST_DIAGDIR/log4py.conf", "xr", "x") # Configuration file for TextTest's internal logs
+        
         self.setUpLogging()
         self.diag = plugins.getDiagnostics("option finder")
         self.diag.info("Replaying from " + repr(os.getenv("USECASE_REPLAY_SCRIPT")))
         self.diag.info(repr(self))
-    def setUpLogging(self):
-        if self.has_key("x"):
-            self.diagConfigFile = self.getSelfDiagFile()
-            self.diagWriteDir = self.getSelfDiagWriteDir()
-        elif os.environ.has_key("TEXTTEST_LOGCONFIG"):
-            self.diagConfigFile = os.getenv("TEXTTEST_LOGCONFIG")
-            self.diagWriteDir = os.getenv("TEXTTEST_DIAGDIR", os.getcwd())
 
+    def setPathFromOptionsOrEnv(self, envVar, *args):
+        givenValue = self.getPathFromOptionsOrEnv(envVar, *args)
+        if givenValue is not None:
+            value = os.path.normpath(givenValue).replace("\\", "/")
+            os.environ[envVar] = value
+            return value
+
+    def getPathFromOptionsOrEnv(self, envVar, defaultValue, optionName="", enablingOption=""):
+        optionEnabled = not enablingOption or self.has_key(enablingOption)
+        envEnabled = not enablingOption or not self.has_key(enablingOption)
+        if optionEnabled and optionName and self.has_key(optionName):
+            return plugins.abspath(self[optionName])
+        elif envEnabled and os.environ.has_key(envVar):
+            return plugins.abspath(os.environ[envVar])
+        elif optionEnabled:
+            return plugins.abspath(os.path.expanduser(os.path.expandvars(defaultValue)))
+
+    def setUpLogging(self):
         if self.diagConfigFile:
             if os.path.isfile(self.diagConfigFile):
                 # Assume log4py's configuration file refers to files relative to TEXTTEST_DIAGDIR
-                os.environ["TEXTTEST_DIAGDIR"] = self.diagWriteDir
                 print "TextTest will write diagnostics in", self.diagWriteDir, "based on file at", self.diagConfigFile
             else:
                 print "Could not find diagnostic file at", self.diagConfigFile, ": cannot run with diagnostics"
@@ -1623,20 +1638,8 @@ class OptionFinder(plugins.OptionFinder):
         return self.has_key("help")
     def runScript(self):
         return self.get("s")
-    def getSelfDiagFile(self):
-        return self.get("xr", os.path.join(self.getDefaultSelfDiagDir(), "log4py.conf"))
-    def getSelfDiagWriteDir(self):
-        return self.get("xw", self.getDefaultSelfDiagDir())            
-    def getDefaultSelfDiagDir(self):
-        return os.path.join(plugins.getPersonalConfigDir(), "log")
-    def findDirectoryName(self):
-        if self.has_key("d"):
-            return plugins.abspath(self["d"])
-        elif os.environ.has_key("TEXTTEST_HOME"):
-            return plugins.abspath(os.environ["TEXTTEST_HOME"])
-        else:
-            return os.getcwd()
-
+    
+    
 # Compulsory responder to generate application events. Always present. See respond module
 class ApplicationEventResponder(Responder):
     def notifyLifecycleChange(self, test, state, changeDesc):

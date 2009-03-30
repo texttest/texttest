@@ -130,9 +130,6 @@ class TextTest(Responder, plugins.Observable):
         self.inputOptions = testmodel.OptionFinder()
         self.diag = plugins.getDiagnostics("Find Applications")
         self.appSuites = seqdict()
-        # Set USECASE_HOME for the use-case recorders we expect people to use for their tests...
-        if not os.environ.has_key("USECASE_HOME"):
-            os.environ["USECASE_HOME"] = os.path.join(self.inputOptions.directoryName, "usecases")
     def printStackTrace(self, *args):
         from traceback import print_stack
         print_stack()

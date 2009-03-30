@@ -635,12 +635,15 @@ class QueueSystemServer(BaseActionRunner):
         if self.optionMap.diagConfigFile:
             runOptions.append("-x")
             runOptions.append("-xr " + self.optionMap.diagConfigFile)
-            # The environment variable is mostly for self-testing
-            # so we can point all logs to the same place. 
-            slaveWriteDir = os.getenv("TEXTTEST_SLAVE_DIAGDIR",
-                                      os.path.join(self.optionMap.diagWriteDir, submissionRules.getJobName()))
-            runOptions.append("-xw " + slaveWriteDir)
+            runOptions.append("-xw " + self.getSlaveDiagDir(submissionRules))
         return " ".join(runOptions)
+    def getSlaveDiagDir(self, submissionRules):
+        # The environment variable is mostly for self-testing
+        # so we can point all logs to the same place.
+        # Format strange so DocumentEnvironment can produce something sensible
+        slaveWriteDir = os.getenv("TEXTTEST_SLAVE_DIAGDIR", "$TEXTTEST_DIAGDIR/<slave job name>")
+        return os.path.expandvars(slaveWriteDir.replace("<slave job name>", submissionRules.getJobName()))
+        
     def getSlaveLogDir(self, test):
         return os.path.join(test.app.writeDirectory, "slavelogs")
     def submitJob(self, test, submissionRules, command, slaveEnv):

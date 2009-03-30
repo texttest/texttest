@@ -78,8 +78,8 @@ def runXvfb(logDir):
         signal.signal(signal.SIGUSR1, connectionComplete)
         signal.signal(signal.SIGALRM, connectionFailed)
         if not Xvfb_ready:
-            signal.alarm(int(os.getenv("TEXTTEST_XVFB_WAIT", 30)))
-            signal.pause() # Wait until we know Xvfb is ready to be connected to before proceeding, or we time out
+            signal.alarm(int(os.getenv("TEXTTEST_XVFB_WAIT", 30))) # Time to wait for Xvfb to set up connections
+            signal.pause() 
     except ConnectionTimeout:
         # Kill it and tell TextTest we timed out. It will then start a new startXvfb.py process, with a new process ID
         # that will hopefully work better

@@ -251,18 +251,8 @@ class Config:
     def isolatesDataUsingCatalogues(self, app):
         return app.getConfigValue("create_catalogues") == "true" and \
                len(app.getConfigValue("partial_copy_test_path")) > 0
-    def getRootTmpDir(self):
-        if not os.getenv("TEXTTEST_TMP"):
-            os.environ["TEXTTEST_TMP"] = self.getDefaultTextTestTmp()
-        return os.path.expanduser(os.getenv("TEXTTEST_TMP"))
-    def getDefaultTextTestTmp(self):
-        if os.name == "nt" and os.getenv("TEMP"):
-            return os.getenv("TEMP").replace("\\", "/")
-        else:
-            return "~/texttesttmp"
-
     def getWriteDirectory(self, app):
-        return os.path.join(self.getRootTmpDir(), self.getWriteDirectoryName(app))
+        return os.path.join(os.getenv("TEXTTEST_TMP"), self.getWriteDirectoryName(app))
     def getWriteDirectoryName(self, app):
         parts = self.getBasicRunDescriptors(app) + self.getVersionDescriptors() + [ self.getTimeDescriptor(), str(os.getpid()) ]
         return ".".join(parts)
@@ -525,7 +515,7 @@ class Config:
         
         try: 
             self.verifyCheckoutValid(checkoutPath)
-            os.environ["TEXTTEST_CHECKOUT"] = checkoutPath
+            os.environ["TEXTTEST_CHECKOUT"] = checkoutPath # Full path to the checkout directory
             return checkoutPath
         except plugins.TextTestError, e:
             if self.ignoreExecutable():
@@ -584,7 +574,7 @@ class Config:
             return checkout
         checkoutLocations = app.getCompositeConfigValue("checkout_location", checkout, expandVars=False)
         # do this afterwards, so it doesn't get expanded (yet)
-        os.environ["TEXTTEST_CHECKOUT_NAME"] = checkout
+        os.environ["TEXTTEST_CHECKOUT_NAME"] = checkout # Local name of the checkout directory
         if len(checkoutLocations) > 0:
             return self.makeAbsoluteCheckout(checkoutLocations, checkout, app)
         else:
@@ -1188,6 +1178,97 @@ class DocumentConfig(plugins.Action):
             if not docOutput.startswith("Private"):
                 value = app.configDir[realKey]
                 print key + "|" + str(value) + "|" + docOutput  
+
+class DocumentEnvironment(plugins.Action):
+    def __init__(self, args=[]):
+        self.onlyEntries = args
+        self.prefixes = [ "TEXTTEST_", "USECASE_" ]
+        self.exceptions = self.prefixes + [ "TEXTTEST_DELETION", "TEXTTEST_SYMLINK" ]
+        
+    def getEntriesToUse(self, app):
+        if len(self.onlyEntries) > 0:
+            return self.onlyEntries
+        else:
+            return self.findAllVariables(app)
+
+    def findAllVariables(self, app):
+        rootDir = plugins.installationRoots[0]
+        vanilla = app.inputOptions.has_key("vanilla")
+        allVars = {}
+        for root, dirs, files in os.walk(rootDir):
+            if vanilla and "site" in dirs:
+                dirs.remove("site")
+            if root.endswith("lib"):
+                for dir in dirs:
+                    if not sys.modules.has_key(dir):
+                        dirs.remove(dir)
+            for file in files:
+                if file.endswith(".py"):
+                    path = os.path.join(root, file)
+                    if not os.path.islink(path):
+                        self.findVarsInFile(path, allVars)
+        return allVars
+
+    def getArgList(self, line, functionName):
+        pos = line.find(functionName) + len(functionName)
+        parts = line[pos:].strip().split("#")
+        endPos = parts[0].find(")")
+        argStr = parts[0][:endPos + 1]
+        allArgs = self.getActualArguments(argStr)
+        if len(parts) > 1:
+            allArgs.append(parts[1].strip())
+        else:
+            allArgs.append("")
+        return allArgs
+
+    def getActualArguments(self, argStr):
+        if not argStr.startswith("("):
+            return []
+        try:
+            argTuple = eval(argStr)
+            from types import TupleType
+            if type(argTuple) == TupleType:
+                allArgs = list(eval(argStr))
+                del allArgs[0] # don't include the variable itself
+                while len(allArgs) < 3:
+                    allArgs.append("") # pad to produce consistent table size
+                return map(str, allArgs) 
+            else:
+                return []
+        except: # could be anything at all
+            return []
+
+    def isRelevant(self, var, vars):
+        if var in self.exceptions or "SLEEP" in var:
+            return False
+        prevVal = vars.get(var, [])
+        return not prevVal or not prevVal[0]
+        
+    def findVarsInFile(self, path, vars):
+        import re
+        regexes = [ re.compile("([^/ \"'\.,\(]*)[\(]?[\"]?(" + prefix + "[^/ \"'\.,]*)") for prefix in self.prefixes ]
+        for line in open(path).xreadlines():
+            for regex in regexes:
+                match = regex.search(line)
+                if match is not None:
+                    functionName = match.group(1)
+                    var = match.group(2).strip()
+                    if self.isRelevant(var, vars):
+                        argList = self.getArgList(line, functionName)
+                        vars[var] = argList
+        
+    def setUpApplication(self, app):
+        vars = self.getEntriesToUse(app)
+        print "The following variables may be set by the user :"
+        for key in sorted(vars.keys()):
+            argList = vars[key]
+            if len(argList) > 1:
+                print key + "|" + "|".join(argList)
+
+        print "The following variables are set by TextTest :"
+        for var in sorted(filter(lambda key: len(vars[key]) == 1, vars.keys())):
+            print var + "|" + vars[var][0]
+
 
 class DocumentScripts(plugins.Action):
     def setUpApplication(self, app):

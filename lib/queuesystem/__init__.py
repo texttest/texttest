@@ -236,9 +236,9 @@ class SubmissionRules:
         self.envResource = self.getEnvironmentResource()
         self.processesNeeded = self.getProcessesNeeded()
     def getEnvironmentResource(self):
-        return os.path.expandvars(self.test.getEnvironment("QUEUE_SYSTEM_RESOURCE", ""))
+        return os.path.expandvars(self.test.getEnvironment("QUEUE_SYSTEM_RESOURCE", "")) # Grid engine resources required for the test
     def getProcessesNeeded(self):
-        return self.test.getEnvironment("QUEUE_SYSTEM_PROCESSES", "1")
+        return self.test.getEnvironment("QUEUE_SYSTEM_PROCESSES", "1") # Number of processes the test needs to run
     def getJobName(self):
         path = self.test.getRelPath()
         parts = path.split("/")
@@ -615,7 +615,8 @@ class QueueSystemServer(BaseActionRunner):
         # it comes to noticing extra shells
         return "exec $SHELL -c \"exec " + command + "\""
     def getSlaveCommand(self, test, submissionRules):
-        return os.getenv("TEXTTEST_SLAVE_CMD", sys.argv[0]) + " -d " + os.getenv("TEXTTEST_HOME") + \
+        slaveCmd = os.getenv("TEXTTEST_SLAVE_CMD", sys.argv[0]) # TextTest executable to call for the grid engine slave process
+        return slaveCmd + " -d " + os.getenv("TEXTTEST_HOME") + \
                " -a " + test.app.name + test.app.versionSuffix() + \
                " -l -tp " + test.getRelPath() + \
                self.getSlaveArgs(test) + " " + \
@@ -641,7 +642,7 @@ class QueueSystemServer(BaseActionRunner):
         # The environment variable is mostly for self-testing
         # so we can point all logs to the same place.
         # Format strange so DocumentEnvironment can produce something sensible
-        slaveWriteDir = os.getenv("TEXTTEST_SLAVE_DIAGDIR", "$TEXTTEST_DIAGDIR/<slave job name>")
+        slaveWriteDir = os.getenv("TEXTTEST_SLAVE_DIAGDIR", "$TEXTTEST_DIAGDIR/<slave job name>") # Internal log directory to use in the grid engine slave process
         return os.path.expandvars(slaveWriteDir.replace("<slave job name>", submissionRules.getJobName()))
         
     def getSlaveLogDir(self, test):
@@ -650,7 +651,7 @@ class QueueSystemServer(BaseActionRunner):
         self.diag.info("Submitting job at " + plugins.localtime() + ":" + command)
         self.diag.info("Creating job at " + plugins.localtime())
         queueSystem = self.getQueueSystem(test)
-        extraArgs = test.getEnvironment("QUEUE_SYSTEM_SUBMIT_ARGS")
+        extraArgs = test.getEnvironment("QUEUE_SYSTEM_SUBMIT_ARGS", "") # Extra arguments to provide on submission to grid engine
         cmdArgs = queueSystem.getSubmitCmdArgs(submissionRules)
         if extraArgs:
             cmdArgs += plugins.splitcmd(extraArgs)
@@ -920,3 +921,13 @@ class MachineInfoFinder(default.sandbox.MachineInfoFinder):
         for user, jobId, jobName in jobsFromQueue:
             jobs.append("Also on " + machine + " : " + user + "'s job " + jobId + " '" + jobName + "'")
         return jobs    
+
+
+class DocumentEnvironment(default.DocumentEnvironment):
+    def setUpApplication(self, app):
+        default.DocumentEnvironment.setUpApplication(self, app)
+        vars = self.findAllVariables(app, [ "QUEUE_SYSTEM_" ], os.path.dirname(__file__))
+        print "The following variables can be used in environment files :"
+        for key in sorted(vars.keys()):
+            argList = vars[key]
+            print key + "|" + "|".join(argList)

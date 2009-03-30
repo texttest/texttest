@@ -1183,16 +1183,16 @@ class DocumentEnvironment(plugins.Action):
     def __init__(self, args=[]):
         self.onlyEntries = args
         self.prefixes = [ "TEXTTEST_", "USECASE_" ]
-        self.exceptions = self.prefixes + [ "TEXTTEST_DELETION", "TEXTTEST_SYMLINK" ]
+        self.exceptions = [ "TEXTTEST_DELETION", "TEXTTEST_SYMLINK" ]
         
     def getEntriesToUse(self, app):
         if len(self.onlyEntries) > 0:
             return self.onlyEntries
         else:
-            return self.findAllVariables(app)
+            rootDir = plugins.installationRoots[0]
+            return self.findAllVariables(app, self.prefixes, rootDir)
 
-    def findAllVariables(self, app):
-        rootDir = plugins.installationRoots[0]
+    def findAllVariables(self, app, prefixes, rootDir):
         vanilla = app.inputOptions.has_key("vanilla")
         allVars = {}
         for root, dirs, files in os.walk(rootDir):
@@ -1206,7 +1206,7 @@ class DocumentEnvironment(plugins.Action):
                 if file.endswith(".py"):
                     path = os.path.join(root, file)
                     if not os.path.islink(path):
-                        self.findVarsInFile(path, allVars)
+                        self.findVarsInFile(path, allVars, prefixes)
         return allVars
 
     def getArgList(self, line, functionName):
@@ -1229,31 +1229,34 @@ class DocumentEnvironment(plugins.Action):
             from types import TupleType
             if type(argTuple) == TupleType:
                 allArgs = list(eval(argStr))
-                del allArgs[0] # don't include the variable itself
-                while len(allArgs) < 3:
-                    allArgs.append("") # pad to produce consistent table size
-                return map(str, allArgs) 
+                return [ self.interpretArgument(str(allArgs[1])) ]
             else:
                 return []
         except: # could be anything at all
             return []
 
-    def isRelevant(self, var, vars):
-        if var in self.exceptions or "SLEEP" in var:
+    def interpretArgument(self, arg):
+        if arg.endswith("texttest.py"):
+            return "<source directory>/bin/texttest.py"
+        else:
+            return arg
+
+    def isRelevant(self, var, vars, prefixes):
+        if var in self.exceptions or var in prefixes or "SLEEP" in var:
             return False
         prevVal = vars.get(var, [])
         return not prevVal or not prevVal[0]
         
-    def findVarsInFile(self, path, vars):
+    def findVarsInFile(self, path, vars, prefixes):
         import re
-        regexes = [ re.compile("([^/ \"'\.,\(]*)[\(]?[\"]?(" + prefix + "[^/ \"'\.,]*)") for prefix in self.prefixes ]
+        regexes = [ re.compile("([^/ \"'\.,\(]*)[\(]?[\"]?(" + prefix + "[^/ \"'\.,]*)") for prefix in prefixes ]
         for line in open(path).xreadlines():
             for regex in regexes:
                 match = regex.search(line)
                 if match is not None:
                     functionName = match.group(1)
                     var = match.group(2).strip()
-                    if self.isRelevant(var, vars):
+                    if self.isRelevant(var, vars, prefixes):
                         argList = self.getArgList(line, functionName)
                         vars[var] = argList
         

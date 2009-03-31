@@ -1127,36 +1127,40 @@ class MultiEntryDictionary(seqdict):
             self.warnings.append(message)
             printWarning(message, stderr=True, stdout=False)
 
-    def parseConfigLine(self, line, insert=True, errorOnUnknown=False):
+    def parseConfigLine(self, line, *args, **kwargs):
         if line.startswith("[") and line.endswith("]"):
             sectionName = self.getEntryName(line[1:-1])
-            self.resetSectionMarker(sectionName, errorOnUnknown)
+            self.resetSectionMarker(sectionName, *args, **kwargs)
         elif line.find(":") != -1:
             key, value = line.split(":", 1)
             entryName = self.getEntryName(os.path.expandvars(key))
-            self.addEntry(entryName, value, "", insert, errorOnUnknown)
+            self.addEntry(entryName, value, "", *args, **kwargs)
             if key and key == self.importKey:
-                self.readFromFile(self.importFileFinder(os.path.expandvars(value)), insert, errorOnUnknown)
+                self.readFromFile(self.importFileFinder(os.path.expandvars(value)), *args, **kwargs)
         else:
             self.warn("Could not parse config line " + line)
             
-    def resetSectionMarker(self, name, errorOnUnknown):
+    def resetSectionMarker(self, name, insert=True, errorOnUnknown=False):
         newSectionName = ""
         if name != "end":
             if self.has_key(name):
-                if type(self[name]) == types.DictType:
+                value = self[name]
+                if isinstance(value, seqdict) or type(value) == types.DictType:
                     newSectionName = name
                 else:
                     self.warn("Config entry name '" + name + "' incorrectly used as a section marker.")
+            elif insert:
+                self[name] = seqdict()
+                newSectionName = name
             elif errorOnUnknown:
                 self.warn("Config section name '" + name + "' not recognised.")
         self.resetCurrent(newSectionName)
         
-    def addEntry(self, entryName, entry, sectionName="", insert=0, errorOnUnknown=1):
+    def addEntry(self, entryName, entry, sectionName="", *args, **kwargs):
         if sectionName:
             self.resetCurrent(sectionName)
         try:
-            self._addEntry(entryName, entry, insert, errorOnUnknown)
+            self._addEntry(entryName, entry, *args, **kwargs)
         except ValueError, e:
             self.warn("Config entry name '" + entryName + "' in section '" + self.currSection +
                       "' given an invalid value '" + entry + "', ignoring.")
@@ -1164,7 +1168,7 @@ class MultiEntryDictionary(seqdict):
         if sectionName:
             self.resetCurrent()
 
-    def _addEntry(self, entryName, entry, insert, errorOnUnknown):
+    def _addEntry(self, entryName, entry, insert=True, errorOnUnknown=False):
         if self.currDict is not self and self.has_key(entryName):
             self.warn("Config entry name '" + entryName + "' found in section '" + self.currSection +
                       "', but defined at global scope. Did you forget an [end] marker?")

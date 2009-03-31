@@ -265,8 +265,8 @@ class Test(plugins.Observable):
             self.environment[var] = value
     def addProperty(self, var, value, propFile):
         if not self.properties.has_key(propFile):
-            self.properties.addEntry(propFile, {}, insert=1)
-        self.properties.addEntry(var, value, sectionName = propFile, insert=1)
+            self.properties.addEntry(propFile, {})
+        self.properties.addEntry(var, value, sectionName = propFile)
 
     def getEnvironment(self, var, defaultValue=None):
         return self.environment.getSingleValue(var, defaultValue)
@@ -356,7 +356,7 @@ class Test(plugins.Observable):
                 return True
         return False
     def findAllStdFiles(self, stem):
-        if stem == "environment":
+        if stem in [ "environment", "properties" ]:
             otherApps = self.app.findOtherAppNames()
             self.diagnose("Finding environment files, excluding " + repr(otherApps))
             otherAppExcludor = lambda vset: len(vset.intersection(otherApps)) == 0
@@ -1143,7 +1143,7 @@ class Application:
         configFileName = self.dircache.pathName("config." + self.name)
         configFile = open(configFileName, "w")
         for key, value in configEntries.items():
-            self.configDir.addEntry(key, value, insert=0, errorOnUnknown=1)
+            self.configDir.addEntry(key, value, insert=False, errorOnUnknown=True)
             configFile.write("# " + self.configDocs.get(key) + "\n")
             configFile.write(key + ":" + value + "\n\n")
 
@@ -1221,6 +1221,9 @@ class Application:
         envFiles = test.getAllPathNames("environment")
         envVars = map(self.readEnvironment, envFiles)
         allVars = reduce(operator.add, envVars, [])
+        propFiles = test.getAllPathNames("properties")
+        test.properties.readValues(propFiles, insert=True, errorOnUnknown=False)
+        
         allProps = []
         for suite in test.getAllTestsToRoot():
             vars, props = self.configObject.getConfigEnvironment(suite)
@@ -1323,7 +1326,7 @@ class Application:
         self.setConfigDefault("link_test_path", [], "Paths to be linked from the temp. directory when running tests")
         self.setConfigDefault("test_data_ignore", { "default" : [] }, \
                               "Elements under test data structures which should not be viewed or change-monitored")
-        self.setConfigDefault("definition_file_stems", { "default": [], "builtin": [ "environment", "testsuite" ]}, \
+        self.setConfigDefault("definition_file_stems", { "default": [], "builtin": [ "environment", "properties", "testsuite" ]}, \
                               "files to be shown as definition files by the static GUI")
         self.setConfigDefault("unsaveable_version", [], "Versions which should not have results saved for them")
         self.setConfigDefault("version_priority", { "default": 99 }, \
@@ -1534,7 +1537,7 @@ class Application:
             return value
 
     def addConfigEntry(self, key, value, sectionName = ""):
-        self.configDir.addEntry(key, value, sectionName)
+        self.configDir.addEntry(key, value, sectionName, insert=False, errorOnUnknown=True)
     def setConfigDefault(self, key, value, docString = ""):
         self.configDir[key] = value
         if len(docString) > 0:

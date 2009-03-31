@@ -193,51 +193,43 @@ class LicenseDialog(guiplugins.ActionResultDialogGUI):
         notebook.append_page(textView, gtk.Label("License"))
         self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
         return "Showing license:\n" + licenseText
-            
-class ShowMigrationNotes(guiplugins.ActionResultDialogGUI):
+
+class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
     def isActiveOnCurrent(self, *args):
         return True
-    def _getTitle(self):
-        return "_Migration Notes"
     def messageAfterPerform(self):
         return ""
-    def getTooltip(self):
-        return "show texttest migration notes"
-
-    def getDialogTitle(self):
-        return "TextTest Migration Notes"
-    
-    def makeVersions(self, file):
-        versions = []
-        for stringVersion in file.split("_")[-1].split("."):
-            try:
-                versions.append(int(stringVersion))
-            except ValueError:
-                versions.append(stringVersion)
-        return versions
-                     
     def cmpVersions(self, file1, file2):
         v1 = self.makeVersions(file1)
         v2 = self.makeVersions(file2)
         return -cmp(v1, v2) # We want the most recent file first ...
-    
+
+    def makeVersions(self, versionStr):
+        versions = []
+        for stringVersion in versionStr.split("."):
+            try:
+                versions.append(int(stringVersion))
+            except ValueError:
+                versions.append(stringVersion)
+        return tuple(versions)
+
     def addContents(self):
         notebook = gtk.Notebook()
         notebook.set_scrollable(True)
         notebook.popup_enable()
-        notes = glob.glob(os.path.join(plugins.installationDir("doc"), "MigrationNotes*"))
-        notes.sort(self.cmpVersions)
+        docDir = plugins.installationDir("doc")
+        versionInfo = self.readVersionInfo(docDir)
         message = ""
-        for note in notes:
-            notesFile = open(note)
-            unicodeInfo = plugins.decodeText(notesFile.read())           
-            notesFile.close()
-            notesText = plugins.encodeToUTF(unicodeInfo)
-            endFirstSentence = notesText.find(".")
-            message += "Adding migration notes from file '" + os.path.basename(note) + "':\nFirst sentence :" + notesText[:endFirstSentence + 1] + "\n"
+        for version in reversed(sorted(versionInfo.keys())):
+            unicodeInfo = plugins.decodeText(versionInfo[version])
+            displayText = plugins.encodeToUTF(unicodeInfo)
+            endFirstSentence = displayText.find(".")
+            versionStr = ".".join(map(str, version))
+            message += "Adding " + self.getTitle() + " from version " + versionStr + \
+                       ":\nFirst sentence :" + displayText[:endFirstSentence + 1] + "\n"
 
             buffer = gtk.TextBuffer()
-            buffer.set_text(notesText)
+            buffer.set_text(displayText)
             textView = gtk.TextView(buffer)
             textView.set_editable(False)
             textView.set_cursor_visible(False)
@@ -247,16 +239,64 @@ class ShowMigrationNotes(guiplugins.ActionResultDialogGUI):
             scrolledWindow.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
             scrolledWindow.add(textView)
             scrolledWindow.set_shadow_type(gtk.SHADOW_IN)
-            notesVersion = os.path.basename(note).replace("MigrationNotes_", "").replace("_", " ")
-            notebook.append_page(scrolledWindow, gtk.Label(notesVersion))
+            notebook.append_page(scrolledWindow, gtk.Label(self.labelPrefix() + versionStr))
 
         if notebook.get_n_pages() == 0: #pragma : no cover - should never happen
-            raise plugins.TextTestError, "\nNo migration notes could be found in\n" + plugins.installationDir("doc") + "\n"
+            raise plugins.TextTestError, "\nNo " + self.getTitle() + " could be found in\n" + docDir + "\n"
         else:
-            guiplugins.scriptEngine.monitorNotebook(notebook, "view migration notes in tab")
+            guiplugins.scriptEngine.monitorNotebook(notebook, "view " + self.getTitle().lower() + " in tab")
             parentSize = self.topWindow.get_size()
             self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[0] * 0.7))
             self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
             return message
 
+    def labelPrefix(self):
+        return ""
 
+            
+class ShowMigrationNotes(VersionInfoDialogGUI):
+    def _getTitle(self):
+        return "_Migration Notes"
+    def getTooltip(self):
+        return "show texttest migration notes"
+
+    def getDialogTitle(self):
+        return "TextTest Migration Notes"
+        
+    def readVersionInfo(self, docDir):
+        versionInfo = {}
+        for fileName in glob.glob(os.path.join(docDir, "MigrationNotes*")):
+            versions = self.makeVersions(fileName.split("_")[-1])
+            versionInfo[versions] = open(fileName).read()
+        return versionInfo
+
+    def labelPrefix(self):
+        return "from "
+
+    
+class ShowChangeLogs(VersionInfoDialogGUI):
+    def _getTitle(self):
+        return "_Change Logs"
+    def getTooltip(self):
+        return "show texttest change logs"
+
+    def getDialogTitle(self):
+        return "TextTest Change Logs"
+    
+    def readVersionInfo(self, docDir):
+        versionInfo = {}
+        currVersions = ()
+        for line in open(os.path.join(docDir, "ChangeLog")):
+            if line.startswith("Version"):
+                words = line.strip().split()
+                if len(words) == 2:
+                    versionStr = words[-1].rstrip(":")
+                    currVersions = self.makeVersions(versionStr)
+                    versionInfo[currVersions] = ""
+                else:
+                    versionInfo[currVersions] += line
+            elif len(line.strip()) == 0 or line.startswith("="):
+                continue
+            else:
+                versionInfo[currVersions] += line
+        return versionInfo

@@ -2533,7 +2533,7 @@ class InteractiveActionConfig:
                          RepositionTestFirst, RepositionTestUp,
                          RepositionTestDown, RepositionTestLast,
                          ReconnectToTests, LoadSelection, SaveSelection ]
-        classes += [ helpdialogs.ShowMigrationNotes, helpdialogs.ShowVersions, helpdialogs.AboutTextTest ]
+        classes += [ helpdialogs.ShowMigrationNotes, helpdialogs.ShowChangeLogs, helpdialogs.ShowVersions, helpdialogs.AboutTextTest ]
         return classes
 
     def getReplacements(self):

@@ -23,6 +23,7 @@
 
     <menu action="helpmenu">
       <menuitem action="Migration Notes"/>
+      <menuitem action="Change Logs"/>
       <separator/>
       <menuitem action="Component Versions"/>
       <separator/>

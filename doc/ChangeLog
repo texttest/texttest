@@ -1346,8 +1346,11 @@ Bug Fixes:
 Grid Engine bug fixes:
     - Clearer error message when the grid engine (qsub/bsub) cannot be found (queuesystem.py)
 
-Version 3.14
-============
+Version trunk
+=============
+General GUI Enhancements:
+    - This ChangeLog now visible from the GUI (helpdialogs.py)
+	From Help menu/Change Logs
 Dynamic GUI Enhancements:
 Framework Enhancements:
     - Can now remove certain elements from versioned config files (plugins.py)

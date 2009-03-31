@@ -104,7 +104,7 @@ class ShowVersions(guiplugins.ActionResultDialogGUI):
         centeredTable.add(tableVbox)
         sourceDirLabel = gtk.Label()
         sourceDirLabel.set_markup("")
-        sourceDir = gtk.Label(os.path.dirname(__file__))
+        sourceDir = gtk.Label(plugins.installationRoots[0])
         vbox = gtk.VBox()
         vbox.pack_start(centeredTable, expand=True, fill=True)
         vbox.pack_start(self.justify("\n<b>TextTest source directory:</b>", 0.0, True), expand=True, fill=True)

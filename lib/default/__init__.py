@@ -286,7 +286,7 @@ class Config:
         else:
             return []
     def addGuiResponder(self, classes):
-        from gtkgui import TextTestGUI
+        from gtkgui.texttestgui import TextTestGUI
         classes.append(TextTestGUI)
     def getReconnectSequence(self):
         actions = [ self.reconnectConfig.getReconnectAction() ]

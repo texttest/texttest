@@ -25,3 +25,10 @@ builtin:traffic
 [end]
 
 Obviously you can swap "traffic" for "usecase" if appropriate. 
+
+(2) Default value of TEXTTEST_TMP is changed
+============================================
+It used to be ~/texttesttmp on UNIX and $TEMP on Windows. It's been changed
+to $TEXTTEST_PERSONAL_CONFIG/tmp (i.e. ~/.texttest/tmp unless you repoint the
+personal configuration directory) as that seemed more consistent, and nicer than polluting
+several different locations with TextTest's files.

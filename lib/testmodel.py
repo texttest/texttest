@@ -1301,7 +1301,7 @@ class Application:
         else:
             # try as user name
             if previousTmpInfo.find("/") == -1 and previousTmpInfo.find("\\") == -1:
-                return os.path.expanduser("~" + previousTmpInfo + "/texttesttmp")
+                return os.path.expanduser("~" + previousTmpInfo + "/.texttest/tmp")
             else:
                 return previousTmpInfo
     def findOtherAppNames(self):

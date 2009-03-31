@@ -1361,6 +1361,10 @@ Framework Enhancements:
 	"definition_file_stems" is now a dictionary, where items like these can be keyed "regenerate"
     - Now set up the checkout if we can when running scripts, including website generation (default.py)
 	Means repository location can depend on TEXTTEST_CHECKOUT.
+    - Picks up "properties" files in a similar way to "environment" files (testmodel.py)
+	Used for Java applications. See website for more details.
+    - Default location of temporary files changed (engine.py)
+	Now writes to ~/.texttest/tmp instead of $TEMP or ~/texttesttmp
 Historical HTML Batch Report Enhancements:
 Email Batch Report Enhancements:
 Version Control Browser Enhancements/bug fixes:
@@ -1372,4 +1376,6 @@ Version Control Browser Enhancements/bug fixes:
 Grid Engine (LSF/SGE) enhancements:
 Installation and self-test changes:
 Bug Fixes:
+    - Traffic mechanism does not handle directory removals by removing all files any more (traffic.py)
+	Actually stores and replays the directory removal directly.
     - No longer flag runs as missing if batch_collect_compulsory_version overlaps with versions given on command line (batch.py)

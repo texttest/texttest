@@ -1203,10 +1203,9 @@ class DocumentEnvironment(plugins.Action):
                     if not sys.modules.has_key(dir):
                         dirs.remove(dir)
             for file in files:
-                if file.endswith(".py"):
+                if file.endswith(".py") and not "usecase" in file: # exclude PyUseCase, which may be linked/copied in
                     path = os.path.join(root, file)
-                    if not os.path.islink(path):
-                        self.findVarsInFile(path, allVars, prefixes)
+                    self.findVarsInFile(path, allVars, prefixes)
         return allVars
 
     def getArgList(self, line, functionName):

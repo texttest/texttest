@@ -1,5 +1,6 @@
 
-There is almost certainly no migration needed...
+There is almost certainly no migration needed. The main incompatibility
+is that it won't work to reconnect to runs done by version 3.13.
 
 =========================================================
 CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)

@@ -5,7 +5,6 @@ from traceback import format_exception
 from threading import currentThread
 from Queue import Queue, Empty
 from copy import copy
-from sets import Set
 from fnmatch import fnmatch
 from glob import glob
 
@@ -407,10 +406,10 @@ class TestPathFilter(TextFilter):
         return sections
 
     def findSectionMatchingApp(self, app, allHeaders):
-        myVersionSet = Set(app.versions)
+        myVersionSet = set(app.versions)
         bestVersionSet, bestHeader = None, None
         for header in allHeaders:
-            currVersionSet = Set(header.split(".")[1:])
+            currVersionSet = set(header.split(".")[1:])
             if bestVersionSet is None or self.isBetterMatch(currVersionSet, bestVersionSet, myVersionSet):
                 bestHeader = header
                 bestVersionSet = currVersionSet
@@ -418,10 +417,10 @@ class TestPathFilter(TextFilter):
 
     def findAppMatchingSection(self, header, allApps):
         bestVersionSet, bestApp = None, None
-        myVersionSet = Set(header.split(".")[1:])
+        myVersionSet = set(header.split(".")[1:])
         self.diag.info("Looking for app matching " + repr(myVersionSet))
         for app in allApps:
-            appVersionSet = Set(app.versions)
+            appVersionSet = set(app.versions)
             if bestVersionSet is None or self.isBetterMatch(appVersionSet, bestVersionSet, myVersionSet):
                 bestApp = app
                 bestVersionSet = appVersionSet

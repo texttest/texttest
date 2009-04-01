@@ -1,6 +1,5 @@
 
 import guiplugins, plugins, os, sys, shutil, time, subprocess, operator, types
-from sets import Set
 from copy import copy, deepcopy
 from threading import Thread
 from glob import glob
@@ -1068,9 +1067,9 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
                           "Hide all tests which do not match the criteria. Do not show any tests that aren't already shown.",
                           "Show all tests which match the criteria. Do not hide any tests that are currently shown." ]
         self.filteringGroup.addSwitch("current_filtering", options = [ "Discard", "Refine", "Extend" ], description=currFilterDesc)
-        excludeKeys = Set(self.optionGroup.keys()) # remember these so we don't try and save them to selections
+        excludeKeys = set(self.optionGroup.keys()) # remember these so we don't try and save them to selections
         self.addApplicationOptions(allApps)
-        self.appKeys = Set(self.optionGroup.keys())
+        self.appKeys = set(self.optionGroup.keys())
         self.appKeys.difference_update(excludeKeys)
 
     def addSuites(self, suites):
@@ -1602,7 +1601,7 @@ class RunningAction:
     def getTmpFilterDir(self, app):
         return os.path.join(app.writeDirectory, "temporary_filter_files")
     def getCmdlineOptionForApps(self):
-        appNames = Set([ app.name for app in self.currAppSelection ])
+        appNames = set([ app.name for app in self.currAppSelection ])
         return [ "-a", ",".join(sorted(list(appNames))) ]
     def checkTestRun(self, errFile, testSel, usecase):
         if self.checkErrorFile(errFile, testSel, usecase):

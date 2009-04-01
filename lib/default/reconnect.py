@@ -1,7 +1,6 @@
 
 import os, shutil, plugins, operator
 from glob import glob
-from sets import ImmutableSet, Set
 from itertools import groupby
 
 # Trawl around for a suitable dir to reconnect to if we haven't been told one
@@ -10,7 +9,7 @@ from itertools import groupby
 # (so we can bail if it's not there) and store in self.reconnDir, ready to provide to the ReconnectTest action
 class ReconnectConfig:
     runDirCache = {}
-    datedVersions = Set()
+    datedVersions = set()
     def __init__(self, optionMap):
         self.fullRecalculate = optionMap.has_key("reconnfull")
         self.diag = plugins.getDiagnostics("Reconnection")
@@ -76,12 +75,12 @@ class ReconnectConfig:
         self.diag.info("Directory has version sets " + repr(versionSets))
         if versionSets is None:
             return False
-        appVersionSet = ImmutableSet(app.versions)
+        appVersionSet = frozenset(app.versions)
         return reduce(operator.or_, (appVersionSet.issubset(s) for s in versionSets), False)
     
     def findAppDirUnder(self, app, runDir):
         # Don't pay attention to dated versions here...
-        appVersions = ImmutableSet(app.versions).difference(self.datedVersions)
+        appVersions = frozenset(app.versions).difference(self.datedVersions)
         self.diag.info("Looking for directory with versions " + repr(appVersions))
         for f in os.listdir(runDir):
             versionSet = self.getVersionSetSubDir(f, app.name)
@@ -113,7 +112,7 @@ class ReconnectConfig:
     def getVersionSetsTopDir(self, fileName):
         vlists = self.getVersionListsTopDir(fileName)
         if vlists is not None:
-            return [ ImmutableSet(vlist) for vlist in vlists ]
+            return [ frozenset(vlist) for vlist in vlists ]
         
     def getVersionSetSubDir(self, fileName, stem):
         # Show the framework how to find the version list given a file name
@@ -121,14 +120,14 @@ class ReconnectConfig:
         parts = fileName.split(".")
         if stem == parts[0]:
             # drop the application at the start 
-            return ImmutableSet(parts[1:])
+            return frozenset(parts[1:])
 
     def getVersionsFromDirs(self, app, dirs):
         versions = []
-        appVersions = Set(app.versions)
+        appVersions = frozenset(app.versions)
         for versionLists, groupDirIter in groupby(dirs, self.getVersionListsTopDir):
             for versionList in versionLists:
-                extraVersion = ".".join(ImmutableSet(versionList).difference(appVersions))
+                extraVersion = ".".join(frozenset(versionList).difference(appVersions))
                 version = ".".join(versionList)
                 groupDirs = list(groupDirIter)
                 if extraVersion:

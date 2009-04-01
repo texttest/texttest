@@ -7,7 +7,6 @@ from copy import copy
 from cPickle import Pickler, loads, UnpicklingError
 from respond import Responder
 from threading import Lock
-from sets import Set, ImmutableSet
 from tempfile import mkstemp
 
 helpIntro = """
@@ -55,7 +54,7 @@ class DirectoryCache:
 
     def splitStem(self, fileName):
         parts = fileName.split(".")
-        return parts[0], ImmutableSet(parts[1:])
+        return parts[0], frozenset(parts[1:])
 
     def findVersionSet(self, fileName, stem):
         if fileName.startswith(stem):
@@ -1305,7 +1304,7 @@ class Application:
             else:
                 return previousTmpInfo
     def findOtherAppNames(self):
-        names = Set()
+        names = set()
         for configFile in self.dircache.findAllFiles("config"):
             appName = os.path.basename(configFile).split(".")[1]
             if appName != self.name:
@@ -1391,10 +1390,10 @@ class Application:
     def getExtensionPredicate(self, allVersions):
         if allVersions:
             # everything that has at least the given extensions
-            return Set([ self.name ]).issubset
+            return set([ self.name ]).issubset
         else:
             possVersions = [ self.name ] + self.getConfigValue("base_version") + self.versions
-            return Set(possVersions).issuperset
+            return set(possVersions).issuperset
     def compareForDisplay(self, vset1, vset2):
         if vset1.issubset(vset2):
             return -1
@@ -1411,7 +1410,7 @@ class Application:
                 return extraVersions.index(version)
         return 99
     def compareForPriority(self, vset1, vset2):
-        versionSet = Set(self.versions)
+        versionSet = set(self.versions)
         self.diag.info("Compare " + repr(vset1) + " to " + repr(vset2))
         if len(versionSet) > 0:
             if vset1.issuperset(versionSet):
@@ -1419,7 +1418,7 @@ class Application:
             elif vset2.issuperset(versionSet):
                 return -1
 
-        explicitVersions = Set([ self.name ] + self.versions)
+        explicitVersions = set([ self.name ] + self.versions)
         priority1 = self.getVersionSetPriority(vset1)
         priority2 = self.getVersionSetPriority(vset2)
         # Low number implies higher priority...
@@ -1434,7 +1433,7 @@ class Application:
             self.diag.info("Version count " + repr(versionCount1) + " vs " + repr(versionCount2))
             return cmp(versionCount1, versionCount2)
 
-        baseVersions = Set(self.getConfigValue("base_version"))
+        baseVersions = set(self.getConfigValue("base_version"))
         baseCount1 = len(vset1.intersection(baseVersions))
         baseCount2 = len(vset2.intersection(baseVersions))
         self.diag.info("Base count " + repr(baseCount1) + " vs " + repr(baseCount2))

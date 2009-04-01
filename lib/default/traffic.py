@@ -5,7 +5,6 @@ from SocketServer import TCPServer, StreamRequestHandler
 from threading import Thread, Lock
 from types import StringType
 from jobprocess import JobProcess
-from sets import Set
 from copy import copy
 
 class SetUpTrafficHandlers(plugins.Action):
@@ -815,7 +814,7 @@ class ReplayInfo:
 
         descWords = self.getWords(desc)
         bestMatch = None
-        bestMatchInfo = Set(), 100000
+        bestMatchInfo = set(), 100000
         for currDesc, responseHandler in self.responseMap.items():
             if self.sameType(desc, currDesc):
                 descToCompare = currDesc

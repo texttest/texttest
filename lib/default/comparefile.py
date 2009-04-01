@@ -5,7 +5,6 @@ import os, filecmp, plugins, time, stat, subprocess
 from ndict import seqdict
 from shutil import copyfile
 from fnmatch import fnmatch
-from sets import Set
 
 class FileComparison:
     def __init__(self, test, stem, standardFile, tmpFile, testInProgress=False, observers={}):
@@ -227,9 +226,9 @@ class FileComparison:
         localRoot = ".".join(local.split(".")[:2])
         return os.path.join(dirname, localRoot)
     def versionMatchesStd(self, versionString):
-        versions = Set(versionString.split("."))
+        versions = set(versionString.split("."))
         dirname, local = os.path.split(self.stdFile)
-        localVersions = Set(local.split(".")[2:])
+        localVersions = set(local.split(".")[2:])
         return versions == localVersions
     def getStdFileForSave(self, versionString):
         if self.versionMatchesStd(versionString):

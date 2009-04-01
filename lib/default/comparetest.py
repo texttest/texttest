@@ -2,7 +2,6 @@ import os, performance, filecmp, string, plugins, shutil
 from ndict import seqdict
 from tempfile import mktemp
 from comparefile import FileComparison
-from sets import Set
 
 plugins.addCategory("success", "succeeded")
 plugins.addCategory("failure", "FAILED")
@@ -434,8 +433,8 @@ class PrintObsoleteVersions(plugins.Action):
         if filecmp.cmp(cmpFile1, cmpFile2, 0):
             local1 = os.path.basename(origFile1)
             local2 = os.path.basename(origFile2)
-            vlist1 = Set(local1.split(".")[2:])
-            vlist2 = Set(local2.split(".")[2:])
+            vlist1 = set(local1.split(".")[2:])
+            vlist2 = set(local2.split(".")[2:])
             if vlist1.issuperset(vlist2):
                 self.checkObsolete(test, origFile1, local1, origFile2)
             elif vlist2.issuperset(vlist1):

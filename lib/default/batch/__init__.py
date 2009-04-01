@@ -3,7 +3,6 @@
 import os, plugins, respond, sys, string, time, types, shutil, datetime, testoverview
 from ndict import seqdict
 from cPickle import Pickler
-from sets import Set
 
 class BatchVersionFilter:
     def __init__(self, batchSession):
@@ -483,8 +482,8 @@ class WebPageResponder(respond.Responder):
         self.allApps = allApps
     def addSuites(self, suites):
         # These are the ones that got through. Remove all rejected apps...
-        apps = Set([ suite.app for suite in suites ])
-        for app in Set(self.allApps).difference(apps):
+        apps = set([ suite.app for suite in suites ])
+        for app in set(self.allApps).difference(apps):
             self.allApps.remove(app)
     def notifyAllComplete(self):
         appInfo = self.getAppRepositoryInfo()
@@ -558,10 +557,10 @@ class WebPageResponder(respond.Responder):
         subdirs = []
         dirlist = os.listdir(repository)
         dirlist.sort()
-        appVersions = Set(app.versions)
+        appVersions = set(app.versions)
         for dir in dirlist:
             dirVersions = dir.split(".")
-            if Set(dirVersions).issuperset(appVersions):
+            if set(dirVersions).issuperset(appVersions):
                 # Check all tails that this is not an extraVersion
                 inExtraVersions = False;
                 for pos in xrange(len(dirVersions)):
@@ -600,8 +599,8 @@ class CollectFiles(plugins.ScriptWithArgs):
             return
         dirlist = os.listdir(rootDir)
         dirlist.sort()
-        compulsoryVersions = Set(app.getCompositeConfigValue("batch_collect_compulsory_version", self.batchSession))
-        versionsFound = Set()
+        compulsoryVersions = set(app.getCompositeConfigValue("batch_collect_compulsory_version", self.batchSession))
+        versionsFound = set()
         for dir in dirlist:
             fullDir = os.path.join(rootDir, dir)
             if os.path.isdir(fullDir) and self.matchesApp(dir, app):
@@ -631,14 +630,14 @@ class CollectFiles(plugins.ScriptWithArgs):
         filelist = os.listdir(fullDir)
         filelist.sort()
         fileBodies = []
-        versionsFound = Set()
+        versionsFound = set()
         for filename in filelist:
             if filename.startswith(prefix):
                 fullname = os.path.join(fullDir, filename)
                 fileBody = self.parseFile(fullname, app, totalValues)
                 if fileBody:
                     fileBodies.append(fileBody)
-                    versionsFound.update(Set(filename.replace(basicPrefix, "").split(".")))
+                    versionsFound.update(set(filename.replace(basicPrefix, "").split(".")))
 
         return fileBodies, versionsFound
 

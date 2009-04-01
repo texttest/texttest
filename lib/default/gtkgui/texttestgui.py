@@ -30,7 +30,6 @@ import pango, guiplugins, plugins, os, sys, operator, subprocess
 from ndict import seqdict
 from respond import Responder
 from copy import copy
-from sets import Set
 from TreeViewTooltips import TreeViewTooltips
 
 
@@ -1098,14 +1097,14 @@ class TestTreeGUI(ContainerGUI):
         self.notify("NewTestSelection", tests, apps, self.selection.count_selected_rows(), direct)
     def getSelected(self):
         allSelected = []
-        self.selection.selected_foreach(self.addSelTest, (allSelected, Set(self.selectedTests)))
+        self.selection.selected_foreach(self.addSelTest, (allSelected, set(self.selectedTests)))
         self.diag.info("Selected tests are " + repr(allSelected))
         return allSelected
     def addSelTest(self, model, path, iter, args):
         selected, prevSelected = args
         selected += self.getNewSelected(model.get_value(iter, 2), prevSelected)
     def getNewSelected(self, tests, prevSelected):
-        intersection = prevSelected.intersection(Set(tests))
+        intersection = prevSelected.intersection(set(tests))
         if len(intersection) == 0 or len(intersection) == len(tests):
             return tests
         else:
@@ -1185,7 +1184,7 @@ class TestTreeGUI(ContainerGUI):
         if not suite:
             return
 
-        self.successPerSuite.setdefault(suite, Set()).add(test)
+        self.successPerSuite.setdefault(suite, set()).add(test)
         successCount = len(self.successPerSuite.get(suite))
         suiteSize = len(filter(lambda subtest: not subtest.isEmpty(), suite.testcases))
         if successCount == suiteSize:

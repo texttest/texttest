@@ -5,7 +5,6 @@ from threading import Thread
 from ndict import seqdict
 from time import sleep
 from respond import Responder
-from sets import Set
 from glob import glob
 
 # Class to allocate unique names to tests for script identification and cross process communication
@@ -107,13 +106,13 @@ class Activator(Responder, plugins.Observable):
     def writeErrors(self, rejectionInfo):
         # Don't write errors if only some of a group are rejected
         extras = []
-        rejectedApps = Set(rejectionInfo.keys())
+        rejectedApps = set(rejectionInfo.keys())
         for suite in self.suites:
             app = suite.app
             if app in extras:
                 continue
             extras += app.extras
-            appGroup = Set([ app ] + app.extras)
+            appGroup = set([ app ] + app.extras)
             if appGroup.issubset(rejectedApps):
                 sys.stderr.write(app.rejectionMessage(rejectionInfo.get(app)))
 
@@ -326,9 +325,9 @@ class TextTest(Responder, plugins.Observable):
         return True
 
     def findAllValidOptions(self, allApps):
-        validOptions = Set()
+        validOptions = set()
         for configObject in self.getAllConfigObjects(allApps):
-            validOptions.update(Set(configObject.findAllValidOptions(allApps)))
+            validOptions.update(set(configObject.findAllValidOptions(allApps)))
         return validOptions
                                  
     def createAndRunSuites(self, allApps):

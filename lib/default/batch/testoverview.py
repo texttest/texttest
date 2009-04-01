@@ -4,7 +4,6 @@
 import os, plugins, time, re, HTMLgen, HTMLcolors, operator, sys
 from cPickle import Pickler, Unpickler, UnpicklingError
 from ndict import seqdict
-from sets import Set
 from glob import glob
 HTMLgen.PRINTECHO = 0
 
@@ -64,7 +63,7 @@ class GenerateWebPages(object):
     def generate(self, repositoryDirs, subPageNames):
         foundMinorVersions = HTMLgen.Container()
         details = TestDetails()
-        allMonthSelectors = Set()
+        allMonthSelectors = set()
         for repositoryDir, version in repositoryDirs:
             self.diag.info("Generating " + version)
             allFiles, tags = self.findTestStateFilesAndTags(repositoryDir)
@@ -78,7 +77,7 @@ class GenerateWebPages(object):
                     selectors = allSelectors
                 else:
                     selectors.append(monthSelectors[-1])
-                    tags = list(reduce(Set.union, (Set(selector.selectedTags) for selector in selectors), Set()))
+                    tags = list(reduce(set.union, (set(selector.selectedTags) for selector in selectors), set()))
                     tags.sort(self.compareTags)
 
                 loggedTests = seqdict()
@@ -137,7 +136,7 @@ class GenerateWebPages(object):
         
     def findTestStateFilesAndTags(self, repositoryDir):
         allFiles = []
-        allTags = Set()
+        allTags = set()
         for dir in self.findAllRepositories(repositoryDir):
             for root, dirs, files in os.walk(dir):
                 for file in files:

@@ -1,6 +1,13 @@
 #!/usr/bin/env python
 
-import os, plugins
+
+import os
+
+if __name__ == "__main__":
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+import plugins
 from ndict import seqdict
 from re import sub
 
@@ -284,7 +291,6 @@ class LineFilter:
         return len(words) + 1
 
 if __name__ == "__main__":
-    import sys
     args = [ arg.split(",") for arg in sys.argv[1:3]] + sys.argv[3:]
     plugins.configureLog4py(os.getenv("TEXTTEST_LOGCONFIG"))
     runDepFilter = RunDependentTextFilter(*args)

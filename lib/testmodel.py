@@ -396,6 +396,12 @@ class Test(plugins.Observable):
             tests = self.parent.getAllTestsToRoot() + tests
         return tests
 
+    def updateAllRelPaths(self, origRelPath):
+        stdFiles, defFiles = self.listStandardFiles(allVersions=True)
+        newRelPath = self.getRelPath()
+        for file in stdFiles + defFiles:
+            self.updateRelPathReferences(file, origRelPath, newRelPath)
+
     def getDirCachesToRoot(self, configName):
         fromTests = [ test.dircache for test in self.getAllTestsToRoot() ]
         dirNames = self.getCompositeConfigValue("extra_search_directory", configName)
@@ -529,12 +535,6 @@ class TestCase(Test):
                 return self.writeDirectory
         else:
             return self.dircache.dir
-
-    def updateAllRelPaths(self, origRelPath):
-        stdFiles, defFiles = self.listStandardFiles(allVersions=True)
-        newRelPath = self.getRelPath()
-        for file in stdFiles + defFiles:
-            self.updateRelPathReferences(file, origRelPath, newRelPath)
             
     def getDescription(self):
         performanceFileName = self.getFileName("performance")
@@ -831,6 +831,7 @@ class TestSuite(Test):
         self.updateOrder()
 
     def updateAllRelPaths(self, origRelPath):
+        Test.updateAllRelPaths(self, origRelPath)
         for subTest in self.testcases:
             subTest.updateAllRelPaths(os.path.join(origRelPath, subTest.name))
 

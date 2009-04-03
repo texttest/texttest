@@ -83,9 +83,6 @@ class CVSInterface(version_control.VersionControlInterface):
                 spaceAfterNamePos = line.find("\t", 7)
                 return line[spaceAfterNamePos:].replace("Status: ", "").strip(" \n\t")
     
-    def getCombinedRevisionOptions(self, r1, r2):
-        return [ "-r", r1, "-r", r2 ]
-
     # Move in source control also. In CVS this implies a remove and then an add
     def moveDirectory(self, oldDir, newDir):
         if os.path.isdir(os.path.join(oldDir, "CVS")):
@@ -96,17 +93,9 @@ class CVSInterface(version_control.VersionControlInterface):
             os.rename(oldDir, newDir)
 
     def copyDirectory(self, oldDir, newDir):
-        if os.path.isdir(newDir):
-            # After a remove, possibly...
-            for path in os.listdir(oldDir):
-                oldPath = os.path.join(oldDir, path)
-                newPath = os.path.join(newDir, path)
-                if os.path.isdir(oldPath):
-                    self.copyDirectory(oldPath, newPath)
-                else:
-                    shutil.copyfile(oldPath, newPath)
-        else:
-            version_control.VersionControlInterface.copyDirectory(self, oldDir, newDir)
+        existedBefore = os.path.exists(newDir)
+        version_control.VersionControlInterface.copyDirectory(self, oldDir, newDir)
+        if not existedBefore:
             self.cleanControlDirs(newDir)
 
     def removePath(self, path):

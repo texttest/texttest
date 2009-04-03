@@ -3,7 +3,7 @@
 
 import gtk, gobject, guiplugins, default_gui, plugins, custom_widgets, entrycompletion, os, datetime, subprocess, shutil
 
-vcsClass, vcs = None, None
+vcsClass, vcs, annotateClass = None, None, None
     
 # All VCS specific stuff goes in this class. One global instance, "vcs" above
 class VersionControlInterface:
@@ -88,11 +88,21 @@ class VersionControlInterface:
         pass # pragma: no cover - implemented in all derived classes
 
     def getCombinedRevisionOptions(self, r1, r2):
-        return [] # pragma: no cover - implemented in all derived classes
+        return [ "-r", r1, "-r", r2 ] # applies to CVS and Mercurial
 
     def copyDirectory(self, oldDir, newDir):
-        shutil.copytree(oldDir, newDir)
-
+        if os.path.isdir(newDir):
+            # After a remove, possibly, or after Mercurial has half-moved...
+            for path in os.listdir(oldDir):
+                oldPath = os.path.join(oldDir, path)
+                newPath = os.path.join(newDir, path)
+                if os.path.isdir(oldPath):
+                    self.copyDirectory(oldPath, newPath)
+                else:
+                    shutil.copyfile(oldPath, newPath)
+        else:
+            shutil.copytree(oldDir, newDir)
+    
     def moveDirectory(self, oldDir, newDir):
         retCode = self.callProgram("mv", [ oldDir, newDir ])
         if retCode > 0:
@@ -249,7 +259,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
 
     def viewAnnotations(self, button):
         file = self.getSelectedFile()
-        annotater = AnnotateGUI()
+        annotater = annotateClass()
         annotater.topWindow = self.topWindow
         annotater.currTestSelection = [ self.fileToTest[file] ]
         annotater.currFileSelection = [ (file, None) ]
@@ -786,15 +796,19 @@ class AddGUIRecursive(AddGUI):
 #
 class InteractiveActionConfig(default_gui.InteractiveActionConfig):
     def __init__(self, controlDir):
-        global vcs
+        global vcs, annotateClass
         vcs = vcsClass(controlDir)
+        annotateClass = self.annotateClasses()[0]
 
     def getMenuNames(self):
         return [ vcs.name ]
 
     def getInteractiveActionClasses(self, dynamic):
-        return [ LogGUI, LogGUIRecursive, DiffGUI, DiffGUIRecursive, StatusGUI, StatusGUIRecursive,
-                 AnnotateGUI, AnnotateGUIRecursive, AddGUI, AddGUIRecursive ]
+        return [ LogGUI, LogGUIRecursive, DiffGUI, DiffGUIRecursive, StatusGUI, StatusGUIRecursive ] +\
+               self.annotateClasses() + [ AddGUI, AddGUIRecursive ]
+
+    def annotateClasses(self):
+        return [ AnnotateGUI, AnnotateGUIRecursive ]
 
     def getReplacements(self):
         return { default_gui.RemoveTests : RemoveTests,

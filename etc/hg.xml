@@ -1,0 +1,67 @@
+<ui>
+
+  <menubar name="MainMenuBar">
+
+    <placeholder name="ExtraMenus">
+      <menu action="Mercurialmenu">
+        <menuitem action="Mercurial Log"/>
+        <menuitem action="Mercurial Log Recursive"/>
+        <separator/>
+        <menuitem action="Mercurial Difference"/>
+        <menuitem action="Mercurial Difference Recursive"/>
+        <separator/>
+        <menuitem action="Mercurial Status"/>
+        <menuitem action="Mercurial Status Recursive"/>
+        <separator/>
+        <menuitem action="Mercurial Annotate"/>
+        <menuitem action="Mercurial Annotate Recursive"/>
+        <separator/>        
+        <menuitem action="Mercurial Add"/>
+        <menuitem action="Mercurial Add Recursive"/>
+        <separator/>
+      </menu>
+    </placeholder>
+
+  </menubar>
+
+  <popup name="TestPopupMenu">
+    <menu action="Mercurialmenu">
+      <menuitem action="Mercurial Log"/>
+      <menuitem action="Mercurial Log Recursive"/>
+      <separator/>
+      <menuitem action="Mercurial Difference"/>
+      <menuitem action="Mercurial Difference Recursive"/>
+      <separator/>
+      <menuitem action="Mercurial Status"/>
+      <menuitem action="Mercurial Status Recursive"/>
+      <separator/>
+      <menuitem action="Mercurial Annotate"/>
+      <menuitem action="Mercurial Annotate Recursive"/>
+      <separator/>
+      <menuitem action="Mercurial Add"/>
+      <menuitem action="Mercurial Add Recursive"/>
+      <separator/>
+    </menu>
+  </popup>
+
+  <popup name="TestFilePopupMenu">
+    <menu action="Mercurialmenu">
+      <menuitem action="Mercurial Log"/>
+      <menuitem action="Mercurial Log Recursive"/>
+      <separator/>
+      <menuitem action="Mercurial Difference"/>
+      <menuitem action="Mercurial Difference Recursive"/>
+      <separator/>
+      <menuitem action="Mercurial Status"/>
+      <menuitem action="Mercurial Status Recursive"/>
+      <separator/>
+      <menuitem action="Mercurial Annotate"/>
+      <menuitem action="Mercurial Annotate Recursive"/>
+      <separator/>
+      <menuitem action="Mercurial Add"/>
+      <menuitem action="Mercurial Add Recursive"/>
+      <separator/>
+    </menu>
+  </popup>
+
+</ui>

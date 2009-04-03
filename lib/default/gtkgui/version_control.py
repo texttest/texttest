@@ -14,6 +14,7 @@ class VersionControlInterface:
         self.warningStates = warningStates
         self.errorStates = errorStates
         self.latestRevisionName = latestRevisionName
+        self.lastMoveInVCS = False
         self.defaultArgs = {}
 
     def callProgram(self, cmdName, fileArgs, **kwargs):
@@ -104,10 +105,25 @@ class VersionControlInterface:
             shutil.copytree(oldDir, newDir)
     
     def moveDirectory(self, oldDir, newDir):
+        self.lastMoveInVCS = self._moveDirectory(oldDir, newDir)
+
+    def _moveDirectory(self, oldDir, newDir):
         retCode = self.callProgram("mv", [ oldDir, newDir ])
         if retCode > 0:
             # Wasn't in version control, probably
             os.rename(oldDir, newDir)
+            return False
+        else:
+            return True
+
+    def getMoveSuffix(self):
+        if self.lastMoveInVCS:
+            return " in " + self.name + " (using '" + self.getMoveCommand() + "')"
+        else:
+            return ""
+
+    def getMoveCommand(self):
+        return self.program + " mv"
 
     def removePath(self, path):
         retCode = self.callProgram("rm", [ path ])
@@ -766,6 +782,10 @@ class RenameTest(default_gui.RenameTest):
     def moveDirectory(*args):
         return vcs.moveDirectory(*args)
 
+    def getNameChangeMessage(self, newName):
+        origMessage = default_gui.RenameTest.getNameChangeMessage(self, newName)
+        return origMessage + vcs.getMoveSuffix() 
+
 
 class PasteTests(default_gui.PasteTests):
     @staticmethod
@@ -774,6 +794,13 @@ class PasteTests(default_gui.PasteTests):
     @staticmethod
     def copyDirectory(*args):
         return vcs.copyDirectory(*args)
+
+    def getStatusMessage(self, *args):
+        origMessage = default_gui.PasteTests.getStatusMessage(self, *args)
+        if self.removeAfter:
+            return origMessage + vcs.getMoveSuffix()
+        else:
+            return origMessage
 
             
 class LogGUIRecursive(LogGUI):

@@ -30,16 +30,18 @@ class HgInterface(version_control.VersionControlInterface):
         statusLetter = output.split()[0]
         return self.warningStateInfo.get(statusLetter, self.errorStateInfo.get(statusLetter, statusLetter))
         
-    def moveDirectory(self, oldDir, newDir):
+    def _moveDirectory(self, oldDir, newDir):
         # Moving doesn't work in hg if there are symbolic links in the path to the new location!
         retCode = self.callProgram("mv", [ oldDir, os.path.realpath(newDir) ])
         if retCode == 0:
             # And it doesn't take non-versioned files with it...
             self.copyDirectory(oldDir, newDir)
             shutil.rmtree(oldDir)
+            return True
         else:
             # Wasn't in version control, probably
             os.rename(oldDir, newDir)
+            return False
 
     def removePath(self, path):
         retCode = self.callProgram("rm", [ path ])

@@ -84,13 +84,18 @@ class CVSInterface(version_control.VersionControlInterface):
                 return line[spaceAfterNamePos:].replace("Status: ", "").strip(" \n\t")
     
     # Move in source control also. In CVS this implies a remove and then an add
-    def moveDirectory(self, oldDir, newDir):
+    def _moveDirectory(self, oldDir, newDir):
         if os.path.isdir(os.path.join(oldDir, "CVS")):
             self.copyDirectory(oldDir, newDir)
             self.removePath(oldDir)
             self.callProgramOnFiles("add", newDir)
+            return True
         else:
             os.rename(oldDir, newDir)
+            return False
+
+    def getMoveCommand(self):
+        return "cvs rm' and 'cvs add"
 
     def copyDirectory(self, oldDir, newDir):
         existedBefore = os.path.exists(newDir)
@@ -246,6 +251,7 @@ class RenameTest(version_control.RenameTest):
             version_control.vcs.callProgram("update", [ "-dP", local ], cwd=dirname)
         else:
             version_control.RenameTest.handleExistingDirectory(self, dir)
+            
 #
 # Configuration for the Interactive Actions
 #

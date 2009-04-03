@@ -1375,10 +1375,12 @@ Version Control Browser Enhancements/bug fixes:
 	Rename,Move and Remove will also do so in the VCS for tests under VCS-control
     - Can now add to the VCS via TextTest (version_control.py)
 	Separate action on appropriate menu
-    - Now supports Bazaar as well as CVS (bzr.py/version_control.py)
+    - Now supports Bazaar and Mercurial as well as CVS (bzr.py/hg.py/version_control.py)
 Grid Engine (LSF/SGE) enhancements:
 Installation and self-test changes:
 Bug Fixes:
     - Traffic mechanism does not handle directory removals by removing all files any more (traffic.py)
 	Actually stores and replays the directory removal directly.
     - No longer flag runs as missing if batch_collect_compulsory_version overlaps with versions given on command line (batch.py)
+    - Python 2.6 shouldn't produce annoying messages about deprecated modules any more.
+

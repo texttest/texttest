@@ -729,6 +729,10 @@ class PasteTests(guiplugins.ActionGUI):
             return placement - 1
         else:
             return placement
+
+    def messageAfterPerform(self):
+        pass # do it below...
+        
     def performOnCurrent(self):
         newTests = []
         destInfo = seqdict()
@@ -752,6 +756,7 @@ class PasteTests(guiplugins.ActionGUI):
                 # Cut + paste to the same suite is basically a reposition, do it as one action
                 test.parent.repositionTest(test, self.getRepositionPlacement(test, realPlacement))
                 newTests.append(test)
+                suiteDeltas.setdefault(suite, 0)
             else:
                 newDesc = self.getNewDescription(test)
                 # Create test files first, so that if it fails due to e.g. full disk, we won't register the test either...
@@ -773,12 +778,21 @@ class PasteTests(guiplugins.ActionGUI):
                     
         guiplugins.guilog.info("Selecting new tests : " + repr(newTests))
         self.notify("SetTestSelection", newTests)
+        self.currTestSelection = newTests
+        self.notify("Status", self.getStatusMessage(suiteDeltas))
         if self.removeAfter:
             # After a paste from cut, subsequent pastes should behave like copies of the new tests
             self.clipboardTests = newTests
             self.removeAfter = False
         for suite, placement in destInfo.values():
             suite.contentChanged()
+
+    def getStatusMessage(self, suiteDeltas):
+        suiteName = suiteDeltas.keys()[0].name
+        if self.removeAfter:
+            return "Moved " + self.describeTests() + " to suite '" + suiteName + "'"
+        else:
+            return "Pasted " +  self.describeTests() + " to suite '" + suiteName + "'"
 
     def getSignalsSent(self):
         return [ "SetTestSelection" ]
@@ -2367,9 +2381,13 @@ class RenameTest(guiplugins.ActionDialogGUI):
         return "Rename selected test"
     def messageAfterPerform(self):
         pass # Use method below instead.
+
+    def getNameChangeMessage(self, newName):    
+        return "Renamed test " + self.oldName + " to " + newName
+
     def getChangeMessage(self, newName, newDesc):
         if self.oldName != newName:
-            message = "Renamed test " + self.oldName + " to " + newName
+            message = self.getNameChangeMessage(newName)
             if self.oldDescription != newDesc:
                 message += " and changed description."
             else:
@@ -2400,14 +2418,14 @@ class RenameTest(guiplugins.ActionDialogGUI):
             newName = self.optionGroup.getOptionValue("name")
             self.checkNewName(newName)
             newDesc = self.optionGroup.getOptionValue("desc")
-            changeMessage = self.getChangeMessage(newName, newDesc)
             if newName != self.oldName or newDesc != self.oldDescription:
                 for test in self.currTestSelection:
                     # Do this first, so that if we fail we won't update the test suite files either
                     self.moveFiles(test, newName)
                     test.rename(newName, newDesc)
-                self.oldName = newName
-                self.oldDescription = newDesc
+            changeMessage = self.getChangeMessage(newName, newDesc)
+            self.oldName = newName
+            self.oldDescription = newDesc
             self.notify("Status", changeMessage)
         except IOError, e:
             self.showErrorDialog("Failed to rename test:\n" + str(e))

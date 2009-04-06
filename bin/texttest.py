@@ -9,7 +9,7 @@ except ImportError:
 
 import sys, os
 
-install_root = os.path.dirname(os.path.dirname(os.path.normpath(sys.argv[0])))
+install_root = os.path.join(os.path.dirname(os.path.normpath(sys.argv[0])), "..")
 # We pick up the basic libraries.
 # Also accept a setup with a "site" subdirectory containing local modules,
 # or a "generic" directory containing the TextTest core with local modules in the root

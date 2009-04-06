@@ -560,6 +560,11 @@ class Config:
             raise plugins.TextTestError, "config file entry 'executable' not defined"
         if self.executableShouldBeFile(suite.app, executable) and not os.path.isfile(executable):
             raise plugins.TextTestError, "The executable program '" + executable + "' does not exist."
+
+        interpreter = suite.getConfigValue("interpreter")
+        if os.path.isabs(interpreter) and not os.path.exists(interpreter):
+            raise plugins.TextTestError, "The interpreter program '" + interpreter + "' does not exist."
+        
     def executableShouldBeFile(self, app, executable):
         # For finding java classes, don't warn if they don't exist as files...
         interpreter = app.getConfigValue("interpreter")

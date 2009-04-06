@@ -1383,4 +1383,5 @@ Bug Fixes:
 	Actually stores and replays the directory removal directly.
     - No longer flag runs as missing if batch_collect_compulsory_version overlaps with versions given on command line (batch.py)
     - Python 2.6 shouldn't produce annoying messages about deprecated modules any more.
-
+    - Race condition removed from virtual server handling on UNIX: shouldn't leak virtual servers any more (startXvfb.py)
+    - No longer stacktrace if "interpreter" is an invalid path (default/__init__.py)

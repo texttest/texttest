@@ -2,6 +2,7 @@
 import os, sys, plugins, sandbox, respond, rundependent, comparetest, batch, subprocess, operator, glob, signal, shutil
 
 from copy import copy
+from string import Template
 from threading import Lock
 from knownbugs import CheckForBugs, CheckForCrashes
 from reconnect import ReconnectConfig
@@ -1031,8 +1032,7 @@ class RunTest(plugins.Action):
     def getOptions(self, test):
         optionsFile = test.getFileName("options")
         if optionsFile:
-            # Our own version, see plugins.py
-            return os.path.expandvars(open(optionsFile).read().strip(), test.getEnvironment)
+            return Template(open(optionsFile).read().strip()).safe_substitute(test.environment)
         else:
             return ""
     def diagnose(self, testEnv, commandArgs):
@@ -1064,7 +1064,7 @@ class RunTest(plugins.Action):
         return subprocess.Popen(commandArgs, preexec_fn=self.getPreExecFunction(), \
                                 stdin=open(self.getInputFile(test)), cwd=test.getDirectory(temporary=1), \
                                 stdout=self.makeFile(test, "output"), stderr=self.makeFile(test, "errors"), \
-                                env=testEnv, startupinfo=plugins.getProcessStartUpInfo(test.getEnvironment))
+                                env=testEnv, startupinfo=plugins.getProcessStartUpInfo(test.environment))
     def getPreExecFunction(self):
         if os.name == "posix":
             return self.ignoreJobControlSignals

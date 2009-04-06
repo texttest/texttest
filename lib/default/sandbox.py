@@ -2,6 +2,7 @@ import os, shutil, plugins, re, stat, subprocess, glob, types
 
 from jobprocess import killArbitaryProcess
 from ndict import seqdict
+from string import Template
 
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):
@@ -43,7 +44,7 @@ class PrepareWriteDirectory(plugins.Action):
         if pathName != configName:
             return pathName
     def getPathFromEnvironment(self, configName, test):
-        return os.path.normpath(os.path.expandvars(configName, test.getEnvironment))
+        return os.path.normpath(Template(configName).safe_substitute(test.environment))
     def getTargetPath(self, test, configName):
         # handle environment variables
         localName = os.path.basename(self.getPathFromEnvironment(configName, test))

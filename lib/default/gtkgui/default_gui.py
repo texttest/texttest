@@ -754,7 +754,9 @@ class PasteTests(guiplugins.ActionGUI):
                         repr(suite) + ", in position " + str(realPlacement))
             if self.removeAfter and newName == test.name and suite is test.parent:
                 # Cut + paste to the same suite is basically a reposition, do it as one action
-                test.parent.repositionTest(test, self.getRepositionPlacement(test, realPlacement))
+                repositionPlacement = self.getRepositionPlacement(test, realPlacement)
+                plugins.tryFileChange(test.parent.repositionTest, "Failed to reposition test: no permissions to edit the testsuite file",
+                                      test, repositionPlacement)
                 newTests.append(test)
                 suiteDeltas.setdefault(suite, 0)
             else:
@@ -2280,10 +2282,13 @@ class RepositionTest(guiplugins.ActionGUI):
 
     def performOnCurrent(self):
         newIndex = self.findNewIndex()
-        if self.currTestSelection[0].parent.repositionTest(self.currTestSelection[0], newIndex):
+        test = self.currTestSelection[0]
+        permMessage = "Failed to reposition test: no permissions to edit the testsuite file"
+                
+        if plugins.tryFileChange(test.parent.repositionTest, permMessage, test, newIndex):
             self.notify("RefreshTestSelection")
         else:
-            raise plugins.TextTestError, "\nThe test\n'" + self.currTestSelection[0].name + "'\nis not present in the default version\nand hence cannot be reordered.\n"
+            raise plugins.TextTestError, "\nThe test\n'" + test.name + "'\nis not present in the default version\nand hence cannot be reordered.\n"
 
 class RepositionTestDown(RepositionTest):
     def _getStockId(self):

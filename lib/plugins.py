@@ -1359,10 +1359,25 @@ class TextOption(Option):
                 
         return allDirs, self.findDefaultDirectory(allDirs)
 
+    def canBeDefaultDir(self, dir):
+        return self.saveFile or len(os.listdir(dir)) > 0
+
+    def getPreviousDirectory(self):
+        prevVal = self.getValue()
+        if os.path.exists(prevVal):
+            if self.selectDir:
+                return prevVal
+            else:
+                return os.path.dirname(prevVal)
+
     def findDefaultDirectory(self, allDirs):
+        previousDir = self.getPreviousDirectory()
+        if previousDir in allDirs and self.canBeDefaultDir(previousDir):
+            return previousDir
+        
         # Set first non-empty dir as default ...)
         for dir in allDirs:
-            if self.saveFile or len(os.listdir(dir)) > 0:
+            if self.canBeDefaultDir(dir):
                 return dir
 
         return allDirs[0]

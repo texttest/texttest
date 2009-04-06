@@ -86,7 +86,7 @@ def runXvfb(logDir):
         os.kill(proc.pid, signal.SIGTERM)
         return writeAndWait("Time Out!", proc, displayNum)
     except ConnectionComplete:
-        pass
+        signal.alarm(0) # cancel any alarms that were previously set up!
 
     writeAndWait(displayNum + "," + str(proc.pid), proc, displayNum)
     

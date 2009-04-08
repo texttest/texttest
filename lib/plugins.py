@@ -1039,7 +1039,7 @@ class MultiEntryDictionary(seqdict):
             self.resetSectionMarker(sectionName, *args, **kwargs)
         elif line.find(":") != -1:
             key, value = line.split(":", 1)
-            entryName = self.getEntryName(os.path.expandvars(key))
+            entryName = self.getEntryName(string.Template(key).safe_substitute(os.environ))
             self.addEntry(entryName, value, "", *args, **kwargs)
             if key and key == self.importKey:
                 self.readFromFile(self.importFileFinder(os.path.expandvars(value)), *args, **kwargs)

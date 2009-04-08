@@ -23,105 +23,12 @@ def joinpath(a, *p):
             path += '/' + b
     return path
 
-# Copied from posixpath. os.path.expandvars should support this really
-_varprog = None
-def posixexpandvars(path, getenvFunc=os.getenv):
-    """Expand shell variables of form $var and ${var}.  Unknown variables
-    are left unchanged."""
-    global _varprog
-    if '$' not in path:
-        return path
-    if not _varprog:
-        _varprog = re.compile(r'\$(\w+|\{[^}]*\})')
-    i = 0
-    while True:
-        m = _varprog.search(path, i)
-        if not m:
-            break
-        i, j = m.span(0)
-        name = m.group(1)
-        if name.startswith('{') and name.endswith('}'):
-            name = name[1:-1]
-        envValue = getenvFunc(name)
-        if envValue is not None:
-            tail = path[j:]
-            path = path[:i] + envValue
-            i = len(path)
-            path += tail
-        else:
-            i = j
-    return path
-
-# Copied from ntpath
-def ntexpandvars(path, getenvFunc=os.getenv): # pragma: no cover
-    """Expand shell variables of form $var and ${var}.
-
-    Unknown variables are left unchanged."""
-    if '$' not in path:
-        return path
-    varchars = string.ascii_letters + string.digits + '_-'
-    res = ''
-    index = 0
-    pathlen = len(path)
-    while index < pathlen:
-        c = path[index]
-        if c == '\'':   # no expansion within single quotes
-            path = path[index + 1:]
-            pathlen = len(path)
-            try:
-                index = path.index('\'')
-                res = res + '\'' + path[:index + 1]
-            except ValueError:
-                res = res + path
-                index = pathlen - 1
-        elif c == '$':  # variable or '$$'
-            if path[index + 1:index + 2] == '$':
-                res = res + c
-                index = index + 1
-            elif path[index + 1:index + 2] == '{':
-                path = path[index+2:]
-                pathlen = len(path)
-                try:
-                    index = path.index('}')
-                    var = path[:index]
-                    value = getenvFunc(var)
-                    if value is not None:
-                        res = res + value
-                    else:
-                        res = res + '${' + var + '}'
-                except ValueError:
-                    res = res + '${' + path
-                    index = pathlen - 1
-            else:
-                var = ''
-                index = index + 1
-                c = path[index:index + 1]
-                while c != '' and c in varchars:
-                    var = var + c
-                    index = index + 1
-                    c = path[index:index + 1]
-                envValue = getenvFunc(var)
-                if envValue is not None:
-                    res = res + envValue
-                else:
-                    res = res + '$' + var
-                if c != '':
-                    index = index - 1
-        else:
-            res = res + c
-        index = index + 1
-    return res
-
-
 os.path.join = joinpath
 if os.name == "nt":
     import posixpath
     os.sep = posixpath.sep
     os.path.sep = posixpath.sep
     os.path.normpath = posixpath.normpath
-    os.path.expandvars = ntexpandvars
-else:
-    os.path.expandvars = posixexpandvars
 
 # Useful utility...
 def localtime(format= "%d%b%H:%M:%S", seconds=None):
@@ -761,9 +668,9 @@ def relpath(fullpath, parentdir):
     else:
         return relPath
 
-def getProcessStartUpInfo(getenvFunc=os.getenv):
+def getProcessStartUpInfo(envMapping=os.environ):
     # Used for hiding the windows if we're on Windows!
-    if os.name == "nt" and getenvFunc("DISPLAY") == "HIDE_WINDOWS":
+    if os.name == "nt" and envMapping.get("DISPLAY") == "HIDE_WINDOWS":
         info = subprocess.STARTUPINFO()
         info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         info.wShowWindow = subprocess.SW_HIDE

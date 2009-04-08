@@ -18,13 +18,14 @@ class UniqueNameFinder(Responder):
             oldTest = self.name2test[test.name]
             self.storeUnique(oldTest, test)
         else:
-            self.diag.info("Storing test " + test.name)
-            self.name2test[test.name] = test
+            self.storeBothWays(test.name, test)
+
     def notifyRemove(self, test):
         self.removeName(test.name)
+
     def removeName(self, name):
         if self.name2test.has_key(name):
-            self.diag.info("Removing test " + name)
+            self.diag.info("Removing test name " + name)
             del self.name2test[name]
 
     def notifyNameChange(self, test, origRelPath):

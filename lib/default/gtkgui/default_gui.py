@@ -6,6 +6,8 @@ from glob import glob
 from stat import *
 from ndict import seqdict
 from log4py import LOGLEVEL_NORMAL
+from string import Template
+
 try:
     import gtk, helpdialogs
 except ImportError:
@@ -582,7 +584,7 @@ class FollowFile(FileViewAction):
     def getFollowProgram(self, followProgram, fileName):
         title = '"' + self.currTestSelection[0].name + " (" + os.path.basename(fileName) + ')"'
         envDir = { "TEXTTEST_FOLLOW_FILE_TITLE" : title } # Title of the window when following file progress
-        return os.path.expandvars(followProgram, envDir.get)
+        return Template(followProgram).safe_substitute(envDir)
 
     def getFollowCommand(self, program, fileName):
         remoteHost = self.getRemoteHost()

@@ -103,6 +103,18 @@ class Callable:
         toUse = calledArgs + self.extraArgs
         return self.method(*toUse)
 
+class DynamicMapping:
+    def __init__(self, method, *args):
+        self.method = method
+        self.extraArgs = args
+    def __getitem__(self, key):
+        value = self.method(key, *self.extraArgs)
+        if value is not None:
+            return value
+        else:
+            raise KeyError, "No such value " + key
+
+
 class TestEnvironment(seqdict):
     def __init__(self, populateFunction):
         seqdict.__init__(self)
@@ -134,6 +146,13 @@ class TestEnvironment(seqdict):
                 values[var] = value
         return values
 
+    def __getitem__(self, var):
+        value = self.getSingleValue(var)
+        if value is not None:
+            return value
+        else:
+            raise KeyError, "No such value " + var
+
     def getSingleValue(self, var, defaultValue=None):
         self.checkPopulated()
         return self._getSingleValue(var, defaultValue)
@@ -157,16 +176,16 @@ class TestEnvironment(seqdict):
             pass
     def expandSelfReferences(self, var, valueOrMethod):
         if type(valueOrMethod) == types.StringType:
-            getenvFunc = Callable(self.getSelfReference, var)
-            return os.path.expandvars(valueOrMethod, getenvFunc)
+            mapping = DynamicMapping(self.getSelfReference, var)
+            return string.Template(valueOrMethod).safe_substitute(mapping)
         else:
             return valueOrMethod(var, self._getSingleValue(var, ""))
     def expandVariables(self):
         expanded = False
         for var, value in self.items():
             if value is not None:
-                getenvFunc = Callable(self.getSingleValueNoSelfRef, var)
-                newValue = os.path.expandvars(value, getenvFunc)
+                mapping = DynamicMapping(self.getSingleValueNoSelfRef, var)
+                newValue = string.Template(value).safe_substitute(mapping)
                 if newValue != value:
                     expanded = True
                     self.diag.info("Expanded " + var + " = " + newValue)
@@ -415,11 +434,11 @@ class Test(plugins.Observable):
             appToUse = self.app.getRefVersionApplication(refVersion)
         return appToUse._getAllFileNames([ self.dircache ], stem)
     def getConfigValue(self, key, expandVars=True):
-        return self.app.getConfigValue(key, expandVars, self.getEnvironment)
+        return self.app.getConfigValue(key, expandVars, self.environment)
     def getDataFileNames(self):
-        return self.app.getDataFileNames(self.getEnvironment)
+        return self.app.getDataFileNames(self.environment)
     def getCompositeConfigValue(self, key, subKey, expandVars=True):
-        return self.app.getCompositeConfigValue(key, subKey, expandVars, self.getEnvironment)
+        return self.app.getCompositeConfigValue(key, subKey, expandVars, self.environment)
     def actionsCompleted(self):
         self.diagnose("All actions completed")
         if self.state.isComplete():
@@ -1256,10 +1275,10 @@ class Application:
             raise BadConfigError, "Cannot find file '" + fileName + "' to import config file settings from"
         return os.path.normpath(configPath)
 
-    def getDataFileNames(self, getenvFunc=os.getenv):
-        allNames = self.getConfigValue("link_test_path", getenvFunc=getenvFunc) + \
-                   self.getConfigValue("copy_test_path", getenvFunc=getenvFunc) + \
-                   self.getConfigValue("partial_copy_test_path", getenvFunc=getenvFunc)
+    def getDataFileNames(self, envMapping=os.environ):
+        allNames = self.getConfigValue("link_test_path", envMapping=envMapping) + \
+                   self.getConfigValue("copy_test_path", envMapping=envMapping) + \
+                   self.getConfigValue("partial_copy_test_path", envMapping=envMapping)
         # Don't manage data that has an external path name, only accept absolute paths built by ourselves...
         return filter(lambda name: name.find(self.writeDirectory) != -1 or not os.path.isabs(name), allNames)
     def getFileName(self, dirList, stem, versionSetMethod=None):
@@ -1508,31 +1527,30 @@ class Application:
         print header
         self.configObject.printHelpText()
 
-    def getConfigValue(self, key, expandVars=True, getenvFunc=os.getenv):
+    def getConfigValue(self, key, expandVars=True, envMapping=os.environ):
         value = self.configDir.get(key)
         if expandVars:
-            return self.expandEnvironment(value, getenvFunc)
+            return self.expandEnvironment(value, envMapping)
         else:
             return value
 
-    def expandEnvironment(self, value, getenvFunc):
+    def expandEnvironment(self, value, envMapping):
         if type(value) == types.StringType:
-            # See top of plugins.py, we redefined this one so we can use a different environment
-            return os.path.expandvars(value, getenvFunc)
+            return string.Template(value).safe_substitute(envMapping)
         elif type(value) == types.ListType:
-            return [ os.path.expandvars(element, getenvFunc) for element in value ]
+            return [ string.Template(element).safe_substitute(envMapping) for element in value ]
         elif type(value) == types.DictType:
             newDict = {}
             for key, val in value.items():
-                newDict[key] = self.expandEnvironment(val, getenvFunc)
+                newDict[key] = self.expandEnvironment(val, envMapping)
             return newDict
         else:
             return value
 
-    def getCompositeConfigValue(self, key, subKey, expandVars=True, getenvFunc=os.getenv, defaultKey="default"):
+    def getCompositeConfigValue(self, key, subKey, expandVars=True, envMapping=os.environ, defaultKey="default"):
         value = self.configDir.getComposite(key, subKey, defaultKey)
         if expandVars:
-            return self.expandEnvironment(value, getenvFunc)
+            return self.expandEnvironment(value, envMapping)
         else:
             return value
 

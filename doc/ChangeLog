@@ -1351,6 +1351,8 @@ Version trunk
 General GUI Enhancements:
     - This ChangeLog now visible from the GUI (helpdialogs.py)
 	From Help menu/Change Logs
+    - Locations chosen in FileChoosers now get remembered (plugins.py)
+	So you don't need to keep searching to the same place.
 Dynamic GUI Enhancements:
 Framework Enhancements:
     - Can now remove certain elements from versioned config files (plugins.py)
@@ -1376,8 +1378,10 @@ Version Control Browser Enhancements/bug fixes:
     - Can now add to the VCS via TextTest (version_control.py)
 	Separate action on appropriate menu
     - Now supports Bazaar and Mercurial as well as CVS (bzr.py/hg.py/version_control.py)
+    - Hiding "unknown" category now works correctly (version_control.py)
 Grid Engine (LSF/SGE) enhancements:
-Installation and self-test changes:
+Internal changes:
+    - TextTest now structured into packages so lots of files have moved around
 Bug Fixes:
     - Traffic mechanism does not handle directory removals by removing all files any more (traffic.py)
 	Actually stores and replays the directory removal directly.
@@ -1386,4 +1390,3 @@ Bug Fixes:
     - Race condition removed from virtual server handling on UNIX: shouldn't leak virtual servers any more (startXvfb.py)
     - No longer stacktrace if "interpreter" is an invalid path (default/__init__.py)
     - No longer stacktrace when repositioning tests if no write permissions to the files (default_gui.py)
-

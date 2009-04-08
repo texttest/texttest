@@ -10,6 +10,7 @@ if __name__ == "__main__":
 import plugins
 from ndict import seqdict
 from re import sub
+import StringIO, fpdiff
 
 # Generic base class for filtering standard and temporary files
 class FilterAction(plugins.Action):
@@ -21,7 +22,8 @@ class FilterAction(plugins.Action):
             stem = os.path.basename(fileName).split(".")[0]
             runDepTexts = test.getCompositeConfigValue("run_dependent_text", stem)
             unorderedTexts = test.getCompositeConfigValue("unordered_text", stem)
-            if len(runDepTexts) > 0 or len(unorderedTexts) > 0 or self.changedOs(test.app):
+            floatTolerance = test.getCompositeConfigValue("floating_point_tolerance", stem)
+            if runDepTexts or unorderedTexts or floatTolerance or self.changedOs(test.app):
                 fileFilter= RunDependentTextFilter(runDepTexts, unorderedTexts, test.getRelPath())
                 filterFileBase = test.makeTmpFileName(stem + "." + test.app.name, forFramework=1)
                 newFileName = filterFileBase + postfix
@@ -29,7 +31,7 @@ class FilterAction(plugins.Action):
                     self.diag.info("Removing previous file at " + newFileName)
                     os.remove(newFileName)
                 if not os.path.isfile(newFileName):
-                    fileFilter.filterFile(fileName, newFileName)
+                    fileFilter.filterFile(fileName, newFileName, self.againstFile(filterFileBase), floatTolerance)
     def changedOs(self, app):
         homeOs = app.getConfigValue("home_operating_system")
         return homeOs != "any" and os.name != homeOs
@@ -40,6 +42,8 @@ class FilterAction(plugins.Action):
         return plugins.modifiedTime(newFile) <= plugins.modifiedTime(oldFile)
     def constantPostfix(self, files, postfix):
         return [ (file, postfix) for file in files ]
+    def againstFile(self, file):
+        return None
         
 class FilterOriginal(FilterAction):
     def filesToFilter(self, test):
@@ -49,7 +53,8 @@ class FilterOriginal(FilterAction):
 class FilterTemporary(FilterAction):
     def filesToFilter(self, test):
         return self.constantPostfix(test.listTmpFiles(), "cmp")
-
+    def againstFile(self, file):
+        return file+"origcmp"
 
 class FilterRecompute(FilterOriginal):
     def shouldRemove(self, newFile, oldFile):
@@ -83,11 +88,19 @@ class RunDependentTextFilter(plugins.Observable):
             orderFilter = LineFilter(text, testId, self.diag)
             self.orderFilters[orderFilter] = []
 
-    def filterFile(self, fileName, newFileName):
+    def filterFile(self, fileName, newFileName, against=None, floatTolerance=0.0):
         self.diag.info("Filtering " + fileName + " to create " + newFileName)
         file = open(fileName, "rU") # use universal newlines to simplify
         newFile = plugins.openForWrite(newFileName)
-        self.filterFileObject(file, newFile)
+        if against and floatTolerance:
+            stringFile = StringIO.StringIO()
+            self.filterFileObject(file, stringFile)
+            stringFile.seek(0)
+            fromlines = open(against, "rU").readlines()
+            tolines = stringFile.readlines()
+            fpdiff.fpfilter(fromlines, tolines, newFile, floatTolerance)
+        else:
+            self.filterFileObject(file, newFile)
         
     def filterFileObject(self, file, newFile):
         lineNumber = 0

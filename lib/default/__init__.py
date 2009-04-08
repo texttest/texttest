@@ -772,6 +772,7 @@ class Config:
                              "Mapping of result files to how serious diffs in them are")
         app.setConfigDefault("failure_display_priority", self.defaultDisplayPriorities(), \
                              "Mapping of result files to which order they should be shown in the text info window.")
+        app.setConfigDefault("floating_point_tolerance", { "default" : 0.0 }, "Which tolerance to apply when comparing floating point values in output")
 
         app.setConfigDefault("collate_file", self.getDefaultCollations(), "Mapping of result file names to paths to collect them from")
         app.setConfigDefault("collate_script", self.getDefaultCollateScripts(), "Mapping of result file names to scripts which turn them into suitable text")

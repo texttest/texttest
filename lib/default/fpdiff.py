@@ -12,8 +12,8 @@ def _getNumberAt(l, pos):
 
 def _fpequal(l1, l2, tolerance):
     pos = 0
-    while pos <= min(len(l1), len(l2)):
-        if pos == min(len(l1), len(l2)) or l1[pos] != l2[pos]:
+    while pos < min(len(l1), len(l2)):
+        if l1[pos] != l2[pos]:
             number1, l1 = _getNumberAt(l1, pos)
             number2, l2 = _getNumberAt(l2, pos)
             try:
@@ -24,7 +24,15 @@ def _fpequal(l1, l2, tolerance):
             pos = 0
         else:
             pos += 1
-    return len(l1) == len(l2)
+    if len(l1) != len(l2):
+        number1, l1 = _getNumberAt(l1, pos)
+        number2, l2 = _getNumberAt(l2, pos)
+        try:
+            if abs(float(number1) - float(number2)) > tolerance:
+                return False
+        except ValueError:
+            return False
+    return True
 
 def fpfilter(fromlines, tolines, outlines, tolerance):
     s = difflib.SequenceMatcher(None, fromlines, tolines)

@@ -1235,15 +1235,15 @@ class TextOption(Option):
         if self.usePossibleValues():
             self.setPossibleValues(self.possibleValues)
     def setPossibleValues(self, values):
-        if self.defaultValue in values:
+        if self.selectFile or (self.defaultValue in values):
             self.possibleValues = values
         else:
             self.possibleValues = [ self.defaultValue ] + values
         self.clear()
         self.updatePossibleValues()
     def getPossibleDirs(self):
-        if self.selectDir:
-            return self.possibleValues
+        if self.selectDir or self.selectFile:
+            return self.possibleDirs + self.possibleValues
         else:
             return self.possibleDirs
 

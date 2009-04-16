@@ -1897,7 +1897,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
                 self.appendAppName = (fileType == "definition" or fileType == "standard")
     def getResizeDivisors(self):
         # size of the dialog
-        return 1.4, 1.7
+        return 1.4, 1.4
     
     def findAllStems(self, fileType):
         if fileType == "definition":

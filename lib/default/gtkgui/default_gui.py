@@ -1862,23 +1862,28 @@ class ImportFiles(guiplugins.ActionDialogGUI):
     def _getStockId(self):
         return "new"
     def getDialogTitle(self):
-        return "New File"
+        return "Create/Import Files and Directories"
     def isActiveOnCurrent(self, *args):
         return self.creationDir is not None and guiplugins.ActionDialogGUI.isActiveOnCurrent(self, *args)
     def fillVBox(self, vbox):
-        header = gtk.Label()
         test = self.currTestSelection[0]
         dirText = self.getDirectoryText(test)
-        guiplugins.guilog.info("Adding text '" + dirText + "'")
-        header.set_markup("<b>" + dirText + "</b>\n")
-        vbox.pack_start(header)
+        self.addText(vbox, "<b><u>" + dirText + "</u></b>")
+        self.addText(vbox, "<i>(Test is " + repr(test) + ")</i>")
         return guiplugins.ActionDialogGUI.fillVBox(self, vbox)
+    
+    def addText(self, vbox, text):
+        header = gtk.Label()
+        guiplugins.guilog.info("Adding text '" + text + "'")
+        header.set_markup(text + "\n")
+        vbox.pack_start(header)
+    
     def getDirectoryText(self, test):
         relDir = plugins.relpath(self.creationDir, test.getDirectory())
         if relDir:
-            return "Creating/importing files in test subdirectory '" + relDir + "' for " + repr(test)
+            return "Create or import files in test subdirectory '" + relDir + "'"
         else:
-            return "Creating/importing files in test directory for " + repr(test)
+            return "Create or import files in the test directory"
     def notifyFileCreationInfo(self, creationDir, fileType):
         if fileType == "external":
             self.creationDir = None

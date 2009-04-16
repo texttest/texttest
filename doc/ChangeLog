@@ -1353,6 +1353,9 @@ General GUI Enhancements:
 	From Help menu/Change Logs
     - Locations chosen in FileChoosers now get remembered (plugins.py)
 	So you don't need to keep searching to the same place.
+Static GUI Enhancements:
+    - "Create File" functionality enhanced. (default_gui.py)
+	Will now handle directories correctly, and you can choose your source with a filechooser now.
 Dynamic GUI Enhancements:
 Framework Enhancements:
     - Can now remove certain elements from versioned config files (plugins.py)

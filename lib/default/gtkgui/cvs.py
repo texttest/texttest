@@ -88,7 +88,7 @@ class CVSInterface(version_control.VersionControlInterface):
         if os.path.isdir(os.path.join(oldDir, "CVS")):
             self.copyDirectory(oldDir, newDir)
             self.removePath(oldDir)
-            self.callProgramOnFiles("add", newDir)
+            self.callProgramOnFiles("add", newDir, recursive=True)
             return True
         else:
             os.rename(oldDir, newDir)

@@ -34,9 +34,10 @@ class HgInterface(version_control.VersionControlInterface):
         # Moving doesn't work in hg if there are symbolic links in the path to the new location!
         retCode = self.callProgram("mv", [ oldDir, os.path.realpath(newDir) ])
         if retCode == 0:
-            # And it doesn't take non-versioned files with it...
-            self.copyDirectory(oldDir, newDir)
-            shutil.rmtree(oldDir)
+            # And it doesn't take non-versioned files with it, if there are any...
+            if os.path.isdir(oldDir):
+                self.copyDirectory(oldDir, newDir)
+                shutil.rmtree(oldDir)
             return True
         else:
             # Wasn't in version control, probably

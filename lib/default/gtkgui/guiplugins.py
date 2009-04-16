@@ -1182,6 +1182,8 @@ class ActionDialogGUI(OptionGroupGUI):
         fileChooser.set_current_folder(startFolder)
         for folder in folders:
             fileChooser.add_shortcut_folder(folder)
+        if option.selectFile and option.defaultValue:
+            fileChooser.set_filename(option.defaultValue)
             
         fileChooser.set_local_only(True)
         option.setMethods(fileChooser.get_filename, fileChooser.set_filename)

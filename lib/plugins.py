@@ -676,6 +676,12 @@ def getProcessStartUpInfo(envMapping=os.environ):
         info.wShowWindow = subprocess.SW_HIDE
         return info
 
+def copyPath(srcPath, dstPath):
+    if os.path.isdir(srcPath):
+        shutil.copytree(srcPath, dstPath)
+    else:
+        shutil.copyfile(srcPath, dstPath)
+        
 def removePath(path):
     if os.path.exists(path):
         if os.path.isdir(path):

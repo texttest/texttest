@@ -1838,17 +1838,27 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
         return "Record _Use-Case"
 
 
-class CreateDefinitionFile(guiplugins.ActionDialogGUI):
-    def __init__(self, *args):
+class ImportFiles(guiplugins.ActionDialogGUI):
+    def __init__(self, allApps, *args):
         self.creationDir = None
         self.appendAppName = False
-        guiplugins.ActionDialogGUI.__init__(self, *args)
-        self.addOption("stem", "Type of definition file to create", allocateNofValues=2)
+        guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
+        self.addOption("stem", "Type of file/directory to create", allocateNofValues=2)
         self.addOption("v", "Version identifier to use")
+        possibleDirs = sorted(set((app.getDirectory() for app in allApps)))
+        # The point of this is that it's never sensible as the source for anything, so it serves as a "use the parent" option
+        # for back-compatibility
+        self.defaultValue = self.findConfigFile(allApps)
+        self.addOption("src", "Source to copy from (leave unchanged to use file from parent suite)", self.defaultValue, selectFile=True, possibleDirs=possibleDirs)
+    def findConfigFile(self, allApps):
+        if len(allApps) > 0:
+            return os.path.join(allApps[0].getDirectory(), "config." + allApps[0].name)
     def singleTestOnly(self):
         return True
     def _getTitle(self):
-        return "Create _File"
+        return "Create/_Import"
+    def getTooltip(self):
+        return "Create a new file or directory, possibly by copying it" 
     def _getStockId(self):
         return "new"
     def getDialogTitle(self):
@@ -1866,9 +1876,9 @@ class CreateDefinitionFile(guiplugins.ActionDialogGUI):
     def getDirectoryText(self, test):
         relDir = plugins.relpath(self.creationDir, test.getDirectory())
         if relDir:
-            return "Creating file in test subdirectory '" + relDir + "' for " + repr(test)
+            return "Creating/importing files in test subdirectory '" + relDir + "' for " + repr(test)
         else:
-            return "Creating file in test directory for " + repr(test)
+            return "Creating/importing files in test directory for " + repr(test)
     def notifyFileCreationInfo(self, creationDir, fileType):
         if fileType == "external":
             self.creationDir = None
@@ -1880,6 +1890,10 @@ class CreateDefinitionFile(guiplugins.ActionDialogGUI):
             if newActive:
                 self.updateStems(fileType)
                 self.appendAppName = (fileType == "definition" or fileType == "standard")
+    def getResizeDivisors(self):
+        # size of the dialog
+        return 1.4, 1.7
+    
     def findAllStems(self, fileType):
         if fileType == "definition":
             return self.getDefinitionFiles()
@@ -1922,9 +1936,13 @@ class CreateDefinitionFile(guiplugins.ActionDialogGUI):
         if version:
             fileName += "." + version
         return fileName
-    def getSourceFile(self, stem, version, targetFile):
+    def getSourcePath(self, stem, version, targetPath):
+        givenSource = self.optionGroup.getOptionValue("src")
+        if givenSource != self.defaultValue:
+            return givenSource
+        
         thisTestName = self.currTestSelection[0].getFileName(stem, version)
-        if thisTestName and not os.path.basename(thisTestName) == targetFile:
+        if thisTestName and not os.path.basename(thisTestName) == targetPath:
             return thisTestName
 
         test = self.currTestSelection[0].parent
@@ -1936,27 +1954,27 @@ class CreateDefinitionFile(guiplugins.ActionDialogGUI):
     def performOnCurrent(self):
         stem = self.optionGroup.getOptionValue("stem")
         version = self.optionGroup.getOptionValue("v")
-        targetFileName = self.getFileName(stem, version)
-        sourceFile = self.getSourceFile(stem, version, targetFileName)
+        targetPathName = self.getFileName(stem, version)
+        sourcePath = self.getSourcePath(stem, version, targetPathName)
         # If the source has an app identifier in it we need to get one, or we won't get prioritised!
         stemWithApp = stem + "." + self.currTestSelection[0].app.name
-        if sourceFile and os.path.basename(sourceFile).startswith(stemWithApp) and not targetFileName.startswith(stemWithApp):
-            targetFileName = targetFileName.replace(stem, stemWithApp, 1)
-            sourceFile = self.getSourceFile(stem, version, targetFileName)
+        if sourcePath and os.path.basename(sourcePath).startswith(stemWithApp) and not targetPathName.startswith(stemWithApp):
+            targetPathName = targetPathName.replace(stem, stemWithApp, 1)
+            sourcePath = self.getSourcePath(stem, version, targetPathName)
 
-        targetFile = os.path.join(self.creationDir, targetFileName)
-        plugins.ensureDirExistsForFile(targetFile)
-        fileExisted = os.path.exists(targetFile)
-        if sourceFile and os.path.isfile(sourceFile):
-            guiplugins.guilog.info("Creating new file, copying " + sourceFile)
-            shutil.copyfile(sourceFile, targetFile)
+        targetPath = os.path.join(self.creationDir, targetPathName)
+        plugins.ensureDirExistsForFile(targetPath)
+        fileExisted = os.path.exists(targetPath)
+        if sourcePath and os.path.exists(sourcePath):
+            guiplugins.guilog.info("Creating new path, copying " + sourcePath)
+            plugins.copyPath(sourcePath, targetPath)
         elif not fileExisted:
-            file = open(targetFile, "w")
+            file = open(targetPath, "w")
             file.close()
             guiplugins.guilog.info("Creating new empty file...")
         else:
-            raise plugins.TextTestError, "Unable to create file, no possible source found and target file already exists:\n" + targetFile
-        self.notify("NewFile", targetFile, fileExisted)
+            raise plugins.TextTestError, "Unable to create file, no possible source found and target file already exists:\n" + targetPath
+        self.notify("NewFile", targetPath, fileExisted)
     def getSignalsSent(self):
         return [ "NewFile" ]
     def messageAfterPerform(self):
@@ -2565,7 +2583,7 @@ class InteractiveActionConfig:
         else:
             classes += [ ViewConfigFileInEditor, CopyTests, CutTests,
                          PasteTests, ImportTestCase, ImportTestSuite, ImportApplication,
-                         CreateDefinitionFile, ReportBugs, SelectTests,
+                         ImportFiles, ReportBugs, SelectTests,
                          RefreshAll, HideUnselected, HideSelected, ShowAll,
                          RunTestsBasic, RunTestsAdvanced, RecordTest, ResetGroups, RenameTest, RemoveTests,
                          SortTestSuiteFileAscending, SortTestSuiteFileDescending,

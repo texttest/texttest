@@ -97,7 +97,7 @@
     <menuitem action="View File"/>
     <menuitem action="File Properties"/>
     <separator/>
-    <menuitem action="Create File"/>
+    <menuitem action="Create/Import"/>
     <separator/>
     <menuitem name="Remove..." action="Remove..."/>
     <separator/>

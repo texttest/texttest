@@ -643,16 +643,31 @@ class ClipboardAction(guiplugins.ActionGUI):
                 if test.parent:
                     return True
         return False
+
     def getSignalsSent(self):
         return [ "Clipboard" ]
+
     def _getStockId(self):
         return self.getName()
+
     def _getTitle(self):
         return "_" + self.getName().capitalize()
+
     def getTooltip(self):
         return self.getName().capitalize() + " selected tests"
+
+    def noAncestorsSelected(self, test):
+        if not test.parent:
+            return True
+        if test.parent in self.currTestSelection:
+            return False
+        else:
+            return self.noAncestorsSelected(test.parent)
+        
     def performOnCurrent(self):
-        self.notify("Clipboard", self.currTestSelection, cut=self.shouldCut())
+        # If suites are selected, don't also select their contents
+        testsForClipboard = filter(self.noAncestorsSelected, self.currTestSelection)
+        self.notify("Clipboard", testsForClipboard, cut=self.shouldCut())
 
 
 class CopyTests(ClipboardAction):

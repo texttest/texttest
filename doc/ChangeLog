@@ -1357,6 +1357,8 @@ Dynamic GUI Enhancements:
 Framework Enhancements:
     - Can now remove certain elements from versioned config files (plugins.py)
 	New syntax {CLEAR <item>}
+    - Can now filter floating-point differences to within a certain tolerance (rundependent.py/fpdiff.py)
+	New config file setting "floating_point_tolerance". See documentation on website. Thanks to Michael Behrisch for this.
     - Config file setting "performance_use_normalised_%" renamed for generic application (default.py)
 	Now called "use_normalised_percentage_change" to reflect possible usage for other purposes. Old name aliased.
     - Traffic mechanism does not assume asynchronous file edits are possible any more (traffic.py)
@@ -1390,3 +1392,6 @@ Bug Fixes:
     - Race condition removed from virtual server handling on UNIX: shouldn't leak virtual servers any more (startXvfb.py)
     - No longer stacktrace if "interpreter" is an invalid path (default/__init__.py)
     - No longer stacktrace when repositioning tests if no write permissions to the files (default_gui.py)
+    - Now shows correct test names in the status bar after a rename (engine.py)
+    - Don't crash if copying or moving a suite and its contents (default_gui.py)
+    - Now works to run locally from bin directory. Thanks again to Michael Behrisch (texttest.py)

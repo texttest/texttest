@@ -95,6 +95,8 @@ class GUIStatusMonitor(guiplugins.SubGUI):
     def describe(self):
         guilog.info("Changing GUI status to: '" + self.label.get_text() + "'")
     def notifyActionStart(self, message="", lock = True):
+        if message == "workaround":
+            return # Don't set the throbber going for the GTK 2.14 bug workaround
         if self.throbber:
             if self.pixbuf: # pragma: no cover : Only occurs if some code forgot to do ActionStop ...
                 self.notifyActionStop()

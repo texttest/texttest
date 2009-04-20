@@ -1040,6 +1040,11 @@ class ActionDialogGUI(OptionGroupGUI):
         alignment = self.createAlignment()
         vbox = gtk.VBox()
         fileChooser, scriptName = self.fillVBox(vbox)
+        if fileChooser and gtk.gtk_version > (2, 14, 0): 
+            # Workaround for GTK 2.14 bug, http://bugzilla.gnome.org/show_bug.cgi?id=579449
+            # Effect is to disable the idle handler which is broken with file choosers
+            self.notify("ActionStart", "workaround")
+
         alignment.add(vbox)
         dialog.vbox.pack_start(alignment, expand=True, fill=True)
         self.createButtons(dialog, fileChooser, scriptName)

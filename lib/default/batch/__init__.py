@@ -485,6 +485,11 @@ class WebPageResponder(respond.Responder):
         apps = set([ suite.app for suite in suites ])
         for app in set(self.allApps).difference(apps):
             self.allApps.remove(app)
+            # If the app is rejected, some of its extra versions may still not be...
+            for extra in app.extras:
+                if extra in apps:
+                    self.allApps.append(extra)
+            
     def notifyAllComplete(self):
         appInfo = self.getAppRepositoryInfo()
         print "Generating web pages..."

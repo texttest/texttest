@@ -17,6 +17,15 @@ class VersionControlInterface:
         self.lastMoveInVCS = False
         self.defaultArgs = {}
 
+    def isVersionControlled(self, dirname):
+        basicArgs = self.getCmdArgs("stat")
+        for file in self.getFileNames(dirname, recursive=True):
+            output = self.getProcessResults(basicArgs + [ file ])[1]
+            status = self.getStateFromStatus(output)
+            if status != "Unknown":
+                return True
+        return False
+        
     def callProgram(self, cmdName, fileArgs, **kwargs):
         return subprocess.call(self.getCmdArgs(cmdName, fileArgs),
                                stdout=open(os.devnull, "w"), stderr=open(os.devnull, "w"), **kwargs)
@@ -27,14 +36,18 @@ class VersionControlInterface:
             self.callProgramWithHandler(fileName, basicArgs + [ fileName ], **kwargs)
 
     def callProgramWithHandler(self, fileName, args, outputHandler=None, outputHandlerArgs=(), **kwargs):
+        retcode, stdout, stderr = self.getProcessResults(args, **kwargs)
+        if outputHandler:
+            outputHandler(retcode, stdout, stderr, fileName, *outputHandlerArgs)
+
+    def getProcessResults(self, args, **kwargs):
         try:
             process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, **kwargs)
         except OSError:
             raise plugins.TextTestError, "Could not run " + self.name + ": make sure you have it installed locally"
 
         stdout, stderr = process.communicate()
-        if outputHandler:
-            outputHandler(process.returncode, stdout, stderr, fileName, *outputHandlerArgs)         
+        return process.returncode, stdout, stderr
 
     def getFileNames(self, fileArg, recursive, includeDirs=False):
         if os.path.isfile(fileArg):
@@ -79,7 +92,7 @@ class VersionControlInterface:
     def getGraphicalDiffArgs(self, diffProgram):
         return [ diffProgram ] # brittle but general...
     
-    def getCmdArgs(self, cmdName, extraArgs):
+    def getCmdArgs(self, cmdName, extraArgs=[]):
         return self.getProgramArgs() + [ cmdName ] + self.defaultArgs.get(cmdName, []) + extraArgs 
 
     def getDateFromLog(self, output):
@@ -103,18 +116,19 @@ class VersionControlInterface:
                     shutil.copyfile(oldPath, newPath)
         else:
             shutil.copytree(oldDir, newDir)
-    
+                
     def moveDirectory(self, oldDir, newDir):
-        self.lastMoveInVCS = self._moveDirectory(oldDir, newDir)
+        self.lastMoveInVCS = self.isVersionControlled(oldDir)
+        if self.lastMoveInVCS:
+            newParent = os.path.dirname(newDir)
+            if not self.isVersionControlled(newParent):
+                self.callProgramOnFiles("add", newParent) 
+            self._moveDirectory(oldDir, newDir)
+        else:
+            os.rename(oldDir, newDir)
 
     def _moveDirectory(self, oldDir, newDir):
-        retCode = self.callProgram("mv", [ oldDir, newDir ])
-        if retCode > 0:
-            # Wasn't in version control, probably
-            os.rename(oldDir, newDir)
-            return False
-        else:
-            return True
+        self.callProgram("mv", [ oldDir, newDir ])
 
     def getMoveSuffix(self):
         if self.lastMoveInVCS:

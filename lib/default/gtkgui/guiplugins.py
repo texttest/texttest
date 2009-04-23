@@ -979,6 +979,16 @@ class ActionTabGUI(OptionGroupGUI):
         return (box, entry)
     
     def showFileChooser(self, widget, entry, option):
+        if gtk.gtk_version > (2, 14, 0): 
+            # Workaround for GTK 2.14 bug, http://bugzilla.gnome.org/show_bug.cgi?id=579449
+            if scriptEngine.replayer.isActive():
+                # PyUseCase's replayer relies entirely on idle handlers and hence we can only give up here...
+                # Try to fail rather than hang.
+                return sys.stderr.write("Cannot replay FileChoosers with GTK 2.14 and later due to a GTK bug\n")
+            else:
+                # Effect is to disable the idle handler which is broken with file choosers
+                self.notify("ActionStart", "workaround")
+
         dialog = gtk.FileChooserDialog("Select a file",
                                        self.getParentWindow(),
                                        gtk.FILE_CHOOSER_ACTION_OPEN,
@@ -1042,8 +1052,15 @@ class ActionDialogGUI(OptionGroupGUI):
         fileChooser, scriptName = self.fillVBox(vbox)
         if fileChooser and gtk.gtk_version > (2, 14, 0): 
             # Workaround for GTK 2.14 bug, http://bugzilla.gnome.org/show_bug.cgi?id=579449
-            # Effect is to disable the idle handler which is broken with file choosers
-            self.notify("ActionStart", "workaround")
+            if scriptEngine.replayer.isActive():
+                # PyUseCase's replayer relies entirely on idle handlers and hence we can only give up here...
+                # Try to fail rather than hang.
+                sys.stderr.write("Cannot replay FileChoosers with GTK 2.14 and later due to a GTK bug\n")
+                dialog.destroy()
+                return scriptEngine.replayer.processCommand("quit", "") # more hacks to try to terminate!
+            else:
+                # Effect is to disable the idle handler which is broken with file choosers
+                self.notify("ActionStart", "workaround")
 
         alignment.add(vbox)
         dialog.vbox.pack_start(alignment, expand=True, fill=True)

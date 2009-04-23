@@ -81,7 +81,9 @@ class VersionControlInterface:
             for f in toAdd:
                 fullPath = os.path.join(root, f)
                 allFiles.append(fullPath)
-                if os.path.isdir(fullPath) and os.path.islink(fullPath):
+            for dir in dirs:
+                fullPath = os.path.join(root, dir)
+                if os.path.islink(fullPath):
                     allFiles += self.getFilesFromDirRecursive(fullPath, includeDirs)
                     
         return sorted(allFiles)

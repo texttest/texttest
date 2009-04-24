@@ -123,7 +123,8 @@ class VersionControlInterface:
         self.lastMoveInVCS = self.isVersionControlled(oldDir)
         if self.lastMoveInVCS:
             newParent = os.path.dirname(newDir)
-            if not self.isVersionControlled(newParent):
+            # If it's also a parent of the old directory we don't need to check if it's version-controlled.
+            if not oldDir.startswith(newParent) and not self.isVersionControlled(newParent):
                 self.callProgramOnFiles("add", newParent) 
             self._moveDirectory(oldDir, newDir)
         else:

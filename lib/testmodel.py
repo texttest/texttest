@@ -1146,6 +1146,8 @@ class Application:
         self.readApplicationConfigFiles()
         self.configDir.readValues(self.getPersonalConfigFiles(), insert=False, errorOnUnknown=False)
         self.diag.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
+        if not plugins.TestState.showExecHosts:
+            plugins.TestState.showExecHosts = self.configObject.showExecHostsInFailures(self)
 
     def readApplicationConfigFiles(self):
         self.readConfigFiles(configModuleInitialised=False)
@@ -1222,6 +1224,11 @@ class Application:
         return "test-app"
     def getDirectory(self):
         return self.dircache.dir
+    def getRunMachine(self):
+        if self.inputOptions.has_key("m"):
+            return self.inputOptions["m"]
+        else:
+            return self.getConfigValue("default_machine")
     def readConfigFiles(self, configModuleInitialised):
         self.readDefaultConfigFiles()
         self.readExplicitConfigFiles(configModuleInitialised)
@@ -1339,6 +1346,7 @@ class Application:
         self.setConfigDefault("full_name", self.name.upper(), "Expanded name to use for application")
         self.setConfigDefault("home_operating_system", "any", "Which OS the test results were originally collected on")
         self.setConfigDefault("base_version", [], "Versions to inherit settings from")
+        self.setConfigDefault("default_machine", "localhost", "Default machine to run tests on")
         # various varieties of test data
         self.setConfigDefault("partial_copy_test_path", [], "Paths to be part-copied, part-linked to the temporary directory")
         self.setConfigDefault("copy_test_path", [], "Paths to be copied to the temporary directory when running tests")

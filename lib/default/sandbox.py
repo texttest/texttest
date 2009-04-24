@@ -466,7 +466,11 @@ class FindExecutionHosts(plugins.Action):
     def __call__(self, test):
         test.state.executionHosts = self.getExecutionMachines(test)
     def getExecutionMachines(self, test):
-        return [ plugins.gethostname() ]
+        runMachine = test.app.getRunMachine()
+        if runMachine == "localhost":
+            return [ plugins.gethostname() ]
+        else:
+            return [ runMachine ]
 
 class CreateCatalogue(plugins.Action):
     def __init__(self):

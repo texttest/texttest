@@ -405,7 +405,8 @@ class ViewInEditor(FileViewAction):
         if guiplugins.guiConfig.getCompositeValue("view_file_on_remote_machine", self.getStem(fileName)):
             remoteHost = self.getRemoteHost()
             if remoteHost:
-                cmdArgs = [ "rsh", remoteHost, "env DISPLAY=" + self.getFullDisplay() + " " + " ".join(cmdArgs) ]
+                remoteShellProgram = guiplugins.guiConfig.getValue("remote_shell_program")
+                cmdArgs = [ remoteShellProgram, remoteHost, "env DISPLAY=" + self.getFullDisplay() + " " + " ".join(cmdArgs) ]
 
         return cmdArgs, descriptor, env
 
@@ -589,7 +590,8 @@ class FollowFile(FileViewAction):
     def getFollowCommand(self, program, fileName):
         remoteHost = self.getRemoteHost()
         if remoteHost:
-            return [ "rsh", remoteHost, "env DISPLAY=" + self.getFullDisplay() + " " + \
+            remoteShellProgram = guiplugins.guiConfig.getValue("remote_shell_program")
+            return [ remoteShellProgram, remoteHost, "env DISPLAY=" + self.getFullDisplay() + " " + \
                      program + " " + fileName ]
         else:
             return plugins.splitcmd(program) + [ fileName ]

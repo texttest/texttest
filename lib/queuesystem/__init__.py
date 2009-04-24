@@ -203,9 +203,9 @@ class QueueSystemConfig(default.Config):
             return RunTestInSlave()
         else:
             return default.Config.getTestRunner(self)
-    def showExecHostsInFailures(self):
+    def showExecHostsInFailures(self, app):
         # Always show execution hosts, many different ones are used
-        return 1
+        return True
     def hasAutomaticCputimeChecking(self, app):
         return default.Config.hasAutomaticCputimeChecking(self, app) or \
                len(app.getCompositeConfigValue("performance_test_resource", "cputime")) > 0

@@ -39,11 +39,12 @@ class Config:
                 group.addOption("r", "Execution time", description="Specify execution time limits, either as '<min>,<max>', or as a list of comma-separated expressions, such as >=0:45,<=1:00. Digit-only numbers are interpreted as minutes, while colon-separated numbers are interpreted as hours:minutes:seconds.")
             elif group.name.startswith("Basic"):
                 if len(apps) > 0:
-                    version, checkout = apps[0].getFullVersion(), apps[0].checkout
+                    version, checkout, machine = apps[0].getFullVersion(), apps[0].checkout, apps[0].getRunMachine()
                 else:
-                    version, checkout = "", ""
+                    version, checkout, machine = "", "", ""
                 group.addOption("v", "Run this version", version)
                 group.addOption("c", "Use checkout", checkout)
+                group.addOption("m", "Run on machine", machine)
                 group.addOption("cp", "Times to run", "1", description="Set this to some number larger than 1 to run the same test multiple times, for example to try to catch indeterminism in the system under test")
                 if recordsUseCases:
                     group.addSwitch("actrep", "Run with slow motion replay")
@@ -482,8 +483,8 @@ class Config:
         return sandbox.MachineInfoFinder()
     def getFailureExplainer(self):
         return [ CheckForCrashes(), CheckForBugs() ]
-    def showExecHostsInFailures(self):
-        return self.batchMode()
+    def showExecHostsInFailures(self, app):
+        return self.batchMode() or app.getRunMachine() != "localhost"
     def getTestComparator(self):
         return comparetest.MakeComparisons()
     def getStateSaver(self):
@@ -827,6 +828,7 @@ class Config:
     def setMiscDefaults(self, app):
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
         app.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")
+        app.setConfigDefault("remote_shell_program", "rsh", "Program to use for running commands remotely")
         app.setConfigDefault("default_filter_file", [], "Filter file to use by default, generally only useful for versions")
         app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
         app.setConfigDefault("test_data_properties", { "default" : "" }, "Write the contents of test_data_environment to the given Java properties file")
@@ -850,8 +852,6 @@ class Config:
         self.setBatchDefaults(app)
         self.setPerformanceDefaults(app)
         self.setUsecaseDefaults(app)
-        if not plugins.TestState.showExecHosts:
-            plugins.TestState.showExecHosts = self.showExecHostsInFailures()
 
 class OrFilter(plugins.Filter):
     def __init__(self, filterLists):
@@ -1079,6 +1079,9 @@ class RunTest(plugins.Action):
         return interpreter
     def getCmdParts(self, test):
         args = []
+        runMachine = test.app.getRunMachine()
+        if runMachine != "localhost":
+            args += [ test.getConfigValue("remote_shell_program"), runMachine ]
         interpreter = self.getInterpreter(test)
         if interpreter:
             args.append(interpreter)

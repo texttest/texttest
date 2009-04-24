@@ -649,6 +649,14 @@ class ActionGUI(BasicActionGUI):
         newActive = self.updateSelection(*args)
         self.setSensitivity(newActive)
 
+    def getTestCaseSelection(self):
+        testcases = []
+        for test in self.currTestSelection:
+            for testCase in test.testCaseList():
+                if not testCase in testcases:
+                    testcases.append(testCase)
+        return testcases
+
     def updateSelection(self, tests, apps, rowCount, *args):
         if rowCount != 1 and self.singleTestOnly():
             self.currTestSelection = []

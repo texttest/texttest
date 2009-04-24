@@ -1461,8 +1461,6 @@ class SaveSelection(guiplugins.ActionDialogGUI):
         self.selectionCriteria = ""
         self.dynamic = dynamic
         self.rootTestSuites = []
-    def correctTestClass(self):
-        return "test-case"
     def addSuites(self, suites):
         guiplugins.ActionDialogGUI.addSuites(self, suites)
         self.rootTestSuites += suites
@@ -1475,10 +1473,11 @@ class SaveSelection(guiplugins.ActionDialogGUI):
         return self.folders
     def getTestPathFilterArg(self):
         selTestPaths = []
+        testCaseSelection = self.getTestCaseSelection()
         for suite in self.rootTestSuites:
             selTestPaths.append("appdata=" + suite.app.name + suite.app.versionSuffix())
             for test in suite.testCaseList():
-                if test in self.currTestSelection:
+                if test in testCaseSelection:
                     selTestPaths.append(test.getRelPath())
         return "-tp " + "\n".join(selTestPaths)
     def notifySetTestSelection(self, tests, criteria="", *args):
@@ -1565,8 +1564,6 @@ class LoadSelection(guiplugins.ActionDialogGUI):
 
 class RunningAction:
     runNumber = 1
-    def correctTestClass(self):
-        return "test-case"
     def getGroupTabTitle(self):
         return "Running"
     def messageAfterPerform(self):
@@ -1624,15 +1621,18 @@ class RunningAction:
         ttOptions = self.getCmdlineOptionForApps()
         for group in self.getOptionGroups():
             ttOptions += group.getCommandLines(self.getCommandLineKeys(usecase))
-        ttOptions += [ "-count", str(self.getTestCount()) ]
+        # May be slow to calculate for large test suites, cache it
+        self.testCount = len(self.getTestCaseSelection())
+        ttOptions += [ "-count", str(self.testCount * self.getCountMultiplier()) ]
         ttOptions += [ "-f", filterFile ]
         ttOptions += [ "-fd", self.getTmpFilterDir(app) ]
         return ttOptions
     def getCommandLineKeys(self, usecase):
         # assume everything by default
         return []
-    def getTestCount(self):
-        return len(self.currTestSelection)
+    def getCountMultiplier(self):
+        return 1
+    
     def getTmpFilterDir(self, app):
         return os.path.join(app.writeDirectory, "temporary_filter_files")
     def getCmdlineOptionForApps(self):
@@ -1666,7 +1666,8 @@ class RunningAction:
         pass # only used when recording
 
     def getConfirmationMessage(self):
-        if len(self.currTestSelection) > 1:
+        # For extra speed we check the selection first before we calculate all the test cases again...
+        if len(self.currTestSelection) > 1 or len(self.getTestCaseSelection()) > 1:
             multiTestWarning = self.getMultipleTestWarning()
             if multiTestWarning:
                 return "You are trying to " + multiTestWarning + ".\nThis will mean lots of target application GUIs " + \
@@ -1711,15 +1712,15 @@ class RunTests(RunningAction,guiplugins.ActionTabGUI):
         return "Run selected tests"
     def getOptionGroups(self):
         return self.optionGroups
-    def getTestCount(self):
-        return len(self.currTestSelection) * self.getCopyCount() * self.getVersionCount()
+    def getCountMultiplier(self):
+        return self.getCopyCount() * self.getVersionCount()
     def getCopyCount(self):
         return int(self.optionGroups[0].getOptionValue("cp"))
     def getVersionCount(self):
         return self.optionGroups[0].getOptionValue("v").count(",") + 1
     def performedDescription(self):
         timesToRun = self.getCopyCount()
-        numberOfTests = len(self.currTestSelection)
+        numberOfTests = self.testCount
         if timesToRun != 1:
             if numberOfTests > 1:
                 return "Started " + str(timesToRun) + " copies each of"
@@ -1759,6 +1760,8 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
         self.addSwitch("rectraffic", "Also record command-line or client-server traffic", 1)
         self.addSwitch("rep", "Automatically replay test after recording it", 1)
         self.addSwitch("repgui", options = ["Auto-replay invisible", "Auto-replay in dynamic GUI"])
+    def correctTestClass(self):
+        return "test-case"
     def _getStockId(self):
         return "media-record"
     def getTabTitle(self):

@@ -825,10 +825,21 @@ class Config:
         app.setConfigDefault("gui_entry_overrides", { "default" : "<not set>" }, "Default settings for entries in the GUI")
         app.setConfigDefault("gui_entry_options", { "default" : [] }, "Default drop-down box options for GUI entries")
         app.setConfigDefault("suppress_stderr_popup", [], "List of patterns which, if written on stderr, should not produce a warning popup")
+    def getDefaultRemoteShellOptions(self):
+        # The aim is to ensure they never hang, but always return errors if contact not possible
+        # Disable passwords: only use public key based authentication.
+        # Also disable hostkey checking, we assume we don't run tests on unknown hosts.
+        # Also don't run tests on machines which take a very long time to connect to...
+        return { "default": "", "ssh" : "-o StrictHostKeyChecking=no -o PasswordAuthentication=no -o ConnectTimeout=10" }
+    def getRemoteShellArgs(self, app):
+        prog = app.getConfigValue("remote_shell_program")
+        argStr = app.getCompositeConfigValue("remote_shell_options", prog)
+        return [ prog ] + plugins.splitcmd(argStr)
     def setMiscDefaults(self, app):
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
         app.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")
         app.setConfigDefault("remote_shell_program", "rsh", "Program to use for running commands remotely")
+        app.setConfigDefault("remote_shell_options", self.getDefaultRemoteShellOptions(), "Default options to use for particular remote shell programs")
         app.setConfigDefault("default_filter_file", [], "Filter file to use by default, generally only useful for versions")
         app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
         app.setConfigDefault("test_data_properties", { "default" : "" }, "Write the contents of test_data_environment to the given Java properties file")
@@ -1081,7 +1092,7 @@ class RunTest(plugins.Action):
         args = []
         runMachine = test.app.getRunMachine()
         if runMachine != "localhost":
-            args += [ test.getConfigValue("remote_shell_program"), runMachine ]
+            args += test.app.getRemoteShellArgs() + [ runMachine ]
         interpreter = self.getInterpreter(test)
         if interpreter:
             args.append(interpreter)

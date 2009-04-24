@@ -36,8 +36,8 @@ class VirtualDisplayResponder(Responder):
     def setUpVirtualDisplay(self, guiSuites):
         machines = self.findMachines(guiSuites)
         logDir = self.getXvfbLogDir(guiSuites)
-        remoteShellProgram = self.getRemoteShellProgram(guiSuites)
-        machine, display, pid = self.getDisplay(machines, logDir, remoteShellProgram)
+        remoteShellArgs = self.getRemoteShellArgs(guiSuites)
+        machine, display, pid = self.getDisplay(machines, logDir, remoteShellArgs)
         if display:
             self.displayName = display
             self.displayMachine = machine
@@ -60,6 +60,8 @@ class VirtualDisplayResponder(Responder):
         allMachines = []
         for suite in suites:
             for machine in suite.getConfigValue("virtual_display_machine"):
+                if machine == "localhost": # Local to the test run, not to where we're trying to run...
+                    machine = suite.app.getRunMachine()
                 if not machine in allMachines:
                     allMachines.append(machine)
         return allMachines
@@ -86,21 +88,21 @@ class VirtualDisplayResponder(Responder):
                 self.killRemoteServer()
             self.displayName = None
 
-    def getRemoteShellProgram(self, guiSuites):
+    def getRemoteShellArgs(self, guiSuites):
         if len(guiSuites) > 0:
-            return guiSuites[0].getConfigValue("remote_shell_program")
+            return guiSuites[0].app.getRemoteShellArgs()
 
     def killRemoteServer(self):
         self.diag.info("Getting ps output from " + self.displayMachine)
         print "Killing remote Xvfb process on", self.displayMachine, "with pid", self.displayPid
-        subprocess.call([ self.getRemoteShellProgram(self.guiSuites), self.displayMachine, "kill", str(self.displayPid) ])
+        subprocess.call(self.getRemoteShellArgs(self.guiSuites) + [ self.displayMachine, "kill", str(self.displayPid) ])
 
-    def createDisplay(self, machine, logDir, remoteShellProgram):
-        if not self.canRunVirtualServer(machine, remoteShellProgram):
+    def createDisplay(self, machine, logDir, remoteShellArgs):
+        if not self.canRunVirtualServer(machine, remoteShellArgs):
             return None, None
 
         plugins.ensureDirectoryExists(logDir)
-        startArgs = self.getVirtualServerArgs(machine, logDir, remoteShellProgram)
+        startArgs = self.getVirtualServerArgs(machine, logDir, remoteShellArgs)
         return self.startXvfb(startArgs, machine)
 
     def startXvfb(self, startArgs, machine):
@@ -120,14 +122,14 @@ class VirtualDisplayResponder(Responder):
             print "Failed to parse line :\n " + line + self.displayProc.stdout.read()
             return None, None
             
-    def getVirtualServerArgs(self, machine, logDir, remoteShellProgram):
+    def getVirtualServerArgs(self, machine, logDir, remoteShellArgs):
         binDir = plugins.installationDir("libexec")
         fullPath = os.path.join(binDir, "startXvfb.py")
         if machine == "localhost":
             return [ sys.executable, fullPath, logDir ]
         else:
             remotePython = self.findRemotePython()
-            return [ remoteShellProgram, machine, remotePython + " -u " + fullPath + " " + logDir ]
+            return remoteShellArgs + [ machine, remotePython + " -u " + fullPath + " " + logDir ]
 
     def findRemotePython(self):
         # In case it isn't the default, allow for a ttpython script in the installation
@@ -146,7 +148,7 @@ class VirtualDisplayResponder(Responder):
         else:
             return machine + displayStr
 
-    def canRunVirtualServer(self, machine, remoteShellProgram):
+    def canRunVirtualServer(self, machine, remoteShellArgs):
         whichArgs = [ "which", "Xvfb" ]
         if machine == "localhost":
             returnCode = subprocess.call(whichArgs, stdin=open(os.devnull), stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
@@ -154,7 +156,7 @@ class VirtualDisplayResponder(Responder):
         else:
             searchStr = "found an Xvfb"
             # Funny tricks here because rsh does not forward the exit status of the program it runs
-            whichArgs = [ remoteShellProgram, machine ] + whichArgs + [ "&&", "echo", searchStr ]
+            whichArgs = remoteShellArgs + [ machine ] + whichArgs + [ "&&", "echo", searchStr ]
             proc = subprocess.Popen(whichArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             output = proc.communicate()[0]
             return output.find(searchStr) != -1

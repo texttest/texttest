@@ -242,7 +242,7 @@ class TextTest(Responder, plugins.Observable):
         self.diag.info("Filtering away base classes, using " + repr(filteredClasses))
         self.observers = map(lambda x : x(self.inputOptions, allApps), filteredClasses)
     def getBuiltinResponderClasses(self):
-        return [ UniqueNameFinder, Activator, testmodel.ApplicationEventResponder, testmodel.AllCompleteResponder ]
+        return [ UniqueNameFinder, Activator, testmodel.AllCompleteResponder ]
     def removeBaseClasses(self, classes):
         # Different apps can produce different versions of the same responder/thread runner
         # We should make sure we only include the most specific ones

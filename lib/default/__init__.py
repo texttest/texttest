@@ -1,5 +1,5 @@
 
-import os, sys, plugins, sandbox, respond, rundependent, comparetest, batch, subprocess, operator, glob, signal, shutil
+import os, sys, plugins, sandbox, respond, rundependent, pyusecase_interface, comparetest, batch, subprocess, operator, glob, signal, shutil
 
 from copy import copy
 from string import Template
@@ -205,9 +205,9 @@ class Config:
             elif len(allApps) == 0:
                 raise plugins.TextTestError, "Could not find any matching applications (files of the form config.<app>) under " + self.optionMap.directoryName
             
-        # Put the GUI first ... first one gets the script engine - see respond module :)
+        scriptEngine = pyusecase_interface.makeScriptEngine(self.optionMap)
         if self.useGUI():
-            self.addGuiResponder(classes)
+            self.addGuiResponder(classes, scriptEngine)
         else:
             classes.append(self.getTextDisplayResponderClass())
         if not self.optionMap.has_key("gx"):
@@ -229,6 +229,8 @@ class Config:
             classes.append(self.getStateSaver())
         if not self.useGUI() and not self.batchMode():
             classes.append(self.getTextResponder())
+        # At the end, so we've done the processing before we proceed
+        classes.append(pyusecase_interface.ApplicationEventResponder)
         return classes
 
     def isActionReplay(self):
@@ -287,8 +289,9 @@ class Config:
             return [ "++".join(plugins.commasplit(givenVersion)) ]
         else:
             return []
-    def addGuiResponder(self, classes):
+    def addGuiResponder(self, classes, scriptEngine):
         from gtkgui.texttestgui import TextTestGUI
+        TextTestGUI.scriptEngine = scriptEngine
         classes.append(TextTestGUI)
     def getReconnectSequence(self):
         actions = [ self.reconnectConfig.getReconnectAction() ]

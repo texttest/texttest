@@ -10,6 +10,7 @@ from default.knownbugs import CheckForBugs
 from default.actionrunner import ActionRunner, BaseActionRunner
 from default.unixonly import VirtualDisplayResponder
 from default.performance import getTestPerformance
+from default.pyusecase_interface import makeScriptEngine, ApplicationEventResponder
 from types import StringType
 
 plugins.addCategory("abandoned", "abandoned", "were abandoned")
@@ -171,6 +172,8 @@ class QueueSystemConfig(default.Config):
         classes = [ SocketResponder, ActionRunner ]
         if not self.isActionReplay():
             classes.append(VirtualDisplayResponder)
+        makeScriptEngine(self.optionMap)
+        classes.append(ApplicationEventResponder)
         return classes
 
     def getResponderClasses(self, allApps):

@@ -1,19 +1,12 @@
 
 import sys, os, plugins, subprocess
 from jobprocess import killSubProcessAndChildren
-from usecase import ScriptEngine
 from time import sleep
 
 # Interface all responders must fulfil
 class Responder:
     def __init__(self, *args):
-        if ScriptEngine.instance:
-            self.scriptEngine = ScriptEngine.instance
-        else:
-            self.setUpScriptEngine()
-    def setUpScriptEngine(self):
-        logger = plugins.getDiagnostics("Use-case log")
-        self.scriptEngine = ScriptEngine(logger)
+        pass
     def addSuites(self, suites):
         for suite in suites:
             self.addSuite(suite)
@@ -131,7 +124,7 @@ class InteractiveResponder(Responder):
         if allowView:
             options = "View details(v), " + options
         self.describeViewOptions(test, options)
-        response = self.scriptEngine.readStdin()
+        response = sys.stdin.readline()
         exactSave = response.find('+') != -1
         if response.startswith('s'):
             self.save(test, version="", exact=exactSave)

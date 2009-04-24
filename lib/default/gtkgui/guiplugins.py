@@ -9,22 +9,11 @@ from log4py import LOGLEVEL_NORMAL
 
 try:
     import gtk, gobject, entrycompletion
-    from gtkusecase import RadioGroupIndexer
 except ImportError:
     pass # We might want to document the config entries, silly to fail on lack of GTK...
 
 guilog, guiConfig, scriptEngine = None, None, None
 
-def setUpGlobals(dynamic, allApps):
-    global guilog, guiConfig, scriptEngine
-    from gtkusecase import ScriptEngine
-    if dynamic:
-        guilog = plugins.getDiagnostics("dynamic GUI behaviour")
-    else:
-        guilog = plugins.getDiagnostics("static GUI behaviour")
-    guiConfig = GUIConfig(dynamic, allApps, guilog)
-    scriptEngine = ScriptEngine(guilog, enableShortcuts=1)
-    return guilog, guiConfig, scriptEngine
 
 # gtk.accelerator_valid appears utterly broken on Windows
 def windowsAcceleratorValid(key, mod):
@@ -850,6 +839,8 @@ class OptionGroupGUI(ActionGUI):
                 radioButton.set_active(True)
             else:
                 radioButton.set_active(False)
+
+        from gtkusecase import RadioGroupIndexer
         indexer = RadioGroupIndexer(buttons)
         switch.setMethods(indexer.getActiveIndex, indexer.setActiveIndex)
         return buttons

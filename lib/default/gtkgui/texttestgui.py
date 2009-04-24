@@ -200,13 +200,13 @@ class IdleHandlerManager:
 
 
 class TextTestGUI(Responder, plugins.Observable):
+    scriptEngine = None
     def __init__(self, optionMap, allApps):
         vanilla = optionMap.has_key("vanilla")
         self.readGtkRCFiles(vanilla)
         self.dynamic = not optionMap.has_key("gx")
-        global guilog, guiConfig, scriptEngine
-        guilog, guiConfig, scriptEngine = guiplugins.setUpGlobals(self.dynamic, allApps)
-        Responder.__init__(self, optionMap)
+        self.setUpGlobals(allApps)
+        Responder.__init__(self)
         plugins.Observable.__init__(self)
         testCount = int(optionMap.get("count", 0))
 
@@ -227,6 +227,16 @@ class TextTestGUI(Responder, plugins.Observable):
         self.rightWindowGUI = self.createRightWindowGUI()
         self.shortcutBarGUI = ShortcutBarGUI()
         self.topWindowGUI = self.createTopWindowGUI(allApps)
+
+    def setUpGlobals(self, allApps):
+        global guilog, guiConfig, scriptEngine
+        scriptEngine = self.scriptEngine
+        guilog = self.scriptEngine.replayer.logger
+        guiConfig = guiplugins.GUIConfig(self.dynamic, allApps, guilog)
+
+        guiplugins.guilog = guilog
+        guiplugins.scriptEngine = scriptEngine
+        guiplugins.guiConfig = guiConfig
 
     def getTestTreeObservers(self):
         return [ self.testColumnGUI, self.testFileGUI, self.textInfoGUI, self.testRunInfoGUI ] + self.allActionGUIs() + [ self.rightWindowGUI ]

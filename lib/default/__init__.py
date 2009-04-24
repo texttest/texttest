@@ -828,9 +828,9 @@ class Config:
     def getDefaultRemoteShellOptions(self):
         # The aim is to ensure they never hang, but always return errors if contact not possible
         # Disable passwords: only use public key based authentication.
-        # Also disable hostkey checking, we assume we don't run tests on unknown hosts.
+        # Also disable hostkey checking, we assume we don't run tests on untrusted hosts.
         # Also don't run tests on machines which take a very long time to connect to...
-        return { "default": "", "ssh" : "-o StrictHostKeyChecking=no -o PasswordAuthentication=no -o ConnectTimeout=10" }
+        return { "default": "", "ssh" : "-o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10" }
     def getRemoteShellArgs(self, app):
         prog = app.getConfigValue("remote_shell_program")
         argStr = app.getCompositeConfigValue("remote_shell_options", prog)

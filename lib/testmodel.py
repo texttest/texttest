@@ -5,7 +5,6 @@ from fnmatch import fnmatch
 from ndict import seqdict
 from copy import copy
 from cPickle import Pickler, loads, UnpicklingError
-from respond import Responder
 from threading import Lock
 from tempfile import mkstemp
 
@@ -1671,9 +1670,9 @@ class OptionFinder(plugins.OptionFinder):
 
 # Simple responder that collects completion notifications and sends one out when
 # it thinks everything is done.
-class AllCompleteResponder(Responder,plugins.Observable):
+class AllCompleteResponder(plugins.Responder,plugins.Observable):
     def __init__(self, inputOptions, allApps):
-        Responder.__init__(self)
+        plugins.Responder.__init__(self)
         plugins.Observable.__init__(self)
         self.unfinishedTests = 0
         self.lock = Lock()

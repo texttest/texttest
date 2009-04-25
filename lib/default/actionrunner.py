@@ -1,6 +1,5 @@
 
 import plugins, os, sys, time
-from respond import Responder
 from Queue import Queue, Empty
 from ndict import seqdict
 from threading import Lock
@@ -13,9 +12,9 @@ class Cancelled(plugins.TestState):
                                    started=1, completed=1, lifecycleChange="complete")
 
 # We're set up for running in a thread but we don't do so by default, for simplicity
-class BaseActionRunner(Responder, plugins.Observable):
+class BaseActionRunner(plugins.Responder, plugins.Observable):
     def __init__(self, optionMap, diag):
-        Responder.__init__(self)
+        plugins.Responder.__init__(self)
         plugins.Observable.__init__(self)
         self.optionMap = optionMap
         self.testQueue = Queue()

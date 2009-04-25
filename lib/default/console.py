@@ -3,46 +3,17 @@ import sys, os, plugins, subprocess
 from jobprocess import killSubProcessAndChildren
 from time import sleep
 
-# Interface all responders must fulfil
-class Responder:
-    def __init__(self, *args):
-        pass
-    def addSuites(self, suites):
-        for suite in suites:
-            self.addSuite(suite)
-    # Full suite of tests, get notified of it at the start...
-    def addSuite(self, suite):
-        pass
-    # Called when the state of the test "moves on" in its lifecycle
-    def notifyLifecycleChange(self, test, state, changeDesc):
-        pass
-    # Called when no further actions will be performed on the test
-    def notifyComplete(self, test):
-        pass
-    # Called when everything is finished
-    def notifyAllComplete(self):
-        pass
-    def canBeMainThread(self):
-        return True
 
-class TextDisplayResponder(Responder):
+class TextDisplayResponder(plugins.Responder):
     def notifyComplete(self, test):
         if test.state.hasFailed():
             self.describe(test)
     def describe(self, test):
         print test.getIndent() + repr(test), test.state.description()
             
-class SaveState(Responder):
-    def notifyComplete(self, test):
-        if test.state.isComplete():
-            self.performSave(test)
-    def performSave(self, test):
-        # overridden in subclasses
-        test.saveState()
             
-class InteractiveResponder(Responder):
+class InteractiveResponder(plugins.Responder):
     def __init__(self, optionMap, *args):
-        Responder.__init__(self)
         self.overwriteSuccess = optionMap.has_key("n")
         self.overwriteFailure = optionMap.has_key("o")
         self.overwriteVersion = optionMap.get("o")

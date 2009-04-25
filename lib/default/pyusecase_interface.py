@@ -1,6 +1,5 @@
 
 import plugins, os
-from respond import Responder
 
 def getLoggerName(staticGUI, dynamicGUI):
     if staticGUI:
@@ -34,7 +33,7 @@ def _makeScriptEngine(optionMap):
 
 
 # Compulsory responder to generate application events. Always present. See respond module
-class ApplicationEventResponder(Responder):
+class ApplicationEventResponder(plugins.Responder):
     scriptEngine = None
     def notifyLifecycleChange(self, test, state, changeDesc):
         if changeDesc.find("saved") != -1 or changeDesc.find("recalculated") != -1 or changeDesc.find("marked") != -1:

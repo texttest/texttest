@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, plugins, respond, sys, string, time, types, shutil, datetime, testoverview
+import os, plugins, sys, string, time, types, shutil, datetime, testoverview
 from ndict import seqdict
 from cPickle import Pickler
 
@@ -151,9 +151,8 @@ class BatchApplicationData:
         return contents
 
 # Works only on UNIX
-class BatchResponder(respond.Responder):
+class BatchResponder(plugins.Responder):
     def __init__(self, optionMap, *args):
-        respond.Responder.__init__(self, optionMap)
         self.sessionName = optionMap["b"]
         self.runId = optionMap.get("name", calculateBatchDate()) # use the command-line name if given, else the date
         self.batchAppData = seqdict()
@@ -373,9 +372,8 @@ def getVersionName(app):
     
 
 # Allow saving results to a historical repository
-class SaveState(respond.SaveState):
+class SaveState(plugins.Responder):
     def __init__(self, optionMap, *args):
-        respond.SaveState.__init__(self, optionMap)
         self.batchSession = optionMap["b"]
         self.fileName = self.createFileName(optionMap.get("name"))
         self.repositories = {}
@@ -386,13 +384,14 @@ class SaveState(respond.SaveState):
         if nameGiven:
             parts.append(nameGiven)
         return string.join(parts, "_")
-    def performSave(self, test):
-        test.saveState()
-        if self.repositories.has_key(test.app):
-            self.diag.info("Saving " + repr(test) + " to repository")
-            self.saveToRepository(test)
-        else:
-            self.diag.info("No repositories for " + repr(test.app) + " in " + repr(self.repositories))
+    def notifyComplete(self, test):
+        if test.state.isComplete(): # might look weird but this notification also comes in scripts, e.g collecting
+            test.saveState()
+            if self.repositories.has_key(test.app):
+                self.diag.info("Saving " + repr(test) + " to repository")
+                self.saveToRepository(test)
+            else:
+                self.diag.info("No repositories for " + repr(test.app) + " in " + repr(self.repositories))
     def saveToRepository(self, test):
         testRepository = self.repositories[test.app]
         targetFile = os.path.join(testRepository, test.app.name, getVersionName(test.app), \
@@ -475,9 +474,8 @@ class ArchiveRepository(plugins.ScriptWithArgs):
             return False
         return True
 
-class WebPageResponder(respond.Responder):
+class WebPageResponder(plugins.Responder):
     def __init__(self, optionMap, allApps):
-        respond.Responder.__init__(self, optionMap, allApps)
         self.batchSession = optionMap.get("b", "default")
         self.allApps = allApps
     def addSuites(self, suites):

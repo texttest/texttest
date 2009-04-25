@@ -28,7 +28,6 @@ except:
 
 import pango, guiplugins, plugins, os, sys, operator, subprocess
 from ndict import seqdict
-from respond import Responder
 from copy import copy
 from TreeViewTooltips import TreeViewTooltips
 
@@ -199,14 +198,14 @@ class IdleHandlerManager:
         self.disableHandler()
 
 
-class TextTestGUI(Responder, plugins.Observable):
+class TextTestGUI(plugins.Responder, plugins.Observable):
     scriptEngine = None
     def __init__(self, optionMap, allApps):
         vanilla = optionMap.has_key("vanilla")
         self.readGtkRCFiles(vanilla)
         self.dynamic = not optionMap.has_key("gx")
         self.setUpGlobals(allApps)
-        Responder.__init__(self)
+        plugins.Responder.__init__(self)
         plugins.Observable.__init__(self)
         testCount = int(optionMap.get("count", 0))
 

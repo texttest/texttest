@@ -5,7 +5,7 @@ from time import sleep
 from ndict import seqdict
 from copy import copy, deepcopy
 from cPickle import dumps
-from respond import Responder, TextDisplayResponder, InteractiveResponder
+from default.console import TextDisplayResponder, InteractiveResponder
 from default.knownbugs import CheckForBugs
 from default.actionrunner import ActionRunner, BaseActionRunner
 from default.unixonly import VirtualDisplayResponder
@@ -41,9 +41,9 @@ class FindExecutionHosts(default.sandbox.FindExecutionHosts):
 def socketSerialise(test):
     return test.app.name + test.app.versionSuffix() + ":" + test.getRelPath()
 
-class SocketResponder(Responder,plugins.Observable):
+class SocketResponder(plugins.Responder,plugins.Observable):
     def __init__(self, optionMap, *args):
-        Responder.__init__(self)
+        plugins.Responder.__init__(self)
         plugins.Observable.__init__(self)
         self.serverAddress = self.getServerAddress(optionMap)
     def getServerAddress(self, optionMap):
@@ -351,9 +351,9 @@ class SlaveRequestHandler(StreamRequestHandler):
     def getHostName(self, ipAddress):
         return socket.gethostbyaddr(ipAddress)[0].split(".")[0]
 
-class SlaveServerResponder(Responder, TCPServer):
+class SlaveServerResponder(plugins.Responder, TCPServer):
     def __init__(self, *args):
-        Responder.__init__(self, *args)
+        plugins.Responder.__init__(self, *args)
         TCPServer.__init__(self, (socket.gethostname(), 0), self.handlerClass())
         self.testMap = {}
         self.testClientInfo = {}

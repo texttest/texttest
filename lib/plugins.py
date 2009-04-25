@@ -478,6 +478,29 @@ class Observable:
         else:
             return method(*args, **kwargs)
 
+# Interface all responders must fulfil
+class Responder:
+    def __init__(self, *args):
+        pass
+    def addSuites(self, suites):
+        for suite in suites:
+            self.addSuite(suite)
+    # Full suite of tests, get notified of it at the start...
+    def addSuite(self, suite):
+        pass
+    # Called when the state of the test "moves on" in its lifecycle
+    def notifyLifecycleChange(self, test, state, changeDesc):
+        pass
+    # Called when no further actions will be performed on the test
+    def notifyComplete(self, test):
+        pass
+    # Called when everything is finished
+    def notifyAllComplete(self):
+        pass
+    def canBeMainThread(self):
+        return True
+
+
 # Generic state which tests can be in, should be overridden by subclasses
 # Acts as a static state for tests which have not run (yet)
 # Free text is text of arbitrary length: it will appear in the "Text Info" GUI window when the test is viewed

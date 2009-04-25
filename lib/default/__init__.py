@@ -1,5 +1,5 @@
 
-import os, sys, plugins, sandbox, respond, rundependent, pyusecase_interface, comparetest, batch, subprocess, operator, glob, signal, shutil
+import os, sys, plugins, sandbox, console, rundependent, pyusecase_interface, comparetest, batch, subprocess, operator, glob, signal, shutil
 
 from copy import copy
 from string import Template
@@ -251,7 +251,7 @@ class Config:
     def getThreadActionClasses(self):
         return [ ActionRunner ]
     def getTextDisplayResponderClass(self):
-        return respond.TextDisplayResponder
+        return console.TextDisplayResponder
     def isolatesDataUsingCatalogues(self, app):
         return app.getConfigValue("create_catalogues") == "true" and \
                len(app.getConfigValue("partial_copy_test_path")) > 0
@@ -494,7 +494,7 @@ class Config:
         if self.batchMode():
             return batch.SaveState
         else:
-            return respond.SaveState
+            return SaveState
     def getConfigEnvironment(self, test):
         testEnvironmentCreator = self.getEnvironmentCreator(test)
         return testEnvironmentCreator.getVariables()
@@ -503,7 +503,7 @@ class Config:
     def getInteractiveReplayOptions(self):
         return [ ("actrep", "slow motion") ]
     def getTextResponder(self):
-        return respond.InteractiveResponder
+        return console.InteractiveResponder
     # Utilities, which prove useful in many derived classes
     def optionValue(self, option):
         return self.optionMap.get(option, "")
@@ -866,6 +866,12 @@ class Config:
         self.setBatchDefaults(app)
         self.setPerformanceDefaults(app)
         self.setUsecaseDefaults(app)
+
+class SaveState(plugins.Responder):
+    def notifyComplete(self, test):
+        if test.state.isComplete(): # might look weird but this notification also comes in scripts etc.
+            test.saveState()
+
 
 class OrFilter(plugins.Filter):
     def __init__(self, filterLists):

@@ -16,29 +16,38 @@ class PrepareWriteDirectory(plugins.Action):
         self.ignoreCatalogues = ignoreCatalogues
         if self.ignoreCatalogues:
             self.diag.info("Ignoring all information in catalogue files")
+
     def __call__(self, test):
         self.collatePaths(test, "copy_test_path", self.copyTestPath)
         self.collatePaths(test, "partial_copy_test_path", self.partialCopyTestPath)
         self.collatePaths(test, "link_test_path", self.linkTestPath)
         test.createPropertiesFiles()
+
     def collatePaths(self, test, configListName, collateMethod):
         for configName in test.getConfigValue(configListName, expandVars=False):
             self.collatePath(test, configName, collateMethod)
+
     def collatePath(self, test, configName, collateMethod):
         sourcePath = self.getSourcePath(test, configName)
-        target = self.getTargetPath(test, configName)
-        self.diag.info("Collating " + configName + " from " + repr(sourcePath) + "\nto " + repr(target))
+        targetMachine, targetPath = self.getTargetPath(test, configName)
+        self.diag.info("Collating " + configName + " from " + repr(sourcePath) + "\nto " + repr(targetPath) + " on " + targetMachine)
         if sourcePath:
-            self.collateExistingPath(test, sourcePath, target, collateMethod)
+            self.collateExistingPath(test, sourcePath, targetMachine, targetPath, collateMethod)
 
         envVarToSet, propFileName = self.findDataEnvironment(test, configName)
         if envVarToSet:
-            self.diag.info("Setting env. variable " + envVarToSet + " to " + target)
-            test.setEnvironment(envVarToSet, target, propFileName)
-    def collateExistingPath(self, test, sourcePath, target, collateMethod):
+            self.diag.info("Setting env. variable " + envVarToSet + " to " + targetPath)
+            test.setEnvironment(envVarToSet, targetPath, propFileName)
+
+    def collateExistingPath(self, test, sourcePath, targetMachine, targetPath, collateMethod):
         self.diag.info("Path for linking/copying at " + sourcePath)
-        plugins.ensureDirExistsForFile(target)
-        collateMethod(test, sourcePath, target)
+        if targetMachine == "localhost":
+            plugins.ensureDirExistsForFile(targetPath)
+            collateMethod(test, sourcePath, targetPath)
+        else:
+            test.app.ensureRemoteDirExists(targetMachine, os.path.dirname(targetPath))
+            test.app.copyFileRemotely(sourcePath, "localhost", targetPath, targetMachine)
+
     def getEnvironmentSourcePath(self, configName, test):
         pathName = self.getPathFromEnvironment(configName, test)
         if pathName != configName:
@@ -48,7 +57,11 @@ class PrepareWriteDirectory(plugins.Action):
     def getTargetPath(self, test, configName):
         # handle environment variables
         localName = os.path.basename(self.getPathFromEnvironment(configName, test))
-        return test.makeTmpFileName(localName, forComparison=0)
+        machine, remoteTmpDir = test.app.getRemoteTmpDirectory()
+        if remoteTmpDir:
+            return machine, os.path.join(remoteTmpDir, test.getRelPath(), localName)
+        else:
+            return "localhost", test.makeTmpFileName(localName, forComparison=0)
     def getSourcePath(self, test, configName):
         # These can refer to environment variables or to paths within the test structure
         fileName = self.getSourceFileName(configName, test)
@@ -222,7 +235,7 @@ class PrepareWriteDirectory(plugins.Action):
     def copySUTRemotely(self, machine, tmpDir, suite):
         self.diag.info("Copying SUT to machine " + machine + " at " + tmpDir)
         fullTmpDir = os.path.join(tmpDir, "system_under_test")
-        suite.app.runCommandOn(machine, [ "mkdir", "-p", fullTmpDir ])
+        suite.app.ensureRemoteDirExists(machine, fullTmpDir)
         for setting in [ "interpreter", "executable" ]:
             file = suite.getConfigValue(setting)
             if os.path.isabs(file) and os.path.exists(file):

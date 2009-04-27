@@ -592,7 +592,7 @@ class Config:
         if remoteCopy:
             runMachine = app.getRunMachine()
             if runMachine != "localhost":
-                return runMachine, ".texttest/tmp/" + os.path.basename(app.writeDirectory)
+                return runMachine, "~/.texttest/tmp/" + os.path.basename(app.writeDirectory)
         return None, None
                 
     def executableShouldBeFile(self, app, executable):
@@ -879,6 +879,9 @@ class Config:
         else:
             return subprocess.call(allArgs, stdin=open(os.devnull), stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
 
+    def ensureRemoteDirExists(self, app, machine, dirname):
+        self.runCommandOn(app, machine, [ "mkdir", "-p", dirname ])
+
     def getRemotePath(self, file, machine):
         if machine == "localhost":
             return file
@@ -892,9 +895,10 @@ class Config:
         return subprocess.call(args, stdin=open(os.devnull), stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
 
     def getRemoteProgramArgs(self, app, setting):
-        prog = app.getConfigValue(setting)
-        argStr = app.getCompositeConfigValue("remote_program_options", prog)
-        return [ prog ] + plugins.splitcmd(argStr)
+        progStr = app.getConfigValue(setting)
+        progArgs = plugins.splitcmd(progStr)
+        argStr = app.getCompositeConfigValue("remote_program_options", progArgs[0])
+        return progArgs + plugins.splitcmd(argStr)
 
     def setMiscDefaults(self, app):
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
@@ -1148,6 +1152,7 @@ class RunTest(plugins.Action):
     def getPreExecFunction(self):
         if os.name == "posix":
             return self.ignoreJobControlSignals
+
     def ignoreJobControlSignals(self):
         for signum in [ signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU ]:
             signal.signal(signum, signal.SIG_IGN)
@@ -1166,8 +1171,23 @@ class RunTest(plugins.Action):
         args.append(test.getConfigValue("executable"))
         args.append(self.getOptions(test))
         runMachine = test.app.getRunMachine()
-        return test.app.getCommandArgsOn(runMachine, args)
-    
+        if runMachine == "localhost":
+            return args
+        else:
+            tmpDir = self.getTmpDirectory(test)
+            args = [ "cd", tmpDir, '";"' ] + args
+            # Need to change working directory remotely
+            return test.app.getCommandArgsOn(runMachine, args)
+
+    def getTmpDirectory(self, test):
+        machine, remoteAppTmp = test.app.getRemoteTmpDirectory()
+        if remoteAppTmp:
+            remoteTmp = os.path.join(remoteAppTmp, test.getRelPath())
+            test.app.ensureRemoteDirExists(machine, remoteTmp)
+            return remoteTmp
+        else:
+            return test.getDirectory(temporary=1)
+        
     def getExecuteCmdArgs(self, test):
         parts = self.getCmdParts(test)
         basicArgs = reduce(operator.add, map(plugins.splitcmd, parts))
@@ -1176,9 +1196,11 @@ class RunTest(plugins.Action):
             return [ "time", "-p", "-o", perfFile ] + basicArgs
         else:
             return basicArgs
+
     def makeFile(self, test, name):
         fileName = test.makeTmpFileName(name)
         return open(fileName, "w")
+
     def getInputFile(self, test):
         inputFileName = test.getFileName("input")
         if inputFileName:

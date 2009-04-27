@@ -288,8 +288,11 @@ class CommandLineTraffic(Traffic):
         interestingEnviron = []
         for var in self.currentTest.getCompositeConfigValue("collect_traffic_environment", self.commandName):
             value = cmdEnviron.get(var)
-            if value is not None and value != self.currentTest.getEnvironment(var):
-                interestingEnviron.append((var, value))
+            if value is not None:
+                currValue = self.currentTest.getEnvironment(var)
+                self.diag.info("Checking environment " + var + "=" + value + " against " + repr(currValue))
+                if value != currValue:
+                    interestingEnviron.append((var, value))
         return interestingEnviron
 
     def hasChangedWorkingDirectory(self):

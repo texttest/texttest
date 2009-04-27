@@ -221,29 +221,19 @@ class PrepareWriteDirectory(plugins.Action):
                     
     def copySUTRemotely(self, machine, tmpDir, suite):
         self.diag.info("Copying SUT to machine " + machine + " at " + tmpDir)
-        remoteTmpDir = self.makeRemoteTmpDir(machine, tmpDir, suite.app)
+        fullTmpDir = os.path.join(tmpDir, "system_under_test")
+        suite.app.runCommandOn(machine, [ "mkdir", "-p", fullTmpDir ])
         for setting in [ "interpreter", "executable" ]:
             file = suite.getConfigValue(setting)
             if os.path.isabs(file) and os.path.exists(file):
                 # If not absolute, assume it's an installed program
                 # If it doesn't exist locally, it must already exist remotely or we'd have raised an error by now
-                remoteFile = self.copyFileRemotely(suite.getConfigValue("remote_copy_program"), remoteTmpDir, file)
+                remoteFile = os.path.join(fullTmpDir, os.path.basename(file))
+                suite.app.copyFileRemotely(file, "localhost", remoteFile, machine)
                 self.diag.info("Copied " + file + " to " + remoteFile)
                 # For convenience, so we don't have to set it everywhere...
                 suite.app.setConfigDefault(setting, remoteFile)
-
-    def makeRemoteTmpDir(self, machine, tmpDir, app):
-        # We hardcode the standard tmp directory location, assume overwrites of TEXTTEST_TMP
-        # won't apply on a different file system
-        remoteTmpDir = tmpDir + "/system_under_test"
-        app.runCommandOn(machine, [ "mkdir", "-p", remoteTmpDir ])
-        return machine + ":" + remoteTmpDir
         
-    def copyFileRemotely(self, copyProgram, remoteDir, file):
-        remotePath = os.path.join(remoteDir, os.path.basename(file))
-        subprocess.call([ copyProgram, file, remotePath ])
-        return remotePath.split(":")[-1]
-
 
 # Class for automatically adding things to test environment files...
 class TestEnvironmentCreator:

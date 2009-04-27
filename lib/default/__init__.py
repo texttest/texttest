@@ -853,18 +853,19 @@ class Config:
         app.setConfigDefault("gui_entry_overrides", { "default" : "<not set>" }, "Default settings for entries in the GUI")
         app.setConfigDefault("gui_entry_options", { "default" : [] }, "Default drop-down box options for GUI entries")
         app.setConfigDefault("suppress_stderr_popup", [], "List of patterns which, if written on stderr, should not produce a warning popup")
-    def getDefaultRemoteShellOptions(self):
+    def getDefaultRemoteProgramOptions(self):
         # The aim is to ensure they never hang, but always return errors if contact not possible
         # Disable passwords: only use public key based authentication.
         # Also disable hostkey checking, we assume we don't run tests on untrusted hosts.
         # Also don't run tests on machines which take a very long time to connect to...
-        return { "default": "", "ssh" : "-o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10" }
+        return { "default": "", "ssh" : "-o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10",
+                 "rsync" : "-az", "scp": "-C" }
 
     def getCommandArgsOn(self, app, machine, cmdArgs):
         if machine == "localhost":
             return cmdArgs
         else:
-            return self.getRemoteShellArgs(app) + [ machine ] + cmdArgs
+            return self.getRemoteProgramArgs(app, "remote_shell_program") + [ machine ] + cmdArgs
 
     def runCommandOn(self, app, machine, cmdArgs, collectExitCode=False):
         allArgs = self.getCommandArgsOn(app, machine, cmdArgs)
@@ -878,16 +879,28 @@ class Config:
         else:
             return subprocess.call(allArgs, stdin=open(os.devnull), stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
 
-    def getRemoteShellArgs(self, app):
-        prog = app.getConfigValue("remote_shell_program")
-        argStr = app.getCompositeConfigValue("remote_shell_options", prog)
+    def getRemotePath(self, file, machine):
+        if machine == "localhost":
+            return file
+        else:
+            return machine + ":" + file
+
+    def copyFileRemotely(self, app, srcFile, srcMachine, dstFile, dstMachine):
+        srcPath = self.getRemotePath(srcFile, srcMachine)
+        dstPath = self.getRemotePath(dstFile, dstMachine)
+        args = self.getRemoteProgramArgs(app, "remote_copy_program") + [ srcPath, dstPath ]
+        return subprocess.call(args, stdin=open(os.devnull), stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
+
+    def getRemoteProgramArgs(self, app, setting):
+        prog = app.getConfigValue(setting)
+        argStr = app.getCompositeConfigValue("remote_program_options", prog)
         return [ prog ] + plugins.splitcmd(argStr)
 
     def setMiscDefaults(self, app):
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
         app.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")
         app.setConfigDefault("remote_shell_program", "rsh", "Program to use for running commands remotely")
-        app.setConfigDefault("remote_shell_options", self.getDefaultRemoteShellOptions(), "Default options to use for particular remote shell programs")
+        app.setConfigDefault("remote_program_options", self.getDefaultRemoteProgramOptions(), "Default options to use for particular remote shell programs")
         app.setConfigDefault("remote_copy_program", "", "(UNIX) Program to use for copying files remotely, in case of non-shared file systems")
         app.setConfigDefault("default_filter_file", [], "Filter file to use by default, generally only useful for versions")
         app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")

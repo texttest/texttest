@@ -858,8 +858,9 @@ class Config:
         # Disable passwords: only use public key based authentication.
         # Also disable hostkey checking, we assume we don't run tests on untrusted hosts.
         # Also don't run tests on machines which take a very long time to connect to...
-        return { "default": "", "ssh" : "-o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10",
-                 "rsync" : "-az", "scp": "-C" }
+        sshOptions = "-o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10"
+        return { "default": "", "ssh" : sshOptions,
+                 "rsync" : "-az", "scp": "-C " + sshOptions }
 
     def getCommandArgsOn(self, app, machine, cmdArgs):
         if machine == "localhost":
@@ -880,7 +881,11 @@ class Config:
             return subprocess.call(allArgs, stdin=open(os.devnull), stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
 
     def ensureRemoteDirExists(self, app, machine, dirname):
-        self.runCommandOn(app, machine, [ "mkdir", "-p", dirname ])
+        cmdArgs = [ "mkdir", "-p", dirname ]
+        exitCode = self.runCommandOn(app, machine, cmdArgs, collectExitCode=True)
+        if exitCode > 0:
+            raise plugins.TextTestError, "Unable to contact machine '" + machine + \
+                  "'. Command run was:\n" + " ".join(self.getCommandArgsOn(app, machine, cmdArgs))
 
     def getRemotePath(self, file, machine):
         if machine == "localhost":

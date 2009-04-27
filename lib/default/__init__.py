@@ -457,6 +457,9 @@ class Config:
     def cleanWriteDirectory(self, suite):
         if not self.keepTemporaryDirectories():
             self._cleanWriteDirectory(suite)
+            machine, tmpDir = self.getRemoteTmpDirectory(suite.app)
+            if tmpDir:
+                self.runCommandOn(suite.app, machine, [ "rm", "-rf", tmpDir ])
     def _cleanWriteDirectory(self, suite):
         if os.path.isdir(suite.app.writeDirectory):
             plugins.rmtree(suite.app.writeDirectory)
@@ -564,12 +567,34 @@ class Config:
         if not executable:
             raise plugins.TextTestError, "config file entry 'executable' not defined"
         if self.executableShouldBeFile(suite.app, executable) and not os.path.isfile(executable):
-            raise plugins.TextTestError, "The executable program '" + executable + "' does not exist."
+            self.handleNonExistent(executable, "executable", suite.app)
 
         interpreter = suite.getConfigValue("interpreter")
         if os.path.isabs(interpreter) and not os.path.exists(interpreter):
-            raise plugins.TextTestError, "The interpreter program '" + interpreter + "' does not exist."
-        
+            self.handleNonExistent(interpreter, "interpreter", suite.app)
+
+    def pathExistsRemotely(self, path, machine, app):
+        exitCode = self.runCommandOn(app, machine, [ "test", "-e", path ], collectExitCode=True)
+        return exitCode == 0
+ 
+    def handleNonExistent(self, path, desc, app):
+        message = "The " + desc + " program '" + path + "' does not exist"
+        remoteCopy = app.getConfigValue("remote_copy_program")
+        if remoteCopy:
+            runMachine = app.getRunMachine()
+            if runMachine != "localhost":
+                if not self.pathExistsRemotely(path, runMachine, app):
+                    raise plugins.TextTestError, message + ", either locally or on machine '" + runMachine + "'."
+        raise plugins.TextTestError, message + "."
+
+    def getRemoteTmpDirectory(self, app):
+        remoteCopy = app.getConfigValue("remote_copy_program")
+        if remoteCopy:
+            runMachine = app.getRunMachine()
+            if runMachine != "localhost":
+                return runMachine, ".texttest/tmp/" + os.path.basename(app.writeDirectory)
+        return None, None
+                
     def executableShouldBeFile(self, app, executable):
         # For finding java classes, don't warn if they don't exist as files...
         interpreter = app.getConfigValue("interpreter")
@@ -834,15 +859,36 @@ class Config:
         # Also disable hostkey checking, we assume we don't run tests on untrusted hosts.
         # Also don't run tests on machines which take a very long time to connect to...
         return { "default": "", "ssh" : "-o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10" }
+
+    def getCommandArgsOn(self, app, machine, cmdArgs):
+        if machine == "localhost":
+            return cmdArgs
+        else:
+            return self.getRemoteShellArgs(app) + [ machine ] + cmdArgs
+
+    def runCommandOn(self, app, machine, cmdArgs, collectExitCode=False):
+        allArgs = self.getCommandArgsOn(app, machine, cmdArgs)
+        if allArgs[0] == "rsh" and collectExitCode:
+            searchStr = "remote cmd succeeded"
+            # Funny tricks here because rsh does not forward the exit status of the program it runs
+            allArgs += [ "&&", "echo", searchStr ]
+            proc = subprocess.Popen(allArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            output = proc.communicate()[0]
+            return searchStr not in output # Return an "exit code" which is 0 when we succeed!
+        else:
+            return subprocess.call(allArgs, stdin=open(os.devnull), stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
+
     def getRemoteShellArgs(self, app):
         prog = app.getConfigValue("remote_shell_program")
         argStr = app.getCompositeConfigValue("remote_shell_options", prog)
         return [ prog ] + plugins.splitcmd(argStr)
+
     def setMiscDefaults(self, app):
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
         app.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")
         app.setConfigDefault("remote_shell_program", "rsh", "Program to use for running commands remotely")
         app.setConfigDefault("remote_shell_options", self.getDefaultRemoteShellOptions(), "Default options to use for particular remote shell programs")
+        app.setConfigDefault("remote_copy_program", "", "(UNIX) Program to use for copying files remotely, in case of non-shared file systems")
         app.setConfigDefault("default_filter_file", [], "Filter file to use by default, generally only useful for versions")
         app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
         app.setConfigDefault("test_data_properties", { "default" : "" }, "Write the contents of test_data_environment to the given Java properties file")
@@ -1092,22 +1138,23 @@ class RunTest(plugins.Action):
     def ignoreJobControlSignals(self):
         for signum in [ signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU ]:
             signal.signal(signum, signal.SIG_IGN)
+
     def getInterpreter(self, test):
         interpreter = test.getConfigValue("interpreter")
         if interpreter.startswith("ttpython"): # interpreted to mean "whatever python TextTest runs with"
             return interpreter.replace("ttpython", sys.executable + " -u")
         return interpreter
+
     def getCmdParts(self, test):
         args = []
-        runMachine = test.app.getRunMachine()
-        if runMachine != "localhost":
-            args += test.app.getRemoteShellArgs() + [ runMachine ]
         interpreter = self.getInterpreter(test)
         if interpreter:
             args.append(interpreter)
         args.append(test.getConfigValue("executable"))
         args.append(self.getOptions(test))
-        return args
+        runMachine = test.app.getRunMachine()
+        return test.app.getCommandArgsOn(runMachine, args)
+    
     def getExecuteCmdArgs(self, test):
         parts = self.getCmdParts(test)
         basicArgs = reduce(operator.add, map(plugins.splitcmd, parts))

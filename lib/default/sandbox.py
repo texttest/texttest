@@ -212,6 +212,39 @@ class PrepareWriteDirectory(plugins.Action):
         fileName = line.strip()[pos:]
         return fileName, indent
 
+    def setUpSuite(self, suite):
+        if suite.parent is None:
+            # Copy the executables remotely, if necessary
+            machine, tmpDir = suite.app.getRemoteTmpDirectory()
+            if tmpDir:
+                self.copySUTRemotely(machine, tmpDir, suite)
+                    
+    def copySUTRemotely(self, machine, tmpDir, suite):
+        self.diag.info("Copying SUT to machine " + machine + " at " + tmpDir)
+        remoteTmpDir = self.makeRemoteTmpDir(machine, tmpDir, suite.app)
+        for setting in [ "interpreter", "executable" ]:
+            file = suite.getConfigValue(setting)
+            if os.path.isabs(file) and os.path.exists(file):
+                # If not absolute, assume it's an installed program
+                # If it doesn't exist locally, it must already exist remotely or we'd have raised an error by now
+                remoteFile = self.copyFileRemotely(suite.getConfigValue("remote_copy_program"), remoteTmpDir, file)
+                self.diag.info("Copied " + file + " to " + remoteFile)
+                # For convenience, so we don't have to set it everywhere...
+                suite.app.setConfigDefault(setting, remoteFile)
+
+    def makeRemoteTmpDir(self, machine, tmpDir, app):
+        # We hardcode the standard tmp directory location, assume overwrites of TEXTTEST_TMP
+        # won't apply on a different file system
+        remoteTmpDir = tmpDir + "/system_under_test"
+        app.runCommandOn(machine, [ "mkdir", "-p", remoteTmpDir ])
+        return machine + ":" + remoteTmpDir
+        
+    def copyFileRemotely(self, copyProgram, remoteDir, file):
+        remotePath = os.path.join(remoteDir, os.path.basename(file))
+        subprocess.call([ copyProgram, file, remotePath ])
+        return remotePath.split(":")[-1]
+
+
 # Class for automatically adding things to test environment files...
 class TestEnvironmentCreator:
     def __init__(self, test, optionMap):
@@ -313,7 +346,6 @@ class TestEnvironmentCreator:
             elif (dataFile.endswith(".jar") or dataFile.endswith(".class")) and "CLASSPATH" not in pathVars:
                 pathVars.append("CLASSPATH")
         return pathVars
-
 
 
 class CollateFiles(plugins.Action):

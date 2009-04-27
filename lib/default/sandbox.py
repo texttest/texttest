@@ -57,9 +57,9 @@ class PrepareWriteDirectory(plugins.Action):
     def getTargetPath(self, test, configName):
         # handle environment variables
         localName = os.path.basename(self.getPathFromEnvironment(configName, test))
-        machine, remoteTmpDir = test.app.getRemoteTmpDirectory()
+        machine, remoteTmpDir = test.app.getRemoteTestTmpDir(test)
         if remoteTmpDir:
-            return machine, os.path.join(remoteTmpDir, test.getRelPath(), localName)
+            return machine, os.path.join(remoteTmpDir, localName)
         else:
             return "localhost", test.makeTmpFileName(localName, forComparison=0)
     def getSourcePath(self, test, configName):
@@ -412,6 +412,9 @@ class CollateFiles(plugins.Action):
 
     def collate(self, test):
         testCollations = self.expandCollations(test, self.collations)
+        machine, remoteTmpDir = test.app.getRemoteTestTmpDir(test)
+        if remoteTmpDir:
+            self.fetchRemoteFiles(test, machine, remoteTmpDir)
         for targetStem, sourcePattern in testCollations.items():
             targetFile = test.makeTmpFileName(targetStem)
             collationErrFile = test.makeTmpFileName(targetStem + ".collate_errs", forFramework=1)
@@ -420,6 +423,10 @@ class CollateFiles(plugins.Action):
                     self.diag.info("Extracting " + fullpath + " to " + targetFile)
                     self.extract(test, fullpath, targetFile, collationErrFile)
                     break
+
+    def fetchRemoteFiles(self, test, machine, tmpDir):
+        test.app.copyFileRemotely(os.path.join(tmpDir, "*"), machine, test.getDirectory(temporary=1), "localhost")
+    
     def getFilesPresent(self, test):
         files = seqdict()
         for targetStem, sourcePattern in self.collations.items():
@@ -427,11 +434,13 @@ class CollateFiles(plugins.Action):
                 self.diag.info("Pre-existing file found " + fullPath)
                 files[fullPath] = plugins.modifiedTime(fullPath)
         return files
+    
     def testEdited(self, test, fullPath):
         filesBefore = self.filesPresentBefore[test]
         if not filesBefore.has_key(fullPath):
             return True
         return filesBefore[fullPath] != plugins.modifiedTime(fullPath)
+
     def findPaths(self, test, sourcePattern):
         self.diag.info("Looking for pattern " + sourcePattern + " for " + repr(test))
         pattern = test.makeTmpFileName(sourcePattern, forComparison=0)
@@ -466,7 +475,7 @@ class CollateFiles(plugins.Action):
         scripts = test.getCompositeConfigValue("collate_script", stem)
         if len(scripts) == 0:
             return shutil.copyfile(sourceFile, targetFile)
-
+            
         currProc = None
         stdin = None
         for script in scripts:

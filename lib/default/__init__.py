@@ -593,7 +593,14 @@ class Config:
             runMachine = app.getRunMachine()
             if runMachine != "localhost":
                 return runMachine, "~/.texttest/tmp/" + os.path.basename(app.writeDirectory)
-        return None, None
+        return "localhost", None
+
+    def getRemoteTestTmpDir(self, test):
+        machine, appTmpDir = self.getRemoteTmpDirectory(test.app)
+        if appTmpDir:
+            return machine, os.path.join(appTmpDir, test.getRelPath())
+        else:
+            return machine, appTmpDir
                 
     def executableShouldBeFile(self, app, executable):
         # For finding java classes, don't warn if they don't exist as files...
@@ -860,7 +867,7 @@ class Config:
         # Also don't run tests on machines which take a very long time to connect to...
         sshOptions = "-o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10"
         return { "default": "", "ssh" : sshOptions,
-                 "rsync" : "-az", "scp": "-C " + sshOptions }
+                 "rsync" : "-az", "scp": "-Cr " + sshOptions }
 
     def getCommandArgsOn(self, app, machine, cmdArgs):
         if machine == "localhost":
@@ -1185,9 +1192,8 @@ class RunTest(plugins.Action):
             return test.app.getCommandArgsOn(runMachine, args)
 
     def getTmpDirectory(self, test):
-        machine, remoteAppTmp = test.app.getRemoteTmpDirectory()
-        if remoteAppTmp:
-            remoteTmp = os.path.join(remoteAppTmp, test.getRelPath())
+        machine, remoteTmp = test.app.getRemoteTestTmpDir(test)
+        if remoteTmp:
             test.app.ensureRemoteDirExists(machine, remoteTmp)
             return remoteTmp
         else:

@@ -1149,18 +1149,17 @@ class RunTest(plugins.Action):
     def getRunDescription(self, test):
         commandArgs = self.getExecuteCmdArgs(test)
         text =  "Command Line   : " + plugins.commandLineString(commandArgs) + "\n"
-        interestingVars = []
-        testEnv = test.getRunEnvironment()
-        for var, value in testEnv.items():
-            if value != os.getenv(var):
-                interestingVars.append(var)
+        interestingVars = self.getEnvironmentChanges(test)
         if len(interestingVars) == 0:
             return text
         text += "\nEnvironment variables :\n"
-        interestingVars.sort()
-        for var in interestingVars:
-            text += var + ": " + testEnv.get(var) + "\n"
+        for var, value in interestingVars:
+            text += var + ": " + value + "\n"
         return text
+
+    def getEnvironmentChanges(self, test):
+        testEnv = test.getRunEnvironment()
+        return sorted(filter(lambda (var, value): value != os.getenv(var), testEnv.items()))
         
     def getTestProcess(self, test):
         commandArgs = self.getExecuteCmdArgs(test)
@@ -1196,10 +1195,19 @@ class RunTest(plugins.Action):
             return args
         else:
             tmpDir = self.getTmpDirectory(test)
-            args = [ "cd", tmpDir, '";"' ] + args
+            envArgs = self.getEnvironmentArgs(test) # Must set the environment remotely
+            args = [ "cd", tmpDir, '";"' ] + envArgs + args
             # Need to change working directory remotely
             return test.app.getCommandArgsOn(runMachine, args)
 
+    def getEnvironmentArgs(self, test):
+        vars = self.getEnvironmentChanges(test)
+        if len(vars) == 0:
+            return []
+        else:
+            # Double quote as two shells will end up intrepreting this...
+            return [ "env" ] + [ var + "='\""+ value + "\"'" for var, value in vars ]
+    
     def getTmpDirectory(self, test):
         machine, remoteTmp = test.app.getRemoteTestTmpDir(test)
         if remoteTmp:

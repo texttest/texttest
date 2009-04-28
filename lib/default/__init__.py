@@ -577,6 +577,9 @@ class Config:
     def pathExistsRemotely(self, path, machine, app):
         exitCode = self.runCommandOn(app, machine, [ "test", "-e", path ], collectExitCode=True)
         return exitCode == 0
+
+    def checkConnection(self, app, machine):
+        self.runCommandAndCheckMachine(app, machine, [ "echo", "hello" ])
  
     def handleNonExistent(self, path, desc, app):
         message = "The " + desc + " '" + path + "' does not exist"
@@ -585,6 +588,7 @@ class Config:
             runMachine = app.getRunMachine()
             if runMachine != "localhost":
                 if not self.pathExistsRemotely(path, runMachine, app):
+                    self.checkConnection(app, runMachine) # throws if we can't get to it
                     raise plugins.TextTestError, message + ", either locally or on machine '" + runMachine + "'."
         raise plugins.TextTestError, message + "."
 
@@ -888,12 +892,15 @@ class Config:
         else:
             return subprocess.call(allArgs, stdin=open(os.devnull), stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
 
-    def ensureRemoteDirExists(self, app, machine, dirname):
-        cmdArgs = [ "mkdir", "-p", dirname ]
+    def runCommandAndCheckMachine(self, app, machine, cmdArgs):
         exitCode = self.runCommandOn(app, machine, cmdArgs, collectExitCode=True)
         if exitCode > 0:
             raise plugins.TextTestError, "Unable to contact machine '" + machine + \
-                  "'. Command run was:\n" + " ".join(self.getCommandArgsOn(app, machine, cmdArgs))
+                  "'.\nMake sure you have passwordless access set up correctly. The failing command was:\n" + \
+                  " ".join(self.getCommandArgsOn(app, machine, cmdArgs))
+
+    def ensureRemoteDirExists(self, app, machine, dirname):
+        self.runCommandAndCheckMachine(app, machine, [ "mkdir", "-p", dirname ])
 
     def getRemotePath(self, file, machine):
         if machine == "localhost":

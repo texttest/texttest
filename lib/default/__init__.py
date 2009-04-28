@@ -1205,8 +1205,15 @@ class RunTest(plugins.Action):
         if len(vars) == 0:
             return []
         else:
-            # Double quote as two shells will end up intrepreting this...
-            return [ "env" ] + [ var + "='\""+ value + "\"'" for var, value in vars ]
+            args = [ "env" ]
+            for var, value in vars:
+                remoteValue = value
+                if var == "PATH":
+                    # This needs to be correctly reset remotely
+                    remoteValue = value.replace(os.getenv(var), "${" + var + "}")
+                # Double quote as two shells will end up intrepreting this...
+                args.append(var + "='\"" + remoteValue + "\"'")
+            return args
     
     def getTmpDirectory(self, test):
         machine, remoteTmp = test.app.getRemoteTestTmpDir(test)

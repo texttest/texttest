@@ -590,7 +590,8 @@ class Config:
                 if not self.pathExistsRemotely(path, runMachine, app):
                     self.checkConnection(app, runMachine) # throws if we can't get to it
                     raise plugins.TextTestError, message + ", either locally or on machine '" + runMachine + "'."
-        raise plugins.TextTestError, message + "."
+        else:
+            raise plugins.TextTestError, message + "."
 
     def getRemoteTmpDirectory(self, app):
         remoteCopy = app.getConfigValue("remote_copy_program")

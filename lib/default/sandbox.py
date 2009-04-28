@@ -414,6 +414,10 @@ class CollateFiles(plugins.Action):
         if not self.filesPresentBefore.has_key(test):
             self.filesPresentBefore[test] = self.getFilesPresent(test)
         else:
+            machine, remoteTmpDir = test.app.getRemoteTestTmpDir(test)
+            if remoteTmpDir:
+                self.fetchRemoteFiles(test, machine, remoteTmpDir)
+        
             self.removeUnwanted(test)
             self.collate(test)
     def removeUnwanted(self, test):
@@ -427,9 +431,6 @@ class CollateFiles(plugins.Action):
 
     def collate(self, test):
         testCollations = self.expandCollations(test, self.collations)
-        machine, remoteTmpDir = test.app.getRemoteTestTmpDir(test)
-        if remoteTmpDir:
-            self.fetchRemoteFiles(test, machine, remoteTmpDir)
         for targetStem, sourcePattern in testCollations.items():
             targetFile = test.makeTmpFileName(targetStem)
             collationErrFile = test.makeTmpFileName(targetStem + ".collate_errs", forFramework=1)

@@ -1073,6 +1073,11 @@ class RunTest(plugins.Action):
             self.killProcess()
         self.lock.release()
 
+    def storeReturnCode(self, test, code):
+        file = open(test.makeTmpFileName("exitcode"), "w")
+        file.write(str(code) + "\n")
+        file.close()
+
     def checkAndClear(self, test):        
         returncode = self.currentProcess.returncode
         self.diag.info("Process terminated with return code " + repr(returncode))
@@ -1084,6 +1089,9 @@ class RunTest(plugins.Action):
         self.currentProcess = None
         if test in self.killedTests:
             self.changeToKilledState(test)
+        elif returncode: # Don't bother to store return code when tests are killed, it isn't interesting
+            self.storeReturnCode(test, returncode)
+        
         self.lock.release()
     def waitForKill(self):
         for i in range(10):

@@ -522,21 +522,22 @@ class Config:
             return "" # Allow empty checkout, means no checkout is set, basically
         
         try: 
-            self.verifyCheckoutValid(checkoutPath)
+            self.verifyCheckoutValid(checkoutPath, app)
             os.environ["TEXTTEST_CHECKOUT"] = checkoutPath # Full path to the checkout directory
             return checkoutPath
         except plugins.TextTestError, e:
             if self.ignoreExecutable():
-                print "WARNING: " + str(e) + " - ignoring checkout."
+                print "WARNING: " + str(e) + " Ignoring checkout."
                 return ""
             else:
                 raise
     
-    def verifyCheckoutValid(self, checkoutPath):
+    def verifyCheckoutValid(self, checkoutPath, app):
         if not os.path.isabs(checkoutPath):
             raise plugins.TextTestError, "could not create absolute checkout from relative path '" + checkoutPath + "'"
         elif not os.path.isdir(checkoutPath):
-            raise plugins.TextTestError, "checkout '" + checkoutPath + "' does not exist"
+            self.handleNonExistent(checkoutPath, "checkout", app)
+
     def checkSanity(self, suite):
         if not self.ignoreExecutable() and not self.optionMap.has_key("gx"):
             self.checkExecutableExists(suite)
@@ -567,18 +568,18 @@ class Config:
         if not executable:
             raise plugins.TextTestError, "config file entry 'executable' not defined"
         if self.executableShouldBeFile(suite.app, executable) and not os.path.isfile(executable):
-            self.handleNonExistent(executable, "executable", suite.app)
+            self.handleNonExistent(executable, "executable program", suite.app)
 
         interpreter = suite.getConfigValue("interpreter")
         if os.path.isabs(interpreter) and not os.path.exists(interpreter):
-            self.handleNonExistent(interpreter, "interpreter", suite.app)
+            self.handleNonExistent(interpreter, "interpreter program", suite.app)
 
     def pathExistsRemotely(self, path, machine, app):
         exitCode = self.runCommandOn(app, machine, [ "test", "-e", path ], collectExitCode=True)
         return exitCode == 0
  
     def handleNonExistent(self, path, desc, app):
-        message = "The " + desc + " program '" + path + "' does not exist"
+        message = "The " + desc + " '" + path + "' does not exist"
         remoteCopy = app.getConfigValue("remote_copy_program")
         if remoteCopy:
             runMachine = app.getRunMachine()

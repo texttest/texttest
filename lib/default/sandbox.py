@@ -231,21 +231,36 @@ class PrepareWriteDirectory(plugins.Action):
             machine, tmpDir = suite.app.getRemoteTmpDirectory()
             if tmpDir:
                 self.copySUTRemotely(machine, tmpDir, suite)
+
+    def tryCopyPathRemotely(self, path, fullTmpDir, machine, app):
+        if os.path.isabs(path) and os.path.exists(path):
+            # If not absolute, assume it's an installed program
+            # If it doesn't exist locally, it must already exist remotely or we'd have raised an error by now
+            remotePath = os.path.join(fullTmpDir, os.path.basename(path))
+            app.copyFileRemotely(path, "localhost", remotePath, machine)
+            self.diag.info("Copied " + path + " to " + remotePath)
+            return remotePath
                     
     def copySUTRemotely(self, machine, tmpDir, suite):
         self.diag.info("Copying SUT to machine " + machine + " at " + tmpDir)
         fullTmpDir = os.path.join(tmpDir, "system_under_test")
         suite.app.ensureRemoteDirExists(machine, fullTmpDir)
+        checkout = suite.app.checkout
+        remoteCheckout = self.tryCopyPathRemotely(checkout, fullTmpDir, machine, suite.app)
+        if remoteCheckout:
+            suite.app.checkout = remoteCheckout
+            suite.setEnvironment("TEXTTEST_CHECKOUT", remoteCheckout)
+            os.environ["TEXTTEST_CHECKOUT"] = remoteCheckout
+            
         for setting in [ "interpreter", "executable" ]:
             file = suite.getConfigValue(setting)
-            if os.path.isabs(file) and os.path.exists(file):
-                # If not absolute, assume it's an installed program
-                # If it doesn't exist locally, it must already exist remotely or we'd have raised an error by now
-                remoteFile = os.path.join(fullTmpDir, os.path.basename(file))
-                suite.app.copyFileRemotely(file, "localhost", remoteFile, machine)
-                self.diag.info("Copied " + file + " to " + remoteFile)
+            if remoteCheckout and file.startswith(checkout):
+                continue # We've copied it already, don't do it again...
+            remoteFile = self.tryCopyPathRemotely(file, fullTmpDir, machine, suite.app)
+            if remoteFile:
                 # For convenience, so we don't have to set it everywhere...
                 suite.app.setConfigDefault(setting, remoteFile)
+        
         
 
 # Class for automatically adding things to test environment files...

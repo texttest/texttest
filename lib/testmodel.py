@@ -1225,9 +1225,9 @@ class Application:
         return self.dircache.dir
     def getRunMachine(self):
         if self.inputOptions.has_key("m"):
-            return self.inputOptions["m"]
+            return plugins.interpretHostname(self.inputOptions["m"])
         else:
-            return self.getConfigValue("default_machine")
+            return plugins.interpretHostname(self.getConfigValue("default_machine"))
     def readConfigFiles(self, configModuleInitialised):
         self.readDefaultConfigFiles()
         self.readExplicitConfigFiles(configModuleInitialised)

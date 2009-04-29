@@ -639,6 +639,25 @@ def gethostname():
     fullname = socket.gethostname()
     return fullname.split(".")[0]
 
+# Return 'localhost' if it is the local host...
+def interpretHostname(hostname):
+    if hostname == "localhost" or len(hostname) == 0:
+        return "localhost"
+    localhost = gethostname()
+    if hostsMatch(hostname, localhost):
+        return "localhost"
+    else:
+        return hostname
+
+def hostsMatch(hostname, localhost):
+    if "@" in hostname:
+        user, host = hostname.split("@")
+        return hostsMatch(host, localhost) and user == os.getenv("USER")
+    else:
+        parts = hostname.split(".")
+        return parts[0] == localhost
+    
+
 # Hacking around os.path.getcwd not working with AMD automounter
 def abspath(relpath):
     if os.environ.has_key("PWD"):

@@ -95,7 +95,7 @@ class QueueSystemConfig(default.Config):
         default.Config.addToOptionGroups(self, apps, groups)
         for group in groups:
             if group.name.startswith("Basic"):
-                group.addSwitch("l", "", value = self.runLocallyByDefault(), options = ["Submit tests to grid", "Run tests locally"])
+                group.addSwitch("l", "", value = self.runLocallyByDefault(), options = ["Submit tests to grid", "Run tests directly (bypass grid)"])
             elif group.name.startswith("Advanced"):
                 group.addOption("R", "Request grid resource", possibleValues = self.getPossibleResources())
                 group.addOption("q", "Request grid queue", possibleValues = self.getPossibleQueues())
@@ -104,6 +104,14 @@ class QueueSystemConfig(default.Config):
             elif group.name.startswith("Invisible"):
                 group.addOption("slave", "Private: used to submit slave runs remotely")
                 group.addOption("servaddr", "Private: used to submit slave runs remotely")
+    def getMachineNameForDisplay(self, machine):
+        # Don't display localhost, as it's not true when using the grid
+        # Should really be something like "whatever grid gives us" but blank space will do for now...
+        if machine == "localhost":
+            return "" 
+        else:
+            return machine
+
     def runLocallyByDefault(self):
         return False
     def getPossibleQueues(self):
@@ -262,6 +270,9 @@ class SubmissionRules:
             resourceList.append(self.optionMap["R"])
         if len(self.envResource):
             resourceList.append(self.envResource)
+        machine = self.test.app.getRunMachine()
+        if machine != "localhost":
+            resourceList.append("hostname=" + machine) # Won't work with LSF, but can't be bothered to figure it out there for now...
         if self.forceOnPerformanceMachines():
             resources = self.getConfigValue("performance_test_resource")
             for resource in resources:

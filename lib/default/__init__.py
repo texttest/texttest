@@ -23,6 +23,8 @@ class Config:
         self.optionMap = optionMap
         self.filterFileMap = {}
         self.reconnectConfig = ReconnectConfig(optionMap)
+    def getMachineNameForDisplay(self, machine):
+        return machine # override for queuesystems
     def addToOptionGroups(self, apps, groups):
         recordsUseCases = reduce(operator.or_, (app.getConfigValue("use_case_record_mode") != "disabled" for app in apps), False)
         useCatalogues = reduce(operator.or_, (self.isolatesDataUsingCatalogues(app) for app in apps), False)
@@ -44,7 +46,7 @@ class Config:
                     version, checkout, machine = "", "", ""
                 group.addOption("v", "Run this version", version)
                 group.addOption("c", "Use checkout", checkout)
-                group.addOption("m", "Run on machine", machine)
+                group.addOption("m", "Run on machine", self.getMachineNameForDisplay(machine))
                 group.addOption("cp", "Times to run", "1", description="Set this to some number larger than 1 to run the same test multiple times, for example to try to catch indeterminism in the system under test")
                 if recordsUseCases:
                     group.addSwitch("actrep", "Run with slow motion replay")

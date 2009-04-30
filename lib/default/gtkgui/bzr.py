@@ -9,7 +9,19 @@ class BzrInterface(version_control.VersionControlInterface):
         errorStates = [ "Unknown", "Conflicts", "Kind changed" ]
         version_control.VersionControlInterface.__init__(self, controlDir, "Bazaar", warningStates, errorStates, "-1")
         self.defaultArgs["rm"] = [ "--force" ]
-        
+
+    def isVersionControlled(self, dirname):
+        args = self.getCmdArgs("status") + [ dirname ]
+        output = self.getProcessResults(args)[1]
+        # Unless the result is "unknown:" followed by the relpath of the dirname, it's version controlled, at least a bit...
+        lines = output.splitlines()
+        if len(lines) != 2:
+            return True
+        if lines[0].strip() != "unknown:":
+            return True
+        pathname = os.path.normpath(lines[1].strip())
+        return not dirname.endswith(pathname)
+                
     def getDateFromLog(self, output):
         for line in output.splitlines():
             if line.startswith("timestamp:"):

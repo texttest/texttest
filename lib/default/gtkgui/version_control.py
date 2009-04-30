@@ -18,11 +18,11 @@ class VersionControlInterface:
         self.defaultArgs = {}
 
     def isVersionControlled(self, dirname):
-        basicArgs = self.getCmdArgs("stat")
+        basicArgs = self.getCmdArgs("status")
         for file in self.getFileNames(dirname, recursive=True):
             output = self.getProcessResults(basicArgs + [ file ])[1]
             status = self.getStateFromStatus(output)
-            if status != "Unknown":
+            if status != "Unknown" and status != "Ignored":
                 return True
         return False
         

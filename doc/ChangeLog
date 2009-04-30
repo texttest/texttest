@@ -1356,8 +1356,15 @@ General GUI Enhancements:
 Static GUI Enhancements:
     - "Create File" functionality enhanced. (default_gui.py)
 	Will now handle directories correctly, and you can choose your source with a filechooser now.
+    - Can now run all the tests in a suite by selecting just that suite (default_gui.py)
+	Also works for reconnecting and saving selections.
 Dynamic GUI Enhancements:
 Framework Enhancements:
+    - Can now run tests on a remote machine (UNIX only) (default.py)
+	Even works if file system not shared. New config entries "remote_shell_program" 
+	and "remote_copy_program". See website for details.
+    - TextTest now collects exit codes from the system under test by default (default.py)
+	Only writes files for non-zero status. Can be disabled via discard_file
     - Can now remove certain elements from versioned config files (plugins.py)
 	New syntax {CLEAR <item>}
     - Can now filter floating-point differences to within a certain tolerance (rundependent.py/fpdiff.py)
@@ -1392,9 +1399,12 @@ Bug Fixes:
 	Actually stores and replays the directory removal directly.
     - No longer flag runs as missing if batch_collect_compulsory_version overlaps with versions given on command line (batch.py)
     - Python 2.6 shouldn't produce annoying messages about deprecated modules any more.
+    - Worked around GTK 2.14 bug in file chooser handling, will no longer hang
     - Race condition removed from virtual server handling on UNIX: shouldn't leak virtual servers any more (startXvfb.py)
     - No longer stacktrace if "interpreter" is an invalid path (default/__init__.py)
     - No longer stacktrace when repositioning tests if no write permissions to the files (default_gui.py)
     - Now shows correct test names in the status bar after a rename (engine.py)
     - Don't crash if copying or moving a suite and its contents (default_gui.py)
     - Now works to run locally from bin directory. Thanks again to Michael Behrisch (texttest.py)
+    - Website generation works for "Extra version" applications even if the parent is blocked (batch.py)
+	

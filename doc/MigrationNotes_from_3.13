@@ -27,7 +27,17 @@ builtin:traffic
 
 Obviously you can swap "traffic" for "usecase" if appropriate. 
 
-(2) Default value of TEXTTEST_TMP is changed
+(2) Exit codes now collected by default
+=======================================
+TextTest now collects the exit code from the system under test along with the standard 
+output and standard error. So if your program returns non-zero
+exit codes you will find tests reporting "exitcode new" (zero exit code
+will not create such a file). There are two things you can do at this point:
+
+a) Save the files and check them in, and be happy that this is now being monitored.
+b) Set "discard_file:exitcode" in your config file which will restores the previous default behaviour. 
+
+(3) Default value of TEXTTEST_TMP is changed
 ============================================
 It used to be ~/texttesttmp on UNIX and $TEMP on Windows. It's been changed
 to $TEXTTEST_PERSONAL_CONFIG/tmp (i.e. ~/.texttest/tmp unless you repoint the

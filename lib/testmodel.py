@@ -1358,8 +1358,9 @@ class Application:
         self.setConfigDefault("base_version", [], "Versions to inherit settings from")
         self.setConfigDefault("default_machine", "localhost", "Default machine to run tests on")
         # various varieties of test data
-        self.setConfigDefault("partial_copy_test_path", [], "Paths to be part-copied, part-linked to the temporary directory")
-        self.setConfigDefault("copy_test_path", [], "Paths to be copied to the temporary directory when running tests")
+        self.setConfigDefault("partial_copy_test_path", [], "Paths to be part-copied, part-linked to the sandbox")
+        self.setConfigDefault("copy_test_path", [], "Paths to be copied to the sandbox when running tests")
+        self.setConfigDefault("copy_test_path_merge", [], "Directories to be copied to the sandbox, and merged together")
         self.setConfigDefault("link_test_path", [], "Paths to be linked from the temp. directory when running tests")
         self.setConfigDefault("test_data_ignore", { "default" : [] }, \
                               "Elements under test data structures which should not be viewed or change-monitored")

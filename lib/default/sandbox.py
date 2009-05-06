@@ -19,20 +19,24 @@ class PrepareWriteDirectory(plugins.Action):
 
     def __call__(self, test):
         self.collatePaths(test, "copy_test_path", self.copyTestPath)
+        self.collatePaths(test, "copy_test_path_merge", self.copyTestPath, True)
         self.collatePaths(test, "partial_copy_test_path", self.partialCopyTestPath)
         self.collatePaths(test, "link_test_path", self.linkTestPath)
         test.createPropertiesFiles()
 
-    def collatePaths(self, test, configListName, collateMethod):
+    def collatePaths(self, test, configListName, *args):
         for configName in test.getConfigValue(configListName, expandVars=False):
-            self.collatePath(test, configName, collateMethod)
+            self.collatePath(test, configName, *args)
 
-    def collatePath(self, test, configName, collateMethod):
-        sourcePath = self.getSourcePath(test, configName)
+    def collatePath(self, test, configName, collateMethod, mergeDirectories=False):
+        sourcePaths = self.getSourcePaths(test, configName)
         targetMachine, targetPath = self.getTargetPath(test, configName)
-        self.diag.info("Collating " + configName + " from " + repr(sourcePath) + "\nto " + repr(targetPath) + " on " + targetMachine)
-        if sourcePath:
+        for sourcePath in sourcePaths:
+            self.diag.info("Collating " + configName + " from " + repr(sourcePath) +
+                           "\nto " + repr(targetPath) + " on " + targetMachine)
             self.collateExistingPath(test, sourcePath, targetMachine, targetPath, collateMethod)
+            if not mergeDirectories or not os.path.isdir(sourcePath):
+                break
 
         envVarToSet, propFileName = self.findDataEnvironment(test, configName)
         if envVarToSet:
@@ -52,8 +56,10 @@ class PrepareWriteDirectory(plugins.Action):
         pathName = self.getPathFromEnvironment(configName, test)
         if pathName != configName:
             return pathName
+    
     def getPathFromEnvironment(self, configName, test):
         return os.path.normpath(Template(configName).safe_substitute(test.environment))
+    
     def getTargetPath(self, test, configName):
         # handle environment variables
         localName = os.path.basename(self.getPathFromEnvironment(configName, test))
@@ -62,19 +68,24 @@ class PrepareWriteDirectory(plugins.Action):
             return machine, os.path.join(remoteTmpDir, localName)
         else:
             return "localhost", test.makeTmpFileName(localName, forComparison=0)
-    def getSourcePath(self, test, configName):
+    
+    def getSourcePaths(self, test, configName):
         # These can refer to environment variables or to paths within the test structure
         fileName = self.getSourceFileName(configName, test)
         self.diag.info("Found source file name for " + configName + " = " + fileName)
-        if not fileName or os.path.isabs(fileName):
-            return fileName
+        if not fileName:
+            return []
+        elif os.path.isabs(fileName):
+            return [ fileName ]
 
-        return test.getPathName(fileName, configName)
+        return reversed(test.getAllPathNames(fileName, configName)) # most specific first
+
     def getSourceFileName(self, configName, test):
         if configName.startswith("$"):
             return self.getEnvironmentSourcePath(configName, test)
         else:
             return configName
+
     def findDataEnvironment(self, test, configName):
         self.diag.info("Finding env. var name from " + configName)
         if configName.startswith("$"):
@@ -104,6 +115,8 @@ class PrepareWriteDirectory(plugins.Action):
         for name in names:
             srcname = os.path.join(src, name)
             dstname = os.path.join(dst, name)
+            if os.path.exists(dstname):
+                continue
             try:
                 if os.path.islink(srcname):
                     self.copylink(srcname, dstname)

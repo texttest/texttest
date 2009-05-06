@@ -1367,6 +1367,8 @@ Framework Enhancements:
 	Only writes files for non-zero status. Can be disabled via discard_file
     - Can now remove certain elements from versioned config files (plugins.py)
 	New syntax {CLEAR <item>}
+    - Can now tell TextTest to merge data directories with each other (sandbox.py)
+	Use new config setting "copy_test_path_merge". "copy_test_path" causes directories to be overwritten.
     - Can now filter floating-point differences to within a certain tolerance (rundependent.py/fpdiff.py)
 	New config file setting "floating_point_tolerance". See documentation on website. Thanks to Michael Behrisch for this.
     - Config file setting "performance_use_normalised_%" renamed for generic application (default.py)

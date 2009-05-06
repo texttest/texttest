@@ -389,25 +389,36 @@ class Test(plugins.Observable):
             return subdir
         except OSError:
             raise plugins.TextTestError, "Cannot create test sub-directory : " + subdir
+
     def getFileNamesMatching(self, pattern):
         pred = self.app.getExtensionPredicate(allVersions=False)
         return self.dircache.findFilesMatching(pattern, pred)
+
+    def getAppForVersion(self, refVersion=None):
+        if refVersion:
+            return self.app.getRefVersionApplication(refVersion)
+        else:
+            return self.app
+
     def getFileName(self, stem, refVersion = None):
         self.diagnose("Getting file from " + stem)
-        appToUse = self.app
-        if refVersion:
-            appToUse = self.app.getRefVersionApplication(refVersion)
-        return appToUse._getFileName([ self.dircache ], stem)
-    def getPathName(self, stem, configName=None):
-        return self.pathNameMethod(stem, configName, self.app._getFileName)
-    def getAllPathNames(self, stem, configName=None):
-        return self.pathNameMethod(stem, configName, self.app._getAllFileNames)
+        return self.getAppForVersion(refVersion)._getFileName([ self.dircache ], stem)
+
+    def getPathName(self, stem, configName=None, refVersion=None):
+        app = self.getAppForVersion(refVersion)
+        return self.pathNameMethod(stem, configName, app._getFileName)
+
+    def getAllPathNames(self, stem, configName=None, refVersion=None):
+        app = self.getAppForVersion(refVersion)
+        return self.pathNameMethod(stem, configName, app._getAllFileNames)
+
     def pathNameMethod(self, stem, configName, method):
         if configName is None:
             configName = stem
         dirCaches = self.getDirCachesToRoot(configName)
         self.diagnose("Directories to be searched: " + repr([ d.dir for d in dirCaches ]))
         return method(dirCaches, stem)
+
     def getAllTestsToRoot(self):
         tests = [ self ]
         if self.parent:

@@ -1946,33 +1946,32 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         if version:
             fileName += "." + version
         return fileName
+
     def getSourcePath(self, stem, version, targetPath):
         givenSource = self.optionGroup.getOptionValue("src")
         if givenSource != self.defaultValue:
             return givenSource
-        
-        thisTestName = self.currTestSelection[0].getFileName(stem, version)
-        if thisTestName and not os.path.basename(thisTestName) == targetPath:
-            return thisTestName
+            
+        pathNames = self.currTestSelection[0].getAllPathNames(stem, refVersion=version)
+        if len(pathNames) > 0:
+            if pathNames[-1] != targetPath:
+                return pathNames[-1]
+            elif len(pathNames) > 1:
+                return pathNames[-2]
 
-        test = self.currTestSelection[0].parent
-        while test:
-            currName = test.getFileName(stem, version)
-            if currName:
-                return currName
-            test = test.parent
     def performOnCurrent(self):
         stem = self.optionGroup.getOptionValue("stem")
         version = self.optionGroup.getOptionValue("v")
         targetPathName = self.getFileName(stem, version)
-        sourcePath = self.getSourcePath(stem, version, targetPathName)
+        targetPath = os.path.join(self.creationDir, targetPathName)
+        sourcePath = self.getSourcePath(stem, version, targetPath)
         # If the source has an app identifier in it we need to get one, or we won't get prioritised!
         stemWithApp = stem + "." + self.currTestSelection[0].app.name
         if sourcePath and os.path.basename(sourcePath).startswith(stemWithApp) and not targetPathName.startswith(stemWithApp):
             targetPathName = targetPathName.replace(stem, stemWithApp, 1)
-            sourcePath = self.getSourcePath(stem, version, targetPathName)
+            targetPath = os.path.join(self.creationDir, targetPathName)
+            sourcePath = self.getSourcePath(stem, version, targetPath)
 
-        targetPath = os.path.join(self.creationDir, targetPathName)
         plugins.ensureDirExistsForFile(targetPath)
         fileExisted = os.path.exists(targetPath)
         if sourcePath and os.path.exists(sourcePath):

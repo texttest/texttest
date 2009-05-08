@@ -477,7 +477,9 @@ class ArchiveRepository(plugins.ScriptWithArgs):
 class WebPageResponder(plugins.Responder):
     def __init__(self, optionMap, allApps):
         self.batchSession = optionMap.get("b", "default")
+        self.diag = plugins.getDiagnostics("GenerateWebPages")
         self.allApps = allApps
+
     def addSuites(self, suites):
         # These are the ones that got through. Remove all rejected apps...
         apps = set([ suite.app for suite in suites ])
@@ -505,8 +507,8 @@ class WebPageResponder(plugins.Responder):
             pageTopDir = app.getCompositeConfigValue("historical_report_location", self.batchSession)
             pageDir = os.path.join(pageTopDir, app.name)
             extraVersions = self.getExtraVersions(app)
-            subDirs = self.findRelevantSubdirectories(repository, app, extraVersions)
-            relevantSubDirs = [ (subDir, os.path.basename(subDir)) for subDir in subDirs ]
+            self.diag.info("Found extra versions " + repr(extraVersions))
+            relevantSubDirs = self.findRelevantSubdirectories(repository, app, extraVersions)
             self.makeAndGenerate(pageDir, app, extraVersions, relevantSubDirs, pageTitle)
                 
     def getAppRepositoryInfo(self):
@@ -525,18 +527,18 @@ class WebPageResponder(plugins.Responder):
         return appInfo
 
     def transformToCommon(self, pageInfo):
-        extraVersions, relevantSubDirs = [], []
+        extraVersions, relevantSubDirs = [], seqdict()
         for app, repository in pageInfo:
             extraVersions += self.getExtraVersions(app)
-            for relDir in self.findRelevantSubdirectories(repository, app, extraVersions):
-                relevantSubDirs.append((relDir, self.getVersionTitle(app, relDir)))
+            relevantSubDirs.update(self.findRelevantSubdirectories(repository, app, extraVersions, self.getVersionTitle))
         return app, extraVersions, relevantSubDirs
-    def getVersionTitle(self, app, dir):
-        version = os.path.basename(dir)
+
+    def getVersionTitle(self, app, version):
         title = app.fullName
         if len(version) > 0 and version != "default":
             title += " version " + version
         return title
+    
     def generateCommonPage(self, pageTitle, pageInfo):
         app, extraVersions, relevantSubDirs = self.transformToCommon(pageInfo)
         pageDir = app.getCompositeConfigValue("historical_report_location", self.batchSession)
@@ -556,21 +558,37 @@ class WebPageResponder(plugins.Responder):
         subPageNames = app.getCompositeConfigValue("historical_report_subpages", self.batchSession)
         generator.generate(relevantSubDirs, subPageNames)
 
-    def findRelevantSubdirectories(self, repository, app, extraVersions):
-        subdirs = []
+    def findMatchingExtraVersion(self, dirVersions, extraVersions):
+        # Check all tails that this is not an extraVersion
+        for pos in xrange(len(dirVersions)):
+            versionToCheck = ".".join(dirVersions[pos:])
+            if versionToCheck in extraVersions:
+                return versionToCheck
+        return ""
+        
+    def findRelevantSubdirectories(self, repository, app, extraVersions, versionTitleMethod=None):
+        subdirs = seqdict()
         dirlist = os.listdir(repository)
         dirlist.sort()
         appVersions = set(app.versions)
         for dir in dirlist:
             dirVersions = dir.split(".")
             if set(dirVersions).issuperset(appVersions):
-                # Check all tails that this is not an extraVersion
-                inExtraVersions = False;
-                for pos in xrange(len(dirVersions)):
-                    inExtraVersions = inExtraVersions or ".".join(dirVersions[pos:]) in extraVersions
-                if not inExtraVersions:
-                    subdirs.append(os.path.join(repository, dir))
+                currExtraVersion = self.findMatchingExtraVersion(dirVersions, extraVersions)
+                if currExtraVersion:
+                    version = dir.replace("." + currExtraVersion, "")
+                else:
+                    version = dir
+                if versionTitleMethod:
+                    versionTitle = versionTitleMethod(app, version)
+                else:
+                    versionTitle = version
+                fullPath = os.path.join(repository, dir)
+                self.diag.info("Found subdirectory " + dir + " with version " + versionTitle
+                               + " and extra version '" + currExtraVersion + "'")
+                subdirs.setdefault(versionTitle, []).append((currExtraVersion, fullPath))
         return subdirs
+    
     def getExtraVersions(self, app):
         extraVersions = []
         length = len(app.versions)
@@ -579,6 +597,7 @@ class WebPageResponder(plugins.Responder):
             if not version in app.versions:
                 extraVersions.append(version)
         return extraVersions
+
     
 class CollectFiles(plugins.ScriptWithArgs):
     scriptDoc = "Collect and send all batch reports that have been written to intermediate files"

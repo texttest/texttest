@@ -1408,5 +1408,4 @@ Bug Fixes:
     - Now shows correct test names in the status bar after a rename (engine.py)
     - Don't crash if copying or moving a suite and its contents (default_gui.py)
     - Now works to run locally from bin directory. Thanks again to Michael Behrisch (texttest.py)
-    - Website generation works for "Extra version" applications even if the parent is blocked (batch.py)
-	
+    - Website generation works for "Extra version" applications even if the parent is blocked or has no data (batch.py)

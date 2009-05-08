@@ -392,22 +392,23 @@ class CollateFiles(plugins.Action):
         newColl = seqdict()
         # copy items specified without "*" in targetStem
         self.diag.info("coll initial:", str(coll))
-        for targetStem, sourcePattern in coll.items():
+        for targetStem, sourcePatterns in coll.items():
             if not glob.has_magic(targetStem):
-                newColl[targetStem] = sourcePattern
+                newColl[targetStem] = sourcePatterns
         # add files generated from items in targetStem containing "*"
-        for targetStem, sourcePattern in coll.items():
+        for targetStem, sourcePatterns in coll.items():
             if not glob.has_magic(targetStem):
                 continue
 
             # add each file to newColl using suffix from sourcePtn
-            for aFile in self.getFilesFromExpansions(test, targetStem, sourcePattern):
-                fullStem = os.path.splitext(aFile)[0]
-                newTargetStem = os.path.basename(fullStem).replace(".", "_")
-                if not newColl.has_key(newTargetStem):
-                    sourceExt = os.path.splitext(sourcePattern)[1]
-                    self.diag.info("New collation to " + newTargetStem + " : from " + fullStem + " with extension " + sourceExt)
-                    newColl[newTargetStem] = fullStem + sourceExt
+            for sourcePattern in sourcePatterns:
+                for aFile in self.getFilesFromExpansions(test, targetStem, sourcePattern):
+                    fullStem = os.path.splitext(aFile)[0]
+                    newTargetStem = os.path.basename(fullStem).replace(".", "_")
+                    if not newColl.has_key(newTargetStem):
+                        sourceExt = os.path.splitext(sourcePattern)[1]
+                        self.diag.info("New collation to " + newTargetStem + " : from " + fullStem + " with extension " + sourceExt)
+                        newColl.setdefault(newTargetStem, []).append(fullStem + sourceExt)
         return newColl
     def getFilesFromExpansions(self, test, targetStem, sourcePattern):
         # generate a list of filenames from previously saved files
@@ -442,26 +443,32 @@ class CollateFiles(plugins.Action):
             except:
                 pass
 
+    def findEditedFile(self, test, patterns):
+        for pattern in patterns:
+            for fullpath in self.findPaths(test, pattern):
+                if self.testEdited(test, fullpath):
+                    return fullpath
+
     def collate(self, test):
         testCollations = self.expandCollations(test, self.collations)
-        for targetStem, sourcePattern in testCollations.items():
-            targetFile = test.makeTmpFileName(targetStem)
-            collationErrFile = test.makeTmpFileName(targetStem + ".collate_errs", forFramework=1)
-            for fullpath in self.findPaths(test, sourcePattern):
-                if self.testEdited(test, fullpath):
-                    self.diag.info("Extracting " + fullpath + " to " + targetFile)
-                    self.extract(test, fullpath, targetFile, collationErrFile)
-                    break
-
+        for targetStem, sourcePatterns in testCollations.items():
+            sourceFile = self.findEditedFile(test, sourcePatterns)
+            if sourceFile:
+                targetFile = test.makeTmpFileName(targetStem)
+                collationErrFile = test.makeTmpFileName(targetStem + ".collate_errs", forFramework=1)
+                self.diag.info("Extracting " + sourceFile + " to " + targetFile)
+                self.extract(test, sourceFile, targetFile, collationErrFile)
+                
     def fetchRemoteFiles(self, test, machine, tmpDir):
         test.app.copyFileRemotely(os.path.join(tmpDir, "*"), machine, test.getDirectory(temporary=1), "localhost")
     
     def getFilesPresent(self, test):
         files = seqdict()
-        for targetStem, sourcePattern in self.collations.items():
-            for fullPath in self.findPaths(test, sourcePattern):
-                self.diag.info("Pre-existing file found " + fullPath)
-                files[fullPath] = plugins.modifiedTime(fullPath)
+        for targetStem, sourcePatterns in self.collations.items():
+            for sourcePattern in sourcePatterns:
+                for fullPath in self.findPaths(test, sourcePattern):
+                    self.diag.info("Pre-existing file found " + fullPath)
+                    files[fullPath] = plugins.modifiedTime(fullPath)
         return files
     
     def testEdited(self, test, fullPath):

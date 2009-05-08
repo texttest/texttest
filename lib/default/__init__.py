@@ -803,9 +803,9 @@ class Config:
         return prios
     def getDefaultCollations(self):
         if os.name == "posix":
-            return { "stacktrace" : "core*" }
+            return { "stacktrace" : [ "core*" ] }
         else:
-            return {}
+            return { "" : [] }
     def getDefaultCollateScripts(self):
         if os.name == "posix":
             return { "default" : [], "stacktrace" : [ "interpretcore.py" ] }

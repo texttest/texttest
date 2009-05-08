@@ -43,3 +43,17 @@ It used to be ~/texttesttmp on UNIX and $TEMP on Windows. It's been changed
 to $TEXTTEST_PERSONAL_CONFIG/tmp (i.e. ~/.texttest/tmp unless you repoint the
 personal configuration directory) as that seemed more consistent, and nicer than polluting
 several different locations with TextTest's files.
+
+(4) collate_file is now a list
+==============================
+When collating a file you used to have to specify a single path or glob to read it from.
+Now you can provide multiple ones. One effect of this is that if you've tried to
+disabled a collation in some version with
+
+[collate_file]
+some_file:
+
+this won't work any more. You'll need to change it to
+
+[collate_file]
+some_file:{CLEAR LIST}

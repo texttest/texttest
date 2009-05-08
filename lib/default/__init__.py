@@ -896,11 +896,14 @@ class Config:
             return subprocess.call(allArgs, stdin=open(os.devnull), stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
 
     def runCommandAndCheckMachine(self, app, machine, cmdArgs):
-        exitCode = self.runCommandOn(app, machine, cmdArgs, collectExitCode=True)
+        allArgs = self.getCommandArgsOn(app, machine, cmdArgs)
+        proc = subprocess.Popen(allArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = proc.communicate()[0]
+        exitCode = proc.returncode
         if exitCode > 0:
             raise plugins.TextTestError, "Unable to contact machine '" + machine + \
                   "'.\nMake sure you have passwordless access set up correctly. The failing command was:\n" + \
-                  " ".join(self.getCommandArgsOn(app, machine, cmdArgs))
+                  " ".join(allArgs) + "\n\nThe command produced the following output:\n" + output
 
     def ensureRemoteDirExists(self, app, machine, dirname):
         self.runCommandAndCheckMachine(app, machine, [ "mkdir", "-p", dirname ])

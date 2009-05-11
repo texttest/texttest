@@ -341,7 +341,7 @@ class FileViewAction(guiplugins.ActionGUI):
         testDesc = self.testDescription()
         fullDesc = description + testDesc
         nullFile = open(os.devnull, "w")
-        guiplugins.processMonitor.startProcess(cmdArgs, fullDesc, stdout=nullFile, stderr=nullFile, *args, **kwargs)
+        guiplugins.processMonitor.startProcess(cmdArgs, fullDesc, *args, **kwargs)
         self.notify("Status", 'Started "' + description + '" in background' + testDesc + '.')
         self.notify("ViewerStarted")
 
@@ -1929,7 +1929,9 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         # That leaves the rest ("default")
         return defFiles + self.currTestSelection[0].defFileStems("default")
     def getStandardFiles(self):
-        stdFiles = [ "output", "errors" ] + self.currTestSelection[0].getConfigValue("collate_file").keys()
+        collateKeys = self.currTestSelection[0].getConfigValue("collate_file").keys()
+        # Don't pick up "dummy" indicators on Windows...
+        stdFiles = [ "output", "errors" ] + filter(lambda k: k, collateKeys)
         discarded = [ "stacktrace" ] + self.currTestSelection[0].getConfigValue("discard_file")
         return filter(lambda f: f not in discarded, stdFiles)
     def updateStems(self, fileType):

@@ -149,14 +149,20 @@ class LineNumberTrigger:
     def replace(self, line, newText):
         return newText + "\n"
 
+def getWriteDirRegexp(testId):
+    # Some stuff, a date, and the testId (ignore the appId as we don't know when or where)
+    return "[^ \"=]*/[^ \"=]*[0-3][0-9][A-Za-z][a-z][a-z][0-9]{6}[^ \"=]*/" + testId
+
 class LineFilter:
     divider = "{->}"
     # All syntax that affects how a match is found
     matcherStrings = [ "{LINE ", "{INTERNAL " ]
     # All syntax that affects what is done when a match is found
     matchModifierStrings = [ "{WORD ", "{REPLACE ", "{LINES " ]
+    internalExpressions = { "writedir" : getWriteDirRegexp }
     def __init__(self, text, testId, diag):
         self.originalText = text
+        self.testId = testId
         self.diag = diag
         self.triggers = []
         self.untrigger = None
@@ -165,15 +171,14 @@ class LineFilter:
         self.wordNumber = None
         self.replaceText = None
         self.removeWordsAfter = 0
-        self.internalExpressions = { "writedir" : self.getWriteDirRegexp(testId) }
         self.parseOriginalText()
 
-    def getWriteDirRegexp(self, testId):
-        # Some stuff, a date, and the testId (ignore the appId as we don't know when or where)
-        return "[^ \"=]*/[^ \"=]*[0-3][0-9][A-Za-z][a-z][a-z][0-9]{6}[^ \"=]*/" + testId
-
+    def getInternalExpression(self, parameter):
+        method = self.internalExpressions.get(parameter)
+        return method(self.testId)
+    
     def makeRegexTriggers(self, parameter):
-        expression = self.internalExpressions.get(parameter, parameter)
+        expression = self.getInternalExpression(parameter)
         triggers = [ plugins.TextTrigger(expression) ]
         if parameter == "writedir":
             triggers.append(plugins.TextTrigger(expression.replace("/", "\\\\")))

@@ -341,7 +341,7 @@ class FileViewAction(guiplugins.ActionGUI):
         testDesc = self.testDescription()
         fullDesc = description + testDesc
         nullFile = open(os.devnull, "w")
-        guiplugins.processMonitor.startProcess(cmdArgs, fullDesc, *args, **kwargs)
+        guiplugins.processMonitor.startProcess(cmdArgs, fullDesc, stdout=nullFile, stderr=nullFile, *args, **kwargs)
         self.notify("Status", 'Started "' + description + '" in background' + testDesc + '.')
         self.notify("ViewerStarted")
 

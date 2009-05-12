@@ -2130,8 +2130,9 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         self.addOption("full_description", "\nFull description (no bug system)")
         self.addOption("brief_description", "Few-word summary (no bug system)")
         self.addSwitch("trigger_on_absence", "Trigger if given text is NOT present")
-        self.addSwitch("internal_error", "Trigger even if other files differ (report as internal error)")
+        self.addSwitch("ignore_other_errors", "Trigger even if other files differ")
         self.addSwitch("trigger_on_success", "Trigger even if test would otherwise succeed")
+        self.addSwitch("internal_error", "Report as 'internal error' rather than 'known bug' (no bug system)")
     def _getStockId(self):
         return "info"
     def singleTestOnly(self):

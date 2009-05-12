@@ -49,7 +49,8 @@ class BugTrigger:
         self.textTrigger = plugins.TextTrigger(getOption("search_string"))
         self.triggerHosts = self.getTriggerHosts(getOption)
         self.checkUnchanged = int(getOption("trigger_on_success", "0"))
-        self.ignoreOtherErrors = int(getOption("internal_error", "0"))
+        self.reportInternalError = int(getOption("internal_error", "0"))
+        self.ignoreOtherErrors = int(getOption("ignore_other_errors", self.reportInternalError))
         self.bugInfo = self.createBugInfo(getOption)
         self.diag = plugins.getDiagnostics("Check For Bugs")
     def __repr__(self):
@@ -65,7 +66,7 @@ class BugTrigger:
         if bugSystem:
             return BugSystemBug(bugSystem, getOption("bug_id"))
         else:
-            return UnreportedBug(getOption("full_description"), getOption("brief_description"), self.ignoreOtherErrors)
+            return UnreportedBug(getOption("full_description"), getOption("brief_description"), self.reportInternalError)
     def matchesText(self, line):
         return self.textTrigger.matches(line)
     def findBug(self, execHosts, isChanged, multipleDiffs, line=None):

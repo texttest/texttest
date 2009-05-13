@@ -1030,7 +1030,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         if self.noApps:
             self.runInteractive()
 
-    def isActiveOnCurrent(self):
+    def isActiveOnCurrent(self, *args):
         return True
     def _getStockId(self):
         return "add"

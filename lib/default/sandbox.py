@@ -240,10 +240,13 @@ class PrepareWriteDirectory(plugins.Action):
 
     def setUpSuite(self, suite):
         if suite.parent is None:
-            # Copy the executables remotely, if necessary
-            machine, tmpDir = suite.app.getRemoteTmpDirectory()
-            if tmpDir:
-                self.copySUTRemotely(machine, tmpDir, suite)
+            self.tryCopySUTRemotely(suite)
+
+    def tryCopySUTRemotely(self, suite):
+        # Copy the executables remotely, if necessary
+        machine, tmpDir = suite.app.getRemoteTmpDirectory()
+        if tmpDir:
+            self.copySUTRemotely(machine, tmpDir, suite)
 
     def tryCopyPathRemotely(self, path, fullTmpDir, machine, app):
         if os.path.isabs(path) and os.path.exists(path):

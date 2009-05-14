@@ -18,6 +18,9 @@ class FailedPrediction(plugins.TestState):
             return "failure", self.briefText
 
 class Bug:
+    def __cmp__(self, other):
+        return cmp(self.getPriority(), other.getPriority())
+                   
     def findCategory(self, internalError):
         if internalError:
             return "badPredict"
@@ -28,6 +31,10 @@ class BugSystemBug(Bug):
     def __init__(self, bugSystem, bugId):
         self.bugId = bugId
         self.bugSystem = bugSystem
+
+    def getPriority(self):
+        return 2
+        
     def findInfo(self, script):
         exec "from " + self.bugSystem + " import findBugInfo as _findBugInfo"
         status, bugText, isResolved = _findBugInfo(script, self.bugId)
@@ -41,8 +48,16 @@ class UnreportedBug(Bug):
         self.briefText = briefText
         self.internalError = internalError
         self.bugSystem = "Internal"
+
+    def getPriority(self):
+        if self.internalError:
+            return 1
+        else:
+            return 3
+        
     def findInfo(self, script):
         return self.findCategory(self.internalError), self.briefText, self.fullText
+
 
 class BugTrigger:
     def __init__(self, getOption):
@@ -96,6 +111,7 @@ class FileBugData:
         self.absentList = []
         self.checkUnchanged = False
         self.diag = plugins.getDiagnostics("Check For Bugs")
+
     def addBugTrigger(self, getOption):
         bugTrigger = BugTrigger(getOption)
         if bugTrigger.checkUnchanged:
@@ -104,35 +120,41 @@ class FileBugData:
             self.absentList.append(bugTrigger)
         else:
             self.presentList.append(bugTrigger)
-    def findBug(self, fileName, execHosts, isChanged, multipleDiffs):
+
+    def findBugs(self, fileName, execHosts, isChanged, multipleDiffs):
         self.diag.info("Looking for bugs in " + fileName)
         if not self.checkUnchanged and not isChanged:
             self.diag.info("File not changed, ignoring")
-            return
+            return []
         if not os.path.isfile(fileName):
             self.diag.info("File doesn't exist, checking only for absence bugs")
-            return self.findAbsenceBug(self.absentList, execHosts, isChanged, multipleDiffs)
+            return self.findAbsenceBugs(self.absentList, execHosts, isChanged, multipleDiffs)
         
-        return self.findBugInText(open(fileName).readlines(), execHosts, isChanged, multipleDiffs)
-    def findBugInText(self, lines, execHosts, isChanged=True, multipleDiffs=False):
+        return self.findBugsInText(open(fileName).readlines(), execHosts, isChanged, multipleDiffs)
+
+    def findBugsInText(self, lines, execHosts, isChanged=True, multipleDiffs=False):
         currAbsent = copy(self.absentList)
+        bugs = []
         for line in lines:
             for bugTrigger in self.presentList:
                 self.diag.info("Checking for existence of " + repr(bugTrigger))
                 bug = bugTrigger.findBug(execHosts, isChanged, multipleDiffs, line)
                 if bug:
-                    return bug
+                    bugs.append(bug)
             for bugTrigger in currAbsent:
                 if bugTrigger.matchesText(line):
                     currAbsent.remove(bugTrigger)
-                    break
 
-        return self.findAbsenceBug(currAbsent, execHosts, isChanged, multipleDiffs)
-    def findAbsenceBug(self, absentList, execHosts, isChanged, multipleDiffs):
+        return bugs + self.findAbsenceBugs(currAbsent, execHosts, isChanged, multipleDiffs)
+
+    def findAbsenceBugs(self, absentList, execHosts, isChanged, multipleDiffs):
+        bugs = []
         for bugTrigger in absentList:
             bug = bugTrigger.findBug(execHosts, isChanged, multipleDiffs)
             if bug:
-                return bug
+                bugs.append(bug)
+        return bugs
+
 
 class ParseMethod:
     def __init__(self, parser, section):
@@ -211,24 +233,34 @@ class CheckForBugs(plugins.Action):
         if not self.checkTest(test, activeBugs):
             return
 
+        bug = self.findBug(test, activeBugs)
+        if bug:
+            category, briefText, fullText = bug.findInfo(test.getCompositeConfigValue("bug_system_location", bug.bugSystem))
+            self.diag.info("Changing to " + category + " with text " + briefText)
+            bugState = FailedPrediction(category, fullText, briefText, completed=1)
+            self.changeState(test, bugState)
+            
+    def findBug(self, test, activeBugs):
         multipleDiffs = self.hasMultipleDifferences(test)
+        bugs = []
         for stem, fileBugData in activeBugs.items():
-            bug = self.findBug(test, stem, fileBugData, multipleDiffs)
-            if bug:
-                category, briefText, fullText = bug.findInfo(test.getCompositeConfigValue("bug_system_location", bug.bugSystem))
-                self.diag.info("Changing to " + category + " with text " + briefText)
-                bugState = FailedPrediction(category, fullText, briefText, completed=1)
-                self.changeState(test, bugState)
-                return # no point searching for more bugs...
-    def findBug(self, test, stem, fileBugData, multipleDiffs):
+            bugs += self.findBugsInFile(test, stem, fileBugData, multipleDiffs)
+        if len(bugs) > 0:
+            bugs.sort()
+            return bugs[0]
+        
+    def findBugsInFile(self, test, stem, fileBugData, multipleDiffs):
         self.diag.info("Looking for bugs in file " + stem)
         if stem == "free_text":
-            return fileBugData.findBugInText(test.state.freeText.split("\n"), test.state.executionHosts)
+            return fileBugData.findBugsInText(test.state.freeText.split("\n"), test.state.executionHosts)
         elif test.state.hasResults():
             # bugs are only relevant if the file itself is changed, unless marked to trigger on success also
             isChanged = self.fileChanged(test, stem)
             fileName = test.makeTmpFileName(stem)
-            return fileBugData.findBug(fileName, test.state.executionHosts, isChanged, multipleDiffs)
+            return fileBugData.findBugs(fileName, test.state.executionHosts, isChanged, multipleDiffs)
+        else:
+            return []
+
     def changeState(self, test, bugState):
         if hasattr(test.state, "failedPrediction"):
             # if we've already compared, slot our things into the comparison object
@@ -237,6 +269,7 @@ class CheckForBugs(plugins.Action):
             test.changeState(newState)
         else:
             test.changeState(bugState)
+
     def hasMultipleDifferences(self, test):
         if not test.state.hasResults():
             # check for unrunnables...

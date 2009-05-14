@@ -1375,6 +1375,8 @@ Framework Enhancements:
 	Essentially collate_file is now a list. May require migration in theory.
     - Decoupled ignoring other errors from reporting bugs as "internal error" (knownbugs.py)
 	Now separate check boxes for these things when doing "Enter failure information"
+    - Bugs marked as "internal error" get reported in preference to "known bug" (knownbugs.py)
+	The latter are usually some catastrophic general environment failure
     - Config file setting "performance_use_normalised_%" renamed for generic application (default.py)
 	Now called "use_normalised_percentage_change" to reflect possible usage for other purposes. Old name aliased.
     - Traffic mechanism does not assume asynchronous file edits are possible any more (traffic.py)

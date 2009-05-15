@@ -1881,7 +1881,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         header = gtk.Label()
         guiplugins.guilog.info("Adding text '" + text + "'")
         header.set_markup(text + "\n")
-        vbox.pack_start(header)
+        vbox.pack_start(header, expand=False, fill=False)
     
     def getDirectoryText(self, test):
         relDir = plugins.relpath(self.creationDir, test.getDirectory())

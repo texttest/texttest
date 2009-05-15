@@ -186,12 +186,10 @@ class BugMap(seqdict):
         except:
             print "Bug file at", fileName, "not understood, ignoring"
     def readFromParser(self, parser):
-        for section in parser.sections():
+        for section in sorted(parser.sections()):
             getOption = ParseMethod(parser, section)
             fileStem = getOption("search_file")
-            if not self.has_key(fileStem):
-                self[fileStem] = FileBugData()
-            self[fileStem].addBugTrigger(getOption)
+            self.setdefault(fileStem, FileBugData()).addBugTrigger(getOption)
 
     
 class CheckForCrashes(plugins.Action):

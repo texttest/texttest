@@ -1319,7 +1319,7 @@ class TextOption(Option):
 
     def getPreviousDirectory(self):
         prevVal = self.getValue()
-        if os.path.exists(prevVal):
+        if prevVal and os.path.exists(prevVal):
             if self.selectDir:
                 return prevVal
             else:

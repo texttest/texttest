@@ -1847,17 +1847,16 @@ class ImportFiles(guiplugins.ActionDialogGUI):
     def __init__(self, allApps, *args):
         self.creationDir = None
         self.appendAppName = False
+        self.currentStem = ""
         guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
         self.addOption("stem", "Type of file/directory to create", allocateNofValues=2)
         self.addOption("v", "Version identifier to use")
         possibleDirs = sorted(set((app.getDirectory() for app in allApps)))
         # The point of this is that it's never sensible as the source for anything, so it serves as a "use the parent" option
         # for back-compatibility
-        self.defaultValue = self.findConfigFile(allApps)
-        self.addOption("src", "Source to copy from (leave unchanged to use file from parent suite)", self.defaultValue, selectFile=True, possibleDirs=possibleDirs)
-    def findConfigFile(self, allApps):
-        if len(allApps) > 0:
-            return os.path.join(allApps[0].getDirectory(), "config." + allApps[0].name)
+        self.addSwitch("imp", options=[ "Import file/directory from source", "Create a new file", "Create a new directory" ])
+        self.addOption("src", "Source to copy from", selectFile=True, possibleDirs=possibleDirs)
+
     def singleTestOnly(self):
         return True
     def _getTitle(self):
@@ -1870,13 +1869,57 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         return "Create/Import Files and Directories"
     def isActiveOnCurrent(self, *args):
         return self.creationDir is not None and guiplugins.ActionDialogGUI.isActiveOnCurrent(self, *args)
+    def getResizeDivisors(self):
+        # size of the dialog
+        return 1.4, 1.4
+    def getSignalsSent(self):
+        return [ "NewFile" ]
+    def messageAfterPerform(self):
+        pass
+
+    def updateOptions(self):
+        self.currentStem = ""
+        return False
+
     def fillVBox(self, vbox):
         test = self.currTestSelection[0]
         dirText = self.getDirectoryText(test)
         self.addText(vbox, "<b><u>" + dirText + "</u></b>")
         self.addText(vbox, "<i>(Test is " + repr(test) + ")</i>")
         return guiplugins.ActionDialogGUI.fillVBox(self, vbox)
-    
+
+    def stemChanged(self, *args):
+        option = self.optionGroup.getOption("stem")
+        newStem = option.getValue()    
+        if newStem in option.possibleValues and newStem != self.currentStem:
+            self.currentStem = newStem
+            version = self.optionGroup.getOptionValue("v")
+            sourcePath = self.getDefaultSourcePath(newStem, version)
+            self.optionGroup.setValue("src", sourcePath)
+            
+    def getTargetPath(self, *args, **kwargs):
+        targetPathName = self.getFileName(*args, **kwargs)
+        return os.path.join(self.creationDir, targetPathName)
+        
+    def getDefaultSourcePath(self, stem, version):
+        targetPath = self.getTargetPath(stem, version)
+        test = self.currTestSelection[0]
+        pathNames = test.getAllPathNames(stem, refVersion=version)
+        if len(pathNames) > 0:
+            firstSource = pathNames[-1]
+            if os.path.basename(firstSource).startswith(stem + "." + test.app.name):
+                targetPath = self.getTargetPath(stem, version, appendAppName=True)
+            if firstSource != targetPath:
+                return firstSource
+            elif len(pathNames) > 1:
+                return pathNames[-2]
+        return test.getDirectory()
+
+    def createComboBox(self, option):
+        combobox, entry = guiplugins.ActionDialogGUI.createComboBox(self, option)
+        handler = combobox.connect("changed", self.stemChanged)
+        return combobox, entry
+        
     def addText(self, vbox, text):
         header = gtk.Label()
         guiplugins.guilog.info("Adding text '" + text + "'")
@@ -1889,6 +1932,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
             return "Create or import files in test subdirectory '" + relDir + "'"
         else:
             return "Create or import files in the test directory"
+
     def notifyFileCreationInfo(self, creationDir, fileType):
         if fileType == "external":
             self.creationDir = None
@@ -1900,10 +1944,8 @@ class ImportFiles(guiplugins.ActionDialogGUI):
             if newActive:
                 self.updateStems(fileType)
                 self.appendAppName = (fileType == "definition" or fileType == "standard")
-    def getResizeDivisors(self):
-        # size of the dialog
-        return 1.4, 1.4
-    
+                self.optionGroup.setValue("imp", int(self.appendAppName))
+
     def findAllStems(self, fileType):
         if fileType == "definition":
             return self.getDefinitionFiles()
@@ -1913,6 +1955,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
             return self.getStandardFiles()
         else:
             return []
+
     def getDefinitionFiles(self):
         defFiles = []
         defFiles.append("environment")
@@ -1928,12 +1971,14 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         # (b) are not auto-generated ("regenerate")
         # That leaves the rest ("default")
         return defFiles + self.currTestSelection[0].defFileStems("default")
+
     def getStandardFiles(self):
         collateKeys = self.currTestSelection[0].getConfigValue("collate_file").keys()
         # Don't pick up "dummy" indicators on Windows...
         stdFiles = [ "output", "errors" ] + filter(lambda k: k, collateKeys)
         discarded = [ "stacktrace" ] + self.currTestSelection[0].getConfigValue("discard_file")
         return filter(lambda f: f not in discarded, stdFiles)
+
     def updateStems(self, fileType):
         stems = self.findAllStems(fileType)
         if len(stems) > 0:
@@ -1941,55 +1986,44 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         else:
             self.optionGroup.setValue("stem", "")
         self.optionGroup.setPossibleValues("stem", stems)
-    def getFileName(self, stem, version):
+
+    def getFileName(self, stem, version, appendAppName=False):
         fileName = stem
-        if self.appendAppName:
+        if self.appendAppName or appendAppName:
             fileName += "." + self.currTestSelection[0].app.name
         if version:
             fileName += "." + version
         return fileName
 
-    def getSourcePath(self, stem, version, targetPath):
-        givenSource = self.optionGroup.getOptionValue("src")
-        if givenSource != self.defaultValue:
-            return givenSource
-            
-        pathNames = self.currTestSelection[0].getAllPathNames(stem, refVersion=version)
-        if len(pathNames) > 0:
-            if pathNames[-1] != targetPath:
-                return pathNames[-1]
-            elif len(pathNames) > 1:
-                return pathNames[-2]
-
     def performOnCurrent(self):
         stem = self.optionGroup.getOptionValue("stem")
         version = self.optionGroup.getOptionValue("v")
-        targetPathName = self.getFileName(stem, version)
-        targetPath = os.path.join(self.creationDir, targetPathName)
-        sourcePath = self.getSourcePath(stem, version, targetPath)
-        # If the source has an app identifier in it we need to get one, or we won't get prioritised!
-        stemWithApp = stem + "." + self.currTestSelection[0].app.name
-        if sourcePath and os.path.basename(sourcePath).startswith(stemWithApp) and not targetPathName.startswith(stemWithApp):
-            targetPathName = targetPathName.replace(stem, stemWithApp, 1)
-            targetPath = os.path.join(self.creationDir, targetPathName)
-            sourcePath = self.getSourcePath(stem, version, targetPath)
+        action = self.optionGroup.getSwitchValue("imp")
+        test = self.currTestSelection[0]
+        if action > 0: # Create new
+            targetPath = self.getTargetPath(stem, version)
+            if os.path.exists(targetPath):
+                raise plugins.TextTestError, "Not creating file or directory : path already exists:\n" + targetPath
 
-        plugins.ensureDirExistsForFile(targetPath)
-        fileExisted = os.path.exists(targetPath)
-        if sourcePath and os.path.exists(sourcePath):
+            if action == 1:
+                plugins.ensureDirExistsForFile(targetPath)
+                file = open(targetPath, "w")
+                file.close()
+                guiplugins.guilog.info("Creating new empty file...")
+                self.notify("NewFile", targetPath, False)
+            elif action == 2:
+                plugins.ensureDirectoryExists(targetPath)
+                guiplugins.guilog.info("Creating new empty directory...")
+                test.filesChanged()
+        else:
+            sourcePath = self.optionGroup.getOptionValue("src")
+            appendAppName = os.path.basename(sourcePath).startswith(stem + "." + test.app.name)
+            targetPath = self.getTargetPath(stem, version, appendAppName) 
+            fileExisted = os.path.exists(targetPath)
             guiplugins.guilog.info("Creating new path, copying " + sourcePath)
             plugins.copyPath(sourcePath, targetPath)
-        elif not fileExisted:
-            file = open(targetPath, "w")
-            file.close()
-            guiplugins.guilog.info("Creating new empty file...")
-        else:
-            raise plugins.TextTestError, "Unable to create file, no possible source found and target file already exists:\n" + targetPath
-        self.notify("NewFile", targetPath, fileExisted)
-    def getSignalsSent(self):
-        return [ "NewFile" ]
-    def messageAfterPerform(self):
-        pass
+            self.notify("NewFile", targetPath, fileExisted)
+
 
 class RemoveTests(guiplugins.ActionGUI):
     def notifyFileCreationInfo(self, creationDir, fileType):

@@ -875,7 +875,7 @@ class OptionGroupGUI(ActionGUI):
     def createOptionWidget(self, option):
         box = gtk.HBox()
         if option.usePossibleValues():
-            (widget, entry) = self.createComboBox(option)
+            widget, entry = self.createComboBox(option)
             box.pack_start(widget, expand=True, fill=True)
         else:
             entry = gtk.Entry()
@@ -1048,7 +1048,7 @@ class ActionDialogGUI(OptionGroupGUI):
         dialog = self.createDialog()
         alignment = self.createAlignment()
         vbox = gtk.VBox()
-        fileChooser, scriptName = self.fillVBox(vbox)
+        fileChooser, fileChooserOption = self.fillVBox(vbox)
         if fileChooser and gtk.gtk_version > (2, 14, 0): 
             # Workaround for GTK 2.14 bug, http://bugzilla.gnome.org/show_bug.cgi?id=579449
             if scriptEngine.replayer.isActive():
@@ -1063,7 +1063,7 @@ class ActionDialogGUI(OptionGroupGUI):
 
         alignment.add(vbox)
         dialog.vbox.pack_start(alignment, expand=True, fill=True)
-        self.createButtons(dialog, fileChooser, scriptName)
+        self.createButtons(dialog, fileChooser, fileChooserOption)
         self.tryResize(dialog)
         dialog.show_all()
         self.describeDialog(dialog, self.getOptionGroupDescription(self.optionGroup))
@@ -1125,33 +1125,35 @@ class ActionDialogGUI(OptionGroupGUI):
         else:
             return gtk.STOCK_OK
 
-    def createButtons(self, dialog, fileChooser, scriptName):
+    def createButtons(self, dialog, fileChooser, fileChooserOption):
         cancelButton = dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL)
         actionScriptName = self.getTooltip()
         okButton = dialog.add_button(self.getOkStock(actionScriptName.lower()), gtk.RESPONSE_ACCEPT)
         dialog.set_default_response(gtk.RESPONSE_ACCEPT)
         if fileChooser:
             buttonScriptName = "press " + actionScriptName.split()[0]
+            fileChooserScriptName = fileChooserOption.name
             if fileChooser.get_property("action") == gtk.FILE_CHOOSER_ACTION_SAVE:
-                scriptEngine.registerSaveFileChooser(fileChooser, scriptName,
+                scriptEngine.registerSaveFileChooser(fileChooser, fileChooserScriptName,
                                                      "choose folder", buttonScriptName, "press cancel",
                                                      self.respond, okButton, cancelButton, dialog)
             else:
-                scriptEngine.registerOpenFileChooser(fileChooser, scriptName,
+                scriptEngine.registerOpenFileChooser(fileChooser, fileChooserScriptName,
                                                      "look in folder", buttonScriptName, "press cancel", 
                                                      self.respond, okButton, cancelButton, dialog)
+            fileChooserOption.setMethods(fileChooser.get_filename, fileChooser.set_filename)
         else:
             scriptEngine.connect("press cancel", "clicked", cancelButton, self.respond, gtk.RESPONSE_CANCEL, False, dialog)
             scriptEngine.connect("press ok", "clicked", okButton, self.respond, gtk.RESPONSE_ACCEPT, True, dialog)
 
     def fillVBox(self, vbox):
-        fileChooser, scriptName = None, ""
+        fileChooser, fileChooserOption = None, None
         allOptions = self.optionGroup.options.values()
         for option in allOptions:
             self.addValuesFromConfig(option)
             
             if option.selectFile or option.selectDir or option.saveFile:
-                scriptName = option.name
+                fileChooserOption = option
                 fileChooser = self.createFileChooser(option)
                 if len(allOptions) > 1: # If there is other stuff, add a frame round the file chooser so we can see what it's for
                     labelEventBox = self.createLabelEventBox(option, separator=":")
@@ -1168,7 +1170,7 @@ class ActionDialogGUI(OptionGroupGUI):
                 vbox.pack_start(entryWidget, expand=False, fill=False)
                 
         self.addSwitches(vbox, self.optionGroup)            
-        return fileChooser, scriptName
+        return fileChooser, fileChooserOption
 
     def addLabel(self, vbox, label):
         hbox = gtk.HBox()
@@ -1207,7 +1209,6 @@ class ActionDialogGUI(OptionGroupGUI):
             fileChooser.set_filename(option.defaultValue)
             
         fileChooser.set_local_only(True)
-        option.setMethods(fileChooser.get_filename, fileChooser.set_filename)
         return fileChooser
 
     def getOptionDescription(self, option):

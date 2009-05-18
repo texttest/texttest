@@ -1347,15 +1347,6 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         self._describeAction(self.gtkAction, self.accelerator)
         self._describeAction(self.filterAction, self.filterAccel)
 
-    def describe(self):
-        guiplugins.guilog.info("Viewing notebook page for '" + self.getTabTitle() + "'")
-        guiplugins.guilog.info(self.getOptionGroupDescription(self.optionGroup))
-        guiplugins.guilog.info("...........")
-        guiplugins.guilog.info(self.getOptionGroupDescription(self.selectionGroup))
-        self._describeAction(self.gtkAction, self.accelerator)
-        guiplugins.guilog.info("...........")
-        guiplugins.guilog.info(self.getOptionGroupDescription(self.filteringGroup))
-        self._describeAction(self.filterAction, self.filterAccel)
 
 class HideSelected(guiplugins.ActionGUI,AllTestsHandler):
     def __init__(self, *args):
@@ -2222,11 +2213,8 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         self.write(writeFile, "\n[Reported by " + os.getenv("USER", "Windows") + " at " + plugins.localtime() + "]\n")
         for name, option in self.optionGroup.options.items():
             value = option.getValue()
-            if name != "version" and len(value) != 0 and value != "<none>":
-                self.write(writeFile, name + ":" + value + "\n")
-        for name, switch in self.optionGroup.switches.items():
-            if switch.getValue():
-                self.write(writeFile, name + ":1\n")
+            if name != "version" and value and value != "<none>":
+                self.write(writeFile, name + ":" + str(value) + "\n")
         writeFile.close()
         self.currTestSelection[0].filesChanged()
 

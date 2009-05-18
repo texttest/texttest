@@ -1284,33 +1284,40 @@ class DocumentOptions(plugins.Action):
         keys.sort()
         for key in keys:
             self.displayKey(key, groups)
+
     def displayKey(self, key, groups):
         for group in groups:
-            if group.options.has_key(key):
-                keyOutput, docOutput = self.optionOutput(key, group, group.options[key].name)
+            option = group.getOption(key)
+            if option:
+                keyOutput, docOutput = self.optionOutput(key, group, option)
                 self.display(keyOutput, self.groupOutput(group), docOutput)
-            if group.switches.has_key(key):    
-                self.display("-" + key, self.groupOutput(group), group.switches[key].describe())
+
     def display(self, keyOutput, groupOutput, docOutput):
         if not docOutput.startswith("Private"):
             print keyOutput + ";" + groupOutput + ";" + docOutput.replace("SGE", "SGE/LSF")
+
     def groupOutput(self, group):
         if group.name == "Invisible":
             return "N/A"
         else:
             return group.name
-    def optionOutput(self, key, group, docs):
-        keyOutput = "-" + key + " <value>"
-        if (docs == "Execution time"):
-            keyOutput = "-" + key + " <time specification string>"
-        elif docs.find("<") != -1:
-            keyOutput = self.filledOptionOutput(key, docs)
-        else:
-            docs += " <value>"
+
+    def optionOutput(self, key, group, option):
+        keyOutput = "-" + key
+        docs = option.describe()
+        if isinstance(option, plugins.TextOption):
+            keyOutput += " <value>"
+            if (docs == "Execution time"):
+                keyOutput = "-" + key + " <time specification string>"
+            elif "<" in docs:
+                keyOutput = self.filledOptionOutput(key, docs)
+            else:
+                docs += " <value>"
         if group.name.startswith("Select"):
             return keyOutput, "Select " + docs.lower()
         else:
             return keyOutput, docs
+        
     def filledOptionOutput(self, key, docs):
         start = docs.find("<")
         end = docs.find(">", start)

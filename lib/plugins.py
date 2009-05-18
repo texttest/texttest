@@ -1219,23 +1219,34 @@ class Option:
         self.updateMethod = None
         self.description = description
         self.changeMethod = changeMethod
+        
     def getValue(self):
         if self.valueMethod:
             return self.valueMethod()
         else:
             return self.defaultValue
+
+    def getCmdLineValue(self):
+        return self.getValue()
+
     def setValue(self, value):
         self.defaultValue = value
         if self.updateMethod:
             self.updateMethod(value)
+
     def setMethods(self, valueMethod, updateMethod):
         self.valueMethod = valueMethod
         self.updateMethod = updateMethod
+
     def reset(self):
         if self.updateMethod:
             self.updateMethod(self.defaultValue)
         else:
             self.valueMethod = None
+
+    def describe(self):
+        return self.name
+        
 
 class TextOption(Option):
     def __init__(self, name, value="", possibleValues=[], allocateNofValues=-1,
@@ -1342,106 +1353,124 @@ class Switch(Option):
         Option.__init__(self, name, int(value), description, changeMethod)
         self.options = options
         self.resetMethod = None
+
     def setValue(self, value):
         Option.setValue(self, int(value))
+
+    def getValue(self):
+        return int(Option.getValue(self))
+
+    def toggle(self):
+        self.setValue(1 - self.getValue())
+
+    def getCmdLineValue(self):
+        return "" # always on or off...
+
     def reset(self):
         if self.defaultValue == 0 and self.resetMethod:
             self.resetMethod(1)
         else:
             Option.reset(self)
+
     def describe(self):
         text = self.name
         if len(self.options) > 0:
             text += self.options[-1]
         return text
 
+
 class OptionGroup:
     def __init__(self, name):
         self.name = name
         self.options = seqdict()
-        self.switches = seqdict()
+        
     def reset(self):
         for option in self.options.values():
             option.reset()
-        for switch in self.switches.values():
-            switch.reset()
+
     def setValue(self, key, value):
         if self.options.has_key(key):
             self.options[key].setValue(value)
-            return 1
-        elif self.switches.has_key(key):
-            self.switches[key].setValue(value)
-            return 1
-        return 0 #pragma : no cover - should never happen
+            return True
+        else:
+            return False #pragma : no cover - should never happen
+
+    def getValue(self, key, defValue = None):
+        if self.options.has_key(key):
+            return self.options[key].getValue()
+        else:
+            return defValue
+
+    # For back compatibility
+    setOptionValue = setValue
+    setSwitchValue = setValue
+    getOptionValue = getValue
+    getSwitchValue = getValue
+
     def addSwitch(self, key, *args, **kwargs):
-        if self.switches.has_key(key):
+        if self.options.has_key(key):
             return False
-        self.switches[key] = Switch(*args, **kwargs)
+        self.options[key] = Switch(*args, **kwargs)
         return True
+
     def addOption(self, key, *args, **kwargs):
         if self.options.has_key(key):
             return False
         self.options[key] = TextOption(*args, **kwargs)
         return True
-    def getSwitchValue(self, key, defValue = None):
-        if self.switches.has_key(key):
-            return self.switches[key].getValue()
-        else:
-            return defValue
-    def getOptionValue(self, key, defValue = None):
-        if self.options.has_key(key):
-            return self.options[key].getValue()
-        else:
-            return defValue
+
     def setPossibleValues(self, key, possibleValues):
         option = self.options.get(key)
         if option:
             option.setPossibleValues(possibleValues)
+            
     def getOption(self, key):
         return self.options.get(key)
-    def setOptionValue(self, key, value):
-        if self.options.has_key(key):
-            return self.options[key].setValue(value)
+
     def getOptionValueMap(self):
         values = {}
         for key, option in self.options.items():
             value = option.getValue()
-            if len(value):
+            if value:
                 values[key] = option.getValue()
         return values
+
     def keys(self):
-        return self.options.keys() + self.switches.keys()
+        return self.options.keys()
+
     def getCommandLines(self, onlyKeys=[]):
         commandLines = []
         for key, option in self.options.items():
             if self.accept(key, option, onlyKeys):
                 commandLines.append("-" + key)
-                commandLines.append(option.getValue())
-        for key, switch in self.switches.items():
-            if self.accept(key, switch, onlyKeys):
-                commandLines.append("-" + key)
+                value = option.getCmdLineValue()
+                if value:
+                    commandLines.append(value)
         return commandLines
+    
     def accept(self, key, option, onlyKeys):
         if not option.getValue():
             return False
         if len(onlyKeys) == 0:
             return True
         return key in onlyKeys
+
     def readCommandLineArguments(self, args):
         for arg in args:
-            if arg.find("=") != -1:
-                option, value = arg.split("=")
-                if self.options.has_key(option):
-                    self.options[option].defaultValue = value
+            if "=" in arg:
+                optionName, value = arg.split("=")
+                option = self.getOption(optionName)
+                if option:
+                    option.setValue(value)
                 else:
-                    raise TextTestError, self.name + " does not support option '" + option + "'"
+                    raise TextTestError, self.name + " does not support option '" + optionName + "'"
             else:
-                if self.switches.has_key(arg):
-                    oldValue = self.switches[arg].defaultValue
-                    # Toggle the value from the default
-                    self.switches[arg].defaultValue = 1 - oldValue
+                switch = self.getOption(arg)
+                if switch:
+                    switch.toggle()
                 else:
                     raise TextTestError, self.name + " does not support switch '" + arg + "'"
+
 
 def decodeText(text, log = None):
     localeEncoding = locale.getdefaultlocale()[1]

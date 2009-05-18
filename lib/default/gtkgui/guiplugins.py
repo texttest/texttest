@@ -793,11 +793,6 @@ class OptionGroupGUI(ActionGUI):
         for extraOption in self.getConfigOptions(option):
             option.addPossibleValue(extraOption)
 
-    def addSwitches(self, vbox, optionGroup):
-        for switch in optionGroup.switches.values():
-            widget = self.createSwitchWidget(switch, optionGroup)
-            vbox.pack_start(widget, expand=False, fill=False)
-
     def createRadioButtonCollection(self, switch, optionGroup):
         hbox = gtk.HBox()
         if len(switch.name) > 0:
@@ -888,12 +883,97 @@ class OptionGroupGUI(ActionGUI):
             return []
         return fromConfig
 
-    def getOptionGroupDescription(self, optionGroup):
-        messages = map(self.getOptionDescription, optionGroup.options.values()) + \
-                   map(self.getSwitchDescription, optionGroup.switches.values())
-        return "\n".join(messages)
+    def getOptionsDescription(self, vbox, fileChooserOption=None, separator="\n"):
+        messages = [ self.getOptionDescription(widget, fileChooserOption) for widget in vbox.get_children() ]
+        return separator.join(messages)
 
-    def getOptionDescription(self, option):
+    def getTableRowDescription(self, children, row, rowCount, columnCount):
+        rowStart = row * columnCount
+        rowEnd = (row + 1) * columnCount
+        rowWidgets = children[rowStart:rowEnd]
+        rowMessages = map(self.getOptionDescription, rowWidgets)
+        return " | ".join(rowMessages)
+
+    def getTextEntryDescription(self, entry):
+        text = entry.get_text()
+        if text:
+            return "Text entry (set to '" + text + "')"
+        else:
+            return "Text entry"
+        
+    def getDropDownDescription(self, combobox):
+        model = combobox.get_model()
+        allEntries = []
+        iter = model.get_iter_root()
+        while iter:
+            allEntries.append(model.get_value(iter, 0))
+            iter = model.iter_next(iter)
+        return allEntries
+
+    def getLabelText(self, labelWidget):
+        try:
+            return labelWidget.get_text()
+        except AttributeError:
+            return labelWidget.get_child().get_text()
+
+    def getOptionDescription(self, widget, fileChooserOption=None):
+        if isinstance(widget, gtk.Label):
+            return "'" + widget.get_text() + "'"
+        elif isinstance(widget, gtk.FileChooserWidget):
+            # Unfortunately we can't get filechooser information out until it's displayed.
+            # So we cheat and use the internal structures
+            return self.getFileChooserDescription(fileChooserOption)
+        elif isinstance(widget, gtk.VBox) or isinstance(widget, gtk.EventBox):
+            return self.getOptionsDescription(widget)
+        elif isinstance(widget, gtk.HBox):
+            return self.getOptionsDescription(widget, separator = " , ")
+        elif isinstance(widget, gtk.Table):
+            columnCount = widget.get_property("n-columns")
+            children = widget.get_children()
+            children.reverse() # They come out in reverse order for some reason...
+            rowCount = widget.get_property("n-rows")
+            text = "Viewing table with " + str(rowCount) + " rows and " + str(columnCount) + " columns.\n"
+            text += "\n".join([ self.getTableRowDescription(children, row, rowCount, columnCount) for row in range(rowCount) ])
+            return text
+        elif isinstance(widget, gtk.Frame):
+            label = self.getLabelText(widget.get_label_widget())
+            frameText = "....." + label + "......\n"
+            # Frame's last child is the label :)
+            for child in widget.get_children()[:-1]:
+                frameText += self.getOptionDescription(child, fileChooserOption) + "\n"
+            return frameText.rstrip()
+        elif isinstance(widget, gtk.ComboBoxEntry):
+            return self.getOptionDescription(widget.get_child()) + " (drop-down list containing " + repr(self.getDropDownDescription(widget)) + ")"
+        elif isinstance(widget, gtk.Entry):
+            return self.getTextEntryDescription(widget)
+        elif isinstance(widget, gtk.CheckButton):
+            group = "Check"
+            if isinstance(widget, gtk.RadioButton):
+                group = "Radio"
+            text = group + " button '" + widget.get_label() + "'"
+            if widget.get_active():
+                text += " (checked)"
+            return text
+        elif isinstance(widget, gtk.Button):
+            labelText = widget.get_label()
+            if labelText:
+                text = "Button '" + widget.get_label() + "'"
+            else:
+                text = "Button"
+            if widget.get_image():
+                stock, size = widget.get_image().get_stock()
+                text += ", stock image '" + stock + "'"
+            return text
+        else:
+            return "Widget type " + repr(widget.__class__)
+##         elif isinstance(widget, 
+##             return self.getSwitchDescription(option)
+##         elif option.selectFile or option.selectDir or option.saveFile:
+##             return self.getFileChooserDescription(option)
+##         else:
+##             return self.getTextOptionDescription(option)
+
+    def getTextOptionDescription(self, option):
         value = option.getValue()
         text = "Viewing entry for option '" + option.name.replace("\n", "\\n") + "'"
         if len(value) > 0:
@@ -901,6 +981,16 @@ class OptionGroupGUI(ActionGUI):
         if option.usePossibleValues():
             text += " (drop-down list containing " + repr(option.listPossibleValues()) + ")"
         return text
+
+    def getFileChooserDescription(self, option):
+        text = "Filechooser"
+        value = option.getValue()
+        if value:
+            text += " (set to '" + value + "')"
+        possDirs = option.getPossibleDirs()
+        if len(possDirs):
+            text += " (choosing from directories " + repr(possDirs) + ")"
+        return text    
 
     def getSwitchDescription(self, switch):
         value = switch.getValue()
@@ -919,14 +1009,17 @@ class ActionTabGUI(OptionGroupGUI):
     def __init__(self, *args):
         OptionGroupGUI.__init__(self, *args)
         self.diag.info("Creating action tab for " + self.getTabTitle() + ", sensitive " + repr(self.shouldShowCurrent()))
+        self.vbox = gtk.VBox()
+
     def shouldShowCurrent(self, *args):
         return self.gtkAction.get_property("sensitive")
+
     def createView(self):
-        vbox = gtk.VBox()
-        self.fillVBox(vbox, self.optionGroup)
-        self.createButtons(vbox)
-        vbox.show_all()
-        return self.addScrollBars(vbox, hpolicy=gtk.POLICY_AUTOMATIC)
+        self.fillVBox(self.vbox, self.optionGroup)
+        self.createButtons(self.vbox)
+        self.vbox.show_all()
+        return self.addScrollBars(self.vbox, hpolicy=gtk.POLICY_AUTOMATIC)
+
     def setSensitivity(self, newValue):
         ActionGUI.setSensitivity(self, newValue)
         self.diag.info("Sensitivity of " + self.getTabTitle() + " changed to " + repr(newValue))
@@ -935,18 +1028,33 @@ class ActionTabGUI(OptionGroupGUI):
 
     def displayInTab(self):
         return True
+
+    def getFileChooserDescription(self, option):
+        # We don't actually show the file choosers here, we just add a button to bring them up
+        # Should probably indicate somehow that we have such a button...
+        return self.getTextOptionDescription(option)
     
     def notifyReset(self):
         self.optionGroup.reset()
         self.contentsChanged()
 
+    def extractSwitches(self, optionGroup):
+        options, switches = [], []
+        for option in optionGroup.options.values():
+            if isinstance(option, plugins.Switch):
+                switches.append(option)
+            else:
+                options.append(option)
+        return options, switches
+    
     def fillVBox(self, vbox, optionGroup):
-        if len(optionGroup.options) > 0:
+        options, switches = self.extractSwitches(optionGroup)
+        if len(options) > 0:
             # Creating 0-row table gives a warning ...
-            table = gtk.Table(len(optionGroup.options), 2, homogeneous=False)
+            table = gtk.Table(len(options), 2, homogeneous=False)
             table.set_row_spacings(1)
             rowIndex = 0        
-            for option in optionGroup.options.values():
+            for option in options:
                 self.addValuesFromConfig(option)
 
                 labelEventBox, entryWidget, entry = self.createOptionEntry(option, separator="  ")
@@ -958,7 +1066,9 @@ class ActionTabGUI(OptionGroupGUI):
                 table.show_all()
             vbox.pack_start(table, expand=False, fill=False)
 
-        self.addSwitches(vbox, optionGroup)
+        for switch in switches:
+            widget = self.createSwitchWidget(switch, optionGroup)
+            vbox.pack_start(widget, expand=False, fill=False)
 
     def createButtons(self, vbox):
         self.addCentralButton(vbox, self.createButton())
@@ -1014,6 +1124,7 @@ class ActionTabGUI(OptionGroupGUI):
             dialog.add_shortcut_folder(folder)
         dialog.set_default_response(gtk.RESPONSE_OK)
         dialog.show()
+        
     def respondChooser(self, dialog, response, entry):
         if response == gtk.RESPONSE_OK:
             entry.set_text(dialog.get_filename().replace("\\", "/"))
@@ -1022,9 +1133,8 @@ class ActionTabGUI(OptionGroupGUI):
 
     def describe(self):
         guilog.info("Viewing notebook page for '" + self.getTabTitle() + "'")
-        guilog.info(self.getOptionGroupDescription(self.optionGroup))
-        self.describeAction()
-
+        guilog.info(self.getOptionsDescription(self.vbox))
+        
     def addApplicationOptions(self, allApps):
         if len(allApps) > 0:
             for app in allApps:
@@ -1066,8 +1176,8 @@ class ActionDialogGUI(OptionGroupGUI):
         self.createButtons(dialog, fileChooser, fileChooserOption)
         self.tryResize(dialog)
         dialog.show_all()
-        self.describeDialog(dialog, self.getOptionGroupDescription(self.optionGroup))
-
+        self.describeDialog(dialog, self.getOptionsDescription(vbox, fileChooserOption))
+        
     def getConfirmationDialogSettings(self):
         return gtk.STOCK_DIALOG_WARNING, "Confirmation"
     
@@ -1152,7 +1262,10 @@ class ActionDialogGUI(OptionGroupGUI):
         for option in allOptions:
             self.addValuesFromConfig(option)
             
-            if option.selectFile or option.selectDir or option.saveFile:
+            if isinstance(option, plugins.Switch):
+                widget = self.createSwitchWidget(option, self.optionGroup)
+                vbox.pack_start(widget, expand=False, fill=False)
+            elif option.selectFile or option.selectDir or option.saveFile:
                 fileChooserOption = option
                 fileChooser = self.createFileChooser(option)
                 if len(allOptions) > 1: # If there is other stuff, add a frame round the file chooser so we can see what it's for
@@ -1168,8 +1281,8 @@ class ActionDialogGUI(OptionGroupGUI):
                 entry.set_activates_default(True)
                 self.addLabel(vbox, labelEventBox)
                 vbox.pack_start(entryWidget, expand=False, fill=False)
-                
-        self.addSwitches(vbox, self.optionGroup)            
+
+
         return fileChooser, fileChooserOption
 
     def addLabel(self, vbox, label):
@@ -1210,19 +1323,6 @@ class ActionDialogGUI(OptionGroupGUI):
             
         fileChooser.set_local_only(True)
         return fileChooser
-
-    def getOptionDescription(self, option):
-        if option.selectFile or option.selectDir or option.saveFile:
-            text = "Viewing filechooser for option '" + option.name.replace("\n", "\\n") + "'"
-            value = option.getValue()
-            if value:
-                text += " (set to '" + value + "')"
-            possDirs = option.getPossibleDirs()
-            if len(possDirs):
-                text += " (choosing from directories " + repr(possDirs) + ")"
-            return text
-        else:
-            return OptionGroupGUI.getOptionDescription(self, option)
 
     def getFilterFileDirs(self, allApps):
         if len(allApps) > 0:

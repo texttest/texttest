@@ -31,10 +31,10 @@ class PrepareWriteDirectory(plugins.Action):
     def collatePath(self, test, configName, collateMethod, mergeDirectories=False):
         sourcePaths = self.getSourcePaths(test, configName)
         targetMachine, targetPath = self.getTargetPath(test, configName)
-        for sourcePath in sourcePaths:
+        for ix, sourcePath in enumerate(sourcePaths):
             self.diag.info("Collating " + configName + " from " + repr(sourcePath) +
                            "\nto " + repr(targetPath) + " on " + targetMachine)
-            self.collateExistingPath(test, sourcePath, targetMachine, targetPath, collateMethod)
+            self.collateExistingPath(test, sourcePath, targetMachine, targetPath, collateMethod, ix==0)
             if not mergeDirectories or not os.path.isdir(sourcePath):
                 break
 
@@ -43,14 +43,18 @@ class PrepareWriteDirectory(plugins.Action):
             self.diag.info("Setting env. variable " + envVarToSet + " to " + targetPath)
             test.setEnvironment(envVarToSet, targetPath, propFileName)
 
-    def collateExistingPath(self, test, sourcePath, targetMachine, targetPath, collateMethod):
+    def collateExistingPath(self, test, sourcePath, targetMachine, targetPath, collateMethod, firstCollation):
         self.diag.info("Path for linking/copying at " + sourcePath)
         if targetMachine == "localhost":
             plugins.ensureDirExistsForFile(targetPath)
             collateMethod(test, sourcePath, targetPath)
-        else:
+        elif firstCollation:
             test.app.ensureRemoteDirExists(targetMachine, os.path.dirname(targetPath))
             test.app.copyFileRemotely(sourcePath, "localhost", targetPath, targetMachine)
+        else:
+            # When merging subsequent data, need to copy to parent directory or we end up with a
+            # subdirectory with the same name
+            test.app.copyFileRemotely(sourcePath, "localhost", os.path.dirname(targetPath), targetMachine)
 
     def getEnvironmentSourcePath(self, configName, test):
         pathName = self.getPathFromEnvironment(configName, test)

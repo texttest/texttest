@@ -14,10 +14,12 @@ class PrepareWriteDirectory(plugins.Action):
     def __init__(self, ignoreCatalogues):
         self.diag = plugins.getDiagnostics("Prepare Writedir")
         self.ignoreCatalogues = ignoreCatalogues
+        self.madeRemoteTmp = False
         if self.ignoreCatalogues:
             self.diag.info("Ignoring all information in catalogue files")
 
     def __call__(self, test):
+        self.madeRemoteTmp = False
         self.collatePaths(test, "copy_test_path", self.copyTestPath)
         self.collatePaths(test, "copy_test_path_merge", self.copyTestPath, True)
         self.collatePaths(test, "partial_copy_test_path", self.partialCopyTestPath)
@@ -49,8 +51,11 @@ class PrepareWriteDirectory(plugins.Action):
             test.setEnvironment(envVarToSet, targetPath, propFileName)
 
     def copyDataRemotely(self, test, sourcePath, machine, remoteTmpDir):
-        test.app.ensureRemoteDirExists(machine, remoteTmpDir)
-        test.app.copyFileRemotely(sourcePath, "localhost", remoteTmpDir, machine)
+        if os.path.exists(sourcePath):
+            if not self.madeRemoteTmp:
+                test.app.ensureRemoteDirExists(machine, remoteTmpDir)
+                self.madeRemoteTmp = True
+            test.app.copyFileRemotely(sourcePath, "localhost", remoteTmpDir, machine)
             
     def getEnvironmentSourcePath(self, configName, test):
         pathName = self.getPathFromEnvironment(configName, test)

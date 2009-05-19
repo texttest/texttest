@@ -875,7 +875,7 @@ class Config:
         # Also don't run tests on machines which take a very long time to connect to...
         sshOptions = "-o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10"
         return { "default": "", "ssh" : sshOptions,
-                 "rsync" : "-az", "scp": "-Cr " + sshOptions }
+                 "rsync" : "-azL", "scp": "-Cr " + sshOptions }
 
     def getCommandArgsOn(self, app, machine, cmdArgs):
         if machine == "localhost":

@@ -30,32 +30,28 @@ class PrepareWriteDirectory(plugins.Action):
 
     def collatePath(self, test, configName, collateMethod, mergeDirectories=False):
         sourcePaths = self.getSourcePaths(test, configName)
-        targetMachine, targetPath = self.getTargetPath(test, configName)
-        for ix, sourcePath in enumerate(sourcePaths):
+        targetPath = self.getTargetPath(test, configName)
+        plugins.ensureDirExistsForFile(targetPath)
+        for sourcePath in sourcePaths:
             self.diag.info("Collating " + configName + " from " + repr(sourcePath) +
-                           "\nto " + repr(targetPath) + " on " + targetMachine)
-            self.collateExistingPath(test, sourcePath, targetMachine, targetPath, collateMethod, ix==0)
+                           "\nto " + repr(targetPath))
+            collateMethod(test, sourcePath, targetPath)
             if not mergeDirectories or not os.path.isdir(sourcePath):
                 break
 
+        machine, remoteTmpDir = test.app.getRemoteTestTmpDir(test)
+        if remoteTmpDir:
+            self.copyDataRemotely(test, targetPath, machine, remoteTmpDir)
+            
         envVarToSet, propFileName = self.findDataEnvironment(test, configName)
         if envVarToSet:
             self.diag.info("Setting env. variable " + envVarToSet + " to " + targetPath)
             test.setEnvironment(envVarToSet, targetPath, propFileName)
 
-    def collateExistingPath(self, test, sourcePath, targetMachine, targetPath, collateMethod, firstCollation):
-        self.diag.info("Path for linking/copying at " + sourcePath)
-        if targetMachine == "localhost":
-            plugins.ensureDirExistsForFile(targetPath)
-            collateMethod(test, sourcePath, targetPath)
-        elif firstCollation:
-            test.app.ensureRemoteDirExists(targetMachine, os.path.dirname(targetPath))
-            test.app.copyFileRemotely(sourcePath, "localhost", targetPath, targetMachine)
-        else:
-            # When merging subsequent data, need to copy to parent directory or we end up with a
-            # subdirectory with the same name
-            test.app.copyFileRemotely(sourcePath, "localhost", os.path.dirname(targetPath), targetMachine)
-
+    def copyDataRemotely(self, test, sourcePath, machine, remoteTmpDir):
+        test.app.ensureRemoteDirExists(machine, remoteTmpDir)
+        test.app.copyFileRemotely(sourcePath, "localhost", remoteTmpDir, machine)
+            
     def getEnvironmentSourcePath(self, configName, test):
         pathName = self.getPathFromEnvironment(configName, test)
         if pathName != configName:
@@ -67,11 +63,7 @@ class PrepareWriteDirectory(plugins.Action):
     def getTargetPath(self, test, configName):
         # handle environment variables
         localName = os.path.basename(self.getPathFromEnvironment(configName, test))
-        machine, remoteTmpDir = test.app.getRemoteTestTmpDir(test)
-        if remoteTmpDir:
-            return machine, os.path.join(remoteTmpDir, localName)
-        else:
-            return "localhost", test.makeTmpFileName(localName, forComparison=0)
+        return test.makeTmpFileName(localName, forComparison=0)
     
     def getSourcePaths(self, test, configName):
         # These can refer to environment variables or to paths within the test structure

@@ -363,20 +363,31 @@ def calculateBatchDate():
     timeinseconds = plugins.globalStartTime - 8*60*60
     return time.strftime("%d%b%Y", time.localtime(timeinseconds))
 
-def getVersionName(app):
+def findExtraVersionParent(app, allApps):
+    for parentApp in allApps:
+        if app in parentApp.extras:
+            return parentApp
+    return app
+
+def getVersionName(app, allApps):
+    parent = findExtraVersionParent(app, allApps)
+    parentVersion = parent.getFullVersion()
     fullVersion = app.getFullVersion()
-    if fullVersion:
+    if parentVersion:
         return fullVersion
+    elif fullVersion:
+        return "default." + fullVersion
     else:
         return "default"
     
 
 # Allow saving results to a historical repository
 class SaveState(plugins.Responder):
-    def __init__(self, optionMap, *args):
+    def __init__(self, optionMap, allApps):
         self.batchSession = optionMap["b"]
         self.fileName = self.createFileName(optionMap.get("name"))
         self.repositories = {}
+        self.allApps = allApps
         self.diag = plugins.getDiagnostics("Save Repository")
     def createFileName(self, nameGiven):
         # include the date and the name, if any. Date is used for archiving, name for display
@@ -394,7 +405,7 @@ class SaveState(plugins.Responder):
                 self.diag.info("No repositories for " + repr(test.app) + " in " + repr(self.repositories))
     def saveToRepository(self, test):
         testRepository = self.repositories[test.app]
-        targetFile = os.path.join(testRepository, test.app.name, getVersionName(test.app), \
+        targetFile = os.path.join(testRepository, test.app.name, getVersionName(test.app, self.allApps), \
                                   test.getRelPath(), self.fileName)
         if os.path.isfile(targetFile):
             plugins.printWarning("File already exists at " + targetFile + " - not overwriting!")
@@ -553,7 +564,7 @@ class WebPageResponder(plugins.Responder):
             plugins.printException()
 
     def generateWebPages(self, pageDir, app, extraVersions, relevantSubDirs, pageTitle):
-        generator = testoverview.GenerateWebPages(pageTitle, getVersionName(app), pageDir,
+        generator = testoverview.GenerateWebPages(pageTitle, getVersionName(app, self.allApps), pageDir,
                                                   extraVersions, app)
         subPageNames = app.getCompositeConfigValue("historical_report_subpages", self.batchSession)
         generator.generate(relevantSubDirs, subPageNames)

@@ -1839,13 +1839,14 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         self.creationDir = None
         self.appendAppName = False
         self.currentStem = ""
+        self.fileChooser = None
         guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
         self.addOption("stem", "Type of file/directory to create", allocateNofValues=2)
         self.addOption("v", "Version identifier to use")
         possibleDirs = sorted(set((app.getDirectory() for app in allApps)))
         # The point of this is that it's never sensible as the source for anything, so it serves as a "use the parent" option
         # for back-compatibility
-        self.addSwitch("imp", options=[ "Import file/directory from source", "Create a new file", "Create a new directory" ])
+        self.addSwitch("act", options=[ "Import file/directory from source", "Create a new file", "Create a new directory" ])
         self.addOption("src", "Source to copy from", selectFile=True, possibleDirs=possibleDirs)
 
     def singleTestOnly(self):
@@ -1887,7 +1888,20 @@ class ImportFiles(guiplugins.ActionDialogGUI):
             version = self.optionGroup.getOptionValue("v")
             sourcePath = self.getDefaultSourcePath(newStem, version)
             self.optionGroup.setValue("src", sourcePath)
-            
+
+    def actionChanged(self, *args):
+        if self.fileChooser:
+            self.setFileChooserSensitivity(verbose=True)
+
+    def setFileChooserSensitivity(self, verbose):
+        action = self.optionGroup.getValue("act")
+        sensitive = self.fileChooser.get_property("sensitive")
+        newSensitive = action == 0
+        if newSensitive != sensitive:
+            self.fileChooser.set_property("sensitive", newSensitive)
+            if verbose:
+                guiplugins.guilog.info("Sensitivity of source file chooser changed to " + repr(newSensitive))
+        
     def getTargetPath(self, *args, **kwargs):
         targetPathName = self.getFileName(*args, **kwargs)
         return os.path.join(self.creationDir, targetPathName)
@@ -1906,11 +1920,21 @@ class ImportFiles(guiplugins.ActionDialogGUI):
                 return pathNames[-2]
         return test.getDirectory()
 
-    def createComboBox(self, option):
-        combobox, entry = guiplugins.ActionDialogGUI.createComboBox(self, option)
+    def createComboBox(self, *args):
+        combobox, entry = guiplugins.ActionDialogGUI.createComboBox(self, *args)
         handler = combobox.connect("changed", self.stemChanged)
         return combobox, entry
-        
+
+    def createRadioButtons(self, *args):
+        buttons = guiplugins.ActionDialogGUI.createRadioButtons(self, *args)
+        buttons[0].connect("toggled", self.actionChanged)
+        return buttons
+
+    def createFileChooser(self, *args):
+        self.fileChooser = guiplugins.ActionDialogGUI.createFileChooser(self, *args)
+        self.setFileChooserSensitivity(verbose=False) # Check initial values, maybe set insensitive
+        return self.fileChooser
+    
     def addText(self, vbox, text):
         header = gtk.Label()
         guiplugins.guilog.info("Adding text '" + text + "'")
@@ -1925,6 +1949,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
             return "Create or import files in the test directory"
 
     def notifyFileCreationInfo(self, creationDir, fileType):
+        self.fileChooser = None
         if fileType == "external":
             self.creationDir = None
             self.setSensitivity(False)
@@ -1935,7 +1960,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
             if newActive:
                 self.updateStems(fileType)
                 self.appendAppName = (fileType == "definition" or fileType == "standard")
-                self.optionGroup.setValue("imp", int(self.appendAppName))
+                self.optionGroup.setValue("act", int(self.appendAppName))
 
     def findAllStems(self, fileType):
         if fileType == "definition":
@@ -1989,7 +2014,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
     def performOnCurrent(self):
         stem = self.optionGroup.getOptionValue("stem")
         version = self.optionGroup.getOptionValue("v")
-        action = self.optionGroup.getSwitchValue("imp")
+        action = self.optionGroup.getSwitchValue("act")
         test = self.currTestSelection[0]
         if action > 0: # Create new
             targetPath = self.getTargetPath(stem, version)

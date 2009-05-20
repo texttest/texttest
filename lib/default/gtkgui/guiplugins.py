@@ -917,6 +917,13 @@ class OptionGroupGUI(ActionGUI):
             return labelWidget.get_child().get_text()
 
     def getOptionDescription(self, widget, fileChooserOption=None):
+        baseDescription = self.getBasicOptionDescription(widget, fileChooserOption)
+        if not widget.get_property("sensitive"):
+            return baseDescription + " (greyed out)"
+        else:
+            return baseDescription
+
+    def getBasicOptionDescription(self, widget, fileChooserOption):
         if isinstance(widget, gtk.Label):
             return "'" + widget.get_text() + "'"
         elif isinstance(widget, gtk.FileChooserWidget):

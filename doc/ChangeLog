@@ -1346,8 +1346,8 @@ Bug Fixes:
 Grid Engine bug fixes:
     - Clearer error message when the grid engine (qsub/bsub) cannot be found (queuesystem.py)
 
-Version trunk
-=============
+Version 3.14
+============
 General GUI Enhancements:
     - This ChangeLog now visible from the GUI (helpdialogs.py)
 	From Help menu/Change Logs
@@ -1358,7 +1358,6 @@ Static GUI Enhancements:
 	Will now handle directories correctly, and you can choose your source with a filechooser now.
     - Can now run all the tests in a suite by selecting just that suite (default_gui.py)
 	Also works for reconnecting and saving selections.
-Dynamic GUI Enhancements:
 Framework Enhancements:
     - Can now run tests on a remote machine (UNIX only) (default.py)
 	Even works if file system not shared. New config entries "remote_shell_program" 
@@ -1370,13 +1369,14 @@ Framework Enhancements:
     - Can now tell TextTest to merge data directories with each other (sandbox.py)
 	Use new config setting "copy_test_path_merge". "copy_test_path" causes directories to be overwritten.
     - Can now filter floating-point differences to within a certain tolerance (rundependent.py/fpdiff.py)
-	New config file setting "floating_point_tolerance". See documentation on website. Thanks to Michael Behrisch for this.
+	New config file setting "floating_point_tolerance". 
+	See documentation on website. Thanks to Michael Behrisch for this.
     - Can now collate result files from a variety of possible source patterns (sandbox.py)
 	Essentially collate_file is now a list. May require migration in theory.
     - Decoupled ignoring other errors from reporting bugs as "internal error" (knownbugs.py)
 	Now separate check boxes for these things when doing "Enter failure information"
     - Bugs marked as "internal error" get reported in preference to "known bug" (knownbugs.py)
-	The latter are usually some catastrophic general environment failure
+	The former are usually some catastrophic general environment failure
     - Config file setting "performance_use_normalised_%" renamed for generic application (default.py)
 	Now called "use_normalised_percentage_change" to reflect possible usage for other purposes. Old name aliased.
     - Traffic mechanism does not assume asynchronous file edits are possible any more (traffic.py)
@@ -1390,8 +1390,6 @@ Framework Enhancements:
 	Used for Java applications. See website for more details.
     - Default location of temporary files changed (engine.py)
 	Now writes to ~/.texttest/tmp instead of $TEMP or ~/texttesttmp
-Historical HTML Batch Report Enhancements:
-Email Batch Report Enhancements:
 Version Control Browser Enhancements/bug fixes:
     - Administration operations update the VCS correctly (version_control.py)
 	Rename,Move and Remove will also do so in the VCS for tests under VCS-control
@@ -1399,7 +1397,6 @@ Version Control Browser Enhancements/bug fixes:
 	Separate action on appropriate menu
     - Now supports Bazaar and Mercurial as well as CVS (bzr.py/hg.py/version_control.py)
     - Hiding "unknown" category now works correctly (version_control.py)
-Grid Engine (LSF/SGE) enhancements:
 Internal changes:
     - TextTest now structured into packages so lots of files have moved around
 Bug Fixes:
@@ -1414,4 +1411,5 @@ Bug Fixes:
     - Now shows correct test names in the status bar after a rename (engine.py)
     - Don't crash if copying or moving a suite and its contents (default_gui.py)
     - Now works to run locally from bin directory. Thanks again to Michael Behrisch (texttest.py)
+    - "Extra versions" write to sensible batch repository locations when no version given on command line (batch.py)
     - Website generation works for "Extra version" applications even if the parent is blocked or has no data (batch.py)

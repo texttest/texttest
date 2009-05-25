@@ -49,11 +49,11 @@ class VersionControlInterface:
         stdout, stderr = process.communicate()
         return process.returncode, stdout, stderr
 
-    def getFileNamesForCmd(self, cmdName, fileArg, recursive, **kwargs):
+    def getFileNamesForCmd(self, cmdName, fileArg, recursive):
         if cmdName == "add" and recursive: # assume VCS adds recursively by default, override for CVS
             return [ fileArg ]
         else:
-            return self.getFileNames(fileArg, recursive, **kwargs)
+            return self.getFileNames(fileArg, recursive)
 
     def getFileNames(self, fileArg, recursive, includeDirs=False):
         if os.path.isfile(fileArg):

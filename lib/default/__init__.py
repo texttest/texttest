@@ -465,6 +465,35 @@ class Config:
     def _cleanWriteDirectory(self, suite):
         if os.path.isdir(suite.app.writeDirectory):
             plugins.rmtree(suite.app.writeDirectory)
+
+    def makeWriteDirectory(self, app, subdir=None):
+        if self.cleanPreviousTempDirs():
+            self.cleanPreviousWriteDirs(app.writeDirectory)
+            machine, tmpDir = self.getRemoteTmpDirectory(app)
+            if tmpDir:
+                # Ignore the datetime and the pid at the end
+                searchParts = tmpDir.split(".")[:-2] + [ "*" ]
+                self.runCommandOn(app, machine, [ "rm", "-rf", ".".join(searchParts) ])
+
+        dirToMake = app.writeDirectory
+        if subdir:
+            dirToMake = os.path.join(app.writeDirectory, subdir)
+        plugins.ensureDirectoryExists(dirToMake)
+        app.diag.info("Made root directory at " + dirToMake)
+
+    def cleanPreviousWriteDirs(self, writeDir):
+        rootDir, basename = os.path.split(writeDir)
+        if os.path.isdir(rootDir):
+            # Ignore the datetime and the pid at the end
+            searchParts = basename.split(".")[:-2]
+            for file in os.listdir(rootDir):
+                fileParts = file.split(".")
+                if fileParts[:-2] == searchParts:
+                    previousWriteDir = os.path.join(rootDir, file)
+                    if os.path.isdir(previousWriteDir) and not plugins.samefile(previousWriteDir, writeDir):
+                        print "Removing previous write directory", previousWriteDir
+                        plugins.rmtree(previousWriteDir, attempts=3)
+    
     def isReconnecting(self):
         return self.optionMap.has_key("reconnect")
     def getWriteDirectoryMaker(self):

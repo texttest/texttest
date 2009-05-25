@@ -1506,26 +1506,6 @@ class Application:
         fullList.append(current)
         fullList += fromRemaining
         return fullList
-    def makeWriteDirectory(self, subdir=None):
-        if self.configObject.cleanPreviousTempDirs():
-            root, tmpId = os.path.split(self.writeDirectory)
-            if os.path.isdir(root):
-                self.cleanPreviousWriteDirs(root)
-        dirToMake = self.writeDirectory
-        if subdir:
-            dirToMake = os.path.join(self.writeDirectory, subdir)
-        plugins.ensureDirectoryExists(dirToMake)
-        self.diag.info("Made root directory at " + dirToMake)
-    def cleanPreviousWriteDirs(self, rootDir):
-        # Ignore the datetime and the pid at the end
-        searchParts = os.path.basename(self.writeDirectory).split(".")[:-2]
-        for file in os.listdir(rootDir):
-            fileParts = file.split(".")
-            if fileParts[:-2] == searchParts:
-                previousWriteDir = os.path.join(rootDir, file)
-                if os.path.isdir(previousWriteDir) and not plugins.samefile(previousWriteDir, self.writeDirectory):
-                    print "Removing previous write directory", previousWriteDir
-                    plugins.rmtree(previousWriteDir, attempts=3)
     def getActionSequence(self):
         actionSequenceFromConfig = self.configObject.getActionSequence()
         actionSequence = []

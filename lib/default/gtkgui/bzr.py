@@ -47,7 +47,7 @@ class BzrInterface(version_control.VersionControlInterface):
     def callProgramOnFiles(self, cmdName, fileArg, recursive=False, extraArgs=[], **kwargs):
         if cmdName == "add":
             basicArgs = self.getCmdArgs(cmdName, extraArgs)
-            for fileName in self.getFileNames(fileArg, recursive):
+            for fileName in self.getFileNamesForCmd(cmdName, fileArg, recursive):
                 self.callProgramWithHandler(fileName, basicArgs + [ os.path.realpath(fileName) ], **kwargs)
         else:
             version_control.VersionControlInterface.callProgramOnFiles(self, cmdName, fileArg, recursive, extraArgs, **kwargs)

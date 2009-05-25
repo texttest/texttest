@@ -32,7 +32,7 @@ class VersionControlInterface:
 
     def callProgramOnFiles(self, cmdName, fileArg, recursive=False, extraArgs=[], **kwargs):
         basicArgs = self.getCmdArgs(cmdName, extraArgs)
-        for fileName in self.getFileNames(fileArg, recursive):
+        for fileName in self.getFileNamesForCmd(cmdName, fileArg, recursive):
             self.callProgramWithHandler(fileName, basicArgs + [ fileName ], **kwargs)
 
     def callProgramWithHandler(self, fileName, args, outputHandler=None, outputHandlerArgs=(), **kwargs):
@@ -48,6 +48,12 @@ class VersionControlInterface:
 
         stdout, stderr = process.communicate()
         return process.returncode, stdout, stderr
+
+    def getFileNamesForCmd(self, cmdName, fileArg, recursive, **kwargs):
+        if cmdName == "add" and recursive: # assume VCS adds recursively by default, override for CVS
+            return [ fileArg ]
+        else:
+            return self.getFileNames(fileArg, recursive, **kwargs)
 
     def getFileNames(self, fileArg, recursive, includeDirs=False):
         if os.path.isfile(fileArg):

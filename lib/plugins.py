@@ -74,13 +74,13 @@ def installationPath(subpath):
         if os.path.exists(instPath):
             return instPath
 
-def findDataPaths(filePattern="", vanilla=False, includePersonal=False):
+def findDataPaths(filePattern="", vanilla=False, includePersonal=False, dataDir="etc"):
     if vanilla:
-        return glob(os.path.join(installationRoots[0], "etc", filePattern))
+        return glob(os.path.join(installationRoots[0], dataDir, filePattern))
     else:
-        dirs = [ os.path.join(instRoot, "etc") for instRoot in installationRoots ]
+        dirs = [ os.path.join(instRoot, dataDir) for instRoot in installationRoots ]
         if includePersonal:
-            dirs.append(getPersonalConfigDir())
+            dirs.append(os.path.join(getPersonalConfigDir(), dataDir))
 
         return reduce(operator.add, (glob(os.path.join(d, filePattern)) for d in dirs), [])
         

@@ -2180,6 +2180,21 @@ class FileViewGUI(guiplugins.SubGUI):
         row = [ baseName, colour, fileName, associatedObject, details, "" ]
         return self.model.insert_before(iter, None, row)
 
+    def addDataFilesUnderIter(self, iter, files, colour, root, **kwargs):
+        dirIters = { root : iter }
+        parentIter = iter
+        for file in files:
+            parent, local = os.path.split(file)
+            parentIter = dirIters.get(parent)
+            if parentIter is None:
+                subDirIters = self.addDataFilesUnderIter(iter, [ parent ], colour, root)
+                parentIter = subDirIters.get(parent)
+            newiter = self.addFileToModel(parentIter, file, colour, **kwargs)
+            if os.path.isdir(file):
+                dirIters[file] = newiter
+        return dirIters
+
+
 
 class ApplicationFileGUI(FileViewGUI):
     def __init__(self, dynamic, allApps):
@@ -2202,13 +2217,14 @@ class ApplicationFileGUI(FileViewGUI):
 
     def addFilesToModel(self, state):
         colour = guiConfig.getCompositeValue("file_colours", "static")
-        personalFiles = self.getPersonalFiles()
+        personalDir = plugins.getPersonalConfigDir()
+        personalFiles = self.getPersonalFiles(personalDir)
         importedFiles = {}
         if len(personalFiles) > 0:
             persiter = self.model.insert_before(None, None)
             self.model.set_value(persiter, 0, "Personal Files")
+            self.addDataFilesUnderIter(persiter, personalFiles, colour, personalDir, associatedObject=self.allApps)
             for file in personalFiles:
-                self.addFileToModel(persiter, file, colour, self.allApps)
                 for importedFile in self.getImportedFiles(file):
                     importedFiles[importedFile] = importedFile
 
@@ -2246,14 +2262,18 @@ class ApplicationFileGUI(FileViewGUI):
 
     def getConfigFiles(self, app):
         return app._getAllFileNames([ app.dircache ], "config", allVersions=True)
-    def getPersonalFiles(self):
-        personalDir = plugins.getPersonalConfigDir()
+
+    def getPersonalFiles(self, personalDir):
         if not os.path.isdir(personalDir):
             return []
-        allEntries = [ os.path.join(personalDir, file) for file in os.listdir(personalDir) ]
-        allFiles = filter(os.path.isfile, allEntries)
-        allFiles.sort()
-        return allFiles
+        allFiles = []
+        for root, dirs, files in os.walk(personalDir):
+            if "tmp" in dirs:
+                dirs.remove("tmp")
+            for file in files + dirs:
+                allFiles.append(os.path.join(root, file))
+        return sorted(allFiles)
+    
     def getImportedFiles(self, file, app = None):
         imports = []
         if os.path.isfile(file):
@@ -2515,19 +2535,6 @@ class TestFileGUI(FileViewGUI):
             datiter, colour = self.getRootIterAndColour("Externally Edited", root)
             self.addDataFilesUnderIter(datiter, files, colour, root)
 
-    def addDataFilesUnderIter(self, iter, files, colour, root):
-        dirIters = { root : iter }
-        parentIter = iter
-        for file in files:
-            parent, local = os.path.split(file)
-            parentIter = dirIters.get(parent)
-            if parentIter is None:
-                subDirIters = self.addDataFilesUnderIter(iter, [ parent ], colour, root)
-                parentIter = subDirIters.get(parent)
-            newiter = self.addFileToModel(parentIter, file, colour)
-            if os.path.isdir(file):
-                dirIters[file] = newiter
-        return dirIters
 
 class ProgressBarGUI(guiplugins.SubGUI):
     def __init__(self, dynamic, testCount):

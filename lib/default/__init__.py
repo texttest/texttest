@@ -193,8 +193,10 @@ class Config:
         return self.useGUI() or self.batchMode() or self.useConsole() or \
                self.optionMap.has_key("o") or self.optionMap.has_key("s")
 
-    def getLogfilePosfix(self):
-        if self.batchMode():
+    def getLogfilePostfix(self):
+        if self.optionMap.has_key("x"):
+            return "debug"
+        elif self.batchMode():
             return "batch"
         elif not self.useGUI():
             return "console"
@@ -202,8 +204,10 @@ class Config:
             return "gui"
         
     def setUpLogging(self):
-        logFile = plugins.installationPath(os.path.join("log", "logging." + self.getLogfilePosfix()))
-        plugins.configureLogging(logFile) # Won't have any effect if we've already got a log file
+        filePattern = "logging." + self.getLogfilePostfix()
+        allPaths = plugins.findDataPaths(filePattern, dataDir="log", includePersonal=True,
+                                         vanilla=self.optionMap.has_key("vanilla"))
+        plugins.configureLogging(allPaths[-1]) # Won't have any effect if we've already got a log file
         
     def getResponderClasses(self, allApps):
         # Global side effects first :)

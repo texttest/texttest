@@ -663,7 +663,7 @@ class ToolBarGUI(ContainerGUI):
         self.widget.show_all()
         return self.widget
     def describe(self):
-        guilog.info("UI layout: \n" + self.uiManager.get_ui())
+        guilog.info("UI layout: \n" + self.uiManager.get_ui().strip())
 
 class PopupMenuGUI(guiplugins.SubGUI):
     def __init__(self, name, uiManager):

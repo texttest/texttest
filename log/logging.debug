@@ -205,6 +205,10 @@ LogLevel: None
 Target: $TEXTTEST_DIAGDIR/slaveserver.diag
 LogLevel: None
 
+[standard log]
+Target: $TEXTTEST_DIAGDIR/standardlog.diag
+LogLevel: None
+
 [static gui behaviour]
 Target: $TEXTTEST_DIAGDIR/staticguibehaviour.diag
 LogLevel: None

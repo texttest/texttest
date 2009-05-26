@@ -10,7 +10,7 @@ from default.knownbugs import CheckForBugs
 from default.actionrunner import ActionRunner, BaseActionRunner
 from default.unixonly import VirtualDisplayResponder
 from default.performance import getTestPerformance
-from default.pyusecase_interface import makeScriptEngine, ApplicationEventResponder
+from default.pyusecase_interface import ApplicationEventResponder
 from types import StringType
 
 plugins.addCategory("abandoned", "abandoned", "were abandoned")
@@ -59,7 +59,7 @@ class SocketResponder(plugins.Responder,plugins.Observable):
                 return
             except socket.error:
                 sleep(1)
-        print "Trouble connecting to", self.serverAddress
+        plugins.log.info("Trouble connecting to " + self.serverAddress)
         sendSocket.connect(self.serverAddress)
     def notifyLifecycleChange(self, test, state, changeDesc):
         testData = socketSerialise(test)
@@ -71,11 +71,12 @@ class SocketResponder(plugins.Responder,plugins.Observable):
                 self.sendData(fullData)
                 return
             except socket.error:
-                print "Failed to communicate with master process - waiting", sleepTime, "seconds and then trying again."
+                plugins.log.info("Failed to communicate with master process - waiting " +
+                                 str(sleepTime) + " seconds and then trying again.")
                 sleep(sleepTime)
                 sleepTime *= 2
                 
-        print "Terminating as failed to communicate with master process."
+        plugins.log.info("Terminating as failed to communicate with master process.")
         plugins.printException()
         
     def sendData(self, fullData):
@@ -180,15 +181,15 @@ class QueueSystemConfig(default.Config):
         classes = [ SocketResponder, ActionRunner ]
         if not self.isActionReplay():
             classes.append(VirtualDisplayResponder)
-        makeScriptEngine(self.optionMap)
         classes.append(ApplicationEventResponder)
         return classes
 
-    def getResponderClasses(self, allApps):
+    def _getResponderClasses(self, *args):
         if self.slaveRun():
             return self.getSlaveResponderClasses()
         else:
-            return default.Config.getResponderClasses(self, allApps)
+            return default.Config._getResponderClasses(self, *args)
+        
     def getThreadActionClasses(self):
         if self.useQueueSystem():
             return [ self.getSlaveServerClass(), self.getQueueServerClass() ] # don't use the action runner at all!
@@ -259,9 +260,9 @@ class SubmissionRules:
         name = queueSystemName(self.test)
         queue = self.findQueue()
         if queue:
-            return "to " + name + " queue " + queue
+            return " to " + name + " queue " + queue
         else:
-            return "to default " + name + " queue"
+            return " to default " + name + " queue"
     def getParallelEnvironment(self):
         return self.test.getConfigValue("parallel_environment_name")
     def findResourceList(self):
@@ -433,14 +434,14 @@ class SlaveServerResponder(plugins.Responder, TCPServer):
 
 class MasterTextResponder(TextDisplayResponder):
     def notifyComplete(self, test):
-        print "S:", test, test.state.description()
+        plugins.log.info("S: " + repr(test) + " " + test.state.description())
 
 # Don't indent, and use the unique name rather than repr()
 class MasterInteractiveResponder(InteractiveResponder):
     def describeSave(self, test, saveDesc):
-        print "Saving", repr(test) + saveDesc
+        plugins.log.info("Saving " + repr(test) + saveDesc)
     def describeViewOptions(self, test, options):
-        print options
+        plugins.log.info(options)
 
 class QueueSystemServer(BaseActionRunner):
     instance = None
@@ -465,7 +466,8 @@ class QueueSystemServer(BaseActionRunner):
             currCap = suite.getConfigValue("queue_system_max_capacity")
             if currCap < self.maxCapacity:
                 self.maxCapacity = currCap
-            print "Using", queueSystemName(suite.app), "queues for", suite.app.description(includeCheckout=True)
+            plugins.log.info("Using " + queueSystemName(suite.app) + " queues for " +
+                             suite.app.description(includeCheckout=True))
 
     def setSlaveServerAddress(self, address):
         self.submitAddress = os.getenv("TEXTTEST_MIM_SERVER", address)
@@ -590,7 +592,7 @@ class QueueSystemServer(BaseActionRunner):
     
         submissionRules = test.app.getSubmissionRules(test)
         command = self.getSlaveCommand(test, submissionRules)
-        print "Q: Submitting", test, submissionRules.getSubmitSuffix()
+        plugins.log.info("Q: Submitting " + repr(test) + submissionRules.getSubmitSuffix())
         sys.stdout.flush()
         self.jobs[test] = [] # Preliminary jobs aren't interesting any more
         if not self.submitJob(test, submissionRules, command, self.getSlaveEnvironment()):
@@ -677,7 +679,7 @@ class QueueSystemServer(BaseActionRunner):
         if self.exited:
             self.cancel(test)
             self.lock.release()
-            print "Q: Submission cancelled for", test, "- exit underway"
+            plugins.log.info("Q: Submission cancelled for " + repr(test) + " - exit underway")
             return False
         
         self.lockDiag.info("Got lock for submission")
@@ -795,8 +797,8 @@ class QueueSystemServer(BaseActionRunner):
                 return
             sleep(1)
             for test, jobId in stillRunning:
-                print "T: Cancellation in progress for", repr(test) + \
-                      ", waited " + str(attempt) + " seconds so far."
+                plugins.log.info("T: Cancellation in progress for " + repr(test) + 
+                                 ", waited " + str(attempt) + " seconds so far.")
         for test, jobId in stillRunning:
             name = queueSystemName(test.app)
             freeText = "Could not delete test in " + name + " (job " + jobId + "): have abandoned it"
@@ -880,7 +882,7 @@ class QueueSystemServer(BaseActionRunner):
 
     def describeJob(self, test, jobId, jobName):
         postText = self.getPostText(test, jobId)
-        print "T: Cancelling", test, postText
+        plugins.log.info("T: Cancelling " + repr(test) + " " + postText)
 
 
 class Abandoned(plugins.TestState):

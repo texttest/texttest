@@ -1,0 +1,61 @@
+# Log4Py configuration file
+#
+# The "Default" Sections contains default settings which can be overwritten
+# by settings for different instances (see bottom of file)
+
+[Default]
+
+# Format is the output format of the lines.
+#
+# Possible parameters are:
+#
+#    %C ..... class-name
+#    %D ..... program duration
+#    %d ..... duration for the last step (last output)
+#    %F ..... function name
+#    %L ..... logtype (Error, Warning, ...)
+#    %M ..... message
+#    %N ..... Line-number
+#    %T ..... current time
+#
+# Example formats are:
+#
+#    Short:           %M
+#    Medium:          [ %C.%F ] %D: %M
+#    Long (default):  %T %L %C [%F] - %M
+#    Debug:           %T [%D (%d)] %L %C [%F (%N)] - %M
+
+Format: %M
+
+# Target controls the output medium of the logging
+#
+# Possible values are:
+#
+#    stdout (default): Standard output stream
+#    stderr:           Error stream
+#    <filename>        Any other filename
+#
+# Multiple targets can be specified as comma seperated list
+
+# Write to stdout, by default
+Target: stdout
+
+# Use ansi colors. Possible values are True or False (default)
+
+Ansi: False
+
+# TimeFormat is the format of the date and time as used by the
+# Python strftime() function
+
+TimeFormat: %d.%m.%Y %H:%M:%S
+
+# LogLevel controls the level of what you want to see
+#
+# Possible values are:
+#
+#    None:             No output (silent mode)
+#    Normal (default): Information- and Errormessages
+#    Verbose:          Information-, Error- and Warningmessages
+#    Debug:            Information-, Error-, Warning- and Debugmessages
+
+LogLevel: None

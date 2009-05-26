@@ -184,7 +184,7 @@ class BugMap(seqdict):
             parser.read(fileName)
             return parser
         except:
-            print "Bug file at", fileName, "not understood, ignoring"
+            plugins.log.info("Bug file at " + fileName + " not understood, ignoring")
     def readFromParser(self, parser):
         for section in sorted(parser.sections()):
             getOption = ParseMethod(parser, section)
@@ -313,7 +313,7 @@ class MigrateFiles(plugins.Action):
             try:
                 parser.read(bugFileName)
             except:
-                print "Bug file at", bugFileName, "not understood, ignoring"
+                plugins.log.info("Bug file at " + bugFileName + " not understood, ignoring")
                 continue
             if not parser.has_section("Migrated section 1"):
                 self.describe(test, " - " + os.path.basename(bugFileName))

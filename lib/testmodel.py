@@ -1575,7 +1575,7 @@ class OptionFinder(plugins.OptionFinder):
         self.setPathFromOptionsOrEnv("TEXTTEST_PERSONAL_CONFIG", "~/.texttest") # Location of personal configuration
         self.setPathFromOptionsOrEnv("TEXTTEST_TMP", "$TEXTTEST_PERSONAL_CONFIG/tmp") # Location of temporary files from test runs
         self.diagWriteDir = self.setPathFromOptionsOrEnv("TEXTTEST_DIAGDIR", "$TEXTTEST_PERSONAL_CONFIG/log", "xw", "x") # Location to write TextTest's internal logs
-        self.diagConfigFile = self.setPathFromOptionsOrEnv("TEXTTEST_LOGCONFIG", "$TEXTTEST_DIAGDIR/log4py.conf", "xr", "x") # Configuration file for TextTest's internal logs
+        self.diagConfigFile = self.setPathFromOptionsOrEnv("TEXTTEST_LOGCONFIG", "$TEXTTEST_DIAGDIR/logging.debug", "xr", "x") # Configuration file for TextTest's internal logs
         
         self.setUpLogging()
         self.diag = plugins.getDiagnostics("option finder")
@@ -1602,7 +1602,6 @@ class OptionFinder(plugins.OptionFinder):
     def setUpLogging(self):
         if self.diagConfigFile:
             if os.path.isfile(self.diagConfigFile):
-                # Assume log4py's configuration file refers to files relative to TEXTTEST_DIAGDIR
                 print "TextTest will write diagnostics in", self.diagWriteDir, "based on file at", self.diagConfigFile
             else:
                 print "Could not find diagnostic file at", self.diagConfigFile, ": cannot run with diagnostics"
@@ -1616,7 +1615,8 @@ class OptionFinder(plugins.OptionFinder):
                     if file.endswith(".diag"):
                         os.remove(os.path.join(self.diagWriteDir, file))
 
-        plugins.configureLog4py(self.diagConfigFile)
+        if self.diagConfigFile:
+            plugins.configureLogging(self.diagConfigFile)
 
     def findVersionList(self):
         versionList = []

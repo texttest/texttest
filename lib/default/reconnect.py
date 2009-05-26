@@ -229,7 +229,7 @@ class ReconnectTest(plugins.Action):
         else:
             return True
     def setUpApplication(self, app):
-        print "Reconnecting to test results in directory", self.rootDirToCopy
+        plugins.log.info("Reconnecting to test results in directory " + self.rootDirToCopy)
 
     def setUpSuite(self, suite):
         self.describe(suite)

@@ -106,7 +106,7 @@ class ActionRunner(BaseActionRunner):
         self.appRunners = seqdict()
 
     def addSuite(self, suite):
-        print "Using", suite.app.description(includeCheckout=True)
+        plugins.log.info("Using " + suite.app.description(includeCheckout=True))
         appRunner = ApplicationRunner(suite, self.script, self.diag)
         self.appRunners[suite.app] = appRunner
 

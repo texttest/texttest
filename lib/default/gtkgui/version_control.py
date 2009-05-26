@@ -564,7 +564,8 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         model, iter = selection.get_selected()
         if iter:
             text = self.updateForIter(iter)
-            guiplugins.guilog.info(vcs.name + " tree view dialog: Showing " + vcs.name + " output\n" + text)
+            message = vcs.name + " tree view dialog: Showing " + vcs.name + " output\n" + text
+            guiplugins.guilog.info(message.strip())
         else:
             self.extraWidgetArea.set_sensitive(False)
 

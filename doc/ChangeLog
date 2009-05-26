@@ -1413,3 +1413,14 @@ Bug Fixes:
     - Now works to run locally from bin directory. Thanks again to Michael Behrisch (texttest.py)
     - "Extra versions" write to sensible batch repository locations when no version given on command line (batch.py)
     - Website generation works for "Extra version" applications even if the parent is blocked or has no data (batch.py)
+
+Version trunk
+=============
+General GUI Enhancements:
+Static GUI Enhancements:
+Framework Enhancements:
+    - Logging more flexible now (default.py)
+	Dynamic GUI does not write anything by default. Batch mode writes time stamps by default.
+Version Control Browser Enhancements/bug fixes:
+Internal changes:
+Bug Fixes:

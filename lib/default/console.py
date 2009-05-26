@@ -9,7 +9,7 @@ class TextDisplayResponder(plugins.Responder):
         if test.state.hasFailed():
             self.describe(test)
     def describe(self, test):
-        print test.getIndent() + repr(test), test.state.description()
+        plugins.log.info(test.getIndent() + repr(test) + " " + test.state.description())
             
             
 class InteractiveResponder(plugins.Responder):
@@ -46,9 +46,9 @@ class InteractiveResponder(plugins.Responder):
         newState = test.state.makeNewState(test.app, "saved")
         test.changeState(newState)
     def describeSave(self, test, saveDesc):
-        print test.getIndent() + "Saving " + repr(test) + saveDesc
+        plugins.log.info(test.getIndent() + "Saving " + repr(test) + saveDesc)
     def describeViewOptions(self, test, options):
-        print test.getIndent() + options
+        plugins.log.info(test.getIndent() + options)
     def useInteractiveResponse(self, test):
         return test.state.hasFailed() and test.state.hasResults() and not self.overwriteFailure
     def presentInteractiveDialog(self, test):            
@@ -81,10 +81,10 @@ class InteractiveResponder(plugins.Responder):
                 try:
                     proc = subprocess.Popen(cmdArgs, stdout=open(os.devnull, "w"),
                                             stderr=subprocess.STDOUT, startupinfo=plugins.getProcessStartUpInfo())
-                    print "<See also " + tool + " window for details of " + logFile + ">"
+                    plugins.log.info("<See also " + tool + " window for details of " + logFile + ">")
                     return proc
                 except OSError:
-                    print "<No window created - could not find graphical difference tool '" + tool + "'>"
+                    plugins.log.info("<No window created - could not find graphical difference tool '" + tool + "'>")
 
     def askUser(self, test, allowView, process=None):      
         versions = test.app.getSaveableVersions()
@@ -108,6 +108,6 @@ class InteractiveResponder(plugins.Responder):
                     self.save(test, versions[i], exactSave)
         if process:
             sleep(int(os.getenv("TEXTTEST_KILL_GRAPHICAL_CONSOLE_SLEEP", "0")))
-            print "Terminating graphical viewer..."
+            plugins.log.info("Terminating graphical viewer...")
             killSubProcessAndChildren(process)
         return 0

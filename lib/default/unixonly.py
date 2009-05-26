@@ -37,7 +37,7 @@ class VirtualDisplayResponder(plugins.Responder):
             self.displayMachine = machine
             self.displayPid = pid
             self.guiSuites = guiSuites
-            print "Tests will run with DISPLAY variable set to", display
+            plugins.log.info("Tests will run with DISPLAY variable set to " + display)
         elif len(machines) > 0:
             plugins.printWarning("Failed to start virtual display on " + ",".join(machines) + " - using real display.")
 
@@ -73,18 +73,18 @@ class VirtualDisplayResponder(plugins.Responder):
     def cleanXvfb(self):
         if self.displayName and os.name == "posix":
             if self.displayMachine == "localhost":
-                print "Killing Xvfb process", self.displayPid
+                plugins.log.info("Killing Xvfb process " + str(self.displayPid))
                 try:
                     os.kill(self.displayPid, signal.SIGTERM)
                 except OSError:
-                    print "Process had already terminated"
+                    plugins.log.info("Process had already terminated")
             else:
                 self.killRemoteServer()
             self.displayName = None
 
     def killRemoteServer(self):
         self.diag.info("Getting ps output from " + self.displayMachine)
-        print "Killing remote Xvfb process on", self.displayMachine, "with pid", self.displayPid
+        plugins.log.info("Killing remote Xvfb process on " + self.displayMachine + " with pid " + str(self.displayPid))
         self.guiSuites[0].app.runCommandOn(self.displayMachine, [ "kill", str(self.displayPid) ])
 
     def createDisplay(self, machine, app):
@@ -108,7 +108,7 @@ class VirtualDisplayResponder(plugins.Responder):
             self.displayProc.stdout.close()
             return self.getDisplayName(machine, displayNum), pid
         except ValueError: #pragma : no cover - should never happen, just a fail-safe
-            print "Failed to parse line :\n " + line + self.displayProc.stdout.read()
+            plugins.log.info("Failed to parse line :\n " + line + self.displayProc.stdout.read())
             return None, None
             
     def getVirtualServerArgs(self, machine, app):

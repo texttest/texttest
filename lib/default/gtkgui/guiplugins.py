@@ -5,7 +5,6 @@ from copy import copy, deepcopy
 from glob import glob
 from stat import *
 from ndict import seqdict
-from log4py import LOGLEVEL_NORMAL
 
 try:
     import gtk, gobject, entrycompletion

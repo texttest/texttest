@@ -110,7 +110,7 @@ def getNumberOfMinutes(timeString):
 
 def printWarning(message, stdout = True, stderr = False):
     if stdout:
-        print "WARNING: " + message
+        log.info("WARNING: " + message)
     if stderr:
         sys.stderr.write("WARNING: " + message + "\n")
 
@@ -368,7 +368,7 @@ class Action:
         return False
     # Useful for printing in a certain format...
     def describe(self, testObj, postText = ""):
-        print testObj.getIndent() + repr(self) + " " + repr(testObj) + postText
+        log.info(testObj.getIndent() + repr(self) + " " + repr(testObj) + postText)
     def __repr__(self):
         return "Doing nothing on"
     def __str__(self):
@@ -611,21 +611,31 @@ class MarkedTestState(TestState):
     def getTypeBreakdown(self):
         return self.category, self.briefText
 
-def configureLog4py(configFile):
-    # Don't use the default locations, particularly current directory causes trouble
-    if len(log4py.CONFIGURATION_FILES) > 1:
-        del log4py.CONFIGURATION_FILES[1]
-    if configFile:
-        # To set new config files appears to require a constructor...
-        rootLogger = log4py.Logger(log4py.TRUE, configFile)
-    else:
-        rootLogger = log4py.Logger().get_root()
-        rootLogger.set_loglevel(log4py.LOGLEVEL_NONE)
+log = None
+class NullLogger:
+    def info(*args):
+        pass
 
 # Simple handle to get diagnostics object. Better than using log4py directly,
 # as it ensures everything appears by default in a standard place with a standard name.
 def getDiagnostics(diagName):
-    return log4py.Logger().get_instance(diagName)
+    rootLogger = log4py.Logger.instance
+    if rootLogger:
+        return rootLogger.get_instance(diagName)
+    else:
+        return NullLogger()
+
+def configureLogging(configFile):
+    rootLogger = log4py.Logger.instance
+    # only set up once
+    if not rootLogger:
+        # Don't use the default locations, particularly current directory causes trouble
+        if len(log4py.CONFIGURATION_FILES) > 1:
+            del log4py.CONFIGURATION_FILES[1]
+
+        rootLogger = log4py.Logger(customconfigfiles=configFile)
+        global log
+        log = rootLogger.get_instance("standard log")
 
 def getPersonalConfigDir():
     fromEnv = os.getenv("TEXTTEST_PERSONAL_CONFIG")
@@ -774,7 +784,7 @@ def makeWriteable(path):
 def rmtree(dir, attempts=100):
     realDir = os.path.realpath(dir)
     if not os.path.isdir(realDir):
-        print "Write directory", dir, "externally removed"
+        log.info("Write directory " + dir + " externally removed")
         return
     # Don't be somewhere under the directory when it's removed
     try:
@@ -795,15 +805,16 @@ def rmtree(dir, attempts=100):
                         try:
                             makeWriteable(os.path.join(root, path))
                         except OSError, e:
-                            print "Could not change permissions to be able to remove directory", dir, ": -", str(e)
+                            log.info("Could not change permissions to be able to remove directory " +
+                                     dir + " : - " + str(e))
                             return
                 continue
             if os.path.isdir(realDir):
                 if i == attempts - 1:
-                    print "Unable to remove directory", dir, ":"
+                    log.info("Unable to remove directory " + dir + " :")
                     printException()
                 else:
-                    print "Problems removing directory", dir, "- waiting 1 second to retry..."
+                    log.info("Problems removing directory " + dir + " - waiting 1 second to retry...")
                     time.sleep(1)
 
 def readList(filename):

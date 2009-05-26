@@ -11,7 +11,6 @@ from jobprocess import killSubProcessAndChildren
 from actionrunner import ActionRunner
 from performance import TimeFilter
 from time import sleep
-from log4py import LOGLEVEL_NORMAL
 
 plugins.addCategory("killed", "killed", "were terminated before completion")
 
@@ -55,8 +54,8 @@ class Config:
             elif group.name.startswith("Advanced"):
                 group.addSwitch("x", "Enable self-diagnostics")
                 defaultDiagDir = os.path.join(plugins.getPersonalConfigDir(), "log")
-                group.addOption("xr", "Configure self-diagnostics from", os.path.join(defaultDiagDir, "log4py.conf"),
-                                possibleValues=[ os.path.join(plugins.installationDir("log"), "log4py.conf") ])
+                group.addOption("xr", "Configure self-diagnostics from", os.path.join(defaultDiagDir, "logging.debug"),
+                                possibleValues=[ os.path.join(plugins.installationDir("log"), "logging.debug") ])
                 group.addOption("xw", "Write self-diagnostics to", defaultDiagDir)
                 group.addOption("b", "Run batch mode session")
                 group.addSwitch("rectraffic", "(Re-)record command-line or client-server traffic")
@@ -193,21 +192,39 @@ class Config:
     def hasExplicitInterface(self):
         return self.useGUI() or self.batchMode() or self.useConsole() or \
                self.optionMap.has_key("o") or self.optionMap.has_key("s")
+
+    def getLogfilePosfix(self):
+        if self.batchMode():
+            return "batch"
+        elif not self.useGUI():
+            return "console"
+        else:
+            return "gui"
+        
+    def setUpLogging(self):
+        logFile = plugins.installationPath(os.path.join("log", "logging." + self.getLogfilePosfix()))
+        plugins.configureLogging(logFile) # Won't have any effect if we've already got a log file
+        
     def getResponderClasses(self, allApps):
+        # Global side effects first :)
+        if not self.hasExplicitInterface():
+            self.setDefaultInterface(allApps)
+
+        self.setUpLogging()
+        scriptEngine = pyusecase_interface.makeScriptEngine(self.optionMap)
+        return self._getResponderClasses(allApps, scriptEngine)
+
+    def _getResponderClasses(self, allApps, scriptEngine):
         classes = []
         if self.optionMap.runScript():
             return self.getThreadActionClasses()
         
-        if not self.hasExplicitInterface():
-            self.setDefaultInterface(allApps)
-
         if not self.optionMap.has_key("gx"):
             if self.optionMap.has_key("new"):
                 raise plugins.TextTestError, "'--new' option can only be provided with the static GUI"
             elif len(allApps) == 0:
                 raise plugins.TextTestError, "Could not find any matching applications (files of the form config.<app>) under " + self.optionMap.directoryName
             
-        scriptEngine = pyusecase_interface.makeScriptEngine(self.optionMap)
         if self.useGUI():
             self.addGuiResponder(classes, scriptEngine)
         else:
@@ -221,7 +238,7 @@ class Config:
                     classes.append(batch.WebPageResponder)
             else:
                 if self.optionValue("b") is None:
-                    print "No batch session identifier provided, using 'default'"
+                    plugins.log.info("No batch session identifier provided, using 'default'")
                     self.optionMap["b"] = "default"
                 classes.append(batch.BatchResponder)
         if self.useVirtualDisplay():
@@ -491,7 +508,7 @@ class Config:
                 if fileParts[:-2] == searchParts:
                     previousWriteDir = os.path.join(rootDir, file)
                     if os.path.isdir(previousWriteDir) and not plugins.samefile(previousWriteDir, writeDir):
-                        print "Removing previous write directory", previousWriteDir
+                        plugins.log.info("Removing previous write directory " + previousWriteDir)
                         plugins.rmtree(previousWriteDir, attempts=3)
     
     def isReconnecting(self):
@@ -558,7 +575,7 @@ class Config:
             return checkoutPath
         except plugins.TextTestError, e:
             if self.ignoreExecutable():
-                print "WARNING: " + str(e) + " Ignoring checkout."
+                plugins.log.info("WARNING: " + str(e) + " Ignoring checkout.")
                 return ""
             else:
                 raise
@@ -1167,7 +1184,7 @@ class RunTest(plugins.Action):
             self.killProcess()
         self.lock.release()
     def killProcess(self):
-        print "Killing running test (process id", str(self.currentProcess.pid) + ")"
+        plugins.log.info("Killing running test (process id " + str(self.currentProcess.pid) + ")")
         killSubProcessAndChildren(self.currentProcess)
     
     def wait(self, process):
@@ -1183,7 +1200,7 @@ class RunTest(plugins.Action):
         else:
             return ""
     def diagnose(self, testEnv, commandArgs):
-        if self.diag.get_loglevel() >= LOGLEVEL_NORMAL:
+        if self.diag.is_enabled():
             for var, value in testEnv.items():
                 self.diag.info("Environment: " + var + " = " + value)
             self.diag.info("Running test with args : " + repr(commandArgs))

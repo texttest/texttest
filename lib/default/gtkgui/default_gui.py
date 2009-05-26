@@ -5,7 +5,6 @@ from threading import Thread
 from glob import glob
 from stat import *
 from ndict import seqdict
-from log4py import LOGLEVEL_NORMAL
 from string import Template
 
 try:
@@ -2224,22 +2223,18 @@ class ReportBugs(guiplugins.ActionDialogGUI):
     def getFileName(self):
         name = "knownbugs." + self.currTestSelection[0].app.name + self.versionSuffix()
         return os.path.join(self.currTestSelection[0].getDirectory(), name)
-    def write(self, writeFile, message):
-        writeFile.write(message)
-        guiplugins.guilog.info(message)
     def getResizeDivisors(self):
         # size of the dialog
         return 1.4, 1.7
     def performOnCurrent(self):
         self.checkSanity()
         fileName = self.getFileName()
-        guiplugins.guilog.info("Recording known bugs to " + fileName + " : ")
         writeFile = open(fileName, "a")
-        self.write(writeFile, "\n[Reported by " + os.getenv("USER", "Windows") + " at " + plugins.localtime() + "]\n")
+        writeFile.write("\n[Reported by " + os.getenv("USER", "Windows") + " at " + plugins.localtime() + "]\n")
         for name, option in self.optionGroup.options.items():
             value = option.getValue()
             if name != "version" and value and value != "<none>":
-                self.write(writeFile, name + ":" + str(value) + "\n")
+                writeFile.write(name + ":" + str(value) + "\n")
         writeFile.close()
         self.currTestSelection[0].filesChanged()
 

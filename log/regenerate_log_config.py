@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import os, operator
-from glob import glob
 from copy import copy
 
 def writeMods(newFile, mods, ext, prefix):
@@ -12,14 +11,17 @@ def writeMods(newFile, mods, ext, prefix):
 
 def findDiagNames(location):
     result = []
-    for fileName in glob(os.path.join(installationRoot, location, "*.py")):
-        for line in open(fileName).xreadlines():
-            if line.find("getDiagnostics") != -1:
-                words = line.split('"')
-                if len(words) > 1:
-                    name = words[1].lower()
-                    if not name in result:
-                        result.append(name)
+    for root, dirs, files in os.walk(os.path.join(installationRoot, location)):
+        for file in files:
+            if file.endswith(".py"):
+                fileName = os.path.join(root, file)
+                for line in open(fileName).xreadlines():
+                    if line.find("getDiagnostics") != -1:
+                        words = line.split('"')
+                        if len(words) > 1:
+                            name = words[1].lower()
+                            if not name in result:
+                                result.append(name)
     result.sort()
     return result
 
@@ -44,10 +46,10 @@ def writeFile(fileName, coreDiagsIn, ext, prefix="", siteDiagsIn=[], defaultDiag
                 coreDiags.remove(mod)
             elif mod in siteDiags:
                 siteDiags.remove(mod)
-            else:
-                continue
+
             newFile.write("[" + mod + "]\n")
-            newFile.write("Target: " + diagFile + "." + ext + "\n")
+            if diagFile:
+                newFile.write("Target: " + diagFile + "." + ext + "\n")
             newFile.write("LogLevel: Normal\nFormat: %M\n\n")
         
     newFile.write("# The following diagnostics are available for the generic TextTest modules:\n")
@@ -59,29 +61,35 @@ def writeFile(fileName, coreDiagsIn, ext, prefix="", siteDiagsIn=[], defaultDiag
     os.remove(fileName)
     os.rename(newFileName, fileName)
 
+def combineDiags(fromFile, defaultDiags):
+    return sorted(fromFile + [ diag for (diag, f) in defaultDiags ])
+
 installationRoot = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 coreDiags = findDiagNames("lib")
-coreDiagFile = os.path.join(installationRoot, "log/log4py.conf")
-writeFile(coreDiagFile, coreDiags, "diag", prefix="$TEXTTEST_DIAGDIR/")
+coreDiagFile = os.path.join(installationRoot, "log/logging.debug")
+defaultCoreDiags = [ ("standard log", None), ("static gui behaviour", "gui_log"), ("dynamic gui behaviour", "dynamic_gui_log"), \
+                     ("use-case log", "usecase_log") ]
+allCoreDiags = combineDiags(coreDiags, defaultCoreDiags) 
+writeFile(coreDiagFile, allCoreDiags, "diag", prefix="$TEXTTEST_DIAGDIR/")
 
-siteDiagFile = os.path.join(installationRoot, "site/log/log4py.conf")
+siteDiagFile = os.path.join(installationRoot, "site/log/logging.debug")
 if os.path.isfile(siteDiagFile):
     siteDiags = findDiagNames("site/lib")
-    writeFile(siteDiagFile, coreDiags, "diag", "$TEXTTEST_DIAGDIR/", siteDiags)
+    defaultSiteDiags = [ ("test graph", "gnuplot") ]
+    allSiteDiags = combineDiags(siteDiags, defaultSiteDiags)
+    writeFile(siteDiagFile, allCoreDiags, "diag", "$TEXTTEST_DIAGDIR/", allSiteDiags)
 
 selftestFile = os.path.join(os.getenv("TEXTTEST_HOME"), "texttest", "logging.texttest")
 if not os.path.isfile(selftestFile):
     selftestFile = os.path.join(os.getenv("TEXTTEST_HOME"), "logging.texttest")
 
-defaultDiags = [ ("static gui behaviour", "gui_log"), ("dynamic gui behaviour", "dynamic_gui_log"), \
-                 ("use-case log", "usecase_log"), ("test graph", "gnuplot") ]
-
-writeFile(selftestFile, coreDiags, "texttest", defaultDiags=defaultDiags)
+writeFile(selftestFile, coreDiags, "texttest", defaultDiags=defaultCoreDiags)
 
 selftestSiteFile = os.path.join(os.getenv("TEXTTEST_HOME"), "texttest", "site", "logging.texttest")
 if not os.path.isfile(selftestFile):
    selftestSiteFile = os.path.join(os.getenv("TEXTTEST_HOME"), "site", "logging.texttest")
 
 if os.path.isfile(selftestSiteFile):
+    defaultDiags = defaultCoreDiags + defaultSiteDiags
     writeFile(selftestSiteFile, coreDiags, "texttest", siteDiagsIn=siteDiags, defaultDiags=defaultDiags)
     os.system("bzr tkdiff " + selftestSiteFile)

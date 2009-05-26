@@ -241,15 +241,15 @@ class GenerateWebPages(object):
                 self.pagesDetails[tag].append(HTMLgen.Heading(1, tagText + " - detailed test results for ", self.pageTitle, align = 'center'))
             self.pagesDetails[tag].append(details[tag])
     def writePages(self):
-        print "Writing overview pages..."
+        plugins.log.info("Writing overview pages...")
         for pageName, page in self.pagesOverview.items():
             page.write(os.path.join(self.pageDir, pageName))
-            print "wrote: '" + pageName + "'"
-        print "Writing detail pages..."
+            plugins.log.info("wrote: '" + pageName + "'")
+        plugins.log.info("Writing detail pages...")
         for tag, page in self.pagesDetails.items():
             pageName = getDetailPageName(self.pageVersion, tag)
             page.write(os.path.join(self.pageDir, pageName))
-            print "wrote: '" + pageName + "'"
+            plugins.log.info("wrote: '" + pageName + "'")
     def getTestIdentifier(self, stateFile, repository):
         dir = os.path.dirname(stateFile)
         return dir.replace(repository + os.sep, "").replace(os.sep, " ")

@@ -221,21 +221,19 @@ class MailSender:
         file.write(mailContents)
         file.close()
     def sendOrStoreMail(self, app, mailContents, useCollection=False, isAllSuccess=False):
-        sys.stdout.write("At " + time.strftime("%H:%M") + " creating batch report for application " + app.fullName + " ...")
-        sys.stdout.flush()
+        plugins.log.info("At " + time.strftime("%H:%M") + " creating batch report for application " + app.fullName + " ...")
         if useCollection:
             self.storeMail(app, mailContents)
-            sys.stdout.write("file written.")
+            plugins.log.info("File written.")
         else:
             if not isAllSuccess or app.getCompositeConfigValue("batch_mail_on_failure_only", self.sessionName) != "true":
                 errorMessage = self.sendMail(app, mailContents)
                 if errorMessage:
-                    sys.stdout.write("FAILED. Details follow:\n" + errorMessage.strip())
+                    plugins.log.info("FAILED. Details follow:\n" + errorMessage.strip())
                 else:
-                    sys.stdout.write("done.")
+                    plugins.log.info("done.")
             else:
-                sys.stdout.write("not sent: all tests succeeded.")
-        sys.stdout.write("\n")
+                plugins.log.info("not sent: all tests succeeded.")
     def exceptionOutput(self):
         exctype, value = sys.exc_info()[:2]
         from traceback import format_exception_only
@@ -458,14 +456,14 @@ class ArchiveRepository(plugins.ScriptWithArgs):
             elif os.path.isdir(fullPath):
                 self.archiveFilesUnder(fullPath, app)
         if count > 0:
-            print "Archived", count, "files dated", self.descriptor, "under", repository.replace(self.repository + os.sep, "")
+            plugins.log.info("Archived " + str(count) + " files dated " + self.descriptor + " under " + repository.replace(self.repository + os.sep, ""))
     def archiveFile(self, fullPath, app):
         targetPath = self.getTargetPath(fullPath, app.name)
         plugins.ensureDirExistsForFile(targetPath)
         try:
             os.rename(fullPath, targetPath)
         except:
-            print "Rename failed: ",fullPath,targetPath
+            plugins.log.info("Rename failed: " + fullPath + " " + targetPath)
 
     def getTargetPath(self, fullPath, appName):
         parts = fullPath.split(os.sep)
@@ -503,15 +501,14 @@ class WebPageResponder(plugins.Responder):
             
     def notifyAllComplete(self):
         appInfo = self.getAppRepositoryInfo()
-        print "Generating web pages..."
-        sys.stdout.flush()
+        plugins.log.info("Generating web pages...")
         for pageTitle, pageInfo in appInfo.items():
-            print "Generating page for", pageTitle
+            plugins.log.info("Generating page for " + pageTitle)
             if len(pageInfo) == 1:
                 self.generatePagePerApp(pageTitle, pageInfo)
             else:
                 self.generateCommonPage(pageTitle, pageInfo)
-        print "Completed web page generation."
+        plugins.log.info("Completed web page generation.")
 
     def generatePagePerApp(self, pageTitle, pageInfo):
         for app, repository in pageInfo:
@@ -620,9 +617,9 @@ class CollectFiles(plugins.ScriptWithArgs):
         self.diag = plugins.getDiagnostics("batch collect")
         self.userName = argDict.get("tmp", "")
         if self.userName:
-            print "Collecting batch files created by user", self.userName + "..."
+            plugins.log.info("Collecting batch files created by user " + self.userName + "...")
         else:
-            print "Collecting batch files locally..."
+            plugins.log.info("Collecting batch files locally...")
     def setUpApplication(self, app):
         fileBodies = []
         totalValues = seqdict()
@@ -686,7 +683,7 @@ class CollectFiles(plugins.ScriptWithArgs):
 
     def parseFile(self, fullname, app, totalValues):
         localName = os.path.basename(fullname)
-        print "Found file called", localName
+        plugins.log.info("Found file called " + localName)
         file = open(fullname)
         valuesLine = file.readline()
         self.runId = file.readline().strip()
@@ -697,7 +694,8 @@ class CollectFiles(plugins.ScriptWithArgs):
             file.close()
             return fileBody
         else:
-            print "Not including", localName, "as run is more than", maxDays, "days old (as determined by batch_collect_max_age_days)."
+            plugins.log.info("Not including " + localName + " as run is more than " +
+                             str(maxDays) + " days old (as determined by batch_collect_max_age_days).")
         
     def addValuesToTotal(self, localName, valuesLine, totalValues):
         catValues = plugins.commasplit(valuesLine.strip())

@@ -539,7 +539,7 @@ class CollateFiles(plugins.Action):
                 errorMsg = "Could not find extract script '" + script + "', not extracting file at\n" + sourceFile + "\n"
                 stderr = open(collationErrFile, "w")
                 stderr.write(errorMsg)
-                print "WARNING : " + errorMsg.strip()
+                plugins.log.info("WARNING : " + errorMsg.strip())
                 stderr.close()
                 return
 
@@ -767,7 +767,7 @@ class MakePerformanceFile(PerformanceFileCreator):
         cpuTime, realTime = self.systemPerfInfoFinder.findTimesUsedBy(test)
         # There was still an error (jobs killed in emergency), so don't write performance files
         if cpuTime == None:
-            print "Not writing performance file for", test
+            plugins.log.info("Not writing performance file for " + repr(test))
             return
 
         fileToWrite = test.makeTmpFileName("performance")

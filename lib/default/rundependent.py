@@ -310,6 +310,6 @@ class LineFilter:
 
 if __name__ == "__main__":
     args = [ arg.split(",") for arg in sys.argv[1:3]] + sys.argv[3:]
-    plugins.configureLog4py(os.getenv("TEXTTEST_LOGCONFIG"))
+    plugins.configureLogging(os.getenv("TEXTTEST_LOGCONFIG"))
     runDepFilter = RunDependentTextFilter(*args)
     runDepFilter.filterFileObject(sys.stdin, sys.stdout)

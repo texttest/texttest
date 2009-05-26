@@ -1421,6 +1421,9 @@ Static GUI Enhancements:
 Framework Enhancements:
     - Logging more flexible now (default.py)
 	Dynamic GUI does not write anything by default. Batch mode writes time stamps by default.
+	Debug logging file now called "logging.debug" rather than "log4py.conf". See migration notes
+    - Personal toolbar/GTK configuration now lives in "etc" subdirectory (plugins.py)
+	Mostly to keep things consistent with "log" locations
 Version Control Browser Enhancements/bug fixes:
 Internal changes:
 Bug Fixes:

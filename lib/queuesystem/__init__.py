@@ -59,7 +59,7 @@ class SocketResponder(plugins.Responder,plugins.Observable):
                 return
             except socket.error:
                 sleep(1)
-        plugins.log.info("Trouble connecting to " + self.serverAddress)
+        plugins.log.info("Trouble connecting to " + repr(self.serverAddress))
         sendSocket.connect(self.serverAddress)
     def notifyLifecycleChange(self, test, state, changeDesc):
         testData = socketSerialise(test)
@@ -124,6 +124,8 @@ class QueueSystemConfig(default.Config):
             if self.optionMap.has_key(localFlag):
                 return False
         return True
+    def hasExplicitInterface(self):
+        return self.slaveRun() or default.Config.hasExplicitInterface(self)
     def slaveRun(self):
         return self.optionMap.has_key("slave")
     def getWriteDirectoryName(self, app):

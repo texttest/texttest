@@ -502,7 +502,6 @@ class ViewTestFileInEditor(ViewInEditor):
             test.filesChanged()
         self.editingComplete()
 
-
 class ViewFilteredTestFileInEditor(ViewTestFileInEditor):
     def _getStockId(self):
         pass # don't use same stock for both
@@ -514,6 +513,24 @@ class ViewFilteredTestFileInEditor(ViewTestFileInEditor):
         return bool(comparison)
     def isDefaultViewer(self, *args):
         return False
+
+class ViewFilteredOrigFileInEditor(ViewFilteredTestFileInEditor):
+    def _getTitle(self):
+        return "View Filtered Original File"
+    def getFileToView(self, fileName, associatedObject):
+        try:
+            # associatedObject might be a comparison object, but it might not
+            # Use the comparison if it's there
+            return associatedObject.getStdFile(self.useFiltered())
+        except AttributeError:
+            return fileName
+
+class ViewOrigFileInEditor(ViewFilteredOrigFileInEditor):
+    def _getTitle(self):
+        return "View Original File"
+    def useFiltered(self):
+        return False
+
 
 class ViewFileDifferences(FileViewAction):
     def _getTitle(self):
@@ -2630,8 +2647,8 @@ class InteractiveActionConfig:
     def getInteractiveActionClasses(self, dynamic):
         classes = [ Quit, ViewTestFileInEditor, ShowFileProperties ]
         if dynamic:
-            classes += [ ViewFilteredTestFileInEditor, ViewFileDifferences,
-                         ViewFilteredFileDifferences, FollowFile,
+            classes += [ ViewFilteredTestFileInEditor, ViewOrigFileInEditor, ViewFilteredOrigFileInEditor,
+                         ViewFileDifferences, ViewFilteredFileDifferences, FollowFile,
                          SaveTests, SaveSelection, KillTests, AnnotateGUI,
                          MarkTest, UnmarkTest, RecomputeTests ] # must keep RecomputeTests at the end!
         else:

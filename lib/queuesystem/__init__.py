@@ -523,10 +523,16 @@ class QueueSystemServer(BaseActionRunner):
         if self.exited and self.testsSubmitted == 0:
             self.diag.info("Forcing termination")
             self.submitTerminators()
+            
     def allowReuse(self, oldTest, newTest):
+        # Don't reuse jobs that have been killed
+        if oldTest.state.category == "killed":
+            return False
+
         oldRules = self.getSubmissionRules(oldTest)
         newRules = self.getSubmissionRules(newTest)
         return oldRules.allowsReuse(newRules)
+
     def getSubmissionRules(self, test):
         if self.submissionRules.has_key(test):
             return self.submissionRules[test]
@@ -534,6 +540,7 @@ class QueueSystemServer(BaseActionRunner):
             submissionRules = test.app.getSubmissionRules(test)
             self.submissionRules[test] = submissionRules
             return submissionRules
+
     def getTest(self, block):
         testOrStatus = self.getItemFromQueue(self.testQueue, block)
         if not testOrStatus:
@@ -543,6 +550,7 @@ class QueueSystemServer(BaseActionRunner):
             return self.getTest(block)
         else:
             return testOrStatus
+
     def sendServerState(self, state):
         self.diag.info("Sending server state '" + state + "'")
         mimServAddr = os.getenv("TEXTTEST_MIM_SERVER")
@@ -615,7 +623,7 @@ class QueueSystemServer(BaseActionRunner):
     def fixUseCaseVariables(self, env):
         # Make sure we clear out the master scripts so the slave doesn't use them too,
         # otherwise just use the environment as is
-        if env.has_key("USECASE_REPLAY_SCRIPT"):
+        if env.has_key("USECASE_REPLAY_SCRIPT") or env.has_key("USECASE_RECORD_SCRIPT"):
             env["USECASE_REPLAY_SCRIPT"] = ""
             env["USECASE_RECORD_SCRIPT"] = ""
 

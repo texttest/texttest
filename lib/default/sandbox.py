@@ -14,54 +14,79 @@ class PrepareWriteDirectory(plugins.Action):
     def __init__(self, ignoreCatalogues):
         self.diag = plugins.getDiagnostics("Prepare Writedir")
         self.ignoreCatalogues = ignoreCatalogues
+        self.madeRemoteTmp = False
         if self.ignoreCatalogues:
             self.diag.info("Ignoring all information in catalogue files")
+
     def __call__(self, test):
+        self.madeRemoteTmp = False
         self.collatePaths(test, "copy_test_path", self.copyTestPath)
+        self.collatePaths(test, "copy_test_path_merge", self.copyTestPath, True)
         self.collatePaths(test, "partial_copy_test_path", self.partialCopyTestPath)
         self.collatePaths(test, "link_test_path", self.linkTestPath)
         test.createPropertiesFiles()
-    def collatePaths(self, test, configListName, collateMethod):
-        for configName in test.getConfigValue(configListName, expandVars=False):
-            self.collatePath(test, configName, collateMethod)
-    def collatePath(self, test, configName, collateMethod):
-        sourcePath = self.getSourcePath(test, configName)
-        target = self.getTargetPath(test, configName)
-        self.diag.info("Collating " + configName + " from " + repr(sourcePath) + "\nto " + repr(target))
-        if sourcePath:
-            self.collateExistingPath(test, sourcePath, target, collateMethod)
 
+    def collatePaths(self, test, configListName, *args):
+        for configName in test.getConfigValue(configListName, expandVars=False):
+            self.collatePath(test, configName, *args)
+
+    def collatePath(self, test, configName, collateMethod, mergeDirectories=False):
+        sourcePaths = self.getSourcePaths(test, configName)
+        targetPath = self.getTargetPath(test, configName)
+        plugins.ensureDirExistsForFile(targetPath)
+        for sourcePath in sourcePaths:
+            self.diag.info("Collating " + configName + " from " + repr(sourcePath) +
+                           "\nto " + repr(targetPath))
+            collateMethod(test, sourcePath, targetPath)
+            if not mergeDirectories or not os.path.isdir(sourcePath):
+                break
+
+        machine, remoteTmpDir = test.app.getRemoteTestTmpDir(test)
+        if remoteTmpDir:
+            self.copyDataRemotely(test, targetPath, machine, remoteTmpDir)
+            
         envVarToSet, propFileName = self.findDataEnvironment(test, configName)
         if envVarToSet:
-            self.diag.info("Setting env. variable " + envVarToSet + " to " + target)
-            test.setEnvironment(envVarToSet, target, propFileName)
-    def collateExistingPath(self, test, sourcePath, target, collateMethod):
-        self.diag.info("Path for linking/copying at " + sourcePath)
-        plugins.ensureDirExistsForFile(target)
-        collateMethod(test, sourcePath, target)
+            self.diag.info("Setting env. variable " + envVarToSet + " to " + targetPath)
+            test.setEnvironment(envVarToSet, targetPath, propFileName)
+
+    def copyDataRemotely(self, test, sourcePath, machine, remoteTmpDir):
+        if os.path.exists(sourcePath):
+            if not self.madeRemoteTmp:
+                test.app.ensureRemoteDirExists(machine, remoteTmpDir)
+                self.madeRemoteTmp = True
+            test.app.copyFileRemotely(sourcePath, "localhost", remoteTmpDir, machine)
+            
     def getEnvironmentSourcePath(self, configName, test):
         pathName = self.getPathFromEnvironment(configName, test)
         if pathName != configName:
             return pathName
+    
     def getPathFromEnvironment(self, configName, test):
         return os.path.normpath(Template(configName).safe_substitute(test.environment))
+    
     def getTargetPath(self, test, configName):
         # handle environment variables
         localName = os.path.basename(self.getPathFromEnvironment(configName, test))
         return test.makeTmpFileName(localName, forComparison=0)
-    def getSourcePath(self, test, configName):
+    
+    def getSourcePaths(self, test, configName):
         # These can refer to environment variables or to paths within the test structure
         fileName = self.getSourceFileName(configName, test)
         self.diag.info("Found source file name for " + configName + " = " + fileName)
-        if not fileName or os.path.isabs(fileName):
-            return fileName
+        if not fileName:
+            return []
+        elif os.path.isabs(fileName):
+            return [ fileName ]
 
-        return test.getPathName(fileName, configName)
+        return reversed(test.getAllPathNames(fileName, configName)) # most specific first
+
     def getSourceFileName(self, configName, test):
         if configName.startswith("$"):
             return self.getEnvironmentSourcePath(configName, test)
         else:
             return configName
+
     def findDataEnvironment(self, test, configName):
         self.diag.info("Finding env. var name from " + configName)
         if configName.startswith("$"):
@@ -91,6 +116,8 @@ class PrepareWriteDirectory(plugins.Action):
         for name in names:
             srcname = os.path.join(src, name)
             dstname = os.path.join(dst, name)
+            if os.path.exists(dstname):
+                continue
             try:
                 if os.path.islink(srcname):
                     self.copylink(srcname, dstname)
@@ -212,6 +239,47 @@ class PrepareWriteDirectory(plugins.Action):
         fileName = line.strip()[pos:]
         return fileName, indent
 
+    def setUpSuite(self, suite):
+        if suite.parent is None:
+            self.tryCopySUTRemotely(suite)
+
+    def tryCopySUTRemotely(self, suite):
+        # Copy the executables remotely, if necessary
+        machine, tmpDir = suite.app.getRemoteTmpDirectory()
+        if tmpDir:
+            self.copySUTRemotely(machine, tmpDir, suite)
+
+    def tryCopyPathRemotely(self, path, fullTmpDir, machine, app):
+        if os.path.isabs(path) and os.path.exists(path):
+            # If not absolute, assume it's an installed program
+            # If it doesn't exist locally, it must already exist remotely or we'd have raised an error by now
+            remotePath = os.path.join(fullTmpDir, os.path.basename(path))
+            app.copyFileRemotely(path, "localhost", remotePath, machine)
+            self.diag.info("Copied " + path + " to " + remotePath)
+            return remotePath
+                    
+    def copySUTRemotely(self, machine, tmpDir, suite):
+        self.diag.info("Copying SUT to machine " + machine + " at " + tmpDir)
+        fullTmpDir = os.path.join(tmpDir, "system_under_test")
+        suite.app.ensureRemoteDirExists(machine, fullTmpDir)
+        checkout = suite.app.checkout
+        remoteCheckout = self.tryCopyPathRemotely(checkout, fullTmpDir, machine, suite.app)
+        if remoteCheckout:
+            suite.app.checkout = remoteCheckout
+            suite.setEnvironment("TEXTTEST_CHECKOUT", remoteCheckout)
+            os.environ["TEXTTEST_CHECKOUT"] = remoteCheckout
+            
+        for setting in [ "interpreter", "executable" ]:
+            file = suite.getConfigValue(setting)
+            if remoteCheckout and file.startswith(checkout):
+                continue # We've copied it already, don't do it again...
+            remoteFile = self.tryCopyPathRemotely(file, fullTmpDir, machine, suite.app)
+            if remoteFile:
+                # For convenience, so we don't have to set it everywhere...
+                suite.app.setConfigDefault(setting, remoteFile)
+        
+        
+
 # Class for automatically adding things to test environment files...
 class TestEnvironmentCreator:
     def __init__(self, test, optionMap):
@@ -315,7 +383,6 @@ class TestEnvironmentCreator:
         return pathVars
 
 
-
 class CollateFiles(plugins.Action):
     def __init__(self):
         self.collations = {}
@@ -329,22 +396,23 @@ class CollateFiles(plugins.Action):
         newColl = seqdict()
         # copy items specified without "*" in targetStem
         self.diag.info("coll initial:", str(coll))
-        for targetStem, sourcePattern in coll.items():
+        for targetStem, sourcePatterns in coll.items():
             if not glob.has_magic(targetStem):
-                newColl[targetStem] = sourcePattern
+                newColl[targetStem] = sourcePatterns
         # add files generated from items in targetStem containing "*"
-        for targetStem, sourcePattern in coll.items():
+        for targetStem, sourcePatterns in coll.items():
             if not glob.has_magic(targetStem):
                 continue
 
             # add each file to newColl using suffix from sourcePtn
-            for aFile in self.getFilesFromExpansions(test, targetStem, sourcePattern):
-                fullStem = os.path.splitext(aFile)[0]
-                newTargetStem = os.path.basename(fullStem).replace(".", "_")
-                if not newColl.has_key(newTargetStem):
-                    sourceExt = os.path.splitext(sourcePattern)[1]
-                    self.diag.info("New collation to " + newTargetStem + " : from " + fullStem + " with extension " + sourceExt)
-                    newColl[newTargetStem] = fullStem + sourceExt
+            for sourcePattern in sourcePatterns:
+                for aFile in self.getFilesFromExpansions(test, targetStem, sourcePattern):
+                    fullStem = os.path.splitext(aFile)[0]
+                    newTargetStem = os.path.basename(fullStem).replace(".", "_")
+                    if not newColl.has_key(newTargetStem):
+                        sourceExt = os.path.splitext(sourcePattern)[1]
+                        self.diag.info("New collation to " + newTargetStem + " : from " + fullStem + " with extension " + sourceExt)
+                        newColl.setdefault(newTargetStem, []).append(fullStem + sourceExt)
         return newColl
     def getFilesFromExpansions(self, test, targetStem, sourcePattern):
         # generate a list of filenames from previously saved files
@@ -364,6 +432,10 @@ class CollateFiles(plugins.Action):
         if not self.filesPresentBefore.has_key(test):
             self.filesPresentBefore[test] = self.getFilesPresent(test)
         else:
+            machine, remoteTmpDir = test.app.getRemoteTestTmpDir(test)
+            if remoteTmpDir:
+                self.fetchRemoteFiles(test, machine, remoteTmpDir)
+        
             self.removeUnwanted(test)
             self.collate(test)
     def removeUnwanted(self, test):
@@ -375,28 +447,40 @@ class CollateFiles(plugins.Action):
             except:
                 pass
 
+    def findEditedFile(self, test, patterns):
+        for pattern in patterns:
+            for fullpath in self.findPaths(test, pattern):
+                if self.testEdited(test, fullpath):
+                    return fullpath
+
     def collate(self, test):
         testCollations = self.expandCollations(test, self.collations)
-        for targetStem, sourcePattern in testCollations.items():
-            targetFile = test.makeTmpFileName(targetStem)
-            collationErrFile = test.makeTmpFileName(targetStem + ".collate_errs", forFramework=1)
-            for fullpath in self.findPaths(test, sourcePattern):
-                if self.testEdited(test, fullpath):
-                    self.diag.info("Extracting " + fullpath + " to " + targetFile)
-                    self.extract(test, fullpath, targetFile, collationErrFile)
-                    break
+        for targetStem, sourcePatterns in testCollations.items():
+            sourceFile = self.findEditedFile(test, sourcePatterns)
+            if sourceFile:
+                targetFile = test.makeTmpFileName(targetStem)
+                collationErrFile = test.makeTmpFileName(targetStem + ".collate_errs", forFramework=1)
+                self.diag.info("Extracting " + sourceFile + " to " + targetFile)
+                self.extract(test, sourceFile, targetFile, collationErrFile)
+                
+    def fetchRemoteFiles(self, test, machine, tmpDir):
+        test.app.copyFileRemotely(os.path.join(tmpDir, "*"), machine, test.getDirectory(temporary=1), "localhost")
+    
     def getFilesPresent(self, test):
         files = seqdict()
-        for targetStem, sourcePattern in self.collations.items():
-            for fullPath in self.findPaths(test, sourcePattern):
-                self.diag.info("Pre-existing file found " + fullPath)
-                files[fullPath] = plugins.modifiedTime(fullPath)
+        for targetStem, sourcePatterns in self.collations.items():
+            for sourcePattern in sourcePatterns:
+                for fullPath in self.findPaths(test, sourcePattern):
+                    self.diag.info("Pre-existing file found " + fullPath)
+                    files[fullPath] = plugins.modifiedTime(fullPath)
         return files
+    
     def testEdited(self, test, fullPath):
         filesBefore = self.filesPresentBefore[test]
         if not filesBefore.has_key(fullPath):
             return True
         return filesBefore[fullPath] != plugins.modifiedTime(fullPath)
+
     def findPaths(self, test, sourcePattern):
         self.diag.info("Looking for pattern " + sourcePattern + " for " + repr(test))
         pattern = test.makeTmpFileName(sourcePattern, forComparison=0)
@@ -431,7 +515,7 @@ class CollateFiles(plugins.Action):
         scripts = test.getCompositeConfigValue("collate_script", stem)
         if len(scripts) == 0:
             return shutil.copyfile(sourceFile, targetFile)
-
+            
         currProc = None
         stdin = None
         for script in scripts:
@@ -455,7 +539,7 @@ class CollateFiles(plugins.Action):
                 errorMsg = "Could not find extract script '" + script + "', not extracting file at\n" + sourceFile + "\n"
                 stderr = open(collationErrFile, "w")
                 stderr.write(errorMsg)
-                print "WARNING : " + errorMsg.strip()
+                plugins.log.info("WARNING : " + errorMsg.strip())
                 stderr.close()
                 return
 
@@ -466,7 +550,11 @@ class FindExecutionHosts(plugins.Action):
     def __call__(self, test):
         test.state.executionHosts = self.getExecutionMachines(test)
     def getExecutionMachines(self, test):
-        return [ plugins.gethostname() ]
+        runMachine = test.app.getRunMachine()
+        if runMachine == "localhost":
+            return [ plugins.gethostname() ]
+        else:
+            return [ runMachine ]
 
 class CreateCatalogue(plugins.Action):
     def __init__(self):
@@ -679,7 +767,7 @@ class MakePerformanceFile(PerformanceFileCreator):
         cpuTime, realTime = self.systemPerfInfoFinder.findTimesUsedBy(test)
         # There was still an error (jobs killed in emergency), so don't write performance files
         if cpuTime == None:
-            print "Not writing performance file for", test
+            plugins.log.info("Not writing performance file for " + repr(test))
             return
 
         fileToWrite = test.makeTmpFileName("performance")

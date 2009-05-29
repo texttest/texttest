@@ -5,9 +5,13 @@ class HgInterface(version_control.VersionControlInterface):
     def __init__(self, controlDir):
         self.warningStateInfo = { "M": "Modified", "R":"Removed", "A":"Added" }
         self.errorStateInfo = { "?" : "Unknown", "!" : "Missing" }
+        self.allStateInfo = { "C": "Unchanged", "I": "Ignored" }
+        self.allStateInfo.update(self.warningStateInfo)
+        self.allStateInfo.update(self.errorStateInfo)
         version_control.VersionControlInterface.__init__(self, controlDir, "Mercurial",
                                                          self.warningStateInfo.values(), self.errorStateInfo.values(), "tip")
         self.defaultArgs["rm"] = [ "--force" ]
+        self.defaultArgs["status"] = [ "-A" ] # Otherwise we can't tell difference between Unchanged and Ignored
         self.defaultArgs["log"] = [ "-f" ] # "follow" renames, which isn't default
         self.defaultArgs["annotate"] = [ "-f", "-n" ] # annotate -f doesn't annotate anything...
         self.defaultArgs["diff"] = [ "-g" ] # "git format", which apparently is how to make it work with revisions :)
@@ -25,24 +29,17 @@ class HgInterface(version_control.VersionControlInterface):
         return time.strptime(input, "%b %d %H:%M:%S %Y")
 
     def getStateFromStatus(self, output):
-        if len(output) == 0:
-            return "Unchanged"
         statusLetter = output.split()[0]
-        return self.warningStateInfo.get(statusLetter, self.errorStateInfo.get(statusLetter, statusLetter))
-        
+        return self.allStateInfo.get(statusLetter, statusLetter)
+
     def _moveDirectory(self, oldDir, newDir):
         # Moving doesn't work in hg if there are symbolic links in the path to the new location!
         retCode = self.callProgram("mv", [ oldDir, os.path.realpath(newDir) ])
-        if retCode == 0:
-            # And it doesn't take non-versioned files with it...
+        # And it doesn't take non-versioned files with it, if there are any...
+        if retCode == 0 and os.path.isdir(oldDir):
             self.copyDirectory(oldDir, newDir)
             shutil.rmtree(oldDir)
-            return True
-        else:
-            # Wasn't in version control, probably
-            os.rename(oldDir, newDir)
-            return False
-
+            
     def removePath(self, path):
         retCode = self.callProgram("rm", [ path ])
         if retCode > 0:

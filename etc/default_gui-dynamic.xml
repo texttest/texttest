@@ -50,6 +50,9 @@
     <menuitem action="View File"/>
     <menuitem action="View Filtered File"/>
     <separator/>
+    <menuitem action="View Original File"/>
+    <menuitem action="View Filtered Original File"/>
+    <separator/>
     <menuitem action="View Differences"/>
     <menuitem action="View Raw Differences"/>
     <separator/>

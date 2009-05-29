@@ -28,7 +28,6 @@ except:
 
 import pango, guiplugins, plugins, os, sys, operator, subprocess
 from ndict import seqdict
-from respond import Responder
 from copy import copy
 from TreeViewTooltips import TreeViewTooltips
 
@@ -95,6 +94,8 @@ class GUIStatusMonitor(guiplugins.SubGUI):
     def describe(self):
         guilog.info("Changing GUI status to: '" + self.label.get_text() + "'")
     def notifyActionStart(self, message="", lock = True):
+        if message == "workaround":
+            return # Don't set the throbber going for the GTK 2.14 bug workaround
         if self.throbber:
             if self.pixbuf: # pragma: no cover : Only occurs if some code forgot to do ActionStop ...
                 self.notifyActionStop()
@@ -197,14 +198,14 @@ class IdleHandlerManager:
         self.disableHandler()
 
 
-class TextTestGUI(Responder, plugins.Observable):
+class TextTestGUI(plugins.Responder, plugins.Observable):
+    scriptEngine = None
     def __init__(self, optionMap, allApps):
         vanilla = optionMap.has_key("vanilla")
         self.readGtkRCFiles(vanilla)
         self.dynamic = not optionMap.has_key("gx")
-        global guilog, guiConfig, scriptEngine
-        guilog, guiConfig, scriptEngine = guiplugins.setUpGlobals(self.dynamic, allApps)
-        Responder.__init__(self, optionMap)
+        self.setUpGlobals(allApps)
+        plugins.Responder.__init__(self)
         plugins.Observable.__init__(self)
         testCount = int(optionMap.get("count", 0))
 
@@ -225,6 +226,16 @@ class TextTestGUI(Responder, plugins.Observable):
         self.rightWindowGUI = self.createRightWindowGUI()
         self.shortcutBarGUI = ShortcutBarGUI()
         self.topWindowGUI = self.createTopWindowGUI(allApps)
+
+    def setUpGlobals(self, allApps):
+        global guilog, guiConfig, scriptEngine
+        scriptEngine = self.scriptEngine
+        guilog = self.scriptEngine.replayer.logger
+        guiConfig = guiplugins.GUIConfig(self.dynamic, allApps, guilog)
+
+        guiplugins.guilog = guilog
+        guiplugins.scriptEngine = scriptEngine
+        guiplugins.guiConfig = guiConfig
 
     def getTestTreeObservers(self):
         return [ self.testColumnGUI, self.testFileGUI, self.textInfoGUI, self.testRunInfoGUI ] + self.allActionGUIs() + [ self.rightWindowGUI ]
@@ -652,7 +663,7 @@ class ToolBarGUI(ContainerGUI):
         self.widget.show_all()
         return self.widget
     def describe(self):
-        guilog.info("UI layout: \n" + self.uiManager.get_ui())
+        guilog.info("UI layout: \n" + self.uiManager.get_ui().strip())
 
 class PopupMenuGUI(guiplugins.SubGUI):
     def __init__(self, name, uiManager):
@@ -2158,7 +2169,8 @@ class FileViewGUI(guiplugins.SubGUI):
         self.selection.unselect_all()
 
     def notifyNewFile(self, fileName, overwrittenExisting):
-        self.notify(self.getViewFileSignal(), fileName, None)
+        if os.path.isfile(fileName):
+            self.notify(self.getViewFileSignal(), fileName, None)
         if not overwrittenExisting:
             self.currentTest.refreshFiles()
             self.recreateModel(self.getState(), preserveSelection=True)
@@ -2167,6 +2179,21 @@ class FileViewGUI(guiplugins.SubGUI):
         baseName = os.path.basename(fileName)
         row = [ baseName, colour, fileName, associatedObject, details, "" ]
         return self.model.insert_before(iter, None, row)
+
+    def addDataFilesUnderIter(self, iter, files, colour, root, **kwargs):
+        dirIters = { root : iter }
+        parentIter = iter
+        for file in files:
+            parent, local = os.path.split(file)
+            parentIter = dirIters.get(parent)
+            if parentIter is None:
+                subDirIters = self.addDataFilesUnderIter(iter, [ parent ], colour, root)
+                parentIter = subDirIters.get(parent)
+            newiter = self.addFileToModel(parentIter, file, colour, **kwargs)
+            if os.path.isdir(file):
+                dirIters[file] = newiter
+        return dirIters
+
 
 
 class ApplicationFileGUI(FileViewGUI):
@@ -2190,13 +2217,14 @@ class ApplicationFileGUI(FileViewGUI):
 
     def addFilesToModel(self, state):
         colour = guiConfig.getCompositeValue("file_colours", "static")
-        personalFiles = self.getPersonalFiles()
+        personalDir = plugins.getPersonalConfigDir()
+        personalFiles = self.getPersonalFiles(personalDir)
         importedFiles = {}
         if len(personalFiles) > 0:
             persiter = self.model.insert_before(None, None)
             self.model.set_value(persiter, 0, "Personal Files")
+            self.addDataFilesUnderIter(persiter, personalFiles, colour, personalDir, associatedObject=self.allApps)
             for file in personalFiles:
-                self.addFileToModel(persiter, file, colour, self.allApps)
                 for importedFile in self.getImportedFiles(file):
                     importedFiles[importedFile] = importedFile
 
@@ -2234,14 +2262,18 @@ class ApplicationFileGUI(FileViewGUI):
 
     def getConfigFiles(self, app):
         return app._getAllFileNames([ app.dircache ], "config", allVersions=True)
-    def getPersonalFiles(self):
-        personalDir = plugins.getPersonalConfigDir()
+
+    def getPersonalFiles(self, personalDir):
         if not os.path.isdir(personalDir):
             return []
-        allEntries = [ os.path.join(personalDir, file) for file in os.listdir(personalDir) ]
-        allFiles = filter(os.path.isfile, allEntries)
-        allFiles.sort()
-        return allFiles
+        allFiles = []
+        for root, dirs, files in os.walk(personalDir):
+            if "tmp" in dirs:
+                dirs.remove("tmp")
+            for file in files + dirs:
+                allFiles.append(os.path.join(root, file))
+        return sorted(allFiles)
+    
     def getImportedFiles(self, file, app = None):
         imports = []
         if os.path.isfile(file):
@@ -2503,19 +2535,6 @@ class TestFileGUI(FileViewGUI):
             datiter, colour = self.getRootIterAndColour("Externally Edited", root)
             self.addDataFilesUnderIter(datiter, files, colour, root)
 
-    def addDataFilesUnderIter(self, iter, files, colour, root):
-        dirIters = { root : iter }
-        parentIter = iter
-        for file in files:
-            parent, local = os.path.split(file)
-            parentIter = dirIters.get(parent)
-            if parentIter is None:
-                subDirIters = self.addDataFilesUnderIter(iter, [ parent ], colour, root)
-                parentIter = subDirIters.get(parent)
-            newiter = self.addFileToModel(parentIter, file, colour)
-            if os.path.isdir(file):
-                dirIters[file] = newiter
-        return dirIters
 
 class ProgressBarGUI(guiplugins.SubGUI):
     def __init__(self, dynamic, testCount):

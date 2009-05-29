@@ -127,7 +127,10 @@ class ReconnectConfig:
         appVersions = frozenset(app.versions)
         for versionLists, groupDirIter in groupby(dirs, self.getVersionListsTopDir):
             for versionList in versionLists:
-                extraVersion = ".".join(frozenset(versionList).difference(appVersions))
+                extraVersionSet = frozenset(versionList).difference(appVersions)
+                # Important to preserve the order of the versions as received
+                extraVersionList = filter(lambda v: v in extraVersionSet, versionList)
+                extraVersion = ".".join(extraVersionList)
                 version = ".".join(versionList)
                 groupDirs = list(groupDirIter)
                 if extraVersion:
@@ -229,7 +232,7 @@ class ReconnectTest(plugins.Action):
         else:
             return True
     def setUpApplication(self, app):
-        print "Reconnecting to test results in directory", self.rootDirToCopy
+        plugins.log.info("Reconnecting to test results in directory " + self.rootDirToCopy)
 
     def setUpSuite(self, suite):
         self.describe(suite)

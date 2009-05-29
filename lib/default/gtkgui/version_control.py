@@ -17,24 +17,43 @@ class VersionControlInterface:
         self.lastMoveInVCS = False
         self.defaultArgs = {}
 
+    def isVersionControlled(self, dirname):
+        basicArgs = self.getCmdArgs("status")
+        for file in self.getFileNames(dirname, recursive=True):
+            output = self.getProcessResults(basicArgs + [ file ])[1]
+            status = self.getStateFromStatus(output)
+            if status != "Unknown" and status != "Ignored":
+                return True
+        return False
+        
     def callProgram(self, cmdName, fileArgs, **kwargs):
         return subprocess.call(self.getCmdArgs(cmdName, fileArgs),
                                stdout=open(os.devnull, "w"), stderr=open(os.devnull, "w"), **kwargs)
 
     def callProgramOnFiles(self, cmdName, fileArg, recursive=False, extraArgs=[], **kwargs):
         basicArgs = self.getCmdArgs(cmdName, extraArgs)
-        for fileName in self.getFileNames(fileArg, recursive):
+        for fileName in self.getFileNamesForCmd(cmdName, fileArg, recursive):
             self.callProgramWithHandler(fileName, basicArgs + [ fileName ], **kwargs)
 
     def callProgramWithHandler(self, fileName, args, outputHandler=None, outputHandlerArgs=(), **kwargs):
+        retcode, stdout, stderr = self.getProcessResults(args, **kwargs)
+        if outputHandler:
+            outputHandler(retcode, stdout, stderr, fileName, *outputHandlerArgs)
+
+    def getProcessResults(self, args, **kwargs):
         try:
             process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, **kwargs)
         except OSError:
             raise plugins.TextTestError, "Could not run " + self.name + ": make sure you have it installed locally"
 
         stdout, stderr = process.communicate()
-        if outputHandler:
-            outputHandler(process.returncode, stdout, stderr, fileName, *outputHandlerArgs)         
+        return process.returncode, stdout, stderr
+
+    def getFileNamesForCmd(self, cmdName, fileArg, recursive):
+        if cmdName == "add" and recursive: # assume VCS adds recursively by default, override for CVS
+            return [ fileArg ]
+        else:
+            return self.getFileNames(fileArg, recursive)
 
     def getFileNames(self, fileArg, recursive, includeDirs=False):
         if os.path.isfile(fileArg):
@@ -68,7 +87,9 @@ class VersionControlInterface:
             for f in toAdd:
                 fullPath = os.path.join(root, f)
                 allFiles.append(fullPath)
-                if os.path.isdir(fullPath) and os.path.islink(fullPath):
+            for dir in dirs:
+                fullPath = os.path.join(root, dir)
+                if os.path.islink(fullPath):
                     allFiles += self.getFilesFromDirRecursive(fullPath, includeDirs)
                     
         return sorted(allFiles)
@@ -79,7 +100,7 @@ class VersionControlInterface:
     def getGraphicalDiffArgs(self, diffProgram):
         return [ diffProgram ] # brittle but general...
     
-    def getCmdArgs(self, cmdName, extraArgs):
+    def getCmdArgs(self, cmdName, extraArgs=[]):
         return self.getProgramArgs() + [ cmdName ] + self.defaultArgs.get(cmdName, []) + extraArgs 
 
     def getDateFromLog(self, output):
@@ -103,18 +124,20 @@ class VersionControlInterface:
                     shutil.copyfile(oldPath, newPath)
         else:
             shutil.copytree(oldDir, newDir)
-    
+                
     def moveDirectory(self, oldDir, newDir):
-        self.lastMoveInVCS = self._moveDirectory(oldDir, newDir)
+        self.lastMoveInVCS = self.isVersionControlled(oldDir)
+        if self.lastMoveInVCS:
+            newParent = os.path.dirname(newDir)
+            # If it's also a parent of the old directory we don't need to check if it's version-controlled.
+            if not oldDir.startswith(newParent) and not self.isVersionControlled(newParent):
+                self.callProgramOnFiles("add", newParent) 
+            self._moveDirectory(oldDir, newDir)
+        else:
+            os.rename(oldDir, newDir)
 
     def _moveDirectory(self, oldDir, newDir):
-        retCode = self.callProgram("mv", [ oldDir, newDir ])
-        if retCode > 0:
-            # Wasn't in version control, probably
-            os.rename(oldDir, newDir)
-            return False
-        else:
-            return True
+        self.callProgram("mv", [ oldDir, newDir ])
 
     def getMoveSuffix(self):
         if self.lastMoveInVCS:
@@ -541,7 +564,8 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         model, iter = selection.get_selected()
         if iter:
             text = self.updateForIter(iter)
-            guiplugins.guilog.info(vcs.name + " tree view dialog: Showing " + vcs.name + " output\n" + text)
+            message = vcs.name + " tree view dialog: Showing " + vcs.name + " output\n" + text
+            guiplugins.guilog.info(message.strip())
         else:
             self.extraWidgetArea.set_sensitive(False)
 

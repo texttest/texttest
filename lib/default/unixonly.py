@@ -1,14 +1,12 @@
 #!/usr/local/bin/python
 
 import default, plugins, os, sys, subprocess, signal
-from respond import Responder
         
 # Unlike earlier incarnations of this functionality,
 # we don't rely on sharing displays but create our own for each test run.
-class VirtualDisplayResponder(Responder):
+class VirtualDisplayResponder(plugins.Responder):
     instance = None
     def __init__(self, *args):
-        Responder.__init__(self, *args)
         self.displayName = None
         self.displayMachine = None
         self.displayPid = None
@@ -28,27 +26,24 @@ class VirtualDisplayResponder(Responder):
     def setHideWindows(self, suites):
         if len(suites) > 0 and not self.displayName:
             self.displayName = "HIDE_WINDOWS"
-
-    def getXvfbLogDir(self, guiSuites):
-        if len(guiSuites) > 0:
-            return os.path.join(guiSuites[0].app.writeDirectory, "Xvfb") 
                               
     def setUpVirtualDisplay(self, guiSuites):
+        if len(guiSuites) == 0:
+            return
         machines = self.findMachines(guiSuites)
-        logDir = self.getXvfbLogDir(guiSuites)
-        machine, display, pid = self.getDisplay(machines, logDir)
+        machine, display, pid = self.getDisplay(machines, guiSuites[0].app)
         if display:
             self.displayName = display
             self.displayMachine = machine
             self.displayPid = pid
             self.guiSuites = guiSuites
-            print "Tests will run with DISPLAY variable set to", display
+            plugins.log.info("Tests will run with DISPLAY variable set to " + display)
         elif len(machines) > 0:
             plugins.printWarning("Failed to start virtual display on " + ",".join(machines) + " - using real display.")
 
-    def getDisplay(self, machines, logDir):
+    def getDisplay(self, machines, app):
         for machine in machines:
-            displayName, pid = self.createDisplay(machine, logDir)
+            displayName, pid = self.createDisplay(machine, app)
             if displayName:
                 return machine, displayName, pid
             else:
@@ -59,6 +54,8 @@ class VirtualDisplayResponder(Responder):
         allMachines = []
         for suite in suites:
             for machine in suite.getConfigValue("virtual_display_machine"):
+                if machine == "localhost": # Local to the test run, not to where we're trying to run...
+                    machine = suite.app.getRunMachine()
                 if not machine in allMachines:
                     allMachines.append(machine)
         return allMachines
@@ -76,26 +73,25 @@ class VirtualDisplayResponder(Responder):
     def cleanXvfb(self):
         if self.displayName and os.name == "posix":
             if self.displayMachine == "localhost":
-                print "Killing Xvfb process", self.displayPid
+                plugins.log.info("Killing Xvfb process " + str(self.displayPid))
                 try:
                     os.kill(self.displayPid, signal.SIGTERM)
                 except OSError:
-                    print "Process had already terminated"
+                    plugins.log.info("Process had already terminated")
             else:
                 self.killRemoteServer()
             self.displayName = None
 
     def killRemoteServer(self):
         self.diag.info("Getting ps output from " + self.displayMachine)
-        print "Killing remote Xvfb process on", self.displayMachine, "with pid", self.displayPid
-        subprocess.call([ "rsh", self.displayMachine, "kill", str(self.displayPid) ])
+        plugins.log.info("Killing remote Xvfb process on " + self.displayMachine + " with pid " + str(self.displayPid))
+        self.guiSuites[0].app.runCommandOn(self.displayMachine, [ "kill", str(self.displayPid) ])
 
-    def createDisplay(self, machine, logDir):
-        if not self.canRunVirtualServer(machine):
+    def createDisplay(self, machine, app):
+        if not self.canRunVirtualServer(machine, app):
             return None, None
 
-        plugins.ensureDirectoryExists(logDir)
-        startArgs = self.getVirtualServerArgs(machine, logDir)
+        startArgs = self.getVirtualServerArgs(machine, app)
         return self.startXvfb(startArgs, machine)
 
     def startXvfb(self, startArgs, machine):
@@ -112,20 +108,23 @@ class VirtualDisplayResponder(Responder):
             self.displayProc.stdout.close()
             return self.getDisplayName(machine, displayNum), pid
         except ValueError: #pragma : no cover - should never happen, just a fail-safe
-            print "Failed to parse line :\n " + line + self.displayProc.stdout.read()
+            plugins.log.info("Failed to parse line :\n " + line + self.displayProc.stdout.read())
             return None, None
             
-    def getVirtualServerArgs(self, machine, logDir):
+    def getVirtualServerArgs(self, machine, app):
         binDir = plugins.installationDir("libexec")
         fullPath = os.path.join(binDir, "startXvfb.py")
-        if machine == "localhost":
-            return [ sys.executable, fullPath, logDir ]
-        else:
-            remotePython = self.findRemotePython()
-            return [ "rsh", machine, remotePython + " -u " + fullPath + " " + logDir ]
+        logDir = os.path.join(app.writeDirectory, "Xvfb") 
+        plugins.ensureDirectoryExists(logDir)
+        python = self.findPython(machine)
+        cmdArgs = [ python, "-u", fullPath, logDir ]
+        return app.getCommandArgsOn(machine, cmdArgs)
 
-    def findRemotePython(self):
+    def findPython(self, machine):
         # In case it isn't the default, allow for a ttpython script in the installation
+        if machine == "localhost":
+            return sys.executable
+        
         localPointer = plugins.installationPath("bin/ttpython")
         if localPointer:
             return localPointer
@@ -141,14 +140,6 @@ class VirtualDisplayResponder(Responder):
         else:
             return machine + displayStr
 
-    def canRunVirtualServer(self, machine):
-        whichArgs = [ "which", "Xvfb" ]
-        if machine == "localhost":
-            returnCode = subprocess.call(whichArgs, stdin=open(os.devnull), stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
-            return returnCode == 0
-        else:
-            searchStr = "found an Xvfb"
-            whichArgs = [ "rsh", machine ] + whichArgs + [ "&&", "echo", searchStr ]
-            proc = subprocess.Popen(whichArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            output = proc.communicate()[0]
-            return output.find(searchStr) != -1
+    def canRunVirtualServer(self, machine, app):
+        retcode = app.runCommandOn(machine, [ "which", "Xvfb" ], collectExitCode=True)
+        return retcode == 0

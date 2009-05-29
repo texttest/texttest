@@ -5,7 +5,6 @@ from fnmatch import fnmatch
 from ndict import seqdict
 from copy import copy
 from cPickle import Pickler, loads, UnpicklingError
-from respond import Responder
 from threading import Lock
 from tempfile import mkstemp
 
@@ -390,25 +389,36 @@ class Test(plugins.Observable):
             return subdir
         except OSError:
             raise plugins.TextTestError, "Cannot create test sub-directory : " + subdir
+
     def getFileNamesMatching(self, pattern):
         pred = self.app.getExtensionPredicate(allVersions=False)
         return self.dircache.findFilesMatching(pattern, pred)
+
+    def getAppForVersion(self, refVersion=None):
+        if refVersion:
+            return self.app.getRefVersionApplication(refVersion)
+        else:
+            return self.app
+
     def getFileName(self, stem, refVersion = None):
         self.diagnose("Getting file from " + stem)
-        appToUse = self.app
-        if refVersion:
-            appToUse = self.app.getRefVersionApplication(refVersion)
-        return appToUse._getFileName([ self.dircache ], stem)
-    def getPathName(self, stem, configName=None):
-        return self.pathNameMethod(stem, configName, self.app._getFileName)
-    def getAllPathNames(self, stem, configName=None):
-        return self.pathNameMethod(stem, configName, self.app._getAllFileNames)
+        return self.getAppForVersion(refVersion)._getFileName([ self.dircache ], stem)
+
+    def getPathName(self, stem, configName=None, refVersion=None):
+        app = self.getAppForVersion(refVersion)
+        return self.pathNameMethod(stem, configName, app._getFileName)
+
+    def getAllPathNames(self, stem, configName=None, refVersion=None):
+        app = self.getAppForVersion(refVersion)
+        return self.pathNameMethod(stem, configName, app._getAllFileNames)
+
     def pathNameMethod(self, stem, configName, method):
         if configName is None:
             configName = stem
         dirCaches = self.getDirCachesToRoot(configName)
         self.diagnose("Directories to be searched: " + repr([ d.dir for d in dirCaches ]))
         return method(dirCaches, stem)
+
     def getAllTestsToRoot(self):
         tests = [ self ]
         if self.parent:
@@ -1146,6 +1156,8 @@ class Application:
         self.readApplicationConfigFiles()
         self.configDir.readValues(self.getPersonalConfigFiles(), insert=False, errorOnUnknown=False)
         self.diag.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
+        if not plugins.TestState.showExecHosts:
+            plugins.TestState.showExecHosts = self.configObject.showExecHostsInFailures(self)
 
     def readApplicationConfigFiles(self):
         self.readConfigFiles(configModuleInitialised=False)
@@ -1222,6 +1234,11 @@ class Application:
         return "test-app"
     def getDirectory(self):
         return self.dircache.dir
+    def getRunMachine(self):
+        if self.inputOptions.has_key("m"):
+            return plugins.interpretHostname(self.inputOptions["m"])
+        else:
+            return plugins.interpretHostname(self.getConfigValue("default_machine"))
     def readConfigFiles(self, configModuleInitialised):
         self.readDefaultConfigFiles()
         self.readExplicitConfigFiles(configModuleInitialised)
@@ -1278,6 +1295,7 @@ class Application:
     def getDataFileNames(self, envMapping=os.environ):
         allNames = self.getConfigValue("link_test_path", envMapping=envMapping) + \
                    self.getConfigValue("copy_test_path", envMapping=envMapping) + \
+                   self.getConfigValue("copy_test_path_merge", envMapping=envMapping) + \
                    self.getConfigValue("partial_copy_test_path", envMapping=envMapping)
         # Don't manage data that has an external path name, only accept absolute paths built by ourselves...
         return filter(lambda name: name.find(self.writeDirectory) != -1 or not os.path.isabs(name), allNames)
@@ -1339,9 +1357,11 @@ class Application:
         self.setConfigDefault("full_name", self.name.upper(), "Expanded name to use for application")
         self.setConfigDefault("home_operating_system", "any", "Which OS the test results were originally collected on")
         self.setConfigDefault("base_version", [], "Versions to inherit settings from")
+        self.setConfigDefault("default_machine", "localhost", "Default machine to run tests on")
         # various varieties of test data
-        self.setConfigDefault("partial_copy_test_path", [], "Paths to be part-copied, part-linked to the temporary directory")
-        self.setConfigDefault("copy_test_path", [], "Paths to be copied to the temporary directory when running tests")
+        self.setConfigDefault("partial_copy_test_path", [], "Paths to be part-copied, part-linked to the sandbox")
+        self.setConfigDefault("copy_test_path", [], "Paths to be copied to the sandbox when running tests")
+        self.setConfigDefault("copy_test_path_merge", [], "Directories to be copied to the sandbox, and merged together")
         self.setConfigDefault("link_test_path", [], "Paths to be linked from the temp. directory when running tests")
         self.setConfigDefault("test_data_ignore", { "default" : [] }, \
                               "Elements under test data structures which should not be viewed or change-monitored")
@@ -1486,26 +1506,6 @@ class Application:
         fullList.append(current)
         fullList += fromRemaining
         return fullList
-    def makeWriteDirectory(self, subdir=None):
-        if self.configObject.cleanPreviousTempDirs():
-            root, tmpId = os.path.split(self.writeDirectory)
-            if os.path.isdir(root):
-                self.cleanPreviousWriteDirs(root)
-        dirToMake = self.writeDirectory
-        if subdir:
-            dirToMake = os.path.join(self.writeDirectory, subdir)
-        plugins.ensureDirectoryExists(dirToMake)
-        self.diag.info("Made root directory at " + dirToMake)
-    def cleanPreviousWriteDirs(self, rootDir):
-        # Ignore the datetime and the pid at the end
-        searchParts = os.path.basename(self.writeDirectory).split(".")[:-2]
-        for file in os.listdir(rootDir):
-            fileParts = file.split(".")
-            if fileParts[:-2] == searchParts:
-                previousWriteDir = os.path.join(rootDir, file)
-                if os.path.isdir(previousWriteDir) and not plugins.samefile(previousWriteDir, self.writeDirectory):
-                    print "Removing previous write directory", previousWriteDir
-                    plugins.rmtree(previousWriteDir, attempts=3)
     def getActionSequence(self):
         actionSequenceFromConfig = self.configObject.getActionSequence()
         actionSequence = []
@@ -1575,7 +1575,7 @@ class OptionFinder(plugins.OptionFinder):
         self.setPathFromOptionsOrEnv("TEXTTEST_PERSONAL_CONFIG", "~/.texttest") # Location of personal configuration
         self.setPathFromOptionsOrEnv("TEXTTEST_TMP", "$TEXTTEST_PERSONAL_CONFIG/tmp") # Location of temporary files from test runs
         self.diagWriteDir = self.setPathFromOptionsOrEnv("TEXTTEST_DIAGDIR", "$TEXTTEST_PERSONAL_CONFIG/log", "xw", "x") # Location to write TextTest's internal logs
-        self.diagConfigFile = self.setPathFromOptionsOrEnv("TEXTTEST_LOGCONFIG", "$TEXTTEST_DIAGDIR/log4py.conf", "xr", "x") # Configuration file for TextTest's internal logs
+        self.diagConfigFile = self.setPathFromOptionsOrEnv("TEXTTEST_LOGCONFIG", "$TEXTTEST_DIAGDIR/logging.debug", "xr", "x") # Configuration file for TextTest's internal logs
         
         self.setUpLogging()
         self.diag = plugins.getDiagnostics("option finder")
@@ -1602,7 +1602,6 @@ class OptionFinder(plugins.OptionFinder):
     def setUpLogging(self):
         if self.diagConfigFile:
             if os.path.isfile(self.diagConfigFile):
-                # Assume log4py's configuration file refers to files relative to TEXTTEST_DIAGDIR
                 print "TextTest will write diagnostics in", self.diagWriteDir, "based on file at", self.diagConfigFile
             else:
                 print "Could not find diagnostic file at", self.diagConfigFile, ": cannot run with diagnostics"
@@ -1616,7 +1615,8 @@ class OptionFinder(plugins.OptionFinder):
                     if file.endswith(".diag"):
                         os.remove(os.path.join(self.diagWriteDir, file))
 
-        plugins.configureLog4py(self.diagConfigFile)
+        if self.diagConfigFile:
+            plugins.configureLogging(self.diagConfigFile)
 
     def findVersionList(self):
         versionList = []
@@ -1660,42 +1660,12 @@ class OptionFinder(plugins.OptionFinder):
     def runScript(self):
         return self.get("s")
     
-    
-# Compulsory responder to generate application events. Always present. See respond module
-class ApplicationEventResponder(Responder):
-    def notifyLifecycleChange(self, test, state, changeDesc):
-        if changeDesc.find("saved") != -1 or changeDesc.find("recalculated") != -1 or changeDesc.find("marked") != -1:
-            # don't generate application events when a test is saved or recalculated or marked...
-            return
-        eventName = "test " + test.uniqueName + " to " + changeDesc
-        category = test.uniqueName
-        timeDelay = self.getTimeDelay()
-        self.scriptEngine.applicationEvent(eventName, category, timeDelay)
-    def notifyAdd(self, test, initial):
-        if initial and test.classId() == "test-case":
-            eventName = "test " + test.uniqueName + " to be read"
-            self.scriptEngine.applicationEvent(eventName, test.uniqueName)
-    def notifyUniqueNameChange(self, test, newName):
-        if test.classId() == "test-case":
-            self.scriptEngine.applicationEventRename("test " + test.uniqueName + " to", "test " + newName + " to")
-
-    def getTimeDelay(self):
-        try:
-            return int(os.getenv("TEXTTEST_FILEWAIT_SLEEP", 1))
-        except ValueError:
-            return 1
-    def notifyAllRead(self, *args):
-        self.scriptEngine.applicationEvent("all tests to be read")
-    def notifyAllComplete(self):
-        self.scriptEngine.applicationEvent("completion of test actions")
-    def notifyCloseDynamic(self, test, name):
-        self.scriptEngine.applicationEvent(name + " GUI to be closed")
 
 # Simple responder that collects completion notifications and sends one out when
 # it thinks everything is done.
-class AllCompleteResponder(Responder,plugins.Observable):
+class AllCompleteResponder(plugins.Responder,plugins.Observable):
     def __init__(self, inputOptions, allApps):
-        Responder.__init__(self)
+        plugins.Responder.__init__(self)
         plugins.Observable.__init__(self)
         self.unfinishedTests = 0
         self.lock = Lock()

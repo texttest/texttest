@@ -1,5 +1,5 @@
 
-import os, sys, plugins, sandbox, respond, rundependent, comparetest, batch, subprocess, operator, glob, signal, shutil
+import os, sys, plugins, sandbox, console, rundependent, pyusecase_interface, comparetest, batch, subprocess, operator, glob, signal, shutil
 
 from copy import copy
 from string import Template
@@ -11,7 +11,6 @@ from jobprocess import killSubProcessAndChildren
 from actionrunner import ActionRunner
 from performance import TimeFilter
 from time import sleep
-from log4py import LOGLEVEL_NORMAL
 
 plugins.addCategory("killed", "killed", "were terminated before completion")
 
@@ -23,6 +22,8 @@ class Config:
         self.optionMap = optionMap
         self.filterFileMap = {}
         self.reconnectConfig = ReconnectConfig(optionMap)
+    def getMachineNameForDisplay(self, machine):
+        return machine # override for queuesystems
     def addToOptionGroups(self, apps, groups):
         recordsUseCases = reduce(operator.or_, (app.getConfigValue("use_case_record_mode") != "disabled" for app in apps), False)
         useCatalogues = reduce(operator.or_, (self.isolatesDataUsingCatalogues(app) for app in apps), False)
@@ -39,11 +40,12 @@ class Config:
                 group.addOption("r", "Execution time", description="Specify execution time limits, either as '<min>,<max>', or as a list of comma-separated expressions, such as >=0:45,<=1:00. Digit-only numbers are interpreted as minutes, while colon-separated numbers are interpreted as hours:minutes:seconds.")
             elif group.name.startswith("Basic"):
                 if len(apps) > 0:
-                    version, checkout = apps[0].getFullVersion(), apps[0].checkout
+                    version, checkout, machine = apps[0].getFullVersion(), apps[0].checkout, apps[0].getRunMachine()
                 else:
-                    version, checkout = "", ""
+                    version, checkout, machine = "", "", ""
                 group.addOption("v", "Run this version", version)
                 group.addOption("c", "Use checkout", checkout)
+                group.addOption("m", "Run on machine", self.getMachineNameForDisplay(machine))
                 group.addOption("cp", "Times to run", "1", description="Set this to some number larger than 1 to run the same test multiple times, for example to try to catch indeterminism in the system under test")
                 if recordsUseCases:
                     group.addSwitch("actrep", "Run with slow motion replay")
@@ -52,8 +54,8 @@ class Config:
             elif group.name.startswith("Advanced"):
                 group.addSwitch("x", "Enable self-diagnostics")
                 defaultDiagDir = os.path.join(plugins.getPersonalConfigDir(), "log")
-                group.addOption("xr", "Configure self-diagnostics from", os.path.join(defaultDiagDir, "log4py.conf"),
-                                possibleValues=[ os.path.join(plugins.installationDir("log"), "log4py.conf") ])
+                group.addOption("xr", "Configure self-diagnostics from", os.path.join(defaultDiagDir, "logging.debug"),
+                                possibleValues=[ os.path.join(plugins.installationDir("log"), "logging.debug") ])
                 group.addOption("xw", "Write self-diagnostics to", defaultDiagDir)
                 group.addOption("b", "Run batch mode session")
                 group.addSwitch("rectraffic", "(Re-)record command-line or client-server traffic")
@@ -190,23 +192,45 @@ class Config:
     def hasExplicitInterface(self):
         return self.useGUI() or self.batchMode() or self.useConsole() or \
                self.optionMap.has_key("o") or self.optionMap.has_key("s")
+
+    def getLogfilePostfix(self):
+        if self.optionMap.has_key("x"):
+            return "debug"
+        elif self.batchMode():
+            return "batch"
+        elif not self.useGUI():
+            return "console"
+        else:
+            return "gui"
+        
+    def setUpLogging(self):
+        filePattern = "logging." + self.getLogfilePostfix()
+        allPaths = plugins.findDataPaths(filePattern, dataDir="log", includePersonal=True,
+                                         vanilla=self.optionMap.has_key("vanilla"))
+        plugins.configureLogging(allPaths[-1]) # Won't have any effect if we've already got a log file
+        
     def getResponderClasses(self, allApps):
+        # Global side effects first :)
+        if not self.hasExplicitInterface():
+            self.setDefaultInterface(allApps)
+
+        self.setUpLogging()
+        scriptEngine = pyusecase_interface.makeScriptEngine(self.optionMap)
+        return self._getResponderClasses(allApps, scriptEngine)
+
+    def _getResponderClasses(self, allApps, scriptEngine):
         classes = []
         if self.optionMap.runScript():
             return self.getThreadActionClasses()
         
-        if not self.hasExplicitInterface():
-            self.setDefaultInterface(allApps)
-
         if not self.optionMap.has_key("gx"):
             if self.optionMap.has_key("new"):
                 raise plugins.TextTestError, "'--new' option can only be provided with the static GUI"
             elif len(allApps) == 0:
                 raise plugins.TextTestError, "Could not find any matching applications (files of the form config.<app>) under " + self.optionMap.directoryName
             
-        # Put the GUI first ... first one gets the script engine - see respond module :)
         if self.useGUI():
-            self.addGuiResponder(classes)
+            self.addGuiResponder(classes, scriptEngine)
         else:
             classes.append(self.getTextDisplayResponderClass())
         if not self.optionMap.has_key("gx"):
@@ -218,7 +242,7 @@ class Config:
                     classes.append(batch.WebPageResponder)
             else:
                 if self.optionValue("b") is None:
-                    print "No batch session identifier provided, using 'default'"
+                    plugins.log.info("No batch session identifier provided, using 'default'")
                     self.optionMap["b"] = "default"
                 classes.append(batch.BatchResponder)
         if self.useVirtualDisplay():
@@ -228,6 +252,8 @@ class Config:
             classes.append(self.getStateSaver())
         if not self.useGUI() and not self.batchMode():
             classes.append(self.getTextResponder())
+        # At the end, so we've done the processing before we proceed
+        classes.append(pyusecase_interface.ApplicationEventResponder)
         return classes
 
     def isActionReplay(self):
@@ -248,7 +274,7 @@ class Config:
     def getThreadActionClasses(self):
         return [ ActionRunner ]
     def getTextDisplayResponderClass(self):
-        return respond.TextDisplayResponder
+        return console.TextDisplayResponder
     def isolatesDataUsingCatalogues(self, app):
         return app.getConfigValue("create_catalogues") == "true" and \
                len(app.getConfigValue("partial_copy_test_path")) > 0
@@ -286,8 +312,9 @@ class Config:
             return [ "++".join(plugins.commasplit(givenVersion)) ]
         else:
             return []
-    def addGuiResponder(self, classes):
+    def addGuiResponder(self, classes, scriptEngine):
         from gtkgui.texttestgui import TextTestGUI
+        TextTestGUI.scriptEngine = scriptEngine
         classes.append(TextTestGUI)
     def getReconnectSequence(self):
         actions = [ self.reconnectConfig.getReconnectAction() ]
@@ -453,9 +480,41 @@ class Config:
     def cleanWriteDirectory(self, suite):
         if not self.keepTemporaryDirectories():
             self._cleanWriteDirectory(suite)
+            machine, tmpDir = self.getRemoteTmpDirectory(suite.app)
+            if tmpDir:
+                self.runCommandOn(suite.app, machine, [ "rm", "-rf", tmpDir ])
     def _cleanWriteDirectory(self, suite):
         if os.path.isdir(suite.app.writeDirectory):
             plugins.rmtree(suite.app.writeDirectory)
+
+    def makeWriteDirectory(self, app, subdir=None):
+        if self.cleanPreviousTempDirs():
+            self.cleanPreviousWriteDirs(app.writeDirectory)
+            machine, tmpDir = self.getRemoteTmpDirectory(app)
+            if tmpDir:
+                # Ignore the datetime and the pid at the end
+                searchParts = tmpDir.split(".")[:-2] + [ "*" ]
+                self.runCommandOn(app, machine, [ "rm", "-rf", ".".join(searchParts) ])
+
+        dirToMake = app.writeDirectory
+        if subdir:
+            dirToMake = os.path.join(app.writeDirectory, subdir)
+        plugins.ensureDirectoryExists(dirToMake)
+        app.diag.info("Made root directory at " + dirToMake)
+
+    def cleanPreviousWriteDirs(self, writeDir):
+        rootDir, basename = os.path.split(writeDir)
+        if os.path.isdir(rootDir):
+            # Ignore the datetime and the pid at the end
+            searchParts = basename.split(".")[:-2]
+            for file in os.listdir(rootDir):
+                fileParts = file.split(".")
+                if fileParts[:-2] == searchParts:
+                    previousWriteDir = os.path.join(rootDir, file)
+                    if os.path.isdir(previousWriteDir) and not plugins.samefile(previousWriteDir, writeDir):
+                        plugins.log.info("Removing previous write directory " + previousWriteDir)
+                        plugins.rmtree(previousWriteDir, attempts=3)
+    
     def isReconnecting(self):
         return self.optionMap.has_key("reconnect")
     def getWriteDirectoryMaker(self):
@@ -482,15 +541,15 @@ class Config:
         return sandbox.MachineInfoFinder()
     def getFailureExplainer(self):
         return [ CheckForCrashes(), CheckForBugs() ]
-    def showExecHostsInFailures(self):
-        return self.batchMode()
+    def showExecHostsInFailures(self, app):
+        return self.batchMode() or app.getRunMachine() != "localhost"
     def getTestComparator(self):
         return comparetest.MakeComparisons()
     def getStateSaver(self):
         if self.batchMode():
             return batch.SaveState
         else:
-            return respond.SaveState
+            return SaveState
     def getConfigEnvironment(self, test):
         testEnvironmentCreator = self.getEnvironmentCreator(test)
         return testEnvironmentCreator.getVariables()
@@ -499,7 +558,7 @@ class Config:
     def getInteractiveReplayOptions(self):
         return [ ("actrep", "slow motion") ]
     def getTextResponder(self):
-        return respond.InteractiveResponder
+        return console.InteractiveResponder
     # Utilities, which prove useful in many derived classes
     def optionValue(self, option):
         return self.optionMap.get(option, "")
@@ -515,21 +574,22 @@ class Config:
             return "" # Allow empty checkout, means no checkout is set, basically
         
         try: 
-            self.verifyCheckoutValid(checkoutPath)
+            self.verifyCheckoutValid(checkoutPath, app)
             os.environ["TEXTTEST_CHECKOUT"] = checkoutPath # Full path to the checkout directory
             return checkoutPath
         except plugins.TextTestError, e:
             if self.ignoreExecutable():
-                print "WARNING: " + str(e) + " - ignoring checkout."
+                plugins.log.info("WARNING: " + str(e) + " Ignoring checkout.")
                 return ""
             else:
                 raise
     
-    def verifyCheckoutValid(self, checkoutPath):
+    def verifyCheckoutValid(self, checkoutPath, app):
         if not os.path.isabs(checkoutPath):
             raise plugins.TextTestError, "could not create absolute checkout from relative path '" + checkoutPath + "'"
         elif not os.path.isdir(checkoutPath):
-            raise plugins.TextTestError, "checkout '" + checkoutPath + "' does not exist"
+            self.handleNonExistent(checkoutPath, "checkout", app)
+
     def checkSanity(self, suite):
         if not self.ignoreExecutable() and not self.optionMap.has_key("gx"):
             self.checkExecutableExists(suite)
@@ -560,12 +620,46 @@ class Config:
         if not executable:
             raise plugins.TextTestError, "config file entry 'executable' not defined"
         if self.executableShouldBeFile(suite.app, executable) and not os.path.isfile(executable):
-            raise plugins.TextTestError, "The executable program '" + executable + "' does not exist."
+            self.handleNonExistent(executable, "executable program", suite.app)
 
         interpreter = suite.getConfigValue("interpreter")
         if os.path.isabs(interpreter) and not os.path.exists(interpreter):
-            raise plugins.TextTestError, "The interpreter program '" + interpreter + "' does not exist."
-        
+            self.handleNonExistent(interpreter, "interpreter program", suite.app)
+
+    def pathExistsRemotely(self, path, machine, app):
+        exitCode = self.runCommandOn(app, machine, [ "test", "-e", path ], collectExitCode=True)
+        return exitCode == 0
+
+    def checkConnection(self, app, machine):
+        self.runCommandAndCheckMachine(app, machine, [ "echo", "hello" ])
+ 
+    def handleNonExistent(self, path, desc, app):
+        message = "The " + desc + " '" + path + "' does not exist"
+        remoteCopy = app.getConfigValue("remote_copy_program")
+        if remoteCopy:
+            runMachine = app.getRunMachine()
+            if runMachine != "localhost":
+                if not self.pathExistsRemotely(path, runMachine, app):
+                    self.checkConnection(app, runMachine) # throws if we can't get to it
+                    raise plugins.TextTestError, message + ", either locally or on machine '" + runMachine + "'."
+        else:
+            raise plugins.TextTestError, message + "."
+
+    def getRemoteTmpDirectory(self, app):
+        remoteCopy = app.getConfigValue("remote_copy_program")
+        if remoteCopy:
+            runMachine = app.getRunMachine()
+            if runMachine != "localhost":
+                return runMachine, "~/.texttest/tmp/" + os.path.basename(app.writeDirectory)
+        return "localhost", None
+
+    def getRemoteTestTmpDir(self, test):
+        machine, appTmpDir = self.getRemoteTmpDirectory(test.app)
+        if appTmpDir:
+            return machine, os.path.join(appTmpDir, test.getRelPath())
+        else:
+            return machine, appTmpDir
+                
     def executableShouldBeFile(self, app, executable):
         # For finding java classes, don't warn if they don't exist as files...
         interpreter = app.getConfigValue("interpreter")
@@ -759,9 +853,9 @@ class Config:
         return prios
     def getDefaultCollations(self):
         if os.name == "posix":
-            return { "stacktrace" : "core*" }
+            return { "stacktrace" : [ "core*" ] }
         else:
-            return {}
+            return { "" : [] }
     def getDefaultCollateScripts(self):
         if os.name == "posix":
             return { "default" : [], "stacktrace" : [ "interpretcore.py" ] }
@@ -824,9 +918,70 @@ class Config:
         app.setConfigDefault("gui_entry_overrides", { "default" : "<not set>" }, "Default settings for entries in the GUI")
         app.setConfigDefault("gui_entry_options", { "default" : [] }, "Default drop-down box options for GUI entries")
         app.setConfigDefault("suppress_stderr_popup", [], "List of patterns which, if written on stderr, should not produce a warning popup")
+    def getDefaultRemoteProgramOptions(self):
+        # The aim is to ensure they never hang, but always return errors if contact not possible
+        # Disable passwords: only use public key based authentication.
+        # Also disable hostkey checking, we assume we don't run tests on untrusted hosts.
+        # Also don't run tests on machines which take a very long time to connect to...
+        sshOptions = "-o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10"
+        return { "default": "", "ssh" : sshOptions,
+                 "rsync" : "-azL", "scp": "-Cr " + sshOptions }
+
+    def getCommandArgsOn(self, app, machine, cmdArgs):
+        if machine == "localhost":
+            return cmdArgs
+        else:
+            return self.getRemoteProgramArgs(app, "remote_shell_program") + [ machine ] + cmdArgs
+
+    def runCommandOn(self, app, machine, cmdArgs, collectExitCode=False):
+        allArgs = self.getCommandArgsOn(app, machine, cmdArgs)
+        if allArgs[0] == "rsh" and collectExitCode:
+            searchStr = "remote cmd succeeded"
+            # Funny tricks here because rsh does not forward the exit status of the program it runs
+            allArgs += [ "&&", "echo", searchStr ]
+            proc = subprocess.Popen(allArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            output = proc.communicate()[0]
+            return searchStr not in output # Return an "exit code" which is 0 when we succeed!
+        else:
+            return subprocess.call(allArgs, stdin=open(os.devnull), stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
+
+    def runCommandAndCheckMachine(self, app, machine, cmdArgs):
+        allArgs = self.getCommandArgsOn(app, machine, cmdArgs)
+        proc = subprocess.Popen(allArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = proc.communicate()[0]
+        exitCode = proc.returncode
+        if exitCode > 0:
+            raise plugins.TextTestError, "Unable to contact machine '" + machine + \
+                  "'.\nMake sure you have passwordless access set up correctly. The failing command was:\n" + \
+                  " ".join(allArgs) + "\n\nThe command produced the following output:\n" + output
+
+    def ensureRemoteDirExists(self, app, machine, dirname):
+        self.runCommandAndCheckMachine(app, machine, [ "mkdir", "-p", dirname ])
+
+    def getRemotePath(self, file, machine):
+        if machine == "localhost":
+            return file
+        else:
+            return machine + ":" + file
+
+    def copyFileRemotely(self, app, srcFile, srcMachine, dstFile, dstMachine):
+        srcPath = self.getRemotePath(srcFile, srcMachine)
+        dstPath = self.getRemotePath(dstFile, dstMachine)
+        args = self.getRemoteProgramArgs(app, "remote_copy_program") + [ srcPath, dstPath ]
+        return subprocess.call(args, stdin=open(os.devnull), stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
+
+    def getRemoteProgramArgs(self, app, setting):
+        progStr = app.getConfigValue(setting)
+        progArgs = plugins.splitcmd(progStr)
+        argStr = app.getCompositeConfigValue("remote_program_options", progArgs[0])
+        return progArgs + plugins.splitcmd(argStr)
+
     def setMiscDefaults(self, app):
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
         app.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")
+        app.setConfigDefault("remote_shell_program", "rsh", "Program to use for running commands remotely")
+        app.setConfigDefault("remote_program_options", self.getDefaultRemoteProgramOptions(), "Default options to use for particular remote shell programs")
+        app.setConfigDefault("remote_copy_program", "", "(UNIX) Program to use for copying files remotely, in case of non-shared file systems")
         app.setConfigDefault("default_filter_file", [], "Filter file to use by default, generally only useful for versions")
         app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
         app.setConfigDefault("test_data_properties", { "default" : "" }, "Write the contents of test_data_environment to the given Java properties file")
@@ -850,8 +1005,12 @@ class Config:
         self.setBatchDefaults(app)
         self.setPerformanceDefaults(app)
         self.setUsecaseDefaults(app)
-        if not plugins.TestState.showExecHosts:
-            plugins.TestState.showExecHosts = self.showExecHostsInFailures()
+
+class SaveState(plugins.Responder):
+    def notifyComplete(self, test):
+        if test.state.isComplete(): # might look weird but this notification also comes in scripts etc.
+            test.saveState()
+
 
 class OrFilter(plugins.Filter):
     def __init__(self, filterLists):
@@ -969,6 +1128,11 @@ class RunTest(plugins.Action):
             self.killProcess()
         self.lock.release()
 
+    def storeReturnCode(self, test, code):
+        file = open(test.makeTmpFileName("exitcode"), "w")
+        file.write(str(code) + "\n")
+        file.close()
+
     def checkAndClear(self, test):        
         returncode = self.currentProcess.returncode
         self.diag.info("Process terminated with return code " + repr(returncode))
@@ -980,6 +1144,9 @@ class RunTest(plugins.Action):
         self.currentProcess = None
         if test in self.killedTests:
             self.changeToKilledState(test)
+        elif returncode: # Don't bother to store return code when tests are killed, it isn't interesting
+            self.storeReturnCode(test, returncode)
+        
         self.lock.release()
     def waitForKill(self):
         for i in range(10):
@@ -1021,7 +1188,7 @@ class RunTest(plugins.Action):
             self.killProcess()
         self.lock.release()
     def killProcess(self):
-        print "Killing running test (process id", str(self.currentProcess.pid) + ")"
+        plugins.log.info("Killing running test (process id " + str(self.currentProcess.pid) + ")")
         killSubProcessAndChildren(self.currentProcess)
     
     def wait(self, process):
@@ -1037,7 +1204,7 @@ class RunTest(plugins.Action):
         else:
             return ""
     def diagnose(self, testEnv, commandArgs):
-        if self.diag.get_loglevel() >= LOGLEVEL_NORMAL:
+        if self.diag.is_enabled():
             for var, value in testEnv.items():
                 self.diag.info("Environment: " + var + " = " + value)
             self.diag.info("Running test with args : " + repr(commandArgs))
@@ -1045,18 +1212,17 @@ class RunTest(plugins.Action):
     def getRunDescription(self, test):
         commandArgs = self.getExecuteCmdArgs(test)
         text =  "Command Line   : " + plugins.commandLineString(commandArgs) + "\n"
-        interestingVars = []
-        testEnv = test.getRunEnvironment()
-        for var, value in testEnv.items():
-            if value != os.getenv(var):
-                interestingVars.append(var)
+        interestingVars = self.getEnvironmentChanges(test)
         if len(interestingVars) == 0:
             return text
         text += "\nEnvironment variables :\n"
-        interestingVars.sort()
-        for var in interestingVars:
-            text += var + ": " + testEnv.get(var) + "\n"
+        for var, value in interestingVars:
+            text += var + ": " + value + "\n"
         return text
+
+    def getEnvironmentChanges(self, test):
+        testEnv = test.getRunEnvironment()
+        return sorted(filter(lambda (var, value): value != os.getenv(var), testEnv.items()))
         
     def getTestProcess(self, test):
         commandArgs = self.getExecuteCmdArgs(test)
@@ -1069,14 +1235,17 @@ class RunTest(plugins.Action):
     def getPreExecFunction(self):
         if os.name == "posix":
             return self.ignoreJobControlSignals
+
     def ignoreJobControlSignals(self):
         for signum in [ signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU ]:
             signal.signal(signum, signal.SIG_IGN)
+
     def getInterpreter(self, test):
         interpreter = test.getConfigValue("interpreter")
         if interpreter.startswith("ttpython"): # interpreted to mean "whatever python TextTest runs with"
             return interpreter.replace("ttpython", sys.executable + " -u")
         return interpreter
+
     def getCmdParts(self, test):
         args = []
         interpreter = self.getInterpreter(test)
@@ -1084,7 +1253,39 @@ class RunTest(plugins.Action):
             args.append(interpreter)
         args.append(test.getConfigValue("executable"))
         args.append(self.getOptions(test))
-        return args
+        runMachine = test.app.getRunMachine()
+        if runMachine == "localhost":
+            return args
+        else:
+            tmpDir = self.getTmpDirectory(test)
+            envArgs = self.getEnvironmentArgs(test) # Must set the environment remotely
+            args = [ "cd", tmpDir, '";"' ] + envArgs + args
+            # Need to change working directory remotely
+            return test.app.getCommandArgsOn(runMachine, args)
+
+    def getEnvironmentArgs(self, test):
+        vars = self.getEnvironmentChanges(test)
+        if len(vars) == 0:
+            return []
+        else:
+            args = [ "env" ]
+            for var, value in vars:
+                remoteValue = value
+                if var == "PATH":
+                    # This needs to be correctly reset remotely
+                    remoteValue = value.replace(os.getenv(var), "${" + var + "}")
+                # Double quote as two shells will end up intrepreting this...
+                args.append(var + "='\"" + remoteValue + "\"'")
+            return args
+    
+    def getTmpDirectory(self, test):
+        machine, remoteTmp = test.app.getRemoteTestTmpDir(test)
+        if remoteTmp:
+            test.app.ensureRemoteDirExists(machine, remoteTmp)
+            return remoteTmp
+        else:
+            return test.getDirectory(temporary=1)
+        
     def getExecuteCmdArgs(self, test):
         parts = self.getCmdParts(test)
         basicArgs = reduce(operator.add, map(plugins.splitcmd, parts))
@@ -1093,9 +1294,11 @@ class RunTest(plugins.Action):
             return [ "time", "-p", "-o", perfFile ] + basicArgs
         else:
             return basicArgs
+
     def makeFile(self, test, name):
         fileName = test.makeTmpFileName(name)
         return open(fileName, "w")
+
     def getInputFile(self, test):
         inputFileName = test.getFileName("input")
         if inputFileName:
@@ -1131,33 +1334,40 @@ class DocumentOptions(plugins.Action):
         keys.sort()
         for key in keys:
             self.displayKey(key, groups)
+
     def displayKey(self, key, groups):
         for group in groups:
-            if group.options.has_key(key):
-                keyOutput, docOutput = self.optionOutput(key, group, group.options[key].name)
+            option = group.getOption(key)
+            if option:
+                keyOutput, docOutput = self.optionOutput(key, group, option)
                 self.display(keyOutput, self.groupOutput(group), docOutput)
-            if group.switches.has_key(key):    
-                self.display("-" + key, self.groupOutput(group), group.switches[key].describe())
+
     def display(self, keyOutput, groupOutput, docOutput):
         if not docOutput.startswith("Private"):
             print keyOutput + ";" + groupOutput + ";" + docOutput.replace("SGE", "SGE/LSF")
+
     def groupOutput(self, group):
         if group.name == "Invisible":
             return "N/A"
         else:
             return group.name
-    def optionOutput(self, key, group, docs):
-        keyOutput = "-" + key + " <value>"
-        if (docs == "Execution time"):
-            keyOutput = "-" + key + " <time specification string>"
-        elif docs.find("<") != -1:
-            keyOutput = self.filledOptionOutput(key, docs)
-        else:
-            docs += " <value>"
+
+    def optionOutput(self, key, group, option):
+        keyOutput = "-" + key
+        docs = option.describe()
+        if isinstance(option, plugins.TextOption):
+            keyOutput += " <value>"
+            if (docs == "Execution time"):
+                keyOutput = "-" + key + " <time specification string>"
+            elif "<" in docs:
+                keyOutput = self.filledOptionOutput(key, docs)
+            else:
+                docs += " <value>"
         if group.name.startswith("Select"):
             return keyOutput, "Select " + docs.lower()
         else:
             return keyOutput, docs
+        
     def filledOptionOutput(self, key, docs):
         start = docs.find("<")
         end = docs.find(">", start)

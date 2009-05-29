@@ -64,9 +64,9 @@ class GenerateWebPages(object):
         foundMinorVersions = HTMLgen.Container()
         details = TestDetails()
         allMonthSelectors = set()
-        for repositoryDir, version in repositoryDirs:
+        for version, repositoryDirInfo in repositoryDirs.items():
             self.diag.info("Generating " + version)
-            allFiles, tags = self.findTestStateFilesAndTags(repositoryDir)
+            allFiles, tags = self.findTestStateFilesAndTags(repositoryDirInfo)
             if len(allFiles) > 0:
                 selectors = self.makeSelectors(subPageNames, tags)
                 monthSelectors = SelectorByMonth.makeInstances(tags)
@@ -119,14 +119,6 @@ class GenerateWebPages(object):
     def getExistingMonthPages(self):
         return glob(os.path.join(self.pageDir, "test_" + self.pageVersion + "_all_???[0-9][0-9][0-9][0-9].html"))
 
-    def findAllRepositories(self, repositoryDir):
-        dirs = [ repositoryDir ]
-        for extra in self.extraVersions:
-            extraDir = repositoryDir + "." + extra
-            if os.path.isdir(extraDir):
-                dirs.append(extraDir)
-        return dirs
-
     def compareTags(self, x, y):
         timeCmp = cmp(self.getTagTimeInSeconds(x), self.getTagTimeInSeconds(y))
         if timeCmp:
@@ -134,10 +126,10 @@ class GenerateWebPages(object):
         else:
             return cmp(x, y) # If the timing is the same, sort alphabetically
         
-    def findTestStateFilesAndTags(self, repositoryDir):
+    def findTestStateFilesAndTags(self, repositoryDirs):
         allFiles = []
         allTags = set()
-        for dir in self.findAllRepositories(repositoryDir):
+        for extraVersion, dir in repositoryDirs:
             for root, dirs, files in os.walk(dir):
                 for file in files:
                     if file.startswith("teststate_"):
@@ -249,15 +241,15 @@ class GenerateWebPages(object):
                 self.pagesDetails[tag].append(HTMLgen.Heading(1, tagText + " - detailed test results for ", self.pageTitle, align = 'center'))
             self.pagesDetails[tag].append(details[tag])
     def writePages(self):
-        print "Writing overview pages..."
+        plugins.log.info("Writing overview pages...")
         for pageName, page in self.pagesOverview.items():
             page.write(os.path.join(self.pageDir, pageName))
-            print "wrote: '" + pageName + "'"
-        print "Writing detail pages..."
+            plugins.log.info("wrote: '" + pageName + "'")
+        plugins.log.info("Writing detail pages...")
         for tag, page in self.pagesDetails.items():
             pageName = getDetailPageName(self.pageVersion, tag)
             page.write(os.path.join(self.pageDir, pageName))
-            print "wrote: '" + pageName + "'"
+            plugins.log.info("wrote: '" + pageName + "'")
     def getTestIdentifier(self, stateFile, repository):
         dir = os.path.dirname(stateFile)
         return dir.replace(repository + os.sep, "").replace(os.sep, " ")

@@ -74,13 +74,13 @@ def installationPath(subpath):
         if os.path.exists(instPath):
             return instPath
 
-def findDataPaths(filePattern="", vanilla=False, includePersonal=False):
+def findDataPaths(filePattern="", vanilla=False, includePersonal=False, dataDir="etc"):
     if vanilla:
-        return glob(os.path.join(installationRoots[0], "etc", filePattern))
+        return glob(os.path.join(installationRoots[0], dataDir, filePattern))
     else:
-        dirs = [ os.path.join(instRoot, "etc") for instRoot in installationRoots ]
+        dirs = [ os.path.join(instRoot, dataDir) for instRoot in installationRoots ]
         if includePersonal:
-            dirs.append(getPersonalConfigDir())
+            dirs.append(os.path.join(getPersonalConfigDir(), dataDir))
 
         return reduce(operator.add, (glob(os.path.join(d, filePattern)) for d in dirs), [])
         
@@ -110,7 +110,7 @@ def getNumberOfMinutes(timeString):
 
 def printWarning(message, stdout = True, stderr = False):
     if stdout:
-        print "WARNING: " + message
+        log.info("WARNING: " + message)
     if stderr:
         sys.stderr.write("WARNING: " + message + "\n")
 
@@ -368,7 +368,7 @@ class Action:
         return False
     # Useful for printing in a certain format...
     def describe(self, testObj, postText = ""):
-        print testObj.getIndent() + repr(self) + " " + repr(testObj) + postText
+        log.info(testObj.getIndent() + repr(self) + " " + repr(testObj) + postText)
     def __repr__(self):
         return "Doing nothing on"
     def __str__(self):
@@ -477,6 +477,29 @@ class Observable:
             return method(self, *args, **kwargs)
         else:
             return method(*args, **kwargs)
+
+# Interface all responders must fulfil
+class Responder:
+    def __init__(self, *args):
+        pass
+    def addSuites(self, suites):
+        for suite in suites:
+            self.addSuite(suite)
+    # Full suite of tests, get notified of it at the start...
+    def addSuite(self, suite):
+        pass
+    # Called when the state of the test "moves on" in its lifecycle
+    def notifyLifecycleChange(self, test, state, changeDesc):
+        pass
+    # Called when no further actions will be performed on the test
+    def notifyComplete(self, test):
+        pass
+    # Called when everything is finished
+    def notifyAllComplete(self):
+        pass
+    def canBeMainThread(self):
+        return True
+
 
 # Generic state which tests can be in, should be overridden by subclasses
 # Acts as a static state for tests which have not run (yet)
@@ -588,21 +611,31 @@ class MarkedTestState(TestState):
     def getTypeBreakdown(self):
         return self.category, self.briefText
 
-def configureLog4py(configFile):
-    # Don't use the default locations, particularly current directory causes trouble
-    if len(log4py.CONFIGURATION_FILES) > 1:
-        del log4py.CONFIGURATION_FILES[1]
-    if configFile:
-        # To set new config files appears to require a constructor...
-        rootLogger = log4py.Logger(log4py.TRUE, configFile)
-    else:
-        rootLogger = log4py.Logger().get_root()
-        rootLogger.set_loglevel(log4py.LOGLEVEL_NONE)
+log = None
+class NullLogger:
+    def info(*args):
+        pass
 
 # Simple handle to get diagnostics object. Better than using log4py directly,
 # as it ensures everything appears by default in a standard place with a standard name.
 def getDiagnostics(diagName):
-    return log4py.Logger().get_instance(diagName)
+    rootLogger = log4py.Logger.instance
+    if rootLogger:
+        return rootLogger.get_instance(diagName)
+    else:
+        return NullLogger()
+
+def configureLogging(configFile):
+    rootLogger = log4py.Logger.instance
+    # only set up once
+    if not rootLogger:
+        # Don't use the default locations, particularly current directory causes trouble
+        if len(log4py.CONFIGURATION_FILES) > 1:
+            del log4py.CONFIGURATION_FILES[1]
+
+        rootLogger = log4py.Logger(customconfigfiles=configFile)
+        global log
+        log = rootLogger.get_instance("standard log")
 
 def getPersonalConfigDir():
     fromEnv = os.getenv("TEXTTEST_PERSONAL_CONFIG")
@@ -615,6 +648,25 @@ def getPersonalConfigDir():
 def gethostname():
     fullname = socket.gethostname()
     return fullname.split(".")[0]
+
+# Return 'localhost' if it is the local host...
+def interpretHostname(hostname):
+    if hostname == "localhost" or len(hostname) == 0:
+        return "localhost"
+    localhost = gethostname()
+    if hostsMatch(hostname, localhost):
+        return "localhost"
+    else:
+        return hostname
+
+def hostsMatch(hostname, localhost):
+    if "@" in hostname:
+        user, host = hostname.split("@")
+        return hostsMatch(host, localhost) and user == os.getenv("USER")
+    else:
+        parts = hostname.split(".")
+        return parts[0] == localhost
+    
 
 # Hacking around os.path.getcwd not working with AMD automounter
 def abspath(relpath):
@@ -676,6 +728,12 @@ def getProcessStartUpInfo(envMapping=os.environ):
         info.wShowWindow = subprocess.SW_HIDE
         return info
 
+def copyPath(srcPath, dstPath):
+    if os.path.isdir(srcPath):
+        shutil.copytree(srcPath, dstPath)
+    else:
+        shutil.copyfile(srcPath, dstPath)
+        
 def removePath(path):
     if os.path.exists(path):
         if os.path.isdir(path):
@@ -726,7 +784,7 @@ def makeWriteable(path):
 def rmtree(dir, attempts=100):
     realDir = os.path.realpath(dir)
     if not os.path.isdir(realDir):
-        print "Write directory", dir, "externally removed"
+        log.info("Write directory " + dir + " externally removed")
         return
     # Don't be somewhere under the directory when it's removed
     try:
@@ -747,15 +805,16 @@ def rmtree(dir, attempts=100):
                         try:
                             makeWriteable(os.path.join(root, path))
                         except OSError, e:
-                            print "Could not change permissions to be able to remove directory", dir, ": -", str(e)
+                            log.info("Could not change permissions to be able to remove directory " +
+                                     dir + " : - " + str(e))
                             return
                 continue
             if os.path.isdir(realDir):
                 if i == attempts - 1:
-                    print "Unable to remove directory", dir, ":"
+                    log.info("Unable to remove directory " + dir + " :")
                     printException()
                 else:
-                    print "Problems removing directory", dir, "- waiting 1 second to retry..."
+                    log.info("Problems removing directory " + dir + " - waiting 1 second to retry...")
                     time.sleep(1)
 
 def readList(filename):
@@ -1171,23 +1230,34 @@ class Option:
         self.updateMethod = None
         self.description = description
         self.changeMethod = changeMethod
+        
     def getValue(self):
         if self.valueMethod:
             return self.valueMethod()
         else:
             return self.defaultValue
+
+    def getCmdLineValue(self):
+        return self.getValue()
+
     def setValue(self, value):
         self.defaultValue = value
         if self.updateMethod:
             self.updateMethod(value)
+
     def setMethods(self, valueMethod, updateMethod):
         self.valueMethod = valueMethod
         self.updateMethod = updateMethod
+
     def reset(self):
         if self.updateMethod:
             self.updateMethod(self.defaultValue)
         else:
             self.valueMethod = None
+
+    def describe(self):
+        return self.name
+        
 
 class TextOption(Option):
     def __init__(self, name, value="", possibleValues=[], allocateNofValues=-1,
@@ -1229,15 +1299,15 @@ class TextOption(Option):
         if self.usePossibleValues():
             self.setPossibleValues(self.possibleValues)
     def setPossibleValues(self, values):
-        if self.defaultValue in values:
+        if self.selectFile or (self.defaultValue in values):
             self.possibleValues = values
         else:
             self.possibleValues = [ self.defaultValue ] + values
         self.clear()
         self.updatePossibleValues()
     def getPossibleDirs(self):
-        if self.selectDir:
-            return self.possibleValues
+        if self.selectDir or self.selectFile:
+            return self.possibleDirs + self.possibleValues
         else:
             return self.possibleDirs
 
@@ -1271,7 +1341,7 @@ class TextOption(Option):
 
     def getPreviousDirectory(self):
         prevVal = self.getValue()
-        if os.path.exists(prevVal):
+        if prevVal and os.path.exists(prevVal):
             if self.selectDir:
                 return prevVal
             else:
@@ -1294,106 +1364,124 @@ class Switch(Option):
         Option.__init__(self, name, int(value), description, changeMethod)
         self.options = options
         self.resetMethod = None
+
     def setValue(self, value):
         Option.setValue(self, int(value))
+
+    def getValue(self):
+        return int(Option.getValue(self))
+
+    def toggle(self):
+        self.setValue(1 - self.getValue())
+
+    def getCmdLineValue(self):
+        return "" # always on or off...
+
     def reset(self):
         if self.defaultValue == 0 and self.resetMethod:
             self.resetMethod(1)
         else:
             Option.reset(self)
+
     def describe(self):
         text = self.name
         if len(self.options) > 0:
             text += self.options[-1]
         return text
 
+
 class OptionGroup:
     def __init__(self, name):
         self.name = name
         self.options = seqdict()
-        self.switches = seqdict()
+        
     def reset(self):
         for option in self.options.values():
             option.reset()
-        for switch in self.switches.values():
-            switch.reset()
+
     def setValue(self, key, value):
         if self.options.has_key(key):
             self.options[key].setValue(value)
-            return 1
-        elif self.switches.has_key(key):
-            self.switches[key].setValue(value)
-            return 1
-        return 0 #pragma : no cover - should never happen
+            return True
+        else:
+            return False #pragma : no cover - should never happen
+
+    def getValue(self, key, defValue = None):
+        if self.options.has_key(key):
+            return self.options[key].getValue()
+        else:
+            return defValue
+
+    # For back compatibility
+    setOptionValue = setValue
+    setSwitchValue = setValue
+    getOptionValue = getValue
+    getSwitchValue = getValue
+
     def addSwitch(self, key, *args, **kwargs):
-        if self.switches.has_key(key):
+        if self.options.has_key(key):
             return False
-        self.switches[key] = Switch(*args, **kwargs)
+        self.options[key] = Switch(*args, **kwargs)
         return True
+
     def addOption(self, key, *args, **kwargs):
         if self.options.has_key(key):
             return False
         self.options[key] = TextOption(*args, **kwargs)
         return True
-    def getSwitchValue(self, key, defValue = None):
-        if self.switches.has_key(key):
-            return self.switches[key].getValue()
-        else:
-            return defValue
-    def getOptionValue(self, key, defValue = None):
-        if self.options.has_key(key):
-            return self.options[key].getValue()
-        else:
-            return defValue
+
     def setPossibleValues(self, key, possibleValues):
         option = self.options.get(key)
         if option:
             option.setPossibleValues(possibleValues)
+            
     def getOption(self, key):
         return self.options.get(key)
-    def setOptionValue(self, key, value):
-        if self.options.has_key(key):
-            return self.options[key].setValue(value)
+
     def getOptionValueMap(self):
         values = {}
         for key, option in self.options.items():
             value = option.getValue()
-            if len(value):
+            if value:
                 values[key] = option.getValue()
         return values
+
     def keys(self):
-        return self.options.keys() + self.switches.keys()
+        return self.options.keys()
+
     def getCommandLines(self, onlyKeys=[]):
         commandLines = []
         for key, option in self.options.items():
             if self.accept(key, option, onlyKeys):
                 commandLines.append("-" + key)
-                commandLines.append(option.getValue())
-        for key, switch in self.switches.items():
-            if self.accept(key, switch, onlyKeys):
-                commandLines.append("-" + key)
+                value = option.getCmdLineValue()
+                if value:
+                    commandLines.append(value)
         return commandLines
+    
     def accept(self, key, option, onlyKeys):
         if not option.getValue():
             return False
         if len(onlyKeys) == 0:
             return True
         return key in onlyKeys
+
     def readCommandLineArguments(self, args):
         for arg in args:
-            if arg.find("=") != -1:
-                option, value = arg.split("=")
-                if self.options.has_key(option):
-                    self.options[option].defaultValue = value
+            if "=" in arg:
+                optionName, value = arg.split("=")
+                option = self.getOption(optionName)
+                if option:
+                    option.setValue(value)
                 else:
-                    raise TextTestError, self.name + " does not support option '" + option + "'"
+                    raise TextTestError, self.name + " does not support option '" + optionName + "'"
             else:
-                if self.switches.has_key(arg):
-                    oldValue = self.switches[arg].defaultValue
-                    # Toggle the value from the default
-                    self.switches[arg].defaultValue = 1 - oldValue
+                switch = self.getOption(arg)
+                if switch:
+                    switch.toggle()
                 else:
                     raise TextTestError, self.name + " does not support switch '" + arg + "'"
+
 
 def decodeText(text, log = None):
     localeEncoding = locale.getdefaultlocale()[1]

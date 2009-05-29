@@ -1,6 +1,6 @@
 
 import os, string, subprocess
-from plugins import getDiagnostics, localtime, gethostname
+from plugins import localtime, gethostname, log
 from time import sleep
 
 # Used by master process for submitting, deleting and monitoring slave jobs
@@ -42,7 +42,7 @@ class QueueSystem:
             if line.find("has been submitted") != -1:
                 jobId = self.getJobId(line)
             else:
-                print "Unexpected output from qsub :", line.strip()
+                log.info("Unexpected output from qsub : " + line.strip())
         return jobId
     def getJobFailureInfo(self, jobId):
         methods = [ self.getAccountInfo, self.getAccountInfoOldFiles, self.retryAccountInfo ]
@@ -68,7 +68,7 @@ class QueueSystem:
             if acctOutput is not None:
                 return acctOutput
             else:
-                print "Waiting", sleepTime, "seconds before retrying account info for job", jobId
+                log.info("Waiting " + str(sleepTime) + " seconds before retrying account info for job " + jobId)
     def getAccountInfoOldFiles(self, jobId):
         for logNum in range(5):
             # try at most 5 accounting files for now - assume jobs don't run longer than 5 days!

@@ -4,13 +4,12 @@ import plugins, os, sys, testmodel, signal, operator
 from threading import Thread
 from ndict import seqdict
 from time import sleep
-from respond import Responder
 from glob import glob
 
 # Class to allocate unique names to tests for script identification and cross process communication
-class UniqueNameFinder(Responder):
+class UniqueNameFinder(plugins.Responder):
     def __init__(self, optionMap, allApps):
-        Responder.__init__(self, optionMap)
+        plugins.Responder.__init__(self, optionMap)
         self.name2test = {}
         self.diag = plugins.getDiagnostics("Unique Names")
     def notifyAdd(self, test, initial=True):
@@ -68,9 +67,9 @@ class UniqueNameFinder(Responder):
         self.name2test[name] = test
         test.setUniqueName(name)
 
-class Activator(Responder, plugins.Observable):
+class Activator(plugins.Responder, plugins.Observable):
     def __init__(self, optionMap, allApps):
-        Responder.__init__(self, optionMap, allApps)
+        plugins.Responder.__init__(self, optionMap, allApps)
         plugins.Observable.__init__(self)
         self.allowEmpty = optionMap.has_key("gx") or optionMap.runScript()
         self.suites = []
@@ -118,7 +117,7 @@ class Activator(Responder, plugins.Observable):
                 sys.stderr.write(app.rejectionMessage(rejectionInfo.get(app)))
 
 
-class TextTest(Responder, plugins.Observable):
+class TextTest(plugins.Responder, plugins.Observable):
     def __init__(self):
         plugins.Observable.__init__(self)
         if os.name == "posix":
@@ -242,7 +241,7 @@ class TextTest(Responder, plugins.Observable):
         self.diag.info("Filtering away base classes, using " + repr(filteredClasses))
         self.observers = map(lambda x : x(self.inputOptions, allApps), filteredClasses)
     def getBuiltinResponderClasses(self):
-        return [ UniqueNameFinder, Activator, testmodel.ApplicationEventResponder, testmodel.AllCompleteResponder ]
+        return [ UniqueNameFinder, Activator, testmodel.AllCompleteResponder ]
     def removeBaseClasses(self, classes):
         # Different apps can produce different versions of the same responder/thread runner
         # We should make sure we only include the most specific ones

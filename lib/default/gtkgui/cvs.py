@@ -82,18 +82,16 @@ class CVSInterface(version_control.VersionControlInterface):
             if line.startswith("File: "):
                 spaceAfterNamePos = line.find("\t", 7)
                 return line[spaceAfterNamePos:].replace("Status: ", "").strip(" \n\t")
+
+    def isVersionControlled(self, dirname):
+        return os.path.isdir(os.path.join(dirname, "CVS"))
     
     # Move in source control also. In CVS this implies a remove and then an add
     def _moveDirectory(self, oldDir, newDir):
-        if os.path.isdir(os.path.join(oldDir, "CVS")):
-            self.copyDirectory(oldDir, newDir)
-            self.removePath(oldDir)
-            self.callProgramOnFiles("add", newDir)
-            return True
-        else:
-            os.rename(oldDir, newDir)
-            return False
-
+        self.copyDirectory(oldDir, newDir)
+        self.removePath(oldDir)
+        self.callProgramOnFiles("add", newDir, recursive=True)
+        
     def getMoveCommand(self):
         return "cvs rm' and 'cvs add"
 

@@ -1,0 +1,25 @@
+
+There is almost certainly no migration needed. 
+
+=========================================================
+CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
+=========================================================
+
+(1) Dynamic GUI no longer writes to standard output directly
+============================================================
+It uses the logging mechanism like everything else. To restore the output by
+default, copy the log/logging.console file from the TextTest source tree to
+$TEXTTEST_PERSONAL_CONFIG/log/logging.gui (i.e. ~/.texttest/log/logging.gui 
+unless you repoint the personal configuration directory)
+
+(2) Data file configuration now lives under $TEXTTEST_PERSONAL_CONFIG/etc
+=========================================================================
+Also for consistency with the log layout. If you have .gtkrc-2.0 or .xml files
+for configuring the tool bar in your personal configuration, you'll need to move them
+to this subdirectory.
+
+(3) Default "debug" logging file now called logging.debug instead of log4py.conf
+================================================================================
+For consistency with the above. So you need to go to $TEXTTEST_PERSONAL_CONFIG/log if
+you have such a location and do this rename.
+

@@ -5,7 +5,6 @@ from threading import Thread
 from glob import glob
 from stat import *
 from ndict import seqdict
-from log4py import LOGLEVEL_NORMAL
 from string import Template
 
 try:
@@ -405,7 +404,8 @@ class ViewInEditor(FileViewAction):
         if guiplugins.guiConfig.getCompositeValue("view_file_on_remote_machine", self.getStem(fileName)):
             remoteHost = self.getRemoteHost()
             if remoteHost:
-                cmdArgs = [ "rsh", remoteHost, "env DISPLAY=" + self.getFullDisplay() + " " + " ".join(cmdArgs) ]
+                remoteShellProgram = guiplugins.guiConfig.getValue("remote_shell_program")
+                cmdArgs = [ remoteShellProgram, remoteHost, "env DISPLAY=" + self.getFullDisplay() + " " + " ".join(cmdArgs) ]
 
         return cmdArgs, descriptor, env
 
@@ -502,7 +502,6 @@ class ViewTestFileInEditor(ViewInEditor):
             test.filesChanged()
         self.editingComplete()
 
-
 class ViewFilteredTestFileInEditor(ViewTestFileInEditor):
     def _getStockId(self):
         pass # don't use same stock for both
@@ -514,6 +513,24 @@ class ViewFilteredTestFileInEditor(ViewTestFileInEditor):
         return bool(comparison)
     def isDefaultViewer(self, *args):
         return False
+
+class ViewFilteredOrigFileInEditor(ViewFilteredTestFileInEditor):
+    def _getTitle(self):
+        return "View Filtered Original File"
+    def getFileToView(self, fileName, associatedObject):
+        try:
+            # associatedObject might be a comparison object, but it might not
+            # Use the comparison if it's there
+            return associatedObject.getStdFile(self.useFiltered())
+        except AttributeError:
+            return fileName
+
+class ViewOrigFileInEditor(ViewFilteredOrigFileInEditor):
+    def _getTitle(self):
+        return "View Original File"
+    def useFiltered(self):
+        return False
+
 
 class ViewFileDifferences(FileViewAction):
     def _getTitle(self):
@@ -589,7 +606,8 @@ class FollowFile(FileViewAction):
     def getFollowCommand(self, program, fileName):
         remoteHost = self.getRemoteHost()
         if remoteHost:
-            return [ "rsh", remoteHost, "env DISPLAY=" + self.getFullDisplay() + " " + \
+            remoteShellProgram = guiplugins.guiConfig.getValue("remote_shell_program")
+            return [ remoteShellProgram, remoteHost, "env DISPLAY=" + self.getFullDisplay() + " " + \
                      program + " " + fileName ]
         else:
             return plugins.splitcmd(program) + [ fileName ]
@@ -643,16 +661,31 @@ class ClipboardAction(guiplugins.ActionGUI):
                 if test.parent:
                     return True
         return False
+
     def getSignalsSent(self):
         return [ "Clipboard" ]
+
     def _getStockId(self):
         return self.getName()
+
     def _getTitle(self):
         return "_" + self.getName().capitalize()
+
     def getTooltip(self):
         return self.getName().capitalize() + " selected tests"
+
+    def noAncestorsSelected(self, test):
+        if not test.parent:
+            return True
+        if test.parent in self.currTestSelection:
+            return False
+        else:
+            return self.noAncestorsSelected(test.parent)
+        
     def performOnCurrent(self):
-        self.notify("Clipboard", self.currTestSelection, cut=self.shouldCut())
+        # If suites are selected, don't also select their contents
+        testsForClipboard = filter(self.noAncestorsSelected, self.currTestSelection)
+        self.notify("Clipboard", testsForClipboard, cut=self.shouldCut())
 
 
 class CopyTests(ClipboardAction):
@@ -1013,7 +1046,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         if self.noApps:
             self.runInteractive()
 
-    def isActiveOnCurrent(self):
+    def isActiveOnCurrent(self, *args):
         return True
     def _getStockId(self):
         return "add"
@@ -1330,15 +1363,6 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         self._describeAction(self.gtkAction, self.accelerator)
         self._describeAction(self.filterAction, self.filterAccel)
 
-    def describe(self):
-        guiplugins.guilog.info("Viewing notebook page for '" + self.getTabTitle() + "'")
-        guiplugins.guilog.info(self.getOptionGroupDescription(self.optionGroup))
-        guiplugins.guilog.info("...........")
-        guiplugins.guilog.info(self.getOptionGroupDescription(self.selectionGroup))
-        self._describeAction(self.gtkAction, self.accelerator)
-        guiplugins.guilog.info("...........")
-        guiplugins.guilog.info(self.getOptionGroupDescription(self.filteringGroup))
-        self._describeAction(self.filterAction, self.filterAccel)
 
 class HideSelected(guiplugins.ActionGUI,AllTestsHandler):
     def __init__(self, *args):
@@ -1444,8 +1468,6 @@ class SaveSelection(guiplugins.ActionDialogGUI):
         self.selectionCriteria = ""
         self.dynamic = dynamic
         self.rootTestSuites = []
-    def correctTestClass(self):
-        return "test-case"
     def addSuites(self, suites):
         guiplugins.ActionDialogGUI.addSuites(self, suites)
         self.rootTestSuites += suites
@@ -1458,10 +1480,11 @@ class SaveSelection(guiplugins.ActionDialogGUI):
         return self.folders
     def getTestPathFilterArg(self):
         selTestPaths = []
+        testCaseSelection = self.getTestCaseSelection()
         for suite in self.rootTestSuites:
             selTestPaths.append("appdata=" + suite.app.name + suite.app.versionSuffix())
             for test in suite.testCaseList():
-                if test in self.currTestSelection:
+                if test in testCaseSelection:
                     selTestPaths.append(test.getRelPath())
         return "-tp " + "\n".join(selTestPaths)
     def notifySetTestSelection(self, tests, criteria="", *args):
@@ -1548,8 +1571,6 @@ class LoadSelection(guiplugins.ActionDialogGUI):
 
 class RunningAction:
     runNumber = 1
-    def correctTestClass(self):
-        return "test-case"
     def getGroupTabTitle(self):
         return "Running"
     def messageAfterPerform(self):
@@ -1607,15 +1628,18 @@ class RunningAction:
         ttOptions = self.getCmdlineOptionForApps()
         for group in self.getOptionGroups():
             ttOptions += group.getCommandLines(self.getCommandLineKeys(usecase))
-        ttOptions += [ "-count", str(self.getTestCount()) ]
+        # May be slow to calculate for large test suites, cache it
+        self.testCount = len(self.getTestCaseSelection())
+        ttOptions += [ "-count", str(self.testCount * self.getCountMultiplier()) ]
         ttOptions += [ "-f", filterFile ]
         ttOptions += [ "-fd", self.getTmpFilterDir(app) ]
         return ttOptions
     def getCommandLineKeys(self, usecase):
         # assume everything by default
         return []
-    def getTestCount(self):
-        return len(self.currTestSelection)
+    def getCountMultiplier(self):
+        return 1
+    
     def getTmpFilterDir(self, app):
         return os.path.join(app.writeDirectory, "temporary_filter_files")
     def getCmdlineOptionForApps(self):
@@ -1649,7 +1673,8 @@ class RunningAction:
         pass # only used when recording
 
     def getConfirmationMessage(self):
-        if len(self.currTestSelection) > 1:
+        # For extra speed we check the selection first before we calculate all the test cases again...
+        if len(self.currTestSelection) > 1 or len(self.getTestCaseSelection()) > 1:
             multiTestWarning = self.getMultipleTestWarning()
             if multiTestWarning:
                 return "You are trying to " + multiTestWarning + ".\nThis will mean lots of target application GUIs " + \
@@ -1694,15 +1719,15 @@ class RunTests(RunningAction,guiplugins.ActionTabGUI):
         return "Run selected tests"
     def getOptionGroups(self):
         return self.optionGroups
-    def getTestCount(self):
-        return len(self.currTestSelection) * self.getCopyCount() * self.getVersionCount()
+    def getCountMultiplier(self):
+        return self.getCopyCount() * self.getVersionCount()
     def getCopyCount(self):
         return int(self.optionGroups[0].getOptionValue("cp"))
     def getVersionCount(self):
         return self.optionGroups[0].getOptionValue("v").count(",") + 1
     def performedDescription(self):
         timesToRun = self.getCopyCount()
-        numberOfTests = len(self.currTestSelection)
+        numberOfTests = self.testCount
         if timesToRun != 1:
             if numberOfTests > 1:
                 return "Started " + str(timesToRun) + " copies each of"
@@ -1742,6 +1767,8 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
         self.addSwitch("rectraffic", "Also record command-line or client-server traffic", 1)
         self.addSwitch("rep", "Automatically replay test after recording it", 1)
         self.addSwitch("repgui", options = ["Auto-replay invisible", "Auto-replay in dynamic GUI"])
+    def correctTestClass(self):
+        return "test-case"
     def _getStockId(self):
         return "media-record"
     def getTabTitle(self):
@@ -1823,38 +1850,122 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
         return "Record _Use-Case"
 
 
-class CreateDefinitionFile(guiplugins.ActionDialogGUI):
-    def __init__(self, *args):
+class ImportFiles(guiplugins.ActionDialogGUI):
+    def __init__(self, allApps, *args):
         self.creationDir = None
         self.appendAppName = False
-        guiplugins.ActionDialogGUI.__init__(self, *args)
-        self.addOption("stem", "Type of definition file to create", allocateNofValues=2)
+        self.currentStem = ""
+        self.fileChooser = None
+        guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
+        self.addOption("stem", "Type of file/directory to create", allocateNofValues=2)
         self.addOption("v", "Version identifier to use")
+        possibleDirs = sorted(set((app.getDirectory() for app in allApps)))
+        # The point of this is that it's never sensible as the source for anything, so it serves as a "use the parent" option
+        # for back-compatibility
+        self.addSwitch("act", options=[ "Import file/directory from source", "Create a new file", "Create a new directory" ])
+        self.addOption("src", "Source to copy from", selectFile=True, possibleDirs=possibleDirs)
+
     def singleTestOnly(self):
         return True
     def _getTitle(self):
-        return "Create _File"
+        return "Create/_Import"
+    def getTooltip(self):
+        return "Create a new file or directory, possibly by copying it" 
     def _getStockId(self):
         return "new"
     def getDialogTitle(self):
-        return "New File"
+        return "Create/Import Files and Directories"
     def isActiveOnCurrent(self, *args):
         return self.creationDir is not None and guiplugins.ActionDialogGUI.isActiveOnCurrent(self, *args)
+    def getResizeDivisors(self):
+        # size of the dialog
+        return 1.4, 1.4
+    def getSignalsSent(self):
+        return [ "NewFile" ]
+    def messageAfterPerform(self):
+        pass
+
+    def updateOptions(self):
+        self.currentStem = ""
+        return False
+
     def fillVBox(self, vbox):
-        header = gtk.Label()
         test = self.currTestSelection[0]
         dirText = self.getDirectoryText(test)
-        guiplugins.guilog.info("Adding text '" + dirText + "'")
-        header.set_markup("<b>" + dirText + "</b>\n")
-        vbox.pack_start(header)
+        self.addText(vbox, "<b><u>" + dirText + "</u></b>")
+        self.addText(vbox, "<i>(Test is " + repr(test) + ")</i>")
         return guiplugins.ActionDialogGUI.fillVBox(self, vbox)
+
+    def stemChanged(self, *args):
+        option = self.optionGroup.getOption("stem")
+        newStem = option.getValue()    
+        if newStem in option.possibleValues and newStem != self.currentStem:
+            self.currentStem = newStem
+            version = self.optionGroup.getOptionValue("v")
+            sourcePath = self.getDefaultSourcePath(newStem, version)
+            self.optionGroup.setValue("src", sourcePath)
+
+    def actionChanged(self, *args):
+        if self.fileChooser:
+            self.setFileChooserSensitivity(verbose=True)
+
+    def setFileChooserSensitivity(self, verbose):
+        action = self.optionGroup.getValue("act")
+        sensitive = self.fileChooser.get_property("sensitive")
+        newSensitive = action == 0
+        if newSensitive != sensitive:
+            self.fileChooser.set_property("sensitive", newSensitive)
+            if verbose:
+                guiplugins.guilog.info("Sensitivity of source file chooser changed to " + repr(newSensitive))
+        
+    def getTargetPath(self, *args, **kwargs):
+        targetPathName = self.getFileName(*args, **kwargs)
+        return os.path.join(self.creationDir, targetPathName)
+        
+    def getDefaultSourcePath(self, stem, version):
+        targetPath = self.getTargetPath(stem, version)
+        test = self.currTestSelection[0]
+        pathNames = test.getAllPathNames(stem, refVersion=version)
+        if len(pathNames) > 0:
+            firstSource = pathNames[-1]
+            if os.path.basename(firstSource).startswith(stem + "." + test.app.name):
+                targetPath = self.getTargetPath(stem, version, appendAppName=True)
+            if firstSource != targetPath:
+                return firstSource
+            elif len(pathNames) > 1:
+                return pathNames[-2]
+        return test.getDirectory()
+
+    def createComboBox(self, *args):
+        combobox, entry = guiplugins.ActionDialogGUI.createComboBox(self, *args)
+        handler = combobox.connect("changed", self.stemChanged)
+        return combobox, entry
+
+    def createRadioButtons(self, *args):
+        buttons = guiplugins.ActionDialogGUI.createRadioButtons(self, *args)
+        buttons[0].connect("toggled", self.actionChanged)
+        return buttons
+
+    def createFileChooser(self, *args):
+        self.fileChooser = guiplugins.ActionDialogGUI.createFileChooser(self, *args)
+        self.setFileChooserSensitivity(verbose=False) # Check initial values, maybe set insensitive
+        return self.fileChooser
+    
+    def addText(self, vbox, text):
+        header = gtk.Label()
+        guiplugins.guilog.info("Adding text '" + text + "'")
+        header.set_markup(text + "\n")
+        vbox.pack_start(header, expand=False, fill=False)
+    
     def getDirectoryText(self, test):
         relDir = plugins.relpath(self.creationDir, test.getDirectory())
         if relDir:
-            return "Creating file in test subdirectory '" + relDir + "' for " + repr(test)
+            return "Create or import files in test subdirectory '" + relDir + "'"
         else:
-            return "Creating file in test directory for " + repr(test)
+            return "Create or import files in the test directory"
+
     def notifyFileCreationInfo(self, creationDir, fileType):
+        self.fileChooser = None
         if fileType == "external":
             self.creationDir = None
             self.setSensitivity(False)
@@ -1865,6 +1976,8 @@ class CreateDefinitionFile(guiplugins.ActionDialogGUI):
             if newActive:
                 self.updateStems(fileType)
                 self.appendAppName = (fileType == "definition" or fileType == "standard")
+                self.optionGroup.setValue("act", int(self.appendAppName))
+
     def findAllStems(self, fileType):
         if fileType == "definition":
             return self.getDefinitionFiles()
@@ -1874,6 +1987,7 @@ class CreateDefinitionFile(guiplugins.ActionDialogGUI):
             return self.getStandardFiles()
         else:
             return []
+
     def getDefinitionFiles(self):
         defFiles = []
         defFiles.append("environment")
@@ -1889,10 +2003,14 @@ class CreateDefinitionFile(guiplugins.ActionDialogGUI):
         # (b) are not auto-generated ("regenerate")
         # That leaves the rest ("default")
         return defFiles + self.currTestSelection[0].defFileStems("default")
+
     def getStandardFiles(self):
-        stdFiles = [ "output", "errors" ] + self.currTestSelection[0].getConfigValue("collate_file").keys()
+        collateKeys = self.currTestSelection[0].getConfigValue("collate_file").keys()
+        # Don't pick up "dummy" indicators on Windows...
+        stdFiles = [ "output", "errors" ] + filter(lambda k: k, collateKeys)
         discarded = [ "stacktrace" ] + self.currTestSelection[0].getConfigValue("discard_file")
         return filter(lambda f: f not in discarded, stdFiles)
+
     def updateStems(self, fileType):
         stems = self.findAllStems(fileType)
         if len(stems) > 0:
@@ -1900,52 +2018,44 @@ class CreateDefinitionFile(guiplugins.ActionDialogGUI):
         else:
             self.optionGroup.setValue("stem", "")
         self.optionGroup.setPossibleValues("stem", stems)
-    def getFileName(self, stem, version):
+
+    def getFileName(self, stem, version, appendAppName=False):
         fileName = stem
-        if self.appendAppName:
+        if self.appendAppName or appendAppName:
             fileName += "." + self.currTestSelection[0].app.name
         if version:
             fileName += "." + version
         return fileName
-    def getSourceFile(self, stem, version, targetFile):
-        thisTestName = self.currTestSelection[0].getFileName(stem, version)
-        if thisTestName and not os.path.basename(thisTestName) == targetFile:
-            return thisTestName
 
-        test = self.currTestSelection[0].parent
-        while test:
-            currName = test.getFileName(stem, version)
-            if currName:
-                return currName
-            test = test.parent
     def performOnCurrent(self):
         stem = self.optionGroup.getOptionValue("stem")
         version = self.optionGroup.getOptionValue("v")
-        targetFileName = self.getFileName(stem, version)
-        sourceFile = self.getSourceFile(stem, version, targetFileName)
-        # If the source has an app identifier in it we need to get one, or we won't get prioritised!
-        stemWithApp = stem + "." + self.currTestSelection[0].app.name
-        if sourceFile and os.path.basename(sourceFile).startswith(stemWithApp) and not targetFileName.startswith(stemWithApp):
-            targetFileName = targetFileName.replace(stem, stemWithApp, 1)
-            sourceFile = self.getSourceFile(stem, version, targetFileName)
+        action = self.optionGroup.getSwitchValue("act")
+        test = self.currTestSelection[0]
+        if action > 0: # Create new
+            targetPath = self.getTargetPath(stem, version)
+            if os.path.exists(targetPath):
+                raise plugins.TextTestError, "Not creating file or directory : path already exists:\n" + targetPath
 
-        targetFile = os.path.join(self.creationDir, targetFileName)
-        plugins.ensureDirExistsForFile(targetFile)
-        fileExisted = os.path.exists(targetFile)
-        if sourceFile and os.path.isfile(sourceFile):
-            guiplugins.guilog.info("Creating new file, copying " + sourceFile)
-            shutil.copyfile(sourceFile, targetFile)
-        elif not fileExisted:
-            file = open(targetFile, "w")
-            file.close()
-            guiplugins.guilog.info("Creating new empty file...")
+            if action == 1:
+                plugins.ensureDirExistsForFile(targetPath)
+                file = open(targetPath, "w")
+                file.close()
+                guiplugins.guilog.info("Creating new empty file...")
+                self.notify("NewFile", targetPath, False)
+            elif action == 2:
+                plugins.ensureDirectoryExists(targetPath)
+                guiplugins.guilog.info("Creating new empty directory...")
+                test.filesChanged()
         else:
-            raise plugins.TextTestError, "Unable to create file, no possible source found and target file already exists:\n" + targetFile
-        self.notify("NewFile", targetFile, fileExisted)
-    def getSignalsSent(self):
-        return [ "NewFile" ]
-    def messageAfterPerform(self):
-        pass
+            sourcePath = self.optionGroup.getOptionValue("src")
+            appendAppName = os.path.basename(sourcePath).startswith(stem + "." + test.app.name)
+            targetPath = self.getTargetPath(stem, version, appendAppName) 
+            fileExisted = os.path.exists(targetPath)
+            guiplugins.guilog.info("Creating new path, copying " + sourcePath)
+            plugins.copyPath(sourcePath, targetPath)
+            self.notify("NewFile", targetPath, fileExisted)
+
 
 class RemoveTests(guiplugins.ActionGUI):
     def notifyFileCreationInfo(self, creationDir, fileType):
@@ -2086,8 +2196,9 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         self.addOption("full_description", "\nFull description (no bug system)")
         self.addOption("brief_description", "Few-word summary (no bug system)")
         self.addSwitch("trigger_on_absence", "Trigger if given text is NOT present")
-        self.addSwitch("internal_error", "Trigger even if other files differ (report as internal error)")
+        self.addSwitch("ignore_other_errors", "Trigger even if other files differ")
         self.addSwitch("trigger_on_success", "Trigger even if test would otherwise succeed")
+        self.addSwitch("internal_error", "Report as 'internal error' rather than 'known bug' (no bug system)")
     def _getStockId(self):
         return "info"
     def singleTestOnly(self):
@@ -2129,25 +2240,18 @@ class ReportBugs(guiplugins.ActionDialogGUI):
     def getFileName(self):
         name = "knownbugs." + self.currTestSelection[0].app.name + self.versionSuffix()
         return os.path.join(self.currTestSelection[0].getDirectory(), name)
-    def write(self, writeFile, message):
-        writeFile.write(message)
-        guiplugins.guilog.info(message)
     def getResizeDivisors(self):
         # size of the dialog
         return 1.4, 1.7
     def performOnCurrent(self):
         self.checkSanity()
         fileName = self.getFileName()
-        guiplugins.guilog.info("Recording known bugs to " + fileName + " : ")
         writeFile = open(fileName, "a")
-        self.write(writeFile, "\n[Reported by " + os.getenv("USER", "Windows") + " at " + plugins.localtime() + "]\n")
+        writeFile.write("\n[Reported by " + os.getenv("USER", "Windows") + " at " + plugins.localtime() + "]\n")
         for name, option in self.optionGroup.options.items():
             value = option.getValue()
-            if name != "version" and len(value) != 0 and value != "<none>":
-                self.write(writeFile, name + ":" + value + "\n")
-        for name, switch in self.optionGroup.switches.items():
-            if switch.getValue():
-                self.write(writeFile, name + ":1\n")
+            if name != "version" and value and value != "<none>":
+                writeFile.write(name + ":" + str(value) + "\n")
         writeFile.close()
         self.currTestSelection[0].filesChanged()
 
@@ -2543,14 +2647,14 @@ class InteractiveActionConfig:
     def getInteractiveActionClasses(self, dynamic):
         classes = [ Quit, ViewTestFileInEditor, ShowFileProperties ]
         if dynamic:
-            classes += [ ViewFilteredTestFileInEditor, ViewFileDifferences,
-                         ViewFilteredFileDifferences, FollowFile,
+            classes += [ ViewFilteredTestFileInEditor, ViewOrigFileInEditor, ViewFilteredOrigFileInEditor,
+                         ViewFileDifferences, ViewFilteredFileDifferences, FollowFile,
                          SaveTests, SaveSelection, KillTests, AnnotateGUI,
                          MarkTest, UnmarkTest, RecomputeTests ] # must keep RecomputeTests at the end!
         else:
             classes += [ ViewConfigFileInEditor, CopyTests, CutTests,
                          PasteTests, ImportTestCase, ImportTestSuite, ImportApplication,
-                         CreateDefinitionFile, ReportBugs, SelectTests,
+                         ImportFiles, ReportBugs, SelectTests,
                          RefreshAll, HideUnselected, HideSelected, ShowAll,
                          RunTestsBasic, RunTestsAdvanced, RecordTest, ResetGroups, RenameTest, RemoveTests,
                          SortTestSuiteFileAscending, SortTestSuiteFileDescending,

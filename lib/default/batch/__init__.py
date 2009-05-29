@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, plugins, respond, sys, string, time, types, shutil, datetime, testoverview
+import os, plugins, sys, string, time, types, shutil, datetime, testoverview
 from ndict import seqdict
 from cPickle import Pickler
 
@@ -151,9 +151,8 @@ class BatchApplicationData:
         return contents
 
 # Works only on UNIX
-class BatchResponder(respond.Responder):
+class BatchResponder(plugins.Responder):
     def __init__(self, optionMap, *args):
-        respond.Responder.__init__(self, optionMap)
         self.sessionName = optionMap["b"]
         self.runId = optionMap.get("name", calculateBatchDate()) # use the command-line name if given, else the date
         self.batchAppData = seqdict()
@@ -222,21 +221,19 @@ class MailSender:
         file.write(mailContents)
         file.close()
     def sendOrStoreMail(self, app, mailContents, useCollection=False, isAllSuccess=False):
-        sys.stdout.write("At " + time.strftime("%H:%M") + " creating batch report for application " + app.fullName + " ...")
-        sys.stdout.flush()
+        plugins.log.info("At " + time.strftime("%H:%M") + " creating batch report for application " + app.fullName + " ...")
         if useCollection:
             self.storeMail(app, mailContents)
-            sys.stdout.write("file written.")
+            plugins.log.info("File written.")
         else:
             if not isAllSuccess or app.getCompositeConfigValue("batch_mail_on_failure_only", self.sessionName) != "true":
                 errorMessage = self.sendMail(app, mailContents)
                 if errorMessage:
-                    sys.stdout.write("FAILED. Details follow:\n" + errorMessage.strip())
+                    plugins.log.info("FAILED. Details follow:\n" + errorMessage.strip())
                 else:
-                    sys.stdout.write("done.")
+                    plugins.log.info("done.")
             else:
-                sys.stdout.write("not sent: all tests succeeded.")
-        sys.stdout.write("\n")
+                plugins.log.info("not sent: all tests succeeded.")
     def exceptionOutput(self):
         exctype, value = sys.exc_info()[:2]
         from traceback import format_exception_only
@@ -364,21 +361,31 @@ def calculateBatchDate():
     timeinseconds = plugins.globalStartTime - 8*60*60
     return time.strftime("%d%b%Y", time.localtime(timeinseconds))
 
-def getVersionName(app):
+def findExtraVersionParent(app, allApps):
+    for parentApp in allApps:
+        if app in parentApp.extras:
+            return parentApp
+    return app
+
+def getVersionName(app, allApps):
+    parent = findExtraVersionParent(app, allApps)
+    parentVersion = parent.getFullVersion()
     fullVersion = app.getFullVersion()
-    if fullVersion:
+    if parentVersion:
         return fullVersion
+    elif fullVersion:
+        return "default." + fullVersion
     else:
         return "default"
     
 
 # Allow saving results to a historical repository
-class SaveState(respond.SaveState):
-    def __init__(self, optionMap, *args):
-        respond.SaveState.__init__(self, optionMap)
+class SaveState(plugins.Responder):
+    def __init__(self, optionMap, allApps):
         self.batchSession = optionMap["b"]
         self.fileName = self.createFileName(optionMap.get("name"))
         self.repositories = {}
+        self.allApps = allApps
         self.diag = plugins.getDiagnostics("Save Repository")
     def createFileName(self, nameGiven):
         # include the date and the name, if any. Date is used for archiving, name for display
@@ -386,16 +393,17 @@ class SaveState(respond.SaveState):
         if nameGiven:
             parts.append(nameGiven)
         return string.join(parts, "_")
-    def performSave(self, test):
-        test.saveState()
-        if self.repositories.has_key(test.app):
-            self.diag.info("Saving " + repr(test) + " to repository")
-            self.saveToRepository(test)
-        else:
-            self.diag.info("No repositories for " + repr(test.app) + " in " + repr(self.repositories))
+    def notifyComplete(self, test):
+        if test.state.isComplete(): # might look weird but this notification also comes in scripts, e.g collecting
+            test.saveState()
+            if self.repositories.has_key(test.app):
+                self.diag.info("Saving " + repr(test) + " to repository")
+                self.saveToRepository(test)
+            else:
+                self.diag.info("No repositories for " + repr(test.app) + " in " + repr(self.repositories))
     def saveToRepository(self, test):
         testRepository = self.repositories[test.app]
-        targetFile = os.path.join(testRepository, test.app.name, getVersionName(test.app), \
+        targetFile = os.path.join(testRepository, test.app.name, getVersionName(test.app, self.allApps), \
                                   test.getRelPath(), self.fileName)
         if os.path.isfile(targetFile):
             plugins.printWarning("File already exists at " + targetFile + " - not overwriting!")
@@ -448,14 +456,14 @@ class ArchiveRepository(plugins.ScriptWithArgs):
             elif os.path.isdir(fullPath):
                 self.archiveFilesUnder(fullPath, app)
         if count > 0:
-            print "Archived", count, "files dated", self.descriptor, "under", repository.replace(self.repository + os.sep, "")
+            plugins.log.info("Archived " + str(count) + " files dated " + self.descriptor + " under " + repository.replace(self.repository + os.sep, ""))
     def archiveFile(self, fullPath, app):
         targetPath = self.getTargetPath(fullPath, app.name)
         plugins.ensureDirExistsForFile(targetPath)
         try:
             os.rename(fullPath, targetPath)
         except:
-            print "Rename failed: ",fullPath,targetPath
+            plugins.log.info("Rename failed: " + fullPath + " " + targetPath)
 
     def getTargetPath(self, fullPath, appName):
         parts = fullPath.split(os.sep)
@@ -475,35 +483,40 @@ class ArchiveRepository(plugins.ScriptWithArgs):
             return False
         return True
 
-class WebPageResponder(respond.Responder):
+class WebPageResponder(plugins.Responder):
     def __init__(self, optionMap, allApps):
-        respond.Responder.__init__(self, optionMap, allApps)
         self.batchSession = optionMap.get("b", "default")
+        self.diag = plugins.getDiagnostics("GenerateWebPages")
         self.allApps = allApps
+
     def addSuites(self, suites):
         # These are the ones that got through. Remove all rejected apps...
         apps = set([ suite.app for suite in suites ])
         for app in set(self.allApps).difference(apps):
             self.allApps.remove(app)
+            # If the app is rejected, some of its extra versions may still not be...
+            for extra in app.extras:
+                if extra in apps:
+                    self.allApps.append(extra)
+            
     def notifyAllComplete(self):
         appInfo = self.getAppRepositoryInfo()
-        print "Generating web pages..."
-        sys.stdout.flush()
+        plugins.log.info("Generating web pages...")
         for pageTitle, pageInfo in appInfo.items():
-            print "Generating page for", pageTitle
+            plugins.log.info("Generating page for " + pageTitle)
             if len(pageInfo) == 1:
                 self.generatePagePerApp(pageTitle, pageInfo)
             else:
                 self.generateCommonPage(pageTitle, pageInfo)
-        print "Completed web page generation."
+        plugins.log.info("Completed web page generation.")
 
     def generatePagePerApp(self, pageTitle, pageInfo):
         for app, repository in pageInfo:
             pageTopDir = app.getCompositeConfigValue("historical_report_location", self.batchSession)
             pageDir = os.path.join(pageTopDir, app.name)
             extraVersions = self.getExtraVersions(app)
-            subDirs = self.findRelevantSubdirectories(repository, app, extraVersions)
-            relevantSubDirs = [ (subDir, os.path.basename(subDir)) for subDir in subDirs ]
+            self.diag.info("Found extra versions " + repr(extraVersions))
+            relevantSubDirs = self.findRelevantSubdirectories(repository, app, extraVersions)
             self.makeAndGenerate(pageDir, app, extraVersions, relevantSubDirs, pageTitle)
                 
     def getAppRepositoryInfo(self):
@@ -522,18 +535,18 @@ class WebPageResponder(respond.Responder):
         return appInfo
 
     def transformToCommon(self, pageInfo):
-        extraVersions, relevantSubDirs = [], []
+        extraVersions, relevantSubDirs = [], seqdict()
         for app, repository in pageInfo:
             extraVersions += self.getExtraVersions(app)
-            for relDir in self.findRelevantSubdirectories(repository, app, extraVersions):
-                relevantSubDirs.append((relDir, self.getVersionTitle(app, relDir)))
+            relevantSubDirs.update(self.findRelevantSubdirectories(repository, app, extraVersions, self.getVersionTitle))
         return app, extraVersions, relevantSubDirs
-    def getVersionTitle(self, app, dir):
-        version = os.path.basename(dir)
+
+    def getVersionTitle(self, app, version):
         title = app.fullName
         if len(version) > 0 and version != "default":
             title += " version " + version
         return title
+    
     def generateCommonPage(self, pageTitle, pageInfo):
         app, extraVersions, relevantSubDirs = self.transformToCommon(pageInfo)
         pageDir = app.getCompositeConfigValue("historical_report_location", self.batchSession)
@@ -548,26 +561,42 @@ class WebPageResponder(respond.Responder):
             plugins.printException()
 
     def generateWebPages(self, pageDir, app, extraVersions, relevantSubDirs, pageTitle):
-        generator = testoverview.GenerateWebPages(pageTitle, getVersionName(app), pageDir,
+        generator = testoverview.GenerateWebPages(pageTitle, getVersionName(app, self.allApps), pageDir,
                                                   extraVersions, app)
         subPageNames = app.getCompositeConfigValue("historical_report_subpages", self.batchSession)
         generator.generate(relevantSubDirs, subPageNames)
 
-    def findRelevantSubdirectories(self, repository, app, extraVersions):
-        subdirs = []
+    def findMatchingExtraVersion(self, dirVersions, extraVersions):
+        # Check all tails that this is not an extraVersion
+        for pos in xrange(len(dirVersions)):
+            versionToCheck = ".".join(dirVersions[pos:])
+            if versionToCheck in extraVersions:
+                return versionToCheck
+        return ""
+        
+    def findRelevantSubdirectories(self, repository, app, extraVersions, versionTitleMethod=None):
+        subdirs = seqdict()
         dirlist = os.listdir(repository)
         dirlist.sort()
         appVersions = set(app.versions)
         for dir in dirlist:
             dirVersions = dir.split(".")
             if set(dirVersions).issuperset(appVersions):
-                # Check all tails that this is not an extraVersion
-                inExtraVersions = False;
-                for pos in xrange(len(dirVersions)):
-                    inExtraVersions = inExtraVersions or ".".join(dirVersions[pos:]) in extraVersions
-                if not inExtraVersions:
-                    subdirs.append(os.path.join(repository, dir))
+                currExtraVersion = self.findMatchingExtraVersion(dirVersions, extraVersions)
+                if currExtraVersion:
+                    version = dir.replace("." + currExtraVersion, "")
+                else:
+                    version = dir
+                if versionTitleMethod:
+                    versionTitle = versionTitleMethod(app, version)
+                else:
+                    versionTitle = version
+                fullPath = os.path.join(repository, dir)
+                self.diag.info("Found subdirectory " + dir + " with version " + versionTitle
+                               + " and extra version '" + currExtraVersion + "'")
+                subdirs.setdefault(versionTitle, []).append((currExtraVersion, fullPath))
         return subdirs
+    
     def getExtraVersions(self, app):
         extraVersions = []
         length = len(app.versions)
@@ -576,6 +605,7 @@ class WebPageResponder(respond.Responder):
             if not version in app.versions:
                 extraVersions.append(version)
         return extraVersions
+
     
 class CollectFiles(plugins.ScriptWithArgs):
     scriptDoc = "Collect and send all batch reports that have been written to intermediate files"
@@ -587,9 +617,9 @@ class CollectFiles(plugins.ScriptWithArgs):
         self.diag = plugins.getDiagnostics("batch collect")
         self.userName = argDict.get("tmp", "")
         if self.userName:
-            print "Collecting batch files created by user", self.userName + "..."
+            plugins.log.info("Collecting batch files created by user " + self.userName + "...")
         else:
-            print "Collecting batch files locally..."
+            plugins.log.info("Collecting batch files locally...")
     def setUpApplication(self, app):
         fileBodies = []
         totalValues = seqdict()
@@ -653,7 +683,7 @@ class CollectFiles(plugins.ScriptWithArgs):
 
     def parseFile(self, fullname, app, totalValues):
         localName = os.path.basename(fullname)
-        print "Found file called", localName
+        plugins.log.info("Found file called " + localName)
         file = open(fullname)
         valuesLine = file.readline()
         self.runId = file.readline().strip()
@@ -664,7 +694,8 @@ class CollectFiles(plugins.ScriptWithArgs):
             file.close()
             return fileBody
         else:
-            print "Not including", localName, "as run is more than", maxDays, "days old (as determined by batch_collect_max_age_days)."
+            plugins.log.info("Not including " + localName + " as run is more than " +
+                             str(maxDays) + " days old (as determined by batch_collect_max_age_days).")
         
     def addValuesToTotal(self, localName, valuesLine, totalValues):
         catValues = plugins.commasplit(valuesLine.strip())

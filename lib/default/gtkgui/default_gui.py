@@ -1859,12 +1859,18 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
         self.addOption("stem", "Type of file/directory to create", allocateNofValues=2)
         self.addOption("v", "Version identifier to use")
-        possibleDirs = sorted(set((app.getDirectory() for app in allApps)))
+        possibleDirs = self.getPossibleDirs(allApps)
         # The point of this is that it's never sensible as the source for anything, so it serves as a "use the parent" option
         # for back-compatibility
         self.addSwitch("act", options=[ "Import file/directory from source", "Create a new file", "Create a new directory" ])
         self.addOption("src", "Source to copy from", selectFile=True, possibleDirs=possibleDirs)
-
+        
+    def getPossibleDirs(self, allApps):
+        if len(allApps) > 0:
+            return sorted(set((app.getDirectory() for app in allApps)))
+        else:
+            return [ os.getenv("TEXTTEST_HOME") ]
+                
     def singleTestOnly(self):
         return True
     def _getTitle(self):

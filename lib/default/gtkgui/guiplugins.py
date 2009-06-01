@@ -915,12 +915,23 @@ class OptionGroupGUI(ActionGUI):
         except AttributeError:
             return labelWidget.get_child().get_text()
 
+    def getTooltipText(self, widget):
+        try:
+            # New 3.12 method...
+            return widget.get_tooltip_text()
+        except AttributeError:
+            data = gtk.tooltips_data_get(widget)
+            if data:
+                return data[2]
+
     def getOptionDescription(self, widget, fileChooserOption=None):
         baseDescription = self.getBasicOptionDescription(widget, fileChooserOption)
         if not widget.get_property("sensitive"):
-            return baseDescription + " (greyed out)"
-        else:
-            return baseDescription
+            baseDescription += " (greyed out)"
+        tooltip = self.getTooltipText(widget)
+        if tooltip:
+            baseDescription += " (tooltip '" + tooltip + "')"
+        return baseDescription
 
     def getBasicOptionDescription(self, widget, fileChooserOption):
         if isinstance(widget, gtk.Label):

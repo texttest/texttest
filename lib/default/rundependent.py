@@ -92,7 +92,7 @@ class RunDependentTextFilter(plugins.Observable):
         self.diag.info("Filtering " + fileName + " to create " + newFileName)
         file = open(fileName, "rU") # use universal newlines to simplify
         newFile = plugins.openForWrite(newFileName)
-        if against and floatTolerance:
+        if against and os.path.isfile(against) and floatTolerance:
             stringFile = StringIO.StringIO()
             self.filterFileObject(file, stringFile)
             stringFile.seek(0)

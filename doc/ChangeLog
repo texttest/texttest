@@ -1414,10 +1414,21 @@ Bug Fixes:
     - "Extra versions" write to sensible batch repository locations when no version given on command line (batch.py)
     - Website generation works for "Extra version" applications even if the parent is blocked or has no data (batch.py)
 
+Version 3.14.1
+==============
+Bug Fixes to 3.14:
+    - Import File now works even when starting without any pre-existing test suites (default_gui.py)
+    - New floating point filtering functionality now handles new files correctly (rundependent.py)
+    - Strange and unnecessary frame removed from Save Selection dialog (guiplugins.py)
+Fixes for older bugs:
+    - Fixed problem where reconnection to multiple runs failed to pick up composite versions (reconnect.py)
+    - Fixed grid engine problem where tests were sent to jobs that had already been killed (queuesystem/__init__.py)
+	
 Version trunk
 =============
 General GUI Enhancements:
-Static GUI Enhancements:
+Dynamic GUI Enhancements:
+    - Can now view original files (filtered and not) from the file view popup menu (default_gui.py)
 Framework Enhancements:
     - Logging more flexible now (default.py)
 	Dynamic GUI does not write anything by default. Batch mode writes time stamps by default.

@@ -53,7 +53,7 @@ class Config:
                     group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
             elif group.name.startswith("Advanced"):
                 group.addSwitch("x", "Enable self-diagnostics")
-                defaultDiagDir = os.path.join(plugins.getPersonalConfigDir(), "log")
+                defaultDiagDir = plugins.getPersonalDir("log")
                 group.addOption("xr", "Configure self-diagnostics from", os.path.join(defaultDiagDir, "logging.debug"),
                                 possibleValues=[ os.path.join(plugins.installationDir("log"), "logging.debug") ])
                 group.addOption("xw", "Write self-diagnostics to", defaultDiagDir)
@@ -193,22 +193,24 @@ class Config:
         return self.useGUI() or self.batchMode() or self.useConsole() or \
                self.optionMap.has_key("o") or self.optionMap.has_key("s")
 
-    def getLogfilePostfix(self):
+    def getLogfilePostfixes(self):
         if self.optionMap.has_key("x"):
-            return "debug"
+            return [ "debug" ]
+        elif self.optionMap.has_key("gx"):
+            return [ "gui", "static_gui" ]
+        elif self.optionMap.has_key("g"):
+            return [ "gui", "dynamic_gui" ]
         elif self.batchMode():
-            return "batch"
-        elif not self.useGUI():
-            return "console"
+            return [ "console", "batch" ]
         else:
-            return "gui"
+            return [ "console" ]
         
     def setUpLogging(self):
-        filePattern = "logging." + self.getLogfilePostfix()
-        allPaths = plugins.findDataPaths(filePattern, dataDir="log", includePersonal=True,
+        filePatterns = [ "logging." + postfix for postfix in self.getLogfilePostfixes() ]
+        allPaths = plugins.findDataPaths(filePatterns, dataDirName="log", includePersonal=True,
                                          vanilla=self.optionMap.has_key("vanilla"))
         plugins.configureLogging(allPaths[-1]) # Won't have any effect if we've already got a log file
-        
+            
     def getResponderClasses(self, allApps):
         # Global side effects first :)
         if not self.hasExplicitInterface():
@@ -579,7 +581,7 @@ class Config:
             return checkoutPath
         except plugins.TextTestError, e:
             if self.ignoreExecutable():
-                plugins.log.info("WARNING: " + str(e) + " Ignoring checkout.")
+                plugins.printWarning(str(e) + " Ignoring checkout.")
                 return ""
             else:
                 raise
@@ -1399,7 +1401,7 @@ class DocumentEnvironment(plugins.Action):
     def __init__(self, args=[]):
         self.onlyEntries = args
         self.prefixes = [ "TEXTTEST_", "USECASE_" ]
-        self.exceptions = [ "TEXTTEST_DELETION", "TEXTTEST_SYMLINK" ]
+        self.exceptions = [ "TEXTTEST_DELETION", "TEXTTEST_SYMLINK", "TEXTTEST_PERSONAL_" ]
         
     def getEntriesToUse(self, app):
         if len(self.onlyEntries) > 0:

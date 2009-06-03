@@ -230,7 +230,7 @@ class TextTestGUI(plugins.Responder, plugins.Observable):
     def setUpGlobals(self, allApps):
         global guilog, guiConfig, scriptEngine
         scriptEngine = self.scriptEngine
-        guilog = self.scriptEngine.replayer.logger
+        guilog = plugins.getDiagnostics("gui log")
         guiConfig = guiplugins.GUIConfig(self.dynamic, allApps, guilog)
 
         guiplugins.guilog = guilog
@@ -302,7 +302,7 @@ class TextTestGUI(plugins.Responder, plugins.Observable):
             self.topWindowGUI.addObserver(observer)
 
     def readGtkRCFiles(self, vanilla):
-        for file in plugins.findDataPaths(".gtkrc-2.0", vanilla, includePersonal=True):
+        for file in plugins.findDataPaths([ ".gtkrc-2.0" ], vanilla, includePersonal=True):
             gtk.rc_add_default_file(file)
 
     def addSuites(self, suites):
@@ -594,7 +594,7 @@ class MenuBarGUI(guiplugins.SubGUI):
         self.widget = self.uiManager.get_widget("/MainMenuBar")
         return self.widget
     def getGUIDescriptionFileNames(self):
-        allFiles = plugins.findDataPaths("*.xml", self.vanilla, includePersonal=True)
+        allFiles = plugins.findDataPaths([ "*.xml" ], self.vanilla, includePersonal=True)
         self.diag.info("All description files : " + repr(allFiles))
         # Pick up all GUI descriptions corresponding to modules we've loaded
         loadFiles = filter(self.shouldLoad, allFiles)

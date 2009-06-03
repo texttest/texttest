@@ -173,7 +173,7 @@ class QueueSystemConfig(default.Config):
             return InteractiveResponder
     
     def getSlaveSwitches(self):
-        return [ "c", "b", "trace", "ignorecat", "actrep", "rectraffic", "keeptmp", "keepslave" ]
+        return [ "c", "b", "trace", "ignorecat", "actrep", "rectraffic", "keeptmp", "keepslave", "x" ]
     def getExecHostFinder(self):
         if self.slaveRun():
             return FindExecutionHosts()
@@ -636,40 +636,39 @@ class QueueSystemServer(BaseActionRunner):
     def getPendingState(self, test):
         freeText = "Job pending in " + queueSystemName(test.app)
         return plugins.TestState("pending", freeText=freeText, briefText="PEND", lifecycleChange="become pending")
+
     def shellWrap(self, command):
         # Must use exec so as not to create extra processes: SGE's qdel isn't very clever when
         # it comes to noticing extra shells
         return "exec $SHELL -c \"exec " + command + "\""
+
     def getSlaveCommand(self, test, submissionRules):
         slaveCmd = os.getenv("TEXTTEST_SLAVE_CMD", sys.argv[0]) # TextTest executable to call for the grid engine slave process
-        return slaveCmd + " -d " + os.getenv("TEXTTEST_HOME") + \
-               " -a " + test.app.name + test.app.versionSuffix() + \
-               " -l -tp " + test.getRelPath() + \
-               self.getSlaveArgs(test) + " " + \
-               self.getRunOptions(test.app, submissionRules)
+        cmdArgs = [ slaveCmd, "-d", os.getenv("TEXTTEST_HOME"),
+                    "-a", test.app.name + test.app.versionSuffix(),
+                    "-l", "-tp", test.getRelPath() ] + \
+                    self.getSlaveArgs(test) + self.getRunOptions(test.app, submissionRules)
+        return " ".join(cmdArgs)
+
     def getSlaveArgs(self, test):
-        return " -slave " + test.app.writeDirectory + " -servaddr " + self.submitAddress
+        return [ "-slave", test.app.writeDirectory, "-servaddr", self.submitAddress ]
+    
     def getRunOptions(self, app, submissionRules):
         runOptions = []
         for slaveSwitch in app.getSlaveSwitches():
             if self.optionMap.has_key(slaveSwitch):
                 option = "-" + slaveSwitch
+                runOptions.append(option)
                 value = self.optionMap.get(slaveSwitch)
                 if value:
-                    option += " " + value
-                runOptions.append(option)
+                    runOptions.append(value)
 
-        if self.optionMap.diagConfigFile:
-            runOptions.append("-x")
-            runOptions.append("-xr " + self.optionMap.diagConfigFile)
-            runOptions.append("-xw " + self.getSlaveDiagDir(submissionRules))
-        return " ".join(runOptions)
-    def getSlaveDiagDir(self, submissionRules):
-        # The environment variable is mostly for self-testing
-        # so we can point all logs to the same place.
-        # Format strange so DocumentEnvironment can produce something sensible
-        slaveWriteDir = os.getenv("TEXTTEST_SLAVE_DIAGDIR", "$TEXTTEST_DIAGDIR/<slave job name>") # Internal log directory to use in the grid engine slave process
-        return os.path.expandvars(slaveWriteDir.replace("<slave job name>", submissionRules.getJobName()))
+        if self.optionMap.has_key("x"):
+            runOptions.append("-xr")
+            runOptions.append(os.path.expandvars("$TEXTTEST_PERSONAL_LOG/logging.debug"))
+            runOptions.append("-xw")
+            runOptions.append(os.path.expandvars("$TEXTTEST_PERSONAL_LOG/" + submissionRules.getJobName()))
+        return runOptions
         
     def getSlaveLogDir(self, test):
         return os.path.join(test.app.writeDirectory, "slavelogs")

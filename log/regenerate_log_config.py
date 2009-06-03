@@ -70,14 +70,14 @@ coreDiagFile = os.path.join(installationRoot, "log/logging.debug")
 defaultCoreDiags = [ ("standard log", None), ("static gui behaviour", "gui_log"), ("dynamic gui behaviour", "dynamic_gui_log"), \
                      ("use-case log", "usecase_log") ]
 allCoreDiags = combineDiags(coreDiags, defaultCoreDiags) 
-writeFile(coreDiagFile, allCoreDiags, "diag", prefix="$TEXTTEST_DIAGDIR/")
+writeFile(coreDiagFile, allCoreDiags, "diag", prefix="$TEXTTEST_PERSONAL_LOG/")
 
 siteDiagFile = os.path.join(installationRoot, "site/log/logging.debug")
 if os.path.isfile(siteDiagFile):
     siteDiags = findDiagNames("site/lib")
     defaultSiteDiags = [ ("test graph", "gnuplot") ]
     allSiteDiags = combineDiags(siteDiags, defaultSiteDiags)
-    writeFile(siteDiagFile, allCoreDiags, "diag", "$TEXTTEST_DIAGDIR/", allSiteDiags)
+    writeFile(siteDiagFile, allCoreDiags, "diag", "$TEXTTEST_PERSONAL_LOG/", allSiteDiags)
 
 selftestFile = os.path.join(os.getenv("TEXTTEST_HOME"), "texttest", "logging.texttest")
 if not os.path.isfile(selftestFile):

@@ -1243,9 +1243,9 @@ class Application:
         self.readDefaultConfigFiles()
         self.readExplicitConfigFiles(configModuleInitialised)
     def readDefaultConfigFiles(self):
-        for dataPath in plugins.findDataPaths(vanilla=self.inputOptions.has_key("vanilla")):
+        for dataDir in plugins.findDataDirs(vanilla=self.inputOptions.has_key("vanilla")):
             # don't error check as there might be settings there for all sorts of config modules...
-            self.readValues(self.configDir, "config", DirectoryCache(dataPath), insert=False, errorOnUnknown=False)
+            self.readValues(self.configDir, "config", DirectoryCache(dataDir), insert=False, errorOnUnknown=False)
     def readExplicitConfigFiles(self, errorOnUnknown):
         self.readValues(self.configDir, "config", self.dircache, insert=False, errorOnUnknown=errorOnUnknown)
     def readValues(self, multiEntryDict, stem, dircache, insert=True, errorOnUnknown=False):
@@ -1574,10 +1574,11 @@ class OptionFinder(plugins.OptionFinder):
         
         self.setPathFromOptionsOrEnv("TEXTTEST_PERSONAL_CONFIG", "~/.texttest") # Location of personal configuration
         self.setPathFromOptionsOrEnv("TEXTTEST_TMP", "$TEXTTEST_PERSONAL_CONFIG/tmp") # Location of temporary files from test runs
-        self.diagWriteDir = self.setPathFromOptionsOrEnv("TEXTTEST_DIAGDIR", "$TEXTTEST_PERSONAL_CONFIG/log", "xw", "x") # Location to write TextTest's internal logs
-        self.diagConfigFile = self.setPathFromOptionsOrEnv("TEXTTEST_LOGCONFIG", "$TEXTTEST_DIAGDIR/logging.debug", "xr", "x") # Configuration file for TextTest's internal logs
-        
-        self.setUpLogging()
+        self.diagWriteDir = self.setPathFromOptionsOrEnv("TEXTTEST_PERSONAL_LOG", "$TEXTTEST_PERSONAL_CONFIG/log", "xw") # Location to write TextTest's internal logs
+        self.diagConfigFile = None
+        if self.has_key("x"): # This is just a fast-track to make sure we can set up diags for the setup
+            self.diagConfigFile = plugins.abspath(self.get("xr", os.path.join(self.diagWriteDir, "logging.debug")))
+            self.setUpLogging()
         self.diag = plugins.getDiagnostics("option finder")
         self.diag.info("Replaying from " + repr(os.getenv("USECASE_REPLAY_SCRIPT")))
         self.diag.info(repr(self))
@@ -1589,31 +1590,27 @@ class OptionFinder(plugins.OptionFinder):
             os.environ[envVar] = value
             return value
 
-    def getPathFromOptionsOrEnv(self, envVar, defaultValue, optionName="", enablingOption=""):
-        optionEnabled = not enablingOption or self.has_key(enablingOption)
-        envEnabled = not enablingOption or not self.has_key(enablingOption)
-        if optionEnabled and optionName and self.has_key(optionName):
+    def getPathFromOptionsOrEnv(self, envVar, defaultValue, optionName=""):
+        if optionName and self.has_key(optionName):
             return plugins.abspath(self[optionName])
-        elif envEnabled and os.environ.has_key(envVar):
+        elif os.environ.has_key(envVar):
             return plugins.abspath(os.environ[envVar])
-        elif optionEnabled:
+        else:
             return plugins.abspath(os.path.expanduser(os.path.expandvars(defaultValue)))
 
     def setUpLogging(self):
-        if self.diagConfigFile:
-            if os.path.isfile(self.diagConfigFile):
-                print "TextTest will write diagnostics in", self.diagWriteDir, "based on file at", self.diagConfigFile
-            else:
-                print "Could not find diagnostic file at", self.diagConfigFile, ": cannot run with diagnostics"
-                self.diagConfigFile = None
-                self.diagWriteDir = None
+        if os.path.isfile(self.diagConfigFile):
+            print "TextTest will write diagnostics in", self.diagWriteDir, "based on file at", self.diagConfigFile
+        else:
+            print "Could not find diagnostic file at", self.diagConfigFile, ": cannot run with diagnostics"
+            self.diagConfigFile = None
+            self.diagWriteDir = None
 
         if self.diagWriteDir:
             plugins.ensureDirectoryExists(self.diagWriteDir)
-            if self.has_key("x"):
-                for file in os.listdir(self.diagWriteDir):
-                    if file.endswith(".diag"):
-                        os.remove(os.path.join(self.diagWriteDir, file))
+            for file in os.listdir(self.diagWriteDir):
+                if file.endswith(".diag"):
+                    os.remove(os.path.join(self.diagWriteDir, file))
 
         if self.diagConfigFile:
             plugins.configureLogging(self.diagConfigFile)

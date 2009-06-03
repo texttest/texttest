@@ -221,7 +221,7 @@ class MailSender:
         file.write(mailContents)
         file.close()
     def sendOrStoreMail(self, app, mailContents, useCollection=False, isAllSuccess=False):
-        plugins.log.info("At " + time.strftime("%H:%M") + " creating batch report for application " + app.fullName + " ...")
+        plugins.log.info("Creating batch report for application " + app.fullName + " ...")
         if useCollection:
             self.storeMail(app, mailContents)
             plugins.log.info("File written.")

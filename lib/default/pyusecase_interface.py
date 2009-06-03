@@ -1,14 +1,6 @@
 
 import plugins, os
 
-def getLoggerName(staticGUI, dynamicGUI):
-    if staticGUI:
-        return "static GUI behaviour"
-    elif dynamicGUI:
-        return "dynamic GUI behaviour"
-    else:
-        return "Use-case log"
-
 def makeScriptEngine(optionMap):
     if ApplicationEventResponder.scriptEngine:
         return ApplicationEventResponder.scriptEngine
@@ -18,10 +10,8 @@ def makeScriptEngine(optionMap):
         return scriptEngine
 
 def _makeScriptEngine(optionMap):
-    staticGUI = optionMap.has_key("gx")
-    dynamicGUI = optionMap.has_key("g")
-    logger = plugins.getDiagnostics(getLoggerName(staticGUI, dynamicGUI))
-    if staticGUI or dynamicGUI:
+    logger = plugins.getDiagnostics("Use-case log")
+    if optionMap.has_key("gx") or optionMap.has_key("g"):
         try:
             from gtkusecase import ScriptEngine
             return ScriptEngine(logger, enableShortcuts=True) 

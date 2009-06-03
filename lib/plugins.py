@@ -74,15 +74,25 @@ def installationPath(subpath):
         if os.path.exists(instPath):
             return instPath
 
-def findDataPaths(filePattern="", vanilla=False, includePersonal=False, dataDir="etc"):
-    if vanilla:
-        return glob(os.path.join(installationRoots[0], dataDir, filePattern))
-    else:
-        dirs = [ os.path.join(instRoot, dataDir) for instRoot in installationRoots ]
-        if includePersonal:
-            dirs.append(os.path.join(getPersonalConfigDir(), dataDir))
+def getPersonalDir(dataDirName):
+    envVar = "TEXTTEST_PERSONAL_" + dataDirName.upper()
+    return os.getenv(envVar, os.path.join(getPersonalConfigDir(), dataDirName))
 
-        return reduce(operator.add, (glob(os.path.join(d, filePattern)) for d in dirs), [])
+def findDataDirs(vanilla=False, includePersonal=False, dataDirName="etc"):
+    if vanilla:
+        return [ os.path.join(installationRoots[0], dataDirName) ]
+    else:
+        dirs = [ os.path.join(instRoot, dataDirName) for instRoot in installationRoots ]
+        if includePersonal:
+            dirs.append(getPersonalDir(dataDirName))
+        return dirs
+
+def findDataPaths(filePatterns, *args, **kwargs):
+    paths = []
+    for dir in findDataDirs(*args, **kwargs):
+        for filePattern in filePatterns:
+            paths += glob(os.path.join(dir, filePattern))
+    return paths
         
 # Parse a time string, either a HH:MM:SS string, or a single int/float,
 # which is interpreted as a number of minutes, for backwards compatibility.
@@ -110,7 +120,10 @@ def getNumberOfMinutes(timeString):
 
 def printWarning(message, stdout = True, stderr = False):
     if stdout:
-        log.info("WARNING: " + message)
+        if log:
+            log.info("WARNING: " + message)
+        else:
+            print "WARNING: " + message # in case we haven't set up the logging yet...
     if stderr:
         sys.stderr.write("WARNING: " + message + "\n")
 

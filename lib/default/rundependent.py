@@ -310,6 +310,7 @@ class LineFilter:
 
 if __name__ == "__main__":
     args = [ arg.split(",") for arg in sys.argv[1:3]] + sys.argv[3:]
-    plugins.configureLogging(os.getenv("TEXTTEST_LOGCONFIG"))
+    allPaths = plugins.findDataPaths([ "logging.console" ], dataDirName="log", includePersonal=True, vanilla=False)
+    plugins.configureLogging(allPaths[-1]) # Won't have any effect if we've already got a log file
     runDepFilter = RunDependentTextFilter(*args)
     runDepFilter.filterFileObject(sys.stdin, sys.stdout)

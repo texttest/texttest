@@ -259,7 +259,7 @@ class PrepareWriteDirectory(plugins.Action):
             return remotePath
                     
     def copySUTRemotely(self, machine, tmpDir, suite):
-        self.diag.info("Copying SUT to machine " + machine + " at " + tmpDir)
+        self.diag.info("Copying SUT for " + repr(suite.app) + " to machine " + machine + " at " + tmpDir)
         fullTmpDir = os.path.join(tmpDir, "system_under_test")
         suite.app.ensureRemoteDirExists(machine, fullTmpDir)
         checkout = suite.app.checkout

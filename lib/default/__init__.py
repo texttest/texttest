@@ -658,7 +658,7 @@ class Config:
     def getRemoteTestTmpDir(self, test):
         machine, appTmpDir = self.getRemoteTmpDirectory(test.app)
         if appTmpDir:
-            return machine, os.path.join(appTmpDir, test.getRelPath())
+            return machine, os.path.join(appTmpDir, test.app.name + test.app.versionSuffix(), test.getRelPath())
         else:
             return machine, appTmpDir
                 

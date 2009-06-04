@@ -1,95 +1,55 @@
 #!/usr/bin/env python
 
-import os, operator
-from copy import copy
+import logconfiggen, os
 
-def writeMods(newFile, mods, ext, prefix):
-    for mod in mods:
-        newFile.write("[" + mod + "]\n")
-        newFile.write("Target: " + prefix + mod.replace(" ", "") + "." + ext + "\n")
-        newFile.write("LogLevel: None\n\n")
-
-def findDiagNames(location):
-    result = []
-    for root, dirs, files in os.walk(os.path.join(installationRoot, location)):
-        for file in files:
-            if file.endswith(".py"):
-                fileName = os.path.join(root, file)
-                for line in open(fileName).xreadlines():
-                    if line.find("getDiagnostics") != -1:
-                        words = line.split('"')
-                        if len(words) > 1:
-                            name = words[1].lower()
-                            if not name in result:
-                                result.append(name)
-    result.sort()
-    return result
-
-def writeFile(fileName, coreDiagsIn, ext, prefix="", siteDiagsIn=[], defaultDiags=[]):
-    coreDiags = copy(coreDiagsIn)
-    siteDiags = copy(siteDiagsIn)
-    newFileName = fileName + ".new"
-    newFile = open(newFileName, "w")
-    foundMarker = False
-    for line in open(fileName).readlines():
-        if line.find("TextTest") != -1:
-            foundMarker = True
-        if not line.startswith("#") and foundMarker:
-            break
-        else:
-            newFile.write(line)
-    newFile.write("\n")
-    if len(defaultDiags) > 0:
-        newFile.write("# The following diagnostics are on by default for the self-tests:\n")
-        for mod, diagFile in defaultDiags:
-            if mod in coreDiags:
-                coreDiags.remove(mod)
-            elif mod in siteDiags:
-                siteDiags.remove(mod)
-
-            newFile.write("[" + mod + "]\n")
-            if diagFile:
-                newFile.write("Target: " + diagFile + "." + ext + "\n")
-            newFile.write("LogLevel: Normal\nFormat: %M\n\n")
+def generateForSelfTests(selftestDir, loggers, extraEnabled=[]):
+    if selftestDir:
+        consoleGen = logconfiggen.PythonLoggingGenerator(os.path.join(selftestDir, "logging.console"), postfix="texttest")
+        enabledLoggerNames = stdInfo + [ ("usecase log", "stdout") ] + extraEnabled
+        consoleGen.generate(enabledLoggerNames, loggers)
         
-    newFile.write("# The following diagnostics are available for the generic TextTest modules:\n")
-    writeMods(newFile, coreDiags, ext, prefix)
-    if len(siteDiags) > 0:
-        newFile.write("# The following diagnostics are only relevant when using site-specific configuration modules:\n")
-        writeMods(newFile, siteDiags, ext, prefix)
-    newFile.close()
-    os.remove(fileName)
-    os.rename(newFileName, fileName)
+        staticGen = logconfiggen.PythonLoggingGenerator(os.path.join(selftestDir, "logging.static_gui"), postfix="texttest")
+        enabledLoggerNames = stdInfo + [ ("gui log", "gui_log"), ("usecase log", "gui_log") ] + extraEnabled
+        staticGen.generate(enabledLoggerNames, loggers)
 
-def combineDiags(fromFile, defaultDiags):
-    return sorted(fromFile + [ diag for (diag, f) in defaultDiags ])
+        dynamicGen = logconfiggen.PythonLoggingGenerator(os.path.join(selftestDir, "logging.dynamic_gui"), postfix="texttest")
+        enabledLoggerNames = stdInfo + [ ("gui log", "dynamic_gui_log"), ("usecase log", "dynamic_gui_log") ] + extraEnabled
+        dynamicGen.generate(enabledLoggerNames, loggers)
 
-installationRoot = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-coreDiags = findDiagNames("lib")
-coreDiagFile = os.path.join(installationRoot, "log/logging.debug")
-defaultCoreDiags = [ ("standard log", None), ("static gui behaviour", "gui_log"), ("dynamic gui behaviour", "dynamic_gui_log"), \
-                     ("use-case log", "usecase_log") ]
-allCoreDiags = combineDiags(coreDiags, defaultCoreDiags) 
-writeFile(coreDiagFile, allCoreDiags, "diag", prefix="$TEXTTEST_PERSONAL_LOG/")
+def getSelfTestDir(subdir):
+    selftestDir = os.path.join(os.getenv("TEXTTEST_HOME"), "texttest", subdir)
+    if os.path.isdir(selftestDir):
+        return selftestDir
+    selftestDir = os.path.join(os.getenv("TEXTTEST_HOME"), subdir)
+    if os.path.isdir(selftestDir):
+        return selftestDir
+    
+if __name__ == "__main__":
+    consoleGen = logconfiggen.PythonLoggingGenerator("logging.console")
+    stdInfo = [ ("standard log", "stdout") ]
+    consoleGen.generate(stdInfo)
+    
+    batchGen = logconfiggen.PythonLoggingGenerator("logging.batch")
+    batchGen.generate(stdInfo, timeStdout=True)
 
-siteDiagFile = os.path.join(installationRoot, "site/log/logging.debug")
-if os.path.isfile(siteDiagFile):
-    siteDiags = findDiagNames("site/lib")
-    defaultSiteDiags = [ ("test graph", "gnuplot") ]
-    allSiteDiags = combineDiags(siteDiags, defaultSiteDiags)
-    writeFile(siteDiagFile, allCoreDiags, "diag", "$TEXTTEST_PERSONAL_LOG/", allSiteDiags)
+    installationRoot = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    coreLib = os.path.join(installationRoot, "lib")
+    coreLoggers = logconfiggen.findLoggerNamesUnder(coreLib, keyText="getDiagnostics")
+    
+    debugGen = logconfiggen.PythonLoggingGenerator("logging.debug", postfix="diag", prefix="%(TEXTTEST_PERSONAL_LOG)s/")
+    debugGen.generate(enabledLoggerNames=[], allLoggerNames=coreLoggers)
+    
+    generateForSelfTests(getSelfTestDir("log"), coreLoggers)
+    
+    # Site-specific
+    siteDiagFile = os.path.join(installationRoot, "site/log/logging.debug")
+    if os.path.isfile(siteDiagFile):
+        siteLib = os.path.join(installationRoot, "site", "lib")
+        siteLoggers = logconfiggen.findLoggerNamesUnder(siteLib, keyText="getDiagnostics")
+        allLoggers = sorted(coreLoggers + siteLoggers)
+        debugGen = logconfiggen.PythonLoggingGenerator(siteDiagFile, postfix="diag", prefix="%(TEXTTEST_PERSONAL_LOG)s/")
+        debugGen.generate(enabledLoggerNames=[], allLoggerNames=allLoggers)
 
-selftestFile = os.path.join(os.getenv("TEXTTEST_HOME"), "texttest", "logging.texttest")
-if not os.path.isfile(selftestFile):
-    selftestFile = os.path.join(os.getenv("TEXTTEST_HOME"), "logging.texttest")
-
-writeFile(selftestFile, coreDiags, "texttest", defaultDiags=defaultCoreDiags)
-
-selftestSiteFile = os.path.join(os.getenv("TEXTTEST_HOME"), "texttest", "site", "logging.texttest")
-if not os.path.isfile(selftestFile):
-   selftestSiteFile = os.path.join(os.getenv("TEXTTEST_HOME"), "site", "logging.texttest")
-
-if os.path.isfile(selftestSiteFile):
-    defaultDiags = defaultCoreDiags + defaultSiteDiags
-    writeFile(selftestSiteFile, coreDiags, "texttest", siteDiagsIn=siteDiags, defaultDiags=defaultDiags)
-    os.system("bzr tkdiff " + selftestSiteFile)
+        generateForSelfTests(getSelfTestDir("site/log"), allLoggers)
+        generateForSelfTests(getSelfTestDir("site/matador/PlotGraph/log"), allLoggers, [ ("Test Graph", "gnuplot") ])
+        generateForSelfTests(getSelfTestDir("site/APC/PlotGraph/log"), allLoggers, [ ("Test Graph", "gnuplot") ])

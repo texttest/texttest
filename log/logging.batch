@@ -27,8 +27,10 @@ format=%(asctime)s - %(message)s
 [formatter_debug]
 format=%(name)s %(levelname)s - %(message)s
 
+# ====== The following are enabled by default ======
 # ======= Section for standard log ======
 [logger_standard log]
 handlers=stdout
 qualname=standard log
 level=INFO
+

@@ -10,7 +10,7 @@ def makeScriptEngine(optionMap):
         return scriptEngine
 
 def _makeScriptEngine(optionMap):
-    logger = plugins.getDiagnostics("Use-case log")
+    logger = plugins.getDiagnostics("usecase log")
     if optionMap.has_key("gx") or optionMap.has_key("g"):
         try:
             from gtkusecase import ScriptEngine

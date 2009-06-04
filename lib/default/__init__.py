@@ -1,5 +1,5 @@
 
-import os, sys, plugins, sandbox, console, rundependent, pyusecase_interface, comparetest, batch, subprocess, operator, glob, signal, shutil
+import os, sys, plugins, sandbox, console, rundependent, pyusecase_interface, comparetest, batch, subprocess, operator, glob, signal, shutil, logging
 
 from copy import copy
 from string import Template
@@ -209,7 +209,10 @@ class Config:
         filePatterns = [ "logging." + postfix for postfix in self.getLogfilePostfixes() ]
         allPaths = plugins.findDataPaths(filePatterns, dataDirName="log", includePersonal=True,
                                          vanilla=self.optionMap.has_key("vanilla"))
-        plugins.configureLogging(allPaths[-1]) # Won't have any effect if we've already got a log file
+        if len(allPaths) > 0:
+            plugins.configureLogging(allPaths[-1]) # Won't have any effect if we've already got a log file
+        else:
+            plugins.configureLogging()
             
     def getResponderClasses(self, allApps):
         # Global side effects first :)
@@ -1206,7 +1209,7 @@ class RunTest(plugins.Action):
         else:
             return ""
     def diagnose(self, testEnv, commandArgs):
-        if self.diag.is_enabled():
+        if self.diag.isEnabledFor(logging.INFO):
             for var, value in testEnv.items():
                 self.diag.info("Environment: " + var + " = " + value)
             self.diag.info("Running test with args : " + repr(commandArgs))
@@ -1414,6 +1417,8 @@ class DocumentEnvironment(plugins.Action):
         vanilla = app.inputOptions.has_key("vanilla")
         allVars = {}
         for root, dirs, files in os.walk(rootDir):
+            if "log" in dirs:
+                dirs.remove("log")
             if vanilla and "site" in dirs:
                 dirs.remove("site")
             if root.endswith("lib"):

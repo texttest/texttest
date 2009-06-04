@@ -1,5 +1,5 @@
 
-import sys, os, log4py, string, shutil, socket, time, re, stat, locale, subprocess, shlex, types, operator
+import sys, os, logging.config, string, shutil, socket, time, re, stat, locale, subprocess, shlex, types, operator
 from ndict import seqdict
 from traceback import format_exception
 from threading import currentThread
@@ -624,31 +624,17 @@ class MarkedTestState(TestState):
     def getTypeBreakdown(self):
         return self.category, self.briefText
 
+# For back-compatibility
+getDiagnostics = logging.getLogger
 log = None
-class NullLogger:
-    def info(*args):
-        pass
-
-# Simple handle to get diagnostics object. Better than using log4py directly,
-# as it ensures everything appears by default in a standard place with a standard name.
-def getDiagnostics(diagName):
-    rootLogger = log4py.Logger.instance
-    if rootLogger:
-        return rootLogger.get_instance(diagName)
-    else:
-        return NullLogger()
-
-def configureLogging(configFile):
-    rootLogger = log4py.Logger.instance
+def configureLogging(configFile=None):
     # only set up once
-    if not rootLogger:
-        # Don't use the default locations, particularly current directory causes trouble
-        if len(log4py.CONFIGURATION_FILES) > 1:
-            del log4py.CONFIGURATION_FILES[1]
-
-        rootLogger = log4py.Logger(customconfigfiles=configFile)
-        global log
-        log = rootLogger.get_instance("standard log")
+    global log
+    if not log:
+        if configFile:
+            defaults = { "TEXTTEST_PERSONAL_LOG": getPersonalDir("log") }
+            logging.config.fileConfig(configFile, defaults)
+        log = getDiagnostics("standard log")
 
 def getPersonalConfigDir():
     fromEnv = os.getenv("TEXTTEST_PERSONAL_CONFIG")

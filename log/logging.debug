@@ -1,9 +1,9 @@
 # Cruft that python logging module needs...
 [loggers]
-keys=root,action runner,activator,application,batch collect,catalogues,check for bugs,check for crashes,collate files,environment creator,file view gui,filecomparison,filter actions,find applications,generatewebpages,gui log,gui notebook,idle handlers,interactive actions,locks,mail sender,makeperformance,menu bar,multientrydictionary,observable,option finder,prepare writedir,progress monitor,queue system submit,read environment,reconnection,run dependent text,run test,save repository,select tests,slave server,standard log,test column gui,test objects,test tree,testcomparison,testpathfilter,traffic replay,traffic server,unique names,use-case log,virtual display
+keys=root,Action Runner,Activator,Check For Bugs,Collate Files,Environment Creator,File View GUI,FileComparison,Filter Actions,Find Applications,GUI notebook,GenerateWebPages,Idle Handlers,Interactive Actions,Mail Sender,Menu Bar,MultiEntryDictionary,Observable,Prepare Writedir,Progress Monitor,Queue System Submit,Reconnection,Run Dependent Text,Save Repository,Select Tests,Slave Server,Test Column GUI,Test Tree,TestComparison,TestPathFilter,Traffic Replay,Traffic Server,Unique Names,application,batch collect,catalogues,check for crashes,gui log,locks,makeperformance,option finder,read environment,run test,standard log,test objects,usecase log,virtual display
 
 [handlers]
-keys=root,stdout,action runner,activator,application,batch collect,catalogues,check for bugs,check for crashes,collate files,environment creator,file view gui,filecomparison,filter actions,find applications,generatewebpages,gui log,gui notebook,idle handlers,interactive actions,locks,mail sender,makeperformance,menu bar,multientrydictionary,observable,option finder,prepare writedir,progress monitor,queue system submit,read environment,reconnection,run dependent text,run test,save repository,select tests,slave server,standard log,test column gui,test objects,test tree,testcomparison,testpathfilter,traffic replay,traffic server,unique names,use-case log,virtual display
+keys=root,stdout,Action Runner,Activator,Check For Bugs,Collate Files,Environment Creator,File View GUI,FileComparison,Filter Actions,Find Applications,GUI notebook,GenerateWebPages,Idle Handlers,Interactive Actions,Mail Sender,Menu Bar,MultiEntryDictionary,Observable,Prepare Writedir,Progress Monitor,Queue System Submit,Reconnection,Run Dependent Text,Save Repository,Select Tests,Slave Server,Test Column GUI,Test Tree,TestComparison,TestPathFilter,Traffic Replay,Traffic Server,Unique Names,application,batch collect,catalogues,check for crashes,gui log,locks,makeperformance,option finder,read environment,run test,standard log,test objects,usecase log,virtual display
 
 [formatters]
 keys=timed,debug
@@ -28,29 +28,389 @@ format=%(asctime)s - %(message)s
 format=%(name)s %(levelname)s - %(message)s
 
 # ====== The following are disabled by default ======
-# ======= Section for action runner ======
-[logger_action runner]
-handlers=action runner
-qualname=action runner
+# ======= Section for Action Runner ======
+[logger_Action Runner]
+handlers=Action Runner
+qualname=Action Runner
 #level=INFO
 
-[handler_action runner]
+[handler_Action Runner]
 class=FileHandler
 formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/actionrunner.diag', 'w')
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/actionrunner.diag', 'a')
 
-# ======= Section for activator ======
-[logger_activator]
-handlers=activator
-qualname=activator
+# ======= Section for Activator ======
+[logger_Activator]
+handlers=Activator
+qualname=Activator
 #level=INFO
 
-[handler_activator]
+[handler_Activator]
 class=FileHandler
 formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/activator.diag', 'w')
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/activator.diag', 'a')
+
+# ======= Section for Check For Bugs ======
+[logger_Check For Bugs]
+handlers=Check For Bugs
+qualname=Check For Bugs
+#level=INFO
+
+[handler_Check For Bugs]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/checkforbugs.diag', 'a')
+
+# ======= Section for Collate Files ======
+[logger_Collate Files]
+handlers=Collate Files
+qualname=Collate Files
+#level=INFO
+
+[handler_Collate Files]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/collatefiles.diag', 'a')
+
+# ======= Section for Environment Creator ======
+[logger_Environment Creator]
+handlers=Environment Creator
+qualname=Environment Creator
+#level=INFO
+
+[handler_Environment Creator]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/environmentcreator.diag', 'a')
+
+# ======= Section for File View GUI ======
+[logger_File View GUI]
+handlers=File View GUI
+qualname=File View GUI
+#level=INFO
+
+[handler_File View GUI]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/fileviewgui.diag', 'a')
+
+# ======= Section for FileComparison ======
+[logger_FileComparison]
+handlers=FileComparison
+qualname=FileComparison
+#level=INFO
+
+[handler_FileComparison]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/filecomparison.diag', 'a')
+
+# ======= Section for Filter Actions ======
+[logger_Filter Actions]
+handlers=Filter Actions
+qualname=Filter Actions
+#level=INFO
+
+[handler_Filter Actions]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/filteractions.diag', 'a')
+
+# ======= Section for Find Applications ======
+[logger_Find Applications]
+handlers=Find Applications
+qualname=Find Applications
+#level=INFO
+
+[handler_Find Applications]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/findapplications.diag', 'a')
+
+# ======= Section for GUI notebook ======
+[logger_GUI notebook]
+handlers=GUI notebook
+qualname=GUI notebook
+#level=INFO
+
+[handler_GUI notebook]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/guinotebook.diag', 'a')
+
+# ======= Section for GenerateWebPages ======
+[logger_GenerateWebPages]
+handlers=GenerateWebPages
+qualname=GenerateWebPages
+#level=INFO
+
+[handler_GenerateWebPages]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/generatewebpages.diag', 'a')
+
+# ======= Section for Idle Handlers ======
+[logger_Idle Handlers]
+handlers=Idle Handlers
+qualname=Idle Handlers
+#level=INFO
+
+[handler_Idle Handlers]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/idlehandlers.diag', 'a')
+
+# ======= Section for Interactive Actions ======
+[logger_Interactive Actions]
+handlers=Interactive Actions
+qualname=Interactive Actions
+#level=INFO
+
+[handler_Interactive Actions]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/interactiveactions.diag', 'a')
+
+# ======= Section for Mail Sender ======
+[logger_Mail Sender]
+handlers=Mail Sender
+qualname=Mail Sender
+#level=INFO
+
+[handler_Mail Sender]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/mailsender.diag', 'a')
+
+# ======= Section for Menu Bar ======
+[logger_Menu Bar]
+handlers=Menu Bar
+qualname=Menu Bar
+#level=INFO
+
+[handler_Menu Bar]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/menubar.diag', 'a')
+
+# ======= Section for MultiEntryDictionary ======
+[logger_MultiEntryDictionary]
+handlers=MultiEntryDictionary
+qualname=MultiEntryDictionary
+#level=INFO
+
+[handler_MultiEntryDictionary]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/multientrydictionary.diag', 'a')
+
+# ======= Section for Observable ======
+[logger_Observable]
+handlers=Observable
+qualname=Observable
+#level=INFO
+
+[handler_Observable]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/observable.diag', 'a')
+
+# ======= Section for Prepare Writedir ======
+[logger_Prepare Writedir]
+handlers=Prepare Writedir
+qualname=Prepare Writedir
+#level=INFO
+
+[handler_Prepare Writedir]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/preparewritedir.diag', 'a')
+
+# ======= Section for Progress Monitor ======
+[logger_Progress Monitor]
+handlers=Progress Monitor
+qualname=Progress Monitor
+#level=INFO
+
+[handler_Progress Monitor]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/progressmonitor.diag', 'a')
+
+# ======= Section for Queue System Submit ======
+[logger_Queue System Submit]
+handlers=Queue System Submit
+qualname=Queue System Submit
+#level=INFO
+
+[handler_Queue System Submit]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/queuesystemsubmit.diag', 'a')
+
+# ======= Section for Reconnection ======
+[logger_Reconnection]
+handlers=Reconnection
+qualname=Reconnection
+#level=INFO
+
+[handler_Reconnection]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/reconnection.diag', 'a')
+
+# ======= Section for Run Dependent Text ======
+[logger_Run Dependent Text]
+handlers=Run Dependent Text
+qualname=Run Dependent Text
+#level=INFO
+
+[handler_Run Dependent Text]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/rundependenttext.diag', 'a')
+
+# ======= Section for Save Repository ======
+[logger_Save Repository]
+handlers=Save Repository
+qualname=Save Repository
+#level=INFO
+
+[handler_Save Repository]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/saverepository.diag', 'a')
+
+# ======= Section for Select Tests ======
+[logger_Select Tests]
+handlers=Select Tests
+qualname=Select Tests
+#level=INFO
+
+[handler_Select Tests]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/selecttests.diag', 'a')
+
+# ======= Section for Slave Server ======
+[logger_Slave Server]
+handlers=Slave Server
+qualname=Slave Server
+#level=INFO
+
+[handler_Slave Server]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/slaveserver.diag', 'a')
+
+# ======= Section for Test Column GUI ======
+[logger_Test Column GUI]
+handlers=Test Column GUI
+qualname=Test Column GUI
+#level=INFO
+
+[handler_Test Column GUI]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/testcolumngui.diag', 'a')
+
+# ======= Section for Test Tree ======
+[logger_Test Tree]
+handlers=Test Tree
+qualname=Test Tree
+#level=INFO
+
+[handler_Test Tree]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/testtree.diag', 'a')
+
+# ======= Section for TestComparison ======
+[logger_TestComparison]
+handlers=TestComparison
+qualname=TestComparison
+#level=INFO
+
+[handler_TestComparison]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/testcomparison.diag', 'a')
+
+# ======= Section for TestPathFilter ======
+[logger_TestPathFilter]
+handlers=TestPathFilter
+qualname=TestPathFilter
+#level=INFO
+
+[handler_TestPathFilter]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/testpathfilter.diag', 'a')
+
+# ======= Section for Traffic Replay ======
+[logger_Traffic Replay]
+handlers=Traffic Replay
+qualname=Traffic Replay
+#level=INFO
+
+[handler_Traffic Replay]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/trafficreplay.diag', 'a')
+
+# ======= Section for Traffic Server ======
+[logger_Traffic Server]
+handlers=Traffic Server
+qualname=Traffic Server
+#level=INFO
+
+[handler_Traffic Server]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/trafficserver.diag', 'a')
+
+# ======= Section for Unique Names ======
+[logger_Unique Names]
+handlers=Unique Names
+qualname=Unique Names
+#level=INFO
+
+[handler_Unique Names]
+class=FileHandler
+formatter=debug
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/uniquenames.diag', 'a')
 
 # ======= Section for application ======
 [logger_application]
@@ -61,8 +421,8 @@ qualname=application
 [handler_application]
 class=FileHandler
 formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/application.diag', 'w')
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/application.diag', 'a')
 
 # ======= Section for batch collect ======
 [logger_batch collect]
@@ -73,8 +433,8 @@ qualname=batch collect
 [handler_batch collect]
 class=FileHandler
 formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/batchcollect.diag', 'w')
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/batchcollect.diag', 'a')
 
 # ======= Section for catalogues ======
 [logger_catalogues]
@@ -85,20 +445,8 @@ qualname=catalogues
 [handler_catalogues]
 class=FileHandler
 formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/catalogues.diag', 'w')
-
-# ======= Section for check for bugs ======
-[logger_check for bugs]
-handlers=check for bugs
-qualname=check for bugs
-#level=INFO
-
-[handler_check for bugs]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/checkforbugs.diag', 'w')
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/catalogues.diag', 'a')
 
 # ======= Section for check for crashes ======
 [logger_check for crashes]
@@ -109,92 +457,8 @@ qualname=check for crashes
 [handler_check for crashes]
 class=FileHandler
 formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/checkforcrashes.diag', 'w')
-
-# ======= Section for collate files ======
-[logger_collate files]
-handlers=collate files
-qualname=collate files
-#level=INFO
-
-[handler_collate files]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/collatefiles.diag', 'w')
-
-# ======= Section for environment creator ======
-[logger_environment creator]
-handlers=environment creator
-qualname=environment creator
-#level=INFO
-
-[handler_environment creator]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/environmentcreator.diag', 'w')
-
-# ======= Section for file view gui ======
-[logger_file view gui]
-handlers=file view gui
-qualname=file view gui
-#level=INFO
-
-[handler_file view gui]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/fileviewgui.diag', 'w')
-
-# ======= Section for filecomparison ======
-[logger_filecomparison]
-handlers=filecomparison
-qualname=filecomparison
-#level=INFO
-
-[handler_filecomparison]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/filecomparison.diag', 'w')
-
-# ======= Section for filter actions ======
-[logger_filter actions]
-handlers=filter actions
-qualname=filter actions
-#level=INFO
-
-[handler_filter actions]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/filteractions.diag', 'w')
-
-# ======= Section for find applications ======
-[logger_find applications]
-handlers=find applications
-qualname=find applications
-#level=INFO
-
-[handler_find applications]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/findapplications.diag', 'w')
-
-# ======= Section for generatewebpages ======
-[logger_generatewebpages]
-handlers=generatewebpages
-qualname=generatewebpages
-#level=INFO
-
-[handler_generatewebpages]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/generatewebpages.diag', 'w')
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/checkforcrashes.diag', 'a')
 
 # ======= Section for gui log ======
 [logger_gui log]
@@ -205,44 +469,8 @@ qualname=gui log
 [handler_gui log]
 class=FileHandler
 formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/guilog.diag', 'w')
-
-# ======= Section for gui notebook ======
-[logger_gui notebook]
-handlers=gui notebook
-qualname=gui notebook
-#level=INFO
-
-[handler_gui notebook]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/guinotebook.diag', 'w')
-
-# ======= Section for idle handlers ======
-[logger_idle handlers]
-handlers=idle handlers
-qualname=idle handlers
-#level=INFO
-
-[handler_idle handlers]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/idlehandlers.diag', 'w')
-
-# ======= Section for interactive actions ======
-[logger_interactive actions]
-handlers=interactive actions
-qualname=interactive actions
-#level=INFO
-
-[handler_interactive actions]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/interactiveactions.diag', 'w')
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/guilog.diag', 'a')
 
 # ======= Section for locks ======
 [logger_locks]
@@ -253,20 +481,8 @@ qualname=locks
 [handler_locks]
 class=FileHandler
 formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/locks.diag', 'w')
-
-# ======= Section for mail sender ======
-[logger_mail sender]
-handlers=mail sender
-qualname=mail sender
-#level=INFO
-
-[handler_mail sender]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/mailsender.diag', 'w')
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/locks.diag', 'a')
 
 # ======= Section for makeperformance ======
 [logger_makeperformance]
@@ -277,44 +493,8 @@ qualname=makeperformance
 [handler_makeperformance]
 class=FileHandler
 formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/makeperformance.diag', 'w')
-
-# ======= Section for menu bar ======
-[logger_menu bar]
-handlers=menu bar
-qualname=menu bar
-#level=INFO
-
-[handler_menu bar]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/menubar.diag', 'w')
-
-# ======= Section for multientrydictionary ======
-[logger_multientrydictionary]
-handlers=multientrydictionary
-qualname=multientrydictionary
-#level=INFO
-
-[handler_multientrydictionary]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/multientrydictionary.diag', 'w')
-
-# ======= Section for observable ======
-[logger_observable]
-handlers=observable
-qualname=observable
-#level=INFO
-
-[handler_observable]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/observable.diag', 'w')
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/makeperformance.diag', 'a')
 
 # ======= Section for option finder ======
 [logger_option finder]
@@ -325,44 +505,8 @@ qualname=option finder
 [handler_option finder]
 class=FileHandler
 formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/optionfinder.diag', 'w')
-
-# ======= Section for prepare writedir ======
-[logger_prepare writedir]
-handlers=prepare writedir
-qualname=prepare writedir
-#level=INFO
-
-[handler_prepare writedir]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/preparewritedir.diag', 'w')
-
-# ======= Section for progress monitor ======
-[logger_progress monitor]
-handlers=progress monitor
-qualname=progress monitor
-#level=INFO
-
-[handler_progress monitor]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/progressmonitor.diag', 'w')
-
-# ======= Section for queue system submit ======
-[logger_queue system submit]
-handlers=queue system submit
-qualname=queue system submit
-#level=INFO
-
-[handler_queue system submit]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/queuesystemsubmit.diag', 'w')
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/optionfinder.diag', 'a')
 
 # ======= Section for read environment ======
 [logger_read environment]
@@ -373,32 +517,8 @@ qualname=read environment
 [handler_read environment]
 class=FileHandler
 formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/readenvironment.diag', 'w')
-
-# ======= Section for reconnection ======
-[logger_reconnection]
-handlers=reconnection
-qualname=reconnection
-#level=INFO
-
-[handler_reconnection]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/reconnection.diag', 'w')
-
-# ======= Section for run dependent text ======
-[logger_run dependent text]
-handlers=run dependent text
-qualname=run dependent text
-#level=INFO
-
-[handler_run dependent text]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/rundependenttext.diag', 'w')
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/readenvironment.diag', 'a')
 
 # ======= Section for run test ======
 [logger_run test]
@@ -409,44 +529,8 @@ qualname=run test
 [handler_run test]
 class=FileHandler
 formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/runtest.diag', 'w')
-
-# ======= Section for save repository ======
-[logger_save repository]
-handlers=save repository
-qualname=save repository
-#level=INFO
-
-[handler_save repository]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/saverepository.diag', 'w')
-
-# ======= Section for select tests ======
-[logger_select tests]
-handlers=select tests
-qualname=select tests
-#level=INFO
-
-[handler_select tests]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/selecttests.diag', 'w')
-
-# ======= Section for slave server ======
-[logger_slave server]
-handlers=slave server
-qualname=slave server
-#level=INFO
-
-[handler_slave server]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/slaveserver.diag', 'w')
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/runtest.diag', 'a')
 
 # ======= Section for standard log ======
 [logger_standard log]
@@ -457,20 +541,8 @@ qualname=standard log
 [handler_standard log]
 class=FileHandler
 formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/standardlog.diag', 'w')
-
-# ======= Section for test column gui ======
-[logger_test column gui]
-handlers=test column gui
-qualname=test column gui
-#level=INFO
-
-[handler_test column gui]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/testcolumngui.diag', 'w')
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/standardlog.diag', 'a')
 
 # ======= Section for test objects ======
 [logger_test objects]
@@ -481,92 +553,20 @@ qualname=test objects
 [handler_test objects]
 class=FileHandler
 formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/testobjects.diag', 'w')
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/testobjects.diag', 'a')
 
-# ======= Section for test tree ======
-[logger_test tree]
-handlers=test tree
-qualname=test tree
+# ======= Section for usecase log ======
+[logger_usecase log]
+handlers=usecase log
+qualname=usecase log
 #level=INFO
 
-[handler_test tree]
+[handler_usecase log]
 class=FileHandler
 formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/testtree.diag', 'w')
-
-# ======= Section for testcomparison ======
-[logger_testcomparison]
-handlers=testcomparison
-qualname=testcomparison
-#level=INFO
-
-[handler_testcomparison]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/testcomparison.diag', 'w')
-
-# ======= Section for testpathfilter ======
-[logger_testpathfilter]
-handlers=testpathfilter
-qualname=testpathfilter
-#level=INFO
-
-[handler_testpathfilter]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/testpathfilter.diag', 'w')
-
-# ======= Section for traffic replay ======
-[logger_traffic replay]
-handlers=traffic replay
-qualname=traffic replay
-#level=INFO
-
-[handler_traffic replay]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/trafficreplay.diag', 'w')
-
-# ======= Section for traffic server ======
-[logger_traffic server]
-handlers=traffic server
-qualname=traffic server
-#level=INFO
-
-[handler_traffic server]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/trafficserver.diag', 'w')
-
-# ======= Section for unique names ======
-[logger_unique names]
-handlers=unique names
-qualname=unique names
-#level=INFO
-
-[handler_unique names]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/uniquenames.diag', 'w')
-
-# ======= Section for use-case log ======
-[logger_use-case log]
-handlers=use-case log
-qualname=use-case log
-#level=INFO
-
-[handler_use-case log]
-class=FileHandler
-formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/use-caselog.diag', 'w')
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/usecaselog.diag', 'a')
 
 # ======= Section for virtual display ======
 [logger_virtual display]
@@ -577,6 +577,6 @@ qualname=virtual display
 [handler_virtual display]
 class=FileHandler
 formatter=debug
-args=('/dev/null', 'w')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/virtualdisplay.diag', 'w')
+args=('/dev/null', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/virtualdisplay.diag', 'a')
 

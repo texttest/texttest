@@ -1577,7 +1577,7 @@ class OptionFinder(plugins.OptionFinder):
         self.diagWriteDir = self.setPathFromOptionsOrEnv("TEXTTEST_PERSONAL_LOG", "$TEXTTEST_PERSONAL_CONFIG/log", "xw") # Location to write TextTest's internal logs
         self.diagConfigFile = None
         if self.has_key("x"): # This is just a fast-track to make sure we can set up diags for the setup
-            self.diagConfigFile = plugins.abspath(self.get("xr", os.path.join(self.diagWriteDir, "logging.debug")))
+            self.diagConfigFile = self.normalisePath(self.get("xr", os.path.join(self.diagWriteDir, "logging.debug")))
             self.setUpLogging()
         self.diag = plugins.getDiagnostics("option finder")
         self.diag.info("Replaying from " + repr(os.getenv("USECASE_REPLAY_SCRIPT")))
@@ -1586,17 +1586,20 @@ class OptionFinder(plugins.OptionFinder):
     def setPathFromOptionsOrEnv(self, envVar, *args):
         givenValue = self.getPathFromOptionsOrEnv(envVar, *args)
         if givenValue is not None:
-            value = os.path.normpath(givenValue).replace("\\", "/")
+            value = self.normalisePath(givenValue)
             os.environ[envVar] = value
             return value
 
+    def normalisePath(self, path):
+        return os.path.normpath(plugins.abspath(path)).replace("\\", "/")
+
     def getPathFromOptionsOrEnv(self, envVar, defaultValue, optionName=""):
         if optionName and self.has_key(optionName):
-            return plugins.abspath(self[optionName])
+            return self[optionName]
         elif os.environ.has_key(envVar):
-            return plugins.abspath(os.environ[envVar])
+            return os.environ[envVar]
         else:
-            return plugins.abspath(os.path.expanduser(os.path.expandvars(defaultValue)))
+            return os.path.expanduser(os.path.expandvars(defaultValue))
 
     def setUpLogging(self):
         if os.path.isfile(self.diagConfigFile):

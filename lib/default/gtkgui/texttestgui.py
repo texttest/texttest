@@ -2171,7 +2171,7 @@ class FileViewGUI(guiplugins.SubGUI):
     def notifyNewFile(self, fileName, overwrittenExisting):
         if os.path.isfile(fileName):
             self.notify(self.getViewFileSignal(), fileName, None)
-        if not overwrittenExisting:
+        if not overwrittenExisting or os.path.isdir(fileName):
             self.currentTest.refreshFiles()
             self.recreateModel(self.getState(), preserveSelection=True)
 

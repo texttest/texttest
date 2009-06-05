@@ -729,6 +729,7 @@ def getProcessStartUpInfo(envMapping=os.environ):
 
 def copyPath(srcPath, dstPath):
     if os.path.isdir(srcPath):
+        removePath(dstPath)
         shutil.copytree(srcPath, dstPath)
     else:
         shutil.copyfile(srcPath, dstPath)

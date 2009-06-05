@@ -48,7 +48,7 @@ class PythonLoggingGenerator:
 
     def generate(self, enabledLoggerNames=[], allLoggerNames=[], timeStdout=False):
         enabled, disabled, all = self.parseInput(enabledLoggerNames, allLoggerNames)
-        self.writeHeaderSections(all, timed=timeStdout)
+        self.writeHeaderSections(timed=timeStdout)
         if len(enabled):
             self.write("# ====== The following are enabled by default ======")
             for loggerName, fileStem in enabled:
@@ -58,6 +58,7 @@ class PythonLoggingGenerator:
             self.write("# ====== The following are disabled by default ======")
             for loggerName in disabled:
                 self.writeLoggerSection(loggerName, False, loggerName)
+        self.writeFooterSections(all)
 
     def writeLoggerSection(self, loggerName, enable, fileStem):
         self.write("# ======= Section for " + loggerName + " ======")
@@ -82,25 +83,15 @@ class PythonLoggingGenerator:
             if enable:
                 self.write("args=('" + fileName + "', 'a')\n")
             else:
-                self.write("args=('/dev/null', 'a')")
+                self.write("args=(os.devnull, 'a')")
                 self.write("#args=('" + fileName + "', 'a')\n")
 
-    def writeHeaderSections(self, loggerNames, timed=False):
-        loggerStr = ",".join(loggerNames)
+    def writeHeaderSections(self, timed=False):
         if timed:
             commentStr = ""
         else:
             commentStr = "#"
-        self.write("""# Cruft that python logging module needs...
-[loggers]
-keys=root,%s
-
-[handlers]
-keys=root,stdout,%s
-
-[formatters]
-keys=timed,debug
-
+        self.write("""
 [logger_root]
 handlers=root
 
@@ -119,5 +110,20 @@ format=%%(asctime)s - %%(message)s
 
 [formatter_debug]
 format=%%(name)s %%(levelname)s - %%(message)s
-""" % (loggerStr, loggerStr, commentStr))
+""" % (commentStr))
+
+    def writeFooterSections(self, loggerNames):
+        loggerStr = ",".join(loggerNames)
+        handlerStr = ",".join(sorted(set(self.handlers.values())))
+        self.write("""# ====== Cruft that python logging module needs ======
+[loggers]
+keys=root,%s
+
+[handlers]
+keys=root,%s
+
+[formatters]
+keys=timed,debug
+""" % (loggerStr, handlerStr))
+    
 

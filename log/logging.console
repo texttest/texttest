@@ -1,12 +1,3 @@
-# Cruft that python logging module needs...
-[loggers]
-keys=root,standard log
-
-[handlers]
-keys=root,stdout,standard log
-
-[formatters]
-keys=timed,debug
 
 [logger_root]
 handlers=root
@@ -33,4 +24,14 @@ format=%(name)s %(levelname)s - %(message)s
 handlers=stdout
 qualname=standard log
 level=INFO
+
+# ====== Cruft that python logging module needs ======
+[loggers]
+keys=root,standard log
+
+[handlers]
+keys=root,stdout
+
+[formatters]
+keys=timed,debug
 

@@ -1,4 +1,4 @@
-import os, sys, default, plugins, socket, subprocess, operator, signal
+import os, sys, default, plugins, socket, subprocess, operator, signal, logging
 from Queue import Queue, Empty
 from SocketServer import TCPServer, StreamRequestHandler
 from time import sleep
@@ -371,7 +371,7 @@ class SlaveServerResponder(plugins.Responder, TCPServer):
         TCPServer.__init__(self, (socket.gethostname(), 0), self.handlerClass())
         self.testMap = {}
         self.testClientInfo = {}
-        self.diag = plugins.getDiagnostics("Slave Server")
+        self.diag = logging.getLogger("Slave Server")
         self.terminate = False
         # Socket may have to be around for some time,
         # enable the keepalive option in the hope that that will make it more resilient
@@ -448,7 +448,7 @@ class MasterInteractiveResponder(InteractiveResponder):
 class QueueSystemServer(BaseActionRunner):
     instance = None
     def __init__(self, optionMap, allApps):
-        BaseActionRunner.__init__(self, optionMap, plugins.getDiagnostics("Queue System Submit"))
+        BaseActionRunner.__init__(self, optionMap, logging.getLogger("Queue System Submit"))
         # queue for putting tests when we couldn't reuse the originals
         self.reuseFailureQueue = Queue()
         self.testCount = 0

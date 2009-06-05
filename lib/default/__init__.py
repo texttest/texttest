@@ -1098,7 +1098,7 @@ class Killed(plugins.TestState):
 
 class RunTest(plugins.Action):
     def __init__(self):
-        self.diag = plugins.getDiagnostics("run test")
+        self.diag = logging.getLogger("run test")
         self.currentProcess = None
         self.killedTests = []
         self.killSignal = None

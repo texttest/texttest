@@ -1,5 +1,5 @@
 
-import plugins, os, sys, shutil, time, subprocess, operator, types
+import plugins, os, sys, shutil, time, subprocess, operator, types, logging
 from jobprocess import killSubProcessAndChildren
 from copy import copy, deepcopy
 from glob import glob
@@ -309,7 +309,7 @@ class SubGUI(plugins.Observable):
 class GtkActionWrapper:
     def __init__(self):
         self.accelerator = None
-        self.diag = plugins.getDiagnostics("Interactive Actions")
+        self.diag = logging.getLogger("Interactive Actions")
         title = self.getTitle(includeMnemonics=True)
         actionName = self.getTitle(includeMnemonics=False)
         self.gtkAction = gtk.Action(actionName, title, \
@@ -1406,7 +1406,7 @@ class MultiActionGUIForwarder(GtkActionWrapper):
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:
     def __init__(self):
-        self.diag = plugins.getDiagnostics("Interactive Actions")
+        self.diag = logging.getLogger("Interactive Actions")
 
     def getDefaultAccelerators(self, allApps):
         return self.joinDictionaries(allApps, lambda x: x.getDefaultAccelerators())

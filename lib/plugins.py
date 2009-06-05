@@ -283,7 +283,7 @@ class ApplicationFilter(TextFilter):
 class TestPathFilter(TextFilter):
     option = "tp"
     def __init__(self, *args):
-        self.diag = getDiagnostics("TestPathFilter")
+        self.diag = logging.getLogger("TestPathFilter")
         TextFilter.__init__(self, *args)
     def parseInput(self, filterText, app, suites):
         allEntries = TextFilter.parseInput(self, filterText, app, suites)
@@ -433,7 +433,7 @@ class Observable:
     @classmethod
     def diagnoseObs(klass, message, *args, **kwargs):
         if not klass.obsDiag:
-            klass.obsDiag = getDiagnostics("Observable")
+            klass.obsDiag = logging.getLogger("Observable")
         klass.obsDiag.info(message + " " + str(klass) + " " + repr(args) + repr(kwargs))
 
     def __init__(self, passSelf=False):
@@ -624,8 +624,6 @@ class MarkedTestState(TestState):
     def getTypeBreakdown(self):
         return self.category, self.briefText
 
-# For back-compatibility
-getDiagnostics = logging.getLogger
 log = None
 def configureLogging(configFile=None):
     # only set up once
@@ -634,7 +632,7 @@ def configureLogging(configFile=None):
         if configFile:
             defaults = { "TEXTTEST_PERSONAL_LOG": getPersonalDir("log") }
             logging.config.fileConfig(configFile, defaults)
-        log = getDiagnostics("standard log")
+        log = logging.getLogger("standard log")
 
 def getPersonalConfigDir():
     fromEnv = os.getenv("TEXTTEST_PERSONAL_CONFIG")
@@ -1057,7 +1055,7 @@ class MultiEntryDictionary(seqdict):
     def __init__(self, importKey="", importFileFinder=None):
         seqdict.__init__(self)
         self.resetCurrent()
-        self.diag = getDiagnostics("MultiEntryDictionary")
+        self.diag = logging.getLogger("MultiEntryDictionary")
         self.aliases = {}
         self.importKey = importKey
         self.importFileFinder= importFileFinder

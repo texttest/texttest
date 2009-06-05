@@ -1,4 +1,4 @@
-import os, shutil, plugins, re, stat, subprocess, glob, types
+import os, shutil, plugins, re, stat, subprocess, glob, types, logging
 
 from jobprocess import killArbitaryProcess
 from ndict import seqdict
@@ -12,7 +12,7 @@ class MakeWriteDirectory(plugins.Action):
 
 class PrepareWriteDirectory(plugins.Action):
     def __init__(self, ignoreCatalogues):
-        self.diag = plugins.getDiagnostics("Prepare Writedir")
+        self.diag = logging.getLogger("Prepare Writedir")
         self.ignoreCatalogues = ignoreCatalogues
         self.madeRemoteTmp = False
         if self.ignoreCatalogues:
@@ -285,7 +285,7 @@ class TestEnvironmentCreator:
     def __init__(self, test, optionMap):
         self.test = test
         self.optionMap = optionMap
-        self.diag = plugins.getDiagnostics("Environment Creator")
+        self.diag = logging.getLogger("Environment Creator")
     def getVariables(self):
         vars, props = [], []
         if self.topLevel():
@@ -388,7 +388,7 @@ class CollateFiles(plugins.Action):
         self.collations = {}
         self.discardFiles = []
         self.filesPresentBefore = {}
-        self.diag = plugins.getDiagnostics("Collate Files")
+        self.diag = logging.getLogger("Collate Files")
     def setUpApplication(self, app):
         self.collations.update(app.getConfigValue("collate_file"))
         self.discardFiles = app.getConfigValue("discard_file")
@@ -559,7 +559,7 @@ class FindExecutionHosts(plugins.Action):
 class CreateCatalogue(plugins.Action):
     def __init__(self):
         self.catalogues = {}
-        self.diag = plugins.getDiagnostics("catalogues")
+        self.diag = logging.getLogger("catalogues")
     def __call__(self, test):
         if test.app.getConfigValue("create_catalogues") != "true":
             return
@@ -700,7 +700,7 @@ class MachineInfoFinder:
 
 class PerformanceFileCreator(plugins.Action):
     def __init__(self, machineInfoFinder):
-        self.diag = plugins.getDiagnostics("makeperformance")
+        self.diag = logging.getLogger("makeperformance")
         self.machineInfoFinder = machineInfoFinder
     def setUpApplication(self, app):
         self.machineInfoFinder.setUpApplication(app)

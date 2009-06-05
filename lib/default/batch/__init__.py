@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, plugins, sys, string, time, types, shutil, datetime, testoverview
+import os, plugins, sys, string, time, types, shutil, datetime, testoverview, logging
 from ndict import seqdict
 from cPickle import Pickler
 
@@ -185,7 +185,7 @@ class MailSender:
     def __init__(self, sessionName, runId=""):
         self.sessionName = sessionName
         self.runId = runId
-        self.diag = plugins.getDiagnostics("Mail Sender")
+        self.diag = logging.getLogger("Mail Sender")
     def send(self, batchDataList):
         if len(batchDataList) == 0:
             self.diag.info("No responders for " + repr(app))
@@ -386,7 +386,7 @@ class SaveState(plugins.Responder):
         self.fileName = self.createFileName(optionMap.get("name"))
         self.repositories = {}
         self.allApps = allApps
-        self.diag = plugins.getDiagnostics("Save Repository")
+        self.diag = logging.getLogger("Save Repository")
     def createFileName(self, nameGiven):
         # include the date and the name, if any. Date is used for archiving, name for display
         parts = [ "teststate", calculateBatchDate() ]
@@ -486,7 +486,7 @@ class ArchiveRepository(plugins.ScriptWithArgs):
 class WebPageResponder(plugins.Responder):
     def __init__(self, optionMap, allApps):
         self.batchSession = optionMap.get("b", "default")
-        self.diag = plugins.getDiagnostics("GenerateWebPages")
+        self.diag = logging.getLogger("GenerateWebPages")
         self.allApps = allApps
 
     def addSuites(self, suites):
@@ -614,7 +614,7 @@ class CollectFiles(plugins.ScriptWithArgs):
         self.batchSession = argDict.get("batch", "default")
         self.mailSender = MailSender(self.batchSession)
         self.runId = "" # depends on what we pick up from collected files
-        self.diag = plugins.getDiagnostics("batch collect")
+        self.diag = logging.getLogger("batch collect")
         self.userName = argDict.get("tmp", "")
         if self.userName:
             plugins.log.info("Collecting batch files created by user " + self.userName + "...")

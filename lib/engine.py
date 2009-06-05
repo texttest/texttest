@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import plugins, os, sys, testmodel, signal, operator
+import plugins, os, sys, testmodel, signal, operator, logging
 from threading import Thread
 from ndict import seqdict
 from time import sleep
@@ -11,7 +11,7 @@ class UniqueNameFinder(plugins.Responder):
     def __init__(self, optionMap, allApps):
         plugins.Responder.__init__(self, optionMap)
         self.name2test = {}
-        self.diag = plugins.getDiagnostics("Unique Names")
+        self.diag = logging.getLogger("Unique Names")
     def notifyAdd(self, test, initial=True):
         if self.name2test.has_key(test.name):
             oldTest = self.name2test[test.name]
@@ -73,7 +73,7 @@ class Activator(plugins.Responder, plugins.Observable):
         plugins.Observable.__init__(self)
         self.allowEmpty = optionMap.has_key("gx") or optionMap.runScript()
         self.suites = []
-        self.diag = plugins.getDiagnostics("Activator")
+        self.diag = logging.getLogger("Activator")
     def addSuites(self, suites):
         self.suites = suites
     
@@ -127,7 +127,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         if os.environ.has_key("FAKE_OS"):
             os.name = os.environ["FAKE_OS"]
         self.inputOptions = testmodel.OptionFinder()
-        self.diag = plugins.getDiagnostics("Find Applications")
+        self.diag = logging.getLogger("Find Applications")
         self.appSuites = seqdict()
     def printStackTrace(self, *args):
         from traceback import print_stack

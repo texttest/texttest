@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import default, plugins, os, sys, subprocess, signal
+import default, plugins, os, sys, subprocess, signal, logging
         
 # Unlike earlier incarnations of this functionality,
 # we don't rely on sharing displays but create our own for each test run.
@@ -12,7 +12,7 @@ class VirtualDisplayResponder(plugins.Responder):
         self.displayPid = None
         self.displayProc = None
         self.guiSuites = []
-        self.diag = plugins.getDiagnostics("virtual display")
+        self.diag = logging.getLogger("virtual display")
         VirtualDisplayResponder.instance = self
         
     def addSuites(self, suites):

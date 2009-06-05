@@ -16,7 +16,7 @@ def findLoggerNamesUnder(location, **kwargs):
     result = set()
     for root, dirs, files in os.walk(location):
         for file in files:
-            if file.endswith(".py"):
+            if file.endswith(".py") and file != "logconfiggen.py": # Don't allow generation from ourselves...
                 fileName = os.path.join(root, file)
                 result.update(findLoggerNames(fileName, **kwargs))
     return sorted(result)

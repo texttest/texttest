@@ -26,7 +26,7 @@ try:
 except:
     raiseException("Unable to import module 'gobject'")
 
-import pango, guiplugins, plugins, os, sys, operator, subprocess
+import pango, guiplugins, plugins, os, sys, operator, subprocess, logging
 from ndict import seqdict
 from copy import copy
 from TreeViewTooltips import TreeViewTooltips
@@ -158,7 +158,7 @@ statusMonitor = GUIStatusMonitor()
 class IdleHandlerManager:
     def __init__(self):
         self.sourceId = -1
-        self.diag = plugins.getDiagnostics("Idle Handlers")
+        self.diag = logging.getLogger("Idle Handlers")
     def notifyActionStart(self, message="", lock=True):
         # To make it possible to have an while-events-process loop
         # to update the GUI during actions, we need to make sure the idle
@@ -230,7 +230,7 @@ class TextTestGUI(plugins.Responder, plugins.Observable):
     def setUpGlobals(self, allApps):
         global guilog, guiConfig, scriptEngine
         scriptEngine = self.scriptEngine
-        guilog = plugins.getDiagnostics("gui log")
+        guilog = logging.getLogger("gui log")
         guiConfig = guiplugins.GUIConfig(self.dynamic, allApps, guilog)
 
         guiplugins.guilog = guilog
@@ -540,7 +540,7 @@ class MenuBarGUI(guiplugins.SubGUI):
         self.actionGUIs = actionGUIs
         self.actionGroup = self.uiManager.get_action_groups()[0]
         self.toggleActions = []
-        self.diag = plugins.getDiagnostics("Menu Bar")
+        self.diag = logging.getLogger("Menu Bar")
     def setActive(self, active):
         guiplugins.SubGUI.setActive(self, active)
         self.widget.get_toplevel().add_accel_group(self.uiManager.get_accel_group())
@@ -716,7 +716,7 @@ class TestColumnGUI(guiplugins.SubGUI):
         self.totalNofTestsShown = 0
         self.column = None
         self.dynamic = dynamic
-        self.diag = plugins.getDiagnostics("Test Column GUI")
+        self.diag = logging.getLogger("Test Column GUI")
         self.allSuites = []
     def addSuites(self, suites):
         self.allSuites = suites
@@ -900,7 +900,7 @@ class TestTreeGUI(ContainerGUI):
         self.filteredModel = None
         self.treeView = None
         self.newTestsVisible = guiConfig.showCategoryByDefault("not_started")
-        self.diag = plugins.getDiagnostics("Test Tree")
+        self.diag = logging.getLogger("Test Tree")
     def notifyDefaultVisibility(self, newValue):
         self.newTestsVisible = newValue
 
@@ -1487,7 +1487,7 @@ class NotebookGUI(guiplugins.SubGUI):
     def __init__(self, tabInfo, scriptTitle):
         guiplugins.SubGUI.__init__(self)
         self.scriptTitle = scriptTitle
-        self.diag = plugins.getDiagnostics("GUI notebook")
+        self.diag = logging.getLogger("GUI notebook")
         self.tabInfo = tabInfo
         self.notebook = None
         tabName, self.currentTabGUI = self.findInitialCurrentTab()
@@ -2031,7 +2031,7 @@ class FileViewGUI(guiplugins.SubGUI):
         self.title = title
         self.selection = None
         self.nameColumn = None
-        self.diag = plugins.getDiagnostics("File View GUI")
+        self.diag = logging.getLogger("File View GUI")
 
     def recreateModel(self, state, preserveSelection):
         if not self.nameColumn:
@@ -2615,7 +2615,7 @@ class TestProgressMonitor(guiplugins.SubGUI):
         # Each row has 'type', 'number', 'show', 'tests'
         self.treeModel = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_INT, gobject.TYPE_BOOLEAN, \
                                        gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
-        self.diag = plugins.getDiagnostics("Progress Monitor")
+        self.diag = logging.getLogger("Progress Monitor")
         self.progressReport = None
         self.treeView = None
         self.dynamic = dynamic

@@ -547,17 +547,17 @@ formatter=debug
 args=(os.devnull, 'a')
 #args=('%(TEXTTEST_PERSONAL_LOG)s/testobjects.diag', 'a')
 
-# ======= Section for usecase log ======
-[logger_usecase log]
-handlers=usecase log
-qualname=usecase log
+# ======= Section for usecase replay log ======
+[logger_usecase replay log]
+handlers=usecase replay log
+qualname=usecase replay log
 #level=INFO
 
-[handler_usecase log]
+[handler_usecase replay log]
 class=FileHandler
 formatter=debug
 args=(os.devnull, 'a')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/usecaselog.diag', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/usecasereplaylog.diag', 'a')
 
 # ======= Section for virtual display ======
 [logger_virtual display]
@@ -573,10 +573,10 @@ args=(os.devnull, 'a')
 
 # ====== Cruft that python logging module needs ======
 [loggers]
-keys=root,Action Runner,Activator,Check For Bugs,Collate Files,Environment Creator,File View GUI,FileComparison,Filter Actions,Find Applications,GUI notebook,GenerateWebPages,Idle Handlers,Interactive Actions,Mail Sender,Menu Bar,MultiEntryDictionary,Observable,Prepare Writedir,Progress Monitor,Queue System Submit,Reconnection,Run Dependent Text,Save Repository,Select Tests,Slave Server,Test Column GUI,Test Tree,TestComparison,TestPathFilter,Traffic Replay,Traffic Server,Unique Names,application,batch collect,catalogues,check for crashes,gui log,locks,makeperformance,option finder,read environment,run test,standard log,test objects,usecase log,virtual display
+keys=root,Action Runner,Activator,Check For Bugs,Collate Files,Environment Creator,File View GUI,FileComparison,Filter Actions,Find Applications,GUI notebook,GenerateWebPages,Idle Handlers,Interactive Actions,Mail Sender,Menu Bar,MultiEntryDictionary,Observable,Prepare Writedir,Progress Monitor,Queue System Submit,Reconnection,Run Dependent Text,Save Repository,Select Tests,Slave Server,Test Column GUI,Test Tree,TestComparison,TestPathFilter,Traffic Replay,Traffic Server,Unique Names,application,batch collect,catalogues,check for crashes,gui log,locks,makeperformance,option finder,read environment,run test,standard log,test objects,usecase replay log,virtual display
 
 [handlers]
-keys=root,Action Runner,Activator,Check For Bugs,Collate Files,Environment Creator,File View GUI,FileComparison,Filter Actions,Find Applications,GUI notebook,GenerateWebPages,Idle Handlers,Interactive Actions,Mail Sender,Menu Bar,MultiEntryDictionary,Observable,Prepare Writedir,Progress Monitor,Queue System Submit,Reconnection,Run Dependent Text,Save Repository,Select Tests,Slave Server,Test Column GUI,Test Tree,TestComparison,TestPathFilter,Traffic Replay,Traffic Server,Unique Names,application,batch collect,catalogues,check for crashes,gui log,locks,makeperformance,option finder,read environment,run test,standard log,stdout,test objects,usecase log,virtual display
+keys=root,Action Runner,Activator,Check For Bugs,Collate Files,Environment Creator,File View GUI,FileComparison,Filter Actions,Find Applications,GUI notebook,GenerateWebPages,Idle Handlers,Interactive Actions,Mail Sender,Menu Bar,MultiEntryDictionary,Observable,Prepare Writedir,Progress Monitor,Queue System Submit,Reconnection,Run Dependent Text,Save Repository,Select Tests,Slave Server,Test Column GUI,Test Tree,TestComparison,TestPathFilter,Traffic Replay,Traffic Server,Unique Names,application,batch collect,catalogues,check for crashes,gui log,locks,makeperformance,option finder,read environment,run test,standard log,stdout,test objects,usecase replay log,virtual display
 
 [formatters]
 keys=timed,debug

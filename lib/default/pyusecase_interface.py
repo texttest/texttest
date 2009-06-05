@@ -10,16 +10,15 @@ def makeScriptEngine(optionMap):
         return scriptEngine
 
 def _makeScriptEngine(optionMap):
-    logger = plugins.getDiagnostics("usecase log")
     if optionMap.has_key("gx") or optionMap.has_key("g"):
         try:
             from gtkusecase import ScriptEngine
-            return ScriptEngine(logger, enableShortcuts=True) 
+            return ScriptEngine(enableShortcuts=True) 
         except ImportError:
             pass # Let the GUI itself print the error
     else:
         from usecase import ScriptEngine
-        return ScriptEngine(logger)
+        return ScriptEngine()
 
 
 # Compulsory responder to generate application events. Always present. See respond module

@@ -7,7 +7,7 @@ if __name__ == "__main__":
     import sys
     sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-import plugins
+import plugins, logging
 from ndict import seqdict
 from re import sub
 import StringIO, fpdiff
@@ -15,7 +15,7 @@ import StringIO, fpdiff
 # Generic base class for filtering standard and temporary files
 class FilterAction(plugins.Action):
     def __init__(self):
-        self.diag = plugins.getDiagnostics("Filter Actions")
+        self.diag = logging.getLogger("Filter Actions")
     def __call__(self, test):
         for fileName, postfix in self.filesToFilter(test):
             self.diag.info("Considering for filtering : " + fileName)
@@ -81,7 +81,7 @@ class FilterResultRecompute(FilterRecompute):
 class RunDependentTextFilter(plugins.Observable):
     def __init__(self, runDepTexts, unorderedTexts=[], testId=""):
         plugins.Observable.__init__(self)
-        self.diag = plugins.getDiagnostics("Run Dependent Text")
+        self.diag = logging.getLogger("Run Dependent Text")
         self.contentFilters = [ LineFilter(text, testId, self.diag) for text in runDepTexts ]
         self.orderFilters = seqdict()
         for text in unorderedTexts:

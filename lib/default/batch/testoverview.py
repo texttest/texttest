@@ -1,7 +1,7 @@
 # Code to generate HTML report of historical information. This report generated
 # either via the -coll flag, or via -s 'batch.GenerateHistoricalReport <batchid>'
 
-import os, plugins, time, re, HTMLgen, HTMLcolors, operator, sys
+import os, plugins, time, re, HTMLgen, HTMLcolors, operator, sys, logging
 from cPickle import Pickler, Unpickler, UnpicklingError
 from ndict import seqdict
 from glob import glob
@@ -46,7 +46,7 @@ class GenerateWebPages(object):
         self.pagesOverview = seqdict()
         self.pagesDetails = seqdict()
         self.app = app
-        self.diag = plugins.getDiagnostics("GenerateWebPages")
+        self.diag = logging.getLogger("GenerateWebPages")
         colourFinder.setColourDict(app.getConfigValue("historical_report_colours"))
 
     def makeSelectors(self, subPageNames, tags=[]):

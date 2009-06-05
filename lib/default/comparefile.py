@@ -1,7 +1,7 @@
 #!/usr/local/bin/python
 
 
-import os, filecmp, plugins, time, stat, subprocess
+import os, filecmp, plugins, time, stat, subprocess, logging
 from ndict import seqdict
 from shutil import copyfile
 from fnmatch import fnmatch
@@ -15,7 +15,7 @@ class FileComparison:
         self.stem = stem
         self.differenceCache = False
         self.recalculationTime = None
-        self.diag = plugins.getDiagnostics("FileComparison")
+        self.diag = logging.getLogger("FileComparison")
         self.severity = test.getCompositeConfigValue("failure_severity", self.stem)
         self.displayPriority = test.getCompositeConfigValue("failure_display_priority", self.stem)
         maxLength = test.getConfigValue("lines_of_text_difference")
@@ -54,7 +54,7 @@ class FileComparison:
         return state
     def __setstate__(self, state):
         self.__dict__ = state
-        self.diag = plugins.getDiagnostics("TestComparison")
+        self.diag = logging.getLogger("TestComparison")
         self.recalculationTime = None
         if not hasattr(self, "differenceCache"):
             self.differenceCache = self.differenceId

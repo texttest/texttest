@@ -1,4 +1,4 @@
-import os, performance, filecmp, string, plugins, shutil
+import os, performance, filecmp, string, plugins, shutil, logging
 from ndict import seqdict
 from tempfile import mktemp
 from comparefile import FileComparison
@@ -15,7 +15,7 @@ class BaseTestComparison(plugins.TestState):
         self.newResults = []
         self.missingResults = []
         self.correctResults = []
-        self.diag = plugins.getDiagnostics("TestComparison")
+        self.diag = logging.getLogger("TestComparison")
 
     def hasResults(self):
         return len(self.allResults) > 0
@@ -105,7 +105,7 @@ class TestComparison(BaseTestComparison):
 
     def __setstate__(self, state):
         self.__dict__ = state
-        self.diag = plugins.getDiagnostics("TestComparison")
+        self.diag = logging.getLogger("TestComparison")
         # If loaded from old pickle files, can get out of date objects...
         if not hasattr(self, "missingResults"):
             self.missingResults = []

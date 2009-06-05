@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import plugins, os, string, shutil, sys
+import plugins, os, string, shutil, sys, logging
 from ConfigParser import ConfigParser, NoOptionError
 from copy import copy
 from ndict import seqdict
@@ -67,7 +67,7 @@ class BugTrigger:
         self.reportInternalError = int(getOption("internal_error", "0"))
         self.ignoreOtherErrors = int(getOption("ignore_other_errors", self.reportInternalError))
         self.bugInfo = self.createBugInfo(getOption)
-        self.diag = plugins.getDiagnostics("Check For Bugs")
+        self.diag = logging.getLogger("Check For Bugs")
     def __repr__(self):
         return repr(self.textTrigger)
     def getTriggerHosts(self, getOption):
@@ -110,7 +110,7 @@ class FileBugData:
         self.presentList = []
         self.absentList = []
         self.checkUnchanged = False
-        self.diag = plugins.getDiagnostics("Check For Bugs")
+        self.diag = logging.getLogger("Check For Bugs")
 
     def addBugTrigger(self, getOption):
         bugTrigger = BugTrigger(getOption)
@@ -194,7 +194,7 @@ class BugMap(seqdict):
     
 class CheckForCrashes(plugins.Action):
     def __init__(self):
-        self.diag = plugins.getDiagnostics("check for crashes")
+        self.diag = logging.getLogger("check for crashes")
     def __call__(self, test):
         if test.state.category == "killed":
             return
@@ -222,7 +222,7 @@ class CheckForCrashes(plugins.Action):
 
 class CheckForBugs(plugins.Action):
     def __init__(self):
-        self.diag = plugins.getDiagnostics("Check For Bugs")
+        self.diag = logging.getLogger("Check For Bugs")
     def callDuringAbandon(self, test):
         # want to be able to mark UNRUNNABLE tests as known bugs too...
         return test.state.lifecycleChange != "complete"

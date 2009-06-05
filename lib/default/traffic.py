@@ -1,5 +1,5 @@
 
-import os, stat, sys, plugins, shutil, socket, subprocess, rundependent
+import os, stat, sys, plugins, shutil, socket, subprocess, rundependent, logging
 from ndict import seqdict
 from SocketServer import TCPServer, StreamRequestHandler
 from threading import Thread, Lock
@@ -268,7 +268,7 @@ class CommandLineTraffic(Traffic):
     diag = None
     realCommands = {}
     def __init__(self, inText, responseFile):
-        self.diag = plugins.getDiagnostics("Traffic Server")
+        self.diag = logging.getLogger("Traffic Server")
         cmdText, environText, cmdCwd, proxyPid = inText.split(":SUT_SEP:")
         argv = eval(cmdText)
         self.cmdEnviron = eval(environText)
@@ -458,7 +458,7 @@ class TrafficServer(TCPServer):
         self.recordFileHandler = RecordFileHandler(recordFile)
         self.replayInfo = ReplayInfo(replayFile)
         self.requestCount = 0
-        self.diag = plugins.getDiagnostics("Traffic Server")
+        self.diag = logging.getLogger("Traffic Server")
         CommandLineTraffic.currentTest = test
         CommandLineTraffic.diag = self.diag
         self.topLevelForEdit = [] # contains only paths explicitly given. Always present.
@@ -761,7 +761,7 @@ class RecordFileHandler:
 class ReplayInfo:
     def __init__(self, replayFile):
         self.responseMap = seqdict()
-        self.diag = plugins.getDiagnostics("Traffic Replay")
+        self.diag = logging.getLogger("Traffic Replay")
         if replayFile:
             self.readReplayFile(replayFile)
             

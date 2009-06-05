@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, sys, types, string, plugins, exceptions, shutil, operator
+import os, sys, types, string, plugins, exceptions, shutil, operator, logging
 from time import time
 from fnmatch import fnmatch
 from ndict import seqdict
@@ -117,7 +117,7 @@ class DynamicMapping:
 class TestEnvironment(seqdict):
     def __init__(self, populateFunction):
         seqdict.__init__(self)
-        self.diag = plugins.getDiagnostics("read environment")
+        self.diag = logging.getLogger("read environment")
         self.populateFunction = populateFunction
         self.populated = False
     def checkPopulated(self):
@@ -217,7 +217,7 @@ class Test(plugins.Observable):
         self.environment = TestEnvironment(populateFunction)
         # Java equivalent of the environment mechanism...
         self.properties = plugins.MultiEntryDictionary()
-        self.diag = plugins.getDiagnostics("test objects")
+        self.diag = logging.getLogger("test objects")
         # Test suites never change state, but it's convenient that they have one
         self.state = NotStarted(self.getDescription)
     def __repr__(self):
@@ -1123,7 +1123,7 @@ class Application:
         # Cache all environment files in the whole suite to stop constantly re-reading them
         self.envFiles = {}
         self.versions = versions
-        self.diag = plugins.getDiagnostics("application")
+        self.diag = logging.getLogger("application")
         self.inputOptions = inputOptions
         self.setUpConfiguration(configEntries)
         self.writeDirectory = self.getWriteDirectory()
@@ -1579,7 +1579,7 @@ class OptionFinder(plugins.OptionFinder):
         if self.has_key("x"): # This is just a fast-track to make sure we can set up diags for the setup
             self.diagConfigFile = self.normalisePath(self.get("xr", os.path.join(self.diagWriteDir, "logging.debug")))
             self.setUpLogging()
-        self.diag = plugins.getDiagnostics("option finder")
+        self.diag = logging.getLogger("option finder")
         self.diag.info("Replaying from " + repr(os.getenv("USECASE_REPLAY_SCRIPT")))
         self.diag.info(repr(self))
 
@@ -1671,7 +1671,7 @@ class AllCompleteResponder(plugins.Responder,plugins.Observable):
         self.lock = Lock()
         self.checkInCompletion = False
         self.hadCompletion = False
-        self.diag = plugins.getDiagnostics("test objects")
+        self.diag = logging.getLogger("test objects")
     def notifyAdd(self, test, initial):
         if test.classId() == "test-case":
             # Locking long thought to be unnecessary

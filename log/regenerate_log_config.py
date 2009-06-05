@@ -5,15 +5,15 @@ import logconfiggen, os
 def generateForSelfTests(selftestDir, loggers, extraEnabled=[]):
     if selftestDir:
         consoleGen = logconfiggen.PythonLoggingGenerator(os.path.join(selftestDir, "logging.console"), postfix="texttest")
-        enabledLoggerNames = stdInfo + [ ("usecase log", "stdout") ] + extraEnabled
+        enabledLoggerNames = stdInfo + [ ("usecase replay log", "stdout") ] + extraEnabled
         consoleGen.generate(enabledLoggerNames, loggers)
         
         staticGen = logconfiggen.PythonLoggingGenerator(os.path.join(selftestDir, "logging.static_gui"), postfix="texttest")
-        enabledLoggerNames = stdInfo + [ ("gui log", "gui_log"), ("usecase log", "gui_log") ] + extraEnabled
+        enabledLoggerNames = stdInfo + [ ("gui log", "gui_log"), ("usecase replay log", "gui_log") ] + extraEnabled
         staticGen.generate(enabledLoggerNames, loggers)
 
         dynamicGen = logconfiggen.PythonLoggingGenerator(os.path.join(selftestDir, "logging.dynamic_gui"), postfix="texttest")
-        enabledLoggerNames = stdInfo + [ ("gui log", "dynamic_gui_log"), ("usecase log", "dynamic_gui_log") ] + extraEnabled
+        enabledLoggerNames = stdInfo + [ ("gui log", "dynamic_gui_log"), ("usecase replay log", "dynamic_gui_log") ] + extraEnabled
         dynamicGen.generate(enabledLoggerNames, loggers)
 
 def getSelfTestDir(subdir):
@@ -34,7 +34,7 @@ if __name__ == "__main__":
 
     installationRoot = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     coreLib = os.path.join(installationRoot, "lib")
-    coreLoggers = logconfiggen.findLoggerNamesUnder(coreLib, keyText="getDiagnostics")
+    coreLoggers = logconfiggen.findLoggerNamesUnder(coreLib)
     
     debugGen = logconfiggen.PythonLoggingGenerator("logging.debug", postfix="diag", prefix="%(TEXTTEST_PERSONAL_LOG)s/")
     debugGen.generate(enabledLoggerNames=[], allLoggerNames=coreLoggers)
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     siteDiagFile = os.path.join(installationRoot, "site/log/logging.debug")
     if os.path.isfile(siteDiagFile):
         siteLib = os.path.join(installationRoot, "site", "lib")
-        siteLoggers = logconfiggen.findLoggerNamesUnder(siteLib, keyText="getDiagnostics")
+        siteLoggers = logconfiggen.findLoggerNamesUnder(siteLib)
         allLoggers = sorted(coreLoggers + siteLoggers)
         debugGen = logconfiggen.PythonLoggingGenerator(siteDiagFile, postfix="diag", prefix="%(TEXTTEST_PERSONAL_LOG)s/")
         debugGen.generate(enabledLoggerNames=[], allLoggerNames=allLoggers)

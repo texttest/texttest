@@ -1,5 +1,5 @@
 
-import guiplugins, plugins, os, sys, shutil, time, subprocess, operator, types
+import guiplugins, plugins, os, sys, shutil, time, subprocess, operator, types, logging
 from copy import copy, deepcopy
 from threading import Thread
 from glob import glob
@@ -1102,7 +1102,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         self.filterAction = gtk.Action("Filter", "Filter", \
                                        self.getFilterTooltip(), self.getStockId())
         guiplugins.scriptEngine.connect(self.getFilterTooltip(), "activate", self.filterAction, self.filterTests)
-        self.selectDiag = plugins.getDiagnostics("Select Tests")
+        self.selectDiag = logging.getLogger("Select Tests")
         self.addOption("vs", "Tests for version", description="Select tests for a specific version.",
                        possibleValues=self.getPossibleVersions(allApps))
         self.selectionGroup = plugins.OptionGroup(self.getTabTitle())

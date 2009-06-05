@@ -1,5 +1,5 @@
 
-import os, shutil, plugins, operator
+import os, shutil, plugins, operator, logging
 from glob import glob
 from itertools import groupby
 
@@ -12,7 +12,7 @@ class ReconnectConfig:
     datedVersions = set()
     def __init__(self, optionMap):
         self.fullRecalculate = optionMap.has_key("reconnfull")
-        self.diag = plugins.getDiagnostics("Reconnection")
+        self.diag = logging.getLogger("Reconnection")
         self.reconnectTmpInfo = optionMap.get("reconnect")
         self.reconnDir = None
         self.errorMessage = ""
@@ -177,7 +177,7 @@ class ReconnectTest(plugins.Action):
     def __init__(self, rootDirToCopy, fullRecalculate):
         self.rootDirToCopy = rootDirToCopy
         self.fullRecalculate = fullRecalculate
-        self.diag = plugins.getDiagnostics("Reconnection")
+        self.diag = logging.getLogger("Reconnection")
     def __repr__(self):
         return "Reconnecting to"
     def __call__(self, test):

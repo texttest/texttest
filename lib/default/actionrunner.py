@@ -1,5 +1,5 @@
 
-import plugins, os, sys, time
+import plugins, os, sys, time, logging
 from Queue import Queue, Empty
 from ndict import seqdict
 from threading import Lock
@@ -23,7 +23,7 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
         self.lock = Lock()
         self.killSignal = None
         self.diag = diag
-        self.lockDiag = plugins.getDiagnostics("locks")
+        self.lockDiag = logging.getLogger("locks")
     def notifyAdd(self, test, initial):
         if test.classId() == "test-case":
             self.diag.info("Adding test " + repr(test))
@@ -99,7 +99,7 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
             
 class ActionRunner(BaseActionRunner):
     def __init__(self, optionMap, allApps):
-        BaseActionRunner.__init__(self, optionMap, plugins.getDiagnostics("Action Runner"))
+        BaseActionRunner.__init__(self, optionMap, logging.getLogger("Action Runner"))
         self.currentTestRunner = None
         self.previousTestRunner = None
         self.script = optionMap.runScript()

@@ -366,10 +366,9 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         self.runAndParse() # will write to the above two structures
         self.vbox = gtk.VBox()
         self.addExtraWidgets()
-        headerMessage = self.addHeader()
-        treeViewMessage = self.addTreeView()
-        return headerMessage + "\n\n" + treeViewMessage
-    
+        self.addHeader()
+        self.addTreeView()
+        
     def addExtraWidgets(self):
         self.extraWidgetArea = gtk.HBox()
         self.extraButtonArea = gtk.HButtonBox()
@@ -445,7 +444,6 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
             alignment.set_padding(5, 5, 0, 5)
             alignment.add(hbox)
             self.vbox.pack_start(alignment, expand=False, fill=False)
-            return "Using Tree View layout with icon '" + iconType + "', header :\n" + message
 
     def getStockIcon(self, stockItem):
         imageBox = gtk.VBox()
@@ -464,7 +462,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         window2.add(textView)
         hpaned.pack2(window2, True, True)
 
-        messages = self.createTreeView()
+        self.createTreeView()
         window1 = gtk.ScrolledWindow()
         window1.set_policy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC)
         window1.add(self.treeView)
@@ -475,8 +473,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
             self.dialog.resize(parentSize[0], int(parentSize[0] / 1.5))
             self.vbox.pack_start(hpaned, expand=True, fill=True)
         self.dialog.vbox.pack_start(self.vbox, expand=True, fill=True)
-        return messages
-
+        
     def parentOutput(self, prevIter):
         if prevIter:
             return "child of " + self.treeModel.get_value(prevIter, 3)
@@ -499,7 +496,6 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
             rootDir = self.getRootPath()
         
         fileToIter = {}
-        message = ""
         for fileName, content, info in self.pages:
             label = plugins.relpath(fileName, rootDir)
             self.diag.info("Adding info for file " + label)
@@ -518,11 +514,6 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
                 currIter = fileToIter.get(currentFile)
                 if currIter is None:
                     newRow = (currentElement, utfContent, currentInfo, currentFile, True)
-                    message += vcs.name + " tree view dialog: Adding " + currentElement + \
-                               " as " + self.parentOutput(prevIter)
-                    if info:
-                        message += ", info " + info
-                    message += "\n"
                     currIter = self.treeModel.append(prevIter, newRow)
                     fileToIter[currentFile] = currIter
                 prevIter = currIter
@@ -539,7 +530,6 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
             self.infoColumn = custom_widgets.ButtonedTreeViewColumn(self.getResultDialogSecondColumnTitle(), infoRenderer, markup=2)
             self.infoColumn.set_resizable(True)
             self.treeView.append_column(self.infoColumn)
-            message += vcs.name + " tree view dialog: Showing two columns\n"
         self.treeView.get_selection().set_select_function(self.canSelect)
         self.treeView.expand_all()
         guiplugins.scriptEngine.monitor("select", self.treeView.get_selection())
@@ -549,11 +539,9 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
             firstIter = self.filteredTreeModel.convert_child_iter_to_iter(fileToIter[firstFile])
             text = self.updateForIter(firstIter)
             self.treeView.get_selection().select_iter(firstIter)
-            message += vcs.name + " tree view dialog: Showing " + vcs.name + " output\n" + text + "\n"
 
         self.treeView.get_selection().connect("changed", self.showOutput)
-        return message
-
+        
     def updateForIter(self, iter):
         self.extraWidgetArea.set_sensitive(True)
         text = self.filteredTreeModel.get_value(iter, 1)
@@ -776,14 +764,13 @@ class StatusGUI(VersionControlDialogGUI):
         self.popupMenu = self.uiManager.get_widget("/Info")
         
     def addContents(self):
-        message = VersionControlDialogGUI.addContents(self)
+        VersionControlDialogGUI.addContents(self)
         self.addToggleItems()
         self.infoColumn.set_clickable(True)
         if self.infoColumn.get_button():
             self.infoColumn.get_button().connect("button-press-event", self.showPopupMenu)
         self.treeView.grab_focus() # Or the column button gets focus ...
-        return message
-    
+        
     def showPopupMenu(self, treeview, event):
         if event.button == 3: # pragma: no cover - replaying doesn't actually press the button
             self.popupMenu.popup(None, None, None, event.button, event.time)

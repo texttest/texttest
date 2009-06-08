@@ -2606,13 +2606,12 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
         return alignment
 
     def addContents(self):
-        dirToProperties = {}
+        dirToProperties = seqdict()
         props = self.getAllProperties()
         for prop in props:
             dirToProperties.setdefault(prop.dir, []).append(prop)
         vbox = self.createVBox(dirToProperties)
         self.dialog.vbox.pack_start(vbox, expand=True, fill=True)
-        return "\n".join([ prop.getDescription() for prop in props ])
 
     def createVBox(self, dirToProperties):
         vbox = gtk.VBox()

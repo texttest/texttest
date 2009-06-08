@@ -52,8 +52,7 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         self.dialog.vbox.pack_start(urlLabel, expand=False, fill=False)
         self.dialog.vbox.pack_start(licenseLabel, expand=False, fill=False)
         self.dialog.set_resizable(False)
-        return message
-
+        
     def showCredits(self, *args):
         newDialog = CreditsDialog(self.dialog, self.validApps)
         newDialog.performOnCurrent()
@@ -113,9 +112,6 @@ class ShowVersions(guiplugins.ActionResultDialogGUI):
         frame.set_padding(10, 10, 10, 10)
         frame.add(vbox)
         self.dialog.vbox.pack_start(frame, expand=True, fill=True)
-        return "Showing component versions: \n TextTest: " + textTestVersion + \
-               "\n Python: " + pythonVersion + "\n GTK: " + gtkVersion + \
-               "\n PyGTK: " + pygtkVersion
         
     def justify(self, label, leftFill, markup = False):
         alignment = gtk.Alignment(leftFill, 0.0, 0.0, 0.0)
@@ -159,7 +155,7 @@ class CreditsDialog(guiplugins.ActionResultDialogGUI):
         notebook.append_page(textView, gtk.Label("Written by"))
         self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
         self.dialog.set_resizable(False)
-        return "Showing credits:\n" + creditsText
+
             
 class LicenseDialog(guiplugins.ActionResultDialogGUI):
     def __init__(self, parent, *args):
@@ -192,8 +188,8 @@ class LicenseDialog(guiplugins.ActionResultDialogGUI):
         notebook = gtk.Notebook()
         notebook.append_page(textView, gtk.Label("License"))
         self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
-        return "Showing license:\n" + licenseText
 
+        
 class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
     def isActiveOnCurrent(self, *args):
         return True
@@ -219,15 +215,12 @@ class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
         notebook.popup_enable()
         docDir = plugins.installationDir("doc")
         versionInfo = self.readVersionInfo(docDir)
-        message = ""
         for version in reversed(sorted(versionInfo.keys())):
             unicodeInfo = plugins.decodeText(versionInfo[version])
             displayText = plugins.encodeToUTF(unicodeInfo)
             endFirstSentence = displayText.find(".")
             versionStr = ".".join(map(str, version))
-            message += "Adding " + self.getTitle() + " from version " + versionStr + \
-                       ":\nFirst sentence :" + displayText[:endFirstSentence + 1] + "\n"
-
+        
             buffer = gtk.TextBuffer()
             buffer.set_text(displayText)
             textView = gtk.TextView(buffer)
@@ -248,8 +241,7 @@ class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
             parentSize = self.topWindow.get_size()
             self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[0] * 0.7))
             self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
-            return message
-
+            
     def labelPrefix(self):
         return ""
 

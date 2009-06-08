@@ -26,7 +26,7 @@ try:
 except:
     raiseException("Unable to import module 'gobject'")
 
-import pango, guiplugins, plugins, os, sys, operator, subprocess, logging
+import pango, guiplugins, plugins, os, sys, operator, subprocess, logging, gtklogger
 from ndict import seqdict
 from copy import copy
 from TreeViewTooltips import TreeViewTooltips
@@ -1780,12 +1780,8 @@ class TextViewGUI(guiplugins.SubGUI):
         return len(self.text) > 0
 
     def describe(self):
-        header = "---------- " + self.getTabTitle() + " Window ----------"
-        guilog.info(header)
-        buffer = self.view.get_buffer()
-        guilog.info(plugins.encodeToLocale(buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter()), guilog).strip())
-        guilog.info("-" * len(header))
-
+        gtklogger.describe(self.view)
+        
     def updateView(self):
         if self.view:
             self.updateViewFromText()

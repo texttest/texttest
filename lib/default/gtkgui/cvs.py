@@ -191,9 +191,8 @@ class CVSLogLatest(version_control.LogGUI):
         self.pages = seqdict()
         self.runAndParse() 
         self.vbox = gtk.VBox()
-        headerMessage = self.addHeader()
-        notebookMessage = self.addNotebook()
-        return headerMessage + "\n\n" + notebookMessage
+        self.addHeader()
+        self.addNotebook()
         
     def addHeader(self):
         message = self.getResultDialogMessage()
@@ -207,13 +206,11 @@ class CVSLogLatest(version_control.LogGUI):
             alignment.set_padding(5, 5, 0, 5)
             alignment.add(hbox)
             self.vbox.pack_start(alignment, expand=False, fill=False)
-            return "Using notebook layout with icon '" + icon + "', header :\n" + message
-    
+        
     def addNotebook(self):
         notebook = gtk.Notebook()
         notebook.set_scrollable(True)
         notebook.popup_enable()
-        message = ""
         for label, content in self.pages.items():
             buffer = gtk.TextBuffer()
             # Encode to UTF-8, necessary for gtk.TextView
@@ -226,7 +223,6 @@ class CVSLogLatest(version_control.LogGUI):
             window = gtk.ScrolledWindow()
             window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
             window.add(textView)
-            message += "Adding notebook tab '" + label + "' with contents\n" + text + "\n"
             notebook.append_page(window, gtk.Label(label))
         notebook.show_all()
         guiplugins.scriptEngine.monitorNotebook(notebook, "view tab")
@@ -235,8 +231,7 @@ class CVSLogLatest(version_control.LogGUI):
             self.dialog.resize(int(parentSize[0] / 1.5), int(parentSize[0] / 2))
         self.vbox.pack_start(notebook, expand=True, fill=True)
         self.dialog.vbox.pack_start(self.vbox, expand=True, fill=True)
-        return message
-
+        
 version_control.vcsClass = CVSInterface
 
 class RenameTest(version_control.RenameTest):

@@ -13,3 +13,6 @@ class ButtonedTreeViewColumn(gtk.TreeViewColumn):
 
     def get_button(self):
         return self.get_widget().get_ancestor(gtk.Button)
+
+    def get_title(self):
+        return self.get_widget().get_text()

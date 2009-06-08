@@ -1,4 +1,5 @@
 
+
 import plugins, os, sys, shutil, time, subprocess, operator, types, logging
 from jobprocess import killSubProcessAndChildren
 from copy import copy, deepcopy
@@ -7,7 +8,7 @@ from stat import *
 from ndict import seqdict
 
 try:
-    import gtk, gobject, entrycompletion
+    import gtk, gobject, entrycompletion, gtklogger
 except ImportError:
     pass # We might want to document the config entries, silly to fail on lack of GTK...
 
@@ -475,21 +476,6 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         alignment.set_padding(5, 5, 0, 5)
         alignment.add(hbox)
         return alignment
-
-    def describeDialog(self, dialog, contents, stockIcon = None):
-        message = "-" * 10 + " Dialog '" + dialog.get_title() + "' " + "-" * 10
-        guilog.info(message)
-        defaultWidget = dialog.default_widget
-        if defaultWidget:
-            try:
-                guilog.info("Default action is labelled '" + defaultWidget.get_label() + "'")
-            except AttributeError: #pragma : no cover, should probably never happen...
-                guilog.info("Default widget unlabelled, type " + str(defaultWidget.__class__))
-        if stockIcon:
-            guilog.info("Using stock icon '" + stockIcon + "'")
-        # One blank line at the end
-        guilog.info(contents.strip())
-        guilog.info("-" * len(message))
             
     def showErrorDialog(self, message):
         self.showErrorWarningDialog(message, gtk.STOCK_DIALOG_ERROR, "Error") 
@@ -502,7 +488,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         scriptEngine.connect("agree to texttest message", "clicked", yesButton, self.cleanDialog,
                              gtk.RESPONSE_ACCEPT, True, dialog)
         dialog.show_all()
-        self.describeDialog(dialog, message, stockIcon)
+        gtklogger.describe(dialog)
         
     def createAlarmDialog(self, parent, message, stockIcon, alarmLevel):
         dialogTitle = "TextTest " + alarmLevel
@@ -523,7 +509,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         scriptEngine.connect("answer yes to texttest " + alarmLevel, "clicked",
                              yesButton, respondMethod, gtk.RESPONSE_YES, True, dialog)
         dialog.show_all()
-        self.describeDialog(dialog, message, stockIcon)
+        gtklogger.describe(dialog)
         
     def cleanDialog(self, button, saidOK, dialog):
         self._cleanDialog(dialog)
@@ -722,7 +708,7 @@ class ActionResultDialogGUI(ActionGUI):
         textContents = self.addContents()
         self.createButtons()
         self.dialog.show_all()
-        self.describeDialog(self.dialog, textContents)
+        gtklogger.describe(self.dialog)#        self.describeDialog(self.dialog, textContents)
 
     def addContents(self):
         pass
@@ -882,145 +868,6 @@ class OptionGroupGUI(ActionGUI):
             return []
         return fromConfig
 
-    def getOptionsDescription(self, vbox, fileChooserOption=None, separator="\n"):
-        messages = [ self.getOptionDescription(widget, fileChooserOption) for widget in vbox.get_children() ]
-        return separator.join(messages)
-
-    def getTableRowDescription(self, children, row, rowCount, columnCount):
-        rowStart = row * columnCount
-        rowEnd = (row + 1) * columnCount
-        rowWidgets = children[rowStart:rowEnd]
-        rowMessages = map(self.getOptionDescription, rowWidgets)
-        return " | ".join(rowMessages)
-
-    def getTextEntryDescription(self, entry):
-        text = entry.get_text()
-        if text:
-            return "Text entry (set to '" + text + "')"
-        else:
-            return "Text entry"
-        
-    def getDropDownDescription(self, combobox):
-        model = combobox.get_model()
-        allEntries = []
-        iter = model.get_iter_root()
-        while iter:
-            allEntries.append(model.get_value(iter, 0))
-            iter = model.iter_next(iter)
-        return allEntries
-
-    def getLabelText(self, labelWidget):
-        try:
-            return labelWidget.get_text()
-        except AttributeError:
-            return labelWidget.get_child().get_text()
-
-    def getTooltipText(self, widget):
-        try:
-            # New 3.12 method...
-            return widget.get_tooltip_text()
-        except AttributeError:
-            data = gtk.tooltips_data_get(widget)
-            if data:
-                return data[2]
-
-    def getOptionDescription(self, widget, fileChooserOption=None):
-        baseDescription = self.getBasicOptionDescription(widget, fileChooserOption)
-        if not widget.get_property("sensitive"):
-            baseDescription += " (greyed out)"
-        tooltip = self.getTooltipText(widget)
-        if tooltip:
-            baseDescription += " (tooltip '" + tooltip + "')"
-        return baseDescription
-
-    def getBasicOptionDescription(self, widget, fileChooserOption):
-        if isinstance(widget, gtk.Label):
-            return "'" + widget.get_text() + "'"
-        elif isinstance(widget, gtk.FileChooserWidget):
-            # Unfortunately we can't get filechooser information out until it's displayed.
-            # So we cheat and use the internal structures
-            return self.getFileChooserDescription(fileChooserOption)
-        elif isinstance(widget, gtk.VBox) or isinstance(widget, gtk.EventBox):
-            return self.getOptionsDescription(widget)
-        elif isinstance(widget, gtk.HBox):
-            return self.getOptionsDescription(widget, separator = " , ")
-        elif isinstance(widget, gtk.Table):
-            columnCount = widget.get_property("n-columns")
-            children = widget.get_children()
-            children.reverse() # They come out in reverse order for some reason...
-            rowCount = widget.get_property("n-rows")
-            text = "Viewing table with " + str(rowCount) + " rows and " + str(columnCount) + " columns.\n"
-            text += "\n".join([ self.getTableRowDescription(children, row, rowCount, columnCount) for row in range(rowCount) ])
-            return text
-        elif isinstance(widget, gtk.Frame):
-            label = self.getLabelText(widget.get_label_widget())
-            frameText = "....." + label + "......\n"
-            # Frame's last child is the label :)
-            for child in widget.get_children()[:-1]:
-                frameText += self.getOptionDescription(child, fileChooserOption) + "\n"
-            return frameText.rstrip()
-        elif isinstance(widget, gtk.ComboBoxEntry):
-            return self.getOptionDescription(widget.get_child()) + " (drop-down list containing " + repr(self.getDropDownDescription(widget)) + ")"
-        elif isinstance(widget, gtk.Entry):
-            return self.getTextEntryDescription(widget)
-        elif isinstance(widget, gtk.CheckButton):
-            group = "Check"
-            if isinstance(widget, gtk.RadioButton):
-                group = "Radio"
-            text = group + " button '" + widget.get_label() + "'"
-            if widget.get_active():
-                text += " (checked)"
-            return text
-        elif isinstance(widget, gtk.Button):
-            labelText = widget.get_label()
-            if labelText:
-                text = "Button '" + widget.get_label() + "'"
-            else:
-                text = "Button"
-            if widget.get_image():
-                stock, size = widget.get_image().get_stock()
-                text += ", stock image '" + stock + "'"
-            return text
-        else:
-            return "Widget type " + repr(widget.__class__)
-##         elif isinstance(widget, 
-##             return self.getSwitchDescription(option)
-##         elif option.selectFile or option.selectDir or option.saveFile:
-##             return self.getFileChooserDescription(option)
-##         else:
-##             return self.getTextOptionDescription(option)
-
-    def getTextOptionDescription(self, option):
-        value = option.getValue()
-        text = "Viewing entry for option '" + option.name.replace("\n", "\\n") + "'"
-        if len(value) > 0:
-            text += " (set to '" + value + "')"
-        if option.usePossibleValues():
-            text += " (drop-down list containing " + repr(option.listPossibleValues()) + ")"
-        return text
-
-    def getFileChooserDescription(self, option):
-        text = "Filechooser"
-        value = option.getValue()
-        if value:
-            text += " (set to '" + value + "')"
-        possDirs = option.getPossibleDirs()
-        if len(possDirs):
-            text += " (choosing from directories " + repr(possDirs) + ")"
-        return text    
-
-    def getSwitchDescription(self, switch):
-        value = switch.getValue()
-        if len(switch.options) >= 1:
-            text = "Viewing radio button for switch '" + switch.name + "', options "
-            text += "/".join(switch.options)
-            text += "'. Default value " + str(value) + "."
-        else:
-            text = "Viewing check button for switch '" + switch.name + "'"
-            if value:
-                text += " (checked)"
-        return text
-
     
 class ActionTabGUI(OptionGroupGUI):
     def __init__(self, *args):
@@ -1045,11 +892,6 @@ class ActionTabGUI(OptionGroupGUI):
 
     def displayInTab(self):
         return True
-
-    def getFileChooserDescription(self, option):
-        # We don't actually show the file choosers here, we just add a button to bring them up
-        # Should probably indicate somehow that we have such a button...
-        return self.getTextOptionDescription(option)
     
     def notifyReset(self):
         self.optionGroup.reset()
@@ -1150,7 +992,7 @@ class ActionTabGUI(OptionGroupGUI):
 
     def describe(self):
         guilog.info("Viewing notebook page for '" + self.getTabTitle() + "'")
-        guilog.info(self.getOptionsDescription(self.vbox))
+        gtklogger.describe(self.vbox)
         
     def addApplicationOptions(self, allApps):
         if len(allApps) > 0:
@@ -1160,6 +1002,21 @@ class ActionTabGUI(OptionGroupGUI):
             configObject = plugins.importAndCall("default", "getConfig", {}) # don't care about inputOptions as we're trying to read them!
             configObject.addToOptionGroups(allApps, [ self.optionGroup ])
             
+
+class FileChooserDescriber:
+    def __init__(self, option):
+        self.option = option
+
+    def getBasicDescription(self, widget):
+        text = "Filechooser"
+        value = self.option.getValue()
+        if value:
+            text += " (set to '" + value + "')"
+        possDirs = self.option.getPossibleDirs()
+        if len(possDirs):
+            text += " (choosing from directories " + repr(possDirs) + ")"
+        return text    
+        
 
 class ActionDialogGUI(OptionGroupGUI):
     def runInteractive(self, *args):
@@ -1193,7 +1050,10 @@ class ActionDialogGUI(OptionGroupGUI):
         self.createButtons(dialog, fileChooser, fileChooserOption)
         self.tryResize(dialog)
         dialog.show_all()
-        self.describeDialog(dialog, self.getOptionsDescription(vbox, fileChooserOption))
+        # Unfortunately we can't get filechooser information out until it's displayed.
+        # So we cheat and use the internal structures
+        customDescribers = { gtk.FileChooserWidget : FileChooserDescriber(fileChooserOption) }
+        gtklogger.describe(dialog, customDescribers)
         
     def getConfirmationDialogSettings(self):
         return gtk.STOCK_DIALOG_WARNING, "Confirmation"

@@ -1533,18 +1533,6 @@ def encodeToUTF(unicodeInfo, log = None):
                          "replacement. Showing error message instead.")
             return "Failed to encode Unicode string."
 
-def encodeToLocale(unicodeInfo, log = None):
-    localeEncoding = locale.getdefaultlocale()[1]
-    if localeEncoding:
-        try:
-            return unicodeInfo.encode(localeEncoding, 'strict')
-        except:
-            if log:
-                log.info("WARNING: Failed to encode Unicode string '" + unicodeInfo + \
-                         "' using strict '" + localeEncoding + "' encoding.\nReverting to non-strict UTF-8 " + \
-                         "encoding but replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
-    return unicodeInfo.encode('utf-8', 'replace')
-
 def rel_pathsplit(p, rest=[]):
     (h,t) = os.path.split(p)
     if len(h) < 1: return [t]+rest
@@ -1617,8 +1605,7 @@ class FileProperties:
     def formatTime(self, timeStamp):
         # %e is more appropriate than %d below, as it fills with space
         # rather than 0, but it is not supported on Windows, it seems.
-        if timeStamp < self.recent or \
-               timeStamp > self.now:
+        if timeStamp < self.recent or timeStamp > self.now:
             timeFormat = "%b %d  %Y"
         else:
             timeFormat = "%b %d %H:%M"
@@ -1632,7 +1619,4 @@ class FileProperties:
                 self.inqLinks(), self.inqOwner(),
                 self.inqGroup(), self.inqSize(),
                 self.inqModificationTime(), self.filename)
-    def getUnixStringRepresentation(self):
-        return "%s%s %3d %-8s %-8s %8d %s %s" % self.getUnixRepresentation()
-    def getDescription(self):
-        return "Showing properties of the file " + self.abspath + ":\n" + self.getUnixStringRepresentation()
+    

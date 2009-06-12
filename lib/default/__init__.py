@@ -128,7 +128,7 @@ class Config:
         if not self.useExtraVersions():
             return []
         fromConfig = self.getExtraVersionsFromConfig(app)
-        fromCmd = self.getExtraVersionsFromCmdLine(app)
+        fromCmd = self.getExtraVersionsFromCmdLine(app, fromConfig)
         return self.createComposites(fromConfig, fromCmd)
 
     def createComposites(self, vlist1, vlist2):
@@ -140,9 +140,9 @@ class Config:
 
         return allVersions
 
-    def getExtraVersionsFromCmdLine(self, app):
+    def getExtraVersionsFromCmdLine(self, app, fromConfig):
         if self.isReconnecting():
-            return self.reconnectConfig.getExtraVersions(app)
+            return self.reconnectConfig.getExtraVersions(app, fromConfig)
         else:
             copyVersions = self.getCopyExtraVersions()
             checkoutVersions = self.getCheckoutExtraVersions()

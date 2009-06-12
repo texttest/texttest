@@ -315,7 +315,6 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
 
     def viewGraphicalDiff(self, button):
         path = self.filteredTreeModel.get_value(self.treeView.get_selection().get_selected()[1], 3)
-        guiplugins.guilog.info("Viewing " + vcs.name + " differences for file '" + path + "' graphically ...")
         pathStem = os.path.basename(path).split(".")[0]
         diffProgram = guiplugins.guiConfig.getCompositeValue("diff_program", pathStem)
         revOptions = self.getExtraArgs()
@@ -457,6 +456,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         self.textBuffer = gtk.TextBuffer()
         textView = gtk.TextView(self.textBuffer)
         textView.set_editable(False)
+        textView.set_name("VCS Output View")
         window2 = gtk.ScrolledWindow()
         window2.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         window2.add(textView)
@@ -519,6 +519,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
                 prevIter = currIter
                         
         self.treeView = gtk.TreeView(self.filteredTreeModel)
+        self.treeView.set_name("VCS " + self.cmdName + " info tree")
         self.treeView.set_enable_search(False)
         fileRenderer = gtk.CellRendererText()
         fileColumn = gtk.TreeViewColumn("File", fileRenderer, markup=0)
@@ -537,7 +538,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         if len(self.pages) > 0:
             firstFile = self.pages[0][0]
             firstIter = self.filteredTreeModel.convert_child_iter_to_iter(fileToIter[firstFile])
-            text = self.updateForIter(firstIter)
+            self.updateForIter(firstIter)
             self.treeView.get_selection().select_iter(firstIter)
 
         self.treeView.get_selection().connect("changed", self.showOutput)
@@ -551,9 +552,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
     def showOutput(self, selection):
         model, iter = selection.get_selected()
         if iter:
-            text = self.updateForIter(iter)
-            message = vcs.name + " tree view dialog: Showing " + vcs.name + " output\n" + text
-            guiplugins.guilog.info(message.strip())
+            self.updateForIter(iter)
         else:
             self.extraWidgetArea.set_sensitive(False)
 

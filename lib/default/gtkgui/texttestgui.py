@@ -1775,17 +1775,20 @@ class TextViewGUI(guiplugins.SubGUI):
         guiplugins.SubGUI.__init__(self)
         self.text = ""
         self.view = None
+        self.described = False
 
     def shouldShowCurrent(self, *args):
-        return len(self.text) > 0
-
-    def describe(self):
-        gtklogger.describe(self.view)
+        return len(self.text) > 0        
         
+    def describe(self):
+        if not self.described:
+            # gtklogger handles the updates for us, don't do it here also
+            gtklogger.describe(self.view)
+            self.described = True
+            
     def updateView(self):
         if self.view:
             self.updateViewFromText()
-            self.contentsChanged()
 
     def createView(self):
         self.view = gtk.TextView()

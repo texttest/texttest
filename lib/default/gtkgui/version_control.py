@@ -1,7 +1,7 @@
 
 # Generic interface to version control systems. We try to keep it as general as possible.
 
-import gtk, gobject, guiplugins, default_gui, plugins, custom_widgets, entrycompletion, os, datetime, subprocess, shutil
+import gtk, gobject, guiplugins, default_gui, plugins, custom_widgets, entrycompletion, os, datetime, subprocess, shutil, gtklogger
 
 vcsClass, vcs, annotateClass = None, None, None
     
@@ -714,6 +714,7 @@ class StatusGUI(VersionControlDialogGUI):
     def toggleVisibility(self, action):
         self.treeModel.foreach(self.setVisibility, (action.get_name(), action.get_active()))
         self.treeView.expand_row(self.filteredTreeModel.get_path(self.filteredTreeModel.get_iter_root()), True)
+        gtklogger.describe(self.treeView)
 
     def getStatus(self, iter):
         markedUpStatus = self.treeModel.get_value(iter, 2)
@@ -726,19 +727,11 @@ class StatusGUI(VersionControlDialogGUI):
     
     def setVisibility(self, model, path, iter, (actionName, actionState)):
         if model.iter_parent(iter) is not None and (actionName == "" or self.getStatus(iter) == actionName):
-            self.setVisibilityInModel(iter, actionState)
+            model.set_value(iter, 4, actionState)
             parentIter = model.iter_parent(iter)
             if actionState or self.hasNoVisibleChildren(model, parentIter):
                 self.setVisibility(model, model.get_path(parentIter), parentIter, ("", actionState))
-
-    def setVisibilityInModel(self, iter, newValue):
-        oldValue = self.treeModel.get_value(iter, 4)
-        if oldValue and not newValue:
-            guiplugins.guilog.info("Hiding node '" + self.treeModel.get_value(iter, 0) + "'")
-        elif newValue and not oldValue:
-            guiplugins.guilog.info("Showing node '" + self.treeModel.get_value(iter, 0) + "'")
-        self.treeModel.set_value(iter, 4, newValue)
-
+        
     def hasNoVisibleChildren(self, model, iter):
         i = model.iter_children(iter)
         while i:

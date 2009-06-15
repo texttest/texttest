@@ -1,7 +1,7 @@
 
 # Generic interface to version control systems. We try to keep it as general as possible.
 
-import gtk, gobject, guiplugins, default_gui, plugins, custom_widgets, entrycompletion, os, datetime, subprocess, shutil, gtklogger
+import gtk, gobject, guiplugins, default_gui, plugins, custom_widgets, entrycompletion, os, datetime, subprocess, shutil
 
 vcsClass, vcs, annotateClass = None, None, None
     
@@ -713,8 +713,7 @@ class StatusGUI(VersionControlDialogGUI):
     def toggleVisibility(self, action):
         self.treeModel.foreach(self.setVisibility, (action.get_name(), action.get_active()))
         self.treeView.expand_row(self.filteredTreeModel.get_path(self.filteredTreeModel.get_iter_root()), True)
-        gtklogger.describe(self.treeView)
-
+        
     def getStatus(self, iter):
         markedUpStatus = self.treeModel.get_value(iter, 2)
         start = markedUpStatus.find(">")

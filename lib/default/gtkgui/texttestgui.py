@@ -2636,6 +2636,7 @@ class TestProgressMonitor(guiplugins.SubGUI):
         return self.dynamic
     def createView(self):
         self.treeView = gtk.TreeView(self.treeModel)
+        self.treeView.set_name("Test Status View")
         selection = self.treeView.get_selection()
         selection.set_mode(gtk.SELECTION_MULTIPLE)
         selection.set_select_function(self.canSelect)
@@ -2669,14 +2670,15 @@ class TestProgressMonitor(guiplugins.SubGUI):
         if self.dynamic and test.classId() == "test-case":
             incrementCount = self.testCount == 0
             self.insertTest(test, test.state, incrementCount)
-            if incrementCount:
-                self.contentsChanged()
     def notifyAllRead(self, *args):
         # Fix the not started count in case the initial guess was wrong
         if self.testCount > 0:
             self.diag.info("Reading complete, updating not-started count to actual answer")
             iter = self.treeModel.get_iter_root()
-            self.treeModel.set_value(iter, 1, len(self.treeModel.get_value(iter, 5)))
+            actualTestCount = len(self.treeModel.get_value(iter, 5))
+            measuredTestCount = self.treeModel.get_value(iter, 1)
+            if actualTestCount != measuredTestCount:
+                self.treeModel.set_value(iter, 1, actualTestCount)
     def selectionChanged(self, selection):
         # For each selected row, select the corresponding rows in the test treeview
         tests = []
@@ -2837,7 +2839,6 @@ class TestProgressMonitor(guiplugins.SubGUI):
             self.treeModel.set_value(iter, 1, testCount + 1)
         self.diag.info("Tests for node " + self.treeModel.get_value(iter, 0) + " " + repr(allTests))
         allTests.append(test)
-        self.treeModel.set_value(iter, 5, allTests)
         self.diag.info("Tests for node " + self.treeModel.get_value(iter, 0) + " " + repr(allTests))
     def addNewIter(self, classifier, parentIter, colour, visibility, testCount, tests=[]):
         modelAttributes = [classifier, testCount, visibility, colour, "bold", tests]
@@ -2859,8 +2860,7 @@ class TestProgressMonitor(guiplugins.SubGUI):
             self.removeFromDiffStore(test)
         colourInserted = self.insertTest(test, state, incrementCount=True)
         self.updateTestAppearance(test, state, changeDesc, colourInserted)
-        self.contentsChanged()
-
+        
     def removeParentIters(self, iters):
         noParents = []
         for iter1 in iters:
@@ -2887,37 +2887,12 @@ class TestProgressMonitor(guiplugins.SubGUI):
                 return True
         return False
 
+    def writeSeparator(self):
+        pass
+    
     def describe(self):
-        guilog.info("Test progress:")
-        childIters = []
-        childIter = self.treeModel.get_iter_root()
-
-        # Put all children in list to be treated
-        while childIter != None:
-            childIters.append(childIter)
-            childIter = self.treeModel.iter_next(childIter)
-
-        while len(childIters) > 0:
-            childIter = childIters[0]
-            # If this iter has children, add these to the list to be treated
-            if self.treeModel.iter_has_child(childIter):
-                subChildIter = self.treeModel.iter_children(childIter)
-                pos = 1
-                while subChildIter != None:
-                    childIters.insert(pos, subChildIter)
-                    pos = pos + 1
-                    subChildIter = self.treeModel.iter_next(subChildIter)
-            # Print the iter
-            indentation = ("--" * (self.getIterDepth(childIter) + 1)) + "> "
-            name = self.treeModel.get_value(childIter, 0)
-            count = str(self.treeModel.get_value(childIter, 1))
-            visible = self.treeModel.get_value(childIter, 2)
-            bg = self.treeModel.get_value(childIter, 3)
-            font = self.treeModel.get_value(childIter, 4)
-            guilog.info(indentation + name + " : " + count + ", colour '" + bg +
-                        "', font '" + font + "'" + "', visible=" + repr(visible))
-            childIters = childIters[1:len(childIters)]
-
+        gtklogger.describe(self.treeView)
+    
     def getIterDepth(self, iter):
         parent = self.treeModel.iter_parent(iter)
         depth = 0

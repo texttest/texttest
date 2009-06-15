@@ -451,6 +451,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
 
     def addTreeView(self):
         hpaned = gtk.HPaned()
+        hpaned.set_name("VCS dialog separator") # Mostly so we can filter the proportions, which we don't set
 
         # We need buffer when creating treeview, so create right-hand side first ...
         self.textBuffer = gtk.TextBuffer()

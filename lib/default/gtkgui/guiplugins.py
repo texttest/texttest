@@ -252,22 +252,12 @@ processMonitor = ProcessTerminationMonitor()
 class SubGUI(plugins.Observable):
     def __init__(self):
         plugins.Observable.__init__(self)
-        self.active = False
         self.widget = None
-    def setActive(self, newValue):
-        if self.shouldShow():
-            self.active = newValue
-
-    def activate(self):
-        self.setActive(True)
-        self.contentsChanged()
-
-    def deactivate(self):
-        self.setActive(False)
+    
     def writeSeparator(self):
         guilog.info("") # blank line for demarcation
     def shouldDescribe(self):
-        return self.active and self.shouldShowCurrent()
+        return self.shouldShow() and self.shouldShowCurrent()
     def contentsChanged(self):
         if self.shouldDescribe():
             self.writeSeparator()
@@ -759,8 +749,10 @@ class OptionGroupGUI(ActionGUI):
 
     def createOptionEntry(self, option, separator):
         widget, entry = self.createOptionWidget(option)
+        optionName = option.name.strip()
+        entry.set_name(optionName)
         labelEventBox = self.createLabelEventBox(option, separator)
-        scriptEngine.registerEntry(entry, "enter " + option.name.strip() + " =")
+        scriptEngine.registerEntry(entry, "enter " + optionName + " =")
         entry.set_text(option.getValue())
         entrycompletion.manager.register(entry)
         # Options in drop-down lists don't change, so we just add them once and for all.
@@ -887,15 +879,14 @@ class ActionTabGUI(OptionGroupGUI):
     def setSensitivity(self, newValue):
         ActionGUI.setSensitivity(self, newValue)
         self.diag.info("Sensitivity of " + self.getTabTitle() + " changed to " + repr(newValue))
-        if self.shouldShowCurrent() and self.updateOptions():
-            self.contentsChanged()        
+        if self.shouldShowCurrent():
+            self.updateOptions()
 
     def displayInTab(self):
         return True
     
     def notifyReset(self):
         self.optionGroup.reset()
-        self.contentsChanged()
 
     def extractSwitches(self, optionGroup):
         options, switches = [], []
@@ -990,9 +981,8 @@ class ActionTabGUI(OptionGroupGUI):
             entry.set_position(-1) # Sets position last, makes it possible to see the vital part of long paths 
         dialog.destroy()
 
-    def describe(self):
-        guilog.info("Viewing notebook page for '" + self.getTabTitle() + "'")
-        gtklogger.describe(self.vbox)
+    def contentsChanged(self):
+        pass # All done for us
         
     def addApplicationOptions(self, allApps):
         if len(allApps) > 0:
@@ -1316,8 +1306,6 @@ class InteractiveActionHandler:
                 actionTabGUIs.append(action)
             else:
                 self.diag.info("Menu/toolbar: " + str(action.__class__))
-                # It's always active, always visible
-                action.setActive(True)
                 defaultGUIs.append(action)
 
         actionGroup = gtk.ActionGroup("AllActions")

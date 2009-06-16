@@ -60,14 +60,6 @@ class ContainerGUI(guiplugins.SubGUI):
     def shouldShowCurrent(self, *args):
         return reduce(operator.and_, (subgui.shouldShowCurrent(*args) for subgui in self.subguis))
 
-    def shouldDescribe(self):
-        return self.active
-
-    def setActive(self, value):
-        guiplugins.SubGUI.setActive(self, value)
-        for subgui in self.subguis:
-            subgui.setActive(value)
-
     def contentsChanged(self):
         guiplugins.SubGUI.contentsChanged(self)
         for subgui in self.subguis:
@@ -256,7 +248,7 @@ class TextTestGUI(plugins.Responder, plugins.Observable):
         # Don't put ourselves in the observers twice or lots of weird stuff happens.
         # Important that closing the GUI is the last thing to be done, so make sure we go at the end...
         frameworkExitObservers = filter(self.isFrameworkExitObserver, frameworkObservers)
-        return self.defaultActionGUIs + [ guiplugins.processMonitor, statusMonitor ] + \
+        return self.defaultActionGUIs + [ guiplugins.processMonitor, statusMonitor, self.testTreeGUI, self.menuBarGUI ] + \
                frameworkExitObservers + [ self.idleManager, self ]
     def getTestColumnObservers(self):
         return [ self.testTreeGUI, statusMonitor, self.idleManager ]
@@ -433,7 +425,7 @@ class TopWindowGUI(ContainerGUI):
         if not self.topWindow:
             # only do this once, not when new suites are added...
             self.createView()
-            self.activate()
+            self.contentsChanged()
 
     def createView(self):
         # Create toplevel window to show it all.
@@ -541,14 +533,6 @@ class MenuBarGUI(guiplugins.SubGUI):
         self.actionGroup = self.uiManager.get_action_groups()[0]
         self.toggleActions = []
         self.diag = logging.getLogger("Menu Bar")
-    def setActive(self, active):
-        guiplugins.SubGUI.setActive(self, active)
-        self.widget.get_toplevel().add_accel_group(self.uiManager.get_accel_group())
-        if self.shouldHide("menubar"):
-            self.hide(self.widget, "Menubar")
-        for toggleAction in self.toggleActions:
-            if self.shouldHide(toggleAction.get_name()):
-                toggleAction.set_active(False)
     def shouldHide(self, name):
         return guiConfig.getCompositeValue("hide_gui_element", name, modeDependent=True)
     def toggleVisibility(self, action, observer, *args):
@@ -593,6 +577,15 @@ class MenuBarGUI(guiplugins.SubGUI):
         self.uiManager.ensure_update()
         self.widget = self.uiManager.get_widget("/MainMenuBar")
         return self.widget
+    
+    def notifyTopWindow(self, window):
+        window.add_accel_group(self.uiManager.get_accel_group())
+        if self.shouldHide("menubar"):
+            self.hide(self.widget, "Menubar")
+        for toggleAction in self.toggleActions:
+            if self.shouldHide(toggleAction.get_name()):
+                toggleAction.set_active(False)
+
     def getGUIDescriptionFileNames(self):
         allFiles = plugins.findDataPaths([ "*.xml" ], self.vanilla, includePersonal=True)
         self.diag.info("All description files : " + repr(allFiles))
@@ -600,6 +593,7 @@ class MenuBarGUI(guiplugins.SubGUI):
         loadFiles = filter(self.shouldLoad, allFiles)
         loadFiles.sort(self.cmpDescFiles)
         return loadFiles
+
     def cmpDescFiles(self, file1, file2):
         base1 = os.path.basename(file1)
         base2 = os.path.basename(file2)
@@ -904,10 +898,6 @@ class TestTreeGUI(ContainerGUI):
     def notifyDefaultVisibility(self, newValue):
         self.newTestsVisible = newValue
 
-    def setActive(self, value):
-        # avoid the quit button getting initial focus, give it to the tree view (why not?)
-        ContainerGUI.setActive(self, value)
-        self.treeView.grab_focus()
     def describe(self):
         guilog.info("Test Tree description...")
         self.filteredModel.foreach(self.describeRow)
@@ -999,10 +989,15 @@ class TestTreeGUI(ContainerGUI):
         self.selection.connect("changed", self.userChangedSelection)
 
         self.treeView.show()
+
         self.popupGUI.createView()
         return self.addScrollBars(self.treeView, hpolicy=gtk.POLICY_NEVER)
     def describeTree(self, *args):
         guiplugins.SubGUI.contentsChanged(self) # don't describe the column too...
+
+    def notifyTopWindow(self, window):
+        # avoid the quit button getting initial focus, give it to the tree view (why not?)
+        self.treeView.grab_focus()
 
     def canSelect(self, path):
         pathIter = self.filteredModel.get_iter(path)
@@ -1460,10 +1455,8 @@ class BoxGUI(ContainerGUI):
 
     def getExpandWidgets(self):
         return [ gtk.HPaned, gtk.ScrolledWindow ]
+    
     def contentsChanged(self):
-        if not self.active:
-            return
-
         if self.horizontal:
             guilog.info("")
             for subgui in self.subguis:
@@ -1471,6 +1464,7 @@ class BoxGUI(ContainerGUI):
         else:
             for subgui in self.subguis:
                 subgui.contentsChanged()
+
     def createView(self):
         box = self.createBox()
         packMethod = self.getPackMethod(box)
@@ -1496,17 +1490,6 @@ class NotebookGUI(guiplugins.SubGUI):
     def findInitialCurrentTab(self):
         return self.tabInfo[0]
 
-    def setActive(self, value):
-        guiplugins.SubGUI.setActive(self, value)
-        if self.currentTabGUI:
-            self.diag.info("Setting active flag " + repr(value) + " for '" + self.currentTabGUI.getTabTitle() + "'")
-            self.currentTabGUI.setActive(value)
-
-    def contentsChanged(self):
-        guiplugins.SubGUI.contentsChanged(self)
-        if self.currentTabGUI:
-            self.currentTabGUI.contentsChanged()
-
     def createView(self):
         self.notebook = gtk.Notebook()
         for tabName, tabGUI in self.tabInfo:
@@ -1516,7 +1499,6 @@ class NotebookGUI(guiplugins.SubGUI):
 
         scriptEngine.monitorNotebook(self.notebook, self.scriptTitle)
         self.notebook.set_scrollable(True)
-        self.notebook.connect("switch-page", self.handlePageSwitch)
         self.notebook.show()
         return self.notebook
 
@@ -1524,37 +1506,8 @@ class NotebookGUI(guiplugins.SubGUI):
         self.diag.info("Adding page " + tabName)
         return tabGUI.createView()
 
-    def handlePageSwitch(self, notebook, ptr, pageNum, *args):
-        if not self.active:
-            return
-        newPageName, newTabGUI = self.tabInfo[pageNum]
-        if newTabGUI is self.currentTabGUI:
-            return
-        self.currentTabGUI = newTabGUI
-        self.diag.info("Switching to page " + newPageName)
-        for tabName, tabGUI in self.tabInfo:
-            if tabGUI is self.currentTabGUI:
-                self.diag.info("Activating " + tabName)
-                tabGUI.activate()
-            else:
-                self.diag.info("Deactivating " + tabName)
-                tabGUI.deactivate()
-
-    def getPageName(self, pageNum):
-        page = self.notebook.get_nth_page(pageNum)
-        if page:
-            return self.notebook.get_tab_label_text(page)
-        else:
-            return ""
-
     def describe(self):
-        guilog.info("Tabs showing : " + ", ".join(self.getTabNames()))
-
-    def getVisiblePages(self):
-        return filter(lambda child: child.get_property("visible"), self.notebook.get_children())
-
-    def getTabNames(self):
-        return map(self.notebook.get_tab_label_text, self.getVisiblePages())
+        gtklogger.describe(self.notebook)
 
     def shouldShowCurrent(self, *args):
         for name, tabGUI in self.tabInfo:
@@ -1581,10 +1534,11 @@ class ChangeableNotebookGUI(NotebookGUI):
         return self.tabInfo[0]
 
     def findFirstRemaining(self, pagesRemoved):
-        for page in self.getVisiblePages():
-            pageNum = self.notebook.page_num(page)
-            if not pagesRemoved.has_key(pageNum):
-                return pageNum
+        for page in self.notebook.get_children():
+            if page.get_property("visible"):
+                pageNum = self.notebook.page_num(page)
+                if not pagesRemoved.has_key(pageNum):
+                    return pageNum
 
     def showNewPages(self, *args):
         changed = False
@@ -1650,9 +1604,6 @@ class ChangeableNotebookGUI(NotebookGUI):
         pagesHidden = self.hideOldPages(test, state)
         if changeCurrentPage:
             self.updateCurrentPage(rowCount)
-
-        if pagesShown or pagesHidden:
-            guiplugins.SubGUI.contentsChanged(self) # just the tabs will do here, the rest is described by other means
 
     def notifyLifecycleChange(self, test, state, changeDesc):
         self.updatePages(test, state)
@@ -1775,17 +1726,10 @@ class TextViewGUI(guiplugins.SubGUI):
         guiplugins.SubGUI.__init__(self)
         self.text = ""
         self.view = None
-        self.described = False
-
+        
     def shouldShowCurrent(self, *args):
         return len(self.text) > 0        
-        
-    def describe(self):
-        if not self.described:
-            # gtklogger handles the updates for us, don't do it here also
-            gtklogger.describe(self.view)
-            self.described = True
-            
+                    
     def updateView(self):
         if self.view:
             self.updateViewFromText()
@@ -2046,8 +1990,7 @@ class FileViewGUI(guiplugins.SubGUI):
         self.selection.get_tree_view().expand_all()
         if preserveSelection:
             self.reselect(selectionStore)
-        self.contentsChanged()
-
+        
     def storeSelection(self):
         selectionStore = []
         self.selection.selected_foreach(self.storeIter, selectionStore)
@@ -2086,35 +2029,13 @@ class FileViewGUI(guiplugins.SubGUI):
 
     def getState(self):
         pass
-
-    def describe(self):
-        self.describeName()
-        self.model.foreach(self.describeIter)
-
-    def describeName(self):
-        if self.nameColumn:
-            guilog.info("Setting file-view title to '" + self.nameColumn.get_title() + "'")
-
-    def describeIter(self, model, path, currIter):
-        parentIter = self.model.iter_parent(currIter)
-        if parentIter:
-            fileName = self.model.get_value(currIter, 0)
-            colour = self.model.get_value(currIter, 1)
-            if colour:
-                parentDesc = self.model.get_value(parentIter, 0)
-                guilog.info("Adding file " + fileName + " under heading '" + parentDesc + "', coloured " + colour)
-            details = self.model.get_value(currIter, 4)
-            if details:
-                guilog.info("(Second column '" + details + "' coloured " + colour + ")")
-            recalcIcon = self.model.get_value(currIter, 5)
-            if recalcIcon:
-                guilog.info("(Recalculation icon showing '" + recalcIcon + "')")
-
+            
     def createView(self):
         self.model.clear()
         state = self.getState()
         self.addFilesToModel(state)
         view = gtk.TreeView(self.model)
+        view.set_name("File Tree")
         self.selection = view.get_selection()
         self.selection.set_mode(gtk.SELECTION_MULTIPLE)
         self.selection.set_select_function(self.canSelect)
@@ -2123,7 +2044,7 @@ class FileViewGUI(guiplugins.SubGUI):
         self.nameColumn.set_cell_data_func(renderer, renderParentsBold)
         self.nameColumn.set_resizable(True)
         view.append_column(self.nameColumn)
-        detailsColumn = self.makeDetailsColumn(renderer)
+        detailsColumn = self.makeDetailsColumn()
         if detailsColumn:
             view.append_column(detailsColumn)
             self.tips = RefreshTips("file", detailsColumn, 5)
@@ -2143,8 +2064,9 @@ class FileViewGUI(guiplugins.SubGUI):
         pathIter = self.model.get_iter(path)
         return not self.model.iter_has_child(pathIter)
 
-    def makeDetailsColumn(self, renderer):
+    def makeDetailsColumn(self):
         if self.dynamic:
+            renderer = gtk.CellRendererText()
             column = gtk.TreeViewColumn("Details")
             column.set_resizable(True)
             recalcRenderer = gtk.CellRendererPixbuf()
@@ -2305,8 +2227,7 @@ class TestFileGUI(FileViewGUI):
     def notifyNameChange(self, test, origRelPath):
         if test is self.currentTest:
             self.model.foreach(self.updatePath, (origRelPath, test.getRelPath()))
-            if self.setName( [ test ], 1):
-                self.describeName()
+            self.setName( [ test ], 1)
 
     def updatePath(self, model, path, iter, data):
         origPath, newPath = data
@@ -2324,13 +2245,8 @@ class TestFileGUI(FileViewGUI):
 
     def notifyRecalculation(self, test, comparisons, newIcon):
         if test is self.currentTest:
-            # slightly ugly hack with "global data": this way we don't have to return any iterators
-            # and can avoid the bug in PyGTK 2.10.3 in this area
-            self.recalculationCausedChange = False
             self.model.foreach(self.setRecalculateIcon, [ comparisons, newIcon ])
-            if self.recalculationCausedChange:
-                self.contentsChanged()
-
+            
     def setRecalculateIcon(self, model, path, iter, data):
         comparisons, newIcon = data
         comparison = model.get_value(iter, 3)
@@ -2338,8 +2254,7 @@ class TestFileGUI(FileViewGUI):
             oldVal = model.get_value(iter, 5)
             if oldVal != newIcon:
                 self.model.set_value(iter, 5, newIcon)
-                self.recalculationCausedChange = True
-
+            
     def forceVisible(self, rowCount):
         return rowCount == 1
 
@@ -2349,8 +2264,7 @@ class TestFileGUI(FileViewGUI):
             return
 
         if len(tests) > 1 and self.currentTest in tests:
-            if self.setName(tests, rowCount) and self.active:
-                self.describeName()
+            self.setName(tests, rowCount)
         else:
             self.currentTest = tests[0]
             self.currentTest.refreshFiles()
@@ -2364,9 +2278,6 @@ class TestFileGUI(FileViewGUI):
             self.title = newTitle
             if self.nameColumn:
                 self.nameColumn.set_title(self.title)
-            return True
-        else:
-            return False
 
     def getName(self, tests, rowCount):
         if rowCount > 1:
@@ -2891,16 +2802,9 @@ class TestProgressMonitor(guiplugins.SubGUI):
         pass
     
     def describe(self):
-        gtklogger.describe(self.treeView)
+        pass
+        #gtklogger.describe(self.treeView)
     
-    def getIterDepth(self, iter):
-        parent = self.treeModel.iter_parent(iter)
-        depth = 0
-        while parent != None:
-            depth = depth + 1
-            parent = self.treeModel.iter_parent(parent)
-        return depth
-
     def getAllChildIters(self, iter):
          # Toggle all children too
         childIters = []

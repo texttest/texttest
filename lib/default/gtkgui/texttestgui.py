@@ -795,8 +795,6 @@ class TestColumnGUI(guiplugins.SubGUI):
             self.column.set_title(self.getTitle())
             if not initial:
                 self.contentsChanged()
-    def describe(self):
-        guilog.info("Test column header set to '" + self.column.get_title() + "'")
     def notifyTestTreeCounters(self, totalDelta, totalShownDelta, totalRowsDelta, initial=False):
         self.addedCount += totalDelta
         if not initial or self.totalNofTests < self.addedCount:
@@ -895,25 +893,20 @@ class TestTreeGUI(ContainerGUI):
         self.treeView = None
         self.newTestsVisible = guiConfig.showCategoryByDefault("not_started")
         self.diag = logging.getLogger("Test Tree")
+
     def notifyDefaultVisibility(self, newValue):
         self.newTestsVisible = newValue
 
-    def describe(self):
-        guilog.info("Test Tree description...")
-        self.filteredModel.foreach(self.describeRow)
     def isExpanded(self, iter):
         parentIter = self.filteredModel.iter_parent(iter)
         return not parentIter or self.treeView.row_expanded(self.filteredModel.get_path(parentIter))
-    def describeRow(self, model, path, iter):
-        if self.isExpanded(iter):
-            test = model.get_value(iter, 2)[0]
-            if test:
-                guilog.info("-> " + test.getIndent() + model.get_value(iter, 0))
+
     def getCollapseStatic(self):
         if self.dynamic:
             return False
         else:
             return guiConfig.getValue("static_collapse_suites")
+
     def notifyAllRead(self, suites):
         if self.dynamic:
             self.filteredModel.connect('row-inserted', self.rowInserted)
@@ -924,7 +917,6 @@ class TestTreeGUI(ContainerGUI):
                 self.expandLevel(self.treeView, self.filteredModel.get_iter_root())
             else:
                 self.treeView.expand_all()
-        self.treeView.connect('row-expanded', self.describeTree) # later expansions should cause description...
         self.contentsChanged()
         self.notify("AllRead")
     def makeRowVisible(self, model, path, iter):
@@ -955,6 +947,7 @@ class TestTreeGUI(ContainerGUI):
         self.filteredModel = self.model.filter_new()
         self.filteredModel.set_visible_column(5)
         self.treeView = gtk.TreeView(self.filteredModel)
+        self.treeView.set_name("Test Tree")
         self.treeView.expand_all()
 
         self.selection = self.treeView.get_selection()
@@ -992,9 +985,7 @@ class TestTreeGUI(ContainerGUI):
 
         self.popupGUI.createView()
         return self.addScrollBars(self.treeView, hpolicy=gtk.POLICY_NEVER)
-    def describeTree(self, *args):
-        guiplugins.SubGUI.contentsChanged(self) # don't describe the column too...
-
+    
     def notifyTopWindow(self, window):
         # avoid the quit button getting initial focus, give it to the tree view (why not?)
         self.treeView.grab_focus()
@@ -1074,7 +1065,6 @@ class TestTreeGUI(ContainerGUI):
         oldVal = self.model.get_value(iter, 6)
         newVal = self.getRecalculationIcon(recalcComparisons)
         if newVal != oldVal:
-            guilog.info("Setting recalculation icon to '" + newVal + "'")
             self.model.set_value(iter, 6, newVal)
         self.notify("Recalculation", test, recalcComparisons, newVal)
 
@@ -1169,7 +1159,6 @@ class TestTreeGUI(ContainerGUI):
         self.model.set_value(iter, 1, colour1)
         self.model.set_value(iter, 3, detailText)
         self.model.set_value(iter, 4, colour2)
-        self.diagnoseTest(test, iter)
         if updateSuccess:
             self.updateSuiteSuccess(test, colour1)
         if saved:
@@ -1197,13 +1186,6 @@ class TestTreeGUI(ContainerGUI):
             self.setAllSucceeded(suite, colour)
             self.updateSuiteSuccess(suite, colour)
 
-    def diagnoseTest(self, test, iter):
-        self.writeSeparator()
-        guilog.info("Redrawing test " + test.name + " coloured " + self.model.get_value(iter, 1))
-        secondColumnText = self.model.get_value(iter, 3)
-        if secondColumnText:
-            guilog.info("(Second column '" + secondColumnText + "' coloured " + self.model.get_value(iter, 4) + ")")
-
     def setAllSucceeded(self, suite, colour):
         # Print how many tests succeeded, color details column in success color,
         # collapse row, and try to collapse parent suite.
@@ -1211,7 +1193,6 @@ class TestTreeGUI(ContainerGUI):
         iter = self.itermap.getIterator(suite)
         self.model.set_value(iter, 3, detailText)
         self.model.set_value(iter, 4, colour)
-        guilog.info("Redrawing suite " + suite.name + " : second column '" + detailText +  "' coloured " + colour)
 
         if guiConfig.getValue("auto_collapse_successful") == 1:
             self.collapseRow(iter)
@@ -1254,18 +1235,19 @@ class TestTreeGUI(ContainerGUI):
 
         self.diag.info("Adding test " + repr(test))
         self.tryAddTest(test, initial)
-        if not initial:
-            self.describeTree()
+
     def getTotalRowsDelta(self, test):
         if self.itermap.getIterator(test):
             return 0
         else:
             return 1
+
     def getTotalShownDelta(self):
         if self.dynamic:
             return int(self.newTestsVisible)
         else:
             return 1 # we hide them temporarily for performance reasons, so can't do as above
+
     def tryAddTest(self, test, initial=False):
         iter = self.itermap.getIterator(test)
         if iter:
@@ -1296,8 +1278,6 @@ class TestTreeGUI(ContainerGUI):
         if len(allTests) == 1:
             self.notify("TestTreeCounters", totalDelta=delta, totalShownDelta=delta, totalRowsDelta=delta)
             self.removeTest(test, iter)
-            guilog.info("Removing test with path " + test.getRelPath())
-            self.describeTree()
         else:
             self.notify("TestTreeCounters", totalDelta=delta, totalShownDelta=delta, totalRowsDelta=0)
             allTests.remove(test)
@@ -1316,7 +1296,6 @@ class TestTreeGUI(ContainerGUI):
         # We may get this notification if one of the parent suites changes name : don't redescribe the test suite then
         if test.name != oldName:
             self.model.set_value(iter, 0, test.name)
-            self.describeTree()
 
         filteredIter = self.filteredModel.convert_child_iter_to_iter(iter)
         if self.selection.iter_is_selected(filteredIter):
@@ -1326,7 +1305,7 @@ class TestTreeGUI(ContainerGUI):
         suiteIter = self.itermap.getIterator(suite)
         newOrder = self.findNewOrder(suite, suiteIter)
         self.model.reorder(suiteIter, newOrder)
-        self.describeTree()
+
     def findNewOrder(self, suite, suiteIter):
         child = self.model.iter_children(suiteIter)
         index = 0
@@ -1400,13 +1379,9 @@ class TestTreeGUI(ContainerGUI):
             self.diag.info("Not changing test : " + repr(test))
             return False
 
-        if self.treeView:
-            if newValue:
-                guilog.info("Making test visible : " + repr(test))
-            else:
-                guilog.info("Hiding test : " + repr(test))
         self.model.set_value(iter, 5, newValue)
         return True
+
     def findVisibilityIterators(self, test):
         iter = self.itermap.getIterator(test)
         parents = []
@@ -1505,9 +1480,6 @@ class NotebookGUI(guiplugins.SubGUI):
     def createPage(self, tabGUI, tabName):
         self.diag.info("Adding page " + tabName)
         return tabGUI.createView()
-
-    def describe(self):
-        gtklogger.describe(self.notebook)
 
     def shouldShowCurrent(self, *args):
         for name, tabGUI in self.tabInfo:
@@ -1621,13 +1593,17 @@ class PaneGUI(ContainerGUI):
         self.paned = None
         self.separatorHandler = None
         self.position = 0
+        self.maxPosition = 0
         self.shrink = shrink
-        self.initialMaxSize = None
-    def getSeparatorPositionFromConfig(self):
-        if self.horizontal:
+
+    def getCurrentProportion(self):
+        if self.maxPosition:
+            return float(self.position) / self.maxPosition
+        elif self.horizontal:
             return float(guiConfig.getWindowOption("vertical_separator_position"))
         else:
             return float(guiConfig.getWindowOption("horizontal_separator_position"))
+
     def createPaned(self):
         if self.horizontal:
             return gtk.HPaned()
@@ -1661,48 +1637,19 @@ class PaneGUI(ContainerGUI):
         self.paned.show()
         return self.paned
 
-    def positionDescription(self, proportion):
-        message = str(int(100 * proportion + 0.5)) + "% from the "
-        if self.horizontal:
-            return message + "left edge"
-        else:
-            return message + "top"
-
     def contentsChanged(self):
-        self.subguis[0].contentsChanged()
-        self.describeSeparator()
-        self.subguis[1].contentsChanged()
-
-    def describeSeparator(self):
-        guilog.info("")
-        perc = self.getSeparatorPosition()
-        guilog.info("Pane separator positioned " + self.positionDescription(perc))
-
-    def getSeparatorPosition(self):
-        # We print the real position if we have it, and the intended one if we don't
-        if self.initialMaxSize:
-            return float(self.paned.get_position()) / self.initialMaxSize
-        else:
-            return self.getSeparatorPositionFromConfig()
-
-    def getMaximimumSize(self):
-        if self.horizontal:
-            return self.paned.allocation.width
-        else:
-            return self.paned.allocation.height
+        gtklogger.idleScheduler.scheduleDescribe(self.paned)
 
     def adjustSeparator(self, *args):
-        self.initialMaxSize = self.paned.get_property("max-position")
         self.paned.child_set_property(self.paned.get_child1(), "shrink", self.shrink)
         self.paned.child_set_property(self.paned.get_child2(), "shrink", self.shrink)
-        self.position = int(self.initialMaxSize * self.getSeparatorPositionFromConfig())
+        currentProportion = self.getCurrentProportion()
+        self.maxPosition = self.paned.get_property("max-position")
+        self.position = int(self.maxPosition * currentProportion)
         self.paned.set_position(self.position)
-        # Only want to do this once, providing we actually change something
-        if self.position > 0:
-            self.paned.disconnect(self.separatorHandler)
+        if self.position > 0 and not self.shrink:
             # subsequent changes are hopefully manual, and in these circumstances we don't want to prevent shrinking
-            if not self.shrink:
-                self.paned.connect('notify::position', self.checkShrinkSetting)
+            self.paned.connect('notify::position', self.checkShrinkSetting)
 
     def checkShrinkSetting(self, *args):
         oldPos = self.position
@@ -2797,13 +2744,6 @@ class TestProgressMonitor(guiplugins.SubGUI):
             if visible:
                 return True
         return False
-
-    def writeSeparator(self):
-        pass
-    
-    def describe(self):
-        pass
-        #gtklogger.describe(self.treeView)
     
     def getAllChildIters(self, iter):
          # Toggle all children too
@@ -2814,19 +2754,14 @@ class TestProgressMonitor(guiplugins.SubGUI):
             childIters += self.getAllChildIters(childIter)
             childIter = self.treeModel.iter_next(childIter)
         return childIters
+
     def showToggled(self, cellrenderer, path):
         # Toggle the toggle button
         newValue = not self.treeModel[path][2]
         self.treeModel[path][2] = newValue
 
-        # Print some gui log info
         iter = self.treeModel.get_iter_from_string(path)
         categoryName = self.treeModel.get_value(iter, 0)
-        if self.treeModel.get_value(iter, 2) == 1:
-            guilog.info("Selecting to show tests in the '" + categoryName + "' category.")
-        else:
-            guilog.info("Selecting not to show tests in the '" + categoryName + "' category.")
-
         for childIter in self.getAllChildIters(iter):
             self.treeModel.set_value(childIter, 2, newValue)
 

@@ -254,18 +254,6 @@ class SubGUI(plugins.Observable):
         plugins.Observable.__init__(self)
         self.widget = None
     
-    def writeSeparator(self):
-        guilog.info("") # blank line for demarcation
-    def shouldDescribe(self):
-        return self.shouldShow() and self.shouldShowCurrent()
-    def contentsChanged(self):
-        if self.shouldDescribe():
-            self.writeSeparator()
-            self.describe()
-
-    def describe(self): #pragma : no cover - for documentation only
-        pass
-
     def createView(self):
         pass
 
@@ -340,32 +328,9 @@ class GtkActionWrapper:
 
     def _setSensitivity(self, gtkAction, newValue):
         oldValue = gtkAction.get_property("sensitive")
-        gtkAction.set_property("sensitive", newValue)
         if oldValue != newValue:
-            guilog.info("Setting sensitivity of action '" + gtkAction.get_property("label") + "' to " + repr(newValue))
+            gtkAction.set_property("sensitive", newValue)
 
-    def describeAction(self):
-        self._describeAction(self.gtkAction, self.accelerator)
-
-    def _describeAction(self, gtkAction, accelerator):
-        message = "Viewing action with title '" + gtkAction.get_property("label") + "'"
-        message += self.detailDescription(gtkAction, accelerator)
-        guilog.info(message)
-
-    def detailDescription(self, gtkAction, accelerator):
-        message = ""
-        stockId = gtkAction.get_property("stock-id")
-        if stockId:
-            message += ", stock id '" + repr(stockId) + "'"
-        if accelerator:
-            message += ", accelerator '" + repr(accelerator) + "'"
-        return message + self.sensitivityDescription(gtkAction)
-    
-    def sensitivityDescription(self, gtkAction):
-        if gtkAction.get_property("sensitive"):
-            return ""
-        else:
-            return " (greyed out)"
 
 
 # Introduce an extra level without all the selection-dependent stuff, some actions want
@@ -425,9 +390,6 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
 
     def _getStockId(self): # The stock ID for the action, in toolbar and menu.
         pass
-
-    def describe(self):
-        self.describeAction()
                 
     def setObservers(self, observers):
         signals = [ "Status", "ActionProgress" ] + self.getSignalsSent()
@@ -698,7 +660,7 @@ class ActionResultDialogGUI(ActionGUI):
         textContents = self.addContents()
         self.createButtons()
         self.dialog.show_all()
-        gtklogger.describe(self.dialog)#        self.describeDialog(self.dialog, textContents)
+        gtklogger.describe(self.dialog)
 
     def addContents(self):
         pass
@@ -980,9 +942,6 @@ class ActionTabGUI(OptionGroupGUI):
             entry.set_text(dialog.get_filename().replace("\\", "/"))
             entry.set_position(-1) # Sets position last, makes it possible to see the vital part of long paths 
         dialog.destroy()
-
-    def contentsChanged(self):
-        pass # All done for us
         
     def addApplicationOptions(self, allApps):
         if len(allApps) > 0:

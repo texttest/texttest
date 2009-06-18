@@ -60,11 +60,6 @@ class ContainerGUI(guiplugins.SubGUI):
     def shouldShowCurrent(self, *args):
         return reduce(operator.and_, (subgui.shouldShowCurrent(*args) for subgui in self.subguis))
 
-    def contentsChanged(self):
-        guiplugins.SubGUI.contentsChanged(self)
-        for subgui in self.subguis:
-            subgui.contentsChanged()
-
     def getGroupTabTitle(self):
         return self.subguis[0].getGroupTabTitle()
 
@@ -83,8 +78,7 @@ class GUIStatusMonitor(guiplugins.SubGUI):
 
     def getWidgetName(self):
         return "_Status bar"
-    def describe(self):
-        guilog.info("Changing GUI status to: '" + self.label.get_text() + "'")
+
     def notifyActionStart(self, message="", lock = True):
         if message == "workaround":
             return # Don't set the throbber going for the GTK 2.14 bug workaround
@@ -109,11 +103,11 @@ class GUIStatusMonitor(guiplugins.SubGUI):
     def notifyStatus(self, message):
         if self.label:
             self.label.set_markup(plugins.convertForMarkup(message))
-            self.contentsChanged()
 
     def createView(self):
         hbox = gtk.HBox()
         self.label = gtk.Label()
+        self.label.set_name("GUI status")
         self.label.set_ellipsize(pango.ELLIPSIZE_END)
         # It seems difficult to say 'ellipsize when you'd otherwise need
         # to enlarge the window', so we'll have to settle for a fixed number
@@ -397,7 +391,6 @@ class TopWindowGUI(ContainerGUI):
         self.dynamic = dynamic
         self.topWindow = None
         self.allApps = copy(allApps)
-        self.windowSizeDescriptor = ""
         self.exitStatus = 0
         if not self.dynamic:
             self.exitStatus |= self.COMPLETION_NOTIFIED # no tests to wait for...
@@ -420,13 +413,11 @@ class TopWindowGUI(ContainerGUI):
             if suite.app.fullName not in [ app.fullName for app in self.allApps ]:
                 self.allApps.append(suite.app)
                 self.setWindowTitle()
-                self.describeTitle()
-
+                
         if not self.topWindow:
             # only do this once, not when new suites are added...
             self.createView()
-            self.contentsChanged()
-
+            
     def createView(self):
         # Create toplevel window to show it all.
         self.topWindow = gtk.Window(gtk.WINDOW_TOPLEVEL)
@@ -440,10 +431,11 @@ class TopWindowGUI(ContainerGUI):
         self.setWindowTitle()
 
         self.topWindow.add(self.subguis[0].createView())
-        self.windowSizeDescriptor = self.adjustSize()
+        self.adjustSize()
         self.topWindow.show()
         self.topWindow.set_default_size(-1, -1)
 
+        gtklogger.idleScheduler.scheduleDescribe(self.topWindow)
         self.notify("TopWindow", self.topWindow)
         scriptEngine.connect("close window", "delete_event", self.topWindow, self.notifyQuit)
         return self.topWindow
@@ -466,14 +458,7 @@ class TopWindowGUI(ContainerGUI):
             return os.path.join(imageDir, "texttest-icon-dynamic.jpg")
         else:
             return os.path.join(imageDir, "texttest-icon-static.jpg")
-    def writeSeparator(self):
-        pass # Don't bother, we're at the top
-    def describeTitle(self):
-        guilog.info("Top Window title is " + self.topWindow.get_title())
-    def describe(self):
-        self.describeTitle()
-        guilog.info("Default widget is " + str(self.topWindow.get_focus().__class__))
-        guilog.info(self.windowSizeDescriptor)
+
     def forceQuit(self):
         self.exitStatus |= self.COMPLETION_NOTIFIED
         self.notifyQuit()
@@ -503,12 +488,14 @@ class TopWindowGUI(ContainerGUI):
     def adjustSize(self):
         if guiConfig.getWindowOption("maximize"):
             self.topWindow.maximize()
-            return "Maximising top window..."
+            guilog.info("Maximising top window...")
         else:
             width, widthDescriptor = self.getWindowDimension("width")
             height, heightDescriptor  = self.getWindowDimension("height")
             self.topWindow.set_default_size(width, height)
-            return widthDescriptor + "\n" + heightDescriptor
+            guilog.info(widthDescriptor)
+            guilog.info(heightDescriptor)
+
     def getWindowDimension(self, dimensionName):
         pixelDimension = guiConfig.getWindowOption(dimensionName + "_pixels")
         if pixelDimension != "<not set>":
@@ -540,15 +527,9 @@ class MenuBarGUI(guiplugins.SubGUI):
         oldVisible = widget.get_property('visible')
         newVisible = action.get_active()
         if oldVisible and not newVisible:
-            self.hide(widget, action.get_name())
+            widget.hide()
         elif newVisible and not oldVisible:
-            self.show(widget, action.get_name())
-    def hide(self, widget, name):
-        widget.hide()
-        guilog.info("Hiding the " + name)
-    def show(self, widget, name):
-        widget.show()
-        guilog.info("Showing the " + name)
+            widget.show()
     def createToggleActions(self):
         for observer in self.observers:
             actionTitle = observer.getWidgetName()
@@ -581,7 +562,7 @@ class MenuBarGUI(guiplugins.SubGUI):
     def notifyTopWindow(self, window):
         window.add_accel_group(self.uiManager.get_accel_group())
         if self.shouldHide("menubar"):
-            self.hide(self.widget, "Menubar")
+            self.widget.hide()
         for toggleAction in self.toggleActions:
             if self.shouldHide(toggleAction.get_name()):
                 toggleAction.set_active(False)
@@ -616,11 +597,7 @@ class MenuBarGUI(guiplugins.SubGUI):
         self.diag.info("Checking if we loaded module " + moduleName)
         packageName = ".".join(__name__.split(".")[:-1])
         return sys.modules.has_key(moduleName) or sys.modules.has_key(packageName + "." + moduleName)
-    def describe(self):
-        for toggleAction in self.toggleActions:
-            guilog.info("Viewing toggle action with title '" + toggleAction.get_property("label") + "'")
-        for actionGUI in self.actionGUIs:
-            actionGUI.describeAction()
+    
 
 class ToolBarGUI(ContainerGUI):
     def __init__(self, uiManager, subgui):
@@ -656,8 +633,7 @@ class ToolBarGUI(ContainerGUI):
 
         self.widget.show_all()
         return self.widget
-    def describe(self):
-        guilog.info("UI layout: \n" + self.uiManager.get_ui().strip())
+
 
 class PopupMenuGUI(guiplugins.SubGUI):
     def __init__(self, name, uiManager):
@@ -694,11 +670,10 @@ class ShortcutBarGUI(guiplugins.SubGUI):
         return "_Shortcut bar"
     def createView(self):
         self.widget = scriptEngine.createShortcutBar()
+        self.widget.set_name(self.getWidgetName().replace("_", ""))
         self.widget.show()
         return self.widget
-    def contentsChanged(self):
-        pass # not yet integrated
-
+    
 class TestColumnGUI(guiplugins.SubGUI):
     def __init__(self, dynamic, testCount):
         guiplugins.SubGUI.__init__(self)
@@ -790,11 +765,11 @@ class TestColumnGUI(guiplugins.SubGUI):
             title += ", " + str(self.totalNofTests - self.totalNofTestsShown) + " hidden"
 
         return title
+
     def updateTitle(self, initial=False):
         if self.column:
             self.column.set_title(self.getTitle())
-            if not initial:
-                self.contentsChanged()
+
     def notifyTestTreeCounters(self, totalDelta, totalShownDelta, totalRowsDelta, initial=False):
         self.addedCount += totalDelta
         if not initial or self.totalNofTests < self.addedCount:
@@ -917,7 +892,6 @@ class TestTreeGUI(ContainerGUI):
                 self.expandLevel(self.treeView, self.filteredModel.get_iter_root())
             else:
                 self.treeView.expand_all()
-        self.contentsChanged()
         self.notify("AllRead")
     def makeRowVisible(self, model, path, iter):
         self.model.set_value(iter, 5, True)
@@ -1293,7 +1267,6 @@ class TestTreeGUI(ContainerGUI):
     def notifyNameChange(self, test, origRelPath):
         iter = self.itermap.updateIterator(test, origRelPath)
         oldName = self.model.get_value(iter, 0)
-        # We may get this notification if one of the parent suites changes name : don't redescribe the test suite then
         if test.name != oldName:
             self.model.set_value(iter, 0, test.name)
 
@@ -1431,15 +1404,6 @@ class BoxGUI(ContainerGUI):
     def getExpandWidgets(self):
         return [ gtk.HPaned, gtk.ScrolledWindow ]
     
-    def contentsChanged(self):
-        if self.horizontal:
-            guilog.info("")
-            for subgui in self.subguis:
-                subgui.describe()
-        else:
-            for subgui in self.subguis:
-                subgui.contentsChanged()
-
     def createView(self):
         box = self.createBox()
         packMethod = self.getPackMethod(box)
@@ -1636,9 +1600,6 @@ class PaneGUI(ContainerGUI):
         self.paned.pack2(frames[1], resize=True)
         self.paned.show()
         return self.paned
-
-    def contentsChanged(self):
-        gtklogger.idleScheduler.scheduleDescribe(self.paned)
 
     def adjustSeparator(self, *args):
         self.paned.child_set_property(self.paned.get_child1(), "shrink", self.shrink)
@@ -2404,12 +2365,7 @@ class ProgressBarGUI(guiplugins.SubGUI):
 
     def shouldShow(self):
         return self.dynamic
-    def shouldDescribe(self):
-        return self.dynamic and self.addedCount > 0
-
-    def describe(self):
-        guilog.info("Progress bar set to fraction " + str(self.widget.get_fraction()) + ", text '" + self.widget.get_text() + "'")
-
+    
     def createView(self):
         self.widget = gtk.ProgressBar()
         self.resetBar()
@@ -2427,13 +2383,12 @@ class ProgressBarGUI(guiplugins.SubGUI):
         # Can be wrong in case versions are defined by testsuite files.
         self.totalNofTests = self.addedCount
         self.resetBar()
-        self.contentsChanged()
 
     def notifyLifecycleChange(self, test, state, changeDesc):
         if changeDesc == "complete":
             self.nofCompletedTests += 1
             self.resetBar()
-            self.contentsChanged()
+
     def computeFraction(self):
         if self.totalNofTests > 0:
             return float(self.nofCompletedTests) / float(self.totalNofTests)

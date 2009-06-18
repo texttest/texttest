@@ -189,7 +189,6 @@ class SaveTests(guiplugins.ActionDialogGUI):
         self.notify("Status", "Saving " + testDesc + " ...")
         try:
             for test, version in testsWithVersions:
-                guiplugins.guilog.info("Saving " + repr(test) + " - version " + version + saveDesc)
                 testComparison = test.state
                 testComparison.setObservers(self.observers)
                 testComparison.save(test, self.getExactness(), version, overwriteSuccess, stemsToSave, backupVersion)
@@ -1136,7 +1135,6 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         defaultTestFile = self.findDefaultTestFile(allStems)
         self.optionGroup.setValue("grepfile", defaultTestFile)
         self.optionGroup.setPossibleValues("grepfile", allStems)
-        self.contentsChanged()
 
     def findDefaultTestFile(self, allStems):
         if len(allStems) == 0:
@@ -1197,11 +1195,12 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         # Get strategy. 0 = discard, 1 = refine, 2 = extend, 3 = exclude
         strategy = self.selectionGroup.getSwitchValue("current_selection")
         return self._makeNewSelection(strategy)
+
     def notifyReset(self):
         self.optionGroup.reset()
         self.selectionGroup.reset()
         self.filteringGroup.reset()
-        self.contentsChanged()
+
     def _makeNewSelection(self, strategy=0):
         selectedTests = []
         suitesToTry = self.getSuitesToTry()
@@ -1913,16 +1912,14 @@ class ImportFiles(guiplugins.ActionDialogGUI):
 
     def actionChanged(self, *args):
         if self.fileChooser:
-            self.setFileChooserSensitivity(verbose=True)
+            self.setFileChooserSensitivity()
 
-    def setFileChooserSensitivity(self, verbose):
+    def setFileChooserSensitivity(self):
         action = self.optionGroup.getValue("act")
         sensitive = self.fileChooser.get_property("sensitive")
         newSensitive = action == 0
         if newSensitive != sensitive:
             self.fileChooser.set_property("sensitive", newSensitive)
-            if verbose:
-                guiplugins.guilog.info("Sensitivity of source file chooser changed to " + repr(newSensitive))
         
     def getTargetPath(self, *args, **kwargs):
         targetPathName = self.getFileName(*args, **kwargs)
@@ -1954,7 +1951,8 @@ class ImportFiles(guiplugins.ActionDialogGUI):
 
     def createFileChooser(self, *args):
         self.fileChooser = guiplugins.ActionDialogGUI.createFileChooser(self, *args)
-        self.setFileChooserSensitivity(verbose=False) # Check initial values, maybe set insensitive
+        self.fileChooser.set_name("Source File Chooser")
+        self.setFileChooserSensitivity() # Check initial values, maybe set insensitive
         return self.fileChooser
     
     def addText(self, vbox, text):

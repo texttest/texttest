@@ -410,9 +410,9 @@ class ThreadedNotificationHandler:
     def __init__(self):
         self.workQueue = Queue()
         self.active = False
-    def enablePoll(self, idleHandleMethod):
+    def enablePoll(self, idleHandleMethod, **kwargs):
         self.active = True
-        return idleHandleMethod(self.pollQueue)
+        return idleHandleMethod(self.pollQueue, **kwargs)
     def disablePoll(self):
         self.active = False
     def pollQueue(self):

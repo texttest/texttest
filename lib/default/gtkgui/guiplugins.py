@@ -900,16 +900,6 @@ class ActionTabGUI(OptionGroupGUI):
         return (box, entry)
     
     def showFileChooser(self, widget, entry, option):
-        if gtk.gtk_version > (2, 14, 0): 
-            # Workaround for GTK 2.14 bug, http://bugzilla.gnome.org/show_bug.cgi?id=579449
-            if scriptEngine.replayer.isActive():
-                # PyUseCase's replayer relies entirely on idle handlers and hence we can only give up here...
-                # Try to fail rather than hang.
-                return sys.stderr.write("Cannot replay FileChoosers with GTK 2.14 and later due to a GTK bug\n")
-            else:
-                # Effect is to disable the idle handler which is broken with file choosers
-                self.notify("ActionStart", "workaround")
-
         dialog = gtk.FileChooserDialog("Select a file",
                                        self.getParentWindow(),
                                        gtk.FILE_CHOOSER_ACTION_OPEN,
@@ -950,22 +940,6 @@ class ActionTabGUI(OptionGroupGUI):
         else:
             configObject = plugins.importAndCall("default", "getConfig", {}) # don't care about inputOptions as we're trying to read them!
             configObject.addToOptionGroups(allApps, [ self.optionGroup ])
-            
-
-class FileChooserDescriber:
-    def __init__(self, option):
-        self.option = option
-
-    def getBasicDescription(self, widget):
-        text = "Filechooser"
-        value = self.option.getValue()
-        if value:
-            text += " (set to '" + value + "')"
-        possDirs = self.option.getPossibleDirs()
-        if len(possDirs):
-            text += " (choosing from directories " + repr(possDirs) + ")"
-        return text    
-        
 
 class ActionDialogGUI(OptionGroupGUI):
     def runInteractive(self, *args):
@@ -982,27 +956,12 @@ class ActionDialogGUI(OptionGroupGUI):
         alignment = self.createAlignment()
         vbox = gtk.VBox()
         fileChooser, fileChooserOption = self.fillVBox(vbox)
-        if fileChooser and gtk.gtk_version > (2, 14, 0): 
-            # Workaround for GTK 2.14 bug, http://bugzilla.gnome.org/show_bug.cgi?id=579449
-            if scriptEngine.replayer.isActive():
-                # PyUseCase's replayer relies entirely on idle handlers and hence we can only give up here...
-                # Try to fail rather than hang.
-                sys.stderr.write("Cannot replay FileChoosers with GTK 2.14 and later due to a GTK bug\n")
-                dialog.destroy()
-                return scriptEngine.replayer.processCommand("quit", "") # more hacks to try to terminate!
-            else:
-                # Effect is to disable the idle handler which is broken with file choosers
-                self.notify("ActionStart", "workaround")
-
         alignment.add(vbox)
         dialog.vbox.pack_start(alignment, expand=True, fill=True)
         self.createButtons(dialog, fileChooser, fileChooserOption)
         self.tryResize(dialog)
         dialog.show_all()
-        # Unfortunately we can't get filechooser information out until it's displayed.
-        # So we cheat and use the internal structures
-        customDescribers = { gtk.FileChooserWidget : FileChooserDescriber(fileChooserOption) }
-        gtklogger.describe(dialog, customDescribers)
+        gtklogger.idleScheduler.scheduleDescribe(dialog)
         
     def getConfirmationDialogSettings(self):
         return gtk.STOCK_DIALOG_WARNING, "Confirmation"
@@ -1068,12 +1027,14 @@ class ActionDialogGUI(OptionGroupGUI):
         dialog.set_default_response(gtk.RESPONSE_ACCEPT)
         if fileChooser:
             buttonScriptName = "press " + actionScriptName.split()[0]
-            fileChooserScriptName = fileChooserOption.name
             if fileChooser.get_property("action") == gtk.FILE_CHOOSER_ACTION_SAVE:
-                scriptEngine.registerSaveFileChooser(fileChooser, fileChooserScriptName,
+                scriptEngine.registerSaveFileChooser(fileChooser, fileChooserOption.name,
                                                      "choose folder", buttonScriptName, "press cancel",
                                                      self.respond, okButton, cancelButton, dialog)
             else:
+                fileChooserScriptName = fileChooserOption.name.strip().lower()
+                if not fileChooserScriptName.startswith("select"):
+                    fileChooserScriptName = "select " + fileChooserScriptName + " ="
                 scriptEngine.registerOpenFileChooser(fileChooser, fileChooserScriptName,
                                                      "look in folder", buttonScriptName, "press cancel", 
                                                      self.respond, okButton, cancelButton, dialog)

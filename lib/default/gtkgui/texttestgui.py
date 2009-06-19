@@ -80,8 +80,6 @@ class GUIStatusMonitor(guiplugins.SubGUI):
         return "_Status bar"
 
     def notifyActionStart(self, message="", lock = True):
-        if message == "workaround":
-            return # Don't set the throbber going for the GTK 2.14 bug workaround
         if self.throbber:
             if self.pixbuf: # pragma: no cover : Only occurs if some code forgot to do ActionStop ...
                 self.notifyActionStop()
@@ -168,7 +166,10 @@ class IdleHandlerManager:
 
     def enableHandler(self):
         if self.sourceId == -1:
-            self.sourceId = plugins.Observable.threadedNotificationHandler.enablePoll(gobject.idle_add)
+            # Set lower priority (=higher number!) to avoid getting in the way of file chooser
+            # updates
+            self.sourceId = plugins.Observable.threadedNotificationHandler.enablePoll(gobject.idle_add,
+                                                                                      priority=gobject.PRIORITY_DEFAULT_IDLE + 20)
             self.diag.info("Adding idle handler")
 
     def disableHandler(self):
@@ -1560,10 +1561,8 @@ class PaneGUI(ContainerGUI):
         self.maxPosition = 0
         self.shrink = shrink
 
-    def getCurrentProportion(self):
-        if self.maxPosition:
-            return float(self.position) / self.maxPosition
-        elif self.horizontal:
+    def getSeparatorPositionFromConfig(self):
+        if self.horizontal:
             return float(guiConfig.getWindowOption("vertical_separator_position"))
         else:
             return float(guiConfig.getWindowOption("horizontal_separator_position"))
@@ -1602,16 +1601,19 @@ class PaneGUI(ContainerGUI):
         return self.paned
 
     def adjustSeparator(self, *args):
+        self.initialMaxSize = self.paned.get_property("max-position")
         self.paned.child_set_property(self.paned.get_child1(), "shrink", self.shrink)
         self.paned.child_set_property(self.paned.get_child2(), "shrink", self.shrink)
-        currentProportion = self.getCurrentProportion()
-        self.maxPosition = self.paned.get_property("max-position")
-        self.position = int(self.maxPosition * currentProportion)
-        self.paned.set_position(self.position)
-        if self.position > 0 and not self.shrink:
-            # subsequent changes are hopefully manual, and in these circumstances we don't want to prevent shrinking
-            self.paned.connect('notify::position', self.checkShrinkSetting)
+        self.position = int(self.initialMaxSize * self.getSeparatorPositionFromConfig())
 
+        self.paned.set_position(self.position)
+        # Only want to do this once, when we're visible...
+        if self.position > 0:
+            self.paned.disconnect(self.separatorHandler)
+            # subsequent changes are hopefully manual, and in these circumstances we don't want to prevent shrinking
+            if not self.shrink:
+                self.paned.connect('notify::position', self.checkShrinkSetting)
+        
     def checkShrinkSetting(self, *args):
         oldPos = self.position
         self.position = self.paned.get_position()

@@ -26,7 +26,7 @@ try:
 except:
     raiseException("Unable to import module 'gobject'")
 
-import pango, guiplugins, plugins, os, sys, operator, subprocess, logging, gtklogger
+import gtkusecase, pango, guiplugins, plugins, os, sys, operator, subprocess, logging
 from ndict import seqdict
 from copy import copy
 from TreeViewTooltips import TreeViewTooltips
@@ -166,10 +166,10 @@ class IdleHandlerManager:
 
     def enableHandler(self):
         if self.sourceId == -1:
-            # Set lower priority (=higher number!) to avoid getting in the way of file chooser
-            # updates
+            # Same priority as PyUseCase replay, so they get called interchangeably
+            # Non-default as a workaround for bugs in filechooser handling in GTK
             self.sourceId = plugins.Observable.threadedNotificationHandler.enablePoll(gobject.idle_add,
-                                                                                      priority=gobject.PRIORITY_DEFAULT_IDLE + 20)
+                                                                                      priority=gtkusecase.PRIORITY_PYUSECASE_IDLE)
             self.diag.info("Adding idle handler")
 
     def disableHandler(self):
@@ -436,7 +436,6 @@ class TopWindowGUI(ContainerGUI):
         self.topWindow.show()
         self.topWindow.set_default_size(-1, -1)
 
-        gtklogger.idleScheduler.scheduleDescribe(self.topWindow)
         self.notify("TopWindow", self.topWindow)
         scriptEngine.connect("close window", "delete_event", self.topWindow, self.notifyQuit)
         return self.topWindow

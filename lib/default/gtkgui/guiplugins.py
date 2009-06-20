@@ -8,7 +8,7 @@ from stat import *
 from ndict import seqdict
 
 try:
-    import gtk, gobject, entrycompletion, gtklogger
+    import gtk, gobject, entrycompletion
 except ImportError:
     pass # We might want to document the config entries, silly to fail on lack of GTK...
 
@@ -440,7 +440,6 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         scriptEngine.connect("agree to texttest message", "clicked", yesButton, self.cleanDialog,
                              gtk.RESPONSE_ACCEPT, True, dialog)
         dialog.show_all()
-        gtklogger.describe(dialog)
         
     def createAlarmDialog(self, parent, message, stockIcon, alarmLevel):
         dialogTitle = "TextTest " + alarmLevel
@@ -461,7 +460,6 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         scriptEngine.connect("answer yes to texttest " + alarmLevel, "clicked",
                              yesButton, respondMethod, gtk.RESPONSE_YES, True, dialog)
         dialog.show_all()
-        gtklogger.describe(dialog)
         
     def cleanDialog(self, button, saidOK, dialog):
         self._cleanDialog(dialog)
@@ -660,8 +658,7 @@ class ActionResultDialogGUI(ActionGUI):
         textContents = self.addContents()
         self.createButtons()
         self.dialog.show_all()
-        gtklogger.describe(self.dialog)
-
+        
     def addContents(self):
         pass
     
@@ -961,7 +958,6 @@ class ActionDialogGUI(OptionGroupGUI):
         self.createButtons(dialog, fileChooser, fileChooserOption)
         self.tryResize(dialog)
         dialog.show_all()
-        gtklogger.idleScheduler.scheduleDescribe(dialog)
         
     def getConfirmationDialogSettings(self):
         return gtk.STOCK_DIALOG_WARNING, "Confirmation"

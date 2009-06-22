@@ -91,17 +91,17 @@ class SaveTests(guiplugins.ActionDialogGUI):
             self.updateOptions()
 
     def getConfirmationMessage(self):
-        testsForWarn = filter(lambda test: test.state.warnOnSave(), self.currTestSelection)
+        testsForWarn = filter(lambda test: test.stateInGui.warnOnSave(), self.currTestSelection)
         if len(testsForWarn) == 0:
             return ""
         message = "You have selected tests whose results are partial or which are registered as bugs:\n"
         for test in testsForWarn:
-            message += "  Test '" + test.uniqueName + "' " + test.state.categoryRepr() + "\n"
+            message += "  Test '" + test.uniqueName + "' " + test.stateInGui.categoryRepr() + "\n"
         message += "Are you sure you want to do this?\n"
         return message
 
     def getSaveableTests(self):
-        return filter(lambda test: test.state.isSaveable(), self.currTestSelection)
+        return filter(lambda test: test.stateInGui.isSaveable(), self.currTestSelection)
     def updateOptions(self):
         defaultSaveOption = self.getDefaultSaveOption()
         versionOption = self.optionGroup.getOption("v")
@@ -150,7 +150,7 @@ class SaveTests(guiplugins.ActionDialogGUI):
         return int(self.optionGroup.getSwitchValue("ex", 1))
     def isAllNew(self):
         for test in self.getSaveableTests():
-            if not test.state.isAllNew():
+            if not test.stateInGui.isAllNew():
                 return False
         return True
     def getVersion(self, test):
@@ -163,7 +163,7 @@ class SaveTests(guiplugins.ActionDialogGUI):
         if state and state.isSaveable():
             return True
         for seltest in self.currTestSelection:
-            if seltest is not test and seltest.state.isSaveable():
+            if seltest is not test and seltest.stateInGui.isSaveable():
                 return True
         return False
     def getStemsToSave(self):
@@ -189,7 +189,7 @@ class SaveTests(guiplugins.ActionDialogGUI):
         self.notify("Status", "Saving " + testDesc + " ...")
         try:
             for test, version in testsWithVersions:
-                testComparison = test.state
+                testComparison = test.stateInGui
                 testComparison.setObservers(self.observers)
                 testComparison.save(test, self.getExactness(), version, overwriteSuccess, stemsToSave, backupVersion)
                 newState = testComparison.makeNewState(test.app, "saved")
@@ -217,10 +217,10 @@ class MarkTest(guiplugins.ActionDialogGUI):
         return "Mark the selected tests"
     def performOnCurrent(self):
         for test in self.currTestSelection:
-            oldState = test.state
+            oldState = test.stateInGui
             if oldState.isComplete():
-                if test.state.isMarked():
-                    oldState = test.state.oldState # Keep the old state so as not to build hierarchies ...
+                if test.stateInGui.isMarked():
+                    oldState = test.stateInGui.oldState # Keep the old state so as not to build hierarchies ...
                 newState = plugins.MarkedTestState(self.optionGroup.getOptionValue("free"),
                                                    self.optionGroup.getOptionValue("brief"), oldState)
                 test.changeState(newState)
@@ -229,7 +229,7 @@ class MarkTest(guiplugins.ActionDialogGUI):
         if state and state.isComplete():
             return True
         for seltest in self.currTestSelection:
-            if seltest is not test and seltest.state.isComplete():
+            if seltest is not test and seltest.stateInGui.isComplete():
                 return True
         return False
 
@@ -240,13 +240,13 @@ class UnmarkTest(guiplugins.ActionGUI):
         return "Unmark the selected tests"
     def performOnCurrent(self):
         for test in self.currTestSelection:
-            if test.state.isMarked():
-                test.state.oldState.lifecycleChange = "unmarked" # To avoid triggering completion ...
-                test.changeState(test.state.oldState)
+            if test.stateInGui.isMarked():
+                test.stateInGui.oldState.lifecycleChange = "unmarked" # To avoid triggering completion ...
+                test.changeState(test.stateInGui.oldState)
                 self.notify("ActionProgress", "") # Just to update gui ...
     def isActiveOnCurrent(self, *args):
         for test in self.currTestSelection:
-            if test.state.isMarked():
+            if test.stateInGui.isMarked():
                 return True
         return False
 
@@ -319,7 +319,7 @@ class FileViewAction(guiplugins.ActionGUI):
             return ""
     def getRemoteHost(self):
         if os.name == "posix" and len(self.currTestSelection) > 0:
-            state = self.currTestSelection[0].state
+            state = self.currTestSelection[0].stateInGui
             if hasattr(state, "executionHosts") and len(state.executionHosts) > 0:
                 remoteHost = state.executionHosts[0]
                 localhost = plugins.gethostname()
@@ -339,15 +339,15 @@ class FileViewAction(guiplugins.ActionGUI):
         testDesc = self.testDescription()
         fullDesc = description + testDesc
         nullFile = open(os.devnull, "w")
-        guiplugins.processMonitor.startProcess(cmdArgs, fullDesc, stdout=nullFile, stderr=nullFile, *args, **kwargs)
         self.notify("Status", 'Started "' + description + '" in background' + testDesc + '.')
+        guiplugins.processMonitor.startProcess(cmdArgs, fullDesc, stdout=nullFile, stderr=nullFile, *args, **kwargs)
         self.notify("ViewerStarted")
 
     def getStem(self, fileName):
         return os.path.basename(fileName).split(".")[0]
     def testRunning(self):
-        return self.currTestSelection[0].state.hasStarted() and \
-               not self.currTestSelection[0].state.isComplete()
+        return self.currTestSelection[0].stateInGui.hasStarted() and \
+               not self.currTestSelection[0].stateInGui.isComplete()
 
     def getViewToolName(self, fileName):
         stem = self.getStem(fileName)
@@ -636,13 +636,13 @@ class KillTests(guiplugins.ActionGUI):
                 if not state.isComplete():
                     return True
             else:
-                if not seltest.state.isComplete():
+                if not seltest.stateInGui.isComplete():
                     return True
         return False
     def getSignalsSent(self):
         return [ "Kill" ]
     def performOnCurrent(self):
-        tests = filter(lambda test: not test.state.isComplete(), self.currTestSelection)
+        tests = filter(lambda test: not test.stateInGui.isComplete(), self.currTestSelection)
         tests.reverse() # best to cut across the action thread rather than follow it and disturb it excessively
         testDesc = str(len(tests)) + " tests"
         self.notify("Status", "Killing " + testDesc + " ...")
@@ -2268,7 +2268,7 @@ class RecomputeTests(guiplugins.ActionGUI):
             if currTest is test:
                 if state.hasStarted():
                     return True
-            elif currTest.state.hasStarted():
+            elif currTest.stateInGui.hasStarted():
                 return True
         return False
     def _getTitle(self):
@@ -2295,7 +2295,7 @@ class RecomputeTests(guiplugins.ActionGUI):
             self.latestNumberOfRecomputations += 1
             self.notify("Status", "Recomputing status of " + repr(test) + " ...")
             self.notify("ActionProgress", "")
-            test.app.recomputeProgress(test, self.observers)
+            test.app.recomputeProgress(test, test.stateInGui, self.observers)
             self.notify("Recomputed", test)
 
 

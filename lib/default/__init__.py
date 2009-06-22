@@ -715,8 +715,7 @@ class Config:
             # old-style: infer expansion in default checkout
             return os.path.join(fullLocation, checkout)
 
-    def recomputeProgress(self, test, observers):
-        state = test.state
+    def recomputeProgress(self, test, state, observers):
         if state.isComplete():
             if state.hasResults():
                 state.recalculateStdFiles(test)
@@ -729,7 +728,7 @@ class Config:
             fileFilter = rundependent.FilterProgressRecompute()
             fileFilter(test)
             comparator = self.getTestComparator()
-            comparator.recomputeProgress(test, observers)
+            comparator.recomputeProgress(test, state, observers)
 
     def getRunDescription(self, test):
         return RunTest().getRunDescription(test)
@@ -1426,7 +1425,7 @@ class DocumentEnvironment(plugins.Action):
                     if not sys.modules.has_key(dir):
                         dirs.remove(dir)
             for file in files:
-                if file.endswith(".py") and not "usecase" in file: # exclude PyUseCase, which may be linked/copied in
+                if file.endswith(".py") and ("usecase" not in file and "gtk" not in file): # exclude PyUseCase, which may be linked/copied in
                     path = os.path.join(root, file)
                     self.findVarsInFile(path, allVars, prefixes)
         return allVars
@@ -1471,7 +1470,7 @@ class DocumentEnvironment(plugins.Action):
         
     def findVarsInFile(self, path, vars, prefixes):
         import re
-        regexes = [ re.compile("([^/ \"'\.,\(]*)[\(]?[\"]?(" + prefix + "[^/ \"'\.,]*)") for prefix in prefixes ]
+        regexes = [ re.compile("([^/ \"'\.,\(]*)[\(]?[\"'](" + prefix + "[^/ \"'\.,]*)") for prefix in prefixes ]
         for line in open(path).xreadlines():
             for regex in regexes:
                 match = regex.search(line)

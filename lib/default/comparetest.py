@@ -378,8 +378,8 @@ class MakeComparisons(plugins.Action):
         newState = self.testComparisonClass(test.state, test.app)
         newState.computeFor(test)
         self.describe(test, newState.getPostText())
-    def recomputeProgress(self, test, observers):
-        newState = self.progressComparisonClass(test.state)
+    def recomputeProgress(self, test, state, observers):
+        newState = self.progressComparisonClass(state)
         newState.setObservers(observers)
         newState.computeFor(test)        
     def setUpSuite(self, suite):

@@ -353,6 +353,7 @@ class TextTestGUI(plugins.Responder, plugins.Observable):
     def notifyExit(self):
         gtk.main_quit()
     def notifyLifecycleChange(self, test, state, changeDesc):
+        test.stateInGui = state
         self.notify("LifecycleChange", test, state, changeDesc)
     def notifyDescriptionChange(self, test):
         self.notify("DescriptionChange", test)
@@ -375,8 +376,9 @@ class TextTestGUI(plugins.Responder, plugins.Observable):
             guilog.info("There weren't any tests to run, terminating...")
             self.topWindowGUI.forceQuit()
 
-    def notifyAdd(self, *args, **kwargs):
-        self.notify("Add", *args, **kwargs)
+    def notifyAdd(self, test, *args, **kwargs):
+        test.stateInGui = test.state
+        self.notify("Add", test, *args, **kwargs)
     def notifyStatus(self, *args, **kwargs):
         self.notify("Status", *args, **kwargs)
     def notifyRemove(self, test):
@@ -1028,10 +1030,10 @@ class TestTreeGUI(ContainerGUI):
 
     def updateRecalculationMarker(self, model, path, iter):
         tests = model.get_value(iter, 2)
-        if not tests[0].state.isComplete():
+        if not tests[0].stateInGui.isComplete():
             return
 
-        recalcComparisons = tests[0].state.getComparisonsForRecalculation()
+        recalcComparisons = tests[0].stateInGui.getComparisonsForRecalculation()
         childIter = self.filteredModel.convert_iter_to_child_iter(iter)
         self.setNewRecalculationStatus(childIter, tests[0], recalcComparisons)
 
@@ -1859,11 +1861,11 @@ class TextInfoGUI(TextViewGUI):
             self.currentTest = None
         elif self.currentTest not in tests:
             self.currentTest = tests[0]
-            self.resetText(self.currentTest.state)
+            self.resetText(self.currentTest.stateInGui)
             self.updateView()
 
     def notifyDescriptionChange(self, test):
-        self.resetText(self.currentTest.state)
+        self.resetText(self.currentTest.stateInGui)
         self.updateView()
 
     def notifyLifecycleChange(self, test, state, changeDesc):
@@ -2146,7 +2148,7 @@ class TestFileGUI(FileViewGUI):
 
     def notifyFileChange(self, test):
         if test is self.currentTest:
-            self.recreateModel(test.state, preserveSelection=True)
+            self.recreateModel(test.stateInGui, preserveSelection=True)
 
     def notifyLifecycleChange(self, test, state, changeDesc):
         if test is self.currentTest:
@@ -2259,7 +2261,7 @@ class TestFileGUI(FileViewGUI):
 
     def getState(self):
         if self.currentTest:
-            return self.currentTest.state
+            return self.currentTest.stateInGui
     def addComparisonsToModel(self, state):
         self.addComparisons(state, state.correctResults + state.changedResults, "Comparison Files")
         self.addComparisons(state, state.newResults, "New Files")
@@ -2483,7 +2485,7 @@ class TestProgressMonitor(guiplugins.SubGUI):
     def notifyAdd(self, test, initial):
         if self.dynamic and test.classId() == "test-case":
             incrementCount = self.testCount == 0
-            self.insertTest(test, test.state, incrementCount)
+            self.insertTest(test, test.stateInGui, incrementCount)
     def notifyAllRead(self, *args):
         # Fix the not started count in case the initial guess was wrong
         if self.testCount > 0:

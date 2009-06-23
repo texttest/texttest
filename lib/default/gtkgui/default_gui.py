@@ -413,7 +413,7 @@ class ViewInEditor(FileViewAction):
         return self.viewFile(fileName, viewTool, exitHandler, exitHandlerArgs)
 
     def editingComplete(self):
-        guiplugins.scriptEngine.applicationEvent("file editing operations to complete")
+        guiplugins.scriptEngine.applicationEvent("file editing operations to complete", "files")
 
 
 class ViewConfigFileInEditor(ViewInEditor):
@@ -557,7 +557,7 @@ class ViewFileDifferences(FileViewAction):
         self.startViewer(cmdArgs, description=description, exitHandler=self.diffingComplete)
 
     def diffingComplete(self, *args):
-        guiplugins.scriptEngine.applicationEvent("the graphical diff program to terminate")
+        guiplugins.scriptEngine.applicationEvent("the graphical diff program to terminate", "files")
 
 
 class ViewFilteredFileDifferences(ViewFileDifferences):
@@ -620,7 +620,7 @@ class FollowFile(FileViewAction):
         self.startViewer(cmdArgs, description=description, exitHandler=self.followComplete)
 
     def followComplete(self, *args):
-        guiplugins.scriptEngine.applicationEvent("the file-following program to terminate")
+        guiplugins.scriptEngine.applicationEvent("the file-following program to terminate", "files")
 
 
 class KillTests(guiplugins.ActionGUI):

@@ -976,6 +976,7 @@ class ImportTestCase(ImportTest):
         return os.path.join(testDir, name + "." + suite.app.name)
     def getWriteFile(self, name, suite, testDir):
         return open(self.getWriteFileName(name, suite, testDir), "w")
+
     def writeEnvironmentFile(self, suite, testDir):
         envDir = self.getEnvironment(suite)
         if len(envDir) == 0:
@@ -985,19 +986,20 @@ class ImportTestCase(ImportTest):
             guiplugins.guilog.info("Setting test env: " + var + " = " + value)
             envFile.write(var + ":" + value + "\n")
         envFile.close()
+
     def writeDefinitionFiles(self, suite, testDir):
         optionString = self.getOptions(suite)
         if len(optionString):
-            guiplugins.guilog.info("Using option string : " + optionString)
             optionFile = self.getWriteFile("options", suite, testDir)
             optionFile.write(optionString + "\n")
-        else:
-            guiplugins.guilog.info("Not creating options file")
         return optionString
+
     def getOptions(self, suite):
         return self.optionGroup.getOptionValue("opt")
+
     def getEnvironment(self, suite):
         return {}
+
     def writeResultsFiles(self, suite, testDir):
         # Cannot do anything in general
         pass

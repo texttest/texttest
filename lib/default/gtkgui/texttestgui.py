@@ -149,6 +149,7 @@ class IdleHandlerManager:
         # process isn't run. We hence remove that for a while here ...
         if lock:
             self.disableHandler()
+            scriptEngine.replayer.disableIdleHandlers()
 
     def shouldShow(self):
         return True # nothing to show, but we need to observe...
@@ -160,6 +161,7 @@ class IdleHandlerManager:
     def notifyActionStop(self, *args):
         # Activate idle function again, see comment in notifyActionStart
         self.enableHandler()
+        scriptEngine.replayer.reenableIdleHandlers()
 
     def addSuites(self, *args):
         self.enableHandler()
@@ -818,7 +820,7 @@ class TestIteratorMap:
         self.dict[self.getKey(test)] = iter
     def updateIterator(self, test, oldRelPath):
         # relative path of test has changed
-        key = self.parentApps.get(test.app), oldRelPath
+        key = self.parentApps.get(test.app, test.app), oldRelPath
         iter = self.dict.get(key)
         if iter is not None:
             self.store(test, iter)
@@ -1228,7 +1230,6 @@ class TestTreeGUI(ContainerGUI):
         iter = self.itermap.getIterator(test)
         if iter:
             self.addAdditional(iter, test)
-            self.diag.info("Adding additional test to node " + self.model.get_value(iter, 0))
             return iter
         suite = test.parent
         suiteIter = None
@@ -1245,6 +1246,7 @@ class TestTreeGUI(ContainerGUI):
     def addAdditional(self, iter, test):
         currTests = self.model.get_value(iter, 2)
         if not test in currTests:
+            self.diag.info("Adding additional test to node " + self.model.get_value(iter, 0))
             currTests.append(test)
 
     def notifyRemove(self, test):

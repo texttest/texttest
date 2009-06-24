@@ -331,7 +331,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
                                      "'.\nPlease install it somewhere on your $PATH.\n")
     
     def diffingComplete(self, *args):
-        guiplugins.scriptEngine.applicationEvent("the version-control graphical diff program to terminate")
+        guiplugins.scriptEngine.applicationEvent("the version-control graphical diff program to terminate", "files")
                                 
     def getRootPath(self):
         appPath = self.currTestSelection[0].app.getDirectory()

@@ -31,11 +31,11 @@ class ApplicationEventResponder(plugins.Responder):
         eventName = "test " + test.uniqueName + " to " + changeDesc
         category = test.uniqueName
         timeDelay = self.getTimeDelay()
-        self.scriptEngine.applicationEvent(eventName, category, timeDelay)
+        self.scriptEngine.applicationEvent(eventName, category, "tests", timeDelay)
     def notifyAdd(self, test, initial):
         if initial and test.classId() == "test-case":
             eventName = "test " + test.uniqueName + " to be read"
-            self.scriptEngine.applicationEvent(eventName, test.uniqueName)
+            self.scriptEngine.applicationEvent(eventName, test.uniqueName, "tests")
     def notifyUniqueNameChange(self, test, newName):
         if test.classId() == "test-case":
             self.scriptEngine.applicationEventRename("test " + test.uniqueName + " to", "test " + newName + " to")
@@ -46,8 +46,8 @@ class ApplicationEventResponder(plugins.Responder):
         except ValueError:
             return 1
     def notifyAllRead(self, *args):
-        self.scriptEngine.applicationEvent("all tests to be read")
+        self.scriptEngine.applicationEvent("all tests to be read", "tests")
     def notifyAllComplete(self):
-        self.scriptEngine.applicationEvent("completion of test actions")
+        self.scriptEngine.applicationEvent("completion of test actions", "tests")
     def notifyCloseDynamic(self, test, name):
         self.scriptEngine.applicationEvent(name + " GUI to be closed")

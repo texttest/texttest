@@ -415,7 +415,7 @@ class TopWindowGUI(ContainerGUI):
 
     def addSuites(self, suites):
         for suite in suites:
-            if suite.app.fullName not in [ app.fullName for app in self.allApps ]:
+            if suite.app.fullName() not in [ app.fullName() for app in self.allApps ]:
                 self.allApps.append(suite.app)
                 self.setWindowTitle()
                 
@@ -445,7 +445,7 @@ class TopWindowGUI(ContainerGUI):
         return self.topWindow
 
     def setWindowTitle(self):
-        allAppNames = [ app.fullName + app.versionSuffix() for app in self.allApps ]
+        allAppNames = [ repr(app) for app in self.allApps ]
         appNameDesc = ",".join(allAppNames)
         if self.dynamic:
             checkoutTitle = self.getCheckoutTitle()
@@ -1775,7 +1775,7 @@ class RunInfoGUI(TextViewGUI):
         return self.dynamic
 
     def appInfo(self, suite):
-        textToUse  = "Application name : " + suite.app.fullName + "\n"
+        textToUse  = "Application name : " + suite.app.fullName() + "\n"
         textToUse += "Version          : " + suite.app.getFullVersion() + "\n"
         textToUse += "Number of tests  : " + str(suite.size()) + "\n"
         textToUse += "Executable       : " + suite.getConfigValue("executable") + "\n"
@@ -2081,11 +2081,11 @@ class ApplicationFileGUI(FileViewGUI):
             for importedFile in sortedFiles:
                 self.addFileToModel(importediter, importedFile, colour, self.allApps)
     def getApplicationTitles(self):
-        basicTitles = [ app.fullName + app.versionSuffix() for app in self.allApps ]
+        basicTitles = [ repr(app) for app in self.allApps ]
         if self.areUnique(basicTitles):
             return basicTitles
         else:
-            return [ app.fullName + app.versionSuffix() + " (" + app.name + " under " +
+            return [ repr(app) + " (" + app.name + " under " +
                      os.path.basename(app.getDirectory()) + ")" for app in self.allApps ]
     def areUnique(self, names):
         for index, name in enumerate(names):

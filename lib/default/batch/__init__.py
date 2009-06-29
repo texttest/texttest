@@ -221,7 +221,7 @@ class MailSender:
         file.write(mailContents)
         file.close()
     def sendOrStoreMail(self, app, mailContents, useCollection=False, isAllSuccess=False):
-        plugins.log.info("Creating batch report for application " + app.fullName + " ...")
+        plugins.log.info("Creating batch report for application " + app.fullName() + " ...")
         if useCollection:
             self.storeMail(app, mailContents)
             plugins.log.info("File written.")
@@ -276,7 +276,7 @@ class MailSender:
         return app.getCompositeConfigValue("batch_use_collection", self.sessionName) == "true"
     def getMailHeader(self, app, batchDataList):
         versions = self.findCommonVersions(app, batchDataList)
-        return app.fullName + self.getVersionString(versions) + " : "
+        return app.fullName() + self.getVersionString(versions) + " : "
     def getCategoryNames(self, batchDataList):
         names = []
         for resp in batchDataList:
@@ -542,7 +542,7 @@ class WebPageResponder(plugins.Responder):
         return app, extraVersions, relevantSubDirs
 
     def getVersionTitle(self, app, version):
-        title = app.fullName
+        title = app.fullName()
         if len(version) > 0 and version != "default":
             title += " version " + version
         return title

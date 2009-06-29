@@ -768,7 +768,7 @@ class Config:
         return colours
 
     def getDefaultPageName(self, app):
-        pageName = app.fullName
+        pageName = app.fullName()
         fullVersion = app.getFullVersion()
         if fullVersion:
             pageName += " - version " + fullVersion

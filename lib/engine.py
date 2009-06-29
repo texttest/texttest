@@ -49,8 +49,8 @@ class UniqueNameFinder(plugins.Responder):
             self.storeBothWays(oldTest.name + oldParentId, oldTest)
             self.storeBothWays(newTest.name + newParentId, newTest)
         elif oldTest.app.name != newTest.app.name:
-            self.storeBothWays(oldTest.name + " for " + oldTest.app.fullName, oldTest)
-            self.storeBothWays(newTest.name + " for " + newTest.app.fullName, newTest)
+            self.storeBothWays(oldTest.name + " for " + oldTest.app.fullName(), oldTest)
+            self.storeBothWays(newTest.name + " for " + newTest.app.fullName(), newTest)
         elif oldTest.app.getFullVersion() != newTest.app.getFullVersion():
             self.storeBothWays(oldTest.name + " version " + self.getVersionName(oldTest), oldTest)
             self.storeBothWays(newTest.name + " version " + self.getVersionName(newTest), newTest)

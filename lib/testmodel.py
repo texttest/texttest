@@ -1132,10 +1132,11 @@ class Application:
         self.checkout = self.configObject.setUpCheckout(self)
         self.diag.info("Checkout set to " + self.checkout)
     def __repr__(self):
-        return self.fullName + self.versionSuffix()
+        return self.fullName() + self.versionSuffix()
     def __hash__(self):
         return id(self)
-
+    def fullName(self):
+        return self.getConfigValue("full_name")
     def getPersonalConfigFiles(self):
         if self.inputOptions.has_key("vanilla"):
             return []
@@ -1148,12 +1149,13 @@ class Application:
         self.configDocs = {}
         self.extraDirCaches = {}
         self.setConfigDefaults()
+
+        # Read our pre-existing config files
+        self.readApplicationConfigFiles()
         if len(configEntries):
             # We've been given some entries, read them in and write them out to file
             self.importAndWriteEntries(configEntries)
 
-        # Read our pre-existing config files
-        self.readApplicationConfigFiles()
         self.configDir.readValues(self.getPersonalConfigFiles(), insert=False, errorOnUnknown=False)
         self.diag.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
         if not plugins.TestState.showExecHosts:
@@ -1162,8 +1164,7 @@ class Application:
     def readApplicationConfigFiles(self):
         self.readConfigFiles(configModuleInitialised=False)
         self.diag.info("Basic Config file settings are: " + "\n" + repr(self.configDir.dict))
-        self.fullName = self.getConfigValue("full_name")
-        self.diag.info("Found application " + repr(self))
+        self.diag.info("Found application '" + self.name + "'")
         self.configObject = self.makeConfigObject()
         # Fill in the values we expect from the configurations, and read the file a second time
         self.configObject.setApplicationDefaults(self)
@@ -1411,7 +1412,7 @@ class Application:
         return suite
 
     def description(self, includeCheckout = False):
-        description = "Application " + self.fullName
+        description = "Application " + self.fullName()
         if len(self.versions):
             description += ", version " + ".".join(self.versions)
         if includeCheckout and self.checkout:

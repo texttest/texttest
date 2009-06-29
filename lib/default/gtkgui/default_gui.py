@@ -868,7 +868,7 @@ class ImportTest(guiplugins.ActionDialogGUI):
         newDir = os.path.join(suite.getDirectory(), testName)
         if os.path.isdir(newDir):
             if self.testFilesExist(newDir, suite.app):
-                raise plugins.TextTestError, "Test already exists for application " + suite.app.fullName + \
+                raise plugins.TextTestError, "Test already exists for application " + suite.app.fullName() + \
                           " : " + os.path.basename(newDir)
             else:
                 return "Test directory already exists for '" + testName + "'\nAre you sure you want to use this name?"
@@ -1028,6 +1028,8 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         self.addOption("name", "Full name of application", description="Name of application to use in reports etc.")
         self.addOption("ext", "\nFile extension to use for TextTest files associated with this application", description="Short space-free extension, to identify all TextTest's files associated with this application")
         self.addOption("subdir", "\nSubdirectory of TEXTTEST_HOME to store the above application files under (leave blank for local storage)", possibleValues=self.findSubDirectories())
+        self.addSwitch("gui", "Enable GUI testing operations (recording and virtual servers)")
+ 
         possibleDirs = []
         for app in allApps:
             if app.getDirectory() not in possibleDirs:
@@ -1081,6 +1083,9 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         fullName = self.optionGroup.getOptionValue("name")
         if fullName:
             configEntries["full_name"] = fullName
+        useGui = self.optionGroup.getSwitchValue("gui")
+        if useGui:
+            configEntries["use_case_record_mode"] = "GUI"
         self.notify("NewApplication", ext, directory, configEntries)
         self.notify("Status", "Created new application with extension '" + ext + "'.")
 
@@ -1779,8 +1784,8 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
     def performOnCurrent(self):
         self.updateRecordTime(self.currTestSelection[0])
         self.startTextTestProcess("record", [ "-g", "-record" ])
-    def shouldShow(self):
-        return len(self.validApps) > 0 # override the default so it's disabled if there are no apps
+    def shouldShowCurrent(self, *args):
+        return len(self.validApps) > 0 and guiplugins.ActionTabGUI.shouldShowCurrent(self, *args) # override the default so it's disabled if there are no apps
     def isValidForApp(self, app):
         return app.getConfigValue("use_case_record_mode") != "disabled" and \
                app.getConfigValue("use_case_recorder") != "none"

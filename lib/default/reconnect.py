@@ -22,9 +22,9 @@ class ReconnectConfig:
 
     def cacheRunDir(self, app, runDir, version=""):
         if version:
-            keys = [ app.fullName + "." + version ]
+            keys = [ app.fullName() + "." + version ]
         else:
-            keys = [ app.fullName ] + app.versions
+            keys = [ app.fullName() ] + app.versions
         for i in range(len(keys)):
             subKey = ".".join(keys[:i+1])
             if i == len(keys) - 1 or not self.runDirCache.has_key(subKey):

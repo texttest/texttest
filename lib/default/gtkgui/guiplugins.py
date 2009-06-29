@@ -47,9 +47,9 @@ class GUIConfig:
         return allPersonalFiles
     
     def addSuites(self, suites):
-        fullNames = [ app.fullName for app in self.apps ]
+        fullNames = [ app.fullName() for app in self.apps ]
         for suite in suites:
-            if suite.app.fullName not in fullNames:
+            if suite.app.fullName() not in fullNames:
                 self.apps.append(suite.app)
 
     def makeColourDictionary(self):

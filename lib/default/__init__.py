@@ -1,5 +1,5 @@
 
-import os, sys, plugins, sandbox, console, rundependent, pyusecase_interface, comparetest, batch, subprocess, operator, glob, signal, shutil, logging
+import os, sys, plugins, sandbox, console, rundependent, pyusecase_interface, comparetest, batch, subprocess, operator, signal, shutil, logging
 
 from copy import copy
 from string import Template
@@ -468,14 +468,10 @@ class Config:
             if timeLimit:
                 filters.append(TimeFilter(timeLimit))
         if optionMap.has_key("grep"):
-            filters.append(GrepFilter(optionMap["grep"], self.getGrepFile(optionMap, app)))
+            grepFile = optionMap.get("grepfile", app.getConfigValue("log_file"))
+            filters.append(GrepFilter(optionMap["grep"], grepFile))
         return filters
-
-    def getGrepFile(self, optionMap, app):
-        if optionMap.has_key("grepfile"):
-            return optionMap["grepfile"]
-        else:
-            return app.getConfigValue("log_file")
+    
     def batchMode(self):
         return self.optionMap.has_key("b")
     def keepTemporaryDirectories(self):
@@ -1050,27 +1046,24 @@ class GrepFilter(plugins.TextFilter):
     def __init__(self, filterText, fileStem):
         plugins.TextFilter.__init__(self, filterText)
         self.fileStem = fileStem
+        
     def acceptsTestCase(self, test):
         for logFile in self.findAllLogFiles(test):
             if self.matches(logFile):
                 return True
         return False
+
     def findAllLogFiles(self, test):
         logFiles = []
-        for fileName in test.findAllStdFiles(self.fileStem):
+        for fileName in test.getFileNamesMatching(self.fileStem):
             fileVersions = os.path.basename(fileName).split(".")[2:]
-            if self.allAllowed(fileVersions, test.app.versions):
-                if os.path.isfile(fileName):
-                    logFiles.append(fileName)
-                else:
-                    test.refreshFiles()
-                    return self.findAllLogFiles(test)
+            if os.path.isfile(fileName):
+                logFiles.append(fileName)
+            else:
+                test.refreshFiles()
+                return self.findAllLogFiles(test)
         return logFiles
-    def allAllowed(self, fileVersions, versions):
-        for version in fileVersions:
-            if version not in versions:
-                return False
-        return True
+
     def matches(self, logFile):
         for line in open(logFile).xreadlines():
             if self.stringContainsText(line):
@@ -1614,10 +1607,7 @@ class ExtractStandardPerformance(sandbox.ExtractPerformanceFiles):
         self.describe(test)
         sandbox.ExtractPerformanceFiles.__call__(self, test)
     def findLogFiles(self, test, stem):
-        if glob.has_magic(stem):
-            return test.getFileNamesMatching(stem)
-        else:
-            return [ test.getFileName(stem) ]
+        return test.getFileNamesMatching(stem)
     def getFileToWrite(self, test, stem):
         name = stem + "." + test.app.name + test.app.versionSuffix()
         return os.path.join(test.getDirectory(), name)

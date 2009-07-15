@@ -46,10 +46,8 @@ class DirectoryCache:
         return map(self.pathName, matchingFiles)
 
     def matchesPattern(self, fileName, pattern, versionPredicate):
-        if not fnmatch(fileName, pattern):
-            return False
         stem, versions = self.splitStem(fileName)
-        return versionPredicate(versions)
+        return fnmatch(stem, pattern) and versionPredicate(versions)
 
     def splitStem(self, fileName):
         parts = fileName.split(".")
@@ -72,7 +70,7 @@ class DirectoryCache:
         return reduce(operator.add, versionSets.values(), [])
 
     def findVersionSets(self, stem, predicate, versionSetMethod=None):
-        if stem.find("/") != -1:
+        if "/" in stem:
             root, local = os.path.split(stem)
             newCache = DirectoryCache(os.path.join(self.dir, root))
             return newCache.findVersionSets(local, predicate, versionSetMethod)
@@ -351,6 +349,7 @@ class Test(plugins.Observable):
             return rootDir, self.listFilesFrom(fileList, filesToIgnore, followLinks=True)
         else:
             return None, []
+
     def listFilesFrom(self, files, filesToIgnore, followLinks):
         files.sort()
         dataFiles = []
@@ -367,11 +366,13 @@ class Test(plugins.Observable):
             dataFiles.append(subdir)
             dataFiles += self.listFilesFrom(self.fullPathList(subdir), filesToIgnore, followLinks)
         return dataFiles
+
     def fileMatches(self, file, filesToIgnore):
         for ignFile in filesToIgnore:
             if fnmatch(file, ignFile):
                 return True
         return False
+    
     def findAllStdFiles(self, stem):
         if stem in [ "environment", "properties" ]:
             otherApps = self.app.findOtherAppNames()
@@ -380,6 +381,7 @@ class Test(plugins.Observable):
             return self.dircache.findAllFiles(stem, otherAppExcludor)
         else:
             return self.app._getAllFileNames([ self.dircache ], stem, allVersions=True)
+
     def makeSubDirectory(self, name):
         subdir = self.dircache.pathName(name)
         if os.path.isdir(subdir):

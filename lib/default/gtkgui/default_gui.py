@@ -384,6 +384,8 @@ class ViewInEditor(FileViewAction):
         guiplugins.guilog.info("Viewing file " + fileName + " using '" + descriptor + "', refresh set to " + refresh)
         self.startViewer(cmdArgs, description=description, env=env,
                          exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
+        guiplugins.scriptEngine.applicationEvent("the file editing process to start", "files", timeDelay=1)
+        
     def getViewerEnvironment(self, cmdArgs):
         # An absolute path to the viewer may indicate a custom tool, send the test environment along too
         # Doing this is unlikely to cause harm in any case

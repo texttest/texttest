@@ -1486,22 +1486,19 @@ class SaveSelection(guiplugins.ActionDialogGUI):
     def getTooltip(self):
         return "Save selected tests in file"
         return self.folders
-    def getTestPathFilterArg(self):
-        selTestPaths = []
-        testCaseSelection = self.getTestCaseSelection()
+    def getSignalsSent(self):
+        return [ "WriteTestIfSelected" ]
+
+    def writeTestList(self, file):
+        file.write("-tp ")
         for suite in self.rootTestSuites:
-            selTestPaths.append("appdata=" + suite.app.name + suite.app.versionSuffix())
+            file.write("appdata=" + suite.app.name + suite.app.versionSuffix() + "\n")
             for test in suite.testCaseList():
-                if test in testCaseSelection:
-                    selTestPaths.append(test.getRelPath())
-        return "-tp " + "\n".join(selTestPaths)
+                self.notify("WriteTestIfSelected", test, file)
+    
     def notifySetTestSelection(self, tests, criteria="", *args):
         self.selectionCriteria = criteria
-    def getTextToSave(self):
-        if self.dynamic or not self.optionGroup.getSwitchValue("tests"):
-            return self.getTestPathFilterArg()
-        else:
-            return self.selectionCriteria
+    
     def getConfirmationMessage(self):
         fileName = self.optionGroup.getOptionValue("f")
         if fileName and os.path.isfile(fileName):
@@ -1510,25 +1507,31 @@ class SaveSelection(guiplugins.ActionDialogGUI):
     def getConfirmationDialogSettings(self):
         return gtk.STOCK_DIALOG_QUESTION, "Query"
 
-    def notifySaveSelection(self, fileName):
-        toSave = self.getTestPathFilterArg()
-        self.writeFile(fileName, toSave)
-    def performOnCurrent(self):
-        toWrite = self.getTextToSave()
+    def notifySaveSelection(self, fileName, writeCriteria=False):
+        try:
+            file = open(fileName, "w")
+            if writeCriteria:
+                file.write(self.selectionCriteria + "\n")
+            else:
+                self.writeTestList(file)
+            file.close()
+        except IOError, e:
+            raise plugins.TextTestError, "\nFailed to save selection:\n" + str(e) + "\n"
+       
+    def getFileName(self):
         fileName = self.optionGroup.getOptionValue("f")
         if not fileName:
             raise plugins.TextTestError, "Cannot save selection - no file name specified"
         elif os.path.isdir(fileName):
             raise plugins.TextTestError, "Cannot save selection - existing directory specified"
         else:
-            self.writeFile(fileName, toWrite)
-    def writeFile(self, fileName, toWrite):
-        try:
-            file = open(fileName, "w")
-            file.write(toWrite + "\n")
-            file.close()
-        except IOError, e:
-            raise plugins.TextTestError, "\nFailed to save selection:\n" + str(e) + "\n"
+            return fileName
+        
+    def performOnCurrent(self):
+        fileName = self.getFileName()
+        writeCriteria = not self.dynamic and self.optionGroup.getSwitchValue("tests")
+        self.notifySaveSelection(fileName, writeCriteria)        
+
     def messageAfterPerform(self):
         return "Saved " + self.describeTests() + " in file '" + self.optionGroup.getOptionValue("f") + "'."
 

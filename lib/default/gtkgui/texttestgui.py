@@ -1025,11 +1025,27 @@ class TestTreeGUI(ContainerGUI):
         # The selection hasn't changed, but we want to e.g.
         # recalculate the action sensitiveness.
         self.sendSelectionNotification(self.selectedTests)
+        
     def notifyRecomputed(self, test):
         iter = self.itermap.getIterator(test)
         # If we've recomputed, clear the recalculation icons
         self.setNewRecalculationStatus(iter, test, [])
 
+    def notifyWriteTestIfSelected(self, test, file):
+        # From Save Selection.
+        if not self.isVisible(test):
+            return
+        if self.hasSelectedAncestor(test):
+            file.write(test.getRelPath() + "\n")
+
+    def hasSelectedAncestor(self, test):
+        if test in self.selectedTests:
+            return True
+        elif test.parent:
+            return self.hasSelectedAncestor(test.parent)
+        else:
+            return False
+        
     def updateRecalculationMarker(self, model, path, iter):
         tests = model.get_value(iter, 2)
         if not tests[0].stateInGui.isComplete():

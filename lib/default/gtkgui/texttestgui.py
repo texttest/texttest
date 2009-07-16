@@ -954,8 +954,8 @@ class TestTreeGUI(ContainerGUI):
         scriptEngine.monitorExpansion(self.treeView, "show test suite", "hide test suite")
         self.treeView.connect('row-expanded', self.rowExpanded)
         self.expandLevel(self.treeView, self.filteredModel.get_iter_root())
+        scriptEngine.monitorRightClicks("view actions for test", self.treeView)
         self.treeView.connect("button_press_event", self.popupGUI.showMenu)
-
         scriptEngine.monitor("set test selection to", self.selection)
         self.selection.connect("changed", self.userChangedSelection)
 
@@ -1966,6 +1966,7 @@ class FileViewGUI(guiplugins.SubGUI):
         view.expand_all()
         self.monitorEvents()
         if self.popupGUI:
+            scriptEngine.monitorRightClicks("view actions for file", view)
             view.connect("button_press_event", self.popupGUI.showMenu)
             self.popupGUI.createView()
 

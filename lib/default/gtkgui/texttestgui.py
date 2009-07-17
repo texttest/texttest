@@ -2072,8 +2072,8 @@ class ApplicationFileGUI(FileViewGUI):
         personalFiles = self.getPersonalFiles(personalDir)
         importedFiles = {}
         if len(personalFiles) > 0:
-            persiter = self.model.insert_before(None, None)
-            self.model.set_value(persiter, 0, "Personal Files")
+            headerRow = [ "Personal Files", "white", personalDir, None, "", "" ]
+            persiter = self.model.insert_before(None, None, headerRow)
             self.addDataFilesUnderIter(persiter, personalFiles, colour, personalDir, associatedObject=self.allApps)
             for file in personalFiles:
                 for importedFile in self.getImportedFiles(file):
@@ -2081,8 +2081,8 @@ class ApplicationFileGUI(FileViewGUI):
 
         allTitles = self.getApplicationTitles()
         for index, app in enumerate(self.allApps):
-            confiter = self.model.insert_before(None, None)
-            self.model.set_value(confiter, 0, "Files for " + allTitles[index])
+            headerRow = [ "Files for " + allTitles[index], "white", app.getDirectory(), None, "", "" ]
+            confiter = self.model.insert_before(None, None, headerRow)
             for file in self.getConfigFiles(app):
                 self.addFileToModel(confiter, file, colour, [ app ])
                 for importedFile in self.getImportedFiles(file, app):

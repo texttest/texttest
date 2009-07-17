@@ -636,27 +636,19 @@ class CreateCatalogue(plugins.Action):
         allPaths = seqdict()
         for path in test.listUnownedTmpPaths():
             editInfo = self.getEditInfo(path)
-            if type(editInfo) == types.IntType:
-                self.diag.info("Path " + path + " edit info " + plugins.localtime(seconds=editInfo))
-            else:
-                self.diag.info("Path " + path + " edit info " + str(editInfo))
+            self.diag.info("Path " + path + " edit info " + editInfo)
             allPaths[path] = editInfo
         return allPaths
+
     def getEditInfo(self, fullPath):
         # Check modified times for files and directories, targets for links
         if os.path.islink(fullPath):
             return os.path.realpath(fullPath)
         else:
-            return plugins.modifiedTime(fullPath)
+            return plugins.localtime(seconds=plugins.modifiedTime(fullPath))
+
     def editInfoChanged(self, fullPath, oldInfo, newInfo):
-        if os.path.islink(fullPath):
-            return oldInfo != newInfo
-        else:
-            try:
-                return newInfo - oldInfo > 0
-            except:
-                # Handle the case where a link becomes a normal file
-                return oldInfo != newInfo
+        return oldInfo != newInfo
     def findDifferences(self, oldPaths, newPaths, writeDir):
         pathsGained, pathsEdited, pathsLost = [], [], []
         for path, modTime in newPaths.items():

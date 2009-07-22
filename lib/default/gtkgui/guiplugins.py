@@ -201,19 +201,17 @@ class ProcessTerminationMonitor(plugins.Observable):
 
     def listRunningProcesses(self):
         processesToCheck = guiConfig.getCompositeValue("query_kill_processes", "", modeDependent=True)
-        running = []
+        if "all" in processesToCheck:
+            processesToCheck = [ ".*" ]
         if len(processesToCheck) == 0:
-            return running
+            return []
+        
+        running = []
+        triggerGroup = plugins.TextTriggerGroup(processesToCheck)
         for process, description, exitHandler, exitHandlerArgs in self.processes.values():
-            for processToCheck in processesToCheck:
-                if plugins.isRegularExpression(processToCheck):
-                    if plugins.findRegularExpression(processToCheck, description):
-                        running.append("PID " + str(process.pid) + " : " + description)
-                        break
-                elif processToCheck.lower() == "all" or description.find(processToCheck) != -1:
-                    running.append("PID " + str(process.pid) + " : " + description)
-                    break
-
+            if triggerGroup.stringContainsText(description):
+                running.append("PID " + str(process.pid) + " : " + description)
+                
         return running
 
     def getProcessIdentifier(self, process):

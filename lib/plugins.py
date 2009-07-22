@@ -114,10 +114,6 @@ def getNumberOfSeconds(timeString):
     raise TextTestError, "Illegal time format '" + timeString + \
           "' :  Use format HH:MM:SS or MM:SS, or a single number to denote a number of minutes."
 
-# Same as above, but gives minutes instead of seconds ...
-def getNumberOfMinutes(timeString):
-    return getNumberOfSeconds(timeString) / 60
-
 def printWarning(message, stdout = True, stderr = False):
     if stdout:
         if log:
@@ -131,12 +127,6 @@ def printWarning(message, stdout = True, stderr = False):
 regexChars = re.compile("[\^\$\[\]\{\}\\\*\?\|\+]")
 def isRegularExpression(text):
     return (regexChars.search(text) != None)
-def findRegularExpression(expr, text):
-    try:
-        regExpr = re.compile(expr)
-        return regExpr.search(text)
-    except:
-        return False
 
 # Parse the string as a byte expression.
 # Mb/mb/megabytes/mbytes
@@ -241,7 +231,7 @@ def convertForMarkup(message):
 # Filter interface: all must provide these three methods
 class Filter:
     def acceptsTestCase(self, test):
-        return 1
+        return 1 # pragma: no cover - implemented in all base classes
     def acceptsTestSuite(self, suite):
         return 1
     def acceptsTestSuiteContents(self, suite):
@@ -382,8 +372,6 @@ class Action:
     # Useful for printing in a certain format...
     def describe(self, testObj, postText = ""):
         log.info(testObj.getIndent() + repr(self) + " " + repr(testObj) + postText)
-    def __repr__(self):
-        return "Doing nothing on"
     def __str__(self):
         return str(self.__class__)
 
@@ -477,19 +465,17 @@ class Observable:
         methodName = "notify" + name
         for observer in self.observers:
             if hasattr(observer, methodName):
-                retValue = self.notifyObserver(observer, methodName, *args, **kwargs)
-                if retValue is not None: # break off the chain if we get a non-None value back
-                    break
-
+                self.notifyObserver(observer, methodName, *args, **kwargs)
+                
     def notifyObserver(self, observer, methodName, *args, **kwargs):
         # doesn't matter if only some of the observers have the method
         method = eval("observer." + methodName)
         # unpickled objects have not called __init__, and
         # hence do not have self.passSelf ...
         if hasattr(self, "passSelf") and self.passSelf:
-            return method(self, *args, **kwargs)
+            method(self, *args, **kwargs)
         else:
-            return method(*args, **kwargs)
+            method(*args, **kwargs)
 
 # Interface all responders must fulfil
 class Responder:
@@ -635,11 +621,7 @@ def configureLogging(configFile=None):
         log = logging.getLogger("standard log")
 
 def getPersonalConfigDir():
-    fromEnv = os.getenv("TEXTTEST_PERSONAL_CONFIG")
-    if fromEnv:
-        return fromEnv
-    else:
-        return os.path.normpath(os.path.expanduser("~/.texttest"))
+    return os.getenv("TEXTTEST_PERSONAL_CONFIG", os.path.normpath(os.path.expanduser("~/.texttest")))
 
 # Return the hostname, guaranteed to be just the hostname...
 def gethostname():
@@ -926,24 +908,26 @@ def printException():
     sys.stderr.write(exceptionString)
     return exceptionString
 
+def zeroDivisorPercentage(numerator):
+    if numerator == 0.0:
+        return 0
+    else:
+        return -1
+
 def calculatePercentageNormalised(oldVal, newVal):        
     largest = max(oldVal, newVal)
     smallest = min(oldVal, newVal)
-    if smallest == 0.0:
-        if largest == 0.0:
-            return 0
-        else:
-            return -1
-    return ((largest - smallest) / smallest) * 100
+    if smallest != 0.0:
+        return ((largest - smallest) / smallest) * 100
+    else:
+        return zeroDivisorPercentage(largest)
 
 def calculatePercentageStandard(oldVal, newVal):        
-    if oldVal == 0.0:
-        if newVal == 0.0:
-            return 0
-        else:
-            return -1
-    diff = abs(newVal - oldVal)
-    return (diff / oldVal) * 100
+    if oldVal != 0.0:
+        diff = abs(newVal - oldVal)
+        return (diff / oldVal) * 100
+    else:
+        return zeroDivisorPercentage(newVal)
 
 def roundPercentage(val):
     perc = int(val)
@@ -954,34 +938,27 @@ def roundPercentage(val):
 
 
 class PreviewGenerator:
-    def __init__(self, maxWidth, maxLength, startEndRatio=1):
+    def __init__(self, maxWidth, maxLength):
         self.maxWidth = maxWidth
-        self.cutFromStart = int(maxLength * startEndRatio)
-        self.cutFromEnd = maxLength - self.cutFromStart
-    def getCutLines(self, lines):
-        if len(lines) < self.cutFromEnd + self.cutFromStart:
-            return lines
+        self.maxLength = maxLength
 
-        cutLines = lines[:self.cutFromStart]
-        if self.cutFromEnd > 0:
-            cutLines.append("... extra data truncated by TextTest ...\n")
-            cutLines += lines[-self.cutFromEnd:]
-        return cutLines
+    def getCutLines(self, lines):
+        return lines[:self.maxLength] 
+
     def getPreview(self, file):
         fileLines = retryOnInterrupt(self.getFileLines, file)
-        return self._getPreview(fileLines)
+        return self.getPreviewFromLines(fileLines)
+
     def getFileLines(self, file):
         lines = file.readlines()
         file.close()
         return lines
-    def _getPreview(self, lines):
+
+    def getPreviewFromLines(self, lines):
         cutLines = self.getCutLines(lines)
         lines = map(self.getWrappedLine, cutLines)
-        return string.join(lines, "")
-    def getPreviewFromText(self, text):
-        truncatedLines = text.splitlines()
-        lines = [ line + "\n" for line in truncatedLines ]
-        return self._getPreview(lines)
+        return "".join(lines)
+
     def getWrappedLine(self, line):
         remaining = line
         result = ""
@@ -990,6 +967,7 @@ class PreviewGenerator:
                 return result + remaining
             result += remaining[:self.maxWidth] + "\n"
             remaining = remaining[self.maxWidth:]
+
 
 # Exception to throw. It's generally good to throw this internally
 class TextTestError(RuntimeError):
@@ -1287,11 +1265,7 @@ class TextOption(Option):
     def addPossibleValue(self, value):
         if value not in self.possibleValues:
             self.possibleValues.append(value)
-            if self.possValAppendMethod:
-                self.possValAppendMethod(value)
-            return True
-        else:
-            return False
+            
     def setValue(self, value):
         Option.setValue(self, value)
         if self.usePossibleValues():
@@ -1463,23 +1437,7 @@ class OptionGroup:
         if len(onlyKeys) == 0:
             return True
         return key in onlyKeys
-
-    def readCommandLineArguments(self, args):
-        for arg in args:
-            if "=" in arg:
-                optionName, value = arg.split("=")
-                option = self.getOption(optionName)
-                if option:
-                    option.setValue(value)
-                else:
-                    raise TextTestError, self.name + " does not support option '" + optionName + "'"
-            else:
-                switch = self.getOption(arg)
-                if switch:
-                    switch.toggle()
-                else:
-                    raise TextTestError, self.name + " does not support switch '" + arg + "'"
-
+    
 
 def decodeText(text, log = None):
     localeEncoding = locale.getdefaultlocale()[1]
@@ -1532,26 +1490,6 @@ def encodeToUTF(unicodeInfo, log = None):
                          "' using both strict UTF-8 encoding and UTF-8 encoding with " + \
                          "replacement. Showing error message instead.")
             return "Failed to encode Unicode string."
-
-def rel_pathsplit(p, rest=[]):
-    (h,t) = os.path.split(p)
-    if len(h) < 1: return [t]+rest
-    if len(t) < 1: return [h]+rest
-    return rel_pathsplit(h,[t]+rest)
-
-def commonpath(l1, l2, common=[]):
-    if len(l1) < 1: return (common, l1, l2)
-    if len(l2) < 1: return (common, l1, l2)
-    if l1[0] != l2[0]: return (common, l1, l2)
-    return commonpath(l1[1:], l2[1:], common+[l1[0]])
-
-def relativepath(p1, p2):
-    (common,l1,l2) = commonpath(rel_pathsplit(p1), rel_pathsplit(p2))
-    p = []
-    if len(l1) > 0:
-        p = [ '../' * len(l1) ]
-    p = p + l2
-    return os.path.join( *p )
 
 # pwd and grp doesn't exist on windows ...
 import stat

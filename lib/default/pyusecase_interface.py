@@ -43,7 +43,7 @@ class ApplicationEventResponder(plugins.Responder):
     def getTimeDelay(self):
         try:
             return int(os.getenv("TEXTTEST_FILEWAIT_SLEEP", 1))
-        except ValueError:
+        except ValueError: # pragma: no cover - pathological case
             return 1
     def notifyAllRead(self, *args):
         self.scriptEngine.applicationEvent("all tests to be read", "tests")

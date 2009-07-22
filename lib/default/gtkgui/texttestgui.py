@@ -306,7 +306,7 @@ class TextTestGUI(plugins.Responder, plugins.Observable):
     def createTopWindowGUI(self, allApps):
         mainWindowGUI = PaneGUI(self.testTreeGUI, self.rightWindowGUI, horizontal=True, shrink=self.shouldShrinkMainPanes())
         parts = [ self.menuBarGUI, self.toolBarGUI, mainWindowGUI, self.shortcutBarGUI, statusMonitor ]
-        boxGUI = BoxGUI(parts, horizontal=False)
+        boxGUI = VBoxGUI(parts)
         return TopWindowGUI(boxGUI, self.dynamic, allApps)
 
     def createMenuAndToolBarGUIs(self, allApps, vanilla, uiManager):
@@ -644,8 +644,6 @@ class PopupMenuGUI(guiplugins.SubGUI):
         guiplugins.SubGUI.__init__(self)
         self.name = name
         self.uiManager = uiManager
-    def getWidgetName(self):
-        return "_" + self.name
     def createView(self):
         self.uiManager.ensure_update()
         self.widget = self.uiManager.get_widget("/" + self.name)
@@ -1397,40 +1395,14 @@ class TestTreeGUI(ContainerGUI):
         return False
 
 
-class BoxGUI(ContainerGUI):
-    def __init__(self, subguis, horizontal, reversed=False):
-        ContainerGUI.__init__(self, subguis)
-        self.horizontal = horizontal
-        self.reversed = reversed
-
-    def createBox(self):
-        if self.horizontal:
-            return gtk.HBox()
-        else:
-            return gtk.VBox()
-    def getPackMethod(self, box):
-        if self.reversed:
-            return box.pack_end
-        else:
-            return box.pack_start
-    def getOrderedSubGUIs(self):
-        if self.reversed:
-            reversedGUIs = copy(self.subguis)
-            reversedGUIs.reverse()
-            return reversedGUIs
-        else:
-            return self.subguis
-
-    def getExpandWidgets(self):
-        return [ gtk.HPaned, gtk.ScrolledWindow ]
-    
+class VBoxGUI(ContainerGUI):    
     def createView(self):
-        box = self.createBox()
-        packMethod = self.getPackMethod(box)
-        for subgui in self.getOrderedSubGUIs():
+        box = gtk.VBox()
+        expandWidgets = [ gtk.HPaned, gtk.ScrolledWindow ]
+        for subgui in self.subguis:
             view = subgui.createView()
-            expand = view.__class__ in self.getExpandWidgets()
-            packMethod(view, expand=expand, fill=expand)
+            expand = view.__class__ in expandWidgets
+            box.pack_start(view, expand=expand, fill=expand)
 
         box.show()
         return box
@@ -1604,15 +1576,11 @@ class PaneGUI(ContainerGUI):
         scriptEngine.registerPaned(self.paned, self.scriptCommand())
         frames = []
         for subgui in self.subguis:
-            widget = subgui.createView()
-            if isinstance(subgui, PaneGUI):
-                frames.append(widget)
-            else:
-                frame = gtk.Frame()
-                frame.set_shadow_type(gtk.SHADOW_IN)
-                frame.add(widget)
-                frame.show()
-                frames.append(frame)
+            frame = gtk.Frame()
+            frame.set_shadow_type(gtk.SHADOW_IN)
+            frame.add(subgui.createView())
+            frame.show()
+            frames.append(frame)
 
         self.paned.pack1(frames[0], resize=True)
         self.paned.pack2(frames[1], resize=True)
@@ -1824,9 +1792,6 @@ class TestRunInfoGUI(TextViewGUI):
 
     def getTabTitle(self):
         return "Test Run Info"
-
-    def getGroupTabTitle(self):
-        return "Run Info"
 
     def notifyNewTestSelection(self, tests, *args):
         if len(tests) == 0:

@@ -34,10 +34,7 @@ class DirectoryCache:
         return False
 
     def exists(self, fileName):
-        if fileName.find("/") != -1:
-            return os.path.exists(self.pathName(fileName))
-        else:
-            return fileName in self.contents
+        return fileName in self.contents
 
     def pathName(self, fileName):
         return os.path.join(self.dir, fileName)
@@ -59,26 +56,19 @@ class DirectoryCache:
             if len(fileStem) == 0:
                 return versions
 
-    def findVersionSetMethod(self, versionSetMethod):
-        if versionSetMethod:
-            return versionSetMethod
-        else:
-            return self.findVersionSet
-
     def findAllFiles(self, stem, extensionPred=None):
         versionSets = self.findVersionSets(stem, extensionPred)
         return reduce(operator.add, versionSets.values(), [])
 
-    def findVersionSets(self, stem, predicate, versionSetMethod=None):
+    def findVersionSets(self, stem, predicate):
         if "/" in stem:
             root, local = os.path.split(stem)
             newCache = DirectoryCache(os.path.join(self.dir, root))
-            return newCache.findVersionSets(local, predicate, versionSetMethod)
+            return newCache.findVersionSets(local, predicate)
 
-        methodToUse = self.findVersionSetMethod(versionSetMethod)
         versionSets = seqdict()
         for fileName in self.contents:
-            versionSet = methodToUse(fileName, stem)
+            versionSet = self.findVersionSet(fileName, stem)
             if versionSet is not None and (predicate is None or predicate(versionSet)):
                 versionSets.setdefault(versionSet, []).append(self.pathName(fileName))
         return versionSets
@@ -287,9 +277,6 @@ class Test(plugins.Observable):
         return self.environment.getSingleValue(var, defaultValue)
     def hasEnvironment(self, var):
         return self.environment.definesValue(var)
-    def getTestRelPath(self, file):
-        # test suites don't use this mechanism currently
-        return ""
     def needsRecalculation(self): #pragma : no cover - completeness only
         return False
     def isEmpty(self):
@@ -609,17 +596,13 @@ class TestCase(Test):
             return self.notify
     def getStateFile(self):
         return self.makeTmpFileName("teststate", forFramework=True)
-    def setWriteDirectory(self, newDir):
-        self.writeDirectory = newDir
+
     def makeWriteDirectory(self):
         self.diagnose("Created writedir at " + self.writeDirectory)
         plugins.ensureDirectoryExists(self.writeDirectory)
         frameworkTmp = self.getDirectory(temporary=1, forFramework=True)
         plugins.ensureDirectoryExists(frameworkTmp)
-    def getTestRelPath(self, file):
-        parts = file.split(self.getRelPath() + "/")
-        if len(parts) >= 2:
-            return parts[-1]
+        
     def listTmpFiles(self):
         tmpFiles = []
         if not os.path.isdir(self.writeDirectory):
@@ -630,14 +613,7 @@ class TestCase(Test):
             if file.endswith("." + self.app.name):
                 tmpFiles.append(os.path.join(self.writeDirectory, file))
         return tmpFiles
-    def getAllTmpFiles(self): # Also checks comparison files, if present.
-        files = self.listTmpFiles()
-        if len(files) == 0:
-            if self.state.hasResults():
-                for comparison in self.state.allResults:
-                    if comparison.stdFile: # New files have no std file ...
-                        files.append(os.path.basename(comparison.stdFile))
-        return files
+
     def listUnownedTmpPaths(self):
         paths = []
         filelist = os.listdir(self.writeDirectory)
@@ -836,8 +812,6 @@ class TestSuite(Test):
         return "test-suite"
     def isEmpty(self):
         return len(self.testcases) == 0
-    def callAction(self, action):
-        return action.setUpSuite(self)
     def isAcceptedBy(self, filter):
         return filter.acceptsTestSuite(self)
     def findTestSuiteFiles(self):
@@ -1046,13 +1020,6 @@ class TestSuite(Test):
                 else:
                     return cmp(b.lower(), a.lower())
 
-    def copyTestContents(self, newDir):
-        Test.copyTestContents(self, newDir)
-        for test in self.testcases:
-            testNewDir = os.path.join(newDir, test.name)
-            plugins.ensureDirectoryExists(testNewDir)
-            test.copyTestContents(testNewDir)
-
     def changeDirectory(self, newDir, origRelPath):
         Test.changeDirectory(self, newDir, origRelPath)
         for test in self.testcases:
@@ -1230,11 +1197,6 @@ class Application:
             return ConfigurationCall(name, self)
         else:
             raise AttributeError, "No such Application method : " + name
-    def getIndent(self):
-        # Useful for printing with tests
-        return ""
-    def classId(self):
-        return "test-app"
     def getDirectory(self):
         return self.dircache.dir
     def getRunMachine(self):
@@ -1302,20 +1264,20 @@ class Application:
                    self.getConfigValue("partial_copy_test_path", envMapping=envMapping)
         # Don't manage data that has an external path name, only accept absolute paths built by ourselves...
         return filter(lambda name: name.find(self.writeDirectory) != -1 or not os.path.isabs(name), allNames)
-    def getFileName(self, dirList, stem, versionSetMethod=None):
+    def getFileName(self, dirList, stem):
         dircaches = map(lambda dir: DirectoryCache(dir), dirList)
-        return self._getFileName(dircaches, stem, versionSetMethod=versionSetMethod)
-    def _getFileName(self, dircaches, stem, versionSetMethod=None):
-        allFiles = self._getAllFileNames(dircaches, stem, versionSetMethod=versionSetMethod)
+        return self._getFileName(dircaches, stem)
+    def _getFileName(self, dircaches, stem):
+        allFiles = self._getAllFileNames(dircaches, stem)
         if len(allFiles):
             return allFiles[-1]
 
-    def _getAllFileNames(self, dircaches, stem, allVersions=False, versionSetMethod=None):
+    def _getAllFileNames(self, dircaches, stem, allVersions=False):
         versionPred = self.getExtensionPredicate(allVersions)
         versionSets = seqdict()
         for dircache in dircaches:
             # Sorts into order most specific first
-            currVersionSets = dircache.findVersionSets(stem, versionPred, versionSetMethod)
+            currVersionSets = dircache.findVersionSets(stem, versionPred)
             for vset, files in currVersionSets.items():
                 versionSets.setdefault(vset, []).extend(files)
 
@@ -1599,10 +1561,8 @@ class OptionFinder(plugins.OptionFinder):
     def getPathFromOptionsOrEnv(self, envVar, defaultValue, optionName=""):
         if optionName and self.has_key(optionName):
             return self[optionName]
-        elif os.environ.has_key(envVar):
-            return os.environ[envVar]
         else:
-            return os.path.expanduser(os.path.expandvars(defaultValue))
+            return os.getenv(envVar, os.path.expanduser(os.path.expandvars(defaultValue)))
 
     def setUpLogging(self):
         if os.path.isfile(self.diagConfigFile):

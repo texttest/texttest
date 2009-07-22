@@ -80,10 +80,6 @@ class SaveTests(guiplugins.ActionDialogGUI):
         self.directAccel = self._addToGroups("Save", self.directAction, actionGroup, accelGroup)
         guiplugins.ActionDialogGUI.addToGroups(self, actionGroup, accelGroup)
 
-    def describeAction(self):
-        self._describeAction(self.directAction, self.directAccel)
-        self._describeAction(self.gtkAction, self.accelerator)
-
     def setSensitivity(self, newValue):
         self._setSensitivity(self.directAction, newValue)
         self._setSensitivity(self.gtkAction, newValue)
@@ -1367,10 +1363,6 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         filterFrame = self.createFrame("Filtering", self.filteringGroup, self.createFilterButton())
         vbox.pack_start(filterFrame, fill=False, expand=False, padding=8)
 
-    def describeAction(self):
-        self._describeAction(self.gtkAction, self.accelerator)
-        self._describeAction(self.filterAction, self.filterAccel)
-
 
 class HideSelected(guiplugins.ActionGUI,AllTestsHandler):
     def __init__(self, *args):
@@ -1485,7 +1477,6 @@ class SaveSelection(guiplugins.ActionDialogGUI):
         return "S_ave Selection..."
     def getTooltip(self):
         return "Save selected tests in file"
-        return self.folders
     def getSignalsSent(self):
         return [ "WriteTestIfSelected" ]
 

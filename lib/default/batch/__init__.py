@@ -422,7 +422,7 @@ class SaveState(plugins.Responder):
 class ArchiveRepository(plugins.ScriptWithArgs):
     scriptDoc = "Archive parts of the batch result repository to a history directory"
     def __init__(self, args):
-        argDict = self.parseArguments(args)
+        argDict = self.parseArguments(args, [ "before", "after", "session" ])
         self.descriptor = ""
         self.beforeDate = self.parseDate(argDict, "before")
         self.afterDate = self.parseDate(argDict, "after")
@@ -610,7 +610,7 @@ class WebPageResponder(plugins.Responder):
 class CollectFiles(plugins.ScriptWithArgs):
     scriptDoc = "Collect and send all batch reports that have been written to intermediate files"
     def __init__(self, args=[""]):
-        argDict = self.parseArguments(args)
+        argDict = self.parseArguments(args, [ "batch", "tmp" ])
         self.batchSession = argDict.get("batch", "default")
         self.mailSender = MailSender(self.batchSession)
         self.runId = "" # depends on what we pick up from collected files

@@ -797,7 +797,7 @@ class Config:
         app.setConfigDefault("cputime_include_system_time", 0, "Include system time when measuring CPU time?")
         app.setConfigDefault("performance_logfile", { "default" : [] }, "Which result file to collect performance data from")
         app.setConfigDefault("performance_logfile_extractor", {}, "What string to look for when collecting performance data")
-        app.setConfigDefault("performance_test_machine", { "default" : [], "memory" : [ "any" ] }, \
+        app.setConfigDefault("performance_test_machine", { "default" : [], "*mem*" : [ "any" ] }, \
                              "List of machines where performance can be collected")
         app.setConfigDefault("performance_variation_%", { "default" : 10.0 }, "How much variation in performance is allowed")
         app.setConfigDefault("performance_variation_serious_%", { "default" : 0.0 }, "Additional cutoff to performance_variation_% for extra highlighting")                
@@ -820,7 +820,7 @@ class Config:
     def defaultPerfUnits(self):
         units = {}
         units["default"] = "seconds"
-        units["memory"] = "MB"
+        units["*mem*"] = "MB"
         return units
 
     def defaultPerfDecreaseDescriptors(self):
@@ -1507,7 +1507,7 @@ class DocumentScripts(plugins.Action):
 class ReplaceText(plugins.ScriptWithArgs):
     scriptDoc = "Perform a search and replace on all files with the given stem"
     def __init__(self, args):
-        argDict = self.parseArguments(args)
+        argDict = self.parseArguments(args, [ "old", "new", "file" ])
         self.oldTextTrigger = plugins.TextTrigger(argDict["old"])
         self.newText = argDict["new"].replace("\\n", "\n")
         self.logFile = None
@@ -1540,7 +1540,7 @@ class ReplaceText(plugins.ScriptWithArgs):
 class ExportTests(plugins.ScriptWithArgs):
     scriptDoc = "Export the selected tests to a different test suite"
     def __init__(self, args):
-        argDict = self.parseArguments(args)
+        argDict = self.parseArguments(args, [ "dest" ])
         self.otherTTHome = argDict.get("dest")
         self.otherSuites = {}
         self.placements = {}

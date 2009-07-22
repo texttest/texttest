@@ -151,7 +151,7 @@ class PerformanceComparison:
             return settings.getDescriptor("performance_descriptor_increase")
 
     def getSummary(self, includeNumbers=True):
-        if self.newPerformance < 0:
+        if self.newPerformance < 0 or self.oldPerformance < 0:
             return "Performance comparison failed"
 
         perc = plugins.roundPercentage(self.percentageChange)
@@ -212,26 +212,17 @@ class TimeFilter(plugins.Filter):
             return 1
         return testPerformance >= self.minTime and testPerformance <= self.maxTime       
         
-class PerformanceStatistics(plugins.Action):
+class PerformanceStatistics(plugins.ScriptWithArgs):
     scriptDoc = "Prints a report on system resource usage per test. Can compare versions"
     printedTitle = False
     def __init__(self, args = []):
-        self.compareVersion = None
+        optDict = self.parseArguments(args, [ "compv", "file" ])
+        self.compareVersion = optDict.get("compv")
         self.compareTotal = 0.0
         self.total = 0.0
         self.testCount = 0
         self.app = None
-        self.file = "performance"
-        self.interpretOptions(args)
-    def interpretOptions(self, args):
-        for ar in args:
-            arr = ar.split("=")
-            if arr[0]=="compv":
-                self.compareVersion = arr[1]
-            elif arr[0]=="file":
-                self.file = arr[1]
-            else:
-                print "Unknown option " + arr[0]
+        self.file = optDict.get("file", "performance")
     def setUpSuite(self, suite):
         if suite.parent:
             print suite.getIndent() + suite.name
@@ -252,7 +243,8 @@ class PerformanceStatistics(plugins.Action):
     def __call__(self, test):
         self.testCount += 1
         perf = getPerformance(test.getFileName(self.file))
-        self.total += perf
+        if perf > 0:
+            self.total += perf
         entries = [ test.getIndent() + test.name, self.format(perf) ]
         if self.compareVersion is not None:
             comparePerf = getPerformance(test.getFileName(self.file, self.compareVersion))
@@ -262,7 +254,9 @@ class PerformanceStatistics(plugins.Action):
             entries += [ self.format(comparePerf), perfComp.getSummary() ]
         print self.getPaddedLine(entries)
     def format(self, number):
-        if self.file.find("mem") != -1:
+        if number < 0:
+            return "N/A"
+        if "mem" in self.file:
             return self.formatMemory(number)
         else:
             from datetime import timedelta

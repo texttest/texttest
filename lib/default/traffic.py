@@ -913,7 +913,7 @@ class ModifyTraffic(plugins.ScriptWithArgs):
     # For now, only bother with the client server traffic which is mostly what needs tweaking...
     scriptDoc = "Apply a script to all the client server data"
     def __init__(self, args):
-        argDict = self.parseArguments(args)
+        argDict = self.parseArguments(args, [ "script" ])
         self.script = argDict.get("script")
     def __repr__(self):
         return "Updating traffic in"

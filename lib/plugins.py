@@ -376,13 +376,16 @@ class Action:
         return str(self.__class__)
 
 class ScriptWithArgs(Action):
-    def parseArguments(self, args):
+    def parseArguments(self, args, allowedArgs):
         currKey = ""
         dict = {}
         for arg in args:
-            if arg.find("=") != -1:
+            if "=" in arg:
                 currKey, val = arg.split("=")
-                dict[currKey] = val
+                if currKey in allowedArgs:
+                    dict[currKey] = val
+                else:
+                    print "Unrecognised option '" + currKey + "'"
             elif dict.has_key(currKey):
                 dict[currKey] += " " + arg
         return dict

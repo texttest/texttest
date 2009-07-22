@@ -93,12 +93,17 @@ class PerformanceFileComparison(FileComparison):
             # If we didn't understand the old performance, overwrite it and behave like it didn't exist
             if (oldPerf < 0):
                 os.remove(self.stdFile)
-            else:
-                newPerf = getPerformance(self.tmpFile)
-                self.diag.info("Performance is " + str(oldPerf) + " and " + str(newPerf))
-                settings = PerformanceConfigSettings(test, self.stem)
-                self.perfComparison = PerformanceComparison(oldPerf, newPerf, settings)
-                self.differenceCache = self.perfComparison.isSignificant(settings)
+                test.refreshFiles()
+                self.stdFile = test.getFileName(self.stem)
+                self.stdCmpFile = self.stdFile
+                if not self.stdFile:
+                    return
+
+            newPerf = getPerformance(self.tmpFile)
+            self.diag.info("Performance is " + str(oldPerf) + " and " + str(newPerf))
+            settings = PerformanceConfigSettings(test, self.stem)
+            self.perfComparison = PerformanceComparison(oldPerf, newPerf, settings)
+            self.differenceCache = self.perfComparison.isSignificant(settings)
     
     def __repr__(self):
         baseText = FileComparison.__repr__(self)

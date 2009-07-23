@@ -1,5 +1,5 @@
 
-import sys, os, logging.config, string, shutil, socket, time, re, stat, locale, subprocess, shlex, types, operator
+import sys, os, logging.config, string, shutil, socket, time, re, stat, subprocess, shlex, types, operator
 from ndict import seqdict
 from traceback import format_exception
 from threading import currentThread
@@ -1441,58 +1441,6 @@ class OptionGroup:
             return True
         return key in onlyKeys
     
-
-def decodeText(text, log = None):
-    localeEncoding = locale.getdefaultlocale()[1]
-    if localeEncoding:
-        try:
-            return unicode(text, localeEncoding, errors="strict")
-        except:
-            if log:
-                log.info("WARNING: Failed to decode string '" + text + \
-                         "' using default locale encoding " + repr(localeEncoding) + \
-                         ". Trying ISO8859-1 encoding ...")
-
-    return decodeISO88591Text(text, localeEncoding, log)
-
-def decodeISO88591Text(text, localeEncoding, log = None):
-    try:
-        return unicode(text, 'ISO8859-1', errors="strict")
-    except:
-        if log:
-            log.info("WARNING: Failed to decode string '" + text + \
-                     "' using ISO8859-1 encoding " + repr(localeEncoding) + \
-                     ". Trying strict UTF-8 encoding ...")
-
-        return decodeUtf8Text(text, localeEncoding, log)
-
-def decodeUtf8Text(text, localeEncoding, log = None):
-    try:
-        return unicode(text, 'utf-8', errors="strict")
-    except:
-        if log:
-            log.info("WARNING: Failed to decode string '" + text + \
-                     "' both using strict UTF-8 and " + repr(localeEncoding) + \
-                     " encodings.\nReverting to non-strict UTF-8 encoding but " + \
-                     "replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
-        return unicode(text, 'utf-8', errors="replace")
-
-def encodeToUTF(unicodeInfo, log = None):
-    try:
-        return unicodeInfo.encode('utf-8', 'strict')
-    except:
-        try:
-            if log:
-                log.info("WARNING: Failed to encode Unicode string '" + unicodeInfo + \
-                         "' using strict UTF-8 encoding.\nReverting to non-strict UTF-8 " + \
-                         "encoding but replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
-            return unicodeInfo.encode('utf-8', 'replace')
-        except:
-            if log:
-                log.info("WARNING: Failed to encode Unicode string '" + unicodeInfo + \
-                         "' using both strict UTF-8 encoding and UTF-8 encoding with " + \
-                         "replacement. Showing error message instead.")
-            return "Failed to encode Unicode string."
 
 # pwd and grp doesn't exist on windows ...
 import stat

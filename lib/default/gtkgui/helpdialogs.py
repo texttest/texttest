@@ -54,11 +54,11 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         self.dialog.set_resizable(False)
         
     def showCredits(self, *args):
-        newDialog = CreditsDialog(self.dialog, self.validApps)
+        newDialog = TextFileDisplayDialog(self.dialog, "TextTest Credits", "AUTHORS", "Written by", self.validApps)
         newDialog.performOnCurrent()
 
     def showLicense(self, *args):
-        newDialog = LicenseDialog(self.dialog, self.validApps)
+        newDialog = TextFileDisplayDialog(self.dialog, "TextTest License", "LICENSE", "License", self.validApps)
         newDialog.performOnCurrent()
 
     def showVersions(self, *args):
@@ -123,27 +123,29 @@ class ShowVersions(guiplugins.ActionResultDialogGUI):
             alignment.add(gtk.Label(label))
         return alignment
 
-class CreditsDialog(guiplugins.ActionResultDialogGUI):
-    def __init__(self, parent, *args):
-        guiplugins.ActionResultDialogGUI.__init__(self, *args)
+class TextFileDisplayDialog(guiplugins.ActionResultDialogGUI):
+    def __init__(self, parent, title, fileName, tabTitle, *args):
         self.parent = parent
-
+        self.title = title
+        self.fileName = fileName
+        self.tabTitle = tabTitle
+        guiplugins.ActionResultDialogGUI.__init__(self, *args)
+        
     def getParentWindow(self):
         return self.parent
     
     def _getTitle(self):
-        return "TextTest Credits"
+        return self.title
 
     def addContents(self):
         try:
-            authorFile = open(os.path.join(plugins.installationDir("doc"), "AUTHORS"))
-            unicodeInfo = plugins.decodeText("".join(authorFile.readlines()))           
-            authorFile.close()
-            creditsText = plugins.encodeToUTF(unicodeInfo)
+            file = open(os.path.join(plugins.installationDir("doc"), self.fileName))
+            text = file.read()
+            file.close()
             buffer = gtk.TextBuffer()
-            buffer.set_text(creditsText)
+            buffer.set_text(guiplugins.convertToUtf8(text))
         except Exception, e: #pragma : no cover - should never happen
-            self.showErrorDialog("Failed to show AUTHORS file:\n" + str(e))
+            self.showErrorDialog("Failed to show " + self.fileName + " file:\n" + str(e))
             return
 
         textView = gtk.TextView(buffer)
@@ -152,53 +154,17 @@ class CreditsDialog(guiplugins.ActionResultDialogGUI):
         textView.set_left_margin(5)
         textView.set_right_margin(5)
         notebook = gtk.Notebook()
-        notebook.append_page(textView, gtk.Label("Written by"))
+        notebook.append_page(textView, gtk.Label(self.tabTitle))
         self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
         self.dialog.set_resizable(False)
-
-            
-class LicenseDialog(guiplugins.ActionResultDialogGUI):
-    def __init__(self, parent, *args):
-        guiplugins.ActionResultDialogGUI.__init__(self, *args)
-        self.parent = parent
-
-    def getParentWindow(self):
-        return self.parent
-    
-    def _getTitle(self):
-        return "TextTest License"
-    
-    def addContents(self):
-        try:
-            licenseFile = open(os.path.join(plugins.installationDir("doc"), "LICENSE"))
-            unicodeInfo = plugins.decodeText("".join(licenseFile.readlines()))           
-            licenseFile.close()
-            licenseText = plugins.encodeToUTF(unicodeInfo)
-            buffer = gtk.TextBuffer()
-            buffer.set_text(licenseText)
-        except Exception, e: #pragma : no cover - should never happen
-            self.showErrorDialog("Failed to show LICENSE file:\n" + str(e))
-            return
-
-        textView = gtk.TextView(buffer)
-        textView.set_editable(False)
-        textView.set_cursor_visible(False)
-        textView.set_left_margin(5)
-        textView.set_right_margin(5)
-        notebook = gtk.Notebook()
-        notebook.append_page(textView, gtk.Label("License"))
-        self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
 
         
 class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
     def isActiveOnCurrent(self, *args):
         return True
+
     def messageAfterPerform(self):
         return ""
-    def cmpVersions(self, file1, file2):
-        v1 = self.makeVersions(file1)
-        v2 = self.makeVersions(file2)
-        return -cmp(v1, v2) # We want the most recent file first ...
 
     def makeVersions(self, versionStr):
         versions = []
@@ -216,13 +182,8 @@ class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
         docDir = plugins.installationDir("doc")
         versionInfo = self.readVersionInfo(docDir)
         for version in reversed(sorted(versionInfo.keys())):
-            unicodeInfo = plugins.decodeText(versionInfo[version])
-            displayText = plugins.encodeToUTF(unicodeInfo)
-            endFirstSentence = displayText.find(".")
-            versionStr = ".".join(map(str, version))
-        
             buffer = gtk.TextBuffer()
-            buffer.set_text(displayText)
+            buffer.set_text(guiplugins.convertToUtf8(versionInfo[version]))
             textView = gtk.TextView(buffer)
             textView.set_editable(False)
             textView.set_cursor_visible(False)
@@ -232,6 +193,7 @@ class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
             scrolledWindow.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
             scrolledWindow.add(textView)
             scrolledWindow.set_shadow_type(gtk.SHADOW_IN)
+            versionStr = ".".join(map(str, version))
             notebook.append_page(scrolledWindow, gtk.Label(self.labelPrefix() + versionStr))
 
         if notebook.get_n_pages() == 0: #pragma : no cover - should never happen

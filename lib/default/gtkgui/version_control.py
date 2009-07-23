@@ -109,6 +109,9 @@ class VersionControlInterface:
     def parseStateFromStatus(self, output):
         pass # pragma: no cover - implemented in all derived classes
 
+    def removePath(self, path):
+        pass # pragma: no cover - implemented in all derived classes
+
     def getCombinedRevisionOptions(self, r1, r2):
         return [ "-r", r1, "-r", r2 ] # applies to CVS and Mercurial
 
@@ -147,14 +150,6 @@ class VersionControlInterface:
 
     def getMoveCommand(self):
         return self.program + " mv"
-
-    def removePath(self, path):
-        retCode = self.callProgram("rm", [ path ])
-        if retCode > 0:
-            # Wasn't in version control, probably
-            return plugins.removePath(path)
-        else:
-            return True
 
 
 # Base class for all version control actions.
@@ -229,12 +224,6 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
     def getResultTitle(self):
         return self._getTitle().replace("_", "").lower()
 
-    def getTestDescription(self, test):
-        relpath = test.getRelPath()
-        if relpath:
-            return relpath
-        else:
-            return "the root test suite"
     def runAndParse(self):
         self.notInRepository = False
         self.needsAttention = False
@@ -474,13 +463,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
             self.dialog.resize(parentSize[0], int(parentSize[0] / 1.5))
             self.vbox.pack_start(hpaned, expand=True, fill=True)
         self.dialog.vbox.pack_start(self.vbox, expand=True, fill=True)
-        
-    def parentOutput(self, prevIter):
-        if prevIter:
-            return "child of " + self.treeModel.get_value(prevIter, 3)
-        else:
-            return "root"
-        
+                
     def createTreeView(self):
         # Columns are: 0 - Tree node name
         #              1 - Content (output from VCS) for the corresponding file
@@ -500,7 +483,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         for fileName, content, info in self.pages:
             label = plugins.relpath(fileName, rootDir)
             self.diag.info("Adding info for file " + label)
-            utfContent = plugins.encodeToUTF(plugins.decodeText(content))
+            utfContent = guiplugins.convertToUtf8(content)
             path = label.split(os.sep)
             currentFile = rootDir
             prevIter = None
@@ -764,9 +747,10 @@ class StatusGUI(VersionControlDialogGUI):
         self.treeView.grab_focus() # Or the column button gets focus ...
         
     def showPopupMenu(self, treeview, event):
-        if event.button == 3: # pragma: no cover - replaying doesn't actually press the button
+        if event.button == 3: 
             self.popupMenu.popup(None, None, None, event.button, event.time)
             return True
+
 
 class AnnotateGUI(VersionControlDialogGUI):
     def _getTitle(self):

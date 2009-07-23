@@ -479,10 +479,6 @@ class TrafficServer(TCPServer):
     def run(self):
         while not self.terminate:
             self.handle_request()
-        
-    def notifyAllRead(self, suites):
-        if len(self.testMap) == 0:
-            self.notifyAllComplete()
             
     def shutdown(self):
         self.diag.info("Told to shut down!")

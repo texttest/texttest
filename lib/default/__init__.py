@@ -1230,11 +1230,11 @@ class RunTest(plugins.Action):
                                 stdout=self.makeFile(test, "output"), stderr=self.makeFile(test, "errors"), \
                                 env=testEnv, startupinfo=plugins.getProcessStartUpInfo(test.environment))
     def getPreExecFunction(self):
-        if os.name == "posix":
+        if os.name == "posix": # pragma: no cover - only run in the subprocess!
             return self.ignoreJobControlSignals
 
-    def ignoreJobControlSignals(self):
-        for signum in [ signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU ]:
+    def ignoreJobControlSignals(self): # pragma: no cover - only run in the subprocess!
+        for signum in [ signal.SIGQUIT, signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU ]:
             signal.signal(signum, signal.SIG_IGN)
 
     def getInterpreter(self, test):
@@ -1356,8 +1356,6 @@ class DocumentOptions(plugins.Action):
             keyOutput += " <value>"
             if (docs == "Execution time"):
                 keyOutput = "-" + key + " <time specification string>"
-            elif "<" in docs:
-                keyOutput = self.filledOptionOutput(key, docs)
             else:
                 docs += " <value>"
         if group.name.startswith("Select"):
@@ -1365,11 +1363,6 @@ class DocumentOptions(plugins.Action):
         else:
             return keyOutput, docs
         
-    def filledOptionOutput(self, key, docs):
-        start = docs.find("<")
-        end = docs.find(">", start)
-        filledPart = docs[start:end + 1]
-        return "-" + key + " " + filledPart
 
 class DocumentConfig(plugins.Action):
     def __init__(self, args=[]):

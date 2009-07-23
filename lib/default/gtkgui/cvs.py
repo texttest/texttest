@@ -214,10 +214,7 @@ class CVSLogLatest(version_control.LogGUI):
         for label, content in self.pages.items():
             buffer = gtk.TextBuffer()
             # Encode to UTF-8, necessary for gtk.TextView
-            # First decode using most appropriate encoding ...
-            unicodeInfo = plugins.decodeText(content)
-            text = plugins.encodeToUTF(unicodeInfo)
-            buffer.set_text(text)
+            buffer.set_text(guiplugins.convertToUtf8(content))
             textView = gtk.TextView(buffer)
             textView.set_editable(False)
             window = gtk.ScrolledWindow()

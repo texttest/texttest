@@ -1643,8 +1643,9 @@ class TextViewGUI(guiplugins.SubGUI):
 
     def updateViewFromText(self):
         textbuffer = self.view.get_buffer()
-        textToUse = self.getTextForView()
-        if textToUse.find("http://") != -1:
+        # Encode to UTF-8, necessary for gtk.TextView
+        textToUse = guiplugins.convertToUtf8(self.text)
+        if "http://" in textToUse:
             self.view.connect("event-after", self.event_after)
             self.view.connect("motion-notify-event", self.motion_notify_event)
             self.setHyperlinkText(textbuffer, textToUse)
@@ -1735,12 +1736,6 @@ class TextViewGUI(guiplugins.SubGUI):
         newLine = " ".join(words[:-1]) + "\n"
         tag.set_data("target", linkTarget)
         buffer.insert_with_tags(iter, newLine, tag)
-
-    def getTextForView(self):
-        # Encode to UTF-8, necessary for gtk.TextView
-        # First decode using most appropriate encoding ...
-        unicodeInfo = plugins.decodeText(self.text, guilog)
-        return plugins.encodeToUTF(unicodeInfo, guilog)
 
 
 class RunInfoGUI(TextViewGUI):

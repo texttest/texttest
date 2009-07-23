@@ -253,13 +253,6 @@ class MailSender:
         except:
             return "Mail could not be sent\n" + self.exceptionOutput()
         smtp.quit()
-    def findAvailable(self, origFile):
-        if not os.path.isfile(origFile):
-            return origFile
-        for i in range(20):
-            attempt = origFile + str(i)
-            if not os.path.isfile(attempt):
-                return attempt
     
     def createMailHeaderSection(self, title, app, batchDataList):
         if self.useCollection(app):

@@ -130,6 +130,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         self.diag = logging.getLogger("Find Applications")
         self.appSuites = seqdict()
     def printStackTrace(self, *args):
+        sys.stderr.write("Received SIGQUIT: showing current stack trace below:\n")
         from traceback import print_stack
         print_stack()
     def findSearchDirs(self):

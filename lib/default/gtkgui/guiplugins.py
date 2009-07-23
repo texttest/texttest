@@ -6,6 +6,7 @@ from copy import copy, deepcopy
 from glob import glob
 from stat import *
 from ndict import seqdict
+from locale import getdefaultlocale
 
 try:
     import gtk, gobject, entrycompletion
@@ -22,7 +23,56 @@ def windowsAcceleratorValid(key, mod):
 
 if os.name == "nt":
     gtk.accelerator_valid = windowsAcceleratorValid
-            
+
+class Utf8Converter:
+    def convert(self, text):
+        unicodeInfo = self.decodeText(text)
+        return self.encodeText(unicodeInfo)
+
+    def decodeText(self, text):
+        encodings = self.getEncodings()
+        for ix, encoding in enumerate(encodings):
+            try:
+                unicodeInfo = unicode(text, encoding, errors="strict")
+                if ix > 0:
+                    guilog.info("WARNING: Failed to decode string '" + text + \
+                                "' using encoding(s) " + " and ".join(encodings[:ix]) + \
+                                ". Encoded using " + encoding + " instead.")
+                return unicodeInfo
+            except:
+                pass
+        guilog.info("WARNING: Failed to decode string '" + text + \
+                    "' using strict encodings " + " and ".join(encodings) + \
+                    ".\nReverting to non-strict UTF-8 encoding but " + \
+                    "replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
+        return unicode(text, 'utf-8', errors="replace")
+
+    def getEncodings(self):
+        encodings = [ 'ISO8859-1', 'utf-8' ]
+        localeEncoding = getdefaultlocale()[1]
+        if localeEncoding and not localeEncoding in encodings:
+            encodings.insert(0, localeEncoding)
+        return encodings
+
+    def encodeText(self, unicodeInfo):
+        try:
+            return unicodeInfo.encode('utf-8', 'strict')
+        except:
+            try:
+                guilog.info("WARNING: Failed to encode Unicode string '" + unicodeInfo + \
+                             "' using strict UTF-8 encoding.\nReverting to non-strict UTF-8 " + \
+                             "encoding but replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
+                return unicodeInfo.encode('utf-8', 'replace')
+            except:
+                guilog.info("WARNING: Failed to encode Unicode string '" + unicodeInfo + \
+                            "' using both strict UTF-8 encoding and UTF-8 encoding with " + \
+                            "replacement. Showing error message instead.")
+                return "Failed to encode Unicode string."
+
+
+def convertToUtf8(text): # gtk.TextViews insist we do the conversion ourselves
+    return Utf8Converter().convert(text)
+
 
 class GUIConfig:
     def __init__(self, dynamic, allApps, entryCompletionLogger):

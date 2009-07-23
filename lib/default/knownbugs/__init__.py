@@ -124,7 +124,7 @@ class FileBugData:
     def findBugs(self, fileName, execHosts, isChanged, multipleDiffs):
         self.diag.info("Looking for bugs in " + fileName)
         if not self.checkUnchanged and not isChanged:
-            self.diag.info("File not changed, ignoring")
+            self.diag.info("File not changed, ignoring all bugs")
             return []
         if not os.path.isfile(fileName):
             self.diag.info("File doesn't exist, checking only for absence bugs")
@@ -228,7 +228,8 @@ class CheckForBugs(plugins.Action):
         return test.state.lifecycleChange != "complete"
     def __call__(self, test):
         activeBugs = self.readBugs(test)
-        if not self.checkTest(test, activeBugs):
+        if not activeBugs.checkUnchanged() and not test.state.hasFailed():
+            self.diag.info(repr(test) + " succeeded, not looking for bugs")
             return
 
         bug = self.findBug(test, activeBugs)
@@ -281,10 +282,6 @@ class CheckForBugs(plugins.Action):
             if comp.stem in perfStems:
                 diffCount -= 1
         return diffCount > 1
-    def checkTest(self, test, activeBugs):
-        if activeBugs.checkUnchanged():
-            return True
-        return test.state.hasFailed()
     def fileChanged(self, test, stem):
         comparison, list = test.state.findComparison(stem)
         return bool(comparison)

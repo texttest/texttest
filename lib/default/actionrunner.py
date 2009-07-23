@@ -92,7 +92,7 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
 
     def getTestForRun(self):
         return self.getItemFromQueue(self.testQueue, block=True)
-    def cleanup(self):
+    def cleanup(self): # pragma: no cover - implemented in all subclasses
         pass
     def canBeMainThread(self):
         return False # We block, so we shouldn't be the main thread...

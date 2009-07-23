@@ -43,6 +43,10 @@ class BzrInterface(version_control.VersionControlInterface):
     def getCombinedRevisionOptions(self, r1, r2):
         return [ "-r", r1 + ".." + r2 ]
 
+    def removePath(self, path):
+        retCode = self.callProgram("rm", [ path ]) # Always removes
+        return retCode == 0
+
     # Hack for bug in Bazaar, which can't handle symbolic links to the branch...
     def callProgramOnFiles(self, cmdName, fileArg, recursive=False, extraArgs=[], **kwargs):
         if cmdName == "add":

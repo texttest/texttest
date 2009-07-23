@@ -41,13 +41,11 @@ class HgInterface(version_control.VersionControlInterface):
             shutil.rmtree(oldDir)
             
     def removePath(self, path):
-        retCode = self.callProgram("rm", [ path ])
-        if retCode > 0:
-            # Wasn't in version control, probably
-            return plugins.removePath(path)
-        else:
-            plugins.removePath(path) # Mercurial doesn't remove unknown files
-            return True
+        # Mercurial doesn't remove unknown files, nor does it return non-zero exit codes when it fails
+        retValue = os.path.exists(path)
+        self.callProgram("rm", [ path ]) # returns 0 whatever happens
+        plugins.removePath(path)
+        return retValue
 
 
 version_control.vcsClass = HgInterface

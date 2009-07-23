@@ -27,24 +27,22 @@ class FilterAction(plugins.Action):
                 fileFilter= RunDependentTextFilter(runDepTexts, unorderedTexts, test.getRelPath())
                 filterFileBase = test.makeTmpFileName(stem + "." + test.app.name, forFramework=1)
                 newFileName = filterFileBase + postfix
-                if self.shouldRemove(newFileName, fileName):
+                if os.path.isfile(newFileName):
                     self.diag.info("Removing previous file at " + newFileName)
                     os.remove(newFileName)
-                if not os.path.isfile(newFileName):
-                    fileFilter.filterFile(fileName, newFileName, self.againstFile(filterFileBase), floatTolerance)
+                fileFilter.filterFile(fileName, newFileName, self.againstFile(filterFileBase), floatTolerance)
+
     def changedOs(self, app):
         homeOs = app.getConfigValue("home_operating_system")
         return homeOs != "any" and os.name != homeOs
-    def shouldRemove(self, newFile, oldFile):
-        # Don't recreate filtered files, unless makeNew is set or they're out of date...
-        if not os.path.isfile(newFile):
-            return False
-        return plugins.modifiedTime(newFile) <= plugins.modifiedTime(oldFile)
+
     def constantPostfix(self, files, postfix):
         return [ (file, postfix) for file in files ]
+
     def againstFile(self, file):
         return None
         
+
 class FilterOriginal(FilterAction):
     def filesToFilter(self, test):
         resultFiles, defFiles = test.listStandardFiles(allVersions=False)
@@ -53,21 +51,17 @@ class FilterOriginal(FilterAction):
 class FilterTemporary(FilterAction):
     def filesToFilter(self, test):
         return self.constantPostfix(test.listTmpFiles(), "cmp")
+    
     def againstFile(self, file):
-        return file+"origcmp"
-
-class FilterRecompute(FilterOriginal):
-    def shouldRemove(self, newFile, oldFile):
-        # Always recalculate when doing it explicitly
-        return os.path.isfile(newFile)
+        return file + "origcmp"
 
 
-class FilterProgressRecompute(FilterRecompute):
+class FilterProgressRecompute(FilterAction):
     def filesToFilter(self, test):
         return self.constantPostfix(test.listTmpFiles(), "partcmp")
 
 
-class FilterResultRecompute(FilterRecompute):
+class FilterResultRecompute(FilterAction):
     def filesToFilter(self, test):
         result = []
         for fileComp in test.state.allResults:

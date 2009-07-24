@@ -103,14 +103,14 @@ class VersionControlInterface:
     def getCmdArgs(self, cmdName, extraArgs=[]):
         return self.getProgramArgs() + [ cmdName ] + self.defaultArgs.get(cmdName, []) + extraArgs 
 
-    def getDateFromLog(self, output):
-        pass # pragma: no cover - implemented in all derived classes
+    def getDateFromLog(self, output): # pragma: no cover - implemented in all derived classes
+        pass 
 
-    def parseStateFromStatus(self, output):
-        pass # pragma: no cover - implemented in all derived classes
+    def parseStateFromStatus(self, output): # pragma: no cover - implemented in all derived classes
+        pass 
 
-    def removePath(self, path):
-        pass # pragma: no cover - implemented in all derived classes
+    def removePath(self, path): # pragma: no cover - implemented in all derived classes
+        pass  
 
     def getCombinedRevisionOptions(self, r1, r2):
         return [ "-r", r1, "-r", r2 ] # applies to CVS and Mercurial

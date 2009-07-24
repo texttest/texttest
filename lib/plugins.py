@@ -718,11 +718,11 @@ def copyPath(srcPath, dstPath):
         shutil.copyfile(srcPath, dstPath)
         
 def removePath(path):
-    if os.path.exists(path):
-        if os.path.isdir(path):
-            shutil.rmtree(path)
-        else:
-            os.remove(path)
+    if os.path.isfile(path) or os.path.islink(path):
+        os.remove(path)
+        return True
+    elif os.path.isdir(path):
+        shutil.rmtree(path)
         return True
     else:
         return False

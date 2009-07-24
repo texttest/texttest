@@ -56,32 +56,40 @@ class SocketResponder(plugins.Responder,plugins.Observable):
         for attempt in range(5):
             try:
                 sendSocket.connect(self.serverAddress)
-                return
+                return True
             except socket.error:
                 sleep(1)
-        plugins.log.info("Trouble connecting to " + repr(self.serverAddress))
-        sendSocket.connect(self.serverAddress)
+        sys.stderr.write("Failed to connect to " + repr(self.serverAddress) + " : " + self.exceptionOutput())
+        return False
+
+    def exceptionOutput(self):
+        exctype, value = sys.exc_info()[:2]
+        from traceback import format_exception_only
+        return "".join(format_exception_only(exctype, value))
+
     def notifyLifecycleChange(self, test, state, changeDesc):
         testData = socketSerialise(test)
         pickleData = dumps(state)
         fullData = str(os.getpid()) + os.linesep + testData + os.linesep + pickleData
         sleepTime = 1
         for attempt in range(9):
+            sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            if not self.connect(sendSocket):
+                return
             try:
-                self.sendData(fullData)
+                self.sendData(sendSocket, fullData)
                 return
             except socket.error:
                 plugins.log.info("Failed to communicate with master process - waiting " +
                                  str(sleepTime) + " seconds and then trying again.")
                 sleep(sleepTime)
                 sleepTime *= 2
-                
-        plugins.log.info("Terminating as failed to communicate with master process.")
-        plugins.printException()
+
+        message = "Terminating as failed to communicate with master process : " + self.exceptionOutput()
+        sys.stderr.write(message)
+        plugins.log.info(message.strip())
         
-    def sendData(self, fullData):
-        sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.connect(sendSocket)
+    def sendData(self, sendSocket, fullData):
         sendSocket.sendall(fullData)
         sendSocket.shutdown(socket.SHUT_WR)
         response = sendSocket.makefile().read()
@@ -149,15 +157,11 @@ class QueueSystemConfig(default.Config):
     def cleanSlaveFiles(self, test):
         if test.state.hasSucceeded():
             writeDir = test.getDirectory(temporary=1)
-            if os.path.isdir(writeDir):
-                plugins.rmtree(writeDir)
+            plugins.removePath(writeDir)
         else:
             for dataFile in test.getDataFileNames():
                 fullPath = test.makeTmpFileName(dataFile, forComparison=0)
-                if os.path.isfile(fullPath) or os.path.islink(fullPath):
-                    os.remove(fullPath)
-                elif os.path.isdir(fullPath):
-                    plugins.rmtree(fullPath)
+                plugins.removePath(fullPath)
                 
     def _cleanWriteDirectory(self, suite):
         if self.slaveRun():
@@ -435,15 +439,16 @@ class SlaveServerResponder(plugins.Responder, TCPServer):
         self.testClientInfo[test] = clientInfo
 
 class MasterTextResponder(TextDisplayResponder):
+    def getPrefix(self, test):
+        return "S: " # don't get things in order, so indenting is pointless
+    
     def notifyComplete(self, test):
-        plugins.log.info("S: " + repr(test) + " " + test.state.description())
+        self.describe(test) # Write the successful tests also
 
-# Don't indent, and use the unique name rather than repr()
 class MasterInteractiveResponder(InteractiveResponder):
-    def describeSave(self, test, saveDesc):
-        plugins.log.info("Saving " + repr(test) + saveDesc)
-    def describeViewOptions(self, test, options):
-        plugins.log.info(options)
+    def getPrefix(self, test):
+        return "" # don't get things in order, so indenting is pointless
+
 
 class QueueSystemServer(BaseActionRunner):
     instance = None
@@ -596,10 +601,7 @@ class QueueSystemServer(BaseActionRunner):
         self.sendServerState("Completed submission of all tests")
     def remainStr(self):
         return " : " + str(self.testCount) + " tests remain."
-    def runTest(self, test):
-        if test.state.isComplete():
-            return
-    
+    def runTest(self, test):   
         submissionRules = test.app.getSubmissionRules(test)
         command = self.getSlaveCommand(test, submissionRules)
         plugins.log.info("Q: Submitting " + repr(test) + submissionRules.getSubmitSuffix())

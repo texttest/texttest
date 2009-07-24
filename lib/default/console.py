@@ -8,8 +8,12 @@ class TextDisplayResponder(plugins.Responder):
     def notifyComplete(self, test):
         if test.state.hasFailed():
             self.describe(test)
+
+    def getPrefix(self, test):
+        return test.getIndent()
+    
     def describe(self, test):
-        plugins.log.info(test.getIndent() + repr(test) + " " + test.state.description())
+        plugins.log.info(self.getPrefix(test) + repr(test) + " " + test.state.description())
             
             
 class InteractiveResponder(plugins.Responder):
@@ -41,14 +45,10 @@ class InteractiveResponder(plugins.Responder):
             saveDesc += "(exact) "
         if self.overwriteSuccess:
             saveDesc += "(overwriting succeeded files also)"
-        self.describeSave(test, saveDesc)
+        plugins.log.info(self.getPrefix(test) + "Saving " + repr(test) + saveDesc)
         test.state.save(test, exact, version, self.overwriteSuccess)
         newState = test.state.makeNewState(test.app, "saved")
         test.changeState(newState)
-    def describeSave(self, test, saveDesc):
-        plugins.log.info(test.getIndent() + "Saving " + repr(test) + saveDesc)
-    def describeViewOptions(self, test, options):
-        plugins.log.info(test.getIndent() + options)
     def useInteractiveResponse(self, test):
         return test.state.hasFailed() and test.state.hasResults() and not self.overwriteFailure
     def presentInteractiveDialog(self, test):            
@@ -86,6 +86,9 @@ class InteractiveResponder(plugins.Responder):
                 except OSError:
                     plugins.log.info("<No window created - could not find graphical difference tool '" + tool + "'>")
 
+    def getPrefix(self, test):
+        return test.getIndent() # Mostly so we can override for queuesystem module
+
     def askUser(self, test, allowView, process=None):      
         versions = test.app.getSaveableVersions()
         options = ""
@@ -94,7 +97,7 @@ class InteractiveResponder(plugins.Responder):
         options += "Save(s) or continue(any other key)?"
         if allowView:
             options = "View details(v), " + options
-        self.describeViewOptions(test, options)
+        plugins.log.info(self.getPrefix(test) + options)
         response = sys.stdin.readline()
         exactSave = response.find('+') != -1
         if response.startswith('s'):

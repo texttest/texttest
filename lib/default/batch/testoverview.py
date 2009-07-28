@@ -491,9 +491,7 @@ class CategoryHandler:
 
     def compareCategories(self, data1, data2):
         # Put success at the start, it's neater like that
-        if data1[0] == data2[0]:
-            return 0
-        elif data1[0] == "success":
+        if data1[0] == "success":
             return -1
         elif data2[0] == "success":
             return 1

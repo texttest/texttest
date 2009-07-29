@@ -269,6 +269,7 @@ class TestTable:
                 if extraVersion:
                     fullVersion += "." + extraVersion
                 table.append(self.generateExtraVersionHeader(fullVersion, tagsFound))
+                table.append(self.generateSummaries(categoryHandlers, pageVersion, version, tagsFound, extraVersion))
 
             for test in sorted(testInfo.keys()):
                 results = testInfo[test]
@@ -277,13 +278,13 @@ class TestTable:
         table.append(HTMLgen.BR())
         return table
 
-    def generateSummaries(self, categoryHandlers, pageVersion, version, tags):
+    def generateSummaries(self, categoryHandlers, pageVersion, version, tags, extraVersion=None):
         bgColour = colourFinder.find("column_header_bg")
         row = [ HTMLgen.TD("Summary", bgcolor = bgColour) ]
         for tag in tags:
             categoryHandler = categoryHandlers[tag]
             detailPageName = getDetailPageName(pageVersion, tag)
-            summary = categoryHandler.generateSummaryHTML(detailPageName + "#" + version)
+            summary = categoryHandler.generateSummaryHTML(detailPageName + "#" + version, extraVersion)
             row.append(HTMLgen.TD(summary, bgcolor = bgColour))
         return HTMLgen.TR(*row)
 
@@ -462,9 +463,10 @@ class CategoryHandler:
         testCountSummary = self._generateSummary(categoryDescs)
         return testCountSummary + " ".join(categoryDescs)
 
-    def generateSummaryHTML(self, detailPageRef):
+    def generateSummaryHTML(self, detailPageRef, extraVersion=None):
         container = HTMLgen.Container()
-        testCountSummary = self._generateSummary(container, self.categorySummaryHTML, detailPageRef=detailPageRef) 
+        testCountSummary = self._generateSummary(container, self.categorySummaryHTML,
+                                                 extraVersion=extraVersion, detailPageRef=detailPageRef) 
         return HTMLgen.Container(HTMLgen.Text(testCountSummary), container)
 
     def categorySummaryHTML(self, cat, summary, longDescr, detailPageRef):
@@ -474,17 +476,24 @@ class CategoryHandler:
         else:
             return HTMLgen.Href(detailPageRef + longDescr, basic)
 
-    def _generateSummary(self, container, categorySummaryMethod=None, **kwargs):
+    def countTests(self, testInfo, extraVersion):
+        if extraVersion is not None:
+            return sum((currExtra == extraVersion for (testId, state, currExtra) in testInfo))
+        else:
+            return len(testInfo)
+
+    def _generateSummary(self, container, categorySummaryMethod=None, extraVersion=None, **kwargs):
         numTests = 0
         for cat, testInfo in sorted(self.testsInCategory.items(), self.compareCategories):
-            testCount = len(testInfo)
-            shortDescr, longDescr = getCategoryDescription(cat)
-            categorySummary = str(testCount) + " " + shortDescr
-            if categorySummaryMethod:
-                container.append(categorySummaryMethod(cat, categorySummary, longDescr, **kwargs))
-            else:
-                container.append(categorySummary)
-            numTests += testCount
+            testCount = self.countTests(testInfo, extraVersion)
+            if testCount > 0:
+                shortDescr, longDescr = getCategoryDescription(cat)
+                categorySummary = str(testCount) + " " + shortDescr
+                if categorySummaryMethod:
+                    container.append(categorySummaryMethod(cat, categorySummary, longDescr, **kwargs))
+                else:
+                    container.append(categorySummary)
+                numTests += testCount
         return str(numTests) + " tests: "
 
     def getTestsWithDescriptions(self):

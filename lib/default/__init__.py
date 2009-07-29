@@ -569,30 +569,35 @@ class Config:
         return self.isReconnecting() # No use of checkouts has yet been thought up when reconnecting :)
     def setUpCheckout(self, app):
         if self.ignoreCheckout():
-            return "" 
-        checkoutPath = self.getGivenCheckoutPath(app)
-        if not checkoutPath:
+            return ""
+        else:
+            checkoutPath = self.getGivenCheckoutPath(app)
+            os.environ["TEXTTEST_CHECKOUT"] = checkoutPath # Full path to the checkout directory
+            return checkoutPath
+    
+    def verifyCheckoutValid(self, app):
+        if not os.path.isabs(app.checkout):
+            raise plugins.TextTestError, "could not create absolute checkout from relative path '" + app.checkout + "'"
+        elif not os.path.isdir(app.checkout):
+            self.handleNonExistent(app.checkout, "checkout", app)
+
+    def checkCheckoutExists(self, app):
+        if not app.checkout:
             return "" # Allow empty checkout, means no checkout is set, basically
         
         try: 
-            self.verifyCheckoutValid(checkoutPath, app)
-            os.environ["TEXTTEST_CHECKOUT"] = checkoutPath # Full path to the checkout directory
-            return checkoutPath
+            self.verifyCheckoutValid(app)
         except plugins.TextTestError, e:
             if self.ignoreExecutable():
-                plugins.printWarning(str(e) + " Ignoring checkout.")
+                plugins.printWarning(str(e))
                 return ""
             else:
                 raise
-    
-    def verifyCheckoutValid(self, checkoutPath, app):
-        if not os.path.isabs(checkoutPath):
-            raise plugins.TextTestError, "could not create absolute checkout from relative path '" + checkoutPath + "'"
-        elif not os.path.isdir(checkoutPath):
-            self.handleNonExistent(checkoutPath, "checkout", app)
 
     def checkSanity(self, suite):
-        if not self.ignoreExecutable() and not self.optionMap.has_key("gx"):
+        if not self.ignoreCheckout():
+            self.checkCheckoutExists(suite.app)
+        if not self.ignoreExecutable():
             self.checkExecutableExists(suite)
 
         self.checkFilterFileSanity(suite)

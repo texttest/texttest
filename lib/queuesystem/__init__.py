@@ -831,17 +831,18 @@ class QueueSystemServer(BaseActionRunner):
         startNotified = self.jobStarted(test)
         if jobExisted:
             if startNotified:
-                return self.shouldWaitFor(test)
+                self.diag.info("Job " + jobId + " was running.")
+                return True
             else:
+                self.diag.info("Job " + jobId + " was pending.")
                 self.setKilledPending(test)
                 return False
         else:
+            self.diag.info("Job " + jobId + " did not exist.")
             # might get here when the test completed since we checked...
             if not test.state.isComplete():
                 self.setSlaveFailed(test, startNotified, wantStatus)
         return False
-    def shouldWaitFor(self, test):
-        return True
     def jobStarted(self, test):
         return test.state.hasStarted()
     def setKilledPending(self, test):

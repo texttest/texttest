@@ -262,11 +262,12 @@ class TestTable:
         table = HTMLgen.TableLite(border=0, cellpadding=4, cellspacing=2,width="100%")
         table.append(self.generateTableHead(pageVersion, version, tagsFound))
         table.append(self.generateSummaries(categoryHandlers, pageVersion, version, tagsFound))
-        firstVersion = loggedTests.keys()[0]
         for extraVersion, testInfo in loggedTests.items():
             # Add an extra line in the table only if there are several versions.
-            if extraVersion != firstVersion:
-                fullVersion = version + "." + extraVersion
+            if len(loggedTests) > 1:
+                fullVersion = version
+                if extraVersion:
+                    fullVersion += "." + extraVersion
                 table.append(self.generateExtraVersionHeader(fullVersion, tagsFound))
 
             for test in sorted(testInfo.keys()):

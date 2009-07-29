@@ -237,8 +237,13 @@ class TextTestGUI(plugins.Responder, plugins.Observable):
                  statusMonitor, self.runInfoGUI, self.idleManager, self.topWindowGUI ]
     def getActionObservers(self):
         return [ self.testTreeGUI, self.testFileGUI, statusMonitor, self.runInfoGUI, self.idleManager, self.topWindowGUI ]
+
     def getFileViewObservers(self):
-        return self.defaultActionGUIs + self.actionTabGUIs
+        observers = self.defaultActionGUIs + self.actionTabGUIs
+        if self.dynamic:
+            observers.append(self.textInfoGUI)
+        return observers
+    
     def isFrameworkExitObserver(self, obs):
         return hasattr(obs, "notifyExit") or hasattr(obs, "notifyKillProcesses")
     def getExitObservers(self, frameworkObservers):
@@ -1622,6 +1627,7 @@ class TextViewGUI(guiplugins.SubGUI):
     def __init__(self):
         guiplugins.SubGUI.__init__(self)
         self.text = ""
+        self.showingSubText = False
         self.view = None
         
     def shouldShowCurrent(self, *args):
@@ -1629,7 +1635,7 @@ class TextViewGUI(guiplugins.SubGUI):
                     
     def updateView(self):
         if self.view:
-            self.updateViewFromText()
+            self.updateViewFromText(self.text)
 
     def createView(self):
         self.view = gtk.TextView()
@@ -1637,14 +1643,49 @@ class TextViewGUI(guiplugins.SubGUI):
         self.view.set_editable(False)
         self.view.set_cursor_visible(False)
         self.view.set_wrap_mode(gtk.WRAP_WORD)
-        self.updateViewFromText()
+        self.updateViewFromText(self.text)
         self.view.show()
         return self.addScrollBars(self.view, hpolicy=gtk.POLICY_AUTOMATIC)
 
-    def updateViewFromText(self):
+    def hasStem(self, line, files):
+        for fileName, comp in files:
+            if comp.stem and line.find(" " + comp.stem + " ") != -1:
+                return True
+        return False
+
+    def makeSubText(self, files):
+        enabled = True
+        usedSection, ignoredSection = False, False
+        newText = ""
+        for line in self.text.splitlines():
+            if line.startswith("----"):
+                enabled = self.hasStem(line, files)
+                if enabled:
+                    usedSection = True
+                else:
+                    ignoredSection = True
+            if enabled:
+                newText += line + "\n"
+        return newText, usedSection and ignoredSection
+
+    def notifyNewFileSelection(self, files):
+        if len(files) == 0:
+            if self.showingSubText:
+                self.showingSubText = False
+                self.updateViewFromText(self.text)
+        else:
+            newText, changed = self.makeSubText(files)
+            if changed:
+                self.showingSubText = True
+                self.updateViewFromText(newText)
+            elif self.showingSubText:
+                self.showingSubText = False
+                self.updateViewFromText(self.text)
+
+    def updateViewFromText(self, text):
         textbuffer = self.view.get_buffer()
         # Encode to UTF-8, necessary for gtk.TextView
-        textToUse = guiplugins.convertToUtf8(self.text)
+        textToUse = guiplugins.convertToUtf8(text)
         if "http://" in textToUse:
             self.view.connect("event-after", self.event_after)
             self.view.connect("motion-notify-event", self.motion_notify_event)

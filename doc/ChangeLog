@@ -1431,12 +1431,12 @@ General GUI Enhancements:
 Static GUI Enhancements:
     - Can now use UNIX-style file expansion wildcards (globs) in the "Test-file to search" box in the Selection tab. (default_gui.py)
 	Allows looking for text in multiple files simultaneously. Also affects -grepfile on the command line.
-    - "Create/Import" functionality works correctly for directories which previously existed (default_gui.py)
-	Overwrites them rather than just failing.
     - On creating a new application, can specify at creation time that it is a GUI (default_gui.py)
 	Saves on fiddling and restarting the GUI.
     - Tooltips added to the selection tab to aid clarity.
 Dynamic GUI Enhancements:
+    - Selecting files in the file view now also filters the Text Info display below (texttestgui.py)
+	So that it only previews what is currently selected.
     - Can now view original files (filtered and not) from the file view popup menu (default_gui.py)
 Framework Enhancements:
     - Reconnect now picks up all "extra versions" that were originally run (reconnect.py)
@@ -1458,7 +1458,9 @@ Self-test/Internal changes:
     - Lots of work on coverage: tests added, dead code removed, no-coverage pragmas added. Coverage from self-tests now 98.6%
 Bug Fixes:
     - Invisible (filtered out) tests will not be run now when a test suite is selected (texttestgui.py)
+    - "Create/Import" functionality in static GUI works correctly for directories which previously existed (default_gui.py)
     - Static GUI no longer refuses to start if the "default checkout" can't be found (default/__init__.py)
     - All plugins scripts now reject unknown arguments in a consistent way (plugins.py)
     - Status of tests now synchronised across the GUI, should be harder to get a test green/red somewhere and still yellow
 	somewhere else.
+    

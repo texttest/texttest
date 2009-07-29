@@ -1,6 +1,7 @@
 
-import gtk, guiplugins, plugins, texttest_version, os, string, sys, glob
+import gtk, gobject, guiplugins, plugins, texttest_version, os, sys, glob
 from guiplugins import scriptEngine, ActionResultDialogGUI
+from types import StringType
 
 # Show useful info about TextTest.
 # I don't particularly like the standard gtk.AboutDialog, and we also want
@@ -77,23 +78,27 @@ class ShowVersions(guiplugins.ActionResultDialogGUI):
 
     def getDialogTitle(self):
         return "Version Information"
+
+    def makeString(self, versionTuple):
+        if type(versionTuple) == StringType:
+            return versionTuple
+        else:
+            return ".".join(map(str, versionTuple))
     
     def addContents(self):
-        textTestVersion = texttest_version.version
-        pythonVersion = ".".join(map(lambda l: str(l), sys.version_info))
-        gtkVersion = ".".join(map(lambda l: str(l), gtk.gtk_version))
-        pygtkVersion = ".".join(map(lambda l: str(l), gtk.pygtk_version))
+        versionList = [ ("TextTest", texttest_version.version),
+                        ("Python", sys.version_info),
+                        ("GTK", gtk.gtk_version),
+                        ("PyGTK",  gtk.pygtk_version),
+                        ("PyGObject", gobject.pygobject_version),
+                        ("GLib", gobject.glib_version) ]
         
-        table = gtk.Table(4, 2, homogeneous=False)
+        table = gtk.Table(len(versionList), 2, homogeneous=False)
         table.set_row_spacings(1)
-        table.attach(self.justify("TextTest:", 0.0), 0, 1, 0, 1, xoptions=gtk.FILL, xpadding=1)
-        table.attach(self.justify("Python:", 0.0), 0, 1, 1, 2, xoptions=gtk.FILL, xpadding=1)
-        table.attach(self.justify("GTK:", 0.0), 0, 1, 2, 3, xoptions=gtk.FILL, xpadding=1)
-        table.attach(self.justify("PyGTK:", 0.0), 0, 1, 3, 4, xoptions=gtk.FILL, xpadding=1)
-        table.attach(self.justify(textTestVersion, 1.0), 1, 2, 0, 1)
-        table.attach(self.justify(pythonVersion, 1.0), 1, 2, 1, 2)
-        table.attach(self.justify(gtkVersion, 1.0), 1, 2, 2, 3)
-        table.attach(self.justify(pygtkVersion, 1.0), 1, 2, 3, 4)
+        for rowNo, (title, versionTuple) in enumerate(versionList):
+            table.attach(self.justify(title + ":", 0.0), 0, 1, rowNo, rowNo + 1, xoptions=gtk.FILL, xpadding=1)
+            table.attach(self.justify(self.makeString(versionTuple), 1.0), 1, 2, rowNo, rowNo + 1)
+
         header = gtk.Label()
         header.set_markup("<b>You are using these versions:\n</b>")
         tableVbox = gtk.VBox()

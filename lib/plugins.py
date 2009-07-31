@@ -36,6 +36,18 @@ def localtime(format= "%d%b%H:%M:%S", seconds=None):
         seconds = time.time()
     return time.strftime(format, time.localtime(seconds))
 
+class Callable:
+    def __init__(self, method, *args):
+        self.method = method
+        self.extraArgs = args
+    def __call__(self, *calledArgs):
+        toUse = calledArgs + self.extraArgs
+        return self.method(*toUse)
+    def __eq__(self, other):
+        return isinstance(other, Callable) and self.method == other.method and self.extraArgs == other.extraArgs
+    def __hash__(self):
+        return hash((self.method, self.extraArgs))
+
 def findInstallationRoots():
     installationRoot = os.path.dirname(os.path.dirname(__file__)).replace("\\", "/")
     if os.path.basename(installationRoot) == "generic":
@@ -68,9 +80,9 @@ def installationDir(name):
     # Generic modules only, we're confident we know where they are
     return os.path.join(installationRoots[0], name)
 
-def installationPath(subpath):
+def installationPath(*pathElems):
     for instRoot in installationRoots:
-        instPath = os.path.join(instRoot, subpath)
+        instPath = os.path.join(instRoot, *pathElems)
         if os.path.exists(instPath):
             return instPath
 

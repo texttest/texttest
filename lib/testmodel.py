@@ -82,14 +82,6 @@ class DirectoryCache:
         return stems
 
 
-class Callable:
-    def __init__(self, method, *args):
-        self.method = method
-        self.extraArgs = args
-    def __call__(self, *calledArgs):
-        toUse = calledArgs + self.extraArgs
-        return self.method(*toUse)
-
 class DynamicMapping:
     def __init__(self, method, *args):
         self.method = method
@@ -201,7 +193,7 @@ class Test(plugins.Observable):
         self.app = app
         self.parent = parent
         self.dircache = dircache
-        populateFunction = Callable(app.setEnvironment, self)
+        populateFunction = plugins.Callable(app.setEnvironment, self)
         self.environment = TestEnvironment(populateFunction)
         # Java equivalent of the environment mechanism...
         self.properties = plugins.MultiEntryDictionary()
@@ -667,7 +659,7 @@ class TestSuiteFileHandler:
             if cached is not None:
                 return cached
 
-        tests = plugins.readListWithComments(fileName, Callable(self.getExclusionReason, filterMethod, warn))
+        tests = plugins.readListWithComments(fileName, plugins.Callable(self.getExclusionReason, filterMethod, warn))
         self.cache[fileName] = tests
         return tests
 

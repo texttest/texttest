@@ -1323,6 +1323,7 @@ class InteractiveActionHandler:
         instances = []
         for className in config.getInteractiveActionClasses(dynamic):
             if className not in classNames:
+                self.diag.info("Making instances for " + repr(className))
                 allClasses = self.findAllClasses(className, allApps, dynamic)
                 subinstances = self.makeAllInstances(allClasses, dynamic)
                 if len(subinstances) == 1:
@@ -1363,7 +1364,7 @@ class InteractiveActionHandler:
             return instance
         except:
             # If some invalid interactive action is provided, need to know which
-            sys.stderr.write("Error with interactive action " + str(className.__name__) + "\n")
+            sys.stderr.write("Error with interactive action " + str(className) + "\n")
             raise
 
     def classValid(self, className, app):

@@ -22,10 +22,14 @@
     <placeholder name="ExtraMenus" />
 
     <menu action="helpmenu">
+      <menuitem action="Quick Start"/>
       <menuitem action="Migration Notes"/>
       <menuitem action="Change Logs"/>
       <separator/>
+      <placeholder name="Custom Help" />
       <menuitem action="Component Versions"/>
+      <menuitem action="Credits"/>
+      <menuitem action="License"/>
       <separator/>
       <menuitem action="About TextTest"/>
     </menu>

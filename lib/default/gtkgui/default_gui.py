@@ -2667,13 +2667,22 @@ class InteractiveActionConfig:
                          RepositionTestFirst, RepositionTestUp,
                          RepositionTestDown, RepositionTestLast,
                          ReconnectToTests, LoadSelection, SaveSelection ]
-        classes += [ helpdialogs.ShowMigrationNotes, helpdialogs.ShowChangeLogs, helpdialogs.ShowVersions, helpdialogs.AboutTextTest ]
+        classes += helpdialogs.getInteractiveActionClasses()
         return classes
 
     def getReplacements(self):
         # Return a dictionary mapping classes above to what to replace them with
         return {}
 
+    def contains(self, cls, classes):
+        if cls in classes:
+            return True
+        
+        for currCls in classes:
+            if isinstance(currCls, plugins.Callable) and currCls.method == cls:
+                return True
+        return False
+    
     def isValid(self, className):
         replacements = self.getReplacements()
         if className in replacements.values():
@@ -2681,7 +2690,8 @@ class InteractiveActionConfig:
         elif replacements.has_key(className):
             return False
         else:
-            return className in self.getInteractiveActionClasses(True) or className in self.getInteractiveActionClasses(False)
+            return self.contains(className, self.getInteractiveActionClasses(True)) or \
+                   self.contains(className, self.getInteractiveActionClasses(False))
 
     def getColourDictionary(self):
         dict = {}

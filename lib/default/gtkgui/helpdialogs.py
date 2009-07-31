@@ -55,11 +55,11 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         self.dialog.set_resizable(False)
         
     def showCredits(self, *args):
-        newDialog = TextFileDisplayDialog(self.dialog, "TextTest Credits", "AUTHORS", "Written by", self.validApps)
+        newDialog = TextFileDisplayDialog(self.validApps, False, "CREDITS.txt", self.dialog)
         newDialog.performOnCurrent()
 
     def showLicense(self, *args):
-        newDialog = TextFileDisplayDialog(self.dialog, "TextTest License", "LICENSE", "License", self.validApps)
+        newDialog = TextFileDisplayDialog(self.validApps, False, "LICENSE.txt", self.dialog)
         newDialog.performOnCurrent()
 
     def showVersions(self, *args):
@@ -129,22 +129,46 @@ class ShowVersions(guiplugins.ActionResultDialogGUI):
         return alignment
 
 class TextFileDisplayDialog(guiplugins.ActionResultDialogGUI):
-    def __init__(self, parent, title, fileName, tabTitle, *args):
+    def __init__(self, allApps, dynamic, fileName, parent=None):
         self.parent = parent
-        self.title = title
         self.fileName = fileName
-        self.tabTitle = tabTitle
-        guiplugins.ActionResultDialogGUI.__init__(self, *args)
+        self.title = self.makeTitleFromFileName(fileName)
+        guiplugins.ActionResultDialogGUI.__init__(self, allApps, dynamic)
         
     def getParentWindow(self):
-        return self.parent
-    
+        if self.parent:
+            return self.parent
+        else:
+            return self.topWindow
+
+    def makeTitleFromFileName(self, fileName):
+        words = fileName.replace(".txt", "").split("_")
+        return " ".join([ word.capitalize() for word in words ])
+
+    def messageAfterPerform(self):
+        return ""
+        
     def _getTitle(self):
         return self.title
 
+    def getTooltip(self):
+        return "Show TextTest " + self.title
+
+    def isActiveOnCurrent(self, *args):
+        return True
+    
+    def getDialogTitle(self):
+        return "TextTest " + self.title
+
+    def getTabTitle(self):
+        if self.title == "Credits":
+            return "Written by"
+        else:
+            return self.title
+
     def addContents(self):
         try:
-            file = open(os.path.join(plugins.installationDir("doc"), self.fileName))
+            file = open(plugins.installationPath("doc", self.fileName))
             text = file.read()
             file.close()
             buffer = gtk.TextBuffer()
@@ -158,11 +182,21 @@ class TextFileDisplayDialog(guiplugins.ActionResultDialogGUI):
         textView.set_cursor_visible(False)
         textView.set_left_margin(5)
         textView.set_right_margin(5)
+        useScrollbars = not self.parent and text.count("\n") > 30
         notebook = gtk.Notebook()
-        notebook.append_page(textView, gtk.Label(self.tabTitle))
+        label = gtk.Label(self.getTabTitle())
+        if useScrollbars:
+            window = gtk.ScrolledWindow()
+            window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+            window.add(textView)
+            notebook.append_page(window, label)        
+            parentSize = self.topWindow.get_size()
+            self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[0] * 0.7))
+        else:
+            notebook.append_page(textView, label)
+            
         self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
-        self.dialog.set_resizable(False)
-
+        
         
 class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
     def isActiveOnCurrent(self, *args):
@@ -206,7 +240,7 @@ class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
         else:
             guiplugins.scriptEngine.monitorNotebook(notebook, "view " + self.getTitle().lower() + " in tab")
             parentSize = self.topWindow.get_size()
-            self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[0] * 0.7))
+            self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[1] * 0.7))
             self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
             
     def labelPrefix(self):
@@ -259,3 +293,10 @@ class ShowChangeLogs(VersionInfoDialogGUI):
             else:
                 versionInfo[currVersions] += line
         return versionInfo
+
+
+def getInteractiveActionClasses():
+    classes = [ ShowMigrationNotes, ShowChangeLogs, ShowVersions, AboutTextTest ]
+    for fileName in plugins.findDataPaths([ "*.txt" ], dataDirName="doc"):
+        classes.append(plugins.Callable(TextFileDisplayDialog, os.path.basename(fileName)))
+    return classes

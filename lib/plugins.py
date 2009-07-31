@@ -715,7 +715,7 @@ def copyPath(srcPath, dstPath):
         removePath(dstPath)
         shutil.copytree(srcPath, dstPath)
     else:
-        shutil.copyfile(srcPath, dstPath)
+        shutil.copy(srcPath, dstPath)
         
 def removePath(path):
     if os.path.isfile(path) or os.path.islink(path):

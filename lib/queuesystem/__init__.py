@@ -8,7 +8,7 @@ from cPickle import dumps
 from default.console import TextDisplayResponder, InteractiveResponder
 from default.knownbugs import CheckForBugs
 from default.actionrunner import ActionRunner, BaseActionRunner
-from default.unixonly import VirtualDisplayResponder
+from default.virtualdisplay import VirtualDisplayResponder
 from default.performance import getTestPerformance
 from default.pyusecase_interface import ApplicationEventResponder
 from types import StringType

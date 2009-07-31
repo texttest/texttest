@@ -291,7 +291,7 @@ class TestEnvironmentCreator:
         if self.topLevel():
             vars.append(("TEXTTEST_CHECKOUT", self.test.app.checkout))
             if self.test.getConfigValue("use_case_record_mode") == "GUI":
-                from unixonly import VirtualDisplayResponder
+                from virtualdisplay import VirtualDisplayResponder
                 if VirtualDisplayResponder.instance:
                     virtualDisplay = VirtualDisplayResponder.instance.displayName
                     if virtualDisplay:

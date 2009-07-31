@@ -60,8 +60,8 @@ class VirtualDisplayResponder(plugins.Responder):
                     allMachines.append(machine)
         return allMachines
 
-    def notifyExtraTest(self, *args):
-        # Called when a slave is given an extra test to solve
+    def notifyComplete(self, *args):
+        # Whenever a test completes, we check to see if the virtual server is still going
         if self.displayProc is not None and self.displayProc.poll() is not None:
             # If Xvfb has terminated, we need to restart it
             self.setUpVirtualDisplay(self.guiSuites)
@@ -86,6 +86,11 @@ class VirtualDisplayResponder(plugins.Responder):
         self.diag.info("Getting ps output from " + self.displayMachine)
         plugins.log.info("Killing remote Xvfb process on " + self.displayMachine + " with pid " + str(self.displayPid))
         self.guiSuites[0].app.runCommandOn(self.displayMachine, [ "kill", str(self.displayPid) ])
+        try:
+            os.kill(self.displayProc.pid, signal.SIGTERM)
+            plugins.log.info("Killing local Xvfb process with pid " + str(self.displayProc.pid))
+        except OSError:
+            pass
 
     def createDisplay(self, machine, app):
         if not self.canRunVirtualServer(machine, app):

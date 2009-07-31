@@ -251,7 +251,7 @@ class Config:
                     self.optionMap["b"] = "default"
                 classes.append(batch.BatchResponder)
         if self.useVirtualDisplay():
-            from unixonly import VirtualDisplayResponder
+            from virtualdisplay import VirtualDisplayResponder
             classes.append(VirtualDisplayResponder)
         if self.keepTemporaryDirectories():
             classes.append(self.getStateSaver())

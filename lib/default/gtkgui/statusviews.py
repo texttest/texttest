@@ -1,0 +1,461 @@
+
+"""
+Module for the various widgets that keep an overall view of the status or progress
+of the current run/setup
+"""
+
+import gtk, gobject, pango, guiplugins, plugins, os, logging
+from ndict import seqdict
+from copy import copy
+
+#
+# A class responsible for putting messages in the status bar.
+# It is also responsible for keeping the throbber rotating
+# while actions are under way.
+#
+class StatusMonitorGUI(guiplugins.SubGUI):
+    def __init__(self):
+        guiplugins.SubGUI.__init__(self)
+        self.throbber = None
+        self.animation = None
+        self.pixbuf = None
+        self.label = None
+
+    def getWidgetName(self):
+        return "_Status bar"
+
+    def notifyActionStart(self, message="", lock = True):
+        if self.throbber:
+            if self.pixbuf: # pragma: no cover : Only occurs if some code forgot to do ActionStop ...
+                self.notifyActionStop()
+            self.pixbuf = self.throbber.get_pixbuf()
+            self.throbber.set_from_animation(self.animation)
+            if lock:
+                self.throbber.grab_add()
+
+    def notifyActionProgress(self, message=""):
+        while gtk.events_pending():
+            gtk.main_iteration(False)
+
+    def notifyActionStop(self, message=""):
+        if self.throbber:
+            self.throbber.set_from_pixbuf(self.pixbuf)
+            self.pixbuf = None
+            self.throbber.grab_remove()
+
+    def notifyStatus(self, message):
+        if self.label:
+            self.label.set_markup(plugins.convertForMarkup(message))
+
+    def createView(self):
+        hbox = gtk.HBox()
+        self.label = gtk.Label()
+        self.label.set_name("GUI status")
+        self.label.set_ellipsize(pango.ELLIPSIZE_END)
+        # It seems difficult to say 'ellipsize when you'd otherwise need
+        # to enlarge the window', so we'll have to settle for a fixed number
+        # of max char's ... The current setting (90) is just a good choice
+        # based on my preferred window size, on the test case I used to
+        # develop this code. (since different chars have different widths,
+        # the optimal number depends on the string to display) \ Mattias++
+        self.label.set_max_width_chars(90)
+        self.label.set_use_markup(True)
+        self.label.set_markup(plugins.convertForMarkup("TextTest started at " + plugins.localtime() + "."))
+        hbox.pack_start(self.label, expand=False, fill=False)
+        imageDir = plugins.installationDir("images")
+        try:
+            staticIcon = os.path.join(imageDir, "throbber_inactive.png")
+            temp = gtk.gdk.pixbuf_new_from_file(staticIcon)
+            self.throbber = gtk.Image()
+            self.throbber.set_from_pixbuf(temp)
+            animationIcon = os.path.join(imageDir, "throbber_active.gif")
+            self.animation = gtk.gdk.PixbufAnimation(animationIcon)
+            hbox.pack_end(self.throbber, expand=False, fill=False)
+        except Exception, e:
+            plugins.printWarning("Failed to create icons for the status throbber:\n" + str(e) + "\nAs a result, the throbber will be disabled.")
+            self.throbber = None
+        self.widget = gtk.Frame()
+        self.widget.set_shadow_type(gtk.SHADOW_ETCHED_IN)
+        self.widget.add(hbox)
+        self.widget.show_all()
+        return self.widget
+
+
+class ProgressBarGUI(guiplugins.SubGUI):
+    def __init__(self, dynamic, testCount):
+        guiplugins.SubGUI.__init__(self)
+        self.dynamic = dynamic
+        self.totalNofTests = testCount
+        self.addedCount = 0
+        self.nofCompletedTests = 0
+        self.widget = None
+
+    def shouldShow(self):
+        return self.dynamic
+    
+    def createView(self):
+        self.widget = gtk.ProgressBar()
+        self.resetBar()
+        self.widget.show()
+        return self.widget
+
+    def notifyAdd(self, test, initial):
+        if test.classId() == "test-case":
+            self.addedCount += 1
+            if self.addedCount > self.totalNofTests:
+                self.totalNofTests += 1
+                self.resetBar()
+    def notifyAllRead(self, *args):
+        # The initial number was told be the static GUI, treat it as a guess
+        # Can be wrong in case versions are defined by testsuite files.
+        self.totalNofTests = self.addedCount
+        self.resetBar()
+
+    def notifyLifecycleChange(self, test, state, changeDesc):
+        if changeDesc == "complete":
+            self.nofCompletedTests += 1
+            self.resetBar()
+
+    def computeFraction(self):
+        if self.totalNofTests > 0:
+            return float(self.nofCompletedTests) / float(self.totalNofTests)
+        else:
+            return 0 # No tests yet, haven't read them in
+
+    def resetBar(self):
+        if self.widget:
+            self.widget.set_text(self.getFractionMessage())
+            self.widget.set_fraction(self.computeFraction())
+
+    def getFractionMessage(self):
+        if self.nofCompletedTests >= self.totalNofTests:
+            completionTime = plugins.localtime()
+            return "All " + str(self.totalNofTests) + " tests completed at " + completionTime
+        else:
+            return str(self.nofCompletedTests) + " of " + str(self.totalNofTests) + " tests completed"
+
+class ClassificationTree(seqdict):
+    def addClassification(self, path):
+        prevElement = None
+        for element in path:
+            if not self.has_key(element):
+                self[element] = []
+            if prevElement and element not in self[prevElement]:
+                self[prevElement].append(element)
+            prevElement = element
+
+# Class that keeps track of (and possibly shows) the progress of
+# pending/running/completed tests
+class TestProgressMonitor(guiplugins.SubGUI):
+    def __init__(self, dynamic, testCount):
+        guiplugins.SubGUI.__init__(self)
+        self.classifications = {} # map from test to list of iterators where it exists
+
+        # Each row has 'type', 'number', 'show', 'tests'
+        self.treeModel = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_INT, gobject.TYPE_BOOLEAN, \
+                                       gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
+        self.diag = logging.getLogger("Progress Monitor")
+        self.progressReport = None
+        self.treeView = None
+        self.dynamic = dynamic
+        self.testCount = testCount
+        self.diffStore = {}
+        if self.shouldShow():
+            # It isn't really a gui configuration, and this could cause bugs when several apps
+            # using differnt diff tools are run together. However, this isn't very likely and we prefer not
+            # to recalculate all the time...
+            diffTool = guiplugins.guiConfig.getValue("text_diff_program")
+            self.diffFilterGroup = plugins.TextTriggerGroup(guiplugins.guiConfig.getCompositeValue("text_diff_program_filters", diffTool))
+            if testCount > 0:
+                colour = guiplugins.guiConfig.getTestColour("not_started")
+                visibility = guiplugins.guiConfig.showCategoryByDefault("not_started")
+                self.addNewIter("Not started", None, colour, visibility, testCount)
+    def getGroupTabTitle(self):
+        return "Status"
+    def shouldShow(self):
+        return self.dynamic
+    def createView(self):
+        self.treeView = gtk.TreeView(self.treeModel)
+        self.treeView.set_name("Test Status View")
+        selection = self.treeView.get_selection()
+        selection.set_mode(gtk.SELECTION_MULTIPLE)
+        selection.set_select_function(self.canSelect)
+        selection.connect("changed", self.selectionChanged)
+        textRenderer = gtk.CellRendererText()
+        textRenderer.set_property('wrap-width', 350)
+        textRenderer.set_property('wrap-mode', pango.WRAP_WORD_CHAR)
+        numberRenderer = gtk.CellRendererText()
+        numberRenderer.set_property('xalign', 1)
+        statusColumn = gtk.TreeViewColumn("Status", textRenderer, text=0, background=3, font=4)
+        numberColumn = gtk.TreeViewColumn("Number", numberRenderer, text=1, background=3, font=4)
+        statusColumn.set_resizable(True)
+        numberColumn.set_resizable(True)
+        self.treeView.append_column(statusColumn)
+        self.treeView.append_column(numberColumn)
+        toggle = gtk.CellRendererToggle()
+        toggle.set_property('activatable', True)
+        guiplugins.scriptEngine.registerCellToggleButton(toggle, "toggle progress report category", self.treeView)
+        toggle.connect("toggled", self.showToggled)
+        guiplugins.scriptEngine.monitor("set progress report filter selection to", selection)
+        toggleColumn = gtk.TreeViewColumn("Visible", toggle, active=2)
+        toggleColumn.set_resizable(True)
+        toggleColumn.set_alignment(0.5)
+        self.treeView.append_column(toggleColumn)
+        self.treeView.show()
+        return self.addScrollBars(self.treeView, hpolicy=gtk.POLICY_NEVER)
+    def canSelect(self, path):
+        pathIter = self.treeModel.get_iter(path)
+        return self.treeModel.get_value(pathIter, 2)
+    def notifyAdd(self, test, initial):
+        if self.dynamic and test.classId() == "test-case":
+            incrementCount = self.testCount == 0
+            self.insertTest(test, test.stateInGui, incrementCount)
+    def notifyAllRead(self, *args):
+        # Fix the not started count in case the initial guess was wrong
+        if self.testCount > 0:
+            self.diag.info("Reading complete, updating not-started count to actual answer")
+            iter = self.treeModel.get_iter_root()
+            actualTestCount = len(self.treeModel.get_value(iter, 5))
+            measuredTestCount = self.treeModel.get_value(iter, 1)
+            if actualTestCount != measuredTestCount:
+                self.treeModel.set_value(iter, 1, actualTestCount)
+    def selectionChanged(self, selection):
+        # For each selected row, select the corresponding rows in the test treeview
+        tests = []
+        selection.selected_foreach(self.selectCorrespondingTests, tests)
+        self.notify("SetTestSelection", tests)
+    def selectCorrespondingTests(self, treemodel, path, iter, tests , *args):
+        guiplugins.guilog.info("Selecting all " + str(treemodel.get_value(iter, 1)) + " tests in category " + treemodel.get_value(iter, 0))
+        for test in treemodel.get_value(iter, 5):
+            if test not in tests:
+                tests.append(test)
+    def findTestIterators(self, test):
+        return self.classifications.get(test, [])
+    def getCategoryDescription(self, state, categoryName=None):
+        if not categoryName:
+            categoryName = state.category
+        briefDesc, fullDesc = state.categoryDescriptions.get(categoryName, (categoryName, categoryName))
+        return briefDesc.replace("_", " ").capitalize()
+
+    def filterDiff(self, test, diff):
+        filteredDiff = ""
+        for line in diff.split("\n"):
+            if self.diffFilterGroup.stringContainsText(line):
+                filteredDiff += line + "\n"
+        return filteredDiff
+
+    def getClassifiers(self, test, state):
+        classifiers = ClassificationTree()
+        catDesc = self.getCategoryDescription(state)
+        if state.isMarked():
+            if state.briefText == catDesc:
+                # Just in case - otherwise we get an infinite loop...
+                classifiers.addClassification([ catDesc, "Marked as Marked" ])
+            else:
+                classifiers.addClassification([ catDesc, state.briefText ])
+            return classifiers
+
+        if not state.isComplete() or not state.hasFailed():
+            classifiers.addClassification([ catDesc ])
+            return classifiers
+
+        if not state.isSaveable() or state.warnOnSave(): # If it's not saveable, don't classify it by the files
+            overall, details = state.getTypeBreakdown()
+            self.diag.info("Adding unsaveable : " + catDesc + " " + details)
+            classifiers.addClassification([ "Failed", catDesc, details ])
+            return classifiers
+
+        comparisons = state.getComparisons()
+        maxLengthForGrouping = test.getConfigValue("lines_of_text_difference")
+        for fileComp in filter(lambda c: c.getType() == "failure", comparisons):
+            summary = fileComp.getSummary(includeNumbers=False)
+            fileClass = [ "Failed", "Differences", summary ]
+
+            freeText = fileComp.getFreeTextBody()
+            if freeText.count("\n") < maxLengthForGrouping:
+                filteredDiff = self.filterDiff(test, freeText)
+                summaryDiffs = self.diffStore.setdefault(summary, seqdict())
+                testList, hasGroup = summaryDiffs.setdefault(filteredDiff, ([], False))
+                if test not in testList:
+                    testList.append(test)
+                if len(testList) > 1 and not hasGroup:
+                    hasGroup = True
+                    summaryDiffs[filteredDiff] = (testList, hasGroup)
+                if hasGroup:
+                    group = summaryDiffs.index(filteredDiff) + 1
+                    fileClass.append("Group " + str(group))
+
+            self.diag.info("Adding file classification for " + repr(fileComp) + " = " + repr(fileClass))
+            classifiers.addClassification(fileClass)
+
+        for fileComp in filter(lambda c: c.getType() != "failure", comparisons):
+            summary = fileComp.getSummary(includeNumbers=False)
+            fileClass = [ "Failed", "Performance differences", self.getCategoryDescription(state, summary) ]
+            self.diag.info("Adding file classification for " + repr(fileComp) + " = " + repr(fileClass))
+            classifiers.addClassification(fileClass)
+
+        return classifiers
+
+    def removeFromModel(self, test):
+        for iter in self.findTestIterators(test):
+            testCount = self.treeModel.get_value(iter, 1)
+            self.treeModel.set_value(iter, 1, testCount - 1)
+            if testCount == 1:
+                self.treeModel.set_value(iter, 3, "white")
+                self.treeModel.set_value(iter, 4, "")
+            allTests = self.treeModel.get_value(iter, 5)
+            allTests.remove(test)
+            self.diag.info("Removing test " + repr(test) + " from node " + self.treeModel.get_value(iter, 0))
+            self.treeModel.set_value(iter, 5, allTests)
+
+    def removeFromDiffStore(self, test):
+        for fileInfo in self.diffStore.values():
+            for testList, hasGroup in fileInfo.values():
+                if test in testList:
+                    testList.remove(test)
+
+    def insertTest(self, test, state, incrementCount):
+        self.classifications[test] = []
+        classifiers = self.getClassifiers(test, state)
+        nodeClassifier = classifiers.keys()[0]
+        defaultColour, defaultVisibility = self.getCategorySettings(state.category, nodeClassifier, classifiers)
+        return self.addTestForNode(test, defaultColour, defaultVisibility, nodeClassifier, classifiers, incrementCount)
+    def getCategorySettings(self, category, nodeClassifier, classifiers):
+        # Use the category description if there is only one level, otherwise rely on the status names
+        if len(classifiers.get(nodeClassifier)) == 0 or category == "failure":
+            return guiplugins.guiConfig.getTestColour(category), guiplugins.guiConfig.showCategoryByDefault(category)
+        else:
+            return None, True
+    def updateTestAppearance(self, test, state, changeDesc, colour):
+        resultType, summary = state.getTypeBreakdown()
+        catDesc = self.getCategoryDescription(state, resultType)
+        mainColour = guiplugins.guiConfig.getTestColour(catDesc, guiplugins.guiConfig.getTestColour(resultType))
+        # Don't change suite states when unmarking tests
+        updateSuccess = state.hasSucceeded() and changeDesc != "unmarked"
+        saved = changeDesc.find("save") != -1
+        self.notify("TestAppearance", test, summary, mainColour, colour, updateSuccess, saved)
+        self.notify("Visibility", [ test ], self.shouldBeVisible(test))
+
+    def getInitialTestsForNode(self, test, parentIter, nodeClassifier):
+        try:
+            if nodeClassifier.startswith("Group "):
+                diffNumber = int(nodeClassifier[6:]) - 1
+                parentName = self.treeModel.get_value(parentIter, 0)
+                testLists = self.diffStore.get(parentName)
+                testList, hasGroup = testLists.values()[diffNumber]
+                return copy(testList)
+        except ValueError:
+            pass
+        return [ test ]
+
+    def addTestForNode(self, test, defaultColour, defaultVisibility, nodeClassifier, classifiers, incrementCount, parentIter=None):
+        nodeIter = self.findIter(nodeClassifier, parentIter)
+        colour = guiplugins.guiConfig.getTestColour(nodeClassifier, defaultColour)
+        if nodeIter:
+            visibility = self.treeModel.get_value(nodeIter, 2)
+            self.diag.info("Adding " + repr(test) + " for node " + nodeClassifier + ", visible = " + repr(visibility))
+            self.insertTestAtIter(nodeIter, test, colour, incrementCount)
+            self.classifications[test].append(nodeIter)
+        else:
+            visibility = guiplugins.guiConfig.showCategoryByDefault(nodeClassifier, parentHidden=not defaultVisibility)
+            initialTests = self.getInitialTestsForNode(test, parentIter, nodeClassifier)
+            nodeIter = self.addNewIter(nodeClassifier, parentIter, colour, visibility, len(initialTests), initialTests)
+            for initTest in initialTests:
+                self.diag.info("New node " + nodeClassifier + ", visible = " + repr(visibility) + " : add " + repr(initTest))
+                self.classifications[initTest].append(nodeIter)
+
+        subColours = []
+        for subNodeClassifier in classifiers[nodeClassifier]:
+            subColour = self.addTestForNode(test, colour, visibility, subNodeClassifier, classifiers, incrementCount, nodeIter)
+            subColours.append(subColour)
+
+        if len(subColours) > 0:
+            return subColours[0]
+        else:
+            return colour
+    def insertTestAtIter(self, iter, test, colour, incrementCount):
+        allTests = self.treeModel.get_value(iter, 5)
+        testCount = self.treeModel.get_value(iter, 1)
+        if testCount == 0:
+            self.treeModel.set_value(iter, 3, colour)
+            self.treeModel.set_value(iter, 4, "bold")
+        if incrementCount:
+            self.treeModel.set_value(iter, 1, testCount + 1)
+        self.diag.info("Tests for node " + self.treeModel.get_value(iter, 0) + " " + repr(allTests))
+        allTests.append(test)
+        self.diag.info("Tests for node " + self.treeModel.get_value(iter, 0) + " " + repr(allTests))
+    def addNewIter(self, classifier, parentIter, colour, visibility, testCount, tests=[]):
+        modelAttributes = [classifier, testCount, visibility, colour, "bold", tests]
+        newIter = self.treeModel.append(parentIter, modelAttributes)
+        if parentIter:
+            self.treeView.expand_row(self.treeModel.get_path(parentIter), open_all=0)
+        return newIter
+    def findIter(self, classifier, startIter):
+        iter = self.treeModel.iter_children(startIter)
+        while iter != None:
+            name = self.treeModel.get_value(iter, 0)
+            if name == classifier:
+                return iter
+            else:
+                iter = self.treeModel.iter_next(iter)
+    def notifyLifecycleChange(self, test, state, changeDesc):
+        self.removeFromModel(test)
+        if changeDesc.find("save") != -1 or changeDesc.find("marked") != -1 or changeDesc.find("recalculated") != -1:
+            self.removeFromDiffStore(test)
+        colourInserted = self.insertTest(test, state, incrementCount=True)
+        self.updateTestAppearance(test, state, changeDesc, colourInserted)
+        
+    def removeParentIters(self, iters):
+        noParents = []
+        for iter1 in iters:
+            if not self.isParent(iter1, iters):
+                noParents.append(iter1)
+        return noParents
+
+    def isParent(self, iter1, iters):
+        path1 = self.treeModel.get_path(iter1)
+        for iter2 in iters:
+            parent = self.treeModel.iter_parent(iter2)
+            if parent is not None and self.treeModel.get_path(parent) == path1:
+                return True
+        return False
+
+    def shouldBeVisible(self, test):
+        iters = self.findTestIterators(test)
+        # ignore the parent nodes where visibility is concerned
+        visibilityIters = self.removeParentIters(iters)
+        self.diag.info("Visibility for " + repr(test) + " : iters " + repr(map(self.treeModel.get_path, visibilityIters)))
+        for nodeIter in visibilityIters:
+            visible = self.treeModel.get_value(nodeIter, 2)
+            if visible:
+                return True
+        return False
+    
+    def getAllChildIters(self, iter):
+         # Toggle all children too
+        childIters = []
+        childIter = self.treeModel.iter_children(iter)
+        while childIter != None:
+            childIters.append(childIter)
+            childIters += self.getAllChildIters(childIter)
+            childIter = self.treeModel.iter_next(childIter)
+        return childIters
+
+    def showToggled(self, cellrenderer, path):
+        # Toggle the toggle button
+        newValue = not self.treeModel[path][2]
+        self.treeModel[path][2] = newValue
+
+        iter = self.treeModel.get_iter_from_string(path)
+        categoryName = self.treeModel.get_value(iter, 0)
+        for childIter in self.getAllChildIters(iter):
+            self.treeModel.set_value(childIter, 2, newValue)
+
+        if categoryName == "Not started":
+            self.notify("DefaultVisibility", newValue)
+
+        changedTests = []
+        for test in self.treeModel.get_value(iter, 5):
+            if self.shouldBeVisible(test) == newValue:
+                changedTests.append(test)
+        self.notify("Visibility", changedTests, newValue)

@@ -921,14 +921,14 @@ def calculatePercentageNormalised(oldVal, newVal):
     largest = max(oldVal, newVal)
     smallest = min(oldVal, newVal)
     if smallest != 0.0:
-        return ((largest - smallest) / smallest) * 100
+        return ((largest - smallest) / abs(smallest)) * 100
     else:
         return zeroDivisorPercentage(largest)
 
 def calculatePercentageStandard(oldVal, newVal):        
     if oldVal != 0.0:
         diff = abs(newVal - oldVal)
-        return (diff / oldVal) * 100
+        return (diff / abs(oldVal)) * 100
     else:
         return zeroDivisorPercentage(newVal)
 

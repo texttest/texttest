@@ -2562,21 +2562,25 @@ class TestProgressMonitor(guiplugins.SubGUI):
             return classifiers
 
         comparisons = state.getComparisons()
+        maxLengthForGrouping = test.getConfigValue("lines_of_text_difference")
         for fileComp in filter(lambda c: c.getType() == "failure", comparisons):
             summary = fileComp.getSummary(includeNumbers=False)
             fileClass = [ "Failed", "Differences", summary ]
 
-            filteredDiff = self.filterDiff(test, fileComp.getFreeTextBody())
-            summaryDiffs = self.diffStore.setdefault(summary, seqdict())
-            testList, hasGroup = summaryDiffs.setdefault(filteredDiff, ([], False))
-            if test not in testList:
-                testList.append(test)
-            if len(testList) > 1 and not hasGroup:
-                hasGroup = True
-                summaryDiffs[filteredDiff] = (testList, hasGroup)
-            if hasGroup:
-                group = summaryDiffs.index(filteredDiff) + 1
-                fileClass.append("Group " + str(group))
+            freeText = fileComp.getFreeTextBody()
+            if freeText.count("\n") < maxLengthForGrouping:
+                filteredDiff = self.filterDiff(test, freeText)
+                summaryDiffs = self.diffStore.setdefault(summary, seqdict())
+                testList, hasGroup = summaryDiffs.setdefault(filteredDiff, ([], False))
+                if test not in testList:
+                    testList.append(test)
+                if len(testList) > 1 and not hasGroup:
+                    hasGroup = True
+                    summaryDiffs[filteredDiff] = (testList, hasGroup)
+                if hasGroup:
+                    group = summaryDiffs.index(filteredDiff) + 1
+                    fileClass.append("Group " + str(group))
+
             self.diag.info("Adding file classification for " + repr(fileComp) + " = " + repr(fileClass))
             classifiers.addClassification(fileClass)
 

@@ -7,6 +7,7 @@ from glob import glob
 from stat import *
 from ndict import seqdict
 from locale import getdefaultlocale
+from TreeViewTooltips import TreeViewTooltips
 
 try:
     import gtk, gobject, entrycompletion
@@ -72,6 +73,21 @@ class Utf8Converter:
 
 def convertToUtf8(text): # gtk.TextViews insist we do the conversion ourselves
     return Utf8Converter().convert(text)
+
+class RefreshTips(TreeViewTooltips):
+    def __init__(self, name, refreshColumn, refreshIndex):
+        TreeViewTooltips.__init__(self)
+        self.name = name
+        self.refreshColumn = refreshColumn
+        self.refreshIndex = refreshIndex
+
+    def get_tooltip(self, view, column, path): #pragma : no cover - can't test tooltips (future?)
+        if column is self.refreshColumn:
+            model = view.get_model()
+            refreshIcon = model[path][self.refreshIndex]
+            if refreshIcon:
+                return "Indicates that this " + self.name + "'s saved result has changed since the status was calculated. " + \
+                       "It's therefore recommended to recompute the status."
 
 
 class GUIConfig:
@@ -332,6 +348,26 @@ class SubGUI(plugins.Observable):
             window.add_with_viewport(widget)
         else:
             window.add(widget)
+
+
+# base class for managing containers
+class ContainerGUI(SubGUI):
+    def __init__(self, subguis):
+        SubGUI.__init__(self)
+        self.subguis = subguis
+
+    def forceVisible(self, rowCount):
+        return reduce(operator.or_, (subgui.forceVisible(rowCount) for subgui in self.subguis))
+
+    def shouldShow(self):
+        return reduce(operator.or_, (subgui.shouldShow() for subgui in self.subguis))
+
+    def shouldShowCurrent(self, *args):
+        return reduce(operator.and_, (subgui.shouldShowCurrent(*args) for subgui in self.subguis))
+
+    def getGroupTabTitle(self):
+        return self.subguis[0].getGroupTabTitle()
+
 
 class GtkActionWrapper:
     def __init__(self):

@@ -1,6 +1,9 @@
-#!/usr/bin/env python
 
-# GUI for TextTest written with PyGTK
+"""
+GUI for TextTest written with PyGTK. Formerly known as texttestgui.py
+Contains the main control code and is the only point of contact with the core framework
+"""
+
 # First make sure we can import the GUI modules: if we can't, throw appropriate exceptions
 
 import texttest_version
@@ -78,7 +81,7 @@ class IdleHandlerManager:
         self.disableHandler()
 
 
-class TextTestGUI(plugins.Responder, plugins.Observable):
+class GUIController(plugins.Responder, plugins.Observable):
     scriptEngine = None
     def __init__(self, optionMap, allApps):
         vanilla = optionMap.has_key("vanilla")

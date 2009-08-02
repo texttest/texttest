@@ -318,9 +318,9 @@ class Config:
         else:
             return []
     def addGuiResponder(self, classes, scriptEngine):
-        from gtkgui.texttestgui import TextTestGUI
-        TextTestGUI.scriptEngine = scriptEngine
-        classes.append(TextTestGUI)
+        from gtkgui.controller import GUIController
+        GUIController.scriptEngine = scriptEngine
+        classes.append(GUIController)
     def getReconnectSequence(self):
         actions = [ self.reconnectConfig.getReconnectAction() ]
         actions += [ rundependent.FilterOriginal(), rundependent.FilterTemporary(), \

@@ -1,16 +1,11 @@
 
-import guiplugins, guiutils, plugins, os, sys, shutil, time, subprocess, operator, types, logging
+import gtk, helpdialogs, guiplugins, guiutils, plugins, os, sys, shutil, time, subprocess, operator, types, logging
 from copy import copy, deepcopy
 from threading import Thread
 from glob import glob
 from stat import *
 from ndict import seqdict
 from string import Template
-
-try:
-    import gtk, helpdialogs
-except ImportError:
-    pass # don't fail on scripts : we should already have imported it anyway
 
 
 class Quit(guiplugins.BasicActionGUI):
@@ -2681,45 +2676,8 @@ class InteractiveActionConfig:
                    self.contains(className, self.getInteractiveActionClasses(False))
 
     def getColourDictionary(self):
-        dict = {}
-        dict["default"] = "red"
-        dict["success"] = "green"
-        dict["failure"] = "red"
-        dict["running"] = "yellow"
-        dict["not_started"] = "white"
-        dict["pending"] = "white"
-        dict["static"] = "grey90"
-        dict["marked"] = "orange"
-        return dict
-
+        return guiutils.GUIConfig.getDefaultColours()
+        
     def getDefaultAccelerators(self):
-        dict = {}
-        dict["quit"] = "<control>q"
-        dict["select"] = "<control>s"
-        dict["filter"] = "<control>f"
-        dict["save"] = "<control>s"
-        dict["save_as"] = "<control><alt>s"
-        dict["copy"] = "<control>c"
-        dict["kill"] = "<control>Delete"
-        dict["remove"] = "<control>Delete"
-        dict["cut"] = "<control>x"
-        dict["paste"] = "<control>v"
-        dict["save_selection"] = "<control>d"
-        dict["load_selection"] = "<control><shift>o"
-        dict["reset"] = "<control>e"
-        dict["reconnect"] = "<control><shift>r"
-        dict["run"] = "<control>r"
-        dict["rename"] = "<control>m"
-        dict["refresh"] = "F5"
-        dict["record_use-case"] = "F9"
-        dict["recompute_status"] = "F5"
-        dict["add_test"] = "<control>n"
-        dict["enter_failure_information"] = "<control>i"
-        dict["move_down"] = "<control>Page_Down"
-        dict["move_up"] = "<control>Page_Up"
-        dict["move_to_first"] = "<control>Home"
-        dict["move_to_last"] = "<control>End"
-        dict["mark"] = "<control><shift>m"
-        dict["unmark"] = "<control><shift>u"
-        return dict
+        return guiutils.GUIConfig.getDefaultAccelerators()
 

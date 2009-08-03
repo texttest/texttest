@@ -1,18 +1,12 @@
 
 
-import guiutils, plugins, os, sys, shutil, time, subprocess, operator, types, logging
+import gtk, gobject, guiutils, entrycompletion, plugins, os, sys, shutil, time, subprocess, operator, types, logging
 from jobprocess import killSubProcessAndChildren
 from copy import copy, deepcopy
 from glob import glob
 from stat import *
 from ndict import seqdict
-from locale import getdefaultlocale
-    
-try:
-    import gtk, gobject, entrycompletion
-except ImportError:
-    pass # We might want to document the config entries, silly to fail on lack of GTK...
-    
+        
 # The purpose of this class is to provide a means to monitor externally
 # started process, so that (a) code can be called when they exit, and (b)
 # they can be terminated when TextTest is terminated.

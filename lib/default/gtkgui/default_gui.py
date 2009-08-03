@@ -2736,10 +2736,3 @@ class InteractiveActionConfig:
         dict["unmark"] = "<control><shift>u"
         return dict
 
-class DocumentGUIConfig(plugins.Action):
-    def setUpApplication(self, app):
-        guiConfig = guiplugins.GUIConfig(False, [ app ], None)
-        for key in sorted(guiConfig.configDir.keys()):
-            docOutput = guiConfig.configDocs[key]
-            value = guiConfig.configDir[key]
-            print key + "|" + str(value) + "|" + docOutput

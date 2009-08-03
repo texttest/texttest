@@ -125,6 +125,9 @@ class BasicActionGUI(guiutils.SubGUI,GtkActionWrapper):
         GtkActionWrapper.__init__(self)
         self.topWindow = None
 
+    def checkValid(self, app):
+        pass
+
     def notifyTopWindow(self, window):
         self.topWindow = window
 
@@ -330,16 +333,14 @@ class ActionGUI(BasicActionGUI):
         self.noApps = len(allApps) == 0
         BasicActionGUI.__init__(self)
         for app in allApps:
-            self.checkValid(app)
-            
-    def addSuites(self, suites):
-        oldActive = self.isActiveOnCurrent()
-        for suite in suites:
-            if suite.app not in self.validApps and interactiveActionHandler.classValid(self.__class__, suite.app):
-                self.checkValid(suite.app)
-        self.noApps = len(suites) == 0
-            
+            self._checkValid(app)
+
     def checkValid(self, app):
+        if app not in self.validApps:
+            self._checkValid(app)
+        self.noApps = len(self.validApps) == 0
+                        
+    def _checkValid(self, app):
         if self.isValidForApp(app):
             self.validApps.append(app)
             self.validApps += app.extras
@@ -900,213 +901,3 @@ class ActionDialogGUI(OptionGroupGUI):
         
 
 
-class MultiActionGUIForwarder(GtkActionWrapper):
-    def __init__(self, actionGUIs):
-        self.actionGUIs = actionGUIs
-        GtkActionWrapper.__init__(self)
-            
-    def setObservers(self, observers):
-        for actionGUI in self.actionGUIs:
-            actionGUI.setObservers(observers)
-            
-    def addToGroups(self, *args):
-        for actionGUI in self.actionGUIs:
-            actionGUI.addToGroups(*args)
-        GtkActionWrapper.addToGroups(self, *args)
-        
-    def notifyNewTestSelection(self, *args):
-        if not hasattr(self.actionGUIs[0], "notifyNewTestSelection"):
-            return
-        
-        newActive = False
-        for actionGUI in self.actionGUIs:
-            if actionGUI.updateSelection(*args):
-                newActive = True
-
-        self.setSensitivity(newActive)
-
-    def notifyTopWindow(self, *args):
-        for actionGUI in self.actionGUIs:
-            actionGUI.notifyTopWindow(*args)
-
-    def addSuites(self, suites):
-        for actionGUI in self.actionGUIs:
-            if hasattr(actionGUI, "addSuites"):
-                actionGUI.addSuites(suites)
-    
-    def runInteractive(self, *args):
-        # otherwise it only gets computed once...
-        actionGUI = self.findActiveActionGUI()
-        self.diag.info("Forwarder executing " + str(actionGUI.__class__))
-        actionGUI.runInteractive(*args)
-        
-    def __getattr__(self, name):
-        actionGUI = self.findActiveActionGUI()
-        self.diag.info("Forwarding " + name + " to " + str(actionGUI.__class__))
-        return getattr(actionGUI, name)
-
-    def findActiveActionGUI(self):
-        for actionGUI in self.actionGUIs:
-            if actionGUI.allAppsValid():
-                return actionGUI
-        return self.actionGUIs[0]
-        
-
-# Placeholder for all classes. Remember to add them!
-class InteractiveActionHandler:
-    def __init__(self):
-        self.diag = logging.getLogger("Interactive Actions")
-
-    def getDefaultAccelerators(self, allApps):
-        return self.joinDictionaries(allApps, lambda x: x.getDefaultAccelerators())
-
-    def getColourDictionary(self, allApps):
-        return self.joinDictionaries(allApps, lambda x: x.getColourDictionary())
-
-    def joinDictionaries(self, allApps, method):
-        dict = {}
-        for config in self.getAllIntvConfigs(allApps):
-            dict.update(method(config))
-        return dict
-
-    def getMenuNames(self, allApps):
-        return reduce(set.union, (c.getMenuNames() for c in self.getAllIntvConfigs(allApps)), set())
-    
-    def getAllIntvConfigs(self, allApps):
-        return self.getAllConfigs(allApps, self.getExplicitConfigModule) + \
-               self.getAllConfigs(allApps, self.getVcsModule)
-
-    def getAllConfigs(self, allApps, getModule):
-        configs = []
-        modules = set()
-        for app in allApps:
-            module, extraArgs = getModule(app)
-            if module and module not in modules:
-                modules.add(module)
-                config = self._getIntvActionConfig(module, *extraArgs)
-                if config:
-                    configs.append(config)
-        if len(configs) == 0:
-            defaultModule, extraArgs = getModule()
-            if defaultModule:
-                defaultConfig = self._getIntvActionConfig(defaultModule, *extraArgs)
-                if defaultConfig:
-                    return [ defaultConfig ]
-                else:
-                    return []
-        return configs                                
-    
-    def getPluginGUIs(self, dynamic, allApps, uiManager):
-        instances = self.getInstances(dynamic, allApps)
-        defaultGUIs, actionTabGUIs = [], []
-        for action in instances:
-            if action.displayInTab():
-                self.diag.info("Tab: " + str(action.__class__))
-                actionTabGUIs.append(action)
-            else:
-                self.diag.info("Menu/toolbar: " + str(action.__class__))
-                defaultGUIs.append(action)
-
-        actionGroup = gtk.ActionGroup("AllActions")
-        uiManager.insert_action_group(actionGroup, 0)
-        accelGroup = uiManager.get_accel_group()
-        for actionGUI in defaultGUIs + actionTabGUIs:
-            actionGUI.addToGroups(actionGroup, accelGroup)
-
-        return defaultGUIs, actionTabGUIs
-
-    def getExplicitConfigModule(self, app=None):
-        if app:
-            module = app.getConfigValue("interactive_action_module")
-            if module == "cvs": # for back compatibility...
-                return "default_gui", ()
-            else:
-                return module, ()
-        else:
-            return "default_gui", ()
-
-    def getVcsModule(self, app=None):
-        if app:
-            return self._getVcsModule(app.getDirectory())
-        else:
-            return self._getVcsModule(os.getenv("TEXTTEST_HOME"))
-
-    def _getVcsModule(self, directory):
-        for dir in [ directory, os.path.dirname(directory) ]:
-            for controlDirName in plugins.controlDirNames:
-                controlDir = os.path.join(dir, controlDirName)
-                if os.path.isdir(controlDir):
-                    return controlDirName.lower().replace(".", ""), (controlDir,)
-        return None, ()
-    
-    def _getIntvActionConfig(self, module, *args):
-        try:
-            exec "from " + module + " import InteractiveActionConfig"
-            return InteractiveActionConfig(*args)
-        except ImportError:
-            if module == "default_gui":
-                raise
-        
-    def getInstances(self, dynamic, allApps):
-        instances = []
-        classNames = []
-        for config in self.getAllIntvConfigs(allApps):
-            instances += self.getInstancesFromConfig(config, dynamic, allApps, classNames)
-        return instances
-
-    def getInstancesFromConfig(self, config, dynamic, allApps, classNames=[]):
-        instances = []
-        for className in config.getInteractiveActionClasses(dynamic):
-            if className not in classNames:
-                self.diag.info("Making instances for " + repr(className))
-                allClasses = self.findAllClasses(className, allApps, dynamic)
-                subinstances = self.makeAllInstances(allClasses, dynamic)
-                if len(subinstances) == 1:
-                    instances.append(subinstances[0])
-                else:
-                    showable = filter(lambda x: x.shouldShow(), subinstances)
-                    if len(showable) == 1:
-                        instances.append(showable[0])
-                    else:
-                        instances.append(MultiActionGUIForwarder(subinstances))
-                classNames.append(className)
-        return instances
-    
-    def makeAllInstances(self, allClasses, dynamic):
-        instances = []
-        for classToUse, relevantApps in allClasses:
-            instances.append(self.tryMakeInstance(classToUse, relevantApps, dynamic))
-        return instances
-
-    def findAllClasses(self, className, allApps, dynamic):
-        if len(allApps) == 0:
-            return [ (className, []) ]
-        else:
-            classNames = seqdict()
-            for app in allApps:
-                replacements = self.joinDictionaries([ app ], lambda x: x.getReplacements())
-                for config in self.getAllIntvConfigs([ app ]):
-                    if className in config.getInteractiveActionClasses(dynamic):
-                        realClassName = replacements.get(className, className)
-                        classNames.setdefault(realClassName, []).append(app)
-            return classNames.items()
-    
-    def tryMakeInstance(self, className, apps, dynamic):
-        # Basically a workaround for crap error message with variable className from python...
-        try:
-            instance = className(apps, dynamic)
-            self.diag.info("Creating " + str(instance.__class__.__name__) + " instance for " + repr(apps))
-            return instance
-        except:
-            # If some invalid interactive action is provided, need to know which
-            sys.stderr.write("Error with interactive action " + str(className) + "\n")
-            raise
-
-    def classValid(self, className, app):
-        for config in self.getAllIntvConfigs([ app ]):
-            if not config.isValid(className):
-                return False
-        return True
-        
-        
-interactiveActionHandler = InteractiveActionHandler()

@@ -423,7 +423,6 @@ class ViewConfigFileInEditor(ViewInEditor):
         return "View In Editor"
 
     def addSuites(self, suites):
-        ViewInEditor.addSuites(self, suites)
         self.rootTestSuites += suites
 
     def isActiveOnCurrent(self, *args):
@@ -1127,10 +1126,6 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         self.appKeys = set(self.optionGroup.keys())
         self.appKeys.difference_update(excludeKeys)
 
-    def addSuites(self, suites):
-        guiplugins.ActionTabGUI.addSuites(self, suites)
-        AllTestsHandler.addSuites(self, suites)
-
     def addToGroups(self, actionGroup, accelGroup):
         guiplugins.ActionTabGUI.addToGroups(self, actionGroup, accelGroup)
         self.filterAccel = self._addToGroups("Filter", self.filterAction, actionGroup, accelGroup)
@@ -1368,9 +1363,6 @@ class HideSelected(guiplugins.ActionGUI,AllTestsHandler):
     def __init__(self, *args):
         guiplugins.ActionGUI.__init__(self, *args)
         AllTestsHandler.__init__(self)
-    def addSuites(self, suites):
-        guiplugins.ActionGUI.addSuites(self, suites)
-        AllTestsHandler.addSuites(self, suites)
     def _getTitle(self):
         return "Hide selected"
     def messageBeforePerform(self):
@@ -1387,9 +1379,6 @@ class HideUnselected(guiplugins.ActionGUI,AllTestsHandler):
     def __init__(self, *args):
         guiplugins.ActionGUI.__init__(self, *args)
         AllTestsHandler.__init__(self)
-    def addSuites(self, suites):
-        guiplugins.ActionGUI.addSuites(self, suites)
-        AllTestsHandler.addSuites(self, suites)
     def _getTitle(self):
         return "Show only selected"
     def messageBeforePerform(self):
@@ -1469,7 +1458,6 @@ class SaveSelection(guiplugins.ActionDialogGUI):
         self.dynamic = dynamic
         self.rootTestSuites = []
     def addSuites(self, suites):
-        guiplugins.ActionDialogGUI.addSuites(self, suites)
         self.rootTestSuites += suites
     def _getStockId(self):
         return "save-as"
@@ -1534,7 +1522,6 @@ class LoadSelection(guiplugins.ActionDialogGUI):
         self.rootTestSuites = []
 
     def addSuites(self, suites):
-        guiplugins.ActionDialogGUI.addSuites(self, suites)
         self.rootTestSuites += suites
     def isActiveOnCurrent(self, *args):
         return True

@@ -7,7 +7,6 @@ from glob import glob
 from stat import *
 from ndict import seqdict
 from locale import getdefaultlocale
-from TreeViewTooltips import TreeViewTooltips
 
 try:
     import gtk, gobject, entrycompletion
@@ -74,20 +73,46 @@ class Utf8Converter:
 def convertToUtf8(text): # gtk.TextViews insist we do the conversion ourselves
     return Utf8Converter().convert(text)
 
-class RefreshTips(TreeViewTooltips):
-    def __init__(self, name, refreshColumn, refreshIndex):
-        TreeViewTooltips.__init__(self)
-        self.name = name
-        self.refreshColumn = refreshColumn
-        self.refreshIndex = refreshIndex
 
-    def get_tooltip(self, view, column, path): #pragma : no cover - can't test tooltips (future?)
-        if column is self.refreshColumn:
-            model = view.get_model()
-            refreshIcon = model[path][self.refreshIndex]
-            if refreshIcon:
-                return "Indicates that this " + self.name + "'s saved result has changed since the status was calculated. " + \
-                       "It's therefore recommended to recompute the status."
+class RefreshTips:
+    def __init__(self, name, refreshCell, refreshColumn, refreshIndex):
+        self.name = name
+        self.refreshIndex = refreshIndex
+        self.refreshColumn = refreshColumn
+        self.refreshCell = refreshCell
+
+    def hasRefreshIcon(self, view, path):
+        model = view.get_model()
+        if isinstance(model, gtk.TreeModelFilter):
+            childPath = model.convert_path_to_child_path(path)
+            return model.get_model()[path][self.refreshIndex]
+        else:
+            return model[path][self.refreshIndex]
+
+    def getTooltip(self, view, widget_x, widget_y, keyboard_mode, tooltip): 
+        x, y = view.convert_widget_to_tree_coords(widget_x, widget_y)
+        pathInfo = view.get_path_at_pos(x, y)
+        if pathInfo is None:
+            return False
+        
+        path, column, cell_x, cell_y = pathInfo
+        if column is not self.refreshColumn or not self.hasRefreshIcon(view, path):
+            return False
+
+        cell_pos, cell_size = column.cell_get_position(self.refreshCell)
+        if cell_x > cell_pos:
+            tooltip.set_text("Indicates that this " + self.name + "'s saved result has changed since the status was calculated. " + \
+                             "It's therefore recommended to recompute the status.")
+            return True
+        else:
+            return False
+
+
+def addRefreshTips(view, *args):
+    if gtk.gtk_version >= (2, 12, 0): # Tree view tooltips don't exist prior to this version
+        view.set_property("has-tooltip", True)
+        refreshTips = RefreshTips(*args)
+        view.connect("query-tooltip", refreshTips.getTooltip)
 
 
 class GUIConfig:

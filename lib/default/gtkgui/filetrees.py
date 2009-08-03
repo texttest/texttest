@@ -87,11 +87,10 @@ class FileViewGUI(guiplugins.SubGUI):
         self.nameColumn.set_cell_data_func(renderer, self.renderParentsBold)
         self.nameColumn.set_resizable(True)
         view.append_column(self.nameColumn)
-        detailsColumn = self.makeDetailsColumn()
+        detailsColumn, recalcRenderer = self.makeDetailsColumn()
         if detailsColumn:
             view.append_column(detailsColumn)
-            self.tips = guiplugins.RefreshTips("file", detailsColumn, 5)
-            self.tips.add_view(view)
+            guiplugins.addRefreshTips(view, "file", recalcRenderer, detailsColumn, 5)
 
         view.expand_all()
         self.monitorEvents()
@@ -125,7 +124,9 @@ class FileViewGUI(guiplugins.SubGUI):
             column.add_attribute(renderer, 'text', 4)
             column.add_attribute(renderer, 'background', 1)
             column.add_attribute(recalcRenderer, 'stock_id', 5)
-            return column
+            return column, recalcRenderer
+        else:
+            return None, None
 
     def fileActivated(self, view, path, column, *args):
         iter = self.model.get_iter(path)

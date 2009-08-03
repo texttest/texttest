@@ -269,8 +269,7 @@ class TestTreeGUI(guiplugins.ContainerGUI):
             detailsColumn.add_attribute(detailsRenderer, 'background', 4)
             detailsColumn.add_attribute(recalcRenderer, 'stock_id', 6)
             detailsColumn.set_resizable(True)
-            self.tips = guiplugins.RefreshTips("test", detailsColumn, 6)
-            self.tips.add_view(self.treeView)
+            guiplugins.addRefreshTips(self.treeView, "test", recalcRenderer, detailsColumn, 6)
             self.treeView.append_column(detailsColumn)
 
         guiplugins.scriptEngine.monitorExpansion(self.treeView, "show test suite", "hide test suite")

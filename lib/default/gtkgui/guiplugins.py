@@ -1,286 +1,17 @@
 
 
-import plugins, os, sys, shutil, time, subprocess, operator, types, logging
+import guiutils, plugins, os, sys, shutil, time, subprocess, operator, types, logging
 from jobprocess import killSubProcessAndChildren
 from copy import copy, deepcopy
 from glob import glob
 from stat import *
 from ndict import seqdict
 from locale import getdefaultlocale
-
+    
 try:
     import gtk, gobject, entrycompletion
 except ImportError:
     pass # We might want to document the config entries, silly to fail on lack of GTK...
-
-guilog, guiConfig, scriptEngine = None, None, None
-
-
-# gtk.accelerator_valid appears utterly broken on Windows
-def windowsAcceleratorValid(key, mod):
-    name = gtk.accelerator_name(key, mod)
-    return len(name) > 0 and name != "VoidSymbol"
-
-if os.name == "nt":
-    gtk.accelerator_valid = windowsAcceleratorValid
-
-class Utf8Converter:
-    def convert(self, text):
-        unicodeInfo = self.decodeText(text)
-        return self.encodeText(unicodeInfo)
-
-    def decodeText(self, text):
-        encodings = self.getEncodings()
-        for ix, encoding in enumerate(encodings):
-            try:
-                unicodeInfo = unicode(text, encoding, errors="strict")
-                if ix > 0:
-                    guilog.info("WARNING: Failed to decode string '" + text + \
-                                "' using encoding(s) " + " and ".join(encodings[:ix]) + \
-                                ". Encoded using " + encoding + " instead.")
-                return unicodeInfo
-            except:
-                pass
-        guilog.info("WARNING: Failed to decode string '" + text + \
-                    "' using strict encodings " + " and ".join(encodings) + \
-                    ".\nReverting to non-strict UTF-8 encoding but " + \
-                    "replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
-        return unicode(text, 'utf-8', errors="replace")
-
-    def getEncodings(self):
-        encodings = [ 'ISO8859-1', 'utf-8' ]
-        localeEncoding = getdefaultlocale()[1]
-        if localeEncoding and not localeEncoding in encodings:
-            encodings.insert(0, localeEncoding)
-        return encodings
-
-    def encodeText(self, unicodeInfo):
-        try:
-            return unicodeInfo.encode('utf-8', 'strict')
-        except:
-            try:
-                guilog.info("WARNING: Failed to encode Unicode string '" + unicodeInfo + \
-                             "' using strict UTF-8 encoding.\nReverting to non-strict UTF-8 " + \
-                             "encoding but replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
-                return unicodeInfo.encode('utf-8', 'replace')
-            except:
-                guilog.info("WARNING: Failed to encode Unicode string '" + unicodeInfo + \
-                            "' using both strict UTF-8 encoding and UTF-8 encoding with " + \
-                            "replacement. Showing error message instead.")
-                return "Failed to encode Unicode string."
-
-
-def convertToUtf8(text): # gtk.TextViews insist we do the conversion ourselves
-    return Utf8Converter().convert(text)
-
-
-class RefreshTips:
-    def __init__(self, name, refreshCell, refreshColumn, refreshIndex):
-        self.name = name
-        self.refreshIndex = refreshIndex
-        self.refreshColumn = refreshColumn
-        self.refreshCell = refreshCell
-
-    def hasRefreshIcon(self, view, path):
-        model = view.get_model()
-        if isinstance(model, gtk.TreeModelFilter):
-            childPath = model.convert_path_to_child_path(path)
-            return model.get_model()[path][self.refreshIndex]
-        else:
-            return model[path][self.refreshIndex]
-
-    def getTooltip(self, view, widget_x, widget_y, keyboard_mode, tooltip): 
-        x, y = view.convert_widget_to_tree_coords(widget_x, widget_y)
-        pathInfo = view.get_path_at_pos(x, y)
-        if pathInfo is None:
-            return False
-        
-        path, column, cell_x, cell_y = pathInfo
-        if column is not self.refreshColumn or not self.hasRefreshIcon(view, path):
-            return False
-
-        cell_pos, cell_size = column.cell_get_position(self.refreshCell)
-        if cell_x > cell_pos:
-            tooltip.set_text("Indicates that this " + self.name + "'s saved result has changed since the status was calculated. " + \
-                             "It's therefore recommended to recompute the status.")
-            return True
-        else:
-            return False
-
-
-def addRefreshTips(view, *args):
-    if gtk.gtk_version >= (2, 12, 0): # Tree view tooltips don't exist prior to this version
-        view.set_property("has-tooltip", True)
-        refreshTips = RefreshTips(*args)
-        view.connect("query-tooltip", refreshTips.getTooltip)
-
-
-class GUIConfig:
-    def __init__(self, dynamic, allApps, entryCompletionLogger):
-        self.apps = copy(allApps)
-        self.dynamic = dynamic
-        self.configDir = plugins.MultiEntryDictionary()
-        self.configDocs = {}
-        self.setConfigDefaults()
-        self.configDir.readValues(self.getAllPersonalConfigFiles(), insert=0, errorOnUnknown=0)
-
-        self.hiddenCategories = map(self.getConfigName, self.configDir.get("hide_test_category"))
-        self.colourDict = self.makeColourDictionary()
-        if entryCompletionLogger:
-            self.setUpEntryCompletion(entryCompletionLogger)
-
-    def getAllPersonalConfigFiles(self):
-        allPersonalFiles = []
-        for app in self.apps:
-            for fileName in app.getPersonalConfigFiles():
-                if not fileName in allPersonalFiles:
-                    allPersonalFiles.append(fileName)
-        return allPersonalFiles
-    
-    def addSuites(self, suites):
-        fullNames = [ app.fullName() for app in self.apps ]
-        for suite in suites:
-            if suite.app.fullName() not in fullNames:
-                self.apps.append(suite.app)
-
-    def makeColourDictionary(self):
-        dict = {}
-        for key, value in self.configDir.get("test_colours").items():
-            dict[self.getConfigName(key)] = value
-        return dict
-
-    def setConfigDefaults(self):
-        colourDict = interactiveActionHandler.getColourDictionary(self.apps)
-        self.setConfigDefault("static_collapse_suites", 0, "Whether or not the static GUI will show everything collapsed")
-        self.setConfigDefault("test_colours", colourDict, "Colours to use for each test state")
-        self.setConfigDefault("file_colours", copy(colourDict), "Colours to use for each file state")
-        self.setConfigDefault("auto_collapse_successful", 1, "Automatically collapse successful test suites?")
-        self.setConfigDefault("window_size", self.getWindowSizeSettings(), "To set the initial size of the dynamic/static GUI.")
-        self.setConfigDefault("hide_gui_element", self.getDefaultHideWidgets(), "List of widgets to hide by default")
-        self.setConfigDefault("hide_test_category", [], "Categories of tests which should not appear in the dynamic GUI test view")
-        self.setConfigDefault("query_kill_processes", { "default" : [] }, "Ask about whether to kill these processes when exiting texttest.")
-        self.setConfigDefault("gui_accelerators", interactiveActionHandler.getDefaultAccelerators(self.apps), "Custom action accelerators.")        
-        self.setConfigDefault("gui_entry_completion_matching", 1, "Which matching type to use for entry completion. 0 means turn entry completions off, 1 means match the start of possible completions, 2 means match any part of possible completions")
-        self.setConfigDefault("gui_entry_completion_inline", 0, "Automatically inline common completion prefix in entry.")
-        self.setConfigDefault("gui_entry_completions", { "default" : [] }, "Add these completions to the entry completion lists initially")
-        self.setConfigDefault("sort_test_suites_recursively", 1, "Sort subsuites when sorting test suites")
-        
-    def setConfigDefault(self, key, value, docString):
-        self.configDir[key] = value
-        self.configDocs[key] = docString
-
-    def setUpEntryCompletion(self, entryCompletionLogger):
-        matching = self.configDir.get("gui_entry_completion_matching")
-        if matching != 0:
-            inline = self.configDir.get("gui_entry_completion_inline")
-            completions = self.getCompositeValue("gui_entry_completions", "", modeDependent=True)
-            entrycompletion.manager.start(matching, inline, completions, entryCompletionLogger)
-    def _simpleValue(self, app, entryName):
-        return app.getConfigValue(entryName)
-    def _compositeValue(self, app, *args, **kwargs):
-        return app.getCompositeConfigValue(*args, **kwargs)
-    def _getFromApps(self, method, *args, **kwargs):
-        prevValue = None
-        for app in self.apps:
-            currValue = method(app, *args, **kwargs)
-            toUse = self.chooseValueFrom(prevValue, currValue)
-            if toUse is None and prevValue is not None:
-                plugins.printWarning("GUI configuration '" + "::".join(args) +\
-                                     "' differs between applications, ignoring that from " + repr(app) + "\n" + \
-                                     "Value was " + repr(currValue) + ", change from " + repr(prevValue))
-            else:
-                prevValue = toUse
-        return prevValue
-    def chooseValueFrom(self, value1, value2):
-        if value1 is None or value1 == value2:
-            return value2
-        if value2 is None:
-            return value1
-        if type(value1) == types.ListType:
-            return self.createUnion(value1, value2)
-
-    def createUnion(self, list1, list2):
-        result = []
-        result += list1
-        for entry in list2:
-            if not entry in list1:
-                result.append(entry)
-        return result
-    
-    def getModeName(self):
-        if self.dynamic:
-            return "dynamic"
-        else:
-            return "static"
-    def getConfigName(self, name, modeDependent=False):
-        formattedName = name.lower().replace(" ", "_").replace(":", "_")
-        if modeDependent:
-            if len(name) > 0:
-                return self.getModeName() + "_" + formattedName
-            else:
-                return self.getModeName()
-        else:
-            return formattedName
-        
-    def getValue(self, entryName, modeDependent=False):
-        nameToUse = self.getConfigName(entryName, modeDependent)
-        guiValue = self.configDir.get(nameToUse)
-        if guiValue is not None:
-            return guiValue
-        else:
-            return self._getFromApps(self._simpleValue, nameToUse)
-    def getCompositeValue(self, sectionName, entryName, modeDependent=False, defaultKey="default"):
-        nameToUse = self.getConfigName(entryName, modeDependent)
-        value = self.configDir.getComposite(sectionName, nameToUse, defaultKey)
-        if value is None:
-            value = self._getFromApps(self._compositeValue, sectionName, nameToUse, defaultKey=defaultKey)
-        if modeDependent and value is None:
-            return self.getCompositeValue(sectionName, entryName)
-        else:
-            return value
-    def getWindowOption(self, name):
-        return self.getCompositeValue("window_size", name, modeDependent=True)
-    def showCategoryByDefault(self, category, parentHidden=False):
-        if self.dynamic:
-            if parentHidden:
-                return False
-            nameToUse = self.getConfigName(category)
-            if nameToUse in self.hiddenCategories:
-                return False
-            else:
-                return True
-        else:
-            return False    
-    def getTestColour(self, category, fallback=None):
-        if self.dynamic:
-            nameToUse = self.getConfigName(category)
-            if self.colourDict.has_key(nameToUse):
-                return self.colourDict[nameToUse]
-            elif fallback:
-                return fallback
-            else:
-                return self.colourDict.get("failure")
-        else:
-            return self.colourDict.get("static")
-
-    def getWindowSizeSettings(self):
-        dict = {}
-        dict["maximize"] = 0
-        dict["horizontal_separator_position"] = 0.46
-        dict["vertical_separator_position"] = 0.5
-        dict["height_pixels"] = "<not set>"
-        dict["width_pixels"] = "<not set>"
-        dict["height_screen"] = float(5.0) / 6
-        dict["width_screen"] = 0.6
-        return dict
-    
-    def getDefaultHideWidgets(self):
-        dict = {}
-        dict["status_bar"] = 0
-        dict["toolbar"] = 0
-        dict["shortcut_bar"] = 0
-        return dict
-    
     
 # The purpose of this class is to provide a means to monitor externally
 # started process, so that (a) code can be called when they exit, and (b)
@@ -291,7 +22,7 @@ class ProcessTerminationMonitor(plugins.Observable):
         self.processes = seqdict()
 
     def listRunningProcesses(self):
-        processesToCheck = guiConfig.getCompositeValue("query_kill_processes", "", modeDependent=True)
+        processesToCheck = guiutils.guiConfig.getCompositeValue("query_kill_processes", "", modeDependent=True)
         if "all" in processesToCheck:
             processesToCheck = [ ".*" ]
         if len(processesToCheck) == 0:
@@ -331,67 +62,10 @@ class ProcessTerminationMonitor(plugins.Observable):
         self.notify("Status", "Terminating all external viewers ...")
         for process, description, exitHandler, exitHandlerArgs in self.processes.values():
             self.notify("ActionProgress", "")
-            guilog.info("Killing '" + description + "' interactive process")
+            guiutils.guilog.info("Killing '" + description + "' interactive process")
             killSubProcessAndChildren(process, sig)
         
 processMonitor = ProcessTerminationMonitor()
-
-
-# base class for all "GUI" classes which manage parts of the display
-class SubGUI(plugins.Observable):
-    def __init__(self):
-        plugins.Observable.__init__(self)
-        self.widget = None
-    
-    def createView(self):
-        pass
-
-    def shouldShow(self):
-        return True # should this be shown/created at all this run
-
-    def shouldShowCurrent(self, *args):
-        return True # should this be shown or hidden in the current context?
-
-    def getTabTitle(self):
-        return "Need Title For Tab!"
-
-    def getGroupTabTitle(self):
-        return "Test"
-
-    def forceVisible(self, rowCount):
-        return False
-
-    def addScrollBars(self, view, hpolicy):
-        window = gtk.ScrolledWindow()
-        window.set_policy(hpolicy, gtk.POLICY_AUTOMATIC)
-        self.addToScrolledWindow(window, view)
-        window.show()
-        return window
-
-    def addToScrolledWindow(self, window, widget):
-        if isinstance(widget, gtk.VBox):
-            window.add_with_viewport(widget)
-        else:
-            window.add(widget)
-
-
-# base class for managing containers
-class ContainerGUI(SubGUI):
-    def __init__(self, subguis):
-        SubGUI.__init__(self)
-        self.subguis = subguis
-
-    def forceVisible(self, rowCount):
-        return reduce(operator.or_, (subgui.forceVisible(rowCount) for subgui in self.subguis))
-
-    def shouldShow(self):
-        return reduce(operator.or_, (subgui.shouldShow() for subgui in self.subguis))
-
-    def shouldShowCurrent(self, *args):
-        return reduce(operator.and_, (subgui.shouldShowCurrent(*args) for subgui in self.subguis))
-
-    def getGroupTabTitle(self):
-        return self.subguis[0].getGroupTabTitle()
 
 
 class GtkActionWrapper:
@@ -402,12 +76,12 @@ class GtkActionWrapper:
         actionName = self.getTitle(includeMnemonics=False)
         self.gtkAction = gtk.Action(actionName, title, \
                                     self.getTooltip(), self.getStockId())
-        scriptEngine.connect(self.getTooltip(), "activate", self.gtkAction, self.runInteractive)
+        guiutils.scriptEngine.connect(self.getTooltip(), "activate", self.gtkAction, self.runInteractive)
         if not self.isActiveOnCurrent():
             self.gtkAction.set_property("sensitive", False)
 
     def getAccelerator(self, title):
-        realAcc = guiConfig.getCompositeValue("gui_accelerators", title)
+        realAcc = guiutils.guiConfig.getCompositeValue("gui_accelerators", title)
         if realAcc:
             key, mod = gtk.accelerator_parse(realAcc)
             if gtk.accelerator_valid(key, mod):
@@ -444,10 +118,10 @@ class GtkActionWrapper:
 
 # Introduce an extra level without all the selection-dependent stuff, some actions want
 # to inherit from here and it provides a separation
-class BasicActionGUI(SubGUI,GtkActionWrapper):
+class BasicActionGUI(guiutils.SubGUI,GtkActionWrapper):
     busy = False
     def __init__(self, *args):
-        SubGUI.__init__(self)
+        guiutils.SubGUI.__init__(self)
         GtkActionWrapper.__init__(self)
         self.topWindow = None
 
@@ -546,7 +220,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         dialog = self.createAlarmDialog(self.getParentWindow(), message, stockIcon, alarmLevel)
         yesButton = dialog.add_button(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT)
         dialog.set_default_response(gtk.RESPONSE_ACCEPT)
-        scriptEngine.connect("agree to texttest message", "clicked", yesButton, self.cleanDialog,
+        guiutils.scriptEngine.connect("agree to texttest message", "clicked", yesButton, self.cleanDialog,
                              gtk.RESPONSE_ACCEPT, True, dialog)
         dialog.show_all()
         
@@ -564,9 +238,9 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         dialog.set_default_response(gtk.RESPONSE_NO)
         noButton = dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
         yesButton = dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
-        scriptEngine.connect("answer no to texttest " + alarmLevel, "clicked",
+        guiutils.scriptEngine.connect("answer no to texttest " + alarmLevel, "clicked",
                              noButton, respondMethod, gtk.RESPONSE_NO, False, dialog)
-        scriptEngine.connect("answer yes to texttest " + alarmLevel, "clicked",
+        guiutils.scriptEngine.connect("answer yes to texttest " + alarmLevel, "clicked",
                              yesButton, respondMethod, gtk.RESPONSE_YES, True, dialog)
         dialog.show_all()
         
@@ -774,7 +448,7 @@ class ActionResultDialogGUI(ActionGUI):
     def createButtons(self):
         okButton = self.dialog.add_button(gtk.STOCK_CLOSE, gtk.RESPONSE_ACCEPT)
         self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
-        scriptEngine.connect("press close", "clicked", okButton, self.cleanDialog, gtk.RESPONSE_ACCEPT, True, self.dialog)
+        guiutils.scriptEngine.connect("press close", "clicked", okButton, self.cleanDialog, gtk.RESPONSE_ACCEPT, True, self.dialog)
 
 
 class ComboBoxListFinder:
@@ -802,7 +476,7 @@ class OptionGroupGUI(ActionGUI):
         return False     
 
     def updateForConfig(self, option):
-        fromConfig = guiConfig.getCompositeValue("gui_entry_overrides", option.name)
+        fromConfig = guiutils.guiConfig.getCompositeValue("gui_entry_overrides", option.name)
         # only do this if it hasn't previously been manually overwritten
         if fromConfig is not None and fromConfig != "<not set>" and option.getValue() == option.defaultValue:
             option.setValue(fromConfig)
@@ -820,7 +494,7 @@ class OptionGroupGUI(ActionGUI):
         optionName = option.name.strip()
         entry.set_name(optionName)
         labelEventBox = self.createLabelEventBox(option, separator)
-        scriptEngine.registerEntry(entry, "enter " + optionName + " =")
+        guiutils.scriptEngine.registerEntry(entry, "enter " + optionName + " =")
         entry.set_text(option.getValue())
         entrycompletion.manager.register(entry)
         # Options in drop-down lists don't change, so we just add them once and for all.
@@ -863,14 +537,14 @@ class OptionGroupGUI(ActionGUI):
         for index, option in enumerate(switch.options):
             cleanOption = option.split("\n")[0].replace("_", "")
             configName, useCaseName = self.getNaming(switch.name, cleanOption, optionGroup)
-            if guiConfig.getCompositeValue("gui_entry_overrides", configName) == "1":
+            if guiutils.guiConfig.getCompositeValue("gui_entry_overrides", configName) == "1":
                 switch.setValue(index)
             radioButton = gtk.RadioButton(mainRadioButton, option, use_underline=True)
             if individualToolTips:
                 self.tooltips.set_tip(radioButton, switch.description[index])
                 
             buttons.append(radioButton)
-            scriptEngine.registerToggleButton(radioButton, "choose " + useCaseName)
+            guiutils.scriptEngine.registerToggleButton(radioButton, "choose " + useCaseName)
             if not mainRadioButton:
                 mainRadioButton = radioButton
             if switch.defaultValue == index:
@@ -899,7 +573,7 @@ class OptionGroupGUI(ActionGUI):
         
         if int(switch.getValue()):
             checkButton.set_active(True)
-        scriptEngine.registerToggleButton(checkButton, "check " + switch.name, "uncheck " + switch.name)
+        guiutils.scriptEngine.registerToggleButton(checkButton, "check " + switch.name, "uncheck " + switch.name)
         switch.setMethods(checkButton.get_active, checkButton.set_active)
         checkButton.show()
         return checkButton
@@ -923,7 +597,7 @@ class OptionGroupGUI(ActionGUI):
         return box, entry
   
     def getConfigOptions(self, option):
-        fromConfig = guiConfig.getCompositeValue("gui_entry_options", option.name)
+        fromConfig = guiutils.guiConfig.getCompositeValue("gui_entry_options", option.name)
         if fromConfig is None: #Happens on initial startup with no apps...
             return []
         return fromConfig
@@ -976,7 +650,7 @@ class ActionTabGUI(OptionGroupGUI):
                 self.addValuesFromConfig(option)
 
                 labelEventBox, entryWidget, entry = self.createOptionEntry(option, separator="  ")
-                scriptEngine.connect("activate from " + option.name, "activate", entry, self.runInteractive)
+                guiutils.scriptEngine.connect("activate from " + option.name, "activate", entry, self.runInteractive)
                 labelEventBox.get_children()[0].set_alignment(1.0, 0.5)
                 table.attach(labelEventBox, 0, 1, rowIndex, rowIndex + 1, xoptions=gtk.FILL, xpadding=1)
                 table.attach(entryWidget, 1, 2, rowIndex, rowIndex + 1)
@@ -1001,7 +675,7 @@ class ActionTabGUI(OptionGroupGUI):
         if option.selectFile:
             button = gtk.Button("...")
             box.pack_start(button, expand=False, fill=False)
-            scriptEngine.connect("search for files for '" + option.name + "'",
+            guiutils.scriptEngine.connect("search for files for '" + option.name + "'",
                                  "clicked", button, self.showFileChooser, None, entry, option)
         return (box, entry)
     
@@ -1019,7 +693,7 @@ class ActionTabGUI(OptionGroupGUI):
         # 'temporary_filter_files' or 'filter_files' ...
         dialog.set_modal(True)
         folders, defaultFolder = option.getDirectories()
-        scriptEngine.registerOpenFileChooser(dialog, "select filter-file", "look in folder", 
+        guiutils.scriptEngine.registerOpenFileChooser(dialog, "select filter-file", "look in folder", 
                                              "open selected file", "cancel file selection", self.respondChooser, respondMethodArg=entry)
         # If current entry forms a valid path, set that as default
         currPath = entry.get_text()
@@ -1133,20 +807,20 @@ class ActionDialogGUI(OptionGroupGUI):
         if fileChooser:
             buttonScriptName = "press " + actionScriptName.split()[0]
             if fileChooser.get_property("action") == gtk.FILE_CHOOSER_ACTION_SAVE:
-                scriptEngine.registerSaveFileChooser(fileChooser, fileChooserOption.name,
+                guiutils.scriptEngine.registerSaveFileChooser(fileChooser, fileChooserOption.name,
                                                      "choose folder", buttonScriptName, "press cancel",
                                                      self.respond, okButton, cancelButton, dialog)
             else:
                 fileChooserScriptName = fileChooserOption.name.strip().lower()
                 if not fileChooserScriptName.startswith("select"):
                     fileChooserScriptName = "select " + fileChooserScriptName + " ="
-                scriptEngine.registerOpenFileChooser(fileChooser, fileChooserScriptName,
+                guiutils.scriptEngine.registerOpenFileChooser(fileChooser, fileChooserScriptName,
                                                      "look in folder", buttonScriptName, "press cancel", 
                                                      self.respond, okButton, cancelButton, dialog)
             fileChooserOption.setMethods(fileChooser.get_filename, fileChooser.set_filename)
         else:
-            scriptEngine.connect("press cancel", "clicked", cancelButton, self.respond, gtk.RESPONSE_CANCEL, False, dialog)
-            scriptEngine.connect("press ok", "clicked", okButton, self.respond, gtk.RESPONSE_ACCEPT, True, dialog)
+            guiutils.scriptEngine.connect("press cancel", "clicked", cancelButton, self.respond, gtk.RESPONSE_CANCEL, False, dialog)
+            guiutils.scriptEngine.connect("press ok", "clicked", okButton, self.respond, gtk.RESPONSE_ACCEPT, True, dialog)
 
     def fillVBox(self, vbox):
         fileChooser, fileChooserOption = None, None

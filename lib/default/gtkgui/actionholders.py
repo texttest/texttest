@@ -4,14 +4,14 @@ The various "holders" for displaying the "ActionGUI" abstraction: i.e. menus, to
 to store the simple actions and the dialogs, and a notebook to store the tabs in.
 """
 
-import gtk, guiplugins, plugins, os, sys, logging
+import gtk, guiutils, plugins, os, sys, logging
 from ndict import seqdict
 
-class MenuBarGUI(guiplugins.SubGUI):
-    def __init__(self, allApps, dynamic, vanilla, uiManager, actionGUIs):
-        guiplugins.SubGUI.__init__(self)
+class MenuBarGUI(guiutils.SubGUI):
+    def __init__(self, allApps, dynamic, vanilla, uiManager, actionGUIs, menuNames):
+        guiutils.SubGUI.__init__(self)
         # Create GUI manager, and a few default action groups
-        self.menuNames = guiplugins.interactiveActionHandler.getMenuNames(allApps)
+        self.menuNames = menuNames
         self.dynamic = dynamic
         self.vanilla = vanilla
         self.uiManager = uiManager
@@ -20,7 +20,7 @@ class MenuBarGUI(guiplugins.SubGUI):
         self.toggleActions = []
         self.diag = logging.getLogger("Menu Bar")
     def shouldHide(self, name):
-        return guiplugins.guiConfig.getCompositeValue("hide_gui_element", name, modeDependent=True)
+        return guiutils.guiConfig.getCompositeValue("hide_gui_element", name, modeDependent=True)
     def toggleVisibility(self, action, observer, *args):
         widget = observer.widget
         oldVisible = widget.get_property('visible')
@@ -37,7 +37,7 @@ class MenuBarGUI(guiplugins.SubGUI):
             gtkAction.set_active(True)
             self.actionGroup.add_action(gtkAction)
             gtkAction.connect("toggled", self.toggleVisibility, observer)
-            guiplugins.scriptEngine.registerToggleButton(gtkAction, "show " + actionName, "hide " + actionName)
+            guiutils.scriptEngine.registerToggleButton(gtkAction, "show " + actionName, "hide " + actionName)
             self.toggleActions.append(gtkAction)
     def createView(self):
         # Initialize
@@ -98,9 +98,9 @@ class MenuBarGUI(guiplugins.SubGUI):
         return sys.modules.has_key(moduleName) or sys.modules.has_key(packageName + "." + moduleName)
     
 
-class ToolBarGUI(guiplugins.ContainerGUI):
+class ToolBarGUI(guiutils.ContainerGUI):
     def __init__(self, uiManager, subgui):
-        guiplugins.ContainerGUI.__init__(self, [ subgui ])
+        guiutils.ContainerGUI.__init__(self, [ subgui ])
         self.uiManager = uiManager
     def getWidgetName(self):
         return "_Toolbar"
@@ -136,9 +136,9 @@ class ToolBarGUI(guiplugins.ContainerGUI):
 def createPopupGUIs(uiManager):
     return PopupMenuGUI("TestPopupMenu", uiManager), PopupMenuGUI("TestFilePopupMenu", uiManager)
 
-class PopupMenuGUI(guiplugins.SubGUI):
+class PopupMenuGUI(guiutils.SubGUI):
     def __init__(self, name, uiManager):
-        guiplugins.SubGUI.__init__(self)
+        guiutils.SubGUI.__init__(self)
         self.name = name
         self.uiManager = uiManager
     def createView(self):
@@ -164,9 +164,9 @@ class PopupMenuGUI(guiplugins.SubGUI):
                 return True
 
 
-class NotebookGUI(guiplugins.SubGUI):
+class NotebookGUI(guiutils.SubGUI):
     def __init__(self, tabInfo, scriptTitle):
-        guiplugins.SubGUI.__init__(self)
+        guiutils.SubGUI.__init__(self)
         self.scriptTitle = scriptTitle
         self.diag = logging.getLogger("GUI notebook")
         self.tabInfo = tabInfo
@@ -184,7 +184,7 @@ class NotebookGUI(guiplugins.SubGUI):
             page = self.createPage(tabGUI, tabName)
             self.notebook.append_page(page, label)
 
-        guiplugins.scriptEngine.monitorNotebook(self.notebook, self.scriptTitle)
+        guiutils.scriptEngine.monitorNotebook(self.notebook, self.scriptTitle)
         self.notebook.set_scrollable(True)
         self.notebook.show()
         return self.notebook

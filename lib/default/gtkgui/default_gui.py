@@ -1,5 +1,5 @@
 
-import guiplugins, plugins, os, sys, shutil, time, subprocess, operator, types, logging
+import guiplugins, guiutils, plugins, os, sys, shutil, time, subprocess, operator, types, logging
 from copy import copy, deepcopy
 from threading import Thread
 from glob import glob
@@ -50,7 +50,7 @@ class SaveTests(guiplugins.ActionDialogGUI):
         guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
         self.directAction = gtk.Action("Save", "_Save", \
                                        self.getDirectTooltip(), self.getStockId())
-        guiplugins.scriptEngine.connect(self.getDirectTooltip(), "activate", self.directAction, self._respond)
+        guiutils.scriptEngine.connect(self.getDirectTooltip(), "activate", self.directAction, self._respond)
         self.directAction.set_property("sensitive", False)
         self.addOption("v", "Version to save")
         self.addOption("old", "Version to save previous results as")
@@ -350,7 +350,7 @@ class FileViewAction(guiplugins.ActionGUI):
         if len(self.currTestSelection) > 0:
             return self.currTestSelection[0].getCompositeConfigValue(self.getToolConfigEntry(), stem)
         else:
-            return guiplugins.guiConfig.getCompositeValue(self.getToolConfigEntry(), stem)
+            return guiutils.guiConfig.getCompositeValue(self.getToolConfigEntry(), stem)
     def differencesActive(self, comparison):
         if not comparison or comparison.newResult() or comparison.missingResult():
             return False
@@ -377,10 +377,10 @@ class ViewInEditor(FileViewAction):
         cmdArgs, descriptor, env = self.getViewCommand(fileName, viewTool)
         description = descriptor + " " + os.path.basename(fileName)
         refresh = str(exitHandler != self.editingComplete)
-        guiplugins.guilog.info("Viewing file " + fileName + " using '" + descriptor + "', refresh set to " + refresh)
+        guiutils.guilog.info("Viewing file " + fileName + " using '" + descriptor + "', refresh set to " + refresh)
         self.startViewer(cmdArgs, description=description, env=env,
                          exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
-        guiplugins.scriptEngine.applicationEvent("the file editing process to start", "files", timeDelay=1)
+        guiutils.scriptEngine.applicationEvent("the file editing process to start", "files", timeDelay=1)
         
     def getViewerEnvironment(self, cmdArgs):
         # An absolute path to the viewer may indicate a custom tool, send the test environment along too
@@ -398,10 +398,10 @@ class ViewInEditor(FileViewAction):
         if interpreter:
             cmdArgs = [ interpreter ] + cmdArgs
 
-        if guiplugins.guiConfig.getCompositeValue("view_file_on_remote_machine", self.getStem(fileName)):
+        if guiutils.guiConfig.getCompositeValue("view_file_on_remote_machine", self.getStem(fileName)):
             remoteHost = self.getRemoteHost()
             if remoteHost:
-                remoteShellProgram = guiplugins.guiConfig.getValue("remote_shell_program")
+                remoteShellProgram = guiutils.guiConfig.getValue("remote_shell_program")
                 cmdArgs = [ remoteShellProgram, remoteHost, "env DISPLAY=" + self.getFullDisplay() + " " + " ".join(cmdArgs) ]
 
         return cmdArgs, descriptor, env
@@ -411,7 +411,7 @@ class ViewInEditor(FileViewAction):
         return self.viewFile(fileName, viewTool, exitHandler, exitHandlerArgs)
 
     def editingComplete(self):
-        guiplugins.scriptEngine.applicationEvent("file editing operations to complete", "files")
+        guiutils.scriptEngine.applicationEvent("file editing operations to complete", "files")
 
 
 class ViewConfigFileInEditor(ViewInEditor):
@@ -461,7 +461,7 @@ class ViewTestFileInEditor(ViewInEditor):
 
     def isDefaultViewer(self, comparison):
         return not self.differencesActive(comparison) and \
-               (not self.testRunning() or not guiplugins.guiConfig.getValue("follow_file_by_default"))
+               (not self.testRunning() or not guiutils.guiConfig.getValue("follow_file_by_default"))
 
     def findExitHandlerInfo(self, fileName, *args):
         if self.dynamic:
@@ -548,14 +548,14 @@ class ViewFileDifferences(FileViewAction):
     def _performOnFile(self, diffProgram, tmpFile, comparison):
         stdFile = comparison.getStdFile(self.useFiltered())
         description = diffProgram + " " + os.path.basename(stdFile) + " " + os.path.basename(tmpFile)
-        guiplugins.guilog.info("Starting graphical difference comparison using '" + diffProgram + "':")
-        guiplugins.guilog.info("-- original file : " + stdFile)
-        guiplugins.guilog.info("--  current file : " + tmpFile)
+        guiutils.guilog.info("Starting graphical difference comparison using '" + diffProgram + "':")
+        guiutils.guilog.info("-- original file : " + stdFile)
+        guiutils.guilog.info("--  current file : " + tmpFile)
         cmdArgs = plugins.splitcmd(diffProgram) + [ stdFile, tmpFile ]
         self.startViewer(cmdArgs, description=description, exitHandler=self.diffingComplete)
 
     def diffingComplete(self, *args):
-        guiplugins.scriptEngine.applicationEvent("the graphical diff program to terminate", "files")
+        guiutils.scriptEngine.applicationEvent("the graphical diff program to terminate", "files")
 
 
 class ViewFilteredFileDifferences(ViewFileDifferences):
@@ -593,7 +593,7 @@ class FollowFile(FileViewAction):
 
     def isDefaultViewer(self, comparison):
         return not self.differencesActive(comparison) and self.testRunning() and \
-               guiplugins.guiConfig.getValue("follow_file_by_default")
+               guiutils.guiConfig.getValue("follow_file_by_default")
 
     def getFollowProgram(self, followProgram, fileName):
         title = '"' + self.currTestSelection[0].name + " (" + os.path.basename(fileName) + ')"'
@@ -603,7 +603,7 @@ class FollowFile(FileViewAction):
     def getFollowCommand(self, program, fileName):
         remoteHost = self.getRemoteHost()
         if remoteHost:
-            remoteShellProgram = guiplugins.guiConfig.getValue("remote_shell_program")
+            remoteShellProgram = guiutils.guiConfig.getValue("remote_shell_program")
             return [ remoteShellProgram, remoteHost, "env DISPLAY=" + self.getFullDisplay() + " " + \
                      program + " " + fileName ]
         else:
@@ -612,13 +612,13 @@ class FollowFile(FileViewAction):
     def _performOnFile(self, followProgram, fileName, comparison):
         useFile = self.fileToFollow(fileName, comparison)
         useProgram = self.getFollowProgram(followProgram, fileName)
-        guiplugins.guilog.info("Following file " + useFile + " using '" + useProgram + "'")
+        guiutils.guilog.info("Following file " + useFile + " using '" + useProgram + "'")
         description = useProgram + " " + os.path.basename(useFile)
         cmdArgs = self.getFollowCommand(useProgram, useFile)
         self.startViewer(cmdArgs, description=description, exitHandler=self.followComplete)
 
     def followComplete(self, *args):
-        guiplugins.scriptEngine.applicationEvent("the file-following program to terminate", "files")
+        guiutils.scriptEngine.applicationEvent("the file-following program to terminate", "files")
 
 
 class KillTests(guiplugins.ActionGUI):
@@ -646,7 +646,7 @@ class KillTests(guiplugins.ActionGUI):
         self.notify("Status", "Killing " + testDesc + " ...")
         for test in tests:
             self.notify("ActionProgress", "")
-            guiplugins.guilog.info("Killing " + repr(test))
+            guiutils.guilog.info("Killing " + repr(test))
             test.notify("Kill")
 
         self.notify("Status", "Killed " + testDesc + ".")
@@ -782,7 +782,7 @@ class PasteTests(guiplugins.ActionGUI):
             suite, placement = destInfo[test]
             realPlacement = placement + suiteDeltas.get(suite, 0)
             newName = self.getNewTestName(suite, test.name)
-            guiplugins.guilog.info("Pasting test " + newName + " under test suite " + \
+            guiutils.guilog.info("Pasting test " + newName + " under test suite " + \
                         repr(suite) + ", in position " + str(realPlacement))
             if self.removeAfter and newName == test.name and suite is test.parent:
                 # Cut + paste to the same suite is basically a reposition, do it as one action
@@ -810,7 +810,7 @@ class PasteTests(guiplugins.ActionGUI):
                 if self.removeAfter:
                     plugins.tryFileChange(test.remove, "Failed to remove old test: didn't have sufficient write permission to the test files. Test copied instead of moved.")
                     
-        guiplugins.guilog.info("Selecting new tests : " + repr(newTests))
+        guiutils.guilog.info("Selecting new tests : " + repr(newTests))
         self.notify("SetTestSelection", newTests)
         self.currTestSelection = newTests
         self.notify("Status", self.getStatusMessage(suiteDeltas))
@@ -927,7 +927,7 @@ class ImportTest(guiplugins.ActionDialogGUI):
         testName = self.getNewTestName()
         suite = self.getDestinationSuite()
 
-        guiplugins.guilog.info("Adding " + self.testType() + " " + testName + " under test suite " + \
+        guiutils.guilog.info("Adding " + self.testType() + " " + testName + " under test suite " + \
                     repr(suite) + ", placed " + self.optionGroup.getOptionValue("testpos"))
         placement = self.getPlacement()
         description = self.optionGroup.getOptionValue("desc")
@@ -935,7 +935,7 @@ class ImportTest(guiplugins.ActionDialogGUI):
         testDir = suite.makeSubDirectory(testName)
         self.testImported = self.createTestContents(suite, testDir, description, placement)
         suite.contentChanged()
-        guiplugins.guilog.info("Selecting new test " + self.testImported.name)
+        guiutils.guilog.info("Selecting new test " + self.testImported.name)
         self.notify("SetTestSelection", [ self.testImported ])
     def getSignalsSent(self):
         return [ "SetTestSelection" ]
@@ -981,7 +981,7 @@ class ImportTestCase(ImportTest):
             return
         envFile = self.getWriteFile("environment", suite, testDir)
         for var, value in envDir.items():
-            guiplugins.guilog.info("Setting test env: " + var + " = " + value)
+            guiutils.guilog.info("Setting test env: " + var + " = " + value)
             envFile.write(var + ":" + value + "\n")
         envFile.close()
 
@@ -1105,7 +1105,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         AllTestsHandler.__init__(self)
         self.filterAction = gtk.Action("Filter", "Filter", \
                                        self.getFilterTooltip(), self.getStockId())
-        guiplugins.scriptEngine.connect(self.getFilterTooltip(), "activate", self.filterAction, self.filterTests)
+        guiutils.scriptEngine.connect(self.getFilterTooltip(), "activate", self.filterAction, self.filterTests)
         self.selectDiag = logging.getLogger("Select Tests")
         self.addOption("vs", "Tests for version", description="Select tests for a specific version.",
                        possibleValues=self.getPossibleVersions(allApps))
@@ -1217,7 +1217,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
             else:
                 newTests = self.combineWithPrevious([], suite.app, strategy)
 
-            guiplugins.guilog.info("Selected " + str(len(newTests)) + " out of a possible " + str(suite.size()))
+            guiutils.guilog.info("Selected " + str(len(newTests)) + " out of a possible " + str(suite.size()))
             selectedTests += newTests
         return selectedTests
 
@@ -1550,7 +1550,7 @@ class LoadSelection(guiplugins.ActionDialogGUI):
         fileName = self.optionGroup.getOptionValue("f")
         if fileName:
             newSelection = self.makeNewSelection(fileName)
-            guiplugins.guilog.info("Loaded " + str(len(newSelection)) + " tests from " + fileName)
+            guiutils.guilog.info("Loaded " + str(len(newSelection)) + " tests from " + fileName)
             self.notify("SetTestSelection", newSelection, "-f " + fileName, True)
             self.notify("Status", "Loaded test selection from file '" + fileName + "'.")
         else:
@@ -1586,7 +1586,7 @@ class RunningAction:
         plugins.ensureDirectoryExists(writeDir)
         filterFile = self.writeFilterFile(writeDir)
         ttOptions = runModeOptions + self.getTextTestOptions(filterFile, app, usecase)
-        guiplugins.guilog.info("Starting " + usecase + " run of TextTest with arguments " + repr(ttOptions))
+        guiutils.guilog.info("Starting " + usecase + " run of TextTest with arguments " + repr(ttOptions))
         logFile = os.path.join(writeDir, "output.log")
         errFile = os.path.join(writeDir, "errors.log")
         RunningAction.runNumber += 1
@@ -1960,7 +1960,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
     
     def addText(self, vbox, text):
         header = gtk.Label()
-        guiplugins.guilog.info("Adding text '" + text + "'")
+        guiutils.guilog.info("Adding text '" + text + "'")
         header.set_markup(text + "\n")
         vbox.pack_start(header, expand=False, fill=False)
     
@@ -2048,18 +2048,18 @@ class ImportFiles(guiplugins.ActionDialogGUI):
                 plugins.ensureDirExistsForFile(targetPath)
                 file = open(targetPath, "w")
                 file.close()
-                guiplugins.guilog.info("Creating new empty file...")
+                guiutils.guilog.info("Creating new empty file...")
                 self.notify("NewFile", targetPath, False)
             elif action == 2:
                 plugins.ensureDirectoryExists(targetPath)
-                guiplugins.guilog.info("Creating new empty directory...")
+                guiutils.guilog.info("Creating new empty directory...")
                 test.filesChanged()
         else:
             sourcePath = self.optionGroup.getOptionValue("src")
             appendAppName = os.path.basename(sourcePath).startswith(stem + "." + test.app.name)
             targetPath = self.getTargetPath(stem, version, appendAppName) 
             fileExisted = os.path.exists(targetPath)
-            guiplugins.guilog.info("Creating new path, copying " + sourcePath)
+            guiutils.guilog.info("Creating new path, copying " + sourcePath)
             plugins.copyPath(sourcePath, targetPath)
             self.notify("NewFile", targetPath, fileExisted)
 
@@ -2347,7 +2347,7 @@ class SortTestSuiteFileAscending(guiplugins.ActionGUI):
     def performRecursively(self, suite, ascending):
         # First ask all sub-suites to sort themselves
         errors = ""
-        if guiplugins.guiConfig.getValue("sort_test_suites_recursively"):
+        if guiutils.guiConfig.getValue("sort_test_suites_recursively"):
             for test in suite.testcases:
                 if test.classId() == "test-suite":
                     try:

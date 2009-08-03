@@ -1,7 +1,7 @@
 
 # Generic interface to version control systems. We try to keep it as general as possible.
 
-import gtk, gobject, guiplugins, default_gui, plugins, custom_widgets, entrycompletion, os, datetime, subprocess, shutil
+import gtk, gobject, guiplugins, guiutils, default_gui, plugins, custom_widgets, entrycompletion, os, datetime, subprocess, shutil
 
 vcsClass, vcs, annotateClass = None, None, None
     
@@ -296,7 +296,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
     def viewGraphicalDiff(self, button):
         path = self.filteredTreeModel.get_value(self.treeView.get_selection().get_selected()[1], 3)
         pathStem = os.path.basename(path).split(".")[0]
-        diffProgram = guiplugins.guiConfig.getCompositeValue("diff_program", pathStem)
+        diffProgram = guiutils.guiConfig.getCompositeValue("diff_program", pathStem)
         revOptions = self.getExtraArgs()
         graphDiffArgs = vcs.getGraphicalDiffArgs(diffProgram)
         try:
@@ -311,7 +311,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
                                      "'.\nPlease install it somewhere on your $PATH.\n")
     
     def diffingComplete(self, *args):
-        guiplugins.scriptEngine.applicationEvent("the version-control graphical diff program to terminate", "files")
+        guiutils.scriptEngine.applicationEvent("the version-control graphical diff program to terminate", "files")
                                 
     def getRootPath(self):
         appPath = self.currTestSelection[0].app.getDirectory()
@@ -334,7 +334,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         except AttributeError:
             raise plugins.TextTestError, "Cannot establish which files should be compared as no comparison information exists.\n" + \
                   "To create this information, perform 'recompute status' (press '" + \
-                         guiplugins.guiConfig.getCompositeValue("gui_accelerators", "recompute_status") + "') and try again."
+                         guiutils.guiConfig.getCompositeValue("gui_accelerators", "recompute_status") + "') and try again."
 
     def isModal(self):
         return False
@@ -371,17 +371,17 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
 
     def addStatusWidget(self):
         button = gtk.Button("_Status")
-        guiplugins.scriptEngine.connect("show version control status", "clicked", button, self.viewStatus)
+        guiutils.scriptEngine.connect("show version control status", "clicked", button, self.viewStatus)
         self.extraButtonArea.pack_start(button, expand=False, fill=False)        
 
     def addLogWidget(self):
         button = gtk.Button("_Log")
-        guiplugins.scriptEngine.connect("show version control log", "clicked", button, self.viewLog)
+        guiutils.scriptEngine.connect("show version control log", "clicked", button, self.viewLog)
         self.extraButtonArea.pack_start(button, expand=False, fill=False)        
 
     def addAnnotateWidget(self):
         button = gtk.Button("_Annotate")
-        guiplugins.scriptEngine.connect("show version control annotations", "clicked", button, self.viewAnnotations)
+        guiutils.scriptEngine.connect("show version control annotations", "clicked", button, self.viewAnnotations)
         self.extraButtonArea.pack_start(button, expand=False, fill=False)        
 
     def addDiffWidget(self):
@@ -397,18 +397,18 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         self.revision2.set_alignment(1.0)
         self.revision1.set_width_chars(6)
         self.revision2.set_width_chars(6)
-        guiplugins.scriptEngine.registerEntry(self.revision1, "set first revision to ")
-        guiplugins.scriptEngine.registerEntry(self.revision2, "set second revision to ")
+        guiutils.scriptEngine.registerEntry(self.revision1, "set first revision to ")
+        guiutils.scriptEngine.registerEntry(self.revision2, "set second revision to ")
         self.extraButtonArea.pack_start(diffButton, expand=False, fill=False)
         self.extraWidgetArea.pack_start(label1, expand=False, fill=False)
         self.extraWidgetArea.pack_start(self.revision1, expand=False, fill=False)
         self.extraWidgetArea.pack_start(label2, expand=False, fill=False)
         self.extraWidgetArea.pack_start(self.revision2, expand=False, fill=False)
-        guiplugins.scriptEngine.connect("show version control differences", "clicked", diffButton, self.viewDiffs)
+        guiutils.scriptEngine.connect("show version control differences", "clicked", diffButton, self.viewDiffs)
 
     def addGraphicalDiffWidget(self):
         button = gtk.Button("_Graphical Diffs")
-        guiplugins.scriptEngine.connect("show version control differences graphically", "clicked", button, self.viewGraphicalDiff)
+        guiutils.scriptEngine.connect("show version control differences graphically", "clicked", button, self.viewGraphicalDiff)
         self.extraButtonArea.pack_start(button, expand=False, fill=False)        
 
     def addHeader(self):
@@ -474,7 +474,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         for fileName, content, info in self.pages:
             label = plugins.relpath(fileName, rootDir)
             self.diag.info("Adding info for file " + label)
-            utfContent = guiplugins.convertToUtf8(content)
+            utfContent = guiutils.convertToUtf8(content)
             path = label.split(os.sep)
             currentFile = rootDir
             prevIter = None
@@ -508,7 +508,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
             self.treeView.append_column(self.infoColumn)
         self.treeView.get_selection().set_select_function(self.canSelect)
         self.treeView.expand_all()
-        guiplugins.scriptEngine.monitor("select", self.treeView.get_selection())
+        guiutils.scriptEngine.monitor("select", self.treeView.get_selection())
 
         if len(self.pages) > 0:
             firstFile = self.pages[0][0]
@@ -682,7 +682,7 @@ class StatusGUI(VersionControlDialogGUI):
             actionGroup.add_action(action)
             self.uiManager.add_ui_from_string("<popup name='Info'><menuitem name='" + info + "' action='" + info + "'/></popup>")
             action.connect("toggled", self.toggleVisibility)
-            guiplugins.scriptEngine.registerToggleButton(action, "show category " + action.get_name(), "hide category " + action.get_name())
+            guiutils.scriptEngine.registerToggleButton(action, "show category " + action.get_name(), "hide category " + action.get_name())
         self.uiManager.ensure_update()
 
     def toggleVisibility(self, action):
@@ -735,7 +735,7 @@ class StatusGUI(VersionControlDialogGUI):
         self.infoColumn.set_clickable(True)
         button = self.infoColumn.get_button()
         if button:
-            guiplugins.scriptEngine.monitorRightClicks("show visibility controls", button)
+            guiutils.scriptEngine.monitorRightClicks("show visibility controls", button)
             button.connect("button-press-event", self.showPopupMenu)
             
         self.treeView.grab_focus() # Or the column button gets focus ...

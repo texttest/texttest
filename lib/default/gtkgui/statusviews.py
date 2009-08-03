@@ -4,7 +4,7 @@ Module for the various widgets that keep an overall view of the status or progre
 of the current run/setup
 """
 
-import gtk, gobject, pango, guiplugins, plugins, os, logging
+import gtk, gobject, pango, guiutils, plugins, os, logging
 from ndict import seqdict
 from copy import copy
 
@@ -13,9 +13,9 @@ from copy import copy
 # It is also responsible for keeping the throbber rotating
 # while actions are under way.
 #
-class StatusMonitorGUI(guiplugins.SubGUI):
+class StatusMonitorGUI(guiutils.SubGUI):
     def __init__(self):
-        guiplugins.SubGUI.__init__(self)
+        guiutils.SubGUI.__init__(self)
         self.throbber = None
         self.animation = None
         self.pixbuf = None
@@ -81,9 +81,9 @@ class StatusMonitorGUI(guiplugins.SubGUI):
         return self.widget
 
 
-class ProgressBarGUI(guiplugins.SubGUI):
+class ProgressBarGUI(guiutils.SubGUI):
     def __init__(self, dynamic, testCount):
-        guiplugins.SubGUI.__init__(self)
+        guiutils.SubGUI.__init__(self)
         self.dynamic = dynamic
         self.totalNofTests = testCount
         self.addedCount = 0
@@ -146,9 +146,9 @@ class ClassificationTree(seqdict):
 
 # Class that keeps track of (and possibly shows) the progress of
 # pending/running/completed tests
-class TestProgressMonitor(guiplugins.SubGUI):
+class TestProgressMonitor(guiutils.SubGUI):
     def __init__(self, dynamic, testCount):
-        guiplugins.SubGUI.__init__(self)
+        guiutils.SubGUI.__init__(self)
         self.classifications = {} # map from test to list of iterators where it exists
 
         # Each row has 'type', 'number', 'show', 'tests'
@@ -164,11 +164,11 @@ class TestProgressMonitor(guiplugins.SubGUI):
             # It isn't really a gui configuration, and this could cause bugs when several apps
             # using differnt diff tools are run together. However, this isn't very likely and we prefer not
             # to recalculate all the time...
-            diffTool = guiplugins.guiConfig.getValue("text_diff_program")
-            self.diffFilterGroup = plugins.TextTriggerGroup(guiplugins.guiConfig.getCompositeValue("text_diff_program_filters", diffTool))
+            diffTool = guiutils.guiConfig.getValue("text_diff_program")
+            self.diffFilterGroup = plugins.TextTriggerGroup(guiutils.guiConfig.getCompositeValue("text_diff_program_filters", diffTool))
             if testCount > 0:
-                colour = guiplugins.guiConfig.getTestColour("not_started")
-                visibility = guiplugins.guiConfig.showCategoryByDefault("not_started")
+                colour = guiutils.guiConfig.getTestColour("not_started")
+                visibility = guiutils.guiConfig.showCategoryByDefault("not_started")
                 self.addNewIter("Not started", None, colour, visibility, testCount)
     def getGroupTabTitle(self):
         return "Status"
@@ -194,9 +194,9 @@ class TestProgressMonitor(guiplugins.SubGUI):
         self.treeView.append_column(numberColumn)
         toggle = gtk.CellRendererToggle()
         toggle.set_property('activatable', True)
-        guiplugins.scriptEngine.registerCellToggleButton(toggle, "toggle progress report category", self.treeView)
+        guiutils.scriptEngine.registerCellToggleButton(toggle, "toggle progress report category", self.treeView)
         toggle.connect("toggled", self.showToggled)
-        guiplugins.scriptEngine.monitor("set progress report filter selection to", selection)
+        guiutils.scriptEngine.monitor("set progress report filter selection to", selection)
         toggleColumn = gtk.TreeViewColumn("Visible", toggle, active=2)
         toggleColumn.set_resizable(True)
         toggleColumn.set_alignment(0.5)
@@ -225,7 +225,7 @@ class TestProgressMonitor(guiplugins.SubGUI):
         selection.selected_foreach(self.selectCorrespondingTests, tests)
         self.notify("SetTestSelection", tests)
     def selectCorrespondingTests(self, treemodel, path, iter, tests , *args):
-        guiplugins.guilog.info("Selecting all " + str(treemodel.get_value(iter, 1)) + " tests in category " + treemodel.get_value(iter, 0))
+        guiutils.guilog.info("Selecting all " + str(treemodel.get_value(iter, 1)) + " tests in category " + treemodel.get_value(iter, 0))
         for test in treemodel.get_value(iter, 5):
             if test not in tests:
                 tests.append(test)
@@ -323,13 +323,13 @@ class TestProgressMonitor(guiplugins.SubGUI):
     def getCategorySettings(self, category, nodeClassifier, classifiers):
         # Use the category description if there is only one level, otherwise rely on the status names
         if len(classifiers.get(nodeClassifier)) == 0 or category == "failure":
-            return guiplugins.guiConfig.getTestColour(category), guiplugins.guiConfig.showCategoryByDefault(category)
+            return guiutils.guiConfig.getTestColour(category), guiutils.guiConfig.showCategoryByDefault(category)
         else:
             return None, True
     def updateTestAppearance(self, test, state, changeDesc, colour):
         resultType, summary = state.getTypeBreakdown()
         catDesc = self.getCategoryDescription(state, resultType)
-        mainColour = guiplugins.guiConfig.getTestColour(catDesc, guiplugins.guiConfig.getTestColour(resultType))
+        mainColour = guiutils.guiConfig.getTestColour(catDesc, guiutils.guiConfig.getTestColour(resultType))
         # Don't change suite states when unmarking tests
         updateSuccess = state.hasSucceeded() and changeDesc != "unmarked"
         saved = changeDesc.find("save") != -1
@@ -350,14 +350,14 @@ class TestProgressMonitor(guiplugins.SubGUI):
 
     def addTestForNode(self, test, defaultColour, defaultVisibility, nodeClassifier, classifiers, incrementCount, parentIter=None):
         nodeIter = self.findIter(nodeClassifier, parentIter)
-        colour = guiplugins.guiConfig.getTestColour(nodeClassifier, defaultColour)
+        colour = guiutils.guiConfig.getTestColour(nodeClassifier, defaultColour)
         if nodeIter:
             visibility = self.treeModel.get_value(nodeIter, 2)
             self.diag.info("Adding " + repr(test) + " for node " + nodeClassifier + ", visible = " + repr(visibility))
             self.insertTestAtIter(nodeIter, test, colour, incrementCount)
             self.classifications[test].append(nodeIter)
         else:
-            visibility = guiplugins.guiConfig.showCategoryByDefault(nodeClassifier, parentHidden=not defaultVisibility)
+            visibility = guiutils.guiConfig.showCategoryByDefault(nodeClassifier, parentHidden=not defaultVisibility)
             initialTests = self.getInitialTestsForNode(test, parentIter, nodeClassifier)
             nodeIter = self.addNewIter(nodeClassifier, parentIter, colour, visibility, len(initialTests), initialTests)
             for initTest in initialTests:

@@ -1,5 +1,5 @@
 
-import gtk, version_control, default_gui, guiplugins, plugins, datetime, shutil, time, os
+import gtk, version_control, default_gui, guiutils, plugins, datetime, shutil, time, os
 from ndict import seqdict
 
 #
@@ -214,7 +214,7 @@ class CVSLogLatest(version_control.LogGUI):
         for label, content in self.pages.items():
             buffer = gtk.TextBuffer()
             # Encode to UTF-8, necessary for gtk.TextView
-            buffer.set_text(guiplugins.convertToUtf8(content))
+            buffer.set_text(guiutils.convertToUtf8(content))
             textView = gtk.TextView(buffer)
             textView.set_editable(False)
             window = gtk.ScrolledWindow()
@@ -222,7 +222,7 @@ class CVSLogLatest(version_control.LogGUI):
             window.add(textView)
             notebook.append_page(window, gtk.Label(label))
         notebook.show_all()
-        guiplugins.scriptEngine.monitorNotebook(notebook, "view tab")
+        guiutils.scriptEngine.monitorNotebook(notebook, "view tab")
         if len(notebook.get_children()) > 0: # Resize to a nice-looking dialog window ...
             parentSize = self.topWindow.get_size()
             self.dialog.resize(int(parentSize[0] / 1.5), int(parentSize[0] / 2))

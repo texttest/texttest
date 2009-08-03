@@ -4,16 +4,16 @@ The various text info views, i.e. the bottom right-corner "Text Info" and
 the "Run Info" tab from the dynamic GUI
 """
 
-import gtk, pango, guiplugins, plugins, os, sys, subprocess
+import gtk, pango, guiutils, plugins, os, sys, subprocess
 
 
-class TextViewGUI(guiplugins.SubGUI):
+class TextViewGUI(guiutils.SubGUI):
     hovering_over_link = False
     hand_cursor = gtk.gdk.Cursor(gtk.gdk.HAND2)
     regular_cursor = gtk.gdk.Cursor(gtk.gdk.XTERM)
 
     def __init__(self):
-        guiplugins.SubGUI.__init__(self)
+        guiutils.SubGUI.__init__(self)
         self.text = ""
         self.showingSubText = False
         self.view = None
@@ -73,7 +73,7 @@ class TextViewGUI(guiplugins.SubGUI):
     def updateViewFromText(self, text):
         textbuffer = self.view.get_buffer()
         # Encode to UTF-8, necessary for gtk.TextView
-        textToUse = guiplugins.convertToUtf8(text)
+        textToUse = guiutils.convertToUtf8(text)
         if "http://" in textToUse:
             self.view.connect("event-after", self.event_after)
             self.view.connect("motion-notify-event", self.motion_notify_event)
@@ -261,7 +261,7 @@ class TextInfoGUI(TextViewGUI):
         if state.hasStarted() and not state.isComplete():
             self.text += "\n\nTo obtain the latest progress information and an up-to-date comparison of the files above, " + \
                          "perform 'recompute status' (press '" + \
-                         guiplugins.guiConfig.getCompositeValue("gui_accelerators", "recompute_status") + "')"
+                         guiutils.guiConfig.getCompositeValue("gui_accelerators", "recompute_status") + "')"
 
     def notifyNewTestSelection(self, tests, *args):
         if len(tests) == 0:

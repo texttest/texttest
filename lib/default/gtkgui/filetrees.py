@@ -3,13 +3,13 @@
 Module to handle the various file-trees in the GUI
 """
 
-import gtk, gobject, guiplugins, plugins, os, sys, operator, logging
+import gtk, gobject, guiutils, plugins, os, sys, operator, logging
 from ndict import seqdict
 from copy import copy
 
-class FileViewGUI(guiplugins.SubGUI):
+class FileViewGUI(guiutils.SubGUI):
     def __init__(self, dynamic, title = "", popupGUI = None):
-        guiplugins.SubGUI.__init__(self)
+        guiutils.SubGUI.__init__(self)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING,\
                                    gobject.TYPE_PYOBJECT, gobject.TYPE_STRING, gobject.TYPE_STRING)
         self.popupGUI = popupGUI
@@ -90,12 +90,12 @@ class FileViewGUI(guiplugins.SubGUI):
         detailsColumn, recalcRenderer = self.makeDetailsColumn()
         if detailsColumn:
             view.append_column(detailsColumn)
-            guiplugins.addRefreshTips(view, "file", recalcRenderer, detailsColumn, 5)
+            guiutils.addRefreshTips(view, "file", recalcRenderer, detailsColumn, 5)
 
         view.expand_all()
         self.monitorEvents()
         if self.popupGUI:
-            guiplugins.scriptEngine.monitorRightClicks("view actions for file", view)
+            guiutils.scriptEngine.monitorRightClicks("view actions for file", view)
             view.connect("button_press_event", self.popupGUI.showMenu)
             self.popupGUI.createView()
 
@@ -180,7 +180,7 @@ class ApplicationFileGUI(FileViewGUI):
     def getViewFileSignal(self):
         return "ViewApplicationFile"
     def monitorEvents(self):
-        guiplugins.scriptEngine.connect("select application file", "row_activated", self.selection.get_tree_view(), self.fileActivated)
+        guiutils.scriptEngine.connect("select application file", "row_activated", self.selection.get_tree_view(), self.fileActivated)
     def addSuites(self, suites):
         for suite in suites:
             if suite.app not in self.allApps and suite.app not in self.extras:
@@ -188,7 +188,7 @@ class ApplicationFileGUI(FileViewGUI):
                 self.recreateModel(self.getState(), preserveSelection=False)
 
     def addFilesToModel(self, state):
-        colour = guiplugins.guiConfig.getCompositeValue("file_colours", "static")
+        colour = guiutils.guiConfig.getCompositeValue("file_colours", "static")
         personalDir = plugins.getPersonalConfigDir()
         personalFiles = self.getPersonalFiles(personalDir)
         importedFiles = {}
@@ -336,7 +336,7 @@ class TestFileGUI(FileViewGUI):
         else:
             return self.currentTest.name.replace("_", "__")
     def getColour(self, name):
-        return guiplugins.guiConfig.getCompositeValue("file_colours", name)
+        return guiutils.guiConfig.getCompositeValue("file_colours", name)
 
     def shouldShowCurrent(self, *args):
         return self.currentTest is not None
@@ -357,8 +357,8 @@ class TestFileGUI(FileViewGUI):
             self.addStaticFilesToModel(realState)
 
     def monitorEvents(self):
-        guiplugins.scriptEngine.connect("select file", "row_activated", self.selection.get_tree_view(), self.fileActivated)
-        guiplugins.scriptEngine.monitor("set file selection to", self.selection)
+        guiutils.scriptEngine.connect("select file", "row_activated", self.selection.get_tree_view(), self.fileActivated)
+        guiutils.scriptEngine.monitor("set file selection to", self.selection)
         self.selectionChanged(self.selection)
         self.selection.connect("changed", self.selectionChanged)
 
@@ -445,7 +445,7 @@ class TestFileGUI(FileViewGUI):
             rootDir = self.currentTest.getDirectory()
         headerRow = [ heading + " Files", "white", rootDir, None, "", "" ]
         stditer = self.model.insert_before(None, None, headerRow)
-        colour =  guiplugins.guiConfig.getCompositeValue("file_colours", "static_" + heading.lower(), defaultKey="static")
+        colour = guiutils.guiConfig.getCompositeValue("file_colours", "static_" + heading.lower(), defaultKey="static")
         return stditer, colour
 
     def addStaticFilesWithHeading(self, heading, stdFiles):

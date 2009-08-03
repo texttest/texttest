@@ -29,7 +29,7 @@ try:
 except:
     raiseException("Unable to import module 'gobject'")
 
-import gtkusecase, testtree, filetrees, statusviews, textinfo, actionholders, guiplugins, plugins, os, logging
+import gtkusecase, testtree, filetrees, statusviews, textinfo, actionholders, guiplugins, guiutils, plugins, os, logging
 from copy import copy
 
 
@@ -116,11 +116,13 @@ class GUIController(plugins.Responder, plugins.Observable):
         global guilog, guiConfig, scriptEngine
         scriptEngine = self.scriptEngine
         guilog = logging.getLogger("gui log")
-        guiConfig = guiplugins.GUIConfig(self.dynamic, allApps, guilog)
+        defaultColours = guiplugins.interactiveActionHandler.getColourDictionary(allApps)
+        defaultAccelerators = guiplugins.interactiveActionHandler.getDefaultAccelerators(allApps)
+        guiConfig = guiutils.GUIConfig(self.dynamic, allApps, defaultColours, defaultAccelerators, guilog)
 
-        guiplugins.guilog = guilog
-        guiplugins.scriptEngine = scriptEngine
-        guiplugins.guiConfig = guiConfig
+        guiutils.guilog = guilog
+        guiutils.scriptEngine = scriptEngine
+        guiutils.guiConfig = guiConfig
 
     def getTestTreeObservers(self):
         return [ self.testColumnGUI, self.testFileGUI, self.textInfoGUI, self.testRunInfoGUI ] + self.allActionGUIs() + [ self.rightWindowGUI ]
@@ -155,7 +157,7 @@ class GUIController(plugins.Responder, plugins.Observable):
         return [ self.toolBarGUI, self.shortcutBarGUI, self.statusMonitor ]
     def getAddSuitesObservers(self):
         actionObservers = filter(lambda obs: hasattr(obs, "addSuites"), self.defaultActionGUIs + self.actionTabGUIs)
-        return [ guiplugins.guiConfig, self.testColumnGUI, self.appFileGUI ] + actionObservers + \
+        return [ guiutils.guiConfig, self.testColumnGUI, self.appFileGUI ] + actionObservers + \
                [ self.rightWindowGUI, self.topWindowGUI, self.idleManager ]
     def setObservers(self, frameworkObservers):
         # We don't actually have the framework observe changes here, this causes duplication. Just forward
@@ -212,7 +214,8 @@ class GUIController(plugins.Responder, plugins.Observable):
         return TopWindowGUI(boxGUI, self.dynamic, allApps)
 
     def createMenuAndToolBarGUIs(self, allApps, vanilla, uiManager):
-        menu = actionholders.MenuBarGUI(allApps, self.dynamic, vanilla, uiManager, self.allActionGUIs())
+        menuNames = guiplugins.interactiveActionHandler.getMenuNames(allApps)
+        menu = actionholders.MenuBarGUI(allApps, self.dynamic, vanilla, uiManager, self.allActionGUIs(), menuNames)
         toolbar = actionholders.ToolBarGUI(uiManager, self.progressBarGUI)
         testPopup, testFilePopup = actionholders.createPopupGUIs(uiManager)
         return menu, toolbar, testPopup, testFilePopup
@@ -261,11 +264,11 @@ class GUIController(plugins.Responder, plugins.Observable):
     def notifyAllComplete(self):
         self.notify("AllComplete")
 
-class TopWindowGUI(guiplugins.ContainerGUI):
+class TopWindowGUI(guiutils.ContainerGUI):
     EXIT_NOTIFIED = 1
     COMPLETION_NOTIFIED = 2
     def __init__(self, contentGUI, dynamic, allApps):
-        guiplugins.ContainerGUI.__init__(self, [ contentGUI ])
+        guiutils.ContainerGUI.__init__(self, [ contentGUI ])
         self.dynamic = dynamic
         self.topWindow = None
         self.allApps = copy(allApps)
@@ -385,7 +388,7 @@ class TopWindowGUI(guiplugins.ContainerGUI):
             return int(fullSize * proportion), descriptor
 
 
-class ShortcutBarGUI(guiplugins.SubGUI):
+class ShortcutBarGUI(guiutils.SubGUI):
     def getWidgetName(self):
         return "_Shortcut bar"
     def createView(self):
@@ -395,7 +398,7 @@ class ShortcutBarGUI(guiplugins.SubGUI):
         return self.widget
     
 
-class VBoxGUI(guiplugins.ContainerGUI):    
+class VBoxGUI(guiutils.ContainerGUI):    
     def createView(self):
         box = gtk.VBox()
         expandWidgets = [ gtk.HPaned, gtk.ScrolledWindow ]
@@ -408,9 +411,9 @@ class VBoxGUI(guiplugins.ContainerGUI):
         return box
 
 
-class PaneGUI(guiplugins.ContainerGUI):
+class PaneGUI(guiutils.ContainerGUI):
     def __init__(self, gui1, gui2 , horizontal, shrink=True):
-        guiplugins.ContainerGUI.__init__(self, [ gui1, gui2 ])
+        guiutils.ContainerGUI.__init__(self, [ gui1, gui2 ])
         self.horizontal = horizontal
         self.panedTooltips = gtk.Tooltips()
         self.paned = None

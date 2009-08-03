@@ -1,6 +1,5 @@
 
-import gtk, gobject, guiplugins, plugins, texttest_version, os, sys, glob
-from guiplugins import scriptEngine, ActionResultDialogGUI
+import gtk, gobject, guiplugins, guiutils, plugins, texttest_version, os, sys, glob
 from types import StringType
 
 # Show useful info about TextTest.
@@ -24,9 +23,9 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         self.creditsButton = self.dialog.add_button('texttest-stock-credits', gtk.RESPONSE_NONE)
         self.licenseButton = self.dialog.add_button('_License', gtk.RESPONSE_NONE)
         self.versionsButton = self.dialog.add_button('_Versions', gtk.RESPONSE_NONE)
-        guiplugins.scriptEngine.connect("press credits", "clicked", self.creditsButton, self.showCredits)
-        guiplugins.scriptEngine.connect("press license", "clicked", self.licenseButton, self.showLicense)
-        guiplugins.scriptEngine.connect("press versions", "clicked", self.versionsButton, self.showVersions)
+        guiutils.scriptEngine.connect("press credits", "clicked", self.creditsButton, self.showCredits)
+        guiutils.scriptEngine.connect("press license", "clicked", self.licenseButton, self.showLicense)
+        guiutils.scriptEngine.connect("press versions", "clicked", self.versionsButton, self.showVersions)
         guiplugins.ActionResultDialogGUI.createButtons(self)
         
     def addContents(self):
@@ -172,7 +171,7 @@ class TextFileDisplayDialog(guiplugins.ActionResultDialogGUI):
             text = file.read()
             file.close()
             buffer = gtk.TextBuffer()
-            buffer.set_text(guiplugins.convertToUtf8(text))
+            buffer.set_text(guiutils.convertToUtf8(text))
         except Exception, e: #pragma : no cover - should never happen
             self.showErrorDialog("Failed to show " + self.fileName + " file:\n" + str(e))
             return
@@ -222,7 +221,7 @@ class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
         versionInfo = self.readVersionInfo(docDir)
         for version in reversed(sorted(versionInfo.keys())):
             buffer = gtk.TextBuffer()
-            buffer.set_text(guiplugins.convertToUtf8(versionInfo[version]))
+            buffer.set_text(guiutils.convertToUtf8(versionInfo[version]))
             textView = gtk.TextView(buffer)
             textView.set_editable(False)
             textView.set_cursor_visible(False)
@@ -238,7 +237,7 @@ class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
         if notebook.get_n_pages() == 0: #pragma : no cover - should never happen
             raise plugins.TextTestError, "\nNo " + self.getTitle() + " could be found in\n" + docDir + "\n"
         else:
-            guiplugins.scriptEngine.monitorNotebook(notebook, "view " + self.getTitle().lower() + " in tab")
+            guiutils.scriptEngine.monitorNotebook(notebook, "view " + self.getTitle().lower() + " in tab")
             parentSize = self.topWindow.get_size()
             self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[1] * 0.7))
             self.dialog.vbox.pack_start(notebook, expand=True, fill=True)

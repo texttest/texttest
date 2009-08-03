@@ -3,12 +3,12 @@
 Code associated with the left-hand tree view for tests 
 """
 
-import gtk, gobject, pango, guiplugins, logging
+import gtk, gobject, pango, guiutils, logging
 from ndict import seqdict
 
-class TestColumnGUI(guiplugins.SubGUI):
+class TestColumnGUI(guiutils.SubGUI):
     def __init__(self, dynamic, testCount):
-        guiplugins.SubGUI.__init__(self)
+        guiutils.SubGUI.__init__(self)
         self.addedCount = 0
         self.totalNofTests = testCount
         self.totalNofDistinctTests = testCount
@@ -30,13 +30,13 @@ class TestColumnGUI(guiplugins.SubGUI):
         self.column.set_cell_data_func(testRenderer, self.renderSuitesBold)
         if not self.dynamic:
             self.column.set_clickable(True)
-            guiplugins.scriptEngine.connect("toggle test sorting order", "clicked", self.column, self.columnClicked)
-        if guiplugins.guiConfig.getValue("auto_sort_test_suites") == 1:
-            guiplugins.guilog.info("Initially sorting tests in alphabetical order.")
+            guiutils.scriptEngine.connect("toggle test sorting order", "clicked", self.column, self.columnClicked)
+        if guiutils.guiConfig.getValue("auto_sort_test_suites") == 1:
+            guiutils.guilog.info("Initially sorting tests in alphabetical order.")
             self.column.set_sort_indicator(True)
             self.column.set_sort_order(gtk.SORT_ASCENDING)
-        elif guiplugins.guiConfig.getValue("auto_sort_test_suites") == -1:
-            guiplugins.guilog.info("Initially sorting tests in descending alphabetical order.")
+        elif guiutils.guiConfig.getValue("auto_sort_test_suites") == -1:
+            guiutils.guilog.info("Initially sorting tests in descending alphabetical order.")
             self.column.set_sort_indicator(True)
             self.column.set_sort_order(gtk.SORT_DESCENDING)
         return self.column
@@ -175,9 +175,9 @@ class TestIteratorMap:
             del self.dict[key]
 
 
-class TestTreeGUI(guiplugins.ContainerGUI):
+class TestTreeGUI(guiutils.ContainerGUI):
     def __init__(self, dynamic, allApps, popupGUI, subGUI):
-        guiplugins.ContainerGUI.__init__(self, [ subGUI ])
+        guiutils.ContainerGUI.__init__(self, [ subGUI ])
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,\
                                    gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_BOOLEAN, \
                                    gobject.TYPE_STRING)
@@ -192,7 +192,7 @@ class TestTreeGUI(guiplugins.ContainerGUI):
         self.collapsedRows = {}
         self.filteredModel = None
         self.treeView = None
-        self.newTestsVisible = guiplugins.guiConfig.showCategoryByDefault("not_started")
+        self.newTestsVisible = guiutils.guiConfig.showCategoryByDefault("not_started")
         self.diag = logging.getLogger("Test Tree")
 
     def notifyDefaultVisibility(self, newValue):
@@ -206,7 +206,7 @@ class TestTreeGUI(guiplugins.ContainerGUI):
         if self.dynamic:
             return False
         else:
-            return guiplugins.guiConfig.getValue("static_collapse_suites")
+            return guiutils.guiConfig.getValue("static_collapse_suites")
 
     def notifyAllRead(self, suites):
         if self.dynamic:
@@ -232,7 +232,7 @@ class TestTreeGUI(guiplugins.ContainerGUI):
     def addSuiteWithParent(self, suite, parent, follower=None):
         nodeName = self.getNodeName(suite, parent)
         self.diag.info("Adding node with name " + nodeName)
-        colour = guiplugins.guiConfig.getTestColour("not_started")
+        colour = guiutils.guiConfig.getTestColour("not_started")
         visible = self.newTestsVisible or not suite.parent
         row = [ nodeName, colour, [ suite ], "", colour, visible, "" ]
         iter = self.model.insert_before(parent, follower, row)
@@ -269,15 +269,15 @@ class TestTreeGUI(guiplugins.ContainerGUI):
             detailsColumn.add_attribute(detailsRenderer, 'background', 4)
             detailsColumn.add_attribute(recalcRenderer, 'stock_id', 6)
             detailsColumn.set_resizable(True)
-            guiplugins.addRefreshTips(self.treeView, "test", recalcRenderer, detailsColumn, 6)
+            guiutils.addRefreshTips(self.treeView, "test", recalcRenderer, detailsColumn, 6)
             self.treeView.append_column(detailsColumn)
 
-        guiplugins.scriptEngine.monitorExpansion(self.treeView, "show test suite", "hide test suite")
+        guiutils.scriptEngine.monitorExpansion(self.treeView, "show test suite", "hide test suite")
         self.treeView.connect('row-expanded', self.rowExpanded)
         self.expandLevel(self.treeView, self.filteredModel.get_iter_root())
-        guiplugins.scriptEngine.monitorRightClicks("view actions for test", self.treeView)
+        guiutils.scriptEngine.monitorRightClicks("view actions for test", self.treeView)
         self.treeView.connect("button_press_event", self.popupGUI.showMenu)
-        guiplugins.scriptEngine.monitor("set test selection to", self.selection)
+        guiutils.scriptEngine.monitor("set test selection to", self.selection)
         self.selection.connect("changed", self.userChangedSelection)
 
         self.treeView.show()
@@ -429,7 +429,7 @@ class TestTreeGUI(guiplugins.ContainerGUI):
             pass # convert_child_iter_to_iter throws RunTimeError if the row is hidden in the TreeModelFilter
     def notifySetTestSelection(self, selTests, criteria="", selectCollapsed=True):
         actualSelection = self.selectTestRows(selTests, selectCollapsed)
-        guiplugins.guilog.info("Marking " + str(self.selection.count_selected_rows()) + " tests as selected")
+        guiutils.guilog.info("Marking " + str(self.selection.count_selected_rows()) + " tests as selected")
         # Here it's been set via some indirect mechanism, might want to behave differently
         self.sendSelectionNotification(actualSelection, direct=False)
     def selectTestRows(self, selTests, selectCollapsed=True):
@@ -509,7 +509,7 @@ class TestTreeGUI(guiplugins.ContainerGUI):
         self.model.set_value(iter, 3, detailText)
         self.model.set_value(iter, 4, colour)
 
-        if guiplugins.guiConfig.getValue("auto_collapse_successful") == 1:
+        if guiutils.guiConfig.getValue("auto_collapse_successful") == 1:
             self.collapseRow(iter)
 
     def isVisible(self, test):
@@ -537,7 +537,7 @@ class TestTreeGUI(guiplugins.ContainerGUI):
     def notifyAllComplete(self):
         test = self.getTestForAutoSelect()
         if test:
-            guiplugins.guilog.info("Only one test found, selecting " + test.uniqueName)
+            guiutils.guilog.info("Only one test found, selecting " + test.uniqueName)
             actualSelection = self.selectTestRows([ test ])
             self.sendSelectionNotification(actualSelection)
 
@@ -596,7 +596,7 @@ class TestTreeGUI(guiplugins.ContainerGUI):
         else:
             self.notify("TestTreeCounters", totalDelta=delta, totalShownDelta=delta, totalRowsDelta=0)
             allTests.remove(test)
-            guiplugins.guilog.info("Removing additional test from path " + test.getRelPath())
+            guiutils.guilog.info("Removing additional test from path " + test.getRelPath())
 
     def removeTest(self, test, iter):
         filteredIter = self.findIter(test)

@@ -1203,8 +1203,18 @@ class RunTest(plugins.Action):
         return Template(open(optionsFile).read().strip()).safe_substitute(test.environment)
         
     def getOptions(self, test):
-        optionsFiles = test.getAllPathNames("options")
-        return " ".join((self.getOptionsFromFile(test, f) for f in optionsFiles))
+        options = ""
+        for optionsFile in test.getAllPathNames("options"):
+            optionString = self.getOptionsFromFile(test, optionsFile)
+            startPos = optionString.find("{CLEAR ")
+            if startPos != -1:
+                endPos = optionString.find("}", startPos)
+                clearStr = optionString[startPos:endPos + 1]
+                toClear = clearStr[7:-1]
+                options = options.replace(toClear, "") + optionString.replace(clearStr, "")
+            else:
+                options += optionString
+        return options
         
     def diagnose(self, testEnv, commandArgs):
         if self.diag.isEnabledFor(logging.INFO):

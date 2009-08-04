@@ -214,7 +214,8 @@ class ImportTest(guiplugins.ActionDialogGUI):
         self.optionGroup.addOption("name", self.getNameTitle())
         self.optionGroup.addOption("desc", self.getDescTitle(), description="Enter a description of the new " + self.testType().lower() + " which will be inserted as a comment in the testsuite file.")
         self.optionGroup.addOption("testpos", self.getPlaceTitle(), "last in suite", allocateNofValues=2, description="Where in the test suite should the test be placed?")
-        self.testImported = None
+        self.testsImported = []
+
     def getConfirmationMessage(self):
         testName = self.getNewTestName()
         suite = self.getDestinationSuite()
@@ -228,8 +229,10 @@ class ImportTest(guiplugins.ActionDialogGUI):
                 return "Test directory already exists for '" + testName + "'\nAre you sure you want to use this name?"
         else:
             return ""
+
     def _getStockId(self):
         return "add"
+    
     def getResizeDivisors(self):
         # size of the dialog
         return 1.5, 2.8
@@ -240,16 +243,28 @@ class ImportTest(guiplugins.ActionDialogGUI):
             if len(parts) > 1 and parts[1] == app.name:
                 return True
         return False
+
     def singleTestOnly(self):
         return True
+
     def correctTestClass(self):
         return "test-suite"
+
     def getNameTitle(self):
         return self.testType() + " Name"
+
     def getDescTitle(self):
         return self.testType() + " Description"
+
     def getPlaceTitle(self):
         return "\nPlace " + self.testType()
+
+    def getDefaultName(self):
+        return ""
+
+    def getDefaultDesc(self):
+        return ""
+    
     def updateOptions(self):
         self.optionGroup.setOptionValue("name", self.getDefaultName())
         self.optionGroup.setOptionValue("desc", self.getDefaultDesc())
@@ -265,41 +280,43 @@ class ImportTest(guiplugins.ActionDialogGUI):
 
         self.optionGroup.setPossibleValues("testpos", placements)
         self.optionGroup.getOption("testpos").reset()
-    def getDefaultName(self):
-        return ""
-    def getDefaultDesc(self):
-        return ""
+
     def _getTitle(self):
         return "Add " + self.testType()
+
     def testType(self): #pragma : no cover - doc only
         return ""
+
     def messageAfterPerform(self):
-        if self.testImported:
-            return "Added new " + repr(self.testImported)
+        if len(self.testsImported):
+            return "Added new " + ", ".join((repr(test) for test in self.testsImported))
+
     def getNewTestName(self):
         # Overwritten in subclasses - occasionally it can be inferred
         return self.optionGroup.getOptionValue("name").strip()
+
     def performOnCurrent(self):
         testName = self.getNewTestName()
-        suite = self.getDestinationSuite()
-
-        guiutils.guilog.info("Adding " + self.testType() + " " + testName + " under test suite " + \
-                    repr(suite) + ", placed " + self.optionGroup.getOptionValue("testpos"))
-        placement = self.getPlacement()
         description = self.optionGroup.getOptionValue("desc")
-        suite.registerTest(testName, description, placement)
-        testDir = suite.makeSubDirectory(testName)
-        self.testImported = self.createTestContents(suite, testDir, description, placement)
-        suite.contentChanged()
-        guiutils.guilog.info("Selecting new test " + self.testImported.name)
-        self.notify("SetTestSelection", [ self.testImported ])
+        placement = self.getPlacement()
+        self.testsImported = []
+        for suite in self.currTestSelection:
+            suite.registerTest(testName, description, placement)
+            testDir = suite.makeSubDirectory(testName)
+            self.testsImported.append(self.createTestContents(suite, testDir, description, placement))
+            suite.contentChanged()
+
+        self.notify("SetTestSelection", self.testsImported)
+
     def getSignalsSent(self):
         return [ "SetTestSelection" ]
     def getDestinationSuite(self):
         return self.currTestSelection[0]
+    
     def getPlacement(self):
         option = self.optionGroup.getOption("testpos")
         return option.possibleValues.index(option.getValue())
+
     def checkName(self, suite, testName):
         if len(testName) == 0:
             raise plugins.TextTestError, "No name given for new " + self.testType() + "!" + "\n" + \

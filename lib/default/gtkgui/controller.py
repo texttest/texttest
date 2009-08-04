@@ -85,8 +85,8 @@ class IdleHandlerManager:
 class GUIController(plugins.Responder, plugins.Observable):
     scriptEngine = None
     def __init__(self, optionMap, allApps):
-        vanilla = optionMap.has_key("vanilla")
-        self.readGtkRCFiles(vanilla)
+        includeSite, includePersonal = optionMap.configPathOptions()
+        self.readGtkRCFiles(includeSite, includePersonal)
         self.dynamic = not optionMap.has_key("gx")
         self.interactiveActionHandler = InteractiveActionHandler(self.dynamic, allApps)
         self.setUpGlobals(allApps)
@@ -103,7 +103,7 @@ class GUIController(plugins.Responder, plugins.Observable):
         self.idleManager = IdleHandlerManager()
         uiManager = gtk.UIManager()
         self.defaultActionGUIs, self.actionTabGUIs = self.interactiveActionHandler.getPluginGUIs(uiManager)
-        self.menuBarGUI, self.toolBarGUI, testPopupGUI, testFilePopupGUI = self.createMenuAndToolBarGUIs(allApps, vanilla, uiManager)
+        self.menuBarGUI, self.toolBarGUI, testPopupGUI, testFilePopupGUI = self.createMenuAndToolBarGUIs(allApps, uiManager, includeSite, includePersonal)
         self.testColumnGUI = testtree.TestColumnGUI(self.dynamic, testCount)
         self.testTreeGUI = testtree.TestTreeGUI(self.dynamic, allApps, testPopupGUI, self.testColumnGUI)
         self.testFileGUI = filetrees.TestFileGUI(self.dynamic, testFilePopupGUI)
@@ -196,8 +196,8 @@ class GUIController(plugins.Responder, plugins.Observable):
         for observer in self.getExitObservers(frameworkObserversToUse):
             self.topWindowGUI.addObserver(observer)
 
-    def readGtkRCFiles(self, vanilla):
-        for file in plugins.findDataPaths([ ".gtkrc-2.0" ], vanilla, includePersonal=True):
+    def readGtkRCFiles(self, *args):
+        for file in plugins.findDataPaths([ ".gtkrc-2.0" ], *args):
             gtk.rc_add_default_file(file)
 
     def addSuites(self, suites):
@@ -223,9 +223,9 @@ class GUIController(plugins.Responder, plugins.Observable):
         boxGUI = VBoxGUI(parts)
         return TopWindowGUI(boxGUI, self.dynamic, allApps)
 
-    def createMenuAndToolBarGUIs(self, allApps, vanilla, uiManager):
+    def createMenuAndToolBarGUIs(self, allApps, uiManager, *args):
         menuNames = self.interactiveActionHandler.getMenuNames()
-        menu = actionholders.MenuBarGUI(allApps, self.dynamic, vanilla, uiManager, self.allActionGUIs(), menuNames)
+        menu = actionholders.MenuBarGUI(allApps, self.dynamic, uiManager, self.allActionGUIs(), menuNames, *args)
         toolbar = actionholders.ToolBarGUI(uiManager, self.progressBarGUI)
         testPopup, testFilePopup = actionholders.createPopupGUIs(uiManager)
         return menu, toolbar, testPopup, testFilePopup

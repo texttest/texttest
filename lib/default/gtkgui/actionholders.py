@@ -8,18 +8,19 @@ import gtk, guiutils, plugins, os, sys, logging
 from ndict import seqdict
 
 class MenuBarGUI(guiutils.SubGUI):
-    def __init__(self, allApps, dynamic, vanilla, uiManager, actionGUIs, menuNames):
+    def __init__(self, allApps, dynamic, uiManager, actionGUIs, menuNames, *args):
         guiutils.SubGUI.__init__(self)
         # Create GUI manager, and a few default action groups
         self.menuNames = menuNames
         self.dynamic = dynamic
-        self.vanilla = vanilla
+        self.allFiles = plugins.findDataPaths([ "*.xml" ], *args)
         self.uiManager = uiManager
         self.actionGUIs = actionGUIs
         self.actionGroup = self.uiManager.get_action_groups()[0]
         self.toggleActions = []
         self.loadedModules = self.getLoadedModules()
         self.diag = logging.getLogger("Menu Bar")
+        self.diag.info("All description files : " + repr(self.allFiles))
 
     def getLoadedModules(self):
         return set((module.split(".")[-1] for module in sys.modules.keys()))
@@ -75,10 +76,8 @@ class MenuBarGUI(guiutils.SubGUI):
                 toggleAction.set_active(False)
 
     def getGUIDescriptionFileNames(self):
-        allFiles = plugins.findDataPaths([ "*.xml" ], self.vanilla, includePersonal=True)
-        self.diag.info("All description files : " + repr(allFiles))
         # Pick up all GUI descriptions corresponding to modules we've loaded
-        loadFiles = filter(self.shouldLoad, allFiles)
+        loadFiles = filter(self.shouldLoad, self.allFiles)
         loadFiles.sort(self.cmpDescFiles)
         return loadFiles
 

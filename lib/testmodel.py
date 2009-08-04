@@ -1099,7 +1099,8 @@ class Application:
     def fullName(self):
         return self.getConfigValue("full_name")
     def getPersonalConfigFiles(self):
-        if self.inputOptions.has_key("vanilla"):
+        includeSite, includePersonal = self.inputOptions.configPathOptions()
+        if not includePersonal:
             return []
         else:
             dircache = DirectoryCache(plugins.getPersonalConfigDir())
@@ -1200,7 +1201,8 @@ class Application:
         self.readDefaultConfigFiles()
         self.readExplicitConfigFiles(configModuleInitialised)
     def readDefaultConfigFiles(self):
-        for dataDir in plugins.findDataDirs(vanilla=self.inputOptions.has_key("vanilla")):
+        includeSite, includePersonal = self.inputOptions.configPathOptions()
+        for dataDir in plugins.findDataDirs(includeSite, includePersonal):
             # don't error check as there might be settings there for all sorts of config modules...
             self.readValues(self.configDir, "config", DirectoryCache(dataDir), insert=False, errorOnUnknown=False)
     def readExplicitConfigFiles(self, errorOnUnknown):
@@ -1581,6 +1583,7 @@ class OptionFinder(plugins.OptionFinder):
             else:
                 versionList.append(version)
         return versionList
+    
     def findSelectedAppNames(self):
         if not self.has_key("a"):
             return {}
@@ -1598,6 +1601,7 @@ class OptionFinder(plugins.OptionFinder):
                 self.addToAppDict(appDict, appName, self.combineVersions(appVersion, version))
 
         return appDict
+
     def combineVersions(self, v1, v2):
         if len(v1) == 0 or v1 == v2:
             return v2
@@ -1605,15 +1609,31 @@ class OptionFinder(plugins.OptionFinder):
             return v1
         else:
             return v1 + "." + v2
+
     def addToAppDict(self, appDict, appName, versionName):
         if appDict.has_key(appName):
             appDict[appName].append(versionName)
         else:
             appDict[appName] = [ versionName ]
+
     def helpMode(self):
         return self.has_key("help")
+
     def runScript(self):
         return self.get("s")
+
+    def configPathOptions(self):
+        # Returns includeSite, includePersonal
+        if not self.has_key("vanilla"):
+            return True, True
+
+        vanilla = self.get("vanilla")
+        if vanilla == "site":
+            return False, True
+        elif vanilla == "personal":
+            return True, False
+        else:
+            return False, False
     
 
 # Simple responder that collects completion notifications and sends one out when

@@ -90,14 +90,14 @@ def getPersonalDir(dataDirName):
     envVar = "TEXTTEST_PERSONAL_" + dataDirName.upper()
     return os.getenv(envVar, os.path.join(getPersonalConfigDir(), dataDirName))
 
-def findDataDirs(vanilla=False, includePersonal=False, dataDirName="etc"):
-    if vanilla:
-        return [ os.path.join(installationRoots[0], dataDirName) ]
-    else:
+def findDataDirs(includeSite=True, includePersonal=False, dataDirName="etc"):
+    if includeSite:
         dirs = [ os.path.join(instRoot, dataDirName) for instRoot in installationRoots ]
-        if includePersonal:
-            dirs.append(getPersonalDir(dataDirName))
-        return dirs
+    else:
+        dirs = [ os.path.join(installationRoots[0], dataDirName) ]
+    if includePersonal:
+        dirs.append(getPersonalDir(dataDirName))
+    return dirs
 
 def findDataPaths(filePatterns, *args, **kwargs):
     paths = []

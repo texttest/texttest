@@ -207,8 +207,8 @@ class Config:
         
     def setUpLogging(self):
         filePatterns = [ "logging." + postfix for postfix in self.getLogfilePostfixes() ]
-        allPaths = plugins.findDataPaths(filePatterns, dataDirName="log", includePersonal=True,
-                                         vanilla=self.optionMap.has_key("vanilla"))
+        includePersonal, includeSite = self.optionMap.configPathOptions()
+        allPaths = plugins.findDataPaths(filePatterns, includeSite, includePersonal, dataDirName="log")
         if len(allPaths) > 0:
             plugins.configureLogging(allPaths[-1]) # Won't have any effect if we've already got a log file
         else:
@@ -1415,12 +1415,12 @@ class DocumentEnvironment(plugins.Action):
             return self.findAllVariables(app, self.prefixes, rootDir)
 
     def findAllVariables(self, app, prefixes, rootDir):
-        vanilla = app.inputOptions.has_key("vanilla")
+        includeSite = app.inputOptions.configPathOptions()[0]
         allVars = {}
         for root, dirs, files in os.walk(rootDir):
             if "log" in dirs:
                 dirs.remove("log")
-            if vanilla and "site" in dirs:
+            if not includeSite and "site" in dirs:
                 dirs.remove("site")
             if root.endswith("lib"):
                 for dir in dirs:

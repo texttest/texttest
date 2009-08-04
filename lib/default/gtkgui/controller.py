@@ -29,7 +29,7 @@ try:
 except:
     raiseException("Unable to import module 'gobject'")
 
-import gtkusecase, testtree, filetrees, statusviews, textinfo, actionholders, guiplugins, guiutils, plugins, os, sys, logging
+import gtkusecase, testtree, filetrees, statusviews, textinfo, actionholders, version_control, guiplugins, guiutils, plugins, os, sys, logging
 from copy import copy
 from ndict import seqdict
 
@@ -568,23 +568,26 @@ class InteractiveActionHandler:
         return reduce(set.union, (c.getMenuNames() for c in self.getAllIntvConfigs(self.allApps)), set())
     
     def getAllIntvConfigs(self, apps):
-        return self.getAllConfigs(apps, self.getExplicitConfigModule) + \
-               self.getAllConfigs(apps, self.getVcsModule)
+        configs = self.getAllConfigs(apps)
+        vcsConfig = version_control.getVersionControlConfig(apps)
+        if vcsConfig:
+            configs.append(vcsConfig)
+        return configs
 
-    def getAllConfigs(self, allApps, getModule):
+    def getAllConfigs(self, allApps):
         configs = []
         modules = set()
         for app in allApps:
-            module, extraArgs = getModule(app)
+            module = self.getExplicitConfigModule(app)
             if module and module not in modules:
                 modules.add(module)
-                config = self._getIntvActionConfig(module, *extraArgs)
+                config = self._getIntvActionConfig(module)
                 if config:
                     configs.append(config)
         if len(configs) == 0:
-            defaultModule, extraArgs = getModule()
+            defaultModule = self.getExplicitConfigModule()
             if defaultModule:
-                defaultConfig = self._getIntvActionConfig(defaultModule, *extraArgs)
+                defaultConfig = self._getIntvActionConfig(defaultModule)
                 if defaultConfig:
                     return [ defaultConfig ]
                 else:
@@ -614,30 +617,16 @@ class InteractiveActionHandler:
         if app:
             module = app.getConfigValue("interactive_action_module")
             if module == "cvs": # for back compatibility...
-                return "default_gui", ()
+                return "default_gui"
             else:
-                return module, ()
+                return module
         else:
-            return "default_gui", ()
-
-    def getVcsModule(self, app=None):
-        if app:
-            return self._getVcsModule(app.getDirectory())
-        else:
-            return self._getVcsModule(os.getenv("TEXTTEST_HOME"))
-
-    def _getVcsModule(self, directory):
-        for dir in [ directory, os.path.dirname(directory) ]:
-            for controlDirName in plugins.controlDirNames:
-                controlDir = os.path.join(dir, controlDirName)
-                if os.path.isdir(controlDir):
-                    return controlDirName.lower().replace(".", ""), (controlDir,)
-        return None, ()
+            return "default_gui"
     
-    def _getIntvActionConfig(self, module, *args):
+    def _getIntvActionConfig(self, module):
         try:
             exec "from " + module + " import InteractiveActionConfig"
-            return InteractiveActionConfig(*args)
+            return InteractiveActionConfig()
         except ImportError:
             if module == "default_gui":
                 raise

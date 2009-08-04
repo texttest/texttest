@@ -18,9 +18,15 @@ class MenuBarGUI(guiutils.SubGUI):
         self.actionGUIs = actionGUIs
         self.actionGroup = self.uiManager.get_action_groups()[0]
         self.toggleActions = []
+        self.loadedModules = self.getLoadedModules()
         self.diag = logging.getLogger("Menu Bar")
+
+    def getLoadedModules(self):
+        return set((module.split(".")[-1] for module in sys.modules.keys()))
+
     def shouldHide(self, name):
         return guiutils.guiConfig.getCompositeValue("hide_gui_element", name, modeDependent=True)
+
     def toggleVisibility(self, action, observer, *args):
         widget = observer.widget
         oldVisible = widget.get_property('visible')
@@ -29,6 +35,7 @@ class MenuBarGUI(guiutils.SubGUI):
             widget.hide()
         elif newVisible and not oldVisible:
             widget.show()
+
     def createToggleActions(self):
         for observer in self.observers:
             actionTitle = observer.getWidgetName()
@@ -39,6 +46,7 @@ class MenuBarGUI(guiutils.SubGUI):
             gtkAction.connect("toggled", self.toggleVisibility, observer)
             guiutils.scriptEngine.registerToggleButton(gtkAction, "show " + actionName, "hide " + actionName)
             self.toggleActions.append(gtkAction)
+            
     def createView(self):
         # Initialize
         for menuName in self.menuNames:
@@ -86,6 +94,7 @@ class MenuBarGUI(guiutils.SubGUI):
         if partCount1 != partCount2:
             return cmp(partCount1, partCount2) # less - implies read first (not mode-specific)
         return cmp(base2, base1) # something deterministic, just to make sure it's the same for everyone
+    
     def shouldLoad(self, fileName):
         baseName = os.path.basename(fileName)
         if (baseName.endswith("-dynamic.xml") and self.dynamic) or \
@@ -94,8 +103,7 @@ class MenuBarGUI(guiutils.SubGUI):
         else:
             moduleName = baseName[:-4]
         self.diag.info("Checking if we loaded module " + moduleName)
-        packageName = ".".join(__name__.split(".")[:-1])
-        return sys.modules.has_key(moduleName) or sys.modules.has_key(packageName + "." + moduleName)
+        return moduleName in self.loadedModules
     
 
 class ToolBarGUI(guiutils.ContainerGUI):

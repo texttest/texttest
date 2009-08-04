@@ -1,5 +1,6 @@
 
-import gtk, version_control, guiutils, plugins, datetime, shutil, time, os
+import gtk, vcs_independent, plugins, datetime, shutil, time, os
+from default.gtkgui import guiutils
 from ndict import seqdict
 
 #
@@ -31,13 +32,13 @@ from ndict import seqdict
 #
 
 
-class CVSInterface(version_control.VersionControlInterface):
+class CVSInterface(vcs_independent.VersionControlInterface):
     def __init__(self, cvsDir):
         # Googled up.
         cvsWarningStates = [ "Locally Modified", "Locally Removed", "Locally Added" ]
         cvsErrorStates = [ "File had conflicts on merge", "Needs Checkout", "Unresolved Conflicts", "Needs Patch",
                            "Needs Merge", "Entry Invalid", "Unknown", "PROHIBITED" ]
-        version_control.VersionControlInterface.__init__(self, cvsDir, "CVS", cvsWarningStates, cvsErrorStates, "HEAD")
+        vcs_independent.VersionControlInterface.__init__(self, cvsDir, "CVS", cvsWarningStates, cvsErrorStates, "HEAD")
         self.defaultArgs["log"] = [ "-N" ]
         self.defaultArgs["diff"] = [ "-N" ]
         self.defaultArgs["rm"] = [ "-f" ]
@@ -97,7 +98,7 @@ class CVSInterface(version_control.VersionControlInterface):
 
     def copyDirectory(self, oldDir, newDir):
         existedBefore = os.path.exists(newDir)
-        version_control.VersionControlInterface.copyDirectory(self, oldDir, newDir)
+        vcs_independent.VersionControlInterface.copyDirectory(self, oldDir, newDir)
         if not existedBefore:
             self.cleanControlDirs(newDir)
 
@@ -136,21 +137,21 @@ class CVSInterface(version_control.VersionControlInterface):
             for fileName in self.getFileNames(fileArg, recursive, includeDirs=True):
                 self.callProgramWithHandler(fileName, basicArgs + [ fileName ], cwd=os.path.dirname(fileName), **kwargs)
         else:
-            version_control.VersionControlInterface.callProgramOnFiles(self, cmdName, fileArg, recursive, extraArgs, **kwargs)
+            vcs_independent.VersionControlInterface.callProgramOnFiles(self, cmdName, fileArg, recursive, extraArgs, **kwargs)
 
         
 
      
-class CVSLogLatest(version_control.LogGUI):
+class CVSLogLatest(vcs_independent.LogGUI):
     def __init__(self, *args):
-        version_control.LogGUI.__init__(self, *args)
+        vcs_independent.LogGUI.__init__(self, *args)
         self.cmdName = "log"
     def getExtraArgs(self):
         return [ "-rHEAD" ]
     def _getTitle(self):
         return "Log Latest"
     def getResultDialogMessage(self):
-        cmdArgs = version_control.vcs.getCmdArgs(self.cmdName, self.getExtraArgs())
+        cmdArgs = vcs_independent.vcs.getCmdArgs(self.cmdName, self.getExtraArgs())
         message = "Showing latest log entries for the CVS controlled files.\nCVS command used: " + " ".join(cmdArgs)
         if not self.recursive:
             message += "\nSubdirectories were ignored."            
@@ -229,25 +230,25 @@ class CVSLogLatest(version_control.LogGUI):
         self.vbox.pack_start(notebook, expand=True, fill=True)
         self.dialog.vbox.pack_start(self.vbox, expand=True, fill=True)
         
-version_control.vcsClass = CVSInterface
+vcs_independent.vcsClass = CVSInterface
 
-class RenameTest(version_control.RenameTest):
+class RenameTest(vcs_independent.RenameTest):
     def handleExistingDirectory(self, dir):
         if os.listdir(dir) == [ "CVS" ]:
             # There is only a CVS control dir, i.e. it's probably been removed in CVS.
             # Revert it in CVS and continue
             shutil.rmtree(dir)
             dirname, local = os.path.split(dir)
-            version_control.vcs.callProgram("update", [ "-dP", local ], cwd=dirname)
+            vcs_independent.vcs.callProgram("update", [ "-dP", local ], cwd=dirname)
         else:
-            version_control.RenameTest.handleExistingDirectory(self, dir)
+            vcs_independent.RenameTest.handleExistingDirectory(self, dir)
             
 #
 # Configuration for the Interactive Actions
 #
-class InteractiveActionConfig(version_control.InteractiveActionConfig):
+class InteractiveActionConfig(vcs_independent.InteractiveActionConfig):
     def getInteractiveActionClasses(self, dynamic):
-        return version_control.InteractiveActionConfig.getInteractiveActionClasses(self, dynamic) + [ CVSLogLatest ]
+        return vcs_independent.InteractiveActionConfig.getInteractiveActionClasses(self, dynamic) + [ CVSLogLatest ]
     
     def getRenameClass(self):
         return RenameTest

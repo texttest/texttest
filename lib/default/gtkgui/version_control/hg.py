@@ -1,14 +1,14 @@
 
-import version_control, plugins, shutil, datetime, time, os
+import vcs_independent, plugins, shutil, datetime, time, os
 
-class HgInterface(version_control.VersionControlInterface):
+class HgInterface(vcs_independent.VersionControlInterface):
     def __init__(self, controlDir):
         self.warningStateInfo = { "M": "Modified", "R":"Removed", "A":"Added" }
         self.errorStateInfo = { "?" : "Unknown", "!" : "Missing" }
         self.allStateInfo = { "C": "Unchanged", "I": "Ignored" }
         self.allStateInfo.update(self.warningStateInfo)
         self.allStateInfo.update(self.errorStateInfo)
-        version_control.VersionControlInterface.__init__(self, controlDir, "Mercurial",
+        vcs_independent.VersionControlInterface.__init__(self, controlDir, "Mercurial",
                                                          self.warningStateInfo.values(), self.errorStateInfo.values(), "tip")
         self.defaultArgs["rm"] = [ "--force" ]
         self.defaultArgs["status"] = [ "-A" ] # Otherwise we can't tell difference between Unchanged and Ignored
@@ -48,9 +48,9 @@ class HgInterface(version_control.VersionControlInterface):
         return retValue
 
 
-version_control.vcsClass = HgInterface
+vcs_independent.vcsClass = HgInterface
 
-class AnnotateGUI(version_control.AnnotateGUI):
+class AnnotateGUI(vcs_independent.AnnotateGUI):
     def commandHadError(self, retcode, stderr):
         return len(stderr) > 0 # Mercurial doesn't do return codes in annotate for some reason...
 
@@ -60,6 +60,6 @@ class AnnotateGUIRecursive(AnnotateGUI):
 #
 # Configuration for the Interactive Actions
 #
-class InteractiveActionConfig(version_control.InteractiveActionConfig):
+class InteractiveActionConfig(vcs_independent.InteractiveActionConfig):
     def annotateClasses(self):
         return [ AnnotateGUI, AnnotateGUIRecursive ]

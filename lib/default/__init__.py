@@ -1198,13 +1198,14 @@ class RunTest(plugins.Action):
             plugins.retryOnInterrupt(process.wait)
         except OSError:
             pass # safest, as there are python bugs in this area
+
+    def getOptionsFromFile(self, test, optionsFile):
+        return Template(open(optionsFile).read().strip()).safe_substitute(test.environment)
         
     def getOptions(self, test):
-        optionsFile = test.getFileName("options")
-        if optionsFile:
-            return Template(open(optionsFile).read().strip()).safe_substitute(test.environment)
-        else:
-            return ""
+        optionsFiles = test.getAllPathNames("options")
+        return " ".join((self.getOptionsFromFile(test, f) for f in optionsFiles))
+        
     def diagnose(self, testEnv, commandArgs):
         if self.diag.isEnabledFor(logging.INFO):
             for var, value in testEnv.items():

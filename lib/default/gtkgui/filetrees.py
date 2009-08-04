@@ -100,7 +100,7 @@ class FileViewGUI(guiutils.SubGUI):
             self.popupGUI.createView()
 
         view.show()
-        return self.addScrollBars(view, hpolicy=gtk.POLICY_AUTOMATIC)
+        return self.addScrollBars(view, hpolicy=gtk.POLICY_NEVER)
         # only used in test view
 
     def renderParentsBold(self, column, cell, model, iter):

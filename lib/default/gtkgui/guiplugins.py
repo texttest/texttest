@@ -1,6 +1,7 @@
 
 
-import gtk, gobject, guiutils, entrycompletion, plugins, os, sys, shutil, time, subprocess, operator, types, logging
+import gtk, gobject, entrycompletion, plugins, os, shutil, time, subprocess, operator, types, logging
+from guiutils import scriptEngine, guilog, guiConfig, SubGUI
 from jobprocess import killSubProcessAndChildren
 from copy import copy, deepcopy
 from glob import glob
@@ -16,7 +17,7 @@ class ProcessTerminationMonitor(plugins.Observable):
         self.processes = seqdict()
 
     def listRunningProcesses(self):
-        processesToCheck = guiutils.guiConfig.getCompositeValue("query_kill_processes", "", modeDependent=True)
+        processesToCheck = guiConfig.getCompositeValue("query_kill_processes", "", modeDependent=True)
         if "all" in processesToCheck:
             processesToCheck = [ ".*" ]
         if len(processesToCheck) == 0:
@@ -56,7 +57,7 @@ class ProcessTerminationMonitor(plugins.Observable):
         self.notify("Status", "Terminating all external viewers ...")
         for process, description, exitHandler, exitHandlerArgs in self.processes.values():
             self.notify("ActionProgress", "")
-            guiutils.guilog.info("Killing '" + description + "' interactive process")
+            guilog.info("Killing '" + description + "' interactive process")
             killSubProcessAndChildren(process, sig)
         
 processMonitor = ProcessTerminationMonitor()
@@ -70,12 +71,12 @@ class GtkActionWrapper:
         actionName = self.getTitle(includeMnemonics=False)
         self.gtkAction = gtk.Action(actionName, title, \
                                     self.getTooltip(), self.getStockId())
-        guiutils.scriptEngine.connect(self.getTooltip(), "activate", self.gtkAction, self.runInteractive)
+        scriptEngine.connect(self.getTooltip(), "activate", self.gtkAction, self.runInteractive)
         if not self.isActiveOnCurrent():
             self.gtkAction.set_property("sensitive", False)
 
     def getAccelerator(self, title):
-        realAcc = guiutils.guiConfig.getCompositeValue("gui_accelerators", title)
+        realAcc = guiConfig.getCompositeValue("gui_accelerators", title)
         if realAcc:
             key, mod = gtk.accelerator_parse(realAcc)
             if gtk.accelerator_valid(key, mod):
@@ -112,10 +113,10 @@ class GtkActionWrapper:
 
 # Introduce an extra level without all the selection-dependent stuff, some actions want
 # to inherit from here and it provides a separation
-class BasicActionGUI(guiutils.SubGUI,GtkActionWrapper):
+class BasicActionGUI(SubGUI,GtkActionWrapper):
     busy = False
     def __init__(self, *args):
-        guiutils.SubGUI.__init__(self)
+        SubGUI.__init__(self)
         GtkActionWrapper.__init__(self)
         self.topWindow = None
 
@@ -217,7 +218,7 @@ class BasicActionGUI(guiutils.SubGUI,GtkActionWrapper):
         dialog = self.createAlarmDialog(self.getParentWindow(), message, stockIcon, alarmLevel)
         yesButton = dialog.add_button(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT)
         dialog.set_default_response(gtk.RESPONSE_ACCEPT)
-        guiutils.scriptEngine.connect("agree to texttest message", "clicked", yesButton, self.cleanDialog,
+        scriptEngine.connect("agree to texttest message", "clicked", yesButton, self.cleanDialog,
                              gtk.RESPONSE_ACCEPT, True, dialog)
         dialog.show_all()
         
@@ -235,9 +236,9 @@ class BasicActionGUI(guiutils.SubGUI,GtkActionWrapper):
         dialog.set_default_response(gtk.RESPONSE_NO)
         noButton = dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
         yesButton = dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
-        guiutils.scriptEngine.connect("answer no to texttest " + alarmLevel, "clicked",
+        scriptEngine.connect("answer no to texttest " + alarmLevel, "clicked",
                              noButton, respondMethod, gtk.RESPONSE_NO, False, dialog)
-        guiutils.scriptEngine.connect("answer yes to texttest " + alarmLevel, "clicked",
+        scriptEngine.connect("answer yes to texttest " + alarmLevel, "clicked",
                              yesButton, respondMethod, gtk.RESPONSE_YES, True, dialog)
         dialog.show_all()
         
@@ -443,7 +444,7 @@ class ActionResultDialogGUI(ActionGUI):
     def createButtons(self):
         okButton = self.dialog.add_button(gtk.STOCK_CLOSE, gtk.RESPONSE_ACCEPT)
         self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
-        guiutils.scriptEngine.connect("press close", "clicked", okButton, self.cleanDialog, gtk.RESPONSE_ACCEPT, True, self.dialog)
+        scriptEngine.connect("press close", "clicked", okButton, self.cleanDialog, gtk.RESPONSE_ACCEPT, True, self.dialog)
 
 
 class ComboBoxListFinder:
@@ -471,7 +472,7 @@ class OptionGroupGUI(ActionGUI):
         return False     
 
     def updateForConfig(self, option):
-        fromConfig = guiutils.guiConfig.getCompositeValue("gui_entry_overrides", option.name)
+        fromConfig = guiConfig.getCompositeValue("gui_entry_overrides", option.name)
         # only do this if it hasn't previously been manually overwritten
         if fromConfig is not None and fromConfig != "<not set>" and option.getValue() == option.defaultValue:
             option.setValue(fromConfig)
@@ -489,7 +490,7 @@ class OptionGroupGUI(ActionGUI):
         optionName = option.name.strip()
         entry.set_name(optionName)
         labelEventBox = self.createLabelEventBox(option, separator)
-        guiutils.scriptEngine.registerEntry(entry, "enter " + optionName + " =")
+        scriptEngine.registerEntry(entry, "enter " + optionName + " =")
         entry.set_text(option.getValue())
         entrycompletion.manager.register(entry)
         # Options in drop-down lists don't change, so we just add them once and for all.
@@ -532,14 +533,14 @@ class OptionGroupGUI(ActionGUI):
         for index, option in enumerate(switch.options):
             cleanOption = option.split("\n")[0].replace("_", "")
             configName, useCaseName = self.getNaming(switch.name, cleanOption, optionGroup)
-            if guiutils.guiConfig.getCompositeValue("gui_entry_overrides", configName) == "1":
+            if guiConfig.getCompositeValue("gui_entry_overrides", configName) == "1":
                 switch.setValue(index)
             radioButton = gtk.RadioButton(mainRadioButton, option, use_underline=True)
             if individualToolTips:
                 self.tooltips.set_tip(radioButton, switch.description[index])
                 
             buttons.append(radioButton)
-            guiutils.scriptEngine.registerToggleButton(radioButton, "choose " + useCaseName)
+            scriptEngine.registerToggleButton(radioButton, "choose " + useCaseName)
             if not mainRadioButton:
                 mainRadioButton = radioButton
             if switch.defaultValue == index:
@@ -568,7 +569,7 @@ class OptionGroupGUI(ActionGUI):
         
         if int(switch.getValue()):
             checkButton.set_active(True)
-        guiutils.scriptEngine.registerToggleButton(checkButton, "check " + switch.name, "uncheck " + switch.name)
+        scriptEngine.registerToggleButton(checkButton, "check " + switch.name, "uncheck " + switch.name)
         switch.setMethods(checkButton.get_active, checkButton.set_active)
         checkButton.show()
         return checkButton
@@ -592,7 +593,7 @@ class OptionGroupGUI(ActionGUI):
         return box, entry
   
     def getConfigOptions(self, option):
-        fromConfig = guiutils.guiConfig.getCompositeValue("gui_entry_options", option.name)
+        fromConfig = guiConfig.getCompositeValue("gui_entry_options", option.name)
         if fromConfig is None: #Happens on initial startup with no apps...
             return []
         return fromConfig
@@ -645,7 +646,7 @@ class ActionTabGUI(OptionGroupGUI):
                 self.addValuesFromConfig(option)
 
                 labelEventBox, entryWidget, entry = self.createOptionEntry(option, separator="  ")
-                guiutils.scriptEngine.connect("activate from " + option.name, "activate", entry, self.runInteractive)
+                scriptEngine.connect("activate from " + option.name, "activate", entry, self.runInteractive)
                 labelEventBox.get_children()[0].set_alignment(1.0, 0.5)
                 table.attach(labelEventBox, 0, 1, rowIndex, rowIndex + 1, xoptions=gtk.FILL, xpadding=1)
                 table.attach(entryWidget, 1, 2, rowIndex, rowIndex + 1)
@@ -670,7 +671,7 @@ class ActionTabGUI(OptionGroupGUI):
         if option.selectFile:
             button = gtk.Button("...")
             box.pack_start(button, expand=False, fill=False)
-            guiutils.scriptEngine.connect("search for files for '" + option.name + "'",
+            scriptEngine.connect("search for files for '" + option.name + "'",
                                  "clicked", button, self.showFileChooser, None, entry, option)
         return (box, entry)
     
@@ -688,7 +689,7 @@ class ActionTabGUI(OptionGroupGUI):
         # 'temporary_filter_files' or 'filter_files' ...
         dialog.set_modal(True)
         folders, defaultFolder = option.getDirectories()
-        guiutils.scriptEngine.registerOpenFileChooser(dialog, "select filter-file", "look in folder", 
+        scriptEngine.registerOpenFileChooser(dialog, "select filter-file", "look in folder", 
                                              "open selected file", "cancel file selection", self.respondChooser, respondMethodArg=entry)
         # If current entry forms a valid path, set that as default
         currPath = entry.get_text()
@@ -802,20 +803,20 @@ class ActionDialogGUI(OptionGroupGUI):
         if fileChooser:
             buttonScriptName = "press " + actionScriptName.split()[0]
             if fileChooser.get_property("action") == gtk.FILE_CHOOSER_ACTION_SAVE:
-                guiutils.scriptEngine.registerSaveFileChooser(fileChooser, fileChooserOption.name,
+                scriptEngine.registerSaveFileChooser(fileChooser, fileChooserOption.name,
                                                      "choose folder", buttonScriptName, "press cancel",
                                                      self.respond, okButton, cancelButton, dialog)
             else:
                 fileChooserScriptName = fileChooserOption.name.strip().lower()
                 if not fileChooserScriptName.startswith("select"):
                     fileChooserScriptName = "select " + fileChooserScriptName + " ="
-                guiutils.scriptEngine.registerOpenFileChooser(fileChooser, fileChooserScriptName,
+                scriptEngine.registerOpenFileChooser(fileChooser, fileChooserScriptName,
                                                      "look in folder", buttonScriptName, "press cancel", 
                                                      self.respond, okButton, cancelButton, dialog)
             fileChooserOption.setMethods(fileChooser.get_filename, fileChooser.set_filename)
         else:
-            guiutils.scriptEngine.connect("press cancel", "clicked", cancelButton, self.respond, gtk.RESPONSE_CANCEL, False, dialog)
-            guiutils.scriptEngine.connect("press ok", "clicked", okButton, self.respond, gtk.RESPONSE_ACCEPT, True, dialog)
+            scriptEngine.connect("press cancel", "clicked", cancelButton, self.respond, gtk.RESPONSE_CANCEL, False, dialog)
+            scriptEngine.connect("press ok", "clicked", okButton, self.respond, gtk.RESPONSE_ACCEPT, True, dialog)
 
     def fillVBox(self, vbox):
         fileChooser, fileChooserOption = None, None

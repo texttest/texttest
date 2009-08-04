@@ -29,7 +29,7 @@ try:
 except:
     raiseException("Unable to import module 'gobject'")
 
-import gtkusecase, testtree, filetrees, statusviews, textinfo, actionholders, guiplugins, guiutils, plugins, os, logging
+import gtkusecase, testtree, filetrees, statusviews, textinfo, actionholders, guiplugins, guiutils, plugins, os, sys, logging
 from copy import copy
 from ndict import seqdict
 
@@ -121,9 +121,10 @@ class GUIController(plugins.Responder, plugins.Observable):
         defaultAccelerators = self.interactiveActionHandler.getDefaultAccelerators()
         guiConfig = guiutils.GUIConfig(self.dynamic, allApps, defaultColours, defaultAccelerators, guilog)
 
-        guiutils.guilog = guilog
-        guiutils.scriptEngine = scriptEngine
-        guiutils.guiConfig = guiConfig
+        for module in [ guiutils, guiplugins ]:
+            module.guilog = guilog
+            module.scriptEngine = scriptEngine
+            module.guiConfig = guiConfig
 
     def getTestTreeObservers(self):
         return [ self.testColumnGUI, self.testFileGUI, self.textInfoGUI, self.testRunInfoGUI ] + self.allActionGUIs() + [ self.rightWindowGUI ]

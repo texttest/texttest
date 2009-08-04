@@ -207,7 +207,7 @@ class Config:
         
     def setUpLogging(self):
         filePatterns = [ "logging." + postfix for postfix in self.getLogfilePostfixes() ]
-        includePersonal, includeSite = self.optionMap.configPathOptions()
+        includeSite, includePersonal = self.optionMap.configPathOptions()
         allPaths = plugins.findDataPaths(filePatterns, includeSite, includePersonal, dataDirName="log")
         if len(allPaths) > 0:
             plugins.configureLogging(allPaths[-1]) # Won't have any effect if we've already got a log file

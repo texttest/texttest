@@ -85,7 +85,7 @@ class RefreshTips:
         model = view.get_model()
         if isinstance(model, gtk.TreeModelFilter):
             childPath = model.convert_path_to_child_path(path)
-            return model.get_model()[path][self.refreshIndex]
+            return model.get_model()[childPath][self.refreshIndex]
         else:
             return model[path][self.refreshIndex]
 

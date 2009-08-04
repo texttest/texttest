@@ -81,7 +81,7 @@ class RefreshTips:
         self.refreshColumn = refreshColumn
         self.refreshCell = refreshCell
 
-    def hasRefreshIcon(self, view, path):
+    def hasRefreshIcon(self, view, path): # pragma: no cover - PyUseCase cannot test tooltips (future?)
         model = view.get_model()
         if isinstance(model, gtk.TreeModelFilter):
             childPath = model.convert_path_to_child_path(path)
@@ -89,7 +89,7 @@ class RefreshTips:
         else:
             return model[path][self.refreshIndex]
 
-    def getTooltip(self, view, widget_x, widget_y, keyboard_mode, tooltip): 
+    def getTooltip(self, view, widget_x, widget_y, keyboard_mode, tooltip): # pragma: no cover - PyUseCase cannot test tooltips (future?)
         x, y = view.convert_widget_to_tree_coords(widget_x, widget_y)
         pathInfo = view.get_path_at_pos(x, y)
         if pathInfo is None:
@@ -192,10 +192,10 @@ class GUIConfig:
                 prevValue = toUse
         return prevValue
     def chooseValueFrom(self, value1, value2):
-        if value1 is None or value1 == value2:
-            return value2
-        if value2 is None:
+        if value2 is None or value1 == value2:
             return value1
+        if value1 is None:
+            return value2
         if type(value1) == types.ListType:
             return self.createUnion(value1, value2)
 
@@ -336,7 +336,7 @@ class SubGUI(plugins.Observable):
         plugins.Observable.__init__(self)
         self.widget = None
     
-    def createView(self):
+    def createView(self): # pragma: no cover - implemented in all subclasses
         pass
 
     def shouldShow(self):

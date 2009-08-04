@@ -3,8 +3,9 @@
 The various classes that launch external programs to view files
 """
 
-import plugins, os
+import gtk, plugins, os
 from default.gtkgui import guiplugins # from .. import guiplugins when we drop Python 2.4 support
+from ndict import seqdict
 from string import Template
 
 class FileViewAction(guiplugins.ActionGUI):
@@ -380,9 +381,89 @@ class FollowFile(FileViewAction):
     def followComplete(self, *args):
         guiplugins.scriptEngine.applicationEvent("the file-following program to terminate", "files")
 
+class ShowFileProperties(guiplugins.ActionResultDialogGUI):
+    def __init__(self, allApps, dynamic):
+        self.dynamic = dynamic
+        guiplugins.ActionGUI.__init__(self, allApps)
+    def _getStockId(self):
+        return "properties"
+    def isActiveOnCurrent(self, *args):
+        return ((not self.dynamic) or len(self.currTestSelection) == 1) and \
+               len(self.currFileSelection) > 0
+    def _getTitle(self):
+        return "_File Properties"
+    def getTooltip(self):
+        return "Show properties of selected files"
+    def describeTests(self):
+        return str(len(self.currFileSelection)) + " files"
+    def getAllProperties(self):
+        errors, properties = [], []
+        for file, comp in self.currFileSelection:
+            if self.dynamic and comp:
+                self.processFile(comp.tmpFile, properties, errors)
+            self.processFile(file, properties, errors)
+
+        if len(errors):
+            self.showErrorDialog("Failed to get file properties:\n" + "\n".join(errors))
+
+        return properties
+    def processFile(self, file, properties, errors):
+        try:
+            prop = plugins.FileProperties(file)
+            properties.append(prop)
+        except Exception, e:
+            errors.append(plugins.getExceptionString())
+
+    # xalign = 1.0 means right aligned, 0.0 means left aligned
+    def justify(self, text, xalign = 0.0):
+        alignment = gtk.Alignment()
+        alignment.set(xalign, 0.0, 0.0, 0.0)
+        label = gtk.Label(text)
+        alignment.add(label)
+        return alignment
+
+    def addContents(self):
+        dirToProperties = seqdict()
+        props = self.getAllProperties()
+        for prop in props:
+            dirToProperties.setdefault(prop.dir, []).append(prop)
+        vbox = self.createVBox(dirToProperties)
+        self.dialog.vbox.pack_start(vbox, expand=True, fill=True)
+
+    def createVBox(self, dirToProperties):
+        vbox = gtk.VBox()
+        for dir, properties in dirToProperties.items():
+            expander = gtk.Expander()
+            expander.set_label_widget(self.justify(dir))
+            table = gtk.Table(len(properties), 7)
+            table.set_col_spacings(5)
+            row = 0
+            for prop in properties:
+                values = prop.getUnixRepresentation()
+                table.attach(self.justify(values[0] + values[1], 1.0), 0, 1, row, row + 1)
+                table.attach(self.justify(values[2], 1.0), 1, 2, row, row + 1)
+                table.attach(self.justify(values[3], 0.0), 2, 3, row, row + 1)
+                table.attach(self.justify(values[4], 0.0), 3, 4, row, row + 1)
+                table.attach(self.justify(values[5], 1.0), 4, 5, row, row + 1)
+                table.attach(self.justify(values[6], 1.0), 5, 6, row, row + 1)
+                table.attach(self.justify(prop.filename, 0.0), 6, 7, row, row + 1)
+                row += 1
+            hbox = gtk.HBox()
+            hbox.pack_start(table, expand=False, fill=False)
+            innerBorder = gtk.Alignment()
+            innerBorder.set_padding(5, 0, 0, 0)
+            innerBorder.add(hbox)
+            expander.add(innerBorder)
+            expander.set_expanded(True)
+            border = gtk.Alignment()
+            border.set_padding(5, 5, 5, 5)
+            border.add(expander)
+            vbox.pack_start(border, expand=False, fill=False)
+        return vbox
+
 
 def getInteractiveActionClasses(dynamic):
-    classes = [ ViewTestFileInEditor ]
+    classes = [ ShowFileProperties, ViewTestFileInEditor ]
     if dynamic:
         classes += [ ViewFilteredTestFileInEditor, ViewOrigFileInEditor, ViewFilteredOrigFileInEditor,
                      ViewFileDifferences, ViewFilteredFileDifferences, FollowFile ]

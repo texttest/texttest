@@ -1022,9 +1022,81 @@ class SortTestSuiteFileDescending(SortTestSuiteFileAscending):
         self.performRecursively(self.currTestSelection[0], False)
 
 
+class ReportBugs(guiplugins.ActionDialogGUI):
+    def __init__(self, *args):
+        guiplugins.ActionDialogGUI.__init__(self, *args)
+        self.addOption("search_string", "Text or regexp to match")
+        self.addOption("search_file", "File to search in")
+        self.addOption("version", "\nVersion to report for")
+        self.addOption("execution_hosts", "Trigger only when run on machine(s)")
+        self.addOption("bug_system", "\nExtract info from bug system", "<none>", [ "bugzilla", "bugzillav2" ])
+        self.addOption("bug_id", "Bug ID (only if bug system given)")
+        self.addOption("full_description", "\nFull description (no bug system)")
+        self.addOption("brief_description", "Few-word summary (no bug system)")
+        self.addSwitch("trigger_on_absence", "Trigger if given text is NOT present")
+        self.addSwitch("ignore_other_errors", "Trigger even if other files differ")
+        self.addSwitch("trigger_on_success", "Trigger even if test would otherwise succeed")
+        self.addSwitch("internal_error", "Report as 'internal error' rather than 'known bug' (no bug system)")
+    def _getStockId(self):
+        return "info"
+    def singleTestOnly(self):
+        return True
+    def _getTitle(self):
+        return "Enter Failure Information"
+    def getDialogTitle(self):
+        return "Enter information for automatic interpretation of test failures"
+    def updateOptions(self):
+        self.optionGroup.setOptionValue("search_file", self.currTestSelection[0].app.getConfigValue("log_file"))
+        self.optionGroup.setPossibleValues("search_file", self.getPossibleFileStems())
+        self.optionGroup.setOptionValue("version", self.currTestSelection[0].app.getFullVersion())
+        return False
+    def getPossibleFileStems(self):
+        stems = []
+        for test in self.currTestSelection[0].testCaseList():
+            for stem in test.dircache.findAllStems(self.currTestSelection[0].defFileStems()):
+                if not stem in stems:
+                    stems.append(stem)
+        # use for unrunnable tests...
+        stems.append("free_text")
+        return stems
+    def checkSanity(self):
+        if len(self.optionGroup.getOptionValue("search_string")) == 0:
+            raise plugins.TextTestError, "Must fill in the field 'text or regexp to match'"
+        if self.optionGroup.getOptionValue("bug_system") == "<none>":
+            if len(self.optionGroup.getOptionValue("full_description")) == 0 or \
+                   len(self.optionGroup.getOptionValue("brief_description")) == 0:
+                raise plugins.TextTestError, "Must either provide a bug system or fill in both description and summary fields"
+        else:
+            if len(self.optionGroup.getOptionValue("bug_id")) == 0:
+                raise plugins.TextTestError, "Must provide a bug ID if bug system is given"
+    def versionSuffix(self):
+        version = self.optionGroup.getOptionValue("version")
+        if len(version) == 0:
+            return ""
+        else:
+            return "." + version
+    def getFileName(self):
+        name = "knownbugs." + self.currTestSelection[0].app.name + self.versionSuffix()
+        return os.path.join(self.currTestSelection[0].getDirectory(), name)
+    def getResizeDivisors(self):
+        # size of the dialog
+        return 1.4, 1.7
+    def performOnCurrent(self):
+        self.checkSanity()
+        fileName = self.getFileName()
+        writeFile = open(fileName, "a")
+        writeFile.write("\n[Reported by " + os.getenv("USER", "Windows") + " at " + plugins.localtime() + "]\n")
+        for name, option in self.optionGroup.options.items():
+            value = option.getValue()
+            if name != "version" and value and value != "<none>":
+                writeFile.write(name + ":" + str(value) + "\n")
+        writeFile.close()
+        self.currTestSelection[0].filesChanged()
+
+
 def getInteractiveActionClasses():
     return [ CopyTests, CutTests, PasteTests,
              ImportTestCase, ImportTestSuite, ImportApplication, ImportFiles,
-             RenameTest, RemoveTests,
+             RenameTest, RemoveTests, ReportBugs,
              SortTestSuiteFileAscending, SortTestSuiteFileDescending,
              RepositionTestFirst, RepositionTestUp, RepositionTestDown, RepositionTestLast ]

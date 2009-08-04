@@ -1,5 +1,5 @@
 
-import gtk, version_control, default_gui, guiutils, plugins, datetime, shutil, time, os
+import gtk, version_control, guiutils, plugins, datetime, shutil, time, os
 from ndict import seqdict
 
 #
@@ -249,7 +249,5 @@ class InteractiveActionConfig(version_control.InteractiveActionConfig):
     def getInteractiveActionClasses(self, dynamic):
         return version_control.InteractiveActionConfig.getInteractiveActionClasses(self, dynamic) + [ CVSLogLatest ]
     
-    def getReplacements(self):
-        replacements = version_control.InteractiveActionConfig.getReplacements(self)
-        replacements[default_gui.RenameTest] = RenameTest
-        return replacements
+    def getRenameClass(self):
+        return RenameTest

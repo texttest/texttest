@@ -1,7 +1,8 @@
 
 # Generic interface to version control systems. We try to keep it as general as possible.
 
-import gtk, gobject, guiplugins, guiutils, default_gui, plugins, custom_widgets, entrycompletion, os, datetime, subprocess, shutil
+import gtk, gobject, guiplugins, guiutils, plugins, custom_widgets, entrycompletion, os, datetime, subprocess, shutil
+from default.gtkgui.default_gui import adminactions
 
 vcsClass, vcs, annotateClass = None, None, None
     
@@ -764,7 +765,7 @@ class AddGUI(VersionControlDialogGUI):
         # Particularly CVS likes to write add output on stderr for some reason...
         return len(stderr) > 0
 
-class RemoveTests(default_gui.RemoveTests):
+class RemoveTests(adminactions.RemoveTests):
     @staticmethod
     def removePath(*args):
         return vcs.removePath(*args)
@@ -773,17 +774,17 @@ class RemoveTests(default_gui.RemoveTests):
         return "Any " + vcs.name + "-controlled files will be removed in " + vcs.name + ".\n" + \
                "Any files that are not version controlled will be removed from the file system and hence may not be recoverable."
     
-class RenameTest(default_gui.RenameTest):
+class RenameTest(adminactions.RenameTest):
     @staticmethod
     def moveDirectory(*args):
         return vcs.moveDirectory(*args)
 
     def getNameChangeMessage(self, newName):
-        origMessage = default_gui.RenameTest.getNameChangeMessage(self, newName)
+        origMessage = adminactions.RenameTest.getNameChangeMessage(self, newName)
         return origMessage + vcs.getMoveSuffix() 
 
 
-class PasteTests(default_gui.PasteTests):
+class PasteTests(adminactions.PasteTests):
     @staticmethod
     def moveDirectory(*args):
         return vcs.moveDirectory(*args)
@@ -792,7 +793,7 @@ class PasteTests(default_gui.PasteTests):
         return vcs.copyDirectory(*args)
 
     def getStatusMessage(self, *args):
-        origMessage = default_gui.PasteTests.getStatusMessage(self, *args)
+        origMessage = adminactions.PasteTests.getStatusMessage(self, *args)
         if self.removeAfter:
             return origMessage + vcs.getMoveSuffix()
         else:
@@ -817,7 +818,7 @@ class AddGUIRecursive(AddGUI):
 #
 # Configuration for the Interactive Actions
 #
-class InteractiveActionConfig(default_gui.InteractiveActionConfig):
+class InteractiveActionConfig(guiplugins.InteractiveActionConfig):
     def __init__(self, controlDir):
         global vcs, annotateClass
         vcs = vcsClass(controlDir)
@@ -833,7 +834,10 @@ class InteractiveActionConfig(default_gui.InteractiveActionConfig):
     def annotateClasses(self):
         return [ AnnotateGUI, AnnotateGUIRecursive ]
 
+    def getRenameClass(self):
+        return RenameTest
+
     def getReplacements(self):
-        return { default_gui.RemoveTests : RemoveTests,
-                 default_gui.RenameTest  : RenameTest,
-                 default_gui.PasteTests  : PasteTests }
+        return { adminactions.RemoveTests : RemoveTests,
+                 adminactions.RenameTest  : self.getRenameClass(),
+                 adminactions.PasteTests  : PasteTests }

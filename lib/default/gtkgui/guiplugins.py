@@ -1,7 +1,7 @@
 
 
 import gtk, gobject, entrycompletion, plugins, os, shutil, time, subprocess, operator, types, logging
-from guiutils import scriptEngine, guilog, guiConfig, SubGUI
+from guiutils import scriptEngine, guilog, guiConfig, SubGUI, GUIConfig
 from jobprocess import killSubProcessAndChildren
 from copy import copy, deepcopy
 from glob import glob
@@ -895,4 +895,32 @@ class ActionDialogGUI(OptionGroupGUI):
             return []
         
 
+class InteractiveActionConfig:
+    def getColourDictionary(self):
+        return GUIConfig.getDefaultColours()
+        
+    def getDefaultAccelerators(self):
+        return GUIConfig.getDefaultAccelerators()
 
+    def getReplacements(self):
+        # Return a dictionary mapping classes above to what to replace them with
+        return {}
+
+    def contains(self, cls, classes):
+        if cls in classes:
+            return True
+        
+        for currCls in classes:
+            if isinstance(currCls, plugins.Callable) and currCls.method == cls:
+                return True
+        return False
+    
+    def isValid(self, className):
+        replacements = self.getReplacements()
+        if className in replacements.values():
+            return True
+        elif replacements.has_key(className):
+            return False
+        else:
+            return self.contains(className, self.getInteractiveActionClasses(True)) or \
+                   self.contains(className, self.getInteractiveActionClasses(False))

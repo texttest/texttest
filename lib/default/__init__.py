@@ -1211,9 +1211,9 @@ class RunTest(plugins.Action):
                 endPos = optionString.find("}", startPos)
                 clearStr = optionString[startPos:endPos + 1]
                 toClear = clearStr[7:-1]
-                options = options.replace(toClear, "") + optionString.replace(clearStr, "")
+                options = options.replace(toClear, "") + " " + optionString.replace(clearStr, "")
             else:
-                options += optionString
+                options += " " + optionString
         return options
         
     def diagnose(self, testEnv, commandArgs):

@@ -209,7 +209,7 @@ class TestProgressMonitor(guiutils.SubGUI):
     def notifyAdd(self, test, initial):
         if self.dynamic and test.classId() == "test-case":
             incrementCount = self.testCount == 0
-            self.insertTest(test, test.stateInGui, incrementCount)
+            self.insertTest(test, test.stateInGui, "add", incrementCount)
     def notifyAllRead(self, *args):
         # Fix the not started count in case the initial guess was wrong
         if self.testCount > 0:
@@ -244,7 +244,7 @@ class TestProgressMonitor(guiutils.SubGUI):
                 filteredDiff += line + "\n"
         return filteredDiff
 
-    def getClassifiers(self, test, state):
+    def getClassifiers(self, test, state, changeDesc):
         classifiers = ClassificationTree()
         catDesc = self.getCategoryDescription(state)
         if state.isMarked():
@@ -256,7 +256,10 @@ class TestProgressMonitor(guiutils.SubGUI):
             return classifiers
 
         if not state.isComplete() or not state.hasFailed():
-            classifiers.addClassification([ catDesc ])
+            classification = [ catDesc ]
+            if "save" in changeDesc:
+                classification.append("Saved")
+            classifiers.addClassification(classification)
             return classifiers
 
         if not state.isSaveable() or state.warnOnSave(): # If it's not saveable, don't classify it by the files
@@ -314,26 +317,27 @@ class TestProgressMonitor(guiutils.SubGUI):
                 if test in testList:
                     testList.remove(test)
 
-    def insertTest(self, test, state, incrementCount):
+    def insertTest(self, test, state, changeDesc, incrementCount):
         self.classifications[test] = []
-        classifiers = self.getClassifiers(test, state)
+        classifiers = self.getClassifiers(test, state, changeDesc)
         nodeClassifier = classifiers.keys()[0]
         defaultColour, defaultVisibility = self.getCategorySettings(state.category, nodeClassifier, classifiers)
         return self.addTestForNode(test, defaultColour, defaultVisibility, nodeClassifier, classifiers, incrementCount)
+
     def getCategorySettings(self, category, nodeClassifier, classifiers):
         # Use the category description if there is only one level, otherwise rely on the status names
-        if len(classifiers.get(nodeClassifier)) == 0 or category == "failure":
+        if len(classifiers.get(nodeClassifier)) == 0 or category in [ "failure", "success" ]:
             return guiutils.guiConfig.getTestColour(category), guiutils.guiConfig.showCategoryByDefault(category)
         else:
             return None, True
+
     def updateTestAppearance(self, test, state, changeDesc, colour):
         resultType, summary = state.getTypeBreakdown()
         catDesc = self.getCategoryDescription(state, resultType)
         mainColour = guiutils.guiConfig.getTestColour(catDesc, guiutils.guiConfig.getTestColour(resultType))
         # Don't change suite states when unmarking tests
         updateSuccess = state.hasSucceeded() and changeDesc != "unmarked"
-        saved = changeDesc.find("save") != -1
-        self.notify("TestAppearance", test, summary, mainColour, colour, updateSuccess, saved)
+        self.notify("TestAppearance", test, summary, mainColour, colour, updateSuccess, "save" in changeDesc)
         self.notify("Visibility", [ test ], self.shouldBeVisible(test))
 
     def getInitialTestsForNode(self, test, parentIter, nodeClassifier):
@@ -361,7 +365,7 @@ class TestProgressMonitor(guiutils.SubGUI):
             initialTests = self.getInitialTestsForNode(test, parentIter, nodeClassifier)
             nodeIter = self.addNewIter(nodeClassifier, parentIter, colour, visibility, len(initialTests), initialTests)
             for initTest in initialTests:
-                self.diag.info("New node " + nodeClassifier + ", visible = " + repr(visibility) + " : add " + repr(initTest))
+                self.diag.info("New node " + nodeClassifier + ", colour = " + repr(colour) + ", visible = " + repr(visibility) + " : add " + repr(initTest))
                 self.classifications[initTest].append(nodeIter)
 
         subColours = []
@@ -400,9 +404,9 @@ class TestProgressMonitor(guiutils.SubGUI):
                 iter = self.treeModel.iter_next(iter)
     def notifyLifecycleChange(self, test, state, changeDesc):
         self.removeFromModel(test)
-        if changeDesc.find("save") != -1 or changeDesc.find("marked") != -1 or changeDesc.find("recalculated") != -1:
+        if "save" in changeDesc or "marked" in changeDesc or "recalculated" in changeDesc:
             self.removeFromDiffStore(test)
-        colourInserted = self.insertTest(test, state, incrementCount=True)
+        colourInserted = self.insertTest(test, state, changeDesc, incrementCount=True)
         self.updateTestAppearance(test, state, changeDesc, colourInserted)
         
     def removeParentIters(self, iters):

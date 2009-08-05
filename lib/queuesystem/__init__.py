@@ -12,6 +12,7 @@ from default.virtualdisplay import VirtualDisplayResponder
 from default.performance import getTestPerformance
 from default.pyusecase_interface import ApplicationEventResponder
 from types import StringType
+from glob import glob
 
 plugins.addCategory("abandoned", "abandoned", "were abandoned")
 
@@ -465,11 +466,12 @@ class QueueSystemServer(BaseActionRunner):
         self.queueSystems = {}
         self.reuseOnly = False
         self.submitAddress = None
+        self.slaveLogDirs = set()
         QueueSystemServer.instance = self
         
     def addSuites(self, suites):
         for suite in suites:
-            suite.app.makeWriteDirectory("slavelogs")
+            self.slaveLogDirs.add(suite.app.makeWriteDirectory("slavelogs"))
             currCap = suite.getConfigValue("queue_system_max_capacity")
             if currCap < self.maxCapacity:
                 self.maxCapacity = currCap
@@ -596,6 +598,19 @@ class QueueSystemServer(BaseActionRunner):
             return self.getTestForRunNormalMode()
         else:
             return self.getTestForRunReuseOnlyMode()
+    def notifyAllComplete(self):
+        errors = {}
+        errorFiles = []
+        for logDir in self.slaveLogDirs:
+            errorFiles += filter(os.path.getsize, glob(os.path.join(logDir, "*.errors")))
+        if len(errorFiles) == 0:
+            return
+        for fileName in errorFiles:
+            contents = open(fileName).read()
+            errors[contents] = os.path.basename(fileName)[:-7]
+
+        for msg, jobName in errors.items():
+            sys.stderr.write("WARNING: error produced by slave job '" + jobName + "'\n" + msg)
     
     def cleanup(self):
         self.sendServerState("Completed submission of all tests")

@@ -512,6 +512,7 @@ class Config:
             dirToMake = os.path.join(app.writeDirectory, subdir)
         plugins.ensureDirectoryExists(dirToMake)
         app.diag.info("Made root directory at " + dirToMake)
+        return dirToMake
 
     def cleanPreviousWriteDirs(self, writeDir):
         rootDir, basename = os.path.split(writeDir)

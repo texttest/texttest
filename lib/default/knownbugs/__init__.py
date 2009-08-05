@@ -176,12 +176,23 @@ class BugMap(seqdict):
         parser = self.makeParser(fileName)
         if parser:
             self.readFromParser(parser)
+
+    def lookupSection(self, name, fileName, realLookup):
+        plugins.log.info("Bug file at " + fileName + " has duplicated sections named '" + name + "', the later ones will be ignored")
+        return realLookup(name)
+    
     def makeParser(self, fileName):
         parser = ConfigParser()
         # Default behaviour transforms to lower case: we want case-sensitive
         parser.optionxform = str
+        parser._sections = seqdict()
+        # There isn't a nice way to change the behaviour on getting a duplicate section
+        # so we use a nasty way :)
+        realLookup = parser._sections.__getitem__
+        parser._sections.__getitem__ = plugins.Callable(self.lookupSection, fileName, realLookup)
         try:
             parser.read(fileName)
+            parser._sections.__getitem__ = realLookup
             return parser
         except:
             plugins.log.info("Bug file at " + fileName + " not understood, ignoring")

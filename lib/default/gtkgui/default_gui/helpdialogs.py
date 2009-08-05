@@ -55,11 +55,11 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         self.dialog.set_resizable(False)
         
     def showCredits(self, *args):
-        newDialog = TextFileDisplayDialog(self.validApps, False, "CREDITS.txt", self.dialog)
+        newDialog = TextFileDisplayDialog(self.validApps, False, {}, "CREDITS.txt", self.dialog)
         newDialog.performOnCurrent()
 
     def showLicense(self, *args):
-        newDialog = TextFileDisplayDialog(self.validApps, False, "LICENSE.txt", self.dialog)
+        newDialog = TextFileDisplayDialog(self.validApps, False, {}, "LICENSE.txt", self.dialog)
         newDialog.performOnCurrent()
 
     def showVersions(self, *args):
@@ -129,7 +129,7 @@ class ShowVersions(guiplugins.ActionResultDialogGUI):
         return alignment
 
 class TextFileDisplayDialog(guiplugins.ActionResultDialogGUI):
-    def __init__(self, allApps, dynamic, fileName, parent=None):
+    def __init__(self, allApps, dynamic, inputOptions, fileName, parent=None):
         self.parent = parent
         self.fileName = fileName
         self.title = self.makeTitleFromFileName(fileName)

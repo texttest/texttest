@@ -60,7 +60,8 @@ class Config:
                 group.addOption("b", "Run batch mode session")
                 group.addSwitch("rectraffic", "(Re-)record command-line or client-server traffic")
                 group.addSwitch("keeptmp", "Keep temporary write-directories")
-                group.addSwitch("vanilla", "Ignore site-specific and personal configuration", self.optionMap.has_key("vanilla"))
+                group.addOption("vanilla", "Ignore configuration files", self.defaultVanillaValue(),
+                                possibleValues = [ "", "site", "personal", "all" ])
             elif group.name.startswith("Invisible"):
                 # Options that don't make sense with the GUI should be invisible there...
                 group.addOption("s", "Run this script")
@@ -91,6 +92,15 @@ class Config:
                     group.addSwitch("actrep", "Run with slow motion replay")
                 if not useCatalogues:
                     group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
+
+    def defaultVanillaValue(self):
+        if not self.optionMap.has_key("vanilla"):
+            return ""
+        given = self.optionValue("vanilla")
+        if given:
+            return given
+        else:
+            return "all"
 
     def createOptionGroups(self, allApps):
         groupNames = [ "Selection", "Basic", "Advanced", "Invisible" ]

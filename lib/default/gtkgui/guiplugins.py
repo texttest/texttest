@@ -709,12 +709,12 @@ class ActionTabGUI(OptionGroupGUI):
             entry.set_position(-1) # Sets position last, makes it possible to see the vital part of long paths 
         dialog.destroy()
         
-    def addApplicationOptions(self, allApps):
+    def addApplicationOptions(self, allApps, inputOptions={}):
         if len(allApps) > 0:
             for app in allApps:
                 app.addToOptionGroups(allApps, [ self.optionGroup ])
         else:
-            configObject = plugins.importAndCall("default", "getConfig", {}) # don't care about inputOptions as we're trying to read them!
+            configObject = plugins.importAndCall("default", "getConfig", inputOptions)
             configObject.addToOptionGroups(allApps, [ self.optionGroup ])
 
 class ActionDialogGUI(OptionGroupGUI):

@@ -148,7 +148,7 @@ class VersionControlInterface:
 # Base class for all version control actions.
 class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
     recursive = False
-    def __init__(self, allApps=[], dynamic=False):
+    def __init__(self, allApps=[], dynamic=False, inputOptions={}):
         guiplugins.ActionResultDialogGUI.__init__(self, allApps)
         self.cmdName = self._getTitle().replace("_", "").lower()
         self.dynamic = dynamic

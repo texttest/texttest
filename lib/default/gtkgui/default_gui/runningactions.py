@@ -9,6 +9,9 @@ from copy import deepcopy
 
 class RunningAction:
     runNumber = 1
+    def __init__(self, inputOptions):
+        self.inputOptions = inputOptions
+        
     def getGroupTabTitle(self):
         return "Running"
     def messageAfterPerform(self):
@@ -62,6 +65,7 @@ class RunningAction:
         return [ sys.executable ] + extraArgs + [ sys.argv[0] ]
     def getOptionGroups(self):
         return [ self.optionGroup ]
+
     def getTextTestOptions(self, filterFile, app, usecase):
         ttOptions = self.getCmdlineOptionForApps()
         for group in self.getOptionGroups():
@@ -72,17 +76,30 @@ class RunningAction:
         ttOptions += [ "-f", filterFile ]
         ttOptions += [ "-fd", self.getTmpFilterDir(app) ]
         return ttOptions
+
     def getCommandLineKeys(self, usecase):
         # assume everything by default
         return []
+
     def getCountMultiplier(self):
         return 1
+
+    def getVanillaOption(self):
+        options = []
+        if self.inputOptions.has_key("vanilla"):
+            options.append("-vanilla")
+            value = self.inputOptions.get("vanilla")
+            if value:
+                options.append(value)
+        return options
     
     def getTmpFilterDir(self, app):
         return os.path.join(app.writeDirectory, "temporary_filter_files")
+
     def getCmdlineOptionForApps(self):
         appNames = set([ app.name for app in self.currAppSelection ])
         return [ "-a", ",".join(sorted(list(appNames))) ]
+
     def checkTestRun(self, errFile, testSel, usecase):
         if self.checkErrorFile(errFile, testSel, usecase):
             self.handleCompletion(testSel, usecase)
@@ -124,8 +141,9 @@ class RunningAction:
 
 
 class ReconnectToTests(RunningAction,guiplugins.ActionDialogGUI):
-    def __init__(self, *args):
-        guiplugins.ActionDialogGUI.__init__(self, *args)
+    def __init__(self, allApps, dynamic, inputOptions):
+        guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic)
+        RunningAction.__init__(self, inputOptions)
         self.addOption("v", "Version to reconnect to")
         self.addOption("reconnect", "Temporary result directory", os.getenv("TEXTTEST_TMP", ""), selectDir=True, description="Specify a directory containing temporary texttest results. The reconnection will use a random subdirectory matching the version used.")
         self.addSwitch("reconnfull", "Recomputation", 0, ["Display results exactly as they were in the original run", "Use raw data from the original run, but recompute run-dependent text, known bug information etc."])
@@ -141,13 +159,17 @@ class ReconnectToTests(RunningAction,guiplugins.ActionDialogGUI):
         return "Reconnected to"
     def getUseCaseName(self):
         return "reconnect"
+    def performOnCurrent(self):
+        self.startTextTestProcess(self.getUseCaseName(), [ "-g" ] + self.getVanillaOption())
+    
 
 class RunTests(RunningAction,guiplugins.ActionTabGUI):
     optionGroups = []
-    def __init__(self, allApps, *args):
+    def __init__(self, allApps, dynamic, inputOptions):
         guiplugins.ActionTabGUI.__init__(self, allApps)
+        RunningAction.__init__(self, inputOptions)
         self.optionGroups.append(self.optionGroup)
-        self.addApplicationOptions(allApps)
+        self.addApplicationOptions(allApps, inputOptions)
 
     def _getTitle(self):
         return "_Run"
@@ -191,8 +213,9 @@ class RunTestsAdvanced(RunTests):
         return "Advanced"
 
 class RecordTest(RunningAction,guiplugins.ActionTabGUI):
-    def __init__(self, allApps, *args):
-        guiplugins.ActionTabGUI.__init__(self, allApps, *args)
+    def __init__(self, allApps, dynamic, inputOptions):
+        guiplugins.ActionTabGUI.__init__(self, allApps, dynamic)
+        RunningAction.__init__(self, inputOptions)
         self.currentApp = None
         self.recordTime = None
         defaultVersion, defaultCheckout = "", ""
@@ -215,7 +238,7 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
         return "Started record session for " + self.describeTests()
     def performOnCurrent(self):
         self.updateRecordTime(self.currTestSelection[0])
-        self.startTextTestProcess("record", [ "-g", "-record" ])
+        self.startTextTestProcess("record", [ "-g", "-record" ] + self.getVanillaOption())
     def shouldShowCurrent(self, *args):
         return len(self.validApps) > 0 and guiplugins.ActionTabGUI.shouldShowCurrent(self, *args) # override the default so it's disabled if there are no apps
     def isValidForApp(self, app):
@@ -263,7 +286,7 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
         if usecase == "record":
             changedUseCaseVersion = self.getChangedUseCaseVersion(test)
             if changedUseCaseVersion is not None and self.optionGroup.getSwitchValue("rep"):
-                self.startTextTestProcess("replay", self.getReplayRunModeOptions(changedUseCaseVersion))
+                self.startTextTestProcess("replay", self.getVanillaOption() + self.getReplayRunModeOptions(changedUseCaseVersion))
                 message = "Recording completed for " + repr(test) + \
                           ". Auto-replay of test now started. Don't submit the test manually!"
                 self.notify("Status", message)

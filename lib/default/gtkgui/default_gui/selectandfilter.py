@@ -327,8 +327,8 @@ class ShowAll(guiplugins.BasicActionGUI,AllTestsHandler):
 
 
 class SaveSelection(guiplugins.ActionDialogGUI):
-    def __init__(self, allApps, dynamic):
-        guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic)
+    def __init__(self, allApps, dynamic, *args):
+        guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic, *args)
         self.addOption("f", "enter filter-file name =", possibleDirs=self.getFilterFileDirs(allApps), saveFile=True)
         if not dynamic:
             # In the static GUI case, we also want radiobuttons specifying

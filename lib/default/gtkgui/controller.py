@@ -88,7 +88,7 @@ class GUIController(plugins.Responder, plugins.Observable):
         includeSite, includePersonal = optionMap.configPathOptions()
         self.readGtkRCFiles(includeSite, includePersonal)
         self.dynamic = not optionMap.has_key("gx")
-        self.interactiveActionHandler = InteractiveActionHandler(self.dynamic, allApps)
+        self.interactiveActionHandler = InteractiveActionHandler(self.dynamic, allApps, optionMap)
         self.setUpGlobals(allApps)
         plugins.Responder.__init__(self)
         plugins.Observable.__init__(self)
@@ -547,10 +547,11 @@ class MultiActionGUIForwarder(guiplugins.GtkActionWrapper):
 
 # Placeholder for all classes. Remember to add them!
 class InteractiveActionHandler:
-    def __init__(self, dynamic, allApps):
+    def __init__(self, dynamic, allApps, inputOptions):
         self.diag = logging.getLogger("Interactive Actions")
         self.dynamic = dynamic
         self.allApps = allApps
+        self.inputOptions = inputOptions
 
     def getDefaultAccelerators(self):
         return self.joinDictionaries(self.allApps, lambda x: x.getDefaultAccelerators())
@@ -678,7 +679,7 @@ class InteractiveActionHandler:
     def tryMakeInstance(self, className, apps):
         # Basically a workaround for crap error message with variable className from python...
         try:
-            instance = className(apps, self.dynamic)
+            instance = className(apps, self.dynamic, self.inputOptions)
             self.diag.info("Creating " + str(instance.__class__.__name__) + " instance for " + repr(apps))
             return instance
         except:

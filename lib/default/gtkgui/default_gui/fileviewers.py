@@ -122,7 +122,7 @@ class FileViewAction(guiplugins.ActionGUI):
 
 
 class ViewInEditor(FileViewAction):
-    def __init__(self, allApps, dynamic):
+    def __init__(self, allApps, dynamic, *args):
         FileViewAction.__init__(self, allApps)
         self.dynamic = dynamic
 
@@ -276,13 +276,8 @@ class ViewFilteredOrigFileInEditor(ViewFilteredTestFileInEditor):
     def _getTitle(self):
         return "View Filtered Original File"
     def getFileToView(self, fileName, associatedObject):
-        try:
-            # associatedObject might be a comparison object, but it might not
-            # Use the comparison if it's there
-            return associatedObject.getStdFile(self.useFiltered())
-        except AttributeError:
-            return fileName
-
+        return associatedObject.getStdFile(self.useFiltered())
+        
 class ViewOrigFileInEditor(ViewFilteredOrigFileInEditor):
     def _getTitle(self):
         return "View Original File"
@@ -382,7 +377,7 @@ class FollowFile(FileViewAction):
         guiplugins.scriptEngine.applicationEvent("the file-following program to terminate", "files")
 
 class ShowFileProperties(guiplugins.ActionResultDialogGUI):
-    def __init__(self, allApps, dynamic):
+    def __init__(self, allApps, dynamic, *args):
         self.dynamic = dynamic
         guiplugins.ActionGUI.__init__(self, allApps)
     def _getStockId(self):

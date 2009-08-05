@@ -157,7 +157,7 @@ class GUIConfig:
         self.setConfigDefault("window_size", self.getWindowSizeSettings(), "To set the initial size of the dynamic/static GUI.")
         self.setConfigDefault("hide_gui_element", self.getDefaultHideWidgets(), "List of widgets to hide by default")
         self.setConfigDefault("hide_test_category", [], "Categories of tests which should not appear in the dynamic GUI test view")
-        self.setConfigDefault("query_kill_processes", { "default" : [] }, "Ask about whether to kill these processes when exiting texttest.")
+        self.setConfigDefault("query_kill_processes", { "default" : [], "static" : [ "Dynamic GUI" ] }, "Ask about whether to kill these processes when exiting texttest.")
         self.setConfigDefault("gui_accelerators", accelerators, "Custom action accelerators.")        
         self.setConfigDefault("gui_entry_completion_matching", 1, "Which matching type to use for entry completion. 0 means turn entry completions off, 1 means match the start of possible completions, 2 means match any part of possible completions")
         self.setConfigDefault("gui_entry_completion_inline", 0, "Automatically inline common completion prefix in entry.")

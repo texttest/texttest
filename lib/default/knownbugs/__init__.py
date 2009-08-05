@@ -178,7 +178,8 @@ class BugMap(seqdict):
             self.readFromParser(parser)
 
     def lookupSection(self, name, fileName, realLookup):
-        plugins.log.info("Bug file at " + fileName + " has duplicated sections named '" + name + "', the later ones will be ignored")
+        msg = "Bug file at " + fileName + " has duplicated sections named '" + name + "', the later ones will be ignored"
+        plugins.printWarning(msg, stderr=True, stdout=False)
         return realLookup(name)
     
     def makeParser(self, fileName):
@@ -195,7 +196,7 @@ class BugMap(seqdict):
             parser._sections.__getitem__ = realLookup
             return parser
         except:
-            plugins.log.info("Bug file at " + fileName + " not understood, ignoring")
+            plugins.printWarning("Bug file at " + fileName + " not understood, ignoring", stderr=True, stdout=False)
     def readFromParser(self, parser):
         for section in sorted(parser.sections()):
             getOption = ParseMethod(parser, section)
@@ -321,7 +322,7 @@ class MigrateFiles(plugins.Action):
             try:
                 parser.read(bugFileName)
             except:
-                plugins.log.info("Bug file at " + bugFileName + " not understood, ignoring")
+                plugins.printWarning("Bug file at " + bugFileName + " not understood, ignoring", stderr=True, stdout=False)
                 continue
             if not parser.has_section("Migrated section 1"):
                 self.describe(test, " - " + os.path.basename(bugFileName))

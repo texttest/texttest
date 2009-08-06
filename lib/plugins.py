@@ -1436,14 +1436,11 @@ class OptionGroup:
     def keys(self):
         return self.options.keys()
 
-    def getCommandLines(self, onlyKeys=[]):
+    def getOptionsForCmdLine(self, onlyKeys):
         commandLines = []
         for key, option in self.options.items():
             if self.accept(key, option, onlyKeys):
-                commandLines.append("-" + key)
-                value = option.getCmdLineValue()
-                if value:
-                    commandLines.append(value)
+                commandLines.append((key, option.getCmdLineValue()))
         return commandLines
     
     def accept(self, key, option, onlyKeys):

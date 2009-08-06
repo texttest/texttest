@@ -598,6 +598,14 @@ class OptionGroupGUI(ActionGUI):
             return []
         return fromConfig
 
+    def getCommandLineArgs(self, optionGroup, onlyKeys=[]):
+        args = []
+        for key, value in optionGroup.getOptionsForCmdLine(onlyKeys):
+            args.append("-" + key)
+            if value:
+                args.append(value)
+        return args
+
     
 class ActionTabGUI(OptionGroupGUI):
     def __init__(self, *args):
@@ -716,6 +724,7 @@ class ActionTabGUI(OptionGroupGUI):
         else:
             configObject = plugins.importAndCall("default", "getConfig", inputOptions)
             configObject.addToOptionGroups(allApps, [ self.optionGroup ])
+
 
 class ActionDialogGUI(OptionGroupGUI):
     def runInteractive(self, *args):

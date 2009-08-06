@@ -69,7 +69,7 @@ class RunningAction:
     def getTextTestOptions(self, filterFile, app, usecase):
         ttOptions = self.getCmdlineOptionForApps()
         for group in self.getOptionGroups():
-            ttOptions += group.getCommandLines(self.getCommandLineKeys(usecase))
+            ttOptions += self.getCommandLineArgs(group, self.getCommandLineKeys(usecase))
         # May be slow to calculate for large test suites, cache it
         self.testCount = len(self.getTestCaseSelection())
         ttOptions += [ "-count", str(self.testCount * self.getCountMultiplier()) ]
@@ -310,6 +310,51 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
     def _getTitle(self):
         return "Record _Use-Case"
 
+class RunScriptAction(RunningAction,guiplugins.ActionDialogGUI):
+    def __init__(self, allApps, dynamic, inputOptions):
+        guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic)
+        RunningAction.__init__(self, inputOptions)
+        
+    def getUseCaseName(self):
+        return "script"
 
+    def performOnCurrent(self):
+        self.startTextTestProcess(self.getUseCaseName(), [ "-g" ] + self.getVanillaOption())
+
+    def getCommandLineArgs(self, optionGroup, onlyKeys=[]):
+        args = [ self.scriptName() ]
+        for key, value in optionGroup.getOptionsForCmdLine(onlyKeys):
+            if value:
+                args.append(key + "=" + value)
+            else:
+                args.append(key)
+        return [ "-s", " ".join(args) ]
+        
+
+
+class ReplaceText(RunScriptAction):
+    def __init__(self, *args):
+        RunScriptAction.__init__(self, *args)
+        self.addOption("old", "Text or regular expression to search for")
+        self.addOption("new", "Text to replace it with (may contain regexp back references)")
+        self.addOption("file", "File stem(s) to perform replacement in", allocateNofValues=2)
+
+    def notifyAllStems(self, allStems, defaultTestFile):
+        self.optionGroup.setValue("file", defaultTestFile)
+        self.optionGroup.setPossibleValues("file", allStems)
+
+    def scriptName(self):
+        return "default.ReplaceText"
+
+    def _getTitle(self):
+        return "Replace Text in Files"
+
+    def getTooltip(self):
+        return "Replace text in multiple test files"
+
+    def performedDescription(self):
+        return "Replaced text in files for"
+
+    
 def getInteractiveActionClasses():
-    return [ RunTestsBasic, RunTestsAdvanced, RecordTest, ReconnectToTests ]
+    return [ RunTestsBasic, RunTestsAdvanced, RecordTest, ReconnectToTests, ReplaceText ]

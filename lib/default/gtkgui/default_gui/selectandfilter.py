@@ -52,6 +52,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
     def notifyAllRead(self, *args):
         allStems = self.findAllStems()
         defaultTestFile = self.findDefaultTestFile(allStems)
+        self.notify("AllStems", allStems, defaultTestFile)
         self.optionGroup.setValue("grepfile", defaultTestFile)
         self.optionGroup.setPossibleValues("grepfile", allStems)
 
@@ -92,7 +93,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
     def isActiveOnCurrent(self, *args):
         return True
     def getSignalsSent(self):
-        return [ "SetTestSelection", "Visibility" ]
+        return [ "SetTestSelection", "Visibility", "AllStems" ]
     def _getStockId(self):
         return "find"
     def _getTitle(self):
@@ -137,7 +138,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
 
     def performOnCurrent(self):
         newSelection = self.makeNewSelection()
-        criteria = " ".join(self.optionGroup.getCommandLines(onlyKeys=self.appKeys))
+        criteria = " ".join(self.getCommandLineArgs(self.optionGroup, onlyKeys=self.appKeys))
         self.notify("SetTestSelection", newSelection, criteria, self.selectionGroup.getSwitchValue("select_in_collapsed_suites"))
 
     def getSuitesToTry(self):

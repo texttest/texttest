@@ -177,6 +177,7 @@ class TestProgressMonitor(guiutils.SubGUI):
     def createView(self):
         self.treeView = gtk.TreeView(self.treeModel)
         self.treeView.set_name("Test Status View")
+        self.treeView.set_enable_search(False)
         selection = self.treeView.get_selection()
         selection.set_mode(gtk.SELECTION_MULTIPLE)
         selection.set_select_function(self.canSelect)

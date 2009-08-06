@@ -243,6 +243,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
             filterPath = self.filteredModel.convert_child_path_to_path(path)
             self.treeView.expand_to_path(filterPath)
         return iter
+    
     def createView(self):
         self.filteredModel = self.model.filter_new()
         self.filteredModel.set_visible_column(5)

@@ -79,6 +79,7 @@ class FileViewGUI(guiutils.SubGUI):
         self.addFilesToModel(state)
         view = gtk.TreeView(self.model)
         view.set_name("File Tree")
+        view.set_enable_search(False) # Shouldn't get big enough to need this
         self.selection = view.get_selection()
         self.selection.set_mode(gtk.SELECTION_MULTIPLE)
         self.selection.set_select_function(self.canSelect)

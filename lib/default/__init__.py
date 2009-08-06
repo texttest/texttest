@@ -126,9 +126,18 @@ class Config:
 
         scriptObject = self.optionMap.getScriptObject()
         if scriptObject:
-            return [ scriptObject ]
+            if self.usesComparator(scriptObject):
+                return [ self.getWriteDirectoryMaker(), scriptObject, comparetest.MakeComparisons(ignoreMissing=True) ]
+            else:
+                return [ scriptObject ]
         else:
             return self.getTestProcessor()
+
+    def usesComparator(self, scriptObject):
+        try:
+            return scriptObject.usesComparator()
+        except AttributeError:
+            return False
 
     def useGUI(self):
         return self.optionMap.has_key("g") or self.optionMap.has_key("gx")
@@ -191,8 +200,11 @@ class Config:
         return basic
 
     def getDefaultInterface(self, allApps):
-        if len(allApps) == 0 or self.optionMap.has_key("new"):
+        if self.optionMap.has_key("s"):
+            return "console"
+        elif len(allApps) == 0 or self.optionMap.has_key("new"):
             return "static_gui"
+
         defaultIntf = None
         for app in allApps:
             appIntf = app.getConfigValue("default_interface")
@@ -201,6 +213,7 @@ class Config:
                       appIntf + " and " + defaultIntf
             defaultIntf = appIntf
         return defaultIntf
+
     def setDefaultInterface(self, allApps):
         mapping = { "static_gui" : "gx", "dynamic_gui": "g", "console": "con" }
         defaultInterface = self.getDefaultInterface(allApps)
@@ -208,9 +221,9 @@ class Config:
             self.optionMap[mapping[defaultInterface]] = ""
         else:
             raise plugins.TextTestError, "Invalid value for default_interface '" + defaultInterface + "'"
+        
     def hasExplicitInterface(self):
-        return self.useGUI() or self.batchMode() or self.useConsole() or \
-               self.optionMap.has_key("o") or self.optionMap.has_key("s")
+        return self.useGUI() or self.batchMode() or self.useConsole() or self.optionMap.has_key("o")
 
     def getLogfilePostfixes(self):
         if self.optionMap.has_key("x"):
@@ -243,10 +256,7 @@ class Config:
         return self._getResponderClasses(allApps, scriptEngine)
 
     def _getResponderClasses(self, allApps, scriptEngine):
-        classes = []
-        if self.optionMap.runScript():
-            return self.getThreadActionClasses()
-        
+        classes = []        
         if not self.optionMap.has_key("gx"):
             if self.optionMap.has_key("new"):
                 raise plugins.TextTestError, "'--new' option can only be provided with the static GUI"
@@ -1539,32 +1549,36 @@ class ReplaceText(plugins.ScriptWithArgs):
         argDict = self.parseArguments(args, [ "old", "new", "file" ])
         self.oldTextTrigger = plugins.TextTrigger(argDict["old"])
         self.newText = argDict["new"].replace("\\n", "\n")
-        self.logFile = None
-        if argDict.has_key("file"):
-            self.logFile = argDict["file"]
-        self.textDiffTool = None
+        fileStr = argDict.get("file", "")
+        self.stems = plugins.commasplit(fileStr)
+
     def __repr__(self):
         return "Replacing " + self.oldTextTrigger.text + " with " + self.newText + " for"
+
     def __call__(self, test):
-        logFile = test.getFileName(self.logFile)
-        if not logFile:
-            return
-        self.describe(test)
-        sys.stdout.flush()
-        newLogFile = logFile + "_new"
-        writeFile = open(newLogFile, "w")
-        for line in open(logFile).xreadlines():
-            writeFile.write(self.oldTextTrigger.replace(line, self.newText))
-        writeFile.close()
-        os.system(self.textDiffTool + " " + logFile + " " + newLogFile)
-        os.remove(logFile)
-        os.rename(newLogFile, logFile)
+        for stem in self.stems:
+            stdFile = test.getFileName(stem)        
+            if stdFile:
+                self.describe(test, " - file " + stem)
+                sys.stdout.flush()
+                tmpFile = test.makeTmpFileName(stem)
+                writeFile = open(tmpFile, "w")
+                for line in open(stdFile).xreadlines():
+                    writeFile.write(self.oldTextTrigger.replace(line, self.newText))
+                writeFile.close()
+
+    def usesComparator(self):
+        return True
+
     def setUpSuite(self, suite):
         self.describe(suite)
+
     def setUpApplication(self, app):
-        if not self.logFile:
-            self.logFile = app.getConfigValue("log_file")
-        self.textDiffTool = app.getConfigValue("text_diff_program")
+        if len(self.stems) == 0:
+            logFile = app.getConfigValue("log_file")
+            if not logFile in self.stems:
+                self.stems.append(logFile)                
+            
 
 class ExportTests(plugins.ScriptWithArgs):
     scriptDoc = "Export the selected tests to a different test suite"

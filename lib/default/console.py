@@ -21,22 +21,24 @@ class InteractiveResponder(plugins.Responder):
         self.overwriteSuccess = optionMap.has_key("n")
         self.overwriteFailure = optionMap.has_key("o")
         self.overwriteVersion = optionMap.get("o")
+
     def notifyComplete(self, test):
-        if self.shouldSave(test):
-            self.save(test, self.getOverwriteVersion(test))
-        elif self.useInteractiveResponse(test):
-            self.presentInteractiveDialog(test)
+        if test.state.hasResults():
+            overwriteFail = self.overwriteFailure and test.state.hasFailed()
+            if overwriteFail:
+                self.writeTextDiffs(test)
+
+            if overwriteFail or (self.overwriteSuccess and test.state.hasSucceeded()):
+                self.save(test, self.getOverwriteVersion(test))
+            elif self.useInteractiveResponse(test):
+                self.presentInteractiveDialog(test)
+
     def getOverwriteVersion(self, test):
         if self.overwriteVersion is None:
             return test.app.getFullVersion(forSave=1)
         else:
             return self.overwriteVersion
-    def shouldSave(self, test):
-        if not test.state.hasResults():
-            return 0
-        if self.overwriteSuccess and test.state.hasSucceeded():
-            return 1
-        return self.overwriteFailure and test.state.hasFailed()
+
     def save(self, test, version, exact=1):
         saveDesc = " "
         if version:
@@ -49,13 +51,17 @@ class InteractiveResponder(plugins.Responder):
         test.state.save(test, exact, version, self.overwriteSuccess)
         newState = test.state.makeNewState(test.app, "saved")
         test.changeState(newState)
+
     def useInteractiveResponse(self, test):
-        return test.state.hasFailed() and test.state.hasResults() and not self.overwriteFailure
+        return test.state.hasFailed() and not self.overwriteFailure
+
     def presentInteractiveDialog(self, test):            
         performView = self.askUser(test, allowView=1)
         if performView:
-            process = self.viewTest(test)
+            self.writeTextDiffs(test)
+            process = self.viewLogFileGraphically(test)
             self.askUser(test, allowView=0, process=process)
+
     def getViewCmdInfo(self, test, comparison):
         if comparison.missingResult():
             # Don't fire up GUI tools for missing results...
@@ -68,11 +74,13 @@ class InteractiveResponder(plugins.Responder):
             cmdArgs = [ tool, comparison.stdCmpFile, comparison.tmpCmpFile ]
         return tool, cmdArgs        
 
-    def viewTest(self, test):
+    def writeTextDiffs(self, test):
         outputText = test.state.freeText
         sys.stdout.write(outputText)
         if not outputText.endswith("\n"):
             sys.stdout.write("\n")
+
+    def viewLogFileGraphically(self, test):
         logFile = test.getConfigValue("log_file")
         logFileComparison, list = test.state.findComparison(logFile)
         if logFileComparison:

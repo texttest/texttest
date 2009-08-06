@@ -467,6 +467,8 @@ class QueueSystemServer(BaseActionRunner):
         self.reuseOnly = False
         self.submitAddress = None
         self.slaveLogDirs = set()
+        self.delayedTestsForAdd = []
+        self.remainingForApp = {}
         QueueSystemServer.instance = self
         
     def addSuites(self, suites):
@@ -477,16 +479,36 @@ class QueueSystemServer(BaseActionRunner):
                 self.maxCapacity = currCap
             plugins.log.info("Using " + queueSystemName(suite.app) + " queues for " +
                              suite.app.description(includeCheckout=True))
+        capacityPerSuite = self.maxCapacity / len(suites)
+        for suite in suites:
+            self.remainingForApp[suite.app] = capacityPerSuite
 
     def setSlaveServerAddress(self, address):
         self.submitAddress = os.getenv("TEXTTEST_MIM_SERVER", address)
         self.testQueue.put("TextTest slave server started on " + address)
 
     def addTest(self, test):
+        capacityForApp = self.remainingForApp[test.app]
+        if capacityForApp > 0:
+            self._addTest(test)
+            self.remainingForApp[test.app] = capacityForApp - 1
+        else:
+            self.delayedTestsForAdd.append(test)
+
+    def _addTest(self, test):
         self.testCount += 1
         queue = self.findQueueForTest(test)
         if queue:
             queue.put(test)
+
+    def addDelayedTests(self):
+        for test in self.delayedTestsForAdd:
+            self._addTest(test)
+        self.delayedTestsForAdd = []
+
+    def notifyAllRead(self, suites):
+        self.addDelayedTests()
+        BaseActionRunner.notifyAllRead(self, suites)
 
     def run(self): # picked up by core to indicate running in a thread
         self.runAllTests()

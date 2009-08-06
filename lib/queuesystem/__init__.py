@@ -460,6 +460,11 @@ class QueueSystemServer(BaseActionRunner):
         self.testCount = 0
         self.testsSubmitted = 0
         self.maxCapacity = 100000 # infinity, sort of
+        for app in allApps:
+            currCap = app.getConfigValue("queue_system_max_capacity")
+            if currCap is not None and currCap < self.maxCapacity:
+                self.maxCapacity = currCap
+            
         self.jobs = seqdict()
         self.submissionRules = {}
         self.killedJobs = {}
@@ -468,32 +473,32 @@ class QueueSystemServer(BaseActionRunner):
         self.submitAddress = None
         self.slaveLogDirs = set()
         self.delayedTestsForAdd = []
-        self.remainingForApp = {}
+        self.remainingForApp = seqdict()
+        capacityPerSuite = self.maxCapacity / len(allApps)
+        for app in allApps:
+            self.remainingForApp[app.name] = capacityPerSuite
         QueueSystemServer.instance = self
         
     def addSuites(self, suites):
         for suite in suites:
             self.slaveLogDirs.add(suite.app.makeWriteDirectory("slavelogs"))
-            currCap = suite.getConfigValue("queue_system_max_capacity")
-            if currCap < self.maxCapacity:
-                self.maxCapacity = currCap
             plugins.log.info("Using " + queueSystemName(suite.app) + " queues for " +
                              suite.app.description(includeCheckout=True))
-        capacityPerSuite = self.maxCapacity / len(suites)
-        for suite in suites:
-            self.remainingForApp[suite.app] = capacityPerSuite
-
+        
     def setSlaveServerAddress(self, address):
         self.submitAddress = os.getenv("TEXTTEST_MIM_SERVER", address)
         self.testQueue.put("TextTest slave server started on " + address)
 
     def addTest(self, test):
-        capacityForApp = self.remainingForApp[test.app]
+        capacityForApp = self.remainingForApp[test.app.name]
         if capacityForApp > 0:
             self._addTest(test)
-            self.remainingForApp[test.app] = capacityForApp - 1
+            self.remainingForApp[test.app.name] = capacityForApp - 1
         else:
-            self.delayedTestsForAdd.append(test)
+            if test.app.name == self.remainingForApp.keys()[-1]:
+                self._addTest(test) # For the last app (which may be the only one) there is no point in delaying
+            else:
+                self.delayedTestsForAdd.append(test)
 
     def _addTest(self, test):
         self.testCount += 1

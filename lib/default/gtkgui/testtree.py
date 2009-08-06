@@ -247,6 +247,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         self.filteredModel = self.model.filter_new()
         self.filteredModel.set_visible_column(5)
         self.treeView = gtk.TreeView(self.filteredModel)
+        self.treeView.set_search_column(0)
         self.treeView.set_name("Test Tree")
         self.treeView.expand_all()
 

@@ -111,7 +111,7 @@ class Config:
     def findAllValidOptions(self, allApps):
         groups = self.createOptionGroups(allApps)
         return reduce(operator.add, (g.keys() for g in groups), [])
-    
+
     def getActionSequence(self):
         if self.optionMap.has_key("coll"):
             arg = self.optionMap.get("coll")
@@ -124,16 +124,25 @@ class Config:
         if self.isReconnecting():
             return self.getReconnectSequence()
 
-        return self.getTestProcessor()
+        scriptObject = self.optionMap.getScriptObject()
+        if scriptObject:
+            return [ scriptObject ]
+        else:
+            return self.getTestProcessor()
+
     def useGUI(self):
         return self.optionMap.has_key("g") or self.optionMap.has_key("gx")
+
     def useStaticGUI(self, app):
         return self.optionMap.has_key("gx") or \
                (not self.hasExplicitInterface() and app.getConfigValue("default_interface") == "static_gui")
+
     def useConsole(self):
         return self.optionMap.has_key("con")
+
     def useExtraVersions(self):
         return True # static GUI didn't, once, but now we always read things the same.
+
     def getExtraVersions(self, app):
         if not self.useExtraVersions():
             return []

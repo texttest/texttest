@@ -337,11 +337,16 @@ class TextTest(plugins.Responder, plugins.Observable):
         except plugins.TextTestError, e:
             # Responder class-level errors are basically fatal : there is no point running without them (cannot
             # do anything about them) and no way to get partial errors.
-            sys.stderr.write(str(e) + "\n")
-            return
+            return sys.stderr.write(str(e) + "\n")
+        
         raisedError, self.appSuites = self.createTestSuites(allApps)
         if not raisedError or len(self.appSuites) > 0:
-            self.addSuites(self.appSuites.values())
+            try:
+                self.addSuites(self.appSuites.values())
+            except plugins.TextTestError, e:
+                # addSuites errors are fatal for the same reasons
+                return sys.stderr.write(str(e) + "\n")
+            
             # Set the signal handlers to use when running, if we actually plan to do any
             if not self.ignoreAllExecutables():
                 self.setSignalHandlers(self.handleSignal)

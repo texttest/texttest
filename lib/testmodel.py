@@ -1444,8 +1444,10 @@ class Application:
             return 99
         else:
             return min(map(self.getVersionPriority, vlist))
+
     def getVersionPriority(self, version):
         return self.getCompositeConfigValue("version_priority", version)
+
     def getSaveableVersions(self):
         versionsToUse = self.versions + self.getConfigValue("base_version")
         versionsToUse = self.filterUnsaveable(versionsToUse)
@@ -1453,6 +1455,7 @@ class Application:
             return []
 
         return self._getVersionExtensions(versionsToUse)
+
     def _getVersionExtensions(self, versions):
         if len(versions) == 1:
             return versions
@@ -1465,19 +1468,7 @@ class Application:
         fullList.append(current)
         fullList += fromRemaining
         return fullList
-    def getActionSequence(self):
-        actionSequenceFromConfig = self.configObject.getActionSequence()
-        actionSequence = []
-        # Collapse lists and remove None actions
-        for action in actionSequenceFromConfig:
-            self.addActionToList(action, actionSequence)
-        return actionSequence
-    def addActionToList(self, action, actionSequence):
-        if type(action) == types.ListType:
-            for subAction in action:
-                self.addActionToList(subAction, actionSequence)
-        elif action != None:
-            actionSequence.append(action)
+
     def printHelpText(self):
         print helpIntro
         header = "Description of the " + self.getConfigValue("config_module") + " configuration"
@@ -1621,6 +1612,44 @@ class OptionFinder(plugins.OptionFinder):
 
     def runScript(self):
         return self.get("s")
+
+    def getScriptObject(self):
+        script = self.runScript()
+        if not script:
+            return
+        
+        words = script.split(" ")
+        actionCmd = words[0]
+        actionArgs = words[1:] 
+        if "." in actionCmd:
+            return self._getScriptObject(actionCmd, actionArgs)
+        else:
+            raise plugins.TextTestError, "Plugin scripts must be of the form <module_name>.<script>\n"
+
+    def _getScriptObject(self, actionCmd, actionArgs):
+        module, className = actionCmd.rsplit(".", 1)
+        importCommand = "from " + module + " import " + className + " as _class"
+        try:
+            exec importCommand
+        except:
+            # Backwards compatibility : many scripts are now in the default package
+            excString = plugins.getExceptionString()
+            if not module.startswith("default"):
+                try:
+                    return self._getScriptObject("default." + actionCmd, actionArgs)
+                except plugins.TextTestError:
+                    pass
+            raise plugins.TextTestError, "Could not import script " + className + " from module " + module + "\n" +\
+                  "Import failed, looked at " + repr(sys.path) + "\n" + excString
+        
+        try:
+            if len(actionArgs) > 0:
+                return _class(actionArgs)
+            else:
+                return _class()
+        except:
+            raise plugins.TextTestError, "Could not instantiate script action " + repr(actionCmd) +\
+                  " with arguments " + repr(actionArgs) + "\n" + plugins.getExceptionString()
 
     def configPathOptions(self):
         # Returns includeSite, includePersonal

@@ -1,5 +1,5 @@
 
-import plugins, os, sys, time, logging
+import plugins, os, sys, time, logging, types
 from Queue import Queue, Empty
 from ndict import seqdict
 from threading import Lock
@@ -100,12 +100,11 @@ class ActionRunner(BaseActionRunner):
         BaseActionRunner.__init__(self, optionMap, logging.getLogger("Action Runner"))
         self.currentTestRunner = None
         self.previousTestRunner = None
-        self.script = optionMap.runScript()
         self.appRunners = seqdict()
 
     def addSuite(self, suite):
         plugins.log.info("Using " + suite.app.description(includeCheckout=True))
-        appRunner = ApplicationRunner(suite, self.script, self.diag)
+        appRunner = ApplicationRunner(suite, self.diag)
         self.appRunners[suite.app] = appRunner
 
     def notifyAllReadAndNotified(self):
@@ -142,12 +141,12 @@ class ActionRunner(BaseActionRunner):
             appRunner.cleanActions()
     
 class ApplicationRunner:
-    def __init__(self, testSuite, script, diag):
+    def __init__(self, testSuite, diag):
         self.testSuite = testSuite
         self.suitesSetUp = {}
         self.suitesToSetUp = {}
         self.diag = diag
-        self.actionSequence = self.getActionSequence(script)
+        self.actionSequence = self.getActionSequence()
         self.setUpApplications()
     def cleanActions(self):
         # clean up the actions before we exit
@@ -190,40 +189,22 @@ class ApplicationRunner:
             self.diag.info(str(action) + " tear down " + repr(suite))
             action.tearDownSuite(suite)
         self.suitesSetUp[suite] = []
-    
-    def getActionSequence(self, script):
-        if not script:
-            return self.testSuite.app.getActionSequence()
+
+    def getActionSequence(self):
+        actionSequenceFromConfig = self.testSuite.app.getActionSequence()
+        actionSequence = []
+        # Collapse lists and remove None actions
+        for action in actionSequenceFromConfig:
+            self.addActionToList(action, actionSequence)
+        return actionSequence
+
+    def addActionToList(self, action, actionSequence):
+        if type(action) == types.ListType:
+            for subAction in action:
+                self.addActionToList(subAction, actionSequence)
+        elif action != None:
+            actionSequence.append(action)
             
-        actionCom = script.split(" ")[0]
-        actionArgs = script.split(" ")[1:]
-        actionOption = actionCom.split(".")
-        if len(actionOption) < 2:
-            sys.stderr.write("Plugin scripts must be of the form <module_name>.<script>\n")
-            return []
-
-        module = ".".join(actionOption[:-1])
-        pclass = actionOption[-1]
-        importCommand = "from " + module + " import " + pclass + " as _pclass"
-        try:
-            exec importCommand
-        except:
-            sys.stderr.write("Could not import script " + pclass + " from module " + module + "\n" +\
-                             "Import failed, looked at " + repr(sys.path) + "\n")
-            plugins.printException()
-            return []
-
-        # Assume if we succeed in importing then a python module is intended.
-        try:
-            if len(actionArgs) > 0:
-                return [ _pclass(actionArgs) ]
-            else:
-                return [ _pclass() ]
-        except:
-            sys.stderr.write("Could not instantiate script action " + repr(actionCom) +\
-                             " with arguments " + repr(actionArgs) + "\n")
-            plugins.printException()
-            return []
 
 class TestRunner:
     def __init__(self, test, appRunner, diag, killed, killSignal):

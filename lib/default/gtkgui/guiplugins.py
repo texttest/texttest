@@ -909,7 +909,7 @@ class InteractiveActionConfig:
         return GUIConfig.getDefaultColours()
         
     def getDefaultAccelerators(self):
-        return GUIConfig.getDefaultAccelerators()
+        return {}
 
     def getReplacements(self):
         # Return a dictionary mapping classes above to what to replace them with

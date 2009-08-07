@@ -295,6 +295,7 @@ class Config:
             if self.optionMap.has_key(option):
                 return True
         return False
+
     def noFileAdvice(self):
         # What can we suggest if files aren't present? In this case, not much
         return ""
@@ -307,16 +308,30 @@ class Config:
     
     def getThreadActionClasses(self):
         return [ ActionRunner ]
+
     def getTextDisplayResponderClass(self):
         return console.TextDisplayResponder
+
     def isolatesDataUsingCatalogues(self, app):
         return app.getConfigValue("create_catalogues") == "true" and \
                len(app.getConfigValue("partial_copy_test_path")) > 0
+
+    def hasWritePermission(self, path):
+        if os.path.isdir(path):
+            return os.access(path, os.W_OK)
+        else:
+            return self.hasWritePermission(os.path.dirname(path))
+
     def getWriteDirectory(self, app):
-        return os.path.join(os.getenv("TEXTTEST_TMP"), self.getWriteDirectoryName(app))
+        rootDir = self.optionMap.setPathFromOptionsOrEnv("TEXTTEST_TMP", app.getConfigValue("default_texttest_tmp")) # Location of temporary files from test runs
+        if not os.path.isdir(rootDir) and not self.hasWritePermission(os.path.dirname(rootDir)):
+            rootDir = self.optionMap.setPathFromOptionsOrEnv("", "$TEXTTEST_PERSONAL_CONFIG/tmp")
+        return os.path.join(rootDir, self.getWriteDirectoryName(app))
+
     def getWriteDirectoryName(self, app):
         parts = self.getBasicRunDescriptors(app) + self.getVersionDescriptors() + [ self.getTimeDescriptor(), str(os.getpid()) ]
         return ".".join(parts)
+
     def getBasicRunDescriptors(self, app):
         appDescriptors = self.getAppDescriptors()
         if self.useStaticGUI(app):
@@ -329,6 +344,7 @@ class Config:
             return [ "dynamic_gui" ]
         else:
             return [ "console" ]
+
     def getTimeDescriptor(self):
         return plugins.startTimeString().replace(":", "")
     def getAppDescriptors(self):
@@ -1012,6 +1028,7 @@ class Config:
         return progArgs + plugins.splitcmd(argStr)
 
     def setMiscDefaults(self, app):
+        app.setConfigDefault("default_texttest_tmp", "$TEXTTEST_PERSONAL_CONFIG/tmp", "Default value for $TEXTTEST_TMP, if it is not set")
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
         app.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")
         app.setConfigDefault("remote_shell_program", "rsh", "Program to use for running commands remotely")
@@ -1467,6 +1484,9 @@ class DocumentEnvironment(plugins.Action):
         parts = line[pos:].strip().split("#")
         endPos = parts[0].find(")")
         argStr = parts[0][:endPos + 1]
+        for i in range(argStr.count("(", 1)):
+            endPos = parts[0].find(")", endPos + 1)
+            argStr = parts[0][:endPos + 1]
         allArgs = self.getActualArguments(argStr)
         if len(parts) > 1:
             allArgs.append(parts[1].strip())
@@ -1477,6 +1497,12 @@ class DocumentEnvironment(plugins.Action):
     def getActualArguments(self, argStr):
         if not argStr.startswith("("):
             return []
+
+        # Pick up app.getConfigValue
+        class FakeApp:
+            def getConfigValue(self, name):
+                return "Config value '" + name + "'"
+        app = FakeApp()
         try:
             argTuple = eval(argStr)
             from types import TupleType

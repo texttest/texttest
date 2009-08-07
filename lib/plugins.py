@@ -636,7 +636,7 @@ def configureLogging(configFile=None):
         log = logging.getLogger("standard log")
 
 def getPersonalConfigDir():
-    return os.getenv("TEXTTEST_PERSONAL_CONFIG", os.path.normpath(os.path.expanduser("~/.texttest")))
+    return os.getenv("TEXTTEST_PERSONAL_CONFIG")
 
 # Return the hostname, guaranteed to be just the hostname...
 def gethostname():

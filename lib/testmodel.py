@@ -1523,7 +1523,6 @@ class OptionFinder(plugins.OptionFinder):
         self.setPathFromOptionsOrEnv("USECASE_HOME", "$TEXTTEST_HOME/usecases") # Location to store shortcuts from the GUI
         
         self.setPathFromOptionsOrEnv("TEXTTEST_PERSONAL_CONFIG", "~/.texttest") # Location of personal configuration
-        self.setPathFromOptionsOrEnv("TEXTTEST_TMP", "$TEXTTEST_PERSONAL_CONFIG/tmp") # Location of temporary files from test runs
         self.diagWriteDir = self.setPathFromOptionsOrEnv("TEXTTEST_PERSONAL_LOG", "$TEXTTEST_PERSONAL_CONFIG/log", "xw") # Location to write TextTest's internal logs
         self.diagConfigFile = None
         if self.has_key("x"): # This is just a fast-track to make sure we can set up diags for the setup

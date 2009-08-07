@@ -214,10 +214,14 @@ class ClientSocketTraffic(Traffic):
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.connect(self.destination)
             sock.sendall(self.text)
-            sock.shutdown(socket.SHUT_WR)
-            response = sock.makefile().read()
-            sock.close()
-            return [ ServerTraffic(response, self.responseFile) ]
+            try:
+                sock.shutdown(socket.SHUT_WR)
+                response = sock.makefile().read()
+                sock.close()
+                return [ ServerTraffic(response, self.responseFile) ]
+            except socket.error:
+                sock.close()
+                return []
         else:
             return [] # client is alone, nowhere to forward
 

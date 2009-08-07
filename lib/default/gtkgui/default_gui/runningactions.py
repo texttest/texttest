@@ -5,7 +5,7 @@ The various ways to launch the dynamic GUI from the static GUI
 
 import plugins, os, sys, shutil 
 from default.gtkgui import guiplugins # from .. import guiplugins, guiutils when we drop Python 2.4 support
-from copy import deepcopy
+from copy import copy, deepcopy
 
 class RunningAction:
     runNumber = 1
@@ -14,16 +14,25 @@ class RunningAction:
         
     def getGroupTabTitle(self):
         return "Running"
+
     def messageAfterPerform(self):
         return self.performedDescription() + " " + self.describeTests() + " at " + plugins.localtime() + "."
 
     def performOnCurrent(self):
         self.startTextTestProcess(self.getUseCaseName(), [ "-g" ])
-    def startTextTestProcess(self, usecase, runModeOptions):
+
+    def getTestsAffected(self, testSelOverride):
+        if testSelOverride:
+            return testSelOverride
+        else:
+            # Take a copy so we aren't fooled by selection changes
+            return copy(self.currTestSelection)
+        
+    def startTextTestProcess(self, usecase, runModeOptions, testSelOverride=None, filterFileOverride=None):
         app = self.currAppSelection[0]
         writeDir = os.path.join(app.writeDirectory, "dynamic_run" + str(self.runNumber))
         plugins.ensureDirectoryExists(writeDir)
-        filterFile = self.writeFilterFile(writeDir)
+        filterFile = self.getFilterFile(writeDir, filterFileOverride)
         ttOptions = runModeOptions + self.getTextTestOptions(filterFile, app, usecase)
         guiplugins.guilog.info("Starting " + usecase + " run of TextTest with arguments " + repr(ttOptions))
         logFile = os.path.join(writeDir, "output.log")
@@ -32,10 +41,11 @@ class RunningAction:
         description = "Dynamic GUI started at " + plugins.localtime()
         cmdArgs = self.getTextTestArgs() + ttOptions
         env = self.getNewUseCaseEnvironment(usecase)
+        testsAffected = self.getTestsAffected(testSelOverride)
         guiplugins.processMonitor.startProcess(cmdArgs, description, env=env,
                                                stdout=open(logFile, "w"), stderr=open(errFile, "w"),
                                                exitHandler=self.checkTestRun,
-                                               exitHandlerArgs=(errFile,self.currTestSelection,usecase))
+                                               exitHandlerArgs=(errFile,testsAffected,filterFile,usecase))
 
     def getNewUseCaseEnvironment(self, usecase):
         environ = deepcopy(os.environ)
@@ -52,17 +62,24 @@ class RunningAction:
             else:
                 del environ["USECASE_REPLAY_SCRIPT"]
         return environ
+
     def getSignalsSent(self):
         return [ "SaveSelection" ]
-    def writeFilterFile(self, writeDir):
+
+    def getFilterFile(self, writeDir, filterFileOverride):
         # Because the description of the selection can be extremely long, we write it in a file and refer to it
         # This avoids too-long command lines which are a problem at least on Windows XP
-        filterFileName = os.path.join(writeDir, "gui_select")
-        self.notify("SaveSelection", filterFileName)
-        return filterFileName
+        if filterFileOverride:
+            return filterFileOverride
+        else:
+            filterFileName = os.path.join(writeDir, "gui_select")
+            self.notify("SaveSelection", filterFileName)
+            return filterFileName
+    
     def getTextTestArgs(self):
         extraArgs = plugins.splitcmd(os.getenv("TEXTTEST_DYNAMIC_GUI_PYARGS", "")) # Additional python arguments for dynamic GUI : mostly useful for coverage
         return [ sys.executable ] + extraArgs + [ sys.argv[0] ]
+
     def getOptionGroups(self):
         return [ self.optionGroup ]
 
@@ -100,9 +117,9 @@ class RunningAction:
         appNames = set([ app.name for app in self.currAppSelection ])
         return [ "-a", ",".join(sorted(list(appNames))) ]
 
-    def checkTestRun(self, errFile, testSel, usecase):
+    def checkTestRun(self, errFile, testSel, filterFile, usecase):
         if self.checkErrorFile(errFile, testSel, usecase):
-            self.handleCompletion(testSel, usecase)
+            self.handleCompletion(testSel, filterFile, usecase)
             if len(self.currTestSelection) >= 1 and self.currTestSelection[0] in testSel:
                 self.currTestSelection[0].filesChanged()
 
@@ -281,12 +298,13 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
     def getMultipleTestWarning(self):
         return "record " + self.describeTests() + " simultaneously"
 
-    def handleCompletion(self, testSel, usecase):
+    def handleCompletion(self, testSel, filterFile, usecase):
         test = testSel[0]
         if usecase == "record":
             changedUseCaseVersion = self.getChangedUseCaseVersion(test)
             if changedUseCaseVersion is not None and self.optionGroup.getSwitchValue("rep"):
-                self.startTextTestProcess("replay", self.getVanillaOption() + self.getReplayRunModeOptions(changedUseCaseVersion))
+                replayOptions = self.getVanillaOption() + self.getReplayRunModeOptions(changedUseCaseVersion)
+                self.startTextTestProcess("replay", replayOptions, testSel, filterFile)
                 message = "Recording completed for " + repr(test) + \
                           ". Auto-replay of test now started. Don't submit the test manually!"
                 self.notify("Status", message)

@@ -86,6 +86,8 @@ class VirtualDisplayResponder(plugins.Responder):
             else:
                 self.killRemoteServer()
             self.displayName = None
+            self.displayProc.wait() # don't leave zombies around
+            self.displayProc = None
 
     def killRemoteServer(self):
         self.diag.info("Getting ps output from " + self.displayMachine)

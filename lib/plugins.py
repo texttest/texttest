@@ -487,10 +487,14 @@ class Observable:
         method = eval("observer." + methodName)
         # unpickled objects have not called __init__, and
         # hence do not have self.passSelf ...
-        if hasattr(self, "passSelf") and self.passSelf:
-            method(self, *args, **kwargs)
-        else:
-            method(*args, **kwargs)
+        try:
+            if hasattr(self, "passSelf") and self.passSelf:
+                method(self, *args, **kwargs)
+            else:
+                method(*args, **kwargs)
+        except:
+            sys.stderr.write("Observer raised exception while calling " + methodName + " :\n")
+            printException()
 
 # Interface all responders must fulfil
 class Responder:

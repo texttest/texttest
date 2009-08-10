@@ -560,7 +560,7 @@ class QueueSystemServer(BaseActionRunner):
             
     def allowReuse(self, oldTest, newTest):
         # Don't reuse jobs that have been killed
-        if oldTest.state.category == "killed":
+        if oldTest.state.category == "killed" or newTest.state.isComplete():
             return False
 
         oldRules = self.getSubmissionRules(oldTest)

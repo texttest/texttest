@@ -73,6 +73,7 @@ class PasteTests(guiplugins.ActionGUI):
 
     def isActiveOnCurrent(self, test=None, state=None):
         return guiplugins.ActionGUI.isActiveOnCurrent(self, test, state) and len(self.clipboardTests) > 0
+
     def getCurrentTestMatchingApp(self, test):
         for currTest in self.currTestSelection:
             if currTest.app == test.app:
@@ -89,13 +90,19 @@ class PasteTests(guiplugins.ActionGUI):
 
     def getNewTestName(self, suite, oldName):
         existingTest = suite.findSubtest(oldName)
-        if not existingTest or self.willBeRemoved(existingTest):
+        if not existingTest:
+            dirName = suite.getNewDirectoryName(oldName)
+            if not os.path.exists(dirName):
+                return oldName
+        elif self.willBeRemoved(existingTest):
             return oldName
-
+        
         nextNameCandidate = self.findNextNameCandidate(oldName)
         return self.getNewTestName(suite, nextNameCandidate)
+    
     def willBeRemoved(self, test):
         return self.removeAfter and test in self.clipboardTests
+
     def findNextNameCandidate(self, name):
         copyPos = name.find("_copy_")
         if copyPos != -1:
@@ -106,11 +113,13 @@ class PasteTests(guiplugins.ActionGUI):
             return name + "_2"
         else:
             return name + "_copy"
+
     def getNewDescription(self, test):
         if len(test.description) or self.removeAfter:
             return plugins.extractComment(test.description)
         else:
             return "Copy of " + test.name
+
     def getRepositionPlacement(self, test, placement):
         currPos = test.positionInParent()
         if placement > currPos:
@@ -127,17 +136,15 @@ class PasteTests(guiplugins.ActionGUI):
         for test in self.clipboardTests:
             suite, placement = self.getDestinationInfo(test)
             if suite:
-                destInfo[test] = suite, placement
+                newName = self.getNewTestName(suite, test.name)
+                destInfo[test] = suite, placement, newName
         if len(destInfo) == 0:
             raise plugins.TextTestError, "Cannot paste test there, as the copied test and currently selected test have no application/version in common"
 
         suiteDeltas = {} # When we insert as we go along, need to update subsequent placements
-        for test in self.clipboardTests:
-            if not destInfo.has_key(test):
-                continue
-            suite, placement = destInfo[test]
-            realPlacement = placement + suiteDeltas.get(suite, 0)
-            newName = self.getNewTestName(suite, test.name)
+        for test, (suite, placement, newName) in destInfo.items():
+            suiteDeltas.setdefault(suite, 0)
+            realPlacement = placement + suiteDeltas.get(suite)
             guiutils.guilog.info("Pasting test " + newName + " under test suite " + \
                         repr(suite) + ", in position " + str(realPlacement))
             if self.removeAfter and newName == test.name and suite is test.parent:
@@ -146,7 +153,6 @@ class PasteTests(guiplugins.ActionGUI):
                 plugins.tryFileChange(test.parent.repositionTest, "Failed to reposition test: no permissions to edit the testsuite file",
                                       test, repositionPlacement)
                 newTests.append(test)
-                suiteDeltas.setdefault(suite, 0)
             else:
                 newDesc = self.getNewDescription(test)
                 # Create test files first, so that if it fails due to e.g. full disk, we won't register the test either...
@@ -158,10 +164,7 @@ class PasteTests(guiplugins.ActionGUI):
                 # might have also been copied
                 testImported.readContents(initial=False)
                 testImported.updateAllRelPaths(test.getRelPath())
-                if suiteDeltas.has_key(suite):
-                    suiteDeltas[suite] += 1
-                else:
-                    suiteDeltas[suite] = 1
+                suiteDeltas[suite] += 1
                 newTests.append(testImported)
                 if self.removeAfter:
                     plugins.tryFileChange(test.remove, "Failed to remove old test: didn't have sufficient write permission to the test files. Test copied instead of moved.")
@@ -174,7 +177,7 @@ class PasteTests(guiplugins.ActionGUI):
             # After a paste from cut, subsequent pastes should behave like copies of the new tests
             self.clipboardTests = newTests
             self.removeAfter = False
-        for suite, placement in destInfo.values():
+        for suite, placement, newName in destInfo.values():
             suite.contentChanged()
 
     def getStatusMessage(self, suiteDeltas):

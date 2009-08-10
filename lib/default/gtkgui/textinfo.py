@@ -266,6 +266,8 @@ class TextInfoGUI(TextViewGUI):
     def notifyNewTestSelection(self, tests, *args):
         if len(tests) == 0:
             self.currentTest = None
+            self.text = "No test currently selected"
+            self.updateView()
         elif self.currentTest not in tests:
             self.currentTest = tests[0]
             self.resetText(self.currentTest.stateInGui)

@@ -311,9 +311,12 @@ class ChangeableNotebookGUI(NotebookGUI):
                 self.setCurrentPage(pageNum)
 
     def notifyNewTestSelection(self, tests, apps, rowCount, direct):
-        self.diag.info("New selection with " + repr(tests) + ", adjusting '" + self.scriptTitle + "'")
-        # only change pages around if a test is directly selected
-        self.updatePages(rowCount=rowCount, changeCurrentPage=direct)
+        # This is mostly an attempt to work around the tree search problems.
+        # Don't hide the tab for user-deselections of all tests because it trashes the search.
+        if len(tests) > 0 or not direct:
+            self.diag.info("New selection with " + repr(tests) + ", adjusting '" + self.scriptTitle + "'")
+            # only change pages around if a test is directly selected
+            self.updatePages(rowCount=rowCount, changeCurrentPage=direct)
 
     def updatePages(self, test=None, state=None, rowCount=0, changeCurrentPage=False):
         if not self.notebook:

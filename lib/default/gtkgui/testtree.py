@@ -328,11 +328,15 @@ class TestTreeGUI(guiutils.ContainerGUI):
         # in the above cases)
         path = self.model.get_path(iter)
         self.collapsedRows[path] = 1
+        # Collapsing rows can cause indirect changes of selection, make sure we indicate this.
+        self.selecting = True
         try:
             filterPath = self.filteredModel.convert_child_path_to_path(path)
             self.selection.get_tree_view().collapse_row(filterPath)
         except:
             pass
+        self.selecting = False
+        self.selectionChanged(direct=False)
 
     def userChangedSelection(self, *args):
         if not self.selecting and not hasattr(self.selection, "unseen_changes"):
@@ -602,8 +606,11 @@ class TestTreeGUI(guiutils.ContainerGUI):
 
     def removeTest(self, test, iter):
         filteredIter = self.findIter(test)
+        self.selecting = True
         if self.selection.iter_is_selected(filteredIter):
             self.selection.unselect_iter(filteredIter)
+        self.selecting = False
+        self.selectionChanged(direct=False)
         self.model.remove(iter)
         self.itermap.remove(test)
 

@@ -313,6 +313,8 @@ class TestFileGUI(FileViewGUI):
     def notifyNewTestSelection(self, tests, apps, rowCount, *args):
         if len(tests) == 0 or (not self.dynamic and rowCount > 1): # multiple tests in static GUI result in removal
             self.currentTest = None
+            self.setName(tests, rowCount)
+            self.model.clear()
             return
 
         if len(tests) > 1 and self.currentTest in tests:
@@ -334,8 +336,11 @@ class TestFileGUI(FileViewGUI):
     def getName(self, tests, rowCount):
         if rowCount > 1:
             return "Sample from " + repr(len(tests)) + " tests"
-        else:
+        elif self.currentTest:
             return self.currentTest.name.replace("_", "__")
+        else:
+            return "No test selected"
+        
     def getColour(self, name):
         return guiutils.guiConfig.getCompositeValue("file_colours", name)
 

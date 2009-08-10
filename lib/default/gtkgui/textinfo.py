@@ -37,7 +37,7 @@ class TextViewGUI(guiutils.SubGUI):
 
     def hasStem(self, line, files):
         for fileName, comp in files:
-            if comp.stem and line.find(" " + comp.stem + " ") != -1:
+            if comp.stem and line.find(" " + repr(comp) + " ") != -1:
                 return True
         return False
 

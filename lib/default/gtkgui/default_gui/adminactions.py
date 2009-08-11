@@ -609,8 +609,8 @@ class ImportFiles(guiplugins.ActionDialogGUI):
     def getDefinitionFiles(self):
         defFiles = []
         defFiles.append("environment")
+        defFiles.append("options")
         if self.currTestSelection[0].classId() == "test-case":
-            defFiles.append("options")
             recordMode = self.currTestSelection[0].getConfigValue("use_case_record_mode")
             if recordMode == "disabled":
                 defFiles.append("input")

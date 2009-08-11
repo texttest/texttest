@@ -1458,6 +1458,9 @@ Framework Enhancements:
 	Mostly to keep things consistent with "log" locations
     - Generalised --vanilla option (testmodel.py)
 	Now have --vanilla site and --vanilla personal
+    - New "default_texttest_tmp" config file entry (default/__init__.py)
+	Useful for setting a site-wide default, e.g. if a separate disk is used for this purpose
+    - Overwrite mode (-o) now displays differences for what it overwrites
 Historical HTML Batch Report Enhancements:
     - Separate summary rows are now displayed for each extra version (testoverview.py) 
     - With extra versions, the first one also gets given a header row now (testoverview.py)
@@ -1483,5 +1486,9 @@ Bug Fixes:
     - Observer exceptions no longer fatal (plugins.py)
 	Many observers can be in configuration code and shouldn't be allowed to bring down other applications.
     - Pasting a test where there already exists a file of that name now handled gracefully (adminactions.py)
+    - Traffic mechanism no longer stacktraces if server under test resets its connection (traffic.py)
+    - Auto-replay the correct test when recording if static GUI test selection changes in the meantime (adminactions.py)
+    - Now produce a warning for duplicated sections in "knownbugs" files (knownbugs/__init__.py)
+	Silently ignored previously
 Grid Engine (LSF/SGE) Bug Fixes:
     - Don't send tests for re-use whose submission has been cancelled (queuesystem/__init__.py)

@@ -127,7 +127,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         for suite in self.rootTestSuites:
             if suite in suitesToTry:
                 filters = self.getFilterList(suite.app)
-                reqTests = self.getRequestedTests(suite, filters)
+                reqTests = self.getRequestedTests(suite, filters, strategy)
                 newTests = self.combineWithPrevious(reqTests, suite.app, strategy)
             else:
                 newTests = self.combineWithPrevious([], suite.app, strategy)
@@ -141,21 +141,23 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         criteria = " ".join(self.getCommandLineArgs(self.optionGroup, onlyKeys=self.appKeys))
         self.notify("SetTestSelection", newSelection, criteria, self.selectionGroup.getSwitchValue("select_in_collapsed_suites"))
 
+    def matchesVersions(self, test):
+        versionSelection = self.optionGroup.getOptionValue("vs")
+        if len(versionSelection) == 0:
+            return True
+        
+        versions = versionSelection.split(".")
+        return self.allVersionsMatch(versions, test.app.versions)        
+
     def getSuitesToTry(self):
         # If only some of the suites present match the version selection, only consider them.
         # If none of them do, try to filter them all
-        versionSelection = self.optionGroup.getOptionValue("vs")
-        if len(versionSelection) == 0:
-            return self.rootTestSuites
-        versions = versionSelection.split(".")
-        toTry = []
-        for suite in self.rootTestSuites:
-            if self.allVersionsMatch(versions, suite.app.versions):
-                toTry.append(suite)
+        toTry = filter(self.matchesVersions, self.rootTestSuites)
         if len(toTry) == 0:
             return self.rootTestSuites
         else:
             return toTry
+        
     def allVersionsMatch(self, versions, appVersions):
         for version in versions:
             if version == "<default>":
@@ -165,25 +167,33 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
                 if not version in appVersions:
                     return False
         return True
-    def getRequestedTests(self, suite, filters):
+    
+    def getRequestedTests(self, suite, filters, strategy):
         self.notify("ActionProgress", "") # Just to update gui ...
+        if strategy == 1: # refine, don't check the whole suite
+            return filter(lambda test: test.app is suite.app and test.isAcceptedByAll(filters), self.currTestSelection)
+        else:
+            return self.getRequestedTestsFromSuite(suite, filters)
+        
+    def getRequestedTestsFromSuite(self, suite, filters):
         if not suite.isAcceptedByAll(filters):
             return []
-        if suite.classId() == "test-suite":
-            tests = []
-            for subSuite in self.findTestCaseList(suite):
-                tests += self.getRequestedTests(subSuite, filters)
-            return tests
         else:
-            return [ suite ]
+            if suite.classId() == "test-suite":
+                tests = []
+                for subSuite in self.findTestCaseList(suite):
+                    self.notify("ActionProgress", "") # Just to update gui ...
+                    tests += self.getRequestedTestsFromSuite(subSuite, filters)
+                return tests
+            else:
+                return [ suite ]
+
     def combineWithPrevious(self, reqTests, app, strategy):
         # Strategies: 0 - discard, 1 - refine, 2 - extend, 3 - exclude
         # If we want to extend selection, we include test if it was previsouly selected,
         # even if it doesn't fit the current criterion
-        if strategy == 0:
+        if strategy < 2:
             return reqTests
-        elif strategy == 1:
-            return filter(lambda test: test in self.currTestSelection, reqTests)
         else:
             extraRequested = filter(lambda test: test not in self.currTestSelection, reqTests)
             if strategy == 2:

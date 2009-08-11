@@ -17,6 +17,7 @@ class TestColumnGUI(guiutils.SubGUI):
         self.totalNofTestsShown = 0
         self.column = None
         self.dynamic = dynamic
+        self.testSuiteSelection = False
         self.diag = logging.getLogger("Test Column GUI")
         self.allSuites = []
 
@@ -71,6 +72,7 @@ class TestColumnGUI(guiutils.SubGUI):
             self.notify("Status", "Tests sorted according to testsuite file.")
         self.notify("RefreshTestSelection")
         self.notify("ActionStop", "")
+        
     def setSortingOrder(self, order, suite = None):
         if not suite:
             for suite in self.allSuites:
@@ -83,8 +85,16 @@ class TestColumnGUI(guiutils.SubGUI):
             for test in suite.testcases:
                 if test.classId() == "test-suite":
                     self.setSortingOrder(order, test)
+
     def getTitle(self):
         title = "Tests: "
+        if self.testSuiteSelection:
+            # We don't care about totals with test suites
+            title += self.pluralise(self.nofSelectedTests, "suite") + " selected"
+            if self.nofDistinctSelectedTests != self.nofSelectedTests:
+                title += ", " + str(self.nofDistinctSelectedTests) + " distinct"
+            return title
+        
         if self.nofSelectedTests == self.totalNofTests:
             title += "All " + str(self.totalNofTests) + " selected"
         else:
@@ -118,27 +128,46 @@ class TestColumnGUI(guiutils.SubGUI):
             self.totalNofDistinctTests += totalRowsDelta
         self.totalNofTestsShown += totalShownDelta
         self.updateTitle(initial)
+
     def notifyAllRead(self):
         if self.addedCount != self.totalNofTests:
             self.totalNofTests = self.addedCount
             self.updateTitle()
 
+    def countTests(self, tests):
+        if self.dynamic:
+            return len(tests), False
+        
+        testCount, suiteCount = 0, 0
+        for test in tests:
+            if test.classId() == "test-case":
+                testCount += 1
+            else:
+                suiteCount += 1
+        if suiteCount and not testCount:
+            return suiteCount, True
+        else:
+            return testCount, False
+
     def notifyNewTestSelection(self, tests, apps, distinctTestCount, direct=False):
-        testcases = filter(lambda test: test.classId() == "test-case", tests)
-        newCount = len(testcases)
+        newCount, suitesOnly = self.countTests(tests)
         if distinctTestCount > newCount:
             distinctTestCount = newCount
-        if self.nofSelectedTests != newCount or self.nofDistinctSelectedTests != distinctTestCount:
+        if self.nofSelectedTests != newCount or \
+               self.nofDistinctSelectedTests != distinctTestCount or suitesOnly != self.testSuiteSelection:
             self.diag.info("New selection " + repr(tests) + " distinct " + str(distinctTestCount))
             self.nofSelectedTests = newCount
             self.nofDistinctSelectedTests = distinctTestCount
+            self.testSuiteSelection = suitesOnly
             self.updateTitle()
+            
     def notifyVisibility(self, tests, newValue):
         if newValue:
             self.totalNofTestsShown += len(tests)
         else:
             self.totalNofTestsShown -= len(tests)
         self.updateTitle()
+
 
 class TestIteratorMap:
     def __init__(self, dynamic, allApps):

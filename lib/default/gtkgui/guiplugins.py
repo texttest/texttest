@@ -410,12 +410,6 @@ class ActionGUI(BasicActionGUI):
     def correctTestClass(self):
         pass
 
-    def pluralise(self, num, name):
-        if num == 1:
-            return "1 " + name
-        else:
-            return str(num) + " " + name + "s"
-
     def messageAfterPerform(self):
         return "Performed '" + self.getTooltip() + "' on " + self.describeTests() + "."
 

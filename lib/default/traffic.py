@@ -220,6 +220,8 @@ class ClientSocketTraffic(Traffic):
                 sock.close()
                 return [ ServerTraffic(response, self.responseFile) ]
             except socket.error:
+                sys.stderr.write("WARNING: Server process reset the connection while TextTest's 'fake client' was trying to read a response from it!\n")
+                sys.stderr.write("(while running " + repr(CommandLineTraffic.currentTest) + ")\n")
                 sock.close()
                 return []
         else:

@@ -1427,18 +1427,28 @@ Fixes for older bugs:
 Version trunk
 =============
 General GUI Enhancements:
+    - Default search now works! (testtree.py)
+	Can select tests just by typing with the test tree highlighted
     - Version dialog shows version of PyGObject and GLib also (helpdialogs.py)
 Static GUI Enhancements:
+    - New "Replace Text in Files" action
+	Graphical version of default.ReplaceText script
     - Can now use UNIX-style file expansion wildcards (globs) in the "Test-file to search" box in the Selection tab. (default_gui.py)
 	Allows looking for text in multiple files simultaneously. Also affects -grepfile on the command line.
     - On creating a new application, can specify at creation time that it is a GUI (default_gui.py)
 	Saves on fiddling and restarting the GUI.
+    - Default value for "query_kill_processes" changed (default/__init__.py)
+	Ask before terminating dynamic GUIs when static GUI is terminated.
     - Tooltips added to the selection tab to aid clarity.
 Dynamic GUI Enhancements:
     - Selecting files in the file view now also filters the Text Info display below (texttestgui.py)
 	So that it only previews what is currently selected.
+    - Saved tests are now listed separately in the status view (statusviews.py)
+	Makes it easier to track which tests have been saved and which worked by themselves
     - Can now view original files (filtered and not) from the file view popup menu (default_gui.py)
 Framework Enhancements:
+    - Can now use "options" files in test suites (default/__init__.py)
+	They get combined like "environment" files. See "Test Suite Guide" on the website for more details.
     - Reconnect now picks up all "extra versions" that were originally run (reconnect.py)
 	Mainly useful if batch_extra_version was originally supplied
     - Logging more flexible now (default.py)
@@ -1446,21 +1456,32 @@ Framework Enhancements:
 	Debug logging file now called "logging.debug" rather than "log4py.conf". See migration notes
     - Personal toolbar/GTK configuration now lives in "etc" subdirectory (plugins.py)
 	Mostly to keep things consistent with "log" locations
+    - Generalised --vanilla option (testmodel.py)
+	Now have --vanilla site and --vanilla personal
 Historical HTML Batch Report Enhancements:
     - Separate summary rows are now displayed for each extra version (testoverview.py) 
     - With extra versions, the first one also gets given a header row now (testoverview.py)
     - Category ordering is now deterministic, with succeeded tests displayed first (testoverview.py)
-Version Control Browser Enhancements/bug fixes:
+Grid Engine (LSF/SGE) enhancements:
+    - Errors produced by remote jobs now get reported on master process stderr (queuesystem/__init__.py)
+	And hence in popups in the static GUI where appropriate.
+    - Tests from different applications now interleaved when submitting (queuesystem/__init__.py)
+	Means one application is less likely to take over all available resources
 Self-test/Internal changes:
     - Everything now done via PyUseCase 2.0's new auto-logging. Most custom logging removed from TextTest.
     - Popup menus are now called and shown in the tests.
     - New application event fixes indeterminism problems around tests that kill external viewers.
+    - Major GUI code refactoring to create packages as appropriate
     - Lots of work on coverage: tests added, dead code removed, no-coverage pragmas added. Coverage from self-tests now 98.6%
 Bug Fixes:
     - Invisible (filtered out) tests will not be run now when a test suite is selected (texttestgui.py)
-    - "Create/Import" functionality in static GUI works correctly for directories which previously existed (default_gui.py)
+    - "Create/Import" functionality in static GUI works correctly for directories which previously existed (adminactions.py)
     - Static GUI no longer refuses to start if the "default checkout" can't be found (default/__init__.py)
     - All plugins scripts now reject unknown arguments in a consistent way (plugins.py)
     - Status of tests now synchronised across the GUI, should be harder to get a test green/red somewhere and still yellow
 	somewhere else.
-    
+    - Observer exceptions no longer fatal (plugins.py)
+	Many observers can be in configuration code and shouldn't be allowed to bring down other applications.
+    - Pasting a test where there already exists a file of that name now handled gracefully (adminactions.py)
+Grid Engine (LSF/SGE) Bug Fixes:
+    - Don't send tests for re-use whose submission has been cancelled (queuesystem/__init__.py)

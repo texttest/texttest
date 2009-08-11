@@ -1430,9 +1430,14 @@ General GUI Enhancements:
     - Default search now works! (testtree.py)
 	Can select tests just by typing with the test tree highlighted
     - Version dialog shows version of PyGObject and GLib also (helpdialogs.py)
+    - Quick Start guide now available from help menu, also credits and license (helpdialogs.py)
 Static GUI Enhancements:
     - New "Replace Text in Files" action
 	Graphical version of default.ReplaceText script
+    - Selection of test suites now reported in test tree header (testtree.py)
+	Reports number of suites selected instead of 0 tests
+    - Adding a test now adds it to all selected suites (adminactions.py)
+	More consistent with behaviour of Rename, Copy etc.
     - Can now use UNIX-style file expansion wildcards (globs) in the "Test-file to search" box in the Selection tab. (default_gui.py)
 	Allows looking for text in multiple files simultaneously. Also affects -grepfile on the command line.
     - On creating a new application, can specify at creation time that it is a GUI (default_gui.py)
@@ -1446,6 +1451,8 @@ Dynamic GUI Enhancements:
     - Saved tests are now listed separately in the status view (statusviews.py)
 	Makes it easier to track which tests have been saved and which worked by themselves
     - Can now view original files (filtered and not) from the file view popup menu (default_gui.py)
+    - Test tree tooltips now work more reliably and use the builtin support in PyGTK 2.12 (testtree.py)
+	They are removed in PyGTK 2.10, was not deemed important enough to keep them there
 Framework Enhancements:
     - Can now use "options" files in test suites (default/__init__.py)
 	They get combined like "environment" files. See "Test Suite Guide" on the website for more details.
@@ -1488,7 +1495,13 @@ Bug Fixes:
     - Pasting a test where there already exists a file of that name now handled gracefully (adminactions.py)
     - Traffic mechanism no longer stacktraces if server under test resets its connection (traffic.py)
     - Auto-replay the correct test when recording if static GUI test selection changes in the meantime (adminactions.py)
+    - Refining a selection containing test suites now works properly (selectandfilter.py)
+	Previously lost all test suites
     - Now produce a warning for duplicated sections in "knownbugs" files (knownbugs/__init__.py)
 	Silently ignored previously
+    - Importing files now preserves permissions correctly (adminactions.py)
+    - Crashed virtual servers are now restarted after each test, preventing multiple tests failing for the same crash (virtualdisplay.py)
+    - Grouping of tests in the dynamic GUI is disabled if their diffs are longer than the maximum to display (statusviews.py)
+	Could lead to false grouping and hence incorrect saves
 Grid Engine (LSF/SGE) Bug Fixes:
     - Don't send tests for re-use whose submission has been cancelled (queuesystem/__init__.py)

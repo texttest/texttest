@@ -3,7 +3,7 @@
 Generic module broken out from guiplugins. Contains utility code that can be
 called from anywhere in the gtkgui package
 """
-import plugins, os, operator, types
+import plugins, os, sys, operator, types
 from copy import copy
 from locale import getdefaultlocale
 
@@ -27,47 +27,29 @@ if os.name == "nt":
 class Utf8Converter:
     def convert(self, text):
         unicodeInfo = self.decodeText(text)
-        return self.encodeText(unicodeInfo)
+        return unicodeInfo.encode('utf-8', 'replace')
 
     def decodeText(self, text):
         encodings = self.getEncodings()
-        for ix, encoding in enumerate(encodings):
+        for encoding in encodings:
             try:
-                unicodeInfo = unicode(text, encoding, errors="strict")
-                if ix > 0:
-                    guilog.info("WARNING: Failed to decode string '" + text + \
-                                "' using encoding(s) " + " and ".join(encodings[:ix]) + \
-                                ". Encoded using " + encoding + " instead.")
-                return unicodeInfo
+                return unicode(text, encoding, errors="strict")
             except:
                 pass
-        guilog.info("WARNING: Failed to decode string '" + text + \
-                    "' using strict encodings " + " and ".join(encodings) + \
-                    ".\nReverting to non-strict UTF-8 encoding but " + \
-                    "replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
-        return unicode(text, 'utf-8', errors="replace")
+
+        sys.stderr.write("WARNING: TextTest's textual display had some trouble with character encodings.\n" + \
+                         "It tried the encoding(s) " + " and ".join(encodings) + \
+                         ",\nbut the Unicode replacement character still had to be used.\n" + \
+                         "Please ensure your locale is compatible with the encodings in your test files.\n" + \
+                         "The problematic text follows:\n\n" + text.strip() + "\n")
+        return unicode(text, encodings[0], errors="replace")
 
     def getEncodings(self):
-        encodings = [ 'ISO8859-1', 'utf-8' ]
+        encodings = [ 'utf-8' ]
         localeEncoding = getdefaultlocale()[1]
         if localeEncoding and not localeEncoding in encodings:
             encodings.insert(0, localeEncoding)
         return encodings
-
-    def encodeText(self, unicodeInfo):
-        try:
-            return unicodeInfo.encode('utf-8', 'strict')
-        except:
-            try:
-                guilog.info("WARNING: Failed to encode Unicode string '" + unicodeInfo + \
-                             "' using strict UTF-8 encoding.\nReverting to non-strict UTF-8 " + \
-                             "encoding but replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
-                return unicodeInfo.encode('utf-8', 'replace')
-            except:
-                guilog.info("WARNING: Failed to encode Unicode string '" + unicodeInfo + \
-                            "' using both strict UTF-8 encoding and UTF-8 encoding with " + \
-                            "replacement. Showing error message instead.")
-                return "Failed to encode Unicode string."
 
 
 def convertToUtf8(text): # gtk.TextViews insist we do the conversion ourselves

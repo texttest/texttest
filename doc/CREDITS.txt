@@ -5,7 +5,7 @@ Code Maintainer:
 Developers:
 
     Geoff Bache
-    Mattias Grönkvist
+    Mattias GrÃ¶nkvist
     Johan Ivarsson
     Johan Andersson
 
@@ -18,3 +18,4 @@ Contributors:
     Claes Verdoes
     Henning Thornblad
     Michael Behrisch
+

@@ -172,7 +172,7 @@ class TextFileDisplayDialog(guiplugins.ActionResultDialogGUI):
             text = file.read()
             file.close()
             buffer = gtk.TextBuffer()
-            buffer.set_text(guiutils.convertToUtf8(text))
+            buffer.set_text(text)
         except Exception, e: #pragma : no cover - should never happen
             self.showErrorDialog("Failed to show " + self.fileName + " file:\n" + str(e))
             return
@@ -222,7 +222,7 @@ class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
         versionInfo = self.readVersionInfo(docDir)
         for version in reversed(sorted(versionInfo.keys())):
             buffer = gtk.TextBuffer()
-            buffer.set_text(guiutils.convertToUtf8(versionInfo[version]))
+            buffer.set_text(versionInfo[version])
             textView = gtk.TextView(buffer)
             textView.set_editable(False)
             textView.set_cursor_visible(False)

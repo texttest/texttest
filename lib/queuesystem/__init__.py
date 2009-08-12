@@ -343,6 +343,9 @@ class SlaveRequestHandler(StreamRequestHandler):
     def handleRequestFromHost(self, hostname, identifier):
         testString = self.rfile.readline().strip()
         test = self.server.getTest(testString)
+        if test is None:
+            return
+        
         if self.server.clientCorrect(test, (hostname, identifier)):
             if not test.state.isComplete(): # we might have killed it already...
                 oldBt = test.state.briefText
@@ -426,10 +429,15 @@ class SlaveServerResponder(plugins.Responder, TCPServer):
         if not self.testMap.has_key(testApp):
             self.testMap[testApp] = {}
         self.testMap[testApp][testPath] = test
+
     def getTest(self, testString):
         self.diag.info("Received request for '" + testString + "'")
-        appName, testPath = testString.split(":")
-        return self.testMap[appName][testPath]
+        try:
+            appName, testPath = testString.split(":")
+            return self.testMap[appName][testPath]
+        except ValueError:
+            sys.stderr.write("Received request from slave process which could not be parsed :\n" + testString + "\n")
+    
     def clientCorrect(self, test, clientInfo):
         # Only allow one client per test!
         if self.testClientInfo.has_key(test):

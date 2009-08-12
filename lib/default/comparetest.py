@@ -247,6 +247,8 @@ class TestComparison(BaseTestComparison):
         worstResult = self.getMostSevereFileComparison()
         if not worstResult:
             self.category = "success"
+            if "save" in self.lifecycleChange:
+                self.freeText = "(Saved at " + plugins.localtime("%H:%M") + ")"
         else:
             self.category = worstResult.getType()
             self.freeText = self.getFreeTextInfo()

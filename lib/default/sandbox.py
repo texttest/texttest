@@ -14,23 +14,31 @@ class PrepareWriteDirectory(plugins.Action):
     def __init__(self, ignoreCatalogues):
         self.diag = logging.getLogger("Prepare Writedir")
         self.ignoreCatalogues = ignoreCatalogues
-        self.madeRemoteTmp = False
         if self.ignoreCatalogues:
             self.diag.info("Ignoring all information in catalogue files")
 
     def __call__(self, test):
-        self.madeRemoteTmp = False
-        self.collatePaths(test, "copy_test_path", self.copyTestPath)
-        self.collatePaths(test, "copy_test_path_merge", self.copyTestPath, True)
-        self.collatePaths(test, "partial_copy_test_path", self.partialCopyTestPath)
-        self.collatePaths(test, "link_test_path", self.linkTestPath)
+        machine, remoteTmpDir = test.app.getRemoteTestTmpDir(test)
+        if remoteTmpDir:
+            test.app.ensureRemoteDirExists(machine, remoteTmpDir)
+            remoteCopy = plugins.Callable(self.copyDataRemotely, test, machine, remoteTmpDir)
+        else:
+            remoteCopy = None
+
+        self.collateAllPaths(test, remoteCopy)
         test.createPropertiesFiles()
 
-    def collatePaths(self, test, configListName, *args):
-        for configName in test.getConfigValue(configListName, expandVars=False):
-            self.collatePath(test, configName, *args)
+    def collateAllPaths(self, test, remoteCopy):
+        self.collatePaths(test, "copy_test_path", self.copyTestPath, remoteCopy)
+        self.collatePaths(test, "copy_test_path_merge", self.copyTestPath, remoteCopy, mergeDirectories=True)
+        self.collatePaths(test, "partial_copy_test_path", self.partialCopyTestPath, remoteCopy)
+        self.collatePaths(test, "link_test_path", self.linkTestPath, remoteCopy)
 
-    def collatePath(self, test, configName, collateMethod, mergeDirectories=False):
+    def collatePaths(self, test, configListName, *args, **kwargs):
+        for configName in test.getConfigValue(configListName, expandVars=False):
+            self.collatePath(test, configName, *args, **kwargs)
+
+    def collatePath(self, test, configName, collateMethod, remoteCopy, mergeDirectories=False):
         sourcePaths = self.getSourcePaths(test, configName)
         targetPath = self.getTargetPath(test, configName)
         plugins.ensureDirExistsForFile(targetPath)
@@ -41,20 +49,16 @@ class PrepareWriteDirectory(plugins.Action):
             if not mergeDirectories or not os.path.isdir(sourcePath):
                 break
 
-        machine, remoteTmpDir = test.app.getRemoteTestTmpDir(test)
-        if remoteTmpDir:
-            self.copyDataRemotely(test, targetPath, machine, remoteTmpDir)
+        if remoteCopy:
+            remoteCopy(targetPath)
             
         envVarToSet, propFileName = self.findDataEnvironment(test, configName)
         if envVarToSet:
             self.diag.info("Setting env. variable " + envVarToSet + " to " + targetPath)
             test.setEnvironment(envVarToSet, targetPath, propFileName)
 
-    def copyDataRemotely(self, test, sourcePath, machine, remoteTmpDir):
+    def copyDataRemotely(self, sourcePath, test, machine, remoteTmpDir):
         if os.path.exists(sourcePath):
-            if not self.madeRemoteTmp:
-                test.app.ensureRemoteDirExists(machine, remoteTmpDir)
-                self.madeRemoteTmp = True
             test.app.copyFileRemotely(sourcePath, "localhost", remoteTmpDir, machine)
             
     def getEnvironmentSourcePath(self, configName, test):

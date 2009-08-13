@@ -1346,7 +1346,6 @@ class RunTest(plugins.Action):
     def getTmpDirectory(self, test):
         machine, remoteTmp = test.app.getRemoteTestTmpDir(test)
         if remoteTmp:
-            test.app.ensureRemoteDirExists(machine, remoteTmp)
             return remoteTmp
         else:
             return test.getDirectory(temporary=1)

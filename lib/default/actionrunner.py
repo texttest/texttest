@@ -217,24 +217,30 @@ class TestRunner:
         self.currentAction = None
         self.lock = Lock()
         self.setActionSequence(appRunner.actionSequence)
+
     def setActionSequence(self, actionSequence):
         self.actionSequence = []
         # Copy the action sequence, so we can edit it and mark progress
         for action in actionSequence:
             self.actionSequence.append(action)
+
     def handleExceptions(self, method, *args):
         try:
-            return method(*args)
+            method(*args)
+            return True
         except plugins.TextTestError, e:
             self.failTest(str(e))
         except:
             plugins.printWarning("Caught exception while running " + repr(self.test) + " changing state to UNRUNNABLE :")
             exceptionText = plugins.printException()
             self.failTest(exceptionText)
+        return False
+    
     def failTest(self, excString):
         execHosts = self.test.state.executionHosts
         failState = plugins.Unrunnable(freeText=excString, briefText="TEXTTEST EXCEPTION", executionHosts=execHosts)
         self.test.changeState(failState)
+
     def performActions(self, previousTestRunner):
         tearDownSuites, setUpSuites = self.findSuitesToChange(previousTestRunner)
         for suite in tearDownSuites:
@@ -248,8 +254,8 @@ class TestRunner:
                 self.actionSequence.pop(0)
                 continue
             self.diag.info("->Performing action " + str(action) + " on " + repr(self.test))
-            self.handleExceptions(self.appRunner.setUpSuites, action, self.test)
-            self.callAction(action)
+            if self.handleExceptions(self.appRunner.setUpSuites, action, self.test):
+                self.callAction(action)
             self.diag.info("<-End Performing action " + str(action))
             self.actionSequence.pop(0)
             if not abandon and self.test.state.shouldAbandon():

@@ -1329,11 +1329,16 @@ class RunTest(plugins.Action):
             return []
         else:
             args = [ "env" ]
+            localTmpDir = test.app.writeDirectory
+            machine, remoteTmp = test.app.getRemoteTmpDirectory()
             for var, value in vars:
-                remoteValue = value
+                if remoteTmp:
+                    remoteValue = value.replace(localTmpDir, remoteTmp)
+                else:
+                    remoteValue = value
                 if var == "PATH":
                     # This needs to be correctly reset remotely
-                    remoteValue = value.replace(os.getenv(var), "${" + var + "}")
+                    remoteValue = remoteValue.replace(os.getenv(var), "${" + var + "}")
                 # Double quote as two shells will end up intrepreting this...
                 args.append(var + "='\"" + remoteValue + "\"'")
             return args

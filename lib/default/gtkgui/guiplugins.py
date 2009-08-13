@@ -14,7 +14,8 @@ from ndict import seqdict
 class ProcessTerminationMonitor(plugins.Observable):
     def __init__(self):
         plugins.Observable.__init__(self)
-        self.processes = seqdict()
+        self.processesForKill = seqdict()
+        self.exitHandlers = seqdict()
 
     def listRunningProcesses(self):
         processesToCheck = guiConfig.getCompositeValue("query_kill_processes", "", modeDependent=True)
@@ -25,7 +26,7 @@ class ProcessTerminationMonitor(plugins.Observable):
         
         running = []
         triggerGroup = plugins.TextTriggerGroup(processesToCheck)
-        for process, description, exitHandler, exitHandlerArgs in self.processes.values():
+        for process, description in self.processesForKill.values():
             if triggerGroup.stringContainsText(description):
                 running.append("PID " + str(process.pid) + " : " + description)
                 
@@ -39,23 +40,28 @@ class ProcessTerminationMonitor(plugins.Observable):
         else:
             return process._handle
 
-    def startProcess(self, cmdArgs, description = "", exitHandler=None, exitHandlerArgs=(), **kwargs):
+    def startProcess(self, cmdArgs, description = "", killOnTermination=True, exitHandler=None, exitHandlerArgs=(), **kwargs):
         process = subprocess.Popen(cmdArgs, stdin=open(os.devnull), startupinfo=plugins.getProcessStartUpInfo(), **kwargs)
         pidOrHandle = self.getProcessIdentifier(process)
-        self.processes[int(pidOrHandle)] = (process, description, exitHandler, exitHandlerArgs)
+        self.exitHandlers[int(pidOrHandle)] = (exitHandler, exitHandlerArgs)
+        if killOnTermination:
+            self.processesForKill[int(pidOrHandle)] = (process, description)
         gobject.child_watch_add(pidOrHandle, self.processExited)
 
     def processExited(self, pid, *args):
-        process, description, exitHandler, exitHandlerArgs = self.processes.pop(pid)
+        if self.processesForKill.has_key(pid):
+            del self.processesForKill[pid]
+            
+        exitHandler, exitHandlerArgs = self.exitHandlers.pop(pid)
         if exitHandler:
             exitHandler(*exitHandlerArgs)
     
     def notifyKillProcesses(self, sig=None):
         # Don't leak processes
-        if len(self.processes) == 0:
+        if len(self.processesForKill) == 0:
             return
         self.notify("Status", "Terminating all external viewers ...")
-        for process, description, exitHandler, exitHandlerArgs in self.processes.values():
+        for process, description in self.processesForKill.values():
             self.notify("ActionProgress", "")
             guilog.info("Killing '" + description + "' interactive process")
             killSubProcessAndChildren(process, sig)

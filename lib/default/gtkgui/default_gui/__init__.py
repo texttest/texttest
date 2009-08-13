@@ -32,8 +32,8 @@ class InteractiveActionConfig(BaseInteractiveActionConfig):
             classes += changeteststate.getInteractiveActionClasses()
         else:
             classes += adminactions.getInteractiveActionClasses()
-            classes += runningactions.getInteractiveActionClasses()
-            
+
+        classes += runningactions.getInteractiveActionClasses(dynamic)    
         classes += helpdialogs.getInteractiveActionClasses()
         classes += fileviewers.getInteractiveActionClasses(dynamic)
         classes += selectandfilter.getInteractiveActionClasses(dynamic)
@@ -56,6 +56,7 @@ class InteractiveActionConfig(BaseInteractiveActionConfig):
         dict["reset"] = "<control>e"
         dict["reconnect"] = "<control><shift>r"
         dict["run"] = "<control>r"
+        dict["rerun"] = "<control>r"
         dict["rename"] = "<control>m"
         dict["refresh"] = "F5"
         dict["record_use-case"] = "F9"

@@ -42,10 +42,13 @@ class RunningAction:
         cmdArgs = self.getTextTestArgs() + ttOptions
         env = self.getNewUseCaseEnvironment(usecase)
         testsAffected = self.getTestsAffected(testSelOverride)
-        guiplugins.processMonitor.startProcess(cmdArgs, description, env=env,
+        guiplugins.processMonitor.startProcess(cmdArgs, description, env=env, killOnTermination=self.killOnTermination(),
                                                stdout=open(logFile, "w"), stderr=open(errFile, "w"),
                                                exitHandler=self.checkTestRun,
                                                exitHandlerArgs=(errFile,testsAffected,filterFile,usecase))
+
+    def killOnTermination(self):
+        return True
 
     def getNewUseCaseEnvironment(self, usecase):
         environ = deepcopy(os.environ)
@@ -91,7 +94,9 @@ class RunningAction:
         self.testCount = len(self.getTestCaseSelection())
         ttOptions += [ "-count", str(self.testCount * self.getCountMultiplier()) ]
         ttOptions += [ "-f", filterFile ]
-        ttOptions += [ "-fd", self.getTmpFilterDir(app) ]
+        tmpFilterDir = self.getTmpFilterDir(app)
+        if tmpFilterDir:
+            ttOptions += [ "-fd", tmpFilterDir ]
         return ttOptions
 
     def getCommandLineKeys(self, usecase):
@@ -228,6 +233,39 @@ class RunTestsBasic(RunTests):
 class RunTestsAdvanced(RunTests):
     def getTabTitle(self):
         return "Advanced"
+
+class RerunTests(RunningAction,guiplugins.ActionGUI):
+    def __init__(self, allApps, dynamic, inputOptions):
+        guiplugins.ActionGUI.__init__(self, allApps)
+        RunningAction.__init__(self, inputOptions)
+
+    def _getTitle(self):
+        return "_Rerun"
+    def _getStockId(self):
+        return "execute"
+    def getTooltip(self):
+        return "Rerun selected tests"
+    def performedDescription(self):
+        return "Started"
+    def getUseCaseName(self):
+        return "rerun"
+    def getOptionGroups(self):
+        return []
+    def killOnTermination(self):
+        return False # don't want rerun GUIs to disturb each other like this
+    def getTmpFilterDir(self, app):
+        return "" # don't want selections returned here, send them to the static GUI
+
+    def getTextTestOptions(self, *args):
+        ttOptions = RunningAction.getTextTestOptions(self, *args)
+        ignoreInput = [ "a", "cp", "count", "f", "g" ]
+        for key, value in self.inputOptions.items():
+            if key not in ignoreInput:
+                ttOptions.append("-" + key)
+                if value is not None:
+                    ttOptions.append(value)
+        return ttOptions
+
 
 class RecordTest(RunningAction,guiplugins.ActionTabGUI):
     def __init__(self, allApps, dynamic, inputOptions):
@@ -374,5 +412,8 @@ class ReplaceText(RunScriptAction):
         return "Replaced text in files for"
 
     
-def getInteractiveActionClasses():
-    return [ RunTestsBasic, RunTestsAdvanced, RecordTest, ReconnectToTests, ReplaceText ]
+def getInteractiveActionClasses(dynamic):
+    if dynamic:
+        return [ RerunTests ]
+    else:
+        return [ RunTestsBasic, RunTestsAdvanced, RecordTest, ReconnectToTests, ReplaceText ]

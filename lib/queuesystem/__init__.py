@@ -344,9 +344,10 @@ class SlaveRequestHandler(StreamRequestHandler):
         testString = self.rfile.readline().strip()
         test = self.server.getTest(testString)
         if test is None:
-            return
-        
-        if self.server.clientCorrect(test, (hostname, identifier)):
+            sys.stderr.write("WARNING: Received request from hostname " + hostname +
+                             " (process " + identifier + ")\nwhich could not be parsed:\n'" + testString + "'\n")
+            self.connection.shutdown(socket.SHUT_RDWR)
+        elif self.server.clientCorrect(test, (hostname, identifier)):
             if not test.state.isComplete(): # we might have killed it already...
                 oldBt = test.state.briefText
                 # The updates are only for testing against old slave traffic,
@@ -436,7 +437,7 @@ class SlaveServerResponder(plugins.Responder, TCPServer):
             appName, testPath = testString.split(":")
             return self.testMap[appName][testPath]
         except ValueError:
-            sys.stderr.write("Received request from slave process which could not be parsed :\n" + testString + "\n")
+            return
     
     def clientCorrect(self, test, clientInfo):
         # Only allow one client per test!

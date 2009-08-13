@@ -976,7 +976,7 @@ class Config:
         # Also don't run tests on machines which take a very long time to connect to...
         sshOptions = "-o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10"
         return { "default": "", "ssh" : sshOptions,
-                 "rsync" : "-azL", "scp": "-Cr " + sshOptions }
+                 "rsync" : "-azLp", "scp": "-Crp " + sshOptions }
 
     def getCommandArgsOn(self, app, machine, cmdArgs):
         if machine == "localhost":
@@ -1317,18 +1317,36 @@ class RunTest(plugins.Action):
         if runMachine == "localhost":
             return args
         else:
-            tmpDir = self.getTmpDirectory(test)
-            envArgs = self.getEnvironmentArgs(test) # Must set the environment remotely
-            args = [ "cd", tmpDir, '";"' ] + envArgs + args
-            # Need to change working directory remotely
-            return test.app.getCommandArgsOn(runMachine, args)
+            return self.getRemoteCmdParts(test, runMachine, args)
+
+    def getRemoteCmdParts(self, test, runMachine, localArgs):
+        scriptFileName = test.makeTmpFileName("run_test.sh", forComparison=0)
+        scriptFile = open(scriptFileName, "w")
+        scriptFile.write("#!/bin/sh\n\n")
+
+        # Need to change working directory remotely
+        tmpDir = self.getTmpDirectory(test)
+        scriptFile.write("cd " + self.quote(tmpDir, "'") + "\n")
+
+        for arg, value in self.getEnvironmentArgs(test): # Must set the environment remotely
+            scriptFile.write("export " + arg + "=" + value + "\n")
+        scriptFile.write("exec " + " ".join(localArgs) + "\n")
+        scriptFile.close()
+        os.chmod(scriptFileName, 0775) # make executable
+        machine, remoteTmp = test.app.getRemoteTestTmpDir(test)
+        if remoteTmp:
+            test.app.copyFileRemotely(scriptFileName, "localhost", remoteTmp, machine)
+            remoteScript = os.path.join(remoteTmp, os.path.basename(scriptFileName))
+            return test.app.getCommandArgsOn(runMachine, [ remoteScript ])
+        else:
+            return test.app.getCommandArgsOn(runMachine, [ scriptFileName ])
 
     def getEnvironmentArgs(self, test):
         vars = self.getEnvironmentChanges(test)
         if len(vars) == 0:
             return []
         else:
-            args = [ "env" ]
+            args = []
             localTmpDir = test.app.writeDirectory
             machine, remoteTmp = test.app.getRemoteTmpDirectory()
             for var, value in vars:
@@ -1338,10 +1356,18 @@ class RunTest(plugins.Action):
                     remoteValue = value
                 if var == "PATH":
                     # This needs to be correctly reset remotely
-                    remoteValue = remoteValue.replace(os.getenv(var), "${" + var + "}")
-                # Double quote as two shells will end up intrepreting this...
-                args.append(var + "='\"" + remoteValue + "\"'")
+                    remoteValue = self.quote(remoteValue.replace(os.getenv(var), "${" + var + "}"), '"')
+                else:
+                    remoteValue = self.quote(remoteValue, "'")
+                args.append((var, remoteValue))
             return args
+
+    def quote(self, value, quoteChar):
+        # Make sure the home directory gets expanded...
+        if value.startswith("~/"):
+            return value[:2] + quoteChar + value[2:] + quoteChar
+        else:
+            return quoteChar + value + quoteChar
     
     def getTmpDirectory(self, test):
         machine, remoteTmp = test.app.getRemoteTestTmpDir(test)

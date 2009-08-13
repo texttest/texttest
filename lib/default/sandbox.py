@@ -290,6 +290,7 @@ class TestEnvironmentCreator:
         vars, props = [], []
         if self.topLevel():
             vars.append(("TEXTTEST_CHECKOUT", self.test.app.checkout))
+            vars.append(("TEXTTEST_SANDBOX_ROOT", self.test.app.writeDirectory)) # Full path to the sandbox root directory
             if self.test.getConfigValue("use_case_record_mode") == "GUI":
                 from virtualdisplay import VirtualDisplayResponder
                 if VirtualDisplayResponder.instance:

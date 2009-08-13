@@ -1446,10 +1446,13 @@ Static GUI Enhancements:
 	Ask before terminating dynamic GUIs when static GUI is terminated.
     - Tooltips added to the selection tab to aid clarity.
 Dynamic GUI Enhancements:
+    - Can now rerun tests directly from the dynamic GUI (runningactions.py)
+	Saves on saving a selection back to the static GUI, loading it and then rerunning.
     - Selecting files in the file view now also filters the Text Info display below (texttestgui.py)
 	So that it only previews what is currently selected.
     - Saved tests are now listed separately in the status view (statusviews.py)
 	Makes it easier to track which tests have been saved and which worked by themselves
+    - Saved tests make this clear in the Text Info space, recording the time at which they were saved (comparetest.py)
     - Can now view original files (filtered and not) from the file view popup menu (default_gui.py)
     - Test tree tooltips now work more reliably and use the builtin support in PyGTK 2.12 (testtree.py)
 	They are removed in PyGTK 2.10, was not deemed important enough to keep them there
@@ -1458,6 +1461,8 @@ Framework Enhancements:
 	They get combined like "environment" files. See "Test Suite Guide" on the website for more details.
     - Reconnect now picks up all "extra versions" that were originally run (reconnect.py)
 	Mainly useful if batch_extra_version was originally supplied
+    - New variable TEXTTEST_SANDBOX_ROOT provided
+	Refers to the top level of the sandbox structure, can be used for temporary storage shared between tests.
     - Logging more flexible now (default.py)
 	Dynamic GUI does not write anything by default. Batch mode writes time stamps by default.
 	Debug logging file now called "logging.debug" rather than "log4py.conf". See migration notes
@@ -1503,5 +1508,7 @@ Bug Fixes:
     - Crashed virtual servers are now restarted after each test, preventing multiple tests failing for the same crash (virtualdisplay.py)
     - Grouping of tests in the dynamic GUI is disabled if their diffs are longer than the maximum to display (statusviews.py)
 	Could lead to false grouping and hence incorrect saves
+    - Credits dialog no longer mangled in locales which aren't Latin-1 compatible (helpdialogs.py)
+    - Added error messages for locale encoding problems (guiutils.py)
 Grid Engine (LSF/SGE) Bug Fixes:
     - Don't send tests for re-use whose submission has been cancelled (queuesystem/__init__.py)

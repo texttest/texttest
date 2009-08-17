@@ -1253,14 +1253,17 @@ class RunTest(plugins.Action):
         options = ""
         for optionsFile in test.getAllPathNames("options"):
             optionString = self.getOptionsFromFile(test, optionsFile)
-            startPos = optionString.find("{CLEAR ")
-            if startPos != -1:
-                endPos = optionString.find("}", startPos)
-                clearStr = optionString[startPos:endPos + 1]
-                toClear = clearStr[7:-1]
-                options = options.replace(toClear, "") + " " + optionString.replace(clearStr, "")
+            if "{CLEAR}" in optionString: # wipes all other definitions
+                options = optionString.replace("{CLEAR}", "")
             else:
-                options += " " + optionString
+                startPos = optionString.find("{CLEAR ")
+                if startPos != -1:
+                    endPos = optionString.find("}", startPos)
+                    clearStr = optionString[startPos:endPos + 1]
+                    toClear = clearStr[7:-1]
+                    options = options.replace(toClear, "") + " " + optionString.replace(clearStr, "")
+                else:
+                    options += " " + optionString
         return options
         
     def diagnose(self, testEnv, commandArgs):

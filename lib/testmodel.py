@@ -594,6 +594,69 @@ class TestCase(Test):
         plugins.ensureDirectoryExists(self.writeDirectory)
         frameworkTmp = self.getDirectory(temporary=1, forFramework=True)
         plugins.ensureDirectoryExists(frameworkTmp)
+
+    def getOptionsFromFile(self, optionsFile):
+        optionStr = open(optionsFile).read().strip()
+        return string.Template(optionStr).safe_substitute(self.environment)
+
+    def removeOptions(self, optionArgs, toClear):
+        # Only want to remove them as a sequence
+        try:
+            pos = optionArgs.index(toClear[0])
+        except ValueError:
+            return
+        
+        for itemToClear in toClear:
+            if itemToClear == optionArgs[pos]:
+                del optionArgs[pos]
+                # which should leave the new pos as the next item
+        
+    def getCommandLineOptions(self):
+        optionArgs = []
+        for optionsFile in self.getAllPathNames("options"):
+            optionString = self.getOptionsFromFile(optionsFile)
+            if "{CLEAR}" in optionString: # wipes all other definitions
+                optionArgs = []
+                optionString = optionString.replace("{CLEAR}", "")
+            else:
+                startPos = optionString.find("{CLEAR ")
+                if startPos != -1:
+                    endPos = optionString.find("}", startPos)
+                    clearStr = optionString[startPos:endPos + 1]
+                    optionString = optionString.replace(clearStr, "")
+                    self.removeOptions(optionArgs, plugins.splitcmd(clearStr[7:-1]))
+            newArgs = plugins.splitcmd(optionString)
+            if len(optionArgs) == 0:
+                optionArgs = newArgs
+            else:
+                self.combineOptions(optionArgs, newArgs)
+
+        return optionArgs
+
+    def combineOptions(self, optionArgs, newArgs):
+        prevOption = False
+        optionInsertPos = self.findOptionInsertPosition(optionArgs)
+        self.diagnose("Inserting options into " + repr(optionArgs) + " in position " + repr(optionInsertPos))
+        for newArg in newArgs:
+            if newArg.startswith("-") or prevOption:
+                optionArgs.insert(optionInsertPos, newArg)
+                optionInsertPos += 1
+            else:
+                optionArgs.append(newArg)
+            prevOption = newArg.startswith("-")
+
+    def findLastOptionIndex(self, optionArgs):
+        for i, option in enumerate(reversed(optionArgs)):
+            if option.startswith("-"):
+                return len(optionArgs) - i - 1
+
+    def findOptionInsertPosition(self, optionArgs):
+        lastOptionIndex = self.findLastOptionIndex(optionArgs)
+        if lastOptionIndex is None:
+            return 0 # all positional, insert options at the beginning
+
+        # We allow one non-option after the last one in case it's an argument
+        return min(lastOptionIndex + 2, len(optionArgs))
         
     def listTmpFiles(self):
         tmpFiles = []

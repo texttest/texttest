@@ -1246,26 +1246,6 @@ class RunTest(plugins.Action):
         except OSError:
             pass # safest, as there are python bugs in this area
 
-    def getOptionsFromFile(self, test, optionsFile):
-        return Template(open(optionsFile).read().strip()).safe_substitute(test.environment)
-        
-    def getOptions(self, test):
-        options = ""
-        for optionsFile in test.getAllPathNames("options"):
-            optionString = self.getOptionsFromFile(test, optionsFile)
-            if "{CLEAR}" in optionString: # wipes all other definitions
-                options = optionString.replace("{CLEAR}", "")
-            else:
-                startPos = optionString.find("{CLEAR ")
-                if startPos != -1:
-                    endPos = optionString.find("}", startPos)
-                    clearStr = optionString[startPos:endPos + 1]
-                    toClear = clearStr[7:-1]
-                    options = options.replace(toClear, "") + " " + optionString.replace(clearStr, "")
-                else:
-                    options += " " + optionString
-        return options
-        
     def diagnose(self, testEnv, commandArgs):
         if self.diag.isEnabledFor(logging.INFO):
             for var, value in testEnv.items():
@@ -1303,19 +1283,17 @@ class RunTest(plugins.Action):
         for signum in [ signal.SIGQUIT, signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU ]:
             signal.signal(signum, signal.SIG_IGN)
 
-    def getInterpreter(self, test):
-        interpreter = test.getConfigValue("interpreter")
-        if interpreter.startswith("ttpython"): # interpreted to mean "whatever python TextTest runs with"
-            return interpreter.replace("ttpython", sys.executable + " -u")
-        return interpreter
+    def getInterpreterArgs(self, test):
+        args = plugins.splitcmd(test.getConfigValue("interpreter"))
+        if len(args) > 0 and args[0] == "ttpython": # interpreted to mean "whatever python TextTest runs with"
+            return [ sys.executable, "-u" ] + args[1:]
+        else:
+            return args
 
     def getCmdParts(self, test):
-        args = []
-        interpreter = self.getInterpreter(test)
-        if interpreter:
-            args.append(interpreter)
-        args.append(test.getConfigValue("executable"))
-        args.append(self.getOptions(test))
+        args = self.getInterpreterArgs(test)
+        args += plugins.splitcmd(test.getConfigValue("executable"))
+        args += test.getCommandLineOptions()
         runMachine = test.app.getRunMachine()
         if runMachine == "localhost":
             return args
@@ -1380,8 +1358,7 @@ class RunTest(plugins.Action):
             return test.getDirectory(temporary=1)
         
     def getExecuteCmdArgs(self, test):
-        parts = self.getCmdParts(test)
-        basicArgs = reduce(operator.add, map(plugins.splitcmd, parts))
+        basicArgs = self.getCmdParts(test)
         if test.app.hasAutomaticCputimeChecking():
             perfFile = test.makeTmpFileName("unixperf", forFramework=1)
             return [ "time", "-p", "-o", perfFile ] + basicArgs

@@ -445,6 +445,7 @@ class CollateFiles(plugins.Action):
             self.collate(test)
     def removeUnwanted(self, test):
         for stem in self.discardFiles:
+            self.diag.info("Trying to remove generated file with stem " + stem)
             filePath = test.makeTmpFileName(stem)
             try:
                 # Checking for existence too dependent on file server (?)

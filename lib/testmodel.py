@@ -244,13 +244,7 @@ class Test(plugins.Observable):
 
     def diagnose(self, message):
         self.diag.info("In test " + self.uniqueName + " : " + message)
-    def getWordsInFile(self, stem):
-        file = self.getFileName(stem)
-        if file:
-            contents = open(file).read().strip()
-            return contents.split()
-        else:
-            return []
+        
     def setUniqueName(self, newName):
         if newName != self.uniqueName:
             self.notify("UniqueNameChange", newName)

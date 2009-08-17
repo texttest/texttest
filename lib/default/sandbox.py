@@ -400,7 +400,7 @@ class CollateFiles(plugins.Action):
     def expandCollations(self, test, coll):
         newColl = seqdict()
         # copy items specified without "*" in targetStem
-        self.diag.info("coll initial:", str(coll))
+        self.diag.info("coll initial:" + str(coll))
         for targetStem, sourcePatterns in coll.items():
             if not glob.has_magic(targetStem):
                 newColl[targetStem] = sourcePatterns
@@ -457,6 +457,8 @@ class CollateFiles(plugins.Action):
             for fullpath in self.findPaths(test, pattern):
                 if self.testEdited(test, fullpath):
                     return fullpath
+                else:
+                    self.diag.info("Found " + fullpath + " but it wasn't edited")
 
     def collate(self, test):
         testCollations = self.expandCollations(test, self.collations)

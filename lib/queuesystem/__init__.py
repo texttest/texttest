@@ -1,13 +1,18 @@
-import os, sys, default, plugins, socket, subprocess, operator, signal, logging
+
+"""
+Module for the queuesystem configuration, i.e. using grid engines to run tests in parallel
+"""
+
+import slavejobs, os, sys, default, plugins, socket, subprocess, operator, signal, logging
+from utils import *
 from Queue import Queue, Empty
 from SocketServer import TCPServer, StreamRequestHandler
 from time import sleep
 from ndict import seqdict
 from copy import copy, deepcopy
-from cPickle import dumps
 from default.console import TextDisplayResponder, InteractiveResponder
 from default.knownbugs import CheckForBugs
-from default.actionrunner import ActionRunner, BaseActionRunner
+from default.actionrunner import BaseActionRunner
 from default.virtualdisplay import VirtualDisplayResponder
 from default.performance import getTestPerformance
 from default.pyusecase_interface import ApplicationEventResponder
@@ -18,103 +23,6 @@ plugins.addCategory("abandoned", "abandoned", "were abandoned")
 
 def getConfig(optionMap):
     return QueueSystemConfig(optionMap)
-
-def queueSystemName(app):
-    return app.getConfigValue("queue_system_module")
-
-# Use a non-monitoring runTest, but the rest from unix
-class RunTestInSlave(default.RunTest):
-    def getBriefText(self, execMachines):
-        return "RUN (" + ",".join(execMachines) + ")"
-    def getUserSignalKillInfo(self, test, userSignalNumber):
-        moduleName = queueSystemName(test.app).lower()
-        command = "from " + moduleName + " import getUserSignalKillInfo as _getUserSignalKillInfo"
-        exec command
-        return _getUserSignalKillInfo(userSignalNumber, self.getExplicitKillInfo)
-
-class FindExecutionHosts(default.sandbox.FindExecutionHosts):
-    def getExecutionMachines(self, test):
-        moduleName = queueSystemName(test.app).lower()
-        command = "from " + moduleName + " import getExecutionMachines as _getExecutionMachines"
-        exec command
-        return _getExecutionMachines()
-
-def socketSerialise(test):
-    return test.app.name + test.app.versionSuffix() + ":" + test.getRelPath()
-
-class SocketResponder(plugins.Responder,plugins.Observable):
-    def __init__(self, optionMap, *args):
-        plugins.Responder.__init__(self)
-        plugins.Observable.__init__(self)
-        self.serverAddress = self.getServerAddress(optionMap)
-    def getServerAddress(self, optionMap):
-        servAddrStr = optionMap.get("servaddr", os.getenv("TEXTTEST_MIM_SERVER"))
-        if not servAddrStr:
-            raise plugins.TextTestError, "Cannot run slave, no server address has been provided to send results to!"
-        host, port = servAddrStr.split(":")
-        return host, int(port)
-    def connect(self, sendSocket):
-        for attempt in range(5):
-            try:
-                sendSocket.connect(self.serverAddress)
-                return True
-            except socket.error:
-                sleep(1)
-        sys.stderr.write("Failed to connect to " + repr(self.serverAddress) + " : " + self.exceptionOutput())
-        return False
-
-    def exceptionOutput(self):
-        exctype, value = sys.exc_info()[:2]
-        from traceback import format_exception_only
-        return "".join(format_exception_only(exctype, value))
-
-    def notifyLifecycleChange(self, test, state, changeDesc):
-        testData = socketSerialise(test)
-        pickleData = dumps(state)
-        fullData = str(os.getpid()) + os.linesep + testData + os.linesep + pickleData
-        sleepTime = 1
-        for attempt in range(9):
-            sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            if not self.connect(sendSocket):
-                return self.notify("NoMoreExtraTests")
-            try:
-                response = self.sendData(sendSocket, fullData)
-                return self.interpretResponse(state, response)
-            except socket.error:
-                plugins.log.info("Failed to communicate with master process - waiting " +
-                                 str(sleepTime) + " seconds and then trying again.")
-                sleep(sleepTime)
-                sleepTime *= 2
-
-        message = "Terminating as failed to communicate with master process : " + self.exceptionOutput()
-        sys.stderr.write(message)
-        plugins.log.info(message.strip())
-        self.notify("NoMoreExtraTests")
-        
-    def sendData(self, sendSocket, fullData):
-        sendSocket.sendall(fullData)
-        sendSocket.shutdown(socket.SHUT_WR)
-        response = sendSocket.makefile().read()
-        sendSocket.close()
-        return response
-
-    def interpretResponse(self, state, response):
-        if len(response) > 0:
-            appDesc, testPath = response.strip().split(":")
-            appParts = appDesc.split(".")
-            self.notify("ExtraTest", testPath, appParts[0], appParts[1:])
-        elif state.isComplete():
-            self.notify("NoMoreExtraTests")
-
-
-class SlaveActionRunner(ActionRunner):
-    def notifyAllRead(self, *args):
-        pass # don't add a terminator, we might get given more tests via the socket (code above)
-
-    def notifyNoMoreExtraTests(self):
-        self.diag.info("No more extra tests, adding terminator")
-        self.testQueue.put(None)
-        
             
 class QueueSystemConfig(default.Config):
     def addToOptionGroups(self, apps, groups):
@@ -197,11 +105,11 @@ class QueueSystemConfig(default.Config):
         return [ "c", "b", "trace", "ignorecat", "actrep", "rectraffic", "keeptmp", "keepslave", "x" ]
     def getExecHostFinder(self):
         if self.slaveRun():
-            return FindExecutionHosts()
+            return slavejobs.FindExecutionHostsInSlave()
         else:
             return default.Config.getExecHostFinder(self)
     def getSlaveResponderClasses(self):
-        classes = [ SocketResponder, SlaveActionRunner ]
+        classes = [ slavejobs.SocketResponder, slavejobs.SlaveActionRunner ]
         if not self.isActionReplay():
             classes.append(VirtualDisplayResponder)
         classes.append(ApplicationEventResponder)
@@ -235,7 +143,7 @@ class QueueSystemConfig(default.Config):
             return default.Config.getTextDisplayResponderClass(self)
     def getTestRunner(self):
         if self.slaveRun():
-            return RunTestInSlave()
+            return slavejobs.RunTestInSlave()
         else:
             return default.Config.getTestRunner(self)
     def showExecHostsInFailures(self, app):
@@ -248,7 +156,7 @@ class QueueSystemConfig(default.Config):
         return SubmissionRules(self.optionMap, test)
     def getMachineInfoFinder(self):
         if self.slaveRun():
-            return MachineInfoFinder()
+            return slavejobs.SlaveMachineInfoFinder()
         else:
             return default.Config.getMachineInfoFinder(self)
     def printHelpDescription(self):
@@ -975,52 +883,6 @@ class Abandoned(plugins.TestState):
     def shouldAbandon(self):
         return 1
         
-class MachineInfoFinder(default.sandbox.MachineInfoFinder):
-    def __init__(self):
-        self.queueMachineInfo = None
-    def findPerformanceMachines(self, app, fileStem):
-        perfMachines = []
-        resources = app.getCompositeConfigValue("performance_test_resource", fileStem)
-        for resource in resources:
-            perfMachines += plugins.retryOnInterrupt(self.queueMachineInfo.findResourceMachines, resource)
-
-        rawPerfMachines = default.sandbox.MachineInfoFinder.findPerformanceMachines(self, app, fileStem)
-        for machine in rawPerfMachines:
-            if machine != "any":
-                perfMachines += self.queueMachineInfo.findActualMachines(machine)
-        if "any" in rawPerfMachines and len(resources) == 0:
-            return rawPerfMachines
-        else:
-            return perfMachines
-    def setUpApplication(self, app):
-        default.sandbox.MachineInfoFinder.setUpApplication(self, app)
-        moduleName = queueSystemName(app).lower()
-        command = "from " + moduleName + " import MachineInfo as _MachineInfo"
-        exec command
-        self.queueMachineInfo = _MachineInfo()
-    def getMachineInformation(self, test):
-        # Try and write some information about what's happening on the machine
-        info = ""
-        for machine in test.state.executionHosts:
-            for jobLine in self.findRunningJobs(machine):
-                info += jobLine + "\n"
-        return info
-    def findRunningJobs(self, machine):
-        try:
-            return self._findRunningJobs(machine)
-        except IOError:
-            # If system calls to the queue system are interrupted, it shouldn't matter, try again
-            return self._findRunningJobs(machine)
-    def _findRunningJobs(self, machine):
-        # On a multi-processor machine performance can be affected by jobs on other processors,
-        # as for example a process can hog the memory bus. Describe these so the user can judge
-        # for himself if performance is likely to be affected...
-        jobsFromQueue = self.queueMachineInfo.findRunningJobs(machine)
-        jobs = []
-        for user, jobId, jobName in jobsFromQueue:
-            jobs.append("Also on " + machine + " : " + user + "'s job " + jobId + " '" + jobName + "'")
-        return jobs    
-
 
 class DocumentEnvironment(default.DocumentEnvironment):
     def setUpApplication(self, app):

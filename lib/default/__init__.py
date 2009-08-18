@@ -1290,17 +1290,7 @@ class RunTest(plugins.Action):
         else:
             return args
 
-    def getCmdParts(self, test):
-        args = self.getInterpreterArgs(test)
-        args += plugins.splitcmd(test.getConfigValue("executable"))
-        args += test.getCommandLineOptions()
-        runMachine = test.app.getRunMachine()
-        if runMachine == "localhost":
-            return args
-        else:
-            return self.getRemoteCmdParts(test, runMachine, args)
-
-    def getRemoteCmdParts(self, test, runMachine, localArgs):
+    def getRemoteExecuteCmdArgs(self, test, runMachine, localArgs):
         scriptFileName = test.makeTmpFileName("run_test.sh", forComparison=0)
         scriptFile = open(scriptFileName, "w")
         scriptFile.write("#!/bin/sh\n\n")
@@ -1358,12 +1348,19 @@ class RunTest(plugins.Action):
             return test.getDirectory(temporary=1)
         
     def getExecuteCmdArgs(self, test):
-        basicArgs = self.getCmdParts(test)
+        args = []
         if test.app.hasAutomaticCputimeChecking():
             perfFile = test.makeTmpFileName("unixperf", forFramework=1)
-            return [ "time", "-p", "-o", perfFile ] + basicArgs
+            args += [ "time", "-p", "-o", perfFile ]
+
+        args += self.getInterpreterArgs(test)
+        args += plugins.splitcmd(test.getConfigValue("executable"))
+        args += test.getCommandLineOptions()
+        runMachine = test.app.getRunMachine()
+        if runMachine == "localhost":
+            return args
         else:
-            return basicArgs
+            return self.getRemoteExecuteCmdArgs(test, runMachine, args)
 
     def makeFile(self, test, name):
         fileName = test.makeTmpFileName(name)

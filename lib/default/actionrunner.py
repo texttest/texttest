@@ -80,12 +80,11 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
                 self.diag.info(desc.capitalize() + " test " + repr(test))
                 runMethod(test)
                 self.diag.info("Completed " + desc + " " + repr(test))
-    def getItemFromQueue(self, queue, block):
+    def getItemFromQueue(self, queue, block, replaceTerminators=False):
         try:
             item = queue.get(block=block)
-            if item is None:
-                item = self.getItemFromQueue(queue, False) # In case more stuff comes after the terminator
-                queue.put(None) # Put the terminator back, we'll probably need it again
+            if replaceTerminators and item is None:
+                queue.put(item) 
             return item
         except Empty:
             return

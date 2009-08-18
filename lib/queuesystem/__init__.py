@@ -76,10 +76,10 @@ class SocketResponder(plugins.Responder,plugins.Observable):
         for attempt in range(9):
             sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             if not self.connect(sendSocket):
-                return
+                return self.notify("NoMoreExtraTests")
             try:
-                self.sendData(sendSocket, fullData)
-                return
+                response = self.sendData(sendSocket, fullData)
+                return self.interpretResponse(state, response)
             except socket.error:
                 plugins.log.info("Failed to communicate with master process - waiting " +
                                  str(sleepTime) + " seconds and then trying again.")
@@ -89,16 +89,32 @@ class SocketResponder(plugins.Responder,plugins.Observable):
         message = "Terminating as failed to communicate with master process : " + self.exceptionOutput()
         sys.stderr.write(message)
         plugins.log.info(message.strip())
+        self.notify("NoMoreExtraTests")
         
     def sendData(self, sendSocket, fullData):
         sendSocket.sendall(fullData)
         sendSocket.shutdown(socket.SHUT_WR)
         response = sendSocket.makefile().read()
         sendSocket.close()
+        return response
+
+    def interpretResponse(self, state, response):
         if len(response) > 0:
             appDesc, testPath = response.strip().split(":")
             appParts = appDesc.split(".")
             self.notify("ExtraTest", testPath, appParts[0], appParts[1:])
+        elif state.isComplete():
+            self.notify("NoMoreExtraTests")
+
+
+class SlaveActionRunner(ActionRunner):
+    def notifyAllRead(self, *args):
+        pass # don't add a terminator, we might get given more tests via the socket (code above)
+
+    def notifyNoMoreExtraTests(self):
+        self.diag.info("No more extra tests, adding terminator")
+        self.testQueue.put(None)
+        
             
 class QueueSystemConfig(default.Config):
     def addToOptionGroups(self, apps, groups):
@@ -185,7 +201,7 @@ class QueueSystemConfig(default.Config):
         else:
             return default.Config.getExecHostFinder(self)
     def getSlaveResponderClasses(self):
-        classes = [ SocketResponder, ActionRunner ]
+        classes = [ SocketResponder, SlaveActionRunner ]
         if not self.isActionReplay():
             classes.append(VirtualDisplayResponder)
         classes.append(ApplicationEventResponder)
@@ -530,8 +546,10 @@ class QueueSystemServer(BaseActionRunner):
     def findQueueForTest(self, test):
         # If we've gone into reuse mode and there are no active tests for reuse, use the "reuse failure queue"
         if self.reuseOnly and self.testsSubmitted == 0:
+            self.diag.info("Putting test in reuse failure queue " + self.remainStr())
             return self.reuseFailureQueue
         else:
+            self.diag.info("Putting test in normal queue " + self.remainStr())
             return self.testQueue
                 
     def handleLocalError(self, test, previouslySubmitted):
@@ -545,7 +563,8 @@ class QueueSystemServer(BaseActionRunner):
     def getTestForReuse(self, test):
         # Pick up any test that matches the current one's resource requirements
         if not self.exited:
-            newTest = self.getTest(block=False)
+            # Don't allow this to use up the terminator
+            newTest = self.getTest(block=False, replaceTerminators=True)
             if newTest:
                 if self.allowReuse(test, newTest):
                     self.jobs[newTest] = self.getJobInfo(test)
@@ -584,8 +603,8 @@ class QueueSystemServer(BaseActionRunner):
             self.submissionRules[test] = submissionRules
             return submissionRules
 
-    def getTest(self, block):
-        testOrStatus = self.getItemFromQueue(self.testQueue, block)
+    def getTest(self, block, replaceTerminators=False):
+        testOrStatus = self.getItemFromQueue(self.testQueue, block, replaceTerminators)
         if not testOrStatus:
             return
         if type(testOrStatus) == StringType:
@@ -618,6 +637,7 @@ class QueueSystemServer(BaseActionRunner):
                 return newTest
             else:
                 # Make sure we pick up anything that failed in reuse while we were submitting the final test...
+                self.diag.info("No normal test found, checking reuse failures...")
                 return self.getItemFromQueue(self.reuseFailureQueue, block=False)
     def getTestForRunReuseOnlyMode(self):
         self.reuseOnly = True
@@ -651,7 +671,7 @@ class QueueSystemServer(BaseActionRunner):
     def cleanup(self):
         self.sendServerState("Completed submission of all tests")
     def remainStr(self):
-        return " : " + str(self.testCount) + " tests remain."
+        return " : " + str(self.testCount) + " tests remain, " + str(self.testsSubmitted) + " are submitted."
     def runTest(self, test):   
         submissionRules = test.app.getSubmissionRules(test)
         command = self.getSlaveCommand(test, submissionRules)
@@ -662,8 +682,8 @@ class QueueSystemServer(BaseActionRunner):
             return
         
         self.testCount -= 1
-        self.diag.info("Submission successful" + self.remainStr())
         self.testsSubmitted += 1
+        self.diag.info("Submission successful" + self.remainStr())
         if not test.state.hasStarted():
             test.changeState(self.getPendingState(test))
         if self.testsSubmitted == self.maxCapacity:

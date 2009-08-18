@@ -377,15 +377,12 @@ class RunScriptAction(RunningAction,guiplugins.ActionDialogGUI):
     def performOnCurrent(self):
         self.startTextTestProcess(self.getUseCaseName(), [ "-g" ] + self.getVanillaOption())
 
-    def getCommandLineArgs(self, optionGroup, onlyKeys=[]):
+    def getCommandLineArgs(self, optionGroup, *args):
         args = [ self.scriptName() ]
-        for key, value in optionGroup.getOptionsForCmdLine(onlyKeys):
-            if value:
-                args.append(key + "=" + value)
-            else:
-                args.append(key)
+        for key, option in optionGroup.options.items():
+            args.append(key + "=" + option.getValue())
+            
         return [ "-s", " ".join(args) ]
-        
 
 
 class ReplaceText(RunScriptAction):

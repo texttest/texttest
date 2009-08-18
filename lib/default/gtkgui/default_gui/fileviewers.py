@@ -275,8 +275,10 @@ class ViewFilteredTestFileInEditor(ViewTestFileInEditor):
 class ViewFilteredOrigFileInEditor(ViewFilteredTestFileInEditor):
     def _getTitle(self):
         return "View Filtered Original File"
-    def getFileToView(self, fileName, associatedObject):
-        return associatedObject.getStdFile(self.useFiltered())
+    def isActiveForFile(self, fileName, comparison):
+        return comparison and not comparison.newResult()
+    def getFileToView(self, fileName, comparison):
+        return comparison.getStdFile(self.useFiltered())
         
 class ViewOrigFileInEditor(ViewFilteredOrigFileInEditor):
     def _getTitle(self):

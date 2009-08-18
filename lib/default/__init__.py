@@ -1253,7 +1253,7 @@ class RunTest(plugins.Action):
             self.diag.info("Running test with args : " + repr(commandArgs))
 
     def getRunDescription(self, test):
-        commandArgs = self.getExecuteCmdArgs(test)
+        commandArgs = self.getLocalExecuteCmdArgs(test)
         text =  "Command Line   : " + plugins.commandLineString(commandArgs) + "\n"
         interestingVars = self.getEnvironmentChanges(test)
         if len(interestingVars) == 0:
@@ -1339,8 +1339,8 @@ class RunTest(plugins.Action):
             return remoteTmp
         else:
             return test.getDirectory(temporary=1)
-        
-    def getExecuteCmdArgs(self, test):
+
+    def getLocalExecuteCmdArgs(self, test):
         args = []
         if test.app.hasAutomaticCputimeChecking():
             perfFile = test.makeTmpFileName("unixperf", forFramework=1)
@@ -1349,6 +1349,10 @@ class RunTest(plugins.Action):
         args += self.getInterpreterArgs(test)
         args += plugins.splitcmd(test.getConfigValue("executable"))
         args += test.getCommandLineOptions()
+        return args
+        
+    def getExecuteCmdArgs(self, test):
+        args = self.getLocalExecuteCmdArgs(test)
         runMachine = test.app.getRunMachine()
         if runMachine == "localhost":
             return args

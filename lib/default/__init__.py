@@ -1007,19 +1007,19 @@ class Config:
                   " ".join(allArgs) + "\n\nThe command produced the following output:\n" + output
 
     def ensureRemoteDirExists(self, app, machine, dirname):
-        self.runCommandAndCheckMachine(app, machine, [ "mkdir", "-p", dirname ])
+        self.runCommandAndCheckMachine(app, machine, [ "mkdir", "-p", plugins.quote(dirname, '"') ])
 
     def getRemotePath(self, file, machine):
         if machine == "localhost":
             return file
         else:
-            return machine + ":" + file
-
+            return machine + ":" + plugins.quote(file, '"')
+                                                 
     def copyFileRemotely(self, app, srcFile, srcMachine, dstFile, dstMachine):
         srcPath = self.getRemotePath(srcFile, srcMachine)
         dstPath = self.getRemotePath(dstFile, dstMachine)
         args = self.getRemoteProgramArgs(app, "remote_copy_program") + [ srcPath, dstPath ]
-        return subprocess.call(args, stdin=open(os.devnull), stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
+        return subprocess.call(args, stdin=open(os.devnull)) #, stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
 
     def getRemoteProgramArgs(self, app, setting):
         progStr = app.getConfigValue(setting)
@@ -1297,7 +1297,7 @@ class RunTest(plugins.Action):
 
         # Need to change working directory remotely
         tmpDir = self.getTmpDirectory(test)
-        scriptFile.write("cd " + self.quote(tmpDir, "'") + "\n")
+        scriptFile.write("cd " + plugins.quote(tmpDir, "'") + "\n")
 
         for arg, value in self.getEnvironmentArgs(test): # Must set the environment remotely
             scriptFile.write("export " + arg + "=" + value + "\n")
@@ -1308,9 +1308,9 @@ class RunTest(plugins.Action):
         if remoteTmp:
             test.app.copyFileRemotely(scriptFileName, "localhost", remoteTmp, machine)
             remoteScript = os.path.join(remoteTmp, os.path.basename(scriptFileName))
-            return test.app.getCommandArgsOn(runMachine, [ remoteScript ])
+            return test.app.getCommandArgsOn(runMachine, [ plugins.quote(remoteScript, '"') ])
         else:
-            return test.app.getCommandArgsOn(runMachine, [ scriptFileName ])
+            return test.app.getCommandArgsOn(runMachine, [ plugins.quote(scriptFileName, '"') ])
 
     def getEnvironmentArgs(self, test):
         vars = self.getEnvironmentChanges(test)
@@ -1327,18 +1327,11 @@ class RunTest(plugins.Action):
                     remoteValue = value
                 if var == "PATH":
                     # This needs to be correctly reset remotely
-                    remoteValue = self.quote(remoteValue.replace(os.getenv(var), "${" + var + "}"), '"')
+                    remoteValue = plugins.quote(remoteValue.replace(os.getenv(var), "${" + var + "}"), '"')
                 else:
-                    remoteValue = self.quote(remoteValue, "'")
+                    remoteValue = plugins.quote(remoteValue, "'")
                 args.append((var, remoteValue))
             return args
-
-    def quote(self, value, quoteChar):
-        # Make sure the home directory gets expanded...
-        if value.startswith("~/"):
-            return value[:2] + quoteChar + value[2:] + quoteChar
-        else:
-            return quoteChar + value + quoteChar
     
     def getTmpDirectory(self, test):
         machine, remoteTmp = test.app.getRemoteTestTmpDir(test)

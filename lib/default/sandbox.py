@@ -472,7 +472,8 @@ class CollateFiles(plugins.Action):
                 self.extract(test, sourceFile, targetFile, collationErrFile)
                 
     def fetchRemoteFiles(self, test, machine, tmpDir):
-        test.app.copyFileRemotely(os.path.join(tmpDir, "*"), machine, test.getDirectory(temporary=1), "localhost")
+        sourcePaths = os.path.join(plugins.quote(tmpDir, '"'), "*")
+        test.app.copyFileRemotely(sourcePaths, machine, test.getDirectory(temporary=1), "localhost")
     
     def getFilesPresent(self, test):
         files = seqdict()

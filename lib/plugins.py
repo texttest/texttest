@@ -90,6 +90,16 @@ def getPersonalDir(dataDirName):
     envVar = "TEXTTEST_PERSONAL_" + dataDirName.upper()
     return os.getenv(envVar, os.path.join(getPersonalConfigDir(), dataDirName))
 
+def quote(value, quoteChar):
+    if quoteChar in value:
+        return value # don't double-quote
+    # Make sure the home directory gets expanded...
+    if value.startswith("~/"):
+        return value[:2] + quoteChar + value[2:] + quoteChar
+    else:
+        return quoteChar + value + quoteChar
+
+
 def findDataDirs(includeSite=True, includePersonal=False, dataDirName="etc"):
     if includeSite:
         dirs = [ os.path.join(instRoot, dataDirName) for instRoot in installationRoots ]

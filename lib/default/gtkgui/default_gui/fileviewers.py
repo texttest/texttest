@@ -398,18 +398,21 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
         for file, comp in self.currFileSelection:
             if self.dynamic and comp:
                 self.processFile(comp.tmpFile, properties, errors)
-            self.processFile(file, properties, errors)
+                self.processFile(comp.stdFile, properties, errors)
+            else:
+                self.processFile(file, properties, errors)
 
         if len(errors):
             self.showErrorDialog("Failed to get file properties:\n" + "\n".join(errors))
 
         return properties
     def processFile(self, file, properties, errors):
-        try:
-            prop = plugins.FileProperties(file)
-            properties.append(prop)
-        except Exception, e:
-            errors.append(plugins.getExceptionString())
+        if file:
+            try:
+                prop = plugins.FileProperties(file)
+                properties.append(prop)
+            except Exception, e:
+                errors.append(plugins.getExceptionString())
 
     # xalign = 1.0 means right aligned, 0.0 means left aligned
     def justify(self, text, xalign = 0.0):

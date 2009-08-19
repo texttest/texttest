@@ -1253,7 +1253,7 @@ class RunTest(plugins.Action):
             self.diag.info("Running test with args : " + repr(commandArgs))
 
     def getRunDescription(self, test):
-        commandArgs = self.getLocalExecuteCmdArgs(test)
+        commandArgs = self.getLocalExecuteCmdArgs(test, makeDirs=False)
         text =  "Command Line   : " + plugins.commandLineString(commandArgs) + "\n"
         interestingVars = self.getEnvironmentChanges(test)
         if len(interestingVars) == 0:
@@ -1340,11 +1340,21 @@ class RunTest(plugins.Action):
         else:
             return test.getDirectory(temporary=1)
 
-    def getLocalExecuteCmdArgs(self, test):
+    def getTimingArgs(self, test, makeDirs):
+        machine, remoteTmp = test.app.getRemoteTestTmpDir(test)
+        if remoteTmp:
+            frameworkDir = os.path.join(remoteTmp, "framework_tmp")
+            if makeDirs:
+                test.app.ensureRemoteDirExists(machine, frameworkDir)
+            perfFile = os.path.join(frameworkDir, "unixperf")
+        else:
+            perfFile = test.makeTmpFileName("unixperf", forFramework=1)
+        return [ "time", "-p", "-o", perfFile ]
+
+    def getLocalExecuteCmdArgs(self, test, makeDirs=True):
         args = []
         if test.app.hasAutomaticCputimeChecking():
-            perfFile = test.makeTmpFileName("unixperf", forFramework=1)
-            args += [ "time", "-p", "-o", perfFile ]
+            args += self.getTimingArgs(test, makeDirs)
 
         args += self.getInterpreterArgs(test)
         args += plugins.splitcmd(test.getConfigValue("executable"))

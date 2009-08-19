@@ -65,7 +65,7 @@ class Config:
             elif group.name.startswith("Invisible"):
                 # Options that don't make sense with the GUI should be invisible there...
                 group.addOption("s", "Run this script")
-                group.addOption("d", "Run as if TEXTTEST_HOME was")
+                group.addOption("d", "Look for test files under")
                 group.addSwitch("help", "Print configuration help text on stdout")
                 group.addSwitch("g", "use dynamic GUI")
                 group.addSwitch("gx", "use static GUI")

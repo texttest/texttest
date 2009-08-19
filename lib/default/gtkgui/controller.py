@@ -570,7 +570,7 @@ class InteractiveActionHandler:
     
     def getAllIntvConfigs(self, apps):
         configs = self.getAllConfigs(apps)
-        vcsConfig = version_control.getVersionControlConfig(apps)
+        vcsConfig = version_control.getVersionControlConfig(apps, self.inputOptions)
         if vcsConfig:
             configs.append(vcsConfig)
         return configs

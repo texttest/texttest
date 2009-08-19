@@ -266,7 +266,7 @@ class QueueSystemServer(BaseActionRunner):
 
     def getSlaveCommand(self, test, submissionRules):
         slaveCmd = os.getenv("TEXTTEST_SLAVE_CMD", sys.argv[0]) # TextTest executable to call for the grid engine slave process
-        cmdArgs = [ slaveCmd, "-d", os.getenv("TEXTTEST_HOME"),
+        cmdArgs = [ slaveCmd, "-d", ":".join(self.optionMap.getRootDirectories()),
                     "-a", test.app.name + test.app.versionSuffix(),
                     "-l", "-tp", test.getRelPath() ] + \
                     self.getSlaveArgs(test) + self.getRunOptions(test.app, submissionRules)

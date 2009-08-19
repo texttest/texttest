@@ -1605,6 +1605,9 @@ class OptionFinder(plugins.OptionFinder):
         else:
             return os.getenv(envVar, os.path.expanduser(os.path.expandvars(defaultValue)))
 
+    def getRootDirectories(self):
+        return [ self.directoryName ]
+
     def setUpLogging(self):
         if os.path.isfile(self.diagConfigFile):
             print "TextTest will write diagnostics in", self.diagWriteDir, "based on file at", self.diagConfigFile

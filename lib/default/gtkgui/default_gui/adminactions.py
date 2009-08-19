@@ -396,12 +396,13 @@ class ImportTestSuite(ImportTest):
 
 
 class ImportApplication(guiplugins.ActionDialogGUI):
-    def __init__(self, allApps, *args):
-        guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
-        self.textTestHome = os.getenv("TEXTTEST_HOME")
+    def __init__(self, allApps, dynamic, inputOptions):
+        guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic, inputOptions)
+        self.rootDirectories = inputOptions.getRootDirectories()
         self.addOption("name", "Full name of application", description="Name of application to use in reports etc.")
         self.addOption("ext", "\nFile extension to use for TextTest files associated with this application", description="Short space-free extension, to identify all TextTest's files associated with this application")
-        self.addOption("subdir", "\nSubdirectory of TEXTTEST_HOME to store the above application files under (leave blank for local storage)", possibleValues=self.findSubDirectories())
+        possibleSubDirs = self.findSubDirectories()
+        self.addOption("subdir", "\nSubdirectory name to store the above application files under (leave blank for local storage)", possibleValues=possibleSubDirs)
         self.addSwitch("gui", "Enable GUI testing operations (recording and virtual servers)")
  
         possibleDirs = []
@@ -409,13 +410,15 @@ class ImportApplication(guiplugins.ActionDialogGUI):
             if app.getDirectory() not in possibleDirs:
                 possibleDirs.append(app.getDirectory())
         if len(possibleDirs) == 0:
-            possibleDirs = [ self.textTestHome ]
+            possibleDirs = self.rootDirectories
         self.addOption("exec", "\nSelect executable program to test", description="The full path to the program you want to test", possibleDirs=possibleDirs, selectFile=True)
 
     def findSubDirectories(self):
-        usableFiles = filter(lambda f: f not in plugins.controlDirNames, os.listdir(self.textTestHome))
-        allFiles = [ os.path.join(self.textTestHome, f) for f in usableFiles ]
-        allDirs = filter(os.path.isdir, allFiles)
+        allDirs = []
+        for rootDir in self.rootDirectories:
+            usableFiles = filter(lambda f: f not in plugins.controlDirNames, os.listdir(rootDir))
+            allFiles = [ os.path.join(rootDir, f) for f in usableFiles ]
+            allDirs += filter(os.path.isdir, allFiles)
         allDirs.sort()
         return map(os.path.basename, allDirs)
 
@@ -450,7 +453,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
     def performOnCurrent(self):
         executable = self.optionGroup.getOptionValue("exec")
         ext = self.optionGroup.getOptionValue("ext")
-        directory = os.path.normpath(os.path.join(self.textTestHome, self.optionGroup.getOptionValue("subdir")))
+        directory = self.findFullDirectoryPath()
         self.checkSanity(ext, executable, directory)
         plugins.ensureDirectoryExists(directory)
         configEntries = { "executable" : executable }
@@ -463,26 +466,35 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         self.notify("NewApplication", ext, directory, configEntries)
         self.notify("Status", "Created new application with extension '" + ext + "'.")
 
+    def findFullDirectoryPath(self):
+        subdir = self.optionGroup.getOptionValue("subdir")
+        for rootDir in self.rootDirectories:
+            candidate = os.path.normpath(os.path.join(rootDir, subdir))
+            if os.path.isdir(candidate):
+                return candidate
+        return os.path.normpath(os.path.join(self.rootDirectories[0], subdir))
+        
+
 class ImportFiles(guiplugins.ActionDialogGUI):
-    def __init__(self, allApps, *args):
+    def __init__(self, allApps, dynamic, inputOptions):
         self.creationDir = None
         self.appendAppName = False
         self.currentStem = ""
         self.fileChooser = None
-        guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
+        guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic, inputOptions)
         self.addOption("stem", "Type of file/directory to create", allocateNofValues=2)
         self.addOption("v", "Version identifier to use")
-        possibleDirs = self.getPossibleDirs(allApps)
+        possibleDirs = self.getPossibleDirs(allApps, inputOptions)
         # The point of this is that it's never sensible as the source for anything, so it serves as a "use the parent" option
         # for back-compatibility
         self.addSwitch("act", options=[ "Import file/directory from source", "Create a new file", "Create a new directory" ])
         self.addOption("src", "Source to copy from", selectFile=True, possibleDirs=possibleDirs)
         
-    def getPossibleDirs(self, allApps):
+    def getPossibleDirs(self, allApps, inputOptions):
         if len(allApps) > 0:
             return sorted(set((app.getDirectory() for app in allApps)))
         else:
-            return [ os.getenv("TEXTTEST_HOME") ]
+            return inputOptions.getRootDirectories()
                 
     def singleTestOnly(self):
         return True

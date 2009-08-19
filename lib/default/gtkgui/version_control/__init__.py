@@ -1,13 +1,12 @@
 
 import os, plugins
 
-def getVersionControlConfig(apps):
-    for app in apps:
-        config = getConfigFromDirectory(app.getDirectory())
+def getVersionControlConfig(apps, inputOptions):
+    allDirs = [ app.getDirectory() for app in apps ] + inputOptions.getRootDirectories()
+    for dir in allDirs:
+        config = getConfigFromDirectory(dir)
         if config:
             return config
-    return getConfigFromDirectory(os.getenv("TEXTTEST_HOME"))
-
 
 def getConfigFromDirectory(directory):
     for dir in [ directory, os.path.dirname(directory) ]:

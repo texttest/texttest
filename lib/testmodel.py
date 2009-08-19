@@ -1205,9 +1205,11 @@ class Application:
         if os.path.isabs(envDir) and os.path.isdir(envDir):
             return DirectoryCache(envDir)
 
-        rootPath = os.path.join(self.inputOptions.directoryName, envDir)
-        if os.path.isdir(rootPath):
-            return DirectoryCache(rootPath)
+        for rootDir in self.inputOptions.rootDirectories:
+            rootPath = os.path.join(rootDir, envDir)
+            if os.path.isdir(rootPath):
+                return DirectoryCache(rootPath)
+            
         appPath = os.path.join(self.getDirectory(), envDir)
         if os.path.isdir(appPath):
             return DirectoryCache(appPath)
@@ -1576,7 +1578,9 @@ class OptionFinder(plugins.OptionFinder):
     def __init__(self):
         # Note: the comments in this method will be extracted for documenting environment variables!
         plugins.OptionFinder.__init__(self, sys.argv[1:])
-        self.directoryName = self.setPathFromOptionsOrEnv("TEXTTEST_HOME", ".", "d") # Root directory of the test suite
+        self.setPathFromOptionsOrEnv("TEXTTEST_HOME", ".", "d") # Alias for TEXTTEST_PATH
+        textTestPath = self.setPathFromOptionsOrEnv("TEXTTEST_PATH", "$TEXTTEST_HOME") # Root directories of the test suite
+        self.rootDirectories = textTestPath.split(os.pathsep)
         self.setPathFromOptionsOrEnv("USECASE_HOME", "$TEXTTEST_HOME/usecases") # Location to store shortcuts from the GUI
         
         self.setPathFromOptionsOrEnv("TEXTTEST_PERSONAL_CONFIG", "~/.texttest") # Location of personal configuration
@@ -1604,9 +1608,6 @@ class OptionFinder(plugins.OptionFinder):
             return self[optionName]
         else:
             return os.getenv(envVar, os.path.expanduser(os.path.expandvars(defaultValue)))
-
-    def getRootDirectories(self):
-        return [ self.directoryName ]
 
     def setUpLogging(self):
         if os.path.isfile(self.diagConfigFile):

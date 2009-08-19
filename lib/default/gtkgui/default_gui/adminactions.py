@@ -398,7 +398,7 @@ class ImportTestSuite(ImportTest):
 class ImportApplication(guiplugins.ActionDialogGUI):
     def __init__(self, allApps, dynamic, inputOptions):
         guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic, inputOptions)
-        self.rootDirectories = inputOptions.getRootDirectories()
+        self.rootDirectories = inputOptions.rootDirectories
         self.addOption("name", "Full name of application", description="Name of application to use in reports etc.")
         self.addOption("ext", "\nFile extension to use for TextTest files associated with this application", description="Short space-free extension, to identify all TextTest's files associated with this application")
         possibleSubDirs = self.findSubDirectories()
@@ -494,7 +494,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         if len(allApps) > 0:
             return sorted(set((app.getDirectory() for app in allApps)))
         else:
-            return inputOptions.getRootDirectories()
+            return inputOptions.rootDirectories
                 
     def singleTestOnly(self):
         return True

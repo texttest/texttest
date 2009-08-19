@@ -129,19 +129,28 @@ class TextTest(plugins.Responder, plugins.Observable):
         self.inputOptions = testmodel.OptionFinder()
         self.diag = logging.getLogger("Find Applications")
         self.appSuites = seqdict()
+        
     def printStackTrace(self, *args):
         sys.stderr.write("Received SIGQUIT: showing current stack trace below:\n")
         from traceback import print_stack
         print_stack()
+
     def findSearchDirs(self):
-        root = self.inputOptions.directoryName
-        self.diag.info("Using test suite at " + root)
-        fullPaths = map(lambda name: os.path.join(root, name), os.listdir(root))
-        return [ self.inputOptions.directoryName ] + filter(os.path.isdir, fullPaths)
+        roots = filter(os.path.isdir, self.inputOptions.rootDirectories)
+        self.diag.info("Using test suite at " + repr(roots))
+        subDirs = []
+        for root in roots:
+            for f in os.listdir(root):
+                path = os.path.join(root, f)
+                if os.path.isdir(path):
+                    subDirs.append(path)
+        return roots + subDirs
+
     def findApps(self):
-        root = self.inputOptions.directoryName
-        if not os.path.isdir(root):
-            sys.stderr.write("Test suite root directory does not exist: " + root + "\n")
+        searchDirs = self.findSearchDirs()
+        if len(searchDirs) == 0:
+            for root in self.inputOptions.rootDirectories:
+                sys.stderr.write("Test suite root directory does not exist: " + root + "\n")
             return True, []
 
         if self.inputOptions.has_key("new"):
@@ -150,14 +159,14 @@ class TextTest(plugins.Responder, plugins.Observable):
         appList = []
         raisedError = False
         selectedAppDict = self.inputOptions.findSelectedAppNames()
-        for dir in self.findSearchDirs():
+        for dir in searchDirs:
             subRaisedError, apps = self.findAppsUnder(dir, selectedAppDict)
             appList += apps
             raisedError |= subRaisedError
 
         if not raisedError:
             for missingAppName in self.findMissingApps(appList, selectedAppDict.keys()):
-                sys.stderr.write("Could not read application '" + missingAppName + "'. No file named config." + missingAppName + " was found under " + root + ".\n")
+                sys.stderr.write("Could not read application '" + missingAppName + "'. No file named config." + missingAppName + " was found under " + " or ".join(self.inputOptions.rootDirectories) + ".\n")
                 raisedError = True
             
         appList.sort(self.compareApps)
@@ -391,13 +400,14 @@ class TextTest(plugins.Responder, plugins.Observable):
     
     def makeDirectoryCache(self, appName):
         configFile = "config." + appName
-        rootDir = self.inputOptions.directoryName
-        rootConfig = os.path.join(rootDir, configFile)
-        if os.path.isfile(rootConfig):
-            return testmodel.DirectoryCache(rootDir)
-        else:
-            allFiles = glob(os.path.join(rootDir, "*", configFile))
-            return testmodel.DirectoryCache(os.path.dirname(allFiles[0]))
+        for rootDir in self.inputOptions.rootDirectories:
+            rootConfig = os.path.join(rootDir, configFile)
+            if os.path.isfile(rootConfig):
+                return testmodel.DirectoryCache(rootDir)
+            else:
+                allFiles = glob(os.path.join(rootDir, "*", configFile))
+                if len(allFiles) > 0:
+                    return testmodel.DirectoryCache(os.path.dirname(allFiles[0]))
             
     def notifyExtraTest(self, testPath, appName, versions):
         rootSuite = self.getRootSuite(appName, versions)

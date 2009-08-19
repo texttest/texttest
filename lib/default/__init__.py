@@ -261,7 +261,7 @@ class Config:
             if self.optionMap.has_key("new"):
                 raise plugins.TextTestError, "'--new' option can only be provided with the static GUI"
             elif len(allApps) == 0:
-                raise plugins.TextTestError, "Could not find any matching applications (files of the form config.<app>) under " + self.optionMap.directoryName
+                raise plugins.TextTestError, "Could not find any matching applications (files of the form config.<app>) under " + " or ".join(self.optionMap.rootDirectories)
             
         if self.useGUI():
             self.addGuiResponder(classes, scriptEngine)

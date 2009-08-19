@@ -2,7 +2,7 @@
 import os, plugins
 
 def getVersionControlConfig(apps, inputOptions):
-    allDirs = [ app.getDirectory() for app in apps ] + inputOptions.getRootDirectories()
+    allDirs = [ app.getDirectory() for app in apps ] + inputOptions.rootDirectories
     for dir in allDirs:
         config = getConfigFromDirectory(dir)
         if config:

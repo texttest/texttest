@@ -138,11 +138,7 @@ class SlaveMachineInfoFinder(MachineInfoFinder):
         return info
 
     def findRunningJobs(self, machine):
-        try:
-            return self._findRunningJobs(machine)
-        except IOError:
-            # If system calls to the queue system are interrupted, it shouldn't matter, try again
-            return self._findRunningJobs(machine)
+        return plugins.retryOnInterrupt(self._findRunningJobs, machine)
 
     def _findRunningJobs(self, machine):
         # On a multi-processor machine performance can be affected by jobs on other processors,

@@ -1579,7 +1579,7 @@ class OptionFinder(plugins.OptionFinder):
         # Note: the comments in this method will be extracted for documenting environment variables!
         plugins.OptionFinder.__init__(self, sys.argv[1:])
         self.setPathFromOptionsOrEnv("TEXTTEST_HOME", ".", "d") # Alias for TEXTTEST_PATH
-        textTestPath = self.setPathFromOptionsOrEnv("TEXTTEST_PATH", "$TEXTTEST_HOME") # Root directories of the test suite
+        textTestPath = self.getPathFromOptionsOrEnv("TEXTTEST_PATH", "$TEXTTEST_HOME") # Root directories of the test suite
         self.rootDirectories = textTestPath.split(os.pathsep)
         self.setPathFromOptionsOrEnv("USECASE_HOME", "$TEXTTEST_HOME/usecases") # Location to store shortcuts from the GUI
         

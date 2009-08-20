@@ -651,10 +651,13 @@ class SlaveServerResponder(plugins.Responder, TCPServer):
         self.testClientInfo = {}
         self.diag = logging.getLogger("Slave Server")
         self.terminate = False
-        # Socket may have to be around for some time,
-        # enable the keepalive option in the hope that that will make it more resilient
-        # to network problems
+        
+        # If a client rings in and then the connectivity is lost, we don't want to hang waiting for it forever
+        # So we enable keepalive that will check the connection if no data is received for a while
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, True)
+        # Default is 2 hours here which is rather a long time to wait for anything to happen.
+        # We give up after 5 minutes
+        self.socket.setsockopt(socket.SOL_TCP, socket.TCP_KEEPIDLE, 300)
         # Default value of 5 isn't very much...
         # There doesn't seem to be any disadvantage of allowing a longer queue, so we will increase it by a lot...
         self.request_queue_size = 500

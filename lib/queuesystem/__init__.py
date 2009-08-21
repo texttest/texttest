@@ -69,7 +69,7 @@ class QueueSystemConfig(default.Config):
     def cleanSlaveFiles(self, test):
         if test.state.hasSucceeded():
             writeDir = test.getDirectory(temporary=1)
-            plugins.removePath(writeDir)
+            plugins.rmtree(writeDir)
         else:
             for dataFile in test.getDataFileNames():
                 fullPath = test.makeTmpFileName(dataFile, forComparison=0)

@@ -1597,11 +1597,11 @@ class ReplaceText(plugins.ScriptWithArgs):
 
     def __call__(self, test):
         for stem in self.stems:
-            stdFile = test.getFileName(stem)        
-            if stdFile:
-                self.describe(test, " - file " + stem)
+            for stdFile in test.getFileNamesMatching(stem):
+                fileName = os.path.basename(stdFile)
+                self.describe(test, " - file " + fileName)
                 sys.stdout.flush()
-                tmpFile = test.makeTmpFileName(stem)
+                tmpFile = os.path.join(test.getDirectory(temporary=1), fileName)
                 writeFile = open(tmpFile, "w")
                 for line in open(stdFile).xreadlines():
                     writeFile.write(self.oldTextTrigger.replace(line, self.newText))

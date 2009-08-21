@@ -850,6 +850,7 @@ class TestSuite(Test):
 
     def fileExists(self, name):
         return self.dircache.exists(name)
+
     def testCaseList(self, filters=[]):
         list = []
         if not self.isAcceptedByAll(filters):
@@ -857,12 +858,16 @@ class TestSuite(Test):
         for case in self.testcases:
             list += case.testCaseList(filters)
         return list
+
     def classId(self):
         return "test-suite"
+
     def isEmpty(self):
         return len(self.testcases) == 0
+
     def isAcceptedBy(self, filter):
         return filter.acceptsTestSuite(self)
+
     def findTestSuiteFiles(self):
         contentFile = self.getContentFileName()
         versionFiles = []
@@ -870,15 +875,21 @@ class TestSuite(Test):
         for newFile in allFiles:
             if newFile != contentFile:
                 versionFiles.append(newFile)
-        return [ contentFile ] + versionFiles
+        if contentFile:
+            return [ contentFile ] + versionFiles
+        else:
+            return versionFiles # can happen when removing suites recursively
+        
     def getContentFileName(self):
         return self.getFileName("testsuite")
+    
     def createContentFile(self):
         contentFile = self.dircache.pathName("testsuite." + self.app.name)
         file = open(contentFile, "a")
         file.write("# Ordered list of tests in test suite. Add as appropriate\n\n")
         file.close()
         self.dircache.refresh()
+        
     def contentChanged(self):
         # Here we assume that only order can change...
         self.refreshFiles()

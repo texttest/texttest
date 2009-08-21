@@ -71,10 +71,13 @@ class PerformanceConfigSettings:
             return self._getDescriptor(configEntry, fallbackConfigName) + postfix
 
     def getFallbackConfigName(self):
-        if self.configName.find("mem") != -1:
+        if "mem" in self.configName:
             return "memory"
         else:
             return "cputime"
+
+    def ignoreImprovements(self):
+        return self.configMethod("performance_ignore_improvements", self.configName) == "true"
         
     def _getDescriptor(self, configEntry, configName):
         fromConfig = self.configMethod(configEntry, configName)
@@ -165,6 +168,9 @@ class PerformanceComparison:
             return self.descriptor
 
     def isSignificant(self, settings):
+        if settings.ignoreImprovements() and self.newPerformance < self.oldPerformance:
+            return False
+        
         longEnough = settings.aboveMinimum(self.newPerformance, "performance_test_minimum") or \
                      settings.aboveMinimum(self.oldPerformance, "performance_test_minimum")
         varianceEnough = settings.aboveMinimum(self.percentageChange, "performance_variation_%")

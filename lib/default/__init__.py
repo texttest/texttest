@@ -843,6 +843,7 @@ class Config:
         app.setConfigDefault("batch_use_version_filtering", { "default" : "false" }, "Which batch sessions use the version filtering mechanism")
         app.setConfigDefault("batch_version", { "default" : [] }, "List of versions to allow if batch_use_version_filtering enabled")
         app.setConfigAlias("testoverview_colours", "historical_report_colours")
+        
     def setPerformanceDefaults(self, app):
         # Performance values
         app.setConfigDefault("cputime_include_system_time", 0, "Include system time when measuring CPU time?")
@@ -859,6 +860,7 @@ class Config:
         app.setConfigDefault("performance_descriptor_decrease", self.defaultPerfDecreaseDescriptors(), "Descriptions to be used when the numbers decrease in a performance file")
         app.setConfigDefault("performance_descriptor_increase", self.defaultPerfIncreaseDescriptors(), "Descriptions to be used when the numbers increase in a performance file")
         app.setConfigDefault("performance_unit", self.defaultPerfUnits(), "Name to be used to identify the units in a performance file")
+        app.setConfigDefault("performance_ignore_improvements", { "default" : "false" }, "Should we ignore all improvements in performance?")
         app.setConfigAlias("performance_use_normalised_%", "use_normalised_percentage_change")
         
     def setUsecaseDefaults(self, app):

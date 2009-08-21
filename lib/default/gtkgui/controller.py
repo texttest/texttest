@@ -403,7 +403,6 @@ class ShortcutBarGUI(guiutils.SubGUI):
         return "_Shortcut bar"
     def createView(self):
         self.widget = scriptEngine.createShortcutBar()
-        self.widget.set_name(self.getWidgetName().replace("_", ""))
         self.widget.show()
         return self.widget
     

@@ -548,7 +548,7 @@ class CollateFiles(plugins.Action):
                 errorMsg = "Could not find extract script '" + script + "', not extracting file at\n" + sourceFile + "\n"
                 stderr = open(collationErrFile, "w")
                 stderr.write(errorMsg)
-                plugins.log.info("WARNING : " + errorMsg.strip())
+                plugins.printWarning(errorMsg.strip(), stderr=True, stdout=False)
                 stderr.close()
                 return
 

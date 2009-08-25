@@ -11,11 +11,15 @@ def getConfig(optionMap):
     return QueueSystemConfig(optionMap)
             
 class QueueSystemConfig(default.Config):
+    def __init__(self, *args):
+        default.Config.__init__(self, *args)
+        self.useQueueSystem = None
+        
     def addToOptionGroups(self, apps, groups):
         default.Config.addToOptionGroups(self, apps, groups)
         for group in groups:
             if group.name.startswith("Basic"):
-                group.addSwitch("l", "", value = self.runLocallyByDefault(), options = ["Submit tests to grid", "Run tests directly (bypass grid)"])
+                group.addSwitch("l", "Use grid", value=0, options = ["If enough tests", "Never", "Always"])
             elif group.name.startswith("Advanced"):
                 group.addOption("R", "Request grid resource", possibleValues = self.getPossibleResources())
                 group.addOption("q", "Request grid queue", possibleValues = self.getPossibleQueues())
@@ -24,6 +28,7 @@ class QueueSystemConfig(default.Config):
             elif group.name.startswith("Invisible"):
                 group.addOption("slave", "Private: used to submit slave runs remotely")
                 group.addOption("servaddr", "Private: used to submit slave runs remotely")
+
     def getMachineNameForDisplay(self, machine):
         # Don't display localhost, as it's not true when using the grid
         # Should really be something like "whatever grid gives us" but blank space will do for now...
@@ -32,17 +37,32 @@ class QueueSystemConfig(default.Config):
         else:
             return machine
 
-    def runLocallyByDefault(self):
-        return False
     def getPossibleQueues(self):
         return [] # placeholders for derived configurations
     def getPossibleResources(self):
         return []
-    def useQueueSystem(self):
-        for localFlag in [ "reconnect", "l", "gx", "s", "coll", "record", "autoreplay" ]:
+
+    def getLocalRunArgs(self):
+        return [ "reconnect", "gx", "s", "coll", "record", "autoreplay" ]
+    
+    def calculateUseQueueSystem(self, allApps):
+        for localFlag in self.getLocalRunArgs():
             if self.optionMap.has_key(localFlag):
                 return False
-        return True
+
+        if self.optionMap.has_key("l"):
+            value = self.optionValue("l")
+            if value is None or value == "1":
+                return False
+            elif value == "2":
+                return True
+        elif self.optionMap.has_key("count"):
+            count = int(self.optionMap.get("count"))
+            minCount = min((app.getConfigValue("queue_system_min_test_count") for app in allApps))
+            return count >= minCount
+        else:
+            return True
+    
     def hasExplicitInterface(self):
         return self.slaveRun() or default.Config.hasExplicitInterface(self)
     def slaveRun(self):
@@ -54,7 +74,7 @@ class QueueSystemConfig(default.Config):
         else:
             return default.Config.getWriteDirectoryName(self, app)
     def noFileAdvice(self):
-        if self.useQueueSystem():
+        if self.useQueueSystem:
             return "Try re-running the test, and either use local mode, or check the box for keeping\n" + \
                    "successful test files under the Running/Advanced tab in the static GUI"
         else:
@@ -84,7 +104,7 @@ class QueueSystemConfig(default.Config):
             default.Config._cleanWriteDirectory(self, suite)
 
     def getTextResponder(self):
-        if self.useQueueSystem():
+        if self.useQueueSystem:
             return masterprocess.MasterInteractiveResponder
         else:
             return default.Config.getTextResponder(self)
@@ -105,14 +125,15 @@ class QueueSystemConfig(default.Config):
         classes.append(ApplicationEventResponder)
         return classes
 
-    def _getResponderClasses(self, *args):
+    def _getResponderClasses(self, allApps, *args):
+        self.useQueueSystem = self.calculateUseQueueSystem(allApps)
         if self.slaveRun():
             return self.getSlaveResponderClasses()
         else:
-            return default.Config._getResponderClasses(self, *args)
+            return default.Config._getResponderClasses(self, allApps, *args)
         
     def getThreadActionClasses(self):
-        if self.useQueueSystem():
+        if self.useQueueSystem:
             return [ self.getSlaveServerClass(), self.getQueueServerClass() ] # don't use the action runner at all!
         else:
             return default.Config.getThreadActionClasses(self)
@@ -121,13 +142,13 @@ class QueueSystemConfig(default.Config):
     def getSlaveServerClass(self):
         return masterprocess.SlaveServerResponder
     def useVirtualDisplay(self):
-        if self.useQueueSystem() and not self.slaveRun():
+        if self.useQueueSystem and not self.slaveRun():
             return False
         else:
             return default.Config.useVirtualDisplay(self)
         
     def getTextDisplayResponderClass(self):
-        if self.useQueueSystem():
+        if self.useQueueSystem:
             return masterprocess.MasterTextResponder
         else:
             return default.Config.getTextDisplayResponderClass(self)
@@ -168,6 +189,7 @@ class QueueSystemConfig(default.Config):
         app.setConfigDefault("performance_test_resource", { "default" : [] }, "Resources to request from queue system for performance testing")
         app.setConfigDefault("parallel_environment_name", "*", "(SGE) Which SGE parallel environment to use when SUT is parallel")
         app.setConfigDefault("queue_system_max_capacity", 100000, "Maximum possible number of parallel similar jobs in the available grid")
+        app.setConfigDefault("queue_system_min_test_count", 0, "Minimum number of tests before it's worth submitting them to the grid")
         
 
 class DocumentEnvironment(default.DocumentEnvironment):

@@ -1376,7 +1376,10 @@ class Switch(Option):
         self.setValue(1 - self.getValue())
 
     def getCmdLineValue(self):
-        return "" # always on or off...
+        if len(self.options) > 2:
+            return str(self.getValue())
+        else:
+            return "" # always on or off...
 
     def reset(self):
         if self.defaultValue == 0 and self.resetMethod:

@@ -1482,9 +1482,11 @@ Historical HTML Batch Report Enhancements:
     - With extra versions, the first one also gets given a header row now (testoverview.py)
     - Category ordering is now deterministic, with succeeded tests displayed first (testoverview.py)
 Grid Engine (LSF/SGE) enhancements:
-    - Errors produced by remote jobs now get reported on master process stderr (queuesystem/__init__.py)
+    - New config file option "queue_system_min_test_count" (queuesystem/__init__.py)
+	Can make sure small numbers of tests get run locally by default, while large numbers use the grid.
+    - Errors produced by remote jobs now get reported on master process stderr (masterprocess.py)
 	And hence in popups in the static GUI where appropriate.
-    - Tests from different applications now interleaved when submitting (queuesystem/__init__.py)
+    - Tests from different applications now interleaved when submitting (masterprocess.py)
 	Means one application is less likely to take over all available resources
 Self-test/Internal changes:
     - Everything now done via PyUseCase 2.0's new auto-logging. Most custom logging removed from TextTest.
@@ -1519,6 +1521,9 @@ Bug Fixes:
 	Could lead to false grouping and hence incorrect saves
     - Credits dialog no longer mangled in locales which aren't Latin-1 compatible (helpdialogs.py)
     - Added error messages for locale encoding problems (guiutils.py)
+    - Errors when collating now get shown in the GUI (sandbox.py)
 Grid Engine (LSF/SGE) Bug Fixes:
     - Don't send tests for re-use whose submission has been cancelled (queuesystem/masterprocess.py)
     - Reduced keepalive timeout to 5 minutes, 2 hours is rather a long time in a test context (masterprocess.py)
+    - Don't fall over if SUT leaves child processes running from the slave (slavejobs.py)
+

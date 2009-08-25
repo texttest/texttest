@@ -1389,8 +1389,8 @@ class Switch(Option):
 
     def describe(self):
         text = self.name
-        if len(self.options) > 0:
-            text += self.options[-1]
+        if len(self.options) > 1:
+            text += "=" + self.options[1]
         return text
 
 

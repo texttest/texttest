@@ -1236,12 +1236,21 @@ class RunTest(plugins.Action):
         self.killedTests.append(test)
         self.killSignal = sig
         if self.currentProcess:
-            self.killProcess()
+            self.killProcess(test)
         self.lock.release()
-    def killProcess(self):
+        
+    def killProcess(self, test):
+        machine = test.app.getRunMachine()
+        if machine != "localhost" and test.getConfigValue("remote_shell_program") == "ssh":
+            self.killRemoteProcess(test, machine)
         plugins.log.info("Killing running test (process id " + str(self.currentProcess.pid) + ")")
         killSubProcessAndChildren(self.currentProcess)
-    
+
+    def killRemoteProcess(self, test, machine):
+        tmpDir = self.getTmpDirectory(test)
+        remoteScript = os.path.join(tmpDir, "kill_test.sh")
+        test.app.runCommandOn(machine, [ "sh", plugins.quote(remoteScript, '"') ])
+        
     def wait(self, process):
         try:
             plugins.retryOnInterrupt(process.wait)
@@ -1303,6 +1312,9 @@ class RunTest(plugins.Action):
 
         for arg, value in self.getEnvironmentArgs(test): # Must set the environment remotely
             scriptFile.write("export " + arg + "=" + value + "\n")
+        if test.app.getConfigValue("remote_shell_program") == "ssh":
+            # SSH doesn't kill remote processes, create a kill script
+            scriptFile.write('echo "kill $$" > kill_test.sh\n')
         scriptFile.write("exec " + " ".join(localArgs) + "\n")
         scriptFile.close()
         os.chmod(scriptFileName, 0775) # make executable

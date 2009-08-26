@@ -20,10 +20,6 @@ class QueueSystemConfig(default.Config):
         minTestCount = min((app.getConfigValue("queue_system_min_test_count") for app in apps))
         for group in groups:
             if group.name.startswith("Basic"):
-                descriptions =  ["Show all tests which match the criteria, and hide all those that do not.",
-                                 "Hide all tests which do not match the criteria. Do not show any tests that aren't already shown.",
-                                 "Show all tests which match the criteria. Do not hide any tests that are currently shown." ]
-
                 options = [ "Always", "Never" ]
                 qsName = "grid"
                 for app in apps:

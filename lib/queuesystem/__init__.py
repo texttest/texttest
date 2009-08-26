@@ -3,7 +3,7 @@
 Module for the queuesystem configuration, i.e. using grid engines to run tests in parallel
 """
 
-import masterprocess, slavejobs, os, default, plugins
+import masterprocess, slavejobs, utils, os, default, plugins
 from default.virtualdisplay import VirtualDisplayResponder
 from default.pyusecase_interface import ApplicationEventResponder
 
@@ -17,9 +17,27 @@ class QueueSystemConfig(default.Config):
         
     def addToOptionGroups(self, apps, groups):
         default.Config.addToOptionGroups(self, apps, groups)
+        minTestCount = min((app.getConfigValue("queue_system_min_test_count") for app in apps))
         for group in groups:
             if group.name.startswith("Basic"):
-                group.addSwitch("l", "Use grid", value=0, options = ["If enough tests", "Never", "Always"])
+                descriptions =  ["Show all tests which match the criteria, and hide all those that do not.",
+                                 "Hide all tests which do not match the criteria. Do not show any tests that aren't already shown.",
+                                 "Show all tests which match the criteria. Do not hide any tests that are currently shown." ]
+
+                options = [ "Always", "Never" ]
+                qsName = "grid"
+                for app in apps:
+                    currName = utils.queueSystemName(app)
+                    if currName:
+                        qsName = currName
+                descriptions = [ "Submit the tests to " + qsName,
+                                 "Run the tests directly, not using " + qsName ] 
+                defaultValue = 0
+                if minTestCount:
+                    options.append("If enough tests")
+                    descriptions.append("Submit the tests to " + qsName + " only if " + str(minTestCount) + " or more are selected.")
+                    defaultValue = 2
+                group.addSwitch("l", "Use grid", value=defaultValue, options=options, description=descriptions)
             elif group.name.startswith("Advanced"):
                 group.addOption("R", "Request grid resource", possibleValues = self.getPossibleResources())
                 group.addOption("q", "Request grid queue", possibleValues = self.getPossibleQueues())
@@ -54,14 +72,12 @@ class QueueSystemConfig(default.Config):
             value = self.optionValue("l")
             if value is None or value == "1":
                 return False
-            elif value == "2":
-                return True
-        elif self.optionMap.has_key("count"):
-            count = int(self.optionMap.get("count"))
-            minCount = min((app.getConfigValue("queue_system_min_test_count") for app in allApps))
-            return count >= minCount
-        else:
-            return True
+            elif value == "2" and self.optionMap.has_key("count"):
+                count = int(self.optionMap.get("count"))
+                minCount = min((app.getConfigValue("queue_system_min_test_count") for app in allApps))
+                return count >= minCount
+
+        return True
     
     def hasExplicitInterface(self):
         return self.slaveRun() or default.Config.hasExplicitInterface(self)

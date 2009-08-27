@@ -673,15 +673,14 @@ class TestCase(Test):
             fullPath = os.path.join(self.writeDirectory, file)
             paths += self.listFiles(fullPath, file, followLinks=False)
         return paths
-    def loadState(self, file, **updateArgs):
-        loaded, state = self.getNewState(file, **updateArgs)
-        self.changeState(state)
+
     def makeTmpFileName(self, stem, forComparison=1, forFramework=0):
         dir = self.getDirectory(temporary=1, forFramework=forFramework)
         if forComparison and not forFramework and stem.find(os.sep) == -1:
             return os.path.join(dir, stem + "." + self.app.name)
         else:
             return os.path.join(dir, stem)
+
     def getNewState(self, file, **updateArgs):
         try:
             # Would like to do load(file) here... but it doesn't work with universal line endings, see Python bug 1724366

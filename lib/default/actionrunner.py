@@ -262,6 +262,7 @@ class TestRunner:
                 abandon = True
 
         self.test.actionsCompleted()
+
     def kill(self, sig=None):
         self.diag.info("Killing test " + repr(self.test))
         self.lock.acquire()
@@ -270,6 +271,7 @@ class TestRunner:
         if self.currentAction:
             self.currentAction.kill(self.test, sig)
         self.lock.release()
+
     def callAction(self, action):
         self.lock.acquire()
         self.currentAction = action
@@ -277,7 +279,7 @@ class TestRunner:
             action.kill(self.test, self.killSignal)
         self.lock.release()
 
-        self.handleExceptions(self.test.callAction, action)
+        self.handleExceptions(action, self.test)
 
         self.lock.acquire()
         self.currentAction = None

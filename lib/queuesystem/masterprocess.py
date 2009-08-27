@@ -6,7 +6,8 @@ Code to do with the grid engine master process, i.e. submitting slave jobs and w
 import plugins, os, sys, socket, subprocess, signal, logging, time
 from utils import *
 from Queue import Queue, Empty
-from SocketServer import TCPServer, StreamRequestHandler
+from SocketServer import ThreadingTCPServer, StreamRequestHandler
+from threading import Lock
 from ndict import seqdict
 from default.console import TextDisplayResponder, InteractiveResponder
 from default.knownbugs import CheckForBugs
@@ -109,13 +110,13 @@ class QueueSystemServer(BaseActionRunner):
     def submitTerminators(self):
         # snap out of our loop if this was the last one. Rely on others to manage the test queue
         self.reuseFailureQueue.put(None)
-    def getTestForReuse(self, test):
+    def getTestForReuse(self, test, state):
         # Pick up any test that matches the current one's resource requirements
         if not self.exited:
             # Don't allow this to use up the terminator
             newTest = self.getTest(block=False, replaceTerminators=True)
             if newTest:
-                if self.allowReuse(test, newTest):
+                if self.allowReuse(test, state, newTest):
                     self.jobs[newTest] = self.getJobInfo(test)
                     if self.testCount > 1:
                         self.testCount -= 1
@@ -135,9 +136,9 @@ class QueueSystemServer(BaseActionRunner):
             self.diag.info("Forcing termination")
             self.submitTerminators()
             
-    def allowReuse(self, oldTest, newTest):
+    def allowReuse(self, oldTest, oldState, newTest):
         # Don't reuse jobs that have been killed
-        if oldTest.state.category == "killed" or newTest.state.isComplete():
+        if newTest.state.isComplete() or oldState.category == "killed":
             return False
 
         oldRules = self.getSubmissionRules(oldTest)
@@ -188,6 +189,7 @@ class QueueSystemServer(BaseActionRunner):
                 # Make sure we pick up anything that failed in reuse while we were submitting the final test...
                 self.diag.info("No normal test found, checking reuse failures...")
                 return self.getItemFromQueue(self.reuseFailureQueue, block=False)
+            
     def getTestForRunReuseOnlyMode(self):
         self.reuseOnly = True
         self.diag.info("Waiting for reuse failures...")
@@ -203,6 +205,7 @@ class QueueSystemServer(BaseActionRunner):
             return self.getTestForRunNormalMode()
         else:
             return self.getTestForRunReuseOnlyMode()
+
     def notifyAllComplete(self):
         errors = {}
         errorFiles = []
@@ -609,6 +612,10 @@ class SlaveRequestHandler(StreamRequestHandler):
         clientHost, clientPort = self.client_address
         # Don't use port, it changes all the time
         self.handleRequestFromHost(self.getHostName(clientHost), identifier)
+
+    def getHostName(self, ipAddress):
+        return socket.gethostbyaddr(ipAddress)[0].split(".")[0]
+        
     def handleRequestFromHost(self, hostname, identifier):
         testString = self.rfile.readline().strip()
         test = self.server.getTest(testString)
@@ -621,11 +628,12 @@ class SlaveRequestHandler(StreamRequestHandler):
                 oldBt = test.state.briefText
                 # The updates are only for testing against old slave traffic,
                 # a bit sad we can't disable them when not testing...
-                test.loadState(self.rfile, updatePaths=True)
+                loaded, state = test.getNewState(self.rfile, updatePaths=True)
+                self.server.changeState(test, state)
                 self.connection.shutdown(socket.SHUT_RD)
-                self.server.diag.info("Changed from '" + oldBt + "' to '" + test.state.briefText + "'")
-                if test.state.isComplete():
-                    newTest = QueueSystemServer.instance.getTestForReuse(test)
+                self.server.diag.info("Changed from '" + oldBt + "' to '" + state.briefText + "'")
+                if state.isComplete():
+                    newTest = QueueSystemServer.instance.getTestForReuse(test, state)
                     if newTest:
                         self.wfile.write(socketSerialise(newTest))
                 else:
@@ -640,14 +648,13 @@ class SlaveRequestHandler(StreamRequestHandler):
             sys.stderr.flush()
             self.connection.shutdown(socket.SHUT_RDWR)
             
-    def getHostName(self, ipAddress):
-        return socket.gethostbyaddr(ipAddress)[0].split(".")[0]
 
-class SlaveServerResponder(plugins.Responder, TCPServer):
+class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
     def __init__(self, *args):
         plugins.Responder.__init__(self, *args)
-        TCPServer.__init__(self, (socket.gethostname(), 0), self.handlerClass())
+        ThreadingTCPServer.__init__(self, (socket.gethostname(), 0), self.handlerClass())
         self.testMap = {}
+        self.testLocks = {}
         self.testClientInfo = {}
         self.diag = logging.getLogger("Slave Server")
         self.terminate = False
@@ -670,16 +677,19 @@ class SlaveServerResponder(plugins.Responder, TCPServer):
         # Tell the submission code where we are
         QueueSystemServer.instance.setSlaveServerAddress(serverAddress)
 
-    def handlerClass(self):
+    def handlerClass(self):    
         return SlaveRequestHandler
+
     def canBeMainThread(self):
         return False # We wait for sockets and stuff
+
     def run(self):
         while not self.terminate:
             self.diag.info("Waiting for a new request...")
             self.handle_request()
         
         self.diag.info("Terminating slave server")
+        
     def notifyAllRead(self, suites):
         if len(self.testMap) == 0:
             self.notifyAllComplete()
@@ -691,18 +701,36 @@ class SlaveServerResponder(plugins.Responder, TCPServer):
         sendSocket.connect(self.socket.getsockname())
         sendSocket.sendall("TERMINATE_SERVER\n")
         sendSocket.close()
+        
     def getAddress(self):
         host, port = self.socket.getsockname()
         return host + ":" + str(port)
+
     def notifyAdd(self, test, initial):
         if test.classId() == "test-case":
             self.storeTest(test)
+            
     def storeTest(self, test):
         testPath = test.getRelPath()
         testApp = test.app.name + test.app.versionSuffix()
         if not self.testMap.has_key(testApp):
             self.testMap[testApp] = {}
         self.testMap[testApp][testPath] = test
+        self.testLocks[test] = Lock()
+
+    def changeState(self, test, state):
+        # Several threads could be trying to do this at once...
+        lock = self.testLocks.get(test)
+        lock.acquire()
+        allow = self.allowChange(test.state, state)
+        if allow:
+            test.changeState(state)
+        lock.release()
+        return allow
+
+    def allowChange(self, oldState, newState):
+        return (newState.hasStarted() and not oldState.hasStarted()) or \
+               (newState.isComplete() and not oldState.isComplete())
 
     def getTest(self, testString):
         self.diag.info("Received request for '" + testString + "'")
@@ -718,8 +746,10 @@ class SlaveServerResponder(plugins.Responder, TCPServer):
             return self.testClientInfo[test] == clientInfo
         else:
             return True
+
     def storeClient(self, test, clientInfo):
         self.testClientInfo[test] = clientInfo
+
 
 class MasterTextResponder(TextDisplayResponder):
     def getPrefix(self, test):

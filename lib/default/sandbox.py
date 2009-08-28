@@ -441,8 +441,9 @@ class CollateFiles(plugins.Action):
             if remoteTmpDir:
                 self.fetchRemoteFiles(test, machine, remoteTmpDir)
         
-            self.removeUnwanted(test)
             self.collate(test)
+            self.removeUnwanted(test)
+
     def removeUnwanted(self, test):
         for stem in self.discardFiles:
             self.diag.info("Trying to remove generated file with stem " + stem)

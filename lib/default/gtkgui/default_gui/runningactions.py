@@ -265,6 +265,12 @@ class RerunTests(RunningAction,guiplugins.ActionGUI):
                 if value is not None:
                     ttOptions.append(value)
         return ttOptions
+    
+    def checkTestRun(self, errFile, testSel, filterFile, usecase):
+        # Don't do anything with the files, but do produce popups on failures and notify when complete
+        self.checkErrorFile(errFile, testSel, usecase)
+        testSel[0].notify("CloseDynamic", usecase)
+
 
 
 class RecordTest(RunningAction,guiplugins.ActionTabGUI):

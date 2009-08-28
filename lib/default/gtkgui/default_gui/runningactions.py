@@ -30,7 +30,7 @@ class RunningAction:
         
     def startTextTestProcess(self, usecase, runModeOptions, testSelOverride=None, filterFileOverride=None):
         app = self.currAppSelection[0]
-        writeDir = os.path.join(app.writeDirectory, "dynamic_run" + str(self.runNumber))
+        writeDir = os.path.join(self.getLogRootDirectory(app), "dynamic_run" + str(self.runNumber))
         plugins.ensureDirectoryExists(writeDir)
         filterFile = self.getFilterFile(writeDir, filterFileOverride)
         ttOptions = runModeOptions + self.getTextTestOptions(filterFile, app, usecase)
@@ -46,6 +46,9 @@ class RunningAction:
                                                stdout=open(logFile, "w"), stderr=open(errFile, "w"),
                                                exitHandler=self.checkTestRun,
                                                exitHandlerArgs=(errFile,testsAffected,filterFile,usecase))
+
+    def getLogRootDirectory(self, app):
+        return app.writeDirectory
 
     def killOnTermination(self):
         return True
@@ -265,7 +268,14 @@ class RerunTests(RunningAction,guiplugins.ActionGUI):
                 if value is not None:
                     ttOptions.append(value)
         return ttOptions
-    
+
+    def getLogRootDirectory(self, app):
+        if self.inputOptions.has_key("f"):
+            logRootDir = os.path.dirname(self.inputOptions["f"])
+            if os.path.basename(logRootDir).startswith("dynamic_run"):
+                return logRootDir
+        return RunningAction.getLogRootDirectory(self, app)
+
     def checkTestRun(self, errFile, testSel, filterFile, usecase):
         # Don't do anything with the files, but do produce popups on failures and notify when complete
         self.checkErrorFile(errFile, testSel, usecase)

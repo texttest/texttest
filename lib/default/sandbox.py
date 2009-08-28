@@ -555,6 +555,14 @@ class CollateFiles(plugins.Action):
         if currProc:
             currProc.wait()
 
+        collateErrMsg = open(collationErrFile).read()
+        if collateErrMsg:
+            msg = "Errors occurred running collate_script(s) " + " and ".join(scripts) + \
+                  "\nwhile trying to extract file at \n" + sourceFile + " : \n" + collateErrMsg
+            plugins.printWarning(msg, stderr=True, stdout=False)
+        
+        
+
 class FindExecutionHosts(plugins.Action):
     def __call__(self, test):
         test.state.executionHosts = self.getExecutionMachines(test)

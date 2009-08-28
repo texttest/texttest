@@ -207,6 +207,7 @@ class BugMap(seqdict):
 class CheckForCrashes(plugins.Action):
     def __init__(self):
         self.diag = logging.getLogger("check for crashes")
+
     def __call__(self, test):
         if test.state.category == "killed":
             return
@@ -224,13 +225,16 @@ class CheckForCrashes(plugins.Action):
             newState.setFailedPrediction(crashState)
             test.changeState(newState)
             os.remove(stackTraceFile)
+
     def parseStackTrace(self, test, stackTraceFile):
         lines = open(stackTraceFile).readlines()
         if len(lines) > 2:
             return lines[0].strip(), string.join(lines[2:], "")
         else:
             errFile = test.makeTmpFileName("stacktrace.collate_errs", forFramework=1)
-            return "core not parsed", "Errors from collation script:\n" + open(errFile).read()
+            script = test.getCompositeConfigValue("collate_script", "stacktrace")[0]
+            return "core not parsed", "The core file could not be parsed. Errors from '" + script + "' follow :\n" + open(errFile).read()
+
 
 class CheckForBugs(plugins.Action):
     def __init__(self):

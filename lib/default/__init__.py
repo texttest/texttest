@@ -935,6 +935,8 @@ class Config:
         app.setConfigDefault("discard_file", [], "List of generated result files which should not be compared")
         if self.optionMap.has_key("rectraffic"):
             app.addConfigEntry("base_version", "rectraffic")
+        if self.optionMap.has_key("record"):
+            app.addConfigEntry("base_version", "recusecase")
         if homeOS != "any" and homeOS != os.name:
             app.addConfigEntry("base_version", os.name)
 

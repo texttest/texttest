@@ -7,10 +7,10 @@ if __name__ == "__main__":
     import sys
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(sys.argv[0]))))
 
-import plugins, logging
+import plugins, fpdiff, logging
 from ndict import seqdict
 from re import sub
-import StringIO, fpdiff
+from optparse import OptionParser
 
 # Generic base class for filtering standard and temporary files
 class FilterAction(plugins.Action):
@@ -21,27 +21,33 @@ class FilterAction(plugins.Action):
             self.diag.info("Considering for filtering : " + fileName)
             stem = os.path.basename(fileName).split(".")[0]
             newFileName = test.makeTmpFileName(stem + "." + test.app.name + postfix, forFramework=1)
-            currFile = fileName
-            filters = self.makeAllFilters(test, stem)
-            for fileFilter, extraPostfix in filters:
-                writeFile = newFileName + extraPostfix
-                self.diag.info("Applying " + fileFilter.__class__.__name__ + " to make\n" + writeFile + " from\n " + currFile) 
-                if os.path.isfile(writeFile):
-                    self.diag.info("Removing previous file at " + writeFile)
-                    os.remove(writeFile)
-                fileFilter.filterFile(currFile, writeFile)
-                currFile = writeFile
-            if len(filters) > 0:
-                os.rename(currFile, newFileName)
+            self.performAllFilterings(test, stem, fileName, newFileName)
+
+    def performAllFilterings(self, test, stem, fileName, newFileName):
+        currFile = fileName
+        filters = self.makeAllFilters(test, stem)
+        for fileFilter, extraPostfix in filters:
+            writeFile = newFileName + extraPostfix
+            self.diag.info("Applying " + fileFilter.__class__.__name__ + " to make\n" + writeFile + " from\n " + currFile) 
+            if os.path.isfile(writeFile):
+                self.diag.info("Removing previous file at " + writeFile)
+                os.remove(writeFile)
+            fileFilter.filterFile(currFile, writeFile)
+            currFile = writeFile
+        if len(filters) > 0:
+            os.rename(currFile, newFileName)
 
     def makeAllFilters(self, test, stem):
+        filters = []
         runDepTexts = test.getCompositeConfigValue("run_dependent_text", stem)
-        unorderedTexts = test.getCompositeConfigValue("unordered_text", stem)
-        if runDepTexts or unorderedTexts or self.changedOs(test.app):
-            return [ (RunDependentTextFilter(runDepTexts, unorderedTexts, test.getRelPath()), ".normal") ]
-        else:
-            return []
+        if runDepTexts or self.changedOs(test.app):
+            filters.append((RunDependentTextFilter(runDepTexts, test.getRelPath()), ".normal"))
 
+        unorderedTexts = test.getCompositeConfigValue("unordered_text", stem)
+        if unorderedTexts:
+            filters.append((UnorderedTextFilter(unorderedTexts, test.getRelPath()), ".sorted"))
+        return filters
+            
     def changedOs(self, app):
         homeOs = app.getConfigValue("home_operating_system")
         return homeOs != "any" and os.name != homeOs
@@ -100,57 +106,56 @@ class FloatingPointFilter:
 
 
 class RunDependentTextFilter(plugins.Observable):
-    def __init__(self, runDepTexts, unorderedTexts=[], testId=""):
+    def __init__(self, filterTexts, testId=""):
         plugins.Observable.__init__(self)
         self.diag = logging.getLogger("Run Dependent Text")
-        self.contentFilters = [ LineFilter(text, testId, self.diag) for text in runDepTexts ]
-        self.orderFilters = seqdict()
-        for text in unorderedTexts:
-            orderFilter = LineFilter(text, testId, self.diag)
-            self.orderFilters[orderFilter] = []
+        self.lineFilters = [ LineFilter(text, testId, self.diag) for text in filterTexts ]
 
     def filterFile(self, fileName, newFileName):
         self.diag.info("Filtering " + fileName + " to create " + newFileName)
         file = open(fileName, "rU") # use universal newlines to simplify
         newFile = plugins.openForWrite(newFileName)
         self.filterFileObject(file, newFile)
-        
-    def filterFileObject(self, file, newFile):
+
+    def filterFileObject(self, file, newFile, filteredAway=None):
         lineNumber = 0
         for line in file.xreadlines():
             # We don't want to stack up ActionProgreess calls in ThreaderNotificationHandler ...
             self.notifyIfMainThread("ActionProgress", "")
             lineNumber += 1
-            filteredLine = self.getFilteredLine(line, lineNumber)
+            lineFilter, filteredLine = self.getFilteredLine(line, lineNumber)
             if filteredLine:
                 newFile.write(filteredLine)
-        self.writeUnorderedText(newFile)
+            elif filteredAway is not None and lineFilter is not None:
+                filteredAway.setdefault(lineFilter, []).append(line)
 
     def getFilteredLine(self, line, lineNumber):
-        for contentFilter in self.contentFilters:
-            changed, filteredLine = contentFilter.applyTo(line, lineNumber)
+        for lineFilter in self.lineFilters:
+            changed, filteredLine = lineFilter.applyTo(line, lineNumber)
             if changed:
                 if not filteredLine:
-                    return filteredLine
+                    return lineFilter, filteredLine
                 line = filteredLine
-        for orderFilter in self.orderFilters.keys():
-            changed, filteredLine = orderFilter.applyTo(line, lineNumber)
-            if changed:
-                if not filteredLine:
-                    filteredLine = line
-                self.orderFilters[orderFilter].append(filteredLine)
-                return ""
-        return line
-    def writeUnorderedText(self, newFile):
-        for filter, linesFiltered in self.orderFilters.items():
-            if len(linesFiltered) == 0:
+        return None, line
+
+
+class UnorderedTextFilter(RunDependentTextFilter):
+    def filterFileObject(self, file, newFile):
+        unorderedLines = {}
+        RunDependentTextFilter.filterFileObject(self, file, newFile, unorderedLines)
+        self.writeUnorderedText(newFile, unorderedLines)
+
+    def writeUnorderedText(self, newFile, lines):
+        for filter in self.lineFilters:
+            unordered = lines.get(filter, [])
+            if len(unordered) == 0:
                 continue
-            linesFiltered.sort()
+            unordered.sort()
             newFile.write("-- Unordered text as found by filter '" + filter.originalText + "' --" + "\n")
-            for line in linesFiltered:
+            for line in unordered:
                 newFile.write(line)
             newFile.write("\n")
-            self.orderFilters[filter] = []
+  
 
 class LineNumberTrigger:
     def __init__(self, lineNumber):
@@ -322,8 +327,16 @@ class LineFilter:
         return len(words) + 1
 
 if __name__ == "__main__":
-    args = [ arg.split(",") for arg in sys.argv[1:3]] + sys.argv[3:]
+    parser = OptionParser("usage: %prog [options] filter1 filter2 ...")
+    parser.add_option("-u", "--unordered", action="store_true", 
+                      help='Use unordered filter instead of standard one')
+    parser.add_option("-t", "--testrelpath", 
+                      help="use test relative path RELPATH", metavar="RELPATH")
+    (options, args) = parser.parse_args()
     allPaths = plugins.findDataPaths([ "logging.console" ], dataDirName="log", includePersonal=True)
     plugins.configureLogging(allPaths[-1]) # Won't have any effect if we've already got a log file
-    runDepFilter = RunDependentTextFilter(*args)
+    if options.unordered:
+        runDepFilter = UnorderedTextFilter(args, options.testrelpath)
+    else:
+        runDepFilter = RunDependentTextFilter(args, options.testrelpath)
     runDepFilter.filterFileObject(sys.stdin, sys.stdout)

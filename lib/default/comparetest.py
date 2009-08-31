@@ -430,15 +430,15 @@ class PrintObsoleteVersions(plugins.Action):
     def cmpFile(self, test, file):
         basename = os.path.basename(file)
         return mktemp(basename + "cmp")
+    
     def filterFile(self, test, file):
         newFile = self.cmpFile(test, file)
         stem = os.path.basename(file).split(".")[0]
-        runDepTexts = test.getCompositeConfigValue("run_dependent_text", stem)
-        unorderedTexts = test.getCompositeConfigValue("unordered_text", stem)    
-        from rundependent import RunDependentTextFilter
-        filter = RunDependentTextFilter(runDepTexts, unorderedTexts, test.getRelPath())
-        filter.filterFile(file, newFile)
+        from rundependent import FilterAction
+        action = FilterAction()
+        action.performAllFilterings(test, stem, file, newFile)
         return newFile
+
     def compareFiles(self, test, filePair1, filePair2):
         origFile1, cmpFile1 = filePair1
         origFile2, cmpFile2 = filePair2

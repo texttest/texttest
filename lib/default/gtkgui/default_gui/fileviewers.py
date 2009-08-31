@@ -53,6 +53,9 @@ class FileViewAction(guiplugins.ActionGUI):
 
     def isDefaultViewer(self, *args):
         return False
+    
+    def extraPostfix(self):
+        return ""
 
     def notifyViewFile(self, fileName, *args):
         if self.isDefaultViewer(*args):
@@ -62,9 +65,10 @@ class FileViewAction(guiplugins.ActionGUI):
         try:
             # associatedObject might be a comparison object, but it might not
             # Use the comparison if it's there
-            return associatedObject.existingFile(self.useFiltered())
+            return associatedObject.existingFile(self.useFiltered(), self.extraPostfix())
         except AttributeError:
             return fileName
+        
     def noFileAdvice(self):
         if len(self.currAppSelection) > 0:
             return "\n" + self.currAppSelection[0].noFileAdvice()
@@ -260,6 +264,7 @@ class ViewTestFileInEditor(ViewInEditor):
             test.filesChanged()
         self.editingComplete()
 
+
 class ViewFilteredTestFileInEditor(ViewTestFileInEditor):
     def _getStockId(self):
         pass # don't use same stock for both
@@ -272,13 +277,30 @@ class ViewFilteredTestFileInEditor(ViewTestFileInEditor):
     def isDefaultViewer(self, *args):
         return False
 
+class ContentFilterViewer:
+    def extraPostfix(self):
+        return ".normal"
+
+    def unorderedFiltersActive(self, comparison):
+        return len(self.currAppSelection[0].getCompositeConfigValue("unordered_text", comparison.stem)) > 0
+
+
+class ViewContentFilteredTestFileInEditor(ContentFilterViewer, ViewFilteredTestFileInEditor):
+    def _getTitle(self):
+        return "View Content-Filtered File"
+
+    def isActiveForFile(self, fileName, comparison):
+        return ViewFilteredTestFileInEditor.isActiveForFile(self, fileName, comparison) and \
+               self.unorderedFiltersActive(comparison)
+    
+
 class ViewFilteredOrigFileInEditor(ViewFilteredTestFileInEditor):
     def _getTitle(self):
         return "View Filtered Original File"
     def isActiveForFile(self, fileName, comparison):
         return comparison and not comparison.newResult()
     def getFileToView(self, fileName, comparison):
-        return comparison.getStdFile(self.useFiltered())
+        return comparison.getStdFile(self.useFiltered(), self.extraPostfix())
         
 class ViewOrigFileInEditor(ViewFilteredOrigFileInEditor):
     def _getTitle(self):
@@ -286,6 +308,14 @@ class ViewOrigFileInEditor(ViewFilteredOrigFileInEditor):
     def useFiltered(self):
         return False
 
+class ViewContentFilteredOrigFileInEditor(ContentFilterViewer, ViewFilteredOrigFileInEditor):
+    def _getTitle(self):
+        return "View Content-Filtered Original File"
+
+    def isActiveForFile(self, fileName, comparison):
+        return ViewFilteredOrigFileInEditor.isActiveForFile(self, fileName, comparison) and \
+               self.unorderedFiltersActive(comparison)
+               
 
 class ViewFileDifferences(FileViewAction):
     def _getTitle(self):
@@ -304,7 +334,7 @@ class ViewFileDifferences(FileViewAction):
         return False
 
     def _performOnFile(self, diffProgram, tmpFile, comparison):
-        stdFile = comparison.getStdFile(self.useFiltered())
+        stdFile = comparison.getStdFile(self.useFiltered(), self.extraPostfix())
         description = diffProgram + " " + os.path.basename(stdFile) + " " + os.path.basename(tmpFile)
         guiplugins.guilog.info("Starting graphical difference comparison using '" + diffProgram + "':")
         guiplugins.guilog.info("-- original file : " + stdFile)
@@ -328,6 +358,16 @@ class ViewFilteredFileDifferences(ViewFileDifferences):
 
     def isDefaultViewer(self, comparison):
         return self.differencesActive(comparison)
+
+class ViewContentFilteredFileDifferences(ContentFilterViewer, ViewFilteredFileDifferences):
+    def _getTitle(self):
+        return "View Content-Filtered Differences"
+
+    def isActiveForFile(self, fileName, comparison):
+        return ViewFileDifferences.isActiveForFile(self, fileName, comparison) and self.unorderedFiltersActive(comparison)
+
+    def isDefaultViewer(self, comparison):
+        return False
 
 
 class FollowFile(FileViewAction):
@@ -377,6 +417,7 @@ class FollowFile(FileViewAction):
 
     def followComplete(self, *args):
         guiplugins.scriptEngine.applicationEvent("the file-following program to terminate", "files")
+
 
 class ShowFileProperties(guiplugins.ActionResultDialogGUI):
     def __init__(self, allApps, dynamic, *args):
@@ -465,8 +506,10 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
 def getInteractiveActionClasses(dynamic):
     classes = [ ShowFileProperties, ViewTestFileInEditor ]
     if dynamic:
-        classes += [ ViewFilteredTestFileInEditor, ViewOrigFileInEditor, ViewFilteredOrigFileInEditor,
-                     ViewFileDifferences, ViewFilteredFileDifferences, FollowFile ]
+        classes += [ ViewFilteredTestFileInEditor, ViewContentFilteredTestFileInEditor,
+                     ViewOrigFileInEditor, ViewContentFilteredOrigFileInEditor, ViewFilteredOrigFileInEditor,
+                     ViewFileDifferences, ViewContentFilteredFileDifferences, ViewFilteredFileDifferences,
+                     FollowFile ]
     else:
         classes.append(ViewConfigFileInEditor)
 

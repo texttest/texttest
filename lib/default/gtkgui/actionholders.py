@@ -4,7 +4,7 @@ The various "holders" for displaying the "ActionGUI" abstraction: i.e. menus, to
 to store the simple actions and the dialogs, and a notebook to store the tabs in.
 """
 
-import gtk, guiutils, plugins, os, sys, logging
+import gtk, guiutils, plugins, os, sys, logging, types
 from ndict import seqdict
 
 class MenuBarGUI(guiutils.SubGUI):
@@ -95,14 +95,46 @@ class MenuBarGUI(guiutils.SubGUI):
         return cmp(base2, base1) # something deterministic, just to make sure it's the same for everyone
     
     def shouldLoad(self, fileName):
-        baseName = os.path.basename(fileName)
-        if (baseName.endswith("-dynamic.xml") and self.dynamic) or \
-               (baseName.endswith("-static.xml") and not self.dynamic):
-            moduleName = "-".join(baseName.split("-")[:-1])
-        else:
-            moduleName = baseName[:-4]
+        # Infer whether a file should be loaded
+        # The format is
+        # <module_name>-<config setting>-<config setting...>-[|dynamic|static].xml
+        allParts = os.path.basename(fileName)[:-4].split("-") # drop .xml, split on "-"
+        moduleName = allParts[0]
+        if allParts[-1] == "dynamic":
+            if self.dynamic:
+                allParts = allParts[:-1]
+            else:
+                return False
+        elif allParts[-1] == "static":
+            if self.dynamic:
+                return False
+            else:
+                allParts = allParts[:-1]
+
         self.diag.info("Checking if we loaded module " + moduleName)
-        return moduleName in self.loadedModules
+        if moduleName not in self.loadedModules:
+            return False
+
+        for configSetting in allParts[1:]:
+            value = guiutils.guiConfig.getValue(configSetting)
+            self.diag.info("Checking if we have set " + configSetting + " = " + repr(value))
+            if not self.haveSet(value):
+                return False
+        return True
+
+    def haveSet(self, val):
+        if type(val) == types.DictType:
+            if len(val) == 1:
+                if val.has_key(""):
+                    return val[""]
+                elif val.has_key("default"):
+                    return val["default"]
+            else:
+                return True
+        else:
+            return bool(value)
+
+        
     
 
 class ToolBarGUI(guiutils.ContainerGUI):

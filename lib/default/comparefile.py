@@ -124,21 +124,25 @@ class FileComparison:
         return self.stdFile and self.tmpFile and not self.hasDifferences()
     def hasDifferences(self):
         return self.differenceCache
-    def getStdFile(self, filtered):
+    
+    def getStdFile(self, filtered, postfix=""):
         if filtered:
-            return self.stdCmpFile
+            return self.stdCmpFile + postfix
         else:
-            return self.stdFile
-    def getTmpFile(self, filtered):
+            return self.stdFile + postfix
+
+    def getTmpFile(self, filtered, postfix=""):
         if filtered:
-            return self.tmpCmpFile
+            return self.tmpCmpFile + postfix
         else:
-            return self.tmpFile
-    def existingFile(self, filtered):
+            return self.tmpFile + postfix
+
+    def existingFile(self, *args):
         if self.missingResult():
-            return self.getStdFile(filtered)
+            return self.getStdFile(*args)
         else:
-            return self.getTmpFile(filtered)
+            return self.getTmpFile(*args)
+        
     def cacheDifferences(self, test, testInProgress):
         filterFileBase = test.makeTmpFileName(self.stem + "." + test.app.name, forFramework=1)
         origCmp = filterFileBase + "origcmp"

@@ -1,0 +1,16 @@
+<ui>
+
+  <popup name="TestFilePopupMenu">
+    <placeholder name="ExtraTmpViewers">
+      <menuitem action="View Content-Filtered File"/>
+    </placeholder>
+    <placeholder name="ExtraOrigViewers">
+      <menuitem action="View Content-Filtered Original File"/>
+    </placeholder>
+    <separator/>
+    <placeholder name="ExtraDiffViewers">
+      <menuitem action="View Content-Filtered Differences"/>
+    </placeholder>
+  </popup>
+
+</ui>

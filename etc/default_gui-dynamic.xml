@@ -50,12 +50,15 @@
 
   <popup name="TestFilePopupMenu">
     <menuitem action="View File"/>
+    <placeholder name="ExtraTmpViewers" />
     <menuitem action="View Filtered File"/>
     <separator/>
     <menuitem action="View Original File"/>
+    <placeholder name="ExtraOrigViewers" />
     <menuitem action="View Filtered Original File"/>
     <separator/>
     <menuitem action="View Differences"/>
+    <placeholder name="ExtraDiffViewers" />
     <menuitem action="View Raw Differences"/>
     <separator/>
     <menuitem action="Follow File Progress"/>

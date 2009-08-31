@@ -20,17 +20,27 @@ class FilterAction(plugins.Action):
         for fileName, postfix in self.filesToFilter(test):
             self.diag.info("Considering for filtering : " + fileName)
             stem = os.path.basename(fileName).split(".")[0]
-            runDepTexts = test.getCompositeConfigValue("run_dependent_text", stem)
-            unorderedTexts = test.getCompositeConfigValue("unordered_text", stem)
-            floatTolerance = test.getCompositeConfigValue("floating_point_tolerance", stem)
-            if runDepTexts or unorderedTexts or floatTolerance or self.changedOs(test.app):
-                fileFilter= RunDependentTextFilter(runDepTexts, unorderedTexts, test.getRelPath())
-                filterFileBase = test.makeTmpFileName(stem + "." + test.app.name, forFramework=1)
-                newFileName = filterFileBase + postfix
-                if os.path.isfile(newFileName):
-                    self.diag.info("Removing previous file at " + newFileName)
-                    os.remove(newFileName)
-                fileFilter.filterFile(fileName, newFileName, self.againstFile(filterFileBase), floatTolerance)
+            newFileName = test.makeTmpFileName(stem + "." + test.app.name + postfix, forFramework=1)
+            currFile = fileName
+            filters = self.makeAllFilters(test, stem)
+            for fileFilter, extraPostfix in filters:
+                writeFile = newFileName + extraPostfix
+                self.diag.info("Applying " + fileFilter.__class__.__name__ + " to make\n" + writeFile + " from\n " + currFile) 
+                if os.path.isfile(writeFile):
+                    self.diag.info("Removing previous file at " + writeFile)
+                    os.remove(writeFile)
+                fileFilter.filterFile(currFile, writeFile)
+                currFile = writeFile
+            if len(filters) > 0:
+                os.rename(currFile, newFileName)
+
+    def makeAllFilters(self, test, stem):
+        runDepTexts = test.getCompositeConfigValue("run_dependent_text", stem)
+        unorderedTexts = test.getCompositeConfigValue("unordered_text", stem)
+        if runDepTexts or unorderedTexts or self.changedOs(test.app):
+            return [ (RunDependentTextFilter(runDepTexts, unorderedTexts, test.getRelPath()), ".normal") ]
+        else:
+            return []
 
     def changedOs(self, app):
         homeOs = app.getConfigValue("home_operating_system")
@@ -38,9 +48,6 @@ class FilterAction(plugins.Action):
 
     def constantPostfix(self, files, postfix):
         return [ (file, postfix) for file in files ]
-
-    def againstFile(self, file):
-        return None
         
 
 class FilterOriginal(FilterAction):
@@ -51,10 +58,18 @@ class FilterOriginal(FilterAction):
 class FilterTemporary(FilterAction):
     def filesToFilter(self, test):
         return self.constantPostfix(test.listTmpFiles(), "cmp")
-    
-    def againstFile(self, file):
-        return file + "origcmp"
 
+    def makeAllFilters(self, test, stem):
+        filters = FilterAction.makeAllFilters(self, test, stem)
+        floatTolerance = test.getCompositeConfigValue("floating_point_tolerance", stem)
+        if floatTolerance:
+            origFile = test.makeTmpFileName(stem + "." + test.app.name + "origcmp", forFramework=1)
+            if not os.path.isfile(origFile):
+                origFile = test.getFileName(stem)
+            if origFile and os.path.isfile(origFile):
+                filters.append((FloatingPointFilter(origFile, floatTolerance), ".fpdiff"))
+        return filters
+    
 
 class FilterProgressRecompute(FilterAction):
     def filesToFilter(self, test):
@@ -72,6 +87,18 @@ class FilterResultRecompute(FilterAction):
                 result.append((fileComp.tmpFile, "cmp"))
         return result
 
+class FloatingPointFilter:
+    def __init__(self, origFileName, tolerance):
+        self.origFileName = origFileName
+        self.tolerance = tolerance
+
+    def filterFile(self, fileName, newFileName):
+        fromlines = open(self.origFileName, "rU").readlines()
+        tolines = open(fileName).readlines()
+        newFile = plugins.openForWrite(newFileName)
+        fpdiff.fpfilter(fromlines, tolines, newFile, self.tolerance)
+
+
 class RunDependentTextFilter(plugins.Observable):
     def __init__(self, runDepTexts, unorderedTexts=[], testId=""):
         plugins.Observable.__init__(self)
@@ -82,19 +109,11 @@ class RunDependentTextFilter(plugins.Observable):
             orderFilter = LineFilter(text, testId, self.diag)
             self.orderFilters[orderFilter] = []
 
-    def filterFile(self, fileName, newFileName, against=None, floatTolerance=0.0):
+    def filterFile(self, fileName, newFileName):
         self.diag.info("Filtering " + fileName + " to create " + newFileName)
         file = open(fileName, "rU") # use universal newlines to simplify
         newFile = plugins.openForWrite(newFileName)
-        if against and os.path.isfile(against) and floatTolerance:
-            stringFile = StringIO.StringIO()
-            self.filterFileObject(file, stringFile)
-            stringFile.seek(0)
-            fromlines = open(against, "rU").readlines()
-            tolines = stringFile.readlines()
-            fpdiff.fpfilter(fromlines, tolines, newFile, floatTolerance)
-        else:
-            self.filterFileObject(file, newFile)
+        self.filterFileObject(file, newFile)
         
     def filterFileObject(self, file, newFile):
         lineNumber = 0

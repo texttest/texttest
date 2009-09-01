@@ -1131,7 +1131,7 @@ class GrepFilter(plugins.TextFilter):
 class TestDescriptionFilter(plugins.TextFilter):
     option = "desc"
     def acceptsTestCase(self, test):
-        return self.stringContainsText(plugins.extractComment(test.description))
+        return self.stringContainsText(test.description)
 
 class Running(plugins.TestState):
     def __init__(self, execMachines, freeText = "", briefText = ""):

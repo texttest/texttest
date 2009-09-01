@@ -171,16 +171,7 @@ class TestEnvironment(seqdict):
                     self[var] = newValue
         return expanded
 
-# Have the description as our free text, for display in the static GUI
-class NotStarted(plugins.TestState):
-    def __init__(self, freeTextMethod):
-        plugins.TestState.__init__(self, "not_started")
-        self.freeTextMethod = freeTextMethod
-    def getFreeText(self):
-        if len(self.freeText) == 0:
-            self.freeText = self.freeTextMethod()
-        return self.freeText
-
+        
 # Base class for TestCase and TestSuite
 class Test(plugins.Observable):
     def __init__(self, name, description, dircache, app, parent = None):
@@ -199,7 +190,7 @@ class Test(plugins.Observable):
         self.properties = plugins.MultiEntryDictionary()
         self.diag = logging.getLogger("test objects")
         # Test suites never change state, but it's convenient that they have one
-        self.state = NotStarted(self.getDescription)
+        self.state = plugins.TestState("not_started")
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.name
     def paddedRepr(self):
@@ -209,13 +200,7 @@ class Test(plugins.Observable):
             return self.name
         maxLength = max(len(test.name) for test in self.parent.testcases)
         return self.name.ljust(maxLength)
-    def getDescription(self):
-        description = plugins.extractComment(self.description)
-        if description:
-            return description
-        else:
-            return "<No description provided>"
-
+    
     def changeDirectory(self, newDir, origRelPath):
         self.dircache = DirectoryCache(newDir)
         self.notify("NameChange", origRelPath)
@@ -232,13 +217,8 @@ class Test(plugins.Observable):
     def setDescription(self, newDesc):
         if self.description != newDesc:
             self.description = newDesc
-            self.refreshDescription()
-
-    def refreshDescription(self):
-        oldDesc = self.state.freeText
-        self.state.freeText = self.getDescription()
-        if oldDesc != self.state.freeText:
             self.notify("DescriptionChange")
+
     def classDescription(self):
         return self.classId().replace("-", " ")
 
@@ -513,7 +493,6 @@ class Test(plugins.Observable):
         self.dircache.refresh()
     def filesChanged(self):
         self.refreshFiles()
-        self.refreshDescription()
         self.notify("FileChange")
     def refresh(self, filters):
         self.refreshFiles()
@@ -540,31 +519,6 @@ class TestCase(Test):
         else:
             return self.dircache.dir
             
-    def getDescription(self):
-        performanceFileName = self.getFileName("performance")
-        if performanceFileName:
-            performanceFile = open(performanceFileName, "r")
-            lines = performanceFile.readlines()
-            if len(lines) >= 2:
-                performanceDescription = "\n\nExpected running time for the default version:\n" + lines[0] + lines[1]
-            else:
-                performanceDescription = "\n\nExpected running time for the default version:\n" + "".join(lines)
-            performanceFile.close()
-        else:
-            performanceDescription = ""
-        memoryFileName = self.getFileName("memory")
-        if memoryFileName:
-            memoryFile = open(memoryFileName, "r")
-            memoryDescription = "\nExpected memory consumption for the default version:\n" + memoryFile.read()
-            memoryFile.close()
-        else:
-            memoryDescription = ""
-        desc = Test.getDescription(self)
-        return "\nDescription:\n" + desc + \
-               performanceDescription + \
-               memoryDescription
-    def callAction(self, action):
-        return action(self)
     def changeState(self, state):
         isCompletion = not self.state.isComplete() and state.isComplete()
         self.state = state
@@ -815,9 +769,7 @@ class TestSuite(Test):
         if not contentFile:
             self.createContentFile()
         self.autoSortOrder = self.getConfigValue("auto_sort_test_suites")
-    def getDescription(self):
-        return "\nDescription:\n" + Test.getDescription(self)
-
+    
     def readContents(self, filters=[], initial=True):
         testNames = self.readTestNames(warn=True)
         self.createTestCases(filters, testNames, initial)
@@ -966,7 +918,7 @@ class TestSuite(Test):
 
         for testName in self.getOrderedTestNames(testNames.keys(), testCaseNames):
             dirCache = testCaches.get(testName, self.createTestCache(testName))
-            desc = testNames.get(testName)
+            desc = plugins.extractComment(testNames.get(testName))
             self.createTestOrSuite(testName, desc, dirCache, filters, initial)
 
     def createTestOrSuite(self, testName, description, dirCache, filters, initial=True):

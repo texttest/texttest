@@ -116,7 +116,7 @@ class PasteTests(guiplugins.ActionGUI):
 
     def getNewDescription(self, test):
         if len(test.description) or self.removeAfter:
-            return plugins.extractComment(test.description)
+            return test.description
         else:
             return "Copy of " + test.name
 
@@ -913,7 +913,7 @@ class RenameTest(guiplugins.ActionDialogGUI):
         return True
     def updateOptions(self):
         self.oldName = self.currTestSelection[0].name
-        self.oldDescription = plugins.extractComment(self.currTestSelection[0].description)
+        self.oldDescription = self.currTestSelection[0].description
         self.optionGroup.setOptionValue("name", self.oldName)
         self.optionGroup.setOptionValue("desc", self.oldDescription)
         return True

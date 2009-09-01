@@ -132,6 +132,34 @@ class TextViewGUI(guiutils.SubGUI):
         tag.set_data("target", linkTarget)
         buffer.insert_with_tags(iter, newLine, tag)
 
+    def getDescriptionText(self, test):
+        paragraphs = [ self.getDescription(test) ]
+        performanceFileName = test.getFileName("performance")
+        if performanceFileName:
+            performanceFile = open(performanceFileName, "r")
+            lines = performanceFile.readlines()
+            if len(lines) >= 2:
+                performanceDescription = "Expected running time for the default version:\n" + lines[0] + lines[1].rstrip()
+            else:
+                performanceDescription = "Expected running time for the default version:\n" + "".join(lines).rstrip()
+            paragraphs.append(performanceDescription)
+            performanceFile.close()
+
+        memoryFileName = test.getFileName("memory")
+        if memoryFileName:
+            memoryFile = open(memoryFileName, "r")
+            paragraphs.append("Expected memory consumption for the default version:\n" + memoryFile.read().rstrip())
+            memoryFile.close()
+
+        return "\n\n".join(paragraphs)
+
+    def getDescription(self, test):
+        header = "Description:\n"
+        if test.description:
+            return header + test.description
+        else:
+            return header + "<No description provided>"
+
 
 class RunInfoGUI(TextViewGUI):
     def __init__(self, *args):
@@ -199,8 +227,8 @@ class TestRunInfoGUI(TextViewGUI):
         self.updateView()
 
     def appendTestInfo(self, test):
-        self.text += test.getDescription() + "\n\n"
-        self.text += test.app.getRunDescription(test)
+        self.text += "\n" + self.getDescriptionText(test)
+        self.text += "\n\n" + test.app.getRunDescription(test)
 
 
 class TextInfoGUI(TextViewGUI):
@@ -215,17 +243,20 @@ class TextInfoGUI(TextViewGUI):
         return rowCount == 1
 
     def resetText(self, state):
-        self.text = ""
-        freeText = state.getFreeText()
-        if state.isComplete():
-            self.text = "Test " + repr(state) + "\n"
-            if len(freeText) == 0:
-                self.text = self.text.replace(" :", "")
-        self.text += str(freeText)
-        if state.hasStarted() and not state.isComplete():
-            self.text += "\n\nTo obtain the latest progress information and an up-to-date comparison of the files above, " + \
-                         "perform 'recompute status' (press '" + \
-                         guiutils.guiConfig.getCompositeValue("gui_accelerators", "recompute_status") + "')"
+        if state.category == "not_started":
+            self.text = self.getDescriptionText(self.currentTest)
+        else:
+            self.text = ""
+            freeText = state.getFreeText()
+            if state.isComplete():
+                self.text = "Test " + repr(state) + "\n"
+                if len(freeText) == 0:
+                    self.text = self.text.replace(" :", "")
+            self.text += str(freeText)
+            if state.hasStarted() and not state.isComplete():
+                self.text += "\n\nTo obtain the latest progress information and an up-to-date comparison of the files above, " + \
+                             "perform 'recompute status' (press '" + \
+                             guiutils.guiConfig.getCompositeValue("gui_accelerators", "recompute_status") + "')"
 
     def notifyNewTestSelection(self, tests, *args):
         if len(tests) == 0:
@@ -287,3 +318,4 @@ class TextInfoGUI(TextViewGUI):
                 self.showingSubText = False
                 self.updateViewFromText(self.text)
 
+    

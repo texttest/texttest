@@ -7,7 +7,7 @@ if __name__ == "__main__":
     import sys
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(sys.argv[0]))))
 
-import plugins, fpdiff, logging
+import plugins, fpdiff, logging, shutil
 from ndict import seqdict
 from re import sub
 from optparse import OptionParser
@@ -34,13 +34,20 @@ class FilterAction(plugins.Action):
                 os.remove(writeFile)
             fileFilter.filterFile(currFile, writeFile)
             currFile = writeFile
-        if len(filters) > 0:
-            os.rename(currFile, newFileName)
+        if len(filters) > 0 and currFile != newFileName:
+            shutil.move(currFile, newFileName)
 
     def makeAllFilters(self, test, stem):
+        filters = self._makeAllFilters(test, stem)
+        if len(filters) == 0 and self.changedOs(test.app):
+            return  [ (RunDependentTextFilter([], ""), "") ]
+        else:
+            return filters
+
+    def _makeAllFilters(self, test, stem):                    
         filters = []
         runDepTexts = test.getCompositeConfigValue("run_dependent_text", stem)
-        if runDepTexts or self.changedOs(test.app):
+        if runDepTexts:
             filters.append((RunDependentTextFilter(runDepTexts, test.getRelPath()), ".normal"))
 
         unorderedTexts = test.getCompositeConfigValue("unordered_text", stem)
@@ -65,8 +72,8 @@ class FilterTemporary(FilterAction):
     def filesToFilter(self, test):
         return self.constantPostfix(test.listTmpFiles(), "cmp")
 
-    def makeAllFilters(self, test, stem):
-        filters = FilterAction.makeAllFilters(self, test, stem)
+    def _makeAllFilters(self, test, stem):
+        filters = FilterAction._makeAllFilters(self, test, stem)
         floatTolerance = test.getCompositeConfigValue("floating_point_tolerance", stem)
         if floatTolerance:
             origFile = test.makeTmpFileName(stem + "." + test.app.name + "origcmp", forFramework=1)

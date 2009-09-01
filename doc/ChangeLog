@@ -1453,7 +1453,11 @@ Dynamic GUI Enhancements:
     - Saved tests are now listed separately in the status view (statusviews.py)
 	Makes it easier to track which tests have been saved and which worked by themselves
     - Saved tests make this clear in the Text Info space, recording the time at which they were saved (comparetest.py)
-    - Can now view original files (filtered and not) from the file view popup menu (default_gui.py)
+    - Can now view original files (filtered and not) from the file view popup menu (fileviewers.py)
+    - Can now view files with content-filtering but not order-filtering present (fileviewers.py)
+	Useful when "unordered_text" is defined
+    - New base_version "recusecase" for when recording GUI tests
+	Works much like the exisiting "rectraffic", i.e. a way to have different configuration only in this case
     - Test tree tooltips now work more reliably and use the builtin support in PyGTK 2.12 (testtree.py)
 	They are removed in PyGTK 2.10, was not deemed important enough to keep them there
 Framework Enhancements:
@@ -1467,6 +1471,8 @@ Framework Enhancements:
 	Like TEXTTEST_HOME, but allows loading tests from multiple locations into the same process
     - New config setting "performance_ignore_improvements" (performance.py)
 	As the name suggests, allows performance testing to only flag when performance degrades.
+    - New config setting "save_filtered_file_stems"
+	Allows the filtered version of files to be saved instead of the raw output.
     - Logging more flexible now (default.py)
 	Dynamic GUI does not write anything by default. Batch mode writes time stamps by default.
 	Debug logging file now called "logging.debug" rather than "log4py.conf". See migration notes
@@ -1484,6 +1490,8 @@ Historical HTML Batch Report Enhancements:
 Grid Engine (LSF/SGE) enhancements:
     - New config file option "queue_system_min_test_count" (queuesystem/__init__.py)
 	Can make sure small numbers of tests get run locally by default, while large numbers use the grid.
+    - Slave job handling is now multithreaded (masterprocess.py)
+	Hopefully a bit faster and less sensitive to network trouble
     - Errors produced by remote jobs now get reported on master process stderr (masterprocess.py)
 	And hence in popups in the static GUI where appropriate.
     - Tests from different applications now interleaved when submitting (masterprocess.py)
@@ -1510,6 +1518,8 @@ Bug Fixes:
     - Running tests remotely (without grid engine) can now handle illegal shell syntax in test names and environment variables (default.py)
     - Running tests remotely (without grid engine) now gets correct values for TEXTTEST_SANDBOX
     - Running tests remotely (without grid engine) now works in conjunction with automatic performance measurement (default.py)
+    - Killing remote tests started with SSH now works (default/__init__.py)
+	SSH doesn't forward signals unfortunately...
     - Auto-replay the correct test when recording if static GUI test selection changes in the meantime (adminactions.py)
     - Refining a selection containing test suites now works properly (selectandfilter.py)
 	Previously lost all test suites
@@ -1522,6 +1532,8 @@ Bug Fixes:
     - Credits dialog no longer mangled in locales which aren't Latin-1 compatible (helpdialogs.py)
     - Added error messages for locale encoding problems (guiutils.py)
     - Errors when collating now get shown in the GUI (sandbox.py)
+    - "collate_file" is now done before "discard_file" (sandbox.py)
+	Means you can "rename" files by collating them to a new name and then discarding the original one.
 Grid Engine (LSF/SGE) Bug Fixes:
     - Don't send tests for re-use whose submission has been cancelled (queuesystem/masterprocess.py)
     - Reduced keepalive timeout to 5 minutes, 2 hours is rather a long time in a test context (masterprocess.py)

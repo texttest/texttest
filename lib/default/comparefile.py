@@ -253,26 +253,39 @@ class FileComparison:
         self.diag.info("save file from " + self.tmpFile)
         self.stdFile = self.getStdFileForSave(versionString)
         self.backupOrRemove(self.stdFile, backupVersionString)
-        self.saveTmpFile(exact)
+        self.saveTmpFile(test, exact)
         
     def saveNew(self, test, versionString):
         self.stdFile = os.path.join(test.getDirectory(), self.versionise(self.stem + "." + test.app.name, versionString))
-        self.saveTmpFile()
+        self.saveTmpFile(test)
 
-    def saveTmpFile(self, exact=True):
+    def getTmpFileForSave(self, test):
+        if self.stem not in test.getConfigValue("save_filtered_file_stems"):
+            return self.tmpFile
+
+        # Don't include the sorting when saving filtered files...
+        normalFile = self.tmpCmpFile + ".normal"
+        if os.path.isfile(normalFile):
+            return normalFile
+        else:
+            return self.tmpCmpFile
+
+    def saveTmpFile(self, test, exact=True):
         self.diag.info("Saving tmp file to " + self.stdFile)
         plugins.ensureDirExistsForFile(self.stdFile)
         # Allow for subclasses to differentiate between a literal overwrite and a
         # more intelligent save, e.g. for performance. Default is the same for exact
         # and inexact save
+        tmpFile = self.getTmpFileForSave(test)
         if exact:
-            copyfile(self.tmpFile, self.stdFile)
+            copyfile(tmpFile, self.stdFile)
         else:
-            self.saveResults(self.stdFile)
+            self.saveResults(tmpFile, self.stdFile)
         # Try to get everything to behave normally after a save...
         self.differenceCache = False
         self.tmpFile = self.stdFile
         self.tmpCmpFile = self.stdFile
+
     def saveMissing(self, versionString, autoGenText, backupVersionString):
         stdRoot = self.getStdRootVersionFile()
         targetFile = self.versionise(stdRoot, versionString)
@@ -285,6 +298,7 @@ class FileComparison:
             newFile = open(targetFile, "w")
             newFile.write(autoGenText)
             newFile.close()
-    def saveResults(self, destFile):
-        copyfile(self.tmpFile, destFile)
+
+    def saveResults(self, tmpFile, destFile):
+        copyfile(tmpFile, destFile)
         

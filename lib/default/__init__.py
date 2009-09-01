@@ -1044,6 +1044,7 @@ class Config:
         app.setConfigDefault("filter_file_directory", [ "filter_files" ], "Default directories for test filter files, relative to an application directory.")
         app.setConfigDefault("extra_version", [], "Versions to be run in addition to the one specified")
         app.setConfigDefault("batch_extra_version", { "default" : [] }, "Versions to be run in addition to the one specified, for particular batch sessions")
+        app.setConfigDefault("save_filtered_file_stems", [], "Files where the filtered version should be saved rather than the SUT output")
         # Applies to any interface...
         app.setConfigDefault("auto_sort_test_suites", 0, "Automatically sort test suites in alphabetical order. 1 means sort in ascending order, -1 means sort in descending order.")
         app.addConfigEntry("builtin", "options", "definition_file_stems")

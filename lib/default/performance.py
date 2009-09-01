@@ -125,10 +125,10 @@ class PerformanceFileComparison(FileComparison):
             return self.getDifferencesSummary()
         else:
             return ""
-    def saveResults(self, destFile):
+    def saveResults(self, tmpFile, destFile):
         # Here we save the average of the old and new performance, assuming fluctuation
         avgPerformance = self.perfComparison.getAverage()
-        line = open(self.tmpFile).readlines()[0]
+        line = open(tmpFile).readlines()[0]
         lineToWrite = line.replace(str(self.perfComparison.newPerformance), str(avgPerformance))
         newFile = open(destFile, "w")
         newFile.write(lineToWrite)

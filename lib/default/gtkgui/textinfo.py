@@ -12,8 +12,9 @@ class TextViewGUI(guiutils.SubGUI):
     hand_cursor = gtk.gdk.Cursor(gtk.gdk.HAND2)
     regular_cursor = gtk.gdk.Cursor(gtk.gdk.XTERM)
 
-    def __init__(self):
+    def __init__(self, dynamic):
         guiutils.SubGUI.__init__(self)
+        self.dynamic = dynamic
         self.text = ""
         self.showingSubText = False
         self.view = None
@@ -34,41 +35,6 @@ class TextViewGUI(guiutils.SubGUI):
         self.updateViewFromText(self.text)
         self.view.show()
         return self.addScrollBars(self.view, hpolicy=gtk.POLICY_AUTOMATIC)
-
-    def hasStem(self, line, files):
-        for fileName, comp in files:
-            if comp.stem and line.find(" " + repr(comp) + " ") != -1:
-                return True
-        return False
-
-    def makeSubText(self, files):
-        enabled = True
-        usedSection, ignoredSection = False, False
-        newText = ""
-        for line in self.text.splitlines():
-            if line.startswith("----"):
-                enabled = self.hasStem(line, files)
-                if enabled:
-                    usedSection = True
-                else:
-                    ignoredSection = True
-            if enabled:
-                newText += line + "\n"
-        return newText, usedSection and ignoredSection
-
-    def notifyNewFileSelection(self, files):
-        if len(files) == 0:
-            if self.showingSubText:
-                self.showingSubText = False
-                self.updateViewFromText(self.text)
-        else:
-            newText, changed = self.makeSubText(files)
-            if changed:
-                self.showingSubText = True
-                self.updateViewFromText(newText)
-            elif self.showingSubText:
-                self.showingSubText = False
-                self.updateViewFromText(self.text)
 
     def updateViewFromText(self, text):
         textbuffer = self.view.get_buffer()
@@ -168,9 +134,8 @@ class TextViewGUI(guiutils.SubGUI):
 
 
 class RunInfoGUI(TextViewGUI):
-    def __init__(self, dynamic):
-        TextViewGUI.__init__(self)
-        self.dynamic = dynamic
+    def __init__(self, *args):
+        TextViewGUI.__init__(self, *args)
         self.text = "Information will be available here when all tests have been read..."
 
     def getTabTitle(self):
@@ -205,9 +170,8 @@ class RunInfoGUI(TextViewGUI):
 
 
 class TestRunInfoGUI(TextViewGUI):
-    def __init__(self, dynamic):
-        TextViewGUI.__init__(self)
-        self.dynamic = dynamic
+    def __init__(self, *args):
+        TextViewGUI.__init__(self, *args)
         self.currentTest = None
         self.resetText()
 
@@ -240,8 +204,8 @@ class TestRunInfoGUI(TextViewGUI):
 
 
 class TextInfoGUI(TextViewGUI):
-    def __init__(self):
-        TextViewGUI.__init__(self)
+    def __init__(self, *args):
+        TextViewGUI.__init__(self, *args)
         self.currentTest = None
 
     def getTabTitle(self):
@@ -282,4 +246,44 @@ class TextInfoGUI(TextViewGUI):
             return
         self.resetText(state)
         self.updateView()
+
+    def hasStem(self, line, files):
+        for fileName, comp in files:
+            if comp.stem and line.find(" " + repr(comp) + " ") != -1:
+                return True
+        return False
+
+    def makeSubText(self, files):
+        enabled = True
+        usedSection, ignoredSection = False, False
+        newText = ""
+        for line in self.text.splitlines():
+            if line.startswith("----"):
+                enabled = self.hasStem(line, files)
+                if enabled:
+                    usedSection = True
+                else:
+                    ignoredSection = True
+            if enabled:
+                newText += line + "\n"
+        return newText, usedSection and ignoredSection
+
+    def notifyNewFileSelection(self, files):
+        if self.dynamic:
+            self.updateSubText(files)
+        # TODO: static GUI could show some information here...
+
+    def updateSubText(self, files):
+        if len(files) == 0:
+            if self.showingSubText:
+                self.showingSubText = False
+                self.updateViewFromText(self.text)
+        else:
+            newText, changed = self.makeSubText(files)
+            if changed:
+                self.showingSubText = True
+                self.updateViewFromText(newText)
+            elif self.showingSubText:
+                self.showingSubText = False
+                self.updateViewFromText(self.text)
 

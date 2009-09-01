@@ -95,7 +95,7 @@ class GUIController(plugins.Responder, plugins.Observable):
         testCount = int(optionMap.get("count", 0))
 
         self.appFileGUI = filetrees.ApplicationFileGUI(self.dynamic, allApps)
-        self.textInfoGUI = textinfo.TextInfoGUI()
+        self.textInfoGUI = textinfo.TextInfoGUI(self.dynamic)
         self.runInfoGUI = textinfo.RunInfoGUI(self.dynamic)
         self.testRunInfoGUI = textinfo.TestRunInfoGUI(self.dynamic)
         self.progressMonitor = statusviews.TestProgressMonitor(self.dynamic, testCount)
@@ -140,10 +140,7 @@ class GUIController(plugins.Responder, plugins.Observable):
                  self.idleManager, self.topWindowGUI ]
 
     def getFileViewObservers(self):
-        observers = self.defaultActionGUIs + self.actionTabGUIs
-        if self.dynamic:
-            observers.append(self.textInfoGUI)
-        return observers
+        return self.defaultActionGUIs + self.actionTabGUIs + [ self.textInfoGUI ]
     
     def isFrameworkExitObserver(self, obs):
         return hasattr(obs, "notifyExit") or hasattr(obs, "notifyKillProcesses")

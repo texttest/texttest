@@ -134,22 +134,10 @@ class TextViewGUI(guiutils.SubGUI):
 
     def getDescriptionText(self, test):
         paragraphs = [ self.getDescription(test) ]
-        performanceFileName = test.getFileName("performance")
-        if performanceFileName:
-            performanceFile = open(performanceFileName, "r")
-            lines = performanceFile.readlines()
-            if len(lines) >= 2:
-                performanceDescription = "Expected running time for the default version:\n" + lines[0] + lines[1].rstrip()
-            else:
-                performanceDescription = "Expected running time for the default version:\n" + "".join(lines).rstrip()
-            paragraphs.append(performanceDescription)
-            performanceFile.close()
-
-        memoryFileName = test.getFileName("memory")
-        if memoryFileName:
-            memoryFile = open(memoryFileName, "r")
-            paragraphs.append("Expected memory consumption for the default version:\n" + memoryFile.read().rstrip())
-            memoryFile.close()
+        for stem in sorted(set([ "performance" ] + test.getConfigValue("performance_logfile_extractor").keys())):
+            fileName = test.getFileName(stem)
+            if fileName:
+                paragraphs.append(test.app.getFilePreview(fileName))
 
         return "\n\n".join(paragraphs)
 

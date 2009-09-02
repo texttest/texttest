@@ -779,6 +779,14 @@ class Config:
 
     def getRunDescription(self, test):
         return RunTest().getRunDescription(test)
+
+    def getFilePreview(self, fileName):
+        file = open(fileName, "r")
+        lines = file.readlines()[:2]
+        preview = "Expected " + os.path.basename(fileName).split(".")[0] + " for the default version:\n" + "".join(lines).rstrip()
+        file.close()
+        return preview
+
     # For display in the GUI
     def extraReadFiles(self, test):
         return {}

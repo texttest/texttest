@@ -96,7 +96,8 @@ class GUIController(plugins.Responder, plugins.Observable):
 
         self.appFileGUI = filetrees.ApplicationFileGUI(self.dynamic, allApps)
         self.textInfoGUI = textinfo.TextInfoGUI(self.dynamic)
-        self.runInfoGUI = textinfo.RunInfoGUI(self.dynamic)
+        runName = optionMap.get("name", "")
+        self.runInfoGUI = textinfo.RunInfoGUI(self.dynamic, runName)
         self.testRunInfoGUI = textinfo.TestRunInfoGUI(self.dynamic)
         self.progressMonitor = statusviews.TestProgressMonitor(self.dynamic, testCount)
         self.progressBarGUI = statusviews.ProgressBarGUI(self.dynamic, testCount)
@@ -111,7 +112,7 @@ class GUIController(plugins.Responder, plugins.Observable):
         self.shortcutBarGUI = ShortcutBarGUI()
         self.statusMonitor = statusviews.StatusMonitorGUI()
 
-        self.topWindowGUI = self.createTopWindowGUI(allApps)
+        self.topWindowGUI = self.createTopWindowGUI(allApps, runName)
 
     def setUpGlobals(self, allApps):
         global guilog, guiConfig, scriptEngine
@@ -214,11 +215,11 @@ class GUIController(plugins.Responder, plugins.Observable):
         # it doesn't seem to work very well :)
         return not self.dynamic or guiConfig.getWindowOption("maximize")
 
-    def createTopWindowGUI(self, allApps):
+    def createTopWindowGUI(self, allApps, name):
         mainWindowGUI = PaneGUI(self.testTreeGUI, self.rightWindowGUI, horizontal=True, shrink=self.shouldShrinkMainPanes())
         parts = [ self.menuBarGUI, self.toolBarGUI, mainWindowGUI, self.shortcutBarGUI, self.statusMonitor ]
         boxGUI = VBoxGUI(parts)
-        return TopWindowGUI(boxGUI, self.dynamic, allApps)
+        return TopWindowGUI(boxGUI, self.dynamic, allApps, name)
 
     def createMenuAndToolBarGUIs(self, allApps, uiManager, *args):
         menuNames = self.interactiveActionHandler.getMenuNames()
@@ -274,10 +275,11 @@ class GUIController(plugins.Responder, plugins.Observable):
 class TopWindowGUI(guiutils.ContainerGUI):
     EXIT_NOTIFIED = 1
     COMPLETION_NOTIFIED = 2
-    def __init__(self, contentGUI, dynamic, allApps):
+    def __init__(self, contentGUI, dynamic, allApps, name):
         guiutils.ContainerGUI.__init__(self, [ contentGUI ])
         self.dynamic = dynamic
         self.topWindow = None
+        self.name = name
         self.allApps = copy(allApps)
         self.exitStatus = 0
         if not self.dynamic:
@@ -331,9 +333,14 @@ class TopWindowGUI(guiutils.ContainerGUI):
         allAppNames = [ repr(app) for app in self.allApps ]
         appNameDesc = ",".join(allAppNames)
         if self.dynamic:
-            checkoutTitle = self.getCheckoutTitle()
-            self.topWindow.set_title("TextTest dynamic GUI : testing " + appNameDesc + checkoutTitle + \
-                                     " (started at " + plugins.startTimeString() + ")")
+            title = "TextTest dynamic GUI : "
+            if self.name:
+                title += self.name
+            else:
+                checkoutTitle = self.getCheckoutTitle()
+                title += "testing " + appNameDesc + checkoutTitle + \
+                         " (started at " + plugins.startTimeString() + ")"
+            self.topWindow.set_title(title)
         else:
             if len(appNameDesc) > 0:
                 appNameDesc = " for " + appNameDesc
@@ -365,7 +372,8 @@ class TopWindowGUI(guiutils.ContainerGUI):
             # When they have, we'll get notifyAllComplete
 
     def notifyAnnotate(self, annotation):
-        self.topWindow.set_title("TextTest dynamic GUI : " + annotation)
+        self.name = annotation
+        self.setWindowTitle()
         guilog.info("Top Window title is " + self.topWindow.get_title())
 
     def terminate(self):

@@ -150,9 +150,10 @@ class TextViewGUI(guiutils.SubGUI):
 
 
 class RunInfoGUI(TextViewGUI):
-    def __init__(self, *args):
-        TextViewGUI.__init__(self, *args)
+    def __init__(self, dynamic, runName):
+        TextViewGUI.__init__(self, dynamic)
         self.text = "Information will be available here when all tests have been read..."
+        self.runName = runName
 
     def getTabTitle(self):
         return "Run Info"
@@ -171,11 +172,14 @@ class RunInfoGUI(TextViewGUI):
         return textToUse
 
     def notifyAnnotate(self, text):
-        self.text += "Annotated        : " + text
+        self.text += "Annotated        : " + text + "\n"
         self.updateView()
 
     def notifyAllRead(self, suites):
-        self.text = "\n".join(map(self.appInfo, suites)) + "\n"
+        self.text = ""
+        if self.runName:
+            self.text += "Run Name         : " + self.runName + "\n\n"
+        self.text += "\n".join(map(self.appInfo, suites)) + "\n"
         self.text += "Command line     : " + plugins.commandLineString(sys.argv) + "\n\n"
         self.text += "Start time       : " + plugins.startTimeString() + "\n"
         self.updateView()

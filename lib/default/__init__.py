@@ -57,6 +57,7 @@ class Config:
                                 possibleValues=[ os.path.join(plugins.installationDir("log"), "logging.debug") ])
                 group.addOption("xw", "Write self-diagnostics to", defaultDiagDir)
                 group.addOption("b", "Run batch mode session")
+                group.addOption("name", "Name this run")
                 group.addSwitch("rectraffic", "(Re-)record command-line or client-server traffic")
                 group.addSwitch("keeptmp", "Keep temporary write-directories")
                 group.addOption("vanilla", "Ignore configuration files", self.defaultVanillaValue(),
@@ -76,7 +77,6 @@ class Config:
                 group.addOption("funion", "Tests in any of files")
                 group.addOption("fd", "Private: Directory to search for filter files in")
                 group.addOption("count", "Private: How many tests we believe there will be")
-                group.addOption("name", "Batch run not identified by date, but by name")
                 group.addOption("o", "Overwrite failures, optionally using version")
                 group.addOption("reconnect", "Reconnect to previous run")
                 group.addSwitch("reconnfull", "Recompute file filters when reconnecting")

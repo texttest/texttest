@@ -6,9 +6,9 @@ Miscellaneous actions for generally housekeeping the state of the GUI
 from default.gtkgui import guiplugins # from .. import guiplugins when we drop Python 2.4 support
 
 class Quit(guiplugins.BasicActionGUI):
-    def __init__(self, *args):
-        guiplugins.BasicActionGUI.__init__(self, *args)
-        self.annotation = ""
+    def __init__(self, allApps, dynamic, inputOptions):
+        guiplugins.BasicActionGUI.__init__(self, allApps, dynamic, inputOptions)
+        self.annotation = inputOptions.get("name", "")
     def _getStockId(self):
         return "quit"
     def _getTitle(self):

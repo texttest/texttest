@@ -3,7 +3,7 @@
 Code associated with the left-hand tree view for tests 
 """
 
-import gtk, gobject, pango, guiutils, logging
+import gtk, gobject, pango, guiutils, plugins, logging
 from ndict import seqdict
 
 class TestColumnGUI(guiutils.SubGUI):
@@ -90,7 +90,7 @@ class TestColumnGUI(guiutils.SubGUI):
         title = "Tests: "
         if self.testSuiteSelection:
             # We don't care about totals with test suites
-            title += self.pluralise(self.nofSelectedTests, "suite") + " selected"
+            title += plugins.pluralise(self.nofSelectedTests, "suite") + " selected"
             if self.nofDistinctSelectedTests != self.nofSelectedTests:
                 title += ", " + str(self.nofDistinctSelectedTests) + " distinct"
             return title

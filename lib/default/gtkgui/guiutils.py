@@ -316,12 +316,6 @@ class SubGUI(plugins.Observable):
         else:
             window.add(widget)
 
-    def pluralise(self, num, name):
-        if num == 1:
-            return "1 " + name
-        else:
-            return str(num) + " " + name + "s"
-
 
 # base class for managing containers
 class ContainerGUI(SubGUI):

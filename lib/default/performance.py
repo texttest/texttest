@@ -1,5 +1,5 @@
 
-import os, string, plugins, sys
+import os, string, plugins, sys, time
 from comparefile import FileComparison
 
 # This module won't work without an external module creating a file called performance.app
@@ -15,6 +15,9 @@ def getPerformance(fileName):
     if not fileName:
         return float(-1)
     line = open(fileName).readline()
+    return getPerformanceFromLine(line)
+
+def getPerformanceFromLine(line):
     pos = line.find(":")
     if pos == -1:
         return float(-1)
@@ -26,6 +29,28 @@ def getTestPerformance(test, version = None):
     except IOError: # assume something disappeared externally
         test.refreshFiles()
         return getTestPerformance(test, version)
+
+def describePerformance(fileName):
+    line = open(fileName).readline().strip()
+    if "mem" in os.path.basename(fileName):
+        return line
+    
+    # Assume seconds
+    perf = getPerformanceFromLine(line)
+    values = list(time.gmtime(perf)[2:6])
+    values[0] -= 1 # not actually using timedelta which doesn't support formatting...
+    units = [ "day", "hour", "minute", "second" ]
+    parts = []
+    for unit, val in zip(units, values):
+        if val:
+            parts.append(plugins.pluralise(val, unit))
+
+    if len(parts) > 0:
+        description = " and ".join(parts).replace(" and ", ", ", len(parts) - 2)
+    else:
+        description = "Less than 1 second"
+    return line.replace(str(perf) + " sec.", description)
+
 
 def parseTimeExpression(timeExpression):
     # Starts with <, >, <=, >= ?

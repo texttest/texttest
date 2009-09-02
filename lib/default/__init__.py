@@ -1,5 +1,5 @@
 
-import os, sys, plugins, sandbox, console, rundependent, pyusecase_interface, comparetest, batch, subprocess, operator, signal, shutil, logging
+import os, sys, plugins, sandbox, console, rundependent, pyusecase_interface, comparetest, batch, performance, subprocess, operator, signal, shutil, logging
 
 from copy import copy
 from string import Template
@@ -9,7 +9,6 @@ from reconnect import ReconnectConfig
 from traffic import SetUpTrafficHandlers
 from jobprocess import killSubProcessAndChildren
 from actionrunner import ActionRunner
-from performance import TimeFilter
 from time import sleep
 
 plugins.addCategory("killed", "killed", "were terminated before completion")
@@ -423,7 +422,7 @@ class Config:
         
     def getFilterClasses(self):
         return [ TestNameFilter, plugins.TestPathFilter, \
-                 TestSuiteFilter, TimeFilter, \
+                 TestSuiteFilter, performance.TimeFilter, \
                  plugins.ApplicationFilter, TestDescriptionFilter ]
             
     def getAbsoluteFilterFileName(self, filterFileName, app):
@@ -511,7 +510,7 @@ class Config:
         if batchSession:
             timeLimit = app.getCompositeConfigValue("batch_timelimit", batchSession)
             if timeLimit:
-                filters.append(TimeFilter(timeLimit))
+                filters.append(performance.TimeFilter(timeLimit))
         if optionMap.has_key("grep"):
             grepFile = optionMap.get("grepfile", app.getConfigValue("log_file"))
             filters.append(GrepFilter(optionMap["grep"], grepFile))
@@ -781,11 +780,8 @@ class Config:
         return RunTest().getRunDescription(test)
 
     def getFilePreview(self, fileName):
-        file = open(fileName, "r")
-        lines = file.readlines()[:2]
-        preview = "Expected " + os.path.basename(fileName).split(".")[0] + " for the default version:\n" + "".join(lines).rstrip()
-        file.close()
-        return preview
+        return "Expected " + os.path.basename(fileName).split(".")[0] + " for the default version:\n" + \
+               performance.describePerformance(fileName)
 
     # For display in the GUI
     def extraReadFiles(self, test):

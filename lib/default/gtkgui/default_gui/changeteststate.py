@@ -187,7 +187,7 @@ class RecomputeTests(guiplugins.ActionGUI):
         if self.latestNumberOfRecomputations == 0:
             return "No test needed recomputation."
         else:
-            return "Recomputed status of " + self.pluralise(self.latestNumberOfRecomputations, "test") + "."
+            return "Recomputed status of " + plugins.pluralise(self.latestNumberOfRecomputations, "test") + "."
     def performOnCurrent(self):
         self.latestNumberOfRecomputations = 0
         for app in self.currAppSelection:

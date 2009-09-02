@@ -714,10 +714,10 @@ class RemoveTests(guiplugins.ActionGUI):
         return "Remove selected files"
 
     def getTestCountDescription(self):
-        desc = self.pluralise(self.distinctTestCount, "test")
+        desc = plugins.pluralise(self.distinctTestCount, "test")
         diff = len(self.currTestSelection) - self.distinctTestCount
         if diff > 0:
-            desc += " (with " + self.pluralise(diff, "extra instance") + ")"
+            desc += " (with " + plugins.pluralise(diff, "extra instance") + ")"
         return desc
 
     def updateSelection(self, tests, apps, rowCount, *args):
@@ -731,7 +731,7 @@ class RemoveTests(guiplugins.ActionGUI):
         extraLines = "\n\nNote: " + self.getFileRemoveWarning() + "\n\nAre you sure you wish to proceed?\n"""
         currTest = self.currTestSelection[0]
         if len(self.currFileSelection) > 0:
-            return "\nYou are about to remove " + self.pluralise(len(self.currFileSelection), self.getType(self.currFileSelection[0][0])) + \
+            return "\nYou are about to remove " + plugins.pluralise(len(self.currFileSelection), self.getType(self.currFileSelection[0][0])) + \
                    " from the " + currTest.classDescription() + " '" + currTest.name + "'." + extraLines
         elif len(self.currTestSelection) == 1:
             if currTest.classId() == "test-case":
@@ -805,7 +805,7 @@ class RemoveTests(guiplugins.ActionGUI):
                 removed += 1
 
         test.filesChanged()
-        self.notify("Status", "Removed " + self.pluralise(removed, fileType) + " from the " +
+        self.notify("Status", "Removed " + plugins.pluralise(removed, fileType) + " from the " +
                     test.classDescription() + " " + test.name + "")
         if warnings:
             self.showWarningDialog(warnings)

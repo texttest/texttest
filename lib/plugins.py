@@ -100,6 +100,13 @@ def quote(value, quoteChar):
         return quoteChar + value + quoteChar
 
 
+def pluralise(num, name):
+    if num == 1:
+        return "1 " + name
+    else:
+        return str(num) + " " + name + "s"
+
+
 def findDataDirs(includeSite=True, includePersonal=False, dataDirName="etc"):
     if includeSite:
         dirs = [ os.path.join(instRoot, dataDirName) for instRoot in installationRoots ]

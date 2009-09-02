@@ -1622,7 +1622,8 @@ class ReplaceText(plugins.ScriptWithArgs):
                 fileName = os.path.basename(stdFile)
                 self.describe(test, " - file " + fileName)
                 sys.stdout.flush()
-                tmpFile = os.path.join(test.getDirectory(temporary=1), fileName)
+                unversionedFileName = ".".join(fileName.split(".")[:2])
+                tmpFile = os.path.join(test.getDirectory(temporary=1), unversionedFileName)
                 writeFile = open(tmpFile, "w")
                 for line in open(stdFile).xreadlines():
                     writeFile.write(self.oldTextTrigger.replace(line, self.newText))

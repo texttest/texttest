@@ -236,7 +236,7 @@ class TextInfoGUI(TextViewGUI):
 
     def resetText(self, state):
         if state.category == "not_started":
-            self.text = self.getDescriptionText(self.currentTest)
+            self.text = "\n" + self.getDescriptionText(self.currentTest)
         else:
             self.text = ""
             freeText = state.getFreeText()

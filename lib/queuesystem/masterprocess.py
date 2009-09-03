@@ -96,10 +96,10 @@ class QueueSystemServer(BaseActionRunner):
     def findQueueForTest(self, test):
         # If we've gone into reuse mode and there are no active tests for reuse, use the "reuse failure queue"
         if self.reuseOnly and self.testsSubmitted == 0:
-            self.diag.info("Putting test in reuse failure queue " + self.remainStr())
+            self.diag.info("Putting " + repr(test) + " in reuse failure queue " + self.remainStr())
             return self.reuseFailureQueue
         else:
-            self.diag.info("Putting test in normal queue " + self.remainStr())
+            self.diag.info("Putting " + repr(test) + " in normal queue " + self.remainStr())
             return self.testQueue
                 
     def handleLocalError(self, test, previouslySubmitted):

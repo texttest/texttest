@@ -51,12 +51,15 @@ class QueueSystem:
             if acctOutput is not None:
                 return acctOutput
         return "SGE lost job:" + jobId + "\n qdel output was as follows:\n" + self.qdelOutput
-    def getAccountInfo(self, jobId, extraArgs=""):
-        cmdLine = "qacct -j " + jobId + extraArgs
-        stdin, stdout, stderr = os.popen3(cmdLine)
-        errMsg = stderr.read()
-        if len(errMsg) == 0 or errMsg.find("error: job id " + jobId + " not found") == -1:
-            return stdout.read()
+    
+    def getAccountInfo(self, jobId, extraArgs=[]):
+        cmdArgs = [ "qacct", "-j", jobId ] + extraArgs
+        proc = subprocess.Popen(cmdArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        outMsg, errMsg = proc.communicate()
+        notFoundMsg = "error: job id " + jobId + " not found"
+        if len(errMsg) == 0 or notFoundMsg not in errMsg:
+            return outMsg
+
     def retryAccountInfo(self, jobId):
         sleepTime = 0.5
         for trial in range(9): # would be 10 but we had one already
@@ -69,21 +72,24 @@ class QueueSystem:
                 return acctOutput
             else:
                 log.info("Waiting " + str(sleepTime) + " seconds before retrying account info for job " + jobId)
+
     def getAccountInfoOldFiles(self, jobId):
         for logNum in range(5):
             # try at most 5 accounting files for now - assume jobs don't run longer than 5 days!
             fileName = self.findAccountingFile(logNum)
             if not fileName:
                 return
-            acctInfo = self.getAccountInfo(jobId, " -f " + fileName)
+            acctInfo = self.getAccountInfo(jobId, [ "-f", fileName ])
             if acctInfo:
                 return acctInfo
+
     def findAccountingFile(self, logNum):
         if os.environ.has_key("SGE_ROOT") and os.environ.has_key("SGE_CELL"):
             findPattern = os.path.join(os.environ["SGE_ROOT"], os.environ["SGE_CELL"])
             acctFile = os.path.join(findPattern, "common", "accounting." + str(logNum))
             if os.path.isfile(acctFile):
                 return acctFile        
+
 
 # Used by slave for producing performance data
 class MachineInfo:

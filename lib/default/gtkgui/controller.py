@@ -374,7 +374,6 @@ class TopWindowGUI(guiutils.ContainerGUI):
     def notifySetRunName(self, newName):
         self.name = newName
         self.setWindowTitle()
-        guilog.info("Top Window title is " + self.topWindow.get_title())
 
     def terminate(self):
         self.notify("Exit")

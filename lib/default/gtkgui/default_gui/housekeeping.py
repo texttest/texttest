@@ -8,7 +8,7 @@ from default.gtkgui import guiplugins # from .. import guiplugins when we drop P
 class Quit(guiplugins.BasicActionGUI):
     def __init__(self, allApps, dynamic, inputOptions):
         guiplugins.BasicActionGUI.__init__(self, allApps, dynamic, inputOptions)
-        self.annotation = inputOptions.get("name", "")
+        self.runName = inputOptions.get("name", "")
     def _getStockId(self):
         return "quit"
     def _getTitle(self):
@@ -19,14 +19,14 @@ class Quit(guiplugins.BasicActionGUI):
         return [ "Quit" ]
     def performOnCurrent(self):
         self.notify("Quit")
-    def notifyAnnotate(self, annotation):
-        self.annotation = annotation
+    def notifySetRunName(self, runName):
+        self.runName = runName
     def messageAfterPerform(self):
         pass # GUI isn't there to show it
     def getConfirmationMessage(self):
         message = ""
-        if self.annotation:
-            message = "You annotated this GUI, using the following message : \n" + self.annotation + "\n"
+        if self.runName:
+            message = "You named this run as follows : \n" + self.runName + "\n"
         runningProcesses = guiplugins.processMonitor.listRunningProcesses()
         if len(runningProcesses) > 0:
             message += "\nThese processes are still running, and will be terminated when quitting: \n\n   + " + \
@@ -53,28 +53,28 @@ class ResetGroups(guiplugins.BasicActionGUI):
         self.notify("Reset")
 
 
-class AnnotateGUI(guiplugins.ActionDialogGUI):
+class SetRunName(guiplugins.ActionDialogGUI):
     def __init__(self, *args):
         guiplugins.ActionDialogGUI.__init__(self, *args)
-        self.addOption("desc", "\nDescription of this run")
+        self.addOption("name", "\nNew name for this run")
     def isActiveOnCurrent(self, *args):
         return True
     def _getStockId(self):
         return "index"
     def _getTitle(self):
-        return "Annotate"
+        return "Set Run Name"
     def messageAfterPerform(self):
         pass
     def getDialogTitle(self):
-        return "Annotate this run"
+        return "Set a new name for this run"
     def getTooltip(self):
-        return "Provide an annotation for this run and warn before closing it"
+        return "Provide a name for this run and warn before closing it"
     def getSignalsSent(self):
-        return [ "Annotate" ]
+        return [ "SetRunName" ]
     def performOnCurrent(self):
-        description = self.optionGroup.getOptionValue("desc")
-        self.notify("Annotate", description)
-        self.notify("Status", "Annotated GUI as '" + description + "'")
+        name = self.optionGroup.getOptionValue("name")
+        self.notify("SetRunName", name)
+        self.notify("Status", "Set name of run to '" + name + "'")
 
 
 class RefreshAll(guiplugins.BasicActionGUI):
@@ -105,7 +105,7 @@ class RefreshAll(guiplugins.BasicActionGUI):
 def getInteractiveActionClasses(dynamic):
     classes = [ Quit ]
     if dynamic:
-        classes.append(AnnotateGUI)
+        classes.append(SetRunName)
     else:
         classes += [ RefreshAll, ResetGroups ]
     return classes

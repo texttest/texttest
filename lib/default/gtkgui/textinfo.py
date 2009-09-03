@@ -171,14 +171,18 @@ class RunInfoGUI(TextViewGUI):
         textToUse += "Executable       : " + suite.getConfigValue("executable") + "\n"
         return textToUse
 
-    def notifyAnnotate(self, text):
-        self.text += "Annotated        : " + text + "\n"
+    def notifySetRunName(self, name):
+        self.runName = name
         self.updateView()
+
+    def updateView(self):
+        if self.runName:
+            self.updateViewFromText("Run Name         : " + self.runName + "\n\n" + self.text)
+        else:
+            self.updateViewFromText(self.text)
 
     def notifyAllRead(self, suites):
         self.text = ""
-        if self.runName:
-            self.text += "Run Name         : " + self.runName + "\n\n"
         self.text += "\n".join(map(self.appInfo, suites)) + "\n"
         self.text += "Command line     : " + plugins.commandLineString(sys.argv) + "\n\n"
         self.text += "Start time       : " + plugins.startTimeString() + "\n"

@@ -12,7 +12,7 @@
    
     <menu action="viewmenu">
       <placeholder name="FirstInViewMenu">
-        <menuitem action="Annotate"/>
+        <menuitem action="Set Run Name"/>
         <separator/>
       </placeholder>
     </menu>

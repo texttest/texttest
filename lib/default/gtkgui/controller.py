@@ -371,8 +371,8 @@ class TopWindowGUI(guiutils.ContainerGUI):
             self.notify("Status", "Waiting for all tests to terminate ...")
             # When they have, we'll get notifyAllComplete
 
-    def notifyAnnotate(self, annotation):
-        self.name = annotation
+    def notifySetRunName(self, newName):
+        self.name = newName
         self.setWindowTitle()
         guilog.info("Top Window title is " + self.topWindow.get_title())
 

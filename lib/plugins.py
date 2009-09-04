@@ -277,6 +277,14 @@ class TextTriggerGroup:
                 return True
         return False
 
+    def readAndFilter(self, fileName):
+        text = ""
+        for line in open(fileName).xreadlines():
+            if not self.stringContainsText(line):
+                text += line
+        return text
+
+
 class TextFilter(Filter, TextTriggerGroup):
     def __init__(self, filterText, *args):
         TextTriggerGroup.__init__(self, self.parseInput(filterText, *args))

@@ -35,7 +35,9 @@ class QueueSystemServer(BaseActionRunner):
         self.testCount = 0
         self.testsSubmitted = 0
         self.maxCapacity = 100000 # infinity, sort of
+        self.suppressStderr = set()
         for app in allApps:
+            self.suppressStderr.update(app.getConfigValue("suppress_stderr_text"))
             currCap = app.getConfigValue("queue_system_max_capacity")
             if currCap is not None and currCap < self.maxCapacity:
                 self.maxCapacity = currCap
@@ -213,9 +215,12 @@ class QueueSystemServer(BaseActionRunner):
             errorFiles += filter(os.path.getsize, glob(os.path.join(logDir, "*.errors")))
         if len(errorFiles) == 0:
             return
+
+        triggerGroup = plugins.TextTriggerGroup(self.suppressStderr)
         for fileName in errorFiles:
-            contents = open(fileName).read()
-            errors[contents] = os.path.basename(fileName)[:-7]
+            contents = triggerGroup.readAndFilter(fileName)
+            if contents:
+                errors[contents] = os.path.basename(fileName)[:-7]
 
         for msg, jobName in errors.items():
             sys.stderr.write("WARNING: error produced by slave job '" + jobName + "'\n" + msg)

@@ -976,7 +976,9 @@ class Config:
         # These configure the GUI but tend to have sensible defaults per application
         app.setConfigDefault("gui_entry_overrides", { "default" : "<not set>" }, "Default settings for entries in the GUI")
         app.setConfigDefault("gui_entry_options", { "default" : [] }, "Default drop-down box options for GUI entries")
-        app.setConfigDefault("suppress_stderr_popup", [], "List of patterns which, if written on stderr, should not produce a warning popup")
+        app.setConfigDefault("suppress_stderr_text", [], "List of patterns which, if written on TextTest's own stderr, should not be propagated to popups and further logfiles")
+        app.setConfigAlias("suppress_stderr_popup", "suppress_stderr_text")
+        
     def getDefaultRemoteProgramOptions(self):
         # The aim is to ensure they never hang, but always return errors if contact not possible
         # Disable passwords: only use public key based authentication.

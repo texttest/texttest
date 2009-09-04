@@ -132,17 +132,11 @@ class RunningAction:
                 self.currTestSelection[0].filesChanged()
 
         testSel[0].notify("CloseDynamic", usecase)
-
-    def readAndFilter(self, errFile, testSel):
-        errText = ""
-        triggerGroup = plugins.TextTriggerGroup(testSel[0].getConfigValue("suppress_stderr_popup"))
-        for line in open(errFile).xreadlines():
-            if not triggerGroup.stringContainsText(line):
-                errText += line
-        return errText
+    
     def checkErrorFile(self, errFile, testSel, usecase):
         if os.path.isfile(errFile):
-            errText = self.readAndFilter(errFile, testSel)
+            triggerGroup = plugins.TextTriggerGroup(testSel[0].getConfigValue("suppress_stderr_text"))
+            errText = triggerGroup.readAndFilter(errFile)
             if len(errText):
                 self.notify("Status", usecase.capitalize() + " run failed for " + repr(testSel[0]))
                 self.showErrorDialog(usecase.capitalize() + " run failed, with the following errors:\n" + errText)

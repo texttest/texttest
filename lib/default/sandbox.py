@@ -556,7 +556,8 @@ class CollateFiles(plugins.Action):
         if currProc:
             currProc.wait()
 
-        collateErrMsg = open(collationErrFile).read()
+        triggerGroup = plugins.TextTriggerGroup(test.getConfigValue("suppress_stderr_text"))
+        collateErrMsg = triggerGroup.readAndFilter(collationErrFile)
         if collateErrMsg:
             msg = "Errors occurred running collate_script(s) " + " and ".join(scripts) + \
                   "\nwhile trying to extract file at \n" + sourceFile + " : \n" + collateErrMsg

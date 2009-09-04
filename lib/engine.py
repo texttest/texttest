@@ -239,14 +239,12 @@ class TextTest(plugins.Responder, plugins.Observable):
             return [ plugins.importAndCall("default", "getConfig", self.inputOptions) ]
         
     def createResponders(self, allApps):
-        responderClasses = []
+        responderClasses = self.getBuiltinResponderClasses()
         for configObject in self.getAllConfigObjects(allApps):
             for respClass in configObject.getResponderClasses(allApps):
                 if not respClass in responderClasses:
                     self.diag.info("Adding responder " + repr(respClass))
-                    responderClasses.append(respClass)
-        # Make sure we send application events when tests change state
-        responderClasses += self.getBuiltinResponderClasses()
+                    responderClasses.insert(-2, respClass) # keep Activator and AllCompleteResponder at the end
         filteredClasses = self.removeBaseClasses(responderClasses)
         self.diag.info("Filtering away base classes, using " + repr(filteredClasses))
         self.observers = map(lambda x : x(self.inputOptions, allApps), filteredClasses)

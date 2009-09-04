@@ -31,23 +31,29 @@ class ApplicationEventResponder(plugins.Responder):
         eventName = "test " + test.uniqueName + " to " + changeDesc
         category = test.uniqueName
         timeDelay = self.getTimeDelay()
-        self.scriptEngine.applicationEvent(eventName, category, "tests", timeDelay)
+        self.scriptEngine.applicationEvent(eventName, category + " lifecycle", [ "lifecycle" ], timeDelay)
+        
     def notifyAdd(self, test, initial):
         if initial and test.classId() == "test-case":
             eventName = "test " + test.uniqueName + " to be read"
-            self.scriptEngine.applicationEvent(eventName, test.uniqueName, "tests")
+            self.scriptEngine.applicationEvent(eventName, test.uniqueName, [ test.uniqueName + " lifecycle", "read", "lifecycle" ])
+
     def notifyUniqueNameChange(self, test, newName):
         if test.classId() == "test-case":
-            self.scriptEngine.applicationEventRename("test " + test.uniqueName + " to", "test " + newName + " to")
+            self.scriptEngine.applicationEventRename("test " + test.uniqueName + " to", "test " + newName + " to",
+                                                     test.uniqueName, newName)
 
     def getTimeDelay(self):
         try:
             return int(os.getenv("TEXTTEST_FILEWAIT_SLEEP", 1))
         except ValueError: # pragma: no cover - pathological case
             return 1
+
     def notifyAllRead(self, *args):
-        self.scriptEngine.applicationEvent("all tests to be read", "tests")
+        self.scriptEngine.applicationEvent("all tests to be read", "read", [ "lifecycle" ])
+
     def notifyAllComplete(self):
-        self.scriptEngine.applicationEvent("completion of test actions", "tests")
+        self.scriptEngine.applicationEvent("completion of test actions", "lifecycle")
+
     def notifyCloseDynamic(self, test, name):
         self.scriptEngine.applicationEvent(name + " GUI to be closed")

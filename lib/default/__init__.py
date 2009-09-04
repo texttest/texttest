@@ -712,13 +712,22 @@ class Config:
             return machine, appTmpDir
                 
     def executableShouldBeFile(self, app, executable):
+        if os.path.isabs(executable):
+            return True
+
+        # If it's part of the data it will be available as a relative path anyway
+        if executable in app.getDataFileNames():
+            return False
+        
         # For finding java classes, don't warn if they don't exist as files...
         interpreter = app.getConfigValue("interpreter")
-        return not interpreter.startswith("java") or executable.endswith(".jar") 
+        return not interpreter.startswith("java") or executable.endswith(".jar")
+    
     def checkConfigSanity(self, app):
         for key in app.getConfigValue("collate_file"):
             if key.find(".") != -1:
                 raise plugins.TextTestError, "Cannot collate files to stem '" + key + "' - '.' characters are not allowed"
+
     def getGivenCheckoutPath(self, app):
         checkout = self.getCheckout(app)
         if os.path.isabs(checkout):
@@ -730,6 +739,7 @@ class Config:
             return self.makeAbsoluteCheckout(checkoutLocations, checkout, app)
         else:
             return checkout
+
     def getCheckout(self, app):
         if self.optionMap.has_key("c"):
             allCheckouts = plugins.commasplit(self.optionMap["c"])
@@ -746,6 +756,7 @@ class Config:
             return batchSession
         else:
             return app.getConfigValue("default_checkout")        
+
     def makeAbsoluteCheckout(self, locations, checkout, app):
         isSpecific = app.getConfigValue("checkout_location").has_key(checkout)
         for location in locations:
@@ -753,6 +764,7 @@ class Config:
             if os.path.isdir(fullCheckout):
                 return fullCheckout
         return self.absCheckout(locations[0], checkout, isSpecific)
+
     def absCheckout(self, location, checkout, isSpecific):
         fullLocation = os.path.expanduser(os.path.expandvars(location))
         if isSpecific or location.find("TEXTTEST_CHECKOUT_NAME") != -1:

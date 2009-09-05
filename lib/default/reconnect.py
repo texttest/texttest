@@ -1,5 +1,5 @@
 
-import os, shutil, plugins, operator
+import os, shutil, plugins, operator, logging
 from glob import glob
 from itertools import groupby
 
@@ -12,7 +12,7 @@ class ReconnectConfig:
     datedVersions = set()
     def __init__(self, optionMap):
         self.fullRecalculate = optionMap.has_key("reconnfull")
-        self.diag = plugins.getDiagnostics("Reconnection")
+        self.diag = logging.getLogger("Reconnection")
         self.reconnectTmpInfo = optionMap.get("reconnect")
         self.reconnDir = None
         self.errorMessage = ""
@@ -22,9 +22,9 @@ class ReconnectConfig:
 
     def cacheRunDir(self, app, runDir, version=""):
         if version:
-            keys = [ app.fullName + "." + version ]
+            keys = [ app.fullName() + "." + version ]
         else:
-            keys = [ app.fullName ] + app.versions
+            keys = [ app.fullName() ] + app.versions
         for i in range(len(keys)):
             subKey = ".".join(keys[:i+1])
             if i == len(keys) - 1 or not self.runDirCache.has_key(subKey):
@@ -43,14 +43,15 @@ class ReconnectConfig:
         if len(parts) > 1:
             return self._findRunDir(".".join(parts[:-1]))
 
-    def getExtraVersions(self, app):
-        self.diag.info("Finding reconnect directory for " + repr(app) + " under " + repr(self.reconnectTmpInfo))
+    def getExtraVersions(self, app, givenExtras):
+        self.diag.info("Finding reconnect 'extra versions' for " + repr(app) + " given tmp info '" + repr(self.reconnectTmpInfo) + "'")
         if self.reconnectTmpInfo and os.path.isdir(self.reconnectTmpInfo):
             # See if this is an explicitly provided run directory
-            versionSets = self.getVersionSetsTopDir(self.reconnectTmpInfo)
+            dirName = os.path.normpath(self.reconnectTmpInfo)
+            versionSets = self.getVersionSetsTopDir(dirName)
             self.diag.info("Directory has version sets " + repr(versionSets))
             if versionSets is not None:
-                return self.getVersionsFromDirs(app, [ self.reconnectTmpInfo ])
+                return self.getVersionsFromDirs(app, [ dirName ], givenExtras)
 
         fetchDir = app.getPreviousWriteDirInfo(self.reconnectTmpInfo)
         if not os.path.isdir(fetchDir):
@@ -68,7 +69,7 @@ class ReconnectConfig:
             self.errorMessage = "Could not find any runs matching " + app.description() + " under " + fetchDir
             return []
         else:
-            return self.getVersionsFromDirs(app, runDirs)
+            return self.getVersionsFromDirs(app, runDirs, givenExtras)
 
     def versionsCorrect(self, app, dirName):
         versionSets = self.getVersionSetsTopDir(dirName)
@@ -113,26 +114,53 @@ class ReconnectConfig:
         vlists = self.getVersionListsTopDir(fileName)
         if vlists is not None:
             return [ frozenset(vlist) for vlist in vlists ]
-        
-    def getVersionSetSubDir(self, fileName, stem):
+
+    def getVersionListSubDir(self, fileName, stem):
         # Show the framework how to find the version list given a file name
         # If it doesn't match, return None
         parts = fileName.split(".")
         if stem == parts[0]:
             # drop the application at the start 
-            return frozenset(parts[1:])
+            return parts[1:]
+        
+    def getVersionSetSubDir(self, fileName, stem):
+        vlist = self.getVersionListSubDir(fileName, stem)
+        if vlist is not None:
+            return frozenset(vlist)
 
-    def getVersionsFromDirs(self, app, dirs):
+    def getAllVersionLists(self, app, givenExtras, versionLists, groupDirs):
+        vlists = []
+        givenSet = frozenset(givenExtras)
+        for groupDir in groupDirs:
+            for path in os.listdir(groupDir):
+                fullPath = os.path.join(groupDir, path)
+                if os.path.isdir(fullPath):
+                    vlist = self.getVersionListSubDir(path, app.name)
+                    if vlist is None:
+                        continue
+                    if givenSet:
+                        vset = frozenset(vlist).difference(givenSet)
+                        vlist = filter(lambda v: v in vset, vlist)
+                    if vlist not in vlists:
+                        vlists.append(vlist)
+        return vlists
+
+    def getVersionsFromDirs(self, app, dirs, givenExtras):
         versions = []
         appVersions = frozenset(app.versions)
         for versionLists, groupDirIter in groupby(dirs, self.getVersionListsTopDir):
-            for versionList in versionLists:
-                extraVersionSet = frozenset(versionList).difference(appVersions)
+            groupDirs = list(groupDirIter)
+            self.diag.info("Considering version lists " + repr(versionLists) + " with dirs " + repr(groupDirs))
+            for versionList in self.getAllVersionLists(app, givenExtras, versionLists, groupDirs):
+                version = ".".join(versionList)
+                self.diag.info("Considering version list " + repr(versionList))
+                versionSet = frozenset(versionList)
+                if len(appVersions.difference(versionSet)) > 0:
+                    continue # If the given version isn't included, ignore it
+                extraVersionSet = versionSet.difference(appVersions)
                 # Important to preserve the order of the versions as received
                 extraVersionList = filter(lambda v: v in extraVersionSet, versionList)
                 extraVersion = ".".join(extraVersionList)
-                version = ".".join(versionList)
-                groupDirs = list(groupDirIter)
                 if extraVersion:
                     if len(groupDirs) == 1:
                         versions.append(extraVersion)
@@ -154,6 +182,7 @@ class ReconnectConfig:
                         else:
                             self.cacheRunDir(app, dir, datedVersion)
         versions.sort()
+        self.diag.info("Extra versions found as " + repr(versions))
         return versions
 
     def checkSanity(self, app):
@@ -177,7 +206,7 @@ class ReconnectTest(plugins.Action):
     def __init__(self, rootDirToCopy, fullRecalculate):
         self.rootDirToCopy = rootDirToCopy
         self.fullRecalculate = fullRecalculate
-        self.diag = plugins.getDiagnostics("Reconnection")
+        self.diag = logging.getLogger("Reconnection")
     def __repr__(self):
         return "Reconnecting to"
     def __call__(self, test):

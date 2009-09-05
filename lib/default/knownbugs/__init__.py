@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import plugins, os, string, shutil, sys
+import plugins, os, string, shutil, sys, logging
 from ConfigParser import ConfigParser, NoOptionError
 from copy import copy
 from ndict import seqdict
@@ -67,7 +67,7 @@ class BugTrigger:
         self.reportInternalError = int(getOption("internal_error", "0"))
         self.ignoreOtherErrors = int(getOption("ignore_other_errors", self.reportInternalError))
         self.bugInfo = self.createBugInfo(getOption)
-        self.diag = plugins.getDiagnostics("Check For Bugs")
+        self.diag = logging.getLogger("Check For Bugs")
     def __repr__(self):
         return repr(self.textTrigger)
     def getTriggerHosts(self, getOption):
@@ -110,7 +110,7 @@ class FileBugData:
         self.presentList = []
         self.absentList = []
         self.checkUnchanged = False
-        self.diag = plugins.getDiagnostics("Check For Bugs")
+        self.diag = logging.getLogger("Check For Bugs")
 
     def addBugTrigger(self, getOption):
         bugTrigger = BugTrigger(getOption)
@@ -124,7 +124,7 @@ class FileBugData:
     def findBugs(self, fileName, execHosts, isChanged, multipleDiffs):
         self.diag.info("Looking for bugs in " + fileName)
         if not self.checkUnchanged and not isChanged:
-            self.diag.info("File not changed, ignoring")
+            self.diag.info("File not changed, ignoring all bugs")
             return []
         if not os.path.isfile(fileName):
             self.diag.info("File doesn't exist, checking only for absence bugs")
@@ -176,15 +176,27 @@ class BugMap(seqdict):
         parser = self.makeParser(fileName)
         if parser:
             self.readFromParser(parser)
+
+    def lookupSection(self, name, fileName, realLookup):
+        msg = "Bug file at " + fileName + " has duplicated sections named '" + name + "', the later ones will be ignored"
+        plugins.printWarning(msg, stderr=True, stdout=False)
+        return realLookup(name)
+    
     def makeParser(self, fileName):
         parser = ConfigParser()
         # Default behaviour transforms to lower case: we want case-sensitive
         parser.optionxform = str
+        parser._sections = seqdict()
+        # There isn't a nice way to change the behaviour on getting a duplicate section
+        # so we use a nasty way :)
+        realLookup = parser._sections.__getitem__
+        parser._sections.__getitem__ = plugins.Callable(self.lookupSection, fileName, realLookup)
         try:
             parser.read(fileName)
+            parser._sections.__getitem__ = realLookup
             return parser
         except:
-            plugins.log.info("Bug file at " + fileName + " not understood, ignoring")
+            plugins.printWarning("Bug file at " + fileName + " not understood, ignoring", stderr=True, stdout=False)
     def readFromParser(self, parser):
         for section in sorted(parser.sections()):
             getOption = ParseMethod(parser, section)
@@ -194,7 +206,8 @@ class BugMap(seqdict):
     
 class CheckForCrashes(plugins.Action):
     def __init__(self):
-        self.diag = plugins.getDiagnostics("check for crashes")
+        self.diag = logging.getLogger("check for crashes")
+
     def __call__(self, test):
         if test.state.category == "killed":
             return
@@ -212,23 +225,27 @@ class CheckForCrashes(plugins.Action):
             newState.setFailedPrediction(crashState)
             test.changeState(newState)
             os.remove(stackTraceFile)
+
     def parseStackTrace(self, test, stackTraceFile):
         lines = open(stackTraceFile).readlines()
         if len(lines) > 2:
             return lines[0].strip(), string.join(lines[2:], "")
         else:
             errFile = test.makeTmpFileName("stacktrace.collate_errs", forFramework=1)
-            return "core not parsed", "Errors from collation script:\n" + open(errFile).read()
+            script = test.getCompositeConfigValue("collate_script", "stacktrace")[0]
+            return "core not parsed", "The core file could not be parsed. Errors from '" + script + "' follow :\n" + open(errFile).read()
+
 
 class CheckForBugs(plugins.Action):
     def __init__(self):
-        self.diag = plugins.getDiagnostics("Check For Bugs")
+        self.diag = logging.getLogger("Check For Bugs")
     def callDuringAbandon(self, test):
         # want to be able to mark UNRUNNABLE tests as known bugs too...
         return test.state.lifecycleChange != "complete"
     def __call__(self, test):
         activeBugs = self.readBugs(test)
-        if not self.checkTest(test, activeBugs):
+        if not activeBugs.checkUnchanged() and not test.state.hasFailed():
+            self.diag.info(repr(test) + " succeeded, not looking for bugs")
             return
 
         bug = self.findBug(test, activeBugs)
@@ -281,10 +298,6 @@ class CheckForBugs(plugins.Action):
             if comp.stem in perfStems:
                 diffCount -= 1
         return diffCount > 1
-    def checkTest(self, test, activeBugs):
-        if activeBugs.checkUnchanged():
-            return True
-        return test.state.hasFailed()
     def fileChanged(self, test, stem):
         comparison, list = test.state.findComparison(stem)
         return bool(comparison)
@@ -313,7 +326,7 @@ class MigrateFiles(plugins.Action):
             try:
                 parser.read(bugFileName)
             except:
-                plugins.log.info("Bug file at " + bugFileName + " not understood, ignoring")
+                plugins.printWarning("Bug file at " + bugFileName + " not understood, ignoring", stderr=True, stdout=False)
                 continue
             if not parser.has_section("Migrated section 1"):
                 self.describe(test, " - " + os.path.basename(bugFileName))

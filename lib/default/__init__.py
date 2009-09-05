@@ -1,5 +1,5 @@
 
-import os, sys, plugins, sandbox, console, rundependent, pyusecase_interface, comparetest, batch, subprocess, operator, glob, signal, shutil
+import os, sys, plugins, sandbox, console, rundependent, pyusecase_interface, comparetest, batch, performance, subprocess, operator, signal, shutil, logging
 
 from copy import copy
 from string import Template
@@ -9,7 +9,6 @@ from reconnect import ReconnectConfig
 from traffic import SetUpTrafficHandlers
 from jobprocess import killSubProcessAndChildren
 from actionrunner import ActionRunner
-from performance import TimeFilter
 from time import sleep
 
 plugins.addCategory("killed", "killed", "were terminated before completion")
@@ -35,8 +34,8 @@ class Config:
                 possibleDirs = self.getFilterFileDirectories(apps, useOwnTmpDir=True)
                 group.addOption("f", "Tests listed in file", possibleDirs=possibleDirs, selectFile=True)
                 group.addOption("desc", "Descriptions containing", description="Select tests for which the description (comment) matches the entered text. The text can be a regular expression.")
-                group.addOption("grep", "Test-files containing")
-                group.addOption("grepfile", "Test-file to search", allocateNofValues=2)
+                group.addOption("grep", "Test-files containing", description="Select tests which have a file containing the entered text. The text can be a regular expression : e.g. enter '.*' to only look for the file without checking the contents.")
+                group.addOption("grepfile", "Test-file to search", allocateNofValues=2, description="When the 'test-files containing' field is non-empty, apply the search in files with the given stem. Unix-style file expansion (note not regular expressions) may be used. For example '*' will look in any file.")
                 group.addOption("r", "Execution time", description="Specify execution time limits, either as '<min>,<max>', or as a list of comma-separated expressions, such as >=0:45,<=1:00. Digit-only numbers are interpreted as minutes, while colon-separated numbers are interpreted as hours:minutes:seconds.")
             elif group.name.startswith("Basic"):
                 if len(apps) > 0:
@@ -53,18 +52,20 @@ class Config:
                     group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
             elif group.name.startswith("Advanced"):
                 group.addSwitch("x", "Enable self-diagnostics")
-                defaultDiagDir = os.path.join(plugins.getPersonalConfigDir(), "log")
+                defaultDiagDir = plugins.getPersonalDir("log")
                 group.addOption("xr", "Configure self-diagnostics from", os.path.join(defaultDiagDir, "logging.debug"),
                                 possibleValues=[ os.path.join(plugins.installationDir("log"), "logging.debug") ])
                 group.addOption("xw", "Write self-diagnostics to", defaultDiagDir)
                 group.addOption("b", "Run batch mode session")
+                group.addOption("name", "Name this run")
                 group.addSwitch("rectraffic", "(Re-)record command-line or client-server traffic")
                 group.addSwitch("keeptmp", "Keep temporary write-directories")
-                group.addSwitch("vanilla", "Ignore site-specific and personal configuration", self.optionMap.has_key("vanilla"))
+                group.addOption("vanilla", "Ignore configuration files", self.defaultVanillaValue(),
+                                possibleValues = [ "", "site", "personal", "all" ])
             elif group.name.startswith("Invisible"):
                 # Options that don't make sense with the GUI should be invisible there...
                 group.addOption("s", "Run this script")
-                group.addOption("d", "Run as if TEXTTEST_HOME was")
+                group.addOption("d", "Look for test files under")
                 group.addSwitch("help", "Print configuration help text on stdout")
                 group.addSwitch("g", "use dynamic GUI")
                 group.addSwitch("gx", "use static GUI")
@@ -76,7 +77,6 @@ class Config:
                 group.addOption("funion", "Tests in any of files")
                 group.addOption("fd", "Private: Directory to search for filter files in")
                 group.addOption("count", "Private: How many tests we believe there will be")
-                group.addOption("name", "Batch run not identified by date, but by name")
                 group.addOption("o", "Overwrite failures, optionally using version")
                 group.addOption("reconnect", "Reconnect to previous run")
                 group.addSwitch("reconnfull", "Recompute file filters when reconnecting")
@@ -92,6 +92,15 @@ class Config:
                 if not useCatalogues:
                     group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
 
+    def defaultVanillaValue(self):
+        if not self.optionMap.has_key("vanilla"):
+            return ""
+        given = self.optionValue("vanilla")
+        if given:
+            return given
+        else:
+            return "all"
+
     def createOptionGroups(self, allApps):
         groupNames = [ "Selection", "Basic", "Advanced", "Invisible" ]
         optionGroups = map(plugins.OptionGroup, groupNames)
@@ -101,7 +110,7 @@ class Config:
     def findAllValidOptions(self, allApps):
         groups = self.createOptionGroups(allApps)
         return reduce(operator.add, (g.keys() for g in groups), [])
-    
+
     def getActionSequence(self):
         if self.optionMap.has_key("coll"):
             arg = self.optionMap.get("coll")
@@ -114,21 +123,39 @@ class Config:
         if self.isReconnecting():
             return self.getReconnectSequence()
 
-        return self.getTestProcessor()
+        scriptObject = self.optionMap.getScriptObject()
+        if scriptObject:
+            if self.usesComparator(scriptObject):
+                return [ self.getWriteDirectoryMaker(), scriptObject, comparetest.MakeComparisons(ignoreMissing=True) ]
+            else:
+                return [ scriptObject ]
+        else:
+            return self.getTestProcessor()
+
+    def usesComparator(self, scriptObject):
+        try:
+            return scriptObject.usesComparator()
+        except AttributeError:
+            return False
+
     def useGUI(self):
         return self.optionMap.has_key("g") or self.optionMap.has_key("gx")
+
     def useStaticGUI(self, app):
         return self.optionMap.has_key("gx") or \
                (not self.hasExplicitInterface() and app.getConfigValue("default_interface") == "static_gui")
+
     def useConsole(self):
         return self.optionMap.has_key("con")
+
     def useExtraVersions(self):
         return True # static GUI didn't, once, but now we always read things the same.
+
     def getExtraVersions(self, app):
         if not self.useExtraVersions():
             return []
         fromConfig = self.getExtraVersionsFromConfig(app)
-        fromCmd = self.getExtraVersionsFromCmdLine(app)
+        fromCmd = self.getExtraVersionsFromCmdLine(app, fromConfig)
         return self.createComposites(fromConfig, fromCmd)
 
     def createComposites(self, vlist1, vlist2):
@@ -140,9 +167,9 @@ class Config:
 
         return allVersions
 
-    def getExtraVersionsFromCmdLine(self, app):
+    def getExtraVersionsFromCmdLine(self, app, fromConfig):
         if self.isReconnecting():
-            return self.reconnectConfig.getExtraVersions(app)
+            return self.reconnectConfig.getExtraVersions(app, fromConfig)
         else:
             copyVersions = self.getCopyExtraVersions()
             checkoutVersions = self.getCheckoutExtraVersions()
@@ -172,8 +199,11 @@ class Config:
         return basic
 
     def getDefaultInterface(self, allApps):
-        if len(allApps) == 0 or self.optionMap.has_key("new"):
+        if self.optionMap.has_key("s"):
+            return "console"
+        elif len(allApps) == 0 or self.optionMap.has_key("new"):
             return "static_gui"
+
         defaultIntf = None
         for app in allApps:
             appIntf = app.getConfigValue("default_interface")
@@ -182,6 +212,7 @@ class Config:
                       appIntf + " and " + defaultIntf
             defaultIntf = appIntf
         return defaultIntf
+
     def setDefaultInterface(self, allApps):
         mapping = { "static_gui" : "gx", "dynamic_gui": "g", "console": "con" }
         defaultInterface = self.getDefaultInterface(allApps)
@@ -189,26 +220,31 @@ class Config:
             self.optionMap[mapping[defaultInterface]] = ""
         else:
             raise plugins.TextTestError, "Invalid value for default_interface '" + defaultInterface + "'"
+        
     def hasExplicitInterface(self):
-        return self.useGUI() or self.batchMode() or self.useConsole() or \
-               self.optionMap.has_key("o") or self.optionMap.has_key("s")
+        return self.useGUI() or self.batchMode() or self.useConsole() or self.optionMap.has_key("o")
 
-    def getLogfilePostfix(self):
+    def getLogfilePostfixes(self):
         if self.optionMap.has_key("x"):
-            return "debug"
+            return [ "debug" ]
+        elif self.optionMap.has_key("gx"):
+            return [ "gui", "static_gui" ]
+        elif self.optionMap.has_key("g"):
+            return [ "gui", "dynamic_gui" ]
         elif self.batchMode():
-            return "batch"
-        elif not self.useGUI():
-            return "console"
+            return [ "console", "batch" ]
         else:
-            return "gui"
+            return [ "console" ]
         
     def setUpLogging(self):
-        filePattern = "logging." + self.getLogfilePostfix()
-        allPaths = plugins.findDataPaths(filePattern, dataDir="log", includePersonal=True,
-                                         vanilla=self.optionMap.has_key("vanilla"))
-        plugins.configureLogging(allPaths[-1]) # Won't have any effect if we've already got a log file
-        
+        filePatterns = [ "logging." + postfix for postfix in self.getLogfilePostfixes() ]
+        includeSite, includePersonal = self.optionMap.configPathOptions()
+        allPaths = plugins.findDataPaths(filePatterns, includeSite, includePersonal, dataDirName="log")
+        if len(allPaths) > 0:
+            plugins.configureLogging(allPaths[-1]) # Won't have any effect if we've already got a log file
+        else:
+            plugins.configureLogging()
+            
     def getResponderClasses(self, allApps):
         # Global side effects first :)
         if not self.hasExplicitInterface():
@@ -219,15 +255,12 @@ class Config:
         return self._getResponderClasses(allApps, scriptEngine)
 
     def _getResponderClasses(self, allApps, scriptEngine):
-        classes = []
-        if self.optionMap.runScript():
-            return self.getThreadActionClasses()
-        
+        classes = []        
         if not self.optionMap.has_key("gx"):
             if self.optionMap.has_key("new"):
                 raise plugins.TextTestError, "'--new' option can only be provided with the static GUI"
             elif len(allApps) == 0:
-                raise plugins.TextTestError, "Could not find any matching applications (files of the form config.<app>) under " + self.optionMap.directoryName
+                raise plugins.TextTestError, "Could not find any matching applications (files of the form config.<app>) under " + " or ".join(self.optionMap.rootDirectories)
             
         if self.useGUI():
             self.addGuiResponder(classes, scriptEngine)
@@ -246,7 +279,7 @@ class Config:
                     self.optionMap["b"] = "default"
                 classes.append(batch.BatchResponder)
         if self.useVirtualDisplay():
-            from unixonly import VirtualDisplayResponder
+            from virtualdisplay import VirtualDisplayResponder
             classes.append(VirtualDisplayResponder)
         if self.keepTemporaryDirectories():
             classes.append(self.getStateSaver())
@@ -261,6 +294,7 @@ class Config:
             if self.optionMap.has_key(option):
                 return True
         return False
+
     def noFileAdvice(self):
         # What can we suggest if files aren't present? In this case, not much
         return ""
@@ -273,16 +307,30 @@ class Config:
     
     def getThreadActionClasses(self):
         return [ ActionRunner ]
+
     def getTextDisplayResponderClass(self):
         return console.TextDisplayResponder
+
     def isolatesDataUsingCatalogues(self, app):
         return app.getConfigValue("create_catalogues") == "true" and \
                len(app.getConfigValue("partial_copy_test_path")) > 0
+
+    def hasWritePermission(self, path):
+        if os.path.isdir(path):
+            return os.access(path, os.W_OK)
+        else:
+            return self.hasWritePermission(os.path.dirname(path))
+
     def getWriteDirectory(self, app):
-        return os.path.join(os.getenv("TEXTTEST_TMP"), self.getWriteDirectoryName(app))
+        rootDir = self.optionMap.setPathFromOptionsOrEnv("TEXTTEST_TMP", app.getConfigValue("default_texttest_tmp")) # Location of temporary files from test runs
+        if not os.path.isdir(rootDir) and not self.hasWritePermission(os.path.dirname(rootDir)):
+            rootDir = self.optionMap.setPathFromOptionsOrEnv("", "$TEXTTEST_PERSONAL_CONFIG/tmp")
+        return os.path.join(rootDir, self.getWriteDirectoryName(app))
+
     def getWriteDirectoryName(self, app):
         parts = self.getBasicRunDescriptors(app) + self.getVersionDescriptors() + [ self.getTimeDescriptor(), str(os.getpid()) ]
         return ".".join(parts)
+
     def getBasicRunDescriptors(self, app):
         appDescriptors = self.getAppDescriptors()
         if self.useStaticGUI(app):
@@ -295,6 +343,7 @@ class Config:
             return [ "dynamic_gui" ]
         else:
             return [ "console" ]
+
     def getTimeDescriptor(self):
         return plugins.startTimeString().replace(":", "")
     def getAppDescriptors(self):
@@ -313,9 +362,9 @@ class Config:
         else:
             return []
     def addGuiResponder(self, classes, scriptEngine):
-        from gtkgui.texttestgui import TextTestGUI
-        TextTestGUI.scriptEngine = scriptEngine
-        classes.append(TextTestGUI)
+        from gtkgui.controller import GUIController
+        GUIController.scriptEngine = scriptEngine
+        classes.append(GUIController)
     def getReconnectSequence(self):
         actions = [ self.reconnectConfig.getReconnectAction() ]
         actions += [ rundependent.FilterOriginal(), rundependent.FilterTemporary(), \
@@ -373,7 +422,7 @@ class Config:
         
     def getFilterClasses(self):
         return [ TestNameFilter, plugins.TestPathFilter, \
-                 TestSuiteFilter, TimeFilter, \
+                 TestSuiteFilter, performance.TimeFilter, \
                  plugins.ApplicationFilter, TestDescriptionFilter ]
             
     def getAbsoluteFilterFileName(self, filterFileName, app):
@@ -461,16 +510,12 @@ class Config:
         if batchSession:
             timeLimit = app.getCompositeConfigValue("batch_timelimit", batchSession)
             if timeLimit:
-                filters.append(TimeFilter(timeLimit))
+                filters.append(performance.TimeFilter(timeLimit))
         if optionMap.has_key("grep"):
-            filters.append(GrepFilter(optionMap["grep"], self.getGrepFile(optionMap, app)))
+            grepFile = optionMap.get("grepfile", app.getConfigValue("log_file"))
+            filters.append(GrepFilter(optionMap["grep"], grepFile))
         return filters
-
-    def getGrepFile(self, optionMap, app):
-        if optionMap.has_key("grepfile"):
-            return optionMap["grepfile"]
-        else:
-            return app.getConfigValue("log_file")
+    
     def batchMode(self):
         return self.optionMap.has_key("b")
     def keepTemporaryDirectories(self):
@@ -501,6 +546,7 @@ class Config:
             dirToMake = os.path.join(app.writeDirectory, subdir)
         plugins.ensureDirectoryExists(dirToMake)
         app.diag.info("Made root directory at " + dirToMake)
+        return dirToMake
 
     def cleanPreviousWriteDirs(self, writeDir):
         rootDir, basename = os.path.split(writeDir)
@@ -568,30 +614,35 @@ class Config:
         return self.isReconnecting() # No use of checkouts has yet been thought up when reconnecting :)
     def setUpCheckout(self, app):
         if self.ignoreCheckout():
-            return "" 
-        checkoutPath = self.getGivenCheckoutPath(app)
-        if not checkoutPath:
+            return ""
+        else:
+            checkoutPath = self.getGivenCheckoutPath(app)
+            os.environ["TEXTTEST_CHECKOUT"] = checkoutPath # Full path to the checkout directory
+            return checkoutPath
+    
+    def verifyCheckoutValid(self, app):
+        if not os.path.isabs(app.checkout):
+            raise plugins.TextTestError, "could not create absolute checkout from relative path '" + app.checkout + "'"
+        elif not os.path.isdir(app.checkout):
+            self.handleNonExistent(app.checkout, "checkout", app)
+
+    def checkCheckoutExists(self, app):
+        if not app.checkout:
             return "" # Allow empty checkout, means no checkout is set, basically
         
         try: 
-            self.verifyCheckoutValid(checkoutPath, app)
-            os.environ["TEXTTEST_CHECKOUT"] = checkoutPath # Full path to the checkout directory
-            return checkoutPath
+            self.verifyCheckoutValid(app)
         except plugins.TextTestError, e:
             if self.ignoreExecutable():
-                plugins.log.info("WARNING: " + str(e) + " Ignoring checkout.")
+                plugins.printWarning(str(e))
                 return ""
             else:
                 raise
-    
-    def verifyCheckoutValid(self, checkoutPath, app):
-        if not os.path.isabs(checkoutPath):
-            raise plugins.TextTestError, "could not create absolute checkout from relative path '" + checkoutPath + "'"
-        elif not os.path.isdir(checkoutPath):
-            self.handleNonExistent(checkoutPath, "checkout", app)
 
     def checkSanity(self, suite):
-        if not self.ignoreExecutable() and not self.optionMap.has_key("gx"):
+        if not self.ignoreCheckout():
+            self.checkCheckoutExists(suite.app)
+        if not self.ignoreExecutable():
             self.checkExecutableExists(suite)
 
         self.checkFilterFileSanity(suite)
@@ -656,18 +707,27 @@ class Config:
     def getRemoteTestTmpDir(self, test):
         machine, appTmpDir = self.getRemoteTmpDirectory(test.app)
         if appTmpDir:
-            return machine, os.path.join(appTmpDir, test.getRelPath())
+            return machine, os.path.join(appTmpDir, test.app.name + test.app.versionSuffix(), test.getRelPath())
         else:
             return machine, appTmpDir
                 
     def executableShouldBeFile(self, app, executable):
+        if os.path.isabs(executable):
+            return True
+
+        # If it's part of the data it will be available as a relative path anyway
+        if executable in app.getDataFileNames():
+            return False
+        
         # For finding java classes, don't warn if they don't exist as files...
         interpreter = app.getConfigValue("interpreter")
-        return not interpreter.startswith("java") or executable.endswith(".jar") 
+        return not interpreter.startswith("java") or executable.endswith(".jar")
+    
     def checkConfigSanity(self, app):
         for key in app.getConfigValue("collate_file"):
             if key.find(".") != -1:
                 raise plugins.TextTestError, "Cannot collate files to stem '" + key + "' - '.' characters are not allowed"
+
     def getGivenCheckoutPath(self, app):
         checkout = self.getCheckout(app)
         if os.path.isabs(checkout):
@@ -679,6 +739,7 @@ class Config:
             return self.makeAbsoluteCheckout(checkoutLocations, checkout, app)
         else:
             return checkout
+
     def getCheckout(self, app):
         if self.optionMap.has_key("c"):
             allCheckouts = plugins.commasplit(self.optionMap["c"])
@@ -695,6 +756,7 @@ class Config:
             return batchSession
         else:
             return app.getConfigValue("default_checkout")        
+
     def makeAbsoluteCheckout(self, locations, checkout, app):
         isSpecific = app.getConfigValue("checkout_location").has_key(checkout)
         for location in locations:
@@ -702,6 +764,7 @@ class Config:
             if os.path.isdir(fullCheckout):
                 return fullCheckout
         return self.absCheckout(locations[0], checkout, isSpecific)
+
     def absCheckout(self, location, checkout, isSpecific):
         fullLocation = os.path.expanduser(os.path.expandvars(location))
         if isSpecific or location.find("TEXTTEST_CHECKOUT_NAME") != -1:
@@ -710,8 +773,7 @@ class Config:
             # old-style: infer expansion in default checkout
             return os.path.join(fullLocation, checkout)
 
-    def recomputeProgress(self, test, observers):
-        state = test.state
+    def recomputeProgress(self, test, state, observers):
         if state.isComplete():
             if state.hasResults():
                 state.recalculateStdFiles(test)
@@ -724,10 +786,15 @@ class Config:
             fileFilter = rundependent.FilterProgressRecompute()
             fileFilter(test)
             comparator = self.getTestComparator()
-            comparator.recomputeProgress(test, observers)
+            comparator.recomputeProgress(test, state, observers)
 
     def getRunDescription(self, test):
         return RunTest().getRunDescription(test)
+
+    def getFilePreview(self, fileName):
+        return "Expected " + os.path.basename(fileName).split(".")[0] + " for the default version:\n" + \
+               performance.describePerformance(fileName)
+
     # For display in the GUI
     def extraReadFiles(self, test):
         return {}
@@ -764,7 +831,7 @@ class Config:
         return colours
 
     def getDefaultPageName(self, app):
-        pageName = app.fullName
+        pageName = app.fullName()
         fullVersion = app.getFullVersion()
         if fullVersion:
             pageName += " - version " + fullVersion
@@ -792,12 +859,13 @@ class Config:
         app.setConfigDefault("batch_use_version_filtering", { "default" : "false" }, "Which batch sessions use the version filtering mechanism")
         app.setConfigDefault("batch_version", { "default" : [] }, "List of versions to allow if batch_use_version_filtering enabled")
         app.setConfigAlias("testoverview_colours", "historical_report_colours")
+        
     def setPerformanceDefaults(self, app):
         # Performance values
         app.setConfigDefault("cputime_include_system_time", 0, "Include system time when measuring CPU time?")
         app.setConfigDefault("performance_logfile", { "default" : [] }, "Which result file to collect performance data from")
         app.setConfigDefault("performance_logfile_extractor", {}, "What string to look for when collecting performance data")
-        app.setConfigDefault("performance_test_machine", { "default" : [], "memory" : [ "any" ] }, \
+        app.setConfigDefault("performance_test_machine", { "default" : [], "*mem*" : [ "any" ] }, \
                              "List of machines where performance can be collected")
         app.setConfigDefault("performance_variation_%", { "default" : 10.0 }, "How much variation in performance is allowed")
         app.setConfigDefault("performance_variation_serious_%", { "default" : 0.0 }, "Additional cutoff to performance_variation_% for extra highlighting")                
@@ -808,6 +876,7 @@ class Config:
         app.setConfigDefault("performance_descriptor_decrease", self.defaultPerfDecreaseDescriptors(), "Descriptions to be used when the numbers decrease in a performance file")
         app.setConfigDefault("performance_descriptor_increase", self.defaultPerfIncreaseDescriptors(), "Descriptions to be used when the numbers increase in a performance file")
         app.setConfigDefault("performance_unit", self.defaultPerfUnits(), "Name to be used to identify the units in a performance file")
+        app.setConfigDefault("performance_ignore_improvements", { "default" : "false" }, "Should we ignore all improvements in performance?")
         app.setConfigAlias("performance_use_normalised_%", "use_normalised_percentage_change")
         
     def setUsecaseDefaults(self, app):
@@ -820,7 +889,7 @@ class Config:
     def defaultPerfUnits(self):
         units = {}
         units["default"] = "seconds"
-        units["memory"] = "MB"
+        units["*mem*"] = "MB"
         return units
 
     def defaultPerfDecreaseDescriptors(self):
@@ -882,6 +951,8 @@ class Config:
         app.setConfigDefault("discard_file", [], "List of generated result files which should not be compared")
         if self.optionMap.has_key("rectraffic"):
             app.addConfigEntry("base_version", "rectraffic")
+        if self.optionMap.has_key("record"):
+            app.addConfigEntry("base_version", "recusecase")
         if homeOS != "any" and homeOS != os.name:
             app.addConfigEntry("base_version", os.name)
 
@@ -917,7 +988,9 @@ class Config:
         # These configure the GUI but tend to have sensible defaults per application
         app.setConfigDefault("gui_entry_overrides", { "default" : "<not set>" }, "Default settings for entries in the GUI")
         app.setConfigDefault("gui_entry_options", { "default" : [] }, "Default drop-down box options for GUI entries")
-        app.setConfigDefault("suppress_stderr_popup", [], "List of patterns which, if written on stderr, should not produce a warning popup")
+        app.setConfigDefault("suppress_stderr_text", [], "List of patterns which, if written on TextTest's own stderr, should not be propagated to popups and further logfiles")
+        app.setConfigAlias("suppress_stderr_popup", "suppress_stderr_text")
+        
     def getDefaultRemoteProgramOptions(self):
         # The aim is to ensure they never hang, but always return errors if contact not possible
         # Disable passwords: only use public key based authentication.
@@ -925,7 +998,7 @@ class Config:
         # Also don't run tests on machines which take a very long time to connect to...
         sshOptions = "-o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10"
         return { "default": "", "ssh" : sshOptions,
-                 "rsync" : "-azL", "scp": "-Cr " + sshOptions }
+                 "rsync" : "-azLp", "scp": "-Crp " + sshOptions }
 
     def getCommandArgsOn(self, app, machine, cmdArgs):
         if machine == "localhost":
@@ -956,19 +1029,19 @@ class Config:
                   " ".join(allArgs) + "\n\nThe command produced the following output:\n" + output
 
     def ensureRemoteDirExists(self, app, machine, dirname):
-        self.runCommandAndCheckMachine(app, machine, [ "mkdir", "-p", dirname ])
+        self.runCommandAndCheckMachine(app, machine, [ "mkdir", "-p", plugins.quote(dirname, '"') ])
 
     def getRemotePath(self, file, machine):
         if machine == "localhost":
             return file
         else:
-            return machine + ":" + file
-
+            return machine + ":" + plugins.quote(file, '"')
+                                                 
     def copyFileRemotely(self, app, srcFile, srcMachine, dstFile, dstMachine):
         srcPath = self.getRemotePath(srcFile, srcMachine)
         dstPath = self.getRemotePath(dstFile, dstMachine)
         args = self.getRemoteProgramArgs(app, "remote_copy_program") + [ srcPath, dstPath ]
-        return subprocess.call(args, stdin=open(os.devnull), stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
+        return subprocess.call(args, stdin=open(os.devnull)) #, stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
 
     def getRemoteProgramArgs(self, app, setting):
         progStr = app.getConfigValue(setting)
@@ -977,6 +1050,7 @@ class Config:
         return progArgs + plugins.splitcmd(argStr)
 
     def setMiscDefaults(self, app):
+        app.setConfigDefault("default_texttest_tmp", "$TEXTTEST_PERSONAL_CONFIG/tmp", "Default value for $TEXTTEST_TMP, if it is not set")
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
         app.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")
         app.setConfigDefault("remote_shell_program", "rsh", "Program to use for running commands remotely")
@@ -988,6 +1062,7 @@ class Config:
         app.setConfigDefault("filter_file_directory", [ "filter_files" ], "Default directories for test filter files, relative to an application directory.")
         app.setConfigDefault("extra_version", [], "Versions to be run in addition to the one specified")
         app.setConfigDefault("batch_extra_version", { "default" : [] }, "Versions to be run in addition to the one specified, for particular batch sessions")
+        app.setConfigDefault("save_filtered_file_stems", [], "Files where the filtered version should be saved rather than the SUT output")
         # Applies to any interface...
         app.setConfigDefault("auto_sort_test_suites", 0, "Automatically sort test suites in alphabetical order. 1 means sort in ascending order, -1 means sort in descending order.")
         app.addConfigEntry("builtin", "options", "definition_file_stems")
@@ -1046,27 +1121,24 @@ class GrepFilter(plugins.TextFilter):
     def __init__(self, filterText, fileStem):
         plugins.TextFilter.__init__(self, filterText)
         self.fileStem = fileStem
+        
     def acceptsTestCase(self, test):
         for logFile in self.findAllLogFiles(test):
             if self.matches(logFile):
                 return True
         return False
+
     def findAllLogFiles(self, test):
         logFiles = []
-        for fileName in test.findAllStdFiles(self.fileStem):
+        for fileName in test.getFileNamesMatching(self.fileStem):
             fileVersions = os.path.basename(fileName).split(".")[2:]
-            if self.allAllowed(fileVersions, test.app.versions):
-                if os.path.isfile(fileName):
-                    logFiles.append(fileName)
-                else:
-                    test.refreshFiles()
-                    return self.findAllLogFiles(test)
+            if os.path.isfile(fileName):
+                logFiles.append(fileName)
+            else:
+                test.refreshFiles()
+                return self.findAllLogFiles(test)
         return logFiles
-    def allAllowed(self, fileVersions, versions):
-        for version in fileVersions:
-            if version not in versions:
-                return False
-        return True
+
     def matches(self, logFile):
         for line in open(logFile).xreadlines():
             if self.stringContainsText(line):
@@ -1077,7 +1149,7 @@ class GrepFilter(plugins.TextFilter):
 class TestDescriptionFilter(plugins.TextFilter):
     option = "desc"
     def acceptsTestCase(self, test):
-        return self.stringContainsText(plugins.extractComment(test.description))
+        return self.stringContainsText(test.description)
 
 class Running(plugins.TestState):
     def __init__(self, execMachines, freeText = "", briefText = ""):
@@ -1093,7 +1165,7 @@ class Killed(plugins.TestState):
 
 class RunTest(plugins.Action):
     def __init__(self):
-        self.diag = plugins.getDiagnostics("run test")
+        self.diag = logging.getLogger("run test")
         self.currentProcess = None
         self.killedTests = []
         self.killSignal = None
@@ -1185,32 +1257,35 @@ class RunTest(plugins.Action):
         self.killedTests.append(test)
         self.killSignal = sig
         if self.currentProcess:
-            self.killProcess()
+            self.killProcess(test)
         self.lock.release()
-    def killProcess(self):
+        
+    def killProcess(self, test):
+        machine = test.app.getRunMachine()
+        if machine != "localhost" and test.getConfigValue("remote_shell_program") == "ssh":
+            self.killRemoteProcess(test, machine)
         plugins.log.info("Killing running test (process id " + str(self.currentProcess.pid) + ")")
         killSubProcessAndChildren(self.currentProcess)
-    
+
+    def killRemoteProcess(self, test, machine):
+        tmpDir = self.getTmpDirectory(test)
+        remoteScript = os.path.join(tmpDir, "kill_test.sh")
+        test.app.runCommandOn(machine, [ "sh", plugins.quote(remoteScript, '"') ])
+        
     def wait(self, process):
         try:
             plugins.retryOnInterrupt(process.wait)
         except OSError:
             pass # safest, as there are python bugs in this area
-        
-    def getOptions(self, test):
-        optionsFile = test.getFileName("options")
-        if optionsFile:
-            return Template(open(optionsFile).read().strip()).safe_substitute(test.environment)
-        else:
-            return ""
+
     def diagnose(self, testEnv, commandArgs):
-        if self.diag.is_enabled():
+        if self.diag.isEnabledFor(logging.INFO):
             for var, value in testEnv.items():
                 self.diag.info("Environment: " + var + " = " + value)
             self.diag.info("Running test with args : " + repr(commandArgs))
 
     def getRunDescription(self, test):
-        commandArgs = self.getExecuteCmdArgs(test)
+        commandArgs = self.getLocalExecuteCmdArgs(test, makeDirs=False)
         text =  "Command Line   : " + plugins.commandLineString(commandArgs) + "\n"
         interestingVars = self.getEnvironmentChanges(test)
         if len(interestingVars) == 0:
@@ -1233,67 +1308,101 @@ class RunTest(plugins.Action):
                                 stdout=self.makeFile(test, "output"), stderr=self.makeFile(test, "errors"), \
                                 env=testEnv, startupinfo=plugins.getProcessStartUpInfo(test.environment))
     def getPreExecFunction(self):
-        if os.name == "posix":
+        if os.name == "posix": # pragma: no cover - only run in the subprocess!
             return self.ignoreJobControlSignals
 
-    def ignoreJobControlSignals(self):
-        for signum in [ signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU ]:
+    def ignoreJobControlSignals(self): # pragma: no cover - only run in the subprocess!
+        for signum in [ signal.SIGQUIT, signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU ]:
             signal.signal(signum, signal.SIG_IGN)
 
-    def getInterpreter(self, test):
-        interpreter = test.getConfigValue("interpreter")
-        if interpreter.startswith("ttpython"): # interpreted to mean "whatever python TextTest runs with"
-            return interpreter.replace("ttpython", sys.executable + " -u")
-        return interpreter
-
-    def getCmdParts(self, test):
-        args = []
-        interpreter = self.getInterpreter(test)
-        if interpreter:
-            args.append(interpreter)
-        args.append(test.getConfigValue("executable"))
-        args.append(self.getOptions(test))
-        runMachine = test.app.getRunMachine()
-        if runMachine == "localhost":
-            return args
+    def getInterpreterArgs(self, test):
+        args = plugins.splitcmd(test.getConfigValue("interpreter"))
+        if len(args) > 0 and args[0] == "ttpython": # interpreted to mean "whatever python TextTest runs with"
+            return [ sys.executable, "-u" ] + args[1:]
         else:
-            tmpDir = self.getTmpDirectory(test)
-            envArgs = self.getEnvironmentArgs(test) # Must set the environment remotely
-            args = [ "cd", tmpDir, '";"' ] + envArgs + args
-            # Need to change working directory remotely
-            return test.app.getCommandArgsOn(runMachine, args)
+            return args
+
+    def getRemoteExecuteCmdArgs(self, test, runMachine, localArgs):
+        scriptFileName = test.makeTmpFileName("run_test.sh", forComparison=0)
+        scriptFile = open(scriptFileName, "w")
+        scriptFile.write("#!/bin/sh\n\n")
+
+        # Need to change working directory remotely
+        tmpDir = self.getTmpDirectory(test)
+        scriptFile.write("cd " + plugins.quote(tmpDir, "'") + "\n")
+
+        for arg, value in self.getEnvironmentArgs(test): # Must set the environment remotely
+            scriptFile.write("export " + arg + "=" + value + "\n")
+        if test.app.getConfigValue("remote_shell_program") == "ssh":
+            # SSH doesn't kill remote processes, create a kill script
+            scriptFile.write('echo "kill $$" > kill_test.sh\n')
+        scriptFile.write("exec " + " ".join(localArgs) + "\n")
+        scriptFile.close()
+        os.chmod(scriptFileName, 0775) # make executable
+        machine, remoteTmp = test.app.getRemoteTestTmpDir(test)
+        if remoteTmp:
+            test.app.copyFileRemotely(scriptFileName, "localhost", remoteTmp, machine)
+            remoteScript = os.path.join(remoteTmp, os.path.basename(scriptFileName))
+            return test.app.getCommandArgsOn(runMachine, [ plugins.quote(remoteScript, '"') ])
+        else:
+            return test.app.getCommandArgsOn(runMachine, [ plugins.quote(scriptFileName, '"') ])
 
     def getEnvironmentArgs(self, test):
         vars = self.getEnvironmentChanges(test)
         if len(vars) == 0:
             return []
         else:
-            args = [ "env" ]
+            args = []
+            localTmpDir = test.app.writeDirectory
+            machine, remoteTmp = test.app.getRemoteTmpDirectory()
             for var, value in vars:
-                remoteValue = value
+                if remoteTmp:
+                    remoteValue = value.replace(localTmpDir, remoteTmp)
+                else:
+                    remoteValue = value
                 if var == "PATH":
                     # This needs to be correctly reset remotely
-                    remoteValue = value.replace(os.getenv(var), "${" + var + "}")
-                # Double quote as two shells will end up intrepreting this...
-                args.append(var + "='\"" + remoteValue + "\"'")
+                    remoteValue = plugins.quote(remoteValue.replace(os.getenv(var), "${" + var + "}"), '"')
+                else:
+                    remoteValue = plugins.quote(remoteValue, "'")
+                args.append((var, remoteValue))
             return args
     
     def getTmpDirectory(self, test):
         machine, remoteTmp = test.app.getRemoteTestTmpDir(test)
         if remoteTmp:
-            test.app.ensureRemoteDirExists(machine, remoteTmp)
             return remoteTmp
         else:
             return test.getDirectory(temporary=1)
+
+    def getTimingArgs(self, test, makeDirs):
+        machine, remoteTmp = test.app.getRemoteTestTmpDir(test)
+        if remoteTmp:
+            frameworkDir = os.path.join(remoteTmp, "framework_tmp")
+            if makeDirs:
+                test.app.ensureRemoteDirExists(machine, frameworkDir)
+            perfFile = os.path.join(frameworkDir, "unixperf")
+        else:
+            perfFile = test.makeTmpFileName("unixperf", forFramework=1)
+        return [ "time", "-p", "-o", perfFile ]
+
+    def getLocalExecuteCmdArgs(self, test, makeDirs=True):
+        args = []
+        if test.app.hasAutomaticCputimeChecking():
+            args += self.getTimingArgs(test, makeDirs)
+
+        args += self.getInterpreterArgs(test)
+        args += plugins.splitcmd(test.getConfigValue("executable"))
+        args += test.getCommandLineOptions()
+        return args
         
     def getExecuteCmdArgs(self, test):
-        parts = self.getCmdParts(test)
-        basicArgs = reduce(operator.add, map(plugins.splitcmd, parts))
-        if test.app.hasAutomaticCputimeChecking():
-            perfFile = test.makeTmpFileName("unixperf", forFramework=1)
-            return [ "time", "-p", "-o", perfFile ] + basicArgs
+        args = self.getLocalExecuteCmdArgs(test)
+        runMachine = test.app.getRunMachine()
+        if runMachine == "localhost":
+            return args
         else:
-            return basicArgs
+            return self.getRemoteExecuteCmdArgs(test, runMachine, args)
 
     def makeFile(self, test, name):
         fileName = test.makeTmpFileName(name)
@@ -1359,8 +1468,6 @@ class DocumentOptions(plugins.Action):
             keyOutput += " <value>"
             if (docs == "Execution time"):
                 keyOutput = "-" + key + " <time specification string>"
-            elif "<" in docs:
-                keyOutput = self.filledOptionOutput(key, docs)
             else:
                 docs += " <value>"
         if group.name.startswith("Select"):
@@ -1368,11 +1475,6 @@ class DocumentOptions(plugins.Action):
         else:
             return keyOutput, docs
         
-    def filledOptionOutput(self, key, docs):
-        start = docs.find("<")
-        end = docs.find(">", start)
-        filledPart = docs[start:end + 1]
-        return "-" + key + " " + filledPart
 
 class DocumentConfig(plugins.Action):
     def __init__(self, args=[]):
@@ -1399,7 +1501,7 @@ class DocumentEnvironment(plugins.Action):
     def __init__(self, args=[]):
         self.onlyEntries = args
         self.prefixes = [ "TEXTTEST_", "USECASE_" ]
-        self.exceptions = [ "TEXTTEST_DELETION", "TEXTTEST_SYMLINK" ]
+        self.exceptions = [ "TEXTTEST_DELETION", "TEXTTEST_SYMLINK", "TEXTTEST_PERSONAL_" ]
         
     def getEntriesToUse(self, app):
         if len(self.onlyEntries) > 0:
@@ -1409,17 +1511,19 @@ class DocumentEnvironment(plugins.Action):
             return self.findAllVariables(app, self.prefixes, rootDir)
 
     def findAllVariables(self, app, prefixes, rootDir):
-        vanilla = app.inputOptions.has_key("vanilla")
+        includeSite = app.inputOptions.configPathOptions()[0]
         allVars = {}
         for root, dirs, files in os.walk(rootDir):
-            if vanilla and "site" in dirs:
+            if "log" in dirs:
+                dirs.remove("log")
+            if not includeSite and "site" in dirs:
                 dirs.remove("site")
             if root.endswith("lib"):
                 for dir in dirs:
                     if not sys.modules.has_key(dir):
                         dirs.remove(dir)
             for file in files:
-                if file.endswith(".py") and not "usecase" in file: # exclude PyUseCase, which may be linked/copied in
+                if file.endswith(".py") and ("usecase" not in file and "gtk" not in file): # exclude PyUseCase, which may be linked/copied in
                     path = os.path.join(root, file)
                     self.findVarsInFile(path, allVars, prefixes)
         return allVars
@@ -1429,6 +1533,9 @@ class DocumentEnvironment(plugins.Action):
         parts = line[pos:].strip().split("#")
         endPos = parts[0].find(")")
         argStr = parts[0][:endPos + 1]
+        for i in range(argStr.count("(", 1)):
+            endPos = parts[0].find(")", endPos + 1)
+            argStr = parts[0][:endPos + 1]
         allArgs = self.getActualArguments(argStr)
         if len(parts) > 1:
             allArgs.append(parts[1].strip())
@@ -1439,6 +1546,12 @@ class DocumentEnvironment(plugins.Action):
     def getActualArguments(self, argStr):
         if not argStr.startswith("("):
             return []
+
+        # Pick up app.getConfigValue
+        class FakeApp:
+            def getConfigValue(self, name):
+                return "Config value '" + name + "'"
+        app = FakeApp()
         try:
             argTuple = eval(argStr)
             from types import TupleType
@@ -1464,7 +1577,7 @@ class DocumentEnvironment(plugins.Action):
         
     def findVarsInFile(self, path, vars, prefixes):
         import re
-        regexes = [ re.compile("([^/ \"'\.,\(]*)[\(]?[\"]?(" + prefix + "[^/ \"'\.,]*)") for prefix in prefixes ]
+        regexes = [ re.compile("([^/ \"'\.,\(]*)[\(]?[\"'](" + prefix + "[^/ \"'\.,]*)") for prefix in prefixes ]
         for line in open(path).xreadlines():
             for regex in regexes:
                 match = regex.search(line)
@@ -1508,40 +1621,45 @@ class DocumentScripts(plugins.Action):
 class ReplaceText(plugins.ScriptWithArgs):
     scriptDoc = "Perform a search and replace on all files with the given stem"
     def __init__(self, args):
-        argDict = self.parseArguments(args)
+        argDict = self.parseArguments(args, [ "old", "new", "file" ])
         self.oldTextTrigger = plugins.TextTrigger(argDict["old"])
         self.newText = argDict["new"].replace("\\n", "\n")
-        self.logFile = None
-        if argDict.has_key("file"):
-            self.logFile = argDict["file"]
-        self.textDiffTool = None
+        fileStr = argDict.get("file", "")
+        self.stems = plugins.commasplit(fileStr)
+
     def __repr__(self):
         return "Replacing " + self.oldTextTrigger.text + " with " + self.newText + " for"
+
     def __call__(self, test):
-        logFile = test.getFileName(self.logFile)
-        if not logFile:
-            return
-        self.describe(test)
-        sys.stdout.flush()
-        newLogFile = logFile + "_new"
-        writeFile = open(newLogFile, "w")
-        for line in open(logFile).xreadlines():
-            writeFile.write(self.oldTextTrigger.replace(line, self.newText))
-        writeFile.close()
-        os.system(self.textDiffTool + " " + logFile + " " + newLogFile)
-        os.remove(logFile)
-        os.rename(newLogFile, logFile)
+        for stem in self.stems:
+            for stdFile in test.getFileNamesMatching(stem):
+                fileName = os.path.basename(stdFile)
+                self.describe(test, " - file " + fileName)
+                sys.stdout.flush()
+                unversionedFileName = ".".join(fileName.split(".")[:2])
+                tmpFile = os.path.join(test.getDirectory(temporary=1), unversionedFileName)
+                writeFile = open(tmpFile, "w")
+                for line in open(stdFile).xreadlines():
+                    writeFile.write(self.oldTextTrigger.replace(line, self.newText))
+                writeFile.close()
+
+    def usesComparator(self):
+        return True
+
     def setUpSuite(self, suite):
         self.describe(suite)
+
     def setUpApplication(self, app):
-        if not self.logFile:
-            self.logFile = app.getConfigValue("log_file")
-        self.textDiffTool = app.getConfigValue("text_diff_program")
+        if len(self.stems) == 0:
+            logFile = app.getConfigValue("log_file")
+            if not logFile in self.stems:
+                self.stems.append(logFile)                
+            
 
 class ExportTests(plugins.ScriptWithArgs):
     scriptDoc = "Export the selected tests to a different test suite"
     def __init__(self, args):
-        argDict = self.parseArguments(args)
+        argDict = self.parseArguments(args, [ "dest" ])
         self.otherTTHome = argDict.get("dest")
         self.otherSuites = {}
         self.placements = {}
@@ -1608,10 +1726,7 @@ class ExtractStandardPerformance(sandbox.ExtractPerformanceFiles):
         self.describe(test)
         sandbox.ExtractPerformanceFiles.__call__(self, test)
     def findLogFiles(self, test, stem):
-        if glob.has_magic(stem):
-            return test.getFileNamesMatching(stem)
-        else:
-            return [ test.getFileName(stem) ]
+        return test.getFileNamesMatching(stem)
     def getFileToWrite(self, test, stem):
         name = stem + "." + test.app.name + test.app.versionSuffix()
         return os.path.join(test.getDirectory(), name)

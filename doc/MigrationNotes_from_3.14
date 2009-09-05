@@ -1,5 +1,25 @@
 
-There is almost certainly no migration needed. 
+The main things that need migrating are version-specific "options" files. Otherwise there are a couple
+of changes in behaviour you might want to note.
+
+=========================================================
+COMPULSORY MIGRATION
+=========================================================
+(1) Versioned "options" files.
+
+TextTest 3.15 handles options files much more like e.g. "environment" files and "knownbugs" files have
+been handled up until now. It allows them to be placed in test suites and view them as cumulative, i.e. it attempts 
+to amalgamate them with each other. This breaks backward compatibility in the case where
+you have tests that contain both "options.app" and "options.app.v1" files. For example, if
+options.app contains "-a" and options.app.v1 contains "-b", then if you run version v1 of the
+test it will now run with "-a -b" rather than just "-b" as before.
+
+Many such versioned files simply add an extra option, if so you just need to delete the repeated options.
+The simplest way to restore backward compatibility is to add {CLEAR} to the beginning of the line,
+in which case all other options files will be ignored.
+
+You can also for example do {CLEAR -a} which in this case will have the same effect. See the guide
+to test suites on the website for more complete documentation of this new feature.
 
 =========================================================
 CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)

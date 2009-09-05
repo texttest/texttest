@@ -1414,16 +1414,128 @@ Bug Fixes:
     - "Extra versions" write to sensible batch repository locations when no version given on command line (batch.py)
     - Website generation works for "Extra version" applications even if the parent is blocked or has no data (batch.py)
 
+Version 3.14.1
+==============
+Bug Fixes to 3.14:
+    - Import File now works even when starting without any pre-existing test suites (default_gui.py)
+    - New floating point filtering functionality now handles new files correctly (rundependent.py)
+    - Strange and unnecessary frame removed from Save Selection dialog (guiplugins.py)
+Fixes for older bugs:
+    - Fixed problem where reconnection to multiple runs failed to pick up composite versions (reconnect.py)
+    - Fixed grid engine problem where tests were sent to jobs that had already been killed (queuesystem/__init__.py)
+
 Version trunk
 =============
 General GUI Enhancements:
+    - Default search now works! (testtree.py)
+	Can select tests just by typing with the test tree highlighted
+    - Version dialog shows version of PyGObject and GLib also (helpdialogs.py)
+    - Quick Start guide now available from help menu, also credits and license (helpdialogs.py)
 Static GUI Enhancements:
+    - New "Replace Text in Files" action
+	Graphical version of default.ReplaceText script
+    - Selection of test suites now reported in test tree header (testtree.py)
+	Reports number of suites selected instead of 0 tests
+    - Adding a test now adds it to all selected suites (adminactions.py)
+	More consistent with behaviour of Rename, Copy etc.
+    - Can now use UNIX-style file expansion wildcards (globs) in the "Test-file to search" box in the Selection tab. (default_gui.py)
+	Allows looking for text in multiple files simultaneously. Also affects -grepfile on the command line.
+    - On creating a new application, can specify at creation time that it is a GUI (default_gui.py)
+	Saves on fiddling and restarting the GUI.
+    - Default value for "query_kill_processes" changed (default/__init__.py)
+	Ask before terminating dynamic GUIs when static GUI is terminated.
+    - Tooltips added to the selection tab to aid clarity.
+Dynamic GUI Enhancements:
+    - Can now rerun tests directly from the dynamic GUI (runningactions.py)
+	Saves on saving a selection back to the static GUI, loading it and then rerunning.
+    - Selecting files in the file view now also filters the Text Info display below (texttestgui.py)
+	So that it only previews what is currently selected.
+    - Saved tests are now listed separately in the status view (statusviews.py)
+	Makes it easier to track which tests have been saved and which worked by themselves
+    - Saved tests make this clear in the Text Info space, recording the time at which they were saved (comparetest.py)
+    - Can now view original files (filtered and not) from the file view popup menu (fileviewers.py)
+    - Can now view files with content-filtering but not order-filtering present (fileviewers.py)
+	Useful when "unordered_text" is defined
+    - New base_version "recusecase" for when recording GUI tests
+	Works much like the exisiting "rectraffic", i.e. a way to have different configuration only in this case
+    - Test tree tooltips now work more reliably and use the builtin support in PyGTK 2.12 (testtree.py)
+	They are removed in PyGTK 2.10, was not deemed important enough to keep them there
 Framework Enhancements:
+    - Can now use "options" files in test suites (default/__init__.py)
+	They get combined like "environment" files. See "Test Suite Guide" on the website for more details.
+    - Reconnect now picks up all "extra versions" that were originally run (reconnect.py)
+	Mainly useful if batch_extra_version was originally supplied
+    - New variable TEXTTEST_SANDBOX_ROOT provided
+	Refers to the top level of the sandbox structure, can be used for temporary storage shared between tests.
+    - New variable TEXTTEST_PATH provided (engine.py)
+	Like TEXTTEST_HOME, but allows loading tests from multiple locations into the same process
+    - New config setting "performance_ignore_improvements" (performance.py)
+	As the name suggests, allows performance testing to only flag when performance degrades.
+    - New config setting "save_filtered_file_stems"
+	Allows the filtered version of files to be saved instead of the raw output.
     - Logging more flexible now (default.py)
 	Dynamic GUI does not write anything by default. Batch mode writes time stamps by default.
 	Debug logging file now called "logging.debug" rather than "log4py.conf". See migration notes
     - Personal toolbar/GTK configuration now lives in "etc" subdirectory (plugins.py)
 	Mostly to keep things consistent with "log" locations
-Version Control Browser Enhancements/bug fixes:
-Internal changes:
+    - Generalised --vanilla option (testmodel.py)
+	Now have --vanilla site and --vanilla personal
+    - New "default_texttest_tmp" config file entry (default/__init__.py)
+	Useful for setting a site-wide default, e.g. if a separate disk is used for this purpose
+    - Overwrite mode (-o) now displays differences for what it overwrites
+Historical HTML Batch Report Enhancements:
+    - Separate summary rows are now displayed for each extra version (testoverview.py)
+    - With extra versions, the first one also gets given a header row now (testoverview.py)
+    - Category ordering is now deterministic, with succeeded tests displayed first (testoverview.py)
+Grid Engine (LSF/SGE) enhancements:
+    - New config file option "queue_system_min_test_count" (queuesystem/__init__.py)
+	Can make sure small numbers of tests get run locally by default, while large numbers use the grid.
+    - Slave job handling is now multithreaded (masterprocess.py)
+	Hopefully a bit faster and less sensitive to network trouble
+    - Errors produced by remote jobs now get reported on master process stderr (masterprocess.py)
+	And hence in popups in the static GUI where appropriate.
+    - Tests from different applications now interleaved when submitting (masterprocess.py)
+	Means one application is less likely to take over all available resources
+Self-test/Internal changes:
+    - Everything now done via PyUseCase 2.0's new auto-logging. Most custom logging removed from TextTest.
+    - Popup menus are now called and shown in the tests.
+    - New application event fixes indeterminism problems around tests that kill external viewers.
+    - Major GUI code refactoring to create packages as appropriate
+    - Lots of work on coverage: tests added, dead code removed, no-coverage pragmas added. Coverage from self-tests now 98.6%
 Bug Fixes:
+    - Invisible (filtered out) tests will not be run now when a test suite is selected (texttestgui.py)
+    - "Create/Import" functionality in static GUI works correctly for directories which previously existed (adminactions.py)
+    - Static GUI no longer refuses to start if the "default checkout" can't be found (default/__init__.py)
+    - All plugins scripts now reject unknown arguments in a consistent way (plugins.py)
+    - Status of tests now synchronised across the GUI, should be harder to get a test green/red somewhere and still yellow
+	somewhere else.
+    - Observer exceptions no longer fatal (plugins.py)
+	Many observers can be in configuration code and shouldn't be allowed to bring down other applications.
+    - Pasting a test where there already exists a file of that name now handled gracefully (adminactions.py)
+    - Fixed stacktrace removing a suite containing duplicated subsuites (testmodel.py)
+    - Traffic mechanism no longer stacktraces if server under test resets its connection (traffic.py)
+    - "Show File Properties" in the dynamic GUI no longer shows everything twice for new files (fileviewers.py)
+    - Running tests remotely (without grid engine) can now handle illegal shell syntax in test names and environment variables (default.py)
+    - Running tests remotely (without grid engine) now gets correct values for TEXTTEST_SANDBOX
+    - Running tests remotely (without grid engine) now works in conjunction with automatic performance measurement (default.py)
+    - Killing remote tests started with SSH now works (default/__init__.py)
+	SSH doesn't forward signals unfortunately...
+    - Auto-replay the correct test when recording if static GUI test selection changes in the meantime (adminactions.py)
+    - Refining a selection containing test suites now works properly (selectandfilter.py)
+	Previously lost all test suites
+    - Now produce a warning for duplicated sections in "knownbugs" files (knownbugs/__init__.py)
+	Silently ignored previously
+    - Importing files now preserves permissions correctly (adminactions.py)
+    - Crashed virtual servers are now restarted after each test, preventing multiple tests failing for the same crash (virtualdisplay.py)
+    - Grouping of tests in the dynamic GUI is disabled if their diffs are longer than the maximum to display (statusviews.py)
+	Could lead to false grouping and hence incorrect saves
+    - Credits dialog no longer mangled in locales which aren't Latin-1 compatible (helpdialogs.py)
+    - Added error messages for locale encoding problems (guiutils.py)
+    - Errors when collating now get shown in the GUI (sandbox.py)
+    - "collate_file" is now done before "discard_file" (sandbox.py)
+	Means you can "rename" files by collating them to a new name and then discarding the original one.
+Grid Engine (LSF/SGE) Bug Fixes:
+    - Don't send tests for re-use whose submission has been cancelled (queuesystem/masterprocess.py)
+    - Reduced keepalive timeout to 5 minutes, 2 hours is rather a long time in a test context (masterprocess.py)
+    - Don't fall over if SUT leaves child processes running from the slave (slavejobs.py)
+

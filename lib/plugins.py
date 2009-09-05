@@ -1,5 +1,5 @@
 
-import sys, os, log4py, string, shutil, socket, time, re, stat, locale, subprocess, shlex, types, operator
+import sys, os, logging.config, string, shutil, socket, time, re, stat, subprocess, shlex, types, operator
 from ndict import seqdict
 from traceback import format_exception
 from threading import currentThread
@@ -36,6 +36,18 @@ def localtime(format= "%d%b%H:%M:%S", seconds=None):
         seconds = time.time()
     return time.strftime(format, time.localtime(seconds))
 
+class Callable:
+    def __init__(self, method, *args):
+        self.method = method
+        self.extraArgs = args
+    def __call__(self, *calledArgs):
+        toUse = calledArgs + self.extraArgs
+        return self.method(*toUse)
+    def __eq__(self, other):
+        return isinstance(other, Callable) and self.method == other.method and self.extraArgs == other.extraArgs
+    def __hash__(self):
+        return hash((self.method, self.extraArgs))
+
 def findInstallationRoots():
     installationRoot = os.path.dirname(os.path.dirname(__file__)).replace("\\", "/")
     if os.path.basename(installationRoot) == "generic":
@@ -68,21 +80,48 @@ def installationDir(name):
     # Generic modules only, we're confident we know where they are
     return os.path.join(installationRoots[0], name)
 
-def installationPath(subpath):
+def installationPath(*pathElems):
     for instRoot in installationRoots:
-        instPath = os.path.join(instRoot, subpath)
+        instPath = os.path.join(instRoot, *pathElems)
         if os.path.exists(instPath):
             return instPath
 
-def findDataPaths(filePattern="", vanilla=False, includePersonal=False, dataDir="etc"):
-    if vanilla:
-        return glob(os.path.join(installationRoots[0], dataDir, filePattern))
-    else:
-        dirs = [ os.path.join(instRoot, dataDir) for instRoot in installationRoots ]
-        if includePersonal:
-            dirs.append(os.path.join(getPersonalConfigDir(), dataDir))
+def getPersonalDir(dataDirName):
+    envVar = "TEXTTEST_PERSONAL_" + dataDirName.upper()
+    return os.getenv(envVar, os.path.join(getPersonalConfigDir(), dataDirName))
 
-        return reduce(operator.add, (glob(os.path.join(d, filePattern)) for d in dirs), [])
+def quote(value, quoteChar):
+    if quoteChar in value:
+        return value # don't double-quote
+    # Make sure the home directory gets expanded...
+    if value.startswith("~/"):
+        return value[:2] + quoteChar + value[2:] + quoteChar
+    else:
+        return quoteChar + value + quoteChar
+
+
+def pluralise(num, name):
+    if num == 1:
+        return "1 " + name
+    else:
+        return str(num) + " " + name + "s"
+
+
+def findDataDirs(includeSite=True, includePersonal=False, dataDirName="etc"):
+    if includeSite:
+        dirs = [ os.path.join(instRoot, dataDirName) for instRoot in installationRoots ]
+    else:
+        dirs = [ os.path.join(installationRoots[0], dataDirName) ]
+    if includePersonal:
+        dirs.append(getPersonalDir(dataDirName))
+    return dirs
+
+def findDataPaths(filePatterns, *args, **kwargs):
+    paths = []
+    for dir in findDataDirs(*args, **kwargs):
+        for filePattern in filePatterns:
+            paths += glob(os.path.join(dir, filePattern))
+    return paths
         
 # Parse a time string, either a HH:MM:SS string, or a single int/float,
 # which is interpreted as a number of minutes, for backwards compatibility.
@@ -104,13 +143,12 @@ def getNumberOfSeconds(timeString):
     raise TextTestError, "Illegal time format '" + timeString + \
           "' :  Use format HH:MM:SS or MM:SS, or a single number to denote a number of minutes."
 
-# Same as above, but gives minutes instead of seconds ...
-def getNumberOfMinutes(timeString):
-    return getNumberOfSeconds(timeString) / 60
-
 def printWarning(message, stdout = True, stderr = False):
     if stdout:
-        log.info("WARNING: " + message)
+        if log:
+            log.info("WARNING: " + message)
+        else:
+            print "WARNING: " + message # in case we haven't set up the logging yet...
     if stderr:
         sys.stderr.write("WARNING: " + message + "\n")
 
@@ -118,12 +156,6 @@ def printWarning(message, stdout = True, stderr = False):
 regexChars = re.compile("[\^\$\[\]\{\}\\\*\?\|\+]")
 def isRegularExpression(text):
     return (regexChars.search(text) != None)
-def findRegularExpression(expr, text):
-    try:
-        regExpr = re.compile(expr)
-        return regExpr.search(text)
-    except:
-        return False
 
 # Parse the string as a byte expression.
 # Mb/mb/megabytes/mbytes
@@ -228,7 +260,7 @@ def convertForMarkup(message):
 # Filter interface: all must provide these three methods
 class Filter:
     def acceptsTestCase(self, test):
-        return 1
+        return 1 # pragma: no cover - implemented in all base classes
     def acceptsTestSuite(self, suite):
         return 1
     def acceptsTestSuiteContents(self, suite):
@@ -244,6 +276,14 @@ class TextTriggerGroup:
             if trigger.matches(searchString):
                 return True
         return False
+
+    def readAndFilter(self, fileName):
+        text = ""
+        for line in open(fileName).xreadlines():
+            if not self.stringContainsText(line):
+                text += line
+        return text
+
 
 class TextFilter(Filter, TextTriggerGroup):
     def __init__(self, filterText, *args):
@@ -270,7 +310,7 @@ class ApplicationFilter(TextFilter):
 class TestPathFilter(TextFilter):
     option = "tp"
     def __init__(self, *args):
-        self.diag = getDiagnostics("TestPathFilter")
+        self.diag = logging.getLogger("TestPathFilter")
         TextFilter.__init__(self, *args)
     def parseInput(self, filterText, app, suites):
         allEntries = TextFilter.parseInput(self, filterText, app, suites)
@@ -369,19 +409,20 @@ class Action:
     # Useful for printing in a certain format...
     def describe(self, testObj, postText = ""):
         log.info(testObj.getIndent() + repr(self) + " " + repr(testObj) + postText)
-    def __repr__(self):
-        return "Doing nothing on"
     def __str__(self):
         return str(self.__class__)
 
 class ScriptWithArgs(Action):
-    def parseArguments(self, args):
+    def parseArguments(self, args, allowedArgs):
         currKey = ""
         dict = {}
         for arg in args:
-            if arg.find("=") != -1:
+            if "=" in arg:
                 currKey, val = arg.split("=")
-                dict[currKey] = val
+                if currKey in allowedArgs:
+                    dict[currKey] = val
+                else:
+                    print "Unrecognised option '" + currKey + "'"
             elif dict.has_key(currKey):
                 dict[currKey] += " " + arg
         return dict
@@ -397,9 +438,9 @@ class ThreadedNotificationHandler:
     def __init__(self):
         self.workQueue = Queue()
         self.active = False
-    def enablePoll(self, idleHandleMethod):
+    def enablePoll(self, idleHandleMethod, **kwargs):
         self.active = True
-        return idleHandleMethod(self.pollQueue)
+        return idleHandleMethod(self.pollQueue, **kwargs)
     def disablePoll(self):
         self.active = False
     def pollQueue(self):
@@ -420,7 +461,7 @@ class Observable:
     @classmethod
     def diagnoseObs(klass, message, *args, **kwargs):
         if not klass.obsDiag:
-            klass.obsDiag = getDiagnostics("Observable")
+            klass.obsDiag = logging.getLogger("Observable")
         klass.obsDiag.info(message + " " + str(klass) + " " + repr(args) + repr(kwargs))
 
     def __init__(self, passSelf=False):
@@ -464,19 +505,21 @@ class Observable:
         methodName = "notify" + name
         for observer in self.observers:
             if hasattr(observer, methodName):
-                retValue = self.notifyObserver(observer, methodName, *args, **kwargs)
-                if retValue is not None: # break off the chain if we get a non-None value back
-                    break
-
+                self.notifyObserver(observer, methodName, *args, **kwargs)
+                
     def notifyObserver(self, observer, methodName, *args, **kwargs):
         # doesn't matter if only some of the observers have the method
         method = eval("observer." + methodName)
         # unpickled objects have not called __init__, and
         # hence do not have self.passSelf ...
-        if hasattr(self, "passSelf") and self.passSelf:
-            return method(self, *args, **kwargs)
-        else:
-            return method(*args, **kwargs)
+        try:
+            if hasattr(self, "passSelf") and self.passSelf:
+                method(self, *args, **kwargs)
+            else:
+                method(*args, **kwargs)
+        except:
+            sys.stderr.write("Observer raised exception while calling " + methodName + " :\n")
+            printException()
 
 # Interface all responders must fulfil
 class Responder:
@@ -612,37 +655,17 @@ class MarkedTestState(TestState):
         return self.category, self.briefText
 
 log = None
-class NullLogger:
-    def info(*args):
-        pass
-
-# Simple handle to get diagnostics object. Better than using log4py directly,
-# as it ensures everything appears by default in a standard place with a standard name.
-def getDiagnostics(diagName):
-    rootLogger = log4py.Logger.instance
-    if rootLogger:
-        return rootLogger.get_instance(diagName)
-    else:
-        return NullLogger()
-
-def configureLogging(configFile):
-    rootLogger = log4py.Logger.instance
+def configureLogging(configFile=None):
     # only set up once
-    if not rootLogger:
-        # Don't use the default locations, particularly current directory causes trouble
-        if len(log4py.CONFIGURATION_FILES) > 1:
-            del log4py.CONFIGURATION_FILES[1]
-
-        rootLogger = log4py.Logger(customconfigfiles=configFile)
-        global log
-        log = rootLogger.get_instance("standard log")
+    global log
+    if not log:
+        if configFile:
+            defaults = { "TEXTTEST_PERSONAL_LOG": getPersonalDir("log") }
+            logging.config.fileConfig(configFile, defaults)
+        log = logging.getLogger("standard log")
 
 def getPersonalConfigDir():
-    fromEnv = os.getenv("TEXTTEST_PERSONAL_CONFIG")
-    if fromEnv:
-        return fromEnv
-    else:
-        return os.path.normpath(os.path.expanduser("~/.texttest"))
+    return os.getenv("TEXTTEST_PERSONAL_CONFIG")
 
 # Return the hostname, guaranteed to be just the hostname...
 def gethostname():
@@ -730,16 +753,17 @@ def getProcessStartUpInfo(envMapping=os.environ):
 
 def copyPath(srcPath, dstPath):
     if os.path.isdir(srcPath):
+        removePath(dstPath)
         shutil.copytree(srcPath, dstPath)
     else:
-        shutil.copyfile(srcPath, dstPath)
+        shutil.copy(srcPath, dstPath)
         
 def removePath(path):
-    if os.path.exists(path):
-        if os.path.isdir(path):
-            shutil.rmtree(path)
-        else:
-            os.remove(path)
+    if os.path.isfile(path) or os.path.islink(path):
+        os.remove(path)
+        return True
+    elif os.path.isdir(path):
+        shutil.rmtree(path)
         return True
     else:
         return False
@@ -928,24 +952,26 @@ def printException():
     sys.stderr.write(exceptionString)
     return exceptionString
 
+def zeroDivisorPercentage(numerator):
+    if numerator == 0.0:
+        return 0
+    else:
+        return -1
+
 def calculatePercentageNormalised(oldVal, newVal):        
     largest = max(oldVal, newVal)
     smallest = min(oldVal, newVal)
-    if smallest == 0.0:
-        if largest == 0.0:
-            return 0
-        else:
-            return -1
-    return ((largest - smallest) / smallest) * 100
+    if smallest != 0.0:
+        return ((largest - smallest) / abs(smallest)) * 100
+    else:
+        return zeroDivisorPercentage(largest)
 
 def calculatePercentageStandard(oldVal, newVal):        
-    if oldVal == 0.0:
-        if newVal == 0.0:
-            return 0
-        else:
-            return -1
-    diff = abs(newVal - oldVal)
-    return (diff / oldVal) * 100
+    if oldVal != 0.0:
+        diff = abs(newVal - oldVal)
+        return (diff / abs(oldVal)) * 100
+    else:
+        return zeroDivisorPercentage(newVal)
 
 def roundPercentage(val):
     perc = int(val)
@@ -956,34 +982,27 @@ def roundPercentage(val):
 
 
 class PreviewGenerator:
-    def __init__(self, maxWidth, maxLength, startEndRatio=1):
+    def __init__(self, maxWidth, maxLength):
         self.maxWidth = maxWidth
-        self.cutFromStart = int(maxLength * startEndRatio)
-        self.cutFromEnd = maxLength - self.cutFromStart
-    def getCutLines(self, lines):
-        if len(lines) < self.cutFromEnd + self.cutFromStart:
-            return lines
+        self.maxLength = maxLength
 
-        cutLines = lines[:self.cutFromStart]
-        if self.cutFromEnd > 0:
-            cutLines.append("... extra data truncated by TextTest ...\n")
-            cutLines += lines[-self.cutFromEnd:]
-        return cutLines
+    def getCutLines(self, lines):
+        return lines[:self.maxLength] 
+
     def getPreview(self, file):
         fileLines = retryOnInterrupt(self.getFileLines, file)
-        return self._getPreview(fileLines)
+        return self.getPreviewFromLines(fileLines)
+
     def getFileLines(self, file):
         lines = file.readlines()
         file.close()
         return lines
-    def _getPreview(self, lines):
+
+    def getPreviewFromLines(self, lines):
         cutLines = self.getCutLines(lines)
         lines = map(self.getWrappedLine, cutLines)
-        return string.join(lines, "")
-    def getPreviewFromText(self, text):
-        truncatedLines = text.splitlines()
-        lines = [ line + "\n" for line in truncatedLines ]
-        return self._getPreview(lines)
+        return "".join(lines)
+
     def getWrappedLine(self, line):
         remaining = line
         result = ""
@@ -992,6 +1011,7 @@ class PreviewGenerator:
                 return result + remaining
             result += remaining[:self.maxWidth] + "\n"
             remaining = remaining[self.maxWidth:]
+
 
 # Exception to throw. It's generally good to throw this internally
 class TextTestError(RuntimeError):
@@ -1057,7 +1077,7 @@ class MultiEntryDictionary(seqdict):
     def __init__(self, importKey="", importFileFinder=None):
         seqdict.__init__(self)
         self.resetCurrent()
-        self.diag = getDiagnostics("MultiEntryDictionary")
+        self.diag = logging.getLogger("MultiEntryDictionary")
         self.aliases = {}
         self.importKey = importKey
         self.importFileFinder= importFileFinder
@@ -1289,11 +1309,7 @@ class TextOption(Option):
     def addPossibleValue(self, value):
         if value not in self.possibleValues:
             self.possibleValues.append(value)
-            if self.possValAppendMethod:
-                self.possValAppendMethod(value)
-            return True
-        else:
-            return False
+            
     def setValue(self, value):
         Option.setValue(self, value)
         if self.usePossibleValues():
@@ -1375,7 +1391,10 @@ class Switch(Option):
         self.setValue(1 - self.getValue())
 
     def getCmdLineValue(self):
-        return "" # always on or off...
+        if len(self.options) > 2:
+            return str(self.getValue())
+        else:
+            return "" # always on or off...
 
     def reset(self):
         if self.defaultValue == 0 and self.resetMethod:
@@ -1385,8 +1404,8 @@ class Switch(Option):
 
     def describe(self):
         text = self.name
-        if len(self.options) > 0:
-            text += self.options[-1]
+        if len(self.options) > 1:
+            text += "=" + self.options[1]
         return text
 
 
@@ -1449,14 +1468,11 @@ class OptionGroup:
     def keys(self):
         return self.options.keys()
 
-    def getCommandLines(self, onlyKeys=[]):
+    def getOptionsForCmdLine(self, onlyKeys):
         commandLines = []
         for key, option in self.options.items():
             if self.accept(key, option, onlyKeys):
-                commandLines.append("-" + key)
-                value = option.getCmdLineValue()
-                if value:
-                    commandLines.append(value)
+                commandLines.append((key, option.getCmdLineValue()))
         return commandLines
     
     def accept(self, key, option, onlyKeys):
@@ -1465,107 +1481,7 @@ class OptionGroup:
         if len(onlyKeys) == 0:
             return True
         return key in onlyKeys
-
-    def readCommandLineArguments(self, args):
-        for arg in args:
-            if "=" in arg:
-                optionName, value = arg.split("=")
-                option = self.getOption(optionName)
-                if option:
-                    option.setValue(value)
-                else:
-                    raise TextTestError, self.name + " does not support option '" + optionName + "'"
-            else:
-                switch = self.getOption(arg)
-                if switch:
-                    switch.toggle()
-                else:
-                    raise TextTestError, self.name + " does not support switch '" + arg + "'"
-
-
-def decodeText(text, log = None):
-    localeEncoding = locale.getdefaultlocale()[1]
-    if localeEncoding:
-        try:
-            return unicode(text, localeEncoding, errors="strict")
-        except:
-            if log:
-                log.info("WARNING: Failed to decode string '" + text + \
-                         "' using default locale encoding " + repr(localeEncoding) + \
-                         ". Trying ISO8859-1 encoding ...")
-
-    return decodeISO88591Text(text, localeEncoding, log)
-
-def decodeISO88591Text(text, localeEncoding, log = None):
-    try:
-        return unicode(text, 'ISO8859-1', errors="strict")
-    except:
-        if log:
-            log.info("WARNING: Failed to decode string '" + text + \
-                     "' using ISO8859-1 encoding " + repr(localeEncoding) + \
-                     ". Trying strict UTF-8 encoding ...")
-
-        return decodeUtf8Text(text, localeEncoding, log)
-
-def decodeUtf8Text(text, localeEncoding, log = None):
-    try:
-        return unicode(text, 'utf-8', errors="strict")
-    except:
-        if log:
-            log.info("WARNING: Failed to decode string '" + text + \
-                     "' both using strict UTF-8 and " + repr(localeEncoding) + \
-                     " encodings.\nReverting to non-strict UTF-8 encoding but " + \
-                     "replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
-        return unicode(text, 'utf-8', errors="replace")
-
-def encodeToUTF(unicodeInfo, log = None):
-    try:
-        return unicodeInfo.encode('utf-8', 'strict')
-    except:
-        try:
-            if log:
-                log.info("WARNING: Failed to encode Unicode string '" + unicodeInfo + \
-                         "' using strict UTF-8 encoding.\nReverting to non-strict UTF-8 " + \
-                         "encoding but replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
-            return unicodeInfo.encode('utf-8', 'replace')
-        except:
-            if log:
-                log.info("WARNING: Failed to encode Unicode string '" + unicodeInfo + \
-                         "' using both strict UTF-8 encoding and UTF-8 encoding with " + \
-                         "replacement. Showing error message instead.")
-            return "Failed to encode Unicode string."
-
-def encodeToLocale(unicodeInfo, log = None):
-    localeEncoding = locale.getdefaultlocale()[1]
-    if localeEncoding:
-        try:
-            return unicodeInfo.encode(localeEncoding, 'strict')
-        except:
-            if log:
-                log.info("WARNING: Failed to encode Unicode string '" + unicodeInfo + \
-                         "' using strict '" + localeEncoding + "' encoding.\nReverting to non-strict UTF-8 " + \
-                         "encoding but replacing problematic\ncharacters with the Unicode replacement character, U+FFFD.")
-    return unicodeInfo.encode('utf-8', 'replace')
-
-def rel_pathsplit(p, rest=[]):
-    (h,t) = os.path.split(p)
-    if len(h) < 1: return [t]+rest
-    if len(t) < 1: return [h]+rest
-    return rel_pathsplit(h,[t]+rest)
-
-def commonpath(l1, l2, common=[]):
-    if len(l1) < 1: return (common, l1, l2)
-    if len(l2) < 1: return (common, l1, l2)
-    if l1[0] != l2[0]: return (common, l1, l2)
-    return commonpath(l1[1:], l2[1:], common+[l1[0]])
-
-def relativepath(p1, p2):
-    (common,l1,l2) = commonpath(rel_pathsplit(p1), rel_pathsplit(p2))
-    p = []
-    if len(l1) > 0:
-        p = [ '../' * len(l1) ]
-    p = p + l2
-    return os.path.join( *p )
+    
 
 # pwd and grp doesn't exist on windows ...
 import stat
@@ -1619,8 +1535,7 @@ class FileProperties:
     def formatTime(self, timeStamp):
         # %e is more appropriate than %d below, as it fills with space
         # rather than 0, but it is not supported on Windows, it seems.
-        if timeStamp < self.recent or \
-               timeStamp > self.now:
+        if timeStamp < self.recent or timeStamp > self.now:
             timeFormat = "%b %d  %Y"
         else:
             timeFormat = "%b %d %H:%M"
@@ -1634,7 +1549,4 @@ class FileProperties:
                 self.inqLinks(), self.inqOwner(),
                 self.inqGroup(), self.inqSize(),
                 self.inqModificationTime(), self.filename)
-    def getUnixStringRepresentation(self):
-        return "%s%s %3d %-8s %-8s %8d %s %s" % self.getUnixRepresentation()
-    def getDescription(self):
-        return "Showing properties of the file " + self.abspath + ":\n" + self.getUnixStringRepresentation()
+    

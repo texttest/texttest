@@ -1,14 +1,6 @@
 
 import plugins, os
 
-def getLoggerName(staticGUI, dynamicGUI):
-    if staticGUI:
-        return "static GUI behaviour"
-    elif dynamicGUI:
-        return "dynamic GUI behaviour"
-    else:
-        return "Use-case log"
-
 def makeScriptEngine(optionMap):
     if ApplicationEventResponder.scriptEngine:
         return ApplicationEventResponder.scriptEngine
@@ -18,18 +10,15 @@ def makeScriptEngine(optionMap):
         return scriptEngine
 
 def _makeScriptEngine(optionMap):
-    staticGUI = optionMap.has_key("gx")
-    dynamicGUI = optionMap.has_key("g")
-    logger = plugins.getDiagnostics(getLoggerName(staticGUI, dynamicGUI))
-    if staticGUI or dynamicGUI:
+    if optionMap.has_key("gx") or optionMap.has_key("g"):
         try:
             from gtkusecase import ScriptEngine
-            return ScriptEngine(logger, enableShortcuts=True) 
+            return ScriptEngine(enableShortcuts=True) 
         except ImportError:
             pass # Let the GUI itself print the error
     else:
         from usecase import ScriptEngine
-        return ScriptEngine(logger)
+        return ScriptEngine()
 
 
 # Compulsory responder to generate application events. Always present. See respond module
@@ -42,23 +31,29 @@ class ApplicationEventResponder(plugins.Responder):
         eventName = "test " + test.uniqueName + " to " + changeDesc
         category = test.uniqueName
         timeDelay = self.getTimeDelay()
-        self.scriptEngine.applicationEvent(eventName, category, timeDelay)
+        self.scriptEngine.applicationEvent(eventName, category + " lifecycle", [ "lifecycle" ], timeDelay)
+        
     def notifyAdd(self, test, initial):
         if initial and test.classId() == "test-case":
             eventName = "test " + test.uniqueName + " to be read"
-            self.scriptEngine.applicationEvent(eventName, test.uniqueName)
+            self.scriptEngine.applicationEvent(eventName, test.uniqueName, [ test.uniqueName + " lifecycle", "read", "lifecycle" ])
+
     def notifyUniqueNameChange(self, test, newName):
         if test.classId() == "test-case":
-            self.scriptEngine.applicationEventRename("test " + test.uniqueName + " to", "test " + newName + " to")
+            self.scriptEngine.applicationEventRename("test " + test.uniqueName + " to", "test " + newName + " to",
+                                                     test.uniqueName, newName)
 
     def getTimeDelay(self):
         try:
             return int(os.getenv("TEXTTEST_FILEWAIT_SLEEP", 1))
-        except ValueError:
+        except ValueError: # pragma: no cover - pathological case
             return 1
+
     def notifyAllRead(self, *args):
-        self.scriptEngine.applicationEvent("all tests to be read")
+        self.scriptEngine.applicationEvent("all tests to be read", "read", [ "lifecycle" ])
+
     def notifyAllComplete(self):
-        self.scriptEngine.applicationEvent("completion of test actions")
+        self.scriptEngine.applicationEvent("completion of test actions", "lifecycle")
+
     def notifyCloseDynamic(self, test, name):
         self.scriptEngine.applicationEvent(name + " GUI to be closed")

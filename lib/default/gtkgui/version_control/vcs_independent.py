@@ -1,7 +1,9 @@
 
 # Generic interface to version control systems. We try to keep it as general as possible.
 
-import gtk, gobject, guiplugins, default_gui, plugins, custom_widgets, entrycompletion, os, datetime, subprocess, shutil
+import gtk, gobject, plugins, custom_widgets, os, datetime, subprocess, shutil
+from default.gtkgui import guiplugins, guiutils, entrycompletion
+from default.gtkgui.default_gui import adminactions
 
 vcsClass, vcs, annotateClass = None, None, None
     
@@ -103,12 +105,6 @@ class VersionControlInterface:
     def getCmdArgs(self, cmdName, extraArgs=[]):
         return self.getProgramArgs() + [ cmdName ] + self.defaultArgs.get(cmdName, []) + extraArgs 
 
-    def getDateFromLog(self, output):
-        pass # pragma: no cover - implemented in all derived classes
-
-    def parseStateFromStatus(self, output):
-        pass # pragma: no cover - implemented in all derived classes
-
     def getCombinedRevisionOptions(self, r1, r2):
         return [ "-r", r1, "-r", r2 ] # applies to CVS and Mercurial
 
@@ -148,19 +144,11 @@ class VersionControlInterface:
     def getMoveCommand(self):
         return self.program + " mv"
 
-    def removePath(self, path):
-        retCode = self.callProgram("rm", [ path ])
-        if retCode > 0:
-            # Wasn't in version control, probably
-            return plugins.removePath(path)
-        else:
-            return True
-
 
 # Base class for all version control actions.
 class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
     recursive = False
-    def __init__(self, allApps=[], dynamic=False):
+    def __init__(self, allApps=[], dynamic=False, inputOptions={}):
         guiplugins.ActionResultDialogGUI.__init__(self, allApps)
         self.cmdName = self._getTitle().replace("_", "").lower()
         self.dynamic = dynamic
@@ -229,12 +217,6 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
     def getResultTitle(self):
         return self._getTitle().replace("_", "").lower()
 
-    def getTestDescription(self, test):
-        relpath = test.getRelPath()
-        if relpath:
-            return relpath
-        else:
-            return "the root test suite"
     def runAndParse(self):
         self.notInRepository = False
         self.needsAttention = False
@@ -315,9 +297,8 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
 
     def viewGraphicalDiff(self, button):
         path = self.filteredTreeModel.get_value(self.treeView.get_selection().get_selected()[1], 3)
-        guiplugins.guilog.info("Viewing " + vcs.name + " differences for file '" + path + "' graphically ...")
         pathStem = os.path.basename(path).split(".")[0]
-        diffProgram = guiplugins.guiConfig.getCompositeValue("diff_program", pathStem)
+        diffProgram = guiutils.guiConfig.getCompositeValue("diff_program", pathStem)
         revOptions = self.getExtraArgs()
         graphDiffArgs = vcs.getGraphicalDiffArgs(diffProgram)
         try:
@@ -332,7 +313,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
                                      "'.\nPlease install it somewhere on your $PATH.\n")
     
     def diffingComplete(self, *args):
-        guiplugins.scriptEngine.applicationEvent("the version-control graphical diff program to terminate")
+        guiutils.scriptEngine.applicationEvent("the version-control graphical diff program to terminate", "files")
                                 
     def getRootPath(self):
         appPath = self.currTestSelection[0].app.getDirectory()
@@ -355,7 +336,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         except AttributeError:
             raise plugins.TextTestError, "Cannot establish which files should be compared as no comparison information exists.\n" + \
                   "To create this information, perform 'recompute status' (press '" + \
-                         guiplugins.guiConfig.getCompositeValue("gui_accelerators", "recompute_status") + "') and try again."
+                         guiutils.guiConfig.getCompositeValue("gui_accelerators", "recompute_status") + "') and try again."
 
     def isModal(self):
         return False
@@ -366,10 +347,9 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         self.runAndParse() # will write to the above two structures
         self.vbox = gtk.VBox()
         self.addExtraWidgets()
-        headerMessage = self.addHeader()
-        treeViewMessage = self.addTreeView()
-        return headerMessage + "\n\n" + treeViewMessage
-    
+        self.addHeader()
+        self.addTreeView()
+        
     def addExtraWidgets(self):
         self.extraWidgetArea = gtk.HBox()
         self.extraButtonArea = gtk.HButtonBox()
@@ -393,17 +373,17 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
 
     def addStatusWidget(self):
         button = gtk.Button("_Status")
-        guiplugins.scriptEngine.connect("show version control status", "clicked", button, self.viewStatus)
+        guiutils.scriptEngine.connect("show version control status", "clicked", button, self.viewStatus)
         self.extraButtonArea.pack_start(button, expand=False, fill=False)        
 
     def addLogWidget(self):
         button = gtk.Button("_Log")
-        guiplugins.scriptEngine.connect("show version control log", "clicked", button, self.viewLog)
+        guiutils.scriptEngine.connect("show version control log", "clicked", button, self.viewLog)
         self.extraButtonArea.pack_start(button, expand=False, fill=False)        
 
     def addAnnotateWidget(self):
         button = gtk.Button("_Annotate")
-        guiplugins.scriptEngine.connect("show version control annotations", "clicked", button, self.viewAnnotations)
+        guiutils.scriptEngine.connect("show version control annotations", "clicked", button, self.viewAnnotations)
         self.extraButtonArea.pack_start(button, expand=False, fill=False)        
 
     def addDiffWidget(self):
@@ -419,18 +399,18 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         self.revision2.set_alignment(1.0)
         self.revision1.set_width_chars(6)
         self.revision2.set_width_chars(6)
-        guiplugins.scriptEngine.registerEntry(self.revision1, "set first revision to ")
-        guiplugins.scriptEngine.registerEntry(self.revision2, "set second revision to ")
+        guiutils.scriptEngine.registerEntry(self.revision1, "set first revision to ")
+        guiutils.scriptEngine.registerEntry(self.revision2, "set second revision to ")
         self.extraButtonArea.pack_start(diffButton, expand=False, fill=False)
         self.extraWidgetArea.pack_start(label1, expand=False, fill=False)
         self.extraWidgetArea.pack_start(self.revision1, expand=False, fill=False)
         self.extraWidgetArea.pack_start(label2, expand=False, fill=False)
         self.extraWidgetArea.pack_start(self.revision2, expand=False, fill=False)
-        guiplugins.scriptEngine.connect("show version control differences", "clicked", diffButton, self.viewDiffs)
+        guiutils.scriptEngine.connect("show version control differences", "clicked", diffButton, self.viewDiffs)
 
     def addGraphicalDiffWidget(self):
         button = gtk.Button("_Graphical Diffs")
-        guiplugins.scriptEngine.connect("show version control differences graphically", "clicked", button, self.viewGraphicalDiff)
+        guiutils.scriptEngine.connect("show version control differences graphically", "clicked", button, self.viewGraphicalDiff)
         self.extraButtonArea.pack_start(button, expand=False, fill=False)        
 
     def addHeader(self):
@@ -445,7 +425,6 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
             alignment.set_padding(5, 5, 0, 5)
             alignment.add(hbox)
             self.vbox.pack_start(alignment, expand=False, fill=False)
-            return "Using Tree View layout with icon '" + iconType + "', header :\n" + message
 
     def getStockIcon(self, stockItem):
         imageBox = gtk.VBox()
@@ -454,17 +433,19 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
 
     def addTreeView(self):
         hpaned = gtk.HPaned()
+        hpaned.set_name("VCS dialog separator") # Mostly so we can filter the proportions, which we don't set
 
         # We need buffer when creating treeview, so create right-hand side first ...
         self.textBuffer = gtk.TextBuffer()
         textView = gtk.TextView(self.textBuffer)
         textView.set_editable(False)
+        textView.set_name("VCS Output View")
         window2 = gtk.ScrolledWindow()
         window2.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         window2.add(textView)
         hpaned.pack2(window2, True, True)
 
-        messages = self.createTreeView()
+        self.createTreeView()
         window1 = gtk.ScrolledWindow()
         window1.set_policy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC)
         window1.add(self.treeView)
@@ -475,14 +456,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
             self.dialog.resize(parentSize[0], int(parentSize[0] / 1.5))
             self.vbox.pack_start(hpaned, expand=True, fill=True)
         self.dialog.vbox.pack_start(self.vbox, expand=True, fill=True)
-        return messages
-
-    def parentOutput(self, prevIter):
-        if prevIter:
-            return "child of " + self.treeModel.get_value(prevIter, 3)
-        else:
-            return "root"
-        
+                
     def createTreeView(self):
         # Columns are: 0 - Tree node name
         #              1 - Content (output from VCS) for the corresponding file
@@ -499,11 +473,10 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
             rootDir = self.getRootPath()
         
         fileToIter = {}
-        message = ""
         for fileName, content, info in self.pages:
             label = plugins.relpath(fileName, rootDir)
             self.diag.info("Adding info for file " + label)
-            utfContent = plugins.encodeToUTF(plugins.decodeText(content))
+            utfContent = guiutils.convertToUtf8(content)
             path = label.split(os.sep)
             currentFile = rootDir
             prevIter = None
@@ -518,16 +491,12 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
                 currIter = fileToIter.get(currentFile)
                 if currIter is None:
                     newRow = (currentElement, utfContent, currentInfo, currentFile, True)
-                    message += vcs.name + " tree view dialog: Adding " + currentElement + \
-                               " as " + self.parentOutput(prevIter)
-                    if info:
-                        message += ", info " + info
-                    message += "\n"
                     currIter = self.treeModel.append(prevIter, newRow)
                     fileToIter[currentFile] = currIter
                 prevIter = currIter
                         
         self.treeView = gtk.TreeView(self.filteredTreeModel)
+        self.treeView.set_name("VCS " + self.cmdName + " info tree")
         self.treeView.set_enable_search(False)
         fileRenderer = gtk.CellRendererText()
         fileColumn = gtk.TreeViewColumn("File", fileRenderer, markup=0)
@@ -539,21 +508,18 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
             self.infoColumn = custom_widgets.ButtonedTreeViewColumn(self.getResultDialogSecondColumnTitle(), infoRenderer, markup=2)
             self.infoColumn.set_resizable(True)
             self.treeView.append_column(self.infoColumn)
-            message += vcs.name + " tree view dialog: Showing two columns\n"
         self.treeView.get_selection().set_select_function(self.canSelect)
         self.treeView.expand_all()
-        guiplugins.scriptEngine.monitor("select", self.treeView.get_selection())
+        guiutils.scriptEngine.monitor("select", self.treeView.get_selection())
 
         if len(self.pages) > 0:
             firstFile = self.pages[0][0]
             firstIter = self.filteredTreeModel.convert_child_iter_to_iter(fileToIter[firstFile])
-            text = self.updateForIter(firstIter)
+            self.updateForIter(firstIter)
             self.treeView.get_selection().select_iter(firstIter)
-            message += vcs.name + " tree view dialog: Showing " + vcs.name + " output\n" + text + "\n"
 
         self.treeView.get_selection().connect("changed", self.showOutput)
-        return message
-
+        
     def updateForIter(self, iter):
         self.extraWidgetArea.set_sensitive(True)
         text = self.filteredTreeModel.get_value(iter, 1)
@@ -563,9 +529,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
     def showOutput(self, selection):
         model, iter = selection.get_selected()
         if iter:
-            text = self.updateForIter(iter)
-            message = vcs.name + " tree view dialog: Showing " + vcs.name + " output\n" + text
-            guiplugins.guilog.info(message.strip())
+            self.updateForIter(iter)
         else:
             self.extraWidgetArea.set_sensitive(False)
 
@@ -720,13 +684,13 @@ class StatusGUI(VersionControlDialogGUI):
             actionGroup.add_action(action)
             self.uiManager.add_ui_from_string("<popup name='Info'><menuitem name='" + info + "' action='" + info + "'/></popup>")
             action.connect("toggled", self.toggleVisibility)
-            guiplugins.scriptEngine.registerToggleButton(action, "show category " + action.get_name(), "hide category " + action.get_name())
+            guiutils.scriptEngine.registerToggleButton(action, "show category " + action.get_name(), "hide category " + action.get_name())
         self.uiManager.ensure_update()
 
     def toggleVisibility(self, action):
         self.treeModel.foreach(self.setVisibility, (action.get_name(), action.get_active()))
         self.treeView.expand_row(self.filteredTreeModel.get_path(self.filteredTreeModel.get_iter_root()), True)
-
+        
     def getStatus(self, iter):
         markedUpStatus = self.treeModel.get_value(iter, 2)
         start = markedUpStatus.find(">")
@@ -738,19 +702,11 @@ class StatusGUI(VersionControlDialogGUI):
     
     def setVisibility(self, model, path, iter, (actionName, actionState)):
         if model.iter_parent(iter) is not None and (actionName == "" or self.getStatus(iter) == actionName):
-            self.setVisibilityInModel(iter, actionState)
+            model.set_value(iter, 4, actionState)
             parentIter = model.iter_parent(iter)
             if actionState or self.hasNoVisibleChildren(model, parentIter):
                 self.setVisibility(model, model.get_path(parentIter), parentIter, ("", actionState))
-
-    def setVisibilityInModel(self, iter, newValue):
-        oldValue = self.treeModel.get_value(iter, 4)
-        if oldValue and not newValue:
-            guiplugins.guilog.info("Hiding node '" + self.treeModel.get_value(iter, 0) + "'")
-        elif newValue and not oldValue:
-            guiplugins.guilog.info("Showing node '" + self.treeModel.get_value(iter, 0) + "'")
-        self.treeModel.set_value(iter, 4, newValue)
-
+        
     def hasNoVisibleChildren(self, model, iter):
         i = model.iter_children(iter)
         while i:
@@ -776,18 +732,21 @@ class StatusGUI(VersionControlDialogGUI):
         self.popupMenu = self.uiManager.get_widget("/Info")
         
     def addContents(self):
-        message = VersionControlDialogGUI.addContents(self)
+        VersionControlDialogGUI.addContents(self)
         self.addToggleItems()
         self.infoColumn.set_clickable(True)
-        if self.infoColumn.get_button():
-            self.infoColumn.get_button().connect("button-press-event", self.showPopupMenu)
+        button = self.infoColumn.get_button()
+        if button:
+            guiutils.scriptEngine.monitorRightClicks("show visibility controls", button)
+            button.connect("button-press-event", self.showPopupMenu)
+            
         self.treeView.grab_focus() # Or the column button gets focus ...
-        return message
-    
+        
     def showPopupMenu(self, treeview, event):
-        if event.button == 3: # pragma: no cover - replaying doesn't actually press the button
+        if event.button == 3: 
             self.popupMenu.popup(None, None, None, event.button, event.time)
             return True
+
 
 class AnnotateGUI(VersionControlDialogGUI):
     def _getTitle(self):
@@ -807,7 +766,7 @@ class AddGUI(VersionControlDialogGUI):
         # Particularly CVS likes to write add output on stderr for some reason...
         return len(stderr) > 0
 
-class RemoveTests(default_gui.RemoveTests):
+class RemoveTests(adminactions.RemoveTests):
     @staticmethod
     def removePath(*args):
         return vcs.removePath(*args)
@@ -816,17 +775,17 @@ class RemoveTests(default_gui.RemoveTests):
         return "Any " + vcs.name + "-controlled files will be removed in " + vcs.name + ".\n" + \
                "Any files that are not version controlled will be removed from the file system and hence may not be recoverable."
     
-class RenameTest(default_gui.RenameTest):
+class RenameTest(adminactions.RenameTest):
     @staticmethod
     def moveDirectory(*args):
         return vcs.moveDirectory(*args)
 
     def getNameChangeMessage(self, newName):
-        origMessage = default_gui.RenameTest.getNameChangeMessage(self, newName)
+        origMessage = adminactions.RenameTest.getNameChangeMessage(self, newName)
         return origMessage + vcs.getMoveSuffix() 
 
 
-class PasteTests(default_gui.PasteTests):
+class PasteTests(adminactions.PasteTests):
     @staticmethod
     def moveDirectory(*args):
         return vcs.moveDirectory(*args)
@@ -835,7 +794,7 @@ class PasteTests(default_gui.PasteTests):
         return vcs.copyDirectory(*args)
 
     def getStatusMessage(self, *args):
-        origMessage = default_gui.PasteTests.getStatusMessage(self, *args)
+        origMessage = adminactions.PasteTests.getStatusMessage(self, *args)
         if self.removeAfter:
             return origMessage + vcs.getMoveSuffix()
         else:
@@ -860,7 +819,7 @@ class AddGUIRecursive(AddGUI):
 #
 # Configuration for the Interactive Actions
 #
-class InteractiveActionConfig(default_gui.InteractiveActionConfig):
+class InteractiveActionConfig(guiplugins.InteractiveActionConfig):
     def __init__(self, controlDir):
         global vcs, annotateClass
         vcs = vcsClass(controlDir)
@@ -876,7 +835,10 @@ class InteractiveActionConfig(default_gui.InteractiveActionConfig):
     def annotateClasses(self):
         return [ AnnotateGUI, AnnotateGUIRecursive ]
 
+    def getRenameClass(self):
+        return RenameTest
+
     def getReplacements(self):
-        return { default_gui.RemoveTests : RemoveTests,
-                 default_gui.RenameTest  : RenameTest,
-                 default_gui.PasteTests  : PasteTests }
+        return { adminactions.RemoveTests : RemoveTests,
+                 adminactions.RenameTest  : self.getRenameClass(),
+                 adminactions.PasteTests  : PasteTests }

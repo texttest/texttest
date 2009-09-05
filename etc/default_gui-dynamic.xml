@@ -12,7 +12,7 @@
    
     <menu action="viewmenu">
       <placeholder name="FirstInViewMenu">
-        <menuitem action="Annotate"/>
+        <menuitem action="Set Run Name"/>
         <separator/>
       </placeholder>
     </menu>
@@ -22,6 +22,7 @@
       <menuitem action="Mark"/>
       <menuitem action="Unmark"/>
       <separator/>
+      <menuitem action="Rerun"/>
       <menuitem action="Recompute Status"/>
       <separator/>
     </menu>
@@ -42,18 +43,22 @@
     <menuitem action="Mark"/>
     <menuitem action="Unmark"/>
     <separator/>
+    <menuitem action="Rerun"/>
     <menuitem action="Recompute Status"/>
     <separator/>
   </popup>
 
   <popup name="TestFilePopupMenu">
     <menuitem action="View File"/>
+    <placeholder name="ExtraTmpViewers" />
     <menuitem action="View Filtered File"/>
     <separator/>
     <menuitem action="View Original File"/>
+    <placeholder name="ExtraOrigViewers" />
     <menuitem action="View Filtered Original File"/>
     <separator/>
     <menuitem action="View Differences"/>
+    <placeholder name="ExtraDiffViewers" />
     <menuitem action="View Raw Differences"/>
     <separator/>
     <menuitem action="Follow File Progress"/>

@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import default, plugins, os, sys, subprocess, signal
+import default, plugins, os, sys, subprocess, signal, logging
         
 # Unlike earlier incarnations of this functionality,
 # we don't rely on sharing displays but create our own for each test run.
@@ -12,7 +12,7 @@ class VirtualDisplayResponder(plugins.Responder):
         self.displayPid = None
         self.displayProc = None
         self.guiSuites = []
-        self.diag = plugins.getDiagnostics("virtual display")
+        self.diag = logging.getLogger("virtual display")
         VirtualDisplayResponder.instance = self
         
     def addSuites(self, suites):
@@ -60,9 +60,10 @@ class VirtualDisplayResponder(plugins.Responder):
                     allMachines.append(machine)
         return allMachines
 
-    def notifyExtraTest(self, *args):
-        # Called when a slave is given an extra test to solve
+    def notifyComplete(self, *args):
+        # Whenever a test completes, we check to see if the virtual server is still going
         if self.displayProc is not None and self.displayProc.poll() is not None:
+            self.displayProc.wait() # Don't leave zombie processes around
             # If Xvfb has terminated, we need to restart it
             self.setUpVirtualDisplay(self.guiSuites)
             
@@ -70,22 +71,29 @@ class VirtualDisplayResponder(plugins.Responder):
         self.cleanXvfb()
     def notifyKillProcesses(self, *args):
         self.cleanXvfb()
+
+    def terminateIfRunning(self, pid):
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError: # pragma: no cover - only set up this way to avoid race conditions. Should never happen in real life anyway
+            pass
+    
     def cleanXvfb(self):
         if self.displayName and os.name == "posix":
             if self.displayMachine == "localhost":
                 plugins.log.info("Killing Xvfb process " + str(self.displayPid))
-                try:
-                    os.kill(self.displayPid, signal.SIGTERM)
-                except OSError:
-                    plugins.log.info("Process had already terminated")
+                self.terminateIfRunning(self.displayPid)
             else:
                 self.killRemoteServer()
             self.displayName = None
+            self.displayProc.wait() # don't leave zombies around
+            self.displayProc = None
 
     def killRemoteServer(self):
         self.diag.info("Getting ps output from " + self.displayMachine)
         plugins.log.info("Killing remote Xvfb process on " + self.displayMachine + " with pid " + str(self.displayPid))
         self.guiSuites[0].app.runCommandOn(self.displayMachine, [ "kill", str(self.displayPid) ])
+        self.terminateIfRunning(self.displayProc.pid) # only for self-tests really : traffic mechanism doesn't fake remote process
 
     def createDisplay(self, machine, app):
         if not self.canRunVirtualServer(machine, app):

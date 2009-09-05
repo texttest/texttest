@@ -1,5 +1,5 @@
 
-import plugins, os, sys, time
+import plugins, os, sys, time, logging, types
 from Queue import Queue, Empty
 from ndict import seqdict
 from threading import Lock
@@ -23,7 +23,7 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
         self.lock = Lock()
         self.killSignal = None
         self.diag = diag
-        self.lockDiag = plugins.getDiagnostics("locks")
+        self.lockDiag = logging.getLogger("locks")
     def notifyAdd(self, test, initial):
         if test.classId() == "test-case":
             self.diag.info("Adding test " + repr(test))
@@ -80,34 +80,30 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
                 self.diag.info(desc.capitalize() + " test " + repr(test))
                 runMethod(test)
                 self.diag.info("Completed " + desc + " " + repr(test))
-    def getItemFromQueue(self, queue, block):
+    def getItemFromQueue(self, queue, block, replaceTerminators=False):
         try:
             item = queue.get(block=block)
-            if item is None:
-                item = self.getItemFromQueue(queue, False) # In case more stuff comes after the terminator
-                queue.put(None) # Put the terminator back, we'll probably need it again
+            if replaceTerminators and item is None:
+                queue.put(item) 
             return item
         except Empty:
             return
 
     def getTestForRun(self):
         return self.getItemFromQueue(self.testQueue, block=True)
-    def cleanup(self):
-        pass
     def canBeMainThread(self):
         return False # We block, so we shouldn't be the main thread...
             
 class ActionRunner(BaseActionRunner):
     def __init__(self, optionMap, allApps):
-        BaseActionRunner.__init__(self, optionMap, plugins.getDiagnostics("Action Runner"))
+        BaseActionRunner.__init__(self, optionMap, logging.getLogger("Action Runner"))
         self.currentTestRunner = None
         self.previousTestRunner = None
-        self.script = optionMap.runScript()
         self.appRunners = seqdict()
 
     def addSuite(self, suite):
         plugins.log.info("Using " + suite.app.description(includeCheckout=True))
-        appRunner = ApplicationRunner(suite, self.script, self.diag)
+        appRunner = ApplicationRunner(suite, self.diag)
         self.appRunners[suite.app] = appRunner
 
     def notifyAllReadAndNotified(self):
@@ -144,12 +140,12 @@ class ActionRunner(BaseActionRunner):
             appRunner.cleanActions()
     
 class ApplicationRunner:
-    def __init__(self, testSuite, script, diag):
+    def __init__(self, testSuite, diag):
         self.testSuite = testSuite
         self.suitesSetUp = {}
         self.suitesToSetUp = {}
         self.diag = diag
-        self.actionSequence = self.getActionSequence(script)
+        self.actionSequence = self.getActionSequence()
         self.setUpApplications()
     def cleanActions(self):
         # clean up the actions before we exit
@@ -192,40 +188,22 @@ class ApplicationRunner:
             self.diag.info(str(action) + " tear down " + repr(suite))
             action.tearDownSuite(suite)
         self.suitesSetUp[suite] = []
-    
-    def getActionSequence(self, script):
-        if not script:
-            return self.testSuite.app.getActionSequence()
+
+    def getActionSequence(self):
+        actionSequenceFromConfig = self.testSuite.app.getActionSequence()
+        actionSequence = []
+        # Collapse lists and remove None actions
+        for action in actionSequenceFromConfig:
+            self.addActionToList(action, actionSequence)
+        return actionSequence
+
+    def addActionToList(self, action, actionSequence):
+        if type(action) == types.ListType:
+            for subAction in action:
+                self.addActionToList(subAction, actionSequence)
+        elif action != None:
+            actionSequence.append(action)
             
-        actionCom = script.split(" ")[0]
-        actionArgs = script.split(" ")[1:]
-        actionOption = actionCom.split(".")
-        if len(actionOption) < 2:
-            sys.stderr.write("Plugin scripts must be of the form <module_name>.<script>\n")
-            return []
-
-        module = ".".join(actionOption[:-1])
-        pclass = actionOption[-1]
-        importCommand = "from " + module + " import " + pclass + " as _pclass"
-        try:
-            exec importCommand
-        except:
-            sys.stderr.write("Could not import script " + pclass + " from module " + module + "\n" +\
-                             "Import failed, looked at " + repr(sys.path) + "\n")
-            plugins.printException()
-            return []
-
-        # Assume if we succeed in importing then a python module is intended.
-        try:
-            if len(actionArgs) > 0:
-                return [ _pclass(actionArgs) ]
-            else:
-                return [ _pclass() ]
-        except:
-            sys.stderr.write("Could not instantiate script action " + repr(actionCom) +\
-                             " with arguments " + repr(actionArgs) + "\n")
-            plugins.printException()
-            return []
 
 class TestRunner:
     def __init__(self, test, appRunner, diag, killed, killSignal):
@@ -238,24 +216,30 @@ class TestRunner:
         self.currentAction = None
         self.lock = Lock()
         self.setActionSequence(appRunner.actionSequence)
+
     def setActionSequence(self, actionSequence):
         self.actionSequence = []
         # Copy the action sequence, so we can edit it and mark progress
         for action in actionSequence:
             self.actionSequence.append(action)
+
     def handleExceptions(self, method, *args):
         try:
-            return method(*args)
+            method(*args)
+            return True
         except plugins.TextTestError, e:
             self.failTest(str(e))
         except:
             plugins.printWarning("Caught exception while running " + repr(self.test) + " changing state to UNRUNNABLE :")
             exceptionText = plugins.printException()
             self.failTest(exceptionText)
+        return False
+    
     def failTest(self, excString):
         execHosts = self.test.state.executionHosts
         failState = plugins.Unrunnable(freeText=excString, briefText="TEXTTEST EXCEPTION", executionHosts=execHosts)
         self.test.changeState(failState)
+
     def performActions(self, previousTestRunner):
         tearDownSuites, setUpSuites = self.findSuitesToChange(previousTestRunner)
         for suite in tearDownSuites:
@@ -269,8 +253,8 @@ class TestRunner:
                 self.actionSequence.pop(0)
                 continue
             self.diag.info("->Performing action " + str(action) + " on " + repr(self.test))
-            self.handleExceptions(self.appRunner.setUpSuites, action, self.test)
-            self.callAction(action)
+            if self.handleExceptions(self.appRunner.setUpSuites, action, self.test):
+                self.callAction(action)
             self.diag.info("<-End Performing action " + str(action))
             self.actionSequence.pop(0)
             if not abandon and self.test.state.shouldAbandon():
@@ -278,6 +262,7 @@ class TestRunner:
                 abandon = True
 
         self.test.actionsCompleted()
+
     def kill(self, sig=None):
         self.diag.info("Killing test " + repr(self.test))
         self.lock.acquire()
@@ -286,6 +271,7 @@ class TestRunner:
         if self.currentAction:
             self.currentAction.kill(self.test, sig)
         self.lock.release()
+
     def callAction(self, action):
         self.lock.acquire()
         self.currentAction = action
@@ -293,7 +279,7 @@ class TestRunner:
             action.kill(self.test, self.killSignal)
         self.lock.release()
 
-        self.handleExceptions(self.test.callAction, action)
+        self.handleExceptions(action, self.test)
 
         self.lock.acquire()
         self.currentAction = None

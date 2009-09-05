@@ -1,5 +1,5 @@
 
-import os, stat, sys, plugins, shutil, socket, subprocess, rundependent
+import os, stat, sys, plugins, shutil, socket, subprocess, rundependent, logging
 from ndict import seqdict
 from SocketServer import TCPServer, StreamRequestHandler
 from threading import Thread, Lock
@@ -214,10 +214,16 @@ class ClientSocketTraffic(Traffic):
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.connect(self.destination)
             sock.sendall(self.text)
-            sock.shutdown(socket.SHUT_WR)
-            response = sock.makefile().read()
-            sock.close()
-            return [ ServerTraffic(response, self.responseFile) ]
+            try:
+                sock.shutdown(socket.SHUT_WR)
+                response = sock.makefile().read()
+                sock.close()
+                return [ ServerTraffic(response, self.responseFile) ]
+            except socket.error:
+                sys.stderr.write("WARNING: Server process reset the connection while TextTest's 'fake client' was trying to read a response from it!\n")
+                sys.stderr.write("(while running " + repr(CommandLineTraffic.currentTest) + ")\n")
+                sock.close()
+                return []
         else:
             return [] # client is alone, nowhere to forward
 
@@ -268,7 +274,7 @@ class CommandLineTraffic(Traffic):
     diag = None
     realCommands = {}
     def __init__(self, inText, responseFile):
-        self.diag = plugins.getDiagnostics("Traffic Server")
+        self.diag = logging.getLogger("Traffic Server")
         cmdText, environText, cmdCwd, proxyPid = inText.split(":SUT_SEP:")
         argv = eval(cmdText)
         self.cmdEnviron = eval(environText)
@@ -458,7 +464,7 @@ class TrafficServer(TCPServer):
         self.recordFileHandler = RecordFileHandler(recordFile)
         self.replayInfo = ReplayInfo(replayFile)
         self.requestCount = 0
-        self.diag = plugins.getDiagnostics("Traffic Server")
+        self.diag = logging.getLogger("Traffic Server")
         CommandLineTraffic.currentTest = test
         CommandLineTraffic.diag = self.diag
         self.topLevelForEdit = [] # contains only paths explicitly given. Always present.
@@ -479,10 +485,6 @@ class TrafficServer(TCPServer):
     def run(self):
         while not self.terminate:
             self.handle_request()
-        
-    def notifyAllRead(self, suites):
-        if len(self.testMap) == 0:
-            self.notifyAllComplete()
             
     def shutdown(self):
         self.diag.info("Told to shut down!")
@@ -761,7 +763,7 @@ class RecordFileHandler:
 class ReplayInfo:
     def __init__(self, replayFile):
         self.responseMap = seqdict()
-        self.diag = plugins.getDiagnostics("Traffic Replay")
+        self.diag = logging.getLogger("Traffic Replay")
         if replayFile:
             self.readReplayFile(replayFile)
             
@@ -913,7 +915,7 @@ class ModifyTraffic(plugins.ScriptWithArgs):
     # For now, only bother with the client server traffic which is mostly what needs tweaking...
     scriptDoc = "Apply a script to all the client server data"
     def __init__(self, args):
-        argDict = self.parseArguments(args)
+        argDict = self.parseArguments(args, [ "script" ])
         self.script = argDict.get("script")
     def __repr__(self):
         return "Updating traffic in"

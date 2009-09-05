@@ -1,218 +1,35 @@
 
-import plugins, os, sys, shutil, time, subprocess, operator, types
+
+import gtk, gobject, entrycompletion, plugins, os, shutil, time, subprocess, operator, types, logging
+from guiutils import scriptEngine, guilog, guiConfig, SubGUI, GUIConfig
 from jobprocess import killSubProcessAndChildren
 from copy import copy, deepcopy
 from glob import glob
 from stat import *
 from ndict import seqdict
-
-try:
-    import gtk, gobject, entrycompletion
-except ImportError:
-    pass # We might want to document the config entries, silly to fail on lack of GTK...
-
-guilog, guiConfig, scriptEngine = None, None, None
-
-
-# gtk.accelerator_valid appears utterly broken on Windows
-def windowsAcceleratorValid(key, mod):
-    name = gtk.accelerator_name(key, mod)
-    return len(name) > 0 and name != "VoidSymbol"
-
-if os.name == "nt":
-    gtk.accelerator_valid = windowsAcceleratorValid
-            
-
-class GUIConfig:
-    def __init__(self, dynamic, allApps, entryCompletionLogger):
-        self.apps = copy(allApps)
-        self.dynamic = dynamic
-        self.configDir = plugins.MultiEntryDictionary()
-        self.configDocs = {}
-        self.setConfigDefaults()
-        self.configDir.readValues(self.getAllPersonalConfigFiles(), insert=0, errorOnUnknown=0)
-
-        self.hiddenCategories = map(self.getConfigName, self.configDir.get("hide_test_category"))
-        self.colourDict = self.makeColourDictionary()
-        if entryCompletionLogger:
-            self.setUpEntryCompletion(entryCompletionLogger)
-
-    def getAllPersonalConfigFiles(self):
-        allPersonalFiles = []
-        for app in self.apps:
-            for fileName in app.getPersonalConfigFiles():
-                if not fileName in allPersonalFiles:
-                    allPersonalFiles.append(fileName)
-        return allPersonalFiles
-    
-    def addSuites(self, suites):
-        fullNames = [ app.fullName for app in self.apps ]
-        for suite in suites:
-            if suite.app.fullName not in fullNames:
-                self.apps.append(suite.app)
-
-    def makeColourDictionary(self):
-        dict = {}
-        for key, value in self.configDir.get("test_colours").items():
-            dict[self.getConfigName(key)] = value
-        return dict
-
-    def setConfigDefaults(self):
-        colourDict = interactiveActionHandler.getColourDictionary(self.apps)
-        self.setConfigDefault("static_collapse_suites", 0, "Whether or not the static GUI will show everything collapsed")
-        self.setConfigDefault("test_colours", colourDict, "Colours to use for each test state")
-        self.setConfigDefault("file_colours", copy(colourDict), "Colours to use for each file state")
-        self.setConfigDefault("auto_collapse_successful", 1, "Automatically collapse successful test suites?")
-        self.setConfigDefault("window_size", self.getWindowSizeSettings(), "To set the initial size of the dynamic/static GUI.")
-        self.setConfigDefault("hide_gui_element", self.getDefaultHideWidgets(), "List of widgets to hide by default")
-        self.setConfigDefault("hide_test_category", [], "Categories of tests which should not appear in the dynamic GUI test view")
-        self.setConfigDefault("query_kill_processes", { "default" : [] }, "Ask about whether to kill these processes when exiting texttest.")
-        self.setConfigDefault("gui_accelerators", interactiveActionHandler.getDefaultAccelerators(self.apps), "Custom action accelerators.")        
-        self.setConfigDefault("gui_entry_completion_matching", 1, "Which matching type to use for entry completion. 0 means turn entry completions off, 1 means match the start of possible completions, 2 means match any part of possible completions")
-        self.setConfigDefault("gui_entry_completion_inline", 0, "Automatically inline common completion prefix in entry.")
-        self.setConfigDefault("gui_entry_completions", { "default" : [] }, "Add these completions to the entry completion lists initially")
-        self.setConfigDefault("sort_test_suites_recursively", 1, "Sort subsuites when sorting test suites")
         
-    def setConfigDefault(self, key, value, docString):
-        self.configDir[key] = value
-        self.configDocs[key] = docString
-
-    def setUpEntryCompletion(self, entryCompletionLogger):
-        matching = self.configDir.get("gui_entry_completion_matching")
-        if matching != 0:
-            inline = self.configDir.get("gui_entry_completion_inline")
-            completions = self.getCompositeValue("gui_entry_completions", "", modeDependent=True)
-            entrycompletion.manager.start(matching, inline, completions, entryCompletionLogger)
-    def _simpleValue(self, app, entryName):
-        return app.getConfigValue(entryName)
-    def _compositeValue(self, app, *args, **kwargs):
-        return app.getCompositeConfigValue(*args, **kwargs)
-    def _getFromApps(self, method, *args, **kwargs):
-        prevValue = None
-        for app in self.apps:
-            currValue = method(app, *args, **kwargs)
-            toUse = self.chooseValueFrom(prevValue, currValue)
-            if toUse is None and prevValue is not None:
-                plugins.printWarning("GUI configuration '" + "::".join(args) +\
-                                     "' differs between applications, ignoring that from " + repr(app) + "\n" + \
-                                     "Value was " + repr(currValue) + ", change from " + repr(prevValue))
-            else:
-                prevValue = toUse
-        return prevValue
-    def chooseValueFrom(self, value1, value2):
-        if value1 is None or value1 == value2:
-            return value2
-        if value2 is None:
-            return value1
-        if type(value1) == types.ListType:
-            return self.createUnion(value1, value2)
-
-    def createUnion(self, list1, list2):
-        result = []
-        result += list1
-        for entry in list2:
-            if not entry in list1:
-                result.append(entry)
-        return result
-    
-    def getModeName(self):
-        if self.dynamic:
-            return "dynamic"
-        else:
-            return "static"
-    def getConfigName(self, name, modeDependent=False):
-        formattedName = name.lower().replace(" ", "_").replace(":", "_")
-        if modeDependent:
-            if len(name) > 0:
-                return self.getModeName() + "_" + formattedName
-            else:
-                return self.getModeName()
-        else:
-            return formattedName
-        
-    def getValue(self, entryName, modeDependent=False):
-        nameToUse = self.getConfigName(entryName, modeDependent)
-        guiValue = self.configDir.get(nameToUse)
-        if guiValue is not None:
-            return guiValue
-        else:
-            return self._getFromApps(self._simpleValue, nameToUse)
-    def getCompositeValue(self, sectionName, entryName, modeDependent=False, defaultKey="default"):
-        nameToUse = self.getConfigName(entryName, modeDependent)
-        value = self.configDir.getComposite(sectionName, nameToUse, defaultKey)
-        if value is None:
-            value = self._getFromApps(self._compositeValue, sectionName, nameToUse, defaultKey=defaultKey)
-        if modeDependent and value is None:
-            return self.getCompositeValue(sectionName, entryName)
-        else:
-            return value
-    def getWindowOption(self, name):
-        return self.getCompositeValue("window_size", name, modeDependent=True)
-    def showCategoryByDefault(self, category, parentHidden=False):
-        if self.dynamic:
-            if parentHidden:
-                return False
-            nameToUse = self.getConfigName(category)
-            if nameToUse in self.hiddenCategories:
-                return False
-            else:
-                return True
-        else:
-            return False    
-    def getTestColour(self, category, fallback=None):
-        if self.dynamic:
-            nameToUse = self.getConfigName(category)
-            if self.colourDict.has_key(nameToUse):
-                return self.colourDict[nameToUse]
-            elif fallback:
-                return fallback
-            else:
-                return self.colourDict.get("failure")
-        else:
-            return self.colourDict.get("static")
-
-    def getWindowSizeSettings(self):
-        dict = {}
-        dict["maximize"] = 0
-        dict["horizontal_separator_position"] = 0.46
-        dict["vertical_separator_position"] = 0.5
-        dict["height_pixels"] = "<not set>"
-        dict["width_pixels"] = "<not set>"
-        dict["height_screen"] = float(5.0) / 6
-        dict["width_screen"] = 0.6
-        return dict
-    
-    def getDefaultHideWidgets(self):
-        dict = {}
-        dict["status_bar"] = 0
-        dict["toolbar"] = 0
-        dict["shortcut_bar"] = 0
-        return dict
-    
-    
 # The purpose of this class is to provide a means to monitor externally
 # started process, so that (a) code can be called when they exit, and (b)
 # they can be terminated when TextTest is terminated.
 class ProcessTerminationMonitor(plugins.Observable):
     def __init__(self):
         plugins.Observable.__init__(self)
-        self.processes = seqdict()
+        self.processesForKill = seqdict()
+        self.exitHandlers = seqdict()
 
     def listRunningProcesses(self):
         processesToCheck = guiConfig.getCompositeValue("query_kill_processes", "", modeDependent=True)
-        running = []
+        if "all" in processesToCheck:
+            processesToCheck = [ ".*" ]
         if len(processesToCheck) == 0:
-            return running
-        for process, description, exitHandler, exitHandlerArgs in self.processes.values():
-            for processToCheck in processesToCheck:
-                if plugins.isRegularExpression(processToCheck):
-                    if plugins.findRegularExpression(processToCheck, description):
-                        running.append("PID " + str(process.pid) + " : " + description)
-                        break
-                elif processToCheck.lower() == "all" or description.find(processToCheck) != -1:
-                    running.append("PID " + str(process.pid) + " : " + description)
-                    break
-
+            return []
+        
+        running = []
+        triggerGroup = plugins.TextTriggerGroup(processesToCheck)
+        for process, description in self.processesForKill.values():
+            if triggerGroup.stringContainsText(description):
+                running.append("PID " + str(process.pid) + " : " + description)
+                
         return running
 
     def getProcessIdentifier(self, process):
@@ -223,23 +40,28 @@ class ProcessTerminationMonitor(plugins.Observable):
         else:
             return process._handle
 
-    def startProcess(self, cmdArgs, description = "", exitHandler=None, exitHandlerArgs=(), **kwargs):
+    def startProcess(self, cmdArgs, description = "", killOnTermination=True, exitHandler=None, exitHandlerArgs=(), **kwargs):
         process = subprocess.Popen(cmdArgs, stdin=open(os.devnull), startupinfo=plugins.getProcessStartUpInfo(), **kwargs)
         pidOrHandle = self.getProcessIdentifier(process)
-        self.processes[int(pidOrHandle)] = (process, description, exitHandler, exitHandlerArgs)
+        self.exitHandlers[int(pidOrHandle)] = (exitHandler, exitHandlerArgs)
+        if killOnTermination:
+            self.processesForKill[int(pidOrHandle)] = (process, description)
         gobject.child_watch_add(pidOrHandle, self.processExited)
 
     def processExited(self, pid, *args):
-        process, description, exitHandler, exitHandlerArgs = self.processes.pop(pid)
+        if self.processesForKill.has_key(pid):
+            del self.processesForKill[pid]
+            
+        exitHandler, exitHandlerArgs = self.exitHandlers.pop(pid)
         if exitHandler:
             exitHandler(*exitHandlerArgs)
     
     def notifyKillProcesses(self, sig=None):
         # Don't leak processes
-        if len(self.processes) == 0:
+        if len(self.processesForKill) == 0:
             return
         self.notify("Status", "Terminating all external viewers ...")
-        for process, description, exitHandler, exitHandlerArgs in self.processes.values():
+        for process, description in self.processesForKill.values():
             self.notify("ActionProgress", "")
             guilog.info("Killing '" + description + "' interactive process")
             killSubProcessAndChildren(process, sig)
@@ -247,69 +69,10 @@ class ProcessTerminationMonitor(plugins.Observable):
 processMonitor = ProcessTerminationMonitor()
 
 
-# base class for all "GUI" classes which manage parts of the display
-class SubGUI(plugins.Observable):
-    def __init__(self):
-        plugins.Observable.__init__(self)
-        self.active = False
-        self.widget = None
-    def setActive(self, newValue):
-        if self.shouldShow():
-            self.active = newValue
-
-    def activate(self):
-        self.setActive(True)
-        self.contentsChanged()
-
-    def deactivate(self):
-        self.setActive(False)
-    def writeSeparator(self):
-        guilog.info("") # blank line for demarcation
-    def shouldDescribe(self):
-        return self.active and self.shouldShowCurrent()
-    def contentsChanged(self):
-        if self.shouldDescribe():
-            self.writeSeparator()
-            self.describe()
-
-    def describe(self): #pragma : no cover - for documentation only
-        pass
-
-    def createView(self):
-        pass
-
-    def shouldShow(self):
-        return True # should this be shown/created at all this run
-
-    def shouldShowCurrent(self, *args):
-        return True # should this be shown or hidden in the current context?
-
-    def getTabTitle(self):
-        return "Need Title For Tab!"
-
-    def getGroupTabTitle(self):
-        return "Test"
-
-    def forceVisible(self, rowCount):
-        return False
-
-    def addScrollBars(self, view, hpolicy):
-        window = gtk.ScrolledWindow()
-        window.set_policy(hpolicy, gtk.POLICY_AUTOMATIC)
-        self.addToScrolledWindow(window, view)
-        window.show()
-        return window
-
-    def addToScrolledWindow(self, window, widget):
-        if isinstance(widget, gtk.VBox):
-            window.add_with_viewport(widget)
-        else:
-            window.add(widget)
-
 class GtkActionWrapper:
     def __init__(self):
         self.accelerator = None
-        self.diag = plugins.getDiagnostics("Interactive Actions")
+        self.diag = logging.getLogger("Interactive Actions")
         title = self.getTitle(includeMnemonics=True)
         actionName = self.getTitle(includeMnemonics=False)
         self.gtkAction = gtk.Action(actionName, title, \
@@ -349,32 +112,9 @@ class GtkActionWrapper:
 
     def _setSensitivity(self, gtkAction, newValue):
         oldValue = gtkAction.get_property("sensitive")
-        gtkAction.set_property("sensitive", newValue)
         if oldValue != newValue:
-            guilog.info("Setting sensitivity of action '" + gtkAction.get_property("label") + "' to " + repr(newValue))
+            gtkAction.set_property("sensitive", newValue)
 
-    def describeAction(self):
-        self._describeAction(self.gtkAction, self.accelerator)
-
-    def _describeAction(self, gtkAction, accelerator):
-        message = "Viewing action with title '" + gtkAction.get_property("label") + "'"
-        message += self.detailDescription(gtkAction, accelerator)
-        guilog.info(message)
-
-    def detailDescription(self, gtkAction, accelerator):
-        message = ""
-        stockId = gtkAction.get_property("stock-id")
-        if stockId:
-            message += ", stock id '" + repr(stockId) + "'"
-        if accelerator:
-            message += ", accelerator '" + repr(accelerator) + "'"
-        return message + self.sensitivityDescription(gtkAction)
-    
-    def sensitivityDescription(self, gtkAction):
-        if gtkAction.get_property("sensitive"):
-            return ""
-        else:
-            return " (greyed out)"
 
 
 # Introduce an extra level without all the selection-dependent stuff, some actions want
@@ -385,6 +125,9 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         SubGUI.__init__(self)
         GtkActionWrapper.__init__(self)
         self.topWindow = None
+
+    def checkValid(self, app):
+        pass
 
     def notifyTopWindow(self, window):
         self.topWindow = window
@@ -434,9 +177,6 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
 
     def _getStockId(self): # The stock ID for the action, in toolbar and menu.
         pass
-
-    def describe(self):
-        self.describeAction()
                 
     def setObservers(self, observers):
         signals = [ "Status", "ActionProgress" ] + self.getSignalsSent()
@@ -475,21 +215,6 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         alignment.set_padding(5, 5, 0, 5)
         alignment.add(hbox)
         return alignment
-
-    def describeDialog(self, dialog, contents, stockIcon = None):
-        message = "-" * 10 + " Dialog '" + dialog.get_title() + "' " + "-" * 10
-        guilog.info(message)
-        defaultWidget = dialog.default_widget
-        if defaultWidget:
-            try:
-                guilog.info("Default action is labelled '" + defaultWidget.get_label() + "'")
-            except AttributeError: #pragma : no cover, should probably never happen...
-                guilog.info("Default widget unlabelled, type " + str(defaultWidget.__class__))
-        if stockIcon:
-            guilog.info("Using stock icon '" + stockIcon + "'")
-        # One blank line at the end
-        guilog.info(contents.strip())
-        guilog.info("-" * len(message))
             
     def showErrorDialog(self, message):
         self.showErrorWarningDialog(message, gtk.STOCK_DIALOG_ERROR, "Error") 
@@ -502,7 +227,6 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         scriptEngine.connect("agree to texttest message", "clicked", yesButton, self.cleanDialog,
                              gtk.RESPONSE_ACCEPT, True, dialog)
         dialog.show_all()
-        self.describeDialog(dialog, message, stockIcon)
         
     def createAlarmDialog(self, parent, message, stockIcon, alarmLevel):
         dialogTitle = "TextTest " + alarmLevel
@@ -523,7 +247,6 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         scriptEngine.connect("answer yes to texttest " + alarmLevel, "clicked",
                              yesButton, respondMethod, gtk.RESPONSE_YES, True, dialog)
         dialog.show_all()
-        self.describeDialog(dialog, message, stockIcon)
         
     def cleanDialog(self, button, saidOK, dialog):
         self._cleanDialog(dialog)
@@ -611,16 +334,14 @@ class ActionGUI(BasicActionGUI):
         self.noApps = len(allApps) == 0
         BasicActionGUI.__init__(self)
         for app in allApps:
-            self.checkValid(app)
-            
-    def addSuites(self, suites):
-        oldActive = self.isActiveOnCurrent()
-        for suite in suites:
-            if suite.app not in self.validApps and interactiveActionHandler.classValid(self.__class__, suite.app):
-                self.checkValid(suite.app)
-        self.noApps = len(suites) == 0
-            
+            self._checkValid(app)
+
     def checkValid(self, app):
+        if app not in self.validApps:
+            self._checkValid(app)
+        self.noApps = len(self.validApps) == 0
+                        
+    def _checkValid(self, app):
         if self.isValidForApp(app):
             self.validApps.append(app)
             self.validApps += app.extras
@@ -695,12 +416,6 @@ class ActionGUI(BasicActionGUI):
     def correctTestClass(self):
         pass
 
-    def pluralise(self, num, name):
-        if num == 1:
-            return "1 " + name
-        else:
-            return str(num) + " " + name + "s"
-
     def messageAfterPerform(self):
         return "Performed '" + self.getTooltip() + "' on " + self.describeTests() + "."
 
@@ -722,8 +437,7 @@ class ActionResultDialogGUI(ActionGUI):
         textContents = self.addContents()
         self.createButtons()
         self.dialog.show_all()
-        self.describeDialog(self.dialog, textContents)
-
+        
     def addContents(self):
         pass
     
@@ -773,8 +487,10 @@ class OptionGroupGUI(ActionGUI):
 
     def createOptionEntry(self, option, separator):
         widget, entry = self.createOptionWidget(option)
+        optionName = option.name.strip()
+        entry.set_name(optionName)
         labelEventBox = self.createLabelEventBox(option, separator)
-        scriptEngine.registerEntry(entry, "enter " + option.name.strip() + " =")
+        scriptEngine.registerEntry(entry, "enter " + optionName + " =")
         entry.set_text(option.getValue())
         entrycompletion.manager.register(entry)
         # Options in drop-down lists don't change, so we just add them once and for all.
@@ -882,133 +598,13 @@ class OptionGroupGUI(ActionGUI):
             return []
         return fromConfig
 
-    def getOptionsDescription(self, vbox, fileChooserOption=None, separator="\n"):
-        messages = [ self.getOptionDescription(widget, fileChooserOption) for widget in vbox.get_children() ]
-        return separator.join(messages)
-
-    def getTableRowDescription(self, children, row, rowCount, columnCount):
-        rowStart = row * columnCount
-        rowEnd = (row + 1) * columnCount
-        rowWidgets = children[rowStart:rowEnd]
-        rowMessages = map(self.getOptionDescription, rowWidgets)
-        return " | ".join(rowMessages)
-
-    def getTextEntryDescription(self, entry):
-        text = entry.get_text()
-        if text:
-            return "Text entry (set to '" + text + "')"
-        else:
-            return "Text entry"
-        
-    def getDropDownDescription(self, combobox):
-        model = combobox.get_model()
-        allEntries = []
-        iter = model.get_iter_root()
-        while iter:
-            allEntries.append(model.get_value(iter, 0))
-            iter = model.iter_next(iter)
-        return allEntries
-
-    def getLabelText(self, labelWidget):
-        try:
-            return labelWidget.get_text()
-        except AttributeError:
-            return labelWidget.get_child().get_text()
-
-    def getOptionDescription(self, widget, fileChooserOption=None):
-        baseDescription = self.getBasicOptionDescription(widget, fileChooserOption)
-        if not widget.get_property("sensitive"):
-            return baseDescription + " (greyed out)"
-        else:
-            return baseDescription
-
-    def getBasicOptionDescription(self, widget, fileChooserOption):
-        if isinstance(widget, gtk.Label):
-            return "'" + widget.get_text() + "'"
-        elif isinstance(widget, gtk.FileChooserWidget):
-            # Unfortunately we can't get filechooser information out until it's displayed.
-            # So we cheat and use the internal structures
-            return self.getFileChooserDescription(fileChooserOption)
-        elif isinstance(widget, gtk.VBox) or isinstance(widget, gtk.EventBox):
-            return self.getOptionsDescription(widget)
-        elif isinstance(widget, gtk.HBox):
-            return self.getOptionsDescription(widget, separator = " , ")
-        elif isinstance(widget, gtk.Table):
-            columnCount = widget.get_property("n-columns")
-            children = widget.get_children()
-            children.reverse() # They come out in reverse order for some reason...
-            rowCount = widget.get_property("n-rows")
-            text = "Viewing table with " + str(rowCount) + " rows and " + str(columnCount) + " columns.\n"
-            text += "\n".join([ self.getTableRowDescription(children, row, rowCount, columnCount) for row in range(rowCount) ])
-            return text
-        elif isinstance(widget, gtk.Frame):
-            label = self.getLabelText(widget.get_label_widget())
-            frameText = "....." + label + "......\n"
-            # Frame's last child is the label :)
-            for child in widget.get_children()[:-1]:
-                frameText += self.getOptionDescription(child, fileChooserOption) + "\n"
-            return frameText.rstrip()
-        elif isinstance(widget, gtk.ComboBoxEntry):
-            return self.getOptionDescription(widget.get_child()) + " (drop-down list containing " + repr(self.getDropDownDescription(widget)) + ")"
-        elif isinstance(widget, gtk.Entry):
-            return self.getTextEntryDescription(widget)
-        elif isinstance(widget, gtk.CheckButton):
-            group = "Check"
-            if isinstance(widget, gtk.RadioButton):
-                group = "Radio"
-            text = group + " button '" + widget.get_label() + "'"
-            if widget.get_active():
-                text += " (checked)"
-            return text
-        elif isinstance(widget, gtk.Button):
-            labelText = widget.get_label()
-            if labelText:
-                text = "Button '" + widget.get_label() + "'"
-            else:
-                text = "Button"
-            if widget.get_image():
-                stock, size = widget.get_image().get_stock()
-                text += ", stock image '" + stock + "'"
-            return text
-        else:
-            return "Widget type " + repr(widget.__class__)
-##         elif isinstance(widget, 
-##             return self.getSwitchDescription(option)
-##         elif option.selectFile or option.selectDir or option.saveFile:
-##             return self.getFileChooserDescription(option)
-##         else:
-##             return self.getTextOptionDescription(option)
-
-    def getTextOptionDescription(self, option):
-        value = option.getValue()
-        text = "Viewing entry for option '" + option.name.replace("\n", "\\n") + "'"
-        if len(value) > 0:
-            text += " (set to '" + value + "')"
-        if option.usePossibleValues():
-            text += " (drop-down list containing " + repr(option.listPossibleValues()) + ")"
-        return text
-
-    def getFileChooserDescription(self, option):
-        text = "Filechooser"
-        value = option.getValue()
-        if value:
-            text += " (set to '" + value + "')"
-        possDirs = option.getPossibleDirs()
-        if len(possDirs):
-            text += " (choosing from directories " + repr(possDirs) + ")"
-        return text    
-
-    def getSwitchDescription(self, switch):
-        value = switch.getValue()
-        if len(switch.options) >= 1:
-            text = "Viewing radio button for switch '" + switch.name + "', options "
-            text += "/".join(switch.options)
-            text += "'. Default value " + str(value) + "."
-        else:
-            text = "Viewing check button for switch '" + switch.name + "'"
+    def getCommandLineArgs(self, optionGroup, onlyKeys=[]):
+        args = []
+        for key, value in optionGroup.getOptionsForCmdLine(onlyKeys):
+            args.append("-" + key)
             if value:
-                text += " (checked)"
-        return text
+                args.append(value)
+        return args
 
     
 class ActionTabGUI(OptionGroupGUI):
@@ -1029,20 +625,14 @@ class ActionTabGUI(OptionGroupGUI):
     def setSensitivity(self, newValue):
         ActionGUI.setSensitivity(self, newValue)
         self.diag.info("Sensitivity of " + self.getTabTitle() + " changed to " + repr(newValue))
-        if self.shouldShowCurrent() and self.updateOptions():
-            self.contentsChanged()        
+        if self.shouldShowCurrent():
+            self.updateOptions()
 
     def displayInTab(self):
         return True
-
-    def getFileChooserDescription(self, option):
-        # We don't actually show the file choosers here, we just add a button to bring them up
-        # Should probably indicate somehow that we have such a button...
-        return self.getTextOptionDescription(option)
     
     def notifyReset(self):
         self.optionGroup.reset()
-        self.contentsChanged()
 
     def extractSwitches(self, optionGroup):
         options, switches = [], []
@@ -1094,16 +684,6 @@ class ActionTabGUI(OptionGroupGUI):
         return (box, entry)
     
     def showFileChooser(self, widget, entry, option):
-        if gtk.gtk_version > (2, 14, 0): 
-            # Workaround for GTK 2.14 bug, http://bugzilla.gnome.org/show_bug.cgi?id=579449
-            if scriptEngine.replayer.isActive():
-                # PyUseCase's replayer relies entirely on idle handlers and hence we can only give up here...
-                # Try to fail rather than hang.
-                return sys.stderr.write("Cannot replay FileChoosers with GTK 2.14 and later due to a GTK bug\n")
-            else:
-                # Effect is to disable the idle handler which is broken with file choosers
-                self.notify("ActionStart", "workaround")
-
         dialog = gtk.FileChooserDialog("Select a file",
                                        self.getParentWindow(),
                                        gtk.FILE_CHOOSER_ACTION_OPEN,
@@ -1136,19 +716,15 @@ class ActionTabGUI(OptionGroupGUI):
             entry.set_text(dialog.get_filename().replace("\\", "/"))
             entry.set_position(-1) # Sets position last, makes it possible to see the vital part of long paths 
         dialog.destroy()
-
-    def describe(self):
-        guilog.info("Viewing notebook page for '" + self.getTabTitle() + "'")
-        guilog.info(self.getOptionsDescription(self.vbox))
         
-    def addApplicationOptions(self, allApps):
+    def addApplicationOptions(self, allApps, inputOptions={}):
         if len(allApps) > 0:
             for app in allApps:
                 app.addToOptionGroups(allApps, [ self.optionGroup ])
         else:
-            configObject = plugins.importAndCall("default", "getConfig", {}) # don't care about inputOptions as we're trying to read them!
+            configObject = plugins.importAndCall("default", "getConfig", inputOptions)
             configObject.addToOptionGroups(allApps, [ self.optionGroup ])
-            
+
 
 class ActionDialogGUI(OptionGroupGUI):
     def runInteractive(self, *args):
@@ -1165,24 +741,11 @@ class ActionDialogGUI(OptionGroupGUI):
         alignment = self.createAlignment()
         vbox = gtk.VBox()
         fileChooser, fileChooserOption = self.fillVBox(vbox)
-        if fileChooser and gtk.gtk_version > (2, 14, 0): 
-            # Workaround for GTK 2.14 bug, http://bugzilla.gnome.org/show_bug.cgi?id=579449
-            if scriptEngine.replayer.isActive():
-                # PyUseCase's replayer relies entirely on idle handlers and hence we can only give up here...
-                # Try to fail rather than hang.
-                sys.stderr.write("Cannot replay FileChoosers with GTK 2.14 and later due to a GTK bug\n")
-                dialog.destroy()
-                return scriptEngine.replayer.processCommand("quit", "") # more hacks to try to terminate!
-            else:
-                # Effect is to disable the idle handler which is broken with file choosers
-                self.notify("ActionStart", "workaround")
-
         alignment.add(vbox)
         dialog.vbox.pack_start(alignment, expand=True, fill=True)
         self.createButtons(dialog, fileChooser, fileChooserOption)
         self.tryResize(dialog)
         dialog.show_all()
-        self.describeDialog(dialog, self.getOptionsDescription(vbox, fileChooserOption))
         
     def getConfirmationDialogSettings(self):
         return gtk.STOCK_DIALOG_WARNING, "Confirmation"
@@ -1248,12 +811,14 @@ class ActionDialogGUI(OptionGroupGUI):
         dialog.set_default_response(gtk.RESPONSE_ACCEPT)
         if fileChooser:
             buttonScriptName = "press " + actionScriptName.split()[0]
-            fileChooserScriptName = fileChooserOption.name
             if fileChooser.get_property("action") == gtk.FILE_CHOOSER_ACTION_SAVE:
-                scriptEngine.registerSaveFileChooser(fileChooser, fileChooserScriptName,
+                scriptEngine.registerSaveFileChooser(fileChooser, fileChooserOption.name,
                                                      "choose folder", buttonScriptName, "press cancel",
                                                      self.respond, okButton, cancelButton, dialog)
             else:
+                fileChooserScriptName = fileChooserOption.name.strip().lower()
+                if not fileChooserScriptName.startswith("select"):
+                    fileChooserScriptName = "select " + fileChooserScriptName + " ="
                 scriptEngine.registerOpenFileChooser(fileChooser, fileChooserScriptName,
                                                      "look in folder", buttonScriptName, "press cancel", 
                                                      self.respond, okButton, cancelButton, dialog)
@@ -1274,7 +839,9 @@ class ActionDialogGUI(OptionGroupGUI):
             elif option.selectFile or option.selectDir or option.saveFile:
                 fileChooserOption = option
                 fileChooser = self.createFileChooser(option)
-                if len(allOptions) > 1: # If there is other stuff, add a frame round the file chooser so we can see what it's for
+                if len(allOptions) > 1 and not option.saveFile:
+                    # If there is other stuff, add a frame round the file chooser so we can see what it's for
+                    # Don't do this when saving as it shouldn't be necessary
                     labelEventBox = self.createLabelEventBox(option, separator=":")
                     frame = gtk.Frame()
                     frame.set_label_widget(labelEventBox)
@@ -1337,215 +904,32 @@ class ActionDialogGUI(OptionGroupGUI):
             return []
         
 
-
-class MultiActionGUIForwarder(GtkActionWrapper):
-    def __init__(self, actionGUIs):
-        self.actionGUIs = actionGUIs
-        GtkActionWrapper.__init__(self)
-            
-    def setObservers(self, observers):
-        for actionGUI in self.actionGUIs:
-            actionGUI.setObservers(observers)
-            
-    def addToGroups(self, *args):
-        for actionGUI in self.actionGUIs:
-            actionGUI.addToGroups(*args)
-        GtkActionWrapper.addToGroups(self, *args)
+class InteractiveActionConfig:
+    def getColourDictionary(self):
+        return GUIConfig.getDefaultColours()
         
-    def notifyNewTestSelection(self, *args):
-        if not hasattr(self.actionGUIs[0], "notifyNewTestSelection"):
-            return
+    def getDefaultAccelerators(self):
+        return {}
+
+    def getReplacements(self):
+        # Return a dictionary mapping classes above to what to replace them with
+        return {}
+
+    def contains(self, cls, classes):
+        if cls in classes:
+            return True
         
-        newActive = False
-        for actionGUI in self.actionGUIs:
-            if actionGUI.updateSelection(*args):
-                newActive = True
-
-        self.setSensitivity(newActive)
-
-    def notifyTopWindow(self, *args):
-        for actionGUI in self.actionGUIs:
-            actionGUI.notifyTopWindow(*args)
-
-    def addSuites(self, suites):
-        for actionGUI in self.actionGUIs:
-            if hasattr(actionGUI, "addSuites"):
-                actionGUI.addSuites(suites)
+        for currCls in classes:
+            if isinstance(currCls, plugins.Callable) and currCls.method == cls:
+                return True
+        return False
     
-    def runInteractive(self, *args):
-        # otherwise it only gets computed once...
-        actionGUI = self.findActiveActionGUI()
-        self.diag.info("Forwarder executing " + str(actionGUI.__class__))
-        actionGUI.runInteractive(*args)
-        
-    def __getattr__(self, name):
-        actionGUI = self.findActiveActionGUI()
-        self.diag.info("Forwarding " + name + " to " + str(actionGUI.__class__))
-        return getattr(actionGUI, name)
-
-    def findActiveActionGUI(self):
-        for actionGUI in self.actionGUIs:
-            if actionGUI.allAppsValid():
-                return actionGUI
-        return self.actionGUIs[0]
-        
-
-# Placeholder for all classes. Remember to add them!
-class InteractiveActionHandler:
-    def __init__(self):
-        self.diag = plugins.getDiagnostics("Interactive Actions")
-
-    def getDefaultAccelerators(self, allApps):
-        return self.joinDictionaries(allApps, lambda x: x.getDefaultAccelerators())
-
-    def getColourDictionary(self, allApps):
-        return self.joinDictionaries(allApps, lambda x: x.getColourDictionary())
-
-    def joinDictionaries(self, allApps, method):
-        dict = {}
-        for config in self.getAllIntvConfigs(allApps):
-            dict.update(method(config))
-        return dict
-
-    def getMenuNames(self, allApps):
-        return reduce(set.union, (c.getMenuNames() for c in self.getAllIntvConfigs(allApps)), set())
-    
-    def getAllIntvConfigs(self, allApps):
-        return self.getAllConfigs(allApps, self.getExplicitConfigModule) + \
-               self.getAllConfigs(allApps, self.getVcsModule)
-
-    def getAllConfigs(self, allApps, getModule):
-        configs = []
-        modules = set()
-        for app in allApps:
-            module, extraArgs = getModule(app)
-            if module and module not in modules:
-                modules.add(module)
-                config = self._getIntvActionConfig(module, *extraArgs)
-                if config:
-                    configs.append(config)
-        if len(configs) == 0:
-            defaultModule, extraArgs = getModule()
-            if defaultModule:
-                defaultConfig = self._getIntvActionConfig(defaultModule, *extraArgs)
-                if defaultConfig:
-                    return [ defaultConfig ]
-                else:
-                    return []
-        return configs                                
-    
-    def getPluginGUIs(self, dynamic, allApps, uiManager):
-        instances = self.getInstances(dynamic, allApps)
-        defaultGUIs, actionTabGUIs = [], []
-        for action in instances:
-            if action.displayInTab():
-                self.diag.info("Tab: " + str(action.__class__))
-                actionTabGUIs.append(action)
-            else:
-                self.diag.info("Menu/toolbar: " + str(action.__class__))
-                # It's always active, always visible
-                action.setActive(True)
-                defaultGUIs.append(action)
-
-        actionGroup = gtk.ActionGroup("AllActions")
-        uiManager.insert_action_group(actionGroup, 0)
-        accelGroup = uiManager.get_accel_group()
-        for actionGUI in defaultGUIs + actionTabGUIs:
-            actionGUI.addToGroups(actionGroup, accelGroup)
-
-        return defaultGUIs, actionTabGUIs
-
-    def getExplicitConfigModule(self, app=None):
-        if app:
-            module = app.getConfigValue("interactive_action_module")
-            if module == "cvs": # for back compatibility...
-                return "default_gui", ()
-            else:
-                return module, ()
+    def isValid(self, className):
+        replacements = self.getReplacements()
+        if className in replacements.values():
+            return True
+        elif replacements.has_key(className):
+            return False
         else:
-            return "default_gui", ()
-
-    def getVcsModule(self, app=None):
-        if app:
-            return self._getVcsModule(app.getDirectory())
-        else:
-            return self._getVcsModule(os.getenv("TEXTTEST_HOME"))
-
-    def _getVcsModule(self, directory):
-        for dir in [ directory, os.path.dirname(directory) ]:
-            for controlDirName in plugins.controlDirNames:
-                controlDir = os.path.join(dir, controlDirName)
-                if os.path.isdir(controlDir):
-                    return controlDirName.lower().replace(".", ""), (controlDir,)
-        return None, ()
-    
-    def _getIntvActionConfig(self, module, *args):
-        try:
-            exec "from " + module + " import InteractiveActionConfig"
-            return InteractiveActionConfig(*args)
-        except ImportError:
-            if module == "default_gui":
-                raise
-        
-    def getInstances(self, dynamic, allApps):
-        instances = []
-        classNames = []
-        for config in self.getAllIntvConfigs(allApps):
-            instances += self.getInstancesFromConfig(config, dynamic, allApps, classNames)
-        return instances
-
-    def getInstancesFromConfig(self, config, dynamic, allApps, classNames=[]):
-        instances = []
-        for className in config.getInteractiveActionClasses(dynamic):
-            if className not in classNames:
-                allClasses = self.findAllClasses(className, allApps, dynamic)
-                subinstances = self.makeAllInstances(allClasses, dynamic)
-                if len(subinstances) == 1:
-                    instances.append(subinstances[0])
-                else:
-                    showable = filter(lambda x: x.shouldShow(), subinstances)
-                    if len(showable) == 1:
-                        instances.append(showable[0])
-                    else:
-                        instances.append(MultiActionGUIForwarder(subinstances))
-                classNames.append(className)
-        return instances
-    
-    def makeAllInstances(self, allClasses, dynamic):
-        instances = []
-        for classToUse, relevantApps in allClasses:
-            instances.append(self.tryMakeInstance(classToUse, relevantApps, dynamic))
-        return instances
-
-    def findAllClasses(self, className, allApps, dynamic):
-        if len(allApps) == 0:
-            return [ (className, []) ]
-        else:
-            classNames = seqdict()
-            for app in allApps:
-                replacements = self.joinDictionaries([ app ], lambda x: x.getReplacements())
-                for config in self.getAllIntvConfigs([ app ]):
-                    if className in config.getInteractiveActionClasses(dynamic):
-                        realClassName = replacements.get(className, className)
-                        classNames.setdefault(realClassName, []).append(app)
-            return classNames.items()
-    
-    def tryMakeInstance(self, className, apps, dynamic):
-        # Basically a workaround for crap error message with variable className from python...
-        try:
-            instance = className(apps, dynamic)
-            self.diag.info("Creating " + str(instance.__class__.__name__) + " instance for " + repr(apps))
-            return instance
-        except:
-            # If some invalid interactive action is provided, need to know which
-            sys.stderr.write("Error with interactive action " + str(className.__name__) + "\n")
-            raise
-
-    def classValid(self, className, app):
-        for config in self.getAllIntvConfigs([ app ]):
-            if not config.isValid(className):
-                return False
-        return True
-        
-        
-interactiveActionHandler = InteractiveActionHandler()
+            return self.contains(className, self.getInteractiveActionClasses(True)) or \
+                   self.contains(className, self.getInteractiveActionClasses(False))

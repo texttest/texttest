@@ -1,7 +1,7 @@
 #!/usr/local/bin/python
 
 
-import os, filecmp, plugins, time, stat, subprocess
+import os, filecmp, plugins, time, stat, subprocess, logging
 from ndict import seqdict
 from shutil import copyfile
 from fnmatch import fnmatch
@@ -15,7 +15,7 @@ class FileComparison:
         self.stem = stem
         self.differenceCache = False
         self.recalculationTime = None
-        self.diag = plugins.getDiagnostics("FileComparison")
+        self.diag = logging.getLogger("FileComparison")
         self.severity = test.getCompositeConfigValue("failure_severity", self.stem)
         self.displayPriority = test.getCompositeConfigValue("failure_display_priority", self.stem)
         maxLength = test.getConfigValue("lines_of_text_difference")
@@ -54,7 +54,7 @@ class FileComparison:
         return state
     def __setstate__(self, state):
         self.__dict__ = state
-        self.diag = plugins.getDiagnostics("TestComparison")
+        self.diag = logging.getLogger("TestComparison")
         self.recalculationTime = None
         if not hasattr(self, "differenceCache"):
             self.differenceCache = self.differenceId
@@ -124,21 +124,25 @@ class FileComparison:
         return self.stdFile and self.tmpFile and not self.hasDifferences()
     def hasDifferences(self):
         return self.differenceCache
-    def getStdFile(self, filtered):
+    
+    def getStdFile(self, filtered, postfix=""):
         if filtered:
-            return self.stdCmpFile
+            return self.stdCmpFile + postfix
         else:
-            return self.stdFile
-    def getTmpFile(self, filtered):
+            return self.stdFile + postfix
+
+    def getTmpFile(self, filtered, postfix=""):
         if filtered:
-            return self.tmpCmpFile
+            return self.tmpCmpFile + postfix
         else:
-            return self.tmpFile
-    def existingFile(self, filtered):
+            return self.tmpFile + postfix
+
+    def existingFile(self, *args):
         if self.missingResult():
-            return self.getStdFile(filtered)
+            return self.getStdFile(*args)
         else:
-            return self.getTmpFile(filtered)
+            return self.getTmpFile(*args)
+        
     def cacheDifferences(self, test, testInProgress):
         filterFileBase = test.makeTmpFileName(self.stem + "." + test.app.name, forFramework=1)
         origCmp = filterFileBase + "origcmp"
@@ -249,26 +253,39 @@ class FileComparison:
         self.diag.info("save file from " + self.tmpFile)
         self.stdFile = self.getStdFileForSave(versionString)
         self.backupOrRemove(self.stdFile, backupVersionString)
-        self.saveTmpFile(exact)
+        self.saveTmpFile(test, exact)
         
     def saveNew(self, test, versionString):
         self.stdFile = os.path.join(test.getDirectory(), self.versionise(self.stem + "." + test.app.name, versionString))
-        self.saveTmpFile()
+        self.saveTmpFile(test)
 
-    def saveTmpFile(self, exact=True):
+    def getTmpFileForSave(self, test):
+        if self.stem not in test.getConfigValue("save_filtered_file_stems"):
+            return self.tmpFile
+
+        # Don't include the sorting when saving filtered files...
+        normalFile = self.tmpCmpFile + ".normal"
+        if os.path.isfile(normalFile):
+            return normalFile
+        else:
+            return self.tmpCmpFile
+
+    def saveTmpFile(self, test, exact=True):
         self.diag.info("Saving tmp file to " + self.stdFile)
         plugins.ensureDirExistsForFile(self.stdFile)
         # Allow for subclasses to differentiate between a literal overwrite and a
         # more intelligent save, e.g. for performance. Default is the same for exact
         # and inexact save
+        tmpFile = self.getTmpFileForSave(test)
         if exact:
-            copyfile(self.tmpFile, self.stdFile)
+            copyfile(tmpFile, self.stdFile)
         else:
-            self.saveResults(self.stdFile)
+            self.saveResults(tmpFile, self.stdFile)
         # Try to get everything to behave normally after a save...
         self.differenceCache = False
         self.tmpFile = self.stdFile
         self.tmpCmpFile = self.stdFile
+
     def saveMissing(self, versionString, autoGenText, backupVersionString):
         stdRoot = self.getStdRootVersionFile()
         targetFile = self.versionise(stdRoot, versionString)
@@ -281,6 +298,7 @@ class FileComparison:
             newFile = open(targetFile, "w")
             newFile.write(autoGenText)
             newFile.close()
-    def saveResults(self, destFile):
-        copyfile(self.tmpFile, destFile)
+
+    def saveResults(self, tmpFile, destFile):
+        copyfile(tmpFile, destFile)
         

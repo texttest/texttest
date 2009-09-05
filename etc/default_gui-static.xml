@@ -46,10 +46,12 @@
       <menuitem action="Select"/>
       <menuitem action="Filter"/>
       <separator/>
-      <menuitem action="Refresh"/>
       <menuitem action="Run"/>
       <menuitem action="Reconnect"/>
       <menuitem action="Record Use-Case"/>
+      <menuitem action="Replace Text in Files"/>
+      <separator/>
+      <menuitem action="Refresh"/>
       <menuitem action="Reset"/>
     </menu>
     

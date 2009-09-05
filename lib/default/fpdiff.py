@@ -10,29 +10,28 @@ def _getNumberAt(l, pos):
         end += 1
     return l[start:end], l[end:]
 
+def _fpequalAtPos(l1, l2, tolerance, pos):
+    number1, l1 = _getNumberAt(l1, pos)
+    number2, l2 = _getNumberAt(l2, pos)
+    try:
+        return abs(float(number1) - float(number2)) <= tolerance, l1, l2
+    except ValueError:
+        return False, l1, l2
+
 def _fpequal(l1, l2, tolerance):
     pos = 0
     while pos < min(len(l1), len(l2)):
         if l1[pos] != l2[pos]:
-            number1, l1 = _getNumberAt(l1, pos)
-            number2, l2 = _getNumberAt(l2, pos)
-            try:
-                if abs(float(number1) - float(number2)) > tolerance:
-                    return False
-            except ValueError:
+            equal, l1, l2 = _fpequalAtPos(l1, l2, tolerance, pos)
+            if not equal:
                 return False
             pos = 0
         else:
             pos += 1
-    if len(l1) != len(l2):
-        number1, l1 = _getNumberAt(l1, pos)
-        number2, l2 = _getNumberAt(l2, pos)
-        try:
-            if abs(float(number1) - float(number2)) > tolerance:
-                return False
-        except ValueError:
-            return False
-    return True
+    if len(l1) == len(l2):
+        return True
+    else:
+        return _fpequalAtPos(l1, l2, tolerance, pos)[0]
 
 def fpfilter(fromlines, tolines, outlines, tolerance):
     s = difflib.SequenceMatcher(None, fromlines, tolines)
@@ -53,10 +52,10 @@ def main():
     parser.add_option("-o", "--output",
                       help='Write filtered tofile to use external diff')
     (options, args) = parser.parse_args()
-    if len(args) == 0:
+    if len(args) == 0: # pragma: no cover - not production code
         parser.print_help()
         sys.exit(1)
-    if len(args) != 2:
+    if len(args) != 2: # pragma: no cover - not production code
         parser.error("need to specify both a fromfile and tofile")
     fromfile, tofile = args
     fromlines = open(fromfile, 'U').readlines()
@@ -65,7 +64,7 @@ def main():
         out = open(options.output, 'w')
         fpfilter(fromlines, tolines, out, options.tolerance)
         out.close()
-    else:
+    else: # pragma: no cover - not production code
         out = StringIO.StringIO()
         fpfilter(fromlines, tolines, out, options.tolerance)
         out.seek(0)

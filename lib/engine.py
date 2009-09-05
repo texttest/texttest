@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import plugins, os, sys, testmodel, signal, operator
+import plugins, os, sys, testmodel, signal, operator, logging
 from threading import Thread
 from ndict import seqdict
 from time import sleep
@@ -11,7 +11,7 @@ class UniqueNameFinder(plugins.Responder):
     def __init__(self, optionMap, allApps):
         plugins.Responder.__init__(self, optionMap)
         self.name2test = {}
-        self.diag = plugins.getDiagnostics("Unique Names")
+        self.diag = logging.getLogger("Unique Names")
     def notifyAdd(self, test, initial=True):
         if self.name2test.has_key(test.name):
             oldTest = self.name2test[test.name]
@@ -49,8 +49,8 @@ class UniqueNameFinder(plugins.Responder):
             self.storeBothWays(oldTest.name + oldParentId, oldTest)
             self.storeBothWays(newTest.name + newParentId, newTest)
         elif oldTest.app.name != newTest.app.name:
-            self.storeBothWays(oldTest.name + " for " + oldTest.app.fullName, oldTest)
-            self.storeBothWays(newTest.name + " for " + newTest.app.fullName, newTest)
+            self.storeBothWays(oldTest.name + " for " + oldTest.app.fullName(), oldTest)
+            self.storeBothWays(newTest.name + " for " + newTest.app.fullName(), newTest)
         elif oldTest.app.getFullVersion() != newTest.app.getFullVersion():
             self.storeBothWays(oldTest.name + " version " + self.getVersionName(oldTest), oldTest)
             self.storeBothWays(newTest.name + " version " + self.getVersionName(newTest), newTest)
@@ -73,7 +73,7 @@ class Activator(plugins.Responder, plugins.Observable):
         plugins.Observable.__init__(self)
         self.allowEmpty = optionMap.has_key("gx") or optionMap.runScript()
         self.suites = []
-        self.diag = plugins.getDiagnostics("Activator")
+        self.diag = logging.getLogger("Activator")
     def addSuites(self, suites):
         self.suites = suites
     
@@ -127,20 +127,30 @@ class TextTest(plugins.Responder, plugins.Observable):
         if os.environ.has_key("FAKE_OS"):
             os.name = os.environ["FAKE_OS"]
         self.inputOptions = testmodel.OptionFinder()
-        self.diag = plugins.getDiagnostics("Find Applications")
+        self.diag = logging.getLogger("Find Applications")
         self.appSuites = seqdict()
+        
     def printStackTrace(self, *args):
+        sys.stderr.write("Received SIGQUIT: showing current stack trace below:\n")
         from traceback import print_stack
         print_stack()
+
     def findSearchDirs(self):
-        root = self.inputOptions.directoryName
-        self.diag.info("Using test suite at " + root)
-        fullPaths = map(lambda name: os.path.join(root, name), os.listdir(root))
-        return [ self.inputOptions.directoryName ] + filter(os.path.isdir, fullPaths)
+        roots = filter(os.path.isdir, self.inputOptions.rootDirectories)
+        self.diag.info("Using test suite at " + repr(roots))
+        subDirs = []
+        for root in roots:
+            for f in os.listdir(root):
+                path = os.path.join(root, f)
+                if os.path.isdir(path):
+                    subDirs.append(path)
+        return roots + subDirs
+
     def findApps(self):
-        root = self.inputOptions.directoryName
-        if not os.path.isdir(root):
-            sys.stderr.write("Test suite root directory does not exist: " + root + "\n")
+        searchDirs = self.findSearchDirs()
+        if len(searchDirs) == 0:
+            for root in self.inputOptions.rootDirectories:
+                sys.stderr.write("Test suite root directory does not exist: " + root + "\n")
             return True, []
 
         if self.inputOptions.has_key("new"):
@@ -149,14 +159,14 @@ class TextTest(plugins.Responder, plugins.Observable):
         appList = []
         raisedError = False
         selectedAppDict = self.inputOptions.findSelectedAppNames()
-        for dir in self.findSearchDirs():
+        for dir in searchDirs:
             subRaisedError, apps = self.findAppsUnder(dir, selectedAppDict)
             appList += apps
             raisedError |= subRaisedError
 
         if not raisedError:
             for missingAppName in self.findMissingApps(appList, selectedAppDict.keys()):
-                sys.stderr.write("Could not read application '" + missingAppName + "'. No file named config." + missingAppName + " was found under " + root + ".\n")
+                sys.stderr.write("Could not read application '" + missingAppName + "'. No file named config." + missingAppName + " was found under " + " or ".join(self.inputOptions.rootDirectories) + ".\n")
                 raisedError = True
             
         appList.sort(self.compareApps)
@@ -229,14 +239,12 @@ class TextTest(plugins.Responder, plugins.Observable):
             return [ plugins.importAndCall("default", "getConfig", self.inputOptions) ]
         
     def createResponders(self, allApps):
-        responderClasses = []
+        responderClasses = self.getBuiltinResponderClasses()
         for configObject in self.getAllConfigObjects(allApps):
             for respClass in configObject.getResponderClasses(allApps):
                 if not respClass in responderClasses:
                     self.diag.info("Adding responder " + repr(respClass))
-                    responderClasses.append(respClass)
-        # Make sure we send application events when tests change state
-        responderClasses += self.getBuiltinResponderClasses()
+                    responderClasses.insert(-2, respClass) # keep Activator and AllCompleteResponder at the end
         filteredClasses = self.removeBaseClasses(responderClasses)
         self.diag.info("Filtering away base classes, using " + repr(filteredClasses))
         self.observers = map(lambda x : x(self.inputOptions, allApps), filteredClasses)
@@ -336,11 +344,16 @@ class TextTest(plugins.Responder, plugins.Observable):
         except plugins.TextTestError, e:
             # Responder class-level errors are basically fatal : there is no point running without them (cannot
             # do anything about them) and no way to get partial errors.
-            sys.stderr.write(str(e) + "\n")
-            return
+            return sys.stderr.write(str(e) + "\n")
+        
         raisedError, self.appSuites = self.createTestSuites(allApps)
         if not raisedError or len(self.appSuites) > 0:
-            self.addSuites(self.appSuites.values())
+            try:
+                self.addSuites(self.appSuites.values())
+            except plugins.TextTestError, e:
+                # addSuites errors are fatal for the same reasons
+                return sys.stderr.write(str(e) + "\n")
+            
             # Set the signal handlers to use when running, if we actually plan to do any
             if not self.ignoreAllExecutables():
                 self.setSignalHandlers(self.handleSignal)
@@ -385,13 +398,14 @@ class TextTest(plugins.Responder, plugins.Observable):
     
     def makeDirectoryCache(self, appName):
         configFile = "config." + appName
-        rootDir = self.inputOptions.directoryName
-        rootConfig = os.path.join(rootDir, configFile)
-        if os.path.isfile(rootConfig):
-            return testmodel.DirectoryCache(rootDir)
-        else:
-            allFiles = glob(os.path.join(rootDir, "*", configFile))
-            return testmodel.DirectoryCache(os.path.dirname(allFiles[0]))
+        for rootDir in self.inputOptions.rootDirectories:
+            rootConfig = os.path.join(rootDir, configFile)
+            if os.path.isfile(rootConfig):
+                return testmodel.DirectoryCache(rootDir)
+            else:
+                allFiles = glob(os.path.join(rootDir, "*", configFile))
+                if len(allFiles) > 0:
+                    return testmodel.DirectoryCache(os.path.dirname(allFiles[0]))
             
     def notifyExtraTest(self, testPath, appName, versions):
         rootSuite = self.getRootSuite(appName, versions)

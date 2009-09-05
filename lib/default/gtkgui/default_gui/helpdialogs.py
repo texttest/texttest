@@ -1,6 +1,7 @@
 
-import gtk, guiplugins, plugins, texttest_version, os, string, sys, glob
-from guiplugins import scriptEngine, ActionResultDialogGUI
+import gtk, gobject, plugins, texttest_version, os, sys, glob
+from default.gtkgui import guiplugins, guiutils # from .. import guiplugins, guiutils when we drop Python 2.4 support
+from types import StringType
 
 # Show useful info about TextTest.
 # I don't particularly like the standard gtk.AboutDialog, and we also want
@@ -23,9 +24,9 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         self.creditsButton = self.dialog.add_button('texttest-stock-credits', gtk.RESPONSE_NONE)
         self.licenseButton = self.dialog.add_button('_License', gtk.RESPONSE_NONE)
         self.versionsButton = self.dialog.add_button('_Versions', gtk.RESPONSE_NONE)
-        guiplugins.scriptEngine.connect("press credits", "clicked", self.creditsButton, self.showCredits)
-        guiplugins.scriptEngine.connect("press license", "clicked", self.licenseButton, self.showLicense)
-        guiplugins.scriptEngine.connect("press versions", "clicked", self.versionsButton, self.showVersions)
+        guiutils.scriptEngine.connect("press credits", "clicked", self.creditsButton, self.showCredits)
+        guiutils.scriptEngine.connect("press license", "clicked", self.licenseButton, self.showLicense)
+        guiutils.scriptEngine.connect("press versions", "clicked", self.versionsButton, self.showVersions)
         guiplugins.ActionResultDialogGUI.createButtons(self)
         
     def addContents(self):
@@ -52,14 +53,13 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         self.dialog.vbox.pack_start(urlLabel, expand=False, fill=False)
         self.dialog.vbox.pack_start(licenseLabel, expand=False, fill=False)
         self.dialog.set_resizable(False)
-        return message
-
+        
     def showCredits(self, *args):
-        newDialog = CreditsDialog(self.dialog, self.validApps)
+        newDialog = TextFileDisplayDialog(self.validApps, False, {}, "CREDITS.txt", self.dialog)
         newDialog.performOnCurrent()
 
     def showLicense(self, *args):
-        newDialog = LicenseDialog(self.dialog, self.validApps)
+        newDialog = TextFileDisplayDialog(self.validApps, False, {}, "LICENSE.txt", self.dialog)
         newDialog.performOnCurrent()
 
     def showVersions(self, *args):
@@ -78,23 +78,27 @@ class ShowVersions(guiplugins.ActionResultDialogGUI):
 
     def getDialogTitle(self):
         return "Version Information"
+
+    def makeString(self, versionTuple):
+        if type(versionTuple) == StringType:
+            return versionTuple
+        else:
+            return ".".join(map(str, versionTuple))
     
     def addContents(self):
-        textTestVersion = texttest_version.version
-        pythonVersion = ".".join(map(lambda l: str(l), sys.version_info))
-        gtkVersion = ".".join(map(lambda l: str(l), gtk.gtk_version))
-        pygtkVersion = ".".join(map(lambda l: str(l), gtk.pygtk_version))
+        versionList = [ ("TextTest", texttest_version.version),
+                        ("Python", sys.version_info),
+                        ("GTK", gtk.gtk_version),
+                        ("PyGTK",  gtk.pygtk_version),
+                        ("PyGObject", gobject.pygobject_version),
+                        ("GLib", gobject.glib_version) ]
         
-        table = gtk.Table(4, 2, homogeneous=False)
+        table = gtk.Table(len(versionList), 2, homogeneous=False)
         table.set_row_spacings(1)
-        table.attach(self.justify("TextTest:", 0.0), 0, 1, 0, 1, xoptions=gtk.FILL, xpadding=1)
-        table.attach(self.justify("Python:", 0.0), 0, 1, 1, 2, xoptions=gtk.FILL, xpadding=1)
-        table.attach(self.justify("GTK:", 0.0), 0, 1, 2, 3, xoptions=gtk.FILL, xpadding=1)
-        table.attach(self.justify("PyGTK:", 0.0), 0, 1, 3, 4, xoptions=gtk.FILL, xpadding=1)
-        table.attach(self.justify(textTestVersion, 1.0), 1, 2, 0, 1)
-        table.attach(self.justify(pythonVersion, 1.0), 1, 2, 1, 2)
-        table.attach(self.justify(gtkVersion, 1.0), 1, 2, 2, 3)
-        table.attach(self.justify(pygtkVersion, 1.0), 1, 2, 3, 4)
+        for rowNo, (title, versionTuple) in enumerate(versionList):
+            table.attach(self.justify(title + ":", 0.0), 0, 1, rowNo, rowNo + 1, xoptions=gtk.FILL, xpadding=1)
+            table.attach(self.justify(self.makeString(versionTuple), 1.0), 1, 2, rowNo, rowNo + 1)
+
         header = gtk.Label()
         header.set_markup("<b>You are using these versions:\n</b>")
         tableVbox = gtk.VBox()
@@ -113,9 +117,6 @@ class ShowVersions(guiplugins.ActionResultDialogGUI):
         frame.set_padding(10, 10, 10, 10)
         frame.add(vbox)
         self.dialog.vbox.pack_start(frame, expand=True, fill=True)
-        return "Showing component versions: \n TextTest: " + textTestVersion + \
-               "\n Python: " + pythonVersion + "\n GTK: " + gtkVersion + \
-               "\n PyGTK: " + pygtkVersion
         
     def justify(self, label, leftFill, markup = False):
         alignment = gtk.Alignment(leftFill, 0.0, 0.0, 0.0)
@@ -127,27 +128,53 @@ class ShowVersions(guiplugins.ActionResultDialogGUI):
             alignment.add(gtk.Label(label))
         return alignment
 
-class CreditsDialog(guiplugins.ActionResultDialogGUI):
-    def __init__(self, parent, *args):
-        guiplugins.ActionResultDialogGUI.__init__(self, *args)
+class TextFileDisplayDialog(guiplugins.ActionResultDialogGUI):
+    def __init__(self, allApps, dynamic, inputOptions, fileName, parent=None):
         self.parent = parent
-
+        self.fileName = fileName
+        self.title = self.makeTitleFromFileName(fileName)
+        guiplugins.ActionResultDialogGUI.__init__(self, allApps, dynamic)
+        
     def getParentWindow(self):
-        return self.parent
-    
+        if self.parent:
+            return self.parent
+        else:
+            return self.topWindow
+
+    def makeTitleFromFileName(self, fileName):
+        words = fileName.replace(".txt", "").split("_")
+        return " ".join([ word.capitalize() for word in words ])
+
+    def messageAfterPerform(self):
+        return ""
+        
     def _getTitle(self):
-        return "TextTest Credits"
+        return self.title
+
+    def getTooltip(self):
+        return "Show TextTest " + self.title
+
+    def isActiveOnCurrent(self, *args):
+        return True
+    
+    def getDialogTitle(self):
+        return "TextTest " + self.title
+
+    def getTabTitle(self):
+        if self.title == "Credits":
+            return "Written by"
+        else:
+            return self.title
 
     def addContents(self):
         try:
-            authorFile = open(os.path.join(plugins.installationDir("doc"), "AUTHORS"))
-            unicodeInfo = plugins.decodeText("".join(authorFile.readlines()))           
-            authorFile.close()
-            creditsText = plugins.encodeToUTF(unicodeInfo)
+            file = open(plugins.installationPath("doc", self.fileName))
+            text = file.read()
+            file.close()
             buffer = gtk.TextBuffer()
-            buffer.set_text(creditsText)
+            buffer.set_text(text)
         except Exception, e: #pragma : no cover - should never happen
-            self.showErrorDialog("Failed to show AUTHORS file:\n" + str(e))
+            self.showErrorDialog("Failed to show " + self.fileName + " file:\n" + str(e))
             return
 
         textView = gtk.TextView(buffer)
@@ -155,54 +182,28 @@ class CreditsDialog(guiplugins.ActionResultDialogGUI):
         textView.set_cursor_visible(False)
         textView.set_left_margin(5)
         textView.set_right_margin(5)
+        useScrollbars = not self.parent and text.count("\n") > 30
         notebook = gtk.Notebook()
-        notebook.append_page(textView, gtk.Label("Written by"))
-        self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
-        self.dialog.set_resizable(False)
-        return "Showing credits:\n" + creditsText
+        label = gtk.Label(self.getTabTitle())
+        if useScrollbars:
+            window = gtk.ScrolledWindow()
+            window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+            window.add(textView)
+            notebook.append_page(window, label)        
+            parentSize = self.topWindow.get_size()
+            self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[0] * 0.7))
+        else:
+            notebook.append_page(textView, label)
             
-class LicenseDialog(guiplugins.ActionResultDialogGUI):
-    def __init__(self, parent, *args):
-        guiplugins.ActionResultDialogGUI.__init__(self, *args)
-        self.parent = parent
-
-    def getParentWindow(self):
-        return self.parent
-    
-    def _getTitle(self):
-        return "TextTest License"
-    
-    def addContents(self):
-        try:
-            licenseFile = open(os.path.join(plugins.installationDir("doc"), "LICENSE"))
-            unicodeInfo = plugins.decodeText("".join(licenseFile.readlines()))           
-            licenseFile.close()
-            licenseText = plugins.encodeToUTF(unicodeInfo)
-            buffer = gtk.TextBuffer()
-            buffer.set_text(licenseText)
-        except Exception, e: #pragma : no cover - should never happen
-            self.showErrorDialog("Failed to show LICENSE file:\n" + str(e))
-            return
-
-        textView = gtk.TextView(buffer)
-        textView.set_editable(False)
-        textView.set_cursor_visible(False)
-        textView.set_left_margin(5)
-        textView.set_right_margin(5)
-        notebook = gtk.Notebook()
-        notebook.append_page(textView, gtk.Label("License"))
         self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
-        return "Showing license:\n" + licenseText
-
+        
+        
 class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
     def isActiveOnCurrent(self, *args):
         return True
+
     def messageAfterPerform(self):
         return ""
-    def cmpVersions(self, file1, file2):
-        v1 = self.makeVersions(file1)
-        v2 = self.makeVersions(file2)
-        return -cmp(v1, v2) # We want the most recent file first ...
 
     def makeVersions(self, versionStr):
         versions = []
@@ -219,17 +220,9 @@ class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
         notebook.popup_enable()
         docDir = plugins.installationDir("doc")
         versionInfo = self.readVersionInfo(docDir)
-        message = ""
         for version in reversed(sorted(versionInfo.keys())):
-            unicodeInfo = plugins.decodeText(versionInfo[version])
-            displayText = plugins.encodeToUTF(unicodeInfo)
-            endFirstSentence = displayText.find(".")
-            versionStr = ".".join(map(str, version))
-            message += "Adding " + self.getTitle() + " from version " + versionStr + \
-                       ":\nFirst sentence :" + displayText[:endFirstSentence + 1] + "\n"
-
             buffer = gtk.TextBuffer()
-            buffer.set_text(displayText)
+            buffer.set_text(versionInfo[version])
             textView = gtk.TextView(buffer)
             textView.set_editable(False)
             textView.set_cursor_visible(False)
@@ -239,17 +232,17 @@ class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
             scrolledWindow.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
             scrolledWindow.add(textView)
             scrolledWindow.set_shadow_type(gtk.SHADOW_IN)
+            versionStr = ".".join(map(str, version))
             notebook.append_page(scrolledWindow, gtk.Label(self.labelPrefix() + versionStr))
 
         if notebook.get_n_pages() == 0: #pragma : no cover - should never happen
             raise plugins.TextTestError, "\nNo " + self.getTitle() + " could be found in\n" + docDir + "\n"
         else:
-            guiplugins.scriptEngine.monitorNotebook(notebook, "view " + self.getTitle().lower() + " in tab")
+            guiutils.scriptEngine.monitorNotebook(notebook, "view " + self.getTitle().lower() + " in tab")
             parentSize = self.topWindow.get_size()
-            self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[0] * 0.7))
+            self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[1] * 0.7))
             self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
-            return message
-
+            
     def labelPrefix(self):
         return ""
 
@@ -300,3 +293,10 @@ class ShowChangeLogs(VersionInfoDialogGUI):
             else:
                 versionInfo[currVersions] += line
         return versionInfo
+
+
+def getInteractiveActionClasses():
+    classes = [ ShowMigrationNotes, ShowChangeLogs, ShowVersions, AboutTextTest ]
+    for fileName in plugins.findDataPaths([ "*.txt" ], dataDirName="doc"):
+        classes.append(plugins.Callable(TextFileDisplayDialog, os.path.basename(fileName)))
+    return classes

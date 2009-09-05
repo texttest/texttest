@@ -1,13 +1,13 @@
 
-import version_control, plugins, datetime, time, os
+import vcs_independent, plugins, datetime, time, os
 from ndict import seqdict
 
 
-class BzrInterface(version_control.VersionControlInterface):
+class BzrInterface(vcs_independent.VersionControlInterface):
     def __init__(self, controlDir):
         warningStates = [ "Modified", "Removed", "Added", "Renamed" ]
         errorStates = [ "Unknown", "Conflicts", "Kind changed" ]
-        version_control.VersionControlInterface.__init__(self, controlDir, "Bazaar", warningStates, errorStates, "-1")
+        vcs_independent.VersionControlInterface.__init__(self, controlDir, "Bazaar", warningStates, errorStates, "-1")
         self.defaultArgs["rm"] = [ "--force" ]
 
     def isVersionControlled(self, dirname):
@@ -43,6 +43,10 @@ class BzrInterface(version_control.VersionControlInterface):
     def getCombinedRevisionOptions(self, r1, r2):
         return [ "-r", r1 + ".." + r2 ]
 
+    def removePath(self, path):
+        retCode = self.callProgram("rm", [ path ]) # Always removes
+        return retCode == 0
+
     # Hack for bug in Bazaar, which can't handle symbolic links to the branch...
     def callProgramOnFiles(self, cmdName, fileArg, recursive=False, extraArgs=[], **kwargs):
         if cmdName == "add":
@@ -50,8 +54,8 @@ class BzrInterface(version_control.VersionControlInterface):
             for fileName in self.getFileNamesForCmd(cmdName, fileArg, recursive):
                 self.callProgramWithHandler(fileName, basicArgs + [ os.path.realpath(fileName) ], **kwargs)
         else:
-            version_control.VersionControlInterface.callProgramOnFiles(self, cmdName, fileArg, recursive, extraArgs, **kwargs)
+            vcs_independent.VersionControlInterface.callProgramOnFiles(self, cmdName, fileArg, recursive, extraArgs, **kwargs)
         
 
-version_control.vcsClass = BzrInterface
-InteractiveActionConfig = version_control.InteractiveActionConfig
+vcs_independent.vcsClass = BzrInterface
+InteractiveActionConfig = vcs_independent.InteractiveActionConfig

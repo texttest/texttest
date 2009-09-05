@@ -1,5 +1,5 @@
 
-import os, string, plugins, sys
+import os, string, plugins, sys, time
 from comparefile import FileComparison
 
 # This module won't work without an external module creating a file called performance.app
@@ -15,6 +15,9 @@ def getPerformance(fileName):
     if not fileName:
         return float(-1)
     line = open(fileName).readline()
+    return getPerformanceFromLine(line)
+
+def getPerformanceFromLine(line):
     pos = line.find(":")
     if pos == -1:
         return float(-1)
@@ -26,6 +29,28 @@ def getTestPerformance(test, version = None):
     except IOError: # assume something disappeared externally
         test.refreshFiles()
         return getTestPerformance(test, version)
+
+def describePerformance(fileName):
+    line = open(fileName).readline().strip()
+    if "mem" in os.path.basename(fileName):
+        return line
+    
+    # Assume seconds
+    perf = getPerformanceFromLine(line)
+    values = list(time.gmtime(perf)[2:6])
+    values[0] -= 1 # not actually using timedelta which doesn't support formatting...
+    units = [ "day", "hour", "minute", "second" ]
+    parts = []
+    for unit, val in zip(units, values):
+        if val:
+            parts.append(plugins.pluralise(val, unit))
+
+    if len(parts) > 0:
+        description = " and ".join(parts).replace(" and ", ", ", len(parts) - 2)
+    else:
+        description = "Less than 1 second"
+    return line.replace(str(perf) + " sec.", description)
+
 
 def parseTimeExpression(timeExpression):
     # Starts with <, >, <=, >= ?
@@ -71,10 +96,13 @@ class PerformanceConfigSettings:
             return self._getDescriptor(configEntry, fallbackConfigName) + postfix
 
     def getFallbackConfigName(self):
-        if self.configName.find("mem") != -1:
+        if "mem" in self.configName:
             return "memory"
         else:
             return "cputime"
+
+    def ignoreImprovements(self):
+        return self.configMethod("performance_ignore_improvements", self.configName) == "true"
         
     def _getDescriptor(self, configEntry, configName):
         fromConfig = self.configMethod(configEntry, configName)
@@ -93,12 +121,17 @@ class PerformanceFileComparison(FileComparison):
             # If we didn't understand the old performance, overwrite it and behave like it didn't exist
             if (oldPerf < 0):
                 os.remove(self.stdFile)
-            else:
-                newPerf = getPerformance(self.tmpFile)
-                self.diag.info("Performance is " + str(oldPerf) + " and " + str(newPerf))
-                settings = PerformanceConfigSettings(test, self.stem)
-                self.perfComparison = PerformanceComparison(oldPerf, newPerf, settings)
-                self.differenceCache = self.perfComparison.isSignificant(settings)
+                test.refreshFiles()
+                self.stdFile = test.getFileName(self.stem)
+                self.stdCmpFile = self.stdFile
+                if not self.stdFile:
+                    return
+
+            newPerf = getPerformance(self.tmpFile)
+            self.diag.info("Performance is " + str(oldPerf) + " and " + str(newPerf))
+            settings = PerformanceConfigSettings(test, self.stem)
+            self.perfComparison = PerformanceComparison(oldPerf, newPerf, settings)
+            self.differenceCache = self.perfComparison.isSignificant(settings)
     
     def __repr__(self):
         baseText = FileComparison.__repr__(self)
@@ -117,10 +150,10 @@ class PerformanceFileComparison(FileComparison):
             return self.getDifferencesSummary()
         else:
             return ""
-    def saveResults(self, destFile):
+    def saveResults(self, tmpFile, destFile):
         # Here we save the average of the old and new performance, assuming fluctuation
         avgPerformance = self.perfComparison.getAverage()
-        line = open(self.tmpFile).readlines()[0]
+        line = open(tmpFile).readlines()[0]
         lineToWrite = line.replace(str(self.perfComparison.newPerformance), str(avgPerformance))
         newFile = open(destFile, "w")
         newFile.write(lineToWrite)
@@ -146,7 +179,7 @@ class PerformanceComparison:
             return settings.getDescriptor("performance_descriptor_increase")
 
     def getSummary(self, includeNumbers=True):
-        if self.newPerformance < 0:
+        if self.newPerformance < 0 or self.oldPerformance < 0:
             return "Performance comparison failed"
 
         perc = plugins.roundPercentage(self.percentageChange)
@@ -160,6 +193,9 @@ class PerformanceComparison:
             return self.descriptor
 
     def isSignificant(self, settings):
+        if settings.ignoreImprovements() and self.newPerformance < self.oldPerformance:
+            return False
+        
         longEnough = settings.aboveMinimum(self.newPerformance, "performance_test_minimum") or \
                      settings.aboveMinimum(self.oldPerformance, "performance_test_minimum")
         varianceEnough = settings.aboveMinimum(self.percentageChange, "performance_variation_%")
@@ -207,26 +243,17 @@ class TimeFilter(plugins.Filter):
             return 1
         return testPerformance >= self.minTime and testPerformance <= self.maxTime       
         
-class PerformanceStatistics(plugins.Action):
+class PerformanceStatistics(plugins.ScriptWithArgs):
     scriptDoc = "Prints a report on system resource usage per test. Can compare versions"
     printedTitle = False
     def __init__(self, args = []):
-        self.compareVersion = None
+        optDict = self.parseArguments(args, [ "compv", "file" ])
+        self.compareVersion = optDict.get("compv")
         self.compareTotal = 0.0
         self.total = 0.0
         self.testCount = 0
         self.app = None
-        self.file = "performance"
-        self.interpretOptions(args)
-    def interpretOptions(self, args):
-        for ar in args:
-            arr = ar.split("=")
-            if arr[0]=="compv":
-                self.compareVersion = arr[1]
-            elif arr[0]=="file":
-                self.file = arr[1]
-            else:
-                print "Unknown option " + arr[0]
+        self.file = optDict.get("file", "performance")
     def setUpSuite(self, suite):
         if suite.parent:
             print suite.getIndent() + suite.name
@@ -247,7 +274,8 @@ class PerformanceStatistics(plugins.Action):
     def __call__(self, test):
         self.testCount += 1
         perf = getPerformance(test.getFileName(self.file))
-        self.total += perf
+        if perf > 0:
+            self.total += perf
         entries = [ test.getIndent() + test.name, self.format(perf) ]
         if self.compareVersion is not None:
             comparePerf = getPerformance(test.getFileName(self.file, self.compareVersion))
@@ -257,7 +285,9 @@ class PerformanceStatistics(plugins.Action):
             entries += [ self.format(comparePerf), perfComp.getSummary() ]
         print self.getPaddedLine(entries)
     def format(self, number):
-        if self.file.find("mem") != -1:
+        if number < 0:
+            return "N/A"
+        if "mem" in self.file:
             return self.formatMemory(number)
         else:
             from datetime import timedelta

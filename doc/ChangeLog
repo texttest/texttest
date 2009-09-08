@@ -1444,6 +1444,8 @@ Static GUI Enhancements:
 	Saves on fiddling and restarting the GUI.
     - Default value for "query_kill_processes" changed (default/__init__.py)
 	Ask before terminating dynamic GUIs when static GUI is terminated.
+    - Performance values displayed in more readable format (textinfo.py)
+	Previously in seconds only
     - Tooltips added to the selection tab to aid clarity.
 Dynamic GUI Enhancements:
     - Can now rerun tests directly from the dynamic GUI (runningactions.py)
@@ -1453,9 +1455,13 @@ Dynamic GUI Enhancements:
     - Saved tests are now listed separately in the status view (statusviews.py)
 	Makes it easier to track which tests have been saved and which worked by themselves
     - Saved tests make this clear in the Text Info space, recording the time at which they were saved (comparetest.py)
+    - "Save As" dialog allows multiple versions for "Version to save previous results as" (changetestresults.py)
+	Use comma-separated list which can provide multiple backups of the same file.
     - Can now view original files (filtered and not) from the file view popup menu (fileviewers.py)
     - Can now view files with content-filtering but not order-filtering present (fileviewers.py)
 	Useful when "unordered_text" is defined
+    - "Annotate" is now called "Set Run Name" and works from the command line / static GUI (housekeeping.py)
+	Uses the pre-existing option -name which previously only affected batch mode
     - New base_version "recusecase" for when recording GUI tests
 	Works much like the exisiting "rectraffic", i.e. a way to have different configuration only in this case
     - Test tree tooltips now work more reliably and use the builtin support in PyGTK 2.12 (testtree.py)
@@ -1473,6 +1479,10 @@ Framework Enhancements:
 	As the name suggests, allows performance testing to only flag when performance degrades.
     - New config setting "save_filtered_file_stems"
 	Allows the filtered version of files to be saved instead of the raw output.
+    - Config setting "suppress_stderr_popup" renamed to "suppress_stderr_text" and used more widely
+	Old name still works as an alias. Will now look at stderr from collate scripts and grid engine slaves too.
+    - Can now have variable "executable"
+	Set a relative path and provide it also in one of the "*_test_path" config settings.
     - Logging more flexible now (default.py)
 	Dynamic GUI does not write anything by default. Batch mode writes time stamps by default.
 	Debug logging file now called "logging.debug" rather than "log4py.conf". See migration notes

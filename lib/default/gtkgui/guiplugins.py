@@ -460,6 +460,18 @@ class ComboBoxListFinder:
         entries.append(text)
 
 
+# A utility class to set and get the indices of options in radio button groups.
+class RadioGroupIndexer:
+    def __init__(self, listOfButtons):
+        self.buttons = listOfButtons
+    def getActiveIndex(self):
+        for i in xrange(0, len(self.buttons)):
+            if self.buttons[i].get_active():
+                return i
+    def setActiveIndex(self, index):
+        self.buttons[index].set_active(True)
+
+
 class OptionGroupGUI(ActionGUI):
     def __init__(self, *args):
         ActionGUI.__init__(self, *args)
@@ -550,7 +562,6 @@ class OptionGroupGUI(ActionGUI):
             else:
                 radioButton.set_active(False)
 
-        from gtkusecase import RadioGroupIndexer
         indexer = RadioGroupIndexer(buttons)
         switch.setMethods(indexer.getActiveIndex, indexer.setActiveIndex)
         return buttons

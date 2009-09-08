@@ -14,5 +14,8 @@ def getConfigFromDirectory(directory):
             controlDir = os.path.join(dir, controlDirName)
             if os.path.isdir(controlDir):
                 module = controlDirName.lower().replace(".", "")
-                exec "from " + module + " import InteractiveActionConfig"
-                return InteractiveActionConfig(controlDir)
+                try:
+                    exec "from " + module + " import InteractiveActionConfig"
+                    return InteractiveActionConfig(controlDir)
+                except ImportError: # There may well be more VCSs than we have support for...
+                    pass

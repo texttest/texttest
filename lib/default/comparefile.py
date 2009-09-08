@@ -241,18 +241,18 @@ class FileComparison:
             stdRoot = self.getStdRootVersionFile()
             return self.versionise(stdRoot, versionString)
 
-    def backupOrRemove(self, fileName, backupVersionString):
+    def backupOrRemove(self, fileName, backupVersionStrings):
         if os.path.isfile(fileName):
-            if backupVersionString:
+            for backupVersionString in backupVersionStrings:
                 backupFile = self.getStdFileForSave(backupVersionString)
-                os.rename(fileName, backupFile)
-            else:
-                os.remove(fileName)
+                if not os.path.isfile(backupFile):
+                    copyfile(fileName, backupFile)
+            os.remove(fileName)
 
-    def overwrite(self, test, exact, versionString, backupVersionString):
+    def overwrite(self, test, exact, versionString, backupVersionStrings):
         self.diag.info("save file from " + self.tmpFile)
         self.stdFile = self.getStdFileForSave(versionString)
-        self.backupOrRemove(self.stdFile, backupVersionString)
+        self.backupOrRemove(self.stdFile, backupVersionStrings)
         self.saveTmpFile(test, exact)
         
     def saveNew(self, test, versionString):
@@ -286,10 +286,10 @@ class FileComparison:
         self.tmpFile = self.stdFile
         self.tmpCmpFile = self.stdFile
 
-    def saveMissing(self, versionString, autoGenText, backupVersionString):
+    def saveMissing(self, versionString, autoGenText, backupVersionStrings):
         stdRoot = self.getStdRootVersionFile()
         targetFile = self.versionise(stdRoot, versionString)
-        self.backupOrRemove(targetFile, backupVersionString)
+        self.backupOrRemove(targetFile, backupVersionStrings)
 
         self.stdFile = None
         self.stdCmpFile = None

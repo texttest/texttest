@@ -1079,7 +1079,7 @@ class ConfigurationCall:
             else:
                 self.firstAttemptException = plugins.getExceptionString()
                 return self(self.app, *args, **kwargs)
-        except plugins.TextTestError:
+        except (plugins.TextTestError, KeyboardInterrupt):
             # Just pass it through here, these are deliberate
             raise
         except:

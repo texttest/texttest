@@ -269,23 +269,23 @@ class TestComparison(BaseTestComparison):
         comparison, newList = self.findComparison(stem)
         newList.remove(comparison)
         self.allResults.remove(comparison)
-    def save(self, test, exact=True, versionString="", overwriteSuccessFiles=False, onlyStems=[], backupVersionString=""):
+    def save(self, test, exact=True, versionString="", overwriteSuccessFiles=False, onlyStems=[], backupVersions=[]):
         self.diag.info("Saving " + repr(test) + " stems " + repr(onlyStems))
         for comparison in self.filterComparisons(self.changedResults, onlyStems):
             self.updateStatus(test, str(comparison), versionString)
-            comparison.overwrite(test, exact, versionString, backupVersionString)
+            comparison.overwrite(test, exact, versionString, backupVersions)
         for comparison in self.filterComparisons(self.newResults, onlyStems):
             self.updateStatus(test, str(comparison), versionString)
             comparison.saveNew(test, versionString)
         for comparison in self.filterComparisons(self.missingResults, onlyStems):
             self.updateStatus(test, str(comparison), versionString)
-            comparison.saveMissing(versionString, self.fakeMissingFileText(), backupVersionString)
+            comparison.saveMissing(versionString, self.fakeMissingFileText(), backupVersions)
         if len(onlyStems) == 0:  # Save any external file edits we may have made. Don't do this on partial saves.
             self.saveFileEdits(test, versionString)
         if overwriteSuccessFiles:
             for comparison in self.filterComparisons(self.correctResults, onlyStems):
                 self.updateStatus(test, str(comparison), versionString)
-                comparison.overwrite(test, exact, versionString, backupVersionString)
+                comparison.overwrite(test, exact, versionString, backupVersions)
 
     def saveFileEdits(self, test, versionString):
         tmpFileEditDir = test.makeTmpFileName("file_edits", forComparison=0)

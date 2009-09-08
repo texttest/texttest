@@ -1198,7 +1198,7 @@ class RunTest(plugins.Action):
         self.lock.acquire()
         self.currentProcess = process
         if test in self.killedTests:
-            self.killProcess()
+            self.killProcess(test)
         self.lock.release()
 
     def storeReturnCode(self, test, code):

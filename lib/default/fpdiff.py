@@ -18,8 +18,12 @@ def _fpequalAtPos(l1, l2, tolerance, relTolerance, pos):
         deviation = abs(float(number1) - float(number2))
         if tolerance != None and deviation <= tolerance:
             equal = True
-        elif relTolerance != None and deviation / float(number1) <= relTolerance:
-            equal = True
+        elif relTolerance != None:
+            referenceValue = abs(float(number1))
+            if referenceValue == 0:
+                equal = (deviation == 0)
+            elif deviation / referenceValue <= relTolerance:
+                equal = True
     except ValueError:
         pass
     return equal, l1, l2

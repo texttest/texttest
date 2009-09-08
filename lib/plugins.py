@@ -65,7 +65,7 @@ installationRoots = findInstallationRoots()
 # Don't read these from Python as the names depend on the locale!
 weekdays = [ "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday" ]
 # A few version control systems we might run into...
-controlDirNames = [ "CVS", ".svn", ".bzr", ".hg" ]
+controlDirNames = [ "CVS", ".bzr", ".hg" ]
 
 def startTimeString():
     global globalStartTime

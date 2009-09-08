@@ -75,12 +75,13 @@ class FilterTemporary(FilterAction):
     def _makeAllFilters(self, test, stem):
         filters = FilterAction._makeAllFilters(self, test, stem)
         floatTolerance = test.getCompositeConfigValue("floating_point_tolerance", stem)
-        if floatTolerance:
+        relTolerance = test.getCompositeConfigValue("relative_float_tolerance", stem)
+        if floatTolerance or relTolerance:
             origFile = test.makeTmpFileName(stem + "." + test.app.name + "origcmp", forFramework=1)
             if not os.path.isfile(origFile):
                 origFile = test.getFileName(stem)
             if origFile and os.path.isfile(origFile):
-                filters.append((FloatingPointFilter(origFile, floatTolerance), ".fpdiff"))
+                filters.append((FloatingPointFilter(origFile, floatTolerance, relTolerance), ".fpdiff"))
         return filters
     
 
@@ -101,15 +102,16 @@ class FilterResultRecompute(FilterAction):
         return result
 
 class FloatingPointFilter:
-    def __init__(self, origFileName, tolerance):
+    def __init__(self, origFileName, tolerance, relative):
         self.origFileName = origFileName
-        self.tolerance = tolerance
+        self.tolerance = tolerance if tolerance else None
+        self.relative = relative if relative else None
 
     def filterFile(self, fileName, newFileName):
         fromlines = open(self.origFileName, "rU").readlines()
         tolines = open(fileName).readlines()
         newFile = plugins.openForWrite(newFileName)
-        fpdiff.fpfilter(fromlines, tolines, newFile, self.tolerance)
+        fpdiff.fpfilter(fromlines, tolines, newFile, self.tolerance, self.relative)
 
 
 class RunDependentTextFilter(plugins.Observable):

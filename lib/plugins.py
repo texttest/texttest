@@ -64,8 +64,9 @@ globalStartTime = time.time()
 installationRoots = findInstallationRoots()
 # Don't read these from Python as the names depend on the locale!
 weekdays = [ "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday" ]
-# A few version control systems we might run into...
-controlDirNames = [ "CVS", ".svn", ".bzr", ".hg" ]
+# A few version control systems we might run into... list lifted from emacs "grep-find-ignored-directories"
+# and removed the ones I'd never heard of...
+controlDirNames = [ "CVS", ".svn", ".bzr", ".hg", ".git", "RCS", "_darcs", "{arch}" ]
 
 def startTimeString():
     global globalStartTime

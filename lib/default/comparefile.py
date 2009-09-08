@@ -245,7 +245,8 @@ class FileComparison:
         if os.path.isfile(fileName):
             for backupVersionString in backupVersionStrings:
                 backupFile = self.getStdFileForSave(backupVersionString)
-                copyfile(fileName, backupFile)
+                if not os.path.isfile(backupFile):
+                    copyfile(fileName, backupFile)
             os.remove(fileName)
 
     def overwrite(self, test, exact, versionString, backupVersionStrings):

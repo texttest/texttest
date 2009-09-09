@@ -367,9 +367,13 @@ class Config:
         classes.append(GUIController)
     def getReconnectSequence(self):
         actions = [ self.reconnectConfig.getReconnectAction() ]
-        actions += [ rundependent.FilterOriginal(), rundependent.FilterTemporary(), \
+        actions += [ self.getOriginalFilterer(), self.getTemporaryFilterer(), \
                      self.getTestComparator(), self.getFailureExplainer() ]
         return actions
+    def getOriginalFilterer(self):
+        return rundependent.FilterOriginal()
+    def getTemporaryFilterer(self):
+        return rundependent.FilterTemporary()
     def getTestProcessor(self):        
         catalogueCreator = self.getCatalogueCreator()
         ignoreCatalogues = self.shouldIgnoreCatalogues()
@@ -377,7 +381,7 @@ class Config:
         trafficHandler = SetUpTrafficHandlers(self.optionMap.has_key("rectraffic"))
         return [ self.getExecHostFinder(), self.getWriteDirectoryMaker(), \
                  self.getWriteDirectoryPreparer(ignoreCatalogues), \
-                 trafficHandler, catalogueCreator, collator, rundependent.FilterOriginal(), self.getTestRunner(), \
+                 trafficHandler, catalogueCreator, collator, self.getOriginalFilterer(), self.getTestRunner(), \
                  trafficHandler, catalogueCreator, collator, self.getTestEvaluator() ]
     def shouldIgnoreCatalogues(self):
         return self.optionMap.has_key("ignorecat") or self.optionMap.has_key("record")
@@ -572,7 +576,7 @@ class Config:
     def getTestRunner(self):
         return RunTest()
     def getTestEvaluator(self):
-        return [ self.getFileExtractor(), rundependent.FilterTemporary(), self.getTestComparator(), self.getFailureExplainer() ]
+        return [ self.getFileExtractor(), self.getTemporaryFilterer(), self.getTestComparator(), self.getFailureExplainer() ]
     def getFileExtractor(self):
         return [ self.getPerformanceFileMaker(), self.getPerformanceExtractor() ]
     def getCatalogueCreator(self):

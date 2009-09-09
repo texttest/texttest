@@ -35,6 +35,7 @@ class FilterAction(plugins.Action):
             currFile = open(currFileName, "rU") # use universal newlines to simplify
             writeFile = plugins.openForWrite(writeFileName)
             fileFilter.filterFile(currFile, writeFile)
+            writeFile.close()
             currFileName = writeFileName
         if len(filters) > 0 and currFileName != newFileName:
             shutil.move(currFileName, newFileName)

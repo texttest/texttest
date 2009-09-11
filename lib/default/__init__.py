@@ -1170,6 +1170,7 @@ class Killed(plugins.TestState):
 class RunTest(plugins.Action):
     def __init__(self):
         self.diag = logging.getLogger("run test")
+        self.killDiag = logging.getLogger("kill processes")
         self.currentProcess = None
         self.killedTests = []
         self.killSignal = None
@@ -1268,7 +1269,7 @@ class RunTest(plugins.Action):
         machine = test.app.getRunMachine()
         if machine != "localhost" and test.getConfigValue("remote_shell_program") == "ssh":
             self.killRemoteProcess(test, machine)
-        plugins.log.info("Killing running test (process id " + str(self.currentProcess.pid) + ")")
+        self.killDiag.info("Killing running test (process id " + str(self.currentProcess.pid) + ")")
         killSubProcessAndChildren(self.currentProcess)
 
     def killRemoteProcess(self, test, machine):

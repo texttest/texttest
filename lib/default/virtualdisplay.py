@@ -13,6 +13,7 @@ class VirtualDisplayResponder(plugins.Responder):
         self.displayProc = None
         self.guiSuites = []
         self.diag = logging.getLogger("virtual display")
+        self.killDiag = logging.getLogger("kill processes")
         VirtualDisplayResponder.instance = self
         
     def addSuites(self, suites):
@@ -81,7 +82,7 @@ class VirtualDisplayResponder(plugins.Responder):
     def cleanXvfb(self):
         if self.displayName and os.name == "posix":
             if self.displayMachine == "localhost":
-                plugins.log.info("Killing Xvfb process " + str(self.displayPid))
+                self.killDiag.info("Killing Xvfb process " + str(self.displayPid))
                 self.terminateIfRunning(self.displayPid)
             else:
                 self.killRemoteServer()
@@ -91,7 +92,7 @@ class VirtualDisplayResponder(plugins.Responder):
 
     def killRemoteServer(self):
         self.diag.info("Getting ps output from " + self.displayMachine)
-        plugins.log.info("Killing remote Xvfb process on " + self.displayMachine + " with pid " + str(self.displayPid))
+        self.killDiag.info("Killing remote Xvfb process on " + self.displayMachine + " with pid " + str(self.displayPid))
         self.guiSuites[0].app.runCommandOn(self.displayMachine, [ "kill", str(self.displayPid) ])
         self.terminateIfRunning(self.displayProc.pid) # only for self-tests really : traffic mechanism doesn't fake remote process
 

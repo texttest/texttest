@@ -35,11 +35,18 @@ class BaseTestComparison(plugins.TestState):
         firstLine = open(resultFile).readline()
         return firstLine != self.fakeMissingFileText()
 
+    def definitionFileCategory(self, ignoreMissing):
+        if ignoreMissing:
+            return "all"
+        else:
+            return "regenerate"
+
     def makeComparisons(self, test, ignoreMissing=False):
         # Might have saved some new ones or removed some old ones in the meantime...
         test.refreshFiles()
         tmpFiles = self.makeStemDict(test.listTmpFiles())
-        resultFiles, defFiles = test.listStandardFiles(allVersions=False, defFileCategory="regenerate")
+        defFileCategory = self.definitionFileCategory(ignoreMissing)
+        resultFiles, defFiles = test.listStandardFiles(allVersions=False, defFileCategory=defFileCategory)
         resultFilesToCompare = filter(self.shouldCompare, resultFiles)
         stdFiles = self.makeStemDict(resultFilesToCompare + defFiles)
         for tmpStem, tmpFile in tmpFiles.items():

@@ -24,18 +24,21 @@ class FilterAction(plugins.Action):
             self.performAllFilterings(test, stem, fileName, newFileName)
 
     def performAllFilterings(self, test, stem, fileName, newFileName):
-        currFile = fileName
+        currFileName = fileName
         filters = self.makeAllFilters(test, stem)
         for fileFilter, extraPostfix in filters:
-            writeFile = newFileName + extraPostfix
-            self.diag.info("Applying " + fileFilter.__class__.__name__ + " to make\n" + writeFile + " from\n " + currFile) 
-            if os.path.isfile(writeFile):
-                self.diag.info("Removing previous file at " + writeFile)
-                os.remove(writeFile)
+            writeFileName = newFileName + extraPostfix
+            self.diag.info("Applying " + fileFilter.__class__.__name__ + " to make\n" + writeFileName + " from\n " + currFileName) 
+            if os.path.isfile(writeFileName):
+                self.diag.info("Removing previous file at " + writeFileName)
+                os.remove(writeFileName)
+            currFile = open(currFileName, "rU") # use universal newlines to simplify
+            writeFile = plugins.openForWrite(writeFileName)
             fileFilter.filterFile(currFile, writeFile)
-            currFile = writeFile
-        if len(filters) > 0 and currFile != newFileName:
-            shutil.move(currFile, newFileName)
+            writeFile.close()
+            currFileName = writeFileName
+        if len(filters) > 0 and currFileName != newFileName:
+            shutil.move(currFileName, newFileName)
 
     def makeAllFilters(self, test, stem):
         filters = self._makeAllFilters(test, stem)
@@ -107,11 +110,10 @@ class FloatingPointFilter:
         self.tolerance = tolerance if tolerance else None
         self.relative = relative if relative else None
 
-    def filterFile(self, fileName, newFileName):
+    def filterFile(self, inFile, writeFile):
         fromlines = open(self.origFileName, "rU").readlines()
-        tolines = open(fileName).readlines()
-        newFile = plugins.openForWrite(newFileName)
-        fpdiff.fpfilter(fromlines, tolines, newFile, self.tolerance, self.relative)
+        tolines = inFile.readlines()
+        fpdiff.fpfilter(fromlines, tolines, writeFile, self.tolerance, self.relative)
 
 
 class RunDependentTextFilter(plugins.Observable):
@@ -120,13 +122,7 @@ class RunDependentTextFilter(plugins.Observable):
         self.diag = logging.getLogger("Run Dependent Text")
         self.lineFilters = [ LineFilter(text, testId, self.diag) for text in filterTexts ]
 
-    def filterFile(self, fileName, newFileName):
-        self.diag.info("Filtering " + fileName + " to create " + newFileName)
-        file = open(fileName, "rU") # use universal newlines to simplify
-        newFile = plugins.openForWrite(newFileName)
-        self.filterFileObject(file, newFile)
-
-    def filterFileObject(self, file, newFile, filteredAway=None):
+    def filterFile(self, file, newFile, filteredAway=None):
         lineNumber = 0
         for line in file.xreadlines():
             # We don't want to stack up ActionProgreess calls in ThreaderNotificationHandler ...
@@ -149,9 +145,9 @@ class RunDependentTextFilter(plugins.Observable):
 
 
 class UnorderedTextFilter(RunDependentTextFilter):
-    def filterFileObject(self, file, newFile):
+    def filterFile(self, file, newFile):
         unorderedLines = {}
-        RunDependentTextFilter.filterFileObject(self, file, newFile, unorderedLines)
+        RunDependentTextFilter.filterFile(self, file, newFile, unorderedLines)
         self.writeUnorderedText(newFile, unorderedLines)
 
     def writeUnorderedText(self, newFile, lines):
@@ -348,4 +344,4 @@ if __name__ == "__main__":
         runDepFilter = UnorderedTextFilter(args, options.testrelpath)
     else:
         runDepFilter = RunDependentTextFilter(args, options.testrelpath)
-    runDepFilter.filterFileObject(sys.stdin, sys.stdout)
+    runDepFilter.filterFile(sys.stdin, sys.stdout)

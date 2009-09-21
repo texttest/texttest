@@ -112,13 +112,13 @@ class QueueSystemServer(BaseActionRunner):
     def submitTerminators(self):
         # snap out of our loop if this was the last one. Rely on others to manage the test queue
         self.reuseFailureQueue.put(None)
-    def getTestForReuse(self, test, state):
+    def getTestForReuse(self, test, state, tryReuse):
         # Pick up any test that matches the current one's resource requirements
         if not self.exited:
             # Don't allow this to use up the terminator
             newTest = self.getTest(block=False, replaceTerminators=True)
             if newTest:
-                if self.allowReuse(test, state, newTest):
+                if tryReuse and self.allowReuse(test, state, newTest):
                     self.jobs[newTest] = self.getJobInfo(test)
                     if self.testCount > 1:
                         self.testCount -= 1
@@ -274,6 +274,9 @@ class QueueSystemServer(BaseActionRunner):
 
     def getSlaveCommand(self, test, submissionRules):
         slaveCmd = os.getenv("TEXTTEST_SLAVE_CMD", sys.argv[0]) # TextTest executable to call for the grid engine slave process
+        if not slaveCmd:
+            # To allow it to be reset, the above form is for documentation...
+            slaveCmd = sys.argv[0]
         cmdArgs = [ slaveCmd, "-d", ":".join(self.optionMap.rootDirectories),
                     "-a", test.app.name + test.app.versionSuffix(),
                     "-l", "-tp", test.getRelPath() ] + \
@@ -610,6 +613,7 @@ class SubmissionRules:
                self.getProcessesNeeded() == newRules.getProcessesNeeded()
 
 class SlaveRequestHandler(StreamRequestHandler):
+    noReusePostfix = ".NO_REUSE"
     def handle(self):
         identifier = self.rfile.readline().strip()
         if identifier == "TERMINATE_SERVER":
@@ -624,6 +628,9 @@ class SlaveRequestHandler(StreamRequestHandler):
     def handleRequestFromHost(self, hostname, identifier):
         testString = self.rfile.readline().strip()
         test = self.server.getTest(testString)
+        tryReuse = not identifier.endswith(self.noReusePostfix)
+        if not tryReuse:
+            identifier = identifier.replace(self.noReusePostfix, "")
         if test is None:
             sys.stderr.write("WARNING: Received request from hostname " + hostname +
                              " (process " + identifier + ")\nwhich could not be parsed:\n'" + testString + "'\n")
@@ -638,7 +645,7 @@ class SlaveRequestHandler(StreamRequestHandler):
                 self.connection.shutdown(socket.SHUT_RD)
                 self.server.diag.info("Changed from '" + oldBt + "' to '" + state.briefText + "'")
                 if state.isComplete():
-                    newTest = QueueSystemServer.instance.getTestForReuse(test, state)
+                    newTest = QueueSystemServer.instance.getTestForReuse(test, state, tryReuse)
                     if newTest:
                         self.wfile.write(socketSerialise(newTest))
                 else:

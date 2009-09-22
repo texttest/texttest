@@ -53,5 +53,4 @@ if __name__ == "__main__":
         debugGen.generate(enabledLoggerNames=[], allLoggerNames=allLoggers)
 
         generateForSelfTests(getSelfTestDir("site/log"), allLoggers)
-        generateForSelfTests(getSelfTestDir("site/matador/PlotGraph/log"), allLoggers, [ ("Test Graph", "gnuplot") ])
-        generateForSelfTests(getSelfTestDir("site/APC/PlotGraph/log"), allLoggers, [ ("Test Graph", "gnuplot") ])
+        

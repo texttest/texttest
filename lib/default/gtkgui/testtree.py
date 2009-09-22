@@ -356,6 +356,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         # waiting for rowCollapsed() to do it at the 'row-collapsed' signal (which will not be emitted
         # in the above cases)
         path = self.model.get_path(iter)
+        self.diag.info("Collapsed path " + repr(path))
         self.collapsedRows[path] = 1
         # Collapsing rows can cause indirect changes of selection, make sure we indicate this.
         self.selecting = True
@@ -390,9 +391,12 @@ class TestTreeGUI(guiutils.ContainerGUI):
     def notifyWriteTestIfSelected(self, test, file):
         # From Save Selection.
         if not self.isVisible(test):
+            self.diag.info("Test invisible " + repr(test))
             return
         if self.hasSelectedAncestor(test):
             file.write(test.getRelPath() + "\n")
+        else:
+            self.diag.info("Test not selected " + repr(test))
 
     def hasSelectedAncestor(self, test):
         if test in self.selectedTests:
@@ -548,12 +552,15 @@ class TestTreeGUI(guiutils.ContainerGUI):
             self.collapseRow(iter)
 
     def isVisible(self, test):
-        iter = self.findIter(test)
-        if iter:
-            path = self.filteredModel.get_path(self.filteredModel.iter_parent(iter))
+        filteredIter = self.findIter(test)
+        if filteredIter:
+            filteredPath = self.filteredModel.get_path(self.filteredModel.iter_parent(filteredIter))
+            path = self.filteredModel.convert_path_to_child_path(filteredPath)
             return not self.collapsedRows.has_key(path)
         else:
+            self.diag.info("No iterator found for " + repr(test))
             return False
+        
     def findAllTests(self):
         tests = []
         self.model.foreach(self.appendTest, tests)

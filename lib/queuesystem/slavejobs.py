@@ -25,6 +25,7 @@ class SocketResponder(plugins.Responder,plugins.Observable):
     def __init__(self, optionMap, *args):
         plugins.Responder.__init__(self)
         plugins.Observable.__init__(self)
+        self.killed = False
         self.serverAddress = self.getServerAddress(optionMap)
     def getServerAddress(self, optionMap):
         servAddrStr = optionMap.get("servaddr", os.getenv("TEXTTEST_MIM_SERVER"))
@@ -47,10 +48,19 @@ class SocketResponder(plugins.Responder,plugins.Observable):
         from traceback import format_exception_only
         return "".join(format_exception_only(exctype, value))
 
+    def notifyKillProcesses(self, sig):
+        self.killed = True
+
+    def getProcessIdentifier(self):
+        identifier = str(os.getpid())
+        if self.killed:
+            identifier += ".NO_REUSE"
+        return identifier
+
     def notifyLifecycleChange(self, test, state, changeDesc):
         testData = socketSerialise(test)
         pickleData = dumps(state)
-        fullData = str(os.getpid()) + os.linesep + testData + os.linesep + pickleData
+        fullData = self.getProcessIdentifier() + os.linesep + testData + os.linesep + pickleData
         sleepTime = 1
         for attempt in range(9):
             sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

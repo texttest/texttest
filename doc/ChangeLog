@@ -1479,6 +1479,8 @@ Framework Enhancements:
 	As the name suggests, allows performance testing to only flag when performance degrades.
     - New config setting "save_filtered_file_stems"
 	Allows the filtered version of files to be saved instead of the raw output.
+    - Floating point filtering now supports relative tolerance (fpdiff.py)
+	New config file setting "relative_float_tolerance". Thanks to Michael Behrisch for this.
     - Config setting "suppress_stderr_popup" renamed to "suppress_stderr_text" and used more widely
 	Old name still works as an alias. Will now look at stderr from collate scripts and grid engine slaves too.
     - Can now have variable "executable"

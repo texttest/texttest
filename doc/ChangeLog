@@ -1544,7 +1544,9 @@ Bug Fixes:
     - Errors when collating now get shown in the GUI (sandbox.py)
     - "collate_file" is now done before "discard_file" (sandbox.py)
 	Means you can "rename" files by collating them to a new name and then discarding the original one.
+    - Fixed occasional confusion in the dynamic GUI when tests are both "collapsed" and "hidden" (testtree.py)
 Grid Engine (LSF/SGE) Bug Fixes:
+    - Don't reuse slave jobs that get killed after the test completes (masterprocess.py)
     - Don't send tests for re-use whose submission has been cancelled (queuesystem/masterprocess.py)
     - Reduced keepalive timeout to 5 minutes, 2 hours is rather a long time in a test context (masterprocess.py)
     - Don't fall over if SUT leaves child processes running from the slave (slavejobs.py)

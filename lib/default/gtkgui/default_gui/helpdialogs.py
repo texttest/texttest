@@ -7,6 +7,7 @@ from types import StringType
 # I don't particularly like the standard gtk.AboutDialog, and we also want
 # to show pygtk/gtk/python versions in our dialog, so we create our own ...
 class AboutTextTest(guiplugins.ActionResultDialogGUI):
+    website = "http://www.texttest.org"
     def getDialogTitle(self):
         return "About TextTest"
     def isActiveOnCurrent(self, *args):
@@ -43,8 +44,9 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         messageLabel.set_markup("<i>" + message + "</i>\n")
         messageLabel.set_justify(gtk.JUSTIFY_CENTER)
         urlLabel = gtk.Label()
-        urlLabel.set_markup("<span foreground='blue' underline='single'>http://www.texttest.org/</span>\n")
+        urlLabel.set_markup("<span foreground='blue' underline='single'>" + self.website + "</span>\n")
         urlLabel.set_selectable(True)
+        guiutils.scriptEngine.connect("go to website", "button_release_event", urlLabel, self.urlClicked)
         licenseLabel = gtk.Label()
         licenseLabel.set_markup("<span size='small'>Copyright " + u'\xa9' + " The authors</span>\n")
         self.dialog.vbox.pack_start(logoFrame, expand=False, fill=False)
@@ -53,6 +55,11 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         self.dialog.vbox.pack_start(urlLabel, expand=False, fill=False)
         self.dialog.vbox.pack_start(licenseLabel, expand=False, fill=False)
         self.dialog.set_resizable(False)
+
+    def urlClicked(self, label, event): 
+        if event.button == 1:
+            status = guiutils.openLinkInBrowser(self.website)
+            self.notify("Status", status)
         
     def showCredits(self, *args):
         newDialog = TextFileDisplayDialog(self.validApps, False, {}, "CREDITS.txt", self.dialog)

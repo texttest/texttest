@@ -70,14 +70,8 @@ class TextViewGUI(guiutils.SubGUI):
         iter = text_view.get_iter_at_location(x, y)
         target = self.findLinkTarget(iter)
         if target:
-            if os.name == "nt" and not os.environ.has_key("BROWSER"):
-                self.notify("Status", "Opening " + target + " in default browser.")
-                os.startfile(target)
-            else:
-                browser = os.getenv("BROWSER", "firefox")
-                cmdArgs = [ browser, target ]
-                self.notify("Status", 'Started "' + " ".join(cmdArgs) + '" in background.')
-                subprocess.Popen(cmdArgs)
+            statusMessage = guiutils.openLinkInBrowser(target)
+            self.notify("Status", statusMessage)
 
         return False
 

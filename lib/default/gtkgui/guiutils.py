@@ -3,7 +3,7 @@
 Generic module broken out from guiplugins. Contains utility code that can be
 called from anywhere in the gtkgui package
 """
-import plugins, os, sys, operator, types
+import plugins, os, sys, operator, types, subprocess
 from copy import copy
 from locale import getdefaultlocale
 
@@ -54,6 +54,17 @@ class Utf8Converter:
 
 def convertToUtf8(text): # gtk.TextViews insist we do the conversion ourselves
     return Utf8Converter().convert(text)
+
+
+def openLinkInBrowser(target):
+    if os.name == "nt" and not os.environ.has_key("BROWSER"):
+        os.startfile(target)
+        return "Opened " + target + " in default browser."
+    else:
+        browser = os.getenv("BROWSER", "firefox")
+        cmdArgs = [ browser, target ]
+        subprocess.Popen(cmdArgs)
+        return 'Started "' + " ".join(cmdArgs) + '" in background.'
 
 
 class RefreshTips:

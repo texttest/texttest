@@ -33,7 +33,7 @@ class BaseTestComparison(plugins.TestState):
 
     def shouldCompare(self, resultFile):
         firstLine = open(resultFile).readline()
-        return firstLine != self.fakeMissingFileText()
+        return firstLine.strip() != self.fakeMissingFileText().strip()
 
     def definitionFileCategory(self, ignoreMissing):
         if ignoreMissing:
@@ -47,8 +47,8 @@ class BaseTestComparison(plugins.TestState):
         tmpFiles = self.makeStemDict(test.listTmpFiles())
         defFileCategory = self.definitionFileCategory(ignoreMissing)
         resultFiles, defFiles = test.listStandardFiles(allVersions=False, defFileCategory=defFileCategory)
-        resultFilesToCompare = filter(self.shouldCompare, resultFiles)
-        stdFiles = self.makeStemDict(resultFilesToCompare + defFiles)
+        resultFilesToCompare = filter(self.shouldCompare, resultFiles + defFiles)
+        stdFiles = self.makeStemDict(resultFilesToCompare)
         for tmpStem, tmpFile in tmpFiles.items():
             self.notifyIfMainThread("ActionProgress", "")
             stdFile = stdFiles.get(tmpStem)

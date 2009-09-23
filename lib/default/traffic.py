@@ -782,7 +782,7 @@ class ReplayInfo:
                 else:
                     currResponseHandler = ReplayedResponseHandler()
                     self.responseMap[currTrafficIn] = currResponseHandler
-            else:
+            elif currResponseHandler:
                 currResponseHandler.addResponse(trafficStr)
         self.diag.info("Replay info " + repr(self.responseMap))
 

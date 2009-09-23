@@ -10,19 +10,29 @@ def _getNumberAt(l, pos):
         end += 1
     return l[start:end], l[end:]
 
-def _fpequalAtPos(l1, l2, tolerance, pos):
+def _fpequalAtPos(l1, l2, tolerance, relTolerance, pos):
     number1, l1 = _getNumberAt(l1, pos)
     number2, l2 = _getNumberAt(l2, pos)
     try:
-        return abs(float(number1) - float(number2)) <= tolerance, l1, l2
+        equal = False
+        deviation = abs(float(number1) - float(number2))
+        if tolerance != None and deviation <= tolerance:
+            equal = True
+        elif relTolerance != None:
+            referenceValue = abs(float(number1))
+            if referenceValue == 0:
+                equal = (deviation == 0)
+            elif deviation / referenceValue <= relTolerance:
+                equal = True
     except ValueError:
-        return False, l1, l2
+        pass
+    return equal, l1, l2
 
-def _fpequal(l1, l2, tolerance):
+def _fpequal(l1, l2, tolerance, relTolerance):
     pos = 0
     while pos < min(len(l1), len(l2)):
         if l1[pos] != l2[pos]:
-            equal, l1, l2 = _fpequalAtPos(l1, l2, tolerance, pos)
+            equal, l1, l2 = _fpequalAtPos(l1, l2, tolerance, relTolerance, pos)
             if not equal:
                 return False
             pos = 0
@@ -31,14 +41,14 @@ def _fpequal(l1, l2, tolerance):
     if len(l1) == len(l2):
         return True
     else:
-        return _fpequalAtPos(l1, l2, tolerance, pos)[0]
+        return _fpequalAtPos(l1, l2, tolerance, relTolerance, pos)[0]
 
-def fpfilter(fromlines, tolines, outlines, tolerance):
+def fpfilter(fromlines, tolines, outlines, tolerance, relTolerance=None):
     s = difflib.SequenceMatcher(None, fromlines, tolines)
     for tag, i1, i2, j1, j2 in s.get_opcodes():
         if tag == "replace" and i2 - i1 == j2 - j1:
             for fromline, toline in zip(fromlines[i1:i2], tolines[j1:j2]):
-                if _fpequal(fromline, toline, tolerance):
+                if _fpequal(fromline, toline, tolerance, relTolerance):
                     outlines.write(fromline)
                 else:
                     outlines.write(toline)
@@ -47,8 +57,10 @@ def fpfilter(fromlines, tolines, outlines, tolerance):
 
 def main():
     parser = optparse.OptionParser("usage: %prog [options] fromfile tofile")
-    parser.add_option("-t", "--tolerance", type="float", default=0.0101,
-                      help='Set floating point tolerance (default 0.0101)')
+    parser.add_option("-t", "--tolerance", type="float",
+                      help='Set absolute floating point tolerance')
+    parser.add_option("-r", "--relative", type="float",
+                      help='Set relative floating point tolerance')
     parser.add_option("-o", "--output",
                       help='Write filtered tofile to use external diff')
     (options, args) = parser.parse_args()
@@ -62,11 +74,11 @@ def main():
     tolines = open(tofile, 'U').readlines()
     if options.output:
         out = open(options.output, 'w')
-        fpfilter(fromlines, tolines, out, options.tolerance)
+        fpfilter(fromlines, tolines, out, options.tolerance, options.relative)
         out.close()
     else: # pragma: no cover - not production code
         out = StringIO.StringIO()
-        fpfilter(fromlines, tolines, out, options.tolerance)
+        fpfilter(fromlines, tolines, out, options.tolerance, options.relative)
         out.seek(0)
         tolines = out.readlines()
         sys.stdout.writelines(difflib.unified_diff(fromlines, tolines, fromfile, tofile))

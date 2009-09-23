@@ -107,8 +107,11 @@ class FilterResultRecompute(FilterAction):
 class FloatingPointFilter:
     def __init__(self, origFileName, tolerance, relative):
         self.origFileName = origFileName
-        self.tolerance = tolerance if tolerance else None
-        self.relative = relative if relative else None
+        self.tolerance, self.relative = None, None
+        if tolerance:
+            self.tolerance = tolerance
+        if relative:
+            self.relative = relative
 
     def filterFile(self, inFile, writeFile):
         fromlines = open(self.origFileName, "rU").readlines()

@@ -1298,7 +1298,7 @@ class RunTest(plugins.Action):
             return text
         text += "\nEnvironment variables :\n"
         for var, value in interestingVars:
-            text += var + ": " + value + "\n"
+            text += var + "=" + value + "\n"
         return text
 
     def getEnvironmentChanges(self, test):

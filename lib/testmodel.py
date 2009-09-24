@@ -880,8 +880,9 @@ class TestSuite(Test):
             self.diagnose("removing " + repr(test))
             test.removeFromMemory()
 
-        for testName, desc in newTestNames.items():
+        for testName, descStr in newTestNames.items():
             existingTest = self.findSubtest(testName)
+            desc = plugins.extractComment(descStr)
             if existingTest:
                 existingTest.setDescription(desc)
                 existingTest.refresh(filters)

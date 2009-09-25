@@ -411,7 +411,7 @@ class TestDetails:
     
     def appendFreeText(self, fullText, freeText):
         freeText = freeText.replace("<", "&lt;").replace(">", "&gt;")
-        linkMarker = "URL=http://"
+        linkMarker = "URL=http"
         if freeText.find(linkMarker) != -1:
             currFreeText = ""
             for line in freeText.splitlines():

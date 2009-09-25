@@ -11,6 +11,7 @@ class TextViewGUI(guiutils.SubGUI):
     hovering_over_link = False
     hand_cursor = gtk.gdk.Cursor(gtk.gdk.HAND2)
     regular_cursor = gtk.gdk.Cursor(gtk.gdk.XTERM)
+    linkMarker = "URL=http"
 
     def __init__(self, dynamic):
         guiutils.SubGUI.__init__(self)
@@ -40,7 +41,7 @@ class TextViewGUI(guiutils.SubGUI):
         textbuffer = self.view.get_buffer()
         # Encode to UTF-8, necessary for gtk.TextView
         textToUse = guiutils.convertToUtf8(text)
-        if "http://" in textToUse:
+        if self.linkMarker in textToUse:
             self.view.connect("event-after", self.event_after)
             self.view.connect("motion-notify-event", self.motion_notify_event)
             self.setHyperlinkText(textbuffer, textToUse)
@@ -112,7 +113,7 @@ class TextViewGUI(guiutils.SubGUI):
         buffer.set_text("", 0)
         iter = buffer.get_iter_at_offset(0)
         for line in text.splitlines():
-            if line.find("URL=http://") != -1:
+            if self.linkMarker in line:
                 self.insertLinkLine(buffer, iter, line)
             else:
                 buffer.insert(iter, line + "\n")

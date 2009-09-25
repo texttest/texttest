@@ -987,7 +987,7 @@ class Config:
                               "External program(s) to use for viewing and editing text files")
         app.setConfigDefault("follow_program", { "default": self.defaultFollowProgram() }, "External program to use for following progress of a file")
         app.setConfigDefault("follow_file_by_default", 0, "When double-clicking running files, should we follow progress or just view them?")
-        app.setConfigDefault("bug_system_location", { "default" : "" }, "The location of the bug system we wish to extract failure information from.")
+        app.setConfigDefault("bug_system_location", {}, "The location of the bug system we wish to extract failure information from.")
     def setInterfaceDefaults(self, app):
         app.setConfigDefault("default_interface", "static_gui", "Which interface to start if none of -con, -g and -gx are provided")
         # These configure the GUI but tend to have sensible defaults per application

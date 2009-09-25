@@ -1055,13 +1055,13 @@ class SortTestSuiteFileDescending(SortTestSuiteFileAscending):
 
 
 class ReportBugs(guiplugins.ActionDialogGUI):
-    def __init__(self, *args):
-        guiplugins.ActionDialogGUI.__init__(self, *args)
+    def __init__(self, allApps, *args):
+        guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
         self.addOption("search_string", "Text or regexp to match")
         self.addOption("search_file", "File to search in")
         self.addOption("version", "\nVersion to report for")
         self.addOption("execution_hosts", "Trigger only when run on machine(s)")
-        self.addOption("bug_system", "\nExtract info from bug system", "<none>", [ "bugzilla", "bugzillav2" ])
+        self.addOption("bug_system", "\nExtract info from bug system", "<none>", self.findBugSystems(allApps))
         self.addOption("bug_id", "Bug ID (only if bug system given)")
         self.addOption("full_description", "\nFull description (no bug system)")
         self.addOption("brief_description", "Few-word summary (no bug system)")
@@ -1069,6 +1069,14 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         self.addSwitch("ignore_other_errors", "Trigger even if other files differ")
         self.addSwitch("trigger_on_success", "Trigger even if test would otherwise succeed")
         self.addSwitch("internal_error", "Report as 'internal error' rather than 'known bug' (no bug system)")
+    def findBugSystems(self, allApps):
+        bugSystems = []
+        for app in allApps:
+            for appSystem in app.getConfigValue("bug_system_location").keys():
+                if appSystem not in bugSystems:
+                    bugSystems.append(appSystem)
+        return bugSystems
+            
     def _getStockId(self):
         return "info"
     def singleTestOnly(self):

@@ -1555,6 +1555,8 @@ Bug Fixes:
     - Errors when collating now get shown in the GUI (sandbox.py)
     - "collate_file" is now done before "discard_file" (sandbox.py)
 	Means you can "rename" files by collating them to a new name and then discarding the original one.
+    - "collate_script" scripts can now be in your PATH also on Windows (sandbox.py)
+	Previously PATH only worked on POSIX platforms.
     - Fixed occasional confusion in the dynamic GUI when tests are both "collapsed" and "hidden" (testtree.py)
     - It now works to save versioned missing file markers for "traffic" files (traffic.py)
 Grid Engine (LSF/SGE) Bug Fixes:

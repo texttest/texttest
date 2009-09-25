@@ -498,11 +498,11 @@ class CollateFiles(plugins.Action):
         paths.sort()
         return filter(os.path.isfile, paths)
 
-    def runCollationScript(self, args, test, stdin, stdout, stderr):
+    def runCollationScript(self, args, test, stdin, stdout, stderr, useShell):
         try:
             return subprocess.Popen(args, env=test.getRunEnvironment(),
                                     stdin=stdin, stdout=stdout, stderr=stderr,
-                                    cwd=test.getDirectory(temporary=1))
+                                    cwd=test.getDirectory(temporary=1), shell=useShell)
         except OSError:
             stdout.close()
             stderr.close()
@@ -542,7 +542,8 @@ class CollateFiles(plugins.Action):
                 stdout = subprocess.PIPE
                 stderr = subprocess.STDOUT
 
-            currProc = self.runCollationScript(args, test, stdin, stdout, stderr)
+            useShell = os.name == "nt" and len(scripts) == 1
+            currProc = self.runCollationScript(args, test, stdin, stdout, stderr, useShell)
             if not currProc:
                 if os.path.isfile(targetFile):
                     os.remove(targetFile)

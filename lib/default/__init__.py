@@ -57,7 +57,7 @@ class Config:
                                 possibleValues=[ os.path.join(plugins.installationDir("log"), "logging.debug") ])
                 group.addOption("xw", "Write self-diagnostics to", defaultDiagDir)
                 group.addOption("b", "Run batch mode session")
-                group.addOption("name", "Name this run")
+                group.addOption("name", "Name this run", self.optionValue("name"))
                 group.addSwitch("rectraffic", "(Re-)record command-line or client-server traffic")
                 group.addSwitch("keeptmp", "Keep temporary write-directories")
                 group.addOption("vanilla", "Ignore configuration files", self.defaultVanillaValue(),

@@ -1471,6 +1471,7 @@ Dynamic GUI Enhancements:
 Framework Enhancements:
     - Can now use "options" files in test suites (default/__init__.py)
 	They get combined like "environment" files. See "Test Suite Guide" on the website for more details.
+	This also applies to versioned files so if you have versioned options file you will need to read the Migration notes.
     - Reconnect now picks up all "extra versions" that were originally run (reconnect.py)
 	Mainly useful if batch_extra_version was originally supplied
     - New variable TEXTTEST_SANDBOX_ROOT provided

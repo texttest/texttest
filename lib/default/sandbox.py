@@ -499,6 +499,12 @@ class CollateFiles(plugins.Action):
         return filter(os.path.isfile, paths)
 
     def runCollationScript(self, args, test, stdin, stdout, stderr, useShell):
+        # Windows isn't clever enough to know how to run Python/Java programs without some help...
+        if os.name == "nt" and not useShell: 
+            interpreter = plugins.getInterpreter(args[0])
+            if interpreter:
+                args = [ interpreter ] + args
+
         try:
             return subprocess.Popen(args, env=test.getRunEnvironment(),
                                     stdin=stdin, stdout=stdout, stderr=stderr,
@@ -514,10 +520,6 @@ class CollateFiles(plugins.Action):
         if instScript:
             args = [ instScript ] + args[1:]
             
-        if os.name == "nt": # Windows isn't clever enough to know how to run Python/Java programs without some help...
-            interpreter = plugins.getInterpreter(scriptName)
-            if interpreter:
-                args = [ interpreter ] + args
         return args
     
     def extract(self, test, sourceFile, targetFile, collationErrFile):

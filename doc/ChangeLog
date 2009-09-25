@@ -1431,6 +1431,7 @@ General GUI Enhancements:
 	Can select tests just by typing with the test tree highlighted
     - Version dialog shows version of PyGObject and GLib also (helpdialogs.py)
     - Quick Start guide now available from help menu, also credits and license (helpdialogs.py)
+    - Link on the About splash screen can now be clicked to take you to the website (helpdialogs.py)
 Static GUI Enhancements:
     - New "Replace Text in Files" action
 	Graphical version of default.ReplaceText script
@@ -1466,6 +1467,7 @@ Dynamic GUI Enhancements:
 	Works much like the exisiting "rectraffic", i.e. a way to have different configuration only in this case
     - Test tree tooltips now work more reliably and use the builtin support in PyGTK 2.12 (testtree.py)
 	They are removed in PyGTK 2.10, was not deemed important enough to keep them there
+    - Run Info uses "=" for environment variables, reckoned easier to read (textinfo.py)
 Framework Enhancements:
     - Can now use "options" files in test suites (default/__init__.py)
 	They get combined like "environment" files. See "Test Suite Guide" on the website for more details.
@@ -1537,6 +1539,12 @@ Bug Fixes:
 	Previously lost all test suites
     - Now produce a warning for duplicated sections in "knownbugs" files (knownbugs/__init__.py)
 	Silently ignored previously
+    - Generated links (in GUI and in batch reports) now work for "https://" bug system locations (textinfo.py/testoverview.py)
+	Previously shown only in plain text: assumed "http://"
+    - Drop-down list for bug systems when entering failure information only includes bug systems defined in "bug_system_location"
+	Previously showed all known bug systems
+    - No longer allow default locations across bug systems
+	Was never intentional but might require migration. See migration notes.
     - Importing files now preserves permissions correctly (adminactions.py)
     - Crashed virtual servers are now restarted after each test, preventing multiple tests failing for the same crash (virtualdisplay.py)
     - Grouping of tests in the dynamic GUI is disabled if their diffs are longer than the maximum to display (statusviews.py)
@@ -1547,6 +1555,7 @@ Bug Fixes:
     - "collate_file" is now done before "discard_file" (sandbox.py)
 	Means you can "rename" files by collating them to a new name and then discarding the original one.
     - Fixed occasional confusion in the dynamic GUI when tests are both "collapsed" and "hidden" (testtree.py)
+    - It now works to save versioned missing file markers for "traffic" files (traffic.py)
 Grid Engine (LSF/SGE) Bug Fixes:
     - Don't reuse slave jobs that get killed after the test completes (masterprocess.py)
     - Don't send tests for re-use whose submission has been cancelled (queuesystem/masterprocess.py)

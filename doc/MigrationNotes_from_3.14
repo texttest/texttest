@@ -21,6 +21,25 @@ in which case all other options files will be ignored.
 You can also for example do {CLEAR -a} which in this case will have the same effect. See the guide
 to test suites on the website for more complete documentation of this new feature.
 
+(2) Bug system location no longer recognises "default"
+
+This was never intentionally supported, but it has previously worked to identify your only bug system
+(e.g. bugzilla here) with 
+
+bug_system_location:http://bugzilla.mysite.com
+
+or even
+
+[bug_system_location]
+default:http://bugzilla.mysite.com
+
+This will not work any more. You have to explicitly say what bug system it is, i.e. 
+
+[bug_system_location]
+bugzilla:http://bugzilla.mysite.com
+
+Hopefully anyone with any sense did that anyway, but just in case :)
+
 =========================================================
 CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
 =========================================================

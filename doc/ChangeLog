@@ -1424,8 +1424,8 @@ Fixes for older bugs:
     - Fixed problem where reconnection to multiple runs failed to pick up composite versions (reconnect.py)
     - Fixed grid engine problem where tests were sent to jobs that had already been killed (queuesystem/__init__.py)
 
-Version trunk
-=============
+Version 3.15
+============
 General GUI Enhancements:
     - Default search now works! (testtree.py)
 	Can select tests just by typing with the test tree highlighted
@@ -1565,3 +1565,14 @@ Grid Engine (LSF/SGE) Bug Fixes:
     - Reduced keepalive timeout to 5 minutes, 2 hours is rather a long time in a test context (masterprocess.py)
     - Don't fall over if SUT leaves child processes running from the slave (slavejobs.py)
 
+Version trunk
+=============
+General GUI Enhancements:
+Static GUI Enhancements:
+Dynamic GUI Enhancements:
+Framework Enhancements:
+Historical HTML Batch Report Enhancements:
+Grid Engine (LSF/SGE) enhancements:
+Self-test/Internal changes:
+Bug Fixes:
+Grid Engine (LSF/SGE) Bug Fixes:

@@ -35,19 +35,22 @@ class BugSystemBug(Bug):
     def getPriority(self):
         return 2
         
-    def findInfo(self, script):
+    def findInfo(self, test):
+        location = test.getCompositeConfigValue("bug_system_location", self.bugSystem)
+        username = test.getCompositeConfigValue("bug_system_username", self.bugSystem)
+        password = test.getCompositeConfigValue("bug_system_password", self.bugSystem)
         exec "from " + self.bugSystem + " import findBugInfo as _findBugInfo"
-        status, bugText, isResolved = _findBugInfo(script, self.bugId)
+        status, bugText, isResolved = _findBugInfo(self.bugId, location, username, password)
         category = self.findCategory(isResolved)
         briefText = "bug " + self.bugId + " (" + status + ")"
         return category, briefText, bugText
+
     
 class UnreportedBug(Bug):
     def __init__(self, fullText, briefText, internalError):
         self.fullText = fullText
         self.briefText = briefText
         self.internalError = internalError
-        self.bugSystem = "Internal"
 
     def getPriority(self):
         if self.internalError:
@@ -55,7 +58,7 @@ class UnreportedBug(Bug):
         else:
             return 3
         
-    def findInfo(self, script):
+    def findInfo(self, *args):
         return self.findCategory(self.internalError), self.briefText, self.fullText
 
 
@@ -250,7 +253,7 @@ class CheckForBugs(plugins.Action):
 
         bug = self.findBug(test, activeBugs)
         if bug:
-            category, briefText, fullText = bug.findInfo(test.getCompositeConfigValue("bug_system_location", bug.bugSystem))
+            category, briefText, fullText = bug.findInfo(test)
             self.diag.info("Changing to " + category + " with text " + briefText)
             bugState = FailedPrediction(category, fullText, briefText, completed=1)
             self.changeState(test, bugState)

@@ -45,7 +45,7 @@ def parseReply(reply, location):
         message = "Could not parse reply from bugzilla's web service, maybe incompatible interface. Text of reply follows : \n" + str(reply)
         return "BAD SCRIPT", message, False
     
-def findBugInfo(location, bugId):
+def findBugInfo(bugId, location, *args):
     scriptLocation = location + "/xmlrpc.cgi"
     proxy = xmlrpclib.ServerProxy(scriptLocation)
     try:

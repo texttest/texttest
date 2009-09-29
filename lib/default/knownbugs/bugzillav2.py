@@ -7,7 +7,7 @@
 
 import urllib2
 
-def findBugInfo(location, bugId):
+def findBugInfo(bugId, location, *args):
     bugzillaRequest = location + "/cli.cgi?bug=" + bugId
     try:
         reply = urllib2.urlopen(bugzillaRequest).read().split(':jaeger:')

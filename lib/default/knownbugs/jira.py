@@ -24,12 +24,24 @@
  'votes': '0'}
 """
 
-import xmlrpclib
+import xmlrpclib, types
 from ndict import seqdict
+
+def convertToString(value):
+    if type(value) == types.StringType:
+        return value
+    else:
+        return ", ".join(map(convertDictToString, value))
+
+def convertDictToString(dict):
+    if dict.has_key("name"):
+        return dict["name"]
+    elif dict.has_key("values"):
+        return dict["values"]
 
 def transfer(oldDict, newDict, key, postfix=""):
     if oldDict.has_key(key):
-        newDict[key] = oldDict[key] + postfix
+        newDict[key] = convertToString(oldDict[key]) + postfix
 
 def findId(info, currId):
     for item in info:
@@ -49,7 +61,7 @@ def filterReply(bugInfo, statuses, resolutions):
         newBugInfo["resolution"] = findId(resolutions, bugInfo["resolution"]) + "\n"
     else:
         transfer(bugInfo, newBugInfo, "assignee", "\n")
-    newBugInfo["components"] = ", ".join((c["name"] for c in bugInfo["components"]))
+    newBugInfo["components"] = convertToString(bugInfo["components"])
     remainder = filter(lambda k: k not in ignoreFields and k not in newBugInfo and isInteresting(bugInfo[k]), bugInfo.keys())
     remainder.sort()
     for key in remainder:

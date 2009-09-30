@@ -29,7 +29,7 @@ from ndict import seqdict
 
 def convertToString(value):
     if type(value) == types.StringType:
-        return value
+        return value.replace("\r", "") # Get given Windows line endings but Python doesn't use them internally
     else:
         return ", ".join(map(convertDictToString, value))
 
@@ -78,7 +78,7 @@ def parseReply(bugInfo, statuses, resolutions, location):
         message += ruler + "\n"
         bugId = newBugInfo['key']
         message += "View bug " + bugId + " using Jira URL=" + location + "/browse/" + str(bugId) + "\n\n"
-        message += bugInfo["description"]
+        message += convertToString(bugInfo["description"])
         return newBugInfo['status'], message, newBugInfo.has_key("resolution")
     except (IndexError, KeyError):
         message = "Could not parse reply from Jira's web service, maybe incompatible interface. Text of reply follows : \n" + str(bugInfo)

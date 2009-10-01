@@ -1,0 +1,45 @@
+
+The main things that need migrating are "collate_file" settings which collate multiple files simultaneously. 
+
+=========================================================
+COMPULSORY MIGRATION
+=========================================================
+
+(1) "collate_file" as applied to multiple files at once
+=======================================================
+
+For a long time it has been possible to write in your config file e.g.
+
+[collate_file]
+data*:data*.dump
+
+by which it is intended to collate all files that match the pattern on the right
+and produce corresponding files without the dump suffix. This functionality
+has been completely rewritten since the TextTest 3.15 release to remove
+its assumptions about the form of the files and make it work more generally.
+
+Also, the new version actually takes account of what is on the left-hand-side
+whereas the old version pretty much took the name of the source file and ignored
+what you put there. This is generally where the migration comes in.
+
+The worst that will happen is that a bunch of collated files will change name. For
+example if I instead had written
+
+[collate_file]
+dumped_data*:data*.dump
+
+the files would still have been called "data*" anyway. Now TextTest will replace
+the matched strings and make use of the name in a more predictable way, which may
+produce a different name than you had before. It's usually fairly easy to change the
+name in the config file if you prefer that over renaming lots of files.
+
+One additional restriction is that only "*" characters may be used in the left-hand-side
+patterns: they are effectively replacement markers for the matched values from the source file names. 
+Previously any UNIX-style file pattern would trigger this functionality.
+
+See the website documentation of "collate_file" for full documentation of how this now works.
+
+=========================================================
+CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
+=========================================================
+

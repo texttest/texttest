@@ -1573,6 +1573,9 @@ Dynamic GUI Enhancements:
 Framework Enhancements:
     - Now integrates with Atlassian's Jira bugtracking system as well as Bugzilla (jira.py)
 	Works in broadly the same way as the bugzilla integration. See website for details.
+    - "collate_file" functionality for multiple files rewritten (sandbox.py)
+	Patterns of the form "data*:data*.dump" should behave more intuitively, but may not be completely back-compatible.
+	Read the migration notes and the website for details.
 Historical HTML Batch Report Enhancements:
 Grid Engine (LSF/SGE) enhancements:
 Self-test/Internal changes:

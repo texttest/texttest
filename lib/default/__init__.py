@@ -729,8 +729,8 @@ class Config:
     
     def checkConfigSanity(self, app):
         for key in app.getConfigValue("collate_file"):
-            if key.find(".") != -1:
-                raise plugins.TextTestError, "Cannot collate files to stem '" + key + "' - '.' characters are not allowed"
+            if "." in key or "/" in key:
+                raise plugins.TextTestError, "Cannot collate files to stem '" + key + "' - '.' and '/' characters are not allowed"
 
     def getGivenCheckoutPath(self, app):
         checkout = self.getCheckout(app)

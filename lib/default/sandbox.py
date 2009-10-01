@@ -1,4 +1,4 @@
-import os, shutil, plugins, re, stat, subprocess, glob, types, logging
+import os, shutil, plugins, re, stat, subprocess, glob, types, logging, difflib
 
 from jobprocess import killArbitaryProcess
 from ndict import seqdict
@@ -394,45 +394,67 @@ class CollateFiles(plugins.Action):
         self.discardFiles = []
         self.filesPresentBefore = {}
         self.diag = logging.getLogger("Collate Files")
+
     def setUpApplication(self, app):
         self.collations.update(app.getConfigValue("collate_file"))
         self.discardFiles = app.getConfigValue("discard_file")
+
     def expandCollations(self, test, coll):
         newColl = seqdict()
-        # copy items specified without "*" in targetStem
         self.diag.info("coll initial:" + str(coll))
-        for targetStem, sourcePatterns in coll.items():
-            if not glob.has_magic(targetStem):
-                newColl[targetStem] = sourcePatterns
-        # add files generated from items in targetStem containing "*"
-        for targetStem, sourcePatterns in coll.items():
-            if not glob.has_magic(targetStem):
+        for targetPattern, sourcePatterns in coll.items():
+            if not glob.has_magic(targetPattern):
+                newColl[targetPattern] = sourcePatterns
                 continue
 
-            # add each file to newColl using suffix from sourcePtn
+            # add each file to newColl by transferring wildcards across
             for sourcePattern in sourcePatterns:
-                for aFile in self.getFilesFromExpansions(test, targetStem, sourcePattern):
-                    fullStem = os.path.splitext(aFile)[0]
-                    newTargetStem = os.path.basename(fullStem).replace(".", "_")
-                    if not newColl.has_key(newTargetStem):
-                        sourceExt = os.path.splitext(sourcePattern)[1]
-                        self.diag.info("New collation to " + newTargetStem + " : from " + fullStem + " with extension " + sourceExt)
-                        newColl.setdefault(newTargetStem, []).append(fullStem + sourceExt)
+                for sourcePath in self.findPaths(test, sourcePattern):
+                    # Use relative paths: easier to debug and SequenceMatcher breaks down if strings are longer than 200 chars
+                    relativeSourcePath = plugins.relpath(sourcePath, test.getDirectory(temporary=1))
+                    newTargetStem = self.makeTargetStem(targetPattern, sourcePattern, relativeSourcePath)
+                    self.diag.info("New collation to " + newTargetStem + " : from " + relativeSourcePath)
+                    newColl.setdefault(newTargetStem, []).append(sourcePath)
         return newColl
-    def getFilesFromExpansions(self, test, targetStem, sourcePattern):
-        # generate a list of filenames from previously saved files
-        self.diag.info("Collating for " + targetStem)
-        targetFiles = test.getFileNamesMatching(targetStem)
-        fileList = map(os.path.basename, targetFiles)
-        self.diag.info("Found files: " + repr(fileList))
 
-        # generate a list of filenames for generated files
-        self.diag.info("Adding files for source pattern " + sourcePattern)
-        sourceFiles = glob.glob(test.makeTmpFileName(sourcePattern, forComparison=0))
-        self.diag.info("Found files : " + repr(sourceFiles))
-        fileList += sourceFiles
-        fileList.sort()
-        return fileList
+    def makeTargetStem(self, targetPattern, sourcePattern, sourcePath):
+        newTargetStem = targetPattern
+        for wildcardMatch in self.findWildCardMatches(sourcePattern, sourcePath):
+            newTargetStem = newTargetStem.replace("*", wildcardMatch, 1)
+        return newTargetStem.replace("*", "WILDCARD").replace(".", "_")
+
+    def inSquareBrackets(self, pattern, pos):
+        closeBracket = pattern.find("]", pos)
+        if closeBracket == -1:
+            return False
+        openBracket = pattern.find("[", pos)
+        return openBracket == -1 or closeBracket < openBracket
+
+    def findWildCardMatches(self, pattern, result):
+        parts = zip(pattern.split("/"), result.split("/"))
+        allMatches = []
+        # We take wildcards in the file name first, then those in directory names
+        for subPattern, subResult in reversed(parts):
+            allMatches += self._findWildCardMatches(subPattern, subResult)
+        return allMatches
+
+    def _findWildCardMatches(self, pattern, result):
+        matcher = difflib.SequenceMatcher(None, pattern, result)
+        wildcardStart = 0
+        matches = []
+        self.diag.info("Trying to find wildcard matches in " + repr(result) + " from " + repr(pattern))
+        for patternPos, resultPos, length in matcher.get_matching_blocks():
+            if self.inSquareBrackets(pattern, patternPos):
+                continue
+            self.diag.info("Found match of length " + repr(length) + " at positions " + repr((patternPos, resultPos)))
+            if resultPos > wildcardStart:
+                matches.append(result[wildcardStart:resultPos])
+            wildcardStart = resultPos + length
+        if wildcardStart < len(result):
+            matches.append(result[wildcardStart:])
+        self.diag.info("Found matches : " + repr(matches))
+        return matches
+                    
     def __call__(self, test):
         if not self.filesPresentBefore.has_key(test):
             self.filesPresentBefore[test] = self.getFilesPresent(test)
@@ -491,12 +513,23 @@ class CollateFiles(plugins.Action):
             return True
         return filesBefore[fullPath] != plugins.modifiedTime(fullPath)
 
+    def alreadyCollated(self, test, path, sourcePattern):
+        if "/" not in sourcePattern:
+            parts = os.path.basename(path).split(".")
+            if len(parts) > 1 and parts[1] == test.app.name:
+                return True # Don't collate generated files
+        return False
+
     def findPaths(self, test, sourcePattern):
         self.diag.info("Looking for pattern " + sourcePattern + " for " + repr(test))
         pattern = test.makeTmpFileName(sourcePattern, forComparison=0)
         paths = glob.glob(pattern)
         paths.sort()
-        return filter(os.path.isfile, paths)
+        existingPaths = filter(os.path.isfile, paths)
+        if sourcePattern == "*": # interpret this specially to mean 'all files which are not collated already'
+            return filter(lambda f: not self.alreadyCollated(test, f, sourcePattern), existingPaths)
+        else:
+            return existingPaths
 
     def runCollationScript(self, args, test, stdin, stdout, stderr, useShell):
         # Windows isn't clever enough to know how to run Python/Java programs without some help...

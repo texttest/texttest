@@ -129,6 +129,13 @@ class QueueSystemConfig(default.Config):
             return slavejobs.FindExecutionHostsInSlave()
         else:
             return default.Config.getExecHostFinder(self)
+
+    def getRunDescription(self, test):
+        basicDescription = default.Config.getRunDescription(self, test)
+        if self.useQueueSystem:
+            return basicDescription + "\n" + masterprocess.QueueSystemServer.instance.getQueueSystemCommand(test)
+        else:
+            return basicDescription
         
     def getSlaveResponderClasses(self):
         classes = [ slavejobs.SocketResponder, slavejobs.SlaveActionRunner ]

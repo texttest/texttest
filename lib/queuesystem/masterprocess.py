@@ -305,14 +305,24 @@ class QueueSystemServer(BaseActionRunner):
         
     def getSlaveLogDir(self, test):
         return os.path.join(test.app.writeDirectory, "slavelogs")
-    def submitJob(self, test, submissionRules, command, slaveEnv):
-        self.diag.info("Submitting job at " + plugins.localtime() + ":" + command)
-        self.diag.info("Creating job at " + plugins.localtime())
+
+    def getSubmitCmdArgs(self, test, submissionRules):
         queueSystem = self.getQueueSystem(test)
         extraArgs = test.getEnvironment("QUEUE_SYSTEM_SUBMIT_ARGS", "") # Extra arguments to provide on submission to grid engine
         cmdArgs = queueSystem.getSubmitCmdArgs(submissionRules)
         if extraArgs:
             cmdArgs += plugins.splitcmd(extraArgs)
+        return cmdArgs
+
+    def getQueueSystemCommand(self, test):
+        submissionRules = self.getSubmissionRules(test)
+        cmdArgs = self.getSubmitCmdArgs(test, submissionRules)
+        return queueSystemName(test) + " Command   : " + plugins.commandLineString(cmdArgs) + " ...\n"
+
+    def submitJob(self, test, submissionRules, command, slaveEnv):
+        self.diag.info("Submitting job at " + plugins.localtime() + ":" + command)
+        self.diag.info("Creating job at " + plugins.localtime())
+        cmdArgs = self.getSubmitCmdArgs(test, submissionRules)
         cmdArgs.append(self.shellWrap(command))
         jobName = submissionRules.getJobName()
         self.fixDisplay(slaveEnv)
@@ -325,6 +335,7 @@ class QueueSystemServer(BaseActionRunner):
             return False
         
         self.lockDiag.info("Got lock for submission")
+        queueSystem = self.getQueueSystem(test)
         try:
             process = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                        cwd=self.getSlaveLogDir(test), env=slaveEnv)
@@ -346,9 +357,11 @@ class QueueSystemServer(BaseActionRunner):
             test.changeState(plugins.Unrunnable(fullError, "NOT SUBMITTED"))
             self.handleErrorState(test)
             return False
+        
     def findErrorMessage(self, stderr, queueSystem):
         if len(stderr) > 0:
             return queueSystem.findSubmitError(stderr)
+
     def getFullSubmitError(self, test, errorMessage, cmdArgs):
         qname = queueSystemName(test.app)
         return "Failed to submit to " + qname + " (" + errorMessage.strip() + ")\n" + \

@@ -531,7 +531,11 @@ class Config:
             self._cleanWriteDirectory(suite)
             machine, tmpDir = self.getRemoteTmpDirectory(suite.app)
             if tmpDir:
-                self.runCommandOn(suite.app, machine, [ "rm", "-rf", tmpDir ])
+                self.cleanRemoteDir(suite.app, machine, tmpDir)
+
+    def cleanRemoteDir(self, app, machine, tmpDir):
+        self.runCommandOn(app, machine, [ "rm", "-rf", tmpDir ])
+                
     def _cleanWriteDirectory(self, suite):
         if os.path.isdir(suite.app.writeDirectory):
             plugins.rmtree(suite.app.writeDirectory)
@@ -1195,7 +1199,8 @@ class RunTest(plugins.Action):
         return ""
     def runTest(self, test):
         self.describe(test)
-        process = self.getTestProcess(test)
+        machine = test.app.getRunMachine()
+        process = self.getTestProcess(test, machine)
         self.changeToRunningState(test)
         
         self.registerProcess(test, process)
@@ -1308,8 +1313,8 @@ class RunTest(plugins.Action):
         testEnv = test.getRunEnvironment()
         return sorted(filter(lambda (var, value): value != os.getenv(var), testEnv.items()))
         
-    def getTestProcess(self, test):
-        commandArgs = self.getExecuteCmdArgs(test)
+    def getTestProcess(self, test, machine):
+        commandArgs = self.getExecuteCmdArgs(test, machine)
         testEnv = test.getRunEnvironment()
         self.diagnose(testEnv, commandArgs)
         return subprocess.Popen(commandArgs, preexec_fn=self.getPreExecFunction(), \
@@ -1348,9 +1353,9 @@ class RunTest(plugins.Action):
         scriptFile.write("exec " + " ".join(localArgs) + "\n")
         scriptFile.close()
         os.chmod(scriptFileName, 0775) # make executable
-        machine, remoteTmp = test.app.getRemoteTestTmpDir(test)
+        remoteTmp = test.app.getRemoteTestTmpDir(test)[1]
         if remoteTmp:
-            test.app.copyFileRemotely(scriptFileName, "localhost", remoteTmp, machine)
+            test.app.copyFileRemotely(scriptFileName, "localhost", remoteTmp, runMachine)
             remoteScript = os.path.join(remoteTmp, os.path.basename(scriptFileName))
             return test.app.getCommandArgsOn(runMachine, [ plugins.quote(remoteScript, '"') ])
         else:
@@ -1405,9 +1410,8 @@ class RunTest(plugins.Action):
         args += test.getCommandLineOptions()
         return args
         
-    def getExecuteCmdArgs(self, test):
+    def getExecuteCmdArgs(self, test, runMachine):
         args = self.getLocalExecuteCmdArgs(test)
-        runMachine = test.app.getRunMachine()
         if runMachine == "localhost":
             return args
         else:

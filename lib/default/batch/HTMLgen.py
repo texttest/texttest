@@ -859,6 +859,7 @@ class Href:
 
     Keyword arguments
 
+        title -- the title property, usually used for tooltips
         target -- is an optional target symbol 
         onClick --  is the script-code which is executed when link is clicked.
         onMouseOver -- the script-code which is executed when the mouse
@@ -868,6 +869,7 @@ class Href:
     """
     def __init__(self, url='', text='', **kw):
         self.target = None
+        self.title = None
         self.onClick = None
         self.onMouseOver = None
         self.onMouseOut = None
@@ -882,6 +884,7 @@ class Href:
     def __str__(self):
         s = ['<A HREF="%s"' % self.url]
         if self.target: s.append(' TARGET="%s"' % self.target)
+        if self.title: s.append(' title="%s"' % self.title)
         if self.onClick: s.append(' onClick="%s"' % self.onClick)
         if self.onMouseOver: s.append(' onMouseOver="%s"' % self.onMouseOver)
         if self.onMouseOut: s.append(' onMouseOut="%s"' % self.onMouseOut)

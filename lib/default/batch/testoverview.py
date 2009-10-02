@@ -301,25 +301,31 @@ class TestTable:
         columnHeader = HTMLgen.TH(extraVersionElement, colspan = len(tagsFound) + 1, bgcolor=bgColour)
         return HTMLgen.TR(columnHeader)
     
-    def generateTestRow(self, test, pageVersion, version, extraVersion, results, tagsFound):
+    def generateTestRow(self, testName, pageVersion, version, extraVersion, results, tagsFound):
         bgColour = colourFinder.find("row_header_bg")
-        row = [ HTMLgen.TD(HTMLgen.Container(HTMLgen.Name(version + test + extraVersion), test), bgcolor=bgColour) ]
+        testId = version + testName + extraVersion
+        row = [ HTMLgen.TD(HTMLgen.Container(HTMLgen.Name(testId), testName), bgcolor=bgColour) ]
         for tag in tagsFound:
-            if results.has_key(tag):
-                state = results[tag]
-                fgcol, bgcol = self.getColours(state)
-                filteredState = self.filterState(repr(state))
-                detail = state.getTypeBreakdown()[1]
-                if state.category == "success":
-                    cellContaint =  HTMLgen.Font(filteredState + detail, color = fgcol)
-                else:
-                    cellContaint = HTMLgen.Href(getDetailPageName(pageVersion, tag) + "#" + version + test + extraVersion,
-                                                HTMLgen.Font(filteredState + detail, color = fgcol))
-            else:
-                bgcol = colourFinder.find("no_results_bg")
-                cellContaint = "N/A"
-            row.append(HTMLgen.TD(cellContaint, bgcolor = bgcol))
+            cellContent, bgcol = self.generateTestCell(tag, testName, testId, pageVersion, results)
+            row.append(HTMLgen.TD(cellContent, bgcolor = bgcol))
         return HTMLgen.TR(*row)
+
+    def generateTestCell(self, tag, testName, testId, pageVersion, results):
+        state = results.get(tag)
+        if state:
+            fgcol, bgcol = self.getColours(state)
+            filteredState = self.filterState(repr(state))
+            detail = state.getTypeBreakdown()[1]
+            cellContent = HTMLgen.Font(filteredState + detail, color = fgcol) 
+            if state.category == "success":
+                return cellContent, bgcol
+            else:
+                linkTarget = getDetailPageName(pageVersion, tag) + "#" + testId
+                tooltip = "'" + testName + "' failure for " + getDisplayText(tag)
+                return HTMLgen.Href(linkTarget, cellContent, title=tooltip), bgcol
+        else:
+            return "N/A", colourFinder.find("no_results_bg")
+    
     def filterState(self, cellContent):
         result = cellContent
         result = re.sub(r'CRASHED.*( on .*)', r'CRASH\1', result)

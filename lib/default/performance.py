@@ -138,18 +138,28 @@ class PerformanceFileComparison(FileComparison):
         if self.newResult():
             return baseText
         return baseText + "(" + self.getType() + ")"
+
     def getType(self):
         if self.newResult():
             return FileComparison.getType(self)
         else:
             return self.perfComparison.descriptor
+
     def getDifferencesSummary(self, includeNumbers=True):
         return self.perfComparison.getSummary(includeNumbers)
+
     def getDetails(self):
         if self.hasDifferences():
             return self.getDifferencesSummary()
         else:
             return ""
+        
+    def getNewPerformance(self):
+        if self.perfComparison:
+            return self.perfComparison.newPerformance
+        else:
+            return getPerformanceFromLine(self.freeTextBody.splitlines()[0])
+    
     def saveResults(self, tmpFile, destFile):
         # Here we save the average of the old and new performance, assuming fluctuation
         avgPerformance = self.perfComparison.getAverage()

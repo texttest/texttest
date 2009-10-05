@@ -479,8 +479,15 @@ class ArchiveRepository(plugins.ScriptWithArgs):
 class WebPageResponder(plugins.Responder):
     def __init__(self, optionMap, allApps):
         self.batchSession = optionMap.get("b", "default")
+        self.cellInfo = self.findCellInfoType(optionMap.get("coll"))
         self.diag = logging.getLogger("GenerateWebPages")
         self.allApps = allApps
+
+    def findCellInfoType(self, collArg):
+        if collArg and collArg.startswith("web."):
+            return collArg[4:]
+        else:
+            return ""
 
     def addSuites(self, suites):
         # These are the ones that got through. Remove all rejected apps...
@@ -506,7 +513,7 @@ class WebPageResponder(plugins.Responder):
     def generatePagePerApp(self, pageTitle, pageInfo):
         for app, repository in pageInfo:
             pageTopDir = app.getCompositeConfigValue("historical_report_location", self.batchSession)
-            pageDir = os.path.join(pageTopDir, app.name)
+            pageDir = os.path.join(pageTopDir, app.name, self.cellInfo)
             extraVersions = self.getExtraVersions(app)
             self.diag.info("Found extra versions " + repr(extraVersions))
             relevantSubDirs = self.findRelevantSubdirectories(repository, app, extraVersions)
@@ -554,8 +561,8 @@ class WebPageResponder(plugins.Responder):
             plugins.printException()
 
     def generateWebPages(self, pageDir, app, extraVersions, relevantSubDirs, pageTitle):
-        generator = testoverview.GenerateWebPages(pageTitle, getVersionName(app, self.allApps), pageDir,
-                                                  extraVersions, app)
+        version = getVersionName(app, self.allApps)
+        generator = testoverview.GenerateWebPages(pageTitle, version, pageDir, extraVersions, app, self.cellInfo)
         subPageNames = app.getCompositeConfigValue("historical_report_subpages", self.batchSession)
         generator.generate(relevantSubDirs, subPageNames)
 

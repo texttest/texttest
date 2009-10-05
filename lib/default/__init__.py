@@ -114,7 +114,7 @@ class Config:
     def getActionSequence(self):
         if self.optionMap.has_key("coll"):
             arg = self.optionMap.get("coll")
-            if arg == "web":
+            if arg and "web" in arg:
                 return []
             else:
                 batchSession = self.optionValue("b")

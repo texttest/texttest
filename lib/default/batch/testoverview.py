@@ -38,7 +38,7 @@ class TitleWithDateStamp:
             
 
 class GenerateWebPages(object):
-    def __init__(self, pageTitle, pageVersion, pageDir, extraVersions, app):
+    def __init__(self, pageTitle, pageVersion, pageDir, extraVersions, app, cellInfo):
         self.pageTitle = pageTitle
         self.pageVersion = pageVersion
         self.extraVersions = extraVersions
@@ -46,6 +46,7 @@ class GenerateWebPages(object):
         self.pagesOverview = seqdict()
         self.pagesDetails = seqdict()
         self.app = app
+        self.cellInfo = cellInfo
         self.diag = logging.getLogger("GenerateWebPages")
         colourFinder.setColourDict(app.getConfigValue("historical_report_colours"))
 
@@ -116,9 +117,15 @@ class GenerateWebPages(object):
                 page.prepend(HTMLgen.Heading(2, monthContainer, align = 'center'))
             page.prepend(HTMLgen.Heading(2, selContainer, align = 'center'))
             page.prepend(HTMLgen.Heading(1, foundMinorVersions, align = 'center'))
-            page.prepend(HTMLgen.Heading(1, "Test results for " + self.pageTitle, align = 'center'))
+            page.prepend(HTMLgen.Heading(1, self.getResultType() + " results for " + self.pageTitle, align = 'center'))
 
         self.writePages()
+
+    def getResultType(self):
+        if self.cellInfo:
+            return self.cellInfo.capitalize()
+        else:
+            return "Test"
         
     def getExistingMonthPages(self):
         return glob(os.path.join(self.pageDir, "test_" + self.pageVersion + "_all_???[0-9][0-9][0-9][0-9].html"))
@@ -212,7 +219,7 @@ class GenerateWebPages(object):
         
     def createPage(self):
         style = "body,td {color: #000000;font-size: 11px;font-family: Helvetica;} th {color: #000000;font-size: 13px;font-family: Helvetica;}"
-        title = TitleWithDateStamp("Test results for " + self.pageTitle)
+        title = TitleWithDateStamp(self.getResultType() + " results for " + self.pageTitle)
         return HTMLgen.SimpleDocument(title=title, style=style)
 
     def addVersionHeader(self, page, version):
@@ -221,7 +228,7 @@ class GenerateWebPages(object):
         page.append(HTMLgen.U(HTMLgen.Heading(1, version, align = 'center')))
         
     def addTable(self, page, categoryHandlers, version, loggedTests, selector):
-        testTable = TestTable(self.app)
+        testTable = TestTable(self.app, self.cellInfo)
         extraVersions = loggedTests.keys()[1:]
         if len(extraVersions) > 0:
             page.append(testTable.generateExtraVersionLinks(version, extraVersions))
@@ -255,8 +262,9 @@ class GenerateWebPages(object):
         return time.mktime(time.strptime(timePart, "%d%b%Y"))
 
 class TestTable:
-    def __init__(self, app):
+    def __init__(self, app, cellInfo):
         self.app = app
+        self.cellInfo = cellInfo
 
     def generate(self, categoryHandlers, pageVersion, version, loggedTests, tagsFound):
         table = HTMLgen.TableLite(border=0, cellpadding=4, cellspacing=2,width="100%")
@@ -310,21 +318,45 @@ class TestTable:
             row.append(HTMLgen.TD(cellContent, bgcolor = bgcol))
         return HTMLgen.TR(*row)
 
+    def getCellData(self, state):
+        if state:
+            if self.cellInfo:
+                if hasattr(state, "findComparison"):
+                    fileComp, fileCompList = state.findComparison(self.cellInfo, includeSuccess=True)
+                    if fileComp:
+                        return self.getCellDataFromFileComp(fileComp)
+            else:
+                return self.getCellDataFromState(state)
+
+        return "N/A", True, colourFinder.find("test_default_fg"), colourFinder.find("no_results_bg")
+
+    def getCellDataFromState(self, state):
+        if hasattr(state, "getMostSevereFileComparison"):
+            fileComp = state.getMostSevereFileComparison()
+        else:
+            fileComp = None
+        success = state.category == "success"
+        fgcol, bgcol = self.getColours(state.category, fileComp, success)
+        filteredState = self.filterState(repr(state))
+        detail = state.getTypeBreakdown()[1]
+        return filteredState + detail, success, fgcol, bgcol
+
+    def getCellDataFromFileComp(self, fileComp):
+        success = fileComp.hasSucceeded()
+        fgcol, bgcol = self.getColours(fileComp.getType(), fileComp, success)
+        text = str(fileComp.getNewPerformance()) + " " + self.app.getCompositeConfigValue("performance_unit", fileComp.stem)
+        return text, success, fgcol, bgcol
+
     def generateTestCell(self, tag, testName, testId, pageVersion, results):
         state = results.get(tag)
-        if state:
-            fgcol, bgcol = self.getColours(state)
-            filteredState = self.filterState(repr(state))
-            detail = state.getTypeBreakdown()[1]
-            cellContent = HTMLgen.Font(filteredState + detail, color = fgcol) 
-            if state.category == "success":
-                return cellContent, bgcol
-            else:
-                linkTarget = getDetailPageName(pageVersion, tag) + "#" + testId
-                tooltip = "'" + testName + "' failure for " + getDisplayText(tag)
-                return HTMLgen.Href(linkTarget, cellContent, title=tooltip), bgcol
+        cellText, success, fgcol, bgcol = self.getCellData(state)
+        cellContent = HTMLgen.Font(cellText, color=fgcol) 
+        if success:
+            return cellContent, bgcol
         else:
-            return "N/A", colourFinder.find("no_results_bg")
+            linkTarget = getDetailPageName(pageVersion, tag) + "#" + testId
+            tooltip = "'" + testName + "' failure for " + getDisplayText(tag)
+            return HTMLgen.Href(linkTarget, cellContent, title=tooltip), bgcol
     
     def filterState(self, cellContent):
         result = cellContent
@@ -342,24 +374,23 @@ class TestTable:
         result = re.sub('slower\([^ ]+\) ','', result)
         return result
 
-    def getColours(self, state):
+    def getColours(self, category, fileComp, success):
         bgcol = colourFinder.find("failure_bg")
         fgcol = colourFinder.find("test_default_fg")
-        category = state.category
-        if category.startswith("faster") or category.startswith("slower"):
+        if success:
+            bgcol = colourFinder.find("success_bg")
+        elif category.startswith("faster") or category.startswith("slower"):
             bgcol = colourFinder.find("performance_bg")
-            if self.getPercent(state) >= self.app.getCompositeConfigValue("performance_variation_serious_%", "cputime"):
+            if self.getPercent(fileComp) >= self.app.getCompositeConfigValue("performance_variation_serious_%", "cputime"):
                 fgcol = colourFinder.find("performance_fg")
         elif category == "smaller" or category == "larger":
             bgcol = colourFinder.find("memory_bg")
-            if self.getPercent(state) >= self.app.getCompositeConfigValue("performance_variation_serious_%", "memory"):
+            if self.getPercent(fileComp) >= self.app.getCompositeConfigValue("performance_variation_serious_%", "memory"):
                 fgcol = colourFinder.find("performance_fg")
-        elif category == "success":
-            bgcol = colourFinder.find("success_bg")
         return fgcol, bgcol
 
-    def getPercent(self, state):
-        return state.getMostSevereFileComparison().perfComparison.percentageChange
+    def getPercent(self, fileComp):
+        return fileComp.perfComparison.percentageChange
 
     def findTagColour(self, tag):
         return colourFinder.find("run_" + getWeekDay(tag) + "_fg")

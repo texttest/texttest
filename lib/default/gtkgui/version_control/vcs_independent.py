@@ -766,7 +766,7 @@ class AddGUI(VersionControlDialogGUI):
         # Particularly CVS likes to write add output on stderr for some reason...
         return len(stderr) > 0
 
-class RemoveTests(adminactions.RemoveTests):
+class RemoveTestsOrFiles(adminactions.RemoveTestsOrFiles):
     @staticmethod
     def removePath(*args):
         return vcs.removePath(*args)
@@ -839,6 +839,6 @@ class InteractiveActionConfig(guiplugins.InteractiveActionConfig):
         return RenameTest
 
     def getReplacements(self):
-        return { adminactions.RemoveTests : RemoveTests,
+        return { adminactions.RemoveTestsOrFiles : RemoveTestsOrFiles,
                  adminactions.RenameTest  : self.getRenameClass(),
                  adminactions.PasteTests  : PasteTests }

@@ -687,7 +687,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
             self.notify("NewFile", targetPath, fileExisted)
 
 
-class RemoveTests(guiplugins.ActionGUI):
+class RemoveTestsOrFiles(guiplugins.ActionGUI):
     def notifyFileCreationInfo(self, creationDir, fileType):
         canRemove = fileType != "external" and \
                     (creationDir is None or len(self.currFileSelection) > 0) and \
@@ -1137,6 +1137,6 @@ class ReportBugs(guiplugins.ActionDialogGUI):
 def getInteractiveActionClasses():
     return [ CopyTests, CutTests, PasteTests,
              ImportTestCase, ImportTestSuite, ImportApplication, ImportFiles,
-             RenameTest, RemoveTests, ReportBugs,
+             RenameTest, RemoveTestsOrFiles, ReportBugs,
              SortTestSuiteFileAscending, SortTestSuiteFileDescending,
              RepositionTestFirst, RepositionTestUp, RepositionTestDown, RepositionTestLast ]

@@ -74,12 +74,15 @@ class GtkActionWrapper:
         self.accelerator = None
         self.diag = logging.getLogger("Interactive Actions")
         title = self.getTitle(includeMnemonics=True)
-        actionName = self.getTitle(includeMnemonics=False)
+        actionName = self.getActionName()
         self.gtkAction = gtk.Action(actionName, title, \
                                     self.getTooltip(), self.getStockId())
         scriptEngine.connect(self.getTooltip(), "activate", self.gtkAction, self.runInteractive)
         if not self.isActiveOnCurrent():
             self.gtkAction.set_property("sensitive", False)
+
+    def getActionName(self):
+        return self.getTitle(includeMnemonics=False)
 
     def getAccelerator(self, title):
         realAcc = guiConfig.getCompositeValue("gui_accelerators", title)

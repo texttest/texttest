@@ -31,9 +31,11 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         guiplugins.ActionResultDialogGUI.createButtons(self)
         
     def addContents(self):
+        logoFile = os.path.join(plugins.installationDir("images"), "texttest-logo.gif")
+        logoPixbuf = gtk.gdk.pixbuf_new_from_file(logoFile)
+        logoPixbuf.set_data("name", "TextTest Logo")
         logo = gtk.Image()
-        logo.set_from_pixbuf(gtk.gdk.pixbuf_new_from_file(
-            os.path.join(plugins.installationDir("images"), "texttest-logo.gif")))
+        logo.set_from_pixbuf(logoPixbuf)
         logoFrame = gtk.Alignment(0.5, 0.5, 0.0, 0.0)
         logoFrame.set_padding(10, 10, 10, 10)
         logoFrame.add(logo)
@@ -43,23 +45,23 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         message = "TextTest is an application-independent tool for text-based\nfunctional testing. This means running a batch-mode program\nin lots of different ways, and using the text output produced\nas a means of controlling the behaviour of that application."
         messageLabel.set_markup("<i>" + message + "</i>\n")
         messageLabel.set_justify(gtk.JUSTIFY_CENTER)
-        urlLabel = gtk.Label()
-        urlLabel.set_markup("<span foreground='blue' underline='single'>" + self.website + "</span>\n")
-        urlLabel.set_selectable(True)
-        guiutils.scriptEngine.connect("go to website", "button_release_event", urlLabel, self.urlClicked)
+        urlButton = gtk.LinkButton(self.website)
+        urlButton.set_property("border-width", 0)
+        urlButtonbox = gtk.HBox()
+        urlButtonbox.pack_start(urlButton, expand=True, fill=False)
+        guiutils.scriptEngine.connect("go to website", "clicked", urlButton, self.urlClicked)
         licenseLabel = gtk.Label()
         licenseLabel.set_markup("<span size='small'>Copyright " + u'\xa9' + " The authors</span>\n")
         self.dialog.vbox.pack_start(logoFrame, expand=False, fill=False)
         self.dialog.vbox.pack_start(mainLabel, expand=True, fill=True)
         self.dialog.vbox.pack_start(messageLabel, expand=False, fill=False)
-        self.dialog.vbox.pack_start(urlLabel, expand=False, fill=False)
+        self.dialog.vbox.pack_start(urlButtonbox, expand=False, fill=False)
         self.dialog.vbox.pack_start(licenseLabel, expand=False, fill=False)
         self.dialog.set_resizable(False)
 
-    def urlClicked(self, label, event): 
-        if event.button == 1:
-            status = guiutils.openLinkInBrowser(self.website)
-            self.notify("Status", status)
+    def urlClicked(self, *args): 
+        status = guiutils.openLinkInBrowser(self.website)
+        self.notify("Status", status)
         
     def showCredits(self, *args):
         newDialog = TextFileDisplayDialog(self.validApps, False, {}, "CREDITS.txt", self.dialog)

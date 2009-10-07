@@ -7,7 +7,20 @@ import gtk, plugins, os, shutil
 from default.gtkgui import guiplugins, guiutils # from .. import guiplugins, guiutils when we drop Python 2.4 support
 from ndict import seqdict
 
-class ClipboardAction(guiplugins.ActionGUI):
+# Cut, copy and paste
+class FocusDependentAction(guiplugins.ActionGUI):
+    def notifyTopWindow(self, window):
+        guiplugins.ActionGUI.notifyTopWindow(self, window)
+        window.connect("set-focus", self.focusChanged)
+
+    def focusChanged(self, window, widget):
+        freeTextWidget = isinstance(widget, gtk.Entry) or isinstance(widget, gtk.TextView)
+        if freeTextWidget:
+            self.setSensitivity(False)
+        elif self.isActiveOnCurrent():
+            self.setSensitivity(True)
+
+class ClipboardAction(FocusDependentAction):
     def isActiveOnCurrent(self, *args):
         if guiplugins.ActionGUI.isActiveOnCurrent(self, *args):
             for test in self.currTestSelection:
@@ -53,7 +66,7 @@ class CutTests(ClipboardAction):
     def shouldCut(self):
         return True
 
-class PasteTests(guiplugins.ActionGUI):
+class PasteTests(FocusDependentAction):
     def __init__(self, *args):
         guiplugins.ActionGUI.__init__(self, *args)
         self.clipboardTests = []

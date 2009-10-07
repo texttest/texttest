@@ -1,4 +1,4 @@
-lib/gtklogger.py
+lib/gtklogger*.py
 lib/gtkusecase.py
 lib/jobprocess.py
 lib/ndict.py

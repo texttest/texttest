@@ -444,14 +444,15 @@ class CollateFiles(plugins.Action):
         matches = []
         self.diag.info("Trying to find wildcard matches in " + repr(result) + " from " + repr(pattern))
         for patternPos, resultPos, length in matcher.get_matching_blocks():
-            if self.inSquareBrackets(pattern, patternPos):
+            if length == 0 or self.inSquareBrackets(pattern, patternPos):
                 continue
             self.diag.info("Found match of length " + repr(length) + " at positions " + repr((patternPos, resultPos)))
-            if resultPos > wildcardStart:
+            if resultPos or patternPos:
                 matches.append(result[wildcardStart:resultPos])
             wildcardStart = resultPos + length
-        if wildcardStart < len(result):
-            matches.append(result[wildcardStart:])
+        remainder = result[wildcardStart:]
+        if remainder:
+            matches.append(remainder)
         self.diag.info("Found matches : " + repr(matches))
         return matches
                     

@@ -700,31 +700,27 @@ class ImportFiles(guiplugins.ActionDialogGUI):
             self.notify("NewFile", targetPath, fileExisted)
 
 
-class RemoveTestsOrFiles(guiplugins.ActionGUI):
-    def notifyFileCreationInfo(self, creationDir, fileType):
-        canRemove = fileType != "external" and \
-                    (creationDir is None or len(self.currFileSelection) > 0) and \
-                    self.isActiveOnCurrent()
-        self.setSensitivity(canRemove)
-
+class RemoveTests(guiplugins.ActionGUI):
     def isActiveOnCurrent(self, *args):
+        if len(self.currFileSelection) > 0:
+            return False
+        
         for test in self.currTestSelection:
             if test.parent:
                 return True
-        # Only root selected. Any file?
-        if len(self.currFileSelection) > 0:
-            return True
-        else:
-            return False
+        return False
+
+    def getActionName(self):
+        return "Remove Tests"
 
     def _getTitle(self):
-        return "Remove..."
+        return "Remove Tests..."
 
     def _getStockId(self):
         return "delete"
 
     def getTooltip(self):
-        return "Remove selected files"
+        return "Remove selected tests"
 
     def getTestCountDescription(self):
         desc = plugins.pluralise(self.distinctTestCount, "test")
@@ -739,14 +735,11 @@ class RemoveTestsOrFiles(guiplugins.ActionGUI):
 
     def getFileRemoveWarning(self):
         return "This will remove files from the file system and hence may not be reversible."
-        
+
     def getConfirmationMessage(self):
         extraLines = "\n\nNote: " + self.getFileRemoveWarning() + "\n\nAre you sure you wish to proceed?\n"""
         currTest = self.currTestSelection[0]
-        if len(self.currFileSelection) > 0:
-            return "\nYou are about to remove " + plugins.pluralise(len(self.currFileSelection), self.getType(self.currFileSelection[0][0])) + \
-                   " from the " + currTest.classDescription() + " '" + currTest.name + "'." + extraLines
-        elif len(self.currTestSelection) == 1:
+        if len(self.currTestSelection) == 1:
             if currTest.classId() == "test-case":
                 return "\nYou are about to remove the test '" + currTest.name + \
                        "' and all associated files." + extraLines
@@ -756,12 +749,6 @@ class RemoveTestsOrFiles(guiplugins.ActionGUI):
         else:
             return "\nYou are about to remove " + self.getTestCountDescription() + \
                    " and all associated files." + extraLines
-
-    def performOnCurrent(self):
-        if len(self.currFileSelection) > 0:
-            self.removeFiles()
-        else:
-            self.removeTests()
 
     def getTestsToRemove(self, list):
         toRemove = []
@@ -781,7 +768,7 @@ class RemoveTestsOrFiles(guiplugins.ActionGUI):
 
         return toRemove, warnings
 
-    def removeTests(self):
+    def performOnCurrent(self):
         namesRemoved = []
         toRemove, warnings = self.getTestsToRemove(self.currTestSelection)
         permMessage = "Failed to remove test: didn't have sufficient write permission to the test files"
@@ -799,13 +786,59 @@ class RemoveTestsOrFiles(guiplugins.ActionGUI):
     def removePath(dir):
         return plugins.removePath(dir)
     
+    def messageAfterPerform(self):
+        pass # do it as part of the method as currentTest will have changed by the end!
+
+class RemoveTestsForPopup(RemoveTests):
+    def _getTitle(self):
+        return "Remove..."
+
+    def getActionName(self):
+        return "Remove Tests For Popup"
+
+    
+class RemoveFiles(guiplugins.ActionGUI):
+    def notifyFileCreationInfo(self, creationDir, fileType):
+        canRemove = fileType != "external" and \
+                    (creationDir is None or len(self.currFileSelection) > 0) and \
+                    self.isActiveOnCurrent()
+        self.setSensitivity(canRemove)
+
+    def isActiveOnCurrent(self, *args):
+        return len(self.currFileSelection) > 0
+
+    def getActionName(self):
+        return "Remove Files"
+
+    def _getTitle(self):
+        return "Remove..."
+
+    def _getStockId(self):
+        return "delete"
+
+    def getTooltip(self):
+        return "Remove selected files"
+
+    def getFileRemoveWarning(self):
+        return "This will remove files from the file system and hence may not be reversible."
+        
+    def getConfirmationMessage(self):
+        extraLines = "\n\nNote: " + self.getFileRemoveWarning() + "\n\nAre you sure you wish to proceed?\n"""
+        currTest = self.currTestSelection[0]
+        return "\nYou are about to remove " + plugins.pluralise(len(self.currFileSelection), self.getType(self.currFileSelection[0][0])) + \
+                   " from the " + currTest.classDescription() + " '" + currTest.name + "'." + extraLines
+
+    @staticmethod
+    def removePath(dir):
+        return plugins.removePath(dir)
+    
     def getType(self, filePath):
         if os.path.isdir(filePath):
             return "directory"
         else:
             return "file"
 
-    def removeFiles(self):
+    def performOnCurrent(self):
         test = self.currTestSelection[0]
         warnings = ""
         removed = 0
@@ -824,7 +857,7 @@ class RemoveTestsOrFiles(guiplugins.ActionGUI):
             self.showWarningDialog(warnings)
 
     def messageAfterPerform(self):
-        pass # do it as part of the method as currentTest will have changed by the end!
+        pass # do it as part of the method, uses lots of local data
 
 
 class RepositionTest(guiplugins.ActionGUI):
@@ -1150,6 +1183,6 @@ class ReportBugs(guiplugins.ActionDialogGUI):
 def getInteractiveActionClasses():
     return [ CopyTests, CutTests, PasteTests,
              ImportTestCase, ImportTestSuite, ImportApplication, ImportFiles,
-             RenameTest, RemoveTestsOrFiles, ReportBugs,
+             RenameTest, RemoveTests, RemoveTestsForPopup, RemoveFiles, ReportBugs,
              SortTestSuiteFileAscending, SortTestSuiteFileDescending,
              RepositionTestFirst, RepositionTestUp, RepositionTestDown, RepositionTestLast ]

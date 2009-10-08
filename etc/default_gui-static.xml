@@ -17,9 +17,8 @@
       <menuitem action="Cut"/>
       <menuitem action="Copy"/>
       <menuitem action="Paste"/>
-      <menuitem name="Remove..." action="Remove..."/>
+      <menuitem action="Remove Tests"/>
       <menuitem name="Rename..." action="Rename..."/>
-      <menuitem name="Remove..." action="Remove..."/>
       <separator/>
       <menuitem action="Enter Failure Information"/>
       <separator/>
@@ -64,7 +63,7 @@
     <toolitem action="Run"/>
     <placeholder name="AfterRun" />
     <separator/>
-    <toolitem action="Remove..."/>
+    <toolitem action="Remove Tests"/>
     <separator/>
   </toolbar>
 
@@ -76,7 +75,7 @@
     <menuitem action="Copy"/>
     <menuitem action="Paste"/>
     <menuitem action="Rename..."/>
-    <menuitem action="Remove..."/>
+    <menuitem action="Remove Tests For Popup"/>
     <separator/>
     <menuitem action="Enter Failure Information"/>
     <separator/>
@@ -101,7 +100,7 @@
     <separator/>
     <menuitem action="Create/Import"/>
     <separator/>
-    <menuitem name="Remove..." action="Remove..."/>
+    <menuitem action="Remove Files"/>
     <separator/>
   </popup>
 

@@ -766,33 +766,42 @@ class AddGUI(VersionControlDialogGUI):
         # Particularly CVS likes to write add output on stderr for some reason...
         return len(stderr) > 0
 
-class RemoveTestsOrFiles(adminactions.RemoveTestsOrFiles):
+class VcsAdminAction:
     @staticmethod
     def removePath(*args):
         return vcs.removePath(*args)
 
-    def getFileRemoveWarning(self):
-        return "Any " + vcs.name + "-controlled files will be removed in " + vcs.name + ".\n" + \
-               "Any files that are not version controlled will be removed from the file system and hence may not be recoverable."
-    
-class RenameTest(adminactions.RenameTest):
     @staticmethod
     def moveDirectory(*args):
         return vcs.moveDirectory(*args)
 
+    @staticmethod
+    def copyDirectory(*args):
+        return vcs.copyDirectory(*args)
+
+
+class VcsRemoveAction(VcsAdminAction):
+    def getFileRemoveWarning(self):
+        return "Any " + vcs.name + "-controlled files will be removed in " + vcs.name + ".\n" + \
+               "Any files that are not version controlled will be removed from the file system and hence may not be recoverable."
+
+class RemoveTests(VcsRemoveAction, adminactions.RemoveTests):
+    pass
+
+class RemoveFiles(VcsRemoveAction, adminactions.RemoveFiles):
+    pass
+
+class RemoveTestsForPopup(VcsRemoveAction, adminactions.RemoveTestsForPopup):
+    pass
+    
+    
+class RenameTest(VcsAdminAction, adminactions.RenameTest):
     def getNameChangeMessage(self, newName):
         origMessage = adminactions.RenameTest.getNameChangeMessage(self, newName)
         return origMessage + vcs.getMoveSuffix() 
 
 
-class PasteTests(adminactions.PasteTests):
-    @staticmethod
-    def moveDirectory(*args):
-        return vcs.moveDirectory(*args)
-    @staticmethod
-    def copyDirectory(*args):
-        return vcs.copyDirectory(*args)
-
+class PasteTests(VcsAdminAction, adminactions.PasteTests):
     def getStatusMessage(self, *args):
         origMessage = adminactions.PasteTests.getStatusMessage(self, *args)
         if self.removeAfter:
@@ -839,6 +848,8 @@ class InteractiveActionConfig(guiplugins.InteractiveActionConfig):
         return RenameTest
 
     def getReplacements(self):
-        return { adminactions.RemoveTestsOrFiles : RemoveTestsOrFiles,
+        return { adminactions.RemoveTests : RemoveTests,
+                 adminactions.RemoveFiles : RemoveFiles,
+                 adminactions.RemoveTestsForPopup : RemoveTestsForPopup,
                  adminactions.RenameTest  : self.getRenameClass(),
                  adminactions.PasteTests  : PasteTests }

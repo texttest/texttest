@@ -95,16 +95,16 @@ class GtkActionWrapper:
                                      + title + "' is not valid, ignoring ...")
 
     def addToGroups(self, actionGroup, accelGroup):
-        self.accelerator = self._addToGroups(self.getTitle().rstrip("."), self.gtkAction, actionGroup, accelGroup)
+        self.accelerator = self._addToGroups(self.gtkAction.get_name().rstrip("."), self.gtkAction, actionGroup, accelGroup)
 
-    def _addToGroups(self, title, gtkAction, actionGroup, accelGroup):
+    def _addToGroups(self, actionName, gtkAction, actionGroup, accelGroup):
         # GTK 2.12 got fussy about this...
-        existingAction = actionGroup.get_action(gtkAction.get_name())
+        existingAction = actionGroup.get_action(actionName)
         if existingAction:
             self.diag.info("Removing action with label " + existingAction.get_property("label"))
             actionGroup.remove_action(existingAction)
             
-        accelerator = self.getAccelerator(title)
+        accelerator = self.getAccelerator(actionName)
         actionGroup.add_action_with_accel(gtkAction, accelerator)
         gtkAction.set_accel_group(accelGroup)
         gtkAction.connect_accelerator()

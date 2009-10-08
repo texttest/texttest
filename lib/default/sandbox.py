@@ -544,8 +544,10 @@ class CollateFiles(plugins.Action):
                                     stdin=stdin, stdout=stdout, stderr=stderr,
                                     cwd=test.getDirectory(temporary=1), shell=useShell)
         except OSError:
-            stdout.close()
-            stderr.close()
+            # Might just be pipe identifiers here
+            if hasattr(stdout, "close"):
+                stdout.close()
+                stderr.close()
 
     def getScriptArgs(self, script):
         args = script.split()

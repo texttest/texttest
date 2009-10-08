@@ -45,6 +45,9 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         message = "TextTest is an application-independent tool for text-based\nfunctional testing. This means running a batch-mode program\nin lots of different ways, and using the text output produced\nas a means of controlling the behaviour of that application."
         messageLabel.set_markup("<i>" + message + "</i>\n")
         messageLabel.set_justify(gtk.JUSTIFY_CENTER)
+        # On Windows the default URI hook fails and causes trouble...
+        # According to the docs you can set "None" here but that doesn't seem to work...
+        gtk.link_button_set_uri_hook(lambda x, y : None) 
         urlButton = gtk.LinkButton(self.website)
         urlButton.set_property("border-width", 0)
         urlButtonbox = gtk.HBox()

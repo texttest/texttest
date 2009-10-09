@@ -208,17 +208,17 @@ class PasteTests(FocusDependentAction):
         if not os.path.isdir(newDirName):
             oldDirName = test.getDirectory()
             if self.removeAfter:
-                self.moveDirectory(oldDirName, newDirName)
+                self.movePath(oldDirName, newDirName)
             else:
-                self.copyDirectory(oldDirName, newDirName)
+                self.copyPath(oldDirName, newDirName)
 
     # Methods overridden by version control
     @staticmethod
-    def moveDirectory(oldDirName, newDirName):
+    def movePath(oldDirName, newDirName):
         os.rename(oldDirName, newDirName)
 
     @staticmethod
-    def copyDirectory(oldDirName, newDirName):
+    def copyPath(oldDirName, newDirName):
         shutil.copytree(oldDirName, newDirName)
     
 
@@ -945,9 +945,42 @@ class RepositionTestLast(RepositionTest):
         currLastTest = self.currTestSelection[0].parent.testcases[len(self.currTestSelection[0].parent.testcases) - 1]
         return currLastTest != self.currTestSelection[0]
 
-class RenameTest(guiplugins.ActionDialogGUI):
+class RenameAction(guiplugins.ActionDialogGUI):
+    def singleTestOnly(self):
+        return True
+
+    def _getStockId(self):
+        return "italic"
+
+    def _getTitle(self):
+        return "_Rename..."
+
+    def messageAfterPerform(self):
+        pass # Use method below instead.
+
+    def basicNameCheck(self, newName):
+        if len(newName) == 0:
+            raise plugins.TextTestError, "Please enter a new name."
+        if " " in newName:
+            raise plugins.TextTestError, "The new name must not contain spaces, please choose another name."
+
+    def performOnCurrent(self):
+        try:
+            newName = self.optionGroup.getOptionValue("name")
+            self.basicNameCheck(newName)
+            self.performRename(newName)
+        except (IOError, OSError), e:
+            self.showErrorDialog("Failed to " + self.getActionName().lower() + ":\n" + str(e))
+
+    @staticmethod
+    def movePath(oldPath, newPath):
+        # overridden by version control modules
+        os.rename(oldPath, newPath)
+
+
+class RenameTest(RenameAction):
     def __init__(self, *args):
-        guiplugins.ActionDialogGUI.__init__(self, *args)
+        RenameAction.__init__(self, *args)
         self.addOption("name", "\nNew name")
         self.addOption("desc", "\nNew description")
         self.oldName = ""
@@ -955,8 +988,6 @@ class RenameTest(guiplugins.ActionDialogGUI):
     def isActiveOnCurrent(self, *args):
         # Don't allow renaming of the root suite
         return guiplugins.ActionGUI.isActiveOnCurrent(self, *args) and bool(self.currTestSelection[0].parent)
-    def singleTestOnly(self):
-        return True
     def updateOptions(self):
         self.oldName = self.currTestSelection[0].name
         self.oldDescription = self.currTestSelection[0].description
@@ -968,14 +999,11 @@ class RenameTest(guiplugins.ActionDialogGUI):
         header.set_markup("<b>" + plugins.convertForMarkup(self.oldName) + "</b>")
         vbox.pack_start(header, expand=False, fill=False)
         return guiplugins.ActionDialogGUI.fillVBox(self, vbox)
-    def _getStockId(self):
-        return "italic"
-    def _getTitle(self):
-        return "_Rename..."
     def getTooltip(self):
         return "Rename selected test"
-    def messageAfterPerform(self):
-        pass # Use method below instead.
+
+    def getActionName(self):
+        return "Rename Test"
 
     def getNameChangeMessage(self, newName):    
         return "Renamed test " + self.oldName + " to " + newName
@@ -992,11 +1020,8 @@ class RenameTest(guiplugins.ActionDialogGUI):
         else:
             message = "Nothing changed."
         return message
+    
     def checkNewName(self, newName):
-        if len(newName) == 0:
-            raise plugins.TextTestError, "Please enter a new name."
-        if newName.find(" ") != -1:
-            raise plugins.TextTestError, "The new name must not contain spaces, please choose another name."
         if newName != self.oldName:
             for test in self.currTestSelection[0].parent.testCaseList():
                 if test.name == newName:
@@ -1008,25 +1033,19 @@ class RenameTest(guiplugins.ActionDialogGUI):
     def handleExistingDirectory(self, newDir): # In CVS we might need to override this...
         raise plugins.TextTestError, "The directory " + newDir + " already exists, please choose another name."
 
-    def performOnCurrent(self):
-        try:
-            newName = self.optionGroup.getOptionValue("name")
-            self.checkNewName(newName)
-            newDesc = self.optionGroup.getOptionValue("desc")
-            if newName != self.oldName or newDesc != self.oldDescription:
-                for test in self.currTestSelection:
-                    # Do this first, so that if we fail we won't update the test suite files either
-                    self.moveFiles(test, newName)
-                    test.rename(newName, newDesc)
-            changeMessage = self.getChangeMessage(newName, newDesc)
-            self.oldName = newName
-            self.oldDescription = newDesc
-            self.notify("Status", changeMessage)
-        except IOError, e:
-            self.showErrorDialog("Failed to rename test:\n" + str(e))
-        except OSError, e:
-            self.showErrorDialog("Failed to rename test:\n" + str(e))
-
+    def performRename(self, newName):
+        self.checkNewName(newName)
+        newDesc = self.optionGroup.getOptionValue("desc")
+        if newName != self.oldName or newDesc != self.oldDescription:
+            for test in self.currTestSelection:
+                # Do this first, so that if we fail we won't update the test suite files either
+                self.moveFiles(test, newName)
+                test.rename(newName, newDesc)
+        changeMessage = self.getChangeMessage(newName, newDesc)
+        self.oldName = newName
+        self.oldDescription = newDesc
+        self.notify("Status", changeMessage)
+        
     def moveFiles(self, test, newName):
         # Create new directory, copy files if the new name is new (we might have
         # changed only the comment ...)
@@ -1034,13 +1053,66 @@ class RenameTest(guiplugins.ActionDialogGUI):
             oldDir = test.getDirectory()
             newDir = test.parent.getNewDirectoryName(newName)
             if os.path.isdir(oldDir):
-                self.moveDirectory(oldDir, newDir)
+                self.movePath(oldDir, newDir)
 
-    @staticmethod
-    def moveDirectory(oldDir, newDir):
-        # overridden by version control modules
-        os.rename(oldDir, newDir)
-        
+
+class RenameFile(RenameAction):
+    def __init__(self, *args):
+        RenameAction.__init__(self, *args)
+        self.addOption("name", "\nNew name for file")
+        self.oldName = ""
+
+    def notifyFileCreationInfo(self, creationDir, fileType):
+        canRename = fileType != "external" and \
+                    (creationDir is None or len(self.currFileSelection) > 0) and \
+                    self.isActiveOnCurrent()
+        self.setSensitivity(canRename)
+
+    def isActiveOnCurrent(self, *args):
+        return len(self.currFileSelection) == 1
+
+    def singleTestOnly(self):
+        return True
+
+    def updateOptions(self):
+        self.oldName = os.path.basename(self.currFileSelection[0][0])
+        self.optionGroup.setOptionValue("name", self.oldName)
+        return True
+
+    def _getStockId(self):
+        return "italic"
+
+    def getActionName(self):
+        return "Rename File"
+
+    def _getTitle(self):
+        return "_Rename..."
+    
+    def getTooltip(self):
+        return "Rename selected file"
+
+    def messageAfterPerform(self):
+        pass # Use method below instead.
+
+    def getNameChangeMessage(self, newName):    
+        return "Renamed file " + self.oldName + " to " + newName + "."
+
+    def checkNewName(self, newName, newPath):
+        if newName == self.oldName:
+            raise plugins.TextTestError, "Please enter a new name."
+        if os.path.exists(newPath):
+            raise plugins.TextTestError, "There is already a file or directory at '" + newName + "', please choose another name."
+
+    def performRename(self, newName):
+        oldPath = self.currFileSelection[0][0]
+        newPath = os.path.join(os.path.dirname(oldPath), newName)
+        self.checkNewName(newName, newPath)
+        self.movePath(oldPath, newPath)
+        self.currTestSelection[0].filesChanged()
+        changeMessage = self.getNameChangeMessage(newName)
+        self.oldName = newName
+        self.notify("Status", changeMessage)
+                
 
 class SortTestSuiteFileAscending(guiplugins.ActionGUI):
     def singleTestOnly(self):
@@ -1183,6 +1255,6 @@ class ReportBugs(guiplugins.ActionDialogGUI):
 def getInteractiveActionClasses():
     return [ CopyTests, CutTests, PasteTests,
              ImportTestCase, ImportTestSuite, ImportApplication, ImportFiles,
-             RenameTest, RemoveTests, RemoveTestsForPopup, RemoveFiles, ReportBugs,
+             RenameTest, RenameFile, RemoveTests, RemoveTestsForPopup, RemoveFiles, ReportBugs,
              SortTestSuiteFileAscending, SortTestSuiteFileDescending,
              RepositionTestFirst, RepositionTestUp, RepositionTestDown, RepositionTestLast ]

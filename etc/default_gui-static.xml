@@ -18,7 +18,7 @@
       <menuitem action="Copy"/>
       <menuitem action="Paste"/>
       <menuitem action="Remove Tests"/>
-      <menuitem name="Rename..." action="Rename..."/>
+      <menuitem action="Rename Test"/>
       <separator/>
       <menuitem action="Enter Failure Information"/>
       <separator/>
@@ -74,7 +74,7 @@
     <menuitem action="Cut"/>
     <menuitem action="Copy"/>
     <menuitem action="Paste"/>
-    <menuitem action="Rename..."/>
+    <menuitem action="Rename Test"/>
     <menuitem action="Remove Tests For Popup"/>
     <separator/>
     <menuitem action="Enter Failure Information"/>
@@ -100,6 +100,7 @@
     <separator/>
     <menuitem action="Create/Import"/>
     <separator/>
+    <menuitem action="Rename File"/>
     <menuitem action="Remove Files"/>
     <separator/>
   </popup>

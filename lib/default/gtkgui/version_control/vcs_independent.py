@@ -19,9 +19,9 @@ class VersionControlInterface:
         self.lastMoveInVCS = False
         self.defaultArgs = {}
 
-    def isVersionControlled(self, dirname):
+    def isVersionControlled(self, path):
         basicArgs = self.getCmdArgs("status")
-        for file in self.getFileNames(dirname, recursive=True):
+        for file in self.getFileNames(path, recursive=True):
             output = self.getProcessResults(basicArgs + [ file ])[1]
             status = self.getStateFromStatus(output)
             if status != "Unknown" and status != "Ignored":
@@ -108,32 +108,33 @@ class VersionControlInterface:
     def getCombinedRevisionOptions(self, r1, r2):
         return [ "-r", r1, "-r", r2 ] # applies to CVS and Mercurial
 
-    def copyDirectory(self, oldDir, newDir):
-        if os.path.isdir(newDir):
+    def copyPath(self, oldPath, newPath):
+        if os.path.isdir(newPath):
             # After a remove, possibly, or after Mercurial has half-moved...
-            for path in os.listdir(oldDir):
-                oldPath = os.path.join(oldDir, path)
-                newPath = os.path.join(newDir, path)
-                if os.path.isdir(oldPath):
-                    self.copyDirectory(oldPath, newPath)
+            for path in os.listdir(oldPath):
+                oldSubPath = os.path.join(oldPath, path)
+                newSubPath = os.path.join(newPath, path)
+                if os.path.isdir(oldSubPath):
+                    self.copyPath(oldSubPath, newSubPath)
                 else:
-                    shutil.copyfile(oldPath, newPath)
+                    shutil.copyfile(oldSubPath, newSubPath)
         else:
-            shutil.copytree(oldDir, newDir)
+            plugins.copyPath(oldPath, newPath)
                 
-    def moveDirectory(self, oldDir, newDir):
-        self.lastMoveInVCS = self.isVersionControlled(oldDir)
+    def movePath(self, oldPath, newPath):
+        self.lastMoveInVCS = self.isVersionControlled(oldPath)
         if self.lastMoveInVCS:
-            newParent = os.path.dirname(newDir)
-            # If it's also a parent of the old directory we don't need to check if it's version-controlled.
-            if not oldDir.startswith(newParent) and not self.isVersionControlled(newParent):
-                self.callProgramOnFiles("add", newParent) 
-            self._moveDirectory(oldDir, newDir)
+            if os.path.isdir(oldPath):
+                newParent = os.path.dirname(newPath)
+                # If it's also a parent of the old directory we don't need to check if it's version-controlled.
+                if not oldPath.startswith(newParent) and not self.isVersionControlled(newParent):
+                    self.callProgramOnFiles("add", newParent) 
+            self._movePath(oldPath, newPath)
         else:
-            os.rename(oldDir, newDir)
+            os.rename(oldPath, newPath)
 
-    def _moveDirectory(self, oldDir, newDir):
-        self.callProgram("mv", [ oldDir, newDir ])
+    def _movePath(self, oldPath, newPath):
+        self.callProgram("mv", [ oldPath, newPath ])
 
     def getMoveSuffix(self):
         if self.lastMoveInVCS:
@@ -772,18 +773,19 @@ class VcsAdminAction:
         return vcs.removePath(*args)
 
     @staticmethod
-    def moveDirectory(*args):
-        return vcs.moveDirectory(*args)
+    def movePath(*args):
+        return vcs.movePath(*args)
 
     @staticmethod
-    def copyDirectory(*args):
-        return vcs.copyDirectory(*args)
+    def copyPath(*args):
+        return vcs.copyPath(*args)
 
 
 class VcsRemoveAction(VcsAdminAction):
     def getFileRemoveWarning(self):
         return "Any " + vcs.name + "-controlled files will be removed in " + vcs.name + ".\n" + \
                "Any files that are not version controlled will be removed from the file system and hence may not be recoverable."
+
 
 class RemoveTests(VcsRemoveAction, adminactions.RemoveTests):
     pass
@@ -798,6 +800,11 @@ class RemoveTestsForPopup(VcsRemoveAction, adminactions.RemoveTestsForPopup):
 class RenameTest(VcsAdminAction, adminactions.RenameTest):
     def getNameChangeMessage(self, newName):
         origMessage = adminactions.RenameTest.getNameChangeMessage(self, newName)
+        return origMessage + vcs.getMoveSuffix() 
+
+class RenameFile(VcsAdminAction, adminactions.RenameFile):
+    def getNameChangeMessage(self, newName):
+        origMessage = adminactions.RenameFile.getNameChangeMessage(self, newName)
         return origMessage + vcs.getMoveSuffix() 
 
 
@@ -844,12 +851,13 @@ class InteractiveActionConfig(guiplugins.InteractiveActionConfig):
     def annotateClasses(self):
         return [ AnnotateGUI, AnnotateGUIRecursive ]
 
-    def getRenameClass(self):
+    def getRenameTestClass(self):
         return RenameTest
 
     def getReplacements(self):
         return { adminactions.RemoveTests : RemoveTests,
                  adminactions.RemoveFiles : RemoveFiles,
                  adminactions.RemoveTestsForPopup : RemoveTestsForPopup,
-                 adminactions.RenameTest  : self.getRenameClass(),
+                 adminactions.RenameTest  : self.getRenameTestClass(),
+                 adminactions.RenameFile  : RenameFile,
                  adminactions.PasteTests  : PasteTests }

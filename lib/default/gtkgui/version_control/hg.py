@@ -32,13 +32,13 @@ class HgInterface(vcs_independent.VersionControlInterface):
         statusLetter = output.split()[0]
         return self.allStateInfo.get(statusLetter, statusLetter)
 
-    def _moveDirectory(self, oldDir, newDir):
+    def _movePath(self, oldPath, newPath):
         # Moving doesn't work in hg if there are symbolic links in the path to the new location!
-        retCode = self.callProgram("mv", [ oldDir, os.path.realpath(newDir) ])
+        retCode = self.callProgram("mv", [ oldPath, os.path.realpath(newPath) ])
         # And it doesn't take non-versioned files with it, if there are any...
-        if retCode == 0 and os.path.isdir(oldDir):
-            self.copyDirectory(oldDir, newDir)
-            shutil.rmtree(oldDir)
+        if retCode == 0 and os.path.isdir(oldPath):
+            self.copyPath(oldPath, newPath)
+            shutil.rmtree(oldPath)
             
     def removePath(self, path):
         # Mercurial doesn't remove unknown files, nor does it return non-zero exit codes when it fails

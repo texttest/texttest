@@ -58,7 +58,7 @@ class InteractiveActionConfig(BaseInteractiveActionConfig):
         dict["reconnect"] = "<control><shift>r"
         dict["run"] = "<control>r"
         dict["rerun"] = "<control>r"
-        dict["rename"] = "<control>m"
+        dict["rename_test"] = "<control>m"
         dict["refresh"] = "F5"
         dict["record_use-case"] = "F9"
         dict["recompute_status"] = "F5"

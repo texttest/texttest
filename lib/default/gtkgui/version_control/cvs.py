@@ -84,23 +84,26 @@ class CVSInterface(vcs_independent.VersionControlInterface):
                 spaceAfterNamePos = line.find("\t", 7)
                 return line[spaceAfterNamePos:].replace("Status: ", "").strip(" \n\t")
 
-    def isVersionControlled(self, dirname):
-        return os.path.isdir(os.path.join(dirname, "CVS"))
+    def isVersionControlled(self, path):
+        if os.path.isdir(path):
+            return os.path.isdir(os.path.join(path, "CVS"))
+        else:
+            return vcs_independent.VersionControlInterface.isVersionControlled(self, path)
     
     # Move in source control also. In CVS this implies a remove and then an add
-    def _moveDirectory(self, oldDir, newDir):
-        self.copyDirectory(oldDir, newDir)
-        self.removePath(oldDir)
-        self.callProgramOnFiles("add", newDir, recursive=True)
+    def _movePath(self, oldPath, newPath):
+        self.copyPath(oldPath, newPath)
+        self.removePath(oldPath)
+        self.callProgramOnFiles("add", newPath, recursive=True)
         
     def getMoveCommand(self):
         return "cvs rm' and 'cvs add"
 
-    def copyDirectory(self, oldDir, newDir):
-        existedBefore = os.path.exists(newDir)
-        vcs_independent.VersionControlInterface.copyDirectory(self, oldDir, newDir)
-        if not existedBefore:
-            self.cleanControlDirs(newDir)
+    def copyPath(self, oldPath, newPath):
+        createNewDir = os.path.isdir(oldPath) and not os.path.exists(newPath)
+        vcs_independent.VersionControlInterface.copyPath(self, oldPath, newPath)
+        if createNewDir:
+            self.cleanControlDirs(newPath)
 
     def removePath(self, path):
         if os.path.isdir(path):
@@ -250,5 +253,5 @@ class InteractiveActionConfig(vcs_independent.InteractiveActionConfig):
     def getInteractiveActionClasses(self, dynamic):
         return vcs_independent.InteractiveActionConfig.getInteractiveActionClasses(self, dynamic) + [ CVSLogLatest ]
     
-    def getRenameClass(self):
+    def getRenameTestClass(self):
         return RenameTest

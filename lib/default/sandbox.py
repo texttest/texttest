@@ -595,6 +595,11 @@ class CollateFiles(plugins.Action):
         if currProc:
             currProc.wait()
 
+        if os.path.getsize(sourceFile) > 0 and os.path.getsize(targetFile) == 0 and os.path.getsize(collationErrFile) == 0:
+            # Collation scripts that don't write anything shouldn't produce empty files...
+            # If they write errors though, we might want to pick those up
+            os.remove(targetFile)
+
         triggerGroup = plugins.TextTriggerGroup(test.getConfigValue("suppress_stderr_text"))
         collateErrMsg = triggerGroup.readAndFilter(collationErrFile)
         if collateErrMsg:

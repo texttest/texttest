@@ -33,7 +33,6 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
     def addContents(self):
         logoFile = os.path.join(plugins.installationDir("images"), "texttest-logo.gif")
         logoPixbuf = gtk.gdk.pixbuf_new_from_file(logoFile)
-        logoPixbuf.set_data("name", "TextTest Logo")
         logo = gtk.Image()
         logo.set_from_pixbuf(logoPixbuf)
         logoFrame = gtk.Alignment(0.5, 0.5, 0.0, 0.0)

@@ -24,14 +24,15 @@ class TestColumnGUI(guiutils.SubGUI):
     def addSuites(self, suites):
         self.allSuites = suites
 
-    def createView(self):
+    def createView(self, treeview):
         testRenderer = gtk.CellRendererText()
         self.column = gtk.TreeViewColumn(self.getTitle(), testRenderer, text=0, background=1)
         self.column.set_resizable(True)
         self.column.set_cell_data_func(testRenderer, self.renderSuitesBold)
         if not self.dynamic:
             self.column.set_clickable(True)
-            guiutils.scriptEngine.connect("toggle test sorting order", "clicked", self.column, self.columnClicked)
+            guiutils.scriptEngine.connect("toggle test sorting order", "clicked", 
+                                          self.column, self.columnClicked, treeview)
         if guiutils.guiConfig.getValue("auto_sort_test_suites") == 1:
             guiutils.guilog.info("Initially sorting tests in alphabetical order.")
             self.column.set_sort_indicator(True)
@@ -286,7 +287,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         if self.dynamic:
             self.selection.set_select_function(self.canSelect)
 
-        testsColumn = self.subguis[0].createView()
+        testsColumn = self.subguis[0].createView(self.treeView)
         self.treeView.append_column(testsColumn)
         if self.dynamic:
             detailsRenderer = gtk.CellRendererText()

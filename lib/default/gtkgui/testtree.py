@@ -31,8 +31,9 @@ class TestColumnGUI(guiutils.SubGUI):
         self.column.set_cell_data_func(testRenderer, self.renderSuitesBold)
         if not self.dynamic:
             self.column.set_clickable(True)
-            guiutils.scriptEngine.connect("toggle test sorting order", "clicked", 
-                                          self.column, self.columnClicked, treeview)
+            self.column.connect("clicked", self.columnClicked)
+            guiutils.scriptEngine.monitorSignal("toggle test sorting order", "clicked", 
+                                                treeview, self.column)
         if guiutils.guiConfig.getValue("auto_sort_test_suites") == 1:
             guiutils.guilog.info("Initially sorting tests in alphabetical order.")
             self.column.set_sort_indicator(True)

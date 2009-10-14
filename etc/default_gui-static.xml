@@ -46,7 +46,7 @@
       <menuitem action="Filter"/>
       <separator/>
       <menuitem action="Run"/>
-      <menuitem action="Reconnect"/>
+      <menuitem action="Reconnect..."/>
       <menuitem action="Record Use-Case"/>
       <menuitem action="Replace Text in Files"/>
       <separator/>
@@ -60,11 +60,8 @@
     <toolitem action="Quit"/>
     <separator/>
     <toolitem action="Select"/>
+    <toolitem action="Refresh"/>
     <toolitem action="Run"/>
-    <placeholder name="AfterRun" />
-    <separator/>
-    <toolitem action="Remove Tests"/>
-    <separator/>
   </toolbar>
 
   <popup name="TestPopupMenu">

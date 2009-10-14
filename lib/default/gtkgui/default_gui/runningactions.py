@@ -169,11 +169,9 @@ class ReconnectToTests(RunningAction,guiplugins.ActionDialogGUI):
     def _getStockId(self):
         return "connect"
     def _getTitle(self):
-        return "Re_connect"
+        return "Re_connect..."
     def getTooltip(self):
         return "Reconnect to previously run tests"
-    def getTabTitle(self):
-        return "Reconnect"
     def performedDescription(self):
         return "Reconnected to"
     def getUseCaseName(self):

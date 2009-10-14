@@ -1,3 +1,4 @@
+lib/gtktreeviewextract.py
 lib/gtklogger*.py
 lib/gtkusecase.py
 lib/jobprocess.py

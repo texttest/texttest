@@ -1,10 +1,4 @@
-lib/gtktreeviewextract.py
-lib/gtklogger*.py
-lib/gtkusecase.py
-lib/jobprocess.py
-lib/ndict.py
-lib/setup.py
-lib/usecase.py
 generic
 site
+pyusecase
 coverage_tmp

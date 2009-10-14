@@ -1279,7 +1279,7 @@ class Application:
                    self.getConfigValue("copy_test_path_merge", envMapping=envMapping) + \
                    self.getConfigValue("partial_copy_test_path", envMapping=envMapping)
         # Don't manage data that has an external path name, only accept absolute paths built by ourselves...
-        return filter(lambda name: name.find(self.writeDirectory) != -1 or not os.path.isabs(name), allNames)
+        return filter(lambda name: name and (self.writeDirectory in name or not os.path.isabs(name)), allNames)
     def getFileName(self, dirList, stem):
         dircaches = map(lambda dir: DirectoryCache(dir), dirList)
         return self._getFileName(dircaches, stem)

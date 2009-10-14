@@ -14,7 +14,7 @@ install_root = os.path.dirname(os.path.dirname(os.path.normpath(os.path.abspath(
 # Also accept a setup with a "site" subdirectory containing local modules,
 # or a "generic" directory containing the TextTest core with local modules in the root
 # Also allow tying a TextTest installation to a PyUseCase one
-for subdir in [ "lib", "site/lib", "generic/lib", "pyusecase", "generic/pyusecase" ]:
+for subdir in [ "lib", "site/lib", "generic/lib", "pyusecase/lib", "generic/pyusecase/lib" ]:
     libDir = os.path.abspath(os.path.join(install_root, subdir))
     if os.path.isdir(libDir):
         sys.path.insert(0, libDir)

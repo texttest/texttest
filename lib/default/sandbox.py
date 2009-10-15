@@ -39,21 +39,22 @@ class PrepareWriteDirectory(plugins.Action):
             self.collatePath(test, configName, *args, **kwargs)
 
     def collatePath(self, test, configName, collateMethod, remoteCopy, mergeDirectories=False):
-        sourcePaths = self.getSourcePaths(test, configName)
         targetPath = self.getTargetPath(test, configName)
+        if not targetPath: # Can happen with e.g. empty environment
+            return
         plugins.ensureDirExistsForFile(targetPath)
-        for sourcePath in sourcePaths:
+        for sourcePath in self.getSourcePaths(test, configName):
             self.diag.info("Collating " + configName + " from " + repr(sourcePath) +
                            "\nto " + repr(targetPath))
             collateMethod(test, sourcePath, targetPath)
             if not mergeDirectories or not os.path.isdir(sourcePath):
                 break
 
-        if remoteCopy:
+        if remoteCopy and targetPath:
             remoteCopy(targetPath)
             
         envVarToSet, propFileName = self.findDataEnvironment(test, configName)
-        if envVarToSet:
+        if envVarToSet and targetPath:
             self.diag.info("Setting env. variable " + envVarToSet + " to " + targetPath)
             test.setEnvironment(envVarToSet, targetPath, propFileName)
 
@@ -67,12 +68,17 @@ class PrepareWriteDirectory(plugins.Action):
             return pathName
     
     def getPathFromEnvironment(self, configName, test):
-        return os.path.normpath(Template(configName).safe_substitute(test.environment))
+        expanded = Template(configName).safe_substitute(test.environment)
+        if expanded: # Don't do normpath on empty strings, you get "." which causes trouble later...
+            return os.path.normpath(expanded)
+        else:
+            return expanded
     
     def getTargetPath(self, test, configName):
         # handle environment variables
         localName = os.path.basename(self.getPathFromEnvironment(configName, test))
-        return test.makeTmpFileName(localName, forComparison=0)
+        if localName:
+            return test.makeTmpFileName(localName, forComparison=0)
     
     def getSourcePaths(self, test, configName):
         # These can refer to environment variables or to paths within the test structure

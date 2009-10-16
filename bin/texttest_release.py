@@ -42,17 +42,9 @@ def exportFromBzr(dest, tagName):
     exportDir("TextTest", "source", "source", dest, tagName)
     os.mkdir(os.path.join(dest, "tests"))
     exportDir("TextTest", "tests", "tests/texttest", dest, tagName)
-    exportDir("PyUseCase", "source", "PyUseCase", dest)
+    exportDir("PyUseCase", "source", "source/pyusecase", dest)
         
-def mergePyUseCase(reldir):    
-    for fileName in glob(os.path.join(reldir, "PyUseCase/*.py")):
-        print "Copying", fileName
-        targetPath = fileName.replace("PyUseCase", "source/lib")
-        shutil.copy(fileName, targetPath)
-    shutil.rmtree(os.path.join(reldir, "PyUseCase"))
-
 def createSource(reldir):
-    mergePyUseCase(reldir)
     versionFile = os.path.join(reldir, "source", "lib", "texttest_version.py")
     updateVersionFile(versionFile, releaseName)
     os.rename(os.path.join(reldir, "source", "readme.txt"), os.path.join(reldir, "readme.txt"))

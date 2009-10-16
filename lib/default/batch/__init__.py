@@ -549,7 +549,8 @@ class WebPageResponder(plugins.Responder):
     
     def generateCommonPage(self, pageTitle, pageInfo):
         app, extraVersions, relevantSubDirs = self.transformToCommon(pageInfo)
-        pageDir = app.getCompositeConfigValue("historical_report_location", self.batchSession)
+        pageTopDir = app.getCompositeConfigValue("historical_report_location", self.batchSession)
+        pageDir = os.path.join(pageTopDir, self.cellInfo)
         self.makeAndGenerate(pageDir, app, extraVersions, relevantSubDirs, pageTitle)
         
     def makeAndGenerate(self, pageDir, *args):

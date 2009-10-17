@@ -738,16 +738,15 @@ class StatusGUI(VersionControlDialogGUI):
         self.infoColumn.set_clickable(True)
         button = self.infoColumn.get_button()
         if button:
-            guiutils.scriptEngine.monitorRightClicks("show visibility controls", button)
             button.connect("button-press-event", self.showPopupMenu)
+            guiutils.scriptEngine.monitorRightClicks("show visibility controls", button)
             
         self.treeView.grab_focus() # Or the column button gets focus ...
         
-    def showPopupMenu(self, treeview, event):
+    def showPopupMenu(self, button, event):
         if event.button == 3: 
             self.popupMenu.popup(None, None, None, event.button, event.time)
-            return True
-
+            
 
 class AnnotateGUI(VersionControlDialogGUI):
     def _getTitle(self):

@@ -200,8 +200,7 @@ class PopupMenuGUI(guiutils.SubGUI):
                 path, col, cellx, celly = pathInfo
                 treeview.grab_focus()
                 self.widget.popup(None, None, None, event.button, time)
-                return True
-
+                
 
 class NotebookGUI(guiutils.SubGUI):
     def __init__(self, tabInfo, scriptTitle):

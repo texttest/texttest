@@ -96,8 +96,8 @@ class FileViewGUI(guiutils.SubGUI):
         view.expand_all()
         self.monitorEvents()
         if self.popupGUI:
-            guiutils.scriptEngine.monitorRightClicks("view actions for file", view)
             view.connect("button_press_event", self.popupGUI.showMenu)
+            guiutils.scriptEngine.monitorRightClicks("view actions for file", view)
             self.popupGUI.createView()
 
         view.show()

@@ -308,8 +308,8 @@ class TestTreeGUI(guiutils.ContainerGUI):
         guiutils.scriptEngine.monitorExpansion(self.treeView, "show test suite", "hide test suite")
         self.treeView.connect('row-expanded', self.rowExpanded)
         self.expandLevel(self.treeView, self.filteredModel.get_iter_root())
-        guiutils.scriptEngine.monitorRightClicks("view actions for test", self.treeView)
         self.treeView.connect("button_press_event", self.popupGUI.showMenu)
+        guiutils.scriptEngine.monitorRightClicks("view actions for test", self.treeView)
         guiutils.scriptEngine.monitor("set test selection to", self.selection)
         self.selection.connect("changed", self.userChangedSelection)
 

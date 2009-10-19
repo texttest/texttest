@@ -34,7 +34,7 @@ class HgInterface(vcs_independent.VersionControlInterface):
 
     def _movePath(self, oldPath, newPath):
         # Moving doesn't work in hg if there are symbolic links in the path to the new location!
-        retCode = self.callProgram("mv", [ oldPath, os.path.realpath(newPath) ])
+        retCode = self.callProgram("mv", [ os.path.realpath(oldPath), os.path.realpath(newPath) ])
         # And it doesn't take non-versioned files with it, if there are any...
         if retCode == 0 and os.path.isdir(oldPath):
             self.copyPath(oldPath, newPath)

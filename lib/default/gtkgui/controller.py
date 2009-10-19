@@ -575,7 +575,7 @@ class InteractiveActionHandler:
         configs = self.getAllConfigs(apps)
         vcsConfig = version_control.getVersionControlConfig(apps, self.inputOptions)
         if vcsConfig:
-            configs.append(vcsConfig)
+            configs.insert(0, vcsConfig)
         return configs
 
     def getAllConfigs(self, allApps):

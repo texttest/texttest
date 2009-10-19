@@ -200,6 +200,7 @@ class PopupMenuGUI(guiutils.SubGUI):
                 path, col, cellx, celly = pathInfo
                 treeview.grab_focus()
                 self.widget.popup(None, None, None, event.button, time)
+                treeview.emit_stop_by_name("button-press-event")
                 
 
 class NotebookGUI(guiutils.SubGUI):

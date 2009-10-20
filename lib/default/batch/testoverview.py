@@ -90,17 +90,17 @@ class GenerateWebPages(object):
                         loggedTests.setdefault(extraVersion, seqdict()).setdefault(testId, seqdict())[tag] = state
                         categoryHandlers.setdefault(tag, CategoryHandler()).registerInCategory(testId, state, extraVersion)
 
+                hasData = False
                 for sel in selectors:
                     page = self.getPage(sel)
-                    if len(repositoryDirs) > 1:
-                        self.addVersionHeader(page, version)
-                    self.addTable(page, categoryHandlers, version, loggedTests, sel)
-
+                    hasData |= self.addTable(page, categoryHandlers, version, loggedTests, sel, len(repositoryDirs) > 1)
+                if hasData:
+                    foundMinorVersions.append(HTMLgen.Href("#" + version, self.removePageVersion(version)))
+                    
                 # put them in reverse order, most relevant first
                 linkFromDetailsToOverview = [ sel.getLinkInfo(self.pageVersion) for sel in allSelectors ]
                 det = details.generate(categoryHandlers, version, tags, linkFromDetailsToOverview)
                 self.addDetailPages(det)
-                foundMinorVersions.append(HTMLgen.Href("#" + version, self.removePageVersion(version)))
 
         selContainer = HTMLgen.Container()
         for sel in self.makeSelectors(subPageNames):
@@ -227,14 +227,21 @@ class GenerateWebPages(object):
         page.append(HTMLgen.Name(version))
         page.append(HTMLgen.U(HTMLgen.Heading(1, version, align = 'center')))
         
-    def addTable(self, page, categoryHandlers, version, loggedTests, selector):
+    def addTable(self, page, categoryHandlers, version, loggedTests, selector, addVersionHeader):
         testTable = TestTable(self.app, self.cellInfo)
-        extraVersions = loggedTests.keys()[1:]
-        if len(extraVersions) > 0:
-            page.append(testTable.generateExtraVersionLinks(version, extraVersions))
-
         table = testTable.generate(categoryHandlers, self.pageVersion, version, loggedTests, selector.selectedTags)
-        page.append(table)
+        if table:
+            if addVersionHeader:
+                self.addVersionHeader(page, version)
+
+            extraVersions = loggedTests.keys()[1:]
+            if len(extraVersions) > 0:
+                page.append(testTable.generateExtraVersionLinks(version, extraVersions))
+
+            page.append(table)
+            return True
+        else:
+            return False
         
     def addDetailPages(self, details):
         for tag in details.keys():
@@ -270,7 +277,20 @@ class TestTable:
         table = HTMLgen.TableLite(border=0, cellpadding=4, cellspacing=2,width="100%")
         table.append(self.generateTableHead(pageVersion, version, tagsFound))
         table.append(self.generateSummaries(categoryHandlers, pageVersion, version, tagsFound))
+        hasRows = False
         for extraVersion, testInfo in loggedTests.items():
+            currRows = []
+            for test in sorted(testInfo.keys()):
+                results = testInfo[test]
+                row = self.generateTestRow(test, pageVersion, version, extraVersion, results, tagsFound)
+                if row:
+                    currRows.append(row)
+
+            if len(currRows) == 0:
+                continue
+            else:
+                hasRows = True
+            
             # Add an extra line in the table only if there are several versions.
             if len(loggedTests) > 1:
                 fullVersion = version
@@ -279,12 +299,12 @@ class TestTable:
                 table.append(self.generateExtraVersionHeader(fullVersion, tagsFound))
                 table.append(self.generateSummaries(categoryHandlers, pageVersion, version, tagsFound, extraVersion))
 
-            for test in sorted(testInfo.keys()):
-                results = testInfo[test]
-                table.append(self.generateTestRow(test, pageVersion, version, extraVersion, results, tagsFound))
+            for row in currRows:
+                table.append(row)
 
-        table.append(HTMLgen.BR())
-        return table
+        if hasRows:
+            table.append(HTMLgen.BR())
+            return table
 
     def generateSummaries(self, categoryHandlers, pageVersion, version, tags, extraVersion=None):
         bgColour = colourFinder.find("column_header_bg")
@@ -313,10 +333,15 @@ class TestTable:
         bgColour = colourFinder.find("row_header_bg")
         testId = version + testName + extraVersion
         row = [ HTMLgen.TD(HTMLgen.Container(HTMLgen.Name(testId), testName), bgcolor=bgColour) ]
+        # Don't add empty rows to the table
+        foundData = False
         for tag in tagsFound:
-            cellContent, bgcol = self.generateTestCell(tag, testName, testId, pageVersion, results)
+            cellContent, bgcol, hasData = self.generateTestCell(tag, testName, testId, pageVersion, results)
             row.append(HTMLgen.TD(cellContent, bgcolor = bgcol))
-        return HTMLgen.TR(*row)
+            foundData |= hasData
+            
+        if foundData:
+            return HTMLgen.TR(*row)
 
     def getCellData(self, state):
         if state:
@@ -352,11 +377,11 @@ class TestTable:
         cellText, success, fgcol, bgcol = self.getCellData(state)
         cellContent = HTMLgen.Font(cellText, color=fgcol) 
         if success:
-            return cellContent, bgcol
+            return cellContent, bgcol, cellText != "N/A"
         else:
             linkTarget = getDetailPageName(pageVersion, tag) + "#" + testId
             tooltip = "'" + testName + "' failure for " + getDisplayText(tag)
-            return HTMLgen.Href(linkTarget, cellContent, title=tooltip), bgcol
+            return HTMLgen.Href(linkTarget, cellContent, title=tooltip), bgcol, True
     
     def filterState(self, cellContent):
         result = cellContent

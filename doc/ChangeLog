@@ -1569,6 +1569,9 @@ Version trunk
 =============
 General GUI Enhancements:
 Static GUI Enhancements:
+    - Can now rename files from the drop-down list in the file view (adminactions.py)
+    - "Refresh" replaces "Remove Tests" in the default toolbar, mostly for aesthetic reasons (default_gui-static.xml)
+	Toolbar contents can be configured/put back, see "personalising the UI" on the website
 Dynamic GUI Enhancements:
 Framework Enhancements:
     - Now integrates with Atlassian's Jira bugtracking system as well as Bugzilla (jira.py)
@@ -1577,7 +1580,19 @@ Framework Enhancements:
 	Patterns of the form "data*:data*.dump" should behave more intuitively, but may not be completely back-compatible.
 	Read the migration notes and the website for details.
 Historical HTML Batch Report Enhancements:
+    - Can now create separate report tables containing (e.g.) performance or memory information. (testoverview.py)
+	Use -coll web.performance: see website for details.
+    - Cells now have tooltips indicating which test and date they are, to avoid scrolling large tables (testoverview.py)
 Grid Engine (LSF/SGE) enhancements:
+    - Grid Engine command line now appears in the "Run Info" tab of the dynamic GUI. (textinfo.py)
 Self-test/Internal changes:
+    - Now automatically pick up a local PyUseCase repository called "pyusecase" (texttest.py)
 Bug Fixes:
+    - Accelerators for "Cut Test", "Copy Test" and "Paste Test" are disabled when a text widget is focussed (adminactions.py)
+	Means you can use Ctrl+X, Ctrl+V, Ctrl+C for text in TextTest windows.
+    - Worked around a Mercurial bug renaming files with symbolic links in the name (hg.py)
+    - "copy_test_path:$ENV_VAR" will now do nothing if ENV_VAR is empty (sandbox.py)
+	Previously set it to $TEXTTEST_SANDBOX/. which could cause problems.
+    - If a "collate_script" produces an empty file from non-empty input, don't write an empty file (sandbox.py)
+    - Don't stacktrace if a "collate_script" doesn't exist (sandbox.py)
 Grid Engine (LSF/SGE) Bug Fixes:

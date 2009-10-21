@@ -210,7 +210,7 @@ class FileComparison:
             return self.previewGenerator.getPreview(proc.stdout)
         except OSError:
             return "No difference report could be created: could not find textual difference tool '" + self.textDiffTool + "'"
-    def updateAfterLoad(self, app, changedPaths):
+    def updateAfterLoad(self, changedPaths):
         for oldPath, newPath in changedPaths:
             if self.stdFile:
                 self.stdFile = self.stdFile.replace(oldPath, newPath)

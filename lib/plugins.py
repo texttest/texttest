@@ -842,6 +842,24 @@ def rmtree(dir, attempts=100):
                     log.info("Problems removing directory " + dir + " - waiting 1 second to retry...")
                     time.sleep(1)
 
+# Useful utility for combining different response values for a series of method calls
+class ResponseAggregator:
+    def __init__(self, methods):
+        self.methods = methods
+
+    def __call__(self, *args, **kwargs):
+        basicValue = self.methods[0](*args, **kwargs)
+        if type(basicValue) == types.ListType:
+            for extraMethod in self.methods[1:]:
+                for item in extraMethod(*args, **kwargs):
+                    if not item in basicValue:
+                        basicValue.append(item)
+        elif type(basicValue) == types.DictType:
+            for extraMethod in self.methods[1:]:
+                basicValue.update(extraMethod(*args, **kwargs))
+        return basicValue
+
+
 def readList(filename):
     try:
         items = []

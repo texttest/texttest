@@ -128,7 +128,7 @@ class TestComparison(BaseTestComparison):
         if not hasattr(self, "missingResults"):
             self.missingResults = []
 
-    def updateAfterLoad(self, app, updatePaths=False, newTmpPath=None):
+    def updateAfterLoad(self, app=None, updatePaths=False, newTmpPath=None):
         pathsToChange = []
         if updatePaths:
             newAbsPath = app.getDirectory()
@@ -145,7 +145,7 @@ class TestComparison(BaseTestComparison):
                 self.appWriteDir = newTmpPath
 
         for comparison in self.allResults:
-            comparison.updateAfterLoad(app, pathsToChange)
+            comparison.updateAfterLoad(pathsToChange)
 
     def setFailedPrediction(self, prediction):
         self.diag.info("Setting failed prediction to " + str(prediction))

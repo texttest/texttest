@@ -476,6 +476,7 @@ class ArchiveRepository(plugins.ScriptWithArgs):
             return False
         return True
 
+
 class WebPageResponder(plugins.Responder):
     def __init__(self, optionMap, allApps):
         self.batchSession = optionMap.get("b", "default")
@@ -486,8 +487,6 @@ class WebPageResponder(plugins.Responder):
     def findResourcePage(self, collArg):
         if collArg and collArg.startswith("web."):
             return collArg[4:]
-        else:
-            return ""
 
     def addSuites(self, suites):
         # These are the ones that got through. Remove all rejected apps...
@@ -510,11 +509,11 @@ class WebPageResponder(plugins.Responder):
                 self.generateCommonPage(pageTitle, pageInfo)
         plugins.log.info("Completed web page generation.")
 
-    def getResourcePages(self, app):
-        if self.cmdLineResourcePage:
+    def getResourcePages(self, getConfigValue):
+        if self.cmdLineResourcePage is not None:
             return [ self.cmdLineResourcePage ]
         else:
-            return app.getCompositeConfigValue("historical_report_resource_pages", self.batchSession)
+            return getConfigValue("historical_report_resource_pages", self.batchSession)
 
     def generatePagePerApp(self, pageTitle, pageInfo):
         for app, repository in pageInfo:
@@ -523,7 +522,8 @@ class WebPageResponder(plugins.Responder):
             extraVersions = self.getExtraVersions(app)
             self.diag.info("Found extra versions " + repr(extraVersions))
             relevantSubDirs = self.findRelevantSubdirectories(repository, app, extraVersions)
-            self.makeAndGenerate(pageDir, app, extraVersions, relevantSubDirs, pageTitle)
+            version = getVersionName(app, self.allApps)
+            self.makeAndGenerate(relevantSubDirs, app.getCompositeConfigValue, pageDir, pageTitle, version, extraVersions)
                 
     def getAppRepositoryInfo(self):
         appInfo = seqdict()
@@ -541,11 +541,13 @@ class WebPageResponder(plugins.Responder):
         return appInfo
 
     def transformToCommon(self, pageInfo):
+        version = getVersionName(pageInfo[0][0], self.allApps)
         extraVersions, relevantSubDirs = [], seqdict()
         for app, repository in pageInfo:
             extraVersions += self.getExtraVersions(app)
             relevantSubDirs.update(self.findRelevantSubdirectories(repository, app, extraVersions, self.getVersionTitle))
-        return app, extraVersions, relevantSubDirs
+        getConfigValue = plugins.ResponseAggregator([ app.getCompositeConfigValue for app, r in pageInfo ])
+        return relevantSubDirs, getConfigValue, version, extraVersions
 
     def getVersionTitle(self, app, version):
         title = app.fullName()
@@ -554,25 +556,24 @@ class WebPageResponder(plugins.Responder):
         return title
     
     def generateCommonPage(self, pageTitle, pageInfo):
-        app, extraVersions, relevantSubDirs = self.transformToCommon(pageInfo)
-        pageDir = app.getCompositeConfigValue("historical_report_location", self.batchSession)
-        self.makeAndGenerate(pageDir, app, extraVersions, relevantSubDirs, pageTitle)
+        relevantSubDirs, getConfigValue, version, extraVersions = self.transformToCommon(pageInfo)
+        pageDir = getConfigValue("historical_report_location", self.batchSession)
+        self.makeAndGenerate(relevantSubDirs, getConfigValue, pageDir, pageTitle, version, extraVersions)
         
-    def makeAndGenerate(self, pageDir, app, *args):
-        resourcePages = self.getResourcePages(app)
+    def makeAndGenerate(self, subDirs, getConfigValue, pageDir, *args):
+        resourcePages = self.getResourcePages(getConfigValue)
         for resourcePage in resourcePages:
             plugins.ensureDirectoryExists(os.path.join(pageDir, resourcePage))
         try:
-            self.generateWebPages(pageDir, app, resourcePages, *args)
+            self.generateWebPages(subDirs, getConfigValue, pageDir, resourcePages, *args)
         except:
             sys.stderr.write("Caught exception while generating web pages :\n")
             plugins.printException()
-
-    def generateWebPages(self, pageDir, app, resourcePages, extraVersions, relevantSubDirs, pageTitle):
-        version = getVersionName(app, self.allApps)
-        generator = testoverview.GenerateWebPages(pageTitle, version, pageDir, extraVersions, app, resourcePages)
-        subPageNames = app.getCompositeConfigValue("historical_report_subpages", self.batchSession)
-        generator.generate(relevantSubDirs, subPageNames)
+        
+    def generateWebPages(self, subDirs, getConfigValue, *args):
+        generator = testoverview.GenerateWebPages(getConfigValue, *args)
+        subPageNames = getConfigValue("historical_report_subpages", self.batchSession)
+        generator.generate(subDirs, subPageNames)
 
     def findMatchingExtraVersion(self, dirVersions, extraVersions):
         # Check all tails that this is not an extraVersion

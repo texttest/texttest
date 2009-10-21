@@ -557,16 +557,10 @@ class InteractiveActionHandler:
         self.inputOptions = inputOptions
 
     def getDefaultAccelerators(self):
-        return self.joinDictionaries(self.allApps, lambda x: x.getDefaultAccelerators())
+        return plugins.ResponseAggregator([ x.getDefaultAccelerators for x in self.getAllIntvConfigs(self.allApps) ])()
 
     def getColourDictionary(self):
-        return self.joinDictionaries(self.allApps, lambda x: x.getColourDictionary())
-
-    def joinDictionaries(self, apps, method):
-        dict = {}
-        for config in self.getAllIntvConfigs(apps):
-            dict.update(method(config))
-        return dict
+        return plugins.ResponseAggregator([ x.getColourDictionary for x in self.getAllIntvConfigs(self.allApps) ])()
 
     def getMenuNames(self):
         return reduce(set.union, (c.getMenuNames() for c in self.getAllIntvConfigs(self.allApps)), set())
@@ -672,7 +666,7 @@ class InteractiveActionHandler:
         else:
             classNames = seqdict()
             for app in self.allApps:
-                replacements = self.joinDictionaries([ app ], lambda x: x.getReplacements())
+                replacements = plugins.ResponseAggregator([ x.getReplacements for x in self.getAllIntvConfigs([ app ]) ])()
                 for config in self.getAllIntvConfigs([ app ]):
                     if className in config.getInteractiveActionClasses(self.dynamic):
                         realClassName = replacements.get(className, className)

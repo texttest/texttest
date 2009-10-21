@@ -38,7 +38,7 @@ class TitleWithDateStamp:
             
 
 class GenerateWebPages(object):
-    def __init__(self, pageTitle, pageVersion, pageDir, extraVersions, app, cellInfo):
+    def __init__(self, pageTitle, pageVersion, pageDir, extraVersions, app, cellInfoList):
         self.pageTitle = pageTitle
         self.pageVersion = pageVersion
         self.extraVersions = extraVersions
@@ -46,7 +46,7 @@ class GenerateWebPages(object):
         self.pagesOverview = seqdict()
         self.pagesDetails = seqdict()
         self.app = app
-        self.cellInfo = cellInfo
+        self.cellInfoList = cellInfoList
         self.diag = logging.getLogger("GenerateWebPages")
         colourFinder.setColourDict(app.getConfigValue("historical_report_colours"))
 
@@ -90,12 +90,13 @@ class GenerateWebPages(object):
                         loggedTests.setdefault(extraVersion, seqdict()).setdefault(testId, seqdict())[tag] = state
                         categoryHandlers.setdefault(tag, CategoryHandler()).registerInCategory(testId, state, extraVersion)
 
-                hasData = False
-                for sel in selectors:
-                    page = self.getPage(sel)
-                    hasData |= self.addTable(page, categoryHandlers, version, loggedTests, sel, len(repositoryDirs) > 1)
-                if hasData:
-                    foundMinorVersions.append(HTMLgen.Href("#" + version, self.removePageVersion(version)))
+                for cellInfo in self.cellInfoList:
+                    hasData = False
+                    for sel in selectors:
+                        page = self.getPage(sel, cellInfo)
+                        hasData |= self.addTable(page, cellInfo, categoryHandlers, version, loggedTests, sel, len(repositoryDirs) > 1)
+                    if hasData:
+                        foundMinorVersions.append(HTMLgen.Href("#" + version, self.removePageVersion(version)))
                     
                 # put them in reverse order, most relevant first
                 linkFromDetailsToOverview = [ sel.getLinkInfo(self.pageVersion) for sel in allSelectors ]
@@ -112,18 +113,18 @@ class GenerateWebPages(object):
             target, linkName = sel.getLinkInfo(self.pageVersion)
             monthContainer.append(HTMLgen.Href(target, linkName))
             
-        for page in self.pagesOverview.values():
+        for cellInfo, page in self.pagesOverview.values():
             if len(monthContainer.contents) > 0:
                 page.prepend(HTMLgen.Heading(2, monthContainer, align = 'center'))
             page.prepend(HTMLgen.Heading(2, selContainer, align = 'center'))
             page.prepend(HTMLgen.Heading(1, foundMinorVersions, align = 'center'))
-            page.prepend(HTMLgen.Heading(1, self.getResultType() + " results for " + self.pageTitle, align = 'center'))
+            page.prepend(HTMLgen.Heading(1, self.getResultType(cellInfo) + " results for " + self.pageTitle, align = 'center'))
 
         self.writePages()
 
-    def getResultType(self):
-        if self.cellInfo:
-            return self.cellInfo.capitalize()
+    def getResultType(self, cellInfo):
+        if cellInfo:
+            return cellInfo.capitalize()
         else:
             return "Test"
         
@@ -213,13 +214,15 @@ class GenerateWebPages(object):
                 leftVersions.append(subVersion)
         return ".".join(leftVersions)
 
-    def getPage(self, selector):
-        fileName = selector.getLinkInfo(self.pageVersion)[0]
-        return self.pagesOverview.setdefault(fileName, self.createPage())
+    def getPage(self, selector, cellInfo):
+        pageName = selector.getLinkInfo(self.pageVersion)[0]
+        filePath = os.path.join(self.pageDir, cellInfo, pageName)
+        page = self.createPage(cellInfo)
+        return self.pagesOverview.setdefault(filePath, (cellInfo, page))[1]
         
-    def createPage(self):
+    def createPage(self, cellInfo):
         style = "body,td {color: #000000;font-size: 11px;font-family: Helvetica;} th {color: #000000;font-size: 13px;font-family: Helvetica;}"
-        title = TitleWithDateStamp(self.getResultType() + " results for " + self.pageTitle)
+        title = TitleWithDateStamp(self.getResultType(cellInfo) + " results for " + self.pageTitle)
         return HTMLgen.SimpleDocument(title=title, style=style)
 
     def addVersionHeader(self, page, version):
@@ -227,8 +230,8 @@ class GenerateWebPages(object):
         page.append(HTMLgen.Name(version))
         page.append(HTMLgen.U(HTMLgen.Heading(1, version, align = 'center')))
         
-    def addTable(self, page, categoryHandlers, version, loggedTests, selector, addVersionHeader):
-        testTable = TestTable(self.app, self.cellInfo)
+    def addTable(self, page, cellInfo, categoryHandlers, version, loggedTests, selector, addVersionHeader):
+        testTable = TestTable(self.app, cellInfo)
         table = testTable.generate(categoryHandlers, self.pageVersion, version, loggedTests, selector.selectedTags)
         if table:
             if addVersionHeader:
@@ -251,22 +254,28 @@ class GenerateWebPages(object):
                 self.pagesDetails[tag] = HTMLgen.SimpleDocument(title=TitleWithDateStamp(pageDetailTitle))
                 self.pagesDetails[tag].append(HTMLgen.Heading(1, tagText + " - detailed test results for ", self.pageTitle, align = 'center'))
             self.pagesDetails[tag].append(details[tag])
+            
     def writePages(self):
         plugins.log.info("Writing overview pages...")
-        for pageName, page in self.pagesOverview.items():
-            page.write(os.path.join(self.pageDir, pageName))
-            plugins.log.info("wrote: '" + pageName + "'")
+        for pageFile, (cellInfo, page) in self.pagesOverview.items():
+            page.write(pageFile)
+            plugins.log.info("wrote: '" + plugins.relpath(pageFile, self.pageDir) + "'")
         plugins.log.info("Writing detail pages...")
-        for tag, page in self.pagesDetails.items():
-            pageName = getDetailPageName(self.pageVersion, tag)
-            page.write(os.path.join(self.pageDir, pageName))
-            plugins.log.info("wrote: '" + pageName + "'")
+        for cellInfo in self.cellInfoList:
+            for tag, page in self.pagesDetails.items():
+                pageName = getDetailPageName(self.pageVersion, tag)
+                relPath = os.path.join(cellInfo, pageName)
+                page.write(os.path.join(self.pageDir, relPath))
+                plugins.log.info("wrote: '" + relPath + "'")
+
     def getTestIdentifier(self, stateFile, repository):
         dir = os.path.dirname(stateFile)
         return dir.replace(repository + os.sep, "").replace(os.sep, " ")
+
     def getTagTimeInSeconds(self, tag):
         timePart = tag.split("_")[0]
         return time.mktime(time.strptime(timePart, "%d%b%Y"))
+
 
 class TestTable:
     def __init__(self, app, cellInfo):

@@ -479,7 +479,7 @@ class ArchiveRepository(plugins.ScriptWithArgs):
 class WebPageResponder(plugins.Responder):
     def __init__(self, optionMap, allApps):
         self.batchSession = optionMap.get("b", "default")
-        self.cellInfo = self.findCellInfoType(optionMap.get("coll"))
+        self.cmdLineCellInfo = self.findCellInfoType(optionMap.get("coll"))
         self.diag = logging.getLogger("GenerateWebPages")
         self.allApps = allApps
 
@@ -510,10 +510,16 @@ class WebPageResponder(plugins.Responder):
                 self.generateCommonPage(pageTitle, pageInfo)
         plugins.log.info("Completed web page generation.")
 
+    def getCellInfoList(self, app):
+        if self.cmdLineCellInfo:
+            return [ self.cmdLineCellInfo ]
+        else:
+            return app.getCompositeConfigValue("historical_report_generate", self.batchSession)
+
     def generatePagePerApp(self, pageTitle, pageInfo):
         for app, repository in pageInfo:
             pageTopDir = app.getCompositeConfigValue("historical_report_location", self.batchSession)
-            pageDir = os.path.join(pageTopDir, app.name, self.cellInfo)
+            pageDir = os.path.join(pageTopDir, app.name)
             extraVersions = self.getExtraVersions(app)
             self.diag.info("Found extra versions " + repr(extraVersions))
             relevantSubDirs = self.findRelevantSubdirectories(repository, app, extraVersions)
@@ -549,21 +555,22 @@ class WebPageResponder(plugins.Responder):
     
     def generateCommonPage(self, pageTitle, pageInfo):
         app, extraVersions, relevantSubDirs = self.transformToCommon(pageInfo)
-        pageTopDir = app.getCompositeConfigValue("historical_report_location", self.batchSession)
-        pageDir = os.path.join(pageTopDir, self.cellInfo)
+        pageDir = app.getCompositeConfigValue("historical_report_location", self.batchSession)
         self.makeAndGenerate(pageDir, app, extraVersions, relevantSubDirs, pageTitle)
         
-    def makeAndGenerate(self, pageDir, *args):
-        plugins.ensureDirectoryExists(pageDir)
+    def makeAndGenerate(self, pageDir, app, *args):
+        cellInfoList = self.getCellInfoList(app)
+        for cellInfo in cellInfoList:
+            plugins.ensureDirectoryExists(os.path.join(pageDir, cellInfo))
         try:
-            self.generateWebPages(pageDir, *args)
+            self.generateWebPages(pageDir, app, cellInfoList, *args)
         except:
             sys.stderr.write("Caught exception while generating web pages :\n")
             plugins.printException()
 
-    def generateWebPages(self, pageDir, app, extraVersions, relevantSubDirs, pageTitle):
+    def generateWebPages(self, pageDir, app, cellInfoList, extraVersions, relevantSubDirs, pageTitle):
         version = getVersionName(app, self.allApps)
-        generator = testoverview.GenerateWebPages(pageTitle, version, pageDir, extraVersions, app, self.cellInfo)
+        generator = testoverview.GenerateWebPages(pageTitle, version, pageDir, extraVersions, app, cellInfoList)
         subPageNames = app.getCompositeConfigValue("historical_report_subpages", self.batchSession)
         generator.generate(relevantSubDirs, subPageNames)
 

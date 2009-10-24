@@ -259,7 +259,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         dialog.hide()
         dialog.response(gtk.RESPONSE_NONE)
 
-    def respond(self, button, saidOK, dialog):
+    def respond(self, widget, saidOK, dialog):
         try:
             self._respond(saidOK, dialog)
         except plugins.TextTestError, e:
@@ -711,8 +711,9 @@ class ActionTabGUI(OptionGroupGUI):
         # 'temporary_filter_files' or 'filter_files' ...
         dialog.set_modal(True)
         folders, defaultFolder = option.getDirectories()
-        scriptEngine.registerOpenFileChooser(dialog, "select filter-file", "look in folder", 
-                                             "open selected file", "cancel file selection", self.respondChooser, respondMethodArg=entry)
+        scriptEngine.registerFileChooser(dialog, "select filter-file", "look in folder")
+        scriptEngine.connect("open selected file", "response", dialog, self.respondChooser, gtk.RESPONSE_OK, entry)
+        scriptEngine.connect("cancel file selection", "response", dialog, self.respondChooser, gtk.RESPONSE_CANCEL, entry)
         # If current entry forms a valid path, set that as default
         currPath = entry.get_text()
         currDir, currFile = os.path.split(currPath)
@@ -823,23 +824,20 @@ class ActionDialogGUI(OptionGroupGUI):
         actionScriptName = self.getTooltip()
         okButton = dialog.add_button(self.getOkStock(actionScriptName.lower()), gtk.RESPONSE_ACCEPT)
         dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+        buttonScriptName = "press ok"
         if fileChooser:
             buttonScriptName = "press " + actionScriptName.split()[0]
             if fileChooser.get_property("action") == gtk.FILE_CHOOSER_ACTION_SAVE:
-                scriptEngine.registerSaveFileChooser(fileChooser, fileChooserOption.name,
-                                                     "choose folder", buttonScriptName, "press cancel",
-                                                     self.respond, okButton, cancelButton, dialog)
+                scriptEngine.registerFileChooser(fileChooser, fileChooserOption.name, "choose folder")
             else:
                 fileChooserScriptName = fileChooserOption.name.strip().lower()
                 if not fileChooserScriptName.startswith("select"):
                     fileChooserScriptName = "select " + fileChooserScriptName + " ="
-                scriptEngine.registerOpenFileChooser(fileChooser, fileChooserScriptName,
-                                                     "look in folder", buttonScriptName, "press cancel", 
-                                                     self.respond, okButton, cancelButton, dialog)
+                scriptEngine.registerFileChooser(fileChooser, fileChooserScriptName, "look in folder")
             fileChooserOption.setMethods(fileChooser.get_filename, fileChooser.set_filename)
-        else:
-            scriptEngine.connect("press cancel", "clicked", cancelButton, self.respond, gtk.RESPONSE_CANCEL, False, dialog)
-            scriptEngine.connect("press ok", "clicked", okButton, self.respond, gtk.RESPONSE_ACCEPT, True, dialog)
+        
+        scriptEngine.connect("press cancel", "clicked", cancelButton, self.respond, gtk.RESPONSE_CANCEL, False, dialog)
+        scriptEngine.connect(buttonScriptName, "clicked", okButton, self.respond, gtk.RESPONSE_ACCEPT, True, dialog)
 
     def fillVBox(self, vbox):
         fileChooser, fileChooserOption = None, None

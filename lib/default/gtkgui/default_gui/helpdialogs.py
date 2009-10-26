@@ -25,6 +25,7 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         self.creditsButton = self.dialog.add_button('texttest-stock-credits', gtk.RESPONSE_NONE)
         self.licenseButton = self.dialog.add_button('_License', gtk.RESPONSE_NONE)
         self.versionsButton = self.dialog.add_button('_Versions', gtk.RESPONSE_NONE)
+        # auto-instrumentation doesn't look in the action area, so connect explicitly...
         guiutils.scriptEngine.connect("press credits", "clicked", self.creditsButton, self.showCredits)
         guiutils.scriptEngine.connect("press license", "clicked", self.licenseButton, self.showLicense)
         guiutils.scriptEngine.connect("press versions", "clicked", self.versionsButton, self.showVersions)

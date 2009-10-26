@@ -204,8 +204,9 @@ class PopupMenuGUI(guiutils.SubGUI):
                 
 
 class NotebookGUI(guiutils.SubGUI):
-    def __init__(self, tabInfo, scriptTitle):
+    def __init__(self, tabInfo, name, scriptTitle):
         guiutils.SubGUI.__init__(self)
+        self.name = name
         self.scriptTitle = scriptTitle
         self.diag = logging.getLogger("GUI notebook")
         self.tabInfo = tabInfo
@@ -218,6 +219,7 @@ class NotebookGUI(guiutils.SubGUI):
 
     def createView(self):
         self.notebook = gtk.Notebook()
+        self.notebook.set_name(self.name)
         for tabName, tabGUI in self.tabInfo:
             label = gtk.Label(tabName)
             page = self.createPage(tabGUI, tabName)
@@ -244,7 +246,7 @@ class ChangeableNotebookGUI(NotebookGUI):
     def __init__(self, tabGUIs):
         tabGUIs = filter(lambda tabGUI: tabGUI.shouldShow(), tabGUIs)
         subNotebookGUIs = self.createSubNotebookGUIs(tabGUIs)
-        NotebookGUI.__init__(self, subNotebookGUIs, "view options for")
+        NotebookGUI.__init__(self, subNotebookGUIs, "main right-hand notebook", "view options for")
 
     def classifyByTitle(self, tabGUIs):
         return map(lambda tabGUI: (tabGUI.getTabTitle(), tabGUI), tabGUIs)
@@ -262,8 +264,9 @@ class ChangeableNotebookGUI(NotebookGUI):
         for tabName in self.getGroupTabNames(tabGUIs):
             currTabGUIs = filter(lambda tabGUI: tabGUI.getGroupTabTitle() == tabName, tabGUIs)
             if len(currTabGUIs) > 1:
+                name = "sub-notebook for " + tabName.lower()
                 scriptName = "view sub-options for " + tabName.lower() + " :"
-                notebookGUI = NotebookGUI(self.classifyByTitle(currTabGUIs), scriptName)
+                notebookGUI = NotebookGUI(self.classifyByTitle(currTabGUIs), name, scriptName)
                 tabInfo.append((tabName, notebookGUI))
             elif len(currTabGUIs) == 1:
                 tabInfo.append((tabName, currTabGUIs[0]))

@@ -27,13 +27,12 @@ class TestColumnGUI(guiutils.SubGUI):
     def createView(self, treeview):
         testRenderer = gtk.CellRendererText()
         self.column = gtk.TreeViewColumn(self.getTitle(), testRenderer, text=0, background=1)
+        self.column.set_data("name", "Test Name") # Not a widget, so we can't set a name, do this instead
         self.column.set_resizable(True)
         self.column.set_cell_data_func(testRenderer, self.renderSuitesBold)
         if not self.dynamic:
             self.column.set_clickable(True)
             self.column.connect("clicked", self.columnClicked)
-            guiutils.scriptEngine.monitorSignal("toggle test sorting order", "clicked", 
-                                                treeview, self.column)
         if guiutils.guiConfig.getValue("auto_sort_test_suites") == 1:
             guiutils.guilog.info("Initially sorting tests in alphabetical order.")
             self.column.set_sort_indicator(True)
@@ -305,12 +304,9 @@ class TestTreeGUI(guiutils.ContainerGUI):
             guiutils.addRefreshTips(self.treeView, "test", recalcRenderer, detailsColumn, 6)
             self.treeView.append_column(detailsColumn)
 
-        guiutils.scriptEngine.monitorExpansion(self.treeView, "show test suite", "hide test suite")
         self.treeView.connect('row-expanded', self.rowExpanded)
         self.expandLevel(self.treeView, self.filteredModel.get_iter_root())
         self.treeView.connect("button_press_event", self.popupGUI.showMenu)
-        guiutils.scriptEngine.monitorRightClicks("view actions for test", self.treeView)
-        guiutils.scriptEngine.monitor("set test selection to", self.selection)
         self.selection.connect("changed", self.userChangedSelection)
 
         self.treeView.show()

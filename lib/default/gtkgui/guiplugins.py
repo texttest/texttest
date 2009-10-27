@@ -227,8 +227,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         dialog = self.createAlarmDialog(self.getParentWindow(), message, stockIcon, alarmLevel)
         yesButton = dialog.add_button(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT)
         dialog.set_default_response(gtk.RESPONSE_ACCEPT)
-        scriptEngine.connect("agree to texttest message", "clicked", yesButton, self.cleanDialog,
-                             gtk.RESPONSE_ACCEPT, True, dialog)
+        dialog.connect("response", self._cleanDialog)
         dialog.show_all()
         
     def createAlarmDialog(self, parent, message, stockIcon, alarmLevel):
@@ -245,21 +244,22 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         dialog.set_default_response(gtk.RESPONSE_NO)
         noButton = dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
         yesButton = dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
-        scriptEngine.connect("answer no to texttest " + alarmLevel, "clicked",
-                             noButton, respondMethod, gtk.RESPONSE_NO, False, dialog)
-        scriptEngine.connect("answer yes to texttest " + alarmLevel, "clicked",
-                             yesButton, respondMethod, gtk.RESPONSE_YES, True, dialog)
+        dialog.connect("response", respondMethod)
+        scriptEngine.monitorSignal("answer no to texttest " + alarmLevel, "response",
+                                   dialog, gtk.RESPONSE_NO)
+        scriptEngine.monitorSignal("answer yes to texttest " + alarmLevel, "response",
+                                   dialog, gtk.RESPONSE_YES)
         dialog.show_all()
         
     def cleanDialog(self, button, saidOK, dialog):
         self._cleanDialog(dialog)
 
-    def _cleanDialog(self, dialog):
+    def _cleanDialog(self, dialog, *args):
         entrycompletion.manager.collectCompletions()
         dialog.hide()
-        dialog.response(gtk.RESPONSE_NONE)
-
-    def respond(self, widget, saidOK, dialog):
+        
+    def respond(self, dialog, responseId):
+        saidOK = responseId in [ gtk.RESPONSE_ACCEPT, gtk.RESPONSE_YES, gtk.RESPONSE_OK ]
         try:
             self._respond(saidOK, dialog)
         except plugins.TextTestError, e:
@@ -447,8 +447,11 @@ class ActionResultDialogGUI(ActionGUI):
     def createButtons(self):
         okButton = self.dialog.add_button(gtk.STOCK_CLOSE, gtk.RESPONSE_ACCEPT)
         self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
-        scriptEngine.connect("press close", "clicked", okButton, self.cleanDialog, gtk.RESPONSE_ACCEPT, True, self.dialog)
+        self.dialog.connect("response", self.respond)
 
+    def respond(self, dialog, responseId):
+        if responseId != gtk.RESPONSE_NONE:
+            self._cleanDialog(dialog)
 
 class ComboBoxListFinder:
     def __init__(self, combobox):
@@ -711,9 +714,7 @@ class ActionTabGUI(OptionGroupGUI):
         # 'temporary_filter_files' or 'filter_files' ...
         dialog.set_modal(True)
         folders, defaultFolder = option.getDirectories()
-        scriptEngine.registerFileChooser(dialog, "choose filter file", "look in folder")
-        scriptEngine.connect("open selected file", "response", dialog, self.respondChooser, gtk.RESPONSE_OK, entry)
-        scriptEngine.connect("cancel file selection", "response", dialog, self.respondChooser, gtk.RESPONSE_CANCEL, entry)
+        dialog.connect("response", self.respondChooser, entry)
         # If current entry forms a valid path, set that as default
         currPath = entry.get_text()
         currDir, currFile = os.path.split(currPath)
@@ -778,19 +779,24 @@ class ActionDialogGUI(OptionGroupGUI):
                 self.showErrorDialog(str(e))
         else:
             self.defaultRespond(saidOK, dialog)
+
     def getQueryParentWindow(self, dialog):
         if dialog:
             return dialog
         else:
             return self.getParentWindow()
-    def confirmationRespond(self, button, saidOK, dialog):
+
+    def confirmationRespond(self, dialog, responseId):
+        saidOK = responseId == gtk.RESPONSE_YES
         self.defaultRespond(saidOK, dialog)
         if saidOK:
             parent = dialog.get_transient_for()
             if isinstance(parent, gtk.Dialog):
                 self._cleanDialog(parent)
+
     def defaultRespond(self, *args):
         OptionGroupGUI._respond(self, *args)
+
     def tryResize(self, dialog):
         hordiv, verdiv = self.getResizeDivisors()
         if hordiv is not None:
@@ -837,12 +843,13 @@ class ActionDialogGUI(OptionGroupGUI):
                 scriptEngine.registerFileChooser(fileChooser, fileChooserScriptName, "look in folder")
             fileChooserOption.setMethods(fileChooser.get_filename, fileChooser.set_filename)
         
-        scriptEngine.connect("press cancel", "clicked", cancelButton, self.respond, gtk.RESPONSE_CANCEL, False, dialog)
-        scriptEngine.connect(buttonScriptName, "clicked", okButton, self.respond, gtk.RESPONSE_ACCEPT, True, dialog)
-        
+        scriptEngine.monitorSignal("press cancel", "response", dialog, gtk.RESPONSE_CANCEL)
+        scriptEngine.monitorSignal(buttonScriptName, "response", dialog, gtk.RESPONSE_ACCEPT)
+        dialog.connect("response", self.respond)
+
     def simulateResponse(self, fileChooser, dialog):
         dialog.response(gtk.RESPONSE_ACCEPT)
-
+        
     def fillVBox(self, vbox):
         fileChooser, fileChooserOption = None, None
         allOptions = self.optionGroup.options.values()

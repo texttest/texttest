@@ -25,10 +25,9 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         self.creditsButton = self.dialog.add_button('texttest-stock-credits', gtk.RESPONSE_NONE)
         self.licenseButton = self.dialog.add_button('_License', gtk.RESPONSE_NONE)
         self.versionsButton = self.dialog.add_button('_Versions', gtk.RESPONSE_NONE)
-        # auto-instrumentation doesn't look in the action area, so connect explicitly...
-        guiutils.scriptEngine.connect("press credits", "clicked", self.creditsButton, self.showCredits)
-        guiutils.scriptEngine.connect("press license", "clicked", self.licenseButton, self.showLicense)
-        guiutils.scriptEngine.connect("press versions", "clicked", self.versionsButton, self.showVersions)
+        self.creditsButton.connect("clicked", self.showCredits)
+        self.licenseButton.connect("clicked", self.showLicense)
+        self.versionsButton.connect("clicked", self.showVersions)
         guiplugins.ActionResultDialogGUI.createButtons(self)
         
     def addContents(self):
@@ -52,7 +51,7 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         urlButton.set_property("border-width", 0)
         urlButtonbox = gtk.HBox()
         urlButtonbox.pack_start(urlButton, expand=True, fill=False)
-        guiutils.scriptEngine.connect("go to website", "clicked", urlButton, self.urlClicked)
+        urlButton.connect("clicked", self.urlClicked)
         licenseLabel = gtk.Label()
         licenseLabel.set_markup("<span size='small'>Copyright " + u'\xa9' + " The authors</span>\n")
         self.dialog.vbox.pack_start(logoFrame, expand=False, fill=False)
@@ -250,7 +249,6 @@ class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
         if notebook.get_n_pages() == 0: #pragma : no cover - should never happen
             raise plugins.TextTestError, "\nNo " + self.getTitle() + " could be found in\n" + docDir + "\n"
         else:
-            guiutils.scriptEngine.monitorNotebook(notebook, "view " + self.getTitle().lower() + " in tab")
             parentSize = self.topWindow.get_size()
             self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[1] * 0.7))
             self.dialog.vbox.pack_start(notebook, expand=True, fill=True)

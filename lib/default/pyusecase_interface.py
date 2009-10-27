@@ -13,7 +13,7 @@ def _makeScriptEngine(optionMap):
     if optionMap.has_key("gx") or optionMap.has_key("g"):
         try:
             from gtkusecase import ScriptEngine
-            return ScriptEngine(enableShortcuts=True) 
+            return ScriptEngine(enableShortcuts=True, uiMapFiles=plugins.findDataPaths([ "*.uimap" ])) 
         except ImportError:
             pass # Let the GUI itself print the error
     else:

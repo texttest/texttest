@@ -1,0 +1,857 @@
+[Name=Quit]
+activate = quit
+
+[Name=Refresh]
+activate = refresh the whole test suite so that it reflects file changes
+
+[Name=Reset]
+activate = reset running options
+
+[Name=Copy]
+activate = copy selected tests
+
+[Name=Cut]
+activate = cut selected tests
+
+[Name=Paste]
+activate = paste tests from clipboard
+
+[Name=Add Test]
+activate = add test
+
+[Name=Add Suite]
+activate = add suite
+
+[Name=Add Application]
+activate = define a new tested application
+
+[Name=Create/Import]
+activate = create a new file or directory, possibly by copying it
+
+[Name=Rename Test]
+activate = rename selected test
+
+[Name=Rename File]
+activate = rename selected file
+
+[Name=Remove Tests]
+activate = remove selected tests
+
+[Name=Remove Tests For Popup]
+activate = remove selected tests
+
+[Name=Remove Files]
+activate = remove selected files
+
+[Name=Enter Failure Information]
+activate = enter failure information
+
+[Name=Sort Test Suite File]
+activate = sort testsuite file for the selected test suite in alphabetical order
+
+[Name=Reversed Sort Test Suite File]
+activate = sort testsuite file for the selected test suite in reversed alphabetical order
+
+[Name=Move to first]
+activate = move selected test to first in suite
+
+[Name=Move up]
+activate = move selected test up in suite
+
+[Name=Move down]
+activate = move selected test down in suite
+
+[Name=Move to last]
+activate = move selected test to last in suite
+
+[Name=Run]
+activate = run selected tests
+
+[Name=Record Use-Case]
+activate = record use-case
+
+[Name=Reconnect...]
+activate = reconnect to previously run tests
+
+[Name=Replace Text in Files]
+activate = replace text in multiple test files
+
+[Name=Migration Notes]
+activate = show texttest migration notes
+
+[Name=Change Logs]
+activate = show texttest change logs
+
+[Name=Component Versions]
+activate = show component version information
+
+[Name=About TextTest]
+activate = show information about texttest
+
+[Name=Credits]
+activate = show texttest credits
+
+[Name=License]
+activate = show texttest license
+
+[Name=Quick Start]
+activate = show texttest quick start
+
+[Name=File Properties]
+activate = show properties of selected files
+
+[Name=View File]
+activate = view file
+
+[Name=View In Editor]
+activate = view in editor
+
+[Name=Save Selection...]
+activate = save selected tests in file
+
+[Name=Select]
+activate = select indicated tests
+
+[Name=Filter]
+activate = filter tests to show only those indicated
+
+[Name=Show only selected]
+activate = show only tests that are currently selected
+
+[Name=Hide selected]
+activate = hide all tests that are currently selected
+
+[Name=Show all]
+activate = show all tests
+
+[Name=Load Selection...]
+activate = load test selection from file
+
+[Name=Toolbar]
+toggled.true = show toolbar
+toggled.false = hide toolbar
+
+[Name=Shortcut bar]
+toggled.true = show shortcut bar
+toggled.false = hide shortcut bar
+
+[Name=Status bar]
+toggled.true = show status bar
+toggled.false = hide status bar
+
+[Type=HPaned]
+notify-position = drag vertical pane separator so left half uses
+
+[Name=Test Tree]
+clicked.test name = toggle test sorting order
+row-expanded = show test suite
+row-collapsed = hide test suite
+button-press-event = view actions for test
+changed.selection = set test selection to
+
+[Type=VPaned]
+notify-position = drag horizonal pane separator so top half uses
+
+[Name=File Tree]
+row-activated = select file
+changed.selection = set file selection to
+button-press-event = view actions for file
+
+[Name=Tests for version]
+changed = enter tests for version =
+activate = activate from tests for version
+
+[Name=Test names containing]
+changed = enter test names containing =
+activate = activate from test names containing
+
+[Name=Suite names containing]
+changed = enter suite names containing =
+activate = activate from suite names containing
+
+[Name=App names containing]
+changed = enter app names containing =
+activate = activate from app names containing
+
+[Label=...]
+clicked = search for files for 'tests listed in file'
+
+[Name=Tests listed in file]
+changed = enter tests listed in file =
+activate = activate from tests listed in file
+
+[Name=Descriptions containing]
+changed = enter descriptions containing =
+activate = activate from descriptions containing
+
+[Name=Test-files containing]
+changed = enter test-files containing =
+activate = activate from test-files containing
+
+[Name=Test-file to search]
+changed = enter test-file to search =
+activate = activate from test-file to search
+
+[Name=Execution time]
+changed = enter execution time =
+activate = activate from execution time
+
+[Label=Select in collapsed suites]
+toggled.true = check select in collapsed suites
+toggled.false = uncheck select in collapsed suites
+
+[Label=Discard]
+toggled.true = choose discard for current selection
+
+[Label=Refine]
+toggled.true = choose refine for current selection
+
+[Label=Extend]
+toggled.true = choose extend for current selection
+
+[Label=Exclude]
+toggled.true = choose exclude for current selection
+
+[Name=Run this version]
+changed = enter run this version =
+activate = activate from run this version
+
+[Name=Use checkout]
+changed = enter use checkout =
+activate = activate from use checkout
+
+[Name=Run on machine]
+changed = enter run on machine =
+activate = activate from run on machine
+
+[Name=Times to run]
+changed = enter times to run =
+activate = activate from times to run
+
+[Name=Configure self-diagnostics from]
+changed = enter configure self-diagnostics from =
+activate = activate from configure self-diagnostics from
+
+[Name=Write self-diagnostics to]
+changed = enter write self-diagnostics to =
+activate = activate from write self-diagnostics to
+
+[Name=Run batch mode session]
+changed = enter run batch mode session =
+activate = activate from run batch mode session
+
+[Name=Name this run]
+changed = enter name this run =
+activate = activate from name this run
+
+[Name=Ignore configuration files]
+changed = enter ignore configuration files =
+activate = activate from ignore configuration files
+
+[Label=Enable self-diagnostics]
+toggled.true = check enable self-diagnostics
+toggled.false = uncheck enable self-diagnostics
+
+[Label=(Re-)record command-line or client-server traffic]
+toggled.true = check (re-)record command-line or client-server traffic
+toggled.false = uncheck (re-)record command-line or client-server traffic
+
+[Label=Keep temporary write-directories]
+toggled.true = check keep temporary write-directories
+toggled.false = uncheck keep temporary write-directories
+
+[Name=sub-notebook for running]
+switch-page = view sub-options for running :
+
+[Name=main right-hand notebook]
+switch-page = view options for
+
+[Name=Top Window]
+delete-event = close window
+
+[Name=Set Run Name]
+activate = provide a name for this run and warn before closing it
+
+[Name=Save As...]
+activate = save results with non-default settings
+
+[Name=Save]
+activate = save results for selected tests
+
+[Name=Kill]
+activate = kill selected tests
+
+[Name=Mark]
+activate = mark the selected tests
+
+[Name=Unmark]
+activate = unmark the selected tests
+
+[Name=Recompute Status]
+activate = recompute test status, including progress information if appropriate
+
+[Name=Rerun]
+activate = rerun selected tests
+
+[Name=View Filtered File]
+activate = view filtered file
+
+[Name=View Content-Filtered File]
+activate = view content-filtered file
+
+[Name=View Original File]
+activate = view original file
+
+[Name=View Content-Filtered Original File]
+activate = view content-filtered original file
+
+[Name=View Filtered Original File]
+activate = view filtered original file
+
+[Name=View Raw Differences]
+activate = view raw differences
+
+[Name=View Content-Filtered Differences]
+activate = view content-filtered differences
+
+[Name=View Differences]
+activate = view differences
+
+[Name=Follow File Progress]
+activate = follow file progress
+
+[Name=Test Status View]
+changed.selection = select tests in category
+toggled.visible.true = show tests in category
+toggled.visible.false = hide tests in category
+
+[Title=TextTest Error]
+response.accept = agree to texttest message
+
+[Title=TextTest Warning]
+response.accept = agree to texttest message
+
+[Label=_List of selected tests]
+toggled.true = choose list of selected tests for save
+
+[Label=C_riteria entered in the Selection tab...]
+toggled.true = choose criteria entered in the selection tab for save
+
+[Name=File Chooser for 'Save selected tests in file']
+current-name-changed = enter filter-file name =
+current-folder-changed = choose folder
+
+[Title=Save selected tests in file]
+response.cancel = press cancel
+response.accept = press save
+
+[Name=File Chooser for 'Load test selection from file']
+selection-changed = select filter-file
+current-folder-changed = look in folder
+
+[Title=Load test selection from file]
+response.cancel = press cancel
+response.accept = press load
+
+[Title=Select a file]
+selection-changed = choose filter file
+current-folder-changed = open folder
+response.ok = open selected file
+response.cancel = cancel file selection
+
+[Title=TextTest Query]
+response.no = answer no to texttest query
+response.yes = answer yes to texttest query
+
+[Name=Version to save]
+changed = enter version to save =
+
+[Name=Version(s) to save previous results as]
+changed = enter version(s) to save previous results as =
+
+[Label=Replace successfully compared files also]
+toggled.true = check replace successfully compared files also
+toggled.false = uncheck replace successfully compared files also
+
+[Name=Save As]
+response.cancel = press cancel
+response.accept = press ok
+
+[Name=Version to reconnect to]
+changed = enter version to reconnect to =
+
+[Label=Display results exactly as they were in the original run]
+toggled.true = choose display results exactly as they were in the original run for recomputation
+
+[Label=Use raw data from the original run, but recompute run-dependent text, known bug information etc.]
+toggled.true = choose use raw data from the original run, but recompute run-dependent text, known bug information etc. for recomputation
+
+[Name=File Chooser for 'Reconnect to previously run tests']
+current-folder-changed = select temporary result directory =
+
+[Title=Reconnect to previously run tests]
+response.cancel = press cancel
+response.accept = press reconnect
+
+[Name=Test Name]
+changed = enter test name =
+
+[Name=Test Description]
+changed = enter test description =
+
+[Name=Place Test]
+changed = enter place test =
+
+[Name=Command line options]
+changed = enter command line options =
+
+[Title=Add Test]
+response.cancel = press cancel
+response.accept = press ok
+
+[Name=Brief text]
+changed = enter brief text =
+
+[Name=Free text]
+changed = enter free text =
+
+[Title=Mark the selected tests]
+response.cancel = press cancel
+response.accept = press ok
+
+[Name=Type of file/directory to create]
+changed = enter type of file/directory to create =
+
+[Name=Version identifier to use]
+changed = enter version identifier to use =
+
+[Label=Import file/directory from source]
+toggled.true = choose import file/directory from source
+
+[Label=Create a new file]
+toggled.true = choose create a new file
+
+[Label=Create a new directory]
+toggled.true = choose create a new directory
+
+[Name=Source File Chooser]
+selection-changed = select source to copy from =
+current-folder-changed = look in folder
+
+[Title=Create/Import Files and Directories]
+response.cancel = press cancel
+response.accept = press create
+
+[Title=Show properties of selected files]
+response.accept = press close
+
+[Name=New name]
+changed = enter new name =
+
+[Name=New description]
+changed = enter new description =
+
+[Title=Rename selected test]
+response.cancel = press cancel
+response.accept = press ok
+
+[Label=Ignore catalogue file when isolating data]
+toggled.true = check ignore catalogue file when isolating data
+toggled.false = uncheck ignore catalogue file when isolating data
+
+[Title=TextTest Confirmation]
+response.no = answer no to texttest confirmation
+response.yes = answer yes to texttest confirmation
+
+[Label=Average performance]
+toggled.true = choose average performance for save
+
+[Label=Exact performance]
+toggled.true = choose exact performance for save
+
+[Name=Text or regexp to match]
+changed = enter text or regexp to match =
+
+[Name=File to search in]
+changed = enter file to search in =
+
+[Name=Version to report for]
+changed = enter version to report for =
+
+[Name=Trigger only when run on machine(s)]
+changed = enter trigger only when run on machine(s) =
+
+[Name=Extract info from bug system]
+changed = enter extract info from bug system =
+
+[Name=Bug ID (only if bug system given)]
+changed = enter bug id (only if bug system given) =
+
+[Name=Full description (no bug system)]
+changed = enter full description (no bug system) =
+
+[Name=Few-word summary (no bug system)]
+changed = enter few-word summary (no bug system) =
+
+[Label=Trigger if given text is NOT present]
+toggled.true = check trigger if given text is not present
+toggled.false = uncheck trigger if given text is not present
+
+[Label=Trigger even if other files differ]
+toggled.true = check trigger even if other files differ
+toggled.false = uncheck trigger even if other files differ
+
+[Label=Trigger even if test would otherwise succeed]
+toggled.true = check trigger even if test would otherwise succeed
+toggled.false = uncheck trigger even if test would otherwise succeed
+
+[Label=Report as 'internal error' rather than 'known bug' (no bug system)]
+toggled.true = check report as 'internal error' rather than 'known bug' (no bug system)
+toggled.false = uncheck report as 'internal error' rather than 'known bug' (no bug system)
+
+[Title=Enter information for automatic interpretation of test failures]
+response.cancel = press cancel
+response.accept = press ok
+
+[Label=Run with slow motion replay]
+toggled.true = check run with slow motion replay
+toggled.false = uncheck run with slow motion replay
+
+[Name=Version to record]
+changed = enter version to record =
+activate = activate from version to record
+
+[Name=Checkout to use for recording]
+changed = enter checkout to use for recording =
+activate = activate from checkout to use for recording
+
+[Label=Also record command-line or client-server traffic]
+toggled.true = check also record command-line or client-server traffic
+toggled.false = uncheck also record command-line or client-server traffic
+
+[Label=Automatically replay test after recording it]
+toggled.true = check automatically replay test after recording it
+toggled.false = uncheck automatically replay test after recording it
+
+[Label=Auto-replay invisible]
+toggled.true = choose auto-replay invisible
+
+[Label=Auto-replay in dynamic GUI]
+toggled.true = choose auto-replay in dynamic gui
+
+[Name=Suite Name]
+changed = enter suite name =
+
+[Name=Suite Description]
+changed = enter suite description =
+
+[Name=Place Suite]
+changed = enter place suite =
+
+[Label=Add environment file]
+toggled.true = check add environment file
+toggled.false = uncheck add environment file
+
+[Title=Add Suite]
+response.cancel = press cancel
+response.accept = press ok
+
+[Name=New name for this run]
+changed = enter new name for this run =
+
+[Title=Set a new name for this run]
+response.cancel = press cancel
+response.accept = press ok
+
+[Name=New name for file]
+changed = enter new name for file =
+
+[Title=Rename selected file]
+response.cancel = press cancel
+response.accept = press ok
+
+[Name=Full name of application]
+changed = enter full name of application =
+
+[Name=File extension to use for TextTest files associated with this application]
+changed = enter file extension to use for texttest files associated with this application =
+
+[Name=Subdirectory name to store the above application files under (leave blank for local storage)]
+changed = enter subdirectory name to store the above application files under (leave blank for local storage) =
+
+[Label=Enable GUI testing operations (recording and virtual servers)]
+toggled.true = check enable gui testing operations (recording and virtual servers)
+toggled.false = uncheck enable gui testing operations (recording and virtual servers)
+
+[Name=File Chooser for 'Define a new tested application']
+selection-changed = select executable program to test
+current-folder-changed = look in folder
+
+[Title=Define a new tested application]
+response.cancel = press cancel
+response.accept = press define
+
+[Label=http://www.texttest.org]
+clicked = go to website
+
+[Label=texttest-stock-credits]
+clicked = press credits
+
+[Label=_License]
+clicked = press license
+
+[Label=_Versions]
+clicked = press versions
+
+[Title=About TextTest]
+response.accept = close about dialog
+
+[Title=TextTest Credits]
+response.accept = press close
+
+[Title=TextTest License]
+response.accept = press close
+
+[Title=Version Information]
+response.accept = press close
+
+[Type=Notebook]
+switch-page = view tab
+
+[Title=TextTest Migration Notes]
+response.accept = press close
+
+[Title=TextTest Change Logs]
+response.accept = press close
+
+[Title=TextTest Quick Start]
+response.accept = press close
+
+[Name=Text or regular expression to search for]
+changed = enter text or regular expression to search for =
+
+[Name=Text to replace it with (may contain regexp back references)]
+changed = enter text to replace it with (may contain regexp back references) =
+
+[Name=File stem(s) to perform replacement in]
+changed = enter file stem(s) to perform replacement in =
+
+[Title=Replace text in multiple test files]
+response.cancel = press cancel
+response.accept = press ok
+
+[Name=CVS Log]
+activate = version control log for the selected files
+
+[Name=CVS Log Recursive]
+activate = recursive version control log for the selected files
+
+[Name=CVS Difference]
+activate = version control difference for the selected files
+
+[Name=CVS Difference Recursive]
+activate = recursive version control difference for the selected files
+
+[Name=CVS Status]
+activate = version control status for the selected files
+
+[Name=CVS Status Recursive]
+activate = recursive version control status for the selected files
+
+[Name=CVS Annotate]
+activate = version control annotate for the selected files
+
+[Name=CVS Annotate Recursive]
+activate = recursive version control annotate for the selected files
+
+[Name=CVS Add]
+activate = version control add for the selected files
+
+[Name=CVS Add Recursive]
+activate = recursive version control add for the selected files
+
+[Name=CVS Log Latest]
+activate = version control log latest for the selected files
+
+[Label=_Status]
+clicked = show version control status
+
+[Label=_Annotate]
+clicked = show version control annotations
+
+[Name=Revision 1]
+changed = set first revision to
+
+[Name=Revision 2]
+changed = set second revision to
+
+[Label=_Differences]
+clicked = show version control differences
+
+[Name=VCS log info tree]
+changed.selection = select
+
+[Label=_Log]
+clicked = show version control log
+
+[Label=_Graphical Diffs]
+clicked = show version control differences graphically
+
+[Name=VCS diff info tree]
+changed.selection = select
+
+[Name=VCS status info tree]
+changed.selection = select
+
+[Name=Up-to-date]
+toggled.true = show category up-to-date
+toggled.false = hide category up-to-date
+
+[Name=Locally Modified]
+toggled.true = show category locally modified
+toggled.false = hide category locally modified
+
+[Name=Information]
+button-press-event = show visibility controls
+
+[Name=VCS add info tree]
+changed.selection = select
+
+[Name=VCS annotate info tree]
+changed.selection = select
+
+[Name=Bazaar Log]
+activate = version control log for the selected files
+
+[Name=Bazaar Log Recursive]
+activate = recursive version control log for the selected files
+
+[Name=Bazaar Difference]
+activate = version control difference for the selected files
+
+[Name=Bazaar Difference Recursive]
+activate = recursive version control difference for the selected files
+
+[Name=Bazaar Status]
+activate = version control status for the selected files
+
+[Name=Bazaar Status Recursive]
+activate = recursive version control status for the selected files
+
+[Name=Bazaar Annotate]
+activate = version control annotate for the selected files
+
+[Name=Bazaar Annotate Recursive]
+activate = recursive version control annotate for the selected files
+
+[Name=Bazaar Add]
+activate = version control add for the selected files
+
+[Name=Bazaar Add Recursive]
+activate = recursive version control add for the selected files
+
+[Name=Mercurial Log]
+activate = version control log for the selected files
+
+[Name=Mercurial Log Recursive]
+activate = recursive version control log for the selected files
+
+[Name=Mercurial Difference]
+activate = version control difference for the selected files
+
+[Name=Mercurial Difference Recursive]
+activate = recursive version control difference for the selected files
+
+[Name=Mercurial Status]
+activate = version control status for the selected files
+
+[Name=Mercurial Status Recursive]
+activate = recursive version control status for the selected files
+
+[Name=Mercurial Annotate]
+activate = version control annotate for the selected files
+
+[Name=Mercurial Annotate Recursive]
+activate = recursive version control annotate for the selected files
+
+[Name=Mercurial Add]
+activate = version control add for the selected files
+
+[Name=Mercurial Add Recursive]
+activate = recursive version control add for the selected files
+
+[Name=VCS Status Window]
+response.accept = close status window
+
+[Name=VCS Log Window]
+response.accept = close log window
+
+[Name=VCS Difference Window]
+response.accept = close difference window
+
+[Name=VCS Annotate Window]
+response.accept = close annotate window
+
+[Name=VCS Add Window]
+response.accept = close add window
+
+[Name=VCS Log Latest Window]
+response.accept = close log latest window
+
+[Name=Needs Merge]
+toggled.true = show category needs merge
+toggled.false = hide category needs merge
+
+[Name=Needs Patch]
+toggled.true = show category needs patch
+toggled.false = hide category needs patch
+
+[Name=Unknown]
+toggled.true = show category unknown
+toggled.false = hide category unknown
+
+[Name=Locally Added]
+toggled.true = show category locally added
+toggled.false = hide category locally added
+
+[Name=Unchanged]
+toggled.true = show category unchanged
+toggled.false = hide category unchanged
+
+[Name=Modified]
+toggled.true = show category modified
+toggled.false = hide category modified
+
+[Name=Added]
+toggled.true = show category added
+toggled.false = hide category added
+
+[Name=Ignored]
+toggled.true = show category ignored
+toggled.false = hide category ignored
+
+[Label=Always]
+toggled.true = choose always for use grid
+
+[Label=Never]
+toggled.true = choose never for use grid
+
+[Name=Request grid resource]
+changed = enter request grid resource =
+activate = activate from request grid resource
+
+[Name=Request grid queue]
+changed = enter request grid queue =
+activate = activate from request grid queue
+
+[Label=Keep data files and successful tests until termination]
+toggled.true = check keep data files and successful tests until termination
+toggled.false = uncheck keep data files and successful tests until termination
+
+[Label=Run on performance machines only]
+toggled.true = check run on performance machines only
+toggled.false = uncheck run on performance machines only
+
+[Label=If enough tests]
+toggled.true = choose if enough tests for use grid
+

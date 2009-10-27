@@ -311,6 +311,7 @@ class TopWindowGUI(guiutils.ContainerGUI):
     def createView(self):
         # Create toplevel window to show it all.
         self.topWindow = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        self.topWindow.set_name("Top Window")
         try:
             import stockitems
             stockitems.register(self.topWindow)

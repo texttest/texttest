@@ -19,6 +19,11 @@ class SaveTests(guiplugins.ActionDialogGUI):
         if self.hasPerformance(allApps):
             self.addSwitch("ex", "Save", 1, ["Average performance", "Exact performance"])
 
+    def createDialog(self):
+        dialog = guiplugins.ActionDialogGUI.createDialog(self)
+        dialog.set_name("Save As")
+        return dialog
+
     def getDialogTitle(self):
         stemsToSave = self.getStemsToSave()
         saveDesc = "Saving " + str(len(self.currTestSelection)) + " tests"

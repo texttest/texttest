@@ -155,6 +155,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         self.dynamic = dynamic
         self.needsAttention = False
         self.notInRepository = False
+
     def getTitle(self, includeMnemonics=False, adjectiveAfter=True):
         title = self._getTitle()
         if self.recursive or not includeMnemonics:
@@ -168,6 +169,11 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
             else:
                 title = "Recursive " + title
         return title
+
+    def createDialog(self):
+        dialog = guiplugins.ActionResultDialogGUI.createDialog(self)
+        dialog.set_name("VCS " + self._getTitle().replace("_", "") + " Window")
+        return dialog
 
     def getDialogTitle(self):
         return self.getTitle(adjectiveAfter=False) + " for the selected files"
@@ -392,9 +398,11 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         label1 = gtk.Label(" between revisions ")
         label2 = gtk.Label(" and ")
         self.revision1 = gtk.Entry()
+        self.revision1.set_name("Revision 1")
         entrycompletion.manager.register(self.revision1)
         self.revision1.set_text(vcs.latestRevisionName)
         self.revision2 = gtk.Entry()
+        self.revision2.set_name("Revision 2")
         entrycompletion.manager.register(self.revision2)
         self.revision1.set_alignment(1.0)
         self.revision2.set_alignment(1.0)
@@ -738,6 +746,7 @@ class StatusGUI(VersionControlDialogGUI):
         self.infoColumn.set_clickable(True)
         button = self.infoColumn.get_button()
         if button:
+            button.set_name(self.infoColumn.get_title())
             button.connect("button-press-event", self.showPopupMenu)
             guiutils.scriptEngine.monitorRightClicks("show visibility controls", button)
             

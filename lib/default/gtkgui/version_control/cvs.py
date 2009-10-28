@@ -226,7 +226,6 @@ class CVSLogLatest(vcs_independent.LogGUI):
             window.add(textView)
             notebook.append_page(window, gtk.Label(label))
         notebook.show_all()
-        guiutils.scriptEngine.monitorNotebook(notebook, "view tab")
         if len(notebook.get_children()) > 0: # Resize to a nice-looking dialog window ...
             parentSize = self.topWindow.get_size()
             self.dialog.resize(int(parentSize[0] / 1.5), int(parentSize[0] / 2))

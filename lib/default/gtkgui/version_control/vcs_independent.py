@@ -380,17 +380,17 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
 
     def addStatusWidget(self):
         button = gtk.Button("_Status")
-        guiutils.scriptEngine.connect("show version control status", "clicked", button, self.viewStatus)
+        button.connect("clicked", self.viewStatus)
         self.extraButtonArea.pack_start(button, expand=False, fill=False)        
 
     def addLogWidget(self):
         button = gtk.Button("_Log")
-        guiutils.scriptEngine.connect("show version control log", "clicked", button, self.viewLog)
+        button.connect("clicked", self.viewLog)
         self.extraButtonArea.pack_start(button, expand=False, fill=False)        
 
     def addAnnotateWidget(self):
         button = gtk.Button("_Annotate")
-        guiutils.scriptEngine.connect("show version control annotations", "clicked", button, self.viewAnnotations)
+        button.connect("clicked", self.viewAnnotations)
         self.extraButtonArea.pack_start(button, expand=False, fill=False)        
 
     def addDiffWidget(self):
@@ -408,18 +408,16 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         self.revision2.set_alignment(1.0)
         self.revision1.set_width_chars(6)
         self.revision2.set_width_chars(6)
-        guiutils.scriptEngine.registerEntry(self.revision1, "set first revision to ")
-        guiutils.scriptEngine.registerEntry(self.revision2, "set second revision to ")
         self.extraButtonArea.pack_start(diffButton, expand=False, fill=False)
         self.extraWidgetArea.pack_start(label1, expand=False, fill=False)
         self.extraWidgetArea.pack_start(self.revision1, expand=False, fill=False)
         self.extraWidgetArea.pack_start(label2, expand=False, fill=False)
         self.extraWidgetArea.pack_start(self.revision2, expand=False, fill=False)
-        guiutils.scriptEngine.connect("show version control differences", "clicked", diffButton, self.viewDiffs)
+        diffButton.connect("clicked", self.viewDiffs)
 
     def addGraphicalDiffWidget(self):
         button = gtk.Button("_Graphical Diffs")
-        guiutils.scriptEngine.connect("show version control differences graphically", "clicked", button, self.viewGraphicalDiff)
+        button.connect("clicked", self.viewGraphicalDiff)
         self.extraButtonArea.pack_start(button, expand=False, fill=False)        
 
     def addHeader(self):
@@ -519,7 +517,6 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
             self.treeView.append_column(self.infoColumn)
         self.treeView.get_selection().set_select_function(self.canSelect)
         self.treeView.expand_all()
-        guiutils.scriptEngine.monitor("select", self.treeView.get_selection())
 
         if len(self.pages) > 0:
             firstFile = self.pages[0][0]

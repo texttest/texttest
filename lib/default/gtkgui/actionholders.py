@@ -45,7 +45,6 @@ class MenuBarGUI(guiutils.SubGUI):
             gtkAction.set_active(True)
             self.actionGroup.add_action(gtkAction)
             gtkAction.connect("toggled", self.toggleVisibility, observer)
-            guiutils.scriptEngine.registerToggleButton(gtkAction, "show " + actionName, "hide " + actionName)
             self.toggleActions.append(gtkAction)
             
     def createView(self):
@@ -204,10 +203,9 @@ class PopupMenuGUI(guiutils.SubGUI):
                 
 
 class NotebookGUI(guiutils.SubGUI):
-    def __init__(self, tabInfo, name, scriptTitle):
+    def __init__(self, tabInfo, name):
         guiutils.SubGUI.__init__(self)
         self.name = name
-        self.scriptTitle = scriptTitle
         self.diag = logging.getLogger("GUI notebook")
         self.tabInfo = tabInfo
         self.notebook = None
@@ -225,7 +223,6 @@ class NotebookGUI(guiutils.SubGUI):
             page = self.createPage(tabGUI, tabName)
             self.notebook.append_page(page, label)
 
-        guiutils.scriptEngine.monitorNotebook(self.notebook, self.scriptTitle)
         self.notebook.set_scrollable(True)
         self.notebook.show()
         return self.notebook
@@ -246,7 +243,7 @@ class ChangeableNotebookGUI(NotebookGUI):
     def __init__(self, tabGUIs):
         tabGUIs = filter(lambda tabGUI: tabGUI.shouldShow(), tabGUIs)
         subNotebookGUIs = self.createSubNotebookGUIs(tabGUIs)
-        NotebookGUI.__init__(self, subNotebookGUIs, "main right-hand notebook", "view options for")
+        NotebookGUI.__init__(self, subNotebookGUIs, "main right-hand notebook")
 
     def classifyByTitle(self, tabGUIs):
         return map(lambda tabGUI: (tabGUI.getTabTitle(), tabGUI), tabGUIs)
@@ -265,8 +262,7 @@ class ChangeableNotebookGUI(NotebookGUI):
             currTabGUIs = filter(lambda tabGUI: tabGUI.getGroupTabTitle() == tabName, tabGUIs)
             if len(currTabGUIs) > 1:
                 name = "sub-notebook for " + tabName.lower()
-                scriptName = "view sub-options for " + tabName.lower() + " :"
-                notebookGUI = NotebookGUI(self.classifyByTitle(currTabGUIs), name, scriptName)
+                notebookGUI = NotebookGUI(self.classifyByTitle(currTabGUIs), name)
                 tabInfo.append((tabName, notebookGUI))
             elif len(currTabGUIs) == 1:
                 tabInfo.append((tabName, currTabGUIs[0]))
@@ -349,7 +345,7 @@ class ChangeableNotebookGUI(NotebookGUI):
         # This is mostly an attempt to work around the tree search problems.
         # Don't hide the tab for user-deselections of all tests because it trashes the search.
         if len(tests) > 0 or not direct:
-            self.diag.info("New selection with " + repr(tests) + ", adjusting '" + self.scriptTitle + "'")
+            self.diag.info("New selection with " + repr(tests) + ", adjusting '" + self.name + "'")
             # only change pages around if a test is directly selected
             self.updatePages(rowCount=rowCount, changeCurrentPage=direct)
 

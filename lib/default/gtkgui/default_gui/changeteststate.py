@@ -11,7 +11,7 @@ class SaveTests(guiplugins.ActionDialogGUI):
         guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
         self.directAction = gtk.Action("Save", "_Save", \
                                        self.getDirectTooltip(), self.getStockId())
-        guiplugins.scriptEngine.connect(self.getDirectTooltip(), "activate", self.directAction, self._respond)
+        self.directAction.connect("activate", self._respond)
         self.directAction.set_property("sensitive", False)
         self.addOption("v", "Version to save")
         self.addOption("old", "Version(s) to save previous results as")

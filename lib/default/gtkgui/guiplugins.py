@@ -830,7 +830,6 @@ class ActionDialogGUI(OptionGroupGUI):
         actionScriptName = self.getTooltip()
         okButton = dialog.add_button(self.getOkStock(actionScriptName.lower()), gtk.RESPONSE_ACCEPT)
         dialog.set_default_response(gtk.RESPONSE_ACCEPT)
-        buttonScriptName = "press ok"
         if fileChooser:
             fileChooser.connect("file-activated", self.simulateResponse, dialog)
             buttonScriptName = "press " + actionScriptName.split()[0]
@@ -843,8 +842,8 @@ class ActionDialogGUI(OptionGroupGUI):
                 scriptEngine.registerFileChooser(fileChooser, fileChooserScriptName, "look in folder")
             fileChooserOption.setMethods(fileChooser.get_filename, fileChooser.set_filename)
         
-        scriptEngine.monitorSignal("press cancel", "response", dialog, gtk.RESPONSE_CANCEL)
-        scriptEngine.monitorSignal(buttonScriptName, "response", dialog, gtk.RESPONSE_ACCEPT)
+            scriptEngine.monitorSignal("press cancel", "response", dialog, gtk.RESPONSE_CANCEL)
+            scriptEngine.monitorSignal(buttonScriptName, "response", dialog, gtk.RESPONSE_ACCEPT)
         dialog.connect("response", self.respond)
 
     def simulateResponse(self, fileChooser, dialog):

@@ -1398,7 +1398,6 @@ class Switch(Option):
     def __init__(self, name="", value=0, options=[], description="", changeMethod = None):
         Option.__init__(self, name, int(value), description, changeMethod)
         self.options = options
-        self.resetMethod = None
 
     def setValue(self, value):
         Option.setValue(self, int(value))
@@ -1414,12 +1413,6 @@ class Switch(Option):
             return str(self.getValue())
         else:
             return "" # always on or off...
-
-    def reset(self):
-        if self.defaultValue == 0 and self.resetMethod:
-            self.resetMethod(1)
-        else:
-            Option.reset(self)
 
     def describe(self):
         text = self.name

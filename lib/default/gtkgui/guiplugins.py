@@ -77,7 +77,8 @@ class GtkActionWrapper:
         actionName = self.getActionName()
         self.gtkAction = gtk.Action(actionName, title, \
                                     self.getTooltip(), self.getStockId())
-        scriptEngine.connect(self.getTooltip(), "activate", self.gtkAction, self.runInteractive)
+        scriptEngine.monitorSignal(self.getTooltip(), "activate", self.gtkAction)
+        self.gtkAction.connect("activate", self.runInteractive)
         if not self.isActiveOnCurrent():
             self.gtkAction.set_property("sensitive", False)
 
@@ -466,10 +467,12 @@ class ComboBoxListFinder:
 class RadioGroupIndexer:
     def __init__(self, listOfButtons):
         self.buttons = listOfButtons
+
     def getActiveIndex(self):
         for i in xrange(0, len(self.buttons)):
             if self.buttons[i].get_active():
                 return i
+
     def setActiveIndex(self, index):
         self.buttons[index].set_active(True)
 
@@ -504,13 +507,13 @@ class OptionGroupGUI(ActionGUI):
         optionName = option.name.strip()
         entry.set_name(optionName)
         labelEventBox = self.createLabelEventBox(option, separator)
-        scriptEngine.registerEntry(entry, "enter " + optionName + " =")
         entry.set_text(option.getValue())
         entrycompletion.manager.register(entry)
         # Options in drop-down lists don't change, so we just add them once and for all.
         for text in option.listPossibleValues():
             entrycompletion.manager.addTextCompletion(text)
-        option.setMethods(entry.get_text, entry.set_text)
+        # Don't pass entry.set_text directly, it will mess up PyUseCase's programmatic method interception
+        option.setMethods(entry.get_text, lambda t: entry.set_text(t))
         if option.changeMethod:
             entry.connect("changed", option.changeMethod)
         return labelEventBox, widget, entry
@@ -550,15 +553,13 @@ class OptionGroupGUI(ActionGUI):
             if guiConfig.getCompositeValue("gui_entry_overrides", configName) == "1":
                 switch.setValue(index)
             radioButton = gtk.RadioButton(mainRadioButton, option, use_underline=True)
+            radioButton.set_name(option + " for " + optionGroup.name)
             if individualToolTips:
                 self.tooltips.set_tip(radioButton, switch.description[index])
                 
             buttons.append(radioButton)
-            scriptEngine.registerToggleButton(radioButton, "choose " + useCaseName)
             if not mainRadioButton:
                 mainRadioButton = radioButton
-            if switch.defaultValue == index:
-                switch.resetMethod = radioButton.set_active
             if switch.getValue() == index:
                 radioButton.set_active(True)
             else:
@@ -582,8 +583,8 @@ class OptionGroupGUI(ActionGUI):
         
         if int(switch.getValue()):
             checkButton.set_active(True)
-        scriptEngine.registerToggleButton(checkButton, "check " + switch.name, "uncheck " + switch.name)
-        switch.setMethods(checkButton.get_active, checkButton.set_active)
+        # Don't pass checkButton.set_active as that will screw up PyUseCase's interception of it
+        switch.setMethods(checkButton.get_active, lambda x: checkButton.set_active(x))
         checkButton.show()
         return checkButton
 
@@ -667,7 +668,7 @@ class ActionTabGUI(OptionGroupGUI):
                 self.addValuesFromConfig(option)
 
                 labelEventBox, entryWidget, entry = self.createOptionEntry(option, separator="  ")
-                scriptEngine.connect("activate from " + option.name, "activate", entry, self.runInteractive)
+                entry.connect("activate", self.runInteractive)
                 labelEventBox.get_children()[0].set_alignment(1.0, 0.5)
                 table.attach(labelEventBox, 0, 1, rowIndex, rowIndex + 1, xoptions=gtk.FILL, xpadding=1)
                 table.attach(entryWidget, 1, 2, rowIndex, rowIndex + 1)
@@ -835,7 +836,8 @@ class ActionDialogGUI(OptionGroupGUI):
                 if not fileChooserScriptName.startswith("select"):
                     fileChooserScriptName = "select " + fileChooserScriptName + " ="
                 scriptEngine.registerFileChooser(fileChooser, fileChooserScriptName, "look in folder")
-            fileChooserOption.setMethods(fileChooser.get_filename, fileChooser.set_filename)
+            # Don't pass set_filename directly, will interfere with PyUseCase's attempts to intercept it
+            fileChooserOption.setMethods(fileChooser.get_filename, lambda f: fileChooser.set_filename(f))
         
             scriptEngine.monitorSignal("press cancel", "response", dialog, gtk.RESPONSE_CANCEL)
             scriptEngine.monitorSignal(buttonScriptName, "response", dialog, gtk.RESPONSE_ACCEPT)

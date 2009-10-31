@@ -203,17 +203,26 @@ activate = activate from execution time
 toggled.true = check select in collapsed suites
 toggled.false = uncheck select in collapsed suites
 
-[Label=Discard]
+[Name=Discard for Selection]
 toggled.true = choose discard for current selection
 
-[Label=Refine]
+[Name=Refine for Selection]
 toggled.true = choose refine for current selection
 
-[Label=Extend]
+[Name=Extend for Selection]
 toggled.true = choose extend for current selection
 
-[Label=Exclude]
+[Name=Exclude for Selection]
 toggled.true = choose exclude for current selection
+
+[Name=Discard for Filtering]
+toggled.true = choose discard for current filtering
+
+[Name=Refine for Filtering]
+toggled.true = choose refine for current filtering
+
+[Name=Extend for Filtering]
+toggled.true = choose extend for current filtering
 
 [Name=Run this version]
 changed = enter run this version =

@@ -23,7 +23,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         AllTestsHandler.__init__(self)
         self.filterAction = gtk.Action("Filter", "Filter", \
                                        self.getFilterTooltip(), self.getStockId())
-        guiplugins.scriptEngine.connect(self.getFilterTooltip(), "activate", self.filterAction, self.filterTests)
+        self.filterAction.connect("activate", self.filterTests)
         self.selectDiag = logging.getLogger("Select Tests")
         self.addOption("vs", "Tests for version", description="Select tests for a specific version.",
                        possibleValues=self.getPossibleVersions(allApps))
@@ -35,7 +35,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
                           "After applying the new selection criteria to all tests, unselect the currently selected tests, to exclude them from the new selection." ]
         self.selectionGroup.addSwitch("current_selection", options = [ "Discard", "Refine", "Extend", "Exclude"],
                                       description=currSelectDesc)
-        self.filteringGroup = plugins.OptionGroup(self.getTabTitle())
+        self.filteringGroup = plugins.OptionGroup("Filtering")
         currFilterDesc = ["Show all tests which match the criteria, and hide all those that do not.",
                           "Hide all tests which do not match the criteria. Do not show any tests that aren't already shown.",
                           "Show all tests which match the criteria. Do not hide any tests that are currently shown." ]

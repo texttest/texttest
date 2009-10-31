@@ -245,10 +245,6 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         noButton = dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
         yesButton = dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
         dialog.connect("response", respondMethod)
-        scriptEngine.monitorSignal("answer no to texttest " + alarmLevel, "response",
-                                   dialog, gtk.RESPONSE_NO)
-        scriptEngine.monitorSignal("answer yes to texttest " + alarmLevel, "response",
-                                   dialog, gtk.RESPONSE_YES)
         dialog.show_all()
         
     def cleanDialog(self, button, saidOK, dialog):
@@ -696,8 +692,7 @@ class ActionTabGUI(OptionGroupGUI):
         if option.selectFile:
             button = gtk.Button("...")
             box.pack_start(button, expand=False, fill=False)
-            scriptEngine.connect("search for files for '" + option.name + "'",
-                                 "clicked", button, self.showFileChooser, None, entry, option)
+            button.connect("clicked", self.showFileChooser, entry, option)
         return (box, entry)
     
     def showFileChooser(self, widget, entry, option):

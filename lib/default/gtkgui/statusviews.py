@@ -196,13 +196,10 @@ class TestProgressMonitor(guiutils.SubGUI):
         toggle = gtk.CellRendererToggle()
         toggle.set_property('activatable', True)
         toggle.connect("toggled", self.showToggled)
-        guiutils.scriptEngine.monitor("select tests in category", selection)
         toggleColumn = gtk.TreeViewColumn("Visible", toggle, active=2)
         toggleColumn.set_resizable(True)
         toggleColumn.set_alignment(0.5)
         self.treeView.append_column(toggleColumn)
-        guiutils.scriptEngine.registerCellToggleButton(toggle, "show tests in category", 
-                                                       self.treeView, "hide tests in category")
         self.treeView.show()
         return self.addScrollBars(self.treeView, hpolicy=gtk.POLICY_NEVER)
     def canSelect(self, path):

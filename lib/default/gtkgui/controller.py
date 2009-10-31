@@ -327,7 +327,8 @@ class TopWindowGUI(guiutils.ContainerGUI):
         self.topWindow.set_default_size(-1, -1)
 
         self.notify("TopWindow", self.topWindow)
-        scriptEngine.connect("close window", "delete_event", self.topWindow, self.notifyQuit)
+        scriptEngine.monitorSignal("close window", "delete-event", self.topWindow)
+        self.topWindow.connect("delete-event", self.notifyQuit)
         return self.topWindow
 
     def setWindowTitle(self):
@@ -448,16 +449,9 @@ class PaneGUI(guiutils.ContainerGUI):
         else:
             return gtk.VPaned()
 
-    def scriptCommand(self):
-        if self.horizontal:
-            return "drag vertical pane separator so left half uses"
-        else:
-            return "drag horizonal pane separator so top half uses"
-
     def createView(self):
         self.paned = self.createPaned()
         self.separatorHandler = self.paned.connect('notify::max-position', self.adjustSeparator)
-        scriptEngine.registerPaned(self.paned, self.scriptCommand())
         frames = []
         for subgui in self.subguis:
             frame = gtk.Frame()

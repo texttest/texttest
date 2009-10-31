@@ -157,6 +157,9 @@ row-activated = select file
 changed.selection = set file selection to
 button-press-event = view actions for file
 
+[Name=Application File Tree]
+row-activated = select application file
+
 [Name=Tests for version]
 changed = enter tests for version =
 activate = activate from tests for version

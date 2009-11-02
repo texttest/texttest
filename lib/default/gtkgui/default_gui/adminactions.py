@@ -454,6 +454,10 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         if not ext:
             raise plugins.TextTestError, "Must provide a file extension for TextTest files"
 
+        for char in " ./":
+            if char in ext:
+                raise plugins.TextTestError, "File extensions may not contain the character " + repr(char) + ". It's recommended to stick to alphanumeric characters for this field."
+
         if not executable or not os.path.isfile(executable):
             raise plugins.TextTestError, "Must provide a valid path to a program to test"
 

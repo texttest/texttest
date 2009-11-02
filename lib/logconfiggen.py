@@ -46,21 +46,21 @@ class PythonLoggingGenerator:
         all += disabled
         return enabled, disabled, all
 
-    def generate(self, enabledLoggerNames=[], allLoggerNames=[], timeStdout=False):
+    def generate(self, enabledLoggerNames=[], allLoggerNames=[], timeStdout=False, useDebug=True):
         enabled, disabled, all = self.parseInput(enabledLoggerNames, allLoggerNames)
         self.writeHeaderSections(timed=timeStdout)
         if len(enabled):
             self.write("# ====== The following are enabled by default ======")
             for loggerName, fileStem in enabled:
-                self.writeLoggerSection(loggerName, True, fileStem)
+                self.writeLoggerSection(loggerName, True, fileStem, useDebug)
 
         if len(disabled):
             self.write("# ====== The following are disabled by default ======")
             for loggerName in disabled:
-                self.writeLoggerSection(loggerName, False, loggerName)
+                self.writeLoggerSection(loggerName, False, loggerName, useDebug)
         self.writeFooterSections(all)
 
-    def writeLoggerSection(self, loggerName, enable, fileStem):
+    def writeLoggerSection(self, loggerName, enable, fileStem, useDebug):
         self.write("# ======= Section for " + loggerName + " ======")
         self.write("[logger_" + loggerName + "]")
         handler = self.handlers.get(fileStem, loggerName)
@@ -75,7 +75,7 @@ class PythonLoggingGenerator:
             self.handlers[fileStem] = handler
             self.write("[handler_" + handler + "]")
             self.write("class=FileHandler")
-            if enable:
+            if enable or not useDebug:
                 self.write("#formatter=timed")
             else:
                 self.write("formatter=debug")

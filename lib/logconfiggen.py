@@ -46,30 +46,34 @@ class PythonLoggingGenerator:
         all += disabled
         return enabled, disabled, all
 
-    def generate(self, enabledLoggerNames=[], allLoggerNames=[], timeStdout=False, useDebug=True):
+    def generate(self, enabledLoggerNames=[], allLoggerNames=[], debugLevelLoggers=[], timeStdout=False, useDebug=True):
         enabled, disabled, all = self.parseInput(enabledLoggerNames, allLoggerNames)
         self.writeHeaderSections(timed=timeStdout)
         if len(enabled):
             self.write("# ====== The following are enabled by default ======")
             for loggerName, fileStem in enabled:
-                self.writeLoggerSection(loggerName, True, fileStem, useDebug)
+                self.writeLoggerSection(loggerName, True, fileStem, useDebug, False)
 
         if len(disabled):
             self.write("# ====== The following are disabled by default ======")
             for loggerName in disabled:
-                self.writeLoggerSection(loggerName, False, loggerName, useDebug)
+                self.writeLoggerSection(loggerName, False, loggerName, useDebug, loggerName in debugLevelLoggers)
         self.writeFooterSections(all)
 
-    def writeLoggerSection(self, loggerName, enable, fileStem, useDebug):
+    def writeLoggerSection(self, loggerName, enable, fileStem, useDebug, debugLevel):
         self.write("# ======= Section for " + loggerName + " ======")
         self.write("[logger_" + loggerName + "]")
         handler = self.handlers.get(fileStem, loggerName)
         self.write("handlers=" + handler)
         self.write("qualname=" + loggerName)
-        if enable:
-            self.write("level=INFO\n")
+        if debugLevel:
+            level = "DEBUG"
         else:
-            self.write("#level=INFO\n")
+            level = "INFO"
+        if enable:
+            self.write("level=" + level + "\n")
+        else:
+            self.write("#level=" + level + "\n")
             
         if handler == loggerName:
             self.handlers[fileStem] = handler

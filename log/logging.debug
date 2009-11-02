@@ -463,18 +463,6 @@ formatter=debug
 args=(os.devnull, 'a')
 #args=('%(TEXTTEST_PERSONAL_LOG)s/guilog.diag', 'a')
 
-# ======= Section for gui map ======
-[logger_gui map]
-handlers=gui map
-qualname=gui map
-#level=INFO
-
-[handler_gui map]
-class=FileHandler
-formatter=debug
-args=(os.devnull, 'a')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/guimap.diag', 'a')
-
 # ======= Section for kill processes ======
 [logger_kill processes]
 handlers=kill processes
@@ -571,30 +559,6 @@ formatter=debug
 args=(os.devnull, 'a')
 #args=('%(TEXTTEST_PERSONAL_LOG)s/testobjects.diag', 'a')
 
-# ======= Section for usecase record ======
-[logger_usecase record]
-handlers=usecase record
-qualname=usecase record
-#level=INFO
-
-[handler_usecase record]
-class=FileHandler
-formatter=debug
-args=(os.devnull, 'a')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/usecaserecord.diag', 'a')
-
-# ======= Section for usecase replay log ======
-[logger_usecase replay log]
-handlers=usecase replay log
-qualname=usecase replay log
-#level=INFO
-
-[handler_usecase replay log]
-class=FileHandler
-formatter=debug
-args=(os.devnull, 'a')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/usecasereplaylog.diag', 'a')
-
 # ======= Section for virtual display ======
 [logger_virtual display]
 handlers=virtual display
@@ -607,12 +571,72 @@ formatter=debug
 args=(os.devnull, 'a')
 #args=('%(TEXTTEST_PERSONAL_LOG)s/virtualdisplay.diag', 'a')
 
+# ======= Section for TreeModelIndexer ======
+[logger_TreeModelIndexer]
+handlers=TreeModelIndexer
+qualname=TreeModelIndexer
+#level=DEBUG
+
+[handler_TreeModelIndexer]
+class=FileHandler
+formatter=debug
+args=(os.devnull, 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/treemodelindexer.diag', 'a')
+
+# ======= Section for TreeViewDescriber ======
+[logger_TreeViewDescriber]
+handlers=TreeViewDescriber
+qualname=TreeViewDescriber
+#level=DEBUG
+
+[handler_TreeViewDescriber]
+class=FileHandler
+formatter=debug
+args=(os.devnull, 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/treeviewdescriber.diag', 'a')
+
+# ======= Section for gui map ======
+[logger_gui map]
+handlers=gui map
+qualname=gui map
+#level=DEBUG
+
+[handler_gui map]
+class=FileHandler
+formatter=debug
+args=(os.devnull, 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/guimap.diag', 'a')
+
+# ======= Section for usecase record ======
+[logger_usecase record]
+handlers=usecase record
+qualname=usecase record
+#level=DEBUG
+
+[handler_usecase record]
+class=FileHandler
+formatter=debug
+args=(os.devnull, 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/usecaserecord.diag', 'a')
+
+# ======= Section for usecase replay log ======
+[logger_usecase replay log]
+handlers=usecase replay log
+qualname=usecase replay log
+#level=DEBUG
+
+[handler_usecase replay log]
+class=FileHandler
+formatter=debug
+args=(os.devnull, 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/usecasereplaylog.diag', 'a')
+
 # ====== Cruft that python logging module needs ======
 [loggers]
-keys=root,Action Runner,Activator,Check For Bugs,Collate Files,Environment Creator,File View GUI,FileComparison,Filter Actions,Find Applications,GUI notebook,GenerateWebPages,Idle Handlers,Interactive Actions,Mail Sender,Menu Bar,MultiEntryDictionary,Observable,Prepare Writedir,Progress Monitor,Queue System Submit,Reconnection,Run Dependent Text,Save Repository,Select Tests,Slave Server,Test Column GUI,Test Tree,TestComparison,TestPathFilter,Traffic Replay,Traffic Server,Unique Names,application,batch collect,catalogues,check for crashes,gui log,gui map,kill processes,locks,makeperformance,option finder,read environment,run test,standard log,test objects,usecase record,usecase replay log,virtual display
+keys=root,Action Runner,Activator,Check For Bugs,Collate Files,Environment Creator,File View GUI,FileComparison,Filter Actions,Find Applications,GUI notebook,GenerateWebPages,Idle Handlers,Interactive Actions,Mail Sender,Menu Bar,MultiEntryDictionary,Observable,Prepare Writedir,Progress Monitor,Queue System Submit,Reconnection,Run Dependent Text,Save Repository,Select Tests,Slave Server,Test Column GUI,Test Tree,TestComparison,TestPathFilter,Traffic Replay,Traffic Server,Unique Names,application,batch collect,catalogues,check for crashes,gui log,kill processes,locks,makeperformance,option finder,read environment,run test,standard log,test objects,virtual display,TreeModelIndexer,TreeViewDescriber,gui map,usecase record,usecase replay log
 
 [handlers]
-keys=root,Action Runner,Activator,Check For Bugs,Collate Files,Environment Creator,File View GUI,FileComparison,Filter Actions,Find Applications,GUI notebook,GenerateWebPages,Idle Handlers,Interactive Actions,Mail Sender,Menu Bar,MultiEntryDictionary,Observable,Prepare Writedir,Progress Monitor,Queue System Submit,Reconnection,Run Dependent Text,Save Repository,Select Tests,Slave Server,Test Column GUI,Test Tree,TestComparison,TestPathFilter,Traffic Replay,Traffic Server,Unique Names,application,batch collect,catalogues,check for crashes,gui log,gui map,kill processes,locks,makeperformance,option finder,read environment,run test,standard log,stdout,test objects,usecase record,usecase replay log,virtual display
+keys=root,Action Runner,Activator,Check For Bugs,Collate Files,Environment Creator,File View GUI,FileComparison,Filter Actions,Find Applications,GUI notebook,GenerateWebPages,Idle Handlers,Interactive Actions,Mail Sender,Menu Bar,MultiEntryDictionary,Observable,Prepare Writedir,Progress Monitor,Queue System Submit,Reconnection,Run Dependent Text,Save Repository,Select Tests,Slave Server,Test Column GUI,Test Tree,TestComparison,TestPathFilter,Traffic Replay,Traffic Server,TreeModelIndexer,TreeViewDescriber,Unique Names,application,batch collect,catalogues,check for crashes,gui log,gui map,kill processes,locks,makeperformance,option finder,read environment,run test,standard log,stdout,test objects,usecase record,usecase replay log,virtual display
 
 [formatters]
 keys=timed,debug

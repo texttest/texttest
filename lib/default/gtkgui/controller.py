@@ -681,7 +681,8 @@ class InteractiveActionHandler:
 
     def classValid(self, className, app):
         for config in self.getAllIntvConfigs([ app ]):
-            if not config.isValid(className):
-                self.diag.info(str(config.__class__) + " configuration rejected " + str(className) + " class as invalid")
-                return False
-        return True
+            if config.isValid(className):
+                return True
+            
+        self.diag.info("All configuration objects rejected " + str(className) + " class as invalid")
+        return False

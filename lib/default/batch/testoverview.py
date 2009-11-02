@@ -222,7 +222,10 @@ class GenerateWebPages(object):
             else:
                 return self.readErrorState("Incorrect type for state object.")
         except (UnpicklingError, ImportError, EOFError, AttributeError), e:
-            return self.readErrorState("Stack info follows:\n" + str(e))
+            if os.path.getsize(stateFile) > 0:
+                return self.readErrorState("Stack info follows:\n" + str(e))
+            else:
+                return plugins.Unrunnable("Results file was empty, probably the disk it resides on is full.", "Disk full?")
 
     def readErrorState(self, errMsg):
         freeText = "Failed to read results file, possibly deprecated format. " + errMsg

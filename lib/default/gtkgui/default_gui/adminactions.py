@@ -450,7 +450,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
     def getTooltip(self):
         return "Define a new tested application"
 
-    def checkSanity(self, ext, executable, directory):
+    def checkSanity(self, ext, executable, subdir, directory):
         if not ext:
             raise plugins.TextTestError, "Must provide a file extension for TextTest files"
 
@@ -461,6 +461,10 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         if not executable or not os.path.isfile(executable):
             raise plugins.TextTestError, "Must provide a valid path to a program to test"
 
+        for char in "/\\":
+            if char in subdir:
+                raise plugins.TextTestError, "Subdirectory name must be a local name (not contain " + repr(char) + ").\nTextTest only looks for applications one level down in the hierarchy."
+
         if os.path.exists(os.path.join(directory, "config." + ext)):
             raise plugins.TextTestError, "Test-application already exists at the indicated location with the indicated extension: please choose another name"
 
@@ -470,8 +474,9 @@ class ImportApplication(guiplugins.ActionDialogGUI):
     def performOnCurrent(self):
         executable = self.optionGroup.getOptionValue("exec")
         ext = self.optionGroup.getOptionValue("ext")
-        directory = self.findFullDirectoryPath()
-        self.checkSanity(ext, executable, directory)
+        subdir = self.optionGroup.getOptionValue("subdir")
+        directory = self.findFullDirectoryPath(subdir)
+        self.checkSanity(ext, executable, subdir, directory)
         plugins.ensureDirectoryExists(directory)
         configEntries = { "executable" : executable }
         fullName = self.optionGroup.getOptionValue("name")
@@ -483,8 +488,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         self.notify("NewApplication", ext, directory, configEntries)
         self.notify("Status", "Created new application with extension '" + ext + "'.")
 
-    def findFullDirectoryPath(self):
-        subdir = self.optionGroup.getOptionValue("subdir")
+    def findFullDirectoryPath(self, subdir):
         for rootDir in self.rootDirectories:
             candidate = os.path.normpath(os.path.join(rootDir, subdir))
             if os.path.isdir(candidate):

@@ -176,7 +176,10 @@ class Config:
             return self.createComposites(checkoutVersions, copyVersions)
 
     def getCopyExtraVersions(self):
-        copyCount = int(self.optionMap.get("cp", 1))
+        try:
+            copyCount = int(self.optionMap.get("cp", 1))
+        except TypeError:
+            copyCount = 1
         return [ "copy_" + str(i) for i in range(1, copyCount) ]
 
     def versionNameFromCheckout(self, c):

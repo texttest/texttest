@@ -327,7 +327,6 @@ class TopWindowGUI(guiutils.ContainerGUI):
         self.topWindow.set_default_size(-1, -1)
 
         self.notify("TopWindow", self.topWindow)
-        scriptEngine.monitorSignal("close window", "delete-event", self.topWindow)
         self.topWindow.connect("delete-event", self.notifyQuit)
         return self.topWindow
 
@@ -362,13 +361,13 @@ class TopWindowGUI(guiutils.ContainerGUI):
     def notifyAllComplete(self, *args):
         self.exitStatus |= self.COMPLETION_NOTIFIED
         if self.exitStatus & self.EXIT_NOTIFIED:
-            self.terminate()
+            self.notify("Exit")
 
     def notifyQuit(self, *args):
         self.exitStatus |= self.EXIT_NOTIFIED
         self.notify("KillProcesses")
         if self.exitStatus & self.COMPLETION_NOTIFIED:
-            self.terminate()
+            self.notify("Exit")
         else:
             self.notify("Status", "Waiting for all tests to terminate ...")
             # When they have, we'll get notifyAllComplete
@@ -376,10 +375,6 @@ class TopWindowGUI(guiutils.ContainerGUI):
     def notifySetRunName(self, newName):
         self.name = newName
         self.setWindowTitle()
-
-    def terminate(self):
-        self.notify("Exit")
-        self.topWindow.destroy()
 
     def adjustSize(self):
         if guiConfig.getWindowOption("maximize"):

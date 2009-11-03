@@ -135,8 +135,7 @@ class RunningAction:
     
     def checkErrorFile(self, errFile, testSel, usecase):
         if os.path.isfile(errFile):
-            triggerGroup = plugins.TextTriggerGroup(testSel[0].getConfigValue("suppress_stderr_text"))
-            errText = triggerGroup.readAndFilter(errFile)
+            errText = testSel[0].app.filterErrorText(errFile)
             if len(errText):
                 self.notify("Status", usecase.capitalize() + " run failed for " + repr(testSel[0]))
                 self.showErrorDialog(usecase.capitalize() + " run failed, with the following errors:\n" + errText)

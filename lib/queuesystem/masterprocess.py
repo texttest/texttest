@@ -35,9 +35,8 @@ class QueueSystemServer(BaseActionRunner):
         self.testCount = 0
         self.testsSubmitted = 0
         self.maxCapacity = 100000 # infinity, sort of
-        self.suppressStderr = set()
+        self.allApps = allApps
         for app in allApps:
-            self.suppressStderr.update(app.getConfigValue("suppress_stderr_text"))
             currCap = app.getConfigValue("queue_system_max_capacity")
             if currCap is not None and currCap < self.maxCapacity:
                 self.maxCapacity = currCap
@@ -216,9 +215,13 @@ class QueueSystemServer(BaseActionRunner):
         if len(errorFiles) == 0:
             return
 
-        triggerGroup = plugins.TextTriggerGroup(self.suppressStderr)
         for fileName in errorFiles:
-            contents = triggerGroup.readAndFilter(fileName)
+            contents = None
+            # Take the shortest (i.e. most filtered) one
+            for app in self.allApps:
+                currContent = app.filterErrorText(fileName)
+                if contents is None or len(currContent) < len(contents):
+                    contents = currContent
             if contents:
                 errors[contents] = os.path.basename(fileName)[:-7]
 

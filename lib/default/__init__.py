@@ -377,6 +377,11 @@ class Config:
         return rundependent.FilterOriginal()
     def getTemporaryFilterer(self):
         return rundependent.FilterTemporary()
+    
+    def filterErrorText(self, app, errFile):
+        triggerGroup = plugins.TextTriggerGroup(app.getConfigValue("suppress_stderr_text"))
+        return triggerGroup.readAndFilter(errFile)
+
     def getTestProcessor(self):        
         catalogueCreator = self.getCatalogueCreator()
         ignoreCatalogues = self.shouldIgnoreCatalogues()

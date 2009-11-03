@@ -608,8 +608,7 @@ class CollateFiles(plugins.Action):
             # If they write errors though, we might want to pick those up
             os.remove(targetFile)
 
-        triggerGroup = plugins.TextTriggerGroup(test.getConfigValue("suppress_stderr_text"))
-        collateErrMsg = triggerGroup.readAndFilter(collationErrFile)
+        collateErrMsg = test.app.filterErrorText(collationErrFile)
         if collateErrMsg:
             msg = "Errors occurred running collate_script(s) " + " and ".join(scripts) + \
                   "\nwhile trying to extract file at \n" + sourceFile + " : \n" + collateErrMsg

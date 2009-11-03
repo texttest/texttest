@@ -26,30 +26,60 @@ class FileViewAction(guiplugins.ActionGUI):
     def useFiltered(self):
         return False
 
-    def performOnCurrent(self):
+    def getConfirmationMessage(self):
+        maxFileSize = self.getMaxFileSize()
+        if maxFileSize >= 0:
+            largestFileSize = self.getLargestFileSize()
+            
+        return ""
+
+    def getLargestFileSize(self, f, *args):
+        return os.path.getsize(f)            
+
+    def getConfirmationMessage(self):
+        self.performArgs = []
+        message = ""
         for fileName, associatedObject in self.currFileSelection:
             if self.isActiveForFile(fileName, associatedObject):
-                self.performOnFile(fileName, associatedObject)
+                message, args = self.getConfMessageForFile(fileName, associatedObject)
+                self.performArgs.append(args)
+        return message
 
-    def performOnFile(self, fileName, associatedObject):
+    def performOnCurrent(self):
+        for args in self.performArgs:
+            self.performOnFile(*args)
+
+    def performOnFile(self, viewTool, *args):
+        try:
+            self._performOnFile(viewTool, *args)
+        except OSError:
+            self.showErrorDialog("Cannot find " + self.getToolDescription() + " '" + viewTool + \
+                                 "'.\nPlease install it somewhere on your PATH or\n"
+                                 "change the configuration entry '" + self.getToolConfigEntry() + "'.")
+
+    def getConfMessageForFile(self, fileName, associatedObject):
         fileToView = self.getFileToView(fileName, associatedObject)
         if os.path.isfile(fileToView) or os.path.islink(fileToView):
             viewTool = self.getViewToolName(fileToView)
             if viewTool:
-                try:
-                    self._performOnFile(viewTool, fileToView, associatedObject)
-                except OSError:
-                    self.showErrorDialog("Cannot find " + self.getToolDescription() + " '" + viewTool + \
-                                         "'.\nPlease install it somewhere on your PATH or\n"
-                                         "change the configuration entry '" + self.getToolConfigEntry() + "'.")
+                args = (viewTool, fileToView, associatedObject)
+                maxFileSize = plugins.parseBytes(self.getConfigValue("max_file_size", viewTool))
+                if maxFileSize >= 0:
+                    largestFileSize = self.getLargestFileSize(fileToView, associatedObject)
+                    if largestFileSize > maxFileSize:
+                        message = "You are trying to view a file of size " + str(largestFileSize) + " bytes, while a limit of " + \
+                                  str(maxFileSize) + " bytes is set for the tool '" + viewTool + "'. Are you sure you wish to continue?"
+                        return message, args
+                    
+                return "", args
             else:
-                self.showWarningDialog("No " + self.getToolDescription() + " is defined for files of type '" + \
-                                       os.path.basename(fileToView).split(".")[0] + \
-                                       "'.\nPlease point the configuration entry '" + self.getToolConfigEntry() + "'"
-                                       " at a valid program to view the file.")
+                raise plugins.TextTestError, "No " + self.getToolDescription() + " is defined for files of type '" + \
+                      os.path.basename(fileToView).split(".")[0] + \
+                      "'.\nPlease point the configuration entry '" + self.getToolConfigEntry() + \
+                      "' at a valid program to view the file."
         else:
-            self.showErrorDialog("File '" + os.path.basename(fileName) + "' cannot be viewed"
-                                 " as it has been removed in the file system." + self.noFileAdvice())
+            raise plugins.TextTestError, "File '" + os.path.basename(fileName) + \
+                      "' cannot be viewed as it has been removed in the file system." + self.noFileAdvice()
 
     def isDefaultViewer(self, *args):
         return False
@@ -59,7 +89,9 @@ class FileViewAction(guiplugins.ActionGUI):
 
     def notifyViewFile(self, fileName, *args):
         if self.isDefaultViewer(*args):
-            self.performOnFile(fileName, *args)
+            allArgs = (fileName,) + args
+            self.currFileSelection = [ allArgs ]
+            self.runInteractive()
 
     def getFileToView(self, fileName, associatedObject):
         try:
@@ -74,11 +106,13 @@ class FileViewAction(guiplugins.ActionGUI):
             return "\n" + self.currAppSelection[0].noFileAdvice()
         else:
             return ""
+        
     def testDescription(self):
         if len(self.currTestSelection) > 0:
             return " (from test " + self.currTestSelection[0].uniqueName + ")"
         else:
             return ""
+
     def getRemoteHost(self):
         if os.name == "posix" and len(self.currTestSelection) > 0:
             state = self.currTestSelection[0].stateInGui
@@ -97,6 +131,7 @@ class FileViewAction(guiplugins.ActionGUI):
 
     def getSignalsSent(self):
         return [ "ViewerStarted" ]
+
     def startViewer(self, cmdArgs, description, *args, **kwargs):
         testDesc = self.testDescription()
         fullDesc = description + testDesc
@@ -107,20 +142,26 @@ class FileViewAction(guiplugins.ActionGUI):
 
     def getStem(self, fileName):
         return os.path.basename(fileName).split(".")[0]
+
     def testRunning(self):
         return self.currTestSelection[0].stateInGui.hasStarted() and \
                not self.currTestSelection[0].stateInGui.isComplete()
 
     def getViewToolName(self, fileName):
         stem = self.getStem(fileName)
+        return self.getConfigValue(self.getToolConfigEntry(), stem)
+
+    def getConfigValue(self, *args):
         if len(self.currTestSelection) > 0:
-            return self.currTestSelection[0].getCompositeConfigValue(self.getToolConfigEntry(), stem)
+            return self.currTestSelection[0].getCompositeConfigValue(*args)
         else:
-            return guiplugins.guiConfig.getCompositeValue(self.getToolConfigEntry(), stem)
+            return guiplugins.guiConfig.getCompositeValue(*args)
+        
     def differencesActive(self, comparison):
         if not comparison or comparison.newResult() or comparison.missingResult():
             return False
         return comparison.hasDifferences()
+
     def messageAfterPerform(self):
         pass # provided by starting viewer, with message
 
@@ -195,7 +236,8 @@ class ViewConfigFileInEditor(ViewInEditor):
         return False # only way to get at it is via the activation below...
 
     def notifyViewApplicationFile(self, fileName, apps):
-        self.performOnFile(fileName, apps)
+        self.currFileSelection = [ (fileName, apps) ]
+        self.runInteractive()
 
     def findExitHandlerInfo(self, fileName, apps):
         return self.configFileChanged, (apps,)
@@ -332,6 +374,10 @@ class ViewFileDifferences(FileViewAction):
             if not (comparison.newResult() or comparison.missingResult()):
                 return True
         return False
+
+    def getLargestFileSize(self, tmpFile, comparison):
+        stdFile = comparison.getStdFile(self.useFiltered(), self.extraPostfix())
+        return max(os.path.getsize(stdFile), os.path.getsize(tmpFile))
 
     def _performOnFile(self, diffProgram, tmpFile, comparison):
         stdFile = comparison.getStdFile(self.useFiltered(), self.extraPostfix())

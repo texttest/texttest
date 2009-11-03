@@ -26,7 +26,7 @@ class FileComparison:
         self.binaryFile = self.checkIfBinaryFile(test)
         self.previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength)
         self.textDiffTool = test.getConfigValue("text_diff_program")
-        self.textDiffToolMaxSize = plugins.parseBytes(test.getConfigValue("text_diff_program_max_file_size"))
+        self.textDiffToolMaxSize = plugins.parseBytes(test.getCompositeConfigValue("max_file_size", self.textDiffTool))
         self.freeTextBody = None
         # subclasses may override if they don't want to store in this way
         self.cacheDifferences(test, testInProgress)
@@ -194,15 +194,15 @@ class FileComparison:
             return self.previewGenerator.getPreview(open(self.stdCmpFile))
 
         try:
-            stdFileSize = os.stat(self.stdCmpFile)[stat.ST_SIZE]
-            tmpFileSize = os.stat(self.tmpCmpFile)[stat.ST_SIZE]
+            stdFileSize = os.path.getsize(self.stdCmpFile)
+            tmpFileSize = os.path.getsize(self.tmpCmpFile)
             if self.textDiffToolMaxSize >= 0 and \
                    (stdFileSize > self.textDiffToolMaxSize or \
                     tmpFileSize > self.textDiffToolMaxSize):
                 message = "The result files were too large to compare - " + str(stdFileSize) + " and " + \
                           str(tmpFileSize) + " bytes, compared to the limit of " + str(self.textDiffToolMaxSize) + \
-                          " bytes. Double-click on the file to see the difference, or adjust the configuration entry 'text_diff_program_max_file_size'" + \
-                          " and re-run to see the difference in this text view.\n"
+                          " bytes. Adjust the configuration entry 'max_file_size' for the tool '" + self.textDiffTool + \
+                          "' and re-run to see the difference in this text view.\n"
                 return self.previewGenerator.getWrappedLine(message)
 
             cmdArgs = plugins.splitcmd(self.textDiffTool) + [ self.stdCmpFile, self.tmpCmpFile ]

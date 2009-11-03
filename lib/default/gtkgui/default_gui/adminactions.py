@@ -502,6 +502,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         self.appendAppName = False
         self.currentStem = ""
         self.fileChooser = None
+        self.newFileInfo = (None, False)
         guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic, inputOptions)
         self.addOption("stem", "Type of file/directory to create", allocateNofValues=2)
         self.addOption("v", "Version identifier to use")
@@ -693,7 +694,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
                 file = open(targetPath, "w")
                 file.close()
                 guiutils.guilog.info("Creating new empty file...")
-                self.notify("NewFile", targetPath, False)
+                self.newFileInfo = targetPath, False
             elif action == 2:
                 plugins.ensureDirectoryExists(targetPath)
                 guiutils.guilog.info("Creating new empty directory...")
@@ -705,7 +706,15 @@ class ImportFiles(guiplugins.ActionDialogGUI):
             fileExisted = os.path.exists(targetPath)
             guiutils.guilog.info("Creating new path, copying " + sourcePath)
             plugins.copyPath(sourcePath, targetPath)
-            self.notify("NewFile", targetPath, fileExisted)
+            self.newFileInfo = targetPath, fileExisted
+
+    def endPerform(self):
+        # Shouldn't start new actions until the current ones complete, framework doesn't like it
+        guiplugins.ActionDialogGUI.endPerform(self)
+        fileName, existed = self.newFileInfo
+        if fileName:
+            self.notify("NewFile", fileName, existed)
+            self.newFileInfo = (None, False)
 
 
 class RemoveTests(guiplugins.ActionGUI):

@@ -989,7 +989,7 @@ class Config:
                              "External program to use for textual comparison of files")
         app.setConfigDefault("lines_of_text_difference", 30, "How many lines to present in textual previews of file diffs")
         app.setConfigDefault("max_width_text_difference", 500, "How wide lines can be in textual previews of file diffs")
-        app.setConfigDefault("text_diff_program_max_file_size", "-1", "The maximum file size to use the text_diff_program, in bytes. -1 means no limit.")
+        app.setConfigDefault("max_file_size", { "default": "-1" }, "The maximum file size to load into external programs, in bytes. -1 means no limit.")
         app.setConfigDefault("text_diff_program_filters", { "default" : [], "diff" : [ "^<", "^>" ]}, "Filters that should be applied for particular diff tools to aid with grouping in dynamic GUI")
         app.setConfigDefault("diff_program", { "default": "tkdiff" }, "External program to use for graphical file comparison")
         app.setConfigDefault("view_program", { "default": self.defaultViewProgram(homeOS) },  \
@@ -999,6 +999,7 @@ class Config:
         app.setConfigDefault("bug_system_location", {}, "The location of the bug system we wish to extract failure information from.")
         app.setConfigDefault("bug_system_username", {}, "Username to use when logging in to bug systems defined in bug_system_location")
         app.setConfigDefault("bug_system_password", {}, "Password to use when logging in to bug systems defined in bug_system_location")
+        app.setConfigAlias("text_diff_program_max_file_size", "max_file_size")
         
     def setInterfaceDefaults(self, app):
         app.setConfigDefault("default_interface", "static_gui", "Which interface to start if none of -con, -g and -gx are provided")

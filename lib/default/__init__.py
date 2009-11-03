@@ -10,6 +10,7 @@ from traffic import SetUpTrafficHandlers
 from jobprocess import killSubProcessAndChildren
 from actionrunner import ActionRunner
 from time import sleep
+from StringIO import StringIO
 
 plugins.addCategory("killed", "killed", "were terminated before completion")
 
@@ -379,8 +380,12 @@ class Config:
         return rundependent.FilterTemporary()
     
     def filterErrorText(self, app, errFile):
-        triggerGroup = plugins.TextTriggerGroup(app.getConfigValue("suppress_stderr_text"))
-        return triggerGroup.readAndFilter(errFile)
+        runDepFilter = rundependent.RunDependentTextFilter(app.getConfigValue("suppress_stderr_text"), "")
+        outFile = StringIO()
+        runDepFilter.filterFile(open(errFile), outFile)
+        value = outFile.getvalue()
+        outFile.close()
+        return value
 
     def getTestProcessor(self):        
         catalogueCreator = self.getCatalogueCreator()

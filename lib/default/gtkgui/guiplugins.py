@@ -253,7 +253,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
 
     def _cleanDialog(self, dialog, *args):
         entrycompletion.manager.collectCompletions()
-        dialog.hide()
+        dialog.hide() # Can't destroy it, we might still want to read stuff from it
         
     def respond(self, dialog, responseId):
         saidOK = responseId in [ gtk.RESPONSE_ACCEPT, gtk.RESPONSE_YES, gtk.RESPONSE_OK ]
@@ -828,19 +828,9 @@ class ActionDialogGUI(OptionGroupGUI):
         dialog.set_default_response(gtk.RESPONSE_ACCEPT)
         if fileChooser:
             fileChooser.connect("file-activated", self.simulateResponse, dialog)
-            buttonScriptName = "press " + actionScriptName.split()[0]
-            if fileChooser.get_property("action") == gtk.FILE_CHOOSER_ACTION_SAVE:
-                scriptEngine.registerFileChooser(fileChooser, fileChooserOption.name, "choose folder")
-            else:
-                fileChooserScriptName = fileChooserOption.name.strip().lower()
-                if not fileChooserScriptName.startswith("select"):
-                    fileChooserScriptName = "select " + fileChooserScriptName + " ="
-                scriptEngine.registerFileChooser(fileChooser, fileChooserScriptName, "look in folder")
             # Don't pass set_filename directly, will interfere with PyUseCase's attempts to intercept it
             fileChooserOption.setMethods(fileChooser.get_filename, lambda f: fileChooser.set_filename(f))
         
-            scriptEngine.monitorSignal("press cancel", "response", dialog, gtk.RESPONSE_CANCEL)
-            scriptEngine.monitorSignal(buttonScriptName, "response", dialog, gtk.RESPONSE_ACCEPT)
         dialog.connect("response", self.respond)
 
     def simulateResponse(self, fileChooser, dialog):

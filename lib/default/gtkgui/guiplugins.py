@@ -52,16 +52,19 @@ class ProcessTerminationMonitor(plugins.Observable):
         if self.processesForKill.has_key(pid):
             del self.processesForKill[pid]
             
-        exitHandler, exitHandlerArgs = self.exitHandlers.pop(pid)
-        if exitHandler:
-            exitHandler(*exitHandlerArgs)
+        if self.exitHandlers.has_key(pid):
+            exitHandler, exitHandlerArgs = self.exitHandlers.pop(pid)
+            if exitHandler:
+                exitHandler(*exitHandlerArgs)
     
     def notifyKillProcesses(self, sig=None):
         # Don't leak processes
         if len(self.processesForKill) == 0:
             return
         self.notify("Status", "Terminating all external viewers ...")
-        for process, description in self.processesForKill.values():
+        for pid, (process, description) in self.processesForKill.items():
+            if self.exitHandlers.has_key(pid):
+                self.exitHandlers.pop(pid) # don't call exit handlers in this case, we're terminating
             self.notify("ActionProgress", "")
             guilog.info("Killing '" + description + "' interactive process")
             killSubProcessAndChildren(process, sig)
@@ -77,7 +80,6 @@ class GtkActionWrapper:
         actionName = self.getActionName()
         self.gtkAction = gtk.Action(actionName, title, \
                                     self.getTooltip(), self.getStockId())
-        scriptEngine.monitorSignal(self.getTooltip(), "activate", self.gtkAction)
         self.gtkAction.connect("activate", self.runInteractive)
         if not self.isActiveOnCurrent():
             self.gtkAction.set_property("sensitive", False)

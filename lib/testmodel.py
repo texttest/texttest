@@ -398,21 +398,26 @@ class Test(plugins.Observable):
         if refVersion:
             appToUse = self.app.getRefVersionApplication(refVersion)
         return appToUse._getAllFileNames([ self.dircache ], stem)
+
     def getConfigValue(self, key, expandVars=True):
         return self.app.getConfigValue(key, expandVars, self.environment)
+
     def getDataFileNames(self):
         return self.app.getDataFileNames(self.environment)
+
     def getCompositeConfigValue(self, key, subKey, expandVars=True):
         return self.app.getCompositeConfigValue(key, subKey, expandVars, self.environment)
+
     def actionsCompleted(self):
         self.diagnose("All actions completed")
         if self.state.isComplete():
             if not self.state.lifecycleChange:
                 self.diagnose("Completion notified")
                 self.state.lifecycleChange = "complete"
-                self.changeState(self.state)
+                self.sendStateNotify(True)
         else:
             self.notify("Complete")
+            
     def getRelPath(self):
         if self.parent:
             parentPath = self.parent.getRelPath()
@@ -422,8 +427,10 @@ class Test(plugins.Observable):
                 return self.name
         else:
             return ""
+
     def getDirectory(self, temporary=False, forFramework=False):
         return self.dircache.dir
+
     def positionInParent(self):
         if self.parent:
             return self.parent.testcases.index(self)
@@ -524,16 +531,21 @@ class TestCase(Test):
         self.state = state
         self.diagnose("Change notified to state " + state.category)
         if state and state.lifecycleChange:
-            notifyMethod = self.getNotifyMethod(isCompletion)
-            notifyMethod("LifecycleChange", state, state.lifecycleChange)
-            if state.lifecycleChange == "complete":
-                notifyMethod("Complete")
+            self.sendStateNotify(isCompletion)
+
+    def sendStateNotify(self, isCompletion):
+        notifyMethod = self.getNotifyMethod(isCompletion)
+        notifyMethod("LifecycleChange", self.state, self.state.lifecycleChange)
+        if self.state.lifecycleChange == "complete":
+            notifyMethod("Complete")
+
     def getNotifyMethod(self, isCompletion):
         if isCompletion:
             return self.notifyThreaded # use the idle handlers to avoid things in the wrong order
         else:
             # might as well do it instantly if the test isn't still "active"
             return self.notify
+
     def getStateFile(self):
         return self.makeTmpFileName("teststate", forFramework=True)
 

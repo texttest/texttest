@@ -208,8 +208,9 @@ class FileComparison:
             cmdArgs = plugins.splitcmd(self.textDiffTool) + [ self.stdCmpFile, self.tmpCmpFile ]
             proc = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
             return self.previewGenerator.getPreview(proc.stdout)
-        except OSError:
-            return "No difference report could be created: could not find textual difference tool '" + self.textDiffTool + "'"
+        except OSError, e:
+            return "No difference report could be created: could not find textual difference tool '" + self.textDiffTool + "'\n" + \
+                   "(" + str(e) + ")"
     def updateAfterLoad(self, changedPaths):
         for oldPath, newPath in changedPaths:
             if self.stdFile:

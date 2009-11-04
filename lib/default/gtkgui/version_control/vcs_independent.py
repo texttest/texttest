@@ -741,12 +741,8 @@ class StatusGUI(VersionControlDialogGUI):
         VersionControlDialogGUI.addContents(self)
         self.addToggleItems()
         self.infoColumn.set_clickable(True)
-        button = self.infoColumn.get_button()
-        if button:
-            button.set_name(self.infoColumn.get_title())
-            button.connect("button-press-event", self.showPopupMenu)
-            guiutils.scriptEngine.monitorRightClicks("show visibility controls", button)
-            
+        self.infoColumn.connect("button-press-event", self.showPopupMenu)
+        guiutils.scriptEngine.monitorRightClicks("show visibility controls", self.infoColumn)
         self.treeView.grab_focus() # Or the column button gets focus ...
         
     def showPopupMenu(self, button, event):

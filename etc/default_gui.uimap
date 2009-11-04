@@ -714,6 +714,7 @@ changed.selection = select
 
 [Name=VCS status info tree]
 changed.selection = select
+button-press-event.information = show visibility controls
 
 [Name=Up-to-date]
 toggled.true = show category up-to-date
@@ -722,9 +723,6 @@ toggled.false = hide category up-to-date
 [Name=Locally Modified]
 toggled.true = show category locally modified
 toggled.false = hide category locally modified
-
-[Title=Information]
-button-press-event = show visibility controls
 
 [Name=VCS add info tree]
 changed.selection = select

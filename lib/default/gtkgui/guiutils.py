@@ -13,7 +13,7 @@ except ImportError:
     pass # We might want to document the config entries, silly to fail on lack of GTK...
 
 
-guilog, guiConfig, scriptEngine = None, None, None
+guilog, guiConfig = None, None
 
 
 # gtk.accelerator_valid appears utterly broken on Windows

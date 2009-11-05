@@ -255,10 +255,10 @@ class Config:
             self.setDefaultInterface(allApps)
 
         self.setUpLogging()
-        scriptEngine = pyusecase_interface.makeScriptEngine(self.optionMap)
-        return self._getResponderClasses(allApps, scriptEngine)
+        pyusecase_interface.makeScriptEngine(self.optionMap)
+        return self._getResponderClasses(allApps)
 
-    def _getResponderClasses(self, allApps, scriptEngine):
+    def _getResponderClasses(self, allApps):
         classes = []        
         if not self.optionMap.has_key("gx"):
             if self.optionMap.has_key("new"):
@@ -267,7 +267,7 @@ class Config:
                 raise plugins.TextTestError, "Could not find any matching applications (files of the form config.<app>) under " + " or ".join(self.optionMap.rootDirectories)
             
         if self.useGUI():
-            self.addGuiResponder(classes, scriptEngine)
+            self.addGuiResponder(classes)
         else:
             classes.append(self.getTextDisplayResponderClass())
         if not self.optionMap.has_key("gx"):
@@ -350,12 +350,14 @@ class Config:
 
     def getTimeDescriptor(self):
         return plugins.startTimeString().replace(":", "")
+
     def getAppDescriptors(self):
         givenAppDescriptor = self.optionValue("a")
         if givenAppDescriptor and givenAppDescriptor.find(",") == -1:
             return [ givenAppDescriptor ]
         else:
             return []
+
     def getVersionDescriptors(self):
         givenVersion = self.optionValue("v")
         if givenVersion:
@@ -365,17 +367,20 @@ class Config:
             return [ "++".join(plugins.commasplit(givenVersion)) ]
         else:
             return []
-    def addGuiResponder(self, classes, scriptEngine):
+
+    def addGuiResponder(self, classes):
         from gtkgui.controller import GUIController
-        GUIController.scriptEngine = scriptEngine
         classes.append(GUIController)
+
     def getReconnectSequence(self):
         actions = [ self.reconnectConfig.getReconnectAction() ]
         actions += [ self.getOriginalFilterer(), self.getTemporaryFilterer(), \
                      self.getTestComparator(), self.getFailureExplainer() ]
         return actions
+
     def getOriginalFilterer(self):
         return rundependent.FilterOriginal()
+
     def getTemporaryFilterer(self):
         return rundependent.FilterTemporary()
     

@@ -1,13 +1,9 @@
 
-import plugins, os
+import plugins, os, usecase
 
 def makeScriptEngine(optionMap):
-    if ApplicationEventResponder.scriptEngine:
-        return ApplicationEventResponder.scriptEngine
-    else:
-        scriptEngine = _makeScriptEngine(optionMap)
-        ApplicationEventResponder.scriptEngine = scriptEngine
-        return scriptEngine
+    if not usecase.scriptEngine:
+        usecase.scriptEngine = _makeScriptEngine(optionMap)
 
 def _makeScriptEngine(optionMap):
     if optionMap.has_key("gx") or optionMap.has_key("g"):
@@ -17,13 +13,11 @@ def _makeScriptEngine(optionMap):
         except ImportError:
             pass # Let the GUI itself print the error
     else:
-        from usecase import ScriptEngine
-        return ScriptEngine()
+        return usecase.ScriptEngine()
 
 
 # Compulsory responder to generate application events. Always present. See respond module
 class ApplicationEventResponder(plugins.Responder):
-    scriptEngine = None
     def notifyLifecycleChange(self, test, state, changeDesc):
         if changeDesc.find("saved") != -1 or changeDesc.find("recalculated") != -1 or changeDesc.find("marked") != -1:
             # don't generate application events when a test is saved or recalculated or marked...
@@ -31,16 +25,16 @@ class ApplicationEventResponder(plugins.Responder):
         eventName = "test " + test.uniqueName + " to " + changeDesc
         category = test.uniqueName
         timeDelay = self.getTimeDelay()
-        self.scriptEngine.applicationEvent(eventName, category + " lifecycle", [ "lifecycle" ], timeDelay)
+        usecase.applicationEvent(eventName, category + " lifecycle", [ "lifecycle" ], timeDelay)
         
     def notifyAdd(self, test, initial):
         if initial and test.classId() == "test-case":
             eventName = "test " + test.uniqueName + " to be read"
-            self.scriptEngine.applicationEvent(eventName, test.uniqueName, [ test.uniqueName + " lifecycle", "read", "lifecycle" ])
+            usecase.applicationEvent(eventName, test.uniqueName, [ test.uniqueName + " lifecycle", "read", "lifecycle" ])
 
     def notifyUniqueNameChange(self, test, newName):
         if test.classId() == "test-case":
-            self.scriptEngine.applicationEventRename("test " + test.uniqueName + " to", "test " + newName + " to",
+            usecase.applicationEventRename("test " + test.uniqueName + " to", "test " + newName + " to",
                                                      test.uniqueName, newName)
 
     def getTimeDelay(self):
@@ -50,10 +44,10 @@ class ApplicationEventResponder(plugins.Responder):
             return 1
 
     def notifyAllRead(self, *args):
-        self.scriptEngine.applicationEvent("all tests to be read", "read", [ "lifecycle" ])
+        usecase.applicationEvent("all tests to be read", "read", [ "lifecycle" ])
 
     def notifyAllComplete(self):
-        self.scriptEngine.applicationEvent("completion of test actions", "lifecycle")
+        usecase.applicationEvent("completion of test actions", "lifecycle")
 
     def notifyCloseDynamic(self, test, name):
-        self.scriptEngine.applicationEvent(name + " GUI to be closed")
+        usecase.applicationEvent(name + " GUI to be closed")

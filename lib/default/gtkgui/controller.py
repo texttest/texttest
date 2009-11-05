@@ -81,7 +81,6 @@ class IdleHandlerManager:
 
 
 class GUIController(plugins.Responder, plugins.Observable):
-    scriptEngine = None
     def __init__(self, optionMap, allApps):
         includeSite, includePersonal = optionMap.configPathOptions()
         self.readGtkRCFiles(includeSite, includePersonal)
@@ -113,8 +112,7 @@ class GUIController(plugins.Responder, plugins.Observable):
         self.topWindowGUI = self.createTopWindowGUI(allApps, runName)
 
     def setUpGlobals(self, allApps):
-        global guilog, guiConfig, scriptEngine
-        scriptEngine = self.scriptEngine
+        global guilog, guiConfig
         guilog = logging.getLogger("gui log")
         defaultColours = self.interactiveActionHandler.getColourDictionary()
         defaultAccelerators = self.interactiveActionHandler.getDefaultAccelerators()
@@ -122,7 +120,6 @@ class GUIController(plugins.Responder, plugins.Observable):
 
         for module in [ guiutils, guiplugins ]:
             module.guilog = guilog
-            module.scriptEngine = scriptEngine
             module.guiConfig = guiConfig
 
     def getTestTreeObservers(self):
@@ -401,7 +398,8 @@ class ShortcutBarGUI(guiutils.SubGUI):
     def getWidgetName(self):
         return "_Shortcut bar"
     def createView(self):
-        self.widget = scriptEngine.createShortcutBar()
+        from gtkusecase import createShortcutBar
+        self.widget = createShortcutBar()
         self.widget.show()
         return self.widget
     

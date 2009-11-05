@@ -67,8 +67,14 @@ activate = move selected test to last in suite
 [Name=Run]
 activate = run selected tests
 
+[Label=_Run]
+clicked = run selected tests
+
 [Name=Record Use-Case]
 activate = record use-case
+
+[Label=Record _Use-Case]
+clicked = record use-case
 
 [Name=Reconnect...]
 activate = reconnect to previously run tests
@@ -112,8 +118,14 @@ activate = save selected tests in file
 [Name=Select]
 activate = select indicated tests
 
+[Label=_Select]
+clicked = select indicated tests
+
 [Name=Filter]
 activate = filter tests to show only those indicated
+
+[Label=Filter]
+clicked = filter tests to show only those indicated
 
 [Name=Show only selected]
 activate = show only tests that are currently selected

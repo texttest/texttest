@@ -44,8 +44,7 @@ class IdleHandlerManager:
         # process isn't run. We hence remove that for a while here ...
         if lock:
             self.disableHandler()
-            scriptEngine.replayer.disableIdleHandlers()
-
+        
     def shouldShow(self):
         return True # nothing to show, but we need to observe...
 
@@ -56,8 +55,7 @@ class IdleHandlerManager:
     def notifyActionStop(self, *args):
         # Activate idle function again, see comment in notifyActionStart
         self.enableHandler()
-        scriptEngine.replayer.reenableIdleHandlers()
-
+        
     def addSuites(self, *args):
         self.enableHandler()
 

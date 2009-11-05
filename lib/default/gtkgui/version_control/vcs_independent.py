@@ -647,16 +647,13 @@ class DiffGUI(VersionControlDialogGUI):
 
         
 class StatusGUI(VersionControlDialogGUI):
-    popupMenuUI = '''<ui>
-      <popup name='Info'>
-      </popup>
-    </ui>'''
     def __init__(self, *args):
         VersionControlDialogGUI.__init__(self, *args)
-        self.uiManager = gtk.UIManager()
         self.popupMenu = None
+    
     def _getTitle(self):
         return "_Status"
+    
     def getResultDialogTwoColumnsInTreeView(self):
         return True
     
@@ -676,25 +673,23 @@ class StatusGUI(VersionControlDialogGUI):
             self.needsAttention = True
         return self.getStatusMarkup(status)
             
-    def addToggleItems(self):
-        # Each unique info column (column 2) gets its own toggle action in the popup menu
+    def createPopupMenu(self):
+        # Each unique info column (column 2) gets its own menu item in the popup menu
         uniqueInfos = []
         self.treeModel.foreach(self.collectInfos, uniqueInfos)
-        actionGroup = self.uiManager.get_action_groups()[0]
-        for info in uniqueInfos:
-            # Don't add the same action lots of time, GTK 2.12 protests...
-            if actionGroup.get_action(info):
-                continue
-            action = gtk.ToggleAction(info, info, None, None)
-            action.set_active(True)
-            actionGroup.add_action(action)
-            self.uiManager.add_ui_from_string("<popup name='Info'><menuitem name='" + info + "' action='" + info + "'/></popup>")
-            action.connect("toggled", self.toggleVisibility)
-            guiutils.scriptEngine.registerToggleButton(action, "show category " + action.get_name(), "hide category " + action.get_name())
-        self.uiManager.ensure_update()
 
-    def toggleVisibility(self, action):
-        self.treeModel.foreach(self.setVisibility, (action.get_name(), action.get_active()))
+        menu = gtk.Menu()
+        for info in uniqueInfos:
+            menuItem = gtk.CheckMenuItem(info)
+            menuItem.set_active(True)
+            menuItem.set_name(info)
+            menu.append(menuItem)
+            menuItem.connect("toggled", self.toggleVisibility)         
+            menuItem.show()
+        return menu
+
+    def toggleVisibility(self, menuItem):
+        self.treeModel.foreach(self.setVisibility, (menuItem.get_name(), menuItem.get_active()))
         self.treeView.expand_row(self.filteredTreeModel.get_path(self.filteredTreeModel.get_iter_root()), True)
         
     def getStatus(self, iter):
@@ -728,18 +723,10 @@ class StatusGUI(VersionControlDialogGUI):
                                                                        "").replace("</span>", "").strip()
             if rawInfo not in infos:
                 infos.append(rawInfo)
-            
-    def notifyTopWindow(self, topWindow):
-        VersionControlDialogGUI.notifyTopWindow(self, topWindow)
-        topWindow.add_accel_group(self.uiManager.get_accel_group())
-        self.uiManager.insert_action_group(gtk.ActionGroup("infovisibilitygroup"), 0)
-        self.uiManager.get_action_groups()[0].add_actions([("Info", None, "Info", None, None, None)])
-        self.uiManager.add_ui_from_string(self.popupMenuUI)
-        self.popupMenu = self.uiManager.get_widget("/Info")
-        
+                    
     def addContents(self):
         VersionControlDialogGUI.addContents(self)
-        self.addToggleItems()
+        self.popupMenu = self.createPopupMenu()
         self.infoColumn.set_clickable(True)
         self.infoColumn.connect("button-press-event", self.showPopupMenu)
         self.treeView.grab_focus() # Or the column button gets focus ...

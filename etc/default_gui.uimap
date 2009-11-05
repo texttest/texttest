@@ -1,8 +1,10 @@
 [Name=Quit]
 activate = quit
+clicked = quit
 
 [Name=Refresh]
 activate = refresh the whole test suite so that it reflects file changes
+clicked = refresh the whole test suite so that it reflects file changes
 
 [Name=Reset]
 activate = reset running options
@@ -66,6 +68,7 @@ activate = move selected test to last in suite
 
 [Name=Run]
 activate = run selected tests
+clicked = run selected tests
 
 [Label=_Run]
 clicked = run selected tests
@@ -117,6 +120,7 @@ activate = save selected tests in file
 
 [Name=Select]
 activate = select indicated tests
+clicked = select indicated tests
 
 [Label=_Select]
 clicked = select indicated tests
@@ -301,9 +305,11 @@ activate = save results with non-default settings
 
 [Name=Save]
 activate = save results for selected tests
+clicked = save results for selected tests
 
 [Name=Kill]
 activate = kill selected tests
+clicked = kill selected tests
 
 [Name=Mark]
 activate = mark the selected tests

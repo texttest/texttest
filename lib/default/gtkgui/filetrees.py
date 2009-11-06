@@ -140,7 +140,8 @@ class FileViewGUI(guiutils.SubGUI):
         self.notify(self.getViewFileSignal(), fileName, comparison)
 
     def notifyViewerStarted(self):
-        self.selection.unselect_all()
+        if self.dynamic:
+            self.selection.unselect_all() # Mostly so viewing files doesn't cause only them to be saved
         self.applicationEvent("the viewer process to start", timeDelay=1)
 
     def notifyNewFile(self, fileName, overwrittenExisting):

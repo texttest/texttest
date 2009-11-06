@@ -73,9 +73,6 @@ class IdleHandlerManager:
             gobject.source_remove(self.sourceId)
             self.sourceId = -1
 
-    def notifyAllComplete(self):
-        self.diag.info("Disabling thread-based polling")
-        plugins.Observable.threadedNotificationHandler.disablePoll()
     def notifyExit(self):
         self.disableHandler()
 

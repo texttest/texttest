@@ -6,6 +6,7 @@ called from anywhere in the gtkgui package
 import plugins, os, sys, operator, types, subprocess
 from copy import copy
 from locale import getdefaultlocale
+from usecase import applicationEvent
 
 try:
     import gtk
@@ -326,6 +327,10 @@ class SubGUI(plugins.Observable):
             window.add_with_viewport(widget)
         else:
             window.add(widget)
+
+    def applicationEvent(self, name, **kw):
+        # Everything that comes from here is to do with editing files in external programs
+        applicationEvent(name, "files", **kw)
 
 
 # base class for managing containers

@@ -7,7 +7,6 @@ from copy import copy, deepcopy
 from glob import glob
 from stat import *
 from ndict import seqdict
-from usecase import applicationEvent
         
 # The purpose of this class is to provide a means to monitor externally
 # started process, so that (a) code can be called when they exit, and (b)
@@ -136,10 +135,6 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
     def checkValid(self, app):
         pass
     
-    def applicationEvent(self, name):
-        # Everything that comes from here is to do with editing files in external programs
-        applicationEvent(name, "files")
-
     def notifyTopWindow(self, window):
         self.topWindow = window
 

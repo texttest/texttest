@@ -141,6 +141,7 @@ class FileViewGUI(guiutils.SubGUI):
 
     def notifyViewerStarted(self):
         self.selection.unselect_all()
+        self.applicationEvent("the viewer process to start", timeDelay=1)
 
     def notifyNewFile(self, fileName, overwrittenExisting):
         if os.path.isfile(fileName):

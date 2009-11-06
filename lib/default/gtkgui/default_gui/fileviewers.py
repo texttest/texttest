@@ -138,7 +138,7 @@ class FileViewAction(guiplugins.ActionGUI):
         nullFile = open(os.devnull, "w")
         self.notify("Status", 'Started "' + description + '" in background' + testDesc + '.')
         guiplugins.processMonitor.startProcess(cmdArgs, fullDesc, stdout=nullFile, stderr=nullFile, *args, **kwargs)
-        self.notify("ViewerStarted")
+        self.notifyThreaded("ViewerStarted") # Don't call application events directly in the GUI thread
 
     def getStem(self, fileName):
         return os.path.basename(fileName).split(".")[0]

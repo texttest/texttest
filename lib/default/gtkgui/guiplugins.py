@@ -336,17 +336,20 @@ class ActionGUI(BasicActionGUI):
         self.noApps = len(allApps) == 0
         BasicActionGUI.__init__(self)
         for app in allApps:
-            self._checkValid(app)
-
+            self._checkAllValid(app)
+        
     def checkValid(self, app):
-        if app not in self.validApps:
-            self._checkValid(app)
+        self._checkAllValid(app)
         self.noApps = len(self.validApps) == 0
+
+    def _checkAllValid(self, app):
+        for currApp in [ app ] + app.extras:
+            if currApp not in self.validApps:
+                self._checkValid(currApp)
                         
     def _checkValid(self, app):
         if self.isValidForApp(app):
             self.validApps.append(app)
-            self.validApps += app.extras
         else:
             self.diag.info(str(self.__class__) + " invalid for " + repr(app))
         

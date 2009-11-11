@@ -392,12 +392,19 @@ class TopWindowGUI(guiutils.ContainerGUI):
 
 
 class ShortcutBarGUI(guiutils.SubGUI):
+    def __init__(self):
+        # Do this first, so we set up interceptors and so on early on
+        try:
+            from gtkusecase import createShortcutBar
+            self.widget = createShortcutBar(uiMapFiles=plugins.findDataPaths([ "*.uimap" ]))
+            self.widget.show()
+        except ImportError:
+            self.widget = gtk.HBox() # Anything really, but it should be a widget (for if PyUseCase isn't installed)
+        
     def getWidgetName(self):
         return "_Shortcut bar"
+
     def createView(self):
-        from gtkusecase import createShortcutBar
-        self.widget = createShortcutBar()
-        self.widget.show()
         return self.widget
     
 

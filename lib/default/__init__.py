@@ -255,7 +255,6 @@ class Config:
             self.setDefaultInterface(allApps)
 
         self.setUpLogging()
-        pyusecase_interface.makeScriptEngine(self.optionMap)
         return self._getResponderClasses(allApps)
 
     def _getResponderClasses(self, allApps):

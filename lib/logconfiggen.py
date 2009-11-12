@@ -85,6 +85,7 @@ class PythonLoggingGenerator:
                 self.write("formatter=debug")
             fileName = self.prefix + fileStem.lower().replace(" ", "") + self.postfix
             if enable:
+                self.write("#args=(os.devnull, 'a')")
                 self.write("args=('" + fileName + "', 'a')\n")
             else:
                 self.write("args=(os.devnull, 'a')")

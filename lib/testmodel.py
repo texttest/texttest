@@ -388,9 +388,7 @@ class Test(plugins.Observable):
 
     def getDirCachesToRoot(self, configName):
         fromTests = [ test.dircache for test in self.getAllTestsToRoot() ]
-        dirNames = self.getCompositeConfigValue("extra_search_directory", configName)
-        dirNames.reverse() # lowest priroity comes first, as above
-        return self.app.getExtraDirCaches(dirNames) + fromTests
+        return self.app.getExtraDirCaches(configName, envMapping=self.environment) + fromTests
 
     def getAllFileNames(self, stem, refVersion = None):
         self.diagnose("Getting file from " + stem)
@@ -1189,9 +1187,13 @@ class Application:
         if os.path.isdir(appPath):
             return DirectoryCache(appPath)
 
-    def getExtraDirCaches(self, dirNames):
+    def getExtraDirCaches(self, fileName, includeRoot=False, **kwargs):
+        dirCacheNames = self.getCompositeConfigValue("extra_search_directory", fileName, **kwargs)
+        dirCacheNames.reverse() # lowest-priority comes first, so it can be overridden
+        if includeRoot:
+            dirCacheNames.append(".")
         dirCaches = []
-        for dirName in dirNames:
+        for dirName in dirCacheNames:
             if self.extraDirCaches.has_key(dirName):
                 cached = self.extraDirCaches.get(dirName)
                 if cached:
@@ -1224,27 +1226,36 @@ class Application:
             return ConfigurationCall(name, self)
         else:
             raise AttributeError, "No such Application method : " + name
+
     def getDirectory(self):
         return self.dircache.dir
+
     def getRunMachine(self):
         if self.inputOptions.has_key("m"):
             return plugins.interpretHostname(self.inputOptions["m"])
         else:
             return plugins.interpretHostname(self.getConfigValue("default_machine"))
+
     def readConfigFiles(self, configModuleInitialised):
         self.readDefaultConfigFiles()
         self.readExplicitConfigFiles(configModuleInitialised)
+
     def readDefaultConfigFiles(self):
         includeSite, includePersonal = self.inputOptions.configPathOptions()
-        for dataDir in plugins.findDataDirs(includeSite, includePersonal):
-            # don't error check as there might be settings there for all sorts of config modules...
-            self.readValues(self.configDir, "config", DirectoryCache(dataDir), insert=False, errorOnUnknown=False)
+        dirCaches = map(DirectoryCache, plugins.findDataDirs(includeSite, includePersonal))
+        # don't error check as there might be settings there for all sorts of config modules...
+        self.readValues(self.configDir, "config", dirCaches, insert=False, errorOnUnknown=False)
+            
     def readExplicitConfigFiles(self, errorOnUnknown):
-        self.readValues(self.configDir, "config", self.dircache, insert=False, errorOnUnknown=errorOnUnknown)
-    def readValues(self, multiEntryDict, stem, dircache, insert=True, errorOnUnknown=False):
-        allFiles = self._getAllFileNames([ dircache ], stem)
+        self.readValues(self.configDir, "config", [ self.dircache ], insert=False, errorOnUnknown=errorOnUnknown)
+        extra = self.getExtraDirCaches("config")
+        self.readValues(self.configDir, "config", extra, insert=False, errorOnUnknown=errorOnUnknown)
+        
+    def readValues(self, multiEntryDict, stem, dircaches, insert=True, errorOnUnknown=False):
+        allFiles = self._getAllFileNames(dircaches, stem)
         self.diag.info("Reading values for " + stem + " from files : " + "\n".join(allFiles))
         multiEntryDict.readValues(allFiles, insert, errorOnUnknown)
+
     def setEnvironment(self, test):
         test.environment.diag.info("Reading environment for " + repr(test))
         envFiles = test.getAllPathNames("environment")
@@ -1272,13 +1283,12 @@ class Application:
         envVars = envDir.items()
         self.envFiles[envFile] = envVars
         return envVars
+    
     def configPath(self, fileName):
         if os.path.isabs(fileName):
             return fileName
-        dirCacheNames = self.getCompositeConfigValue("extra_search_directory", fileName)
-        dirCacheNames.reverse() # lowest-priority comes first, so it can be overridden
-        dirCacheNames.append(".") # pick up the root directory
-        dirCaches = self.getExtraDirCaches(dirCacheNames)
+
+        dirCaches = self.getExtraDirCaches(fileName, includeRoot=True)
         dirCaches.append(self.dircache)
         configPath = self._getFileName(dirCaches, fileName)
         if not configPath:

@@ -39,7 +39,7 @@ class RunningAction:
         errFile = os.path.join(writeDir, "errors.log")
         RunningAction.runNumber += 1
         description = "Dynamic GUI started at " + plugins.localtime()
-        cmdArgs = self.getTextTestArgs() + ttOptions
+        cmdArgs = self.getInterpreterArgs() + [ sys.argv[0] ] + ttOptions
         env = self.getNewUseCaseEnvironment(usecase)
         testsAffected = self.getTestsAffected(testSelOverride)
         guiplugins.processMonitor.startProcess(cmdArgs, description, env=env, killOnTermination=self.killOnTermination(),
@@ -82,9 +82,12 @@ class RunningAction:
             self.notify("SaveSelection", filterFileName)
             return filterFileName
     
-    def getTextTestArgs(self):
-        extraArgs = plugins.splitcmd(os.getenv("TEXTTEST_DYNAMIC_GUI_PYARGS", "")) # Additional python arguments for dynamic GUI : mostly useful for coverage
-        return [ sys.executable ] + extraArgs + [ sys.argv[0] ]
+    def getInterpreterArgs(self):
+        interpreterArg = os.getenv("TEXTTEST_DYNAMIC_GUI_INTERPRETER", "") # Alternative interpreter for the dynamic GUI : mostly useful for coverage / testing
+        if interpreterArg:
+            return plugins.splitcmd(interpreterArg.replace("ttpython", sys.executable))
+        else:
+            return [ sys.executable ]
 
     def getOptionGroups(self):
         return [ self.optionGroup ]

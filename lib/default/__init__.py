@@ -1337,10 +1337,15 @@ class RunTest(plugins.Action):
         commandArgs = self.getExecuteCmdArgs(test, machine)
         testEnv = test.getRunEnvironment()
         self.diagnose(testEnv, commandArgs)
-        return subprocess.Popen(commandArgs, preexec_fn=self.getPreExecFunction(), \
-                                stdin=open(self.getInputFile(test)), cwd=test.getDirectory(temporary=1), \
-                                stdout=self.makeFile(test, "output"), stderr=self.makeFile(test, "errors"), \
-                                env=testEnv, startupinfo=plugins.getProcessStartUpInfo(test.environment))
+        try:
+            return subprocess.Popen(commandArgs, preexec_fn=self.getPreExecFunction(), \
+                                    stdin=open(self.getInputFile(test)), cwd=test.getDirectory(temporary=1), \
+                                    stdout=self.makeFile(test, "output"), stderr=self.makeFile(test, "errors"), \
+                                    env=testEnv, startupinfo=plugins.getProcessStartUpInfo(test.environment))
+        except OSError:
+            message = "OS-related error starting the test command - probably cannot find the program " + repr(commandArgs[0])
+            raise plugins.TextTestError, message
+        
     def getPreExecFunction(self):
         if os.name == "posix": # pragma: no cover - only run in the subprocess!
             return self.ignoreJobControlSignals

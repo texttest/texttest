@@ -25,8 +25,8 @@ class Config:
     def getMachineNameForDisplay(self, machine):
         return machine # override for queuesystems
     def addToOptionGroups(self, apps, groups):
-        recordsUseCases = reduce(operator.or_, (app.getConfigValue("use_case_record_mode") != "disabled" for app in apps), False)
-        useCatalogues = reduce(operator.or_, (self.isolatesDataUsingCatalogues(app) for app in apps), False)
+        recordsUseCases = self.anyAppHas(apps, lambda app: app.getConfigValue("use_case_record_mode") != "disabled")
+        useCatalogues = self.anyAppHas(apps, self.isolatesDataUsingCatalogues)
         for group in groups:
             if group.name.startswith("Select"):
                 group.addOption("t", "Test names containing", description="Select tests for which the name matches the entered text. The text can be a regular expression.")
@@ -92,6 +92,13 @@ class Config:
                     group.addSwitch("actrep", "Run with slow motion replay")
                 if not useCatalogues:
                     group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
+
+    def anyAppHas(self, apps, propertyMethod):
+        for app in apps:
+            for partApp in [ app ] + app.extras:
+                if propertyMethod(partApp):
+                    return True
+        return False
 
     def defaultVanillaValue(self):
         if not self.optionMap.has_key("vanilla"):

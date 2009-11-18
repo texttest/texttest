@@ -11,6 +11,7 @@ from jobprocess import killSubProcessAndChildren
 from actionrunner import ActionRunner
 from time import sleep
 from StringIO import StringIO
+from ndict import seqdict
 
 plugins.addCategory("killed", "killed", "were terminated before completion")
 
@@ -1464,20 +1465,23 @@ class RunTest(plugins.Action):
                     
 class CountTest(plugins.Action):
     scriptDoc = "report on the number of tests selected, by application"
-    def __init__(self):
-        self.appCount = {}
+    appCount = seqdict()
+    doneReport = False
     def __del__(self):
-        for app, count in self.appCount.items():
-            print app, "has", count, "tests"
+        if not self.doneReport:
+            for app, count in self.appCount.items():
+                print app.description(), "has", count, "tests"
+            print "There are", sum(self.appCount.values()), "tests in total."
+            CountTest.doneReport = True
     def __repr__(self):
         return "Counting"
     def __call__(self, test):
         self.describe(test)
-        self.appCount[test.app.description()] += 1
+        self.appCount[test.app] += 1
     def setUpSuite(self, suite):
         self.describe(suite)
     def setUpApplication(self, app):
-        self.appCount[app.description()] = 0
+        self.appCount[app] = 0
 
 
 

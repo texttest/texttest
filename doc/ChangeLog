@@ -1581,6 +1581,8 @@ Framework Enhancements:
     - "collate_file" functionality for multiple files rewritten (sandbox.py)
 	Patterns of the form "data*:data*.dump" should behave more intuitively, but may not be completely back-compatible.
 	Read the migration notes and the website for details.
+    - Versioned config files can be now be placed in "extra_search_directory" locations (testmodel.py)
+	Previously only imported files could be found there.
     - "suppress_stderr_text" now supports the same syntax as "run_dependent_text" (default/__init__.py)
 	Allows e.g. multiline filtering
     - "text_diff_program_max_file_size" setting now renamed to "max_file_size" and is now a dictionary (comparefile.py)
@@ -1595,7 +1597,7 @@ Grid Engine (LSF/SGE) enhancements:
     - Grid Engine command line now appears in the "Run Info" tab of the dynamic GUI. (textinfo.py)
 Self-test/Internal changes:
     - PyUseCase instrumentation removed, use PyUseCase 3.0 which doesn't need this. 
-	Uses UI map files (under etc) instead.
+	Uses UI map files (under etc) instead, and command-line PyUseCase.
     - Now automatically pick up a local PyUseCase repository called "pyusecase" (texttest.py)
 Bug Fixes:
     - Accelerators for "Cut Test", "Copy Test" and "Paste Test" are disabled when a text widget is focussed (adminactions.py)
@@ -1605,6 +1607,8 @@ Bug Fixes:
     - "copy_test_path:$ENV_VAR" will now do nothing if ENV_VAR is empty (sandbox.py)
 	Previously set it to $TEXTTEST_SANDBOX/. which could cause problems.
     - If a "collate_script" produces an empty file from non-empty input, don't write an empty file (sandbox.py)
+    - An "extra_version" will now read its GUI-testing config and not just assume it's the same as the parent (guiplugins.py)
     - Don't stacktrace if a "collate_script" doesn't exist (sandbox.py)
     - Don't stacktrace if the argument to "-cp" (or Times to Run) is invalid (default/__init__.py)
+    - Don't stacktrace if a relative interpreter program isn't found (default/__init__.py)
 Grid Engine (LSF/SGE) Bug Fixes:

@@ -1647,10 +1647,9 @@ class OptionFinder(plugins.OptionFinder):
             return v1 + "." + v2
 
     def addToAppDict(self, appDict, appName, versionName):
-        if appDict.has_key(appName):
-            appDict[appName].append(versionName)
-        else:
-            appDict[appName] = [ versionName ]
+        versions = appDict.setdefault(appName, [])
+        if versionName not in versions:
+            versions.append(versionName)
 
     def helpMode(self):
         return self.has_key("help")

@@ -11,7 +11,7 @@ def getWeekDay(tag):
     return plugins.weekdays[time.strptime(tag.split("_")[0], "%d%b%Y")[6]]
     
 class ColourFinder:
-    def setConfigGetter(self, getConfigValue):
+    def __init__(self, getConfigValue):
         self.getConfigValue = getConfigValue
     def find(self, title):
         colourName = self.getConfigValue("historical_report_colours", title)
@@ -20,8 +20,6 @@ class ColourFinder:
         if not colourName.startswith("#"):
             exec "colourName = HTMLcolors." + colourName.upper()
         return colourName
-
-colourFinder = ColourFinder()
 
 def getDisplayText(tag):
     displayText = "_".join(tag.split("_")[1:])
@@ -48,7 +46,6 @@ class GenerateWebPages(object):
         self.getConfigValue = getConfigValue
         self.resourceNames = resourceNames
         self.diag = logging.getLogger("GenerateWebPages")
-        colourFinder.setConfigGetter(getConfigValue)
 
     def makeSelectors(self, subPageNames, tags=[]):
         allSelectors = []
@@ -297,6 +294,7 @@ class TestTable:
     def __init__(self, getConfigValue, cellInfo):
         self.getConfigValue = getConfigValue
         self.cellInfo = cellInfo
+        self.colourFinder = ColourFinder(getConfigValue)
 
     def generate(self, categoryHandlers, pageVersion, version, loggedTests, tagsFound):
         table = HTMLgen.TableLite(border=0, cellpadding=4, cellspacing=2,width="100%")
@@ -332,7 +330,7 @@ class TestTable:
             return table
 
     def generateSummaries(self, categoryHandlers, pageVersion, version, tags, extraVersion=None):
-        bgColour = colourFinder.find("column_header_bg")
+        bgColour = self.colourFinder.find("column_header_bg")
         row = [ HTMLgen.TD("Summary", bgcolor = bgColour) ]
         for tag in tags:
             categoryHandler = categoryHandlers[tag]
@@ -349,13 +347,13 @@ class TestTable:
         return HTMLgen.Heading(2, cont, align='center')
         
     def generateExtraVersionHeader(self, extraVersion, tagsFound):
-        bgColour = colourFinder.find("column_header_bg")
+        bgColour = self.colourFinder.find("column_header_bg")
         extraVersionElement = HTMLgen.Container(HTMLgen.Name(extraVersion), extraVersion)
         columnHeader = HTMLgen.TH(extraVersionElement, colspan = len(tagsFound) + 1, bgcolor=bgColour)
         return HTMLgen.TR(columnHeader)
     
     def generateTestRow(self, testName, pageVersion, version, extraVersion, results, tagsFound):
-        bgColour = colourFinder.find("row_header_bg")
+        bgColour = self.colourFinder.find("row_header_bg")
         testId = version + testName + extraVersion
         row = [ HTMLgen.TD(HTMLgen.Container(HTMLgen.Name(testId), testName), bgcolor=bgColour) ]
         # Don't add empty rows to the table
@@ -378,7 +376,7 @@ class TestTable:
             else:
                 return self.getCellDataFromState(state)
 
-        return "N/A", True, colourFinder.find("test_default_fg"), colourFinder.find("no_results_bg")
+        return "N/A", True, self.colourFinder.find("test_default_fg"), self.colourFinder.find("no_results_bg")
 
     def getCellDataFromState(self, state):
         if hasattr(state, "getMostSevereFileComparison"):
@@ -425,25 +423,25 @@ class TestTable:
         return result
 
     def getColours(self, category, fileComp, success):
-        bgcol = colourFinder.find("failure_bg")
-        fgcol = colourFinder.find("test_default_fg")
+        bgcol = self.colourFinder.find("failure_bg")
+        fgcol = self.colourFinder.find("test_default_fg")
         if success:
-            bgcol = colourFinder.find("success_bg")
+            bgcol = self.colourFinder.find("success_bg")
         elif category.startswith("faster") or category.startswith("slower"):
-            bgcol = colourFinder.find("performance_bg")
+            bgcol = self.colourFinder.find("performance_bg")
             if self.getPercent(fileComp) >= self.getConfigValue("performance_variation_serious_%", "cputime"):
-                fgcol = colourFinder.find("performance_fg")
+                fgcol = self.colourFinder.find("performance_fg")
         elif category == "smaller" or category == "larger":
-            bgcol = colourFinder.find("memory_bg")
+            bgcol = self.colourFinder.find("memory_bg")
             if self.getPercent(fileComp) >= self.getConfigValue("performance_variation_serious_%", "memory"):
-                fgcol = colourFinder.find("performance_fg")
+                fgcol = self.colourFinder.find("performance_fg")
         return fgcol, bgcol
 
     def getPercent(self, fileComp):
         return fileComp.perfComparison.percentageChange
 
     def findTagColour(self, tag):
-        return colourFinder.find("run_" + getWeekDay(tag) + "_fg")
+        return self.colourFinder.find("run_" + getWeekDay(tag) + "_fg")
 
     def generateTableHead(self, pageVersion, version, tagsFound):
         head = [ HTMLgen.TH("Test") ]

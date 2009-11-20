@@ -624,6 +624,7 @@ class GenerateSummaryPage(plugins.ScriptWithArgs):
     def __init__(self, args=[""]):
         argDict = self.parseArguments(args, [ "batch", "file" ])
         self.batchSession = argDict.get("batch", "default")
+        self.diag = logging.getLogger("GenerateWebPages")
         if argDict.has_key("file"):
             GenerateSummaryPage.summaryFileName = argDict["file"]
         
@@ -639,34 +640,77 @@ class GenerateSummaryPage(plugins.ScriptWithArgs):
             return # Don't repeat info for the same app
 
         GenerateSummaryPage.configPathArgs = app.inputOptions.configPathOptions()
-        versionLinks = {}
-        subPageNames = [ pn.lower() for pn in app.getCompositeConfigValue("historical_report_subpages", self.batchSession) ]
+        versionDates = {}
         for path in glob(os.path.join(appDir, "test_*.html")):
             fileName = os.path.basename(path)
-            version = fileName[5:-5]
-            if self.isValidVersion(version, subPageNames):
-                versionLinks[version] = os.path.join(app.name, fileName)
+            version, date = self.parseFileName(fileName)
+            if version:
+                self.diag.info("Found file with version " + version)
+                if versionDates.has_key(version):
+                    oldDate = versionDates[version][0]
+                    if date > oldDate:
+                        versionDates[version] = date, path
+                else:
+                    versionDates[version] = date, path
+        versionLinks = {}
+        for version, (date, path) in versionDates.items():
+            fileToLink = os.path.join(app.name, "test_" + version + ".html")
+            if os.path.isfile(os.path.join(location, fileToLink)):
+                summary = self.extractSummary(path, app)
+                self.diag.info("For version " + version + ", found summary info " + repr(summary))
+                versionLinks[version] = fileToLink, summary
         locationDict[name] = versionLinks
 
-    def isValidVersion(self, version, subPageNames):
-        if "_" not in version:
-            return True
+    def extractSummary(self, datedFile, app):
+        for line in open(datedFile):
+            if line.strip().startswith("<H2>"):
+                text = line.strip()[4:-5] # drop the tags
+                return self.parseSummaryText(text, app)
+        return {}
 
-        components = version.split("_")
-        if components[-1] in subPageNames:
-            return False
+    def parseSummaryText(self, text, app):
+        words = text.split()[3:] # Drop "Version: 12 tests"
+        index = 0
+        categories = []
+        while index < len(words):
+            try:
+                count = int(words[index])
+                categories.append([ "", count ])
+            except ValueError:
+                categories[-1][0] += words[index]
+            index += 1
+        self.diag.info("Category information is " + repr(categories))
+        colourCount = seqdict()
+        for categoryName, count in categories:
+            colour = self.getColour(categoryName, app)
+            if not colourCount.has_key(colour):
+                colourCount[colour] = 0
+            colourCount[colour] += count
+        return colourCount
 
-        for component in components[1:]:
-            if self.isYear(component[-4:]):
-                return False
-        return True
+    def getColour(self, categoryName, app):
+        colourFinder = testoverview.ColourFinder(app.getCompositeConfigValue)
+        return colourFinder.find(self.getCategoryKey(categoryName))
 
-    def isYear(self, text):
-        try:
-            val = int(text)
-            return val > 2000 and val < 3000
-        except ValueError:
-            return False
+    def getCategoryKey(self, categoryName):
+        if categoryName == "succeeded":
+            return "success_bg"
+        elif categoryName in [ "faster", "slower", "memory+", "memory-" ]:
+            return "performance_bg"
+        else:
+            return "failure_bg"
+
+    def parseFileName(self, fileName):
+        versionStr = fileName[5:-5]
+        components = versionStr.split("_")
+        for index, component in enumerate(components[1:]):
+            try:
+                self.diag.info("Trying to parse " + component + " as date.")
+                date = time.strptime(component, "%d%b%Y")
+                return "_".join(components[:index + 1]), date
+            except ValueError:
+                pass
+        return None, None
         
     @classmethod
     def getOrderedVersions(cls, predefined, info):
@@ -685,7 +729,12 @@ class GenerateSummaryPage(plugins.ScriptWithArgs):
             file.write("  <td><h3>" + appName + "</h3></td>\n")
             appPageInfo = pageInfo[appName]
             for version in cls.getOrderedVersions(versionOrder, appPageInfo):
-                file.write('  <td><h3><a href="' + appPageInfo[version] + '">' + version + '</a></h3></td>\n')
+                fileToLink, resultSummary = appPageInfo[version]
+                file.write('  <td><table border="1"><tr>\n')
+                file.write('    <td><h3><a href="' + fileToLink + '">' + version + '</a></h3></td>\n')
+                for colour, count in resultSummary.items():
+                    file.write('    <td bgcolor="' + colour + '"><h3>' + str(count) + "</h3></td>\n")
+                file.write("  </tr></table></td>\n")
             file.write("</tr>\n")
 
     @classmethod

@@ -1391,9 +1391,10 @@ class TextOption(Option):
         return allDirs[0]
 
 class Switch(Option):
-    def __init__(self, name="", value=0, options=[], description="", changeMethod = None):
+    def __init__(self, name="", value=0, options=[], hideOptions=False, description="", changeMethod = None):
         Option.__init__(self, name, int(value), description, changeMethod)
         self.options = options
+        self.hideOptions = hideOptions
 
     def setValue(self, value):
         Option.setValue(self, int(value))

@@ -897,3 +897,7 @@ activate = show actions menu
 
 [Name=helpmenu]
 activate = show help menu
+
+[Name=GUI testing option chooser]
+changed = select gui-testing option named
+

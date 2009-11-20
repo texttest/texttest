@@ -281,7 +281,7 @@ class GenerateWebPages(object):
             for tag, details in self.pagesDetails.items():
                 pageName = getDetailPageName(self.pageVersion, tag)
                 relPath = os.path.join(resourceName, pageName)
-                details.document.write(os.path.join(self.pageDir, relPath))
+                details.write(os.path.join(self.pageDir, relPath))
                 plugins.log.info("wrote: '" + relPath + "'")
 
     def getTestIdentifier(self, stateFile, repository):
@@ -462,18 +462,32 @@ class TestDetails:
         self.document = HTMLgen.SimpleDocument(title=TitleWithDateStamp(pageDetailTitle))
         headerText = tagText + " - detailed test results for " + pageTitle
         self.document.append(HTMLgen.Heading(1, headerText, align = 'center'))
+        self.totalCategoryHandler = CategoryHandler()
+        self.versionSections = []
         
     def addVersionSection(self, version, categoryHandler, linkFromDetailsToOverview):
+        self.totalCategoryHandler.update(categoryHandler)
         container = HTMLgen.Container()
         container.append(HTMLgen.HR())
-        container.append(HTMLgen.Heading(2, version + ": " + categoryHandler.generateSummary()))
+        container.append(self.getSummaryHeading(version, categoryHandler))
         for desc, testInfo in categoryHandler.getTestsWithDescriptions():
             fullDescription = self.getFullDescription(testInfo, version, linkFromDetailsToOverview)
             if fullDescription:
                 container.append(HTMLgen.Name(version + desc))
                 container.append(HTMLgen.Heading(3, "Detailed information for the tests that " + desc + ":"))
                 container.append(fullDescription)
-        self.document.append(container)
+        self.versionSections.append(container)
+
+    def getSummaryHeading(self, version, categoryHandler):
+        return HTMLgen.Heading(2, version + ": " + categoryHandler.generateSummary())
+
+    def write(self, fileName):
+        if len(self.versionSections) > 1:
+            self.document.append(self.getSummaryHeading("Total", self.totalCategoryHandler))
+        for sect in self.versionSections:
+            self.document.append(sect)
+        self.versionSections = [] # In case we get called again
+        self.document.write(fileName)
     
     def getFreeTextData(self, tests):
         data = seqdict()
@@ -545,6 +559,11 @@ class TestDetails:
 class CategoryHandler:
     def __init__(self):
         self.testsInCategory = seqdict()
+
+    def update(self, categoryHandler):
+        for category, testInfo in categoryHandler.testsInCategory.items():
+            testInfoList = self.testsInCategory.setdefault(category, [])
+            testInfoList += testInfo
 
     def registerInCategory(self, testId, state, extraVersion):
         self.testsInCategory.setdefault(state.category, []).append((testId, state, extraVersion))

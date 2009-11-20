@@ -405,6 +405,9 @@ class Action:
         log.info(testObj.getIndent() + repr(self) + " " + repr(testObj) + postText)
     def __str__(self):
         return str(self.__class__)
+    @classmethod
+    def finalise(cls):
+        pass
 
 class ScriptWithArgs(Action):
     def parseArguments(self, args, allowedArgs):

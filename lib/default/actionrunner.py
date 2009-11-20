@@ -135,7 +135,17 @@ class ActionRunner(BaseActionRunner):
             self.currentTestRunner.kill()
         else:
             self.cancel(test)
+
+    def getAllActionClasses(self):
+        classes = set()
+        for appRunner in self.appRunners.values():
+            for action in appRunner.actionSequence:
+                classes.add(action.__class__)
+        return classes
+            
     def cleanup(self):
+        for actionClass in self.getAllActionClasses():
+            actionClass.finalise()
         for appRunner in self.appRunners.values():
             appRunner.cleanActions()
     

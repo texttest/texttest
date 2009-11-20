@@ -1466,23 +1466,24 @@ class RunTest(plugins.Action):
 class CountTest(plugins.Action):
     scriptDoc = "report on the number of tests selected, by application"
     appCount = seqdict()
-    doneReport = False
-    def __del__(self):
-        if not self.doneReport:
-            for app, count in self.appCount.items():
-                print app.description(), "has", count, "tests"
-            print "There are", sum(self.appCount.values()), "tests in total."
-            CountTest.doneReport = True
+    @classmethod
+    def finalise(self):
+        for app, count in self.appCount.items():
+            print app.description(), "has", count, "tests"
+        print "There are", sum(self.appCount.values()), "tests in total."
+
     def __repr__(self):
         return "Counting"
+
     def __call__(self, test):
         self.describe(test)
         self.appCount[test.app] += 1
+
     def setUpSuite(self, suite):
         self.describe(suite)
+
     def setUpApplication(self, app):
         self.appCount[app] = 0
-
 
 
 class DocumentOptions(plugins.Action):

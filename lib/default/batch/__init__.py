@@ -3,6 +3,7 @@
 import os, plugins, sys, string, time, types, shutil, datetime, testoverview, logging
 from ndict import seqdict
 from cPickle import Pickler
+from glob import glob
 
 class BatchVersionFilter:
     def __init__(self, batchSession):
@@ -524,7 +525,7 @@ class WebPageResponder(plugins.Responder):
             relevantSubDirs = self.findRelevantSubdirectories(repository, app, extraVersions)
             version = getVersionName(app, self.allApps)
             self.makeAndGenerate(relevantSubDirs, app.getCompositeConfigValue, pageDir, pageTitle, version, extraVersions)
-                
+
     def getAppRepositoryInfo(self):
         appInfo = seqdict()
         for app in self.allApps:
@@ -614,6 +615,108 @@ class WebPageResponder(plugins.Responder):
             if not version in app.versions:
                 extraVersions.append(version)
         return extraVersions
+
+class GenerateSummaryPage(plugins.ScriptWithArgs):
+    scriptDoc = "Generate a summary page which links all the other generated pages"
+    appInfo = seqdict()
+    configPathArgs = ()
+    summaryFileName = "index.html"
+    def __init__(self, args=[""]):
+        argDict = self.parseArguments(args, [ "batch", "file" ])
+        self.batchSession = argDict.get("batch", "default")
+        if argDict.has_key("file"):
+            GenerateSummaryPage.summaryFileName = argDict["file"]
+        
+    def setUpApplication(self, app):
+        location = os.path.realpath(app.getCompositeConfigValue("historical_report_location", self.batchSession))
+        appDir = os.path.join(location, app.name)
+        if not os.path.isdir(appDir):
+            return
+
+        locationDict = self.appInfo.setdefault(location, {})
+        name = app.fullName()
+        if locationDict.has_key(name):
+            return # Don't repeat info for the same app
+
+        GenerateSummaryPage.configPathArgs = app.inputOptions.configPathOptions()
+        versionLinks = {}
+        subPageNames = [ pn.lower() for pn in app.getCompositeConfigValue("historical_report_subpages", self.batchSession) ]
+        for path in glob(os.path.join(appDir, "test_*.html")):
+            fileName = os.path.basename(path)
+            version = fileName[5:-5]
+            if self.isValidVersion(version, subPageNames):
+                versionLinks[version] = os.path.join(app.name, fileName)
+        locationDict[name] = versionLinks
+
+    def isValidVersion(self, version, subPageNames):
+        if "_" not in version:
+            return True
+
+        components = version.split("_")
+        if components[-1] in subPageNames:
+            return False
+
+        for component in components[1:]:
+            if self.isYear(component[-4:]):
+                return False
+        return True
+
+    def isYear(self, text):
+        try:
+            val = int(text)
+            return val > 2000 and val < 3000
+        except ValueError:
+            return False
+        
+    @classmethod
+    def getOrderedVersions(cls, predefined, info):
+        fullList = sorted(info.keys())
+        versions = []
+        for version in predefined:
+            if version in fullList:
+                versions.append(version)
+                fullList.remove(version)
+        return versions + fullList
+
+    @classmethod
+    def insertSummaryTable(cls, file, pageInfo, appOrder, versionOrder):
+        for appName in cls.getOrderedVersions(appOrder, pageInfo):
+            file.write("<tr>\n")
+            file.write("  <td><h3>" + appName + "</h3></td>\n")
+            appPageInfo = pageInfo[appName]
+            for version in cls.getOrderedVersions(versionOrder, appPageInfo):
+                file.write('  <td><h3><a href="' + appPageInfo[version] + '">' + version + '</a></h3></td>\n')
+            file.write("</tr>\n")
+
+    @classmethod
+    def extractOrder(cls, line):
+        startPos = line.find("order=") + 6
+        endPos = line.rfind("-->")
+        return plugins.commasplit(line[startPos:endPos])
+
+    @classmethod
+    def finalise(cls):
+        for location, pageInfo in cls.appInfo.items():
+            templateFile = os.path.join(location, "summary_template.html")
+            if not os.path.isfile(templateFile):
+                plugins.log.info("No file at '" + templateFile + "', copying default file from installation")
+                srcFile = plugins.findDataPaths([ "summary_template.html" ], *cls.configPathArgs)[-1]
+                shutil.copyfile(srcFile, templateFile)
+            pageName = os.path.join(location, cls.summaryFileName)
+            file = open(pageName, "w")
+            versionOrder = [ "default" ]
+            appOrder = []
+            for line in open(templateFile):
+                file.write(line)
+                if "App order=" in line:
+                    appOrder += cls.extractOrder(line)
+                if "Version order=" in line:
+                    versionOrder += cls.extractOrder(line)
+                if "Insert table here" in line:
+                    cls.insertSummaryTable(file, pageInfo, appOrder, versionOrder)
+            file.close()
+            plugins.log.info("wrote: '" + pageName + "'") 
+
 
     
 class CollectFiles(plugins.ScriptWithArgs):

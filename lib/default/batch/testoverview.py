@@ -63,7 +63,6 @@ class GenerateWebPages(object):
     
     def generate(self, repositoryDirs, subPageNames):
         foundMinorVersions = {}
-        details = TestDetails()
         allMonthSelectors = set()
         for version, repositoryDirInfo in repositoryDirs.items():
             self.diag.info("Generating " + version)
@@ -106,9 +105,10 @@ class GenerateWebPages(object):
                     
                 # put them in reverse order, most relevant first
                 linkFromDetailsToOverview = [ sel.getLinkInfo(self.pageVersion) for sel in allSelectors ]
-                det = details.generate(categoryHandlers, version, tags, linkFromDetailsToOverview)
-                self.addDetailPages(det)
-
+                for tag in tags:
+                    details = self.pagesDetails.setdefault(tag, TestDetails(tag, self.pageTitle))
+                    details.addVersionSection(version, categoryHandlers[tag], linkFromDetailsToOverview)
+                
         selContainer = HTMLgen.Container()
         for sel in self.makeSelectors(subPageNames):
             target, linkName = sel.getLinkInfo(self.pageVersion)
@@ -271,15 +271,6 @@ class GenerateWebPages(object):
         else:
             return False
         
-    def addDetailPages(self, details):
-        for tag in details.keys():
-            if not self.pagesDetails.has_key(tag):
-                tagText = getDisplayText(tag)
-                pageDetailTitle = "Detailed test results for " + self.pageTitle + ": " + tagText
-                self.pagesDetails[tag] = HTMLgen.SimpleDocument(title=TitleWithDateStamp(pageDetailTitle))
-                self.pagesDetails[tag].append(HTMLgen.Heading(1, tagText + " - detailed test results for ", self.pageTitle, align = 'center'))
-            self.pagesDetails[tag].append(details[tag])
-            
     def writePages(self):
         plugins.log.info("Writing overview pages...")
         for pageFile, (resourceName, page) in self.pagesOverview.items():
@@ -287,10 +278,10 @@ class GenerateWebPages(object):
             plugins.log.info("wrote: '" + plugins.relpath(pageFile, self.pageDir) + "'")
         plugins.log.info("Writing detail pages...")
         for resourceName in self.resourceNames:
-            for tag, page in self.pagesDetails.items():
+            for tag, details in self.pagesDetails.items():
                 pageName = getDetailPageName(self.pageVersion, tag)
                 relPath = os.path.join(resourceName, pageName)
-                page.write(os.path.join(self.pageDir, relPath))
+                details.document.write(os.path.join(self.pageDir, relPath))
                 plugins.log.info("wrote: '" + relPath + "'")
 
     def getTestIdentifier(self, stateFile, repository):
@@ -465,20 +456,24 @@ class TestTable:
 
         
 class TestDetails:
-    def generate(self, categoryHandlers, version, tags, linkFromDetailsToOverview):
-        detailsContainers = seqdict()
-        for tag in tags:
-            container = detailsContainers[tag] = HTMLgen.Container()
-            categoryHandler = categoryHandlers[tag]
-            container.append(HTMLgen.HR())
-            container.append(HTMLgen.Heading(2, version + ": " + categoryHandler.generateSummary()))
-            for desc, testInfo in categoryHandler.getTestsWithDescriptions():
-                fullDescription = self.getFullDescription(testInfo, version, linkFromDetailsToOverview)
-                if fullDescription:
-                    container.append(HTMLgen.Name(version + desc))
-                    container.append(HTMLgen.Heading(3, "Detailed information for the tests that " + desc + ":"))
-                    container.append(fullDescription)
-        return detailsContainers
+    def __init__(self, tag, pageTitle):
+        tagText = getDisplayText(tag)
+        pageDetailTitle = "Detailed test results for " + pageTitle + ": " + tagText
+        self.document = HTMLgen.SimpleDocument(title=TitleWithDateStamp(pageDetailTitle))
+        headerText = tagText + " - detailed test results for " + pageTitle
+        self.document.append(HTMLgen.Heading(1, headerText, align = 'center'))
+        
+    def addVersionSection(self, version, categoryHandler, linkFromDetailsToOverview):
+        container = HTMLgen.Container()
+        container.append(HTMLgen.HR())
+        container.append(HTMLgen.Heading(2, version + ": " + categoryHandler.generateSummary()))
+        for desc, testInfo in categoryHandler.getTestsWithDescriptions():
+            fullDescription = self.getFullDescription(testInfo, version, linkFromDetailsToOverview)
+            if fullDescription:
+                container.append(HTMLgen.Name(version + desc))
+                container.append(HTMLgen.Heading(3, "Detailed information for the tests that " + desc + ":"))
+                container.append(fullDescription)
+        self.document.append(container)
     
     def getFreeTextData(self, tests):
         data = seqdict()

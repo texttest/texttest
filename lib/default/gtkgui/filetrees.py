@@ -177,6 +177,7 @@ class ApplicationFileGUI(FileViewGUI):
         FileViewGUI.__init__(self, dynamic, "Configuration Files")
         self.allApps = copy(allApps)
         self.extras = reduce(operator.add, (app.extras for app in allApps), [])
+        self.usecaseDirs = {}
     
     def shouldShow(self):
         return not self.dynamic
@@ -195,23 +196,16 @@ class ApplicationFileGUI(FileViewGUI):
 
     def addSuites(self, suites):
         for suite in suites:
+            currUsecaseHome = suite.getEnvironment("USECASE_HOME")
+            if currUsecaseHome != os.getenv("USECASE_HOME") and os.path.isdir(currUsecaseHome):
+                self.usecaseDirs[suite.app] = currUsecaseHome
             if suite.app not in self.allApps and suite.app not in self.extras:
                 self.allApps.append(suite.app)
                 self.recreateModel(self.getState(), preserveSelection=False)
 
     def addFilesToModel(self, state):
         colour = guiutils.guiConfig.getCompositeValue("file_colours", "static")
-        personalDir = plugins.getPersonalConfigDir()
-        personalFiles = self.getPersonalFiles(personalDir)
         importedFiles = {}
-        if len(personalFiles) > 0:
-            headerRow = [ "Personal Files", "white", personalDir, None, "", "" ]
-            persiter = self.model.insert_before(None, None, headerRow)
-            self.addDataFilesUnderIter(persiter, personalFiles, colour, personalDir, associatedObject=self.allApps)
-            for file in personalFiles:
-                for importedFile in self.getImportedFiles(file):
-                    importedFiles[importedFile] = importedFile
-
         allTitles = self.getApplicationTitles()
         for index, app in enumerate(self.allApps):
             headerRow = [ "Files for " + allTitles[index], "white", app.getDirectory(), None, "", "" ]
@@ -220,7 +214,12 @@ class ApplicationFileGUI(FileViewGUI):
                 self.addFileToModel(confiter, file, colour, [ app ])
                 for importedFile in self.getImportedFiles(file, app):
                     importedFiles[importedFile] = importedFile
-
+            usecaseDir = self.usecaseDirs.get(app)
+            if usecaseDir:
+                files = [ usecaseDir ] + [ os.path.join(usecaseDir, f) for f in os.listdir(usecaseDir) ]
+                self.addDataFilesUnderIter(confiter, files, colour, 
+                                           app.getDirectory(), associatedObject=self.allApps)
+            
         # Handle recursive imports here ...
 
         if len(importedFiles) > 0:
@@ -230,6 +229,14 @@ class ApplicationFileGUI(FileViewGUI):
             sortedFiles.sort()
             for importedFile in sortedFiles:
                 self.addFileToModel(importediter, importedFile, colour, self.allApps)
+
+        personalDir = plugins.getPersonalConfigDir()
+        personalFiles = self.getPersonalFiles(personalDir)
+        if len(personalFiles) > 0:
+            headerRow = [ "Personal Files", "white", personalDir, None, "", "" ]
+            persiter = self.model.insert_before(None, None, headerRow)
+            self.addDataFilesUnderIter(persiter, personalFiles, colour, personalDir, associatedObject=self.allApps)
+
     def getApplicationTitles(self):
         basicTitles = [ repr(app) for app in self.allApps ]
         if self.areUnique(basicTitles):
@@ -237,6 +244,7 @@ class ApplicationFileGUI(FileViewGUI):
         else:
             return [ repr(app) + " (" + app.name + " under " +
                      os.path.basename(app.getDirectory()) + ")" for app in self.allApps ]
+
     def areUnique(self, names):
         for index, name in enumerate(names):
             for otherName in names[index + 1:]:

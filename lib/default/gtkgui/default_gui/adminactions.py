@@ -488,6 +488,10 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         if useGui == 1:
             configEntries["use_case_recorder"] = "pyusecase"
             configEntries["interpreter"] = "pyusecase"
+            pyusecaseDir = os.path.join(directory, "pyusecase_files")
+            plugins.ensureDirectoryExists(pyusecaseDir) 
+            # Create an empty UI map file so it shows up in the Config tab...
+            open(os.path.join(pyusecaseDir, "ui_map.conf"), "w")
         elif useGui == 2:
             configEntries["use_case_recorder"] = "jusecase"
         elif useGui == 4:

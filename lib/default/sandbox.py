@@ -303,7 +303,10 @@ class TestEnvironmentCreator:
             vars.append(("TEXTTEST_SANDBOX_ROOT", self.test.app.writeDirectory)) # Full path to the sandbox root directory
             if self.test.getConfigValue("use_case_record_mode") == "GUI":
                 usecaseRecorder = self.test.getConfigValue("use_case_recorder")
-                if usecaseRecorder != "none":
+                # Mostly to make sure PyUseCase's own tests have a chance of working
+                # Almost any other test suite shouldn't be doing this...
+                envSetInTests = self.test.getConfigValue("test_data_environment").values()
+                if usecaseRecorder != "none" and "USECASE_HOME" not in envSetInTests:
                     if not usecaseRecorder:
                         usecaseRecorder = "ui_simulation"
                     vars.append(("USECASE_HOME", os.path.join(self.test.app.getDirectory(), usecaseRecorder + "_files")))

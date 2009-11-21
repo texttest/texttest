@@ -304,6 +304,8 @@ class TestEnvironmentCreator:
             if self.test.getConfigValue("use_case_record_mode") == "GUI":
                 usecaseRecorder = self.test.getConfigValue("use_case_recorder")
                 if usecaseRecorder != "none":
+                    if not usecaseRecorder:
+                        usecaseRecorder = "ui_simulation"
                     vars.append(("USECASE_HOME", os.path.join(self.test.app.getDirectory(), usecaseRecorder + "_files")))
                 from virtualdisplay import VirtualDisplayResponder
                 if VirtualDisplayResponder.instance:

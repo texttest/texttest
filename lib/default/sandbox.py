@@ -302,6 +302,9 @@ class TestEnvironmentCreator:
             vars.append(("TEXTTEST_CHECKOUT", self.test.app.checkout))
             vars.append(("TEXTTEST_SANDBOX_ROOT", self.test.app.writeDirectory)) # Full path to the sandbox root directory
             if self.test.getConfigValue("use_case_record_mode") == "GUI":
+                usecaseRecorder = self.test.getConfigValue("use_case_recorder")
+                if usecaseRecorder != "none":
+                    vars.append(("USECASE_HOME", os.path.join(self.test.app.getDirectory(), usecaseRecorder + "_files")))
                 from virtualdisplay import VirtualDisplayResponder
                 if VirtualDisplayResponder.instance:
                     virtualDisplay = VirtualDisplayResponder.instance.displayName

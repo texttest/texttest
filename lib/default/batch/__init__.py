@@ -807,7 +807,7 @@ class SummaryGenerator:
             for columnIndex, version in enumerate(self.padWithEmpty(orderedVersions, columnVersions, minColumnIndices)):
                 file.write('  <td>')
                 if version:
-                    file.write('<table border="1"><tr>\n')
+                    file.write('<table border="1" class="version_link"><tr>\n')
                     if version in versionWithColumns:
                         columnVersions[columnIndex] = version
 

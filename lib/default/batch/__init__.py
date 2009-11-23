@@ -629,7 +629,7 @@ class GenerateSummaryPage(plugins.ScriptWithArgs):
             GenerateSummaryPage.summaryFileName = argDict["file"]
         
     def setUpApplication(self, app):
-        location = os.path.realpath(app.getCompositeConfigValue("historical_report_location", self.batchSession))
+        location = os.path.realpath(app.getCompositeConfigValue("historical_report_location", self.batchSession)).replace("\\", "/")
         appDir = os.path.join(location, app.name)
         if not os.path.isdir(appDir):
             return

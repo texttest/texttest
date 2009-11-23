@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, plugins, sys, string, time, types, shutil, datetime, testoverview, logging
+import os, plugins, sys, string, time, types, shutil, datetime, testoverview, logging, operator
 from ndict import seqdict
 from cPickle import Pickler
 from glob import glob
@@ -621,10 +621,11 @@ class GenerateSummaryPage(plugins.ScriptWithArgs):
     appInfo = seqdict()
     configPathArgs = ()
     summaryFileName = "index.html"
+    diag = None
     def __init__(self, args=[""]):
         argDict = self.parseArguments(args, [ "batch", "file" ])
         self.batchSession = argDict.get("batch", "default")
-        self.diag = logging.getLogger("GenerateWebPages")
+        GenerateSummaryPage.diag = logging.getLogger("GenerateWebPages")
         if argDict.has_key("file"):
             GenerateSummaryPage.summaryFileName = argDict["file"]
         
@@ -720,21 +721,67 @@ class GenerateSummaryPage(plugins.ScriptWithArgs):
             if version in fullList:
                 versions.append(version)
                 fullList.remove(version)
-        return versions + fullList
+        return versions + fullList        
+
+    @classmethod
+    def padWithEmpty(cls, versions, columnVersions, minColumnIndices):
+        newVersions = []
+        index = 0
+        for version in versions:
+            minIndex = minColumnIndices.get(version, 0)
+            while index < minIndex:
+                cls.diag.info("Index = " + repr(index) + " but min index = " + repr(minIndex))
+                newVersions.append("")
+                index += 1
+            while columnVersions.has_key(index) and columnVersions[index] != version:
+                newVersions.append("")
+                index += 1
+            newVersions.append(version)
+            index += 1
+        return newVersions
+
+    @classmethod
+    def getMinColumnIndices(cls, pageInfo, versionOrder):
+        # We find the maximum column number a version has on any row,
+        # which is equal to the minimum value it should be given in a particular row
+        versionIndices = {}
+        for rowInfo in pageInfo.values():
+            for index, version in enumerate(cls.getOrderedVersions(versionOrder, rowInfo)):
+                if not versionIndices.has_key(version) or index > versionIndices[version]:
+                    versionIndices[version] = index
+        return versionIndices
+
+    @classmethod
+    def getVersionsWithColumns(cls, pageInfo):
+        allVersions = reduce(operator.add, (info.keys() for info in pageInfo.values()), [])
+        return set(filter(lambda v: allVersions.count(v) > 1, allVersions))  
 
     @classmethod
     def insertSummaryTable(cls, file, pageInfo, appOrder, versionOrder):
+        versionWithColumns = cls.getVersionsWithColumns(pageInfo)
+        cls.diag.info("Following versions will be placed in columns " + repr(versionWithColumns))
+        minColumnIndices = cls.getMinColumnIndices(pageInfo, versionOrder)
+        cls.diag.info("Minimum column indices are " + repr(minColumnIndices))
+        columnVersions = {}
         for appName in cls.getOrderedVersions(appOrder, pageInfo):
             file.write("<tr>\n")
             file.write("  <td><h3>" + appName + "</h3></td>\n")
             appPageInfo = pageInfo[appName]
-            for version in cls.getOrderedVersions(versionOrder, appPageInfo):
-                fileToLink, resultSummary = appPageInfo[version]
-                file.write('  <td><table border="1"><tr>\n')
-                file.write('    <td><h3><a href="' + fileToLink + '">' + version + '</a></h3></td>\n')
-                for colour, count in resultSummary.items():
-                    file.write('    <td bgcolor="' + colour + '"><h3>' + str(count) + "</h3></td>\n")
-                file.write("  </tr></table></td>\n")
+            orderedVersions = cls.getOrderedVersions(versionOrder, appPageInfo)
+            cls.diag.info("For " + appName + " found " + repr(orderedVersions))
+            for columnIndex, version in enumerate(cls.padWithEmpty(orderedVersions, columnVersions, minColumnIndices)):
+                file.write('  <td>')
+                if version:
+                    file.write('<table border="1"><tr>\n')
+                    if version in versionWithColumns:
+                        columnVersions[columnIndex] = version
+
+                    fileToLink, resultSummary = appPageInfo[version]
+                    file.write('    <td><h3><a href="' + fileToLink + '">' + version + '</a></h3></td>\n')
+                    for colour, count in resultSummary.items():
+                        file.write('    <td bgcolor="' + colour + '"><h3>' + str(count) + "</h3></td>\n")
+                    file.write("  </tr></table>")
+                file.write("</td>\n")
             file.write("</tr>\n")
 
     @classmethod

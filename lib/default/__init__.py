@@ -120,15 +120,22 @@ class Config:
         groups = self.createOptionGroups(allApps)
         return reduce(operator.add, (g.keys() for g in groups), [])
 
+    def getCollectSequence(self):
+        arg = self.optionMap.get("coll")
+        sequence = []
+        batchArgs = [ "batch=" + self.optionValue("b") ]
+        if not arg or "web" not in arg:
+            emailHandler = batch.CollectFiles(batchArgs)
+            sequence.append(emailHandler)
+        if not arg or arg == "web":
+            summaryGenerator = batch.GenerateSummaryPage(batchArgs)
+            sequence.append(summaryGenerator)
+        return sequence
+
     def getActionSequence(self):
         if self.optionMap.has_key("coll"):
-            arg = self.optionMap.get("coll")
-            if arg and "web" in arg:
-                return []
-            else:
-                batchSession = self.optionValue("b")
-                emailHandler = batch.CollectFiles([ "batch=" + batchSession ])
-                return [ emailHandler ]
+            return self.getCollectSequence()
+
         if self.isReconnecting():
             return self.getReconnectSequence()
 

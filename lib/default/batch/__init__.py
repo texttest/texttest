@@ -616,31 +616,71 @@ class WebPageResponder(plugins.Responder):
                 extraVersions.append(version)
         return extraVersions
 
+
 class GenerateSummaryPage(plugins.ScriptWithArgs):
     scriptDoc = "Generate a summary page which links all the other generated pages"
-    appInfo = seqdict()
-    configPathArgs = ()
     summaryFileName = "index.html"
-    diag = None
+    locationApps = seqdict()
     def __init__(self, args=[""]):
         argDict = self.parseArguments(args, [ "batch", "file" ])
         self.batchSession = argDict.get("batch", "default")
-        GenerateSummaryPage.diag = logging.getLogger("GenerateWebPages")
         if argDict.has_key("file"):
             GenerateSummaryPage.summaryFileName = argDict["file"]
         
     def setUpApplication(self, app):
         location = os.path.realpath(app.getCompositeConfigValue("historical_report_location", self.batchSession)).replace("\\", "/")
-        appDir = os.path.join(location, app.name)
-        if not os.path.isdir(appDir):
-            return
+        self.locationApps.setdefault(location, []).append(app)
 
-        locationDict = self.appInfo.setdefault(location, {})
-        name = app.fullName()
-        if locationDict.has_key(name):
-            return # Don't repeat info for the same app
+    @classmethod
+    def finalise(cls):
+        generator = SummaryGenerator()
+        generator.generate(cls.locationApps, cls.summaryFileName)
 
-        GenerateSummaryPage.configPathArgs = app.inputOptions.configPathOptions()
+
+class SummaryGenerator:
+    def __init__(self):
+        self.diag = logging.getLogger("GenerateWebPages")
+
+    def getTemplateFile(self, location, apps):
+        templateFile = os.path.join(location, "summary_template.html")
+        if not os.path.isfile(templateFile):
+            plugins.log.info("No file at '" + templateFile + "', copying default file from installation")
+            includeSite, includePersonal = apps[-1].inputOptions.configPathOptions()
+            srcFile = plugins.findDataPaths([ "summary_template.html" ], includeSite, includePersonal)[-1]
+            shutil.copyfile(srcFile, templateFile)
+        return templateFile
+            
+    def generate(self, locationApps, summaryFileName):
+        for location, apps in locationApps.items():
+            pageInfo = self.collectPageInfo(location, apps)
+            if len(pageInfo) == 0:
+                continue
+            
+            templateFile = self.getTemplateFile(location, apps)
+            pageName = os.path.join(location, summaryFileName)
+            file = open(pageName, "w")
+            versionOrder = [ "default" ]
+            appOrder = []
+            for line in open(templateFile):
+                file.write(line)
+                if "App order=" in line:
+                    appOrder += self.extractOrder(line)
+                if "Version order=" in line:
+                    versionOrder += self.extractOrder(line)
+                if "Insert table here" in line:
+                    self.insertSummaryTable(file, pageInfo, appOrder, versionOrder)
+            file.close()
+            plugins.log.info("wrote: '" + pageName + "'") 
+
+    def collectPageInfo(self, location, apps):
+        pageInfo = {}
+        for app in apps:
+            appDir = os.path.join(location, app.name)
+            if os.path.isdir(appDir) and not pageInfo.has_key(app.fullName()):
+                pageInfo[app.fullName()] = self.getAppPageInfo(app, appDir)
+        return pageInfo
+
+    def getAppPageInfo(self, app, appDir):
         versionDates = {}
         for path in glob(os.path.join(appDir, "test_*.html")):
             fileName = os.path.basename(path)
@@ -656,11 +696,11 @@ class GenerateSummaryPage(plugins.ScriptWithArgs):
         versionLinks = {}
         for version, (date, path) in versionDates.items():
             fileToLink = os.path.join(app.name, "test_" + version + ".html")
-            if os.path.isfile(os.path.join(location, fileToLink)):
+            if os.path.isfile(os.path.join(appDir, os.path.basename(fileToLink))):
                 summary = self.extractSummary(path, app)
                 self.diag.info("For version " + version + ", found summary info " + repr(summary))
                 versionLinks[version] = fileToLink, summary
-        locationDict[name] = versionLinks
+        return versionLinks
 
     def extractSummary(self, datedFile, app):
         for line in open(datedFile):
@@ -713,8 +753,7 @@ class GenerateSummaryPage(plugins.ScriptWithArgs):
                 pass
         return None, None
         
-    @classmethod
-    def getOrderedVersions(cls, predefined, info):
+    def getOrderedVersions(self, predefined, info):
         fullList = sorted(info.keys())
         versions = []
         for version in predefined:
@@ -723,14 +762,13 @@ class GenerateSummaryPage(plugins.ScriptWithArgs):
                 fullList.remove(version)
         return versions + fullList        
 
-    @classmethod
-    def padWithEmpty(cls, versions, columnVersions, minColumnIndices):
+    def padWithEmpty(self, versions, columnVersions, minColumnIndices):
         newVersions = []
         index = 0
         for version in versions:
             minIndex = minColumnIndices.get(version, 0)
             while index < minIndex:
-                cls.diag.info("Index = " + repr(index) + " but min index = " + repr(minIndex))
+                self.diag.info("Index = " + repr(index) + " but min index = " + repr(minIndex))
                 newVersions.append("")
                 index += 1
             while columnVersions.has_key(index) and columnVersions[index] != version:
@@ -740,36 +778,33 @@ class GenerateSummaryPage(plugins.ScriptWithArgs):
             index += 1
         return newVersions
 
-    @classmethod
-    def getMinColumnIndices(cls, pageInfo, versionOrder):
+    def getMinColumnIndices(self, pageInfo, versionOrder):
         # We find the maximum column number a version has on any row,
         # which is equal to the minimum value it should be given in a particular row
         versionIndices = {}
         for rowInfo in pageInfo.values():
-            for index, version in enumerate(cls.getOrderedVersions(versionOrder, rowInfo)):
+            for index, version in enumerate(self.getOrderedVersions(versionOrder, rowInfo)):
                 if not versionIndices.has_key(version) or index > versionIndices[version]:
                     versionIndices[version] = index
         return versionIndices
 
-    @classmethod
-    def getVersionsWithColumns(cls, pageInfo):
+    def getVersionsWithColumns(self, pageInfo):
         allVersions = reduce(operator.add, (info.keys() for info in pageInfo.values()), [])
         return set(filter(lambda v: allVersions.count(v) > 1, allVersions))  
 
-    @classmethod
-    def insertSummaryTable(cls, file, pageInfo, appOrder, versionOrder):
-        versionWithColumns = cls.getVersionsWithColumns(pageInfo)
-        cls.diag.info("Following versions will be placed in columns " + repr(versionWithColumns))
-        minColumnIndices = cls.getMinColumnIndices(pageInfo, versionOrder)
-        cls.diag.info("Minimum column indices are " + repr(minColumnIndices))
+    def insertSummaryTable(self, file, pageInfo, appOrder, versionOrder):
+        versionWithColumns = self.getVersionsWithColumns(pageInfo)
+        self.diag.info("Following versions will be placed in columns " + repr(versionWithColumns))
+        minColumnIndices = self.getMinColumnIndices(pageInfo, versionOrder)
+        self.diag.info("Minimum column indices are " + repr(minColumnIndices))
         columnVersions = {}
-        for appName in cls.getOrderedVersions(appOrder, pageInfo):
+        for appName in self.getOrderedVersions(appOrder, pageInfo):
             file.write("<tr>\n")
             file.write("  <td><h3>" + appName + "</h3></td>\n")
             appPageInfo = pageInfo[appName]
-            orderedVersions = cls.getOrderedVersions(versionOrder, appPageInfo)
-            cls.diag.info("For " + appName + " found " + repr(orderedVersions))
-            for columnIndex, version in enumerate(cls.padWithEmpty(orderedVersions, columnVersions, minColumnIndices)):
+            orderedVersions = self.getOrderedVersions(versionOrder, appPageInfo)
+            self.diag.info("For " + appName + " found " + repr(orderedVersions))
+            for columnIndex, version in enumerate(self.padWithEmpty(orderedVersions, columnVersions, minColumnIndices)):
                 file.write('  <td>')
                 if version:
                     file.write('<table border="1"><tr>\n')
@@ -784,35 +819,10 @@ class GenerateSummaryPage(plugins.ScriptWithArgs):
                 file.write("</td>\n")
             file.write("</tr>\n")
 
-    @classmethod
-    def extractOrder(cls, line):
+    def extractOrder(self, line):
         startPos = line.find("order=") + 6
         endPos = line.rfind("-->")
         return plugins.commasplit(line[startPos:endPos])
-
-    @classmethod
-    def finalise(cls):
-        for location, pageInfo in cls.appInfo.items():
-            templateFile = os.path.join(location, "summary_template.html")
-            if not os.path.isfile(templateFile):
-                plugins.log.info("No file at '" + templateFile + "', copying default file from installation")
-                srcFile = plugins.findDataPaths([ "summary_template.html" ], *cls.configPathArgs)[-1]
-                shutil.copyfile(srcFile, templateFile)
-            pageName = os.path.join(location, cls.summaryFileName)
-            file = open(pageName, "w")
-            versionOrder = [ "default" ]
-            appOrder = []
-            for line in open(templateFile):
-                file.write(line)
-                if "App order=" in line:
-                    appOrder += cls.extractOrder(line)
-                if "Version order=" in line:
-                    versionOrder += cls.extractOrder(line)
-                if "Insert table here" in line:
-                    cls.insertSummaryTable(file, pageInfo, appOrder, versionOrder)
-            file.close()
-            plugins.log.info("wrote: '" + pageName + "'") 
-
 
     
 class CollectFiles(plugins.ScriptWithArgs):

@@ -1572,8 +1572,11 @@ Static GUI Enhancements:
     - Can now rename files from the drop-down list in the file view (adminactions.py)
     - "Refresh" replaces "Remove Tests" in the default toolbar, mostly for aesthetic reasons (default_gui-static.xml)
 	Toolbar contents can be configured/put back, see "personalising the UI" on the website
+    - "Add Application" dialog now has a drop-down list of all possible GUI-testing options (adminactions.py)
+	Allows you to get started testing a UI before understanding the config file
     - Error handling on initial "Add Application" dialog improved (adminactions.py)
 	Reject illegal characters in suffix and subdirectory names
+    - GUI-testing "UI map" files now visible from the Config tab (filetrees.py)
 Dynamic GUI Enhancements:
 Framework Enhancements:
     - Now integrates with Atlassian's Jira bugtracking system as well as Bugzilla (jira.py)
@@ -1581,15 +1584,23 @@ Framework Enhancements:
     - "collate_file" functionality for multiple files rewritten (sandbox.py)
 	Patterns of the form "data*:data*.dump" should behave more intuitively, but may not be completely back-compatible.
 	Read the migration notes and the website for details.
+    - "run_dependent_text" enhanced for filtering away sections of text (rundependent.py)
+	Can now control whether start and end lines are filtered via e.g. "{[->]}" syntax
     - Versioned config files can be now be placed in "extra_search_directory" locations (testmodel.py)
 	Previously only imported files could be found there.
     - "suppress_stderr_text" now supports the same syntax as "run_dependent_text" (default/__init__.py)
 	Allows e.g. multiline filtering
     - "text_diff_program_max_file_size" setting now renamed to "max_file_size" and is now a dictionary (comparefile.py)
 	Keys are names of programs. Also get a warning dialog if you try to open a too-large file from the GUI.
+    - Now sets "USECASE_HOME" for testing GUIs with e.g. PyUseCase to "pyusecase_files" (default/__init__.py)
+	Previously allowed SUT's usecase files to get mixed up with TextTest's own.
+    - default.CountTest script now reports a grand total at the end (default/__init__.py)
 Historical HTML Batch Report Enhancements:
+    - Now automatically generates a "dashboard" page containing links to all reports and current status (batch/__init__.py)
+	Comes for free with "-coll", can also be done alone via -s batch.GenerateSummaryPage
     - Can now create separate report tables containing (e.g.) performance or memory information. (testoverview.py)
 	Use -coll web.performance: see website for details.
+    - If several versions are present on the same page, a "grand total" is shown.
     - Rows or tables containing only "N/A" will no longer be shown (testoverview.py)
     - If source files are empty, it points this out and suggests the disk may be full (testoverview.py)
     - Cells now have tooltips indicating which test and date they are, to avoid scrolling large tables (testoverview.py)
@@ -1608,7 +1619,9 @@ Bug Fixes:
 	Previously set it to $TEXTTEST_SANDBOX/. which could cause problems.
     - If a "collate_script" produces an empty file from non-empty input, don't write an empty file (sandbox.py)
     - An "extra_version" will now read its GUI-testing config and not just assume it's the same as the parent (guiplugins.py)
+    - Don't stacktrace if an environment variable in "copy_test_path" doesn't exist (sandbox.py)
     - Don't stacktrace if a "collate_script" doesn't exist (sandbox.py)
     - Don't stacktrace if the argument to "-cp" (or Times to Run) is invalid (default/__init__.py)
     - Don't stacktrace if a relative interpreter program isn't found (default/__init__.py)
+    - Don't stacktrace if the same application name provided twice "-a app,app" on the command line (testmodel.py)
 Grid Engine (LSF/SGE) Bug Fixes:

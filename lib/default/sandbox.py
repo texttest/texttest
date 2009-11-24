@@ -40,10 +40,11 @@ class PrepareWriteDirectory(plugins.Action):
 
     def collatePath(self, test, configName, collateMethod, remoteCopy, mergeDirectories=False):
         targetPath = self.getTargetPath(test, configName)
-        if not targetPath: # Can happen with e.g. empty environment
+        sourceFileName = self.getSourceFileName(configName, test)
+        if not targetPath or not sourceFileName: # Can happen with e.g. empty environment
             return
         plugins.ensureDirExistsForFile(targetPath)
-        for sourcePath in self.getSourcePaths(test, configName):
+        for sourcePath in self.getSourcePaths(test, configName, sourceFileName):
             self.diag.info("Collating " + configName + " from " + repr(sourcePath) +
                            "\nto " + repr(targetPath))
             collateMethod(test, sourcePath, targetPath)
@@ -65,6 +66,7 @@ class PrepareWriteDirectory(plugins.Action):
     def getEnvironmentSourcePath(self, configName, test):
         pathName = self.getPathFromEnvironment(configName, test)
         if pathName != configName:
+            self.diag.info("Found source file name for " + configName + " = " + repr(pathName))
             return pathName
     
     def getPathFromEnvironment(self, configName, test):
@@ -80,18 +82,14 @@ class PrepareWriteDirectory(plugins.Action):
         if localName:
             return test.makeTmpFileName(localName, forComparison=0)
     
-    def getSourcePaths(self, test, configName):
-        # These can refer to environment variables or to paths within the test structure
-        fileName = self.getSourceFileName(configName, test)
-        self.diag.info("Found source file name for " + configName + " = " + fileName)
-        if not fileName:
-            return []
-        elif os.path.isabs(fileName):
+    def getSourcePaths(self, test, configName, fileName):
+        if os.path.isabs(fileName):
             return [ fileName ]
-
-        return reversed(test.getAllPathNames(fileName, configName)) # most specific first
+        else:
+            return reversed(test.getAllPathNames(fileName, configName)) # most specific first
 
     def getSourceFileName(self, configName, test):
+        # These can refer to environment variables or to paths within the test structure
         if configName.startswith("$"):
             return self.getEnvironmentSourcePath(configName, test)
         else:
@@ -104,11 +102,13 @@ class PrepareWriteDirectory(plugins.Action):
         envVarDict = test.getConfigValue("test_data_environment")
         propFile = test.getCompositeConfigValue("test_data_properties", configName)
         return envVarDict.get(configName), propFile
+    
     def copyTestPath(self, test, fullPath, target):
         if os.path.isfile(fullPath):
             self.copyfile(fullPath, target)
         if os.path.isdir(fullPath):
             self.copytree(fullPath, target)
+
     def copytimes(self, src, dst):
         if os.path.isdir(src) and os.name == "nt":
             # Windows doesn't let you update modification times of directories!
@@ -117,6 +117,7 @@ class PrepareWriteDirectory(plugins.Action):
         st = os.stat(src)
         if hasattr(os, 'utime'):
             os.utime(dst, (st[stat.ST_ATIME], st[stat.ST_MTIME]))
+
     def copytree(self, src, dst):
         # Code is a copy of shutil.copytree, with copying modification times
         # so that we can tell when things change...

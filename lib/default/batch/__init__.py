@@ -483,21 +483,30 @@ class WebPageResponder(plugins.Responder):
         self.batchSession = optionMap.get("b", "default")
         self.cmdLineResourcePage = self.findResourcePage(optionMap.get("coll"))
         self.diag = logging.getLogger("GenerateWebPages")
-        self.allApps = allApps
+        self.appsToGenerate = self.findAppsToGenerate(allApps)
 
     def findResourcePage(self, collArg):
         if collArg and collArg.startswith("web."):
             return collArg[4:]
 
-    def addSuites(self, suites):
-        # These are the ones that got through. Remove all rejected apps...
-        apps = set([ suite.app for suite in suites ])
-        for app in set(self.allApps).difference(apps):
-            self.allApps.remove(app)
-            # If the app is rejected, some of its extra versions may still not be...
-            for extra in app.extras:
-                if extra in apps:
-                    self.allApps.append(extra)
+    def findAppsToGenerate(self, apps):
+        # Don't blanket remove rejected apps automatically when collecting
+        batchFilter = BatchVersionFilter(self.batchSession)
+        toGenerate = []
+        for app in apps:
+            try:
+                batchFilter.verifyVersions(app)
+                toGenerate.append(app)
+            except plugins.TextTestError, e:
+                plugins.log.info("Not generating web page for " + app.description() + " : " + str(e))
+                # If the app is rejected, some of its extra versions may still not be...
+                for extra in app.extras:
+                    try:
+                        batchFilter.verifyVersions(extra)
+                        toGenerate.append(extra)
+                    except:
+                        pass # one error message is enough...
+        return toGenerate
             
     def notifyAllComplete(self):
         appInfo = self.getAppRepositoryInfo()
@@ -523,12 +532,12 @@ class WebPageResponder(plugins.Responder):
             extraVersions = self.getExtraVersions(app)
             self.diag.info("Found extra versions " + repr(extraVersions))
             relevantSubDirs = self.findRelevantSubdirectories(repository, app, extraVersions)
-            version = getVersionName(app, self.allApps)
+            version = getVersionName(app, self.appsToGenerate)
             self.makeAndGenerate(relevantSubDirs, app.getCompositeConfigValue, pageDir, pageTitle, version, extraVersions)
 
     def getAppRepositoryInfo(self):
         appInfo = seqdict()
-        for app in self.allApps:
+        for app in self.appsToGenerate:
             repository = app.getCompositeConfigValue("batch_result_repository", self.batchSession)
             if not repository:
                 continue
@@ -542,7 +551,7 @@ class WebPageResponder(plugins.Responder):
         return appInfo
 
     def transformToCommon(self, pageInfo):
-        version = getVersionName(pageInfo[0][0], self.allApps)
+        version = getVersionName(pageInfo[0][0], self.appsToGenerate)
         extraVersions, relevantSubDirs = [], seqdict()
         for app, repository in pageInfo:
             extraVersions += self.getExtraVersions(app)
@@ -640,6 +649,7 @@ class GenerateSummaryPage(plugins.ScriptWithArgs):
 class SummaryGenerator:
     def __init__(self):
         self.diag = logging.getLogger("GenerateWebPages")
+        self.diag.info("Generating summary...")
 
     def getTemplateFile(self, location, apps):
         templateFile = os.path.join(location, "summary_template.html")
@@ -654,6 +664,7 @@ class SummaryGenerator:
         for location, apps in locationApps.items():
             pageInfo = self.collectPageInfo(location, apps)
             if len(pageInfo) == 0:
+                self.diag.info("No info found for " + repr(location))
                 continue
             
             templateFile = self.getTemplateFile(location, apps)
@@ -676,6 +687,7 @@ class SummaryGenerator:
         pageInfo = {}
         for app in apps:
             appDir = os.path.join(location, app.name)
+            self.diag.info("Searching under " + repr(appDir))
             if os.path.isdir(appDir) and not pageInfo.has_key(app.fullName()):
                 pageInfo[app.fullName()] = self.getAppPageInfo(app, appDir)
         return pageInfo

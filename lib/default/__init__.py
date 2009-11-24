@@ -687,9 +687,8 @@ class Config:
 
         self.checkFilterFileSanity(suite)
         self.checkConfigSanity(suite.app)
-        if self.batchMode():
-            batchSession = self.optionMap.get("b")
-            batchFilter = batch.BatchVersionFilter(batchSession)
+        if self.batchMode() and not self.optionMap.has_key("coll"):
+            batchFilter = batch.BatchVersionFilter(self.optionMap.get("b"))
             batchFilter.verifyVersions(suite.app)
         if self.isReconnecting():
             self.reconnectConfig.checkSanity(suite.app)

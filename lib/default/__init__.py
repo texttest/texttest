@@ -287,7 +287,7 @@ class Config:
         if not self.optionMap.has_key("gx"):
             classes += self.getThreadActionClasses()
 
-        if self.batchMode():
+        if self.batchMode() and not self.optionMap.has_key("s"):
             if self.optionMap.has_key("coll"):
                 if self.optionMap["coll"] != "mail": 
                     classes.append(batch.WebPageResponder)

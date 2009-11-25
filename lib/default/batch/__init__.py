@@ -629,13 +629,16 @@ class WebPageResponder(plugins.Responder):
 class GenerateSummaryPage(plugins.ScriptWithArgs):
     scriptDoc = "Generate a summary page which links all the other generated pages"
     summaryFileName = "index.html"
+    basePath = ""
     locationApps = seqdict()
     def __init__(self, args=[""]):
-        argDict = self.parseArguments(args, [ "batch", "file" ])
+        argDict = self.parseArguments(args, [ "batch", "file", "basepath" ])
         self.batchSession = argDict.get("batch", "default")
+        if argDict.has_key("basepath"):
+            GenerateSummaryPage.basePath = argDict["basepath"]
         if argDict.has_key("file"):
             GenerateSummaryPage.summaryFileName = argDict["file"]
-        
+            
     def setUpApplication(self, app):
         location = os.path.realpath(app.getCompositeConfigValue("historical_report_location", self.batchSession)).replace("\\", "/")
         self.locationApps.setdefault(location, []).append(app)
@@ -643,7 +646,7 @@ class GenerateSummaryPage(plugins.ScriptWithArgs):
     @classmethod
     def finalise(cls):
         generator = SummaryGenerator()
-        generator.generate(cls.locationApps, cls.summaryFileName)
+        generator.generate(cls.locationApps, cls.summaryFileName, cls.basePath)
 
 
 class SummaryGenerator:
@@ -660,7 +663,7 @@ class SummaryGenerator:
             shutil.copyfile(srcFile, templateFile)
         return templateFile
             
-    def generate(self, locationApps, summaryFileName):
+    def generate(self, locationApps, summaryFileName, basePath):
         for location, apps in locationApps.items():
             pageInfo = self.collectPageInfo(location, apps)
             if len(pageInfo) == 0:
@@ -679,7 +682,7 @@ class SummaryGenerator:
                 if "Version order=" in line:
                     versionOrder += self.extractOrder(line)
                 if "Insert table here" in line:
-                    self.insertSummaryTable(file, pageInfo, appOrder, versionOrder)
+                    self.insertSummaryTable(file, pageInfo, appOrder, versionOrder, basePath)
             file.close()
             plugins.log.info("wrote: '" + pageName + "'") 
 
@@ -804,7 +807,7 @@ class SummaryGenerator:
         allVersions = reduce(operator.add, (info.keys() for info in pageInfo.values()), [])
         return set(filter(lambda v: allVersions.count(v) > 1, allVersions))  
 
-    def insertSummaryTable(self, file, pageInfo, appOrder, versionOrder):
+    def insertSummaryTable(self, file, pageInfo, appOrder, versionOrder, basePath):
         versionWithColumns = self.getVersionsWithColumns(pageInfo)
         self.diag.info("Following versions will be placed in columns " + repr(versionWithColumns))
         minColumnIndices = self.getMinColumnIndices(pageInfo, versionOrder)
@@ -824,7 +827,7 @@ class SummaryGenerator:
                         columnVersions[columnIndex] = version
 
                     fileToLink, resultSummary = appPageInfo[version]
-                    file.write('    <td><h3><a href="' + fileToLink + '">' + version + '</a></h3></td>\n')
+                    file.write('    <td><h3><a href="' + os.path.join(basePath, fileToLink) + '">' + version + '</a></h3></td>\n')
                     for colour, count in resultSummary.items():
                         file.write('    <td bgcolor="' + colour + '"><h3>' + str(count) + "</h3></td>\n")
                     file.write("  </tr></table>")

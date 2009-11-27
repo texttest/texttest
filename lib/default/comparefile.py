@@ -23,7 +23,7 @@ class FileComparison:
         # It would be nice if this could be replaced by some automagic file type detection
         # mechanism, such as the *nix 'file' command, but as the first implementation I've
         # chosen to use a manually created list instead.
-        self.binaryFile = self.checkIfBinaryFile(test)
+        self.binaryFile = self.stemInConfigValue(test, "binary_file")
         self.previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength)
         self.textDiffTool = test.getConfigValue("text_diff_program")
         self.textDiffToolMaxSize = plugins.parseBytes(test.getCompositeConfigValue("max_file_size", self.textDiffTool))
@@ -61,14 +61,17 @@ class FileComparison:
         
     def __repr__(self):
         return self.stem
-    def checkIfBinaryFile(self, test):
-        for binPattern in test.getConfigValue("binary_file"):
-            if fnmatch(self.stem, binPattern):
+    
+    def stemInConfigValue(self, test, configName):
+        for stemPattern in test.getConfigValue(configName):
+            if fnmatch(self.stem, stemPattern):
                 return True
         return False
+
     def modifiedDates(self):
         files = [ self.stdFile, self.tmpFile, self.stdCmpFile, self.tmpCmpFile ]
         return " : ".join(map(self.modifiedDate, files))
+
     def modifiedDate(self, file):
         if not file:
             return "---"
@@ -77,6 +80,7 @@ class FileComparison:
             return time.strftime("%d%b%H:%M:%S", time.localtime(modTime))
         else:
             return "---"
+
     def needsRecalculation(self):
         if not self.stdFile or not self.tmpFile:
             self.diag.info("No comparison, no recalculation")
@@ -261,7 +265,7 @@ class FileComparison:
         self.saveTmpFile(test)
 
     def getTmpFileForSave(self, test):
-        if self.stem not in test.getConfigValue("save_filtered_file_stems"):
+        if not self.stemInConfigValue(test, "save_filtered_file_stems"):
             return self.tmpFile
 
         # Don't include the sorting when saving filtered files...

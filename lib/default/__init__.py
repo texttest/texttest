@@ -3,7 +3,7 @@ import os, sys, plugins, sandbox, console, rundependent, pyusecase_interface, co
 
 from copy import copy
 from string import Template
-from threading import Lock
+from threading import Lock, Timer
 from knownbugs import CheckForBugs, CheckForCrashes
 from reconnect import ReconnectConfig
 from traffic import SetUpTrafficHandlers
@@ -1231,7 +1231,13 @@ class RunTest(plugins.Action):
         self.changeToRunningState(test)
         
         self.registerProcess(test, process)
-        self.wait(process)
+        if test.getConfigValue("kill_timeout"):
+            timer = Timer(test.getConfigValue("kill_timeout"), self.kill, (test, None))
+            timer.start()
+            self.wait(process)
+            timer.cancel()
+        else:
+            self.wait(process)
         self.checkAndClear(test)
     
     def registerProcess(self, test, process):

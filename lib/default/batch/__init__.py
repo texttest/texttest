@@ -1,8 +1,9 @@
 #!/usr/local/bin/python
 
-import os, plugins, sys, string, time, types, shutil, datetime, testoverview, logging
+import os, plugins, sys, string, time, types, shutil, datetime, testoverview, logging, operator
 from ndict import seqdict
 from cPickle import Pickler
+from glob import glob
 
 class BatchVersionFilter:
     def __init__(self, batchSession):
@@ -482,21 +483,30 @@ class WebPageResponder(plugins.Responder):
         self.batchSession = optionMap.get("b", "default")
         self.cmdLineResourcePage = self.findResourcePage(optionMap.get("coll"))
         self.diag = logging.getLogger("GenerateWebPages")
-        self.allApps = allApps
+        self.appsToGenerate = self.findAppsToGenerate(allApps)
 
     def findResourcePage(self, collArg):
         if collArg and collArg.startswith("web."):
             return collArg[4:]
 
-    def addSuites(self, suites):
-        # These are the ones that got through. Remove all rejected apps...
-        apps = set([ suite.app for suite in suites ])
-        for app in set(self.allApps).difference(apps):
-            self.allApps.remove(app)
-            # If the app is rejected, some of its extra versions may still not be...
-            for extra in app.extras:
-                if extra in apps:
-                    self.allApps.append(extra)
+    def findAppsToGenerate(self, apps):
+        # Don't blanket remove rejected apps automatically when collecting
+        batchFilter = BatchVersionFilter(self.batchSession)
+        toGenerate = []
+        for app in apps:
+            try:
+                batchFilter.verifyVersions(app)
+                toGenerate.append(app)
+            except plugins.TextTestError, e:
+                plugins.log.info("Not generating web page for " + app.description() + " : " + str(e))
+                # If the app is rejected, some of its extra versions may still not be...
+                for extra in app.extras:
+                    try:
+                        batchFilter.verifyVersions(extra)
+                        toGenerate.append(extra)
+                    except:
+                        pass # one error message is enough...
+        return toGenerate
             
     def notifyAllComplete(self):
         appInfo = self.getAppRepositoryInfo()
@@ -522,12 +532,12 @@ class WebPageResponder(plugins.Responder):
             extraVersions = self.getExtraVersions(app)
             self.diag.info("Found extra versions " + repr(extraVersions))
             relevantSubDirs = self.findRelevantSubdirectories(repository, app, extraVersions)
-            version = getVersionName(app, self.allApps)
+            version = getVersionName(app, self.appsToGenerate)
             self.makeAndGenerate(relevantSubDirs, app.getCompositeConfigValue, pageDir, pageTitle, version, extraVersions)
-                
+
     def getAppRepositoryInfo(self):
         appInfo = seqdict()
-        for app in self.allApps:
+        for app in self.appsToGenerate:
             repository = app.getCompositeConfigValue("batch_result_repository", self.batchSession)
             if not repository:
                 continue
@@ -541,7 +551,7 @@ class WebPageResponder(plugins.Responder):
         return appInfo
 
     def transformToCommon(self, pageInfo):
-        version = getVersionName(pageInfo[0][0], self.allApps)
+        version = getVersionName(pageInfo[0][0], self.appsToGenerate)
         extraVersions, relevantSubDirs = [], seqdict()
         for app, repository in pageInfo:
             extraVersions += self.getExtraVersions(app)
@@ -614,6 +624,220 @@ class WebPageResponder(plugins.Responder):
             if not version in app.versions:
                 extraVersions.append(version)
         return extraVersions
+
+
+class GenerateSummaryPage(plugins.ScriptWithArgs):
+    scriptDoc = "Generate a summary page which links all the other generated pages"
+    summaryFileName = "index.html"
+    basePath = ""
+    locationApps = seqdict()
+    def __init__(self, args=[""]):
+        argDict = self.parseArguments(args, [ "batch", "file", "basepath" ])
+        self.batchSession = argDict.get("batch", "default")
+        if argDict.has_key("basepath"):
+            GenerateSummaryPage.basePath = argDict["basepath"]
+        if argDict.has_key("file"):
+            GenerateSummaryPage.summaryFileName = argDict["file"]
+            
+    def setUpApplication(self, app):
+        location = os.path.realpath(app.getCompositeConfigValue("historical_report_location", self.batchSession)).replace("\\", "/")
+        self.locationApps.setdefault(location, []).append(app)
+
+    @classmethod
+    def finalise(cls):
+        generator = SummaryGenerator()
+        generator.generate(cls.locationApps, cls.summaryFileName, cls.basePath)
+
+
+class SummaryGenerator:
+    def __init__(self):
+        self.diag = logging.getLogger("GenerateWebPages")
+        self.diag.info("Generating summary...")
+
+    def getTemplateFile(self, location, apps):
+        templateFile = os.path.join(location, "summary_template.html")
+        if not os.path.isfile(templateFile):
+            plugins.log.info("No file at '" + templateFile + "', copying default file from installation")
+            includeSite, includePersonal = apps[-1].inputOptions.configPathOptions()
+            srcFile = plugins.findDataPaths([ "summary_template.html" ], includeSite, includePersonal)[-1]
+            shutil.copyfile(srcFile, templateFile)
+        return templateFile
+            
+    def generate(self, locationApps, summaryFileName, basePath):
+        for location, apps in locationApps.items():
+            pageInfo = self.collectPageInfo(location, apps)
+            if len(pageInfo) == 0:
+                self.diag.info("No info found for " + repr(location))
+                continue
+            
+            templateFile = self.getTemplateFile(location, apps)
+            pageName = os.path.join(location, summaryFileName)
+            file = open(pageName, "w")
+            versionOrder = [ "default" ]
+            appOrder = []
+            for line in open(templateFile):
+                file.write(line)
+                if "App order=" in line:
+                    appOrder += self.extractOrder(line)
+                if "Version order=" in line:
+                    versionOrder += self.extractOrder(line)
+                if "Insert table here" in line:
+                    self.insertSummaryTable(file, pageInfo, appOrder, versionOrder, basePath)
+            file.close()
+            plugins.log.info("wrote: '" + pageName + "'") 
+
+    def collectPageInfo(self, location, apps):
+        pageInfo = {}
+        for app in apps:
+            appDir = os.path.join(location, app.name)
+            self.diag.info("Searching under " + repr(appDir))
+            if os.path.isdir(appDir) and not pageInfo.has_key(app.fullName()):
+                pageInfo[app.fullName()] = self.getAppPageInfo(app, appDir)
+        return pageInfo
+
+    def getAppPageInfo(self, app, appDir):
+        versionDates = {}
+        for path in glob(os.path.join(appDir, "test_*.html")):
+            fileName = os.path.basename(path)
+            version, date = self.parseFileName(fileName)
+            if version:
+                self.diag.info("Found file with version " + version)
+                if versionDates.has_key(version):
+                    oldDate = versionDates[version][0]
+                    if date > oldDate:
+                        versionDates[version] = date, path
+                else:
+                    versionDates[version] = date, path
+        versionLinks = {}
+        for version, (date, path) in versionDates.items():
+            fileToLink = os.path.join(app.name, "test_" + version + ".html")
+            if os.path.isfile(os.path.join(appDir, os.path.basename(fileToLink))):
+                summary = self.extractSummary(path, app)
+                self.diag.info("For version " + version + ", found summary info " + repr(summary))
+                versionLinks[version] = fileToLink, summary
+        return versionLinks
+
+    def extractSummary(self, datedFile, app):
+        for line in open(datedFile):
+            if line.strip().startswith("<H2>"):
+                text = line.strip()[4:-5] # drop the tags
+                return self.parseSummaryText(text, app)
+        return {}
+
+    def parseSummaryText(self, text, app):
+        words = text.split()[3:] # Drop "Version: 12 tests"
+        index = 0
+        categories = []
+        while index < len(words):
+            try:
+                count = int(words[index])
+                categories.append([ "", count ])
+            except ValueError:
+                categories[-1][0] += words[index]
+            index += 1
+        self.diag.info("Category information is " + repr(categories))
+        colourCount = seqdict()
+        for categoryName, count in categories:
+            colour = self.getColour(categoryName, app)
+            if not colourCount.has_key(colour):
+                colourCount[colour] = 0
+            colourCount[colour] += count
+        return colourCount
+
+    def getColour(self, categoryName, app):
+        colourFinder = testoverview.ColourFinder(app.getCompositeConfigValue)
+        return colourFinder.find(self.getCategoryKey(categoryName))
+
+    def getCategoryKey(self, categoryName):
+        if categoryName == "succeeded":
+            return "success_bg"
+        elif categoryName in [ "faster", "slower", "memory+", "memory-" ]:
+            return "performance_bg"
+        else:
+            return "failure_bg"
+
+    def parseFileName(self, fileName):
+        versionStr = fileName[5:-5]
+        components = versionStr.split("_")
+        for index, component in enumerate(components[1:]):
+            try:
+                self.diag.info("Trying to parse " + component + " as date.")
+                date = time.strptime(component, "%d%b%Y")
+                return "_".join(components[:index + 1]), date
+            except ValueError:
+                pass
+        return None, None
+        
+    def getOrderedVersions(self, predefined, info):
+        fullList = sorted(info.keys())
+        versions = []
+        for version in predefined:
+            if version in fullList:
+                versions.append(version)
+                fullList.remove(version)
+        return versions + fullList        
+
+    def padWithEmpty(self, versions, columnVersions, minColumnIndices):
+        newVersions = []
+        index = 0
+        for version in versions:
+            minIndex = minColumnIndices.get(version, 0)
+            while index < minIndex:
+                self.diag.info("Index = " + repr(index) + " but min index = " + repr(minIndex))
+                newVersions.append("")
+                index += 1
+            while columnVersions.has_key(index) and columnVersions[index] != version:
+                newVersions.append("")
+                index += 1
+            newVersions.append(version)
+            index += 1
+        return newVersions
+
+    def getMinColumnIndices(self, pageInfo, versionOrder):
+        # We find the maximum column number a version has on any row,
+        # which is equal to the minimum value it should be given in a particular row
+        versionIndices = {}
+        for rowInfo in pageInfo.values():
+            for index, version in enumerate(self.getOrderedVersions(versionOrder, rowInfo)):
+                if not versionIndices.has_key(version) or index > versionIndices[version]:
+                    versionIndices[version] = index
+        return versionIndices
+
+    def getVersionsWithColumns(self, pageInfo):
+        allVersions = reduce(operator.add, (info.keys() for info in pageInfo.values()), [])
+        return set(filter(lambda v: allVersions.count(v) > 1, allVersions))  
+
+    def insertSummaryTable(self, file, pageInfo, appOrder, versionOrder, basePath):
+        versionWithColumns = self.getVersionsWithColumns(pageInfo)
+        self.diag.info("Following versions will be placed in columns " + repr(versionWithColumns))
+        minColumnIndices = self.getMinColumnIndices(pageInfo, versionOrder)
+        self.diag.info("Minimum column indices are " + repr(minColumnIndices))
+        columnVersions = {}
+        for appName in self.getOrderedVersions(appOrder, pageInfo):
+            file.write("<tr>\n")
+            file.write("  <td><h3>" + appName + "</h3></td>\n")
+            appPageInfo = pageInfo[appName]
+            orderedVersions = self.getOrderedVersions(versionOrder, appPageInfo)
+            self.diag.info("For " + appName + " found " + repr(orderedVersions))
+            for columnIndex, version in enumerate(self.padWithEmpty(orderedVersions, columnVersions, minColumnIndices)):
+                file.write('  <td>')
+                if version:
+                    file.write('<table border="1" class="version_link"><tr>\n')
+                    if version in versionWithColumns:
+                        columnVersions[columnIndex] = version
+
+                    fileToLink, resultSummary = appPageInfo[version]
+                    file.write('    <td><h3><a href="' + os.path.join(basePath, fileToLink) + '">' + version + '</a></h3></td>\n')
+                    for colour, count in resultSummary.items():
+                        file.write('    <td bgcolor="' + colour + '"><h3>' + str(count) + "</h3></td>\n")
+                    file.write("  </tr></table>")
+                file.write("</td>\n")
+            file.write("</tr>\n")
+
+    def extractOrder(self, line):
+        startPos = line.find("order=") + 6
+        endPos = line.rfind("-->")
+        return plugins.commasplit(line[startPos:endPos])
 
     
 class CollectFiles(plugins.ScriptWithArgs):

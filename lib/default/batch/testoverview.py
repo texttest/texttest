@@ -11,7 +11,7 @@ def getWeekDay(tag):
     return plugins.weekdays[time.strptime(tag.split("_")[0], "%d%b%Y")[6]]
     
 class ColourFinder:
-    def setConfigGetter(self, getConfigValue):
+    def __init__(self, getConfigValue):
         self.getConfigValue = getConfigValue
     def find(self, title):
         colourName = self.getConfigValue("historical_report_colours", title)
@@ -20,8 +20,6 @@ class ColourFinder:
         if not colourName.startswith("#"):
             exec "colourName = HTMLcolors." + colourName.upper()
         return colourName
-
-colourFinder = ColourFinder()
 
 def getDisplayText(tag):
     displayText = "_".join(tag.split("_")[1:])
@@ -48,7 +46,6 @@ class GenerateWebPages(object):
         self.getConfigValue = getConfigValue
         self.resourceNames = resourceNames
         self.diag = logging.getLogger("GenerateWebPages")
-        colourFinder.setConfigGetter(getConfigValue)
 
     def makeSelectors(self, subPageNames, tags=[]):
         allSelectors = []
@@ -63,7 +60,6 @@ class GenerateWebPages(object):
     
     def generate(self, repositoryDirs, subPageNames):
         foundMinorVersions = {}
-        details = TestDetails()
         allMonthSelectors = set()
         for version, repositoryDirInfo in repositoryDirs.items():
             self.diag.info("Generating " + version)
@@ -106,9 +102,10 @@ class GenerateWebPages(object):
                     
                 # put them in reverse order, most relevant first
                 linkFromDetailsToOverview = [ sel.getLinkInfo(self.pageVersion) for sel in allSelectors ]
-                det = details.generate(categoryHandlers, version, tags, linkFromDetailsToOverview)
-                self.addDetailPages(det)
-
+                for tag in tags:
+                    details = self.pagesDetails.setdefault(tag, TestDetails(tag, self.pageTitle))
+                    details.addVersionSection(version, categoryHandlers[tag], linkFromDetailsToOverview)
+                
         selContainer = HTMLgen.Container()
         for sel in self.makeSelectors(subPageNames):
             target, linkName = sel.getLinkInfo(self.pageVersion)
@@ -271,15 +268,6 @@ class GenerateWebPages(object):
         else:
             return False
         
-    def addDetailPages(self, details):
-        for tag in details.keys():
-            if not self.pagesDetails.has_key(tag):
-                tagText = getDisplayText(tag)
-                pageDetailTitle = "Detailed test results for " + self.pageTitle + ": " + tagText
-                self.pagesDetails[tag] = HTMLgen.SimpleDocument(title=TitleWithDateStamp(pageDetailTitle))
-                self.pagesDetails[tag].append(HTMLgen.Heading(1, tagText + " - detailed test results for ", self.pageTitle, align = 'center'))
-            self.pagesDetails[tag].append(details[tag])
-            
     def writePages(self):
         plugins.log.info("Writing overview pages...")
         for pageFile, (resourceName, page) in self.pagesOverview.items():
@@ -287,10 +275,10 @@ class GenerateWebPages(object):
             plugins.log.info("wrote: '" + plugins.relpath(pageFile, self.pageDir) + "'")
         plugins.log.info("Writing detail pages...")
         for resourceName in self.resourceNames:
-            for tag, page in self.pagesDetails.items():
+            for tag, details in self.pagesDetails.items():
                 pageName = getDetailPageName(self.pageVersion, tag)
                 relPath = os.path.join(resourceName, pageName)
-                page.write(os.path.join(self.pageDir, relPath))
+                details.write(os.path.join(self.pageDir, relPath))
                 plugins.log.info("wrote: '" + relPath + "'")
 
     def getTestIdentifier(self, stateFile, repository):
@@ -306,6 +294,7 @@ class TestTable:
     def __init__(self, getConfigValue, cellInfo):
         self.getConfigValue = getConfigValue
         self.cellInfo = cellInfo
+        self.colourFinder = ColourFinder(getConfigValue)
 
     def generate(self, categoryHandlers, pageVersion, version, loggedTests, tagsFound):
         table = HTMLgen.TableLite(border=0, cellpadding=4, cellspacing=2,width="100%")
@@ -341,7 +330,7 @@ class TestTable:
             return table
 
     def generateSummaries(self, categoryHandlers, pageVersion, version, tags, extraVersion=None):
-        bgColour = colourFinder.find("column_header_bg")
+        bgColour = self.colourFinder.find("column_header_bg")
         row = [ HTMLgen.TD("Summary", bgcolor = bgColour) ]
         for tag in tags:
             categoryHandler = categoryHandlers[tag]
@@ -358,13 +347,13 @@ class TestTable:
         return HTMLgen.Heading(2, cont, align='center')
         
     def generateExtraVersionHeader(self, extraVersion, tagsFound):
-        bgColour = colourFinder.find("column_header_bg")
+        bgColour = self.colourFinder.find("column_header_bg")
         extraVersionElement = HTMLgen.Container(HTMLgen.Name(extraVersion), extraVersion)
         columnHeader = HTMLgen.TH(extraVersionElement, colspan = len(tagsFound) + 1, bgcolor=bgColour)
         return HTMLgen.TR(columnHeader)
     
     def generateTestRow(self, testName, pageVersion, version, extraVersion, results, tagsFound):
-        bgColour = colourFinder.find("row_header_bg")
+        bgColour = self.colourFinder.find("row_header_bg")
         testId = version + testName + extraVersion
         row = [ HTMLgen.TD(HTMLgen.Container(HTMLgen.Name(testId), testName), bgcolor=bgColour) ]
         # Don't add empty rows to the table
@@ -387,7 +376,7 @@ class TestTable:
             else:
                 return self.getCellDataFromState(state)
 
-        return "N/A", True, colourFinder.find("test_default_fg"), colourFinder.find("no_results_bg")
+        return "N/A", True, self.colourFinder.find("test_default_fg"), self.colourFinder.find("no_results_bg")
 
     def getCellDataFromState(self, state):
         if hasattr(state, "getMostSevereFileComparison"):
@@ -434,25 +423,25 @@ class TestTable:
         return result
 
     def getColours(self, category, fileComp, success):
-        bgcol = colourFinder.find("failure_bg")
-        fgcol = colourFinder.find("test_default_fg")
+        bgcol = self.colourFinder.find("failure_bg")
+        fgcol = self.colourFinder.find("test_default_fg")
         if success:
-            bgcol = colourFinder.find("success_bg")
+            bgcol = self.colourFinder.find("success_bg")
         elif category.startswith("faster") or category.startswith("slower"):
-            bgcol = colourFinder.find("performance_bg")
+            bgcol = self.colourFinder.find("performance_bg")
             if self.getPercent(fileComp) >= self.getConfigValue("performance_variation_serious_%", "cputime"):
-                fgcol = colourFinder.find("performance_fg")
+                fgcol = self.colourFinder.find("performance_fg")
         elif category == "smaller" or category == "larger":
-            bgcol = colourFinder.find("memory_bg")
+            bgcol = self.colourFinder.find("memory_bg")
             if self.getPercent(fileComp) >= self.getConfigValue("performance_variation_serious_%", "memory"):
-                fgcol = colourFinder.find("performance_fg")
+                fgcol = self.colourFinder.find("performance_fg")
         return fgcol, bgcol
 
     def getPercent(self, fileComp):
         return fileComp.perfComparison.percentageChange
 
     def findTagColour(self, tag):
-        return colourFinder.find("run_" + getWeekDay(tag) + "_fg")
+        return self.colourFinder.find("run_" + getWeekDay(tag) + "_fg")
 
     def generateTableHead(self, pageVersion, version, tagsFound):
         head = [ HTMLgen.TH("Test") ]
@@ -465,20 +454,38 @@ class TestTable:
 
         
 class TestDetails:
-    def generate(self, categoryHandlers, version, tags, linkFromDetailsToOverview):
-        detailsContainers = seqdict()
-        for tag in tags:
-            container = detailsContainers[tag] = HTMLgen.Container()
-            categoryHandler = categoryHandlers[tag]
-            container.append(HTMLgen.HR())
-            container.append(HTMLgen.Heading(2, version + ": " + categoryHandler.generateSummary()))
-            for desc, testInfo in categoryHandler.getTestsWithDescriptions():
-                fullDescription = self.getFullDescription(testInfo, version, linkFromDetailsToOverview)
-                if fullDescription:
-                    container.append(HTMLgen.Name(version + desc))
-                    container.append(HTMLgen.Heading(3, "Detailed information for the tests that " + desc + ":"))
-                    container.append(fullDescription)
-        return detailsContainers
+    def __init__(self, tag, pageTitle):
+        tagText = getDisplayText(tag)
+        pageDetailTitle = "Detailed test results for " + pageTitle + ": " + tagText
+        self.document = HTMLgen.SimpleDocument(title=TitleWithDateStamp(pageDetailTitle))
+        headerText = tagText + " - detailed test results for " + pageTitle
+        self.document.append(HTMLgen.Heading(1, headerText, align = 'center'))
+        self.totalCategoryHandler = CategoryHandler()
+        self.versionSections = []
+        
+    def addVersionSection(self, version, categoryHandler, linkFromDetailsToOverview):
+        self.totalCategoryHandler.update(categoryHandler)
+        container = HTMLgen.Container()
+        container.append(HTMLgen.HR())
+        container.append(self.getSummaryHeading(version, categoryHandler))
+        for desc, testInfo in categoryHandler.getTestsWithDescriptions():
+            fullDescription = self.getFullDescription(testInfo, version, linkFromDetailsToOverview)
+            if fullDescription:
+                container.append(HTMLgen.Name(version + desc))
+                container.append(HTMLgen.Heading(3, "Detailed information for the tests that " + desc + ":"))
+                container.append(fullDescription)
+        self.versionSections.append(container)
+
+    def getSummaryHeading(self, version, categoryHandler):
+        return HTMLgen.Heading(2, version + ": " + categoryHandler.generateSummary())
+
+    def write(self, fileName):
+        if len(self.versionSections) > 1:
+            self.document.append(self.getSummaryHeading("Total", self.totalCategoryHandler))
+        for sect in self.versionSections:
+            self.document.append(sect)
+        self.versionSections = [] # In case we get called again
+        self.document.write(fileName)
     
     def getFreeTextData(self, tests):
         data = seqdict()
@@ -550,6 +557,11 @@ class TestDetails:
 class CategoryHandler:
     def __init__(self):
         self.testsInCategory = seqdict()
+
+    def update(self, categoryHandler):
+        for category, testInfo in categoryHandler.testsInCategory.items():
+            testInfoList = self.testsInCategory.setdefault(category, [])
+            testInfoList += testInfo
 
     def registerInCategory(self, testId, state, extraVersion):
         self.testsInCategory.setdefault(state.category, []).append((testId, state, extraVersion))

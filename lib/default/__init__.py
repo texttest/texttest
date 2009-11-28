@@ -11,6 +11,7 @@ from jobprocess import killSubProcessAndChildren
 from actionrunner import ActionRunner
 from time import sleep
 from StringIO import StringIO
+from ndict import seqdict
 
 plugins.addCategory("killed", "killed", "were terminated before completion")
 
@@ -119,15 +120,22 @@ class Config:
         groups = self.createOptionGroups(allApps)
         return reduce(operator.add, (g.keys() for g in groups), [])
 
+    def getCollectSequence(self):
+        arg = self.optionMap.get("coll")
+        sequence = []
+        batchArgs = [ "batch=" + self.optionValue("b") ]
+        if not arg or "web" not in arg:
+            emailHandler = batch.CollectFiles(batchArgs)
+            sequence.append(emailHandler)
+        if not arg or arg == "web":
+            summaryGenerator = batch.GenerateSummaryPage(batchArgs)
+            sequence.append(summaryGenerator)
+        return sequence
+
     def getActionSequence(self):
         if self.optionMap.has_key("coll"):
-            arg = self.optionMap.get("coll")
-            if arg and "web" in arg:
-                return []
-            else:
-                batchSession = self.optionValue("b")
-                emailHandler = batch.CollectFiles([ "batch=" + batchSession ])
-                return [ emailHandler ]
+            return self.getCollectSequence()
+
         if self.isReconnecting():
             return self.getReconnectSequence()
 
@@ -279,7 +287,7 @@ class Config:
         if not self.optionMap.has_key("gx"):
             classes += self.getThreadActionClasses()
 
-        if self.batchMode():
+        if self.batchMode() and not self.optionMap.has_key("s"):
             if self.optionMap.has_key("coll"):
                 if self.optionMap["coll"] != "mail": 
                     classes.append(batch.WebPageResponder)
@@ -679,9 +687,8 @@ class Config:
 
         self.checkFilterFileSanity(suite)
         self.checkConfigSanity(suite.app)
-        if self.batchMode():
-            batchSession = self.optionMap.get("b")
-            batchFilter = batch.BatchVersionFilter(batchSession)
+        if self.batchMode() and not self.optionMap.has_key("coll"):
+            batchFilter = batch.BatchVersionFilter(self.optionMap.get("b"))
             batchFilter.verifyVersions(suite.app)
         if self.isReconnecting():
             self.reconnectConfig.checkSanity(suite.app)
@@ -1470,21 +1477,25 @@ class RunTest(plugins.Action):
                     
 class CountTest(plugins.Action):
     scriptDoc = "report on the number of tests selected, by application"
-    def __init__(self):
-        self.appCount = {}
-    def __del__(self):
+    appCount = seqdict()
+    @classmethod
+    def finalise(self):
         for app, count in self.appCount.items():
-            print app, "has", count, "tests"
+            print app.description(), "has", count, "tests"
+        print "There are", sum(self.appCount.values()), "tests in total."
+
     def __repr__(self):
         return "Counting"
+
     def __call__(self, test):
         self.describe(test)
-        self.appCount[test.app.description()] += 1
+        self.appCount[test.app] += 1
+
     def setUpSuite(self, suite):
         self.describe(suite)
-    def setUpApplication(self, app):
-        self.appCount[app.description()] = 0
 
+    def setUpApplication(self, app):
+        self.appCount[app] = 0
 
 
 class DocumentOptions(plugins.Action):

@@ -883,3 +883,21 @@ toggled.false = uncheck run on performance machines only
 [Label=If enough tests]
 toggled.true = choose if enough tests for use grid
 
+[Name=viewmenu]
+activate = show view menu
+
+[Name=filemenu]
+activate = show file menu
+
+[Name=editmenu]
+activate = show edit menu
+
+[Name=actionsmenu]
+activate = show actions menu
+
+[Name=helpmenu]
+activate = show help menu
+
+[Name=GUI testing option chooser]
+changed = select gui-testing option named
+

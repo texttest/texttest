@@ -540,23 +540,24 @@ class OptionGroupGUI(ActionGUI):
         hbox.show_all()
         return hbox
 
+    def setConfigOverride(self, switch, index, option, *args):
+        cleanOption = option.split("\n")[0].replace("_", "")
+        configName = self.getNaming(switch.name, option, *args)
+        if index == switch.defaultValue or guiConfig.getCompositeValue("gui_entry_overrides", configName) == "1":
+            switch.setValue(index)
+
     def getNaming(self, switchName, cleanOption, *args):
         if len(switchName) > 0:
-            configName = switchName + ":" + cleanOption
-            useCaseName = cleanOption + " for " + switchName
-            return configName, useCaseName
+            return switchName + ":" + cleanOption
         else:
-            return cleanOption, cleanOption
+            return cleanOption
 
     def createRadioButtons(self, switch, optionGroup):
         buttons = []
         mainRadioButton = None
         individualToolTips = type(switch.description) == types.ListType
         for index, option in enumerate(switch.options):
-            cleanOption = option.split("\n")[0].replace("_", "")
-            configName, useCaseName = self.getNaming(switch.name, cleanOption, optionGroup)
-            if guiConfig.getCompositeValue("gui_entry_overrides", configName) == "1":
-                switch.setValue(index)
+            self.setConfigOverride(switch, index, option, optionGroup)
             radioButton = gtk.RadioButton(mainRadioButton, option, use_underline=True)
             radioButton.set_name(option + " for " + optionGroup.name)
             if individualToolTips:
@@ -574,9 +575,25 @@ class OptionGroupGUI(ActionGUI):
         switch.setMethods(indexer.getActiveIndex, indexer.setActiveIndex)
         return buttons
 
+    def createComboBox(self, switch, *args):
+        combobox = gtk.combo_box_new_text()
+        combobox.set_name(switch.name)
+        switch.setMethods(combobox.get_active, combobox.set_active)
+        for index, option in enumerate(switch.options):
+            combobox.append_text(option)
+            self.setConfigOverride(switch, index, option, *args)
+
+        box = gtk.VBox()
+        box.pack_start(gtk.Label(""))
+        box.pack_start(combobox)
+        return box
+
     def createSwitchWidget(self, switch, optionGroup):
         if len(switch.options) >= 1:
-            return self.createRadioButtonCollection(switch, optionGroup)
+            if switch.hideOptions:
+                return self.createComboBox(switch, optionGroup)
+            else:
+                return self.createRadioButtonCollection(switch, optionGroup)
         else:
             return self.createCheckBox(switch)
 
@@ -593,7 +610,7 @@ class OptionGroupGUI(ActionGUI):
         checkButton.show()
         return checkButton
 
-    def createComboBox(self, option):
+    def createComboBoxEntry(self, option):
         combobox = gtk.combo_box_entry_new_text()
         entry = combobox.child
         option.setPossibleValuesMethods(combobox.append_text, ComboBoxListFinder(combobox))
@@ -604,7 +621,7 @@ class OptionGroupGUI(ActionGUI):
     def createOptionWidget(self, option):
         box = gtk.HBox()
         if option.usePossibleValues():
-            widget, entry = self.createComboBox(option)
+            widget, entry = self.createComboBoxEntry(option)
             box.pack_start(widget, expand=True, fill=True)
         else:
             entry = gtk.Entry()

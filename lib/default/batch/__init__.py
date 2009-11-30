@@ -662,6 +662,10 @@ class SummaryGenerator:
             srcFile = plugins.findDataPaths([ "summary_template.html" ], includeSite, includePersonal)[-1]
             shutil.copyfile(srcFile, templateFile)
         return templateFile
+
+    def adjustLineForTitle(self, line):
+        pos = line.find("</title>")
+        return str(testoverview.TitleWithDateStamp(line[:pos])) + "</title>\n"
             
     def generate(self, locationApps, summaryFileName, basePath):
         for location, apps in locationApps.items():
@@ -676,7 +680,10 @@ class SummaryGenerator:
             versionOrder = [ "default" ]
             appOrder = []
             for line in open(templateFile):
-                file.write(line)
+                if "<title>" in line:
+                    file.write(self.adjustLineForTitle(line))
+                else:
+                    file.write(line)
                 if "App order=" in line:
                     appOrder += self.extractOrder(line)
                 if "Version order=" in line:

@@ -241,6 +241,8 @@ class MailSender:
         return string.join(format_exception_only(exctype, value), "")       
     def sendMail(self, app, mailContents):
         smtpServer = app.getConfigValue("smtp_server")
+        smtpUsername = app.getConfigValue("smtp_server_username")
+        smtpPassword = app.getConfigValue("smtp_server_password")
         fromAddress = app.getCompositeConfigValue("batch_sender", self.sessionName)
         toAddresses = plugins.commasplit(app.getCompositeConfigValue("batch_recipients", self.sessionName))
         from smtplib import SMTP
@@ -249,6 +251,12 @@ class MailSender:
             smtp.connect(smtpServer)
         except:
             return "Could not connect to SMTP server at " + smtpServer + "\n" + self.exceptionOutput()
+        if smtpUsername:
+            try:
+                smtp.login(smtpUsername, smtpPassword)
+            except:
+                return "Failed to login as '" + smtpUsername + "' to SMTP server at " + smtpServer + \
+                    "\n" + self.exceptionOutput()
         try:
             smtp.sendmail(fromAddress, toAddresses, mailContents)
         except:

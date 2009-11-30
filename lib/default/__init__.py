@@ -880,6 +880,8 @@ class Config:
     def setBatchDefaults(self, app):
         # Batch values. Maps from session name to values
         app.setConfigDefault("smtp_server", "localhost", "Server to use for sending mail in batch mode")
+        app.setConfigDefault("smtp_server_username", "", "Username for SMTP authentication when sending mail in batch mode")
+        app.setConfigDefault("smtp_server_password", "", "Password for SMTP authentication when sending mail in batch mode")
         app.setConfigDefault("batch_result_repository", { "default" : "" }, "Directory to store historical batch results under")
         app.setConfigDefault("historical_report_location", { "default" : "" }, "Directory to create reports on historical batch data under")
         app.setConfigDefault("historical_report_page_name", { "default" : self.getDefaultPageName(app) }, "Header for page on which this application should appear")

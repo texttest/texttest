@@ -43,3 +43,15 @@ See the website documentation of "collate_file" for full documentation of how th
 CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
 =========================================================
 
+(1) Default toolbar changed
+===========================
+"Remove Tests" and "Remove Files" are now separate actions, so it wasn't reckoned a good idea
+to keep "Remove" in the toolbar as it wasn't clear which it referred to. So "Refresh" now appears
+there and "Remove" needs to be done from the popup or top menus, or via the accelerator.
+Naturally you can configure this if you want, see the website on "Personalising the UI".
+
+(2) HTML batch report appearance changed
+========================================
+Most of the changes there will occur by default. For example, an "index.html" page will be
+generated at the top level providing an overview of the status. Rows or tables full of "N/A"
+will no longer be shown. There shouldn't be any surprises.

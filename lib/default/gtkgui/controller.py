@@ -545,6 +545,7 @@ class InteractiveActionHandler:
         self.dynamic = dynamic
         self.allApps = allApps
         self.inputOptions = inputOptions
+        self.rejectedModules = [ "cvs " ] # For back-compatibility, don't try to load this module here. 
 
     def getDefaultAccelerators(self):
         return plugins.ResponseAggregator([ x.getDefaultAccelerators for x in self.getAllIntvConfigs(self.allApps) ])()
@@ -604,7 +605,7 @@ class InteractiveActionHandler:
     def getExplicitConfigModule(self, app=None):
         if app:
             module = app.getConfigValue("interactive_action_module")
-            if module == "cvs": # for back compatibility...
+            if module in self.rejectedModules: # for back compatibility...
                 return "default_gui"
             else:
                 return module
@@ -616,6 +617,7 @@ class InteractiveActionHandler:
             exec "from " + module + " import InteractiveActionConfig"
             return InteractiveActionConfig()
         except ImportError:
+            self.rejectedModules.append(module) # Make sure we don't try and import it again
             if module == "default_gui":
                 raise
         

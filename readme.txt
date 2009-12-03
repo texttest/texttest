@@ -22,7 +22,8 @@ Documentation Summary:
 
 Installation and System Requirements:
 
-    Read the installation guide at http://www.texttest.org/index.php?page=documentation_3_11&n=install_texttest
+    Read the online installation guide at http://www.texttest.org. Click on the "Documentation" button
+    and then the "Installation Guide" at the top-left of the table.
     The lightning summary is that you need Python, PyGTK, tkdiff which are probably already
     installed if you're on UNIX. On Windows you'll probably need to download them. However
     you don't need special process management tools any more and it's sufficient to run PyGTK's installer

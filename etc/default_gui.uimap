@@ -428,6 +428,7 @@ changed = enter test name =
 
 [Name=Test Description]
 changed = enter test description =
+activate = 
 
 [Name=Place Test]
 changed = enter place test =

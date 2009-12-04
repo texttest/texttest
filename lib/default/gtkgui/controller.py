@@ -103,7 +103,7 @@ class GUIController(plugins.Responder, plugins.Observable):
         self.testTreeGUI = testtree.TestTreeGUI(self.dynamic, allApps, testPopupGUI, self.testColumnGUI)
         self.testFileGUI = filetrees.TestFileGUI(self.dynamic, testFilePopupGUI)
         self.rightWindowGUI = self.createRightWindowGUI()
-        self.shortcutBarGUI = ShortcutBarGUI()
+        self.shortcutBarGUI = ShortcutBarGUI(includeSite, includePersonal)
         self.statusMonitor = statusviews.StatusMonitorGUI()
 
         self.topWindowGUI = self.createTopWindowGUI(allApps, runName)
@@ -392,11 +392,11 @@ class TopWindowGUI(guiutils.ContainerGUI):
 
 
 class ShortcutBarGUI(guiutils.SubGUI):
-    def __init__(self):
+    def __init__(self, *args):
         # Do this first, so we set up interceptors and so on early on
         try:
             from gtkusecase import createShortcutBar
-            self.widget = createShortcutBar(uiMapFiles=plugins.findDataPaths([ "*.uimap" ]))
+            self.widget = createShortcutBar(uiMapFiles=plugins.findDataPaths([ "*.uimap" ], *args))
             self.widget.show()
         except ImportError:
             self.widget = gtk.HBox() # Anything really, but it should be a widget (for if PyUseCase isn't installed)

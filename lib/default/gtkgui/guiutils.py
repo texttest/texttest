@@ -306,7 +306,7 @@ class SubGUI(plugins.Observable):
         return True # should this be shown or hidden in the current context?
 
     def getTabTitle(self):
-        return "Need Title For Tab!"
+        return ""
 
     def getGroupTabTitle(self):
         return "Test"

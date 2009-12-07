@@ -340,7 +340,7 @@ class ActionGUI(BasicActionGUI):
         
     def checkValid(self, app):
         self._checkAllValid(app)
-        self.noApps = len(self.validApps) == 0
+        self.noApps = False
 
     def _checkAllValid(self, app):
         for currApp in [ app ] + app.extras:

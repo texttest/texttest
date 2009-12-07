@@ -425,6 +425,7 @@ response.accept = press reconnect
 
 [Name=Test Name]
 changed = enter test name =
+activate = 
 
 [Name=Test Description]
 changed = enter test description =

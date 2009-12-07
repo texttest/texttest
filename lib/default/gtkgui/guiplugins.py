@@ -659,7 +659,9 @@ class ActionTabGUI(OptionGroupGUI):
         self.fillVBox(self.vbox, self.optionGroup)
         self.createButtons(self.vbox)
         self.vbox.show_all()
-        return self.addScrollBars(self.vbox, hpolicy=gtk.POLICY_AUTOMATIC)
+        self.widget = self.addScrollBars(self.vbox, hpolicy=gtk.POLICY_AUTOMATIC)
+        self.widget.set_name(self.getTabTitle() + " Tab")
+        return self.widget
 
     def setSensitivity(self, newValue):
         ActionGUI.setSensitivity(self, newValue)

@@ -293,22 +293,36 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
         self.addSwitch("rectraffic", "Also record command-line or client-server traffic", 1)
         self.addSwitch("rep", "Automatically replay test after recording it", 1)
         self.addSwitch("repgui", options = ["Auto-replay invisible", "Auto-replay in dynamic GUI"])
+
     def correctTestClass(self):
         return "test-case"
+
     def _getStockId(self):
         return "media-record"
+
     def getTabTitle(self):
         return "Recording"
+
     def messageAfterPerform(self):
         return "Started record session for " + self.describeTests()
+
     def performOnCurrent(self):
         self.updateRecordTime(self.currTestSelection[0])
         self.startTextTestProcess("record", [ "-g", "-record" ] + self.getVanillaOption())
+
     def shouldShowCurrent(self, *args):
-        return len(self.validApps) > 0 and guiplugins.ActionTabGUI.shouldShowCurrent(self, *args) # override the default so it's disabled if there are no apps
+        # override the default so it's disabled if there are no apps
+        return len(self.validApps) > 0 and guiplugins.ActionTabGUI.shouldShowCurrent(self, *args) 
+
     def isValidForApp(self, app):
         return app.getConfigValue("use_case_record_mode") != "disabled" and \
                app.getConfigValue("use_case_recorder") != "none"
+
+    def checkValid(self, app):
+        guiplugins.ActionTabGUI.checkValid(self, app)
+        if self.widget and len(self.validApps) == 0:
+            self.widget.hide()
+
     def updateOptions(self):
         if self.currentApp is not self.currAppSelection[0]:
             self.currentApp = self.currAppSelection[0]
@@ -317,8 +331,10 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
             return True
         else:
             return False
+
     def getUseCaseFile(self, test):
         return test.getFileName("usecase", self.optionGroup.getOptionValue("v"))
+
     def updateRecordTime(self, test):
         file = self.getUseCaseFile(test)
         if file:

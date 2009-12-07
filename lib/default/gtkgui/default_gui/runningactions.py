@@ -227,6 +227,16 @@ class RunTestsBasic(RunTests):
     def getTabTitle(self):
         return "Basic"
 
+    def checkValid(self, app):
+        if app.getConfigValue("use_case_record_mode") == "disabled" and app not in self.validApps:
+            switch = self.optionGroup.getOption("actrep")
+            if switch:
+                for child in self.vbox.get_children():
+                    if hasattr(child, "get_label") and child.get_label() == switch.name:
+                        child.hide()
+        return RunTests.checkValid(self, app)
+
+
 class RunTestsAdvanced(RunTests):
     def getTabTitle(self):
         return "Advanced"

@@ -26,7 +26,7 @@ class Config:
     def getMachineNameForDisplay(self, machine):
         return machine # override for queuesystems
     def addToOptionGroups(self, apps, groups):
-        recordsUseCases = self.anyAppHas(apps, lambda app: app.getConfigValue("use_case_record_mode") != "disabled")
+        recordsUseCases = len(apps) == 0 or self.anyAppHas(apps, lambda app: app.getConfigValue("use_case_record_mode") != "disabled")
         useCatalogues = self.anyAppHas(apps, self.isolatesDataUsingCatalogues)
         for group in groups:
             if group.name.startswith("Select"):

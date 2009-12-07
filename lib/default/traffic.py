@@ -830,7 +830,7 @@ class ReplayInfo:
                         return currDesc
                     
                 self.diag.info("Comparing with '" + descToCompare + "'")
-                matchInfo = self.getWords(descToCompare), responseHandler.timesChosen
+                matchInfo = self.getWords(descToCompare), responseHandler.getUnmatchedResponseCount()
                 if self.isBetterMatch(matchInfo, bestMatchInfo, descWords):
                     bestMatchInfo = matchInfo
                     bestMatch = currDesc
@@ -859,8 +859,8 @@ class ReplayInfo:
         return count
             
     def isBetterMatch(self, info1, info2, targetWords):
-        words1, count1 = info1
-        words2, count2 = info2
+        words1, unmatchedCount1 = info1
+        words2, unmatchedCount2 = info2
         common1 = self.commonElementCount(words1, targetWords)
         common2 = self.commonElementCount(words2, targetWords)
         self.diag.info("Words in common " + repr(common1) + " vs " + repr(common2))
@@ -877,7 +877,8 @@ class ReplayInfo:
         elif lengthDiff1 > lengthDiff2:
             return False
 
-        return count1 < count2
+        self.diag.info("Unmatched count difference " + repr(unmatchedCount1) + " vs " + repr(unmatchedCount2))
+        return unmatchedCount1 > unmatchedCount2
     
 
 # Need to handle multiple replies to the same question
@@ -899,6 +900,10 @@ class ReplayedResponseHandler:
         else:
             currStrings = self.responses[0]
         return currStrings
+
+    def getUnmatchedResponseCount(self):
+        return len(self.responses) - self.timesChosen
+    
     def makeResponses(self, traffic):
         trafficStrings = self.getCurrentStrings()
         responses = []

@@ -559,7 +559,7 @@ class OptionGroupGUI(ActionGUI):
         for index, option in enumerate(switch.options):
             self.setConfigOverride(switch, index, option, optionGroup)
             radioButton = gtk.RadioButton(mainRadioButton, option, use_underline=True)
-            radioButton.set_name(option + " for " + optionGroup.name)
+            self.setRadioButtonName(radioButton, option, optionGroup)
             if individualToolTips:
                 self.tooltips.set_tip(radioButton, switch.description[index])
                 
@@ -574,6 +574,9 @@ class OptionGroupGUI(ActionGUI):
         indexer = RadioGroupIndexer(buttons)
         switch.setMethods(indexer.getActiveIndex, indexer.setActiveIndex)
         return buttons
+
+    def setRadioButtonName(self, *args):
+        pass # Don't bother by default, it's easy to set stupid names...
 
     def createComboBox(self, switch, *args):
         combobox = gtk.combo_box_new_text()

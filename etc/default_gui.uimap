@@ -902,3 +902,6 @@ activate = show help menu
 [Name=GUI testing option chooser]
 changed = select gui-testing option named
 
+[Name=VCS dialog separator]
+notify-position = drag vertical pane separator so left half uses
+

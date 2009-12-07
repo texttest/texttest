@@ -56,6 +56,9 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         self.optionGroup.setValue("grepfile", defaultTestFile)
         self.optionGroup.setPossibleValues("grepfile", allStems)
 
+    def setRadioButtonName(self, radioButton, option, optionGroup):
+        radioButton.set_name(option + " for " + optionGroup.name)
+
     def findDefaultTestFile(self, allStems):
         if len(allStems) == 0:
             return "output"

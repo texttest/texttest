@@ -1627,6 +1627,20 @@ Bug Fixes:
     - Don't stacktrace if a relative interpreter program isn't found (default/__init__.py)
     - Don't stacktrace if the same application name provided twice "-a app,app" on the command line (testmodel.py)
 
+Version 3.16.1
+==============
+Bug Fixes to 3.16:
+    - Sorted out radio button naming, which was strange in quite a few cases (guiplugins.py)
+    - No longer ignore "vanilla" flag when finding UI map files (pyusecase_interface.py)
+Fixes for older bugs:
+    - Don't stacktrace if dynamic GUI window is closed with tests running (controller.py)
+    - Slow-motion replay check box is shown after importing a new GUI-application for test (runningactions.py)
+    - Recording tab no longer shown after importing a non-GUI application for test (guiplugins.py)
+    - "Record Use-case" stays greyed out if the application under test isn't a GUI (guiplugins.py)
+    - Fixed bug where repeating non-exact matches for traffic replay didn't produce them in the correct order (traffic.py)
+    - Fixed performance issue with many doomed attempts to import non-existent GUI configuration modules (guiplugins.py)
+    - copy_test_path_merge will now also merge subdirectories as it should (sandbox.py)
+
 Version trunk
 =============
 Static GUI Enhancements:

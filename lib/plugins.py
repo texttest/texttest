@@ -435,22 +435,32 @@ class ThreadedNotificationHandler:
     def __init__(self):
         self.workQueue = Queue()
         self.active = False
+        self.allowedEvents = []
+
+    def blockEventsExcept(self, allowedEvents):
+        self.allowedEvents = allowedEvents
+
     def enablePoll(self, idleHandleMethod, **kwargs):
         self.active = True
         return idleHandleMethod(self.pollQueue, **kwargs)
+
     def disablePoll(self):
         self.active = False
+
     def pollQueue(self):
         try:
             observable, args, kwargs = self.workQueue.get_nowait()
-            observable.diagnoseObs("From work queue", *args, **kwargs)
-            observable.performNotify(*args, **kwargs)
+            if len(self.allowedEvents) == 0 or args[0] in self.allowedEvents:
+                observable.diagnoseObs("From work queue", *args, **kwargs)
+                observable.performNotify(*args, **kwargs)
         except Empty:
             # Idle handler. We must sleep for a bit if we don't do anything, or we use the whole CPU (busy-wait)
             time.sleep(0.1)
         return self.active
+    
     def transfer(self, observable, *args, **kwargs):
         self.workQueue.put((observable, args, kwargs))
+
 
 class Observable:
     threadedNotificationHandler = ThreadedNotificationHandler()

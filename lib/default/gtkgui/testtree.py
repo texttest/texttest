@@ -249,8 +249,10 @@ class TestTreeGUI(guiutils.ContainerGUI):
             else:
                 self.treeView.expand_all()
         self.notify("AllRead")
+        
     def makeRowVisible(self, model, path, iter):
         self.model.set_value(iter, 5, True)
+
     def getNodeName(self, suite, parent):
         nodeName = suite.name
         if parent == None:
@@ -575,11 +577,13 @@ class TestTreeGUI(guiutils.ContainerGUI):
                 return test
 
     def notifyAllComplete(self):
-        test = self.getTestForAutoSelect()
-        if test:
-            guiutils.guilog.info("Only one test found, selecting " + test.uniqueName)
-            actualSelection = self.selectTestRows([ test ])
-            self.sendSelectionNotification(actualSelection)
+        # Window may already have been closed...
+        if self.selection.get_tree_view():
+            test = self.getTestForAutoSelect()
+            if test:
+                guiutils.guilog.info("Only one test found, selecting " + test.uniqueName)
+                actualSelection = self.selectTestRows([ test ])
+                self.sendSelectionNotification(actualSelection)
 
     def notifyAdd(self, test, initial):
         if test.classId() == "test-case":

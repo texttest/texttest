@@ -73,6 +73,10 @@ class IdleHandlerManager:
             gobject.source_remove(self.sourceId)
             self.sourceId = -1
 
+    def notifyWindowClosed(self):
+        if self.sourceId >= 0:
+            plugins.Observable.threadedNotificationHandler.blockEventsExcept([ "Complete", "AllComplete" ])
+            
     def notifyExit(self):
         self.disableHandler()
 
@@ -319,7 +323,7 @@ class TopWindowGUI(guiutils.ContainerGUI):
         self.topWindow.set_default_size(-1, -1)
 
         self.notify("TopWindow", self.topWindow)
-        self.topWindow.connect("delete-event", self.notifyQuit)
+        self.topWindow.connect("delete-event", self.windowClosed)
         return self.topWindow
 
     def setWindowTitle(self):
@@ -354,6 +358,10 @@ class TopWindowGUI(guiutils.ContainerGUI):
         self.exitStatus |= self.COMPLETION_NOTIFIED
         if self.exitStatus & self.EXIT_NOTIFIED:
             self.notify("Exit")
+
+    def windowClosed(self, *args):
+        self.notify("WindowClosed")
+        self.notifyQuit()
 
     def notifyQuit(self, *args):
         self.exitStatus |= self.EXIT_NOTIFIED

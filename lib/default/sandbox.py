@@ -127,7 +127,7 @@ class PrepareWriteDirectory(plugins.Action):
         for name in names:
             srcname = os.path.join(src, name)
             dstname = os.path.join(dst, name)
-            if os.path.exists(dstname):
+            if os.path.isfile(dstname) or os.path.islink(dstname):
                 continue
             try:
                 if os.path.islink(srcname):

@@ -1190,7 +1190,7 @@ class MultiEntryDictionary(seqdict):
         else:
             if insert or not self.currDict is self:
                 self.diag.info("Inserting " + entryName + "=" + repr(entry))
-                self.currDict[entryName] = self.castEntry(entry)
+                self.currDict[entryName] = self.castEntry(entryName, entry)
             elif errorOnUnknown:
                 self.warn("Config entry name '" + entryName + "' not recognised.")
 
@@ -1201,7 +1201,7 @@ class MultiEntryDictionary(seqdict):
         else:
             return type(val[0])
 
-    def castEntry(self, entry):
+    def castEntry(self, entryName, entry):
         if type(entry) != types.StringType:
             return entry
         dictValType = self.getDictionaryValueType()

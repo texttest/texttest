@@ -64,6 +64,7 @@ class Config:
                 group.addSwitch("keeptmp", "Keep temporary write-directories")
                 group.addOption("vanilla", "Ignore configuration files", self.defaultVanillaValue(),
                                 possibleValues = [ "", "site", "personal", "all" ])
+                group.addSwitch("ignorefilters", "Ignore all run-dependent text filtering")
             elif group.name.startswith("Invisible"):
                 # Options that don't make sense with the GUI should be invisible there...
                 group.addOption("s", "Run this script")
@@ -393,10 +394,12 @@ class Config:
         return actions
 
     def getOriginalFilterer(self):
-        return rundependent.FilterOriginal()
+        if not self.optionMap.has_key("ignorefilters"):
+            return rundependent.FilterOriginal()
 
     def getTemporaryFilterer(self):
-        return rundependent.FilterTemporary()
+        if not self.optionMap.has_key("ignorefilters"):
+            return rundependent.FilterTemporary()
     
     def filterErrorText(self, app, errFile):
         runDepFilter = rundependent.RunDependentTextFilter(app.getConfigValue("suppress_stderr_text"), "")

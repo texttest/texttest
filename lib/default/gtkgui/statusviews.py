@@ -376,6 +376,7 @@ class TestProgressMonitor(guiutils.SubGUI):
             return subColours[0]
         else:
             return colour
+
     def insertTestAtIter(self, iter, test, colour, incrementCount):
         allTests = self.treeModel.get_value(iter, 5)
         testCount = self.treeModel.get_value(iter, 1)
@@ -387,20 +388,33 @@ class TestProgressMonitor(guiutils.SubGUI):
         self.diag.info("Tests for node " + self.treeModel.get_value(iter, 0) + " " + repr(allTests))
         allTests.append(test)
         self.diag.info("Tests for node " + self.treeModel.get_value(iter, 0) + " " + repr(allTests))
+        
     def addNewIter(self, classifier, parentIter, colour, visibility, testCount, tests=[]):
         modelAttributes = [classifier, testCount, visibility, colour, "bold", tests]
-        newIter = self.treeModel.append(parentIter, modelAttributes)
+        newIter = self.insertIntoModel(parentIter, modelAttributes)
         if parentIter:
             self.treeView.expand_row(self.treeModel.get_path(parentIter), open_all=0)
         return newIter
-    def findIter(self, classifier, startIter):
-        iter = self.treeModel.iter_children(startIter)
+
+    def insertIntoModel(self, parentIter, modelAttributes):
+        if parentIter:
+            follower = self.findChildIter(parentIter, lambda name: name > modelAttributes[0])
+            return self.treeModel.insert_before(parentIter, follower, modelAttributes)
+        else:
+            return self.treeModel.append(parentIter, modelAttributes)
+
+    def findChildIter(self, parentIter, predicate):
+        iter = self.treeModel.iter_children(parentIter)
         while iter != None:
             name = self.treeModel.get_value(iter, 0)
-            if name == classifier:
+            if predicate(name):
                 return iter
             else:
                 iter = self.treeModel.iter_next(iter)
+
+    def findIter(self, classifier, startIter):
+        return self.findChildIter(startIter, lambda name: name == classifier)
+
     def notifyLifecycleChange(self, test, state, changeDesc):
         self.removeFromModel(test)
         if "save" in changeDesc or "marked" in changeDesc or "recalculated" in changeDesc:

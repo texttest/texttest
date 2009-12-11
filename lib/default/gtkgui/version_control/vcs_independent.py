@@ -22,11 +22,14 @@ class VersionControlInterface:
     def isVersionControlled(self, path):
         basicArgs = self.getCmdArgs("status")
         for file in self.getFileNames(path, recursive=True):
-            output = self.getProcessResults(basicArgs + [ file ])[1]
-            status = self.getStateFromStatus(output)
+            status = self.getFileStatus(basicArgs, file)
             if status != "Unknown" and status != "Ignored":
                 return True
         return False
+
+    def getFileStatus(self, basicArgs, file):
+        output = self.getProcessResults(basicArgs + [ file ])[1]
+        return self.getStateFromStatus(output)
         
     def callProgram(self, cmdName, fileArgs, **kwargs):
         return subprocess.call(self.getCmdArgs(cmdName, fileArgs),

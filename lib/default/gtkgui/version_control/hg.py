@@ -28,10 +28,23 @@ class HgInterface(vcs_independent.VersionControlInterface):
     def parseDateTime(self, input):
         return time.strptime(input, "%b %d %H:%M:%S %Y")
 
-    def getStateFromStatus(self, output):
-        statusLetter = output.split()[0]
-        return self.allStateInfo.get(statusLetter, statusLetter)
+    def getFileStatus(self, basicArgs, file):
+        # Mercurial falls over if "file" contains symbolic link references
+        # But don't dereference it if it's actually a link
+        if os.path.islink(file):
+            return vcs_independent.VersionControlInterface.getFileStatus(self, basicArgs, file)
+        else:
+            return vcs_independent.VersionControlInterface.getFileStatus(self, basicArgs, os.path.realpath(file))
 
+    def getStateFromStatus(self, output):
+        words = output.split()
+        if len(words) > 0:
+            statusLetter = words[0]
+            return self.allStateInfo.get(statusLetter, statusLetter)
+        else:
+            # We don't really know, but we assume an error message means we probably don't control the file
+            return "Unknown"
+        
     def _movePath(self, oldPath, newPath):
         # Moving doesn't work in hg if there are symbolic links in the path to the new location!
         retCode = self.callProgram("mv", [ os.path.realpath(oldPath), os.path.realpath(newPath) ])

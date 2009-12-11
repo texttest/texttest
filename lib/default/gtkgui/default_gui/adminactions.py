@@ -170,17 +170,21 @@ class PasteTests(FocusDependentAction):
                 newDesc = self.getNewDescription(test)
                 # Create test files first, so that if it fails due to e.g. full disk, we won't register the test either...
                 testDir = suite.getNewDirectoryName(newName)
-                self.moveOrCopy(test, testDir)
-                suite.registerTest(newName, newDesc, realPlacement)
-                testImported = suite.addTest(test.__class__, os.path.basename(testDir), newDesc, realPlacement)
-                # "testImported" might in fact be a suite: in which case we should read all the new subtests which
-                # might have also been copied
-                testImported.readContents(initial=False)
-                testImported.updateAllRelPaths(test.getRelPath())
-                suiteDeltas[suite] += 1
-                newTests.append(testImported)
-                if self.removeAfter:
-                    plugins.tryFileChange(test.remove, "Failed to remove old test: didn't have sufficient write permission to the test files. Test copied instead of moved.")
+                try:
+                    self.moveOrCopy(test, testDir)
+                    suite.registerTest(newName, newDesc, realPlacement)
+                    testImported = suite.addTest(test.__class__, os.path.basename(testDir), newDesc, realPlacement)
+                    # "testImported" might in fact be a suite: in which case we should read all the new subtests which
+                    # might have also been copied
+                    testImported.readContents(initial=False)
+                    testImported.updateAllRelPaths(test.getRelPath())
+                    suiteDeltas[suite] += 1
+                    newTests.append(testImported)
+                    if self.removeAfter:
+                        message = "Failed to remove old test: didn't have sufficient write permission to the test files. Test copied instead of moved."
+                        plugins.tryFileChange(test.remove, message)
+                except (OSError, IOError), e:
+                    self.showErrorDialog("Failed to paste test:\n" + str(e))
                     
         guiutils.guilog.info("Selecting new tests : " + repr(newTests))
         self.notify("SetTestSelection", newTests)

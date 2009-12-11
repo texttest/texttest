@@ -93,9 +93,14 @@ class CVSInterface(vcs_independent.VersionControlInterface):
     # Move in source control also. In CVS this implies a remove and then an add
     def _movePath(self, oldPath, newPath):
         self.copyPath(oldPath, newPath)
-        self.removePath(oldPath)
-        self.callProgramOnFiles("add", newPath, recursive=True)
-        
+        try:
+            self.removePath(oldPath)
+            self.callProgramOnFiles("add", newPath, recursive=True)
+        except:
+            # Don't leak the copied path if we can't complete the operation...
+            plugins.removePath(newPath)
+            raise
+            
     def getMoveCommand(self):
         return "cvs rm' and 'cvs add"
 

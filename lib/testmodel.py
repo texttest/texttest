@@ -38,13 +38,6 @@ class DirectoryCache:
 
     def pathName(self, fileName):
         return os.path.join(self.dir, fileName)
-    def findFilesMatching(self, pattern, predicate):
-        matchingFiles = filter(lambda fileName : self.matchesPattern(fileName, pattern, predicate), self.contents)
-        return map(self.pathName, matchingFiles)
-
-    def matchesPattern(self, fileName, pattern, versionPredicate):
-        stem, versions = self.splitStem(fileName)
-        return fnmatch(stem, pattern) and versionPredicate(versions)
 
     def splitStem(self, fileName):
         parts = fileName.split(".")
@@ -74,10 +67,16 @@ class DirectoryCache:
         return versionSets
 
     def findAllStems(self, exclude):
+        return self._findAllStems(lambda stem: stem not in exclude)
+
+    def findStemsMatching(self, pattern):
+        return self._findAllStems(lambda stem: fnmatch(stem, pattern))
+
+    def _findAllStems(self, predicate):
         stems = []
         for file in self.contents:
             stem, versionSet = self.splitStem(file)
-            if len(stem) > 0 and len(versionSet) > 0 and stem not in stems and stem not in exclude:
+            if len(stem) > 0 and len(versionSet) > 0 and stem not in stems and predicate(stem):
                 stems.append(stem)
         return stems
 
@@ -346,8 +345,12 @@ class Test(plugins.Observable):
             raise plugins.TextTestError, "Cannot create test sub-directory : " + subdir
 
     def getFileNamesMatching(self, pattern):
-        pred = self.app.getExtensionPredicate(allVersions=False)
-        return self.dircache.findFilesMatching(pattern, pred)
+        fileNames = []
+        for stem in self.dircache.findStemsMatching(pattern):
+            fileName = self.getFileName(stem)
+            if fileName:
+                fileNames.append(fileName)
+        return fileNames
 
     def getAppForVersion(self, refVersion=None):
         if refVersion:

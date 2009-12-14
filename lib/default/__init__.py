@@ -2,7 +2,7 @@
 import os, sys, plugins, sandbox, console, rundependent, pyusecase_interface, comparetest, batch, performance, subprocess, operator, signal, shutil, logging
 
 from copy import copy
-from glob import glob
+from fnmatch import fnmatch
 from string import Template
 from threading import Lock
 from knownbugs import CheckForBugs, CheckForCrashes
@@ -1183,7 +1183,14 @@ class GrepFilter(plugins.TextFilter):
 
     def findAllFiles(self, test):
         if self.useTmpFiles:
-            return glob(os.path.join(test.getDirectory(temporary=1), self.fileStem + "." + test.app.name))
+            files = []
+            try:
+                for comparison in test.state.allResults:
+                    if comparison.tmpFile and fnmatch(comparison.stem, self.fileStem):
+                        files.append(comparison.tmpFile)
+                return files
+            except AttributeError:
+                return []
         else:
             return self.findAllStdFiles(test)
 

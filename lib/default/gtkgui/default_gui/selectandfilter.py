@@ -18,7 +18,7 @@ class AllTestsHandler:
 
 
 class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
-    def __init__(self, allApps, *args):
+    def __init__(self, allApps, dynamic, *args):
         guiplugins.ActionTabGUI.__init__(self, allApps)
         AllTestsHandler.__init__(self)
         self.filterAction = gtk.Action("Filter", "Filter", \
@@ -42,6 +42,8 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         self.filteringGroup.addSwitch("current_filtering", options = [ "Discard", "Refine", "Extend" ], description=currFilterDesc)
         excludeKeys = set(self.optionGroup.keys()) # remember these so we don't try and save them to selections
         self.addApplicationOptions(allApps)
+        if dynamic:
+            self.addSwitch("std", options = [ "Use test-files from current run", "Use stored test-files" ], description = [ "When searching using 'test-files containing', look in the results of tests in the current run", "When searching using 'test-files containing', look in the stored results, i.e. the same search as would be done in the static GUI" ])
         self.appKeys = set(self.optionGroup.keys())
         self.appKeys.difference_update(excludeKeys)
 
@@ -111,9 +113,13 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         return "Selecting tests ..."
     def messageAfterPerform(self):
         return "Selected " + self.describeTests() + "."
+
     # No messageAfterPerform necessary - we update the status bar when the selection changes inside TextTestGUI
     def getFilterList(self, app):
-        return app.getFilterList(self.rootTestSuites, self.optionGroup.getOptionValueMap())
+        optionMap = self.optionGroup.getOptionValueMap()
+        useTmpFiles = self.optionGroup.getOption("std") and not optionMap.has_key("std")
+        return app.getFilterList(self.rootTestSuites, optionMap, useTmpFiles=useTmpFiles)
+    
     def makeNewSelection(self):
         # Get strategy. 0 = discard, 1 = refine, 2 = extend, 3 = exclude
         strategy = self.selectionGroup.getSwitchValue("current_selection")
@@ -454,8 +460,4 @@ class LoadSelection(guiplugins.ActionDialogGUI):
 
 
 def getInteractiveActionClasses(dynamic):
-    classes = [ SaveSelection ]
-    if not dynamic:
-        classes += [ SelectTests, HideUnselected, HideSelected, ShowAll,
-                     LoadSelection ]
-    return classes
+    return [ SaveSelection, SelectTests, HideUnselected, HideSelected, ShowAll, LoadSelection ]

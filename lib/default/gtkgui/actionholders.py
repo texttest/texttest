@@ -249,7 +249,7 @@ class ChangeableNotebookGUI(NotebookGUI):
         return map(lambda tabGUI: (tabGUI.getTabTitle(), tabGUI), tabGUIs)
 
     def getGroupTabNames(self, tabGUIs):
-        tabNames = [ "Test", "Selection", "Running" ]
+        tabNames = [ "Test", "Status", "Selection", "Running" ]
         for tabGUI in tabGUIs:
             tabName = tabGUI.getGroupTabTitle()
             if not tabName in tabNames:

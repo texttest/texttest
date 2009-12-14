@@ -2,6 +2,7 @@
 import os, sys, plugins, sandbox, console, rundependent, pyusecase_interface, comparetest, batch, performance, subprocess, operator, signal, shutil, logging
 
 from copy import copy
+from glob import glob
 from string import Template
 from threading import Lock
 from knownbugs import CheckForBugs, CheckForCrashes
@@ -36,9 +37,9 @@ class Config:
                 possibleDirs = self.getFilterFileDirectories(apps, useOwnTmpDir=True)
                 group.addOption("f", "Tests listed in file", possibleDirs=possibleDirs, selectFile=True)
                 group.addOption("desc", "Descriptions containing", description="Select tests for which the description (comment) matches the entered text. The text can be a regular expression.")
+                group.addOption("r", "Execution time", description="Specify execution time limits, either as '<min>,<max>', or as a list of comma-separated expressions, such as >=0:45,<=1:00. Digit-only numbers are interpreted as minutes, while colon-separated numbers are interpreted as hours:minutes:seconds.")
                 group.addOption("grep", "Test-files containing", description="Select tests which have a file containing the entered text. The text can be a regular expression : e.g. enter '.*' to only look for the file without checking the contents.")
                 group.addOption("grepfile", "Test-file to search", allocateNofValues=2, description="When the 'test-files containing' field is non-empty, apply the search in files with the given stem. Unix-style file expansion (note not regular expressions) may be used. For example '*' will look in any file.")
-                group.addOption("r", "Execution time", description="Specify execution time limits, either as '<min>,<max>', or as a list of comma-separated expressions, such as >=0:45,<=1:00. Digit-only numbers are interpreted as minutes, while colon-separated numbers are interpreted as hours:minutes:seconds.")
             elif group.name.startswith("Basic"):
                 if len(apps) > 0:
                     version, checkout, machine = apps[0].getFullVersion(), apps[0].checkout, apps[0].getRunMachine()
@@ -497,11 +498,11 @@ class Config:
         return self.findFilterFileNames(app, options, includeConfig) + \
                self.optionListValue(options, "funion") + self.optionListValue(options, "finverse")
 
-    def getFilterList(self, app, suites, options=None):
+    def getFilterList(self, app, suites, options=None, **kw):
         if options is None:
-            return self.filterFileMap.setdefault(app, self._getFilterList(app, self.optionMap, suites, includeConfig=True))
+            return self.filterFileMap.setdefault(app, self._getFilterList(app, self.optionMap, suites, includeConfig=True, **kw))
         else:
-            return self._getFilterList(app, options, suites, includeConfig=False)
+            return self._getFilterList(app, options, suites, includeConfig=False, **kw)
         
     def checkFilterFileSanity(self, suite):
         # This will check all the files for existence from the input, and throw if it can't.
@@ -514,8 +515,8 @@ class Config:
             optionFinder = self.makeOptionFinder(app, filterFileName)
             self._checkFilterFileSanity(app, optionFinder)
     
-    def _getFilterList(self, app, options, suites, includeConfig):
-        filters = self.getFiltersFromMap(options, app, suites)
+    def _getFilterList(self, app, options, suites, includeConfig, **kw):
+        filters = self.getFiltersFromMap(options, app, suites, **kw)
         for filterFileName in self.findFilterFileNames(app, options, includeConfig):
             filters += self.getFiltersFromFile(app, filterFileName, suites)
 
@@ -539,7 +540,7 @@ class Config:
         optionFinder = self.makeOptionFinder(app, filename)
         return self._getFilterList(app, optionFinder, suites, includeConfig=False)
     
-    def getFiltersFromMap(self, optionMap, app, suites):
+    def getFiltersFromMap(self, optionMap, app, suites, **kw):
         filters = []
         for filterClass in self.getFilterClasses():
             argument = optionMap.get(filterClass.option)
@@ -552,7 +553,7 @@ class Config:
                 filters.append(performance.TimeFilter(timeLimit))
         if optionMap.has_key("grep"):
             grepFile = optionMap.get("grepfile", app.getConfigValue("log_file"))
-            filters.append(GrepFilter(optionMap["grep"], grepFile))
+            filters.append(GrepFilter(optionMap["grep"], grepFile, **kw))
         return filters
     
     def batchMode(self):
@@ -1169,20 +1170,26 @@ class TestSuiteFilter(plugins.TextFilter):
         return self.stringContainsText(test.parent.getRelPath())
 
 class GrepFilter(plugins.TextFilter):
-    def __init__(self, filterText, fileStem):
+    def __init__(self, filterText, fileStem, useTmpFiles=False):
         plugins.TextFilter.__init__(self, filterText)
         self.fileStem = fileStem
+        self.useTmpFiles = useTmpFiles
         
     def acceptsTestCase(self, test):
-        for logFile in self.findAllLogFiles(test):
+        for logFile in self.findAllFiles(test):
             if self.matches(logFile):
                 return True
         return False
 
-    def findAllLogFiles(self, test):
+    def findAllFiles(self, test):
+        if self.useTmpFiles:
+            return glob(os.path.join(test.getDirectory(temporary=1), self.fileStem + "." + test.app.name))
+        else:
+            return self.findAllStdFiles(test)
+
+    def findAllStdFiles(self, test):
         logFiles = []
         for fileName in test.getFileNamesMatching(self.fileStem):
-            fileVersions = os.path.basename(fileName).split(".")[2:]
             if os.path.isfile(fileName):
                 logFiles.append(fileName)
             else:

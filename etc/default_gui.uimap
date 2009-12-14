@@ -906,3 +906,6 @@ changed = select gui-testing option named
 [Name=VCS dialog separator]
 notify-position = drag vertical pane separator so left half uses
 
+[Name=Use stored test-files for Selection]
+toggled.true = use stored test-files
+

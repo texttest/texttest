@@ -42,7 +42,7 @@ class InteractiveActionConfig(BaseInteractiveActionConfig):
     def getDefaultAccelerators(self):
         dict = {}
         dict["quit"] = "<control>q"
-        dict["select"] = "<control>s"
+        dict["select"] = "<control><alt>f"
         dict["filter"] = "<control>f"
         dict["save"] = "<control>s"
         dict["save_as"] = "<control><alt>s"

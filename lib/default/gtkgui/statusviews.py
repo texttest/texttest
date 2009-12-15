@@ -105,11 +105,13 @@ class ProgressBarGUI(guiutils.SubGUI):
             if self.addedCount > self.totalNofTests:
                 self.totalNofTests += 1
                 self.resetBar()
+                
     def notifyAllRead(self, *args):
         # The initial number was told be the static GUI, treat it as a guess
         # Can be wrong in case versions are defined by testsuite files.
-        self.totalNofTests = self.addedCount
-        self.resetBar()
+        if self.totalNofTests != self.addedCount:
+            self.totalNofTests = self.addedCount
+            self.resetBar()
 
     def notifyLifecycleChange(self, test, state, changeDesc):
         if changeDesc == "complete":

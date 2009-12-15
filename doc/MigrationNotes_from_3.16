@@ -1,0 +1,13 @@
+
+Nothing to migrate, but note the following behaviour changes:
+
+=========================================================
+CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
+=========================================================
+
+(1) Accelerator for "Select"
+============================
+This used to be Ctrl+S but is now Ctrl+Alt+F. This is because it was added to the dynamic GUI
+where it would otherwise have clashed with the accelerator for "Save". Naturally you can reset
+it to whatever using the setting "gui_accelerators".
+

@@ -1644,8 +1644,18 @@ Fixes for older bugs:
 Version trunk
 =============
 Static GUI Enhancements:
+Dynamic GUI Enhancements:
+    - Selection tab added
+	Can do all of the selecting from the static GUI in the dynamic GUI also. (selectandfilter.py)
+	Can also choose between the new and old results from the tests. Note accelerator for "select" changed.
+    - Status tab categories are now sorted alphabetically (statusviews.py)
 Framework Enhancements:
+    - Can now set a timeout after which tests will automatically be killed. (default/__init__.py)
+	See "kill_timeout" documentation on the website. Thanks to Michael Behrisch
 Batch Report Enhancements:
 Grid Engine (LSF/SGE) enhancements:
 Self-test/Internal changes:
 Bug Fixes:
+    - When searching with -grep ("test-files containing"), don't blindly include all versions of tests that match (testmodel.py)
+    - Worked around a Mercurial symbolic link bug: if the test path has a symbolic link, dereference it first (hg.py)
+    - Don't stacktrace on rename/move if VCS control directories are present but the VCS isn't installed (vcs_independent.py)

@@ -1258,7 +1258,7 @@ class RunTest(plugins.Action):
         
         self.registerProcess(test, process)
         if test.getConfigValue("kill_timeout"):
-            timer = Timer(test.getConfigValue("kill_timeout"), self.kill, (test, None))
+            timer = Timer(test.getConfigValue("kill_timeout"), self.kill, (test, "timeout"))
             timer.start()
             self.wait(process)
             timer.cancel()
@@ -1293,6 +1293,7 @@ class RunTest(plugins.Action):
             self.storeReturnCode(test, returncode)
         
         self.lock.release()
+
     def waitForKill(self):
         for i in range(10):
             sleep(0.2)
@@ -1308,6 +1309,8 @@ class RunTest(plugins.Action):
     def getKillInfo(self, test):
         if self.killSignal is None:
             return self.getExplicitKillInfo()
+        elif self.killSignal == "timeout":
+            return "TIMEOUT", "exceeded wallclock time limit of " + str(test.getConfigValue("kill_timeout")) + " seconds"
         elif self.killSignal == signal.SIGUSR1:
             return self.getUserSignalKillInfo(test, "1")
         elif self.killSignal == signal.SIGUSR2:
@@ -1319,9 +1322,11 @@ class RunTest(plugins.Action):
         else:
             briefText = "signal " + str(self.killSignal)
             return briefText, "terminated by " + briefText
+        
     def getExplicitKillInfo(self):
         timeStr = plugins.localtime("%H:%M")
         return "KILLED", "killed explicitly at " + timeStr
+
     def getUserSignalKillInfo(self, test, userSignalNumber):
         return "SIGUSR" + userSignalNumber, "terminated by user signal " + userSignalNumber
 

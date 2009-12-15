@@ -557,8 +557,11 @@ class TestCase(Test):
         plugins.ensureDirectoryExists(frameworkTmp)
 
     def getOptionsFromFile(self, optionsFile):
-        optionStr = open(optionsFile).read().strip()
-        return string.Template(optionStr).safe_substitute(self.environment)
+        lines = plugins.readList(optionsFile)
+        if len(lines) > 0:
+            return string.Template(lines[0]).safe_substitute(self.environment)
+        else:
+            return ""
 
     def removeOptions(self, optionArgs, toClear):
         # Only want to remove them as a sequence

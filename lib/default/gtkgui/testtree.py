@@ -265,8 +265,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         nodeName = self.getNodeName(suite, parent)
         self.diag.info("Adding node with name " + nodeName)
         colour = guiutils.guiConfig.getTestColour("not_started")
-        visible = self.newTestsVisible or not suite.parent
-        row = [ nodeName, colour, [ suite ], "", colour, visible, "" ]
+        row = [ nodeName, colour, [ suite ], "", colour, self.newTestsVisible, "" ]
         iter = self.model.insert_before(parent, follower, row)
         storeIter = iter.copy()
         self.itermap.store(suite, storeIter)
@@ -331,8 +330,10 @@ class TestTreeGUI(guiutils.ContainerGUI):
             if self.collapsedRows.has_key(realPath):
                 del self.collapsedRows[realPath]
         self.expandLevel(treeview, self.filteredModel.iter_children(iter), not self.collapseStatic)
+
     def rowInserted(self, model, path, iter):
         self.expandRow(self.filteredModel.iter_parent(iter), False)
+
     def expandRow(self, iter, recurse):
         if iter == None:
             return
@@ -427,8 +428,10 @@ class TestTreeGUI(guiutils.ContainerGUI):
             return "gtk-refresh"
         else:
             return ""
+
     def checkRelatedForRecalculation(self, test):
         self.filteredModel.foreach(self.checkRecalculationIfMatches, test)
+
     def checkRecalculationIfMatches(self, model, path, iter, test):
         tests = model.get_value(iter, 2)
         if tests[0] is not test and tests[0].getRelPath() == test.getRelPath():
@@ -440,19 +443,23 @@ class TestTreeGUI(guiutils.ContainerGUI):
             if test.app not in apps:
                 apps.append(test.app)
         return apps
+
     def sendSelectionNotification(self, tests, direct=True):
         self.diag.info("Selection now changed to " + repr(tests))
         apps = self.getSelectedApps(tests)
         self.selectedTests = tests
         self.notify("NewTestSelection", tests, apps, self.selection.count_selected_rows(), direct)
+
     def getSelected(self):
         allSelected = []
         self.selection.selected_foreach(self.addSelTest, (allSelected, set(self.selectedTests)))
         self.diag.info("Selected tests are " + repr(allSelected))
         return allSelected
+
     def addSelTest(self, model, path, iter, args):
         selected, prevSelected = args
         selected += self.getNewSelected(model.get_value(iter, 2), prevSelected)
+
     def getNewSelected(self, tests, prevSelected):
         intersection = prevSelected.intersection(set(tests))
         if len(intersection) == 0 or len(intersection) == len(tests):
@@ -471,6 +478,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         guiutils.guilog.info("Marking " + str(self.selection.count_selected_rows()) + " tests as selected")
         # Here it's been set via some indirect mechanism, might want to behave differently
         self.sendSelectionNotification(actualSelection, direct=False)
+
     def selectTestRows(self, selTests, selectCollapsed=True):
         self.selecting = True # don't respond to each individual programmatic change here
         self.selection.unselect_all()
@@ -497,6 +505,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
                 treeView.scroll_to_cell(firstPath, use_align=True, row_align=0.1)
         self.selecting = False
         return actuallySelected
+
     def expandLevel(self, view, iter, recursive=True):
         # Make sure expanding expands everything, better than just one level as default...
         # Avoid using view.expand_row(path, open_all=True), as the open_all flag
@@ -508,6 +517,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
                 view.expand_row(model.get_path(iter), open_all=False)
 
             iter = view.get_model().iter_next(iter)
+
     def notifyTestAppearance(self, test, detailText, colour1, colour2, updateSuccess, saved):
         iter = self.itermap.getIterator(test)
         self.model.set_value(iter, 1, colour1)
@@ -565,10 +575,12 @@ class TestTreeGUI(guiutils.ContainerGUI):
         tests = []
         self.model.foreach(self.appendTest, tests)
         return tests
+    
     def appendTest(self, model, path, iter, tests):
         for test in model.get_value(iter, 2):
             if test.classId() == "test-case":
                 tests.append(test)
+                
     def getTestForAutoSelect(self):
         allTests = self.findAllTests()
         if len(allTests) == 1:
@@ -618,6 +630,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
             suiteIter = self.tryAddTest(suite, initial)
         followIter = self.findFollowIter(suite, test, initial)
         return self.addSuiteWithParent(test, suiteIter, followIter)
+    
     def findFollowIter(self, suite, test, initial):
         if not initial and suite:
             follower = suite.getFollower(test)
@@ -699,6 +712,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
             self.notify("Visibility", changedTests, newValue)
             if self.treeView:
                 self.updateVisibilityInViews(newValue)
+                
     def updateVisibilityInViews(self, newValue):
         self.filteredModel.refilter()
         if newValue: # if things have become visible, expand everything
@@ -752,8 +766,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
             currTest = currTest.parent
             parents.append((parent, currTest))
             parent = self.model.iter_parent(parent)
-        # Don't include the root which we never hide
-        return [ (iter, test) ] + parents[:-1]
+        return [ (iter, test) ] + parents
 
     def hasVisibleChildren(self, iter):
         child = self.model.iter_children(iter)

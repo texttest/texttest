@@ -19,6 +19,9 @@ class VersionControlInterface:
         self.lastMoveInVCS = False
         self.defaultArgs = {}
 
+    def checkInstalled(self):
+        self.callProgram("help") # throws if it's not installed
+
     def isVersionControlled(self, path):
         basicArgs = self.getCmdArgs("status")
         for file in self.getFileNames(path, recursive=True):
@@ -31,7 +34,7 @@ class VersionControlInterface:
         output = self.getProcessResults(basicArgs + [ file ])[1]
         return self.getStateFromStatus(output)
         
-    def callProgram(self, cmdName, fileArgs, **kwargs):
+    def callProgram(self, cmdName, fileArgs=[], **kwargs):
         return subprocess.call(self.getCmdArgs(cmdName, fileArgs),
                                stdout=open(os.devnull, "w"), stderr=open(os.devnull, "w"), **kwargs)
 

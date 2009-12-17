@@ -900,7 +900,10 @@ class ActionDialogGUI(OptionGroupGUI):
         vbox.pack_start(hbox, expand=False, fill=False)
                 
     def createRadioButtonCollection(self, switch, optionGroup):
-        frame = gtk.Frame(switch.name)
+        if switch.name:
+            frame = gtk.Frame(switch.name)
+        else:
+            frame = gtk.Frame()
         frameBox = gtk.VBox()
         for button in self.createRadioButtons(switch, optionGroup):
             frameBox.pack_start(button)

@@ -716,9 +716,11 @@ class Config:
         if self.executableShouldBeFile(suite.app, executable) and not os.path.isfile(executable):
             self.handleNonExistent(executable, "executable program", suite.app)
 
-        interpreter = suite.getConfigValue("interpreter")
-        if os.path.isabs(interpreter) and not os.path.exists(interpreter):
-            self.handleNonExistent(interpreter, "interpreter program", suite.app)
+        interpreterStr = suite.getConfigValue("interpreter")
+        if interpreterStr:
+            interpreter = plugins.splitcmd(interpreterStr)[0]
+            if os.path.isabs(interpreter) and not os.path.exists(interpreter):
+                self.handleNonExistent(interpreter, "interpreter program", suite.app)
 
     def pathExistsRemotely(self, path, machine, app):
         exitCode = self.runCommandOn(app, machine, [ "test", "-e", path ], collectExitCode=True)

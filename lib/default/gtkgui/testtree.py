@@ -376,7 +376,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         newSelection = self.getSelected()
         if newSelection != self.selectedTests:
             self.sendSelectionNotification(newSelection, direct)
-            if self.dynamic:
+            if self.dynamic and direct:
                 self.selection.selected_foreach(self.updateRecalculationMarker)
 
     def notifyRefreshTestSelection(self):
@@ -714,7 +714,6 @@ class TestTreeGUI(guiutils.ContainerGUI):
                 self.updateVisibilityInViews(newValue)
                 
     def updateVisibilityInViews(self, newValue):
-        self.filteredModel.refilter()
         if newValue: # if things have become visible, expand everything
             rootIter = self.filteredModel.get_iter_root()
             while rootIter != None:

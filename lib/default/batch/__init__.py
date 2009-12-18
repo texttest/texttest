@@ -766,6 +766,8 @@ class SummaryGenerator:
     def getCategoryKey(self, categoryName):
         if categoryName == "succeeded":
             return "success_bg"
+        elif categoryName == "knownbugs":
+            return "knownbug_bg"
         elif categoryName in [ "faster", "slower", "memory+", "memory-" ]:
             return "performance_bg"
         else:

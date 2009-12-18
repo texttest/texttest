@@ -870,6 +870,7 @@ class Config:
         colours["memory_bg"] = "pink"
         colours["success_bg"] = "#CEEFBD"
         colours["failure_bg"] = "#FF3118"
+        colours["knownbug_bg"] = "#FF9900"
         colours["no_results_bg"] = "gray2"
         colours["performance_bg"] = "#FFC6A5"
         colours["test_default_fg"] = "black"

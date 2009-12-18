@@ -427,6 +427,8 @@ class TestTable:
         fgcol = self.colourFinder.find("test_default_fg")
         if success:
             bgcol = self.colourFinder.find("success_bg")
+        elif category == "bug":
+            bgcol = self.colourFinder.find("knownbug_bg")
         elif category.startswith("faster") or category.startswith("slower"):
             bgcol = self.colourFinder.find("performance_bg")
             if self.getPercent(fileComp) >= self.getConfigValue("performance_variation_serious_%", "cputime"):

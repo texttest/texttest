@@ -7,13 +7,16 @@ from shutil import copyfile
 from fnmatch import fnmatch
 
 class FileComparison:
+    SAME = 0
+    DIFFERENT = 1
+    SAVED = 2
     def __init__(self, test, stem, standardFile, tmpFile, testInProgress=False, observers={}):
         self.stdFile = standardFile
         self.stdCmpFile = self.stdFile
         self.tmpFile = tmpFile
         self.tmpCmpFile = tmpFile
         self.stem = stem
-        self.differenceCache = False
+        self.differenceCache = self.SAME
         self.recalculationTime = None
         self.diag = logging.getLogger("FileComparison")
         self.severity = test.getCompositeConfigValue("failure_severity", self.stem)
@@ -87,7 +90,7 @@ class FileComparison:
             return False
 
         # A test that has been saved doesn't need recalculating
-        if self.tmpFile == self.stdFile:
+        if self.differenceCache == self.SAVED:
             self.diag.info("Saved file, no recalculation")
             return False
 
@@ -127,7 +130,7 @@ class FileComparison:
     def hasSucceeded(self):
         return self.stdFile and self.tmpFile and not self.hasDifferences()
     def hasDifferences(self):
-        return self.differenceCache
+        return self.differenceCache == self.DIFFERENT
     
     def getStdFile(self, filtered, postfix=""):
         if filtered:
@@ -142,7 +145,7 @@ class FileComparison:
             return self.tmpFile + postfix
 
     def existingFile(self, *args):
-        if self.missingResult():
+        if self.missingResult() or self.differenceCache == self.SAVED:
             return self.getStdFile(*args)
         else:
             return self.getTmpFile(*args)
@@ -159,7 +162,11 @@ class FileComparison:
             self.tmpCmpFile = tmpCmpFileName
 
         if self.stdCmpFile and self.tmpCmpFile:
-            self.differenceCache = not filecmp.cmp(self.stdCmpFile, self.tmpCmpFile, 0)
+            if filecmp.cmp(self.stdCmpFile, self.tmpCmpFile, 0):
+                if self.differenceCache != self.SAVED:
+                    self.differenceCache = self.SAME
+            else:
+                self.differenceCache = self.DIFFERENT
             self.diag.info("Caching differences " + repr(self.stdCmpFile) + " " + repr(self.tmpCmpFile) + " = " + repr(self.differenceCache))
 
     def getSummary(self, includeNumbers=True):
@@ -286,10 +293,7 @@ class FileComparison:
             copyfile(tmpFile, self.stdFile)
         else:
             self.saveResults(tmpFile, self.stdFile)
-        # Try to get everything to behave normally after a save...
-        self.differenceCache = False
-        self.tmpFile = self.stdFile
-        self.tmpCmpFile = self.stdFile
+        self.differenceCache = self.SAVED
 
     def saveMissing(self, versionString, autoGenText, backupVersionStrings):
         stdRoot = self.getStdRootVersionFile()

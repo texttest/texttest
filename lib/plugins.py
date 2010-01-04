@@ -282,12 +282,13 @@ class TextTriggerGroup:
 class TextFilter(Filter, TextTriggerGroup):
     def __init__(self, filterText, *args):
         TextTriggerGroup.__init__(self, self.parseInput(filterText, *args))
+
     def parseInput(self, filterText, *args):
         return commasplit(filterText)
-    def containsText(self, test):
-        return self.stringContainsText(test.name)
+
     def acceptsTestSuiteContents(self, suite):
         return not suite.isEmpty()
+
 
 class ApplicationFilter(TextFilter):
     option = "a"
@@ -301,10 +302,10 @@ class ApplicationFilter(TextFilter):
         # Allow empty suites through
         return True
 
-class TestPathFilter(TextFilter):
+class TestSelectionFilter(TextFilter):
     option = "tp"
     def __init__(self, *args):
-        self.diag = logging.getLogger("TestPathFilter")
+        self.diag = logging.getLogger("TestSelectionFilter")
         TextFilter.__init__(self, *args)
     def parseInput(self, filterText, app, suites):
         allEntries = TextFilter.parseInput(self, filterText, app, suites)

@@ -31,8 +31,8 @@ class Config:
         useCatalogues = self.anyAppHas(apps, self.isolatesDataUsingCatalogues)
         for group in groups:
             if group.name.startswith("Select"):
-                group.addOption("t", "Test names containing", description="Select tests for which the name matches the entered text. The text can be a regular expression.")
-                group.addOption("ts", "Suite names containing", description="Select tests for which at least one parent suite name matches the entered text. The text can be a regular expression.")
+                group.addOption("t", "Test names containing", description="Select tests for which the name contains the entered text. The text can be a regular expression.")
+                group.addOption("ts", "Test paths containing", description="Select tests for which the full path to the test (e.g. suite1/subsuite/testname) contains the entered text. The text can be a regular expression. You can select tests by suite name this way.")
                 group.addOption("a", "App names containing", description="Select tests for which the application name matches the entered text. The text can be a regular expression.")
                 possibleDirs = self.getFilterFileDirectories(apps, useOwnTmpDir=True)
                 group.addOption("f", "Tests listed in file", possibleDirs=possibleDirs, selectFile=True)
@@ -461,8 +461,8 @@ class Config:
             return os.path.join(app.writeDirectory, "temporary_filter_files")
         
     def getFilterClasses(self):
-        return [ TestNameFilter, plugins.TestPathFilter, \
-                 TestSuiteFilter, performance.TimeFilter, \
+        return [ TestNameFilter, plugins.TestSelectionFilter, \
+                 TestRelPathFilter, performance.TimeFilter, \
                  plugins.ApplicationFilter, TestDescriptionFilter ]
             
     def getAbsoluteFilterFileName(self, filterFileName, app):
@@ -1165,12 +1165,12 @@ class NotFilter(plugins.Filter):
 class TestNameFilter(plugins.TextFilter):
     option = "t"
     def acceptsTestCase(self, test):
-        return self.containsText(test)
+        return self.stringContainsText(test.name)
 
-class TestSuiteFilter(plugins.TextFilter):
+class TestRelPathFilter(plugins.TextFilter):
     option = "ts"
     def acceptsTestCase(self, test):
-        return self.stringContainsText(test.parent.getRelPath())
+        return self.stringContainsText(test.getRelPath())
 
 class GrepFilter(plugins.TextFilter):
     def __init__(self, filterText, fileStem, useTmpFiles=False):

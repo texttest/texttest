@@ -517,16 +517,18 @@ class TestDetails:
     def appendFreeText(self, fullText, freeText):
         freeText = freeText.replace("<", "&lt;").replace(">", "&gt;")
         linkMarker = "URL=http"
-        if freeText.find(linkMarker) != -1:
+        if linkMarker in freeText:
             currFreeText = ""
             for line in freeText.splitlines():
-                if line.find(linkMarker) != -1:
+                if linkMarker in line:
                     fullText.append(HTMLgen.RawText("<PRE>" + currFreeText.strip() + "</PRE>"))
                     currFreeText = ""
                     words = line.strip().split()
                     linkTarget = words[-1][4:] # strip off the URL=
-                    newLine = " ".join(words[:-1]) + "\n"
+                    newLine = " ".join(words[:-1])
                     fullText.append(HTMLgen.Href(linkTarget, newLine))
+                    fullText.append(HTMLgen.BR())
+                    fullText.append(HTMLgen.BR())
                 else:
                     currFreeText += line + "\n"
         else:

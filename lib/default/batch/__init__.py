@@ -752,18 +752,15 @@ class SummaryGenerator:
             index += 1
         self.diag.info("Category information is " + repr(categories))
         colourCount = seqdict()
+        colourFinder = testoverview.ColourFinder(app.getCompositeConfigValue)
+        for colourKey in [ "success_bg", "knownbug_bg", "performance_bg", "failure_bg" ]:
+            colourCount[colourFinder.find(colourKey)] = 0
         for categoryName, count in categories:
-            colour = self.getColour(categoryName, app)
-            if not colourCount.has_key(colour):
-                colourCount[colour] = 0
-            colourCount[colour] += count
+            colourKey = self.getColourKey(categoryName)
+            colourCount[colourFinder.find(colourKey)] += count
         return colourCount
 
-    def getColour(self, categoryName, app):
-        colourFinder = testoverview.ColourFinder(app.getCompositeConfigValue)
-        return colourFinder.find(self.getCategoryKey(categoryName))
-
-    def getCategoryKey(self, categoryName):
+    def getColourKey(self, categoryName):
         if categoryName == "succeeded":
             return "success_bg"
         elif categoryName == "knownbugs":
@@ -846,7 +843,8 @@ class SummaryGenerator:
                     fileToLink, resultSummary = appPageInfo[version]
                     file.write('    <td><h3><a href="' + os.path.join(basePath, fileToLink) + '">' + version + '</a></h3></td>\n')
                     for colour, count in resultSummary.items():
-                        file.write('    <td bgcolor="' + colour + '"><h3>' + str(count) + "</h3></td>\n")
+                        if count:
+                            file.write('    <td bgcolor="' + colour + '"><h3>' + str(count) + "</h3></td>\n")
                     file.write("  </tr></table>")
                 file.write("</td>\n")
             file.write("</tr>\n")

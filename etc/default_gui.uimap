@@ -159,7 +159,7 @@ toggled.false = hide status bar
 notify-position = drag vertical pane separator so left half uses
 
 [Name=Test Tree]
-clicked.test name = toggle test sorting order
+clicked.Test Name = toggle test sorting order
 row-expanded = show test suite
 row-collapsed = hide test suite
 button-press-event = view actions for test
@@ -352,8 +352,8 @@ activate = follow file progress
 
 [Name=Test Status View]
 changed.selection = select tests in category
-toggled.visible.true = show tests in category
-toggled.visible.false = hide tests in category
+toggled.Visible.true = show tests in category
+toggled.Visible.false = hide tests in category
 
 [Title=TextTest Error]
 response.accept = agree to texttest message
@@ -734,7 +734,7 @@ changed.selection = select
 
 [Name=VCS status info tree]
 changed.selection = select
-button-press-event.information = show visibility controls
+button-press-event.Information = show visibility controls
 
 [Name=Up-to-date]
 toggled.true = show category up-to-date

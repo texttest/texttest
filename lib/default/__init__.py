@@ -935,6 +935,8 @@ class Config:
         app.setConfigDefault("slow_motion_replay_speed", 3, "How long in seconds to wait between each GUI action")
         app.setConfigDefault("virtual_display_machine", [ "localhost" ], \
                              "(UNIX) List of machines to run virtual display server (Xvfb) on")
+        app.setConfigDefault("virtual_display_extra_args", "", \
+                             "(UNIX) Extra arguments (e.g. bitdepth) to supply to virtual display server (Xvfb)")
 
     def defaultPerfUnits(self):
         units = {}

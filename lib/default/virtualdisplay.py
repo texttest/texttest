@@ -126,7 +126,8 @@ class VirtualDisplayResponder(plugins.Responder):
         logDir = os.path.join(app.writeDirectory, "Xvfb") 
         plugins.ensureDirectoryExists(logDir)
         python = self.findPython(machine)
-        cmdArgs = [ python, "-u", fullPath, logDir ]
+        xvfbExtraArgs = plugins.splitcmd(app.getConfigValue("virtual_display_extra_args"))
+        cmdArgs = [ python, "-u", fullPath, logDir ] + xvfbExtraArgs
         return app.getCommandArgsOn(machine, cmdArgs)
 
     def findPython(self, machine):

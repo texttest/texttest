@@ -66,12 +66,12 @@ def writeAndWait(text, proc, displayNum):
     proc.wait()
     cleanLeakedLockFiles(displayNum)
 
-def runXvfb(logDir):
+def runXvfb(logDir, extraArgs):
     ignoreSignals()
     signal.signal(signal.SIGUSR1, setReadyFlag)
     displayNum = getDisplayNumber()
     logFile = os.path.join(logDir, "Xvfb." + gethostname() + "." + displayNum)
-    startArgs = [ "Xvfb", "-ac", "-audit", "2", ":" + displayNum ]
+    startArgs = [ "Xvfb", "-ac" ] + extraArgs + [ "-audit", "2", ":" + displayNum ]
     proc = subprocess.Popen(startArgs, preexec_fn=ignoreSignals,
                             stdout=open(logFile, "w"), stderr=subprocess.STDOUT, stdin=open(os.devnull))
     try:
@@ -92,4 +92,4 @@ def runXvfb(logDir):
     
     
 if __name__ == "__main__":
-    runXvfb(sys.argv[1])
+    runXvfb(sys.argv[1], sys.argv[2:])

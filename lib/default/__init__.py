@@ -1171,8 +1171,13 @@ class TestNameFilter(plugins.TextFilter):
 
 class TestRelPathFilter(plugins.TextFilter):
     option = "ts"
+    def parseInput(self, filterText, *args):
+        # Handle paths pasted from web page
+        return [ text.replace(" ", "/") for text in plugins.commasplit(filterText) ]
+
     def acceptsTestCase(self, test):
         return self.stringContainsText(test.getRelPath())
+
 
 class GrepFilter(plugins.TextFilter):
     def __init__(self, filterText, fileStem, useTmpFiles=False):

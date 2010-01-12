@@ -11,3 +11,21 @@ This used to be Ctrl+S but is now Ctrl+Alt+F. This is because it was added to th
 where it would otherwise have clashed with the accelerator for "Save". Naturally you can reset
 it to whatever using the setting "gui_accelerators".
 
+(2) Selection tab: "Test paths containing" entry replaces "Test suites containing"
+==================================================================================
+(Also -ts flag on the command line)
+
+It basically works in the same way as before, but instead of searching the test suite path
+and selecting tests under it, it uses the whole test path. Also, it now supports separating
+the suite/test names with spaces as well as path separators. So before you could write
+
+suite/subsuite  (or ite/.*sui)
+
+which you still can, but you can also write
+
+suite/subsuite/test (or ite/.*sui.*/test)
+
+or 
+
+suite subsuite test 
+

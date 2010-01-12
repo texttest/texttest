@@ -1644,6 +1644,9 @@ Fixes for older bugs:
 Version trunk
 =============
 Static GUI Enhancements:
+    - "Test paths containing" replaces "Test suites containing" box in Selection tab (default/__init__.py)
+	Generalised to allow any substring or regexp of the relative path to the test.
+	Also handles spaces as in the names on the webpage. See migration notes.
 Dynamic GUI Enhancements:
     - Selection tab added
 	Can do all of the selecting from the static GUI in the dynamic GUI also. (selectandfilter.py)
@@ -1651,11 +1654,20 @@ Dynamic GUI Enhancements:
     - Status tab categories are now sorted alphabetically (statusviews.py)
     - "Root suite" is no longer always shown in the test tree (testtree.py)
 	If it would otherwise be hidden, it's now hidden.
+    - Performances improvements to "saving" operation. (testtree.py)
+	Saving hundreds of tests should be noticeably faster now.
 Framework Enhancements:
     - Can now set a timeout after which tests will automatically be killed. (default/__init__.py)
 	See "kill_timeout" documentation on the website. Thanks to Michael Behrisch
     - Options files now ignore comments and blank lines like other files (testmodel.py)
+    - $TEXTTEST_ROOT variable added (sandbox.py)
+	Basically to avoid referring to TEXTTEST_HOME in config files
+    - Can now provide extra arguments to virtual display server (Xvfb on UNIX) (virtualdisplay.py)
+	New config setting "virtual_display_extra_args"
 Batch Report Enhancements:
+    - Fixed formatting problem when several tests had the same "known bug" from Bugzilla/Jira (testoverview.py)
+    - Category ordering (coloured tables) now constant in summary page (batch/__init__.py)
+    - Known bugs have their own colour in the pages, defaulting to orange (testoverview.py)
 Grid Engine (LSF/SGE) enhancements:
 Self-test/Internal changes:
 Bug Fixes:
@@ -1663,3 +1675,4 @@ Bug Fixes:
     - Worked around a Mercurial symbolic link bug: if the test path has a symbolic link, dereference it first (hg.py)
     - Don't stacktrace on rename/move if VCS control directories are present but the VCS isn't installed (vcs_independent.py)
     - Don't bail out on absolute paths with arguments for "interpreter" (default/__init__.py)
+    - Recomputing a test that has been saved now works properly (comparefile.py)

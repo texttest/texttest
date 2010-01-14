@@ -36,8 +36,9 @@ class TitleWithDateStamp:
             
 
 class GenerateWebPages(object):
-    def __init__(self, getConfigValue, pageDir, resourceNames, pageTitle, pageVersion, extraVersions):
+    def __init__(self, getConfigValue, pageDir, resourceNames, pageTitle, pageSubTitle, pageVersion, extraVersions):
         self.pageTitle = pageTitle
+        self.pageSubTitle = pageSubTitle
         self.pageVersion = pageVersion
         self.extraVersions = extraVersions
         self.pageDir = pageDir
@@ -103,7 +104,7 @@ class GenerateWebPages(object):
                 # put them in reverse order, most relevant first
                 linkFromDetailsToOverview = [ sel.getLinkInfo(self.pageVersion) for sel in allSelectors ]
                 for tag in tags:
-                    details = self.pagesDetails.setdefault(tag, TestDetails(tag, self.pageTitle))
+                    details = self.pagesDetails.setdefault(tag, TestDetails(tag, self.pageTitle, self.pageSubTitle))
                     details.addVersionSection(version, categoryHandlers[tag], linkFromDetailsToOverview)
                 
         selContainer = HTMLgen.Container()
@@ -456,12 +457,14 @@ class TestTable:
 
         
 class TestDetails:
-    def __init__(self, tag, pageTitle):
+    def __init__(self, tag, pageTitle, pageSubTitle):
         tagText = getDisplayText(tag)
         pageDetailTitle = "Detailed test results for " + pageTitle + ": " + tagText
         self.document = HTMLgen.SimpleDocument(title=TitleWithDateStamp(pageDetailTitle))
         headerText = tagText + " - detailed test results for " + pageTitle
         self.document.append(HTMLgen.Heading(1, headerText, align = 'center'))
+        subTitleText = "(To start TextTest for these tests, run '" + pageSubTitle + "')"
+        self.document.append(HTMLgen.Center(HTMLgen.Emphasis(subTitleText)))
         self.totalCategoryHandler = CategoryHandler()
         self.versionSections = []
         

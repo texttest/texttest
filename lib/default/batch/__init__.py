@@ -541,7 +541,22 @@ class WebPageResponder(plugins.Responder):
             self.diag.info("Found extra versions " + repr(extraVersions))
             relevantSubDirs = self.findRelevantSubdirectories(repository, app, extraVersions)
             version = getVersionName(app, self.appsToGenerate)
-            self.makeAndGenerate(relevantSubDirs, app.getCompositeConfigValue, pageDir, pageTitle, version, extraVersions)
+            pageSubTitle = self.makeCommandLine([ app ])
+            self.makeAndGenerate(relevantSubDirs, app.getCompositeConfigValue, pageDir, pageTitle, pageSubTitle, version, extraVersions)
+
+    def makeCommandLine(self, apps):
+        appStr = ",".join((app.name for app in apps))
+        progName = os.path.basename(plugins.getTextTestProgram())
+        cmd = progName + " -a " + appStr
+        version = apps[0].getFullVersion()
+        if version:
+            cmd += " -v " + version
+        checkouts = set((app.checkout for app in apps))
+        if len(checkouts) == 1:
+            checkout = checkouts.pop()
+            if checkout:
+                cmd += " -c " + checkout
+        return cmd
 
     def getAppRepositoryInfo(self):
         appInfo = seqdict()
@@ -559,13 +574,15 @@ class WebPageResponder(plugins.Responder):
         return appInfo
 
     def transformToCommon(self, pageInfo):
-        version = getVersionName(pageInfo[0][0], self.appsToGenerate)
+        allApps = [ app for app, r in pageInfo ]
+        version = getVersionName(allApps[0], self.appsToGenerate)
         extraVersions, relevantSubDirs = [], seqdict()
         for app, repository in pageInfo:
             extraVersions += self.getExtraVersions(app)
             relevantSubDirs.update(self.findRelevantSubdirectories(repository, app, extraVersions, self.getVersionTitle))
-        getConfigValue = plugins.ResponseAggregator([ app.getCompositeConfigValue for app, r in pageInfo ])
-        return relevantSubDirs, getConfigValue, version, extraVersions
+        getConfigValue = plugins.ResponseAggregator([ app.getCompositeConfigValue for app in allApps ])
+        pageSubTitle = self.makeCommandLine(allApps)
+        return relevantSubDirs, getConfigValue, version, extraVersions, pageSubTitle
 
     def getVersionTitle(self, app, version):
         title = app.fullName()
@@ -574,9 +591,9 @@ class WebPageResponder(plugins.Responder):
         return title
     
     def generateCommonPage(self, pageTitle, pageInfo):
-        relevantSubDirs, getConfigValue, version, extraVersions = self.transformToCommon(pageInfo)
+        relevantSubDirs, getConfigValue, version, extraVersions, pageSubTitle = self.transformToCommon(pageInfo)
         pageDir = getConfigValue("historical_report_location", self.batchSession)
-        self.makeAndGenerate(relevantSubDirs, getConfigValue, pageDir, pageTitle, version, extraVersions)
+        self.makeAndGenerate(relevantSubDirs, getConfigValue, pageDir, pageTitle, pageSubTitle, version, extraVersions)
         
     def makeAndGenerate(self, subDirs, getConfigValue, pageDir, *args):
         resourcePages = self.getResourcePages(getConfigValue)

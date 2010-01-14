@@ -276,11 +276,7 @@ class QueueSystemServer(BaseActionRunner):
         return "exec $SHELL -c \"exec " + command + "\""
 
     def getSlaveCommand(self, test, submissionRules):
-        slaveCmd = os.getenv("TEXTTEST_SLAVE_CMD", sys.argv[0]) # TextTest executable to call for the grid engine slave process
-        if not slaveCmd:
-            # To allow it to be reset, the above form is for documentation...
-            slaveCmd = sys.argv[0]
-        cmdArgs = [ slaveCmd, "-d", ":".join(self.optionMap.rootDirectories),
+        cmdArgs = [ plugins.getTextTestProgram(), "-d", ":".join(self.optionMap.rootDirectories),
                     "-a", test.app.name + test.app.versionSuffix(),
                     "-l", "-tp", test.getRelPath() ] + \
                     self.getSlaveArgs(test) + self.getRunOptions(test.app, submissionRules)

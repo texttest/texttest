@@ -81,6 +81,13 @@ def installationDir(name):
     # Generic modules only, we're confident we know where they are
     return os.path.join(installationRoots[0], name)
 
+def getTextTestProgram():
+    slaveCmd = os.getenv("TEXTTEST_SLAVE_CMD", sys.argv[0]) # TextTest start-script for starting subsequent processes
+    if not slaveCmd:
+        # To allow it to be reset, the above form is for documentation...
+        slaveCmd = sys.argv[0]
+    return slaveCmd
+
 def installationPath(*pathElems):
     for instRoot in installationRoots:
         instPath = os.path.join(instRoot, *pathElems)

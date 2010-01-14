@@ -112,7 +112,7 @@ class TestEnvironment(seqdict):
         removed = []
         for key, value in self.items():
             # Anything set to none is to not to be set in the target environment
-            if value is not None:
+            if value is not None and value != "{CLEAR}":
                 if len(onlyVars) == 0 or key in onlyVars:
                     values[key] = value
             else:

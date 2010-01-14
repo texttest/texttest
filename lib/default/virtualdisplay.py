@@ -104,22 +104,29 @@ class VirtualDisplayResponder(plugins.Responder):
         return self.startXvfb(startArgs, machine)
 
     def startXvfb(self, startArgs, machine):
-        self.diag.info("Starting Xvfb using args " + repr(startArgs))
-        self.displayProc = subprocess.Popen(startArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        line = plugins.retryOnInterrupt(self.displayProc.stdout.readline)
-        if line.find("Time Out!") != -1:
-            self.displayProc.wait()
-            self.displayProc.stdout.close()
-            # We try again and hope for a better process ID!
-            return self.startXvfb(startArgs, machine)
-        try:
-            displayNum, pid = map(int, line.strip().split(","))
-            self.displayProc.stdout.close()
-            return self.getDisplayName(machine, displayNum), pid
-        except ValueError: #pragma : no cover - should never happen, just a fail-safe
-            plugins.log.info("Failed to parse line :\n " + line + self.displayProc.stdout.read())
-            return None, None
-            
+        for attempt in range(5):
+            self.diag.info("Starting Xvfb using args " + repr(startArgs))
+            self.displayProc = subprocess.Popen(startArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            line = plugins.retryOnInterrupt(self.displayProc.stdout.readline)
+            if "Time Out!" in line:
+                self.displayProc.wait()
+                self.displayProc.stdout.close()
+                # We try again and hope for a better process ID!
+                continue
+            try:
+                displayNum, pid = map(int, line.strip().split(","))
+                self.displayProc.stdout.close()
+                return self.getDisplayName(machine, displayNum), pid
+            except ValueError: #pragma : no cover - should never happen, just a fail-safe
+                plugins.log.info("Failed to parse line :\n " + line + self.displayProc.stdout.read())
+                return None, None
+
+        messages = "Failed to start Xvfb in 5 attempts, giving up"
+        if len(startArgs) > 4:
+            messages += "\nAdditional Xvfb arguments were " + repr(" ".join(startArgs[4:]))
+        plugins.printWarning(messages, stderr=True)
+        return None, None
+    
     def getVirtualServerArgs(self, machine, app):
         binDir = plugins.installationDir("libexec")
         fullPath = os.path.join(binDir, "startXvfb.py")

@@ -122,7 +122,7 @@ class QueueSystemConfig(default.Config):
             return default.Config.getTextResponder(self)
     
     def getSlaveSwitches(self):
-        return [ "c", "b", "trace", "ignorecat", "actrep", "rectraffic", "keeptmp", "keepslave", "x" ]
+        return [ "c", "b", "trace", "ignorecat", "ignorefilters", "actrep", "rectraffic", "keeptmp", "keepslave", "x" ]
 
     def getExecHostFinder(self):
         if self.slaveRun():

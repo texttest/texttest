@@ -1659,7 +1659,11 @@ Dynamic GUI Enhancements:
 Framework Enhancements:
     - Can now set a timeout after which tests will automatically be killed. (default/__init__.py)
 	See "kill_timeout" documentation on the website. Thanks to Michael Behrisch
+    - New flag "--ignorefilters" for disabling filtering for a test run (default/__init__.py)
+	Allows full examination of run-dependent text filters
     - Options files now ignore comments and blank lines like other files (testmodel.py)
+    - Can now unset environment variables via environment files. (testmodel.py)
+	Use MY_ENV_VAR:{CLEAR} syntax
     - $TEXTTEST_ROOT variable added (sandbox.py)
 	Basically to avoid referring to TEXTTEST_HOME in config files
     - Can now provide extra arguments to virtual display server (Xvfb on UNIX) (virtualdisplay.py)
@@ -1668,6 +1672,7 @@ Batch Report Enhancements:
     - Fixed formatting problem when several tests had the same "known bug" from Bugzilla/Jira (testoverview.py)
     - Category ordering (coloured tables) now constant in summary page (batch/__init__.py)
     - Known bugs have their own colour in the pages, defaulting to orange (testoverview.py)
+    - Added information on how to start TextTest on the relevant tests (testoverview.py)
 Grid Engine (LSF/SGE) enhancements:
 Self-test/Internal changes:
 Bug Fixes:
@@ -1676,3 +1681,5 @@ Bug Fixes:
     - Don't stacktrace on rename/move if VCS control directories are present but the VCS isn't installed (vcs_independent.py)
     - Don't bail out on absolute paths with arguments for "interpreter" (default/__init__.py)
     - Recomputing a test that has been saved now works properly (comparefile.py)
+    - Load File Selection greyed out when there are no tests (selectandfilter.py)
+

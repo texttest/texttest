@@ -616,10 +616,15 @@ class OptionGroupGUI(ActionGUI):
     def createComboBoxEntry(self, option):
         combobox = gtk.combo_box_entry_new_text()
         entry = combobox.child
+        combobox.set_row_separator_func(self.isRowSeparator)
         option.setPossibleValuesMethods(combobox.append_text, ComboBoxListFinder(combobox))
         
         option.setClearMethod(combobox.get_model().clear)
         return combobox, entry
+
+    def isRowSeparator(self, model, iter):
+        text = model.get_value(iter, 0)
+        return text == "-" * 10
 
     def createOptionWidget(self, option):
         box = gtk.HBox()

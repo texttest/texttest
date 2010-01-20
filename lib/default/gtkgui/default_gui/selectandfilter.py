@@ -5,6 +5,7 @@ Actions for managing selections and filterings of the test tree
 
 import gtk, plugins, os, operator, logging
 from default.gtkgui import guiplugins # from .. import guiplugins when we drop Python 2.4 support
+from fnmatch import fnmatch
 
 class AllTestsHandler:
     def __init__(self):
@@ -71,16 +72,39 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         return allStems[0]
 
     def findAllStems(self):
-        stems = {}
+        stems = set()
+        defStems = set()
+        importantStems = set()
         for suite in self.rootTestSuites:
+            defStems.update(suite.defFileStems())
+            importantStems.update(suite.getCompositeConfigValue("gui_entry_options", "test-file_to_search"))
             exclude = suite.app.getDataFileNames() + [ "file_edits" ]
             for test in suite.testCaseList():
-                for stem in test.dircache.findAllStems(exclude):
-                    if stem in stems:
-                        stems[stem] += 1
-                    else:
-                        stems[stem] = 1
-        return sorted(stems.keys(), lambda x,y: cmp(stems.get(y), stems.get(x)))
+                stems.update(test.dircache.findAllStems(exclude))
+        defStems.intersection_update(stems)
+        stems.difference_update(defStems)
+        expandStems = set()
+        self.selectDiag.info("Found important stems " + repr(importantStems))
+        for stem1 in importantStems:
+            for stem2 in stems:
+                if fnmatch(stem2, stem1):
+                    expandStems.add(stem2)
+                    expandStems.add(stem1)
+
+        self.selectDiag.info("Found expanded stems " + repr(expandStems))
+        importantStems.intersection_update(stems)
+        importantStems.update(expandStems)
+        stems.difference_update(importantStems)
+        separator = "-" * 10
+        allStems = sorted(defStems)
+        if len(allStems) and len(importantStems):
+            allStems.append(separator)
+        allStems += sorted(importantStems)
+        if len(allStems) and len(stems):
+            allStems.append(separator)
+        allStems += sorted(stems)
+        return allStems
+    
     def getPossibleVersions(self, allApps):
         possVersions = []
         for app in allApps:

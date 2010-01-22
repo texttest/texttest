@@ -398,19 +398,26 @@ class CommandLineTraffic(Traffic):
     
     def findRealCommand(self):
         # If we found a link already, use that, otherwise look on the path
-        if self.realCommands.has_key(self.commandName):
-            return self.realCommands[self.commandName]
-        # Find the first one in the path that isn't us :)
-        self.diag.info("Finding real command to replace " + self.fullCommand)
-        for currDir in self.path.split(os.pathsep):
-            self.diag.info("Searching " + currDir)
-            fullPath = os.path.join(currDir, self.commandName)
-            if self.isRealCommand(fullPath):
-                return fullPath
+        for fileName, fullCommand in self.findRealCmdInfo(self.commandName, self.fullCommand):
+            if self.realCommands.has_key(fileName):
+                return self.realCommands[fileName]
+            # Find the first one in the path that isn't us :)
+            self.diag.info("Finding real command to replace " + fullCommand)
+            for currDir in self.path.split(os.pathsep):
+                self.diag.info("Searching " + currDir)
+                fullPath = os.path.join(currDir, fileName)
+                if self.isRealCommand(fullPath, fullCommand):
+                    return fullPath
 
-    def isRealCommand(self, fullPath):
+    def findRealCmdInfo(self, cmdName, cmdPath):
+        cmds = [ (cmdName, cmdPath) ]
+        if os.name == "nt" and not cmdName.endswith(".exe"):
+            cmds.insert(0, (cmdName + ".exe", cmdPath + ".exe"))
+        return cmds
+
+    def isRealCommand(self, fullPath, fullCommand):
         return os.path.isfile(fullPath) and os.access(fullPath, os.X_OK) and \
-               not plugins.samefile(fullPath, self.fullCommand)
+               not plugins.samefile(fullPath, fullCommand)
     
     def filterReplay(self, trafficList):
         insertIndex = 0

@@ -283,7 +283,7 @@ class CheckForBugs(plugins.Action):
         if hasattr(test.state, "failedPrediction"):
             # if we've already compared, slot our things into the comparison object
             newState = copy(test.state)
-            newState.setFailedPrediction(bugState)
+            newState.setFailedPrediction(bugState, usePreviousText=True)
             test.changeState(newState)
         else:
             test.changeState(bugState)

@@ -147,10 +147,13 @@ class TestComparison(BaseTestComparison):
         for comparison in self.allResults:
             comparison.updateAfterLoad(pathsToChange)
 
-    def setFailedPrediction(self, prediction):
+    def setFailedPrediction(self, prediction, usePreviousText=False):
         self.diag.info("Setting failed prediction to " + str(prediction))
         self.failedPrediction = prediction
-        self.freeText = str(prediction)
+        if usePreviousText:
+            self.freeText = str(prediction) + "\n" + self.freeText
+        else:
+            self.freeText = str(prediction)
         self.briefText = prediction.briefText
         self.category = prediction.category
     def hasSucceeded(self):
@@ -261,7 +264,7 @@ class TestComparison(BaseTestComparison):
             self.freeText = self.getFreeTextInfo()
     def getFreeTextInfo(self):
         texts = [ fileComp.getFreeText() for fileComp in self.getSortedComparisons() ] 
-        return string.join(texts, "")
+        return "".join(texts)
     def findComparison(self, stem, includeSuccess=False):
         lists = [ self.changedResults, self.newResults, self.missingResults ]
         if includeSuccess:

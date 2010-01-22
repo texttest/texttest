@@ -670,7 +670,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         # (a) are not created and understood by TextTest itself ("builtin")
         # (b) are not auto-generated ("regenerate")
         # That leaves the rest ("default")
-        return defFiles + self.currTestSelection[0].defFileStems("default")
+        return defFiles + self.currTestSelection[0].expandedDefFileStems("default")
 
     def getStandardFiles(self):
         collateKeys = self.currTestSelection[0].getConfigValue("collate_file").keys()
@@ -1243,9 +1243,10 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         return False
     def getPossibleFileStems(self):
         stems = []
+        excludeStems = self.currTestSelection[0].expandedDefFileStems()
         for test in self.currTestSelection[0].testCaseList():
-            for stem in test.dircache.findAllStems(self.currTestSelection[0].defFileStems()):
-                if not stem in stems:
+            for stem in test.dircache.findAllStems():
+                if stem not in stems and stem not in excludeStems:
                     stems.append(stem)
         # use for unrunnable tests...
         stems.append("free_text")

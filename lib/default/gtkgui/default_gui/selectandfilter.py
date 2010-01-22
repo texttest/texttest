@@ -79,8 +79,9 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
             defStems.update(suite.defFileStems())
             importantStems.update(suite.getCompositeConfigValue("gui_entry_options", "test-file_to_search"))
             exclude = suite.app.getDataFileNames() + [ "file_edits" ]
+            predicate = lambda stem, vset: stem not in exclude and (stem in defStems or len(vset) > 0)
             for test in suite.testCaseList():
-                stems.update(test.dircache.findAllStems(exclude))
+                stems.update(test.dircache.findAllStems(predicate))
         defStems.intersection_update(stems)
         stems.difference_update(defStems)
         expandStems = set()

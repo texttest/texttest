@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, sys, types, string, plugins, exceptions, shutil, operator, logging
+import os, sys, types, string, plugins, exceptions, shutil, operator, logging, glob
 from time import time
 from fnmatch import fnmatch
 from ndict import seqdict
@@ -66,17 +66,14 @@ class DirectoryCache:
                 versionSets.setdefault(versionSet, []).append(self.pathName(fileName))
         return versionSets
 
-    def findAllStems(self, exclude):
-        return self._findAllStems(lambda stem: stem not in exclude)
-
     def findStemsMatching(self, pattern):
-        return self._findAllStems(lambda stem: fnmatch(stem, pattern))
+        return self.findAllStems(lambda stem, vset: fnmatch(stem, pattern))
 
-    def _findAllStems(self, predicate):
+    def findAllStems(self, predicate=None):
         stems = []
         for file in self.contents:
             stem, versionSet = self.splitStem(file)
-            if len(stem) > 0 and len(versionSet) > 0 and stem not in stems and predicate(stem):
+            if len(stem) > 0 and stem not in stems and (predicate is None or predicate(stem, versionSet)):
                 stems.append(stem)
         return stems
 
@@ -256,17 +253,30 @@ class Test(plugins.Observable):
         else:
             return dict.get(category)
 
+    def expandedDefFileStems(self, category="all"):
+        stems = []
+        for pattern in self.defFileStems(category):
+            if glob.has_magic(pattern):
+                for test in self.testCaseList():
+                    stems += test.dircache.findStemsMatching(pattern)
+            else:
+                stems.append(pattern)
+        return stems
+
     def listStandardFiles(self, allVersions, defFileCategory="all"):
         resultFiles, defFiles = [],[]
         self.diagnose("Looking for all standard files")
-        defFileStems = self.defFileStems(defFileCategory)
+        defFileStems = self.expandedDefFileStems(defFileCategory)
         for stem in defFileStems:
             defFiles += self.listStdFilesWithStem(stem, allVersions)
-        exclude = self.defFileStems() + self.app.getDataFileNames() + [ "file_edits" ]
-        for stem in self.dircache.findAllStems(exclude):
+        exclude = self.expandedDefFileStems() + self.app.getDataFileNames() + [ "file_edits" ]
+        self.diagnose("Excluding " + repr(exclude))
+        predicate = lambda stem, vset: stem not in exclude and len(vset) > 0
+        for stem in self.dircache.findAllStems(predicate):
             resultFiles += self.listStdFilesWithStem(stem, allVersions)
         self.diagnose("Found " + repr(resultFiles) + " and " + repr(defFiles))
         return resultFiles, defFiles
+    
     def listStdFilesWithStem(self, stem, allVersions):
         self.diagnose("Getting files for stem " + stem)
         files = []
@@ -277,6 +287,7 @@ class Test(plugins.Observable):
             if currFile:
                 files.append(currFile)
         return files
+
     def listDataFiles(self):
         existingDataFiles = []
         for dataFile in self.getDataFileNames():
@@ -288,11 +299,14 @@ class Test(plugins.Observable):
 
         self.diagnose("Found data files as " + repr(existingDataFiles))
         return existingDataFiles
+
     def listFiles(self, fileName, dataFile, followLinks):
         filesToIgnore = self.getCompositeConfigValue("test_data_ignore", dataFile)
         return self.listFilesFrom([ fileName ], filesToIgnore, followLinks)
+
     def fullPathList(self, dir):
         return map(lambda file: os.path.join(dir, file), os.listdir(dir))
+
     def listExternallyEditedFiles(self):
         rootDir = self.getFileName("file_edits")
         if rootDir:
@@ -1308,9 +1322,11 @@ class Application:
                    self.getConfigValue("partial_copy_test_path", envMapping=envMapping)
         # Don't manage data that has an external path name, only accept absolute paths built by ourselves...
         return filter(lambda name: name and (self.writeDirectory in name or not os.path.isabs(name)), allNames)
+
     def getFileName(self, dirList, stem):
         dircaches = map(lambda dir: DirectoryCache(dir), dirList)
         return self._getFileName(dircaches, stem)
+
     def _getFileName(self, dircaches, stem):
         allFiles = self._getAllFileNames(dircaches, stem)
         if len(allFiles):

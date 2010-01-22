@@ -59,7 +59,7 @@ def convertToUtf8(text): # gtk.TextViews insist we do the conversion ourselves
 def openLinkInBrowser(target):
     if os.name == "nt" and not os.environ.has_key("BROWSER"):
         os.startfile(target)
-        return "Opened " + target + " in default browser."
+        return 'Started "<default browser> ' + target + '" in background.'
     else:
         browser = os.getenv("BROWSER", "firefox")
         cmdArgs = [ browser, target ]

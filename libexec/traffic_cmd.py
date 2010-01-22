@@ -95,5 +95,6 @@ if __name__ == "__main__":
         else:
             sys.exit(exitCode)
     except ValueError:
-        sys.stderr.write("Received unexpected communication from MIM server:\n " + response + "\n\n")
+        from sys import stderr
+        stderr.write("Received unexpected communication from MIM server:\n " + response + "\n\n")
 

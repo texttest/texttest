@@ -258,7 +258,9 @@ class Test(plugins.Observable):
         for pattern in self.defFileStems(category):
             if glob.has_magic(pattern):
                 for test in self.testCaseList():
-                    stems += test.dircache.findStemsMatching(pattern)
+                    for stem in test.dircache.findStemsMatching(pattern):
+                        if stem not in stems:
+                            stems.append(stem)
             else:
                 stems.append(pattern)
         return stems

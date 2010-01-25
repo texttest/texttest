@@ -63,6 +63,9 @@
     <menuitem action="Show only selected"/>
     <menuitem action="Hide selected"/>
     <separator/>    
+    <menuitem action="Run"/>
+    <menuitem action="Record Use-Case"/>
+    <separator/>
     <menu action="reordermenu">
       <menuitem name="Move to first" action="Move to first"/>
       <menuitem name="Move up" action="Move up"/>

@@ -261,7 +261,7 @@ class Test(plugins.Observable):
                     for stem in test.dircache.findStemsMatching(pattern):
                         if stem not in stems:
                             stems.append(stem)
-            else:
+            elif pattern not in stems:
                 stems.append(pattern)
         return stems
 

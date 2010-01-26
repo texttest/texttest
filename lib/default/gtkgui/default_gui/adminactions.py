@@ -1220,6 +1220,7 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         self.addSwitch("ignore_other_errors", "Trigger even if other files differ")
         self.addSwitch("trigger_on_success", "Trigger even if test would otherwise succeed")
         self.addSwitch("internal_error", "Report as 'internal error' rather than 'known bug' (no bug system)")
+        
     def findBugSystems(self, allApps):
         bugSystems = []
         for app in allApps:
@@ -1230,17 +1231,23 @@ class ReportBugs(guiplugins.ActionDialogGUI):
             
     def _getStockId(self):
         return "info"
+
     def singleTestOnly(self):
         return True
+
     def _getTitle(self):
         return "Enter Failure Information"
+
     def getDialogTitle(self):
         return "Enter information for automatic interpretation of test failures"
+
     def updateOptions(self):
-        self.optionGroup.setOptionValue("search_file", self.currTestSelection[0].app.getConfigValue("log_file"))
+        if not self.optionGroup.getOptionValue("search_file"):
+            self.optionGroup.setOptionValue("search_file", self.currTestSelection[0].getConfigValue("log_file"))
+
         self.optionGroup.setPossibleValues("search_file", self.getPossibleFileStems())
-        self.optionGroup.setOptionValue("version", self.currTestSelection[0].app.getFullVersion())
         return False
+
     def getPossibleFileStems(self):
         stems = []
         excludeStems = self.currTestSelection[0].expandedDefFileStems()
@@ -1251,6 +1258,7 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         # use for unrunnable tests...
         stems.append("free_text")
         return stems
+
     def checkSanity(self):
         if len(self.optionGroup.getOptionValue("search_string")) == 0:
             raise plugins.TextTestError, "Must fill in the field 'text or regexp to match'"

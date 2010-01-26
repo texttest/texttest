@@ -1647,6 +1647,9 @@ Static GUI Enhancements:
     - "Test paths containing" replaces "Test suites containing" box in Selection tab (default/__init__.py)
 	Generalised to allow any substring or regexp of the relative path to the test.
 	Also handles spaces as in the names on the webpage. See migration notes.
+    - Added "Run" and "Record" to context menu (default_gui-static.xml)
+    - Drop-down entries for "Test-files to search" are now sorted in sections (selectandfilter.py)
+	Can configure via "gui_entry_options" also
 Dynamic GUI Enhancements:
     - Selection tab added
 	Can do all of the selecting from the static GUI in the dynamic GUI also. (selectandfilter.py)
@@ -1666,6 +1669,10 @@ Framework Enhancements:
 	Use MY_ENV_VAR:{CLEAR} syntax
     - $TEXTTEST_ROOT variable added (sandbox.py)
 	Basically to avoid referring to TEXTTEST_HOME in config files
+    - "definition_file_stems" now supports UNIX-style file expansions (testmodel.py)
+	As do many other file-related entries
+    - "Known bugs" now provide full diff in Text Info and in HTML reports (comparetest.py)
+	Additional to "bug" output
     - Can now provide extra arguments to virtual display server (Xvfb on UNIX) (virtualdisplay.py)
 	New config setting "virtual_display_extra_args"
 Batch Report Enhancements:
@@ -1682,4 +1689,5 @@ Bug Fixes:
     - Don't bail out on absolute paths with arguments for "interpreter" (default/__init__.py)
     - Recomputing a test that has been saved now works properly (comparefile.py)
     - Load File Selection greyed out when there are no tests (selectandfilter.py)
+    - Command-line traffic record mechanism now finds .exe files on Windows (traffic.py)
 

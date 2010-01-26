@@ -22,7 +22,11 @@ class TextViewGUI(guiutils.SubGUI):
         
     def shouldShowCurrent(self, *args):
         return len(self.text) > 0        
-                    
+
+    def forceVisible(self, rowCount):
+        # Both TextInfo and RunInfo should stay visible when tests are selected
+        return rowCount == 1
+
     def updateView(self):
         if self.view:
             self.updateViewFromText(self.text)
@@ -229,9 +233,6 @@ class TextInfoGUI(TextViewGUI):
 
     def getTabTitle(self):
         return "Text Info"
-
-    def forceVisible(self, rowCount):
-        return rowCount == 1
 
     def resetText(self, state):
         if state.category == "not_started":

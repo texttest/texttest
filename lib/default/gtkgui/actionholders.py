@@ -301,11 +301,15 @@ class ChangeableNotebookGUI(NotebookGUI):
             else:
                 self.diag.info("Remaining hidden " + name)
         return changed
-    def setCurrentPage(self, newNum):
+
+    def createView(self):
+        notebook = NotebookGUI.createView(self)
+        notebook.connect("switch-page", self.pageSwitched)
+        return notebook
+    
+    def pageSwitched(self, notebook, page, newNum, *args):
         newName, newTabGUI = self.tabInfo[newNum]
-        self.diag.info("Resetting for current page " + repr(self.notebook.get_current_page()) + \
-                       " to page " + repr(newNum) + " = " + repr(newName))
-        self.notebook.set_current_page(newNum)
+        self.diag.info("Resetting current page to page " + repr(newNum) + " = " + repr(newName))
         # Must do this afterwards, otherwise the above change doesn't propagate
         self.currentTabGUI = newTabGUI
         self.diag.info("Resetting done.")
@@ -328,7 +332,7 @@ class ChangeableNotebookGUI(NotebookGUI):
         if pagesToHide.has_key(self.notebook.get_current_page()):
             newCurrentPageNum = self.findFirstRemaining(pagesToHide)
             if newCurrentPageNum is not None:
-                self.setCurrentPage(newCurrentPageNum)
+                self.notebook.set_current_page(newCurrentPageNum)
 
         # remove from the back, so we don't momentarily view them all if removing everything
         for page in reversed(pagesToHide.values()):
@@ -339,15 +343,17 @@ class ChangeableNotebookGUI(NotebookGUI):
     def updateCurrentPage(self, rowCount):
         for pageNum, (tabName, tabGUI) in enumerate(self.tabInfo):
             if tabGUI.shouldShowCurrent() and tabGUI.forceVisible(rowCount):
-                self.setCurrentPage(pageNum)
+                return self.notebook.set_current_page(pageNum)
 
     def notifyNewTestSelection(self, tests, apps, rowCount, direct):
         # This is mostly an attempt to work around the tree search problems.
         # Don't hide the tab for user-deselections of all tests because it trashes the search.
         if len(tests) > 0 or not direct:
             self.diag.info("New selection with " + repr(tests) + ", adjusting '" + self.name + "'")
-            # only change pages around if a test is directly selected
-            self.updatePages(rowCount=rowCount, changeCurrentPage=direct)
+            # only change pages around if a test is directly selected and we haven't already selected another important tab
+            changeCurrentPage = direct and not self.currentTabGUI.forceVisible(rowCount)
+            self.diag.info("Current tab gui " + repr(self.currentTabGUI.__class__) + " will change = " + repr(changeCurrentPage))
+            self.updatePages(rowCount=rowCount, changeCurrentPage=changeCurrentPage)
 
     def updatePages(self, test=None, state=None, rowCount=0, changeCurrentPage=False):
         if not self.notebook:

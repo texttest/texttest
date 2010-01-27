@@ -298,17 +298,18 @@ class FileComparison:
 
     def saveMissing(self, versionString, autoGenText, backupVersionStrings):
         stdRoot = self.getStdRootVersionFile()
+        self.diag.info("Saving missing file for " + stdRoot + " with version " + repr(versionString))
         targetFile = self.versionise(stdRoot, versionString)
         self.backupOrRemove(targetFile, backupVersionStrings)
 
-        self.stdFile = None
-        self.stdCmpFile = None
-        if stdRoot != targetFile and os.path.isfile(stdRoot):
+        if self.stdFile != targetFile and os.path.isfile(self.stdFile):
             # Create a "versioned-missing" file
             newFile = open(targetFile, "w")
             newFile.write(autoGenText)
             newFile.close()
-
+        self.stdFile = None
+        self.stdCmpFile = None
+        
     def saveResults(self, tmpFile, destFile):
         copyfile(tmpFile, destFile)
         

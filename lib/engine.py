@@ -193,7 +193,9 @@ class TextTest(plugins.Responder, plugins.Observable):
             if len(components) != 2:
                 continue
             appName = components[1]
-            if len(selectedAppDict) and not selectedAppDict.has_key(appName):
+            
+            # Ignore emacs backup files and stuff we haven't selected
+            if appName.endswith("~") or (len(selectedAppDict) and not selectedAppDict.has_key(appName)):
                 continue
 
             self.diag.info("Building apps from " + f)

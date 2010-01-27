@@ -220,6 +220,7 @@ class FileComparison:
             proc = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
             return self.previewGenerator.getPreview(proc.stdout)
         except OSError, e:
+            self.diag.info("No diff report: full exception printout\n" + plugins.getExceptionString())
             return "No difference report could be created: could not find textual difference tool '" + self.textDiffTool + "'\n" + \
                    "(" + str(e) + ")"
     def updateAfterLoad(self, changedPaths):

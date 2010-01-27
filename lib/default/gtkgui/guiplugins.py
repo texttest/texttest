@@ -543,7 +543,7 @@ class OptionGroupGUI(ActionGUI):
     def setConfigOverride(self, switch, index, option, *args):
         cleanOption = option.split("\n")[0].replace("_", "")
         configName = self.getNaming(switch.name, option, *args)
-        if index == switch.defaultValue or guiConfig.getCompositeValue("gui_entry_overrides", configName) == "1":
+        if index == switch.getValue() or guiConfig.getCompositeValue("gui_entry_overrides", configName) == "1":
             switch.setValue(index)
 
     def getNaming(self, switchName, cleanOption, *args):
@@ -581,11 +581,13 @@ class OptionGroupGUI(ActionGUI):
     def createComboBox(self, switch, *args):
         combobox = gtk.combo_box_new_text()
         combobox.set_name(switch.name)
-        switch.setMethods(combobox.get_active, combobox.set_active)
         for index, option in enumerate(switch.options):
             combobox.append_text(option)
             self.setConfigOverride(switch, index, option, *args)
+            if switch.getValue() == index:
+                combobox.set_active(index)
 
+        switch.setMethods(combobox.get_active, combobox.set_active)
         box = gtk.VBox()
         box.pack_start(gtk.Label(""))
         box.pack_start(combobox)

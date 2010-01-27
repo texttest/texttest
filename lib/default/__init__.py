@@ -1186,6 +1186,8 @@ class GrepFilter(plugins.TextFilter):
         self.useTmpFiles = useTmpFiles
         
     def acceptsTestCase(self, test):
+        if self.fileStem == "free_text":
+            return self.stringContainsText(test.state.freeText)
         for logFile in self.findAllFiles(test):
             if self.matches(logFile):
                 return True

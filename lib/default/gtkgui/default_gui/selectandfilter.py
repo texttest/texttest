@@ -22,6 +22,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
     def __init__(self, allApps, dynamic, *args):
         guiplugins.ActionTabGUI.__init__(self, allApps)
         AllTestsHandler.__init__(self)
+        self.dynamic = dynamic
         self.filterAction = gtk.Action("Filter", "Filter", \
                                        self.getFilterTooltip(), self.getStockId())
         self.filterAction.connect("activate", self.filterTests)
@@ -43,7 +44,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         self.filteringGroup.addSwitch("current_filtering", options = [ "Discard", "Refine", "Extend" ], description=currFilterDesc)
         excludeKeys = set(self.optionGroup.keys()) # remember these so we don't try and save them to selections
         self.addApplicationOptions(allApps)
-        if dynamic:
+        if self.dynamic:
             self.addSwitch("std", options = [ "Use test-files from current run", "Use stored test-files" ], description = [ "When searching using 'test-files containing', look in the results of tests in the current run", "When searching using 'test-files containing', look in the stored results, i.e. the same search as would be done in the static GUI" ])
         self.appKeys = set(self.optionGroup.keys())
         self.appKeys.difference_update(excludeKeys)
@@ -96,14 +97,18 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         importantStems.intersection_update(stems)
         importantStems.update(expandStems)
         stems.difference_update(importantStems)
+        if self.dynamic:
+            return self.makeStemList([ [ "free_text" ], importantStems, defStems, stems ])
+        else:
+            return self.makeStemList([ defStems, importantStems, stems ])
+
+    def makeStemList(self, subLists):
         separator = "-" * 10
-        allStems = sorted(defStems)
-        if len(allStems) and len(importantStems):
-            allStems.append(separator)
-        allStems += sorted(importantStems)
-        if len(allStems) and len(stems):
-            allStems.append(separator)
-        allStems += sorted(stems)
+        allStems = sorted(subLists[0])
+        for extraList in subLists[1:]:
+            if len(allStems) and len(extraList):
+                allStems.append(separator)
+            allStems += sorted(extraList)
         return allStems
     
     def getPossibleVersions(self, allApps):

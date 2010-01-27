@@ -245,6 +245,9 @@ class Test(plugins.Observable):
         return False
     def readContents(self, *args, **kwargs):
         return True
+
+    def isDefinitionFileStem(self, stem):
+        return self.fileMatches(stem, self.defFileStems())
                 
     def defFileStems(self, category="all"):
         dict = self.getConfigValue("definition_file_stems")

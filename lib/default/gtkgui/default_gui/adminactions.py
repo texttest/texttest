@@ -1136,6 +1136,16 @@ class RenameFile(RenameAction):
         if os.path.exists(newPath):
             raise plugins.TextTestError, "There is already a file or directory at '" + newName + "', please choose another name."
 
+    def getConfirmationMessage(self):
+        oldStem = self.oldName.split(".")[0]
+        newName = self.optionGroup.getOptionValue("name")
+        newStem = newName.split(".")[0]
+        if self.currTestSelection[0].isDefinitionFileStem(oldStem) and \
+               not self.currTestSelection[0].isDefinitionFileStem(newStem):
+            return "You are trying to rename a definition file in such a way that it will no longer fulfil its previous purpose.\nTextTest uses conventional names for files with certain purposes and '" + oldStem + "' is one such conventional name.\nAre you sure you want to continue?"
+        else:
+            return ""
+
     def performRename(self, newName):
         oldPath = self.currFileSelection[0][0]
         newPath = os.path.join(os.path.dirname(oldPath), newName)

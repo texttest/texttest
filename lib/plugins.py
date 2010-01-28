@@ -1307,9 +1307,6 @@ class Option:
             self.updateMethod(self.defaultValue)
         else:
             self.valueMethod = None
-
-    def describe(self):
-        return self.name
         
 
 class TextOption(Option):
@@ -1428,12 +1425,6 @@ class Switch(Option):
             return str(self.getValue())
         else:
             return "" # always on or off...
-
-    def describe(self):
-        text = self.name
-        if len(self.options) > 1:
-            text += "=" + self.options[1]
-        return text
 
 
 class OptionGroup:

@@ -43,6 +43,10 @@ class QueueSystemConfig(default.Config):
                 group.addOption("slave", "Private: used to submit slave runs remotely")
                 group.addOption("servaddr", "Private: used to submit slave runs remotely")
 
+    def getReconnFullOptions(self):
+        return default.Config.getReconnFullOptions(self) + [
+                "Use raw data from the original run and recompute as above, but use the grid for computations"]
+
     def getMachineNameForDisplay(self, machine):
         # Don't display localhost, as it's not true when using the grid
         # Should really be something like "whatever grid gives us" but blank space will do for now...
@@ -57,7 +61,7 @@ class QueueSystemConfig(default.Config):
         return []
 
     def getLocalRunArgs(self):
-        return [ "reconnect", "gx", "s", "coll", "record", "autoreplay" ]
+        return [ "gx", "s", "coll", "record", "autoreplay" ]
     
     def calculateUseQueueSystem(self, allApps):
         for localFlag in self.getLocalRunArgs():
@@ -73,7 +77,11 @@ class QueueSystemConfig(default.Config):
                 minCount = min((app.getConfigValue("queue_system_min_test_count") for app in allApps))
                 return count >= minCount
 
-        return True
+        if self.optionMap.has_key("reconnect"):
+            # GUI gives us a numeric value, can also get it from the command line
+            return self.optionValue("reconnfull") in [ "2", "grid" ]
+        else:
+            return True
     
     def hasExplicitInterface(self):
         return self.slaveRun() or default.Config.hasExplicitInterface(self)
@@ -91,8 +99,17 @@ class QueueSystemConfig(default.Config):
                    "successful test files under the Running/Advanced tab in the static GUI"
         else:
             return ""
-    def useExtraVersions(self):
-        return not self.slaveRun()
+
+    def getExtraVersions(self, app):
+        if self.slaveRun():
+            if self.isReconnecting():
+                fromConfig = self.getExtraVersionsFromConfig(app)
+                return self.reconnectConfig.getExtraVersions(app, fromConfig)
+            else:
+                return []
+        else:
+            return default.Config.getExtraVersions(self, app)
+
     def keepTemporaryDirectories(self):
         return default.Config.keepTemporaryDirectories(self) or (self.slaveRun() and self.optionMap.has_key("keepslave"))
     def cleanPreviousTempDirs(self):
@@ -122,7 +139,8 @@ class QueueSystemConfig(default.Config):
             return default.Config.getTextResponder(self)
     
     def getSlaveSwitches(self):
-        return [ "c", "b", "trace", "ignorecat", "ignorefilters", "actrep", "rectraffic", "keeptmp", "keepslave", "x" ]
+        return [ "c", "b", "trace", "ignorecat", "ignorefilters", "actrep",
+                 "rectraffic", "keeptmp", "keepslave", "x", "reconnect", "reconnfull" ]
 
     def getExecHostFinder(self):
         if self.slaveRun():

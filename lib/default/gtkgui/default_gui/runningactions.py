@@ -167,7 +167,10 @@ class ReconnectToTests(RunningAction,guiplugins.ActionDialogGUI):
         RunningAction.__init__(self, inputOptions)
         self.addOption("v", "Version to reconnect to")
         self.addOption("reconnect", "Temporary result directory", os.getenv("TEXTTEST_TMP", ""), selectDir=True, description="Specify a directory containing temporary texttest results. The reconnection will use a random subdirectory matching the version used.")
-        self.addSwitch("reconnfull", "Recomputation", 0, ["Display results exactly as they were in the original run", "Use raw data from the original run, but recompute run-dependent text, known bug information etc."])
+        appGroup = plugins.OptionGroup("Invisible")
+        self.addApplicationOptions(allApps, appGroup, inputOptions)
+        self.addSwitch("reconnfull", "Recomputation", options=appGroup.getOption("reconnfull").options)
+        
     def _getStockId(self):
         return "connect"
     def _getTitle(self):
@@ -188,7 +191,7 @@ class RunTests(RunningAction,guiplugins.ActionTabGUI):
         guiplugins.ActionTabGUI.__init__(self, allApps)
         RunningAction.__init__(self, inputOptions)
         self.optionGroups.append(self.optionGroup)
-        self.addApplicationOptions(allApps, inputOptions)
+        self.addApplicationOptions(allApps, self.optionGroup, inputOptions)
 
     def _getTitle(self):
         return "_Run"

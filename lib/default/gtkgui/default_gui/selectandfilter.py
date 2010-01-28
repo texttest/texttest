@@ -43,7 +43,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
                           "Show all tests which match the criteria. Do not hide any tests that are currently shown." ]
         self.filteringGroup.addSwitch("current_filtering", options = [ "Discard", "Refine", "Extend" ], description=currFilterDesc)
         excludeKeys = set(self.optionGroup.keys()) # remember these so we don't try and save them to selections
-        self.addApplicationOptions(allApps)
+        self.addApplicationOptions(allApps, self.optionGroup)
         if self.dynamic:
             self.addSwitch("std", options = [ "Use test-files from current run", "Use stored test-files" ], description = [ "When searching using 'test-files containing', look in the results of tests in the current run", "When searching using 'test-files containing', look in the stored results, i.e. the same search as would be done in the static GUI" ])
         self.appKeys = set(self.optionGroup.keys())

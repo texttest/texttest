@@ -83,7 +83,7 @@ class Config:
                 group.addOption("count", "Private: How many tests we believe there will be")
                 group.addOption("o", "Overwrite failures, optionally using version")
                 group.addOption("reconnect", "Reconnect to previous run")
-                group.addSwitch("reconnfull", "Recompute file filters when reconnecting")
+                group.addSwitch("reconnfull", "Recompute file filters when reconnecting", options=self.getReconnFullOptions())
                 group.addSwitch("n", "Create new results files (overwrite everything)")
                 group.addSwitch("new", "Start static GUI with no applications loaded")
                 group.addOption("bx", "Use extra versions as for batch mode session")
@@ -95,6 +95,10 @@ class Config:
                     group.addSwitch("actrep", "Run with slow motion replay")
                 if not useCatalogues:
                     group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
+
+    def getReconnFullOptions(self):
+        return ["Display results exactly as they were in the original run",
+                "Use raw data from the original run, but recompute run-dependent text, known bug information etc."]
 
     def anyAppHas(self, apps, propertyMethod):
         for app in apps:
@@ -166,12 +170,7 @@ class Config:
     def useConsole(self):
         return self.optionMap.has_key("con")
 
-    def useExtraVersions(self):
-        return True # static GUI didn't, once, but now we always read things the same.
-
     def getExtraVersions(self, app):
-        if not self.useExtraVersions():
-            return []
         fromConfig = self.getExtraVersionsFromConfig(app)
         fromCmd = self.getExtraVersionsFromCmdLine(app, fromConfig)
         return self.createComposites(fromConfig, fromCmd)
@@ -1562,7 +1561,7 @@ class DocumentOptions(plugins.Action):
 
     def optionOutput(self, key, group, option):
         keyOutput = "-" + key
-        docs = option.describe()
+        docs = option.name
         if isinstance(option, plugins.TextOption):
             keyOutput += " <value>"
             if (docs == "Execution time"):

@@ -652,6 +652,15 @@ class OptionGroupGUI(ActionGUI):
                 args.append(value)
         return args
 
+    def addApplicationOptions(self, allApps, optionGroup, inputOptions={}):
+        if len(allApps) > 0:
+            for app in allApps:
+                app.addToOptionGroups(allApps, [ optionGroup ])
+        else:
+            configObject = plugins.importAndCall("default", "getConfig", inputOptions)
+            configObject.addToOptionGroups(allApps, [ optionGroup ])
+
+
     
 class ActionTabGUI(OptionGroupGUI):
     def __init__(self, *args):
@@ -763,14 +772,6 @@ class ActionTabGUI(OptionGroupGUI):
             entry.set_position(-1) # Sets position last, makes it possible to see the vital part of long paths 
         dialog.destroy()
         
-    def addApplicationOptions(self, allApps, inputOptions={}):
-        if len(allApps) > 0:
-            for app in allApps:
-                app.addToOptionGroups(allApps, [ self.optionGroup ])
-        else:
-            configObject = plugins.importAndCall("default", "getConfig", inputOptions)
-            configObject.addToOptionGroups(allApps, [ self.optionGroup ])
-
 
 class ActionDialogGUI(OptionGroupGUI):
     def runInteractive(self, *args):

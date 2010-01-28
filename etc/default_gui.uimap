@@ -909,3 +909,6 @@ notify-position = drag vertical pane separator so left half uses
 [Name=Use stored test-files for Selection]
 toggled.true = use stored test-files
 
+[Label=Use raw data from the original run and recompute as above, but use the grid for computations]
+toggled.true = choose to reconnect via grid
+

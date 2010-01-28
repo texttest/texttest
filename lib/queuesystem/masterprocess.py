@@ -753,8 +753,7 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
         return allow
 
     def allowChange(self, oldState, newState):
-        return (newState.hasStarted() and not oldState.hasStarted()) or \
-               (newState.isComplete() and not oldState.isComplete())
+        return newState.isComplete() or not oldState.isComplete()
 
     def getTest(self, testString):
         self.diag.info("Received request for '" + testString + "'")

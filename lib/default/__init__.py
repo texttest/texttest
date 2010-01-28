@@ -396,11 +396,11 @@ class Config:
 
     def getOriginalFilterer(self):
         if not self.optionMap.has_key("ignorefilters"):
-            return rundependent.FilterOriginal()
+            return rundependent.FilterOriginal(useFilteringStates=not self.batchMode())
 
     def getTemporaryFilterer(self):
         if not self.optionMap.has_key("ignorefilters"):
-            return rundependent.FilterTemporary()
+            return rundependent.FilterTemporary(useFilteringStates=not self.batchMode())
     
     def filterErrorText(self, app, errFile):
         runDepFilter = rundependent.RunDependentTextFilter(app.getConfigValue("suppress_stderr_text"), "")
@@ -1239,6 +1239,7 @@ class Killed(plugins.TestState):
                                    started=1, completed=1, executionHosts=prevState.executionHosts)
         # Cache running information, it can be useful to have this available...
         self.prevState = prevState
+        self.failedPrediction = self
 
 class RunTest(plugins.Action):
     def __init__(self):

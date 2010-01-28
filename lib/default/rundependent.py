@@ -12,16 +12,27 @@ from ndict import seqdict
 from re import sub
 from optparse import OptionParser
 
+class Filtering(plugins.TestState):
+    def __init__(self, name, **kw):
+        plugins.TestState.__init__(self, name, briefText="", **kw)    
+        
 # Generic base class for filtering standard and temporary files
 class FilterAction(plugins.Action):
-    def __init__(self):
+    def __init__(self, useFilteringStates=False):
         self.diag = logging.getLogger("Filter Actions")
+        self.useFilteringStates = useFilteringStates
     def __call__(self, test):
+        if self.useFilteringStates:
+            self.changeToFilteringState(test)
+            
         for fileName, postfix in self.filesToFilter(test):
             self.diag.info("Considering for filtering : " + fileName)
             stem = os.path.basename(fileName).split(".")[0]
             newFileName = test.makeTmpFileName(stem + "." + test.app.name + postfix, forFramework=1)
             self.performAllFilterings(test, stem, fileName, newFileName)
+
+    def changeToFilteringState(self, *args):
+        pass
 
     def performAllFilterings(self, test, stem, fileName, newFileName):
         currFileName = fileName
@@ -71,6 +82,14 @@ class FilterOriginal(FilterAction):
         resultFiles, defFiles = test.listStandardFiles(allVersions=False, defFileCategory="regenerate")
         return self.constantPostfix(resultFiles + defFiles, "origcmp")
 
+    def changeToFilteringState(self, test):
+        # Notifications of current status are only useful when doing normal filtering in the GUI
+        execMachines = test.state.executionHosts
+        freeText = "Filtering stored result files on " + ",".join(execMachines)
+        test.changeState(Filtering("initial_filter", executionHosts=execMachines,
+                                   freeText=freeText, lifecycleChange="start initial filtering"))
+
+    
 class FilterTemporary(FilterAction):
     def filesToFilter(self, test):
         return self.constantPostfix(test.listTmpFiles(), "cmp")
@@ -86,7 +105,17 @@ class FilterTemporary(FilterAction):
             if origFile and os.path.isfile(origFile):
                 filters.append((FloatingPointFilter(origFile, floatTolerance, relTolerance), ".fpdiff"))
         return filters
-    
+
+    def changeToFilteringState(self, test):
+        # Notifications of current status are only useful when doing normal filtering in the GUI
+        execMachines = test.state.executionHosts
+        freeText = "Filtering and comparing newly generated result files on " + ",".join(execMachines)
+        newState = Filtering("final_filter", executionHosts=execMachines, started=1,
+                             freeText=freeText, lifecycleChange="start final filtering and comparison")
+        if test.state.category == "killed":
+            newState.failedPrediction = test.state
+        test.changeState(newState)
+
 
 class FilterProgressRecompute(FilterAction):
     def filesToFilter(self, test):

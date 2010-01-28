@@ -100,19 +100,19 @@ class TestComparison(BaseTestComparison):
     def __init__(self, previousInfo, app, lifecycleChange=""):
         BaseTestComparison.__init__(self, "failure", previousInfo, completed=1, lifecycleChange=lifecycleChange)
         self.failedPrediction = None
-        if previousInfo.category == "killed":
-            self.setFailedPrediction(previousInfo)
         if hasattr(previousInfo, "failedPrediction") and previousInfo.failedPrediction:
             self.setFailedPrediction(previousInfo.failedPrediction)
         # Cache these only so it gets output when we pickle, so we can re-interpret if needed... data may be moved
         self.appAbsPath = app.getDirectory()
         self.appWriteDir = app.writeDirectory
+        
     def categoryRepr(self):    
         if self.failedPrediction:
             briefDescription, longDescription = self.categoryDescriptions[self.category]
             return longDescription + " (" + self.failedPrediction.briefText + ")"
         else:
             return plugins.TestState.categoryRepr(self)
+
     def __getstate__(self):
         # don't pickle the diagnostics
         state = {}
@@ -156,8 +156,10 @@ class TestComparison(BaseTestComparison):
             self.freeText = str(prediction)
         self.briefText = prediction.briefText
         self.category = prediction.category
+
     def hasSucceeded(self):
         return self.category == "success"
+
     def warnOnSave(self):
         return bool(self.failedPrediction)
     def getComparisonsForRecalculation(self):

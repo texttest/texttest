@@ -283,6 +283,8 @@ class GUIConfig:
         dict["success"] = "green"
         dict["failure"] = "red"
         dict["running"] = "yellow"
+        dict["initial_filter"] = "yellow"
+        dict["final_filter"] = "yellow"
         dict["not_started"] = "white"
         dict["pending"] = "white"
         dict["static"] = "grey90"

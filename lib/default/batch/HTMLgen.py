@@ -2092,7 +2092,7 @@ class TD(AbstractTag):
     tagname = 'TD'
     attrs = ('class','id', 'style', 'nowrap', 'align','valign', 'background',
              'bordercolor', 'bordercolordark', 'bordercolorlight',
-             'rowspan','colspan','height', 'width','bgcolor')
+             'rowspan','colspan','height', 'width','bgcolor', 'title')
     attr_template , attr_dict = _make_attr_inits(attrs)
     trailer = ''
 

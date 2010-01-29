@@ -492,10 +492,14 @@ class WebPageResponder(plugins.Responder):
         self.cmdLineResourcePage = self.findResourcePage(optionMap.get("coll"))
         self.diag = logging.getLogger("GenerateWebPages")
         self.appsToGenerate = self.findAppsToGenerate(allApps)
+        self.descriptionInfo = {}
 
     def findResourcePage(self, collArg):
         if collArg and collArg.startswith("web."):
             return collArg[4:]
+
+    def notifyAdd(self, test, *args, **kw):
+        self.descriptionInfo.setdefault(test.app, {}).setdefault(test.getRelPath().replace(os.sep, " "), test.description)
 
     def findAppsToGenerate(self, apps):
         # Don't blanket remove rejected apps automatically when collecting
@@ -542,7 +546,8 @@ class WebPageResponder(plugins.Responder):
             relevantSubDirs = self.findRelevantSubdirectories(repository, app, extraVersions)
             version = getVersionName(app, self.appsToGenerate)
             pageSubTitle = self.makeCommandLine([ app ])
-            self.makeAndGenerate(relevantSubDirs, app.getCompositeConfigValue, pageDir, pageTitle, pageSubTitle, version, extraVersions)
+            self.makeAndGenerate(relevantSubDirs, app.getCompositeConfigValue, pageDir, pageTitle, pageSubTitle,
+                                 version, extraVersions, self.descriptionInfo.get(app, {}))
 
     def makeCommandLine(self, apps):
         appStr = ",".join((app.name for app in apps))
@@ -582,7 +587,10 @@ class WebPageResponder(plugins.Responder):
             relevantSubDirs.update(self.findRelevantSubdirectories(repository, app, extraVersions, self.getVersionTitle))
         getConfigValue = plugins.ResponseAggregator([ app.getCompositeConfigValue for app in allApps ])
         pageSubTitle = self.makeCommandLine(allApps)
-        return relevantSubDirs, getConfigValue, version, extraVersions, pageSubTitle
+        descriptionInfo = {}
+        for app in allApps:
+            descriptionInfo.update(self.descriptionInfo.get(app))
+        return relevantSubDirs, getConfigValue, version, extraVersions, pageSubTitle, descriptionInfo
 
     def getVersionTitle(self, app, version):
         title = app.fullName()
@@ -591,9 +599,10 @@ class WebPageResponder(plugins.Responder):
         return title
     
     def generateCommonPage(self, pageTitle, pageInfo):
-        relevantSubDirs, getConfigValue, version, extraVersions, pageSubTitle = self.transformToCommon(pageInfo)
+        relevantSubDirs, getConfigValue, version, extraVersions, pageSubTitle, descriptionInfo = self.transformToCommon(pageInfo)
         pageDir = getConfigValue("historical_report_location", self.batchSession)
-        self.makeAndGenerate(relevantSubDirs, getConfigValue, pageDir, pageTitle, pageSubTitle, version, extraVersions)
+        self.makeAndGenerate(relevantSubDirs, getConfigValue, pageDir, pageTitle,
+                             pageSubTitle, version, extraVersions, descriptionInfo)
         
     def makeAndGenerate(self, subDirs, getConfigValue, pageDir, *args):
         resourcePages = self.getResourcePages(getConfigValue)

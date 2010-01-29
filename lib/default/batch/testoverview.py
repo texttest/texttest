@@ -36,7 +36,8 @@ class TitleWithDateStamp:
             
 
 class GenerateWebPages(object):
-    def __init__(self, getConfigValue, pageDir, resourceNames, pageTitle, pageSubTitle, pageVersion, extraVersions):
+    def __init__(self, getConfigValue, pageDir, resourceNames,
+                 pageTitle, pageSubTitle, pageVersion, extraVersions, descriptionInfo):
         self.pageTitle = pageTitle
         self.pageSubTitle = pageSubTitle
         self.pageVersion = pageVersion
@@ -46,6 +47,7 @@ class GenerateWebPages(object):
         self.pagesDetails = seqdict()
         self.getConfigValue = getConfigValue
         self.resourceNames = resourceNames
+        self.descriptionInfo = descriptionInfo
         self.diag = logging.getLogger("GenerateWebPages")
 
     def makeSelectors(self, subPageNames, tags=[]):
@@ -254,7 +256,7 @@ class GenerateWebPages(object):
         page.append(HTMLgen.U(HTMLgen.Heading(1, tableHeader, align = 'center')))
         
     def addTable(self, page, cellInfo, categoryHandlers, version, loggedTests, selector, tableHeader):
-        testTable = TestTable(self.getConfigValue, cellInfo)
+        testTable = TestTable(self.getConfigValue, cellInfo, self.descriptionInfo)
         table = testTable.generate(categoryHandlers, self.pageVersion, version, loggedTests, selector.selectedTags)
         if table:
             if tableHeader:
@@ -292,10 +294,11 @@ class GenerateWebPages(object):
 
 
 class TestTable:
-    def __init__(self, getConfigValue, cellInfo):
+    def __init__(self, getConfigValue, cellInfo, descriptionInfo):
         self.getConfigValue = getConfigValue
         self.cellInfo = cellInfo
         self.colourFinder = ColourFinder(getConfigValue)
+        self.descriptionInfo = descriptionInfo
 
     def generate(self, categoryHandlers, pageVersion, version, loggedTests, tagsFound):
         table = HTMLgen.TableLite(border=0, cellpadding=4, cellspacing=2,width="100%")
@@ -356,7 +359,8 @@ class TestTable:
     def generateTestRow(self, testName, pageVersion, version, extraVersion, results, tagsFound):
         bgColour = self.colourFinder.find("row_header_bg")
         testId = version + testName + extraVersion
-        row = [ HTMLgen.TD(HTMLgen.Container(HTMLgen.Name(testId), testName), bgcolor=bgColour) ]
+        container = HTMLgen.Container(HTMLgen.Name(testId), testName)
+        row = [ HTMLgen.TD(container, bgcolor=bgColour, title=self.descriptionInfo.get(testName, "")) ]
         # Don't add empty rows to the table
         foundData = False
         for tag in tagsFound:

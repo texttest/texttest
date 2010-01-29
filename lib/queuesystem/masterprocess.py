@@ -316,7 +316,8 @@ class QueueSystemServer(BaseActionRunner):
     def getQueueSystemCommand(self, test):
         submissionRules = self.getSubmissionRules(test)
         cmdArgs = self.getSubmitCmdArgs(test, submissionRules)
-        return queueSystemName(test) + " Command   : " + plugins.commandLineString(cmdArgs) + " ...\n"
+        return queueSystemName(test) + " Command   : " + plugins.commandLineString(cmdArgs) + " ...\n" + \
+               "Slave Command : " + self.getSlaveCommand(test, submissionRules) + "\n"
 
     def submitJob(self, test, submissionRules, command, slaveEnv):
         self.diag.info("Submitting job at " + plugins.localtime() + ":" + command)

@@ -912,3 +912,6 @@ toggled.true = use stored test-files
 [Label=Use raw data from the original run and recompute as above, but use the grid for computations]
 toggled.true = choose to reconnect via grid
 
+[Name=Reset Selection Tab]
+clicked = reset selection tab
+

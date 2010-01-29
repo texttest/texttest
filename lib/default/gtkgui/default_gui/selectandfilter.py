@@ -155,7 +155,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         strategy = self.selectionGroup.getSwitchValue("current_selection")
         return self._makeNewSelection(strategy)
 
-    def notifyReset(self):
+    def notifyReset(self, *args):
         self.optionGroup.reset()
         self.selectionGroup.reset()
         self.filteringGroup.reset()
@@ -304,7 +304,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         frame.set_shadow_type(gtk.SHADOW_IN)
         frameBox = gtk.VBox()
         self.fillVBox(frameBox, group)
-        self.addCentralButton(frameBox, button)
+        self.addCentralButton(frameBox, button, padding=8)
         frame.add(frameBox)
         return frame
 
@@ -326,6 +326,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         vbox.pack_start(selFrame, fill=False, expand=False, padding=8)
         filterFrame = self.createFrame("Filtering", self.filteringGroup, self.createFilterButton())
         vbox.pack_start(filterFrame, fill=False, expand=False, padding=8)
+        self.addCentralButton(vbox, self.createResetButton(), padding=16)
 
 
 class HideSelected(guiplugins.ActionGUI,AllTestsHandler):

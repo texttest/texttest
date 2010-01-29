@@ -433,6 +433,7 @@ class ActionGUI(BasicActionGUI):
         self.tooltips.set_tip(button, self.getTooltip())
         button.show()
         return button
+    
 
 # These actions consist of bringing up a dialog and only doing that
 # (i.e. the dialog is not a mechanism to steer how the action should be run)
@@ -688,7 +689,7 @@ class ActionTabGUI(OptionGroupGUI):
     def displayInTab(self):
         return True
     
-    def notifyReset(self):
+    def notifyReset(self, *args):
         self.optionGroup.reset()
 
     def extractSwitches(self, optionGroup):
@@ -723,13 +724,22 @@ class ActionTabGUI(OptionGroupGUI):
             widget = self.createSwitchWidget(switch, optionGroup)
             vbox.pack_start(widget, expand=False, fill=False)
 
+    def createResetButton(self):
+        button = gtk.Button("Reset Tab")
+        button.set_name("Reset " + self.getTabTitle() + " Tab")
+        button.connect("clicked", self.notifyReset)
+        self.tooltips.set_tip(button, "Reset all the settings in the current tab to their default values")
+        button.show()
+        return button
+    
     def createButtons(self, vbox):
-        self.addCentralButton(vbox, self.createButton())
+        self.addCentralButton(vbox, self.createButton(), padding=8)
+        self.addCentralButton(vbox, self.createResetButton(), padding=16)
 
-    def addCentralButton(self, vbox, button):
-        buttonbox = gtk.HBox()
+    def addCentralButton(self, vbox, button, padding):
+        buttonbox = gtk.HButtonBox()
         buttonbox.pack_start(button, expand=True, fill=False)
-        vbox.pack_start(buttonbox, expand=False, fill=False, padding=8)
+        vbox.pack_start(buttonbox, expand=False, fill=False, padding=padding)
 
     def createOptionWidget(self, option):
         box, entry = OptionGroupGUI.createOptionWidget(self, option)

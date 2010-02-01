@@ -1650,15 +1650,20 @@ Static GUI Enhancements:
     - Added "Run" and "Record" to context menu (default_gui-static.xml)
     - Drop-down entries for "Test-files to search" are now sorted in sections (selectandfilter.py)
 	Can configure via "gui_entry_options" also
+    - All tabs now have a "Reset" button that will reset just that tab (guiplugins.py)
 Dynamic GUI Enhancements:
     - Selection tab added
 	Can do all of the selecting from the static GUI in the dynamic GUI also. (selectandfilter.py)
 	Can also choose between the new and old results from the tests. Note accelerator for "select" changed.
+    - New status "Initial filter" and "Final filter" (rundependent.py)
+	Allows status view to distinguish between tests that are running and tests that are being filtered.
     - Status tab categories are now sorted alphabetically (statusviews.py)
     - "Root suite" is no longer always shown in the test tree (testtree.py)
 	If it would otherwise be hidden, it's now hidden.
     - Performances improvements to "saving" operation. (testtree.py)
 	Saving hundreds of tests should be noticeably faster now.
+    - Tab selection no longer reset to "Test" if "Run Info" is being viewed (actionholders.py)
+	Makes it easier to browse run info for several tests.
 Framework Enhancements:
     - Can now set a timeout after which tests will automatically be killed. (default/__init__.py)
 	See "kill_timeout" documentation on the website. Thanks to Michael Behrisch
@@ -1676,18 +1681,27 @@ Framework Enhancements:
     - Can now provide extra arguments to virtual display server (Xvfb on UNIX) (virtualdisplay.py)
 	New config setting "virtual_display_extra_args"
 Batch Report Enhancements:
+    - Test descriptions now appear as tooltips over the test names in the first column (testoverview.py)
     - Fixed formatting problem when several tests had the same "known bug" from Bugzilla/Jira (testoverview.py)
     - Category ordering (coloured tables) now constant in summary page (batch/__init__.py)
     - Known bugs have their own colour in the pages, defaulting to orange (testoverview.py)
     - Added information on how to start TextTest on the relevant tests (testoverview.py)
 Grid Engine (LSF/SGE) enhancements:
+    - TextTest Slave Command now appears in Run Info, as well as SGE submission information (masterprocess.py)
+    - Reconnection can now operate via the grid engine (queuesystem/__init__.py)
+	Via -reconnfull grid, or via the third radio button in the static GUI reconnect dialog.
 Self-test/Internal changes:
 Bug Fixes:
     - When searching with -grep ("test-files containing"), don't blindly include all versions of tests that match (testmodel.py)
     - Worked around a Mercurial symbolic link bug: if the test path has a symbolic link, dereference it first (hg.py)
     - Don't stacktrace on rename/move if VCS control directories are present but the VCS isn't installed (vcs_independent.py)
+    - Values in radio buttons in dialogs now remembered correctly for next dialog usage (guiplugins.py)
+    - Value of "Search-file to use" in Enter Failure Information dialog now remembered correctly (adminactions.py)
     - Don't bail out on absolute paths with arguments for "interpreter" (default/__init__.py)
     - Recomputing a test that has been saved now works properly (comparefile.py)
     - Load File Selection greyed out when there are no tests (selectandfilter.py)
     - Command-line traffic record mechanism now finds .exe files on Windows (traffic.py)
+    - Missing file markers now created correctly for composite versions (comparefile.py)
+    - emacs backup files (ending in ~) now ignored when creating applications (engine.py)
+
 

@@ -7,7 +7,7 @@ import plugins, os, sys, socket, subprocess, signal, logging, time
 from utils import *
 from Queue import Queue, Empty
 from SocketServer import ThreadingTCPServer, StreamRequestHandler
-from threading import Lock
+from threading import RLock
 from ndict import seqdict
 from default.console import TextDisplayResponder, InteractiveResponder
 from default.knownbugs import CheckForBugs
@@ -741,7 +741,7 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
         if not self.testMap.has_key(testApp):
             self.testMap[testApp] = {}
         self.testMap[testApp][testPath] = test
-        self.testLocks[test] = Lock()
+        self.testLocks[test] = RLock()
 
     def changeState(self, test, state):
         # Several threads could be trying to do this at once...

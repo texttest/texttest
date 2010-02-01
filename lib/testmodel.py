@@ -1416,12 +1416,22 @@ class Application:
         versionsToUse = self.versions
         if forSave:
             versionsToUse = self.filterUnsaveable(self.versions)
+            self.diag.info("Versions for saving = " + repr(versionsToUse) + " from " + repr(self.versions))
+            if versionsToUse != self.versions:
+                saveableVersions = self.getSaveableVersions()
+                saveableVersions.sort(lambda v1, v2: self.compareForPriority(set(v1.split("."), set(v2.split(".")))))
+                if len(saveableVersions) == 0:
+                    return ""
+                else:
+                    versionsToUse = saveableVersions
         return ".".join(versionsToUse)
+
     def versionSuffix(self):
         fullVersion = self.getFullVersion()
         if len(fullVersion) == 0:
             return ""
         return "." + fullVersion
+
     def makeTestSuite(self, responders, otherDir=None):
         if otherDir:
             dircache = DirectoryCache(otherDir)
@@ -1430,12 +1440,14 @@ class Application:
         suite = TestSuite(os.path.basename(dircache.dir), "Root test suite", dircache, self)
         suite.setObservers(responders)
         return suite
+
     def createInitialTestSuite(self, responders):
         suite = self.makeTestSuite(responders)
         # allow the configurations to decide whether to accept the application in the presence of
         # the suite's environment
         self.configObject.checkSanity(suite)
         return suite
+
     def createExtraTestSuite(self, filters=[], responders=[], otherDir=None):
         suite = self.makeTestSuite(responders, otherDir)
         suite.readContents(filters)
@@ -1448,6 +1460,7 @@ class Application:
         if includeCheckout and self.checkout:
             description += ", checkout " + self.checkout
         return description
+
     def rejectionMessage(self, message):
         return "Rejected " + self.description() + " - " + str(message) + "\n"
 
@@ -1458,6 +1471,7 @@ class Application:
             if not version in unsaveableVersions and not version.startswith("copy_"):
                 saveableVersions.append(version)
         return saveableVersions
+
     def getExtensionPredicate(self, allVersions):
         if allVersions:
             # everything that has at least the given extensions
@@ -1465,6 +1479,7 @@ class Application:
         else:
             possVersions = [ self.name ] + self.getConfigValue("base_version") + self.versions
             return set(possVersions).issuperset
+
     def compareForDisplay(self, vset1, vset2):
         if vset1.issubset(vset2):
             return -1
@@ -1475,11 +1490,13 @@ class Application:
         extraIndex1 = self.extraVersionIndex(vset1, extraVersions)
         extraIndex2 = self.extraVersionIndex(vset2, extraVersions)
         return cmp(extraIndex1, extraIndex2)
+
     def extraVersionIndex(self, vset, extraVersions):
         for version in vset:
             if version in extraVersions:
                 return extraVersions.index(version)
         return 99
+    
     def compareForPriority(self, vset1, vset2):
         versionSet = set(self.versions)
         self.diag.info("Compare " + repr(vset1) + " to " + repr(vset2))

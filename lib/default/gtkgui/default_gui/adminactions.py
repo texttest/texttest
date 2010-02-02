@@ -558,12 +558,12 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         self.currentStem = ""
         return False
 
-    def fillVBox(self, vbox):
+    def fillVBox(self, vbox, group):
         test = self.currTestSelection[0]
         dirText = self.getDirectoryText(test)
         self.addText(vbox, "<b><u>" + dirText + "</u></b>")
         self.addText(vbox, "<i>(Test is " + repr(test) + ")</i>")
-        return guiplugins.ActionDialogGUI.fillVBox(self, vbox)
+        return guiplugins.ActionDialogGUI.fillVBox(self, vbox, group)
 
     def stemChanged(self, *args):
         option = self.optionGroup.getOption("stem")
@@ -1018,20 +1018,24 @@ class RenameTest(RenameAction):
         self.addOption("desc", "\nNew description")
         self.oldName = ""
         self.oldDescription = ""
+
     def isActiveOnCurrent(self, *args):
         # Don't allow renaming of the root suite
         return guiplugins.ActionGUI.isActiveOnCurrent(self, *args) and bool(self.currTestSelection[0].parent)
+
     def updateOptions(self):
         self.oldName = self.currTestSelection[0].name
         self.oldDescription = self.currTestSelection[0].description
         self.optionGroup.setOptionValue("name", self.oldName)
         self.optionGroup.setOptionValue("desc", self.oldDescription)
         return True
-    def fillVBox(self, vbox):
+
+    def fillVBox(self, vbox, group):
         header = gtk.Label()
         header.set_markup("<b>" + plugins.convertForMarkup(self.oldName) + "</b>")
         vbox.pack_start(header, expand=False, fill=False)
-        return guiplugins.ActionDialogGUI.fillVBox(self, vbox)
+        return guiplugins.ActionDialogGUI.fillVBox(self, vbox, group)
+    
     def getTooltip(self):
         return "Rename selected test"
 
@@ -1218,18 +1222,42 @@ class SortTestSuiteFileDescending(SortTestSuiteFileAscending):
 class ReportBugs(guiplugins.ActionDialogGUI):
     def __init__(self, allApps, *args):
         guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
+        self.bugSystemGroup = plugins.OptionGroup("Link failure to a reported bug")
+        self.textDescGroup = plugins.OptionGroup("Link failure to a textual description")
         self.addOption("search_string", "Text or regexp to match")
-        self.addOption("search_file", "File to search in")
+        self.addOption("search_file", "File to search in", description="TextTest will search in the newly generated file (not the diff) with the stem you provide here. The exception is if you choose 'free_text', when it will search in the whole difference report as it appears in the lower right window in the dynamic GUI.")
         self.addOption("version", "\nVersion to report for")
         self.addOption("execution_hosts", "Trigger only when run on machine(s)")
-        self.addOption("bug_system", "\nExtract info from bug system", "<none>", self.findBugSystems(allApps))
-        self.addOption("bug_id", "Bug ID (only if bug system given)")
-        self.addOption("full_description", "\nFull description (no bug system)")
-        self.addOption("brief_description", "Few-word summary (no bug system)")
         self.addSwitch("trigger_on_absence", "Trigger if given text is NOT present")
-        self.addSwitch("ignore_other_errors", "Trigger even if other files differ")
-        self.addSwitch("trigger_on_success", "Trigger even if file to search would otherwise compare as equal")
-        self.addSwitch("internal_error", "Report as 'internal error' rather than 'known bug' (no bug system)")
+        self.addSwitch("ignore_other_errors", "Trigger even if other files differ", description="By default, this bug is only enabled if only the provided file is different. Check this box to enable it irrespective of what other difference exist. Note this increases the chances of it being reported erroneously and should be used carefully.")
+        self.addSwitch("trigger_on_success", "Trigger even if file to search would otherwise compare as equal", description="By default, this bug is only enabled if a difference is detected in the provided file to search. Check this box to search for it even if the file compares as equal.")
+        self.bugSystemGroup.addOption("bug_system", "\nExtract info from bug system", "<none>", self.findBugSystems(allApps))
+        self.bugSystemGroup.addOption("bug_id", "Bug ID")
+        self.textDescGroup.addOption("full_description", "\nFull description")
+        self.textDescGroup.addOption("brief_description", "Few-word summary")
+        self.textDescGroup.addSwitch("internal_error", "Report as 'internal error' rather than 'known bug'")
+
+    def fillVBox(self, vbox, optionGroup):
+        retValue = guiplugins.ActionDialogGUI.fillVBox(self, vbox, optionGroup)
+        if optionGroup is self.optionGroup:
+            vbox.pack_start(gtk.HSeparator(), padding=8)
+            header = gtk.Label()
+            header.set_markup("<u>Fill in exactly <i>one</i> of the sections below</u>\n")
+            vbox.pack_start(header, expand=False, fill=False, padding=8)
+            for group in [ self.bugSystemGroup, self.textDescGroup ]:
+                frame = self.createFrame(group)
+                vbox.pack_start(frame, fill=False, expand=False, padding=8)
+        return retValue
+
+    def createFrame(self, group):
+        frame = gtk.Frame(group.name)
+        frame.set_label_align(0.5, 0.5)
+        frame.set_shadow_type(gtk.SHADOW_IN)
+        frameBox = gtk.VBox()
+        frameBox.set_border_width(10)
+        self.fillVBox(frameBox, group)
+        frame.add(frameBox)
+        return frame
         
     def findBugSystems(self, allApps):
         bugSystems = []
@@ -1272,34 +1300,39 @@ class ReportBugs(guiplugins.ActionDialogGUI):
     def checkSanity(self):
         if len(self.optionGroup.getOptionValue("search_string")) == 0:
             raise plugins.TextTestError, "Must fill in the field 'text or regexp to match'"
-        if self.optionGroup.getOptionValue("bug_system") == "<none>":
-            if len(self.optionGroup.getOptionValue("full_description")) == 0 or \
-                   len(self.optionGroup.getOptionValue("brief_description")) == 0:
+        if self.bugSystemGroup.getOptionValue("bug_system") == "<none>":
+            if len(self.textDescGroup.getOptionValue("full_description")) == 0 or \
+                   len(self.textDescGroup.getOptionValue("brief_description")) == 0:
                 raise plugins.TextTestError, "Must either provide a bug system or fill in both description and summary fields"
         else:
-            if len(self.optionGroup.getOptionValue("bug_id")) == 0:
+            if len(self.bugSystemGroup.getOptionValue("bug_id")) == 0:
                 raise plugins.TextTestError, "Must provide a bug ID if bug system is given"
+
     def versionSuffix(self):
         version = self.optionGroup.getOptionValue("version")
         if len(version) == 0:
             return ""
         else:
             return "." + version
+
     def getFileName(self):
         name = "knownbugs." + self.currTestSelection[0].app.name + self.versionSuffix()
         return os.path.join(self.currTestSelection[0].getDirectory(), name)
+
     def getResizeDivisors(self):
         # size of the dialog
         return 1.4, 1.7
+    
     def performOnCurrent(self):
         self.checkSanity()
         fileName = self.getFileName()
         writeFile = open(fileName, "a")
         writeFile.write("\n[Reported by " + os.getenv("USER", "Windows") + " at " + plugins.localtime() + "]\n")
-        for name, option in self.optionGroup.options.items():
-            value = option.getValue()
-            if name != "version" and value and value != "<none>":
-                writeFile.write(name + ":" + str(value) + "\n")
+        for group in [ self.optionGroup, self.bugSystemGroup, self.textDescGroup ]:
+            for name, option in group.options.items():
+                value = option.getValue()
+                if name != "version" and value and value != "<none>":
+                    writeFile.write(name + ":" + str(value) + "\n")
         writeFile.close()
         self.currTestSelection[0].filesChanged()
 

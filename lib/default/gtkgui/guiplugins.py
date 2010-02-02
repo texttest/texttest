@@ -797,7 +797,7 @@ class ActionDialogGUI(OptionGroupGUI):
         dialog = self.createDialog()
         alignment = self.createAlignment()
         vbox = gtk.VBox()
-        fileChooser, fileChooserOption = self.fillVBox(vbox)
+        fileChooser, fileChooserOption = self.fillVBox(vbox, self.optionGroup)
         alignment.add(vbox)
         dialog.vbox.pack_start(alignment, expand=True, fill=True)
         self.createButtons(dialog, fileChooser, fileChooserOption)
@@ -881,14 +881,14 @@ class ActionDialogGUI(OptionGroupGUI):
     def simulateResponse(self, fileChooser, dialog):
         dialog.response(gtk.RESPONSE_ACCEPT)
         
-    def fillVBox(self, vbox):
+    def fillVBox(self, vbox, optionGroup):
         fileChooser, fileChooserOption = None, None
-        allOptions = self.optionGroup.options.values()
+        allOptions = optionGroup.options.values()
         for option in allOptions:
             self.addValuesFromConfig(option)
             
             if isinstance(option, plugins.Switch):
-                widget = self.createSwitchWidget(option, self.optionGroup)
+                widget = self.createSwitchWidget(option, optionGroup)
                 vbox.pack_start(widget, expand=False, fill=False)
             elif option.selectFile or option.selectDir or option.saveFile:
                 fileChooserOption = option

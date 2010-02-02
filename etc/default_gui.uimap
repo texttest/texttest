@@ -533,9 +533,8 @@ toggled.false = uncheck trigger if given text is not present
 toggled.true = check trigger even if other files differ
 toggled.false = uncheck trigger even if other files differ
 
-[Label=Trigger even if test would otherwise succeed]
-toggled.true = check trigger even if test would otherwise succeed
-toggled.false = uncheck trigger even if test would otherwise succeed
+[Label=Trigger even if file to search would otherwise compare as equal]
+toggled.true = enable option for checking equal files
 
 [Label=Report as 'internal error' rather than 'known bug' (no bug system)]
 toggled.true = check report as 'internal error' rather than 'known bug' (no bug system)

@@ -1228,7 +1228,7 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         self.addOption("brief_description", "Few-word summary (no bug system)")
         self.addSwitch("trigger_on_absence", "Trigger if given text is NOT present")
         self.addSwitch("ignore_other_errors", "Trigger even if other files differ")
-        self.addSwitch("trigger_on_success", "Trigger even if test would otherwise succeed")
+        self.addSwitch("trigger_on_success", "Trigger even if file to search would otherwise compare as equal")
         self.addSwitch("internal_error", "Report as 'internal error' rather than 'known bug' (no bug system)")
         
     def findBugSystems(self, allApps):

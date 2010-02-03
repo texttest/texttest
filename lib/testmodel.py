@@ -1419,11 +1419,12 @@ class Application:
             self.diag.info("Versions for saving = " + repr(versionsToUse) + " from " + repr(self.versions))
             if versionsToUse != self.versions:
                 saveableVersions = self.getSaveableVersions()
-                saveableVersions.sort(lambda v1, v2: self.compareForPriority(set(v1.split("."), set(v2.split(".")))))
+                saveableVersions.sort(lambda v1, v2: self.compareForPriority(set(v1.split(".")), set(v2.split("."))))
+                self.diag.info("Saveable versions = " + repr(saveableVersions))
                 if len(saveableVersions) == 0:
                     return ""
                 else:
-                    versionsToUse = saveableVersions
+                    return saveableVersions[-1]
         return ".".join(versionsToUse)
 
     def versionSuffix(self):

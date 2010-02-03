@@ -679,93 +679,87 @@ class GenerateSummaryPage(plugins.ScriptWithArgs):
 
     @classmethod
     def finalise(cls):
-        generator = SummaryGenerator()
-        generator.generate(cls.locationApps, cls.summaryFileName, cls.basePath)
+        for location, apps in cls.locationApps.items():
+            dataFinder = SummaryDataFinder(location, apps, cls.summaryFileName, cls.basePath)
+            if dataFinder.hasInfo():
+                generator = SummaryGenerator()
+                generator.generatePage(dataFinder)
 
 
-class SummaryGenerator:
-    def __init__(self):
+class SummaryDataFinder:
+    def __init__(self, location, apps, summaryFileName, basePath):
         self.diag = logging.getLogger("GenerateWebPages")
-        self.diag.info("Generating summary...")
+        self.location = location
+        self.basePath = basePath
+        self.summaryPageName = os.path.join(location, summaryFileName)
+        self.appVersionInfo = {}
+        self.appDirs = seqdict()
+        self.colourFinder, self.inputOptions = None, None
+        if len(apps) > 0:
+            self.colourFinder = testoverview.ColourFinder(apps[0].getCompositeConfigValue)
+            self.inputOptions = apps[0].inputOptions
+        for app in apps:
+            appDir = os.path.join(location, app.name)
+            self.diag.info("Searching under " + repr(appDir))
+            if os.path.isdir(appDir):
+                self.appDirs[app.fullName()] = appDir
 
-    def getTemplateFile(self, location, apps):
-        templateFile = os.path.join(location, "summary_template.html")
+    def hasInfo(self):
+        return len(self.appDirs) > 0
+
+    def getTemplateFile(self):
+        templateFile = os.path.join(self.location, "summary_template.html")
         if not os.path.isfile(templateFile):
             plugins.log.info("No file at '" + templateFile + "', copying default file from installation")
-            includeSite, includePersonal = apps[-1].inputOptions.configPathOptions()
+            includeSite, includePersonal = self.inputOptions.configPathOptions()
             srcFile = plugins.findDataPaths([ "summary_template.html" ], includeSite, includePersonal)[-1]
             shutil.copyfile(srcFile, templateFile)
         return templateFile
 
-    def adjustLineForTitle(self, line):
-        pos = line.find("</title>")
-        return str(testoverview.TitleWithDateStamp(line[:pos])) + "</title>\n"
-            
-    def generate(self, locationApps, summaryFileName, basePath):
-        for location, apps in locationApps.items():
-            pageInfo = self.collectPageInfo(location, apps)
-            if len(pageInfo) == 0:
-                self.diag.info("No info found for " + repr(location))
-                continue
-            
-            templateFile = self.getTemplateFile(location, apps)
-            pageName = os.path.join(location, summaryFileName)
-            file = open(pageName, "w")
-            versionOrder = [ "default" ]
-            appOrder = []
-            for line in open(templateFile):
-                if "<title>" in line:
-                    file.write(self.adjustLineForTitle(line))
-                else:
-                    file.write(line)
-                if "App order=" in line:
-                    appOrder += self.extractOrder(line)
-                if "Version order=" in line:
-                    versionOrder += self.extractOrder(line)
-                if "Insert table here" in line:
-                    self.insertSummaryTable(file, pageInfo, appOrder, versionOrder, basePath)
-            file.close()
-            plugins.log.info("wrote: '" + pageName + "'") 
+    def getAppsWithVersions(self):
+        appsWithVersions = seqdict()
+        for appName, appDir in self.appDirs.items():
+            versionInfo = self.getVersionInfoFor(appName, appDir)
+            self.appVersionInfo[appName] = versionInfo
+            appsWithVersions[appName] = versionInfo.keys()
+        return appsWithVersions
 
-    def collectPageInfo(self, location, apps):
-        pageInfo = {}
-        for app in apps:
-            appDir = os.path.join(location, app.name)
-            self.diag.info("Searching under " + repr(appDir))
-            if os.path.isdir(appDir) and not pageInfo.has_key(app.fullName()):
-                pageInfo[app.fullName()] = self.getAppPageInfo(app, appDir)
-        return pageInfo
-
-    def getAppPageInfo(self, app, appDir):
+    def getVersionInfoFor(self, app, appDir):
         versionDates = {}
         for path in glob(os.path.join(appDir, "test_*.html")):
             fileName = os.path.basename(path)
             version, date = self.parseFileName(fileName)
             if version:
-                self.diag.info("Found file with version " + version)
-                if versionDates.has_key(version):
-                    oldDate = versionDates[version][0]
-                    if date > oldDate:
-                        versionDates[version] = date, path
-                else:
-                    versionDates[version] = date, path
-        versionLinks = {}
-        for version, (date, path) in versionDates.items():
-            fileToLink = os.path.join(app.name, "test_" + version + ".html")
-            if os.path.isfile(os.path.join(appDir, os.path.basename(fileToLink))):
-                summary = self.extractSummary(path, app)
-                self.diag.info("For version " + version + ", found summary info " + repr(summary))
-                versionLinks[version] = fileToLink, summary
-        return versionLinks
+                overviewPage = os.path.join(appDir, self.getOverviewPageName(version))
+                if os.path.isfile(overviewPage):
+                    self.diag.info("Found file with version " + version)
+                    versionDates.setdefault(version, {})
+                    versionDates[version][date] = path
+        return versionDates
 
-    def extractSummary(self, datedFile, app):
+    def getOverviewPageName(self, version):
+        return "test_" + version + ".html"
+
+    def getOverviewPage(self, appName, version):
+        appDir = self.appDirs[appName]
+        return os.path.join(self.basePath, os.path.basename(appDir), self.getOverviewPageName(version))
+
+    def getLatestSummary(self, appName, version):
+        versionData = self.appVersionInfo[appName][version]
+        lastDate = sorted(versionData.keys())[-1]
+        path = versionData[lastDate]
+        summary = self.extractSummary(path)
+        self.diag.info("For version " + version + ", found summary info " + repr(summary))
+        return summary
+
+    def extractSummary(self, datedFile):
         for line in open(datedFile):
             if line.strip().startswith("<H2>"):
                 text = line.strip()[4:-5] # drop the tags
-                return self.parseSummaryText(text, app)
+                return self.parseSummaryText(text)
         return {}
 
-    def parseSummaryText(self, text, app):
+    def parseSummaryText(self, text):
         words = text.split()[3:] # Drop "Version: 12 tests"
         index = 0
         categories = []
@@ -778,12 +772,11 @@ class SummaryGenerator:
             index += 1
         self.diag.info("Category information is " + repr(categories))
         colourCount = seqdict()
-        colourFinder = testoverview.ColourFinder(app.getCompositeConfigValue)
         for colourKey in [ "success_bg", "knownbug_bg", "performance_bg", "failure_bg" ]:
-            colourCount[colourFinder.find(colourKey)] = 0
+            colourCount[self.colourFinder.find(colourKey)] = 0
         for categoryName, count in categories:
             colourKey = self.getColourKey(categoryName)
-            colourCount[colourFinder.find(colourKey)] += count
+            colourCount[self.colourFinder.find(colourKey)] += count
         return colourCount
 
     def getColourKey(self, categoryName):
@@ -807,9 +800,37 @@ class SummaryGenerator:
             except ValueError:
                 pass
         return None, None
+
+
+class SummaryGenerator:
+    def __init__(self):
+        self.diag = logging.getLogger("GenerateWebPages")
+        self.diag.info("Generating summary...")
+
+    def adjustLineForTitle(self, line):
+        pos = line.find("</title>")
+        return str(testoverview.TitleWithDateStamp(line[:pos])) + "</title>\n"
+            
+    def generatePage(self, dataFinder):
+        file = open(dataFinder.summaryPageName, "w")
+        versionOrder = [ "default" ]
+        appOrder = []
+        for line in open(dataFinder.getTemplateFile()):
+            if "<title>" in line:
+                file.write(self.adjustLineForTitle(line))
+            else:
+                file.write(line)
+            if "App order=" in line:
+                appOrder += self.extractOrder(line)
+            if "Version order=" in line:
+                versionOrder += self.extractOrder(line)
+            if "Insert table here" in line:
+                self.insertSummaryTable(file, dataFinder, appOrder, versionOrder)
+        file.close()
+        plugins.log.info("wrote: '" + dataFinder.summaryPageName + "'") 
         
     def getOrderedVersions(self, predefined, info):
-        fullList = sorted(info.keys())
+        fullList = sorted(info)
         versions = []
         for version in predefined:
             if version in fullList:
@@ -844,10 +865,11 @@ class SummaryGenerator:
         return versionIndices
 
     def getVersionsWithColumns(self, pageInfo):
-        allVersions = reduce(operator.add, (info.keys() for info in pageInfo.values()), [])
+        allVersions = reduce(operator.add, pageInfo.values(), [])
         return set(filter(lambda v: allVersions.count(v) > 1, allVersions))  
 
-    def insertSummaryTable(self, file, pageInfo, appOrder, versionOrder, basePath):
+    def insertSummaryTable(self, file, dataFinder, appOrder, versionOrder):
+        pageInfo = dataFinder.getAppsWithVersions()
         versionWithColumns = self.getVersionsWithColumns(pageInfo)
         self.diag.info("Following versions will be placed in columns " + repr(versionWithColumns))
         minColumnIndices = self.getMinColumnIndices(pageInfo, versionOrder)
@@ -856,8 +878,8 @@ class SummaryGenerator:
         for appName in self.getOrderedVersions(appOrder, pageInfo):
             file.write("<tr>\n")
             file.write("  <td><h3>" + appName + "</h3></td>\n")
-            appPageInfo = pageInfo[appName]
-            orderedVersions = self.getOrderedVersions(versionOrder, appPageInfo)
+            versions = pageInfo[appName]
+            orderedVersions = self.getOrderedVersions(versionOrder, versions)
             self.diag.info("For " + appName + " found " + repr(orderedVersions))
             for columnIndex, version in enumerate(self.padWithEmpty(orderedVersions, columnVersions, minColumnIndices)):
                 file.write('  <td>')
@@ -866,8 +888,9 @@ class SummaryGenerator:
                     if version in versionWithColumns:
                         columnVersions[columnIndex] = version
 
-                    fileToLink, resultSummary = appPageInfo[version]
-                    file.write('    <td><h3><a href="' + os.path.join(basePath, fileToLink) + '">' + version + '</a></h3></td>\n')
+                    resultSummary = dataFinder.getLatestSummary(appName, version)
+                    fileToLink = dataFinder.getOverviewPage(appName, version)
+                    file.write('    <td><h3><a href="' + fileToLink + '">' + version + '</a></h3></td>\n')
                     for colour, count in resultSummary.items():
                         if count:
                             file.write('    <td bgcolor="' + colour + '"><h3>' + str(count) + "</h3></td>\n")

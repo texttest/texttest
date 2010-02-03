@@ -85,22 +85,12 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
                 stems.update(test.dircache.findAllStems(predicate))
         defStems.intersection_update(stems)
         stems.difference_update(defStems)
-        expandStems = set()
         self.selectDiag.info("Found important stems " + repr(importantStems))
-        for stem1 in importantStems:
-            for stem2 in stems:
-                if fnmatch(stem2, stem1):
-                    expandStems.add(stem2)
-                    expandStems.add(stem1)
-
-        self.selectDiag.info("Found expanded stems " + repr(expandStems))
-        importantStems.intersection_update(stems)
-        importantStems.update(expandStems)
         stems.difference_update(importantStems)
+        subLists = [ importantStems, defStems, stems ]
         if self.dynamic:
-            return self.makeStemList([ [ "free_text" ], importantStems, defStems, stems ])
-        else:
-            return self.makeStemList([ defStems, importantStems, stems ])
+            subLists.insert(0, [ "free_text" ])
+        return self.makeStemList(subLists)
 
     def makeStemList(self, subLists):
         separator = "-" * 10

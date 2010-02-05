@@ -396,6 +396,8 @@ class TestEnvironmentCreator:
 
     def getPathVars(self):
         pathVars = [ "PATH" ]
+        if len(self.test.getConfigValue("collect_traffic_py_module")):
+            pathVars.append("PYTHONPATH")
         for dataFile in self.test.app.getDataFileNames():
             if dataFile.endswith(".py") and "PYTHONPATH" not in pathVars:
                 pathVars.append("PYTHONPATH")

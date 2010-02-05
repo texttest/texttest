@@ -12,6 +12,7 @@ class SetUpTrafficHandlers(plugins.Action):
         self.record = record
         self.trafficServer = None
         self.trafficFiles = self.findTrafficFiles()
+        self.trafficPyModuleFile = os.path.join(plugins.installationDir("libexec"), "traffic_pymodule.py")
         
     def findTrafficFiles(self):
         libExecDir = plugins.installationDir("libexec") 
@@ -41,22 +42,25 @@ class SetUpTrafficHandlers(plugins.Action):
             
     def makeIntercepts(self, test):
         for cmd in self.getCommandsForInterception(test):
-            interceptName = test.makeTmpFileName(cmd, forComparison=0)
-            self.intercept(test, interceptName)
+            self.intercept(test, cmd, self.trafficFiles)
+
+        for moduleName in test.getConfigValue("collect_traffic_py_module"):
+            self.intercept(test, moduleName + ".py", [ self.trafficPyModuleFile ])
 
     def getCommandsForInterception(self, test):
         # This gets all names in collect_traffic, not just those marked
         # "asynchronous"! (it will also pick up "default").
         return test.getCompositeConfigValue("collect_traffic", "asynchronous")
 
-    def intercept(self, test, interceptName):
+    def intercept(self, test, cmd, trafficFiles):
+        interceptName = test.makeTmpFileName(cmd, forComparison=0)
         if os.path.exists(interceptName):
             # We might have written a fake version - store what it points to so we can
             # call it later, and remove the link
             localName = os.path.basename(interceptName)
             self.trafficServer.setRealVersion(localName, test.getPathName(localName))
             os.remove(interceptName)
-        for trafficFile in self.trafficFiles:
+        for trafficFile in trafficFiles:
             if os.name == "posix":
                 os.symlink(trafficFile, interceptName)
             else:
@@ -243,6 +247,30 @@ class ServerStateTraffic(ServerTraffic):
             ServerTraffic.direction = "<-"
     def forwardToDestination(self):
         return []
+
+class PythonModuleTraffic(Traffic):
+    typeId = "PYT"
+    direction = "<-"
+    def __init__(self, inText, responseFile):
+        self.modName, self.funcName, argStr, keywStr = inText.split(":SUT_SEP:")
+        self.args = list(eval(argStr))
+        self.keyw = eval(keywStr)
+        text = self.modName + "." + self.funcName + "(" + self.findArgString() + ")"
+        super(PythonModuleTraffic, self).__init__(text, responseFile)
+
+    def findArgString(self):
+        argStrs = self.args + [ key + "=" + value for key, value in self.keyw.items() ]
+        return ", ".join(argStrs)
+
+    def forwardToDestination(self):
+        importCmd = "from " + self.modName + " import " + self.funcName + " as _func"
+        exec importCmd
+        result = _func(*self.args, **self.keyw)
+        return [ PythonResponseTraffic(repr(result), self.responseFile) ]
+
+class PythonResponseTraffic(ResponseTraffic):
+    typeId = "RET"
+
 
 # Only works on UNIX
 class CommandLineKillTraffic(Traffic):
@@ -442,9 +470,10 @@ class CommandLineTraffic(Traffic):
     
                                
 class TrafficRequestHandler(StreamRequestHandler):
-    parseDict = { "SUT_SERVER" : ServerStateTraffic,
+    parseDict = { "SUT_SERVER"       : ServerStateTraffic,
                   "SUT_COMMAND_LINE" : CommandLineTraffic,
-                  "SUT_COMMAND_KILL" : CommandLineKillTraffic }
+                  "SUT_COMMAND_KILL" : CommandLineKillTraffic,
+                  "SUT_PYTHON_CALL"  : PythonModuleTraffic }
     def __init__(self, requestNumber, *args):
         self.requestNumber = requestNumber
         StreamRequestHandler.__init__(self, *args)
@@ -916,7 +945,8 @@ class ReplayedResponseHandler:
         responses = []
         for trafficStr in trafficStrings:
             trafficType = trafficStr[2:5]
-            allClasses = [ FileEditTraffic, ClientSocketTraffic, ServerTraffic, StdoutTraffic, StderrTraffic, SysExitTraffic ]
+            allClasses = [ FileEditTraffic, ClientSocketTraffic, ServerTraffic,
+                           StdoutTraffic, StderrTraffic, SysExitTraffic, PythonResponseTraffic ]
             for trafficClass in allClasses:
                 if trafficClass.typeId == trafficType:
                     responses.append((trafficClass, trafficStr[6:]))

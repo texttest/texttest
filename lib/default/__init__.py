@@ -994,6 +994,7 @@ class Config:
         app.setConfigDefault("collate_script", self.getDefaultCollateScripts(), "Mapping of result file names to scripts which turn them into suitable text")
         app.setConfigDefault("collect_traffic", { "default": [], "asynchronous": [] }, "List of command-line programs to intercept")
         app.setConfigDefault("collect_traffic_environment", { "default" : [] }, "Mapping of collected programs to environment variables they care about")
+        app.setConfigDefault("collect_traffic_py_module", [], "List of Python modules to intercept")
         app.setConfigDefault("run_dependent_text", { "default" : [] }, "Mapping of patterns to remove from result files")
         app.setConfigDefault("unordered_text", { "default" : [] }, "Mapping of patterns to extract and sort from result files")
         app.setConfigDefault("create_catalogues", "false", "Do we create a listing of files created/removed by tests")

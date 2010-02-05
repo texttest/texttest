@@ -282,7 +282,7 @@ class PythonModuleTraffic(Traffic):
             return self.handleResult(func(*self.args, **self.keyw))
         except:
             exc_type, exc_value, exc_traceback = sys.exc_info()
-            return "Exception " + exc_type.__name__ + "(" + repr(str(exc_value)) + ")"
+            return "Exception " + str(exc_type) + "(" + repr(str(exc_value)) + ")"
 
     def forwardToDestination(self):
         result = self.getResult()

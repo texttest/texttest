@@ -17,7 +17,10 @@ class ModuleProxy:
         if response.startswith("Instance '"):
             return self.__class__(response.split()[-1][1:-1])
         elif response.startswith("Exception "):
-            raise eval(response.replace("Exception ", ""))
+            excStr = response.replace("Exception ", "")
+            moduleName = excStr.split(".")[0]
+            exec "import " + moduleName
+            raise eval(excStr)
         else:
             return eval(response)
 

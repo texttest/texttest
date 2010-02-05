@@ -64,6 +64,7 @@ class GenerateWebPages(object):
     def generate(self, repositoryDirs, subPageNames):
         foundMinorVersions = {}
         allMonthSelectors = set()
+        latestMonth = None
         for version, repositoryDirInfo in repositoryDirs.items():
             self.diag.info("Generating " + version)
             allFiles, tags = self.findTestStateFilesAndTags(repositoryDirInfo)
@@ -76,7 +77,10 @@ class GenerateWebPages(object):
                 if len(self.getExistingMonthPages()) == 0:
                     selectors = allSelectors
                 else:
-                    selectors.append(monthSelectors[-1])
+                    currLatestMonthSel = monthSelectors[-1]
+                    if latestMonth is None or currLatestMonthSel.linkName == latestMonth:
+                        selectors.append(monthSelectors[-1])
+                        latestMonth = currLatestMonthSel.linkName
                     tags = list(reduce(set.union, (set(selector.selectedTags) for selector in selectors), set()))
                     tags.sort(self.compareTags)
 

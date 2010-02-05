@@ -16,6 +16,8 @@ class ModuleProxy:
         response = sock.makefile().read()
         if response.startswith("Instance '"):
             return self.__class__(response.split()[-1][1:-1])
+        elif response.startswith("Exception "):
+            raise eval(response.replace("Exception ", ""))
         else:
             return eval(response)
 

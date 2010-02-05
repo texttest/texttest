@@ -260,7 +260,7 @@ class PythonModuleTraffic(Traffic):
         super(PythonModuleTraffic, self).__init__(text, responseFile)
 
     def findArgString(self):
-        argStrs = map(repr, self.args) + [ key + "=" + value for key, value in self.keyw.items() ]
+        argStrs = map(repr, self.args) + [ key + "=" + repr(value) for key, value in self.keyw.items() ]
         return ", ".join(argStrs)
 
     def getFunction(self):
@@ -269,13 +269,24 @@ class PythonModuleTraffic(Traffic):
             return getattr(instance, self.funcName)
         else:
             importCmd = "from " + self.modOrObjName + " import " + self.funcName + " as _func"
-            exec importCmd
-            return _func
+            try:
+                exec importCmd
+                return _func
+            except ImportError:
+                # This is hopefully what the application would see in this case
+                raise AttributeError, "'module' object has no attribute '" + self.funcName + "'"
+
+    def getResult(self):
+        try:
+            func = self.getFunction()
+            return self.handleResult(func(*self.args, **self.keyw))
+        except:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            return "Exception " + exc_type.__name__ + "(" + repr(str(exc_value)) + ")"
 
     def forwardToDestination(self):
-        func = self.getFunction()
-        result = func(*self.args, **self.keyw)
-        return [ PythonResponseTraffic(self.handleResult(result), self.responseFile) ]
+        result = self.getResult()
+        return [ PythonResponseTraffic(result, self.responseFile) ]
 
     def getNewInstanceName(self, className):
         num = 1

@@ -14,7 +14,10 @@ class ModuleProxy:
         sock = self.createAndSend(name, *args, **kw)
         sock.shutdown(1)
         response = sock.makefile().read()
-        return eval(response)
+        if response.startswith("Instance '"):
+            return self.__class__(response.split()[-1][1:-1])
+        else:
+            return eval(response)
 
     def createAndSend(self, name, *args, **kw):
         sock = self.createSocket()

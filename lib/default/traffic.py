@@ -3,7 +3,7 @@ import os, stat, sys, plugins, shutil, socket, subprocess, rundependent, logging
 from ndict import seqdict
 from SocketServer import TCPServer, StreamRequestHandler
 from threading import Thread, Lock
-from types import StringType
+from types import StringType, InstanceType
 from jobprocess import JobProcess
 from copy import copy
 
@@ -251,22 +251,46 @@ class ServerStateTraffic(ServerTraffic):
 class PythonModuleTraffic(Traffic):
     typeId = "PYT"
     direction = "<-"
+    allInstances = {}
     def __init__(self, inText, responseFile):
-        self.modName, self.funcName, argStr, keywStr = inText.split(":SUT_SEP:")
+        self.modOrObjName, self.funcName, argStr, keywStr = inText.split(":SUT_SEP:")
         self.args = list(eval(argStr))
         self.keyw = eval(keywStr)
-        text = self.modName + "." + self.funcName + "(" + self.findArgString() + ")"
+        text = self.modOrObjName + "." + self.funcName + "(" + self.findArgString() + ")"
         super(PythonModuleTraffic, self).__init__(text, responseFile)
 
     def findArgString(self):
-        argStrs = self.args + [ key + "=" + value for key, value in self.keyw.items() ]
+        argStrs = map(repr, self.args) + [ key + "=" + value for key, value in self.keyw.items() ]
         return ", ".join(argStrs)
 
+    def getFunction(self):
+        instance = self.allInstances.get(self.modOrObjName)
+        if instance is not None:
+            return getattr(instance, self.funcName)
+        else:
+            importCmd = "from " + self.modOrObjName + " import " + self.funcName + " as _func"
+            exec importCmd
+            return _func
+
     def forwardToDestination(self):
-        importCmd = "from " + self.modName + " import " + self.funcName + " as _func"
-        exec importCmd
-        result = _func(*self.args, **self.keyw)
-        return [ PythonResponseTraffic(repr(result), self.responseFile) ]
+        func = self.getFunction()
+        result = func(*self.args, **self.keyw)
+        return [ PythonResponseTraffic(self.handleResult(result), self.responseFile) ]
+
+    def getNewInstanceName(self, className):
+        num = 1
+        while self.allInstances.has_key(className + str(num)):
+            num += 1
+        return className + str(num)
+
+    def handleResult(self, result):
+        if type(result) == InstanceType:
+            className = result.__class__.__name__.lower()
+            instanceName = self.getNewInstanceName(className)
+            self.allInstances[instanceName] = result
+            return "Instance " + repr(instanceName)
+        else:
+            return repr(result)
 
 class PythonResponseTraffic(ResponseTraffic):
     typeId = "RET"

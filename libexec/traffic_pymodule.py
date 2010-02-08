@@ -1,7 +1,8 @@
 
 import sys
 
-class ModuleProxy:
+class ModuleOrObjectProxy:
+    exceptionClass = None
     def __init__(self, moduleName):
         self.moduleName = moduleName
         
@@ -14,13 +15,18 @@ class ModuleProxy:
         sock = self.createAndSend(name, *args, **kw)
         sock.shutdown(1)
         response = sock.makefile().read()
-        if response.startswith("Instance '"):
-            return self.__class__(response.split()[-1][1:-1])
-        elif response.startswith("Exception "):
-            excStr = response.replace("Exception ", "")
-            moduleName = excStr.split(".")[0]
-            exec "import " + moduleName
-            raise eval(excStr)
+        return self.handleResponse(response, self.__class__)
+
+    def handleResponse(self, response, cls):
+        if response.startswith("Exception: "):
+            rest = response.replace("Exception: ", "")
+            raise self.handleResponse(rest, self.exceptionClass)
+        elif " Instance '" in response:
+            words = response.split()
+            className = words[0]
+            setattr(self, className, cls)
+            instanceName = words[-1][1:-1]
+            return cls(instanceName)
         else:
             return eval(response)
 
@@ -40,4 +46,10 @@ class ModuleProxy:
             sock.connect(serverAddress)
             return sock
 
-sys.modules[__name__] = ModuleProxy(__name__)
+class ExceptionProxy(ModuleOrObjectProxy, Exception):
+    def __str__(self):
+        return self.functionCall("__str__")
+
+ModuleOrObjectProxy.exceptionClass = ExceptionProxy
+
+sys.modules[__name__] = ModuleOrObjectProxy(__name__)

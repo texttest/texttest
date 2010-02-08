@@ -270,13 +270,9 @@ class PythonModuleTraffic(Traffic):
         if instance is not None:
             return getattr(instance, self.funcName)
         else:
-            importCmd = "from " + self.modOrObjName + " import " + self.funcName + " as _func"
-            try:
-                exec importCmd
-                return _func
-            except ImportError:
-                # This is hopefully what the application would see in this case
-                raise AttributeError, "'module' object has no attribute '" + self.funcName + "'"
+            importCmd = "import " + self.modOrObjName
+            exec importCmd
+            return eval(self.modOrObjName + "." + self.funcName)
 
     def getResult(self):
         try:
@@ -284,7 +280,11 @@ class PythonModuleTraffic(Traffic):
             return self.handleResult(func(*self.args, **self.keyw))
         except:
             exc_type, exc_value, exc_traceback = sys.exc_info()
-            return "Exception " + str(exc_type) + "(" + repr(str(exc_value)) + ")"
+            if exc_value.__module__ == self.modOrObjName:
+                # We own the exception object also, handle it like an ordinary instance
+                return self.storeObject(exc_value, "Exception: ")
+            else:
+                return "Exception: " + exc_value.__class__.__name__ + "(" + repr(str(exc_value)) + ")"
 
     def forwardToDestination(self):
         result = self.getResult()
@@ -296,12 +296,15 @@ class PythonModuleTraffic(Traffic):
             num += 1
         return className + str(num)
 
+    def storeObject(self, result, prefix=""):
+        className = result.__class__.__name__
+        instanceName = self.getNewInstanceName(className.lower())
+        self.allInstances[instanceName] = result
+        return prefix + className + " Instance " + repr(instanceName)
+
     def handleResult(self, result):
         if type(result) == InstanceType:
-            className = result.__class__.__name__.lower()
-            instanceName = self.getNewInstanceName(className)
-            self.allInstances[instanceName] = result
-            return "Instance " + repr(instanceName)
+            return self.storeObject(result)
         else:
             return repr(result)
 

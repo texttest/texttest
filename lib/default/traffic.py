@@ -274,13 +274,19 @@ class PythonModuleTraffic(Traffic):
             exec importCmd
             return eval(self.modOrObjName + "." + self.funcName)
 
+    def belongsToModule(self, exc_value):
+        try:
+            return exc_value.__module__ == self.modOrObjName
+        except AttributeError: # Global exceptions like AttributeError itself on Windows cause this
+            return False
+        
     def getResult(self):
         try:
             func = self.getFunction()
             return self.handleResult(func(*self.args, **self.keyw))
         except:
             exc_type, exc_value, exc_traceback = sys.exc_info()
-            if exc_value.__module__ == self.modOrObjName:
+            if self.belongsToModule(exc_value):
                 # We own the exception object also, handle it like an ordinary instance
                 return self.storeObject(exc_value, "Exception: ")
             else:

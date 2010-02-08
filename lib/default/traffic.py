@@ -1,9 +1,8 @@
 
-import os, stat, sys, plugins, shutil, socket, subprocess, rundependent, logging
+import os, stat, sys, plugins, shutil, socket, subprocess, rundependent, logging, types
 from ndict import seqdict
 from SocketServer import TCPServer, StreamRequestHandler
 from threading import Thread, Lock
-from types import StringType, InstanceType
 from jobprocess import JobProcess
 from copy import copy
 
@@ -250,10 +249,31 @@ class ServerStateTraffic(ServerTraffic):
     def forwardToDestination(self):
         return []
 
+class PythonInstanceWrapper:
+    allInstances = {}
+    def __init__(self, instance):
+        self.instance = instance
+
+    @classmethod
+    def getInstance(cls, instanceName):
+        return cls.allInstances.get(instanceName)
+
+    def __repr__(self):
+        className = self.instance.__class__.__name__
+        instanceName = self.getNewInstanceName(className.lower())
+        self.allInstances[instanceName] = self.instance
+        return "Instance(" + repr(className) + ", " + repr(instanceName) + ")"
+
+    def getNewInstanceName(self, className):
+        num = 1
+        while self.allInstances.has_key(className + str(num)):
+            num += 1
+        return className + str(num)
+
+
 class PythonModuleTraffic(Traffic):
     typeId = "PYT"
     direction = "<-"
-    allInstances = {}
     def __init__(self, inText, responseFile):
         self.modOrObjName, self.funcName, argStr, keywStr = inText.split(":SUT_SEP:")
         self.args = list(eval(argStr))
@@ -266,7 +286,7 @@ class PythonModuleTraffic(Traffic):
         return ", ".join(argStrs)
 
     def getFunction(self):
-        instance = self.allInstances.get(self.modOrObjName)
+        instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
         if instance is not None:
             return getattr(instance, self.funcName)
         else:
@@ -283,12 +303,13 @@ class PythonModuleTraffic(Traffic):
     def getResult(self):
         try:
             func = self.getFunction()
-            return self.handleResult(func(*self.args, **self.keyw))
+            result = func(*self.args, **self.keyw)
+            return repr(self.addInstanceWrappers(result))
         except:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             if self.belongsToModule(exc_value):
                 # We own the exception object also, handle it like an ordinary instance
-                return "raise " + self.storeObject(exc_value)
+                return "raise " + repr(PythonInstanceWrapper(exc_value))
             else:
                 return "raise " + exc_value.__class__.__name__ + "(" + repr(str(exc_value)) + ")"
 
@@ -296,23 +317,18 @@ class PythonModuleTraffic(Traffic):
         result = self.getResult()
         return [ PythonResponseTraffic(result, self.responseFile) ]
 
-    def getNewInstanceName(self, className):
-        num = 1
-        while self.allInstances.has_key(className + str(num)):
-            num += 1
-        return className + str(num)
-
-    def storeObject(self, result):
-        className = result.__class__.__name__
-        instanceName = self.getNewInstanceName(className.lower())
-        self.allInstances[instanceName] = result
-        return "Instance(" + repr(className) + ", " + repr(instanceName) + ")"
-
-    def handleResult(self, result):
-        if type(result) == InstanceType:
-            return self.storeObject(result)
+    def addInstanceWrappers(self, result):
+        if type(result) == types.InstanceType:
+            return PythonInstanceWrapper(result)
+        elif type(result) == types.ListType:
+            return map(self.addInstanceWrappers, result)
+        elif type(result) == types.DictType:
+            newResult = {}
+            for key, value in result.items():
+                newResult[key] = self.addInstanceWrappers(value)
+            return newResult
         else:
-            return repr(result)
+            return result
 
 class PythonResponseTraffic(ResponseTraffic):
     typeId = "RET"

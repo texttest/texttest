@@ -42,17 +42,17 @@ class SetUpTrafficHandlers(plugins.Action):
             
     def makeIntercepts(self, test):
         for cmd in self.getCommandsForInterception(test):
-            self.intercept(test, cmd, self.trafficFiles)
+            self.intercept(test, cmd, self.trafficFiles, copyExtension=True)
 
         for moduleName in test.getConfigValue("collect_traffic_py_module"):
-            self.intercept(test, moduleName + ".py", [ self.trafficPyModuleFile ])
+            self.intercept(test, moduleName + ".py", [ self.trafficPyModuleFile ], copyExtension=False)
 
     def getCommandsForInterception(self, test):
         # This gets all names in collect_traffic, not just those marked
         # "asynchronous"! (it will also pick up "default").
         return test.getCompositeConfigValue("collect_traffic", "asynchronous")
 
-    def intercept(self, test, cmd, trafficFiles):
+    def intercept(self, test, cmd, trafficFiles, copyExtension):
         interceptName = test.makeTmpFileName(cmd, forComparison=0)
         if os.path.exists(interceptName):
             # We might have written a fake version - store what it points to so we can
@@ -63,10 +63,12 @@ class SetUpTrafficHandlers(plugins.Action):
         for trafficFile in trafficFiles:
             if os.name == "posix":
                 os.symlink(trafficFile, interceptName)
-            else:
+            elif copyExtension:
                 # Rename the files as appropriate and hope for the best :)
                 extension = os.path.splitext(trafficFile)[-1]
                 shutil.copy(trafficFile, interceptName + extension)
+            else:
+                shutil.copy(trafficFile, interceptName)
 
 class Traffic(object):
     def __init__(self, text, responseFile):

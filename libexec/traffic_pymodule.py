@@ -27,17 +27,14 @@ class AttributeProxy:
         return self.handleResponse(response, self.ModuleOrObjectProxy)
 
     def handleResponse(self, response, cls):
-        if response.startswith("Exception: "):
-            rest = response.replace("Exception: ", "")
+        if response.startswith("raise "):
+            rest = response.replace("raise ", "")
             raise self.handleResponse(rest, self.ExceptionProxy)
-        elif " Instance '" in response:
-            words = response.split()
-            className = words[0]
-            setattr(self.modOrObjProxy, className, cls)
-            instanceName = words[-1][1:-1]
-            return cls(instanceName)
         else:
-            return eval(response)
+            def Instance(className, instanceName):
+                setattr(self.modOrObjProxy, className, cls)
+                return cls(instanceName)
+            return eval(response)        
 
     def createAndSend(self, *args, **kw):
         sock = self.createSocket()

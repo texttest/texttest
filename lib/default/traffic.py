@@ -288,9 +288,9 @@ class PythonModuleTraffic(Traffic):
             exc_type, exc_value, exc_traceback = sys.exc_info()
             if self.belongsToModule(exc_value):
                 # We own the exception object also, handle it like an ordinary instance
-                return self.storeObject(exc_value, "Exception: ")
+                return "raise " + self.storeObject(exc_value)
             else:
-                return "Exception: " + exc_value.__class__.__name__ + "(" + repr(str(exc_value)) + ")"
+                return "raise " + exc_value.__class__.__name__ + "(" + repr(str(exc_value)) + ")"
 
     def forwardToDestination(self):
         result = self.getResult()
@@ -302,11 +302,11 @@ class PythonModuleTraffic(Traffic):
             num += 1
         return className + str(num)
 
-    def storeObject(self, result, prefix=""):
+    def storeObject(self, result):
         className = result.__class__.__name__
         instanceName = self.getNewInstanceName(className.lower())
         self.allInstances[instanceName] = result
-        return prefix + className + " Instance " + repr(instanceName)
+        return "Instance(" + repr(className) + ", " + repr(instanceName) + ")"
 
     def handleResult(self, result):
         if type(result) == InstanceType:

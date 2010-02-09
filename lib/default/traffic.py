@@ -89,6 +89,9 @@ class Traffic(object):
     def makesAsynchronousEdits(self):
         return False
     
+    def enquiryOnly(self):
+        return False
+    
     def write(self, message):
         if self.responseFile:
             try:
@@ -278,6 +281,38 @@ class PythonInstanceWrapper:
 class PythonModuleTraffic(Traffic):
     typeId = "PYT"
     direction = "<-"
+    def getAttribute(self, instance, attrName):
+        if instance is not None:
+            return getattr(instance, attrName)
+        else:
+            importCmd = "import " + self.modOrObjName
+            exec importCmd
+            return eval(self.modOrObjName + "." + attrName)
+
+
+class PythonAttributeTraffic(PythonModuleTraffic):
+    def __init__(self, inText, responseFile):
+        self.modOrObjName, self.attrName = inText.split(":SUT_SEP:")
+        text = self.modOrObjName + "." + self.attrName
+        super(PythonModuleTraffic, self).__init__(text, responseFile)
+
+    def enquiryOnly(self):
+        return True
+
+    def forwardToDestination(self):
+        instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
+        try:
+            attr = self.getAttribute(instance, self.attrName)
+        except:
+            return []
+        if type(attr) in [ types.BooleanType, types.FloatType, types.IntType,
+                           types.LongType, types.NoneType, types.StringType, types.UnicodeType ]:
+            return [ PythonResponseTraffic(repr(attr), self.responseFile) ]
+        else:
+            return []
+
+
+class PythonFunctionCallTraffic(PythonModuleTraffic):
     def __init__(self, inText, responseFile):
         self.modOrObjName, self.funcName, argStr, keywStr = inText.split(":SUT_SEP:")
         self.args = list(eval(argStr))
@@ -288,14 +323,6 @@ class PythonModuleTraffic(Traffic):
     def findArgString(self):
         argStrs = map(repr, self.args) + [ key + "=" + repr(value) for key, value in self.keyw.items() ]
         return ", ".join(argStrs)
-
-    def getFunction(self, instance):
-        if instance is not None:
-            return getattr(instance, self.funcName)
-        else:
-            importCmd = "import " + self.modOrObjName
-            exec importCmd
-            return eval(self.modOrObjName + "." + self.funcName)
 
     def belongsToModule(self, exc_value, instance):
         try:
@@ -309,7 +336,7 @@ class PythonModuleTraffic(Traffic):
     def getResult(self):
         instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
         try:
-            func = self.getFunction(instance)
+            func = self.getAttribute(instance, self.funcName)
             result = func(*self.args, **self.keyw)
             return repr(self.addInstanceWrappers(result))
         except:
@@ -318,7 +345,7 @@ class PythonModuleTraffic(Traffic):
                 # We own the exception object also, handle it like an ordinary instance
                 return "raise " + repr(PythonInstanceWrapper(exc_value, self.modOrObjName))
             else:
-                return "raise " + exc_value.__class__.__name__ + "(" + repr(str(exc_value)) + ")"
+                return "raise " + exc_value.__class__.__module__ + "." + exc_value.__class__.__name__ + "(" + repr(str(exc_value)) + ")"
 
     def forwardToDestination(self):
         result = self.getResult()
@@ -542,7 +569,8 @@ class TrafficRequestHandler(StreamRequestHandler):
     parseDict = { "SUT_SERVER"       : ServerStateTraffic,
                   "SUT_COMMAND_LINE" : CommandLineTraffic,
                   "SUT_COMMAND_KILL" : CommandLineKillTraffic,
-                  "SUT_PYTHON_CALL"  : PythonModuleTraffic }
+                  "SUT_PYTHON_CALL"  : PythonFunctionCallTraffic,
+                  "SUT_PYTHON_ATTR"  : PythonAttributeTraffic }
     def __init__(self, requestNumber, *args):
         self.requestNumber = requestNumber
         StreamRequestHandler.__init__(self, *args)
@@ -694,8 +722,10 @@ class TrafficServer(TCPServer):
     def _process(self, traffic, reqNo):
         self.diag.info("Processing traffic " + str(traffic.__class__))
         hasFileEdits = self.addPossibleFileEdits(traffic)
-        traffic.record(self.recordFileHandler, reqNo)
-        for response in self.getResponses(traffic, hasFileEdits):
+        responses = self.getResponses(traffic, hasFileEdits)
+        if len(responses) or not traffic.enquiryOnly():
+            traffic.record(self.recordFileHandler, reqNo)
+        for response in responses:
             self.diag.info("Providing response " + str(response.__class__))
             response.record(self.recordFileHandler, reqNo)
             for chainResponse in response.forwardToDestination():
@@ -909,19 +939,23 @@ class ReplayInfo:
         # the one that is most similar to it
         if not traffic.hasInfo():
             return []
-        desc, filter = traffic.getFilteredDescription()
-        bestMatchKey = self.findBestMatch(desc, filter)
-        if bestMatchKey:
-            return self.responseMap[bestMatchKey].makeResponses(traffic)
+
+        responseMapKey = self.getResponseMapKey(traffic)
+        if responseMapKey:
+            return self.responseMap[responseMapKey].makeResponses(traffic)
         else:
             return []
 
-    def findBestMatch(self, desc, filter):
+    def getResponseMapKey(self, traffic):
+        desc, filter = traffic.getFilteredDescription()
         self.diag.info("Trying to match '" + desc + "'")
         if self.responseMap.has_key(desc):
             self.diag.info("Found exact match")
             return desc
+        elif not traffic.enquiryOnly():
+            return self.findBestMatch(desc, filter)
 
+    def findBestMatch(self, desc, filter):
         descWords = self.getWords(desc)
         bestMatch = None
         bestMatchInfo = set(), 100000

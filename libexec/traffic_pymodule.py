@@ -6,7 +6,7 @@ class ModuleProxy:
         self.name = name
 
     def __getattr__(self, attrname):
-        return self.AttributeProxy(self, self, attrname)
+        return self.AttributeProxy(self, self, attrname).tryEvaluate()
 
     class InstanceProxy:
         def __init__(self, instanceName, moduleProxy):
@@ -14,7 +14,7 @@ class ModuleProxy:
             self.moduleProxy = moduleProxy
 
         def __getattr__(self, attrname):
-            return self.moduleProxy.AttributeProxy(self, self.moduleProxy, attrname)
+            return self.moduleProxy.AttributeProxy(self, self.moduleProxy, attrname).tryEvaluate()
 
     class ExceptionProxy(InstanceProxy, Exception):
         def __str__(self):
@@ -26,6 +26,17 @@ class ModuleProxy:
             self.modOrObjProxy = modOrObjProxy
             self.moduleProxy = moduleProxy
             self.attributeName = attributeName
+
+        def tryEvaluate(self):
+            sock = self.createSocket()
+            text = "SUT_PYTHON_ATTR:" + self.modOrObjProxy.name + ":SUT_SEP:" + self.attributeName
+            sock.sendall(text)
+            sock.shutdown(1)
+            response = sock.makefile().read()
+            if response:
+                return eval(response)
+            else:
+                return self
 
         def __getattr__(self, name):
             return self.__class__(self.modOrObjProxy, self.moduleProxy, self.attributeName + "." + name)
@@ -44,13 +55,20 @@ class ModuleProxy:
                 def Instance(className, instanceName):
                     setattr(self.moduleProxy, className, cls)
                     return cls(instanceName, self.moduleProxy)
-                return eval(response)        
+                return self.evaluateResponse(response, cls, Instance)
+
+        def evaluateResponse(self, response, cls, Instance):
+            try:
+                return eval(response)
+            except NameError: # standard exceptions end up here
+                module = response.split(".", 1)[0]
+                exec "import " + module
+                return eval(response)
 
         def createAndSend(self, *args, **kw):
             sock = self.createSocket()
-            text = "SUT_PYTHON_CALL:" + self.modOrObjProxy.name
-            text += ":SUT_SEP:" + self.attributeName
-            text += ":SUT_SEP:" + repr(args) + ":SUT_SEP:" + repr(kw)
+            text = "SUT_PYTHON_CALL:" + self.modOrObjProxy.name + ":SUT_SEP:" + self.attributeName + \
+                   ":SUT_SEP:" + repr(args) + ":SUT_SEP:" + repr(kw)
             sock.sendall(text)
             return sock
 

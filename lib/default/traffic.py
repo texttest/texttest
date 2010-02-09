@@ -321,8 +321,15 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
         super(PythonModuleTraffic, self).__init__(text, responseFile)
 
     def findArgString(self):
-        argStrs = map(repr, self.args) + [ key + "=" + repr(value) for key, value in self.keyw.items() ]
+        argStrs = map(self.multilineRepr, self.args) + [ key + "=" + repr(value) for key, value in self.keyw.items() ]
         return ", ".join(argStrs)
+
+    def multilineRepr(self, arg):
+        out = repr(arg)
+        if "\\n" in out:
+            return "''" + out.replace("\\n", "\n") + "''"
+        else:
+            return out
 
     def belongsToModule(self, exc_value, instance):
         try:

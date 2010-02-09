@@ -45,17 +45,23 @@ class ModuleProxy:
             sock = self.createAndSend(*args, **kw)
             sock.shutdown(1)
             response = sock.makefile().read()
-            return self.handleResponse(response, self.moduleProxy.InstanceProxy)
+            return self.handleResponse(response, "self.moduleProxy.InstanceProxy")
 
         def handleResponse(self, response, cls):
             if response.startswith("raise "):
                 rest = response.replace("raise ", "")
-                raise self.handleResponse(rest, self.moduleProxy.ExceptionProxy)
+                raise self.handleResponse(rest, "self.moduleProxy.ExceptionProxy")
             else:
                 def Instance(className, instanceName):
-                    setattr(self.moduleProxy, className, cls)
-                    return cls(instanceName, self.moduleProxy)
+                    # Call separate function to avoid exec problems
+                    return self.makeInstance(className, instanceName, cls)
                 return self.evaluateResponse(response, cls, Instance)
+
+        def makeInstance(self, className, instanceName, baseClass):
+            exec "class " + className + "(" + baseClass + "): pass"
+            classObj = eval(className)
+            setattr(self.moduleProxy, className, classObj)
+            return classObj(instanceName, self.moduleProxy)
 
         def evaluateResponse(self, response, cls, Instance):
             try:

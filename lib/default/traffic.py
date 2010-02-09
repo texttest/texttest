@@ -299,7 +299,7 @@ class PythonModuleTraffic(Traffic):
 
     def belongsToModule(self, exc_value, instance):
         try:
-            if instance:
+            if instance is not None:
                 return exc_value.__module__ == instance.moduleName
             else:
                 return exc_value.__module__ == self.modOrObjName

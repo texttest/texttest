@@ -251,24 +251,28 @@ class ServerStateTraffic(ServerTraffic):
 
 class PythonInstanceWrapper:
     allInstances = {}
-    def __init__(self, instance):
+    def __init__(self, instance, moduleName):
         self.instance = instance
+        self.moduleName = moduleName
+        self.className = self.instance.__class__.__name__
+        self.instanceName = self.getNewInstanceName(self.className.lower())
+        self.allInstances[self.instanceName] = self
 
     @classmethod
     def getInstance(cls, instanceName):
         return cls.allInstances.get(instanceName)
 
     def __repr__(self):
-        className = self.instance.__class__.__name__
-        instanceName = self.getNewInstanceName(className.lower())
-        self.allInstances[instanceName] = self.instance
-        return "Instance(" + repr(className) + ", " + repr(instanceName) + ")"
+        return "Instance(" + repr(self.className) + ", " + repr(self.instanceName) + ")"
 
     def getNewInstanceName(self, className):
         num = 1
         while self.allInstances.has_key(className + str(num)):
             num += 1
         return className + str(num)
+
+    def __getattr__(self, name):
+        return getattr(self.instance, name)
 
 
 class PythonModuleTraffic(Traffic):
@@ -285,8 +289,7 @@ class PythonModuleTraffic(Traffic):
         argStrs = map(repr, self.args) + [ key + "=" + repr(value) for key, value in self.keyw.items() ]
         return ", ".join(argStrs)
 
-    def getFunction(self):
-        instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
+    def getFunction(self, instance):
         if instance is not None:
             return getattr(instance, self.funcName)
         else:
@@ -294,22 +297,26 @@ class PythonModuleTraffic(Traffic):
             exec importCmd
             return eval(self.modOrObjName + "." + self.funcName)
 
-    def belongsToModule(self, exc_value):
+    def belongsToModule(self, exc_value, instance):
         try:
-            return exc_value.__module__ == self.modOrObjName
+            if instance:
+                return exc_value.__module__ == instance.moduleName
+            else:
+                return exc_value.__module__ == self.modOrObjName
         except AttributeError: # Global exceptions like AttributeError itself on Windows cause this
             return False
         
     def getResult(self):
+        instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
         try:
-            func = self.getFunction()
+            func = self.getFunction(instance)
             result = func(*self.args, **self.keyw)
             return repr(self.addInstanceWrappers(result))
         except:
             exc_type, exc_value, exc_traceback = sys.exc_info()
-            if self.belongsToModule(exc_value):
+            if self.belongsToModule(exc_value, instance):
                 # We own the exception object also, handle it like an ordinary instance
-                return "raise " + repr(PythonInstanceWrapper(exc_value))
+                return "raise " + repr(PythonInstanceWrapper(exc_value, self.modOrObjName))
             else:
                 return "raise " + exc_value.__class__.__name__ + "(" + repr(str(exc_value)) + ")"
 
@@ -319,7 +326,7 @@ class PythonModuleTraffic(Traffic):
 
     def addInstanceWrappers(self, result):
         if type(result) == types.InstanceType:
-            return PythonInstanceWrapper(result)
+            return PythonInstanceWrapper(result, self.modOrObjName)
         elif type(result) == types.ListType:
             return map(self.addInstanceWrappers, result)
         elif type(result) == types.DictType:

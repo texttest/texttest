@@ -289,6 +289,9 @@ class PythonModuleTraffic(Traffic):
             exec importCmd
             return eval(self.modOrObjName + "." + attrName)
 
+    def isBasicType(self, obj):
+        return obj is None or type(obj) in (bool, float, int, long, str, unicode, list, dict, tuple)
+
 
 class PythonAttributeTraffic(PythonModuleTraffic):
     def __init__(self, inText, responseFile):
@@ -305,8 +308,7 @@ class PythonAttributeTraffic(PythonModuleTraffic):
             attr = self.getAttribute(instance, self.attrName)
         except:
             return []
-        if type(attr) in [ types.BooleanType, types.FloatType, types.IntType,
-                           types.LongType, types.NoneType, types.StringType, types.UnicodeType ]:
+        if self.isBasicType(attr):
             return [ PythonResponseTraffic(repr(attr), self.responseFile) ]
         else:
             return []
@@ -359,10 +361,10 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
         return [ PythonResponseTraffic(result, self.responseFile) ]
 
     def addInstanceWrappers(self, result):
-        if type(result) == types.InstanceType:
+        if not self.isBasicType(result):
             return PythonInstanceWrapper(result, self.modOrObjName)
-        elif type(result) == types.ListType:
-            return map(self.addInstanceWrappers, result)
+        elif type(result) in (list, tuple):
+            return type(result)(map(self.addInstanceWrappers, result))
         elif type(result) == types.DictType:
             newResult = {}
             for key, value in result.items():

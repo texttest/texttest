@@ -316,23 +316,23 @@ class PythonAttributeTraffic(PythonModuleTraffic):
 
 class PythonFunctionCallTraffic(PythonModuleTraffic):
     def __init__(self, inText, responseFile):
-        self.modOrObjName, self.funcName, argStr, keywStr = inText.split(":SUT_SEP:")
-        self.args = list(eval(argStr))
+        self.modOrObjName, self.funcName, self.argStr, keywStr = inText.split(":SUT_SEP:")
         self.keyw = eval(keywStr)
-        text = self.modOrObjName + "." + self.funcName + "(" + self.findArgString() + ")"
+        text = self.modOrObjName + "." + self.funcName + self.findArgString()
         super(PythonModuleTraffic, self).__init__(text, responseFile)
 
     def findArgString(self):
-        argStrs = map(self.multilineRepr, self.args) + [ key + "=" + repr(value) for key, value in self.keyw.items() ]
-        return ", ".join(argStrs)
-
-    def multilineRepr(self, arg):
-        out = repr(arg)
-        if "\\n" in out:
-            return "''" + out.replace("\\n", "\n") + "''"
+        keyws = [ key + "=" + repr(value) for key, value in self.keyw.items() ]
+        keywStr = ", ".join(keyws)
+        # Fix the format for single-entry tuples
+        argStr = self.argStr.replace(",)", ")")
+        if argStr == "()":
+            return "(" + keywStr + ")"
+        elif keyws:
+            return argStr[:-1] + ", " + keywStr + ")"
         else:
-            return out
-
+            return argStr
+            
     def belongsToModule(self, exc_value, instance):
         try:
             if instance is not None:
@@ -341,12 +341,22 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
                 return exc_value.__module__ == self.modOrObjName
         except AttributeError: # Global exceptions like AttributeError itself on Windows cause this
             return False
+
+    def getArgInstance(self, arg):
+        if isinstance(arg, PythonInstanceWrapper):
+            return arg.instance
+        else:
+            return arg
+
+    def parseArgs(self):
+        args = eval(self.argStr, PythonInstanceWrapper.allInstances)
+        return tuple(map(self.getArgInstance, args))
         
     def getResult(self):
         instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
         try:
             func = self.getAttribute(instance, self.funcName)
-            result = func(*self.args, **self.keyw)
+            result = func(*self.parseArgs(), **self.keyw)
             return repr(self.addInstanceWrappers(result))
         except:
             exc_type, exc_value, exc_traceback = sys.exc_info()

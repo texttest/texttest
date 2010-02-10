@@ -74,9 +74,24 @@ class ModuleProxy:
         def createAndSend(self, *args, **kw):
             sock = self.createSocket()
             text = "SUT_PYTHON_CALL:" + self.modOrObjProxy.name + ":SUT_SEP:" + self.attributeName + \
-                   ":SUT_SEP:" + repr(args) + ":SUT_SEP:" + repr(kw)
+                   ":SUT_SEP:" + repr(self.getArgsForSend(args)) + ":SUT_SEP:" + repr(kw)
             sock.sendall(text)
             return sock
+
+        def getArgsForSend(self, args):
+            class ArgWrapper:
+                def __init__(self, arg, moduleProxy):
+                    self.arg = arg
+                    self.moduleProxy = moduleProxy
+                def __repr__(self):
+                    if isinstance(self.arg, self.moduleProxy.InstanceProxy):
+                        return self.arg.name
+                    out = repr(self.arg)
+                    if "\\n" in out:
+                        return "''" + out.replace("\\n", "\n") + "''"
+                    else:
+                        return out
+            return tuple([ ArgWrapper(arg, self.moduleProxy) for arg in args ])
 
         def createSocket(self):
             import os, socket

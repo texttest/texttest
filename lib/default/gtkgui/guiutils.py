@@ -279,14 +279,14 @@ class GUIConfig:
     @staticmethod
     def getDefaultColours():
         dict = {}
-        dict["default"] = "red"
-        dict["success"] = "green"
-        dict["failure"] = "red"
-        dict["running"] = "yellow"
-        dict["initial_filter"] = "yellow"
-        dict["final_filter"] = "yellow"
+        dict["default"] = "salmon"
+        dict["success"] = "DarkSeaGreen2"
+        dict["failure"] = "salmon"
+        dict["running"] = "LightGoldenrod1"
+        dict["initial_filter"] = "LightGoldenrod1"
+        dict["final_filter"] = "LightGoldenrod1"
         dict["not_started"] = "white"
-        dict["pending"] = "white"
+        dict["pending"] = "grey80"
         dict["static"] = "grey90"
         dict["marked"] = "orange"
         return dict

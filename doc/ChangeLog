@@ -1651,10 +1651,13 @@ Static GUI Enhancements:
     - Drop-down entries for "Test-files to search" are now sorted in sections (selectandfilter.py)
 	Can configure via "gui_entry_options" also
     - All tabs now have a "Reset" button that will reset just that tab (guiplugins.py)
+    - "Enter failure information" dialog rejigged, grouping related items together and adding tooltips (adminactions.py)
 Dynamic GUI Enhancements:
     - Selection tab added
 	Can do all of the selecting from the static GUI in the dynamic GUI also. (selectandfilter.py)
 	Can also choose between the new and old results from the tests. Note accelerator for "select" changed.
+    - Default colour scheme changed (guiutils.py)
+	Now more subtle shades of green, yellow and red
     - New status "Initial filter" and "Final filter" (rundependent.py)
 	Allows status view to distinguish between tests that are running and tests that are being filtered.
     - Status tab categories are now sorted alphabetically (statusviews.py)
@@ -1665,6 +1668,8 @@ Dynamic GUI Enhancements:
     - Tab selection no longer reset to "Test" if "Run Info" is being viewed (actionholders.py)
 	Makes it easier to browse run info for several tests.
 Framework Enhancements:
+    - Traffic-interception mechanism can now intercept Python modules
+	New config file setting "collect_traffic_py_module". See website.
     - Can now set a timeout after which tests will automatically be killed. (default/__init__.py)
 	See "kill_timeout" documentation on the website. Thanks to Michael Behrisch
     - New flag "--ignorefilters" for disabling filtering for a test run (default/__init__.py)
@@ -1703,5 +1708,5 @@ Bug Fixes:
     - Command-line traffic record mechanism now finds .exe files on Windows (traffic.py)
     - Missing file markers now created correctly for composite versions (comparefile.py)
     - emacs backup files (ending in ~) now ignored when creating applications (engine.py)
-
-
+    - Fixed HTML batch report bug where older months got wrongly regenerated if some version was include but last active then (testoverview.py)
+    - Fixed default save version with obscure combination of composite versions, base versions and unsaveable versions (comparefile.py)

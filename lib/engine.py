@@ -268,24 +268,27 @@ class TextTest(plugins.Responder, plugins.Observable):
         appSuites = seqdict()
         raisedError = False
         for app in allApps:
-            errorMessages = []
+            warningMessages = []
             appGroup = [ app ] + app.extras
             for partApp in appGroup:
                 try:
                     testSuite = partApp.createInitialTestSuite(self.observers)
                     appSuites[partApp] = testSuite
+                except plugins.TextTestWarning, e:
+                    warningMessages.append(partApp.rejectionMessage(str(e)))
                 except plugins.TextTestError, e:
-                    errorMessages.append(partApp.rejectionMessage(str(e)))
+                    sys.stderr.write(partApp.rejectionMessage(str(e)))
+                    raisedError = True
                 except KeyboardInterrupt:
                     raise
                 except:  
                     sys.stderr.write("Error creating test suite for " + partApp.description() + " :\n")
                     plugins.printException()
-            fullMsg = "".join(errorMessages)
+            fullMsg = "".join(warningMessages)
             # If the whole group failed, we write to standard error, where the GUI will find it. Otherwise we just log in case anyone cares.
-            raisedError = len(errorMessages) == len(appGroup)
-            if raisedError:
+            if len(warningMessages) == len(appGroup):
                 sys.stderr.write(fullMsg)
+                raisedError = True
             else:
                 sys.stdout.write(fullMsg)
         return raisedError, appSuites

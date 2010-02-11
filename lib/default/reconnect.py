@@ -191,12 +191,12 @@ class ReconnectConfig:
 
         runDir = self.findRunDir(app)
         if not runDir:
-            raise plugins.TextTestError, "Could not find any runs matching " + app.description() 
+            raise plugins.TextTestWarning, "Could not find any runs matching " + app.description() 
         self.diag.info("Found run directory " + repr(runDir))
         self.reconnDir = self.findAppDirUnder(app, runDir)        
         self.diag.info("Found application directory " + repr(self.reconnDir))
         if not self.reconnDir:
-            raise plugins.TextTestError, "Could not find an application directory matching " + app.description() + \
+            raise plugins.TextTestWarning, "Could not find an application directory matching " + app.description() + \
                   " for the run directory found at " + runDir
         for datedVersion in self.datedVersions:
             app.addConfigEntry("unsaveable_version", datedVersion)

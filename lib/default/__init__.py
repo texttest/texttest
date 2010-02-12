@@ -1213,7 +1213,7 @@ class GrepFilter(plugins.TextFilter):
                 logFiles.append(fileName)
             else:
                 test.refreshFiles()
-                return self.findAllLogFiles(test)
+                return self.findAllStdFiles(test)
         return logFiles
 
     def matches(self, logFile):

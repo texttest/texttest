@@ -97,6 +97,8 @@ class ModuleProxy:
                 def __repr__(self):
                     if isinstance(self.arg, self.moduleProxy.InstanceProxy):
                         return self.arg.name
+                    elif isinstance(self.arg, list):
+                        return repr([ ArgWrapper(subarg, self.moduleProxy) for subarg in self.arg ])
                     out = repr(self.arg)
                     if "\\n" in out:
                         return "''" + out.replace("\\n", "\n") + "''"

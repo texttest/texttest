@@ -10,8 +10,9 @@ class ModuleProxy:
 
     class InstanceProxy:
         moduleProxy = None
-        def __init__(self, givenInstanceName=None, moduleProxy=None, *args, **kw):
-            self.name = givenInstanceName
+        def __init__(self, *args, **kw):
+            self.name = kw.get("givenInstanceName")
+            moduleProxy = kw.get("moduleProxy")
             if moduleProxy is not None:
                 self.__class__.moduleProxy = moduleProxy
             if self.name is None:
@@ -72,7 +73,7 @@ class ModuleProxy:
             exec "class " + className + "(" + baseClass + "): pass"
             classObj = eval(className)
             setattr(self.moduleProxy, className, classObj)
-            return classObj(instanceName, self.moduleProxy)
+            return classObj(givenInstanceName=instanceName, moduleProxy=self.moduleProxy)
 
         def evaluateResponse(self, response, cls, Instance):
             try:

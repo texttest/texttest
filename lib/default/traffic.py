@@ -345,6 +345,8 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
     def getArgInstance(self, arg):
         if isinstance(arg, PythonInstanceWrapper):
             return arg.instance
+        elif isinstance(arg, list):
+            return map(self.getArgInstance, arg)
         else:
             return arg
 

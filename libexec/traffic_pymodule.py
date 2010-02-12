@@ -9,9 +9,17 @@ class ModuleProxy:
         return self.AttributeProxy(self, self, attrname).tryEvaluate()
 
     class InstanceProxy:
-        def __init__(self, instanceName, moduleProxy):
-            self.name = instanceName
-            self.moduleProxy = moduleProxy
+        moduleProxy = None
+        def __init__(self, givenInstanceName=None, moduleProxy=None, *args, **kw):
+            self.name = givenInstanceName
+            if moduleProxy is not None:
+                self.__class__.moduleProxy = moduleProxy
+            if self.name is None:
+                attrProxy = self.moduleProxy.AttributeProxy(self.moduleProxy, self.moduleProxy, self.__class__.__name__)
+                response = attrProxy.makeResponse(*args, **kw)
+                def Instance(className, instanceName):
+                    return instanceName
+                self.name = eval(response)
 
         def __getattr__(self, attrname):
             return self.moduleProxy.AttributeProxy(self, self.moduleProxy, attrname).tryEvaluate()
@@ -42,11 +50,14 @@ class ModuleProxy:
             return self.__class__(self.modOrObjProxy, self.moduleProxy, self.attributeName + "." + name)
 
         def __call__(self, *args, **kw):
-            sock = self.createAndSend(*args, **kw)
-            sock.shutdown(1)
-            response = sock.makefile().read()
+            response = self.makeResponse(*args, **kw)
             return self.handleResponse(response, "self.moduleProxy.InstanceProxy")
 
+        def makeResponse(self, *args, **kw):
+            sock = self.createAndSend(*args, **kw)
+            sock.shutdown(1)
+            return sock.makefile().read()
+        
         def handleResponse(self, response, cls):
             if response.startswith("raise "):
                 rest = response.replace("raise ", "")

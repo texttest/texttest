@@ -392,15 +392,19 @@ class TestTable:
             fileComp = state.getMostSevereFileComparison()
         else:
             fileComp = None
-        success = state.category == "success"
-        fgcol, bgcol = self.getColours(state.category, fileComp, success)
+        fgcol, bgcol = self.getColours(state.category, fileComp)
         filteredState = self.filterState(repr(state))
         detail = state.getTypeBreakdown()[1]
+        success = state.category == "success"
         return filteredState + detail, success, fgcol, bgcol
 
     def getCellDataFromFileComp(self, fileComp):
         success = fileComp.hasSucceeded()
-        fgcol, bgcol = self.getColours(fileComp.getType(), fileComp, success)
+        if success:
+            category = "success"
+        else:
+            category = fileComp.getType()
+        fgcol, bgcol = self.getColours(category, fileComp)
         text = str(fileComp.getNewPerformance()) + " " + self.getConfigValue("performance_unit", fileComp.stem)
         return text, success, fgcol, bgcol
 
@@ -431,22 +435,31 @@ class TestTable:
         result = re.sub('slower\([^ ]+\) ','', result)
         return result
 
-    def getColours(self, category, fileComp, success):
-        bgcol = self.colourFinder.find("failure_bg")
-        fgcol = self.colourFinder.find("test_default_fg")
-        if success:
-            bgcol = self.colourFinder.find("success_bg")
+    def getBackgroundColourKey(self, category):
+        if category == "success":
+            return "success_bg"
         elif category == "bug":
-            bgcol = self.colourFinder.find("knownbug_bg")
+            return "knownbug_bg"
         elif category.startswith("faster") or category.startswith("slower"):
-            bgcol = self.colourFinder.find("performance_bg")
-            if self.getPercent(fileComp) >= self.getConfigValue("performance_variation_serious_%", "cputime"):
-                fgcol = self.colourFinder.find("performance_fg")
+            return "performance_bg"
         elif category == "smaller" or category == "larger":
-            bgcol = self.colourFinder.find("memory_bg")
-            if self.getPercent(fileComp) >= self.getConfigValue("performance_variation_serious_%", "memory"):
-                fgcol = self.colourFinder.find("performance_fg")
-        return fgcol, bgcol
+            return "memory_bg"
+        else:
+            return "failure_bg"
+
+    def getForegroundColourKey(self, bgcolKey, fileComp):
+        if (bgcolKey == "performance_bg" and self.getPercent(fileComp) >= \
+            self.getConfigValue("performance_variation_serious_%", "cputime")) or \
+            (bgcolKey == "memory_bg" and self.getPercent(fileComp) >= \
+             self.getConfigValue("performance_variation_serious_%", "memory")):
+            return "performance_fg"
+        else:
+            return "test_default_fg"
+
+    def getColours(self, category, fileComp):
+        bgcolKey = self.getBackgroundColourKey(category)
+        fgcolKey = self.getForegroundColourKey(bgcolKey, fileComp)
+        return self.colourFinder.find(fgcolKey), self.colourFinder.find(bgcolKey)
 
     def getPercent(self, fileComp):
         return fileComp.perfComparison.percentageChange
@@ -612,6 +625,10 @@ class CategoryHandler:
             return sum((currExtra == extraVersion for (testId, state, currExtra) in testInfo))
         else:
             return len(testInfo)
+
+    def getColourKeySummaryData(self):
+        summaryData = seqdict()
+        self.getSummaryData()
 
     def getSummaryData(self, extraVersion=None):
         numTests = 0

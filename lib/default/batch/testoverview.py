@@ -343,7 +343,7 @@ class TestTable:
         for tag in tags:
             categoryHandler = categoryHandlers[tag]
             detailPageName = getDetailPageName(pageVersion, tag)
-            summary = categoryHandler.generateSummaryHTML(detailPageName + "#" + version, extraVersion)
+            summary = categoryHandler.generateHTMLSummary(detailPageName + "#" + version, extraVersion)
             row.append(HTMLgen.TD(summary, bgcolor = bgColour))
         return HTMLgen.TR(*row)
 
@@ -490,7 +490,7 @@ class TestDetails:
         self.versionSections.append(container)
 
     def getSummaryHeading(self, version, categoryHandler):
-        return HTMLgen.Heading(2, version + ": " + categoryHandler.generateSummary())
+        return HTMLgen.Heading(2, version + ": " + categoryHandler.generateTextSummary())
 
     def write(self, fileName):
         if len(self.versionSections) > 1:
@@ -581,23 +581,31 @@ class CategoryHandler:
     def registerInCategory(self, testId, state, extraVersion):
         self.testsInCategory.setdefault(state.category, []).append((testId, state, extraVersion))
 
-    def generateSummary(self):
-        categoryDescs = []
-        testCountSummary = self._generateSummary(categoryDescs)
-        return testCountSummary + " ".join(categoryDescs)
+    def getDescription(self, cat, count):
+        shortDescr, longDescr = getCategoryDescription(cat)
+        return str(count) + " " + shortDescr
 
-    def generateSummaryHTML(self, detailPageRef, extraVersion=None):
+    def getTestCountDescription(self, count):
+        return str(count) + " tests: "
+
+    def generateTextSummary(self):
+        numTests, summaryData = self.getSummaryData()
+        categoryDescs = [ self.getDescription(cat, count) for cat, count in summaryData.items() ]
+        return self.getTestCountDescription(numTests) + " ".join(categoryDescs)
+
+    def generateHTMLSummary(self, detailPageRef, extraVersion=None):
+        numTests, summaryData = self.getSummaryData(extraVersion)
         container = HTMLgen.Container()
-        testCountSummary = self._generateSummary(container, self.categorySummaryHTML,
-                                                 extraVersion=extraVersion, detailPageRef=detailPageRef) 
-        return HTMLgen.Container(HTMLgen.Text(testCountSummary), container)
-
-    def categorySummaryHTML(self, cat, summary, longDescr, detailPageRef):
-        basic = HTMLgen.Text(summary)
-        if cat == "success":
-            return basic
-        else:
-            return HTMLgen.Href(detailPageRef + longDescr, basic)
+        for cat, count in summaryData.items():
+            summary = HTMLgen.Text(self.getDescription(cat, count))
+            if cat == "success":
+                container.append(summary)
+            else:
+                linkTarget = detailPageRef + getCategoryDescription(cat)[-1]
+                container.append(HTMLgen.Href(linkTarget, summary))
+            
+        testCountSummary = HTMLgen.Text(self.getTestCountDescription(numTests))
+        return HTMLgen.Container(testCountSummary, container)
 
     def countTests(self, testInfo, extraVersion):
         if extraVersion is not None:
@@ -605,20 +613,16 @@ class CategoryHandler:
         else:
             return len(testInfo)
 
-    def _generateSummary(self, container, categorySummaryMethod=None, extraVersion=None, **kwargs):
+    def getSummaryData(self, extraVersion=None):
         numTests = 0
+        summaryData = seqdict()
         for cat, testInfo in sorted(self.testsInCategory.items(), self.compareCategories):
             testCount = self.countTests(testInfo, extraVersion)
             if testCount > 0:
-                shortDescr, longDescr = getCategoryDescription(cat)
-                categorySummary = str(testCount) + " " + shortDescr
-                if categorySummaryMethod:
-                    container.append(categorySummaryMethod(cat, categorySummary, longDescr, **kwargs))
-                else:
-                    container.append(categorySummary)
+                summaryData[cat] = testCount
                 numTests += testCount
-        return str(numTests) + " tests: "
-
+        return numTests, summaryData
+    
     def getTestsWithDescriptions(self):
         return [ (getCategoryDescription(cat)[1], testInfo) for cat, testInfo in self.testsInCategory.items() ]
 

@@ -352,19 +352,28 @@ class HideUnselected(guiplugins.ActionGUI,AllTestsHandler):
 
 
 class ShowAll(guiplugins.BasicActionGUI,AllTestsHandler):
-    def __init__(self, *args):
-        guiplugins.BasicActionGUI.__init__(self, *args)
+    def __init__(self, allApps, dynamic, *args):
+        guiplugins.BasicActionGUI.__init__(self, allApps, dynamic, *args)
         AllTestsHandler.__init__(self)
+        self.dynamic = dynamic
+        
     def _getTitle(self):
         return "Show all"
+
     def messageBeforePerform(self):
         return "Showing all tests..."
+
     def getTooltip(self):
         return "Show all tests"
+
     def getSignalsSent(self):
-        return [ "Visibility" ]
+        return [ "Visibility", "ResetVisibility" ]
+
     def performOnCurrent(self):
-        self.notify("Visibility", self.findAllTests(), True)
+        if self.dynamic:
+            self.notify("ResetVisibility")
+        else:
+            self.notify("Visibility", self.findAllTests(), True)
 
 
 class SaveSelection(guiplugins.ActionDialogGUI):

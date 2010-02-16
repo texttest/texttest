@@ -124,7 +124,8 @@ class GUIController(plugins.Responder, plugins.Observable):
             module.guiConfig = guiConfig
 
     def getTestTreeObservers(self):
-        return [ self.testColumnGUI, self.testFileGUI, self.textInfoGUI, self.testRunInfoGUI ] + self.allActionGUIs() + [ self.rightWindowGUI ]
+        return [ self.testColumnGUI, self.testFileGUI, self.textInfoGUI, self.testRunInfoGUI ] + \
+               self.allActionGUIs() + [ self.rightWindowGUI ]
     def allActionGUIs(self):
         return self.defaultActionGUIs + self.actionTabGUIs
     def getLifecycleObservers(self):
@@ -133,8 +134,8 @@ class GUIController(plugins.Responder, plugins.Observable):
         return [ self.progressBarGUI, self.progressMonitor, self.testTreeGUI,
                  self.statusMonitor, self.runInfoGUI, self.idleManager, self.topWindowGUI ]
     def getActionObservers(self):
-        return [ self.testTreeGUI, self.testFileGUI, self.statusMonitor, self.runInfoGUI, 
-                 self.idleManager, self.topWindowGUI ]
+        return [ self.progressMonitor, self.testTreeGUI, self.testFileGUI, self.statusMonitor,
+                 self.runInfoGUI, self.idleManager, self.topWindowGUI ]
 
     def getFileViewObservers(self):
         return self.defaultActionGUIs + self.actionTabGUIs + [ self.textInfoGUI ]

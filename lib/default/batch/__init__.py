@@ -1,7 +1,7 @@
 #!/usr/local/bin/python
 
 import os, plugins, sys, string, time, types, shutil, datetime, testoverview, logging, operator
-from summarypages import GenerateSummaryPage
+from summarypages import GenerateSummaryPage, GenerateGraphs
 from ndict import seqdict
 from cPickle import Pickler
 

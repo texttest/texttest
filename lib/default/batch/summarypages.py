@@ -5,19 +5,18 @@ import testoverview, plugins, logging, os, shutil, time, operator
 from ndict import seqdict
 from glob import glob
 
-class GenerateSummaryPage(plugins.ScriptWithArgs):
-    scriptDoc = "Generate a summary page which links all the other generated pages"
+class GenerateFromSummaryData(plugins.ScriptWithArgs):
+    locationApps = seqdict()
     summaryFileName = "index.html"
     basePath = ""
-    locationApps = seqdict()
     def __init__(self, args=[""]):
-        argDict = self.parseArguments(args, [ "batch", "file", "basepath", "graphs" ])
+        argDict = self.parseArguments(args, [ "batch", "basepath", "file" ])
         self.batchSession = argDict.get("batch", "default")
         if argDict.has_key("basepath"):
-            GenerateSummaryPage.basePath = argDict["basepath"]
+            GenerateFromSummaryData.basePath = argDict["basepath"]
         if argDict.has_key("file"):
-            GenerateSummaryPage.summaryFileName = argDict["file"]
-            
+            GenerateFromSummaryData.summaryFileName = argDict["file"]
+
     def setUpApplication(self, app):
         location = os.path.realpath(app.getCompositeConfigValue("historical_report_location", self.batchSession)).replace("\\", "/")
         self.locationApps.setdefault(location, []).append(app)
@@ -27,8 +26,30 @@ class GenerateSummaryPage(plugins.ScriptWithArgs):
         for location, apps in cls.locationApps.items():
             dataFinder = SummaryDataFinder(location, apps, cls.summaryFileName, cls.basePath)
             if dataFinder.hasInfo():
-                generator = SummaryGenerator()
-                generator.generatePage(dataFinder)
+                cls.generate(dataFinder)
+
+
+class GenerateSummaryPage(GenerateFromSummaryData):
+    scriptDoc = "Generate a summary page which links all the other generated pages"
+    @classmethod
+    def generate(cls, dataFinder):
+        generator = SummaryGenerator()
+        generator.generatePage(dataFinder)
+
+
+class GenerateGraphs(GenerateFromSummaryData):
+    scriptDoc = "Generate standalone graphs along the lines of the ones that appear in the HTML report"
+    @classmethod
+    def generate(cls, dataFinder):
+        from resultgraphs import GraphGenerator
+        for appName, versions in dataFinder.getAppsWithVersions().items():
+            for version in versions:
+                results = dataFinder.getAllSummaries(appName, version)
+                if len(results) > 1:
+                    fileName = dataFinder.getGraphFile(appName, version)
+                    graphTitle = "Test results for Application: '" + appName + "'  Version: '" + version + "'"
+                    graphGenerator = GraphGenerator()
+                    graphGenerator.generateGraph(fileName, graphTitle, results, dataFinder.colourFinder)
 
 
 class SummaryDataFinder:
@@ -61,6 +82,9 @@ class SummaryDataFinder:
             shutil.copyfile(srcFile, templateFile)
         return templateFile
 
+    def getGraphFile(self, appName, version):        
+        return os.path.join(self.location, self.getShortAppName(appName), "images", "GenerateGraphs_" + version + ".png")
+
     def getAppsWithVersions(self):
         appsWithVersions = seqdict()
         for appName, appDir in self.appDirs.items():
@@ -68,6 +92,10 @@ class SummaryDataFinder:
             self.appVersionInfo[appName] = versionInfo
             appsWithVersions[appName] = versionInfo.keys()
         return appsWithVersions
+
+    def getShortAppName(self, fullName):
+        appDir = self.appDirs[fullName]
+        return os.path.basename(appDir)
 
     def getVersionInfoFor(self, app, appDir):
         versionDates = {}
@@ -86,8 +114,7 @@ class SummaryDataFinder:
         return "test_" + version + ".html"
 
     def getOverviewPage(self, appName, version):
-        appDir = self.appDirs[appName]
-        return os.path.join(self.basePath, os.path.basename(appDir), self.getOverviewPageName(version))
+        return os.path.join(self.basePath, self.getShortAppName(appName), self.getOverviewPageName(version))
 
     def getLatestSummary(self, appName, version):
         versionData = self.appVersionInfo[appName][version]
@@ -96,6 +123,12 @@ class SummaryDataFinder:
         summary = self.extractSummary(path)
         self.diag.info("For version " + version + ", found summary info " + repr(summary))
         return summary
+
+    def getAllSummaries(self, appName, version):
+        versionData = self.appVersionInfo[appName][version]
+        allDates = versionData.keys()
+        allDates.sort()
+        return [ (time.strftime("%d%b%Y", currDate), self.extractSummary(versionData[currDate])) for currDate in allDates ]
 
     def extractSummary(self, datedFile):
         for line in open(datedFile):
@@ -117,22 +150,25 @@ class SummaryDataFinder:
             index += 1
         self.diag.info("Category information is " + repr(categories))
         colourCount = seqdict()
-        for colourKey in [ "success_bg", "knownbug_bg", "performance_bg", "failure_bg" ]:
-            colourCount[self.colourFinder.find(colourKey)] = 0
+        for colourKey in [ "success", "knownbug", "performance", "failure" ]:
+            colourCount[colourKey] = 0
         for categoryName, count in categories:
             colourKey = self.getColourKey(categoryName)
-            colourCount[self.colourFinder.find(colourKey)] += count
+            colourCount[colourKey] += count
         return colourCount
+
+    def getColour(self, colourKey):
+        return self.colourFinder.find(colourKey + "_bg")
 
     def getColourKey(self, categoryName):
         if categoryName == "succeeded":
-            return "success_bg"
+            return "success"
         elif categoryName == "knownbugs":
-            return "knownbug_bg"
+            return "knownbug"
         elif categoryName in [ "faster", "slower", "memory+", "memory-" ]:
-            return "performance_bg"
+            return "performance"
         else:
-            return "failure_bg"
+            return "failure"
 
     def parseFileName(self, fileName):
         versionStr = fileName[5:-5]
@@ -236,8 +272,9 @@ class SummaryGenerator:
                     resultSummary = dataFinder.getLatestSummary(appName, version)
                     fileToLink = dataFinder.getOverviewPage(appName, version)
                     file.write('    <td><h3><a href="' + fileToLink + '">' + version + '</a></h3></td>\n')
-                    for colour, count in resultSummary.items():
+                    for colourKey, count in resultSummary.items():
                         if count:
+                            colour = dataFinder.getColour(colourKey)
                             file.write('    <td bgcolor="' + colour + '"><h3>' + str(count) + "</h3></td>\n")
                     file.write("  </tr></table>")
                 file.write("</td>\n")
@@ -247,3 +284,5 @@ class SummaryGenerator:
         startPos = line.find("order=") + 6
         endPos = line.rfind("-->")
         return plugins.commasplit(line[startPos:endPos])
+
+

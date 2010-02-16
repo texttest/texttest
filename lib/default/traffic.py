@@ -263,7 +263,7 @@ class PythonInstanceWrapper:
 
     @classmethod
     def getInstance(cls, instanceName):
-        return cls.allInstances.get(instanceName)
+        return cls.allInstances.get(instanceName, sys.modules.get(instanceName))
 
     def __repr__(self):
         return "Instance(" + repr(self.className) + ", " + repr(self.instanceName) + ")"
@@ -281,23 +281,33 @@ class PythonInstanceWrapper:
 class PythonModuleTraffic(Traffic):
     typeId = "PYT"
     direction = "<-"
-    def getAttribute(self, instance, attrName):
-        if instance is not None:
-            return getattr(instance, attrName)
-        else:
-            importCmd = "import " + self.modOrObjName
-            exec importCmd
-            return eval(self.modOrObjName + "." + attrName)
-
     def isBasicType(self, obj):
         return obj is None or type(obj) in (bool, float, int, long, str, unicode, list, dict, tuple)
 
+    def getExceptionText(self, exc_value):
+        return "raise " + exc_value.__class__.__module__ + "." + exc_value.__class__.__name__ + "(" + repr(str(exc_value)) + ")"
+
+
+class PythonImportTraffic(PythonModuleTraffic):
+    def __init__(self, inText, responseFile):
+        self.moduleName = inText
+        text = "import " + self.moduleName
+        super(PythonImportTraffic, self).__init__(text, responseFile)
+
+    def forwardToDestination(self):
+        try:
+            exec self.text
+            return []
+        except:
+            exc_value = sys.exc_info()[1]
+            return [ PythonResponseTraffic(self.getExceptionText(exc_value), self.responseFile) ]
+        
 
 class PythonAttributeTraffic(PythonModuleTraffic):
     def __init__(self, inText, responseFile):
         self.modOrObjName, self.attrName = inText.split(":SUT_SEP:")
         text = self.modOrObjName + "." + self.attrName
-        super(PythonModuleTraffic, self).__init__(text, responseFile)
+        super(PythonAttributeTraffic, self).__init__(text, responseFile)
 
     def enquiryOnly(self):
         return True
@@ -305,7 +315,7 @@ class PythonAttributeTraffic(PythonModuleTraffic):
     def forwardToDestination(self):
         instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
         try:
-            attr = self.getAttribute(instance, self.attrName)
+            attr = getattr(instance, self.attrName)
         except:
             return []
         if self.isBasicType(attr):
@@ -335,7 +345,7 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
             
     def belongsToModule(self, exc_value, instance):
         try:
-            if instance is not None:
+            if isinstance(instance, PythonInstanceWrapper):
                 return exc_value.__module__ == instance.moduleName
             else:
                 return exc_value.__module__ == self.modOrObjName
@@ -357,7 +367,7 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
     def getResult(self):
         instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
         try:
-            func = self.getAttribute(instance, self.funcName)
+            func = getattr(instance, self.funcName)
             result = func(*self.parseArgs(), **self.keyw)
             return repr(self.addInstanceWrappers(result))
         except:
@@ -366,7 +376,7 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
                 # We own the exception object also, handle it like an ordinary instance
                 return "raise " + repr(PythonInstanceWrapper(exc_value, self.modOrObjName))
             else:
-                return "raise " + exc_value.__class__.__module__ + "." + exc_value.__class__.__name__ + "(" + repr(str(exc_value)) + ")"
+                return self.getExceptionText(exc_value)
 
     def forwardToDestination(self):
         result = self.getResult()
@@ -591,7 +601,8 @@ class TrafficRequestHandler(StreamRequestHandler):
                   "SUT_COMMAND_LINE" : CommandLineTraffic,
                   "SUT_COMMAND_KILL" : CommandLineKillTraffic,
                   "SUT_PYTHON_CALL"  : PythonFunctionCallTraffic,
-                  "SUT_PYTHON_ATTR"  : PythonAttributeTraffic }
+                  "SUT_PYTHON_ATTR"  : PythonAttributeTraffic,
+                  "SUT_PYTHON_IMPORT": PythonImportTraffic }
     def __init__(self, requestNumber, *args):
         self.requestNumber = requestNumber
         StreamRequestHandler.__init__(self, *args)

@@ -4,6 +4,7 @@ import sys
 class ModuleProxy:
     def __init__(self, name):
         self.name = name
+        self.AttributeProxy(self, self).tryImport() # make sure "our module" can really be imported
 
     def __getattr__(self, attrname):
         return self.AttributeProxy(self, self, attrname).tryEvaluate()
@@ -31,7 +32,7 @@ class ModuleProxy:
 
         
     class AttributeProxy:
-        def __init__(self, modOrObjProxy, moduleProxy, attributeName):
+        def __init__(self, modOrObjProxy, moduleProxy, attributeName=None):
             self.modOrObjProxy = modOrObjProxy
             self.moduleProxy = moduleProxy
             self.attributeName = attributeName
@@ -46,6 +47,15 @@ class ModuleProxy:
                 return eval(response)
             else:
                 return self
+
+        def tryImport(self):
+            sock = self.createSocket()
+            text = "SUT_PYTHON_IMPORT:" + self.modOrObjProxy.name
+            sock.sendall(text)
+            sock.shutdown(1)
+            response = sock.makefile().read()
+            if response:
+                self.handleResponse(response, "self.moduleProxy.InstanceProxy")
 
         def __getattr__(self, name):
             return self.__class__(self.modOrObjProxy, self.moduleProxy, self.attributeName + "." + name)

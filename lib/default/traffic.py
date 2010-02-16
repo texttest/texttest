@@ -630,6 +630,7 @@ class TrafficServer(TCPServer):
         ClientSocketTraffic.destination = None
         ClientSocketTraffic.direction = "<-"
         ServerTraffic.direction = "->"
+        PythonInstanceWrapper.allInstances = {}
         TCPServer.__init__(self, (socket.gethostname(), 0), TrafficRequestHandler)
         self.setAddressVariable(test)
         self.allThreads = [ Thread(target=self.run) ]

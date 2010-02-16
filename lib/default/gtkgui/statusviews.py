@@ -481,8 +481,10 @@ class TestProgressMonitor(guiutils.SubGUI):
 
     def notifyResetVisibility(self):
         self.diag.info("Resetting visibility from current status")
-        self.treeModel.foreach(self.resetNodeVisibility)
+        testsForReset = []
+        self.treeModel.foreach(self.resetNodeVisibility, testsForReset)
+        self.notify("Visibility", testsForReset, True)
 
-    def resetNodeVisibility(self, model, path, iter):
+    def resetNodeVisibility(self, model, path, iter, testsForReset):
         if model.get_value(iter, 2) and not model.iter_has_child(iter):
-            self.notify("Visibility", model.get_value(iter, 5), True)
+            testsForReset += model.get_value(iter, 5)

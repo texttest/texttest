@@ -499,12 +499,23 @@ class TestTreeGUI(guiutils.ContainerGUI):
             self.selection.select_iter(iter)
         treeView.grab_focus()
         if firstPath is not None and treeView.get_property("visible"):
-            cellArea = treeView.get_cell_area(firstPath, treeView.get_columns()[0])
-            visibleArea = treeView.get_visible_rect()
-            if cellArea.y < 0 or cellArea.y > visibleArea.height:
-                treeView.scroll_to_cell(firstPath, use_align=True, row_align=0.1)
+            self.scrollToPath(firstPath)
         self.selecting = False
         return actuallySelected
+
+    def scrollToFirstTest(self):
+        if len(self.selectedTests) > 0:
+            test = self.selectedTests[0]
+            iter = self.findIter(test)
+            path = self.filteredModel.get_path(iter)
+            self.scrollToPath(path)
+        
+    def scrollToPath(self, path):
+        treeView = self.selection.get_tree_view()
+        cellArea = treeView.get_cell_area(path, treeView.get_columns()[0])
+        visibleArea = treeView.get_visible_rect()
+        if cellArea.y < 0 or cellArea.y > visibleArea.height:
+            treeView.scroll_to_cell(path, use_align=True, row_align=0.1)
 
     def expandLevel(self, view, iter, recursive=True):
         # Make sure expanding expands everything, better than just one level as default...
@@ -719,6 +730,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
             while rootIter != None:
                 self.expandRow(rootIter, True)
                 rootIter = self.filteredModel.iter_next(rootIter)
+            gobject.idle_add(self.scrollToFirstTest)
         else:
             self.selectionChanged(direct=False)
 

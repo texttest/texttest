@@ -1652,6 +1652,7 @@ Static GUI Enhancements:
 	Can configure via "gui_entry_options" also
     - All tabs now have a "Reset" button that will reset just that tab (guiplugins.py)
     - "Enter failure information" dialog rejigged, grouping related items together and adding tooltips (adminactions.py)
+    - "Show All" now scrolls to the first selected test, if any
 Dynamic GUI Enhancements:
     - Selection tab added
 	Can do all of the selecting from the static GUI in the dynamic GUI also. (selectandfilter.py)
@@ -1686,6 +1687,8 @@ Framework Enhancements:
     - Can now provide extra arguments to virtual display server (Xvfb on UNIX) (virtualdisplay.py)
 	New config setting "virtual_display_extra_args"
 Batch Report Enhancements:
+    - Now includes overview graphs at the top of each page (resultgraphs.py)
+	Can also be generated standalone via "-s batch.GenerateGraphs"
     - Test descriptions now appear as tooltips over the test names in the first column (testoverview.py)
     - Fixed formatting problem when several tests had the same "known bug" from Bugzilla/Jira (testoverview.py)
     - Category ordering (coloured tables) now constant in summary page (batch/__init__.py)

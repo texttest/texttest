@@ -284,9 +284,10 @@ class GenerateWebPages(object):
                 cells.append(self.makeTableHeaderCell(tableHeader))
 
             if not cellInfo: 
-                graphFile = self.getGraphFile(filePath, version)
-                if testTable.generateGraph(os.path.abspath(graphFile), graphHeading):
-                    cells.append(self.makeImageLink(graphFile))
+                dirname, fileRef = self.getGraphFileParts(filePath, version)
+                fullPath = os.path.abspath(os.path.join(dirname, fileRef))
+                if testTable.generateGraph(fullPath, graphHeading):
+                    cells.append(self.makeImageLink(fileRef))
 
             if len(cells):
                 row = HTMLgen.TR(*cells)
@@ -304,12 +305,12 @@ class GenerateWebPages(object):
         else:
             return False
 
-    def getGraphFile(self, filePath, version):
+    def getGraphFileParts(self, filePath, version):
         dirname, local = os.path.split(filePath)
         versionSuffix = self.removePageVersion(version)
         if versionSuffix:
             versionSuffix = "." + versionSuffix
-        return os.path.join(dirname, "images", local[:-5] + versionSuffix + ".png")
+        return dirname, os.path.join("images", local[:-5] + versionSuffix + ".png")
         
     def writePages(self):
         plugins.log.info("Writing overview pages...")

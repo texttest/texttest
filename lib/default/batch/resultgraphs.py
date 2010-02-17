@@ -88,6 +88,11 @@ class GraphGenerator:
         plugins.ensureDirExistsForFile(fileName)
         graph.save(fileName)
 
+    def getGraphMinimum(self, bottomPlot, topPlot):
+        actualMin = min(bottomPlot)
+        range = max(max(topPlot) - actualMin, 1)
+        return max(actualMin - range * 2, 0)
+
     def addAllPlots(self, graph, results, *args):
         prevYlist = [ 0 ] * len(results)
         plotData = seqdict()
@@ -100,6 +105,9 @@ class GraphGenerator:
 
         for category in reversed(plotData.keys()):
             prevYlist, ylist = plotData[category]
+            if not self.hasNonZero(prevYlist):
+                # Adjust the bottom of the graph to avoid a huge block of green for large suites
+                prevYlist = [ self.getGraphMinimum(ylist, plotData.values()[-1][-1]) ] * len(ylist)
             self.addPlot(prevYlist, ylist, graph, category=category, *args)
         
     def hasNonZero(self, numbers):

@@ -44,7 +44,17 @@ class SetUpTrafficHandlers(plugins.Action):
             self.intercept(test, cmd, self.trafficFiles, copyExtension=True)
 
         for moduleName in test.getConfigValue("collect_traffic_py_module"):
-            self.intercept(test, moduleName + ".py", [ self.trafficPyModuleFile ], copyExtension=False)
+            modulePath = moduleName.replace(".", "/")
+            self.intercept(test, modulePath + ".py", [ self.trafficPyModuleFile ], copyExtension=False)
+            self.makePackageFiles(test, modulePath)
+
+    def makePackageFiles(self, test, modulePath):
+        parts = modulePath.rsplit("/", 1)
+        if len(parts) == 2:
+            localFileName = os.path.join(parts[0], "__init__.py")
+            fileName = test.makeTmpFileName(localFileName, forComparison=0)
+            open(fileName, "w").close() # make an empty package file
+            self.makePackageFiles(test, parts[0])
 
     def getCommandsForInterception(self, test):
         # This gets all names in collect_traffic, not just those marked
@@ -53,6 +63,7 @@ class SetUpTrafficHandlers(plugins.Action):
 
     def intercept(self, test, cmd, trafficFiles, copyExtension):
         interceptName = test.makeTmpFileName(cmd, forComparison=0)
+        plugins.ensureDirExistsForFile(interceptName)
         if os.path.exists(interceptName):
             # We might have written a fake version - store what it points to so we can
             # call it later, and remove the link

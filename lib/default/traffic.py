@@ -374,11 +374,19 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
     def parseArgs(self):
         args = eval(self.argStr, PythonInstanceWrapper.allInstances)
         return tuple(map(self.getArgInstance, args))
+
+    def getPossibleCompositeAttribute(self, instance, attrName):
+        attrParts = attrName.split(".", 1)
+        firstAttr = getattr(instance, attrParts[0])
+        if len(attrParts) == 1:
+            return firstAttr
+        else:
+            return self.getPossibleCompositeAttribute(firstAttr, attrParts[1])
         
     def getResult(self):
         instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
         try:
-            func = getattr(instance, self.funcName)
+            func = self.getPossibleCompositeAttribute(instance, self.funcName)
             result = func(*self.parseArgs(), **self.keyw)
             return repr(self.addInstanceWrappers(result))
         except:

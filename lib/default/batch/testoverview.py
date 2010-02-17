@@ -285,7 +285,7 @@ class GenerateWebPages(object):
 
             if not cellInfo: 
                 dirname, fileRef = self.getGraphFileParts(filePath, version)
-                fullPath = os.path.abspath(os.path.join(dirname, fileRef))
+                fullPath = os.path.abspath(os.path.join(dirname, fileRef)).replace("\\", "/")
                 if testTable.generateGraph(fullPath, graphHeading):
                     cells.append(self.makeImageLink(fileRef))
 

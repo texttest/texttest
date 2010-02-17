@@ -1,6 +1,7 @@
 
 """ Simple interface to matplotlib """
-
+from matplotlib import use
+use("Agg") # set backend to one that doesn't need a DISPLAY
 import plugins, pylab, logging, operator
 from ndict import seqdict
 

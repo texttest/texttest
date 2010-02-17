@@ -685,12 +685,15 @@ class TrafficServer(TCPServer):
             self.close_request(request)
 
     def process_request(self, request, client_address):
-        """Start a new thread to process the request."""
         self.requestCount += 1
-        t = Thread(target = self.process_request_thread,
-                   args = (request, client_address, self.requestCount))
-        t.start()
-        self.allThreads.append(t)
+        if self.test.getConfigValue("collect_traffic_use_threads") == "true":
+            """Start a new thread to process the request."""
+            t = Thread(target = self.process_request_thread,
+                       args = (request, client_address, self.requestCount))
+            t.start()
+            self.allThreads.append(t)
+        else:
+            self.process_request_thread(request, client_address, self.requestCount)
 
     def setAddressVariable(self, test):
         host, port = self.socket.getsockname()

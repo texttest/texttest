@@ -151,7 +151,7 @@ class BatchApplicationData:
             contents += category.describeFull()
         return contents
 
-# Works only on UNIX
+
 class BatchResponder(plugins.Responder):
     def __init__(self, optionMap, *args):
         self.sessionName = optionMap["b"]

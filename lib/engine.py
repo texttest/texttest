@@ -129,6 +129,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         self.inputOptions = testmodel.OptionFinder()
         self.diag = logging.getLogger("Find Applications")
         self.appSuites = seqdict()
+        self.exitCode = 0
         
     def printStackTrace(self, *args):
         sys.stderr.write("Received SIGQUIT: showing current stack trace below:\n")
@@ -272,7 +273,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             appGroup = [ app ] + app.extras
             for partApp in appGroup:
                 try:
-                    testSuite = partApp.createInitialTestSuite(self.observers)
+                    testSuite = self.createInitialTestSuite(partApp)
                     appSuites[partApp] = testSuite
                 except plugins.TextTestWarning, e:
                     warningMessages.append(partApp.rejectionMessage(str(e)))
@@ -301,10 +302,15 @@ class TextTest(plugins.Responder, plugins.Observable):
                 self.notify("ActionProgress")
                 app.cleanWriteDirectory(testSuite)
             self.appSuites = []
+
+    def notifyComplete(self, test):
+        if test.state.hasFailed():
+            self.exitCode = 1
         
     def run(self):
         try:
             self._run()
+            sys.exit(self.exitCode)
         except KeyboardInterrupt:
             pass # already written about this
 
@@ -396,10 +402,13 @@ class TextTest(plugins.Responder, plugins.Observable):
         return self.createEmptySuite(newApp)
 
     def createEmptySuite(self, newApp):
-        emptySuite = newApp.createInitialTestSuite(self.observers)
+        emptySuite = self.createInitialTestSuite(newApp)
         self.appSuites[newApp] = emptySuite
         self.addSuites([ emptySuite ])
         return emptySuite
+
+    def createInitialTestSuite(self, app):
+        return app.createInitialTestSuite(self.observers + [ self ])
     
     def makeDirectoryCache(self, appName):
         configFile = "config." + appName

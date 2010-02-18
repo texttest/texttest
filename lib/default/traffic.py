@@ -979,7 +979,7 @@ class ReplayInfo:
     def readIntoList(self, replayFile):
         trafficList = []
         currTraffic = ""
-        for line in open(replayFile).xreadlines():
+        for line in open(replayFile, "rU").xreadlines():
             if line.startswith("<-") or line.startswith("->"):
                 if currTraffic:
                     trafficList.append(currTraffic)

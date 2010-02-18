@@ -26,6 +26,11 @@ class ModuleProxy:
         def __getattr__(self, attrname):
             return self.moduleProxy.AttributeProxy(self, self.moduleProxy, attrname).tryEvaluate()
 
+        def __setattr__(self, attrname, value):
+            self.__dict__[attrname] = value
+            if attrname != "name":
+                self.moduleProxy.AttributeProxy(self, self.moduleProxy, attrname).setValue(value)
+            
     class ExceptionProxy(InstanceProxy, Exception):
         def __str__(self):
             return self.__getattr__("__str__")()
@@ -56,6 +61,13 @@ class ModuleProxy:
             response = sock.makefile().read()
             if response:
                 self.handleResponse(response, "self.moduleProxy.InstanceProxy")
+
+        def setValue(self, value):
+            sock = self.createSocket()
+            text = "SUT_PYTHON_SETATTR:" + self.modOrObjProxy.name + ":SUT_SEP:" + self.attributeName + \
+                   ":SUT_SEP:" + repr(value)
+            sock.sendall(text)
+            sock.shutdown(2)
 
         def __getattr__(self, name):
             return self.__class__(self.modOrObjProxy, self.moduleProxy, self.attributeName + "." + name)

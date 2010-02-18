@@ -333,6 +333,17 @@ class PythonAttributeTraffic(PythonModuleTraffic):
             return [ PythonResponseTraffic(repr(attr), self.responseFile) ]
         else:
             return []
+        
+class PythonSetAttributeTraffic(PythonModuleTraffic):
+    def __init__(self, inText, responseFile):
+        self.modOrObjName, self.attrName, self.valueStr = inText.split(":SUT_SEP:")
+        text = self.modOrObjName + "." + self.attrName + " = " + self.valueStr
+        super(PythonSetAttributeTraffic, self).__init__(text, responseFile)
+
+    def forwardToDestination(self):
+        instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
+        setattr(instance.instance, self.attrName, eval(self.valueStr))
+        return []
 
 
 class PythonFunctionCallTraffic(PythonModuleTraffic):
@@ -616,12 +627,13 @@ class CommandLineTraffic(Traffic):
     
                                
 class TrafficRequestHandler(StreamRequestHandler):
-    parseDict = { "SUT_SERVER"       : ServerStateTraffic,
-                  "SUT_COMMAND_LINE" : CommandLineTraffic,
-                  "SUT_COMMAND_KILL" : CommandLineKillTraffic,
-                  "SUT_PYTHON_CALL"  : PythonFunctionCallTraffic,
-                  "SUT_PYTHON_ATTR"  : PythonAttributeTraffic,
-                  "SUT_PYTHON_IMPORT": PythonImportTraffic }
+    parseDict = { "SUT_SERVER"           : ServerStateTraffic,
+                  "SUT_COMMAND_LINE"     : CommandLineTraffic,
+                  "SUT_COMMAND_KILL"     : CommandLineKillTraffic,
+                  "SUT_PYTHON_CALL"      : PythonFunctionCallTraffic,
+                  "SUT_PYTHON_ATTR"      : PythonAttributeTraffic,
+                  "SUT_PYTHON_SETATTR"   : PythonSetAttributeTraffic,
+                  "SUT_PYTHON_IMPORT"    : PythonImportTraffic }
     def __init__(self, requestNumber, *args):
         self.requestNumber = requestNumber
         StreamRequestHandler.__init__(self, *args)

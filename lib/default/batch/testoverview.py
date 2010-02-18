@@ -601,6 +601,7 @@ class TestDetails:
             return
         fullText = HTMLgen.Container()
         for freeText, tests in freeTextData:
+            tests.sort(key=lambda info: info[0])
             for testName, state, extraVersion in tests:
                 fullText.append(HTMLgen.Name(version + testName + extraVersion))
             fullText.append(self.getHeaderLine(tests, version, linkFromDetailsToOverview))

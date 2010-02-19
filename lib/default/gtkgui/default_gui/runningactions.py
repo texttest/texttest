@@ -141,6 +141,11 @@ class RunningAction:
             errText = testSel[0].app.filterErrorText(errFile)
             if len(errText):
                 self.notify("Status", usecase.capitalize() + " run failed for " + repr(testSel[0]))
+                lines = errText.splitlines()
+                maxLength = testSel[0].getConfigValue("lines_of_text_difference")
+                if len(lines) > maxLength:
+                    errText = "\n".join(lines[:maxLength])
+                    errText += "\n(Very long message truncated. Full details can be seen in the file at\n" + errFile + ")"
                 self.showErrorDialog(usecase.capitalize() + " run failed, with the following errors:\n" + errText)
                 return False
         return True

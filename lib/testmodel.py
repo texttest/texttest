@@ -677,7 +677,7 @@ class TestCase(Test):
             newState = loads(file.read())
             newState.updateAfterLoad(self.app, **updateArgs)
             return True, newState
-        except UnpicklingError:
+        except (UnpicklingError, ImportError, EOFError, AttributeError), e:
             return False, plugins.Unrunnable(briefText="read error", \
                                              freeText="Failed to read results file")
     def saveState(self):

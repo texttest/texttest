@@ -165,9 +165,10 @@ class SummaryDataFinder:
             return "success"
         elif categoryName == "knownbugs":
             return "knownbug"
-        elif categoryName in [ "faster", "slower", "memory+", "memory-" ]:
-            return "performance"
         else:
+            for perfCat in [ "faster", "slower", "memory+", "memory-" ]:
+                if categoryName.startswith(perfCat):
+                    return "performance"
             return "failure"
 
     def parseFileName(self, fileName):

@@ -395,7 +395,7 @@ class ActionGUI(BasicActionGUI):
         
     def updateFileSelection(self, files):
         self.currFileSelection = files
-        newActive = self.isActiveOnCurrent()
+        newActive = self.allAppsValid() and self.isActiveOnCurrent()
         self.diag.info("New file selection for " + self.getTitle() + "=" + repr(files) + " : new active = " + repr(newActive))
         return newActive
 

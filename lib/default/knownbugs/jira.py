@@ -24,12 +24,18 @@
  'votes': '0'}
 """
 
-import xmlrpclib, types
+import xmlrpclib
 from ndict import seqdict
 
 def convertToString(value):
-    if type(value) == types.StringType:
-        return value.replace("\r", "") # Get given Windows line endings but Python doesn't use them internally
+    if type(value) in (str, unicode):
+        ret = value.replace("\r", "") # Get given Windows line endings but Python doesn't use them internally
+        if type(ret) == unicode:
+            import locale
+            encoding = locale.getdefaultlocale()[1]
+            return ret.encode(encoding)
+        else:
+            return ret
     else:
         return ", ".join(map(convertDictToString, value))
 

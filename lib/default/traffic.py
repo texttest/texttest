@@ -347,6 +347,7 @@ class PythonSetAttributeTraffic(PythonModuleTraffic):
 
 
 class PythonFunctionCallTraffic(PythonModuleTraffic):
+    interceptModules = []
     def __init__(self, inText, responseFile):
         self.modOrObjName, self.funcName, self.argStr, keywStr = inText.split(":SUT_SEP:")
         self.keyw = eval(keywStr)
@@ -365,12 +366,9 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
         else:
             return argStr
             
-    def belongsToModule(self, exc_value, instance):
+    def belongsToModule(self, exc_value):
         try:
-            if isinstance(instance, PythonInstanceWrapper):
-                return exc_value.__module__ == instance.moduleName
-            else:
-                return exc_value.__module__ == self.modOrObjName
+            return exc_value.__module__ in self.interceptModules
         except AttributeError: # Global exceptions like AttributeError itself on Windows cause this
             return False
 
@@ -402,9 +400,9 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
             return repr(self.addInstanceWrappers(result))
         except:
             exc_type, exc_value, exc_traceback = sys.exc_info()
-            if self.belongsToModule(exc_value, instance):
+            if self.belongsToModule(exc_value):
                 # We own the exception object also, handle it like an ordinary instance
-                return "raise " + repr(PythonInstanceWrapper(exc_value, self.modOrObjName))
+                return "raise " + repr(PythonInstanceWrapper(exc_value, exc_value.__module__))
             else:
                 return self.getExceptionText(exc_value)
 
@@ -673,6 +671,7 @@ class TrafficServer(TCPServer):
         ClientSocketTraffic.direction = "<-"
         ServerTraffic.direction = "->"
         PythonInstanceWrapper.allInstances = {}
+        PythonFunctionCallTraffic.interceptModules = test.getConfigValue("collect_traffic_py_module")
         TCPServer.__init__(self, (socket.gethostname(), 0), TrafficRequestHandler)
         self.setAddressVariable(test)
         self.allThreads = [ Thread(target=self.run) ]

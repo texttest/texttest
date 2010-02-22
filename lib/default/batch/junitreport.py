@@ -73,7 +73,7 @@ class JUnitApplicationData:
         result["success"] = False
         result["failure"] = False                    
         result["short_message"] = self._shortMessage(test)
-        result["long_message"] = test.state.freeText                    
+        result["long_message"] = self._longMessage(test)                   
 
     def _success(self, test, result):
         result["error"] = False
@@ -85,11 +85,15 @@ class JUnitApplicationData:
         result["success"] = False
         result["failure"] = True
         result["short_message"] = self._shortMessage(test)
-        result["long_message"] = test.state.freeText                    
+        result["long_message"] = self._longMessage(test)                    
     
     def _shortMessage(self, test):
         overall, postText = test.state.getTypeBreakdown()
-        return postText        
+        return postText 
+    
+    def _longMessage(self, test):
+        message = test.state.freeText.replace("]]>", "END_MARKER")
+        return message       
 
 
 failure_template = """\
@@ -149,7 +153,6 @@ class ReportWriter:
             
     def _writeTestResult(self, testFileName, text):
             testFile = open(testFileName, "w")
-            text.replace("]]>", "END_MARKER")
             testFile.write(text)
             testFile.close()        
             

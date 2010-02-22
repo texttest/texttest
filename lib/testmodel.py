@@ -1386,7 +1386,7 @@ class Application:
         self.setConfigDefault("import_config_file", [], "Extra config files to use")
         self.setConfigDefault("full_name", self.name.upper(), "Expanded name to use for application")
         self.setConfigDefault("home_operating_system", "any", "Which OS the test results were originally collected on")
-        self.setConfigDefault("base_version", [], "Versions to inherit settings from")
+        self.setConfigDefault("base_version", { "default" : [] }, "Versions to inherit settings from")
         self.setConfigDefault("default_machine", "localhost", "Default machine to run tests on")
         self.setConfigDefault("kill_timeout", 0, "Number of (wall clock) seconds to wait before killing the test")
         # various varieties of test data
@@ -1418,7 +1418,8 @@ class Application:
             versionsToUse = self.filterUnsaveable(self.versions)
             self.diag.info("Versions for saving = " + repr(versionsToUse) + " from " + repr(self.versions))
             if versionsToUse != self.versions:
-                saveableVersions = self.getSaveableVersions()
+                # Don't get implied base versions here, we don't want them to be the default save version
+                saveableVersions = self.getSaveableVersions(baseVersionKey="default")
                 saveableVersions.sort(lambda v1, v2: self.compareForPriority(set(v1.split(".")), set(v2.split("."))))
                 self.diag.info("Saveable versions = " + repr(saveableVersions))
                 if len(saveableVersions) == 0:
@@ -1473,12 +1474,18 @@ class Application:
                 saveableVersions.append(version)
         return saveableVersions
 
+    def getBaseVersions(self, baseVersionKey="implied"):
+        # By default, this gets all names in base_version, not just those marked
+        # "implied"! (it will also pick up "default").
+        # To get only "default", this has to be provided by the caller
+        return self.getCompositeConfigValue("base_version", baseVersionKey)
+
     def getExtensionPredicate(self, allVersions):
         if allVersions:
             # everything that has at least the given extensions
             return set([ self.name ]).issubset
         else:
-            possVersions = [ self.name ] + self.getConfigValue("base_version") + self.versions
+            possVersions = [ self.name ] + self.getBaseVersions() + self.versions
             return set(possVersions).issuperset
 
     def compareForDisplay(self, vset1, vset2):
@@ -1522,7 +1529,7 @@ class Application:
             self.diag.info("Version count " + repr(versionCount1) + " vs " + repr(versionCount2))
             return cmp(versionCount1, versionCount2)
 
-        baseVersions = set(self.getConfigValue("base_version"))
+        baseVersions = set(self.getBaseVersions())
         baseCount1 = len(vset1.intersection(baseVersions))
         baseCount2 = len(vset2.intersection(baseVersions))
         self.diag.info("Base count " + repr(baseCount1) + " vs " + repr(baseCount2))
@@ -1538,8 +1545,8 @@ class Application:
     def getVersionPriority(self, version):
         return self.getCompositeConfigValue("version_priority", version)
 
-    def getSaveableVersions(self):
-        versionsToUse = self.versions + self.getConfigValue("base_version")
+    def getSaveableVersions(self, **kw):
+        versionsToUse = self.versions + self.getBaseVersions(**kw)
         versionsToUse = self.filterUnsaveable(versionsToUse)
         if len(versionsToUse) == 0:
             return []

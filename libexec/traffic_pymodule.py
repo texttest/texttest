@@ -74,7 +74,8 @@ class ModuleProxy:
 
         def __call__(self, *args, **kw):
             response = self.makeResponse(*args, **kw)
-            return self.handleResponse(response, "self.moduleProxy.InstanceProxy")
+            if response:
+                return self.handleResponse(response, "self.moduleProxy.InstanceProxy")
 
         def makeResponse(self, *args, **kw):
             sock = self.createAndSend(*args, **kw)

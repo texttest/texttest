@@ -408,7 +408,10 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
 
     def forwardToDestination(self):
         result = self.getResult()
-        return [ PythonResponseTraffic(result, self.responseFile) ]
+        if result != "None":
+            return [ PythonResponseTraffic(result, self.responseFile) ]
+        else:
+            return []
 
     def addInstanceWrappers(self, result):
         if not self.isBasicType(result):

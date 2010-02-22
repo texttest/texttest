@@ -351,8 +351,9 @@ class TestTable:
         if len(self.tags) > 1: # Don't bother with graphs when tests have only run once
             try:
                 from resultgraphs import GraphGenerator
-            except ImportError:
-                return False # if matplotlib isn't installed
+            except Exception, e:
+                sys.stderr.write("Not producing result graphs: " + str(e) + "\n")
+                return False # if matplotlib isn't installed or is too old
         
             data = self.getColourKeySummaryData()
             generator = GraphGenerator()

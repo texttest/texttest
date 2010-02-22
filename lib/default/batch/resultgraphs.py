@@ -1,9 +1,24 @@
 
 """ Simple interface to matplotlib """
-from matplotlib import use
-use("Agg") # set backend to one that doesn't need a DISPLAY
+
+class MatplotlibError(Exception):
+    pass
+
+try:
+    import matplotlib
+except ImportError:
+    raise MatplotlibError, "Could not find the Matplotlib module, which must be present for graphs to be produced."
+
+version = matplotlib.__version__
+versionParts = tuple(map(int, version.split(".")[:2]))
+if versionParts < (0, 98):
+    raise MatplotlibError, "Graph generation requires at least matplotlib version 0.98" + \
+          ", while version " + version + " is installed."
+
+matplotlib.use("Agg") # set backend to one that doesn't need a DISPLAY
 import plugins, pylab, logging, operator
 from ndict import seqdict
+    
 
 class Graph:
     cms_per_inch = 2.54

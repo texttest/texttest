@@ -46,9 +46,7 @@ class JUnitApplicationData:
     JUnit report format """
     def __init__(self, rootSuite):
         self.rootSuite = rootSuite
-        # full test name : result
         self.testResults = {}
-        self.rootSuiteName = rootSuite.name
         
     def storeResult(self, test):
         result = dict(full_test_name=self._fullTestName(test), 
@@ -68,7 +66,7 @@ class JUnitApplicationData:
     
     def _fullTestName(self, test):
         relpath = test.getRelPath()
-        return self.rootSuiteName + "." + relpath.replace("/", ".")
+        return self.rootSuite.name + "." + relpath.replace("/", ".")
     
     def _error(self, test, result):
         result["error"] = True
@@ -140,19 +138,26 @@ class ReportWriter:
         self.diag.info("writing results in junit format for app " + app.fullName())
         appResultsDir = self._createResultsDir(app)
         for testName, result in appData.getResults().items():
-            testFileName = os.path.join(appResultsDir, testName + ".xml")
-            testFile = open(testFileName, "w")
             if result["success"]:
                 text = Template(success_template).substitute(result)
             elif result["error"]:
                 text = Template(error_template).substitute(result)
             else:
                 text = Template(failure_template).substitute(result)
+            testFileName = os.path.join(appResultsDir, testName + ".xml")
+            self._writeTestResult(testFileName, text)
+            
+    def _writeTestResult(self, testFileName, text):
+            testFile = open(testFileName, "w")
+            text.replace("]]>", "END_MARKER")
             testFile.write(text)
             testFile.close()        
             
     def _createResultsDir(self, app):
-        resultsDir = os.path.join(app.writeDirectory, "junitreport")
+        resultsDir = self.userDefinedFolder(app)
+        if (resultsDir is None or resultsDir.strip() == ""):
+            resultsDir = os.path.join(app.writeDirectory, "junitreport")
+    
         if not os.path.exists(resultsDir):
             os.mkdir(resultsDir)
         appResultsDir = os.path.join(resultsDir, app.name + app.versionSuffix())
@@ -160,5 +165,7 @@ class ReportWriter:
             os.mkdir(appResultsDir)
         return appResultsDir
             
-            
+    def userDefinedFolder(self, app):
+        return app.getCompositeConfigValue("batch_junit_folder", self.sessionName)
+         
         

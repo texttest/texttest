@@ -53,7 +53,7 @@ class JUnitApplicationData:
     def storeResult(self, test):
         result = dict(full_test_name=self._fullTestName(test), 
                       test_name=test.name,
-                      time="1")
+                      time="1") # fake the time
         if not test.state.hasResults():
             self._error(test, result)
         elif test.state.hasSucceeded():
@@ -149,24 +149,7 @@ class ReportWriter:
             else:
                 text = Template(failure_template).substitute(result)
             testFile.write(text)
-            testFile.close()
-            
-        # write fake file for the moment
-#        testFileName = os.path.join(appResultsDir, "OutDiff.xml")
-#        testFile = open(testFileName, "w")
-#        test_result = dict(full_test_name="root.TargetApp.OutDiff",
-#                           time="1",
-#                           test_name="OutDiff",
-#                           short_message="output different",
-#                           long_message="""
-#---------- Differences in output ----------
-#0a1
-#> Hello World!
-#                           """)
-#        text = Template(failure_template).substitute(test_result)
-#        testFile.write(text)
-#        testFile.close()
-        
+            testFile.close()        
             
     def _createResultsDir(self, app):
         resultsDir = os.path.join(app.writeDirectory, "junitreport")

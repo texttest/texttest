@@ -3,6 +3,7 @@ import logging, os
 import plugins
 from ndict import seqdict
 from util import calculateBatchDate, getRootSuite
+from string import Template
 
 class JUnitResponder(plugins.Responder):
     """Respond to test results and write out results in format suitable for JUnit
@@ -27,14 +28,12 @@ class JUnitResponder(plugins.Responder):
     def notifyAllComplete(self):
         # allApps is {appname : [app]}
         for appname, appList in self.allApps.items():
-            # batchAppData is {app : data}
+            # appData is {app : data}
             for app in appList:
                 if self.useJUnitFormat(app):
                     data = self.appData[app]
                     ReportWriter(self.sessionName, self.runId).writeResults(app, data)
-
-
-        
+      
     def _addApplication(self, test):
         rootSuite = getRootSuite(test)
         app = test.app
@@ -47,19 +46,87 @@ class JUnitApplicationData:
     JUnit report format """
     def __init__(self, rootSuite):
         self.rootSuite = rootSuite
-        self.suites = []
+        # full test name : result
+        self.testResults = {}
+        self.rootSuiteName = rootSuite.name
         
     def storeResult(self, test):
-        pass
+        result = dict(full_test_name=self._fullTestName(test), 
+                      test_name=test.name,
+                      time="1")
+        if not test.state.hasResults():
+            self._error(test, result)
+        elif test.state.hasSucceeded():
+            self._success(test, result)
+        else:
+            self._failure(test, result)
         
+        self.testResults[test.name] = result
+        
+    def getResults(self):
+        return self.testResults
+    
+    def _fullTestName(self, test):
+        relpath = test.getRelPath()
+        return self.rootSuiteName + "." + relpath.replace("/", ".")
+    
+    def _error(self, test, result):
+        result["error"] = True
+        result["success"] = False
+        result["failure"] = False                    
+        result["short_message"] = self._shortMessage(test)
+        result["long_message"] = test.state.freeText                    
+
+    def _success(self, test, result):
+        result["error"] = False
+        result["success"] = True
+        result["failure"] = False        
+        
+    def _failure(self, test, result):
+        result["error"] = False
+        result["success"] = False
+        result["failure"] = True
+        result["short_message"] = self._shortMessage(test)
+        result["long_message"] = test.state.freeText                    
+    
+    def _shortMessage(self, test):
+        overall, postText = test.state.getTypeBreakdown()
+        return postText        
 
 
-template = """\
+failure_template = """\
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="root.TargetApp.OutDiff" failures="1" tests="1" time="6" errors="0">
+<testsuite name="$full_test_name" failures="1" tests="1" time="$time" errors="0">
   <properties/>
-  <testcase name="OutDiff time="5.0" classname=""/>
+  <testcase name="$test_name" time="$time" classname="">
+    <failure type="differences" message="$short_message">
+    <![CDATA[
+$long_message
+]]>
+    </failure>
+  </testcase>
+</testsuite>
+"""
 
+error_template = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="$full_test_name" failures="0" tests="1" time="$time" errors="1">
+  <properties/>
+  <testcase name="$test_name" time="$time" classname="">
+    <error type="none" message="$short_message">
+    <![CDATA[
+$long_message
+]]>
+    </error>
+  </testcase>
+</testsuite>
+"""
+
+success_template = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="$full_test_name" failures="0" tests="1" time="$time" errors="0">
+  <properties/>
+  <testcase name="$test_name" time="$time" classname=""/>
 </testsuite>
 """
 
@@ -69,14 +136,36 @@ class ReportWriter:
         self.runId = runId
         self.diag = logging.getLogger("JUnit Report Writer")
         
-    def writeResults(self, app, batchApplicationData):
+    def writeResults(self, app, appData):
         self.diag.info("writing results in junit format for app " + app.fullName())
         appResultsDir = self._createResultsDir(app)
+        for testName, result in appData.getResults().items():
+            testFileName = os.path.join(appResultsDir, testName + ".xml")
+            testFile = open(testFileName, "w")
+            if result["success"]:
+                text = Template(success_template).substitute(result)
+            elif result["error"]:
+                text = Template(error_template).substitute(result)
+            else:
+                text = Template(failure_template).substitute(result)
+            testFile.write(text)
+            testFile.close()
+            
         # write fake file for the moment
-        testFileName = os.path.join(appResultsDir, "OutDiff.xml")
-        testFile = open(testFileName, "w")
-        testFile.write(template)
-        testFile.close()
+#        testFileName = os.path.join(appResultsDir, "OutDiff.xml")
+#        testFile = open(testFileName, "w")
+#        test_result = dict(full_test_name="root.TargetApp.OutDiff",
+#                           time="1",
+#                           test_name="OutDiff",
+#                           short_message="output different",
+#                           long_message="""
+#---------- Differences in output ----------
+#0a1
+#> Hello World!
+#                           """)
+#        text = Template(failure_template).substitute(test_result)
+#        testFile.write(text)
+#        testFile.close()
         
             
     def _createResultsDir(self, app):

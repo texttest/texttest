@@ -2,8 +2,10 @@
 
 import os, plugins, sys, string, time, types, shutil, datetime, testoverview, logging, operator
 from summarypages import GenerateSummaryPage, GenerateGraphs
+import junitreport
 from ndict import seqdict
 from cPickle import Pickler
+from batchutils import calculateBatchDate
 
 class BatchVersionFilter:
     def __init__(self, batchSession):
@@ -158,16 +160,18 @@ class BatchResponder(plugins.Responder):
         self.runId = optionMap.get("name", calculateBatchDate()) # use the command-line name if given, else the date
         self.batchAppData = seqdict()
         self.allApps = seqdict()
+        
     def notifyComplete(self, test):
         if not self.batchAppData.has_key(test.app):
             self.addApplication(test)
         self.batchAppData[test.app].storeCategory(test)
+
     def getRootSuite(self, test):
         if test.parent:
             return self.getRootSuite(test.parent)
         else:
             return test
-        
+       
     def addApplication(self, test):
         rootSuite = self.getRootSuite(test)
         app = test.app
@@ -179,6 +183,8 @@ class BatchResponder(plugins.Responder):
         for appList in self.allApps.values():
             batchDataList = map(lambda x: self.batchAppData[x], appList)
             mailSender.send(batchDataList)
+            
+    
 
 sectionHeaders = [ "Summary of all Unsuccessful tests", "Details of all Unsuccessful tests", "Summary of all Successful tests" ]
 
@@ -357,11 +363,6 @@ class MailSender:
                 return False
         return True
 
-def calculateBatchDate():
-    # Batch mode uses a standardised date that give a consistent answer for night-jobs.
-    # Hence midnight is a bad cutover point. The day therefore starts and ends at 8am :)
-    timeinseconds = plugins.globalStartTime - 8*60*60
-    return time.strftime("%d%b%Y", time.localtime(timeinseconds))
 
 def findExtraVersionParent(app, allApps):
     for parentApp in allApps:

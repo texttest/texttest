@@ -297,6 +297,7 @@ class Config:
                     plugins.log.info("No batch session identifier provided, using 'default'")
                     self.optionMap["b"] = "default"
                 classes.append(batch.BatchResponder)
+                classes.append(batch.junitreport.JUnitResponder)
         if self.useVirtualDisplay():
             from virtualdisplay import VirtualDisplayResponder
             classes.append(VirtualDisplayResponder)
@@ -902,6 +903,8 @@ class Config:
         app.setConfigDefault("batch_timelimit", { "default" : "" }, "Maximum length of test to include in batch mode runs")
         app.setConfigDefault("batch_filter_file", { "default" : [] }, "Generic filter for batch session, more flexible than timelimit")
         app.setConfigDefault("batch_use_collection", { "default" : "false" }, "Do we collect multiple mails into one in batch mode")
+        app.setConfigDefault("batch_junit_format", { "default" : "false" }, "Do we write out results in junit format in batch mode")
+        app.setConfigDefault("batch_junit_folder", { "default" : "" }, "Which folder to write test results in junit format in batch mode. Only useful together with batch_junit_format")
         app.setConfigDefault("batch_collect_max_age_days", { "default" : 100000 }, "When collecting multiple messages, what is the maximum age of run that we should accept?")
         app.setConfigDefault("batch_collect_compulsory_version", self.getDefaultCollectCompulsoryVersions(), "When collecting multiple messages, which versions should be expected and give an error if not present?")
         app.setConfigDefault("batch_mail_on_failure_only", { "default" : "false" }, "Send mails only if at least one test fails")

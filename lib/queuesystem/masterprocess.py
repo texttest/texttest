@@ -479,7 +479,7 @@ class QueueSystemServer(BaseActionRunner):
                 return True
             else:
                 self.diag.info("Job " + jobId + " was pending.")
-                self.setKilledPending(test)
+                self.setKilledPending(test, jobId)
                 return False
         else:
             self.diag.info("Job " + jobId + " did not exist.")
@@ -489,10 +489,10 @@ class QueueSystemServer(BaseActionRunner):
         return False
     def jobStarted(self, test):
         return test.state.hasStarted()
-    def setKilledPending(self, test):
+    def setKilledPending(self, test, jobId):
         timeStr =  plugins.localtime("%H:%M")
         briefText = "cancelled pending job at " + timeStr
-        freeText = "Test job was cancelled (while still pending in " + queueSystemName(test.app) +\
+        freeText = "Test job " + jobId + " was cancelled (while still pending in " + queueSystemName(test.app) +\
                    ") at " + timeStr
         self.cancel(test, briefText, freeText)
 

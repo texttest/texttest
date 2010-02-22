@@ -93,6 +93,7 @@ class GenerateWebPages(object):
                         loggedTests.setdefault(extraVersion, seqdict()).setdefault(testId, seqdict())[tag] = state
                         categoryHandlers.setdefault(tag, CategoryHandler()).registerInCategory(testId, state, extraVersion)
 
+                versionToShow = self.removePageVersion(version)
                 for resourceName in self.resourceNames:
                     hasData = False
                     for sel in selectors:
@@ -105,14 +106,12 @@ class GenerateWebPages(object):
                             
                         for cellInfo in self.getCellInfoForResource(resourceName):
                             tableHeader = self.getTableHeader(resourceName, cellInfo, version, repositoryDirs)
-                            heading = self.getHeading(resourceName)
+                            heading = self.getHeading(resourceName, versionToShow)
                             hasData |= self.addTable(page, cellInfo, categoryHandlers, version,
                                                      loggedTests, sel, tableHeader, filePath, heading)
-                    if hasData:
-                        versionToShow = self.removePageVersion(version)
-                        if versionToShow:
-                            link = HTMLgen.Href("#" + version, versionToShow)
-                            foundMinorVersions.setdefault(resourceName, HTMLgen.Container()).append(link)
+                    if hasData and versionToShow:
+                        link = HTMLgen.Href("#" + version, versionToShow)
+                        foundMinorVersions.setdefault(resourceName, HTMLgen.Container()).append(link)
                     
                 # put them in reverse order, most relevant first
                 linkFromDetailsToOverview = [ sel.getLinkInfo(self.pageVersion) for sel in allSelectors ]
@@ -141,9 +140,12 @@ class GenerateWebPages(object):
 
         self.writePages()
 
-    def getHeading(self, resourceName):
-        return self.getResultType(resourceName) + " results for " + self.pageTitle
-
+    def getHeading(self, resourceName, versionToShow=""):
+        heading = self.getResultType(resourceName) + " results for " + self.pageTitle
+        if versionToShow:
+            heading += "." + versionToShow
+        return heading
+    
     def getTableHeader(self, resourceName, cellInfo, version, repositoryDirs):
         parts = []
         if resourceName != cellInfo:

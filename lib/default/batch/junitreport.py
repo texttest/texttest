@@ -49,6 +49,7 @@ class JUnitApplicationData:
     def storeResult(self, test):
         result = dict(full_test_name=self._fullTestName(test), 
                       test_name=test.name,
+                      suite_name=self._suiteName(test),
                       time="1") # fake the time
         if not test.state.hasResults():
             self._error(test, result)
@@ -61,6 +62,10 @@ class JUnitApplicationData:
         
     def getResults(self):
         return self.testResults
+    
+    def _suiteName(self, test):
+        fullName = self._fullTestName(test)
+        return ".".join(fullName.split(".")[:-1])
     
     def _fullTestName(self, test):
         relpath = test.getRelPath()
@@ -98,7 +103,7 @@ failure_template = """\
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="$full_test_name" failures="1" tests="1" time="$time" errors="0">
   <properties/>
-  <testcase name="$test_name" time="$time" classname="">
+  <testcase name="$test_name" time="$time" classname="$suite_name">
     <failure type="differences" message="$short_message">
     <![CDATA[
 $long_message
@@ -112,7 +117,7 @@ error_template = """\
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="$full_test_name" failures="0" tests="1" time="$time" errors="1">
   <properties/>
-  <testcase name="$test_name" time="$time" classname="">
+  <testcase name="$test_name" time="$time" classname="$suite_name">
     <error type="none" message="$short_message">
     <![CDATA[
 $long_message
@@ -126,7 +131,7 @@ success_template = """\
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="$full_test_name" failures="0" tests="1" time="$time" errors="0">
   <properties/>
-  <testcase name="$test_name" time="$time" classname=""/>
+  <testcase name="$test_name" time="$time" classname="$suite_name"/>
 </testsuite>
 """
 

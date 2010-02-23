@@ -96,7 +96,7 @@ class GraphGenerator:
         self.diag.info("Generating graphs...")
         
     def generateGraph(self, fileName, graphTitle, results, colourFinder):
-        print "Generating graph at " + fileName + " ..."
+        plugins.log.info("Generating graph at " + fileName + " ...")
         graph = Graph(graphTitle, width=24, height=20)
         self.addAllPlots(graph, results, colourFinder)
         self.addDateLabels(graph, results)

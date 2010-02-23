@@ -434,7 +434,6 @@ class PaneGUI(guiutils.ContainerGUI):
     def __init__(self, gui1, gui2 , horizontal, shrink=True):
         guiutils.ContainerGUI.__init__(self, [ gui1, gui2 ])
         self.horizontal = horizontal
-        self.panedTooltips = gtk.Tooltips()
         self.paned = None
         self.separatorHandler = None
         self.position = 0

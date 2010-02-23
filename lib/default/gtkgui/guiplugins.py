@@ -332,11 +332,18 @@ class ActionGUI(BasicActionGUI):
         self.currFileSelection = []
         self.currAppSelection = []
         self.validApps = []
-        self.tooltips = gtk.Tooltips()
         self.noApps = len(allApps) == 0
         BasicActionGUI.__init__(self)
         for app in allApps:
             self._checkAllValid(app)
+
+    def setTooltipText(self, widget, text):
+        if gtk.gtk_version >= (2, 12, 0): # New tooltip API
+            widget.set_tooltip_text(text)
+        else:
+            if not hasattr(self, "tooltips"):
+                self.tooltips = gtk.Tooltips()
+            self.tooltips.set_tip(widget, text)
         
     def checkValid(self, app):
         self._checkAllValid(app)
@@ -430,7 +437,7 @@ class ActionGUI(BasicActionGUI):
         # In theory all this should be automatic, but it appears not to work
         if self.getStockId():
             button.set_image(gtk.image_new_from_stock(self.getStockId(), gtk.ICON_SIZE_BUTTON))
-        self.tooltips.set_tip(button, self.getTooltip())
+        self.setTooltipText(button, self.getTooltip())
         button.show()
         return button
     
@@ -505,7 +512,7 @@ class OptionGroupGUI(ActionGUI):
         label = gtk.EventBox()
         label.add(gtk.Label(option.name + separator))
         if option.description and type(option.description) == types.StringType:
-            self.tooltips.set_tip(label, option.description)
+            self.setTooltipText(label, option.description)
         return label
 
     def createOptionEntry(self, option, separator):
@@ -562,7 +569,7 @@ class OptionGroupGUI(ActionGUI):
             radioButton = gtk.RadioButton(mainRadioButton, option, use_underline=True)
             self.setRadioButtonName(radioButton, option, optionGroup)
             if individualToolTips:
-                self.tooltips.set_tip(radioButton, switch.description[index])
+                self.setTooltipText(radioButton, switch.description[index])
                 
             buttons.append(radioButton)
             if not mainRadioButton:
@@ -607,7 +614,7 @@ class OptionGroupGUI(ActionGUI):
         self.updateForConfig(switch)
         checkButton = gtk.CheckButton(switch.name)
         if switch.description:
-            self.tooltips.set_tip(checkButton, switch.description)
+            self.setTooltipText(checkButton, switch.description)
         
         if int(switch.getValue()):
             checkButton.set_active(True)
@@ -728,7 +735,7 @@ class ActionTabGUI(OptionGroupGUI):
         button = gtk.Button("Reset Tab")
         button.set_name("Reset " + self.getTabTitle() + " Tab")
         button.connect("clicked", self.notifyReset)
-        self.tooltips.set_tip(button, "Reset all the settings in the current tab to their default values")
+        self.setTooltipText(button, "Reset all the settings in the current tab to their default values")
         button.show()
         return button
     

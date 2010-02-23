@@ -377,7 +377,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             # haven't fixed their own observers
             if isinstance(object, plugins.Observable) and len(object.observers) == 0:
                 self.diag.info("All responders now observing " + str(object.__class__))
-                object.setObservers(self.observers + [ self ])
+                object.setObservers([ self ] + self.observers)
             suites = self.getSuitesToAdd(object, emptySuites)
             self.diag.info("Adding suites " + repr(suites) + " for " + str(object.__class__))
             object.addSuites(suites)
@@ -408,7 +408,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         return emptySuite
 
     def createInitialTestSuite(self, app):
-        return app.createInitialTestSuite(self.observers + [ self ])
+        return app.createInitialTestSuite([ self ] + self.observers)
     
     def makeDirectoryCache(self, appName):
         configFile = "config." + appName

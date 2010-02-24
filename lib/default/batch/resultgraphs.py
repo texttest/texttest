@@ -80,6 +80,7 @@ class Graph:
         pylab.setp(self.sub1.get_xticklabels(), 'rotation', 90, fontsize=7)
 
     def finalise_graph(self):
+        self.sub1.autoscale_view(tight=True, scaley=False)
         leg = self.sub1.legend(self.legendItems, tuple(self.plotLabels), 'best', shadow=False)
         leg.get_frame().set_alpha(0.5) # transparent legend box		
         

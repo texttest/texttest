@@ -379,7 +379,8 @@ class ShowAll(guiplugins.BasicActionGUI,AllTestsHandler):
 class SaveSelection(guiplugins.ActionDialogGUI):
     def __init__(self, allApps, dynamic, *args):
         guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic, *args)
-        self.addOption("f", "enter filter-file name =", possibleDirs=self.getFilterFileDirs(allApps), saveFile=True)
+        possibleDirs = self.getFilterFileDirs(allApps, useOwnTmpDir=False)
+        self.addOption("f", "enter filter-file name =", possibleDirs=possibleDirs, saveFile=True)
         if not dynamic:
             # In the static GUI case, we also want radiobuttons specifying
             # whether we want to save the actual tests, or the selection criteria.
@@ -448,7 +449,8 @@ class SaveSelection(guiplugins.ActionDialogGUI):
 class LoadSelection(guiplugins.ActionDialogGUI):
     def __init__(self, allApps, *args):
         guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
-        self.addOption("f", "select filter-file", possibleDirs=self.getFilterFileDirs(allApps), selectFile=True)
+        possibleDirs = self.getFilterFileDirs(allApps, useOwnTmpDir=True)
+        self.addOption("f", "select filter-file", possibleDirs=possibleDirs, selectFile=True)
         self.rootTestSuites = []
 
     def addSuites(self, suites):

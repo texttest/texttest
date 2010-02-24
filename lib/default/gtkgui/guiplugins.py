@@ -963,9 +963,9 @@ class ActionDialogGUI(OptionGroupGUI):
         fileChooser.set_local_only(True)
         return fileChooser
 
-    def getFilterFileDirs(self, allApps):
+    def getFilterFileDirs(self, allApps, **kw):
         if len(allApps) > 0:
-            return allApps[0].getFilterFileDirectories(allApps, useOwnTmpDir=True)
+            return allApps[0].getFilterFileDirectories(allApps, **kw)
         else:
             return []
         

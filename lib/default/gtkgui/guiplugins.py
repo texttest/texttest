@@ -338,7 +338,7 @@ class ActionGUI(BasicActionGUI):
             self._checkAllValid(app)
 
     def setTooltipText(self, widget, text):
-        if gtk.gtk_version >= (2, 12, 0): # New tooltip API
+        if hasattr(widget, "set_tooltip_text"): # New tooltip API
             widget.set_tooltip_text(text)
         else:
             if not hasattr(self, "tooltips"):

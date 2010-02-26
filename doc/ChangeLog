@@ -1641,15 +1641,17 @@ Fixes for older bugs:
     - Fixed performance issue with many doomed attempts to import non-existent GUI configuration modules (guiplugins.py)
     - copy_test_path_merge will now also merge subdirectories as it should (sandbox.py)
 
-Version trunk
-=============
+Version 3.17
+============
 Installation and self-test changes:
     - Deprecation warnings for GTK 2.18 fixed (guiplugins.py)
-	Website link on About dialog still broken with this version
+	Also workaround introduced in self-tests for GTK bug, so self-tests should be all green on GTK 2.18 now.
 Static GUI Enhancements:
     - "Test paths containing" replaces "Test suites containing" box in Selection tab (default/__init__.py)
 	Generalised to allow any substring or regexp of the relative path to the test.
 	Also handles spaces as in the names on the webpage. See migration notes.
+    - New options in application creation dialog (adminactions.py)
+	For testing Tkinter with PyUseCase 3.2 and for testing Java classes
     - Added "Run" and "Record" to context menu (default_gui-static.xml)
     - Drop-down entries for "Test-files to search" are now sorted in sections (selectandfilter.py)
 	Can configure via "gui_entry_options" also
@@ -1727,3 +1729,17 @@ Bug Fixes:
     - Jira plugins can now handle unicode characters in bug text (jira.py)
     - Reconnecting to corrupted or empty test files now ignores and recalculates anything it can't parse (reconnect.py)
     - Traffic files recorded on Windows can now be used on Linux without bad line-ending effects (traffic.py)
+    - Remove default behaviour to save static GUI selections in temporary locations (selectandfilter.py)
+	Very inconvenient with newer GTK which then won't let you remove the directories.
+    - -b and -keeptmp options now work together (default/__init__.py)
+
+
+Version trunk
+=============
+Installation and self-test changes:
+Static GUI Enhancements:
+Dynamic GUI Enhancements:
+Framework Enhancements:
+Batch Report Enhancements:
+Grid Engine (LSF/SGE) enhancements:
+Bug Fixes:

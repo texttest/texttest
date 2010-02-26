@@ -1699,7 +1699,7 @@ Batch Report Enhancements:
     - Now includes overview graphs at the top of each page (resultgraphs.py)
 	Can also be generated standalone via "-s batch.GenerateGraphs"
     - Can now produce batch report in "Junit format" (junitreport.py)
-	Useful for integration with Ant, Hudson etc. New config file setting "batch_junit_format". See website.
+	Useful for integration with Ant, Hudson etc. New config file setting "batch_junit_format". See website. Thanks to Emily Bache.
     - Test descriptions now appear as tooltips over the test names in the first column (testoverview.py)
     - Fixed formatting problem when several tests had the same "known bug" from Bugzilla/Jira (testoverview.py)
     - Category ordering (coloured tables) now constant in summary page (batch/__init__.py)
@@ -1731,7 +1731,7 @@ Bug Fixes:
     - Traffic files recorded on Windows can now be used on Linux without bad line-ending effects (traffic.py)
     - Remove default behaviour to save static GUI selections in temporary locations (selectandfilter.py)
 	Very inconvenient with newer GTK which then won't let you remove the directories.
-    - -b and -keeptmp options now work together (default/__init__.py)
+    - -b and -keeptmp options now work together. Thanks to Matt Baker. (default/__init__.py)
 
 
 Version trunk

@@ -420,7 +420,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         self.addOption("ext", "\nFile extension to use for TextTest files associated with this application", description="Short space-free extension, to identify all TextTest's files associated with this application")
         possibleSubDirs = self.findSubDirectories()
         self.addOption("subdir", "\nSubdirectory name to store the above application files under (leave blank for local storage)", possibleValues=possibleSubDirs)
-        self.addSwitch("gui", "GUI testing option chooser", options = [ "Disable GUI testing options", "PyGTK GUI with PyUseCase 3.x", "Java GUI with JUseCase", "Other embedded Use-case Recorder (e.g. PyUseCase 2.x, NUseCase)", "Other GUI-test tool (enable virtual display only)" ], hideOptions=True)
+        self.addSwitch("gui", "GUI testing option chooser", options = [ "Disable GUI testing options", "PyGTK GUI with PyUseCase 3.x", "Tkinter GUI with PyUseCase 3.2+", "Java GUI with JUseCase", "Other embedded Use-case Recorder (e.g. PyUseCase 2.x, NUseCase)", "Other GUI-test tool (enable virtual display only)" ], hideOptions=True)
 
         possibleDirs = []
         for app in allApps:
@@ -489,16 +489,19 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         useGui = self.optionGroup.getSwitchValue("gui")
         if useGui > 0:
             configEntries["use_case_record_mode"] = "GUI"
-        if useGui == 1:
+        if useGui == 1 or useGui == 2:
+            interpreter = "pyusecase"
+            if useGui == 2:
+                interpreter += " -i tkinter"
             configEntries["use_case_recorder"] = "pyusecase"
-            configEntries["interpreter"] = "pyusecase"
+            configEntries["interpreter"] = interpreter
             pyusecaseDir = os.path.join(directory, "pyusecase_files")
             plugins.ensureDirectoryExists(pyusecaseDir) 
             # Create an empty UI map file so it shows up in the Config tab...
             open(os.path.join(pyusecaseDir, "ui_map.conf"), "w")
-        elif useGui == 2:
+        elif useGui == 3:
             configEntries["use_case_recorder"] = "jusecase"
-        elif useGui == 4:
+        elif useGui == 5:
             configEntries["use_case_recorder"] = "none"
 
         self.notify("NewApplication", ext, directory, configEntries)

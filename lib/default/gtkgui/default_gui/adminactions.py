@@ -415,11 +415,13 @@ class ImportTestSuite(ImportTest):
 class ImportApplication(guiplugins.ActionDialogGUI):
     def __init__(self, allApps, dynamic, inputOptions):
         guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic, inputOptions)
+        self.fileChooser = None
         self.rootDirectories = inputOptions.rootDirectories
         self.addOption("name", "Full name of application", description="Name of application to use in reports etc.")
         self.addOption("ext", "\nFile extension to use for TextTest files associated with this application", description="Short space-free extension, to identify all TextTest's files associated with this application")
         possibleSubDirs = self.findSubDirectories()
         self.addOption("subdir", "\nSubdirectory name to store the above application files under (leave blank for local storage)", possibleValues=possibleSubDirs)
+        self.addOption("javaclass", "\nJava Class name (instead of executable program)")
         self.addSwitch("gui", "GUI testing option chooser", options = [ "Disable GUI testing options", "PyGTK GUI with PyUseCase 3.x", "Tkinter GUI with PyUseCase 3.2+", "Java GUI with JUseCase", "Other embedded Use-case Recorder (e.g. PyUseCase 2.x, NUseCase)", "Other GUI-test tool (enable virtual display only)" ], hideOptions=True)
 
         possibleDirs = []
@@ -429,6 +431,27 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         if len(possibleDirs) == 0:
             possibleDirs = self.rootDirectories
         self.addOption("exec", "\nSelect executable program to test", description="The full path to the program you want to test", possibleDirs=possibleDirs, selectFile=True)
+        
+    def createFileChooser(self, *args):
+        self.fileChooser = guiplugins.ActionDialogGUI.createFileChooser(self, *args)
+        return self.fileChooser
+
+    def createOptionWidget(self, option):
+        box, entry = guiplugins.ActionDialogGUI.createOptionWidget(self, option)
+        if option is self.optionGroup.getOption("javaclass"):
+            entry.connect("changed", self.javaClassChanged)
+        return box, entry
+
+    def javaClassChanged(self, *args):
+        if self.fileChooser:
+            self.setFileChooserSensitivity()
+
+    def setFileChooserSensitivity(self):
+        javaclass = self.optionGroup.getValue("javaclass")
+        sensitive = self.fileChooser.get_property("sensitive")
+        newSensitive = len(javaclass) == 0
+        if newSensitive != sensitive:
+            self.fileChooser.set_property("sensitive", newSensitive)
 
     def findSubDirectories(self):
         allDirs = []
@@ -454,7 +477,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
     def getTooltip(self):
         return "Define a new tested application"
 
-    def checkSanity(self, ext, executable, subdir, directory):
+    def checkSanity(self, ext, executable, subdir, directory, javaClass):
         if not ext:
             raise plugins.TextTestError, "Must provide a file extension for TextTest files"
 
@@ -462,7 +485,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
             if char in ext:
                 raise plugins.TextTestError, "File extensions may not contain the character " + repr(char) + ". It's recommended to stick to alphanumeric characters for this field."
 
-        if not executable or not os.path.isfile(executable):
+        if not javaClass and (not executable or not os.path.isfile(executable)):
             raise plugins.TextTestError, "Must provide a valid path to a program to test"
 
         for char in "/\\":
@@ -480,9 +503,14 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         ext = self.optionGroup.getOptionValue("ext")
         subdir = self.optionGroup.getOptionValue("subdir")
         directory = self.findFullDirectoryPath(subdir)
-        self.checkSanity(ext, executable, subdir, directory)
+        javaClass = self.optionGroup.getOptionValue("javaclass")
+        self.checkSanity(ext, executable, subdir, directory, javaClass)
         plugins.ensureDirectoryExists(directory)
+        if javaClass:
+            executable = javaClass
         configEntries = seqdict({ "executable" : executable })
+        if javaClass:
+            configEntries["interpreter"] = "java"
         fullName = self.optionGroup.getOptionValue("name")
         if fullName:
             configEntries["full_name"] = fullName
@@ -502,7 +530,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         elif useGui == 3:
             configEntries["use_case_recorder"] = "jusecase"
         elif useGui == 5:
-            configEntries["use_case_recorder"] = "none"
+            configEntries["use_case_recorder"] = "none"            
 
         self.notify("NewApplication", ext, directory, configEntries)
         self.notify("Status", "Created new application with extension '" + ext + "'.")

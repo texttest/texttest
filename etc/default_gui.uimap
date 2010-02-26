@@ -914,3 +914,6 @@ toggled.true = choose to reconnect via grid
 [Name=Reset Selection Tab]
 clicked = reset selection tab
 
+[Name=Java Class name (instead of executable program)]
+changed = set java class to
+

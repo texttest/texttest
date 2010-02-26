@@ -561,7 +561,7 @@ class Config:
     def keepTemporaryDirectories(self):
         return self.optionMap.has_key("keeptmp") or (self.batchMode() and not self.isReconnecting())
     def cleanPreviousTempDirs(self):
-        return self.batchMode() and not self.isReconnecting()
+        return self.batchMode() and not self.isReconnecting() and not self.keepTemporaryDirectories()
     def cleanWriteDirectory(self, suite):
         if not self.keepTemporaryDirectories():
             self._cleanWriteDirectory(suite)

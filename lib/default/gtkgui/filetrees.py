@@ -254,7 +254,7 @@ class ApplicationFileGUI(FileViewGUI):
 
     def getConfigFiles(self, app):
         dircaches = [ app.dircache ] + app.getExtraDirCaches("config")
-        return app._getAllFileNames(dircaches, "config", allVersions=True)
+        return app.getAllFileNames(dircaches, "config", allVersions=True)
 
     def getPersonalFiles(self, personalDir):
         if not os.path.isdir(personalDir):

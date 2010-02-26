@@ -1,9 +1,7 @@
 #!/usr/bin/env python
 import os, sys, types, string, plugins, exceptions, shutil, operator, logging, glob
-from time import time
 from fnmatch import fnmatch
 from ndict import seqdict
-from copy import copy
 from cPickle import Pickler, loads, UnpicklingError
 from threading import Lock
 from tempfile import mkstemp
@@ -237,13 +235,23 @@ class Test(plugins.Observable):
 
     def getEnvironment(self, var, defaultValue=None):
         return self.environment.getSingleValue(var, defaultValue)
+
     def hasEnvironment(self, var):
         return self.environment.definesValue(var)
+
     def needsRecalculation(self): #pragma : no cover - completeness only
         return False
+
+    def classId(self): #pragma : no cover - completeness only
+        return "Test Base"
+
+    def isAcceptedBy(self, *args): #pragma : no cover - completeness only
+        return False
+
     def isEmpty(self):
         return False
-    def readContents(self, *args, **kwargs):
+    
+    def readContents(self, *args, **kw):
         return True
 
     def isDefinitionFileStem(self, stem):
@@ -351,7 +359,7 @@ class Test(plugins.Observable):
             otherAppExcludor = lambda vset: len(vset.intersection(otherApps)) == 0
             return self.dircache.findAllFiles(stem, otherAppExcludor)
         else:
-            return self.app._getAllFileNames([ self.dircache ], stem, allVersions=True)
+            return self.app.getAllFileNames([ self.dircache ], stem, allVersions=True)
 
     def makeSubDirectory(self, name):
         subdir = self.dircache.pathName(name)
@@ -379,15 +387,15 @@ class Test(plugins.Observable):
 
     def getFileName(self, stem, refVersion = None):
         self.diagnose("Getting file from " + stem)
-        return self.getAppForVersion(refVersion)._getFileName([ self.dircache ], stem)
+        return self.getAppForVersion(refVersion).getFileNameFromCaches([ self.dircache ], stem)
 
     def getPathName(self, stem, configName=None, refVersion=None):
         app = self.getAppForVersion(refVersion)
-        return self.pathNameMethod(stem, configName, app._getFileName)
+        return self.pathNameMethod(stem, configName, app.getFileNameFromCaches)
 
     def getAllPathNames(self, stem, configName=None, refVersion=None):
         app = self.getAppForVersion(refVersion)
-        return self.pathNameMethod(stem, configName, app._getAllFileNames)
+        return self.pathNameMethod(stem, configName, app.getAllFileNames)
 
     def pathNameMethod(self, stem, configName, method):
         if configName is None:
@@ -417,7 +425,7 @@ class Test(plugins.Observable):
         appToUse = self.app
         if refVersion:
             appToUse = self.app.getRefVersionApplication(refVersion)
-        return appToUse._getAllFileNames([ self.dircache ], stem)
+        return appToUse.getAllFileNames([ self.dircache ], stem)
 
     def getConfigValue(self, key, expandVars=True):
         return self.app.getConfigValue(key, expandVars, self.environment)
@@ -427,16 +435,6 @@ class Test(plugins.Observable):
 
     def getCompositeConfigValue(self, key, subKey, expandVars=True):
         return self.app.getCompositeConfigValue(key, subKey, expandVars, self.environment)
-
-    def actionsCompleted(self):
-        self.diagnose("All actions completed")
-        if self.state.isComplete():
-            if not self.state.lifecycleChange:
-                self.diagnose("Completion notified")
-                self.state.lifecycleChange = "complete"
-                self.sendStateNotify(True)
-        else:
-            self.notify("Complete")
             
     def getRelPath(self):
         if self.parent:
@@ -448,7 +446,7 @@ class Test(plugins.Observable):
         else:
             return ""
 
-    def getDirectory(self, temporary=False, forFramework=False):
+    def getDirectory(self, *args, **kw):
         return self.dircache.dir
 
     def positionInParent(self):
@@ -495,48 +493,51 @@ class Test(plugins.Observable):
             
     def getRunEnvironment(self, onlyVars = []):
         return self.environment.getValues(onlyVars)
-    def createPropertiesFiles(self):
-        self.environment.checkPopulated()
-        for var, value in self.properties.items():
-            propFileName = self.makeTmpFileName(var + ".properties", forComparison=0)
-            file = open(propFileName, "w")
-            for subVar, subValue in value.items():
-                file.write(subVar + " = " + subValue + "\n")
+
     def getIndent(self):
         relPath = self.getRelPath()
         if not len(relPath):
             return ""
         dirCount = string.count(relPath, "/") + 1
         return " " * (dirCount * 2)
+
+    def testCaseList(self, filters=[]):
+        if self.isAcceptedByAll(filters):
+            return [ self ]
+        else:
+            return []
+
     def isAcceptedByAll(self, filters):
         for filter in filters:
             if not self.isAcceptedBy(filter):
                 self.diagnose("Rejected due to " + repr(filter))
                 return False
         return True
+
     def size(self):
         return 1
+
     def refreshFiles(self):
         self.dircache.refresh()
+
     def filesChanged(self):
         self.refreshFiles()
         self.notify("FileChange")
-    def refresh(self, filters):
+
+    def refresh(self, *args):
         self.refreshFiles()
         self.notify("FileChange")
+
 
 class TestCase(Test):
     def __init__(self, name, description, abspath, app, parent):
         Test.__init__(self, name, description, abspath, app, parent)
         # Directory where test executes from and hopefully where all its files end up
         self.writeDirectory = os.path.join(app.writeDirectory, app.name + app.versionSuffix(), self.getRelPath())
+
     def classId(self):
         return "test-case"
-    def testCaseList(self, filters=[]):
-        if self.isAcceptedByAll(filters):
-            return [ self ]
-        else:
-            return []
+    
     def getDirectory(self, temporary=False, forFramework=False):
         if temporary:
             if forFramework:
@@ -565,6 +566,16 @@ class TestCase(Test):
         else:
             # might as well do it instantly if the test isn't still "active"
             return self.notify
+
+    def actionsCompleted(self):
+        self.diagnose("All actions completed")
+        if self.state.isComplete():
+            if not self.state.lifecycleChange:
+                self.diagnose("Completion notified")
+                self.state.lifecycleChange = "complete"
+                self.sendStateNotify(True)
+        else:
+            self.notify("Complete")
 
     def getStateFile(self):
         return self.makeTmpFileName("teststate", forFramework=True)
@@ -677,7 +688,7 @@ class TestCase(Test):
             newState = loads(file.read())
             newState.updateAfterLoad(self.app, **updateArgs)
             return True, newState
-        except (UnpicklingError, ImportError, EOFError, AttributeError), e:
+        except (UnpicklingError, ImportError, EOFError, AttributeError):
             return False, plugins.Unrunnable(briefText="read error", \
                                              freeText="Failed to read results file")
     def saveState(self):
@@ -690,8 +701,18 @@ class TestCase(Test):
         pickler = Pickler(file)
         pickler.dump(self.state)
         file.close()
+
     def isAcceptedBy(self, filter):
         return filter.acceptsTestCase(self)
+
+    def createPropertiesFiles(self):
+        self.environment.checkPopulated()
+        for var, value in self.properties.items():
+            propFileName = self.makeTmpFileName(var + ".properties", forComparison=0)
+            file = open(propFileName, "w")
+            for subVar, subValue in value.items():
+                file.write(subVar + " = " + subValue + "\n")
+
 
 # class for caching and managing changes to test suite files
 class TestSuiteFileHandler:
@@ -753,7 +774,7 @@ class TestSuiteFileHandler:
 
     def remove(self, fileName, testName):
         cache = self.read(fileName)
-        description, index = self.removeFromCache(cache, testName)
+        description = self.removeFromCache(cache, testName)[0]
         if description is not None:
             self.write(fileName, cache)
 
@@ -780,7 +801,7 @@ class TestSuiteFileHandler:
 
     def reposition(self, fileName, testName, newIndex):
         cache = self.read(fileName)
-        description, index = self.removeFromCache(cache, testName)
+        description = self.removeFromCache(cache, testName)[0]
         if description is None:
             return False
 
@@ -792,7 +813,6 @@ class TestSuiteFileHandler:
         tests = self.read(fileName)
         tests.sort(comparator)
         self.write(fileName, tests)
-
 
 
 class TestSuite(Test):
@@ -857,7 +877,7 @@ class TestSuite(Test):
     def findTestSuiteFiles(self):
         contentFile = self.getContentFileName()
         versionFiles = []
-        allFiles = self.app._getAllFileNames([ self.dircache ], "testsuite", allVersions=True)
+        allFiles = self.app.getAllFileNames([ self.dircache ], "testsuite", allVersions=True)
         for newFile in allFiles:
             if newFile != contentFile:
                 versionFiles.append(newFile)
@@ -923,10 +943,10 @@ class TestSuite(Test):
                 existingTest.refresh(filters)
                 testClass = self.getSubtestClass(existingTest.dircache)
                 if existingTest.__class__ != testClass:
-                     self.diagnose("changing type for " + repr(existingTest))
-                     self.testcases.remove(existingTest)
-                     existingTest.notify("Remove")
-                     self.createTestOrSuite(testName, desc, existingTest.dircache, filters, initial=False)
+                    self.diagnose("changing type for " + repr(existingTest))
+                    self.testcases.remove(existingTest)
+                    existingTest.notify("Remove")
+                    self.createTestOrSuite(testName, desc, existingTest.dircache, filters, initial=False)
             else:
                 self.diagnose("creating new test called '" + testName + "'")
                 dirCache = self.createTestCache(testName)
@@ -967,7 +987,7 @@ class TestSuite(Test):
     def createTestCache(self, testName):
         return DirectoryCache(os.path.join(self.getDirectory(), testName))
     def getSubtestClass(self, cache):
-        allFiles = self.app._getAllFileNames([ cache ], "testsuite", allVersions=True)
+        allFiles = self.app.getAllFileNames([ cache ], "testsuite", allVersions=True)
         if len(allFiles) > 0:
             return TestSuite
         else:
@@ -1154,12 +1174,12 @@ class Application:
     def fullName(self):
         return self.getConfigValue("full_name")
     def getPersonalConfigFiles(self):
-        includeSite, includePersonal = self.inputOptions.configPathOptions()
+        includePersonal = self.inputOptions.configPathOptions()[1]
         if not includePersonal:
             return []
         else:
             dircache = DirectoryCache(plugins.getPersonalConfigDir())
-            return self._getAllFileNames([ dircache ], "config")
+            return self.getAllFileNames([ dircache ], "config")
         
     def setUpConfiguration(self, configEntries={}):
         self.configDir = plugins.MultiEntryDictionary(importKey="import_config_file", importFileFinder=self.configPath)
@@ -1168,17 +1188,6 @@ class Application:
         self.setConfigDefaults()
 
         # Read our pre-existing config files
-        self.readApplicationConfigFiles()
-        if len(configEntries):
-            # We've been given some entries, read them in and write them out to file
-            self.importAndWriteEntries(configEntries)
-
-        self.configDir.readValues(self.getPersonalConfigFiles(), insert=False, errorOnUnknown=False)
-        self.diag.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
-        if not plugins.TestState.showExecHosts:
-            plugins.TestState.showExecHosts = self.configObject.showExecHostsInFailures(self)
-
-    def readApplicationConfigFiles(self):
         self.readConfigFiles(configModuleInitialised=False)
         self.diag.info("Basic Config file settings are: " + "\n" + repr(self.configDir.dict))
         self.diag.info("Found application '" + self.name + "'")
@@ -1187,6 +1196,14 @@ class Application:
         self.configObject.setApplicationDefaults(self)
         self.setDependentConfigDefaults()
         self.readConfigFiles(configModuleInitialised=True)
+        if len(configEntries):
+            # We've been given some entries, read them in and write them out to file
+            self.importAndWriteEntries(configEntries)
+
+        self.configDir.readValues(self.getPersonalConfigFiles(), insert=False, errorOnUnknown=False)
+        self.diag.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
+        if not plugins.TestState.showExecHosts:
+            plugins.TestState.showExecHosts = self.configObject.showExecHostsInFailures(self)
 
     def importAndWriteEntries(self, configEntries):
         configFileName = self.dircache.pathName("config." + self.name)
@@ -1277,7 +1294,7 @@ class Application:
         self.readValues(self.configDir, "config", extra, insert=False, errorOnUnknown=errorOnUnknown)
         
     def readValues(self, multiEntryDict, stem, dircaches, insert=True, errorOnUnknown=False):
-        allFiles = self._getAllFileNames(dircaches, stem)
+        allFiles = self.getAllFileNames(dircaches, stem)
         self.diag.info("Reading values for " + stem + " from files : " + "\n".join(allFiles))
         multiEntryDict.readValues(allFiles, insert, errorOnUnknown)
 
@@ -1315,7 +1332,7 @@ class Application:
 
         dirCaches = self.getExtraDirCaches(fileName, includeRoot=True)
         dirCaches.append(self.dircache)
-        configPath = self._getFileName(dirCaches, fileName)
+        configPath = self.getFileNameFromCaches(dirCaches, fileName)
         if not configPath:
             raise BadConfigError, "Cannot find file '" + fileName + "' to import config file settings from"
         return os.path.normpath(configPath)
@@ -1329,15 +1346,15 @@ class Application:
         return filter(lambda name: name and (self.writeDirectory in name or not os.path.isabs(name)), allNames)
 
     def getFileName(self, dirList, stem):
-        dircaches = map(lambda dir: DirectoryCache(dir), dirList)
-        return self._getFileName(dircaches, stem)
+        dircaches = map(DirectoryCache, dirList)
+        return self.getFileNameFromCaches(dircaches, stem)
 
-    def _getFileName(self, dircaches, stem):
-        allFiles = self._getAllFileNames(dircaches, stem)
+    def getFileNameFromCaches(self, dircaches, stem):
+        allFiles = self.getAllFileNames(dircaches, stem)
         if len(allFiles):
             return allFiles[-1]
 
-    def _getAllFileNames(self, dircaches, stem, allVersions=False):
+    def getAllFileNames(self, dircaches, stem, allVersions=False):
         versionPred = self.getExtensionPredicate(allVersions)
         versionSets = seqdict()
         for dircache in dircaches:
@@ -1773,7 +1790,7 @@ class AllCompleteResponder(plugins.Responder,plugins.Observable):
         self.checkInCompletion = False
         self.hadCompletion = False
         self.diag = logging.getLogger("test objects")
-    def notifyAdd(self, test, initial):
+    def notifyAdd(self, test, *args, **kw):
         if test.classId() == "test-case":
             # Locking long thought to be unnecessary
             # but += 1 is not an atomic operation!!

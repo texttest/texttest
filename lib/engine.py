@@ -12,7 +12,7 @@ class UniqueNameFinder(plugins.Responder):
         plugins.Responder.__init__(self, optionMap)
         self.name2test = {}
         self.diag = logging.getLogger("Unique Names")
-    def notifyAdd(self, test, initial=True):
+    def notifyAdd(self, test, *args, **kw):
         if self.name2test.has_key(test.name):
             oldTest = self.name2test[test.name]
             self.storeUnique(oldTest, test)
@@ -119,6 +119,7 @@ class Activator(plugins.Responder, plugins.Observable):
 
 class TextTest(plugins.Responder, plugins.Observable):
     def __init__(self):
+        plugins.Responder.__init__(self)
         plugins.Observable.__init__(self)
         if os.name == "posix":
             # To aid in debugging tests that hang...
@@ -258,7 +259,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         # We should make sure we only include the most specific ones
         toRemove = []
         for i, class1 in enumerate(classes):
-            for j, class2 in enumerate(classes[i+1:]):
+            for class2 in classes[i+1:]:
                 if issubclass(class1, class2):
                     toRemove.append(class2)
                 elif issubclass(class2, class1):
@@ -481,15 +482,15 @@ class TextTest(plugins.Responder, plugins.Observable):
     def setSignalHandlers(self, handler):
         for sig in self.getSignals():
             signal.signal(sig, handler)
-    def handleSignal(self, sig, stackFrame):
+    def handleSignal(self, sig, *args):
         # Don't respond to the same signal more than once!
         signal.signal(sig, signal.SIG_IGN)
         signalText = self.getSignalText(sig)
         self.writeTermMessage(signalText)
         self.notify("KillProcesses", sig)
         return signalText
-    def handleSignalWhileStarting(self, sig, stackFrame):
-        signalText = self.handleSignal(sig, stackFrame)
+    def handleSignalWhileStarting(self, sig, *args):
+        signalText = self.handleSignal(sig)
         raise KeyboardInterrupt, signalText
 
     def writeTermMessage(self, signalText):

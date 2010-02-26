@@ -1528,11 +1528,11 @@ class FileProperties:
         permissions = ""
         for who in "USR", "GRP", "OTH":
             for what in "R", "W", "X":
-               #lookup attribute at runtime using getattr
-               if self.status[stat.ST_MODE] & getattr(stat,"S_I" + what + who):
-                   permissions = permissions + what.lower()
-               else:
-                   permissions = permissions + "-"
+                #lookup attribute at runtime using getattr
+                if self.status[stat.ST_MODE] & getattr(stat,"S_I" + what + who):
+                    permissions = permissions + what.lower()
+                else:
+                    permissions = permissions + "-"
         return permissions
     def inqLinks(self):
         return self.status[stat.ST_NLINK]

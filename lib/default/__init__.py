@@ -1202,7 +1202,7 @@ class GrepFilter(plugins.TextFilter):
             files = []
             try:
                 for comparison in test.state.allResults:
-                    if comparison.tmpFile and fnmatch(comparison.stem, self.fileStem):
+                    if comparison.tmpFile and fnmatch(comparison.stem, self.fileStem) and os.path.isfile(comparison.tmpFile):
                         files.append(comparison.tmpFile)
                 return files
             except AttributeError:

@@ -19,7 +19,8 @@ class GenerateFromSummaryData(plugins.ScriptWithArgs):
 
     def setUpApplication(self, app):
         location = os.path.realpath(app.getCompositeConfigValue("historical_report_location", self.batchSession)).replace("\\", "/")
-        self.locationApps.setdefault(location, []).append(app)
+        usePie = app.getCompositeConfigValue("historical_report_piechart_summary", self.batchSession)
+        self.locationApps.setdefault(location, []).append( (app, usePie))
 
     @classmethod
     def finalise(cls):
@@ -59,17 +60,19 @@ class SummaryDataFinder:
         self.basePath = basePath
         self.summaryPageName = os.path.join(location, summaryFileName)
         self.appVersionInfo = {}
+        self.appUsePie = {}
         self.appDirs = seqdict()
         self.colourFinder, self.inputOptions = None, None
         if len(apps) > 0:
-            self.colourFinder = testoverview.ColourFinder(apps[0].getCompositeConfigValue)
-            self.inputOptions = apps[0].inputOptions
-        for app in apps:
+            self.colourFinder = testoverview.ColourFinder(apps[0][0].getCompositeConfigValue)
+            self.inputOptions = apps[0][0].inputOptions
+        for app, usePie in apps:
+            self.appUsePie[app.fullName()] = usePie
             appDir = os.path.join(location, app.name)
             self.diag.info("Searching under " + repr(appDir))
             if os.path.isdir(appDir):
                 self.appDirs[app.fullName()] = appDir
-
+                
     def hasInfo(self):
         return len(self.appDirs) > 0
 
@@ -122,7 +125,7 @@ class SummaryDataFinder:
         path = versionData[lastDate]
         summary = self.extractSummary(path)
         self.diag.info("For version " + version + ", found summary info " + repr(summary))
-        return summary
+        return summary, lastDate
 
     def getAllSummaries(self, appName, version):
         versionData = self.appVersionInfo[appName][version]
@@ -248,7 +251,22 @@ class SummaryGenerator:
 
     def getVersionsWithColumns(self, pageInfo):
         allVersions = reduce(operator.add, pageInfo.values(), [])
-        return set(filter(lambda v: allVersions.count(v) > 1, allVersions))  
+        return set(filter(lambda v: allVersions.count(v) > 1, allVersions))
+
+    def createPieChart(self, dataFinder, resultSummary, summaryGraphName, version, lastDate):
+        from resultgraphs import PieGraph
+        fracs = []
+        colours = []
+        tests = 0
+        for colourKey, count in resultSummary.items():
+            if count:
+                colour = dataFinder.getColour(colourKey)
+                fracs.append(count)
+                colours.append(colour)
+                tests += count
+        pg = PieGraph(version, time.strftime("%d%b%Y",lastDate) + " - " + str(tests) + " tests", size=5)
+        pg.pie(fracs, colours)
+        pg.save(os.path.join(dataFinder.location, summaryGraphName))
 
     def insertSummaryTable(self, file, dataFinder, appOrder, versionOrder):
         pageInfo = dataFinder.getAppsWithVersions()
@@ -270,13 +288,18 @@ class SummaryGenerator:
                     if version in versionWithColumns:
                         columnVersions[columnIndex] = version
 
-                    resultSummary = dataFinder.getLatestSummary(appName, version)
+                    resultSummary, lastDate = dataFinder.getLatestSummary(appName, version)
                     fileToLink = dataFinder.getOverviewPage(appName, version)
-                    file.write('    <td><h3><a href="' + fileToLink + '">' + version + '</a></h3></td>\n')
-                    for colourKey, count in resultSummary.items():
-                        if count:
-                            colour = dataFinder.getColour(colourKey)
-                            file.write('    <td bgcolor="' + colour + '"><h3>' + str(count) + "</h3></td>\n")
+                    if dataFinder.appUsePie[appName] == "true":
+                        summaryGraphName = "summary_pie_" + version + ".png"
+                        self.createPieChart(dataFinder, resultSummary, summaryGraphName, version, lastDate)
+                        file.write('    <td><a href="' + fileToLink + '"><img border=\"0\" src=\"' + summaryGraphName + '\"></a></td>\n')
+                    else:
+                        file.write('    <td><h3><a href="' + fileToLink + '">' + version + '</a></h3></td>\n')
+                        for colourKey, count in resultSummary.items():
+                            if count:
+                                colour = dataFinder.getColour(colourKey)
+                                file.write('    <td bgcolor="' + colour + '"><h3>' + str(count) + "</h3></td>\n")
                     file.write("  </tr></table>")
                 file.write("</td>\n")
             file.write("</tr>\n")

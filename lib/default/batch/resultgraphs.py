@@ -84,6 +84,33 @@ class Graph:
         leg = self.sub1.legend(self.legendItems, tuple(self.plotLabels), 'best', shadow=False)
         leg.get_frame().set_alpha(0.5) # transparent legend box		
         
+class PieGraph:
+    cms_per_inch = 2.54
+    def __init__(self, title, extratitle, size):
+        self.fig1 = pylab.figure(1)
+        self.fig1.set_figwidth(size / self.cms_per_inch)
+        self.fig1.set_figheight(size / self.cms_per_inch)
+        self.title = title
+        self.extratitle = extratitle
+
+    def pie(self, fracs, colours):
+        self.fig1.clf()
+        pylab.axes([0, 0, 1, 1])
+        explode = []
+        tot = sum(fracs)
+        for fr in fracs:
+            if float(fr)/float(tot) < 0.1:
+                explode.append(0.05)
+            else:
+                explode.append(0)
+        dummy, dummy2, texts  = pylab.pie(fracs, explode = explode, colors = colours, autopct = '%1.1f%%', shadow = True)
+        for text in texts:
+            text.set_size(8)
+        self.fig1.suptitle(self.title, fontsize = 10, family='monospace')
+        self.fig1.text(0.5,0, self.extratitle, fontsize = 10, family='monospace', horizontalalignment='center')
+
+    def save(self, fn):
+        self.fig1.savefig(fn, dpi=100)
 
 class GraphGenerator:
     labels = seqdict()

@@ -278,7 +278,7 @@ class QueueSystemServer(BaseActionRunner):
     def getSlaveCommand(self, test, submissionRules):
         cmdArgs = [ plugins.getTextTestProgram(), "-d", ":".join(self.optionMap.rootDirectories),
                     "-a", test.app.name + test.app.versionSuffix(),
-                    "-l", "-tp", test.getRelPath() ] + \
+                    "-l", "-tp", plugins.quote(test.getRelPath(), "'") ] + \
                     self.getSlaveArgs(test) + self.getRunOptions(test.app, submissionRules)
         return " ".join(cmdArgs)
 

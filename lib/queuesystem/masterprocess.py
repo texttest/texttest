@@ -555,7 +555,8 @@ class SubmissionRules:
         path = self.test.getRelPath()
         parts = path.split("/")
         parts.reverse()
-        return "Test-" + ".".join(parts) + "-" + repr(self.test.app).replace(" ", "_")
+        name = "Test-" + ".".join(parts) + "-" + repr(self.test.app).replace(" ", "_")
+        return name.replace(":", "_")
     def getSubmitSuffix(self):
         name = queueSystemName(self.test)
         queue = self.findQueue()
@@ -759,7 +760,7 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
     def getTest(self, testString):
         self.diag.info("Received request for '" + testString + "'")
         try:
-            appName, testPath = testString.split(":")
+            appName, testPath = testString.split(":", 1)
             return self.testMap[appName][testPath]
         except ValueError:
             return

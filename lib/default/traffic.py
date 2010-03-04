@@ -298,6 +298,14 @@ class PythonModuleTraffic(Traffic):
     def getExceptionText(self, exc_value):
         return "raise " + exc_value.__class__.__module__ + "." + exc_value.__class__.__name__ + "(" + repr(str(exc_value)) + ")"
 
+    def getPossibleCompositeAttribute(self, instance, attrName):
+        attrParts = attrName.split(".", 1)
+        firstAttr = getattr(instance, attrParts[0])
+        if len(attrParts) == 1:
+            return firstAttr
+        else:
+            return self.getPossibleCompositeAttribute(firstAttr, attrParts[1])
+    
 
 class PythonImportTraffic(PythonModuleTraffic):
     def __init__(self, inText, responseFile):
@@ -326,7 +334,7 @@ class PythonAttributeTraffic(PythonModuleTraffic):
     def forwardToDestination(self):
         instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
         try:
-            attr = getattr(instance, self.attrName)
+            attr = self.getPossibleCompositeAttribute(instance, self.attrName)
         except:
             return []
         if self.isBasicType(attr):
@@ -383,15 +391,7 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
     def parseArgs(self):
         args = eval(self.argStr, PythonInstanceWrapper.allInstances)
         return tuple(map(self.getArgInstance, args))
-
-    def getPossibleCompositeAttribute(self, instance, attrName):
-        attrParts = attrName.split(".", 1)
-        firstAttr = getattr(instance, attrParts[0])
-        if len(attrParts) == 1:
-            return firstAttr
-        else:
-            return self.getPossibleCompositeAttribute(firstAttr, attrParts[1])
-        
+    
     def getResult(self):
         instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
         try:
@@ -642,6 +642,7 @@ class TrafficRequestHandler(StreamRequestHandler):
     def handle(self):
         self.server.diag.info("Received incoming request...")
         text = self.rfile.read()
+        self.server.diag.info("Request text : " + text)
         if not text.startswith("TERMINATE_SERVER"):
             traffic = self.parseTraffic(text)
             self.server.process(traffic, self.requestNumber)

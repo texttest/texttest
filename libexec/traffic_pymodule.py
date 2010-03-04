@@ -70,7 +70,7 @@ class ModuleProxy:
             sock.shutdown(2)
 
         def __getattr__(self, name):
-            return self.__class__(self.modOrObjProxy, self.moduleProxy, self.attributeName + "." + name)
+            return self.__class__(self.modOrObjProxy, self.moduleProxy, self.attributeName + "." + name).tryEvaluate()
 
         def __call__(self, *args, **kw):
             response = self.makeResponse(*args, **kw)

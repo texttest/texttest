@@ -1741,5 +1741,10 @@ Static GUI Enhancements:
 Dynamic GUI Enhancements:
 Framework Enhancements:
 Batch Report Enhancements:
+    - Summary page can now produce pie charts instead of HTML tables (summarypages.py)
+	Use the new setting "historical_report_piechart_summary"
 Grid Engine (LSF/SGE) enhancements:
 Bug Fixes:
+    - No longer get stack traces when using Selection tab in the dynamic GUI while running tests via grid engines. (default/__init__.py)
+    - Tests with shell characters in the name now work better using grid engines (masterprocess.py)
+    - Tests with ":" in the name also work better using grid engines (though still fail with collect_traffic) (masterprocess.py)

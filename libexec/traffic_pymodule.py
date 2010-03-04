@@ -123,6 +123,12 @@ class ModuleProxy:
                         return self.arg.name
                     elif isinstance(self.arg, list):
                         return repr([ ArgWrapper(subarg, self.moduleProxy) for subarg in self.arg ])
+                    elif isinstance(self.arg, dict):
+                        newDict = {}
+                        for key, val in self.arg.items():
+                            newDict[key] = ArgWrapper(val, self.moduleProxy)
+                        return repr(newDict)
+                    
                     out = repr(self.arg)
                     if "\\n" in out:
                         return "''" + out.replace("\\n", "\n") + "''"

@@ -131,7 +131,8 @@ class ModuleProxy:
                     
                     out = repr(self.arg)
                     if "\\n" in out:
-                        return "''" + out.replace("\\n", "\n") + "''"
+                        pos = out.find("'")
+                        return out[:pos] + "''" + out[pos:].replace("\\n", "\n") + "''"
                     else:
                         return out
             return tuple([ ArgWrapper(arg, self.moduleProxy) for arg in args ])

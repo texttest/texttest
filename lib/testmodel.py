@@ -604,10 +604,13 @@ class TestCase(Test):
             if itemToClear == optionArgs[pos]:
                 del optionArgs[pos]
                 # which should leave the new pos as the next item
+
+    def getInterpreterOptions(self):
+        return self.getCommandLineOptions(stem="interpreter_options")
         
-    def getCommandLineOptions(self):
+    def getCommandLineOptions(self, stem="options"):
         optionArgs = []
-        for optionsFile in self.getAllPathNames("options"):
+        for optionsFile in self.getAllPathNames(stem):
             optionString = self.getOptionsFromFile(optionsFile)
             if "{CLEAR}" in optionString: # wipes all other definitions
                 optionArgs = []

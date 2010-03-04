@@ -1128,11 +1128,13 @@ class Config:
         # Applies to any interface...
         app.setConfigDefault("auto_sort_test_suites", 0, "Automatically sort test suites in alphabetical order. 1 means sort in ascending order, -1 means sort in descending order.")
         app.addConfigEntry("builtin", "options", "definition_file_stems")
+        app.addConfigEntry("builtin", "interpreter_options", "definition_file_stems")
         app.addConfigEntry("regenerate", "usecase", "definition_file_stems")
         app.addConfigEntry("regenerate", "traffic", "definition_file_stems")
         app.addConfigEntry("builtin", "input", "definition_file_stems")
         app.addConfigEntry("builtin", "knownbugs", "definition_file_stems")
         app.setConfigAlias("test_list_files_directory", "filter_file_directory")
+        
     def setApplicationDefaults(self, app):
         homeOS = app.getConfigValue("home_operating_system")
         self.setComparisonDefaults(app, homeOS)
@@ -1493,6 +1495,7 @@ class RunTest(plugins.Action):
             args += self.getTimingArgs(test, makeDirs)
 
         args += self.getInterpreterArgs(test)
+        args += test.getInterpreterOptions()
         args += plugins.splitcmd(test.getConfigValue("executable"))
         args += test.getCommandLineOptions()
         return args

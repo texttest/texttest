@@ -691,6 +691,8 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         defFiles = []
         defFiles.append("environment")
         defFiles.append("options")
+        if self.currTestSelection[0].getConfigValue("interpreter"):
+            defFiles.append("interpreter_options")
         if self.currTestSelection[0].classId() == "test-case":
             recordMode = self.currTestSelection[0].getConfigValue("use_case_record_mode")
             if recordMode == "disabled":

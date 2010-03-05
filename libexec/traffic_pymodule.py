@@ -9,7 +9,7 @@ class ModuleProxy:
     def __getattr__(self, attrname):
         return self.AttributeProxy(self, self, attrname).tryEvaluate()
 
-    class InstanceProxy:
+    class InstanceProxy(object):
         moduleProxy = None
         def __init__(self, *args, **kw):
             self.name = kw.get("givenInstanceName")
@@ -23,8 +23,11 @@ class ModuleProxy:
                     return instanceName
                 self.name = eval(response)
 
-        def __getattr__(self, attrname):
-            return self.moduleProxy.AttributeProxy(self, self.moduleProxy, attrname).tryEvaluate()
+        def __getattribute__(self, attrname):
+            if attrname in [ "name", "moduleProxy", "__dict__", "__class__", "__getattribute__" ]:
+                return object.__getattribute__(self, attrname)
+            else:
+                return self.moduleProxy.AttributeProxy(self, self.moduleProxy, attrname).tryEvaluate()
 
         def __setattr__(self, attrname, value):
             self.__dict__[attrname] = value
@@ -33,9 +36,8 @@ class ModuleProxy:
             
     class ExceptionProxy(InstanceProxy, Exception):
         def __str__(self):
-            return self.__getattr__("__str__")()
-
-        
+            return self.__getattribute__("__str__")()
+    
     class AttributeProxy:
         def __init__(self, modOrObjProxy, moduleProxy, attributeName=None):
             self.modOrObjProxy = modOrObjProxy

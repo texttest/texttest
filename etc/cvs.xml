@@ -20,6 +20,7 @@
         <menuitem action="CVS Add"/>
         <menuitem action="CVS Add Recursive"/>
         <separator/>
+        <menuitem action="CVS Update"/>
       </menu>
     </placeholder>
 
@@ -43,6 +44,7 @@
       <menuitem action="CVS Add"/>
       <menuitem action="CVS Add Recursive"/>
       <separator/>
+      <menuitem action="CVS Update"/>
     </menu>
   </popup>
 
@@ -64,6 +66,7 @@
       <menuitem action="CVS Add"/>
       <menuitem action="CVS Add Recursive"/>
       <separator/>
+      <menuitem action="CVS Update"/>
     </menu>
   </popup>
 

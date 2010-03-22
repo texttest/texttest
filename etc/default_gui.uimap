@@ -917,3 +917,15 @@ clicked = reset selection tab
 [Name=Java Class name (instead of executable program)]
 changed = set java class to
 
+[Name=Bazaar Update]
+activate = update from vcs
+
+[Name=Mercurial Update]
+activate = update from vcs
+
+[Name=CVS Update]
+activate = update from vcs
+
+[Name=VCS Update Window]
+response.accept = close vcs update window
+

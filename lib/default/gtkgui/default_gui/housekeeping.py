@@ -93,6 +93,9 @@ class RefreshAll(guiplugins.BasicActionGUI):
         return "Refreshed the test suite from the files"
     def addSuites(self, suites):
         self.rootTestSuites += suites
+    def notifyRefresh(self):
+        # when done indirectly
+        self.performOnCurrent()
     def performOnCurrent(self):
         for suite in self.rootTestSuites:
             self.notify("ActionProgress", "")

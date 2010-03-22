@@ -42,6 +42,7 @@ class CVSInterface(vcs_independent.VersionControlInterface):
         self.defaultArgs["log"] = [ "-N" ]
         self.defaultArgs["diff"] = [ "-N" ]
         self.defaultArgs["rm"] = [ "-f" ]
+        self.defaultArgs["update"] = [ "-dP" ]
         self.programArgs, self.errorMessage = self.setProgramArgs(cvsDir)
 
     def getProgramArgs(self):
@@ -245,7 +246,7 @@ class RenameTest(vcs_independent.RenameTest):
             # Revert it in CVS and continue
             shutil.rmtree(dir)
             dirname, local = os.path.split(dir)
-            vcs_independent.vcs.callProgram("update", [ "-dP", local ], cwd=dirname)
+            vcs_independent.vcs.callProgram("update", [ local ], cwd=dirname)
         else:
             vcs_independent.RenameTest.handleExistingDirectory(self, dir)
             

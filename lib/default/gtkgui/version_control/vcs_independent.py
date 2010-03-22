@@ -151,29 +151,26 @@ class VersionControlInterface:
     def getMoveCommand(self):
         return self.program + " mv"
 
-
-# Base class for all version control actions.
-class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
+class BasicVersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
     recursive = False
-    def __init__(self, allApps=[], dynamic=False, inputOptions={}):
-        guiplugins.ActionResultDialogGUI.__init__(self, allApps)
-        self.cmdName = self._getTitle().replace("_", "").lower()
-        self.dynamic = dynamic
-        self.needsAttention = False
-        self.notInRepository = False
-
     def getTitle(self, includeMnemonics=False, adjectiveAfter=True):
         title = self._getTitle()
         if self.recursive or not includeMnemonics:
             title = title.replace("_", "")
+
         if not includeMnemonics:
             # distinguish these from other actions that may have these names
             title = vcs.name + " " + title
+        
         if self.recursive:
-            if adjectiveAfter:
-                title += " Recursive"
-            else:
-                title = "Recursive " + title
+            title = self.add_recursion_annotation(title, adjectiveAfter)
+        return title
+
+    def add_recursion_annotation(self, title, adjectiveAfter):
+        if adjectiveAfter:
+            title += " Recursive"
+        else:
+            title = "Recursive " + title
         return title
 
     def createDialog(self):
@@ -188,6 +185,16 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         from copy import copy
         return copy(self.getDialogTitle()).replace(vcs.name, "version control").lower()
 
+
+# Base class for all version control actions.
+class VersionControlDialogGUI(BasicVersionControlDialogGUI):
+    def __init__(self, allApps=[], dynamic=False, inputOptions={}):
+        BasicVersionControlDialogGUI.__init__(self, allApps)
+        self.cmdName = self._getTitle().replace("_", "").lower()
+        self.dynamic = dynamic
+        self.needsAttention = False
+        self.notInRepository = False
+    
     def showWarning(self):
         return self.notInRepository or self.needsAttention
 
@@ -258,7 +265,7 @@ class VersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         return ""
     
     def updateSelection(self, *args):
-        newActive = guiplugins.ActionResultDialogGUI.updateSelection(self, *args)
+        newActive = BasicVersionControlDialogGUI.updateSelection(self, *args)
         if not self.dynamic: # See bugzilla 17653
             self.currFileSelection = []
         return newActive
@@ -748,6 +755,24 @@ class AnnotateGUI(VersionControlDialogGUI):
     def getResultTitle(self):
         return "annotations"
 
+
+class UpdateGUI(BasicVersionControlDialogGUI):
+    def _getTitle(self):
+        return "Update"
+
+    def getSignalsSent(self):
+        return [ "Refresh" ]
+
+    def addContents(self):
+        args = vcs.getCmdArgs("update")
+        retcode, stdout, stderr = vcs.getProcessResults(args, cwd=self.currTestSelection[0].app.getDirectory())
+        buffer = gtk.TextBuffer()
+        buffer.set_text(stdout + stderr)
+        textView = gtk.TextView(buffer)
+        self.dialog.vbox.pack_start(textView, expand=True, fill=True)
+        self.notify("Refresh")
+
+
 class AddGUI(VersionControlDialogGUI):
     def _getTitle(self):
         return "A_dd"
@@ -839,7 +864,7 @@ class InteractiveActionConfig(guiplugins.InteractiveActionConfig):
 
     def getInteractiveActionClasses(self, dynamic):
         return [ LogGUI, LogGUIRecursive, DiffGUI, DiffGUIRecursive, StatusGUI, StatusGUIRecursive ] +\
-               self.annotateClasses() + [ AddGUI, AddGUIRecursive ]
+               self.annotateClasses() + [ AddGUI, AddGUIRecursive, UpdateGUI ]
 
     def annotateClasses(self):
         return [ AnnotateGUI, AnnotateGUIRecursive ]

@@ -1052,9 +1052,17 @@ class ReplayInfo:
         return desc1[2:5] == desc2[2:5]
 
     def getWords(self, desc):
+        # Heuristic decisions trying to make the best of inexact matches
+        separators = [ "/", "(", ")", None ] # the last means whitespace...
+        return self._getWords(desc, separators)
+
+    def _getWords(self, desc, separators):
+        if len(separators) == 0:
+            return [ desc ]
+        
         words = []
-        for part in desc.split("/"):
-            words += part.split()
+        for part in desc.split(separators[0]):
+            words += self._getWords(part, separators[1:])
         return words
 
     def commonElementCount(self, list1, list2):

@@ -26,40 +26,44 @@ class SetUpTrafficHandlers(plugins.Action):
             self.trafficServer.shutdown()
             self.trafficServer = None
         else:
-            self.trafficServer = self.makeTrafficServer(test)
-            if self.trafficServer:
-                self.makeIntercepts(test)
+            replayFile = test.getFileName("traffic")
+            if self.record or replayFile:
+                realCommands = self.makeIntercepts(test)
+                self.trafficServer = self.makeTrafficServer(test, replayFile, realCommands)
             
-    def makeTrafficServer(self, test):
+    def makeTrafficServer(self, test, replayFile, realCommands):
         recordFile = test.makeTmpFileName("traffic")
         recordEditDir = test.makeTmpFileName("file_edits", forComparison=0)
         useThreads = test.getConfigValue("collect_traffic_use_threads") == "true"
         filesToIgnore = test.getCompositeConfigValue("test_data_ignore", "file_edits")
         asynchronousFileEditCmds = test.getConfigValue("collect_traffic").get("asynchronous")
+        pythonModules = test.getConfigValue("collect_traffic_py_module")
         testPath = test.getRelPath()
         environmentDict = test.getConfigValue("collect_traffic_environment")
         if self.record:
             return TrafficServer(test, testPath, environmentDict, recordFile, recordEditDir,
                                  useThreads=useThreads, filesToIgnore=filesToIgnore,
+                                 pythonModules=pythonModules, realCommands=realCommands,
                                  asynchronousFileEditCmds=asynchronousFileEditCmds)
         else:
-            replayFile = test.getFileName("traffic")
             replayEditDir = test.getFileName("file_edits")
-            if replayFile:
-                return TrafficServer(test, testPath, environmentDict, recordFile, recordEditDir,
-                                     replayFile, replayEditDir, 
-                                     useThreads=useThreads, filesToIgnore=filesToIgnore,
-                                     asynchronousFileEditCmds=asynchronousFileEditCmds)
+            return TrafficServer(test, testPath, environmentDict, recordFile, recordEditDir,
+                                 replayFile, replayEditDir, 
+                                 useThreads=useThreads, filesToIgnore=filesToIgnore,
+                                 pythonModules=pythonModules, realCommands=realCommands,
+                                 asynchronousFileEditCmds=asynchronousFileEditCmds)
             
     def makeIntercepts(self, test):
+        realCommands = {}
         for cmd in self.getCommandsForInterception(test):
-            self.intercept(test, cmd, self.trafficFiles, copyExtension=True)
+            self.intercept(test, cmd, self.trafficFiles, realCommands, copyExtension=True)
 
         for moduleName in test.getConfigValue("collect_traffic_py_module"):
             modulePath = moduleName.replace(".", "/")
-            self.intercept(test, modulePath + ".py", [ self.trafficPyModuleFile ], copyExtension=False)
+            self.intercept(test, modulePath + ".py", [ self.trafficPyModuleFile ], realCommands, copyExtension=False)
             self.makePackageFiles(test, modulePath)
-
+        return realCommands
+    
     def makePackageFiles(self, test, modulePath):
         parts = modulePath.rsplit("/", 1)
         if len(parts) == 2:
@@ -73,14 +77,14 @@ class SetUpTrafficHandlers(plugins.Action):
         # "asynchronous"! (it will also pick up "default").
         return test.getCompositeConfigValue("collect_traffic", "asynchronous")
 
-    def intercept(self, test, cmd, trafficFiles, copyExtension):
+    def intercept(self, test, cmd, trafficFiles, realCommands, copyExtension):
         interceptName = test.makeTmpFileName(cmd, forComparison=0)
         plugins.ensureDirExistsForFile(interceptName)
         if os.path.exists(interceptName):
             # We might have written a fake version - store what it points to so we can
             # call it later, and remove the link
             localName = os.path.basename(interceptName)
-            self.trafficServer.setRealVersion(localName, test.getPathName(localName))
+            realCommands[localName] = test.getPathName(localName)
             os.remove(interceptName)
         for trafficFile in trafficFiles:
             if os.name == "posix":
@@ -699,7 +703,7 @@ class TrafficRequestHandler(StreamRequestHandler):
 class TrafficServer(TCPServer):
     def __init__(self, test, testPath, environmentDict, recordFile, recordFileEditDir,
                  replayFile=None, replayFileEditDir=None,
-                 useThreads=True, filesToIgnore=[], asynchronousFileEditCmds=[]):
+                 useThreads=True, filesToIgnore=[], pythonModules=[], asynchronousFileEditCmds=[], realCommands={}):
         self.useThreads = useThreads
         self.filesToIgnore = filesToIgnore
         self.recordFileHandler = RecordFileHandler(recordFile)
@@ -710,6 +714,7 @@ class TrafficServer(TCPServer):
         CommandLineTraffic.currentTestPath = testPath
         CommandLineTraffic.environmentDict = environmentDict
         CommandLineTraffic.asynchronousFileEditCmds = asynchronousFileEditCmds
+        CommandLineTraffic.realCommands = realCommands
         CommandLineTraffic.diag = self.diag
         FileEditTraffic.replayFileEditDir = replayFileEditDir
         FileEditTraffic.recordFileEditDir = recordFileEditDir
@@ -724,7 +729,7 @@ class TrafficServer(TCPServer):
         ClientSocketTraffic.direction = "<-"
         ServerTraffic.direction = "->"
         PythonInstanceWrapper.allInstances = {}
-        PythonFunctionCallTraffic.interceptModules = test.getConfigValue("collect_traffic_py_module")
+        PythonFunctionCallTraffic.interceptModules = pythonModules
         TCPServer.__init__(self, (socket.gethostname(), 0), TrafficRequestHandler)
         self.setAddressVariable(test)
         self.allThreads = [ Thread(target=self.run) ]
@@ -773,10 +778,6 @@ class TrafficServer(TCPServer):
         test.setEnvironment("TEXTTEST_MIM_SERVER", address) # Address of TextTest's server for recording client/server traffic
         self.diag.info("Setting traffic server address to '" + address + "'")
         
-    def setRealVersion(self, command, realCommand):
-        self.diag.info("Storing faked command for " + command + " = " + realCommand) 
-        CommandLineTraffic.realCommands[command] = realCommand
-
     def findFilesAndLinks(self, path):
         if not os.path.exists(path):
             return []

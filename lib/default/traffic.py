@@ -32,12 +32,24 @@ class SetUpTrafficHandlers(plugins.Action):
             
     def makeTrafficServer(self, test):
         recordFile = test.makeTmpFileName("traffic")
+        recordEditDir = test.makeTmpFileName("file_edits", forComparison=0)
+        useThreads = test.getConfigValue("collect_traffic_use_threads") == "true"
+        filesToIgnore = test.getCompositeConfigValue("test_data_ignore", "file_edits")
+        asynchronousFileEditCmds = test.getConfigValue("collect_traffic").get("asynchronous")
+        testPath = test.getRelPath()
+        environmentDict = test.getConfigValue("collect_traffic_environment")
         if self.record:
-            return TrafficServer(test, recordFile)
+            return TrafficServer(test, testPath, environmentDict, recordFile, recordEditDir,
+                                 useThreads=useThreads, filesToIgnore=filesToIgnore,
+                                 asynchronousFileEditCmds=asynchronousFileEditCmds)
         else:
-            trafficReplay = test.getFileName("traffic")
-            if trafficReplay:
-                return TrafficServer(test, recordFile, trafficReplay)
+            replayFile = test.getFileName("traffic")
+            replayEditDir = test.getFileName("file_edits")
+            if replayFile:
+                return TrafficServer(test, testPath, environmentDict, recordFile, recordEditDir,
+                                     replayFile, replayEditDir, 
+                                     useThreads=useThreads, filesToIgnore=filesToIgnore,
+                                     asynchronousFileEditCmds=asynchronousFileEditCmds)
             
     def makeIntercepts(self, test):
         for cmd in self.getCommandsForInterception(test):
@@ -157,6 +169,10 @@ class FileEditTraffic(ResponseTraffic):
     typeId = "FIL"
     linkSuffix = ".TEXTTEST_SYMLINK"
     deleteSuffix = ".TEXTTEST_DELETION"
+    replayFileEditDir = None
+    recordFileEditDir = None
+    fileRequestCount = {} # also only for recording
+    diag = None
     def __init__(self, fileName, activeFile, storedFile, changedPaths, reproduce):
         self.activeFile = activeFile
         self.storedFile = storedFile
@@ -165,10 +181,10 @@ class FileEditTraffic(ResponseTraffic):
         ResponseTraffic.__init__(self, fileName, None)
 
     @classmethod
-    def getFileWithType(cls, fileName, fileEditDir):
-        if fileEditDir:
+    def getFileWithType(cls, fileName):
+        if cls.replayFileEditDir:
             for name in [ fileName, fileName + cls.linkSuffix, fileName + cls.deleteSuffix ]:
-                candidate = os.path.join(fileEditDir, name)
+                candidate = os.path.join(cls.replayFileEditDir, name)
                 if os.path.exists(candidate):
                     return candidate, cls.getFileType(candidate)
         return None, "unknown"
@@ -181,6 +197,23 @@ class FileEditTraffic(ResponseTraffic):
             return "directory"
         else:
             return "file"
+
+    @classmethod
+    def makeRecordedTraffic(cls, file, changedPaths):
+        storedFile = os.path.join(cls.recordFileEditDir, cls.getFileEditName(os.path.basename(file)))
+        fileName = os.path.basename(storedFile)
+        cls.diag.info("File being edited for '" + fileName + "' : will store " + str(file) + " as " + str(storedFile))
+        for path in changedPaths:
+            cls.diag.info("- changed " + path)
+        return cls(fileName, file, storedFile, changedPaths, reproduce=False)
+
+    @classmethod
+    def getFileEditName(cls, name):
+        timesUsed = cls.fileRequestCount.setdefault(name, 0) + 1
+        cls.fileRequestCount[name] = timesUsed
+        if timesUsed > 1:
+            name += ".edit_" + str(timesUsed)
+        return name
 
     def copy(self, srcRoot, dstRoot):
         for srcPath in self.changedPaths:
@@ -240,7 +273,7 @@ class ClientSocketTraffic(Traffic):
                 return [ ServerTraffic(response, self.responseFile) ]
             except socket.error:
                 sys.stderr.write("WARNING: Server process reset the connection while TextTest's 'fake client' was trying to read a response from it!\n")
-                sys.stderr.write("(while running " + repr(CommandLineTraffic.currentTest) + ")\n")
+                sys.stderr.write("(while running test at " + CommandLineTraffic.currentTestPath + ")\n")
                 sock.close()
                 return []
         else:
@@ -457,6 +490,9 @@ class CommandLineTraffic(Traffic):
     typeId = "CMD"
     direction = "<-"
     currentTest = None
+    currentTestPath = None
+    environmentDict = {}
+    asynchronousFileEditCmds = []
     diag = None
     realCommands = {}
     def __init__(self, inText, responseFile):
@@ -478,7 +514,7 @@ class CommandLineTraffic(Traffic):
         
     def filterEnvironment(self, cmdEnviron):
         interestingEnviron = []
-        for var in self.currentTest.getCompositeConfigValue("collect_traffic_environment", self.commandName):
+        for var in self.getEnvironmentVariables():
             value = cmdEnviron.get(var)
             if value is not None:
                 currValue = self.currentTest.getEnvironment(var)
@@ -486,6 +522,10 @@ class CommandLineTraffic(Traffic):
                 if value != currValue:
                     interestingEnviron.append((var, value))
         return interestingEnviron
+
+    def getEnvironmentVariables(self):
+        return self.environmentDict.get(self.commandName, []) + \
+               self.environmentDict.get("default", [])
 
     def hasChangedWorkingDirectory(self):
         return not plugins.samefile(self.cmdCwd, self.currentTest.getDirectory(temporary=1))
@@ -513,7 +553,7 @@ class CommandLineTraffic(Traffic):
         for dir in writeDirs:
             filteredDesc = filteredDesc.replace(dir, "<sandbox>")
         if filteredDesc != desc:
-            filter = rundependent.LineFilter("{INTERNAL writedir}{REPLACE <sandbox>}", self.currentTest.getRelPath(), self.diag)
+            filter = rundependent.LineFilter("{INTERNAL writedir}{REPLACE <sandbox>}", self.currentTestPath, self.diag)
             return filteredDesc, filter
         else:
             return desc, None
@@ -536,7 +576,7 @@ class CommandLineTraffic(Traffic):
         return edits
 
     def makesAsynchronousEdits(self):
-        return self.commandName in self.currentTest.getConfigValue("collect_traffic").get("asynchronous")
+        return self.commandName in self.asynchronousFileEditCmds
     
     @staticmethod
     def removeSubPaths(paths):
@@ -657,19 +697,28 @@ class TrafficRequestHandler(StreamRequestHandler):
         return ClientSocketTraffic(text, self.wfile)
             
 class TrafficServer(TCPServer):
-    def __init__(self, test, recordFile, replayFile=None):
-        self.test = test
+    def __init__(self, test, testPath, environmentDict, recordFile, recordFileEditDir,
+                 replayFile=None, replayFileEditDir=None,
+                 useThreads=True, filesToIgnore=[], asynchronousFileEditCmds=[]):
+        self.useThreads = useThreads
+        self.filesToIgnore = filesToIgnore
         self.recordFileHandler = RecordFileHandler(recordFile)
         self.replayInfo = ReplayInfo(replayFile)
         self.requestCount = 0
         self.diag = logging.getLogger("Traffic Server")
         CommandLineTraffic.currentTest = test
+        CommandLineTraffic.currentTestPath = testPath
+        CommandLineTraffic.environmentDict = environmentDict
+        CommandLineTraffic.asynchronousFileEditCmds = asynchronousFileEditCmds
         CommandLineTraffic.diag = self.diag
+        FileEditTraffic.replayFileEditDir = replayFileEditDir
+        FileEditTraffic.recordFileEditDir = recordFileEditDir
+        FileEditTraffic.fileRequestCount = {}
+        FileEditTraffic.diag = self.diag
         self.topLevelForEdit = [] # contains only paths explicitly given. Always present.
         self.fileEditData = seqdict() # contains all paths, including subpaths of the above. Empty when replaying.
         self.terminate = False
         self.hasAsynchronousEdits = False
-        self.fileRequestCount = {} # also only for recording
         # Assume testing client until a server contacts us
         ClientSocketTraffic.destination = None
         ClientSocketTraffic.direction = "<-"
@@ -709,7 +758,7 @@ class TrafficServer(TCPServer):
 
     def process_request(self, request, client_address):
         self.requestCount += 1
-        if self.test.getConfigValue("collect_traffic_use_threads") == "true":
+        if self.useThreads:
             """Start a new thread to process the request."""
             t = Thread(target = self.process_request_thread,
                        args = (request, client_address, self.requestCount))
@@ -735,9 +784,8 @@ class TrafficServer(TCPServer):
             return [ path ]
 
         paths = []
-        filesToIgnore = self.test.getCompositeConfigValue("test_data_ignore", "file_edits")
         for srcroot, srcdirs, srcfiles in os.walk(path):
-            for fileToIgnore in filesToIgnore:
+            for fileToIgnore in self.filesToIgnore:
                 if fileToIgnore in srcdirs:
                     srcdirs.remove(fileToIgnore)
                 if fileToIgnore in srcfiles:
@@ -818,16 +866,6 @@ class TrafficServer(TCPServer):
             else:
                 return trafficResponses
 
-    def getFileEditPath(self, file):
-        return os.path.join("file_edits", self.getFileEditName(os.path.basename(file)))
-
-    def getFileEditName(self, name):
-        timesUsed = self.fileRequestCount.setdefault(name, 0) + 1
-        self.fileRequestCount[name] = timesUsed
-        if timesUsed > 1:
-            name += ".edit_" + str(timesUsed)
-        return name
-
     def getFileBeingEdited(self, givenName, fileType, filesMatched):
         # drop the suffix which is internal to TextTest
         fileName = givenName.split(".edit_")[0]
@@ -865,8 +903,7 @@ class TrafficServer(TCPServer):
     def makeResponseTraffic(self, traffic, responseClass, text, filesMatched):
         if responseClass is FileEditTraffic:
             fileName = text.strip()
-            fileEditDir = self.test.getFileName("file_edits")
-            storedFile, fileType = FileEditTraffic.getFileWithType(fileName, fileEditDir)
+            storedFile, fileType = FileEditTraffic.getFileWithType(fileName)
             if storedFile:
                 editedFile = self.getFileBeingEdited(fileName, fileType, filesMatched)
                 self.diag.info("File being edited for '" + fileName + "' : will replace " + str(editedFile) + " with " + str(storedFile))
@@ -905,12 +942,7 @@ class TrafficServer(TCPServer):
                         changedPaths.append(removedPath)
                     
             if len(changedPaths) > 0:
-                storedFile = self.test.makeTmpFileName(self.getFileEditPath(file), forComparison=0)
-                fileName = os.path.basename(storedFile)
-                self.diag.info("File being edited for '" + fileName + "' : will store " + str(file) + " as " + str(storedFile))
-                for path in changedPaths:
-                    self.diag.info("- changed " + path)
-                traffic.append(FileEditTraffic(fileName, file, storedFile, changedPaths, reproduce=False))    
+                traffic.append(FileEditTraffic.makeRecordedTraffic(file, changedPaths))
 
         for path in removedPaths:
             del self.fileEditData[path]

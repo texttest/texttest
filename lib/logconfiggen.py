@@ -99,6 +99,7 @@ class PythonLoggingGenerator:
         self.write("""
 [logger_root]
 handlers=root
+level=WARNING
 
 [handler_root]
 class=StreamHandler

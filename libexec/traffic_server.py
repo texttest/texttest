@@ -744,7 +744,7 @@ class CommandLineTraffic(Traffic):
                self.environmentDict.get("default", [])
 
     def hasChangedWorkingDirectory(self):
-        return not plugins.samefile(self.cmdCwd, os.getcwd())
+        return not plugins.samefile(self.cmdCwd, os.getenv("TEXTTEST_SANDBOX"))
 
     def getEnvString(self):
         recStr = ""
@@ -763,7 +763,8 @@ class CommandLineTraffic(Traffic):
 
     def getFilteredDescription(self):
         desc = self.getDescription()
-        writeDirs = set([ os.getcwd(), os.getenv("TEXTTEST_SANDBOX") ])
+        sandbox = os.getenv("TEXTTEST_SANDBOX")
+        writeDirs = set([ sandbox, os.path.realpath(sandbox) ])
         filteredDesc = desc
         for dir in writeDirs:
             filteredDesc = filteredDesc.replace(dir, "<sandbox>")

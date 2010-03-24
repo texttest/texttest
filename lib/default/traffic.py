@@ -82,14 +82,14 @@ class SetUpTrafficHandlers(plugins.Action):
 
         trafficServerEnv = test.getRunEnvironment()
         testDir = test.getDirectory(temporary=1)
-        trafficServerEnv["TEXTTEST_CWD"] = os.getcwd()
-        proc = subprocess.Popen(cmdArgs, env=trafficServerEnv, cwd=testDir,
+        trafficServerEnv["TEXTTEST_CWD"] = os.getcwd().replace("\\", "/")
+        proc = subprocess.Popen(cmdArgs, env=trafficServerEnv, cwd=testDir, universal_newlines=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         address = proc.stdout.readline().strip()
         test.setEnvironment("TEXTTEST_MIM_SERVER", address) # Address of TextTest's server for recording client/server traffic
         if len(pythonModules):
             # Change test environment to pick up the intercepts
-            test.setEnvironment("PYTHONPATH", testDir + os.pathsep + test.getEnvironment("PYTHONPATH"))
+            test.setEnvironment("PYTHONPATH", testDir + os.pathsep + test.getEnvironment("PYTHONPATH", ""))
         return proc
                     
     def makeIntercepts(self, test):

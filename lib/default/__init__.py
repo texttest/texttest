@@ -1608,7 +1608,7 @@ class DocumentEnvironment(plugins.Action):
     def __init__(self, args=[]):
         self.onlyEntries = args
         self.prefixes = [ "TEXTTEST_", "USECASE_" ]
-        self.exceptions = [ "TEXTTEST_DELETION", "TEXTTEST_SYMLINK", "TEXTTEST_PERSONAL_" ]
+        self.exceptions = [ "TEXTTEST_CWD", "TEXTTEST_DELETION", "TEXTTEST_SYMLINK", "TEXTTEST_PERSONAL_" ]
         
     def getEntriesToUse(self, app):
         if len(self.onlyEntries) > 0:

@@ -175,6 +175,18 @@ formatter=debug
 args=(os.devnull, 'a')
 #args=('%(TEXTTEST_PERSONAL_LOG)s/interactiveactions.diag', 'a')
 
+# ======= Section for JUnit Report Writer ======
+[logger_JUnit Report Writer]
+handlers=JUnit Report Writer
+qualname=JUnit Report Writer
+#level=INFO
+
+[handler_JUnit Report Writer]
+class=FileHandler
+formatter=debug
+args=(os.devnull, 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/junitreportwriter.diag', 'a')
+
 # ======= Section for Mail Sender ======
 [logger_Mail Sender]
 handlers=Mail Sender
@@ -355,41 +367,17 @@ formatter=debug
 args=(os.devnull, 'a')
 #args=('%(TEXTTEST_PERSONAL_LOG)s/testcomparison.diag', 'a')
 
-# ======= Section for TestPathFilter ======
-[logger_TestPathFilter]
-handlers=TestPathFilter
-qualname=TestPathFilter
+# ======= Section for TestSelectionFilter ======
+[logger_TestSelectionFilter]
+handlers=TestSelectionFilter
+qualname=TestSelectionFilter
 #level=INFO
 
-[handler_TestPathFilter]
+[handler_TestSelectionFilter]
 class=FileHandler
 formatter=debug
 args=(os.devnull, 'a')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/testpathfilter.diag', 'a')
-
-# ======= Section for Traffic Replay ======
-[logger_Traffic Replay]
-handlers=Traffic Replay
-qualname=Traffic Replay
-#level=INFO
-
-[handler_Traffic Replay]
-class=FileHandler
-formatter=debug
-args=(os.devnull, 'a')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/trafficreplay.diag', 'a')
-
-# ======= Section for Traffic Server ======
-[logger_Traffic Server]
-handlers=Traffic Server
-qualname=Traffic Server
-#level=INFO
-
-[handler_Traffic Server]
-class=FileHandler
-formatter=debug
-args=(os.devnull, 'a')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/trafficserver.diag', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/testselectionfilter.diag', 'a')
 
 # ======= Section for Unique Names ======
 [logger_Unique Names]
@@ -633,10 +621,10 @@ args=(os.devnull, 'a')
 
 # ====== Cruft that python logging module needs ======
 [loggers]
-keys=root,Action Runner,Activator,Check For Bugs,Collate Files,Environment Creator,File View GUI,FileComparison,Filter Actions,Find Applications,GUI notebook,GenerateWebPages,Idle Handlers,Interactive Actions,Mail Sender,Menu Bar,MultiEntryDictionary,Observable,Prepare Writedir,Progress Monitor,Queue System Submit,Reconnection,Run Dependent Text,Save Repository,Select Tests,Slave Server,Test Column GUI,Test Tree,TestComparison,TestPathFilter,Traffic Replay,Traffic Server,Unique Names,application,batch collect,catalogues,check for crashes,gui log,kill processes,locks,makeperformance,option finder,read environment,run test,standard log,test objects,virtual display,TreeModelIndexer,TreeViewDescriber,gui map,usecase record,usecase replay log
+keys=root,Action Runner,Activator,Check For Bugs,Collate Files,Environment Creator,File View GUI,FileComparison,Filter Actions,Find Applications,GUI notebook,GenerateWebPages,Idle Handlers,Interactive Actions,JUnit Report Writer,Mail Sender,Menu Bar,MultiEntryDictionary,Observable,Prepare Writedir,Progress Monitor,Queue System Submit,Reconnection,Run Dependent Text,Save Repository,Select Tests,Slave Server,Test Column GUI,Test Tree,TestComparison,TestSelectionFilter,Unique Names,application,batch collect,catalogues,check for crashes,gui log,kill processes,locks,makeperformance,option finder,read environment,run test,standard log,test objects,virtual display,TreeModelIndexer,TreeViewDescriber,gui map,usecase record,usecase replay log
 
 [handlers]
-keys=root,Action Runner,Activator,Check For Bugs,Collate Files,Environment Creator,File View GUI,FileComparison,Filter Actions,Find Applications,GUI notebook,GenerateWebPages,Idle Handlers,Interactive Actions,Mail Sender,Menu Bar,MultiEntryDictionary,Observable,Prepare Writedir,Progress Monitor,Queue System Submit,Reconnection,Run Dependent Text,Save Repository,Select Tests,Slave Server,Test Column GUI,Test Tree,TestComparison,TestPathFilter,Traffic Replay,Traffic Server,TreeModelIndexer,TreeViewDescriber,Unique Names,application,batch collect,catalogues,check for crashes,gui log,gui map,kill processes,locks,makeperformance,option finder,read environment,run test,standard log,stdout,test objects,usecase record,usecase replay log,virtual display
+keys=root,Action Runner,Activator,Check For Bugs,Collate Files,Environment Creator,File View GUI,FileComparison,Filter Actions,Find Applications,GUI notebook,GenerateWebPages,Idle Handlers,Interactive Actions,JUnit Report Writer,Mail Sender,Menu Bar,MultiEntryDictionary,Observable,Prepare Writedir,Progress Monitor,Queue System Submit,Reconnection,Run Dependent Text,Save Repository,Select Tests,Slave Server,Test Column GUI,Test Tree,TestComparison,TestSelectionFilter,TreeModelIndexer,TreeViewDescriber,Unique Names,application,batch collect,catalogues,check for crashes,gui log,gui map,kill processes,locks,makeperformance,option finder,read environment,run test,standard log,stdout,test objects,usecase record,usecase replay log,virtual display
 
 [formatters]
 keys=timed,debug

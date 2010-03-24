@@ -1,0 +1,55 @@
+
+[logger_root]
+handlers=root
+
+[handler_root]
+class=StreamHandler
+level=WARNING
+args=(sys.stdout,)
+
+[handler_stdout]
+class=StreamHandler
+args=(sys.stdout,)
+#formatter=timed
+
+[formatter_timed]
+format=%(asctime)s - %(message)s
+
+[formatter_debug]
+format=%(name)s %(levelname)s - %(message)s
+
+# ====== The following are disabled by default ======
+# ======= Section for Traffic Replay ======
+[logger_Traffic Replay]
+handlers=Traffic Replay
+qualname=Traffic Replay
+#level=INFO
+
+[handler_Traffic Replay]
+class=FileHandler
+formatter=debug
+args=(os.devnull, 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/trafficreplay.diag', 'a')
+
+# ======= Section for Traffic Server ======
+[logger_Traffic Server]
+handlers=Traffic Server
+qualname=Traffic Server
+#level=INFO
+
+[handler_Traffic Server]
+class=FileHandler
+formatter=debug
+args=(os.devnull, 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/trafficserver.diag', 'a')
+
+# ====== Cruft that python logging module needs ======
+[loggers]
+keys=root,Traffic Replay,Traffic Server
+
+[handlers]
+keys=root,Traffic Replay,Traffic Server,stdout
+
+[formatters]
+keys=timed,debug
+

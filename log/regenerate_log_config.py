@@ -3,7 +3,7 @@
 import logconfiggen, os
 from copy import copy
 
-def generateForSelfTests(selftestDir, *args):
+def generateForSelfTests(selftestDir, trafficLoggers, *args):
     if selftestDir:
         consoleGen = logconfiggen.PythonLoggingGenerator(os.path.join(selftestDir, "logging.console"), postfix="texttest")
         enabledLoggerNames = stdInfo + [ ("usecase replay log", "stdout"), ("kill processes", "stdout") ]
@@ -17,6 +17,10 @@ def generateForSelfTests(selftestDir, *args):
         enabledLoggerNames = stdInfo + [ ("gui log", "dynamic_gui_log"), ("usecase replay log", "dynamic_gui_log"),
                                          ("kill processes", "dynamic_gui_log") ]
         dynamicGen.generate(enabledLoggerNames, *args)
+
+        trafficGen = logconfiggen.PythonLoggingGenerator(os.path.join(selftestDir, "logging.traffic"),
+                                                         postfix="texttest", prefix="%(TEXTTEST_CWD)s/")
+        trafficGen.generate([], trafficLoggers)
 
 def getSelfTestDir(subdir):
     selftestDir = os.path.join(os.getenv("TEXTTEST_HOME"), "texttest", subdir)
@@ -49,12 +53,16 @@ if __name__ == "__main__":
     coreLoggers = logconfiggen.findLoggerNamesUnder(coreLib)
     pyusecaseLib = os.path.join(installationRoot, "pyusecase", "lib")
     pyusecaseLoggers = logconfiggen.findLoggerNamesUnder(pyusecaseLib)
+    trafficLib = os.path.join(installationRoot, "libexec")
+    trafficLoggers = logconfiggen.findLoggerNamesUnder(trafficLib)
     allLoggers, debugLoggers = combineLoggers(coreLoggers, pyusecaseLoggers)
+    trafficGen = logconfiggen.PythonLoggingGenerator("logging.traffic", postfix="diag", prefix="%(TEXTTEST_PERSONAL_LOG)s/")
+    trafficGen.generate(enabledLoggerNames=[], allLoggerNames=trafficLoggers)
     
     debugGen = logconfiggen.PythonLoggingGenerator("logging.debug", postfix="diag", prefix="%(TEXTTEST_PERSONAL_LOG)s/")
     debugGen.generate(enabledLoggerNames=[], allLoggerNames=allLoggers, debugLevelLoggers=debugLoggers)
     
-    generateForSelfTests(getSelfTestDir("log"), allLoggers, debugLoggers)
+    generateForSelfTests(getSelfTestDir("log"), trafficLoggers, allLoggers, debugLoggers)
     
     # Site-specific
     siteDiagFile = os.path.join(installationRoot, "site/log/logging.debug")
@@ -65,5 +73,5 @@ if __name__ == "__main__":
         debugGen = logconfiggen.PythonLoggingGenerator(siteDiagFile, postfix="diag", prefix="%(TEXTTEST_PERSONAL_LOG)s/")
         debugGen.generate(enabledLoggerNames=[], allLoggerNames=allLoggers, debugLevelLoggers=debugLoggers)
 
-        generateForSelfTests(getSelfTestDir("site/log"), allLoggers, debugLoggers)
+        generateForSelfTests(getSelfTestDir("site/log"), trafficLoggers, allLoggers, debugLoggers)
         

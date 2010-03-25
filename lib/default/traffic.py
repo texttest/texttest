@@ -22,9 +22,12 @@ class SetUpTrafficHandlers(plugins.Action):
             sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             host, port = servAddr.split(":")
             serverAddress = (host, int(port))
-            sendSocket.connect(serverAddress)
-            sendSocket.sendall("TERMINATE_SERVER\n")
-            sendSocket.shutdown(2)
+            try:
+                sendSocket.connect(serverAddress)
+                sendSocket.sendall("TERMINATE_SERVER\n")
+                sendSocket.shutdown(2)
+            except socket.error:
+                print "Could not send terminate message to traffic server, seemed not to be running anyway."
         if self.trafficServerProcess:
             out, err = self.trafficServerProcess.communicate()
             if err:

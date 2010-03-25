@@ -254,9 +254,10 @@ class CheckForBugs(plugins.Action):
         bug = self.findBug(test, activeBugs)
         if bug:
             category, briefText, fullText = bug.findInfo(test)
-            self.diag.info("Changing to " + category + " with text " + briefText)
-            bugState = FailedPrediction(category, fullText, briefText, completed=1)
-            self.changeState(test, bugState)
+            if briefText or fullText:
+                self.diag.info("Changing to " + category + " with text " + briefText)
+                bugState = FailedPrediction(category, fullText, briefText, completed=1)
+                self.changeState(test, bugState)
             
     def findBug(self, test, activeBugs):
         multipleDiffs = self.hasMultipleDifferences(test)

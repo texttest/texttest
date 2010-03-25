@@ -290,10 +290,13 @@ class FileComparison:
         # more intelligent save, e.g. for performance. Default is the same for exact
         # and inexact save
         tmpFile = self.getTmpFileForSave(test)
-        if exact:
-            copyfile(tmpFile, self.stdFile)
+        if os.path.isfile(tmpFile):
+            if exact:
+                copyfile(tmpFile, self.stdFile)
+            else:
+                self.saveResults(tmpFile, self.stdFile)
         else:
-            self.saveResults(tmpFile, self.stdFile)
+            raise plugins.TextTestError, "The following file seems to have been removed since it was created:\n" + repr(tmpFile) 
         self.differenceCache = self.SAVED
 
     def saveMissing(self, versionString, autoGenText, backupVersionStrings):

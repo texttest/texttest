@@ -1139,8 +1139,7 @@ if __name__ == "__main__":
     options = parser.parse_args()[0] # no positional arguments
 
     allPaths = plugins.findDataPaths([ "logging.traffic" ], dataDirName="log", includePersonal=True)
-    defaults = { "TEXTTEST_PERSONAL_LOG": os.getenv("TEXTTEST_PERSONAL_LOG"),
-                 "TEXTTEST_CWD": os.getenv("TEXTTEST_CWD") }
+    defaults = { "TEXTTEST_PERSONAL_LOG": os.getenv("TEXTTEST_PERSONAL_LOG") }
     logging.config.fileConfig(allPaths[-1], defaults)
 
     for cls in [ CommandLineTraffic, FileEditTraffic, PythonFunctionCallTraffic ]:

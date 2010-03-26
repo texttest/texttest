@@ -119,6 +119,7 @@ class GraphGenerator:
     labels["memory"] = "Memory difference"
     labels["knownbug"] = "Known Issues"
     labels["failure"] = "Failed tests"
+    labels["incomplete"] = "Not completed"
     def __init__(self):
         self.diag = logging.getLogger("GenerateWebPages")
         self.diag.info("Generating graphs...")

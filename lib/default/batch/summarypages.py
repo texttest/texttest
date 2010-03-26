@@ -153,7 +153,7 @@ class SummaryDataFinder:
             index += 1
         self.diag.info("Category information is " + repr(categories))
         colourCount = seqdict()
-        for colourKey in [ "success", "knownbug", "performance", "failure" ]:
+        for colourKey in [ "success", "knownbug", "performance", "failure", "incomplete" ]:
             colourCount[colourKey] = 0
         for categoryName, count in categories:
             colourKey = self.getColourKey(categoryName)
@@ -172,7 +172,10 @@ class SummaryDataFinder:
             for perfCat in [ "faster", "slower", "memory+", "memory-" ]:
                 if categoryName.startswith(perfCat):
                     return "performance"
-            return "failure"
+            if categoryName in [ "killed", "unrunnable", "cancelled", "abandoned" ]:
+                return "incomplete"
+            else:
+                return "failure"
 
     def parseFileName(self, fileName):
         versionStr = fileName[5:-5]

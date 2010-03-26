@@ -875,6 +875,7 @@ class Config:
         colours["success_bg"] = "#CEEFBD"
         colours["failure_bg"] = "#FF3118"
         colours["knownbug_bg"] = "#FF9900"
+        colours["incomplete_bg"] = "#8B1A1A"
         colours["no_results_bg"] = "gray2"
         colours["performance_bg"] = "#FFC6A5"
         colours["test_default_fg"] = "black"

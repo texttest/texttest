@@ -409,7 +409,7 @@ class TestTable:
         fullData = []
         for tag in self.tags:
             colourCount = seqdict()
-            for colourKey in [ "success", "knownbug", "performance", "memory", "failure" ]:
+            for colourKey in [ "success", "knownbug", "performance", "memory", "failure", "incomplete" ]:
                 colourCount[colourKey] = 0
             categoryHandler = self.categoryHandlers[tag]
             basicData = categoryHandler.getSummaryData()[-1]
@@ -516,6 +516,8 @@ class TestTable:
             return "performance"
         elif category == "smaller" or category == "larger":
             return "memory"
+        elif category in [ "killed", "unrunnable", "cancelled", "abandoned" ]:
+            return "incomplete"
         else:
             return "failure"
 

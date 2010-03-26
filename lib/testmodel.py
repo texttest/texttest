@@ -671,7 +671,7 @@ class TestCase(Test):
         filelist = os.listdir(self.writeDirectory)
         filelist.sort()
         for file in filelist:
-            if file == "framework_tmp" or file == "file_edits" or file.endswith("." + self.app.name):
+            if file in [ "framework_tmp", "file_edits", "traffic_intercepts" ] or file.endswith("." + self.app.name):
                 continue
             fullPath = os.path.join(self.writeDirectory, file)
             paths += self.listFiles(fullPath, file, followLinks=False)

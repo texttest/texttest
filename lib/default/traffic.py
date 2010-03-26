@@ -41,8 +41,17 @@ class SetUpTrafficHandlers(plugins.Action):
         else:
             replayFile = test.getFileName("traffic")
             if self.record or replayFile:
-                self.makeIntercepts(test)
-                self.trafficServerProcess = self.makeTrafficServer(test, replayFile)
+                self.setUpServer(test, replayFile)
+
+    def setUpServer(self, test, replayFile):
+        interceptDir = test.makeTmpFileName("traffic_intercepts", forComparison=0)
+        pathVars = self.makeIntercepts(test, interceptDir)
+        self.trafficServerProcess = self.makeTrafficServer(test, replayFile)
+        address = self.trafficServerProcess.stdout.readline().strip()
+        test.setEnvironment("TEXTTEST_MIM_SERVER", address) # Address of TextTest's server for recording client/server traffic
+        for pathVar in pathVars:
+            # Change test environment to pick up the intercepts
+            test.setEnvironment(pathVar, interceptDir + os.pathsep + test.getEnvironment(pathVar, ""))
 
     def makeArgFromDict(self, dict):
         args = [ key + "=" + self.makeArgFromVal(val) for key, val in dict.items() ]
@@ -83,42 +92,43 @@ class SetUpTrafficHandlers(plugins.Action):
         if asynchronousFileEditCmds:
             cmdArgs += [ "-a", ",".join(asynchronousFileEditCmds) ]
 
-        proc = subprocess.Popen(cmdArgs, env=test.getRunEnvironment(), universal_newlines=True,
+        return subprocess.Popen(cmdArgs, env=test.getRunEnvironment(), universal_newlines=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        address = proc.stdout.readline().strip()
-        test.setEnvironment("TEXTTEST_MIM_SERVER", address) # Address of TextTest's server for recording client/server traffic
-        if len(pythonModules):
-            # Change test environment to pick up the intercepts
-            test.setEnvironment("PYTHONPATH", test.getDirectory(temporary=1) + os.pathsep + test.getEnvironment("PYTHONPATH", ""))
-        return proc
                     
-    def makeIntercepts(self, test):
-        for cmd in self.getCommandsForInterception(test):
-            self.intercept(test, cmd, self.trafficFiles, copyExtension=True)
+    def makeIntercepts(self, test, interceptDir):
+        commands = self.getCommandsForInterception(test)
+        for cmd in commands:
+            self.intercept(interceptDir, cmd, self.trafficFiles, copyExtension=True)
 
-        for moduleName in test.getConfigValue("collect_traffic_py_module"):
+        pythonModules = test.getConfigValue("collect_traffic_py_module")
+        for moduleName in pythonModules:
             modulePath = moduleName.replace(".", "/")
-            self.intercept(test, modulePath + ".py", [ self.trafficPyModuleFile ], copyExtension=False)
-            self.makePackageFiles(test, modulePath)
+            self.intercept(interceptDir, modulePath + ".py", [ self.trafficPyModuleFile ], copyExtension=False)
+            self.makePackageFiles(interceptDir, modulePath)
+
+        pathVars = []
+        if len(commands):
+            pathVars.append("PATH")
+        if len(pythonModules):
+            pathVars.append("PYTHONPATH")
+        return pathVars
      
-    def makePackageFiles(self, test, modulePath):
+    def makePackageFiles(self, interceptDir, modulePath):
         parts = modulePath.rsplit("/", 1)
         if len(parts) == 2:
             localFileName = os.path.join(parts[0], "__init__.py")
-            fileName = test.makeTmpFileName(localFileName, forComparison=0)
+            fileName = os.path.join(interceptDir, localFileName)
             open(fileName, "w").close() # make an empty package file
-            self.makePackageFiles(test, parts[0])
+            self.makePackageFiles(interceptDir, parts[0])
 
     def getCommandsForInterception(self, test):
         # This gets all names in collect_traffic, not just those marked
         # "asynchronous"! (it will also pick up "default").
         return test.getCompositeConfigValue("collect_traffic", "asynchronous")
 
-    def intercept(self, test, cmd, trafficFiles, copyExtension):
-        interceptName = test.makeTmpFileName(cmd, forComparison=0)
+    def intercept(self, interceptDir, cmd, trafficFiles, copyExtension):
+        interceptName = os.path.join(interceptDir, cmd)
         plugins.ensureDirExistsForFile(interceptName)
-        if os.path.exists(interceptName):
-            return sys.stderr.write("Could not create interceptor file '" + os.path.basename(interceptName) + "' - file already existed for other purposes.\n") 
         for trafficFile in trafficFiles:
             if os.name == "posix":
                 os.symlink(trafficFile, interceptName)

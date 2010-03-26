@@ -26,6 +26,10 @@ class Config:
         self.reconnectConfig = ReconnectConfig(optionMap)
     def getMachineNameForDisplay(self, machine):
         return machine # override for queuesystems
+    def getCheckoutLabel(self):
+        return "Use checkout"
+    def getMachineLabel(self):
+        return "Run on machine"
     def addToOptionGroups(self, apps, groups):
         recordsUseCases = len(apps) == 0 or self.anyAppHas(apps, lambda app: app.getConfigValue("use_case_record_mode") != "disabled")
         useCatalogues = self.anyAppHas(apps, self.isolatesDataUsingCatalogues)
@@ -46,8 +50,8 @@ class Config:
                 else:
                     version, checkout, machine = "", "", ""
                 group.addOption("v", "Run this version", version)
-                group.addOption("c", "Use checkout", checkout)
-                group.addOption("m", "Run on machine", self.getMachineNameForDisplay(machine))
+                group.addOption("c", self.getCheckoutLabel(), checkout)
+                group.addOption("m", self.getMachineLabel(), self.getMachineNameForDisplay(machine))
                 group.addOption("cp", "Times to run", "1", description="Set this to some number larger than 1 to run the same test multiple times, for example to try to catch indeterminism in the system under test")
                 if recordsUseCases:
                     group.addSwitch("actrep", "Run with slow motion replay")

@@ -353,9 +353,7 @@ class TestEnvironmentCreator:
         if self.isRecording():
             if os.environ.has_key("USECASE_REPLAY_SCRIPT"):
                 # For self-testing, to allow us to record TextTest performing recording
-                targetReplayFile = plugins.addLocalPrefix(os.getenv("USECASE_REPLAY_SCRIPT"), "target")
-                if os.path.isfile(targetReplayFile):
-                    return targetReplayFile
+                return self.test.getEnvironment("USECASE_FAKE_REPLAY_SCRIPT")
             else:
                 # Don't replay when recording - let the user do it...
                 return None

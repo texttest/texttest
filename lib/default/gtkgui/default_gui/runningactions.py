@@ -361,11 +361,6 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
         newTime = plugins.modifiedTime(file)
         if newTime != self.recordTime:
             self.recordTime = newTime
-            outerRecord = os.getenv("USECASE_RECORD_SCRIPT")
-            if outerRecord:
-                # If we have an "outer" record going on, provide the result as a target recording...
-                target = plugins.addLocalPrefix(outerRecord, "target_record")
-                shutil.copyfile(file, target)
             return True
         else:
             return False

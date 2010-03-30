@@ -350,14 +350,7 @@ class TestEnvironmentCreator:
     def isRecording(self):
         return self.optionMap.has_key("record")
     def findReplayUseCase(self, usecaseFile):
-        if self.isRecording():
-            if os.environ.has_key("USECASE_REPLAY_SCRIPT"):
-                # For self-testing, to allow us to record TextTest performing recording
-                return self.test.getEnvironment("USECASE_FAKE_REPLAY_SCRIPT")
-            else:
-                # Don't replay when recording - let the user do it...
-                return None
-        else:
+        if not self.isRecording():
             if usecaseFile:
                 return usecaseFile
             elif os.environ.has_key("USECASE_REPLAY_SCRIPT") and not self.useJavaRecorder():

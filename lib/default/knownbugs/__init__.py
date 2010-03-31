@@ -27,6 +27,9 @@ class Bug:
         else:
             return "bug"
 
+    def isCancellation(self):
+        return False
+
 class BugSystemBug(Bug):
     def __init__(self, bugSystem, bugId):
         self.bugId = bugId
@@ -51,6 +54,9 @@ class UnreportedBug(Bug):
         self.fullText = fullText
         self.briefText = briefText
         self.internalError = internalError
+
+    def isCancellation(self):
+        return not self.briefText and not self.fullText
 
     def getPriority(self):
         if self.internalError:
@@ -201,7 +207,7 @@ class BugMap(seqdict):
         except:
             plugins.printWarning("Bug file at " + fileName + " not understood, ignoring", stderr=True, stdout=False)
     def readFromParser(self, parser):
-        for section in sorted(parser.sections()):
+        for section in reversed(sorted(parser.sections())):
             getOption = ParseMethod(parser, section)
             fileStem = getOption("search_file")
             self.setdefault(fileStem, FileBugData()).addBugTrigger(getOption)
@@ -254,19 +260,29 @@ class CheckForBugs(plugins.Action):
         bug = self.findBug(test, activeBugs)
         if bug:
             category, briefText, fullText = bug.findInfo(test)
-            if briefText or fullText:
-                self.diag.info("Changing to " + category + " with text " + briefText)
-                bugState = FailedPrediction(category, fullText, briefText, completed=1)
-                self.changeState(test, bugState)
+            self.diag.info("Changing to " + category + " with text " + briefText)
+            bugState = FailedPrediction(category, fullText, briefText, completed=1)
+            self.changeState(test, bugState)
             
     def findBug(self, test, activeBugs):
         multipleDiffs = self.hasMultipleDifferences(test)
         bugs = []
         for stem, fileBugData in activeBugs.items():
             bugs += self.findBugsInFile(test, stem, fileBugData, multipleDiffs)
-        if len(bugs) > 0:
-            bugs.sort()
-            return bugs[0]
+
+        unblockedBugs = self.findUnblockedBugs(bugs)
+        if len(unblockedBugs) > 0:
+            unblockedBugs.sort()
+            return unblockedBugs[0]
+
+    def findUnblockedBugs(self, bugs):
+        unblockedBugs = []
+        for bug in bugs:
+            if bug.isCancellation():
+                return unblockedBugs
+            else:
+                unblockedBugs.append(bug)
+        return unblockedBugs
         
     def findBugsInFile(self, test, stem, fileBugData, multipleDiffs):
         self.diag.info("Looking for bugs in file " + stem)

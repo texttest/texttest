@@ -929,3 +929,6 @@ activate = update from vcs
 [Name=VCS Update Window]
 response.accept = close vcs update window
 
+[Name=VCS Top Menu]
+activate = show vcs top menu
+

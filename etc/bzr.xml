@@ -3,7 +3,7 @@
   <menubar name="MainMenuBar">
 
     <placeholder name="ExtraMenus">
-      <menu action="Bazaarmenu">
+      <menu name="VCS Top Menu" action="Bazaarmenu">
         <menuitem action="Bazaar Log"/>
         <menuitem action="Bazaar Log Recursive"/>
         <separator/>
@@ -26,7 +26,7 @@
   </menubar>
 
   <popup name="TestPopupMenu">
-    <menu action="Bazaarmenu">
+    <menu name="VCS Popup Menu" action="Bazaarmenu">
       <menuitem action="Bazaar Log"/>
       <menuitem action="Bazaar Log Recursive"/>
       <separator/>
@@ -47,7 +47,7 @@
   </popup>
 
   <popup name="TestFilePopupMenu">
-    <menu action="Bazaarmenu">
+    <menu name="VCS File Popup Menu" action="Bazaarmenu">
       <menuitem action="Bazaar Log"/>
       <menuitem action="Bazaar Log Recursive"/>
       <separator/>

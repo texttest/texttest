@@ -3,7 +3,7 @@
   <menubar name="MainMenuBar">
 
     <placeholder name="ExtraMenus">
-      <menu action="Mercurialmenu">
+      <menu name="VCS Top Menu" action="Mercurialmenu">
         <menuitem action="Mercurial Log"/>
         <menuitem action="Mercurial Log Recursive"/>
         <separator/>
@@ -26,7 +26,7 @@
   </menubar>
 
   <popup name="TestPopupMenu">
-    <menu action="Mercurialmenu">
+    <menu name="VCS Popup Menu" action="Mercurialmenu">
       <menuitem action="Mercurial Log"/>
       <menuitem action="Mercurial Log Recursive"/>
       <separator/>
@@ -47,7 +47,7 @@
   </popup>
 
   <popup name="TestFilePopupMenu">
-    <menu action="Mercurialmenu">
+    <menu name="VCS File Popup Menu" action="Mercurialmenu">
       <menuitem action="Mercurial Log"/>
       <menuitem action="Mercurial Log Recursive"/>
       <separator/>

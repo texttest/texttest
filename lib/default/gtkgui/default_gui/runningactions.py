@@ -251,6 +251,7 @@ class RunTestsAdvanced(RunTests):
 
 class RerunTests(RunningAction,guiplugins.ActionGUI):
     def __init__(self, allApps, dynamic, inputOptions):
+        self.reconnecting = inputOptions.has_key("reconnect")
         guiplugins.ActionGUI.__init__(self, allApps)
         RunningAction.__init__(self, inputOptions)
 
@@ -271,6 +272,9 @@ class RerunTests(RunningAction,guiplugins.ActionGUI):
     def getTmpFilterDir(self, app):
         return "" # don't want selections returned here, send them to the static GUI
 
+    def isValidForApp(self, app):
+        return not self.reconnecting
+    
     def getTextTestOptions(self, *args):
         ttOptions = RunningAction.getTextTestOptions(self, *args)
         ignoreInput = [ "a", "cp", "count", "f", "g" ]
@@ -361,11 +365,6 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
         newTime = plugins.modifiedTime(file)
         if newTime != self.recordTime:
             self.recordTime = newTime
-            outerRecord = os.getenv("USECASE_RECORD_SCRIPT")
-            if outerRecord:
-                # If we have an "outer" record going on, provide the result as a target recording...
-                target = plugins.addLocalPrefix(outerRecord, "target_record")
-                shutil.copyfile(file, target)
             return True
         else:
             return False

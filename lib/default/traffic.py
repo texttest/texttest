@@ -98,16 +98,19 @@ class SetUpTrafficHandlers(plugins.Action):
     def makeIntercepts(self, test, interceptDir):
         commands = self.getCommandsForInterception(test)
         for cmd in commands:
-            self.intercept(interceptDir, cmd, self.trafficFiles, copyExtension=True)
+            self.intercept(interceptDir, cmd, self.trafficFiles, executable=True)
 
         pythonModules = test.getConfigValue("collect_traffic_py_module")
         for moduleName in pythonModules:
             modulePath = moduleName.replace(".", "/")
-            self.intercept(interceptDir, modulePath + ".py", [ self.trafficPyModuleFile ], copyExtension=False)
+            self.intercept(interceptDir, modulePath + ".py", [ self.trafficPyModuleFile ], executable=False)
             self.makePackageFiles(interceptDir, modulePath)
 
         pathVars = []
-        if len(commands):
+        if len(commands) and os.name == "posix":
+            # Intercepts on Windows go directly into the sandbox so they can take advantage of the
+            # "current working directory beats all" rule there and also intercept things that ignore PATH
+            # (like Java)
             pathVars.append("PATH")
         if len(pythonModules):
             pathVars.append("PYTHONPATH")
@@ -126,14 +129,17 @@ class SetUpTrafficHandlers(plugins.Action):
         # "asynchronous"! (it will also pick up "default").
         return test.getCompositeConfigValue("collect_traffic", "asynchronous")
 
-    def intercept(self, interceptDir, cmd, trafficFiles, copyExtension):
+    def intercept(self, interceptDir, cmd, trafficFiles, executable):
         interceptName = os.path.join(interceptDir, cmd)
         plugins.ensureDirExistsForFile(interceptName)
         for trafficFile in trafficFiles:
             if os.name == "posix":
                 os.symlink(trafficFile, interceptName)
-            elif copyExtension:
-                # Rename the files as appropriate and hope for the best :)
+            elif executable:
+                # Windows PATH interception isn't straightforward. Only .exe files get found.
+                # Put them directly into the sandbox directory rather than the purpose-built directory:
+                # that way they can also intercept stuff that is otherwise picked up directly from the registry (like Java)
+                interceptName = os.path.join(os.path.dirname(interceptDir), cmd)
                 extension = os.path.splitext(trafficFile)[-1]
                 shutil.copy(trafficFile, interceptName + extension)
             else:

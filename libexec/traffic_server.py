@@ -102,12 +102,6 @@ class TrafficServer(TCPServer):
             t.start()
         else:
             self.process_request_thread(request, client_address, self.requestCount)
-
-    def setAddressVariable(self, test):
-        host, port = self.socket.getsockname()
-        address = host + ":" + str(port)
-        test.setEnvironment("TEXTTEST_MIM_SERVER", address) # Address of TextTest's server for recording client/server traffic
-        self.diag.info("Setting traffic server address to '" + address + "'")
         
     def findFilesAndLinks(self, path):
         if not os.path.exists(path):
@@ -754,12 +748,22 @@ class CommandLineTraffic(Traffic):
             return recStr
         recStr += "env "
         for var, value in self.environ:
-            recLine = "'" + var + "=" + value + "' "
-            oldVal = os.getenv(var)
-            if oldVal and oldVal != value:
-                recLine = recLine.replace(oldVal, "$" + var)
-            recStr += recLine
+            recStr += "'" + var + "=" + self.getEnvValueString(var, value) + "' "
         return recStr
+
+    def getEnvValueString(self, var, value):
+        oldVal = os.getenv(var)
+        if oldVal and oldVal != value:
+            newVal = value.replace(oldVal, "$" + var)
+            # Fix the traffic interception mechanisms's own files: the program will have been given a separate directory here.
+            # Don't report this in the traffic file
+            interceptStr = "traffic_intercepts" + os.pathsep + "$" + var
+            if interceptStr in newVal:
+                return newVal.split(os.pathsep, 1)[1]
+            else:
+                return newVal
+        else:
+            return value
 
     def getFilteredDescription(self):
         desc = self.getDescription()

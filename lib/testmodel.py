@@ -589,7 +589,8 @@ class TestCase(Test):
     def getOptionsFromFile(self, optionsFile):
         lines = plugins.readList(optionsFile)
         if len(lines) > 0:
-            return string.Template(lines[0]).safe_substitute(self.environment)
+            text = " ".join(lines)
+            return string.Template(text).safe_substitute(self.environment)
         else:
             return ""
 

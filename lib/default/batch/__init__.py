@@ -740,9 +740,10 @@ class CollectFiles(plugins.ScriptWithArgs):
         plugins.log.info("Found file called " + localName)
         file = open(fullname)
         valuesLine = file.readline()
-        self.runId = file.readline().strip()
+        runId = file.readline().strip()
         maxDays = app.getCompositeConfigValue("batch_collect_max_age_days", self.batchSession)
-        if self.runIsRelevant(self.runId, maxDays):
+        if self.runIsRelevant(runId, maxDays):
+            self.runId = runId
             self.addValuesToTotal(localName, valuesLine, totalValues)
             fileBody = self.runId + " " + file.read()
             file.close()

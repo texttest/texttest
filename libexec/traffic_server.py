@@ -620,12 +620,18 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
     def parseArgs(self):
         args = eval(self.argStr, PythonInstanceWrapper.allInstances)
         return tuple(map(self.getArgInstance, args))
+
+    def callFunction(self, instance):
+        if self.funcName == "__repr__" and isinstance(instance, PythonInstanceWrapper): # Has to be special case as we use it internally
+            return repr(instance.instance)
+        else:
+            func = self.getPossibleCompositeAttribute(instance, self.funcName)
+            return func(*self.parseArgs(), **self.keyw)
     
     def getResult(self):
         instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
         try:
-            func = self.getPossibleCompositeAttribute(instance, self.funcName)
-            result = func(*self.parseArgs(), **self.keyw)
+            result = self.callFunction(instance)
             return repr(self.addInstanceWrappers(result))
         except:
             exc_type, exc_value, exc_traceback = sys.exc_info()

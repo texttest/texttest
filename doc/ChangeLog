@@ -1765,3 +1765,6 @@ Bug Fixes:
     - Python module interception handles dictionaries in a more consistent way (traffic_server.py)
     - Python module interception handles reading "args" from exceptions now (traffic_server.py)
     - Python module interception deals with both variants of multiline string quoting (traffic_server.py)
+    - Collected emails ignore old excluded runs when deciding what date to put in the subject line (batch/__init__.py)
+    - No longer write to stderr on TEXTTEST_EXCEPTION which just results in double error reporting (testmodel.py)
+    - Rerun now disabled when reconnecting, it was misleading as it re-reconnected (runningactions.py)

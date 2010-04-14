@@ -584,6 +584,15 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
         modStr = options.python_exception_intercepts
         if modStr:
             cls.interceptModules = modStr.split(",")
+            cls.interceptModules += cls.getModuleParents(cls.interceptModules)
+
+    @staticmethod
+    def getModuleParents(modules):
+        parents = []
+        for module in modules:
+            for ix in range(module.count(".")):
+                parents.append(module.rsplit(".", ix + 1)[0])
+        return parents
             
     def __init__(self, inText, responseFile):
         self.modOrObjName, self.funcName, self.argStr, keywStr = inText.split(":SUT_SEP:")

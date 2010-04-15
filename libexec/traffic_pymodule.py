@@ -75,7 +75,7 @@ class ModuleProxy:
         def setValue(self, value):
             sock = self.createSocket()
             text = "SUT_PYTHON_SETATTR:" + self.modOrObjProxy.name + ":SUT_SEP:" + self.attributeName + \
-                   ":SUT_SEP:" + repr(value)
+                   ":SUT_SEP:" + repr(self.getArgForSend(value))
             sock.sendall(text)
             sock.shutdown(2)
 
@@ -123,7 +123,7 @@ class ModuleProxy:
             sock.sendall(text)
             return sock
 
-        def getArgsForSend(self, args):
+        def getArgForSend(self, arg):
             class ArgWrapper:
                 def __init__(self, arg, moduleProxy):
                     self.arg = arg
@@ -151,7 +151,10 @@ class ModuleProxy:
                             return out[:pos] + '""' + out[pos:].replace("\\n", "\n") + '""'
                     else:
                         return out
-            return tuple([ ArgWrapper(arg, self.moduleProxy) for arg in args ])
+            return ArgWrapper(arg, self.moduleProxy)
+                    
+        def getArgsForSend(self, args):
+            return tuple(map(self.getArgForSend, args))
 
         def createSocket(self):
             import os, socket

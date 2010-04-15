@@ -528,7 +528,10 @@ class PythonModuleTraffic(Traffic):
             return firstAttr
         else:
             return self.getPossibleCompositeAttribute(firstAttr, attrParts[1])
-    
+
+    def evaluate(self, argStr):
+        return eval(argStr, PythonInstanceWrapper.allInstances, sys.modules)
+
 
 class PythonImportTraffic(PythonModuleTraffic):
     def __init__(self, inText, responseFile):
@@ -573,7 +576,8 @@ class PythonSetAttributeTraffic(PythonModuleTraffic):
 
     def forwardToDestination(self):
         instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
-        setattr(instance.instance, self.attrName, eval(self.valueStr))
+        value = self.evaluate(self.valueStr)
+        setattr(instance.instance, self.attrName, value)
         return []
 
 
@@ -627,7 +631,7 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
             return arg
 
     def parseArgs(self):
-        args = eval(self.argStr, PythonInstanceWrapper.allInstances, sys.modules)
+        args = self.evaluate(self.argStr)
         return tuple(map(self.getArgInstance, args))
 
     def callFunction(self, instance):

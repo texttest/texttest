@@ -627,7 +627,7 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
             return arg
 
     def parseArgs(self):
-        args = eval(self.argStr, PythonInstanceWrapper.allInstances)
+        args = eval(self.argStr, PythonInstanceWrapper.allInstances, sys.modules)
         return tuple(map(self.getArgInstance, args))
 
     def callFunction(self, instance):

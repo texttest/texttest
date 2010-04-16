@@ -521,6 +521,10 @@ class PythonModuleTraffic(Traffic):
     def getExceptionText(self, exc_value):
         return "raise " + exc_value.__class__.__module__ + "." + exc_value.__class__.__name__ + "(" + repr(str(exc_value)) + ")"
 
+    def getExceptionResponse(self):
+        exc_value = sys.exc_info()[1]
+        return PythonResponseTraffic(self.getExceptionText(exc_value), self.responseFile)
+
     def getPossibleCompositeAttribute(self, instance, attrName):
         attrParts = attrName.split(".", 1)
         firstAttr = getattr(instance, attrParts[0])
@@ -544,8 +548,7 @@ class PythonImportTraffic(PythonModuleTraffic):
             exec self.text
             return []
         except:
-            exc_value = sys.exc_info()[1]
-            return [ PythonResponseTraffic(self.getExceptionText(exc_value), self.responseFile) ]
+            return [ self.getExceptionResponse() ]
         
 
 class PythonAttributeTraffic(PythonModuleTraffic):
@@ -562,7 +565,7 @@ class PythonAttributeTraffic(PythonModuleTraffic):
         try:
             attr = self.getPossibleCompositeAttribute(instance, self.attrName)
         except:
-            return []
+            return [ self.getExceptionResponse() ]
         if self.isBasicType(attr):
             return [ PythonResponseTraffic(repr(attr), self.responseFile) ]
         else:
@@ -647,7 +650,7 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
             result = self.callFunction(instance)
             return repr(self.addInstanceWrappers(result))
         except:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
+            exc_value = sys.exc_info()[1]
             if self.belongsToModule(exc_value):
                 # We own the exception object also, handle it like an ordinary instance
                 return "raise " + repr(PythonInstanceWrapper(exc_value, exc_value.__module__))

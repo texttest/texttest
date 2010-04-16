@@ -59,7 +59,7 @@ class ModuleProxy:
             sock.shutdown(1)
             response = sock.makefile().read()
             if response:
-                return eval(response)
+                return self.handleResponse(response, "self.moduleProxy.InstanceProxy")
             else:
                 return self
 

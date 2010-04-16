@@ -1,5 +1,5 @@
 
-import optparse, os, stat, sys, logging, logging.config, shutil, socket, subprocess
+import optparse, os, stat, sys, logging, logging.config, shutil, socket, subprocess, types
 from ndict import seqdict
 from SocketServer import TCPServer, StreamRequestHandler
 from threading import Thread, Lock
@@ -548,6 +548,19 @@ class PythonModuleTraffic(Traffic):
     def evaluate(self, argStr):
         return eval(argStr, PythonInstanceWrapper.allInstances, sys.modules)
 
+    def addInstanceWrappers(self, result):
+        if not self.isBasicType(result):
+            return PythonInstanceWrapper(result, self.modOrObjName)
+        elif type(result) in (list, tuple):
+            return type(result)(map(self.addInstanceWrappers, result))
+        elif type(result) == dict:
+            newResult = {}
+            for key, value in result.items():
+                newResult[key] = self.addInstanceWrappers(value)
+            return newResult
+        else:
+            return result
+
 
 class PythonImportTraffic(PythonModuleTraffic):
     def __init__(self, inText, responseFile):
@@ -572,16 +585,25 @@ class PythonAttributeTraffic(PythonModuleTraffic):
     def enquiryOnly(self):
         return True
 
+    def shouldCache(self, obj):
+        return type(obj) not in (types.FunctionType, types.GeneratorType, types.MethodType, types.BuiltinFunctionType,
+                                 types.ClassType, types.TypeType) and \
+                                 not hasattr(obj, "__call__")
+
     def forwardToDestination(self):
         instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
         try:
             attr = self.getPossibleCompositeAttribute(instance, self.attrName)
         except:
             return [ self.getExceptionResponse() ]
-        if self.isBasicType(attr):
-            return [ PythonResponseTraffic(repr(attr), self.responseFile) ]
+        if self.shouldCache(attr):
+            wrappedAttr = self.addInstanceWrappers(attr)
+            return [ PythonResponseTraffic(repr(wrappedAttr), self.responseFile) ]
         else:
+            # Makes things more readable if we delay evaluating this until the function is called
+            # It's rare in Python to cache functions/classes before calling: it's normal to cache other things
             return []
+        
         
 class PythonSetAttributeTraffic(PythonModuleTraffic):
     def __init__(self, inText, responseFile):
@@ -676,18 +698,6 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
         else:
             return []
 
-    def addInstanceWrappers(self, result):
-        if not self.isBasicType(result):
-            return PythonInstanceWrapper(result, self.modOrObjName)
-        elif type(result) in (list, tuple):
-            return type(result)(map(self.addInstanceWrappers, result))
-        elif type(result) == dict:
-            newResult = {}
-            for key, value in result.items():
-                newResult[key] = self.addInstanceWrappers(value)
-            return newResult
-        else:
-            return result
 
 class PythonResponseTraffic(ResponseTraffic):
     typeId = "RET"

@@ -516,7 +516,7 @@ class PythonModuleTraffic(Traffic):
     typeId = "PYT"
     direction = "<-"
     def isBasicType(self, obj):
-        return obj is None or type(obj) in (bool, float, int, long, str, unicode, list, dict, tuple)
+        return obj is None or obj is NotImplemented or type(obj) in (bool, float, int, long, str, unicode, list, dict, tuple)
 
     def getExceptionText(self, exc_value):
         return "raise " + exc_value.__class__.__module__ + "." + exc_value.__class__.__name__ + "(" + repr(str(exc_value)) + ")"

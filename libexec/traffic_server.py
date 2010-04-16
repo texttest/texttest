@@ -499,8 +499,20 @@ class PythonInstanceWrapper:
     def getInstance(cls, instanceName):
         return cls.allInstances.get(instanceName, sys.modules.get(instanceName))
 
+    def getInstanceType(self):
+        if issubclass(self.instance.__class__, object):
+            return "NewStyleInstance"
+        else:
+            return "Instance"
+
+    def exceptionRepr(self):
+        return "Instance" + self.argRepr()
+
     def __repr__(self):
-        return "Instance(" + repr(self.className) + ", " + repr(self.instanceName) + ")"
+        return self.getInstanceType() + self.argRepr()
+
+    def argRepr(self):
+        return "(" + repr(self.className) + ", " + repr(self.instanceName) + ")"
 
     def getNewInstanceName(self, className):
         num = 1
@@ -653,7 +665,7 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
             exc_value = sys.exc_info()[1]
             if self.belongsToModule(exc_value):
                 # We own the exception object also, handle it like an ordinary instance
-                return "raise " + repr(PythonInstanceWrapper(exc_value, exc_value.__module__))
+                return "raise " + PythonInstanceWrapper(exc_value, exc_value.__module__).exceptionRepr()
             else:
                 return self.getExceptionText(exc_value)
 

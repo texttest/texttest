@@ -546,7 +546,12 @@ class PythonModuleTraffic(Traffic):
             return self.getPossibleCompositeAttribute(firstAttr, attrParts[1])
 
     def evaluate(self, argStr):
-        return eval(argStr, PythonInstanceWrapper.allInstances, sys.modules)
+        try:
+            return eval(argStr, PythonInstanceWrapper.allInstances, sys.modules)
+        except:
+            # Not ideal, but better than exit with exception
+            # If this happens we probably can't handle the arguments properly anyway
+            return ()
 
     def addInstanceWrappers(self, result):
         if not self.isBasicType(result):
@@ -641,18 +646,23 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
             
     def __init__(self, inText, responseFile):
         self.modOrObjName, self.funcName, self.argStr, keywStr = inText.split(":SUT_SEP:")
-        self.keyw = eval(keywStr)
-        text = self.modOrObjName + "." + self.funcName + self.findArgString()
+        try:
+            self.keyw = eval(keywStr)
+        except:
+            # Not ideal, but better than exit with exception
+            # If this happens we probably can't handle the keyword objects anyway
+            self.keyw = {}
+        text = self.modOrObjName + "." + self.funcName + self.findArgString(keywStr)
         super(PythonModuleTraffic, self).__init__(text, responseFile)
 
-    def findArgString(self):
-        keyws = [ key + "=" + repr(value) for key, value in self.keyw.items() ]
-        keywStr = ", ".join(keyws)
+    def findArgString(self, keywDictStr):
+        # Slightly daring text-munging of Python dictionary repr, seems to work so far...
+        keywStr = keywDictStr.replace("': ", "=").replace(", '", ", ")[2:-1]
         # Fix the format for single-entry tuples
         argStr = self.argStr.replace(",)", ")")
         if argStr == "()":
             return "(" + keywStr + ")"
-        elif keyws:
+        elif keywStr:
             return argStr[:-1] + ", " + keywStr + ")"
         else:
             return argStr

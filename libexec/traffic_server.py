@@ -595,7 +595,11 @@ class PythonAttributeTraffic(PythonModuleTraffic):
         try:
             attr = self.getPossibleCompositeAttribute(instance, self.attrName)
         except:
-            return [ self.getExceptionResponse() ]
+            if self.attrName == "__all__":
+                # Need to provide something here, the application has probably called 'from module import *'
+                attr = filter(lambda x: not x.startswith("__"), dir(instance))
+            else:
+                return [ self.getExceptionResponse() ]
         if self.shouldCache(attr):
             wrappedAttr = self.addInstanceWrappers(attr)
             return [ PythonResponseTraffic(repr(wrappedAttr), self.responseFile) ]

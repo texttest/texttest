@@ -21,6 +21,7 @@ class ModuleProxy:
                 response = attrProxy.makeResponse(*args, **kw)
                 def Instance(className, instanceName):
                     return instanceName
+                NewStyleInstance = Instance
                 self.name = eval(response)
 
         def __getattr__(self, attrname):

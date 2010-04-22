@@ -645,19 +645,21 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
         return parents
             
     def __init__(self, inText, responseFile):
-        self.modOrObjName, self.funcName, self.argStr, keywStr = inText.split(":SUT_SEP:")
+        self.modOrObjName, self.funcName, self.argStr, keywDictStr = inText.split(":SUT_SEP:")
         try:
-            self.keyw = eval(keywStr)
+            self.keyw = eval(keywDictStr)
+            keyws = [ key + "=" + repr(value) for key, value in self.keyw.items() ]
+            keywStr = ", ".join(keyws)
         except:
             # Not ideal, but better than exit with exception
             # If this happens we probably can't handle the keyword objects anyway
             self.keyw = {}
+            # Slightly daring text-munging of Python dictionary repr, main thing is to print something vaguely representative
+            keywStr = keywDictStr.replace("': ", "=").replace(", '", ", ")[2:-1]
         text = self.modOrObjName + "." + self.funcName + self.findArgString(keywStr)
         super(PythonModuleTraffic, self).__init__(text, responseFile)
 
-    def findArgString(self, keywDictStr):
-        # Slightly daring text-munging of Python dictionary repr, seems to work so far...
-        keywStr = keywDictStr.replace("': ", "=").replace(", '", ", ")[2:-1]
+    def findArgString(self, keywStr):
         # Fix the format for single-entry tuples
         argStr = self.argStr.replace(",)", ")")
         if argStr == "()":

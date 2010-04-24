@@ -528,7 +528,10 @@ class PythonModuleTraffic(Traffic):
             return firstAttr
         else:
             return self.getPossibleCompositeAttribute(firstAttr, attrParts[1])
-    
+
+    def evaluate(self, argStr):
+        return eval(argStr, PythonInstanceWrapper.allInstances, sys.modules)
+
 
 class PythonImportTraffic(PythonModuleTraffic):
     def __init__(self, inText, responseFile):
@@ -573,7 +576,8 @@ class PythonSetAttributeTraffic(PythonModuleTraffic):
 
     def forwardToDestination(self):
         instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
-        setattr(instance.instance, self.attrName, eval(self.valueStr))
+        value = self.evaluate(self.valueStr)
+        setattr(instance.instance, self.attrName, value)
         return []
 
 
@@ -584,6 +588,15 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
         modStr = options.python_exception_intercepts
         if modStr:
             cls.interceptModules = modStr.split(",")
+            cls.interceptModules += cls.getModuleParents(cls.interceptModules)
+
+    @staticmethod
+    def getModuleParents(modules):
+        parents = []
+        for module in modules:
+            for ix in range(module.count(".")):
+                parents.append(module.rsplit(".", ix + 1)[0])
+        return parents
             
     def __init__(self, inText, responseFile):
         self.modOrObjName, self.funcName, self.argStr, keywStr = inText.split(":SUT_SEP:")
@@ -618,14 +631,20 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
             return arg
 
     def parseArgs(self):
-        args = eval(self.argStr, PythonInstanceWrapper.allInstances)
+        args = self.evaluate(self.argStr)
         return tuple(map(self.getArgInstance, args))
+
+    def callFunction(self, instance):
+        if self.funcName == "__repr__" and isinstance(instance, PythonInstanceWrapper): # Has to be special case as we use it internally
+            return repr(instance.instance)
+        else:
+            func = self.getPossibleCompositeAttribute(instance, self.funcName)
+            return func(*self.parseArgs(), **self.keyw)
     
     def getResult(self):
         instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
         try:
-            func = self.getPossibleCompositeAttribute(instance, self.funcName)
-            result = func(*self.parseArgs(), **self.keyw)
+            result = self.callFunction(instance)
             return repr(self.addInstanceWrappers(result))
         except:
             exc_type, exc_value, exc_traceback = sys.exc_info()

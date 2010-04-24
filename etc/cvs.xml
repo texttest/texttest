@@ -3,7 +3,7 @@
   <menubar name="MainMenuBar">
 
     <placeholder name="ExtraMenus">
-      <menu action="CVSmenu">
+      <menu name="VCS Top Menu" action="CVSmenu">
         <menuitem action="CVS Log"/>
         <menuitem action="CVS Log Recursive"/>
         <menuitem action="CVS Log Latest"/>
@@ -27,7 +27,7 @@
   </menubar>
 
   <popup name="TestPopupMenu">
-    <menu action="CVSmenu">
+    <menu name="VCS Popup Menu" action="CVSmenu">
       <menuitem action="CVS Log"/>
       <menuitem action="CVS Log Recursive"/>
       <menuitem action="CVS Log Latest"/>
@@ -49,7 +49,7 @@
   </popup>
 
   <popup name="TestFilePopupMenu">
-    <menu action="CVSmenu">
+    <menu name="VCS File Popup Menu" action="CVSmenu">
       <menuitem action="CVS Log"/>
       <menuitem action="CVS Log Recursive"/>
       <menuitem action="CVS Log Latest"/>

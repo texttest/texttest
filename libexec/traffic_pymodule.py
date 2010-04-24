@@ -21,6 +21,7 @@ class ModuleProxy:
                 response = attrProxy.makeResponse(*args, **kw)
                 def Instance(className, instanceName):
                     return instanceName
+                NewStyleInstance = Instance
                 self.name = eval(response)
 
         def __getattr__(self, attrname):
@@ -30,7 +31,15 @@ class ModuleProxy:
             self.__dict__[attrname] = value
             if attrname != "name":
                 self.moduleProxy.AttributeProxy(self, self.moduleProxy, attrname).setValue(value)
-            
+
+    class NewStyleInstanceProxy(InstanceProxy, object):
+        # Must intercept these as they are defined in "object"
+        def __repr__(self):
+            return self.__getattr__("__repr__")()
+
+        def __str__(self):
+            return self.__getattr__("__str__")()
+        
     class ExceptionProxy(InstanceProxy, Exception):
         def __str__(self):
             return self.__getattr__("__str__")()
@@ -59,7 +68,7 @@ class ModuleProxy:
             sock.shutdown(1)
             response = sock.makefile().read()
             if response:
-                return eval(response)
+                return self.handleResponse(response, "self.moduleProxy.InstanceProxy")
             else:
                 return self
 
@@ -100,7 +109,9 @@ class ModuleProxy:
                 def Instance(className, instanceName):
                     # Call separate function to avoid exec problems
                     return self.makeInstance(className, instanceName, cls)
-                return self.evaluateResponse(response, cls, Instance)
+                def NewStyleInstance(className, instanceName):
+                    return self.makeInstance(className, instanceName, "self.moduleProxy.NewStyleInstanceProxy")
+                return self.evaluateResponse(response, cls, Instance, NewStyleInstance)
 
         def makeInstance(self, className, instanceName, baseClass):
             exec "class " + className + "(" + baseClass + "): pass"
@@ -108,7 +119,7 @@ class ModuleProxy:
             setattr(self.moduleProxy, className, classObj)
             return classObj(givenInstanceName=instanceName, moduleProxy=self.moduleProxy)
 
-        def evaluateResponse(self, response, cls, Instance):
+        def evaluateResponse(self, response, cls, Instance, NewStyleInstance):
             try:
                 return eval(response)
             except NameError: # standard exceptions end up here

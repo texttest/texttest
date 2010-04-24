@@ -1,5 +1,5 @@
 
-import optparse, os, stat, sys, logging, logging.config, shutil, socket, subprocess
+import optparse, os, stat, sys, logging, logging.config, shutil, socket, subprocess, types
 from ndict import seqdict
 from SocketServer import TCPServer, StreamRequestHandler
 from threading import Thread, Lock
@@ -499,8 +499,20 @@ class PythonInstanceWrapper:
     def getInstance(cls, instanceName):
         return cls.allInstances.get(instanceName, sys.modules.get(instanceName))
 
+    def getInstanceType(self):
+        if issubclass(self.instance.__class__, object):
+            return "NewStyleInstance"
+        else:
+            return "Instance"
+
+    def exceptionRepr(self):
+        return "Instance" + self.argRepr()
+
     def __repr__(self):
-        return "Instance(" + repr(self.className) + ", " + repr(self.instanceName) + ")"
+        return self.getInstanceType() + self.argRepr()
+
+    def argRepr(self):
+        return "(" + repr(self.className) + ", " + repr(self.instanceName) + ")"
 
     def getNewInstanceName(self, className):
         num = 1
@@ -516,10 +528,14 @@ class PythonModuleTraffic(Traffic):
     typeId = "PYT"
     direction = "<-"
     def isBasicType(self, obj):
-        return obj is None or type(obj) in (bool, float, int, long, str, unicode, list, dict, tuple)
+        return obj is None or obj is NotImplemented or type(obj) in (bool, float, int, long, str, unicode, list, dict, tuple)
 
     def getExceptionText(self, exc_value):
         return "raise " + exc_value.__class__.__module__ + "." + exc_value.__class__.__name__ + "(" + repr(str(exc_value)) + ")"
+
+    def getExceptionResponse(self):
+        exc_value = sys.exc_info()[1]
+        return PythonResponseTraffic(self.getExceptionText(exc_value), self.responseFile)
 
     def getPossibleCompositeAttribute(self, instance, attrName):
         attrParts = attrName.split(".", 1)
@@ -530,7 +546,25 @@ class PythonModuleTraffic(Traffic):
             return self.getPossibleCompositeAttribute(firstAttr, attrParts[1])
 
     def evaluate(self, argStr):
-        return eval(argStr, PythonInstanceWrapper.allInstances, sys.modules)
+        try:
+            return eval(argStr, PythonInstanceWrapper.allInstances, sys.modules)
+        except:
+            # Not ideal, but better than exit with exception
+            # If this happens we probably can't handle the arguments properly anyway
+            return ()
+
+    def addInstanceWrappers(self, result):
+        if not self.isBasicType(result):
+            return PythonInstanceWrapper(result, self.modOrObjName)
+        elif type(result) in (list, tuple):
+            return type(result)(map(self.addInstanceWrappers, result))
+        elif type(result) == dict:
+            newResult = {}
+            for key, value in result.items():
+                newResult[key] = self.addInstanceWrappers(value)
+            return newResult
+        else:
+            return result
 
 
 class PythonImportTraffic(PythonModuleTraffic):
@@ -544,8 +578,7 @@ class PythonImportTraffic(PythonModuleTraffic):
             exec self.text
             return []
         except:
-            exc_value = sys.exc_info()[1]
-            return [ PythonResponseTraffic(self.getExceptionText(exc_value), self.responseFile) ]
+            return [ self.getExceptionResponse() ]
         
 
 class PythonAttributeTraffic(PythonModuleTraffic):
@@ -557,16 +590,29 @@ class PythonAttributeTraffic(PythonModuleTraffic):
     def enquiryOnly(self):
         return True
 
+    def shouldCache(self, obj):
+        return type(obj) not in (types.FunctionType, types.GeneratorType, types.MethodType, types.BuiltinFunctionType,
+                                 types.ClassType, types.TypeType) and \
+                                 not hasattr(obj, "__call__")
+
     def forwardToDestination(self):
         instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
         try:
             attr = self.getPossibleCompositeAttribute(instance, self.attrName)
         except:
-            return []
-        if self.isBasicType(attr):
-            return [ PythonResponseTraffic(repr(attr), self.responseFile) ]
+            if self.attrName == "__all__":
+                # Need to provide something here, the application has probably called 'from module import *'
+                attr = filter(lambda x: not x.startswith("__"), dir(instance))
+            else:
+                return [ self.getExceptionResponse() ]
+        if self.shouldCache(attr):
+            wrappedAttr = self.addInstanceWrappers(attr)
+            return [ PythonResponseTraffic(repr(wrappedAttr), self.responseFile) ]
         else:
+            # Makes things more readable if we delay evaluating this until the function is called
+            # It's rare in Python to cache functions/classes before calling: it's normal to cache other things
             return []
+        
         
 class PythonSetAttributeTraffic(PythonModuleTraffic):
     def __init__(self, inText, responseFile):
@@ -599,19 +645,26 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
         return parents
             
     def __init__(self, inText, responseFile):
-        self.modOrObjName, self.funcName, self.argStr, keywStr = inText.split(":SUT_SEP:")
-        self.keyw = eval(keywStr)
-        text = self.modOrObjName + "." + self.funcName + self.findArgString()
+        self.modOrObjName, self.funcName, self.argStr, keywDictStr = inText.split(":SUT_SEP:")
+        try:
+            self.keyw = eval(keywDictStr)
+            keyws = [ key + "=" + repr(value) for key, value in self.keyw.items() ]
+            keywStr = ", ".join(keyws)
+        except:
+            # Not ideal, but better than exit with exception
+            # If this happens we probably can't handle the keyword objects anyway
+            self.keyw = {}
+            # Slightly daring text-munging of Python dictionary repr, main thing is to print something vaguely representative
+            keywStr = keywDictStr.replace("': ", "=").replace(", '", ", ")[2:-1]
+        text = self.modOrObjName + "." + self.funcName + self.findArgString(keywStr)
         super(PythonModuleTraffic, self).__init__(text, responseFile)
 
-    def findArgString(self):
-        keyws = [ key + "=" + repr(value) for key, value in self.keyw.items() ]
-        keywStr = ", ".join(keyws)
+    def findArgString(self, keywStr):
         # Fix the format for single-entry tuples
         argStr = self.argStr.replace(",)", ")")
         if argStr == "()":
             return "(" + keywStr + ")"
-        elif keyws:
+        elif keywStr:
             return argStr[:-1] + ", " + keywStr + ")"
         else:
             return argStr
@@ -647,10 +700,10 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
             result = self.callFunction(instance)
             return repr(self.addInstanceWrappers(result))
         except:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
+            exc_value = sys.exc_info()[1]
             if self.belongsToModule(exc_value):
                 # We own the exception object also, handle it like an ordinary instance
-                return "raise " + repr(PythonInstanceWrapper(exc_value, exc_value.__module__))
+                return "raise " + PythonInstanceWrapper(exc_value, exc_value.__module__).exceptionRepr()
             else:
                 return self.getExceptionText(exc_value)
 
@@ -661,18 +714,6 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
         else:
             return []
 
-    def addInstanceWrappers(self, result):
-        if not self.isBasicType(result):
-            return PythonInstanceWrapper(result, self.modOrObjName)
-        elif type(result) in (list, tuple):
-            return type(result)(map(self.addInstanceWrappers, result))
-        elif type(result) == dict:
-            newResult = {}
-            for key, value in result.items():
-                newResult[key] = self.addInstanceWrappers(value)
-            return newResult
-        else:
-            return result
 
 class PythonResponseTraffic(ResponseTraffic):
     typeId = "RET"

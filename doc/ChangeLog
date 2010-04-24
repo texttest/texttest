@@ -1745,6 +1745,8 @@ Framework Enhancements:
     - Traffic interception server now runs in a separate process (traffic_server.py)
 	This means it works better intercepting modules that prefer to be in the main thread (e.g. COM)
 	or for GUI-related stuff that might clash with GTK.
+    - Python interception is now much more general and reliable (traffic_server.py)
+	The version in 3.17 worked on basic cases but hadn't been widely tested
     - Can now pass arguments to the "interpreter" program via "interpreter_options" files (testmodel.py)
 	Work much like "options files otherwise.
     - Can now disable previously defined bug reporting (knownbugs/__init__.py)
@@ -1759,12 +1761,7 @@ Bug Fixes:
     - Tests with shell characters in the name now work better using grid engines (masterprocess.py)
     - Tests with ":" in the name also work better using grid engines (though still fail with collect_traffic) (masterprocess.py)
     - Better error message trying to save if the temporary file has been removed in the meantime (comparefile.py)
-    - Python module interception replay matching now uses brackets as separators: incorrect matches less likely (traffic_server.py)
-    - Python module interception now handles composite attributes (a.b.c) correctly now (traffic_server.py)
-    - Python module interception can now handle Unicode correctly (traffic_server.py)
-    - Python module interception handles dictionaries in a more consistent way (traffic_server.py)
-    - Python module interception handles reading "args" from exceptions now (traffic_server.py)
-    - Python module interception deals with both variants of multiline string quoting (traffic_server.py)
+    - Loads of Python module interception bugs and limitations fixed (traffic_server.py)
     - Collected emails ignore old excluded runs when deciding what date to put in the subject line (batch/__init__.py)
     - No longer write to stderr on TEXTTEST_EXCEPTION which just results in double error reporting (testmodel.py)
     - Rerun now disabled when reconnecting, it was misleading as it re-reconnected (runningactions.py)

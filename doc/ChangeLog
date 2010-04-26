@@ -1751,6 +1751,8 @@ Framework Enhancements:
 	Work much like "options files otherwise.
     - Can now disable previously defined bug reporting (knownbugs/__init__.py)
 	Keep the trigger information but remove the lines corresponding to the report itself.
+    - When a test is killed on Windows, the entire process tree is removed by default (jobprocess.py)
+	New config file setting "kill_command" also, see docs. Thanks to Michael Behrisch.
 Batch Report Enhancements:
     - Uncompleted tests (unrunnable/killed/cancelled) have their own dark-red colour now (testoverview.py)
     - Summary page can now produce pie charts instead of HTML tables (summarypages.py)
@@ -1765,3 +1767,4 @@ Bug Fixes:
     - Collected emails ignore old excluded runs when deciding what date to put in the subject line (batch/__init__.py)
     - No longer write to stderr on TEXTTEST_EXCEPTION which just results in double error reporting (testmodel.py)
     - Rerun now disabled when reconnecting, it was misleading as it re-reconnected (runningactions.py)
+    - import_config_file now finds files in subsequent entries along TEXTTEST_PATH, instead of just the first (testmodel.py)

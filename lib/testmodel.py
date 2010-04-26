@@ -1237,7 +1237,7 @@ class Application:
         dirCacheNames = self.getCompositeConfigValue("extra_search_directory", fileName, **kwargs)
         dirCacheNames.reverse() # lowest-priority comes first, so it can be overridden
         if includeRoot:
-            dirCacheNames.append(".")
+            dirCacheNames += self.inputOptions.rootDirectories
         dirCaches = []
         for dirName in dirCacheNames:
             if self.extraDirCaches.has_key(dirName):

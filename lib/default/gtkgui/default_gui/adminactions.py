@@ -523,6 +523,12 @@ class ImportApplication(guiplugins.ActionDialogGUI):
                 interpreter += " -i tkinter"
             configEntries["use_case_recorder"] = "pyusecase"
             configEntries["interpreter"] = interpreter
+
+            if useGui == 2:
+                # PyUseCase doesn't handle tkMessageBox, deal with it via interception by default
+                configEntries["collect_traffic_py_module"] = "tkMessageBox"
+                configEntries["collect_traffic_use_threads"] = "false"
+            
             pyusecaseDir = os.path.join(directory, "pyusecase_files")
             plugins.ensureDirectoryExists(pyusecaseDir) 
             # Create an empty UI map file so it shows up in the Config tab...

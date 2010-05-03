@@ -87,7 +87,7 @@ class GUIController(plugins.Responder, plugins.Observable):
         self.readGtkRCFiles(includeSite, includePersonal)
         self.dynamic = not optionMap.has_key("gx")
         self.interactiveActionHandler = InteractiveActionHandler(self.dynamic, allApps, optionMap)
-        self.setUpGlobals(allApps)
+        self.setUpGlobals(allApps, includePersonal)
         plugins.Responder.__init__(self)
         plugins.Observable.__init__(self)
         testCount = int(optionMap.get("count", 0))
@@ -112,12 +112,12 @@ class GUIController(plugins.Responder, plugins.Observable):
 
         self.topWindowGUI = self.createTopWindowGUI(allApps, runName)
 
-    def setUpGlobals(self, allApps):
+    def setUpGlobals(self, allApps, includePersonal):
         global guilog, guiConfig
         guilog = logging.getLogger("gui log")
         defaultColours = self.interactiveActionHandler.getColourDictionary()
         defaultAccelerators = self.interactiveActionHandler.getDefaultAccelerators()
-        guiConfig = guiutils.GUIConfig(self.dynamic, allApps, defaultColours, defaultAccelerators, guilog)
+        guiConfig = guiutils.GUIConfig(self.dynamic, allApps, defaultColours, defaultAccelerators, guilog, includePersonal)
 
         for module in [ guiutils, guiplugins ]:
             module.guilog = guilog

@@ -701,9 +701,12 @@ class Config:
         if self.isReconnecting():
             self.reconnectConfig.checkSanity(suite.app)
         # side effects really from here on :(
-        if self.isReconnecting() or self.optionMap.has_key("coll"):
+        if self.readsTestStateFiles():
             # Reading stuff from stored pickle files, need to set up categories independently
             self.setUpPerformanceCategories(suite.app)
+
+    def readsTestStateFiles(self):
+        return self.isReconnecting() or self.optionMap.has_key("coll")
 
     def setUpPerformanceCategories(self, app):
         # We don't create these in the normal way, so we don't know what they are.

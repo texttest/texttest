@@ -112,8 +112,13 @@ class QueueSystemConfig(default.Config):
 
     def keepTemporaryDirectories(self):
         return default.Config.keepTemporaryDirectories(self) or (self.slaveRun() and self.optionMap.has_key("keepslave"))
+
     def cleanPreviousTempDirs(self):
         return not self.slaveRun() and default.Config.cleanPreviousTempDirs(self)
+
+    def readsTestStateFiles(self):
+        # Reads the data via a socket, need to set up categories
+        return default.Config.readsTestStateFiles(self) or (self.useQueueSystem and not self.slaveRun())
 
     def cleanSlaveFiles(self, test):
         if test.state.hasSucceeded():

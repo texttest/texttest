@@ -527,6 +527,28 @@ class PythonInstanceWrapper:
 class PythonModuleTraffic(Traffic):
     typeId = "PYT"
     direction = "<-"
+    interceptModules = []
+    @classmethod
+    def configure(cls, options):
+        modStr = options.python_exception_intercepts
+        if modStr:
+            cls.interceptModules = modStr.split(",")
+            cls.interceptModules += cls.getModuleParents(cls.interceptModules)
+
+    @staticmethod
+    def getModuleParents(modules):
+        parents = []
+        for module in modules:
+            for ix in range(module.count(".")):
+                parents.append(module.rsplit(".", ix + 1)[0])
+        return parents
+
+    def belongsToModule(self, obj):
+        try:
+            return obj.__module__ in self.interceptModules
+        except AttributeError: # Global exceptions like AttributeError itself on Windows cause this
+            return False
+    
     def isBasicType(self, obj):
         return obj is None or obj is NotImplemented or type(obj) in (bool, float, int, long, str, unicode, list, dict, tuple)
 
@@ -554,15 +576,15 @@ class PythonModuleTraffic(Traffic):
             return ()
 
     def addInstanceWrappers(self, result):
-        if not self.isBasicType(result):
-            return PythonInstanceWrapper(result, self.modOrObjName)
-        elif type(result) in (list, tuple):
+        if type(result) in (list, tuple):
             return type(result)(map(self.addInstanceWrappers, result))
         elif type(result) == dict:
             newResult = {}
             for key, value in result.items():
                 newResult[key] = self.addInstanceWrappers(value)
             return newResult
+        elif not self.isBasicType(result) and self.belongsToModule(result):
+            return PythonInstanceWrapper(result, self.modOrObjName)
         else:
             return result
 
@@ -627,23 +649,7 @@ class PythonSetAttributeTraffic(PythonModuleTraffic):
         return []
 
 
-class PythonFunctionCallTraffic(PythonModuleTraffic):
-    interceptModules = []
-    @classmethod
-    def configure(cls, options):
-        modStr = options.python_exception_intercepts
-        if modStr:
-            cls.interceptModules = modStr.split(",")
-            cls.interceptModules += cls.getModuleParents(cls.interceptModules)
-
-    @staticmethod
-    def getModuleParents(modules):
-        parents = []
-        for module in modules:
-            for ix in range(module.count(".")):
-                parents.append(module.rsplit(".", ix + 1)[0])
-        return parents
-            
+class PythonFunctionCallTraffic(PythonModuleTraffic):        
     def __init__(self, inText, responseFile):
         self.modOrObjName, self.funcName, self.argStr, keywDictStr = inText.split(":SUT_SEP:")
         try:
@@ -669,12 +675,6 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
         else:
             return argStr
             
-    def belongsToModule(self, exc_value):
-        try:
-            return exc_value.__module__ in self.interceptModules
-        except AttributeError: # Global exceptions like AttributeError itself on Windows cause this
-            return False
-
     def getArgInstance(self, arg):
         if isinstance(arg, PythonInstanceWrapper):
             return arg.instance
@@ -1206,7 +1206,7 @@ if __name__ == "__main__":
     defaults = { "TEXTTEST_PERSONAL_LOG": os.getenv("TEXTTEST_PERSONAL_LOG") }
     logging.config.fileConfig(allPaths[-1], defaults)
 
-    for cls in [ CommandLineTraffic, FileEditTraffic, PythonFunctionCallTraffic ]:
+    for cls in [ CommandLineTraffic, FileEditTraffic, PythonModuleTraffic ]:
         cls.configure(options)
 
     server = TrafficServer(options)

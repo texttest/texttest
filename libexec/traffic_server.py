@@ -649,7 +649,20 @@ class PythonAttributeTraffic(PythonModuleTraffic):
                                  types.ClassType, types.TypeType) and \
                                  not hasattr(obj, "__call__")
 
+    def interceptionPossible(self):
+        attrs = self.interceptModuleAttrs.get(self.modOrObjName, [])
+        if len(attrs) > 0:
+            for attr in attrs:
+                if attr.startswith(self.attrName):
+                    return True
+            return False
+        else:
+            return True
+
     def forwardToDestination(self):
+        if not self.interceptionPossible():
+            # Shortcut to tell the application to use the real version
+            return [ PythonResponseTraffic(self.text, self.responseFile) ]
         instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
         try:
             attr = self.getPossibleCompositeAttribute(instance, self.attrName)

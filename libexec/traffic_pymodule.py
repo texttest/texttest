@@ -5,12 +5,15 @@ class ModuleProxy:
     def __init__(self, name, fileName):
         self.name = name
         self.__file__ = fileName
+        self.realModule = None
         self.AttributeProxy(self, self).tryImport() # make sure "our module" can really be imported
 
     def __getattr__(self, attrname):
         return self.AttributeProxy(self, self, attrname).tryEvaluate()
 
     def getRealModule(self):
+        if self.realModule is not None:
+            return self.realModule
         import sys, os
         currDir = os.path.dirname(self.__file__)
         sys.path.remove(currDir)
@@ -18,6 +21,7 @@ class ModuleProxy:
         exec "import " + self.name + " as moduleName"
         sys.modules[self.name] = self
         sys.path.insert(0, currDir)
+        self.realModule = moduleName
         return moduleName
 
     class InstanceProxy:

@@ -54,7 +54,7 @@ class SetUpTrafficHandlers(plugins.Action):
             test.setEnvironment(pathVar, interceptDir + os.pathsep + test.getEnvironment(pathVar, ""))
 
     def makeArgFromDict(self, dict):
-        args = [ key + "=" + self.makeArgFromVal(val) for key, val in dict.items() ]
+        args = [ key + "=" + self.makeArgFromVal(val) for key, val in dict.items() if key ]
         return ",".join(args)
 
     def makeArgFromVal(self, val):
@@ -86,7 +86,11 @@ class SetUpTrafficHandlers(plugins.Action):
 
         pythonModules = test.getConfigValue("collect_traffic_py_module")
         if pythonModules:
-            cmdArgs += [ "-x", ",".join(pythonModules) ]
+            cmdArgs += [ "-m", ",".join(pythonModules) ]
+
+        pythonAttrDict = test.getConfigValue("collect_traffic_py_attributes")
+        if pythonAttrDict:
+            cmdArgs += [ "-A", self.makeArgFromDict(pythonAttrDict) ]
 
         asynchronousFileEditCmds = test.getConfigValue("collect_traffic").get("asynchronous")
         if asynchronousFileEditCmds:

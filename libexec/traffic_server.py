@@ -31,8 +31,10 @@ react to the above module to repoint where it sends socket interactions"""
                       help="replay traffic recorded in FILE.", metavar="FILE")
     parser.add_option("-f", "--replay-file-edits", 
                       help="restore edited files referred to in replayed file from DIR.", metavar="DIR")
-    parser.add_option("-x", "--python-exception-intercepts", 
-                      help="When exceptions are thrown recording interaction with python modules, intercept the exception if it belongs to one of these modules.", metavar="MODULES")
+    parser.add_option("-m", "--python-module-intercepts", 
+                      help="Python modules whose objects should be stored locally rather than returned as they are", metavar="MODULES")
+    parser.add_option("-A", "--python-module-attributes", 
+                      help="For the intercepted modules listed, only intercept the attributes listed", metavar="ATTRS")
     parser.add_option("-r", "--record", 
                       help="record traffic to FILE.", metavar="FILE")
     parser.add_option("-F", "--record-file-edits", 
@@ -42,6 +44,14 @@ react to the above module to repoint where it sends socket interactions"""
     parser.add_option("-t", "--test-path", metavar="PATH", 
                       help="Set a test path name for TextTest filtering and/or error messages")
     return parser
+
+def parseCmdDictionary(cmdStr):
+    dict = {}
+    if cmdStr:
+        for part in cmdStr.split(","):
+            cmd, varString = part.split("=")
+            dict[cmd] = varString.split("+")
+    return dict
 
 
 class TrafficServer(TCPServer):
@@ -167,17 +177,19 @@ class TrafficServer(TCPServer):
         self.diag.info("Processing traffic " + str(traffic.__class__))
         hasFileEdits = self.addPossibleFileEdits(traffic)
         responses = self.getResponses(traffic, hasFileEdits)
-        if len(responses) or not traffic.enquiryOnly():
+        shouldRecord = not traffic.enquiryOnly(responses)
+        if shouldRecord:
             traffic.record(self.recordFileHandler, reqNo)
         for response in responses:
             self.diag.info("Providing response " + str(response.__class__))
-            response.record(self.recordFileHandler, reqNo)
+            if shouldRecord:
+                response.record(self.recordFileHandler, reqNo)
             for chainResponse in response.forwardToDestination():
                 self._process(chainResponse, reqNo)
             self.diag.info("Completed response " + str(response.__class__))            
 
     def getResponses(self, traffic, hasFileEdits):
-        if self.replayInfo.isActive():
+        if self.replayInfo.isActive() and traffic.shouldIntercept():
             replayedResponses = []
             filesMatched = []
             for responseClass, text in self.replayInfo.readReplayResponses(traffic):
@@ -296,8 +308,11 @@ class Traffic(object):
     def makesAsynchronousEdits(self):
         return False
     
-    def enquiryOnly(self):
+    def enquiryOnly(self, responses=[]):
         return False
+
+    def shouldIntercept(self):
+        return True
     
     def write(self, message):
         if self.responseFile:
@@ -528,13 +543,15 @@ class PythonModuleTraffic(Traffic):
     typeId = "PYT"
     direction = "<-"
     interceptModules = []
+    interceptModuleAttrs = {}
     @classmethod
     def configure(cls, options):
-        modStr = options.python_exception_intercepts
+        modStr = options.python_module_intercepts
         if modStr:
             cls.interceptModules = modStr.split(",")
             cls.interceptModules += cls.getModuleParents(cls.interceptModules)
-
+            cls.interceptModuleAttrs = parseCmdDictionary(options.python_module_attributes)
+            
     @staticmethod
     def getModuleParents(modules):
         parents = []
@@ -542,6 +559,16 @@ class PythonModuleTraffic(Traffic):
             for ix in range(module.count(".")):
                 parents.append(module.rsplit(".", ix + 1)[0])
         return parents
+
+    def shouldIntercept(self):
+        attrs = self.interceptModuleAttrs.get(self.modOrObjName, [])
+        if len(attrs) > 0:
+            return self.attrName in attrs
+        else:
+            return True
+
+    def enquiryOnly(self, responses=[]):
+        return not self.shouldIntercept()
 
     def belongsToModule(self, obj):
         try:
@@ -576,7 +603,9 @@ class PythonModuleTraffic(Traffic):
             return ()
 
     def addInstanceWrappers(self, result):
-        if type(result) in (list, tuple):
+        if not self.shouldIntercept():
+            return result
+        elif type(result) in (list, tuple):
             return type(result)(map(self.addInstanceWrappers, result))
         elif type(result) == dict:
             newResult = {}
@@ -595,6 +624,9 @@ class PythonImportTraffic(PythonModuleTraffic):
         text = "import " + self.moduleName
         super(PythonImportTraffic, self).__init__(text, responseFile)
 
+    def shouldIntercept(self, responses=[]):
+        return not self.interceptModuleAttrs.has_key(self.moduleName)
+
     def forwardToDestination(self):
         try:
             exec self.text
@@ -609,8 +641,8 @@ class PythonAttributeTraffic(PythonModuleTraffic):
         text = self.modOrObjName + "." + self.attrName
         super(PythonAttributeTraffic, self).__init__(text, responseFile)
 
-    def enquiryOnly(self):
-        return True
+    def enquiryOnly(self, responses=[]):
+        return len(responses) == 0 or not self.shouldIntercept()
 
     def shouldCache(self, obj):
         return type(obj) not in (types.FunctionType, types.GeneratorType, types.MethodType, types.BuiltinFunctionType,
@@ -651,7 +683,7 @@ class PythonSetAttributeTraffic(PythonModuleTraffic):
 
 class PythonFunctionCallTraffic(PythonModuleTraffic):        
     def __init__(self, inText, responseFile):
-        self.modOrObjName, self.funcName, self.argStr, keywDictStr = inText.split(":SUT_SEP:")
+        self.modOrObjName, self.attrName, self.argStr, keywDictStr = inText.split(":SUT_SEP:")
         try:
             self.keyw = eval(keywDictStr)
             keyws = [ key + "=" + repr(value) for key, value in self.keyw.items() ]
@@ -662,7 +694,7 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
             self.keyw = {}
             # Slightly daring text-munging of Python dictionary repr, main thing is to print something vaguely representative
             keywStr = keywDictStr.replace("': ", "=").replace(", '", ", ")[2:-1]
-        text = self.modOrObjName + "." + self.funcName + self.findArgString(keywStr)
+        text = self.modOrObjName + "." + self.attrName + self.findArgString(keywStr)
         super(PythonModuleTraffic, self).__init__(text, responseFile)
 
     def findArgString(self, keywStr):
@@ -688,10 +720,10 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
         return tuple(map(self.getArgInstance, args))
 
     def callFunction(self, instance):
-        if self.funcName == "__repr__" and isinstance(instance, PythonInstanceWrapper): # Has to be special case as we use it internally
+        if self.attrName == "__repr__" and isinstance(instance, PythonInstanceWrapper): # Has to be special case as we use it internally
             return repr(instance.instance)
         else:
-            func = self.getPossibleCompositeAttribute(instance, self.funcName)
+            func = self.getPossibleCompositeAttribute(instance, self.attrName)
             return func(*self.parseArgs(), **self.keyw)
     
     def getResult(self):
@@ -752,18 +784,9 @@ class CommandLineTraffic(Traffic):
     @classmethod
     def configure(cls, options):
         cls.currentTestPath = options.test_path
-        cls.environmentDict = cls.parseEnvironment(options.transfer_environment)
+        cls.environmentDict = parseCmdDictionary(options.transfer_environment)
         if options.asynchronous_file_edit_commands:
             cls.asynchronousFileEditCmds = options.asynchronous_file_edit_commands.split(",")
-
-    @classmethod
-    def parseEnvironment(cls, envString):
-        env = {}
-        if envString:
-            for part in envString.split(","):
-                cmd, varString = part.split("=")
-                env[cmd] = varString.split("+")
-        return env
         
     def __init__(self, inText, responseFile):
         self.diag = logging.getLogger("Traffic Server")

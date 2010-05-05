@@ -5,7 +5,6 @@ Actions for managing selections and filterings of the test tree
 
 import gtk, plugins, os, operator, logging
 from default.gtkgui import guiplugins # from .. import guiplugins when we drop Python 2.4 support
-from fnmatch import fnmatch
 
 class AllTestsHandler:
     def __init__(self):

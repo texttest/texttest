@@ -29,6 +29,8 @@ react to the above module to repoint where it sends socket interactions"""
                       help="When monitoring which files have been edited by a program, ignore files and directories with the given names")
     parser.add_option("-p", "--replay", 
                       help="replay traffic recorded in FILE.", metavar="FILE")
+    parser.add_option("-l", "--logdir",
+                      help="Log diagnostics to LOGDIR", metavar="LOGDIR")
     parser.add_option("-f", "--replay-file-edits", 
                       help="restore edited files referred to in replayed file from DIR.", metavar="DIR")
     parser.add_option("-m", "--python-module-intercepts", 
@@ -1238,8 +1240,10 @@ if __name__ == "__main__":
     parser = create_option_parser()
     options = parser.parse_args()[0] # no positional arguments
 
-    allPaths = plugins.findDataPaths([ "logging.traffic" ], dataDirName="log", includePersonal=True)
-    defaults = { "TEXTTEST_PERSONAL_LOG": os.getenv("TEXTTEST_PERSONAL_LOG") }
+    allPaths = plugins.findDataPaths([ "logging.traffic" ], dataDirName="log")
+    defaults = { "TEXTTEST_PERSONAL_LOG": options.logdir }
+    personalFile = os.path.join(options.logdir, "logging.traffic")
+    allPaths.append(personalFile)
     logging.config.fileConfig(allPaths[-1], defaults)
 
     for cls in [ CommandLineTraffic, FileEditTraffic, PythonModuleTraffic ]:

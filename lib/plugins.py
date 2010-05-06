@@ -1,11 +1,10 @@
 
-import sys, os, logging.config, string, shutil, socket, time, re, stat, subprocess, shlex, types, operator
+import sys, os, logging.config, string, shutil, socket, time, re, stat, subprocess, shlex, types, operator, fnmatch
 from ndict import seqdict
 from traceback import format_exception
 from threading import currentThread
 from Queue import Queue, Empty
 from copy import copy
-from fnmatch import fnmatch
 from glob import glob
 
 # We standardise around UNIX paths, it's all much easier that way. They work fine,
@@ -1255,7 +1254,7 @@ class MultiEntryDictionary(seqdict):
         listVal = []
         usingList = False
         for currSubKey, currValue in dict.items():
-            if fnmatch(subKey, currSubKey):
+            if fnmatch.fnmatch(subKey, currSubKey):
                 if type(currValue) == types.ListType:
                     listVal += currValue
                     usingList = True

@@ -1108,19 +1108,16 @@ class MultiEntryDictionary(seqdict):
     warnings = []
     def __init__(self, importKey="", importFileFinder=None):
         seqdict.__init__(self)
-        self.resetCurrent()
         self.diag = logging.getLogger("MultiEntryDictionary")
         self.aliases = {}
         self.importKey = importKey
         self.importFileFinder= importFileFinder
 
-    def resetCurrent(self, sectionName=""):
-        if sectionName:
-            self.currSection = sectionName
-            self.currDict = self[sectionName]
+    def getSectionInfo(self, sectionName=""):
+        if sectionName and sectionName != "end":
+            return self[sectionName], sectionName
         else:
-            self.currSection = "<global>"
-            self.currDict = self
+            return self, "<global>"
 
     def setAlias(self, aliasName, realName):
         self.aliases[aliasName] = realName
@@ -1129,89 +1126,86 @@ class MultiEntryDictionary(seqdict):
         return self.aliases.get(fromConfig, fromConfig)
 
     def readValues(self, fileNames, *args, **kwargs):
-        self.resetCurrent()
         for filename in fileNames:
             self.readFromFile(filename, *args, **kwargs)
 
     def readFromFile(self, filename, *args, **kwargs):
         self.diag.info("Reading file " + filename)
+        currSectionName = ""
         for line in readList(filename):
-            self.parseConfigLine(line, *args, **kwargs)
-        self.resetCurrent()
+            if self.isSectionHeader(line):
+                currSectionName = self.getNewSectionInfo(line, *args, **kwargs)
+            elif ":" in line:
+                self.parseConfigLine(line, currSectionName, *args, **kwargs)
+            else:
+                self.warn("Could not parse config line " + line)
+
+    def isSectionHeader(self, line):
+        return line.startswith("[") and line.endswith("]")
 
     def warn(self, message):
         if message not in self.warnings:
             self.warnings.append(message)
             printWarning(message, stderr=True, stdout=False)
 
-    def parseConfigLine(self, line, *args, **kwargs):
-        if line.startswith("[") and line.endswith("]"):
-            sectionName = self.getEntryName(line[1:-1])
-            self.resetSectionMarker(sectionName, *args, **kwargs)
-        elif line.find(":") != -1:
-            key, value = line.split(":", 1)
-            entryName = self.getEntryName(string.Template(key).safe_substitute(os.environ))
-            self.addEntry(entryName, value, "", *args, **kwargs)
-            if key and key == self.importKey:
-                self.readFromFile(self.importFileFinder(os.path.expandvars(value)), *args, **kwargs)
-        else:
-            self.warn("Could not parse config line " + line)
+    def parseConfigLine(self, line, currSectionName, *args, **kwargs):
+        key, value = line.split(":", 1)
+        entryName = self.getEntryName(string.Template(key).safe_substitute(os.environ))
+        self.addEntry(entryName, value, currSectionName, *args, **kwargs)
+        if key and key == self.importKey:
+            self.readFromFile(self.importFileFinder(os.path.expandvars(value)), *args, **kwargs)
             
-    def resetSectionMarker(self, name, insert=True, errorOnUnknown=False):
-        newSectionName = ""
+    def getNewSectionInfo(self, line, insert=True, errorOnUnknown=False):
+        name = self.getEntryName(line[1:-1])
         if name != "end":
             if self.has_key(name):
                 value = self[name]
                 if isinstance(value, seqdict) or type(value) == types.DictType:
-                    newSectionName = name
+                    return name
                 else:
                     self.warn("Config entry name '" + name + "' incorrectly used as a section marker.")
             elif insert:
                 self[name] = seqdict()
-                newSectionName = name
+                return name
             elif errorOnUnknown:
                 self.warn("Config section name '" + name + "' not recognised.")
-        self.resetCurrent(newSectionName)
+        return ""
         
     def addEntry(self, entryName, entry, sectionName="", *args, **kwargs):
-        if sectionName:
-            self.resetCurrent(sectionName)
+        currDict, currSection = self.getSectionInfo(sectionName)
         try:
-            self._addEntry(entryName, entry, *args, **kwargs)
+            self._addEntry(entryName, entry, currDict, currSection, *args, **kwargs)
         except ValueError, e:
-            self.warn("Config entry name '" + entryName + "' in section '" + self.currSection +
+            self.warn("Config entry name '" + entryName + "' in section '" + currSection +
                       "' given an invalid value '" + entry + "', ignoring.")
-        # Make sure we reset...
-        if sectionName:
-            self.resetCurrent()
 
-    def _addEntry(self, entryName, entry, insert=True, errorOnUnknown=False):
-        if self.currDict is not self and self.has_key(entryName):
-            self.warn("Config entry name '" + entryName + "' found in section '" + self.currSection +
+    def _addEntry(self, entryName, entry, currDict, currSection, insert=True, errorOnUnknown=False):
+        if currDict is not self and self.has_key(entryName):
+            self.warn("Config entry name '" + entryName + "' found in section '" + currSection +
                       "', but defined at global scope. Did you forget an [end] marker?")
 
-        entryExists = self.currDict.has_key(entryName)
+        entryExists = currDict.has_key(entryName)
         if entryExists:
             self.diag.info("Entry existed, setting " + entryName + "=" + entry)
-            self.insertEntry(entryName, entry)
+            self.insertEntry(entryName, entry, currDict)
         else:
-            if insert or not self.currDict is self:
+            if insert or not currDict is self:
                 self.diag.info("Inserting " + entryName + "=" + repr(entry))
-                self.currDict[entryName] = self.castEntry(entryName, entry)
+                currDict[entryName] = self.castEntry(entryName, entry, currDict)
             elif errorOnUnknown:
                 self.warn("Config entry name '" + entryName + "' not recognised.")
 
-    def getDictionaryValueType(self):
-        val = self.currDict.values()
+    def getDictionaryValueType(self, currDict):
+        val = currDict.values()
         if len(val) == 0:
             return types.StringType
         else:
             return type(val[0])
 
-    def castEntry(self, entryName, entry):
+    def castEntry(self, entryName, entry, currDict):
         if type(entry) != types.StringType:
             return entry
-        dictValType = self.getDictionaryValueType()
+        dictValType = self.getDictionaryValueType(currDict)
         if dictValType == types.ListType:
             return self.getBasicList(entry)
         else:
@@ -1235,16 +1229,15 @@ class MultiEntryDictionary(seqdict):
             currentList.append(entry)
         return currentList
 
-    def insertEntry(self, entryName, entry):
-        currType = type(self.currDict[entryName])
+    def insertEntry(self, entryName, entry, currDict):
+        currType = type(currDict[entryName])
         if currType == types.ListType:
-            self.currDict[entryName] = self.getListValue(entry, self.currDict[entryName])
+            currDict[entryName] = self.getListValue(entry, currDict[entryName])
         elif currType == types.DictType:
-            self.resetCurrent(entryName)
-            self.insertEntry("default", entry)
-            self.resetCurrent()
+            newCurrDict = self.getSectionInfo(entryName)[0]
+            self.insertEntry("default", entry, newCurrDict)
         else:
-            self.currDict[entryName] = currType(entry)
+            currDict[entryName] = currType(entry)
 
     def getComposite(self, key, subKey, defaultSubKey="default"):
         dict = self.get(key)

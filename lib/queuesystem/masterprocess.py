@@ -233,7 +233,7 @@ class QueueSystemServer(BaseActionRunner):
     def remainStr(self):
         return " : " + str(self.testCount) + " tests remain, " + str(self.testsSubmitted) + " are submitted."
     def runTest(self, test):   
-        submissionRules = test.app.getSubmissionRules(test)
+        submissionRules = self.getSubmissionRules(test)
         command = self.getSlaveCommand(test, submissionRules)
         plugins.log.info("Q: Submitting " + repr(test) + submissionRules.getSubmitSuffix())
         sys.stdout.flush()

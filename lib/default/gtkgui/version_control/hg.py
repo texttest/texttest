@@ -29,13 +29,24 @@ class HgInterface(vcs_independent.VersionControlInterface):
         return time.strptime(input, "%b %d %H:%M:%S %Y")
 
     def getFileStatus(self, basicArgs, file):
+        return vcs_independent.VersionControlInterface.getFileStatus(self, basicArgs, self.correctForLinks(file))
+        
+    def correctForLinks(self, file):
         # Mercurial falls over if "file" contains symbolic link references
         # But don't dereference it if it's actually a link
         if os.path.islink(file):
-            return vcs_independent.VersionControlInterface.getFileStatus(self, basicArgs, file)
+            return file
         else:
-            return vcs_independent.VersionControlInterface.getFileStatus(self, basicArgs, os.path.realpath(file))
-
+            return os.path.realpath(file)
+        
+    def callProgramOnFiles(self, cmdName, fileArg, recursive=False, extraArgs=[], **kwargs):
+        if cmdName == "status":
+            basicArgs = self.getCmdArgs(cmdName, extraArgs)
+            for fileName in self.getFileNamesForCmd(cmdName, fileArg, recursive):
+                self.callProgramWithHandler(fileName, basicArgs + [ self.correctForLinks(fileName) ], **kwargs)
+        else:
+            vcs_independent.VersionControlInterface.callProgramOnFiles(self, cmdName, fileArg, recursive, extraArgs, **kwargs)
+    
     def getStateFromStatus(self, output):
         words = output.split()
         if len(words) > 0:

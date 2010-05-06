@@ -1243,7 +1243,8 @@ if __name__ == "__main__":
     allPaths = plugins.findDataPaths([ "logging.traffic" ], dataDirName="log")
     defaults = { "TEXTTEST_PERSONAL_LOG": options.logdir }
     personalFile = os.path.join(options.logdir, "logging.traffic")
-    allPaths.append(personalFile)
+    if os.path.isfile(personalFile):
+        allPaths.append(personalFile)
     logging.config.fileConfig(allPaths[-1], defaults)
 
     for cls in [ CommandLineTraffic, FileEditTraffic, PythonModuleTraffic ]:

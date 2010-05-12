@@ -1747,6 +1747,8 @@ Framework Enhancements:
 	or for GUI-related stuff that might clash with GTK.
     - Python interception is now much more general and reliable (traffic_server.py)
 	The version in 3.17 worked on basic cases but hadn't been widely tested
+    - Python interception can now be applied to individual attributes/functions as well as entire modules (traffic_server.py)
+	New config file setting "collect_traffic_py_attributes". See online docs for details.
     - Can now pass arguments to the "interpreter" program via "interpreter_options" files (testmodel.py)
 	Work much like "options" files otherwise.
     - Can now disable previously defined bug reporting (knownbugs/__init__.py)
@@ -1760,6 +1762,7 @@ Batch Report Enhancements:
 Grid Engine (LSF/SGE) enhancements:
 Bug Fixes:
     - Personal configuration settings such as window_size are now read when starting from scratch with --new (guiutils.py)
+    - Multiple line options files now work again: these worked in 3.16 but not 3.17 (testmodel.py)
     - No longer get stack traces when using Selection tab in the dynamic GUI while running tests via grid engines. (default/__init__.py)
     - Tests with shell characters in the name now work better using grid engines (masterprocess.py)
     - Tests with ":" in the name also work better using grid engines (though still fail with collect_traffic) (masterprocess.py)
@@ -1771,3 +1774,5 @@ Bug Fixes:
     - import_config_file now finds files in subsequent entries along TEXTTEST_PATH, instead of just the first (testmodel.py)
     - Naming for changes in memory consumption now consistent between using grid engines and not doing so. (queuesystem/__init__.py)
     - Tkinter testing always enables interception of tkMessageBox by default without which it doesn't work so well (adminactions.py)
+    - Eliminated race condition when reading config file settings from different threads (plugins.py)
+    - Completed workaround from 3.17 for symbolic link bug in Mercurial: found a related case (hg.py)

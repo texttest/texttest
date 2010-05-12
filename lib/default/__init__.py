@@ -1553,6 +1553,7 @@ class CountTest(plugins.Action):
 
 
 class DocumentOptions(plugins.Action):
+    multiValueOptions = [ "a", "c", "f", "funion", "fintersect", "t", "ts", "v" ]
     def setUpApplication(self, app):
         groups = app.createOptionGroups([ app ])
         keys = reduce(operator.add, (g.keys() for g in groups), [])
@@ -1582,6 +1583,8 @@ class DocumentOptions(plugins.Action):
         docs = option.name
         if isinstance(option, plugins.TextOption):
             keyOutput += " <value>"
+            if key in self.multiValueOptions:
+                keyOutput += ",..."
             if (docs == "Execution time"):
                 keyOutput = "-" + key + " <time specification string>"
             else:

@@ -1583,12 +1583,14 @@ class DocumentOptions(plugins.Action):
         docs = option.name
         if isinstance(option, plugins.TextOption):
             keyOutput += " <value>"
-            if key in self.multiValueOptions:
-                keyOutput += ",..."
             if (docs == "Execution time"):
                 keyOutput = "-" + key + " <time specification string>"
             else:
                 docs += " <value>"
+            if key in self.multiValueOptions:
+                keyOutput += ",..."
+                docs += ",..."
+
         if group.name.startswith("Select"):
             return keyOutput, "Select " + docs.lower()
         else:

@@ -47,7 +47,7 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         # On Windows the default URI hook fails and causes trouble...
         # According to the docs you can set "None" here but that doesn't seem to work...
         gtk.link_button_set_uri_hook(lambda x, y : None) 
-        urlButton = gtk.LinkButton(self.website)
+        urlButton = gtk.LinkButton(self.website, self.website)
         urlButton.set_property("border-width", 0)
         urlButtonbox = gtk.HBox()
         urlButtonbox.pack_start(urlButton, expand=True, fill=False)

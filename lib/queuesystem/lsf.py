@@ -1,5 +1,5 @@
 
-import os
+import os, subprocess
 
 # Used by the master to submit, monitor and delete jobs...
 class QueueSystem:
@@ -37,6 +37,17 @@ class QueueSystem:
             return "LSF lost job:" + jobId
         else:
             return resultOutput
+
+    def getStatusForAllJobs(self):
+        statusDict = {}
+        proc = subprocess.Popen([ "bjobs" ], stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        outMsg, errMsg = proc.communicate()
+        for line in outMsg.splitlines():
+            words = line.split()
+            if len(words) >= 3:
+                statusDict[words[0]] = words[2]
+        return statusDict
+        
     def killJob(self, jobId):
         resultOutput = os.popen("bkill -s USR1 " + jobId + " 2>&1").read()
         return resultOutput.find("is being terminated") != -1 or resultOutput.find("is being signaled") != -1

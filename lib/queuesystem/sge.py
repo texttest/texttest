@@ -30,12 +30,15 @@ class QueueSystem:
         return ",".join(resourceList)
     def findSubmitError(self, stderr):
         return stderr.splitlines()[0].strip()
+
     def killJob(self, jobId):
         proc = subprocess.Popen([ "qdel", jobId ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         self.qdelOutput = proc.communicate()[0]
         return self.qdelOutput.find("has registered the job") != -1 or self.qdelOutput.find("has deleted job") != -1
+
     def getJobId(self, line):
         return line.split()[2]
+
     def findJobId(self, stdout):
         jobId = ""
         for line in stdout.splitlines():
@@ -44,6 +47,17 @@ class QueueSystem:
             else:
                 log.info("Unexpected output from qsub : " + line.strip())
         return jobId
+
+    def getStatusForAllJobs(self):
+        statusDict = {}
+        proc = subprocess.Popen([ "qstat" ], stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        outMsg, errMsg = proc.communicate()
+        for line in outMsg.splitlines():
+            words = line.split()
+            if len(words) >= 5:
+                statusDict[words[0]] = words[-5]
+        return statusDict
+
     def getJobFailureInfo(self, jobId):
         methods = [ self.getAccountInfo, self.getAccountInfoOldFiles, self.retryAccountInfo ]
         for method in methods:

@@ -103,7 +103,7 @@ class QueueSystemServer(BaseActionRunner):
         while True:
             for attempt in range(attempts):
                 time.sleep(0.5)
-                if self.allComplete:
+                if self.allComplete or self.exited:
                     return
             self.updateJobStatus()
             attempts = 30

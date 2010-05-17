@@ -308,7 +308,7 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
         defaultVersion, defaultCheckout = "", ""
         if len(allApps) > 0:
             self.currentApp = allApps[0]
-            defaultVersion = self.currentApp.getFullVersion(forSave=1)
+            defaultVersion = self.currentApp.getFullVersion()
             defaultCheckout = self.currentApp.checkout
         self.addOption("v", "Version to record", defaultVersion)
         self.addOption("c", "Checkout to use for recording", defaultCheckout)
@@ -348,7 +348,7 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
     def updateOptions(self):
         if self.currentApp is not self.currAppSelection[0]:
             self.currentApp = self.currAppSelection[0]
-            self.optionGroup.setOptionValue("v", self.currentApp.getFullVersion(forSave=1))
+            self.optionGroup.setOptionValue("v", self.currentApp.getFullVersion())
             self.optionGroup.setOptionValue("c", self.currentApp.checkout)
             return True
         else:

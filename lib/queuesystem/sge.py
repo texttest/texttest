@@ -5,7 +5,12 @@ from time import sleep
 
 # Used by master process for submitting, deleting and monitoring slave jobs
 class QueueSystem:
-    allStatuses = { "r" : "RUN", "s" : "USUSP", "dr" : "DEL", "R" : "RESTART", "S" : "SSUSP", "T" : "THRESH" }
+    allStatuses = { "r" : ("RUN", "Running"),
+                    "s" : ("USUSP", "Suspended by the user"),
+                    "dr" : ("DEL", "In the process of being killed"),
+                    "R" : ("RESTART", "Restarted"),
+                    "S" : ("SSUSP", "Suspended by SGE due to other higher priority jobs"),
+                    "T" : ("THRESH", "Suspended by SGE as it exceeded allowed thresholds") }
     def getSubmitCmdArgs(self, submissionRules):
         qsubArgs = [ "qsub", "-N", submissionRules.getJobName() ]
         if submissionRules.processesNeeded != "1":
@@ -48,6 +53,9 @@ class QueueSystem:
             else:
                 log.info("Unexpected output from qsub : " + line.strip())
         return jobId
+
+    def supportsPolling(self):
+        return True
 
     def getStatusForAllJobs(self):
         statusDict = {}

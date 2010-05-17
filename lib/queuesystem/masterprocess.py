@@ -106,11 +106,14 @@ class QueueSystemServer(BaseActionRunner):
                 time.sleep(0.5)
                 if self.allComplete or self.exited:
                     return
-            self.updateJobStatus()
+            if not self.updateJobStatus():
+                return
             attempts = 30
 
     def updateJobStatus(self):
         queueSystem = self.getQueueSystem(self.jobs.keys()[0])
+        if not queueSystem.supportsPolling():
+            return False
         statusInfo = queueSystem.getStatusForAllJobs()
         self.diag.info("Got status for all jobs : " + repr(statusInfo))
         for test, jobs in self.jobs.items():
@@ -123,13 +126,16 @@ class QueueSystemServer(BaseActionRunner):
                     elif not status and not self.jobStarted(test):
                         # Do this to any jobs
                         self.setSlaveFailed(test, False, True)
+        return True
 
     def updateRunStatus(self, test, status):
         oldState = test.state
         currRunStatus = oldState.briefText.split()[0]
-        if status != currRunStatus:
-            newState = Running(oldState.executionHosts, oldState.freeText,
-                               oldState.briefText.replace(currRunStatus, status), 
+        newRunStatus, newExplanation = status
+        if newRunStatus != currRunStatus:
+            currFreeTextStatus = oldState.freeText.splitlines()[0].rsplit(" ", 2)[0]
+            newState = Running(oldState.executionHosts, oldState.freeText.replace(currFreeTextStatus, newExplanation),
+                               oldState.briefText.replace(currRunStatus, newRunStatus), 
                                lifecycleChange="grid status update")
             test.changeState(newState)
 

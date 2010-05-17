@@ -5,6 +5,7 @@ from time import sleep
 
 # Used by master process for submitting, deleting and monitoring slave jobs
 class QueueSystem:
+    allStatuses = { "r" : "RUN", "s" : "USUSP", "dr" : "DEL", "R" : "RESTART", "S" : "SSUSP", "T" : "THRESH" }
     def getSubmitCmdArgs(self, submissionRules):
         qsubArgs = [ "qsub", "-N", submissionRules.getJobName() ]
         if submissionRules.processesNeeded != "1":
@@ -55,7 +56,10 @@ class QueueSystem:
         for line in outMsg.splitlines():
             words = line.split()
             if len(words) >= 5:
-                statusDict[words[0]] = words[-5]
+                statusLetter = words[-5]
+                status = self.allStatuses.get(statusLetter)
+                if status:
+                    statusDict[words[0]] = status
         return statusDict
 
     def getJobFailureInfo(self, jobId):

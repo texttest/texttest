@@ -1245,9 +1245,9 @@ class TestDescriptionFilter(plugins.TextFilter):
         return self.stringContainsText(test.description)
 
 class Running(plugins.TestState):
-    def __init__(self, execMachines, freeText = "", briefText = ""):
+    def __init__(self, execMachines, freeText = "", briefText = "", lifecycleChange="start"):
         plugins.TestState.__init__(self, "running", freeText, briefText, started=1,
-                                   executionHosts = execMachines, lifecycleChange="start")
+                                   executionHosts = execMachines, lifecycleChange=lifecycleChange)
 
 class Killed(plugins.TestState):
     def __init__(self, briefText, freeText, prevState):

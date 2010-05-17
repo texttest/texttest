@@ -13,6 +13,7 @@ from default.console import TextDisplayResponder, InteractiveResponder
 from default.knownbugs import CheckForBugs
 from default.actionrunner import BaseActionRunner
 from default.performance import getTestPerformance
+from default import Running
 from types import StringType
 from glob import glob
 
@@ -113,11 +114,24 @@ class QueueSystemServer(BaseActionRunner):
         statusInfo = queueSystem.getStatusForAllJobs()
         self.diag.info("Got status for all jobs : " + repr(statusInfo))
         for test, jobs in self.jobs.items():
-            if not self.jobStarted(test):
+            if not test.state.isComplete():
                 for jobId, jobName in jobs:
                     status = statusInfo.get(jobId)
-                    if not status:
+                    if status and test.state.hasStarted():
+                        # Only do this to test jobs (might make a difference for derived configurations)
+                        self.updateRunStatus(test, status)
+                    elif not status and not self.jobStarted(test):
+                        # Do this to any jobs
                         self.setSlaveFailed(test, False, True)
+
+    def updateRunStatus(self, test, status):
+        oldState = test.state
+        currRunStatus = oldState.briefText.split()[0]
+        if status != currRunStatus:
+            newState = Running(oldState.executionHosts, oldState.freeText,
+                               oldState.briefText.replace(currRunStatus, status), 
+                               lifecycleChange="grid status update")
+            test.changeState(newState)
 
     def findQueueForTest(self, test):
         # If we've gone into reuse mode and there are no active tests for reuse, use the "reuse failure queue"

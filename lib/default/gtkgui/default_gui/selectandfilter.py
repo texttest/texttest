@@ -489,6 +489,26 @@ class LoadSelection(guiplugins.ActionDialogGUI):
     def messageAfterPerform(self):
         pass
 
+class SelectInSameGroup(guiplugins.ActionGUI):
+    def getSignalsSent(self):
+        return [ "SelectInGroup" ]
+
+    def _getTitle(self):
+        return "Select Tests With Same Diff"
+
+    def performOnCurrent(self):
+        self.notify("SelectInGroup", self.currFileSelection[0][1])
+
+    def isActiveOnCurrent(self, *args):
+        if not guiplugins.ActionGUI.isActiveOnCurrent(self) or len(self.currFileSelection) != 1:
+            return False
+
+        comparison = self.currFileSelection[0][1]
+        return comparison and not comparison.hasSucceeded()
+    
 
 def getInteractiveActionClasses(dynamic):
-    return [ SaveSelection, SelectTests, HideUnselected, HideSelected, ShowAll, LoadSelection ]
+    classes = [ SaveSelection, SelectTests, HideUnselected, HideSelected, ShowAll, LoadSelection ]
+    if dynamic:
+        classes.append(SelectInSameGroup)
+    return classes

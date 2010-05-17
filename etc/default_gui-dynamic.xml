@@ -63,7 +63,9 @@
     <separator/>
     <menuitem action="Follow File Progress"/>
     <separator/>
-    <menuitem name="File Properties" action="File Properties"/>
+    <menuitem action="File Properties"/>
+    <separator/>
+    <menuitem action="Select Tests With Same Diff"/>
     <separator/>
     <menuitem action="Save"/>
     <menuitem action="Save As..."/>

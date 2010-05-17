@@ -168,6 +168,7 @@ class TestProgressMonitor(guiutils.SubGUI):
             # to recalculate all the time...
             diffTool = guiutils.guiConfig.getValue("text_diff_program")
             self.diffFilterGroup = plugins.TextTriggerGroup(guiutils.guiConfig.getCompositeValue("text_diff_program_filters", diffTool))
+            self.maxLengthForGrouping = guiutils.guiConfig.getValue("lines_of_text_difference")
             if testCount > 0:
                 colour = guiutils.guiConfig.getTestColour("not_started")
                 visibility = guiutils.guiConfig.showCategoryByDefault("not_started")
@@ -204,13 +205,16 @@ class TestProgressMonitor(guiutils.SubGUI):
         self.treeView.append_column(toggleColumn)
         self.treeView.show()
         return self.addScrollBars(self.treeView, hpolicy=gtk.POLICY_NEVER)
+
     def canSelect(self, path):
         pathIter = self.treeModel.get_iter(path)
         return self.treeModel.get_value(pathIter, 2)
+
     def notifyAdd(self, test, initial):
         if self.dynamic and test.classId() == "test-case":
             incrementCount = self.testCount == 0
             self.insertTest(test, test.stateInGui, "add", incrementCount)
+
     def notifyAllRead(self, *args):
         # Fix the not started count in case the initial guess was wrong
         if self.testCount > 0:
@@ -220,25 +224,29 @@ class TestProgressMonitor(guiutils.SubGUI):
             measuredTestCount = self.treeModel.get_value(iter, 1)
             if actualTestCount != measuredTestCount:
                 self.treeModel.set_value(iter, 1, actualTestCount)
+
     def selectionChanged(self, selection):
         # For each selected row, select the corresponding rows in the test treeview
         tests = []
         selection.selected_foreach(self.selectCorrespondingTests, tests)
         self.notify("SetTestSelection", tests)
+
     def selectCorrespondingTests(self, treemodel, path, iter, tests , *args):
         guiutils.guilog.info("Selecting all " + str(treemodel.get_value(iter, 1)) + " tests in category " + treemodel.get_value(iter, 0))
         for test in treemodel.get_value(iter, 5):
             if test not in tests:
                 tests.append(test)
+
     def findTestIterators(self, test):
         return self.classifications.get(test, [])
+
     def getCategoryDescription(self, state, categoryName=None):
         if not categoryName:
             categoryName = state.category
         briefDesc, fullDesc = state.categoryDescriptions.get(categoryName, (categoryName, categoryName))
         return briefDesc.replace("_", " ").capitalize()
 
-    def filterDiff(self, test, diff):
+    def filterDiff(self, diff):
         filteredDiff = ""
         for line in diff.split("\n"):
             if self.diffFilterGroup.stringContainsText(line):
@@ -270,14 +278,12 @@ class TestProgressMonitor(guiutils.SubGUI):
             return classifiers
 
         comparisons = state.getComparisons()
-        maxLengthForGrouping = test.getConfigValue("lines_of_text_difference")
         for fileComp in filter(lambda c: c.getType() == "failure", comparisons):
-            summary = fileComp.getSummary(includeNumbers=False)
+            summary = self.getFileSummary(fileComp)
             fileClass = [ "Failed", "Differences", summary ]
 
-            freeText = fileComp.getFreeTextBody()
-            if freeText.count("\n") < maxLengthForGrouping:
-                filteredDiff = self.filterDiff(test, freeText)
+            filteredDiff = self.getFilteredDiff(fileComp)
+            if filteredDiff is not None:
                 summaryDiffs = self.diffStore.setdefault(summary, seqdict())
                 testList, hasGroup = summaryDiffs.setdefault(filteredDiff, ([], False))
                 if test not in testList:
@@ -299,6 +305,22 @@ class TestProgressMonitor(guiutils.SubGUI):
             classifiers.addClassification(fileClass)
 
         return classifiers
+
+    def notifySelectInGroup(self, fileComp):
+        summary = self.getFileSummary(fileComp)
+        summaryDiffs = self.diffStore.get(summary, {})
+        filteredDiff = self.getFilteredDiff(fileComp)
+        testList, hasGroup = summaryDiffs.get(filteredDiff, ([], False))
+        if hasGroup:
+            self.notify("SetTestSelection", testList)
+        
+    def getFileSummary(self, fileComp):
+        return fileComp.getSummary(includeNumbers=False)
+
+    def getFilteredDiff(self, fileComp):
+        freeText = fileComp.getFreeTextBody()
+        if freeText.count("\n") < self.maxLengthForGrouping:
+            return self.filterDiff(freeText)
 
     def removeFromModel(self, test):
         for iter in self.findTestIterators(test):

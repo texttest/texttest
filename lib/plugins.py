@@ -1303,7 +1303,8 @@ class Option:
 
 class TextOption(Option):
     def __init__(self, name, value="", possibleValues=[], allocateNofValues=-1,
-                 selectDir=False, selectFile=False, saveFile=False, possibleDirs=[], description="", changeMethod = None):
+                 selectDir=False, selectFile=False, saveFile=False, possibleDirs=[],
+                 description="", changeMethod=None, multilineEntry=False):
         Option.__init__(self, name, value, description, changeMethod)
         self.possValAppendMethod = None
         self.possValListMethod = None
@@ -1313,21 +1314,26 @@ class TextOption(Option):
         self.saveFile = saveFile
         self.possibleDirs = possibleDirs
         self.clearMethod = None
+        self.multilineEntry = multilineEntry
         self.setPossibleValues(possibleValues)
+        
     def setPossibleValuesMethods(self, appendMethod, getMethod):
         self.possValListMethod = getMethod
         if appendMethod:
             self.possValAppendMethod = appendMethod
             self.updatePossibleValues()
+
     def updatePossibleValues(self):
         if self.possValAppendMethod:
             for value in self.possibleValues:
                 self.possValAppendMethod(value)
+
     def listPossibleValues(self):
         if self.possValListMethod:
             return self.possValListMethod()
         else:
             return self.possibleValues
+
     def addPossibleValue(self, value):
         if value not in self.possibleValues:
             self.possibleValues.append(value)
@@ -1336,6 +1342,7 @@ class TextOption(Option):
         Option.setValue(self, value)
         if self.usePossibleValues():
             self.setPossibleValues(self.possibleValues)
+
     def setPossibleValues(self, values):
         if self.selectFile or (self.defaultValue in values):
             self.possibleValues = values
@@ -1343,6 +1350,7 @@ class TextOption(Option):
             self.possibleValues = [ self.defaultValue ] + values
         self.clear()
         self.updatePossibleValues()
+
     def getPossibleDirs(self):
         if self.selectDir or self.selectFile:
             return self.possibleDirs + self.possibleValues
@@ -1351,11 +1359,14 @@ class TextOption(Option):
 
     def usePossibleValues(self):
         return self.selectDir or self.nofValues > 1 or len(self.possibleValues) > 1
+
     def setClearMethod(self, clearMethod):
         self.clearMethod = clearMethod
+
     def clear(self):
         if self.clearMethod:
             self.clearMethod()
+
     def getValue(self):
         basic = Option.getValue(self)
         if (self.selectFile or self.saveFile or self.selectDir) and basic:

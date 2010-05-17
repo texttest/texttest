@@ -515,21 +515,20 @@ class OptionGroupGUI(ActionGUI):
             self.setTooltipText(label, option.description)
         return label
 
-    def createOptionEntry(self, option, separator):
-        widget, entry = self.createOptionWidget(option)
-        optionName = option.name.strip()
-        entry.set_name(optionName)
-        labelEventBox = self.createLabelEventBox(option, separator)
-        entry.set_text(option.getValue())
-        entrycompletion.manager.register(entry)
-        # Options in drop-down lists don't change, so we just add them once and for all.
-        for text in option.listPossibleValues():
-            entrycompletion.manager.addTextCompletion(text)
+    def connectEntry(self, option, entryOrBuffer):
+        entryOrBuffer.set_text(option.getValue())
         # Don't pass entry.set_text directly, it will mess up PyUseCase's programmatic method interception
-        option.setMethods(entry.get_text, lambda t: entry.set_text(t))
+        option.setMethods(self.getGetTextMethod(entryOrBuffer), lambda t: entryOrBuffer.set_text(t))
         if option.changeMethod:
-            entry.connect("changed", option.changeMethod)
-        return labelEventBox, widget, entry
+            entryOrBuffer.connect("changed", option.changeMethod)
+        
+    def getGetTextMethod(self, widget):
+        if isinstance(widget, gtk.Entry):
+            return widget.get_text
+        else:
+            def get_text():
+                return widget.get_text(widget.get_start_iter(), widget.get_end_iter())
+            return get_text
 
     def addValuesFromConfig(self, option):
         newValue = self.updateForConfig(option)
@@ -637,14 +636,31 @@ class OptionGroupGUI(ActionGUI):
         return text == "-" * 10
 
     def createOptionWidget(self, option):
-        box = gtk.HBox()
-        if option.usePossibleValues():
-            widget, entry = self.createComboBoxEntry(option)
-            box.pack_start(widget, expand=True, fill=True)
+        optionName = option.name.strip()
+        if option.multilineEntry:
+            frame = gtk.Frame()
+            frame.set_shadow_type(gtk.SHADOW_OUT)
+            frame.set_border_width(1)
+            view = gtk.TextView()
+            view.set_name(optionName)
+            frame.add(view)
+            return frame, view.get_buffer()
         else:
-            entry = gtk.Entry()
-            box.pack_start(entry, expand=True, fill=True)
-        return box, entry
+            box = gtk.HBox()
+            if option.usePossibleValues():
+                widget, entry = self.createComboBoxEntry(option)
+                box.pack_start(widget, expand=True, fill=True)
+            else:
+                entry = gtk.Entry()
+                box.pack_start(entry, expand=True, fill=True)
+
+            entry.set_name(optionName)
+            entrycompletion.manager.register(entry)
+            # Options in drop-down lists don't change, so we just add them once and for all.
+            for text in option.listPossibleValues():
+                entrycompletion.manager.addTextCompletion(text)
+
+            return box, entry
   
     def getConfigOptions(self, option):
         fromConfig = guiConfig.getCompositeValue("gui_entry_options", option.name)
@@ -718,10 +734,13 @@ class ActionTabGUI(OptionGroupGUI):
             for option in options:
                 self.addValuesFromConfig(option)
 
-                labelEventBox, entryWidget, entry = self.createOptionEntry(option, separator="  ")
-                entry.connect("activate", self.runInteractive)
+                labelEventBox = self.createLabelEventBox(option, separator="  ")
                 labelEventBox.get_children()[0].set_alignment(1.0, 0.5)
                 table.attach(labelEventBox, 0, 1, rowIndex, rowIndex + 1, xoptions=gtk.FILL, xpadding=1)
+                entryWidget, entryOrBuffer = self.createOptionWidget(option)
+                self.connectEntry(option, entryOrBuffer) 
+                if isinstance(entryOrBuffer, gtk.Entry):
+                    entryOrBuffer.connect("activate", self.runInteractive)
                 table.attach(entryWidget, 1, 2, rowIndex, rowIndex + 1)
                 rowIndex += 1
                 table.show_all()
@@ -911,11 +930,15 @@ class ActionDialogGUI(OptionGroupGUI):
                 else:
                     vbox.pack_start(fileChooser, expand=True, fill=True)
             else:
-                labelEventBox, entryWidget, entry = self.createOptionEntry(option, separator=":")
-                entry.set_activates_default(True)
+                labelEventBox = self.createLabelEventBox(option, separator=":")
                 self.addLabel(vbox, labelEventBox)
-                vbox.pack_start(entryWidget, expand=False, fill=False)
-
+                entryWidget, entryOrBuffer = self.createOptionWidget(option)
+                if isinstance(entryOrBuffer, gtk.Entry):
+                    entryOrBuffer.set_activates_default(True)
+                    vbox.pack_start(entryWidget, expand=False, fill=False)
+                else:
+                    vbox.pack_start(entryWidget, expand=True, fill=True)
+                self.connectEntry(option, entryOrBuffer)
 
         return fileChooser, fileChooserOption
 

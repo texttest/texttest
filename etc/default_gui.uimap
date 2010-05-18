@@ -935,3 +935,9 @@ activate = show vcs top menu
 [Name=Select Tests With Same Diff]
 activate = select tests with same diff
 
+[Name=Test Filtering]
+activate = test the run-dependent text filtering
+
+[Title=Filtered contents of output.rdt]
+response.accept = close file-viewing window
+

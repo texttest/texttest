@@ -202,7 +202,7 @@ class TextFileDisplayDialog(guiplugins.ActionResultDialogGUI):
             window.add(textView)
             notebook.append_page(window, label)        
             parentSize = self.topWindow.get_size()
-            self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[0] * 0.7))
+            self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[1] * 0.7))
         else:
             notebook.append_page(textView, label)
             

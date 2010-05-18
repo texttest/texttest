@@ -3,7 +3,7 @@
 The various ways to launch the dynamic GUI from the static GUI
 """
 
-import plugins, os, sys, shutil 
+import gtk, plugins, os, sys, shutil 
 from default.gtkgui import guiplugins # from .. import guiplugins, guiutils when we drop Python 2.4 support
 from copy import copy, deepcopy
 
@@ -451,9 +451,46 @@ class ReplaceText(RunScriptAction):
     def performedDescription(self):
         return "Replaced text in files for"
 
+
+# Not finished yet, had to prioritise other stuff...
+class TestFileFiltering(guiplugins.ActionResultDialogGUI):
+    def _getTitle(self):
+        return "Test Filtering"
+
+    def getDialogTitle(self):
+        return "Filtered contents of " + os.path.basename(self.currFileSelection[0][0])
+
+    def isActiveOnCurrent(self, *args):
+        return guiplugins.ActionGUI.isActiveOnCurrent(self) and len(self.currFileSelection) == 1
+
+    def getTextToShow(self):
+        fileName = self.currFileSelection[0][0]
+        file = open(fileName)
+        text = file.read()
+        file.close()
+        return "UNDER CONSTRUCTION - the filtering hasn't been applied!\n" + text
+    
+    def addContents(self):
+        text = self.getTextToShow()
+        buffer = gtk.TextBuffer()
+        buffer.set_text(text)
+        
+        textView = gtk.TextView(buffer)
+        textView.set_editable(False)
+        textView.set_cursor_visible(False)
+        textView.set_left_margin(5)
+        textView.set_right_margin(5)
+        window = gtk.ScrolledWindow()
+        window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        window.add(textView)
+        parentSize = self.topWindow.get_size()
+        self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[1] * 0.7))
+        self.dialog.vbox.pack_start(window, expand=True, fill=True)
+
+
     
 def getInteractiveActionClasses(dynamic):
     if dynamic:
         return [ RerunTests ]
     else:
-        return [ RunTestsBasic, RunTestsAdvanced, RecordTest, ReconnectToTests, ReplaceText ]
+        return [ RunTestsBasic, RunTestsAdvanced, RecordTest, ReconnectToTests, ReplaceText, TestFileFiltering ]

@@ -120,8 +120,9 @@ class QueueSystemServer(BaseActionRunner):
             if not test.state.isComplete():
                 for jobId, jobName in jobs:
                     status = statusInfo.get(jobId)
-                    if status and test.state.hasStarted():
+                    if status and test.state.hasStarted() and test.state.briefText:
                         # Only do this to test jobs (might make a difference for derived configurations)
+                        # Ignore filtering states for now, which have empty 'briefText'.
                         self.updateRunStatus(test, status)
                     elif not status and not self.jobStarted(test):
                         # Do this to any jobs

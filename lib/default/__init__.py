@@ -943,7 +943,7 @@ class Config:
     def setUsecaseDefaults(self, app):
         app.setConfigDefault("use_case_record_mode", "disabled", "Mode for Use-case recording (GUI, console or disabled)")
         app.setConfigDefault("use_case_recorder", "", "Which Use-case recorder is being used")
-        app.setConfigDefault("slow_motion_replay_speed", 3, "How long in seconds to wait between each GUI action")
+        app.setConfigDefault("slow_motion_replay_speed", 3.0, "How long in seconds to wait between each GUI action")
         app.setConfigDefault("virtual_display_machine", [ "localhost" ], \
                              "(UNIX) List of machines to run virtual display server (Xvfb) on")
         app.setConfigDefault("virtual_display_extra_args", "", \

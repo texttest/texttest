@@ -465,10 +465,13 @@ class TestTable:
         else:
             fileComp = None
         fgcol, bgcol = self.getColours(state.category, fileComp)
-        filteredState = self.filterState(repr(state))
-        detail = state.getTypeBreakdown()[1]
         success = state.category == "success"
-        return filteredState + detail, success, fgcol, bgcol
+        if success:
+            cellContent = "ok"
+        else:
+            cellContent = state.getTypeBreakdown()[1]
+        cellContent += " " + ",".join(state.executionHosts)
+        return cellContent.strip(), success, fgcol, bgcol
 
     def getCellDataFromFileComp(self, fileComp):
         success = fileComp.hasSucceeded()
@@ -490,23 +493,7 @@ class TestTable:
             linkTarget = getDetailPageName(self.pageVersion, tag) + "#" + testId
             tooltip = "'" + testName + "' failure for " + getDisplayText(tag)
             return HTMLgen.Href(linkTarget, cellContent, title=tooltip), bgcol, True
-    
-    def filterState(self, cellContent):
-        result = cellContent
-        result = re.sub(r'CRASHED.*( on .*)', r'CRASH\1', result)
-        result = re.sub('(\w),(\w)', '\\1, \\2', result)
-        result = re.sub(':', '', result)
-        result = re.sub(' on ', ' ', result)
-        result = re.sub('could not be run', '', result)
-        result = re.sub('succeeded', 'ok', result)
-        result = re.sub('used more memory','', result)
-        result = re.sub('used less memory','', result)
-        result = re.sub('ran faster','', result)
-        result = re.sub('ran slower','', result)
-        result = re.sub('faster\([^ ]+\) ','', result)
-        result = re.sub('slower\([^ ]+\) ','', result)
-        return result
-
+            
     def getBackgroundColourKey(self, category):
         if category == "success":
             return "success"

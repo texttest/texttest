@@ -1,15 +1,17 @@
 
 import optparse, os, stat, sys, logging, logging.config, shutil, socket, subprocess, types
-from ndict import seqdict
 from SocketServer import TCPServer, StreamRequestHandler
 from threading import Thread, Lock
-from jobprocess import JobProcess
 from copy import copy
 
 install_root = os.path.dirname(os.path.dirname(os.path.normpath(os.path.abspath(sys.argv[0]))))
+sys.path.insert(0, os.path.join(install_root, "pyusecase/lib"))
 sys.path.insert(0, os.path.join(install_root, "lib"))
                 
+from ndict import seqdict
+from jobprocess import JobProcess
 import plugins, default.rundependent
+
 
 def create_option_parser():
     usage = """usage: %prog [options] 

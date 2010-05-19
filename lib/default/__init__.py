@@ -11,7 +11,6 @@ from traffic import SetUpTrafficHandlers
 from jobprocess import killSubProcessAndChildren
 from actionrunner import ActionRunner
 from time import sleep
-from StringIO import StringIO
 from ndict import seqdict
 
 plugins.addCategory("killed", "killed", "were terminated before completion")
@@ -407,12 +406,13 @@ class Config:
             return rundependent.FilterTemporary(useFilteringStates=not self.batchMode())
     
     def filterErrorText(self, app, errFile):
-        runDepFilter = rundependent.RunDependentTextFilter(app.getConfigValue("suppress_stderr_text"), "")
-        outFile = StringIO()
-        runDepFilter.filterFile(open(errFile), outFile)
-        value = outFile.getvalue()
-        outFile.close()
-        return value
+        filterAction = rundependent.FilterErrorText()
+        return filterAction.getFilteredText(app, errFile, app)
+
+    def applyFiltering(self, test, fileName, version):
+        app = test.getAppForVersion(version)
+        filterAction = rundependent.FilterAction()
+        return filterAction.getFilteredText(test, fileName, app)        
 
     def getTestProcessor(self):        
         catalogueCreator = self.getCatalogueCreator()

@@ -938,6 +938,6 @@ activate = select tests with same diff
 [Name=Test Filtering]
 activate = test the run-dependent text filtering
 
-[Title=Filtered contents of output.rdt]
+[Name=Test Filtering Window]
 response.accept = close file-viewing window
 

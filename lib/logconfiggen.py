@@ -46,30 +46,31 @@ class PythonLoggingGenerator:
         all += disabled
         return enabled, disabled, all
 
-    def generate(self, enabledLoggerNames=[], allLoggerNames=[], debugLevelLoggers=[], timeStdout=False, useDebug=True):
+    def generate(self, enabledLoggerNames=[], allLoggerNames=[], debugLevelLoggers=[],
+                 timeStdout=False, useDebug=True, defaultLevel="INFO"):
         enabled, disabled, all = self.parseInput(enabledLoggerNames, allLoggerNames)
         self.writeHeaderSections(timed=timeStdout)
         if len(enabled):
             self.write("# ====== The following are enabled by default ======")
             for loggerName, fileStem in enabled:
-                self.writeLoggerSection(loggerName, True, fileStem, useDebug, False)
+                self.writeLoggerSection(loggerName, True, fileStem, useDebug, defaultLevel)
 
         if len(disabled):
             self.write("# ====== The following are disabled by default ======")
             for loggerName in disabled:
-                self.writeLoggerSection(loggerName, False, loggerName, useDebug, loggerName in debugLevelLoggers)
+                if loggerName in debugLevelLoggers:
+                    level = "DEBUG"
+                else:
+                    level = defaultLevel
+                self.writeLoggerSection(loggerName, False, loggerName, useDebug, level)
         self.writeFooterSections(all)
 
-    def writeLoggerSection(self, loggerName, enable, fileStem, useDebug, debugLevel):
+    def writeLoggerSection(self, loggerName, enable, fileStem, useDebug, level):
         self.write("# ======= Section for " + loggerName + " ======")
         self.write("[logger_" + loggerName + "]")
         handler = self.handlers.get(fileStem, loggerName)
         self.write("handlers=" + handler)
         self.write("qualname=" + loggerName)
-        if debugLevel:
-            level = "DEBUG"
-        else:
-            level = "INFO"
         if enable:
             self.write("level=" + level + "\n")
         else:
@@ -99,11 +100,11 @@ class PythonLoggingGenerator:
         self.write("""
 [logger_root]
 handlers=root
-level=WARNING
+level=ERROR
 
 [handler_root]
 class=StreamHandler
-level=WARNING
+level=ERROR
 args=(sys.stdout,)
 
 [handler_stdout]

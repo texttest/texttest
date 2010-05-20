@@ -24,17 +24,11 @@ format=%(name)s %(levelname)s - %(message)s
 [logger_standard log]
 handlers=stdout
 qualname=standard log
-level=INFO
-
-# ======= Section for kill processes ======
-[logger_kill processes]
-handlers=stdout
-qualname=kill processes
-level=INFO
+level=WARNING
 
 # ====== Cruft that python logging module needs ======
 [loggers]
-keys=root,standard log,kill processes
+keys=root,standard log
 
 [handlers]
 keys=root,stdout

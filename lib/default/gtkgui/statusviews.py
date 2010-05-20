@@ -72,7 +72,8 @@ class StatusMonitorGUI(guiutils.SubGUI):
             self.animation = gtk.gdk.PixbufAnimation(animationIcon)
             hbox.pack_end(self.throbber, expand=False, fill=False)
         except Exception, e:
-            plugins.printWarning("Failed to create icons for the status throbber:\n" + str(e) + "\nAs a result, the throbber will be disabled.")
+            plugins.printWarning("Failed to create icons for the status throbber:\n" + str(e) + \
+                                 "\nAs a result, the throbber will be disabled.", stdout=True)
             self.throbber = None
         self.widget = gtk.Frame()
         self.widget.set_shadow_type(gtk.SHADOW_ETCHED_IN)

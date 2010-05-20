@@ -244,7 +244,7 @@ class TestRunner:
         except:
             exceptionText = plugins.getExceptionString()
             plugins.printWarning("Caught exception while running " + repr(self.test) +
-                                 " changing state to UNRUNNABLE :\n" + exceptionText.rstrip())
+                                 " changing state to UNRUNNABLE :\n" + exceptionText.rstrip(), stdout=True)
             self.failTest(exceptionText)
         return False
     

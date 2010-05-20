@@ -185,7 +185,7 @@ class GUIConfig:
             if toUse is None and prevValue is not None:
                 plugins.printWarning("GUI configuration '" + "::".join(args) +\
                                      "' differs between applications, ignoring that from " + repr(app) + "\n" + \
-                                     "Value was " + repr(currValue) + ", change from " + repr(prevValue))
+                                     "Value was " + repr(currValue) + ", change from " + repr(prevValue), stdout=True)
             else:
                 prevValue = toUse
         return prevValue

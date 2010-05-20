@@ -47,6 +47,9 @@ if __name__ == "__main__":
     batchGen = logconfiggen.PythonLoggingGenerator("logging.batch")
     batchGen.generate(stdInfo + killInfo, timeStdout=True)
 
+    guiGen = logconfiggen.PythonLoggingGenerator("logging.gui")
+    guiGen.generate(stdInfo, defaultLevel="WARNING")
+
     installationRoot = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     coreLib = os.path.join(installationRoot, "lib")
     coreLoggers = logconfiggen.findLoggerNamesUnder(coreLib)

@@ -1689,7 +1689,7 @@ class OptionFinder(plugins.OptionFinder):
         versionList = []
         for version in plugins.commasplit(self.get("v", "")):
             if version in versionList:
-                plugins.printWarning("Same version '" + version + "' requested more than once, ignoring.")
+                plugins.printWarning("Same version '" + version + "' requested more than once, ignoring.", stdout=True)
             else:
                 versionList.append(version)
         return versionList

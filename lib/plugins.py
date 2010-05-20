@@ -150,13 +150,13 @@ def getNumberOfSeconds(timeString):
     raise TextTestError, "Illegal time format '" + timeString + \
           "' :  Use format HH:MM:SS or MM:SS, or a single number to denote a number of minutes."
 
-def printWarning(message, stdout = True, stderr = False):
+def printWarning(message, stdout=False):
     if stdout:
         if log:
-            log.info("WARNING: " + message)
+            log.warning("WARNING: " + message)
         else:
-            print "WARNING: " + message # in case we haven't set up the logging yet...
-    if stderr:
+            print "WARNING: " + message
+    else:
         sys.stderr.write("WARNING: " + message + "\n")
 
 # Useful stuff to handle regular expressions
@@ -1146,7 +1146,7 @@ class MultiEntryDictionary(seqdict):
     def warn(self, message):
         if message not in self.warnings:
             self.warnings.append(message)
-            printWarning(message, stderr=True, stdout=False)
+            printWarning(message)
 
     def parseConfigLine(self, line, currSectionName, *args, **kwargs):
         key, value = line.split(":", 1)

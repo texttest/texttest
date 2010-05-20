@@ -682,7 +682,7 @@ class Config:
             self.verifyCheckoutValid(app)
         except plugins.TextTestError, e:
             if self.ignoreExecutable():
-                plugins.printWarning(str(e))
+                plugins.printWarning(str(e), stdout=True)
                 return ""
             else:
                 raise

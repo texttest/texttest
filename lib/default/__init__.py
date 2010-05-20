@@ -12,8 +12,8 @@ from jobprocess import killSubProcessAndChildren
 from actionrunner import ActionRunner
 from time import sleep
 from ndict import seqdict
-
-plugins.addCategory("killed", "killed", "were terminated before completion")
+# For back-compatibility
+Killed = sandbox.Killed
 
 def getConfig(optionMap):
     return Config(optionMap)
@@ -1249,13 +1249,6 @@ class Running(plugins.TestState):
         plugins.TestState.__init__(self, "running", freeText, briefText, started=1,
                                    executionHosts = execMachines, lifecycleChange=lifecycleChange)
 
-class Killed(plugins.TestState):
-    def __init__(self, briefText, freeText, prevState):
-        plugins.TestState.__init__(self, "killed", briefText=briefText, freeText=freeText, \
-                                   started=1, completed=1, executionHosts=prevState.executionHosts)
-        # Cache running information, it can be useful to have this available...
-        self.prevState = prevState
-        self.failedPrediction = self
 
 class RunTest(plugins.Action):
     def __init__(self):

@@ -230,12 +230,14 @@ class TextInfoGUI(TextViewGUI):
     def __init__(self, *args):
         TextViewGUI.__init__(self, *args)
         self.currentTest = None
+        self.preambleText = ""
 
     def getTabTitle(self):
         return "Text Info"
 
     def resetText(self, state):
         if state.category == "not_started":
+            self.preambleText = ""
             self.text = "\n" + self.getDescriptionText(self.currentTest)
         else:
             self.text = ""
@@ -244,6 +246,7 @@ class TextInfoGUI(TextViewGUI):
                 self.text = "Test " + repr(state) + "\n"
                 if len(freeText) == 0:
                     self.text = self.text.replace(" :", "")
+                self.preambleText = self.text
             self.text += str(freeText)
             if state.hasStarted() and not state.isComplete():
                 self.text += "\n\nTo obtain the latest progress information and an up-to-date comparison of the files above, " + \
@@ -253,6 +256,7 @@ class TextInfoGUI(TextViewGUI):
     def notifyNewTestSelection(self, tests, *args):
         if len(tests) == 0:
             self.currentTest = None
+            self.preambleText = ""
             self.text = "No test currently selected"
             self.updateView()
         elif self.currentTest not in tests:
@@ -277,19 +281,11 @@ class TextInfoGUI(TextViewGUI):
         return False
 
     def makeSubText(self, files):
-        enabled = True
-        usedSection, ignoredSection = False, False
-        newText = ""
-        for line in self.text.splitlines():
-            if line.startswith("----"):
-                enabled = self.hasStem(line, files)
-                if enabled:
-                    usedSection = True
-                else:
-                    ignoredSection = True
-            if enabled:
-                newText += line + "\n"
-        return newText, usedSection and ignoredSection
+        newText = self.preambleText
+        for fileName, comp in files:
+            if comp and not comp.hasSucceeded():
+                newText += comp.getFreeText()
+        return newText, newText != self.text and newText != self.preambleText
 
     def notifyNewFileSelection(self, files):
         if self.dynamic:
@@ -301,7 +297,7 @@ class TextInfoGUI(TextViewGUI):
             if self.showingSubText:
                 self.showingSubText = False
                 self.updateViewFromText(self.text)
-        else:
+        elif self.preambleText:
             newText, changed = self.makeSubText(files)
             if changed:
                 self.showingSubText = True

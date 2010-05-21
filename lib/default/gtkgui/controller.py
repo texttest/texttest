@@ -131,7 +131,7 @@ class GUIController(plugins.Responder, plugins.Observable):
     def getLifecycleObservers(self):
         # only the things that want to know about lifecycle changes irrespective of what's selected,
         # otherwise we go via the test tree. Include add/remove as lifecycle, also final completion
-        return [ self.progressBarGUI, self.progressMonitor, self.testTreeGUI,
+        return [ self.progressBarGUI, self.progressMonitor, self.textInfoGUI.timeMonitor, self.testTreeGUI, 
                  self.statusMonitor, self.runInfoGUI, self.idleManager, self.topWindowGUI ]
     def getActionObservers(self):
         return [ self.progressMonitor, self.testTreeGUI, self.testFileGUI, self.statusMonitor,

@@ -6,13 +6,41 @@ the "Run Info" tab from the dynamic GUI
 
 import gtk, pango, guiutils, plugins, os, sys, subprocess
 
+class TimeMonitor:
+    def __init__(self):
+        self.timingInfo = {}
+        
+    def notifyLifecycleChange(self, test, state, changeDesc):
+        if changeDesc in [ "start", "complete" ]:
+            self.timingInfo.setdefault(test, []).append((changeDesc, plugins.localtime()))
+
+    def shouldShow(self):
+        # Nothing to show, but needed to be a GUI observer
+        return True
+
+    def getTimingReport(self, test):
+        timingInfo = self.timingInfo.get(test)
+        text = ""
+        if timingInfo:
+            text += "\n"
+            for desc, timeDesc in timingInfo:
+                descToUse = self.getTimeDescription(desc)
+                text += descToUse + ": " + timeDesc + "\n"
+        return text
+
+    def getTimeDescription(self, changeDesc):
+        descToUse = changeDesc.replace("complete", "end").capitalize() + " time"
+        return descToUse.ljust(17)
+
+
 
 class TextViewGUI(guiutils.SubGUI):
     hovering_over_link = False
     hand_cursor = gtk.gdk.Cursor(gtk.gdk.HAND2)
     regular_cursor = gtk.gdk.Cursor(gtk.gdk.XTERM)
     linkMarker = "URL=http"
-
+    timeMonitor = TimeMonitor()
+    
     def __init__(self, dynamic):
         guiutils.SubGUI.__init__(self)
         self.dynamic = dynamic
@@ -225,6 +253,7 @@ class TestRunInfoGUI(TextViewGUI):
         self.updateView()
 
     def appendTestInfo(self, test):
+        self.text += self.timeMonitor.getTimingReport(test)
         self.text += "\n" + self.getDescriptionText(test)
         self.text += "\n\n" + test.app.getRunDescription(test)
 

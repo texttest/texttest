@@ -132,13 +132,16 @@ class TextViewGUI(guiutils.SubGUI):
         buffer.insert_with_tags(iter, newLine, tag)
 
     def getDescriptionText(self, test):
+        paragraphs = self.getDescriptionParagraphs(test)
+        return "\n\n".join(paragraphs)
+
+    def getDescriptionParagraphs(self, test):
         paragraphs = [ self.getDescription(test) ]
         for stem in sorted(set([ "performance" ] + test.getConfigValue("performance_logfile_extractor").keys())):
             fileName = test.getFileName(stem)
             if fileName:
                 paragraphs.append(test.app.getFilePreview(fileName))
-
-        return "\n\n".join(paragraphs)
+        return paragraphs
 
     def getDescription(self, test):
         header = "Description:\n"
@@ -215,7 +218,7 @@ class TestRunInfoGUI(TextViewGUI):
     def resetText(self):
         self.text = "Selected test  : "
         if self.currentTest:
-            self.text += self.currentTest.name + "\n"
+            self.text += self.currentTest.getRelPath() + "\n"
             self.appendTestInfo(self.currentTest)
         else:
             self.text += "none\n"
@@ -252,6 +255,13 @@ class TextInfoGUI(TextViewGUI):
                 self.text += "\n\nTo obtain the latest progress information and an up-to-date comparison of the files above, " + \
                              "perform 'recompute status' (press '" + \
                              guiutils.guiConfig.getCompositeValue("gui_accelerators", "recompute_status") + "')"
+
+    def getDescriptionParagraphs(self, test):
+        paragraphs = TextViewGUI.getDescriptionParagraphs(self, test)
+        testPath = test.getRelPath()
+        if testPath: # Don't include this for root suite
+            paragraphs.insert(1, "Full path:\n" + testPath)
+        return paragraphs
 
     def notifyNewTestSelection(self, tests, *args):
         if len(tests) == 0:

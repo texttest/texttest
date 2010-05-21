@@ -4,7 +4,8 @@ The various text info views, i.e. the bottom right-corner "Text Info" and
 the "Run Info" tab from the dynamic GUI
 """
 
-import gtk, pango, guiutils, plugins, os, sys, subprocess
+import gtk, pango, guiutils, plugins, os, sys, subprocess, time
+from default import performance
 
 class TimeMonitor:
     def __init__(self):
@@ -12,20 +13,27 @@ class TimeMonitor:
         
     def notifyLifecycleChange(self, test, state, changeDesc):
         if changeDesc in [ "start", "complete" ]:
-            self.timingInfo.setdefault(test, []).append((changeDesc, plugins.localtime()))
+            self.timingInfo.setdefault(test, []).append((changeDesc, time.time()))
 
     def shouldShow(self):
         # Nothing to show, but needed to be a GUI observer
         return True
+
+    def getElapsedTime(self, test):
+        timingInfo = self.timingInfo.get(test)
+        if timingInfo:
+            return time.time() - timingInfo[0][1]
+        else:
+            return -1
 
     def getTimingReport(self, test):
         timingInfo = self.timingInfo.get(test)
         text = ""
         if timingInfo:
             text += "\n"
-            for desc, timeDesc in timingInfo:
+            for desc, timestamp in timingInfo:
                 descToUse = self.getTimeDescription(desc)
-                text += descToUse + ": " + timeDesc + "\n"
+                text += descToUse + ": " + plugins.localtime(seconds=timestamp) + "\n"
         return text
 
     def getTimeDescription(self, changeDesc):
@@ -168,8 +176,12 @@ class TextViewGUI(guiutils.SubGUI):
         for stem in sorted(set([ "performance" ] + test.getConfigValue("performance_logfile_extractor").keys())):
             fileName = test.getFileName(stem)
             if fileName:
-                paragraphs.append(test.app.getFilePreview(fileName))
+                paragraphs.append(self.getFilePreview(fileName))
         return paragraphs
+
+    def getFilePreview(self, fileName):
+        return "Expected " + os.path.basename(fileName).split(".")[0] + " for the default version:\n" + \
+               performance.describePerformance(fileName)
 
     def getDescription(self, test):
         header = "Description:\n"
@@ -267,7 +279,7 @@ class TextInfoGUI(TextViewGUI):
     def getTabTitle(self):
         return "Text Info"
 
-    def resetText(self, state):
+    def resetText(self, test, state):
         if state.category == "not_started":
             self.preambleText = ""
             self.text = "\n" + self.getDescriptionText(self.currentTest)
@@ -281,9 +293,20 @@ class TextInfoGUI(TextViewGUI):
                 self.preambleText = self.text
             self.text += str(freeText)
             if state.hasStarted() and not state.isComplete():
+                self.text += self.getPerformanceEstimate(test, state)
                 self.text += "\n\nTo obtain the latest progress information and an up-to-date comparison of the files above, " + \
                              "perform 'recompute status' (press '" + \
                              guiutils.guiConfig.getCompositeValue("gui_accelerators", "recompute_status") + "')"
+
+    def getPerformanceEstimate(self, test, state):
+        expected = performance.getTestPerformance(test)
+        if expected > 0:
+            elapsed = self.timeMonitor.getElapsedTime(test)
+            if elapsed >= 0:
+                perc = (elapsed * 100) / expected
+                return "\nReckoned to be " + str(int(perc)) + "% complete comparing elapsed time with expected performance.\n" + \
+                       "(" + performance.getTimeDescription(elapsed) + " of " + performance.getTimeDescription(expected) + ")" 
+        return ""
 
     def getDescriptionParagraphs(self, test):
         paragraphs = TextViewGUI.getDescriptionParagraphs(self, test)
@@ -300,17 +323,17 @@ class TextInfoGUI(TextViewGUI):
             self.updateView()
         elif self.currentTest not in tests:
             self.currentTest = tests[0]
-            self.resetText(self.currentTest.stateInGui)
+            self.resetText(self.currentTest, self.currentTest.stateInGui)
             self.updateView()
 
     def notifyDescriptionChange(self, test):
-        self.resetText(self.currentTest.stateInGui)
+        self.resetText(self.currentTest, self.currentTest.stateInGui)
         self.updateView()
 
     def notifyLifecycleChange(self, test, state, changeDesc):
         if not test is self.currentTest:
             return
-        self.resetText(state)
+        self.resetText(test, state)
         self.updateView()
 
     def hasStem(self, line, files):

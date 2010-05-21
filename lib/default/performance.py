@@ -37,7 +37,11 @@ def describePerformance(fileName):
     
     # Assume seconds
     perf = getPerformanceFromLine(line)
-    values = list(time.gmtime(perf)[2:6])
+    description = getTimeDescription(perf)
+    return line.replace(str(perf) + " sec.", description)
+    
+def getTimeDescription(seconds):
+    values = list(time.gmtime(seconds)[2:6])
     values[0] -= 1 # not actually using timedelta which doesn't support formatting...
     units = [ "day", "hour", "minute", "second" ]
     parts = []
@@ -49,7 +53,7 @@ def describePerformance(fileName):
         description = " and ".join(parts).replace(" and ", ", ", len(parts) - 2)
     else:
         description = "Less than 1 second"
-    return line.replace(str(perf) + " sec.", description)
+    return description
 
 
 def parseTimeExpression(timeExpression):

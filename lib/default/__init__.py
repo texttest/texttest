@@ -843,10 +843,6 @@ class Config:
     def getRunDescription(self, test):
         return RunTest().getRunDescription(test)
 
-    def getFilePreview(self, fileName):
-        return "Expected " + os.path.basename(fileName).split(".")[0] + " for the default version:\n" + \
-               performance.describePerformance(fileName)
-
     # For display in the GUI
     def extraReadFiles(self, test):
         return {}

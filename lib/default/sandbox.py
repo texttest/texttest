@@ -1,8 +1,11 @@
 import os, shutil, plugins, re, stat, subprocess, glob, types, logging, difflib
 
-from jobprocess import killArbitaryProcess
+from jobprocess import killArbitaryProcess, killSubProcessAndChildren
 from ndict import seqdict
 from string import Template
+
+plugins.addCategory("killed", "killed", "were terminated before completion")
+
 
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):
@@ -394,12 +397,21 @@ class TestEnvironmentCreator:
                 pathVars.append("CLASSPATH")
         return pathVars
 
+class Killed(plugins.TestState):
+    def __init__(self, briefText, freeText, prevState):
+        plugins.TestState.__init__(self, "killed", briefText=briefText, freeText=freeText, \
+                                   started=1, completed=1, executionHosts=prevState.executionHosts)
+        # Cache running information, it can be useful to have this available...
+        self.prevState = prevState
+        self.failedPrediction = self
+
 
 class CollateFiles(plugins.Action):
     def __init__(self):
         self.collations = {}
         self.discardFiles = []
         self.filesPresentBefore = {}
+        self.collationProc = None
         self.diag = logging.getLogger("Collate Files")
 
     def setUpApplication(self, app):
@@ -564,19 +576,25 @@ class CollateFiles(plugins.Action):
             args = [ instScript ] + args[1:]
             
         return args
-    
+
+    def kill(self, test, sig):
+        if self.collationProc:
+            proc = self.collationProc
+            self.collationProc = None
+            killSubProcessAndChildren(proc, cmd=test.getConfigValue("kill_command"))
+            
     def extract(self, test, sourceFile, targetFile, collationErrFile):
         stem = os.path.splitext(os.path.basename(targetFile))[0]
         scripts = test.getCompositeConfigValue("collate_script", stem)
         if len(scripts) == 0:
             return shutil.copyfile(sourceFile, targetFile)
             
-        currProc = None
+        self.collationProc = None
         stdin = None
         for script in scripts:
             args = self.getScriptArgs(script)
-            if currProc:
-                stdin = currProc.stdout
+            if self.collationProc:
+                stdin = self.collationProc.stdout
             else:
                 args.append(sourceFile)
             self.diag.info("Opening extract process with args " + repr(args))
@@ -588,19 +606,27 @@ class CollateFiles(plugins.Action):
                 stderr = subprocess.STDOUT
 
             useShell = os.name == "nt" and len(scripts) == 1
-            currProc = self.runCollationScript(args, test, stdin, stdout, stderr, useShell)
-            if not currProc:
+            self.collationProc = self.runCollationScript(args, test, stdin, stdout, stderr, useShell)
+            if not self.collationProc:
                 if os.path.isfile(targetFile):
                     os.remove(targetFile)
                 errorMsg = "Could not find extract script '" + script + "', not extracting file at\n" + sourceFile + "\n"
                 stderr = open(collationErrFile, "w")
                 stderr.write(errorMsg)
-                plugins.printWarning(errorMsg.strip(), stderr=True, stdout=False)
+                plugins.printWarning(errorMsg.strip())
                 stderr.close()
                 return
 
-        if currProc:
-            currProc.wait()
+        if self.collationProc:
+            self.diag.info("Waiting for collation process to terminate...")
+            self.collationProc.wait()
+            if self.collationProc:
+                self.collationProc = None
+            else:
+                procName = args[0]
+                briefText = "KILLED (" + os.path.basename(procName) + ")"
+                freeText = "Killed collation script '" + procName + "'\n while collating file at " + sourceFile + "\n"
+                test.changeState(Killed(briefText, freeText, test.state))
             stdout.close()
             stderr.close()
 
@@ -613,7 +639,7 @@ class CollateFiles(plugins.Action):
         if collateErrMsg:
             msg = "Errors occurred running collate_script(s) " + " and ".join(scripts) + \
                   "\nwhile trying to extract file at \n" + sourceFile + " : \n" + collateErrMsg
-            plugins.printWarning(msg, stderr=True, stdout=False)
+            plugins.printWarning(msg)
         
         
 

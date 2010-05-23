@@ -3,7 +3,7 @@
 The various ways to launch the dynamic GUI from the static GUI
 """
 
-import plugins, os, sys, shutil 
+import gtk, plugins, os, sys, shutil 
 from default.gtkgui import guiplugins # from .. import guiplugins, guiutils when we drop Python 2.4 support
 from copy import copy, deepcopy
 
@@ -308,7 +308,7 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
         defaultVersion, defaultCheckout = "", ""
         if len(allApps) > 0:
             self.currentApp = allApps[0]
-            defaultVersion = self.currentApp.getFullVersion(forSave=1)
+            defaultVersion = self.currentApp.getFullVersion()
             defaultCheckout = self.currentApp.checkout
         self.addOption("v", "Version to record", defaultVersion)
         self.addOption("c", "Checkout to use for recording", defaultCheckout)
@@ -348,7 +348,7 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
     def updateOptions(self):
         if self.currentApp is not self.currAppSelection[0]:
             self.currentApp = self.currAppSelection[0]
-            self.optionGroup.setOptionValue("v", self.currentApp.getFullVersion(forSave=1))
+            self.optionGroup.setOptionValue("v", self.currentApp.getFullVersion())
             self.optionGroup.setOptionValue("c", self.currentApp.checkout)
             return True
         else:
@@ -451,9 +451,51 @@ class ReplaceText(RunScriptAction):
     def performedDescription(self):
         return "Replaced text in files for"
 
+
+class TestFileFiltering(guiplugins.ActionResultDialogGUI):
+    def _getTitle(self):
+        return "Test Filtering"
+
+    def getDialogTitle(self):
+        return "Filtered contents of " + os.path.basename(self.currFileSelection[0][0])
+
+    def isActiveOnCurrent(self, *args):
+        return guiplugins.ActionGUI.isActiveOnCurrent(self) and len(self.currFileSelection) == 1
+
+    def getVersion(self, test, fileName):
+        fileVersions = set(fileName.split(".")[1:])
+        testVersions = set(test.app.versions + [ test.app.name ])
+        additionalVersions = fileVersions.difference(testVersions)
+        return ".".join(additionalVersions)
+
+    def getTextToShow(self):
+        fileName = self.currFileSelection[0][0]
+        test = self.currTestSelection[0]
+        version = self.getVersion(test, fileName)
+        return test.app.applyFiltering(test, fileName, version)
+    
+    def addContents(self):
+        self.dialog.set_name("Test Filtering Window")
+        text = self.getTextToShow()
+        buffer = gtk.TextBuffer()
+        buffer.set_text(text)
+        
+        textView = gtk.TextView(buffer)
+        textView.set_editable(False)
+        textView.set_cursor_visible(False)
+        textView.set_left_margin(5)
+        textView.set_right_margin(5)
+        window = gtk.ScrolledWindow()
+        window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        window.add(textView)
+        parentSize = self.topWindow.get_size()
+        self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[1] * 0.7))
+        self.dialog.vbox.pack_start(window, expand=True, fill=True)
+
+
     
 def getInteractiveActionClasses(dynamic):
     if dynamic:
         return [ RerunTests ]
     else:
-        return [ RunTestsBasic, RunTestsAdvanced, RecordTest, ReconnectToTests, ReplaceText ]
+        return [ RunTestsBasic, RunTestsAdvanced, RecordTest, ReconnectToTests, ReplaceText, TestFileFiltering ]

@@ -11,6 +11,7 @@ import plugins, fpdiff, logging, shutil
 from ndict import seqdict
 from re import sub
 from optparse import OptionParser
+from StringIO import StringIO
 
 class Filtering(plugins.TestState):
     def __init__(self, name, **kw):
@@ -27,16 +28,19 @@ class FilterAction(plugins.Action):
             
         for fileName, postfix in self.filesToFilter(test):
             self.diag.info("Considering for filtering : " + fileName)
-            stem = os.path.basename(fileName).split(".")[0]
+            stem = self.getStem(fileName)
             newFileName = test.makeTmpFileName(stem + "." + test.app.name + postfix, forFramework=1)
             self.performAllFilterings(test, stem, fileName, newFileName)
+
+    def getStem(self, fileName):
+        return os.path.basename(fileName).split(".")[0]
 
     def changeToFilteringState(self, *args):
         pass
 
     def performAllFilterings(self, test, stem, fileName, newFileName):
         currFileName = fileName
-        filters = self.makeAllFilters(test, stem)
+        filters = self.makeAllFilters(test, stem, test.app)
         for fileFilter, extraPostfix in filters:
             writeFileName = newFileName + extraPostfix
             self.diag.info("Applying " + fileFilter.__class__.__name__ + " to make\n" + writeFileName + " from\n " + currFileName) 
@@ -51,20 +55,35 @@ class FilterAction(plugins.Action):
         if len(filters) > 0 and currFileName != newFileName:
             shutil.move(currFileName, newFileName)
 
-    def makeAllFilters(self, test, stem):
-        filters = self._makeAllFilters(test, stem)
-        if len(filters) == 0 and self.changedOs(test.app):
+    def getFilteredText(self, test, fileName, app):
+        stem = self.getStem(fileName)
+        filters = self.makeAllFilters(test, stem, app)
+        inFile = open(fileName)
+        for fileFilter, extraPostfix in filters:
+            self.diag.info("Applying " + fileFilter.__class__.__name__ + " to " + fileName) 
+            outFile = StringIO()
+            fileFilter.filterFile(inFile, outFile)
+            inFile.close()
+            inFile = outFile
+            inFile.seek(0)
+        value = outFile.getvalue()
+        outFile.close()
+        return value
+        
+    def makeAllFilters(self, test, stem, app):
+        filters = self._makeAllFilters(test, stem, app)
+        if len(filters) == 0 and self.changedOs(app):
             return  [ (RunDependentTextFilter([], ""), "") ]
         else:
             return filters
 
-    def _makeAllFilters(self, test, stem):                    
+    def _makeAllFilters(self, test, stem, app):                    
         filters = []
-        runDepTexts = test.getCompositeConfigValue("run_dependent_text", stem)
+        runDepTexts = app.getCompositeConfigValue("run_dependent_text", stem)
         if runDepTexts:
             filters.append((RunDependentTextFilter(runDepTexts, test.getRelPath()), ".normal"))
 
-        unorderedTexts = test.getCompositeConfigValue("unordered_text", stem)
+        unorderedTexts = app.getCompositeConfigValue("unordered_text", stem)
         if unorderedTexts:
             filters.append((UnorderedTextFilter(unorderedTexts, test.getRelPath()), ".sorted"))
         return filters
@@ -94,12 +113,12 @@ class FilterTemporary(FilterAction):
     def filesToFilter(self, test):
         return self.constantPostfix(test.listTmpFiles(), "cmp")
 
-    def _makeAllFilters(self, test, stem):
-        filters = FilterAction._makeAllFilters(self, test, stem)
-        floatTolerance = test.getCompositeConfigValue("floating_point_tolerance", stem)
-        relTolerance = test.getCompositeConfigValue("relative_float_tolerance", stem)
+    def _makeAllFilters(self, test, stem, app):
+        filters = FilterAction._makeAllFilters(self, test, stem, app)
+        floatTolerance = app.getCompositeConfigValue("floating_point_tolerance", stem)
+        relTolerance = app.getCompositeConfigValue("relative_float_tolerance", stem)
         if floatTolerance or relTolerance:
-            origFile = test.makeTmpFileName(stem + "." + test.app.name + "origcmp", forFramework=1)
+            origFile = test.makeTmpFileName(stem + "." + app.name + "origcmp", forFramework=1)
             if not os.path.isfile(origFile):
                 origFile = test.getFileName(stem)
             if origFile and os.path.isfile(origFile):
@@ -116,6 +135,12 @@ class FilterTemporary(FilterAction):
             newState.failedPrediction = test.state
         test.changeState(newState)
 
+
+class FilterErrorText(FilterAction):
+    def _makeAllFilters(self, test, stem, app):
+        texts = app.getConfigValue("suppress_stderr_text")
+        return [ (RunDependentTextFilter(texts), "") ]
+    
 
 class FilterProgressRecompute(FilterAction):
     def filesToFilter(self, test):
@@ -156,7 +181,7 @@ class RunDependentTextFilter(plugins.Observable):
 
     def filterFile(self, file, newFile, filteredAway=None):
         lineNumber = 0
-        for line in file.xreadlines():
+        for line in file:
             # We don't want to stack up ActionProgreess calls in ThreaderNotificationHandler ...
             self.notifyIfMainThread("ActionProgress", "")
             lineNumber += 1

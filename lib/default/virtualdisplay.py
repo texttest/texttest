@@ -48,7 +48,7 @@ class VirtualDisplayResponder(plugins.Responder):
             if displayName:
                 return machine, displayName, pid
             else:
-                plugins.printWarning("Virtual display program Xvfb not available on " + machine)
+                plugins.printWarning("Virtual display program Xvfb not available on " + machine, stdout=True)
         return None, None, None
     
     def findMachines(self, suites):
@@ -124,7 +124,7 @@ class VirtualDisplayResponder(plugins.Responder):
         messages = "Failed to start Xvfb in 5 attempts, giving up"
         if len(startArgs) > 4:
             messages += "\nAdditional Xvfb arguments were " + repr(" ".join(startArgs[4:]))
-        plugins.printWarning(messages, stderr=True)
+        plugins.printWarning(messages)
         return None, None
     
     def getVirtualServerArgs(self, machine, app):

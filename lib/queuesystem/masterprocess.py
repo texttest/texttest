@@ -13,6 +13,7 @@ from default.console import TextDisplayResponder, InteractiveResponder
 from default.knownbugs import CheckForBugs
 from default.actionrunner import BaseActionRunner
 from default.performance import getTestPerformance
+from default import Running
 from types import StringType
 from glob import glob
 
@@ -93,6 +94,51 @@ class QueueSystemServer(BaseActionRunner):
 
     def run(self): # picked up by core to indicate running in a thread
         self.runAllTests()
+        if len(self.jobs):
+            self.diag.info("All jobs submitted, polling the queue system now.")
+            self.pollQueueSystem()
+
+    def pollQueueSystem(self):
+        # Start by polling after 5 seconds, ever after try every 15
+        attempts = 10
+        while True:
+            for attempt in range(attempts):
+                time.sleep(0.5)
+                if self.allComplete or self.exited:
+                    return
+            if not self.updateJobStatus():
+                return
+            attempts = 30
+
+    def updateJobStatus(self):
+        queueSystem = self.getQueueSystem(self.jobs.keys()[0])
+        if not queueSystem.supportsPolling():
+            return False
+        statusInfo = queueSystem.getStatusForAllJobs()
+        self.diag.info("Got status for all jobs : " + repr(statusInfo))
+        for test, jobs in self.jobs.items():
+            if not test.state.isComplete():
+                for jobId, jobName in jobs:
+                    status = statusInfo.get(jobId)
+                    if status and test.state.hasStarted() and test.state.briefText:
+                        # Only do this to test jobs (might make a difference for derived configurations)
+                        # Ignore filtering states for now, which have empty 'briefText'.
+                        self.updateRunStatus(test, status)
+                    elif not status and not self.jobStarted(test):
+                        # Do this to any jobs
+                        self.setSlaveFailed(test, False, True)
+        return True
+
+    def updateRunStatus(self, test, status):
+        oldState = test.state
+        currRunStatus = oldState.briefText.split()[0]
+        newRunStatus, newExplanation = status
+        if newRunStatus != currRunStatus:
+            currFreeTextStatus = oldState.freeText.splitlines()[0].rsplit(" ", 2)[0]
+            newState = Running(oldState.executionHosts, oldState.freeText.replace(currFreeTextStatus, newExplanation),
+                               oldState.briefText.replace(currRunStatus, newRunStatus), 
+                               lifecycleChange="grid status update")
+            test.changeState(newState)
 
     def findQueueForTest(self, test):
         # If we've gone into reuse mode and there are no active tests for reuse, use the "reuse failure queue"
@@ -208,6 +254,7 @@ class QueueSystemServer(BaseActionRunner):
             return self.getTestForRunReuseOnlyMode()
 
     def notifyAllComplete(self):
+        BaseActionRunner.notifyAllComplete(self)
         errors = {}
         errorFiles = []
         for logDir in self.slaveLogDirs:
@@ -233,7 +280,7 @@ class QueueSystemServer(BaseActionRunner):
     def remainStr(self):
         return " : " + str(self.testCount) + " tests remain, " + str(self.testsSubmitted) + " are submitted."
     def runTest(self, test):   
-        submissionRules = test.app.getSubmissionRules(test)
+        submissionRules = self.getSubmissionRules(test)
         command = self.getSlaveCommand(test, submissionRules)
         plugins.log.info("Q: Submitting " + repr(test) + submissionRules.getSubmitSuffix())
         sys.stdout.flush()
@@ -346,6 +393,7 @@ class QueueSystemServer(BaseActionRunner):
         if not errorMessage:
             jobId = queueSystem.findJobId(stdout)
             self.diag.info("Job created with id " + jobId)
+
             self.jobs.setdefault(test, []).append((jobId, jobName))
             self.lockDiag.info("Releasing lock for submission...")
             self.lock.release()

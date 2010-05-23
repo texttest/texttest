@@ -1734,21 +1734,22 @@ Bug Fixes:
     - -b and -keeptmp options now work together. Thanks to Matt Baker. (default/__init__.py)
 
 
-Version trunk
-=============
-Installation and self-test changes:
+Version 3.18
+============
 Static GUI Enhancements:
     - Can now update from version control directly from the UI (vcs_independent.py)
 	Triggers a refresh automatically
-Dynamic GUI Enhancements:
 Framework Enhancements:
     - Traffic interception server now runs in a separate process (traffic_server.py)
 	This means it works better intercepting modules that prefer to be in the main thread (e.g. COM)
 	or for GUI-related stuff that might clash with GTK.
     - Python interception is now much more general and reliable (traffic_server.py)
 	The version in 3.17 worked on basic cases but hadn't been widely tested
+	Online docs for it greatly expanded also.
+    - Python interception can now be applied to individual attributes/functions as well as entire modules (traffic_server.py)
+	New config file setting "collect_traffic_py_attributes". See online docs for details.
     - Can now pass arguments to the "interpreter" program via "interpreter_options" files (testmodel.py)
-	Work much like "options files otherwise.
+	Work much like "options" files otherwise.
     - Can now disable previously defined bug reporting (knownbugs/__init__.py)
 	Keep the trigger information but remove the lines corresponding to the report itself.
     - When a test is killed on Windows, the entire process tree is removed by default (jobprocess.py)
@@ -1757,8 +1758,9 @@ Batch Report Enhancements:
     - Uncompleted tests (unrunnable/killed/cancelled) have their own dark-red colour now (testoverview.py)
     - Summary page can now produce pie charts instead of HTML tables (summarypages.py)
 	Use the new setting "historical_report_piechart_summary"
-Grid Engine (LSF/SGE) enhancements:
 Bug Fixes:
+    - Personal configuration settings such as window_size are now read when starting from scratch with --new (guiutils.py)
+    - Multiple line options files now work again: these worked in 3.16 but not 3.17 (testmodel.py)
     - No longer get stack traces when using Selection tab in the dynamic GUI while running tests via grid engines. (default/__init__.py)
     - Tests with shell characters in the name now work better using grid engines (masterprocess.py)
     - Tests with ":" in the name also work better using grid engines (though still fail with collect_traffic) (masterprocess.py)
@@ -1768,3 +1770,15 @@ Bug Fixes:
     - No longer write to stderr on TEXTTEST_EXCEPTION which just results in double error reporting (testmodel.py)
     - Rerun now disabled when reconnecting, it was misleading as it re-reconnected (runningactions.py)
     - import_config_file now finds files in subsequent entries along TEXTTEST_PATH, instead of just the first (testmodel.py)
+    - Naming for changes in memory consumption now consistent between using grid engines and not doing so. (queuesystem/__init__.py)
+    - Tkinter testing always enables interception of tkMessageBox by default without which it doesn't work so well (adminactions.py)
+    - Eliminated race condition when reading config file settings from different threads (plugins.py)
+    - Completed workaround from 3.17 for symbolic link bug in Mercurial: found a related case (hg.py)
+    - Link to homepage on credits dialog now works with newest PyGTK versions (2.16) (helpdialogs.py)
+
+Version trunk
+=============
+Static GUI Enhancements:
+Framework Enhancements:
+Batch Report Enhancements:
+Bug Fixes:

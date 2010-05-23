@@ -1,11 +1,11 @@
 
 [logger_root]
 handlers=root
-level=WARNING
+level=ERROR
 
 [handler_root]
 class=StreamHandler
-level=WARNING
+level=ERROR
 args=(sys.stdout,)
 
 [handler_stdout]

@@ -11,10 +11,9 @@ from traffic import SetUpTrafficHandlers
 from jobprocess import killSubProcessAndChildren
 from actionrunner import ActionRunner
 from time import sleep
-from StringIO import StringIO
 from ndict import seqdict
-
-plugins.addCategory("killed", "killed", "were terminated before completion")
+# For back-compatibility
+Killed = sandbox.Killed
 
 def getConfig(optionMap):
     return Config(optionMap)
@@ -407,12 +406,13 @@ class Config:
             return rundependent.FilterTemporary(useFilteringStates=not self.batchMode())
     
     def filterErrorText(self, app, errFile):
-        runDepFilter = rundependent.RunDependentTextFilter(app.getConfigValue("suppress_stderr_text"), "")
-        outFile = StringIO()
-        runDepFilter.filterFile(open(errFile), outFile)
-        value = outFile.getvalue()
-        outFile.close()
-        return value
+        filterAction = rundependent.FilterErrorText()
+        return filterAction.getFilteredText(app, errFile, app)
+
+    def applyFiltering(self, test, fileName, version):
+        app = test.getAppForVersion(version)
+        filterAction = rundependent.FilterAction()
+        return filterAction.getFilteredText(test, fileName, app)        
 
     def getTestProcessor(self):        
         catalogueCreator = self.getCatalogueCreator()
@@ -682,7 +682,7 @@ class Config:
             self.verifyCheckoutValid(app)
         except plugins.TextTestError, e:
             if self.ignoreExecutable():
-                plugins.printWarning(str(e))
+                plugins.printWarning(str(e), stdout=True)
                 return ""
             else:
                 raise
@@ -701,9 +701,12 @@ class Config:
         if self.isReconnecting():
             self.reconnectConfig.checkSanity(suite.app)
         # side effects really from here on :(
-        if self.isReconnecting() or self.optionMap.has_key("coll"):
+        if self.readsTestStateFiles():
             # Reading stuff from stored pickle files, need to set up categories independently
             self.setUpPerformanceCategories(suite.app)
+
+    def readsTestStateFiles(self):
+        return self.isReconnecting() or self.optionMap.has_key("coll")
 
     def setUpPerformanceCategories(self, app):
         # We don't create these in the normal way, so we don't know what they are.
@@ -940,7 +943,7 @@ class Config:
     def setUsecaseDefaults(self, app):
         app.setConfigDefault("use_case_record_mode", "disabled", "Mode for Use-case recording (GUI, console or disabled)")
         app.setConfigDefault("use_case_recorder", "", "Which Use-case recorder is being used")
-        app.setConfigDefault("slow_motion_replay_speed", 3, "How long in seconds to wait between each GUI action")
+        app.setConfigDefault("slow_motion_replay_speed", 3.0, "How long in seconds to wait between each GUI action")
         app.setConfigDefault("virtual_display_machine", [ "localhost" ], \
                              "(UNIX) List of machines to run virtual display server (Xvfb) on")
         app.setConfigDefault("virtual_display_extra_args", "", \
@@ -1004,6 +1007,7 @@ class Config:
         app.setConfigDefault("collect_traffic", { "default": [], "asynchronous": [] }, "List of command-line programs to intercept")
         app.setConfigDefault("collect_traffic_environment", { "default" : [] }, "Mapping of collected programs to environment variables they care about")
         app.setConfigDefault("collect_traffic_py_module", [], "List of Python modules to intercept")
+        app.setConfigDefault("collect_traffic_py_attributes", { "": []}, "List of Python attributes to intercept per intercepted module.")
         app.setConfigDefault("collect_traffic_use_threads", "true", "Whether to enable threading, and hence concurrent requests, in traffic mechanism")
         app.setConfigDefault("run_dependent_text", { "default" : [] }, "Mapping of patterns to remove from result files")
         app.setConfigDefault("unordered_text", { "default" : [] }, "Mapping of patterns to extract and sort from result files")
@@ -1241,17 +1245,10 @@ class TestDescriptionFilter(plugins.TextFilter):
         return self.stringContainsText(test.description)
 
 class Running(plugins.TestState):
-    def __init__(self, execMachines, freeText = "", briefText = ""):
+    def __init__(self, execMachines, freeText = "", briefText = "", lifecycleChange="start"):
         plugins.TestState.__init__(self, "running", freeText, briefText, started=1,
-                                   executionHosts = execMachines, lifecycleChange="start")
+                                   executionHosts = execMachines, lifecycleChange=lifecycleChange)
 
-class Killed(plugins.TestState):
-    def __init__(self, briefText, freeText, prevState):
-        plugins.TestState.__init__(self, "killed", briefText=briefText, freeText=freeText, \
-                                   started=1, completed=1, executionHosts=prevState.executionHosts)
-        # Cache running information, it can be useful to have this available...
-        self.prevState = prevState
-        self.failedPrediction = self
 
 class RunTest(plugins.Action):
     def __init__(self):
@@ -1549,6 +1546,7 @@ class CountTest(plugins.Action):
 
 
 class DocumentOptions(plugins.Action):
+    multiValueOptions = [ "a", "c", "f", "funion", "fintersect", "t", "ts", "v" ]
     def setUpApplication(self, app):
         groups = app.createOptionGroups([ app ])
         keys = reduce(operator.add, (g.keys() for g in groups), [])
@@ -1582,6 +1580,10 @@ class DocumentOptions(plugins.Action):
                 keyOutput = "-" + key + " <time specification string>"
             else:
                 docs += " <value>"
+            if key in self.multiValueOptions:
+                keyOutput += ",..."
+                docs += ",..."
+
         if group.name.startswith("Select"):
             return keyOutput, "Select " + docs.lower()
         else:

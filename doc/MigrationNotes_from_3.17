@@ -1,0 +1,14 @@
+
+Nothing to migrate, but note the following behaviour changes:
+
+=========================================================
+CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
+=========================================================
+
+(1) Process termination on Windows
+==================================
+The entire process tree will now be removed by default, as it is on POSIX systems.
+This is done using the Windows command-line program "taskkill" which is believed to
+exist on all Windows versions from XP and onwards. If killing tests stops working for you and
+your version of Windows doesn't have 'taskkill', you should set the new config file 
+setting "kill_command" appropriately.

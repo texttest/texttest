@@ -232,7 +232,7 @@ class ImportTest(guiplugins.ActionDialogGUI):
     def __init__(self, *args):
         guiplugins.ActionDialogGUI.__init__(self, *args)
         self.optionGroup.addOption("name", self.getNameTitle())
-        self.optionGroup.addOption("desc", self.getDescTitle(), description="Enter a description of the new " + self.testType().lower() + " which will be inserted as a comment in the testsuite file.")
+        self.optionGroup.addOption("desc", self.getDescTitle(), description="Enter a description of the new " + self.testType().lower() + " which will be inserted as a comment in the testsuite file.", multilineEntry=True)
         self.optionGroup.addOption("testpos", self.getPlaceTitle(), "last in suite", allocateNofValues=2, description="Where in the test suite should the test be placed?")
         self.testsImported = []
 
@@ -1054,10 +1054,14 @@ class RenameTest(RenameAction):
     def __init__(self, *args):
         RenameAction.__init__(self, *args)
         self.addOption("name", "\nNew name")
-        self.addOption("desc", "\nNew description")
+        self.addOption("desc", "\nNew description", multilineEntry=True)
         self.oldName = ""
         self.oldDescription = ""
 
+    def getResizeDivisors(self):
+        # size of the dialog
+        return 1.5, 2.8
+    
     def isActiveOnCurrent(self, *args):
         # Don't allow renaming of the root suite
         return guiplugins.ActionGUI.isActiveOnCurrent(self, *args) and bool(self.currTestSelection[0].parent)

@@ -80,6 +80,7 @@
 
   <popup name="TestFilePopupMenu">
     <menuitem action="View File"/>
+    <menuitem action="Test Filtering"/>
     <menuitem action="File Properties"/>
     <separator/>
     <menuitem action="Create/Import"/>

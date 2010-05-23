@@ -109,13 +109,14 @@ def addRefreshTips(view, *args):
 
 
 class GUIConfig:
-    def __init__(self, dynamic, allApps, defaultColours, defaultAccelerators, entryCompletionLogger=None):
+    def __init__(self, dynamic, allApps, defaultColours, defaultAccelerators, entryCompletionLogger=None, includePersonal=True):
         self.apps = copy(allApps)
         self.dynamic = dynamic
         self.configDir = plugins.MultiEntryDictionary()
         self.configDocs = {}
         self.setConfigDefaults(defaultColours, defaultAccelerators)
-        self.configDir.readValues(self.getAllPersonalConfigFiles(), insert=0, errorOnUnknown=0)
+        if includePersonal:
+            self.configDir.readValues(self.getAllPersonalConfigFiles(), insert=0, errorOnUnknown=0)
 
         self.hiddenCategories = map(self.getConfigName, self.configDir.get("hide_test_category"))
         self.colourDict = self.makeColourDictionary()
@@ -124,6 +125,10 @@ class GUIConfig:
 
     def getAllPersonalConfigFiles(self):
         allPersonalFiles = []
+        # Always include app-independent version
+        appIndep = os.path.join(plugins.getPersonalConfigDir(), "config")
+        if os.path.isfile(appIndep):
+            allPersonalFiles.append(appIndep)
         for app in self.apps:
             for fileName in app.getPersonalConfigFiles():
                 if not fileName in allPersonalFiles:
@@ -180,7 +185,7 @@ class GUIConfig:
             if toUse is None and prevValue is not None:
                 plugins.printWarning("GUI configuration '" + "::".join(args) +\
                                      "' differs between applications, ignoring that from " + repr(app) + "\n" + \
-                                     "Value was " + repr(currValue) + ", change from " + repr(prevValue))
+                                     "Value was " + repr(currValue) + ", change from " + repr(prevValue), stdout=True)
             else:
                 prevValue = toUse
         return prevValue

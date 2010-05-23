@@ -932,3 +932,12 @@ response.accept = close vcs update window
 [Name=VCS Top Menu]
 activate = show vcs top menu
 
+[Name=Select Tests With Same Diff]
+activate = select tests with same diff
+
+[Name=Test Filtering]
+activate = test the run-dependent text filtering
+
+[Name=Test Filtering Window]
+response.accept = close file-viewing window
+

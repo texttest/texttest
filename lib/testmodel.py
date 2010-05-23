@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-import os, sys, types, string, plugins, exceptions, shutil, operator, logging, glob
-from fnmatch import fnmatch
+import os, sys, types, string, plugins, exceptions, shutil, operator, logging, glob, fnmatch
 from ndict import seqdict
 from cPickle import Pickler, loads, UnpicklingError
 from threading import Lock
@@ -65,7 +64,7 @@ class DirectoryCache:
         return versionSets
 
     def findStemsMatching(self, pattern):
-        return self.findAllStems(lambda stem, vset: fnmatch(stem, pattern))
+        return self.findAllStems(lambda stem, vset: fnmatch.fnmatch(stem, pattern))
 
     def findAllStems(self, predicate=None):
         stems = []
@@ -348,7 +347,7 @@ class Test(plugins.Observable):
 
     def fileMatches(self, file, filesToIgnore):
         for ignFile in filesToIgnore:
-            if fnmatch(file, ignFile):
+            if fnmatch.fnmatch(file, ignFile):
                 return True
         return False
     
@@ -1690,7 +1689,7 @@ class OptionFinder(plugins.OptionFinder):
         versionList = []
         for version in plugins.commasplit(self.get("v", "")):
             if version in versionList:
-                plugins.printWarning("Same version '" + version + "' requested more than once, ignoring.")
+                plugins.printWarning("Same version '" + version + "' requested more than once, ignoring.", stdout=True)
             else:
                 versionList.append(version)
         return versionList

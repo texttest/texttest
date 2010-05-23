@@ -727,6 +727,8 @@ class CollectFiles(plugins.ScriptWithArgs):
 
     @staticmethod
     def runIsRelevant(runId, maxDays):
+        if maxDays >= 100000: # Default value
+            return True
         try:
             runDate = datetime.date.fromtimestamp(time.mktime(time.strptime(runId, "%d%b%Y")))
         except ValueError:

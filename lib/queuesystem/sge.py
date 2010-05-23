@@ -5,6 +5,14 @@ from time import sleep
 
 # Used by master process for submitting, deleting and monitoring slave jobs
 class QueueSystem:
+    allStatuses = { "qw" : ("PEND", "Pending"),
+                    "t" : ("TRANS", "Transferring"),
+                    "r" : ("RUN", "Running"),
+                    "s" : ("USUSP", "Suspended by the user"),
+                    "dr" : ("DEL", "In the process of being killed"),
+                    "R" : ("RESTART", "Restarted"),
+                    "S" : ("SSUSP", "Suspended by SGE due to other higher priority jobs"),
+                    "T" : ("THRESH", "Suspended by SGE as it exceeded allowed thresholds") }
     def getSubmitCmdArgs(self, submissionRules):
         qsubArgs = [ "qsub", "-N", submissionRules.getJobName() ]
         if submissionRules.processesNeeded != "1":
@@ -30,12 +38,15 @@ class QueueSystem:
         return ",".join(resourceList)
     def findSubmitError(self, stderr):
         return stderr.splitlines()[0].strip()
+
     def killJob(self, jobId):
         proc = subprocess.Popen([ "qdel", jobId ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         self.qdelOutput = proc.communicate()[0]
         return self.qdelOutput.find("has registered the job") != -1 or self.qdelOutput.find("has deleted job") != -1
+
     def getJobId(self, line):
         return line.split()[2]
+
     def findJobId(self, stdout):
         jobId = ""
         for line in stdout.splitlines():
@@ -44,6 +55,23 @@ class QueueSystem:
             else:
                 log.info("Unexpected output from qsub : " + line.strip())
         return jobId
+
+    def supportsPolling(self):
+        return True
+
+    def getStatusForAllJobs(self):
+        statusDict = {}
+        proc = subprocess.Popen([ "qstat" ], stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        outMsg, errMsg = proc.communicate()
+        for line in outMsg.splitlines():
+            words = line.split()
+            if len(words) >= 5:
+                statusLetter = words[4]
+                status = self.allStatuses.get(statusLetter)
+                if status:
+                    statusDict[words[0]] = status
+        return statusDict
+
     def getJobFailureInfo(self, jobId):
         methods = [ self.getAccountInfo, self.getAccountInfoOldFiles, self.retryAccountInfo ]
         for method in methods:

@@ -658,7 +658,7 @@ class PythonAttributeTraffic(PythonModuleTraffic):
 
     def shouldCache(self, obj):
         return type(obj) not in (types.FunctionType, types.GeneratorType, types.MethodType, types.BuiltinFunctionType,
-                                 types.ClassType, types.TypeType) and \
+                                 types.ClassType, types.TypeType, types.ModuleType) and \
                                  not hasattr(obj, "__call__")
 
     def interceptionPossible(self):

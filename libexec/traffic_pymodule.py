@@ -39,6 +39,9 @@ class ModuleProxy:
                 NewStyleInstance = Instance
                 self.name = eval(response)
 
+        def getRepresentationForSendToTrafficServer(self):
+            return self.name
+
         def __getattr__(self, attrname):
             return self.moduleProxy.AttributeProxy(self, self.moduleProxy, attrname).tryEvaluate()
 
@@ -73,7 +76,7 @@ class ModuleProxy:
             self.moduleProxy = moduleProxy
             self.attributeName = attributeName
 
-        def argRepr(self):
+        def getRepresentationForSendToTrafficServer(self):
             return self.modOrObjProxy.name + "." + self.attributeName
 
         def tryEvaluate(self):
@@ -159,10 +162,9 @@ class ModuleProxy:
                     self.arg = arg
                     self.moduleProxy = moduleProxy
                 def __repr__(self):
-                    if isinstance(self.arg, self.moduleProxy.InstanceProxy):
-                        return self.arg.name
-                    elif isinstance(self.arg, self.moduleProxy.AttributeProxy):
-                        return self.arg.argRepr()
+                    if hasattr(self.arg, "getRepresentationForSendToTrafficServer"):
+                        # We choose a long and obscure name to avoid accident clashes with something else
+                        return self.arg.getRepresentationForSendToTrafficServer()
                     elif isinstance(self.arg, list):
                         return repr([ ArgWrapper(subarg, self.moduleProxy) for subarg in self.arg ])
                     elif isinstance(self.arg, dict):

@@ -574,12 +574,20 @@ class PythonModuleTraffic(Traffic):
     def enquiryOnly(self, responses=[]):
         return not self.shouldIntercept()
 
-    def belongsToModule(self, obj):
+    def belongsToInterceptedModule(self, obj):
         try:
-            return obj.__module__ in self.interceptModules
+            return self._belongsToInterceptedModule(obj.__module__)
         except AttributeError: # Global exceptions like AttributeError itself on Windows cause this
             return False
-    
+
+    def _belongsToInterceptedModule(self, moduleName):
+        if moduleName in self.interceptModules:
+            return True
+        elif "." in moduleName:
+            return self._belongsToInterceptedModule(moduleName.rsplit(".", 1)[0])
+        else:
+            return False
+
     def isBasicType(self, obj):
         return obj is None or obj is NotImplemented or type(obj) in (bool, float, int, long, str, unicode, list, dict, tuple)
 
@@ -616,7 +624,7 @@ class PythonModuleTraffic(Traffic):
             for key, value in result.items():
                 newResult[key] = self.addInstanceWrappers(value)
             return newResult
-        elif not self.isBasicType(result) and self.belongsToModule(result):
+        elif not self.isBasicType(result) and self.belongsToInterceptedModule(result):
             return PythonInstanceWrapper(result, self.modOrObjName)
         else:
             return result
@@ -750,7 +758,7 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
             return repr(self.addInstanceWrappers(result))
         except:
             exc_value = sys.exc_info()[1]
-            if self.belongsToModule(exc_value):
+            if self.belongsToInterceptedModule(exc_value):
                 # We own the exception object also, handle it like an ordinary instance
                 return "raise " + PythonInstanceWrapper(exc_value, exc_value.__module__).exceptionRepr()
             else:

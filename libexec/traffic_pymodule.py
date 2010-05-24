@@ -149,7 +149,7 @@ class ModuleProxy:
         def createAndSend(self, *args, **kw):
             sock = self.createSocket()
             text = "SUT_PYTHON_CALL:" + self.modOrObjProxy.name + ":SUT_SEP:" + self.attributeName + \
-                   ":SUT_SEP:" + repr(self.getArgsForSend(args)) + ":SUT_SEP:" + repr(kw)
+                   ":SUT_SEP:" + repr(self.getArgsForSend(args)) + ":SUT_SEP:" + repr(self.getArgForSend(kw))
             sock.sendall(text)
             return sock
 

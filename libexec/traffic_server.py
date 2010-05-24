@@ -710,8 +710,8 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
     def __init__(self, inText, responseFile):
         self.modOrObjName, self.attrName, self.argStr, keywDictStr = inText.split(":SUT_SEP:")
         try:
-            self.keyw = eval(keywDictStr)
-            keyws = [ key + "=" + repr(value) for key, value in self.keyw.items() ]
+            self.keyw = self.evaluate(keywDictStr)
+            keyws = [ key + "=" + self.getKeywordValue(value) for key, value in self.keyw.items() ]
             keywStr = ", ".join(keyws)
         except:
             # Not ideal, but better than exit with exception
@@ -731,6 +731,12 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
             return argStr[:-1] + ", " + keywStr + ")"
         else:
             return argStr
+
+    def getKeywordValue(self, value):
+        if isinstance(value, PythonInstanceWrapper):
+            return value.instanceName
+        else:
+            return repr(value)
             
     def getArgInstance(self, arg):
         if isinstance(arg, PythonInstanceWrapper):

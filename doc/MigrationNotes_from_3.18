@@ -1,0 +1,12 @@
+
+Nothing to migrate, but note the following behaviour changes:
+
+=========================================================
+CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
+=========================================================
+
+(1) Various warnings "upgraded"
+===============================
+Various errors and warnings that previously only got written in batch mode log files will now
+appears also when you run the UI. For example, if a "testsuite" file refers to a test that cannot
+be found. Basically you'll need to fix these things now whereas before they could largely be ignored.

@@ -1779,6 +1779,32 @@ Bug Fixes:
 Version trunk
 =============
 Static GUI Enhancements:
+    - Description boxes are now much larger and easier to enter multiple lines (guiplugins.py)
+	For Add Test and Rename Test.
+    - Can now test your run_dependent_text filtering directly without running a test (runningactions.py)
+	Can be selected rom the file popup menu
+    - Text info field now shows the full path to the test underneath the description (textinfo.py)
+    - "Times to run" entry on Running tab is now a spin button, a bit nicer to handle and less error-prone (guiplugins.py)
+Dynamic GUI Enhancements:
+    - Can now select all tests with the same diff as the currently selected one (statusviews.py)
+	New action in file popup menu
+    - Run Info tab now shows times at which individual tests started and ended (textinfo.py)
+    - Run Info tab now shows full path to the test instead of just the name (textinfo.py)
+    - When running tests are viewed, completion percentage is estimated from stored CPU time as well as file sizes (textinfo.py)
 Framework Enhancements:
+    - System warnings reviewed (plugins.py)
+	Many that were previously largely invisible when running the GUI will now turn up as GUI popup windows. 
+	Others will also appear on the console. One example is when a test is referred to but cannot be found.
 Batch Report Enhancements:
+    - Cell text generator rewritten (testoverview.py)
+	More closely based on text that appears in the UI. Less prone to being horribly long.
+Grid Engine (LSF/SGE) enhancements:
+    - We now poll the grid engine every 15 seconds for job information (masterprocess.py)
+	Means that the GUI shows if a test job is suspended or in some other internal grid states
+	Also means that crashed jobs (e.g. on bad hardware) are picked up automatically rather than remaining pending.
 Bug Fixes:
+    - File previews in bottom-right Text Info window no longer get confused by files with "---" separators in them (textinfo.py)
+    - If a collate_script hangs, killing the test /terminating TextTest now works smoothely (sandbox.py)
+    - Traffic server no longer relies on centrally installed PyUseCase. (traffic_server.py)
+    - slow_motion_replay_speed now allows floating-point values. (default/__init__.py)
+    - Recording no longer eliminates unsaveable versions from the default version used (runningactions.py)

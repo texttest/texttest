@@ -635,6 +635,13 @@ class OptionGroupGUI(ActionGUI):
         text = model.get_value(iter, 0)
         return text == "-" * 10
 
+    def isNumeric(self, value):
+        try:
+            int(value)
+            return True
+        except ValueError:
+            return False
+
     def createOptionWidget(self, option):
         optionName = option.name.strip()
         if option.multilineEntry:
@@ -651,7 +658,13 @@ class OptionGroupGUI(ActionGUI):
                 widget, entry = self.createComboBoxEntry(option)
                 box.pack_start(widget, expand=True, fill=True)
             else:
-                entry = gtk.Entry()
+                value = option.getValue()
+                if self.isNumeric(value):
+                    adjustment = gtk.Adjustment(value=int(value), lower=0, upper=1000, step_incr=1)
+                    entry = gtk.SpinButton(adjustment)
+                    entry.set_numeric(True)
+                else:
+                    entry = gtk.Entry()
                 box.pack_start(entry, expand=True, fill=True)
 
             entry.set_name(optionName)

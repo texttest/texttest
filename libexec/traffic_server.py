@@ -607,13 +607,14 @@ class PythonModuleTraffic(Traffic):
             return self.getPossibleCompositeAttribute(firstAttr, attrParts[1])
 
     def evaluate(self, argStr):
-        try:
-            return eval(argStr, PythonInstanceWrapper.allInstances, sys.modules)
-        except:
-            # Not ideal, but better than exit with exception
-            # If this happens we probably can't handle the arguments properly anyway
-            return ()
-
+        class UnknownInstanceWrapper:
+            def __init__(self, name):
+                self.instanceName = name
+        class NameFinder:
+            def __getitem__(self, name):
+                return PythonInstanceWrapper.getInstance(name) or UnknownInstanceWrapper(name)
+        return eval(argStr, globals(), NameFinder())
+    
     def addInstanceWrappers(self, result):
         if not self.shouldIntercept():
             return result
@@ -708,35 +709,61 @@ class PythonSetAttributeTraffic(PythonModuleTraffic):
 
 class PythonFunctionCallTraffic(PythonModuleTraffic):        
     def __init__(self, inText, responseFile):
-        self.modOrObjName, self.attrName, self.argStr, keywDictStr = inText.split(":SUT_SEP:")
+        self.modOrObjName, self.attrName, argStr, keywDictStr = inText.split(":SUT_SEP:")
+        self.args = ()
+        self.keyw = {}
+        argsForRecord = []
         try:
-            self.keyw = self.evaluate(keywDictStr)
-            keyws = [ key + "=" + self.getKeywordValue(value) for key, value in self.keyw.items() ]
-            keywStr = ", ".join(keyws)
+            internalArgs = self.evaluate(argStr)
+            self.args = tuple(map(self.getArgInstance, internalArgs))
+            argsForRecord += [ self.getArgForRecord(arg) for arg in internalArgs ]
+        except:
+            # Not ideal, but better than exit with exception
+            # If this happens we probably can't handle the arguments anyway
+            # Slightly daring text-munging of Python tuple repr, main thing is to print something vaguely representative
+            argsForRecord += argStr.replace(",)", ")")[1:-1].split(", ")
+        try:
+            internalKw = self.evaluate(keywDictStr)
+            for key, value in internalKw.items():
+                self.keyw[key] = self.getArgInstance(value)
+                argsForRecord.append(key + "=" + self.getArgForRecord(value))
         except:
             # Not ideal, but better than exit with exception
             # If this happens we probably can't handle the keyword objects anyway
-            self.keyw = {}
             # Slightly daring text-munging of Python dictionary repr, main thing is to print something vaguely representative
-            keywStr = keywDictStr.replace("': ", "=").replace(", '", ", ")[2:-1]
-        text = self.modOrObjName + "." + self.attrName + self.findArgString(keywStr)
+            argsForRecord += keywDictStr.replace("': ", "=").replace(", '", ", ")[2:-1].split(", ")
+        text = self.modOrObjName + "." + self.attrName + "(" + ", ".join(argsForRecord) + ")"
         super(PythonModuleTraffic, self).__init__(text, responseFile)
 
-    def findArgString(self, keywStr):
-        # Fix the format for single-entry tuples
-        argStr = self.argStr.replace(",)", ")")
-        if argStr == "()":
-            return "(" + keywStr + ")"
-        elif keywStr:
-            return argStr[:-1] + ", " + keywStr + ")"
-        else:
-            return argStr
-
-    def getKeywordValue(self, value):
-        if isinstance(value, PythonInstanceWrapper):
-            return value.instanceName
-        else:
-            return repr(value)
+    def getArgForRecord(self, arg):
+        class ArgWrapper:
+            def __init__(self, arg):
+                self.arg = arg
+            def __repr__(self):
+                if hasattr(self.arg, "instanceName"):
+                    return self.arg.instanceName
+                elif isinstance(self.arg, list):
+                    return repr([ ArgWrapper(subarg) for subarg in self.arg ])
+                elif isinstance(self.arg, dict):
+                    newDict = {}
+                    for key, val in self.arg.items():
+                        newDict[key] = ArgWrapper(val)
+                    return repr(newDict)
+                elif isinstance(self.arg, float):
+                    # Stick to 2 dp for recording floating point values
+                    return str(round(self.arg, 2))
+                else:
+                    out = repr(self.arg)
+                    if "\\n" in out:
+                        pos = out.find("'", 0, 2)
+                        if pos != -1:
+                            return out[:pos] + "''" + out[pos:].replace("\\n", "\n") + "''"
+                        else:
+                            pos = out.find('"', 0, 2)
+                            return out[:pos] + '""' + out[pos:].replace("\\n", "\n") + '""'
+                    else:
+                        return out
+        return repr(ArgWrapper(arg))
             
     def getArgInstance(self, arg):
         if isinstance(arg, PythonInstanceWrapper):
@@ -746,16 +773,12 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
         else:
             return arg
 
-    def parseArgs(self):
-        args = self.evaluate(self.argStr)
-        return tuple(map(self.getArgInstance, args))
-
     def callFunction(self, instance):
         if self.attrName == "__repr__" and isinstance(instance, PythonInstanceWrapper): # Has to be special case as we use it internally
             return repr(instance.instance)
         else:
             func = self.getPossibleCompositeAttribute(instance, self.attrName)
-            return func(*self.parseArgs(), **self.keyw)
+            return func(*self.args, **self.keyw)
     
     def getResult(self):
         instance = PythonInstanceWrapper.getInstance(self.modOrObjName)

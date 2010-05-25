@@ -172,17 +172,8 @@ class ModuleProxy:
                         for key, val in self.arg.items():
                             newDict[key] = ArgWrapper(val, self.moduleProxy)
                         return repr(newDict)
-                    
-                    out = repr(self.arg)
-                    if "\\n" in out:
-                        pos = out.find("'", 0, 2)
-                        if pos != -1:
-                            return out[:pos] + "''" + out[pos:].replace("\\n", "\n") + "''"
-                        else:
-                            pos = out.find('"', 0, 2)
-                            return out[:pos] + '""' + out[pos:].replace("\\n", "\n") + '""'
                     else:
-                        return out
+                        return repr(self.arg)
             return ArgWrapper(arg, self.moduleProxy)
                     
         def getArgsForSend(self, args):

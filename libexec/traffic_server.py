@@ -613,7 +613,10 @@ class PythonModuleTraffic(Traffic):
         class NameFinder:
             def __getitem__(self, name):
                 return PythonInstanceWrapper.getInstance(name) or UnknownInstanceWrapper(name)
-        return eval(argStr, globals(), NameFinder())
+        try:
+            return eval(argStr)
+        except NameError:
+            return eval(argStr, globals(), NameFinder())
     
     def addInstanceWrappers(self, result):
         if not self.shouldIntercept():

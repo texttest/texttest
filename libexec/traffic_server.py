@@ -729,6 +729,8 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
             internalKw = self.evaluate(keywDictStr)
             for key, value in internalKw.items():
                 self.keyw[key] = self.getArgInstance(value)
+            for key in sorted(internalKw.keys()):
+                value = internalKw[key]
                 argsForRecord.append(key + "=" + self.getArgForRecord(value))
         except:
             # Not ideal, but better than exit with exception

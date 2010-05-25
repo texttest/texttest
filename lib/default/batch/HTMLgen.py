@@ -1721,7 +1721,7 @@ class Image(AbstractTagSingle):
             self.filename = arg
         self.src = self.filename
         # if the file is there test it to get size
-        if not self.attr_dict['width']: # assume if the user has set the width property
+        if not self.attr_dict['width'] and os.path.isfile(self.filename): # assume if the user has set the width property
             # she knows the image size already or wants to resize it.
             try:
                 self.width, self.height = imgsize(self.filename)

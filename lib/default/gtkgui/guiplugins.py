@@ -421,7 +421,7 @@ class ActionGUI(BasicActionGUI):
 
     def describeTests(self):
         if len(self.currTestSelection) == 1:
-            return repr(self.currTestSelection[0])
+            return "test " + self.currTestSelection[0].getRelPath()
         else:
             return str(len(self.currTestSelection)) + " tests"
 

@@ -194,6 +194,7 @@ class PasteTests(FocusDependentAction):
         self.notify("Status", self.getStatusMessage(suiteDeltas))
         if self.removeAfter:
             # After a paste from cut, subsequent pastes should behave like copies of the new tests
+            self.notify("Clipboard", newTests, cut=False)
             self.clipboardTests = newTests
             self.removeAfter = False
         for suite, placement, newName in destInfo.values():
@@ -207,7 +208,7 @@ class PasteTests(FocusDependentAction):
             return "Pasted " +  self.describeTests() + " to suite '" + suiteName + "'"
 
     def getSignalsSent(self):
-        return [ "SetTestSelection" ]
+        return [ "SetTestSelection", "Clipboard" ]
 
     def moveOrCopy(self, test, newDirName):
         # If it exists it's because a previous copy has already taken across the directory

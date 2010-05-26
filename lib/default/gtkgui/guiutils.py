@@ -259,7 +259,10 @@ class GUIConfig:
             else:
                 return self.colourDict.get("failure")
         else:
-            return self.colourDict.get("static")
+            if category.startswith("clipboard"):
+                return self.colourDict.get(category)
+            else:
+                return self.colourDict.get("static")
 
     @staticmethod
     def getWindowSizeSettings():
@@ -293,6 +296,8 @@ class GUIConfig:
         dict["not_started"] = "white"
         dict["pending"] = "grey80"
         dict["static"] = "grey90"
+        dict["clipboard_cut"] = "red"
+        dict["clipboard_copy"] = "purple"
         dict["marked"] = "orange"
         return dict
 

@@ -26,7 +26,7 @@ class TestColumnGUI(guiutils.SubGUI):
 
     def createView(self, treeview):
         testRenderer = gtk.CellRendererText()
-        self.column = gtk.TreeViewColumn(self.getTitle(), testRenderer, text=0, background=1)
+        self.column = gtk.TreeViewColumn(self.getTitle(), testRenderer, text=0, background=1, foreground=7)
         self.column.set_data("name", "Test Name") # Not a widget, so we can't set a name, do this instead
         self.column.set_resizable(True)
         self.column.set_cell_data_func(testRenderer, self.renderSuitesBold)
@@ -210,12 +210,13 @@ class TestTreeGUI(guiutils.ContainerGUI):
         guiutils.ContainerGUI.__init__(self, [ subGUI ])
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,\
                                    gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_BOOLEAN, \
-                                   gobject.TYPE_STRING)
+                                   gobject.TYPE_STRING, gobject.TYPE_STRING)
         self.popupGUI = popupGUI
         self.itermap = TestIteratorMap(dynamic, allApps)
         self.selection = None
         self.selecting = False
         self.selectedTests = []
+        self.clipboardTests = set()
         self.dynamic = dynamic
         self.collapseStatic = self.getCollapseStatic()
         self.successPerSuite = {} # map from suite to tests succeeded
@@ -265,7 +266,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         nodeName = self.getNodeName(suite, parent)
         self.diag.info("Adding node with name " + nodeName)
         colour = guiutils.guiConfig.getTestColour("not_started")
-        row = [ nodeName, colour, [ suite ], "", colour, self.newTestsVisible, "" ]
+        row = [ nodeName, colour, [ suite ], "", colour, self.newTestsVisible, "", "black" ]
         iter = self.model.insert_before(parent, follower, row)
         storeIter = iter.copy()
         self.itermap.store(suite, storeIter)
@@ -617,6 +618,22 @@ class TestTreeGUI(guiutils.ContainerGUI):
 
         self.diag.info("Adding test " + repr(test))
         self.tryAddTest(test, initial)
+
+    def notifyClipboard(self, tests, cut=False):        
+        if cut:
+            colourKey = "clipboard_cut"
+        else:
+            colourKey = "clipboard_copy"
+        colour = guiutils.guiConfig.getTestColour(colourKey)
+        toRemove = self.clipboardTests.difference(set(tests))
+        self.clipboardTests = set(tests)
+        for test in tests:
+            iter = self.itermap.getIterator(test)
+            self.model.set_value(iter, 7, colour)
+        for test in toRemove:
+            iter = self.itermap.getIterator(test)
+            if iter:
+                self.model.set_value(iter, 7, "black")
 
     def getTotalRowsDelta(self, test):
         if self.itermap.getIterator(test):

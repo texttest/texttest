@@ -1291,10 +1291,16 @@ class Application:
         # don't error check as there might be settings there for all sorts of config modules...
         self.readValues(self.configDir, "config", dirCaches, insert=False, errorOnUnknown=False)
             
-    def readExplicitConfigFiles(self, errorOnUnknown):
-        self.readValues(self.configDir, "config", [ self.dircache ], insert=False, errorOnUnknown=errorOnUnknown)
-        extra = self.getExtraDirCaches("config")
-        self.readValues(self.configDir, "config", extra, insert=False, errorOnUnknown=errorOnUnknown)
+    def readExplicitConfigFiles(self, configModuleInitialised):
+        prevFiles = []
+        while True:
+            dircaches = self.getExtraDirCaches("config") + [ self.dircache ]
+            allFiles = self.getAllFileNames(dircaches, "config")
+            if len(allFiles) == len(prevFiles):
+                return
+            self.diag.info("Reading explicit config files : " + "\n".join(allFiles))
+            self.configDir.readValues(allFiles, insert=False, errorOnUnknown=configModuleInitialised)
+            prevFiles = allFiles
         
     def readValues(self, multiEntryDict, stem, dircaches, insert=True, errorOnUnknown=False):
         allFiles = self.getAllFileNames(dircaches, stem)

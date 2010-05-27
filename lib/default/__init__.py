@@ -832,7 +832,7 @@ class Config:
                 fileFilter = rundependent.FilterResultRecompute()
                 fileFilter(test)
                 state.recalculateComparisons(test)
-                newState = state.makeNewState(test.app, "recalculated")
+                newState = state.makeNewState(test, "recalculated")
                 test.changeState(newState)
         else:
             fileFilter = rundependent.FilterProgressRecompute()

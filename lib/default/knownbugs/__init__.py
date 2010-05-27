@@ -252,23 +252,28 @@ class CheckForBugs(plugins.Action):
         # want to be able to mark UNRUNNABLE tests as known bugs too...
         return test.state.lifecycleChange != "complete"
     def __call__(self, test):
+        newState = self.checkTest(test, test.state)
+        if newState:
+            test.changeState(newState)
+
+    def checkTest(self, test, state):
         activeBugs = self.readBugs(test)
-        if not activeBugs.checkUnchanged() and not test.state.hasFailed():
+        if not activeBugs.checkUnchanged() and not state.hasFailed():
             self.diag.info(repr(test) + " succeeded, not looking for bugs")
             return
 
-        bug = self.findBug(test, activeBugs)
+        bug = self.findBug(test, state, activeBugs)
         if bug:
             category, briefText, fullText = bug.findInfo(test)
             self.diag.info("Changing to " + category + " with text " + briefText)
             bugState = FailedPrediction(category, fullText, briefText, completed=1)
-            self.changeState(test, bugState)
+            return self.getNewState(state, bugState)
             
-    def findBug(self, test, activeBugs):
-        multipleDiffs = self.hasMultipleDifferences(test)
+    def findBug(self, test, state, activeBugs):
+        multipleDiffs = self.hasMultipleDifferences(test, state)
         bugs = []
         for stem, fileBugData in activeBugs.items():
-            bugs += self.findBugsInFile(test, stem, fileBugData, multipleDiffs)
+            bugs += self.findBugsInFile(test, state, stem, fileBugData, multipleDiffs)
 
         unblockedBugs = self.findUnblockedBugs(bugs)
         if len(unblockedBugs) > 0:
@@ -284,43 +289,45 @@ class CheckForBugs(plugins.Action):
                 unblockedBugs.append(bug)
         return unblockedBugs
         
-    def findBugsInFile(self, test, stem, fileBugData, multipleDiffs):
+    def findBugsInFile(self, test, state, stem, fileBugData, multipleDiffs):
         self.diag.info("Looking for bugs in file " + stem)
         if stem == "free_text":
-            return fileBugData.findBugsInText(test.state.freeText.split("\n"), test.state.executionHosts)
-        elif test.state.hasResults():
+            return fileBugData.findBugsInText(state.freeText.split("\n"), state.executionHosts)
+        elif state.hasResults():
             # bugs are only relevant if the file itself is changed, unless marked to trigger on success also
-            isChanged = self.fileChanged(test, stem)
+            isChanged = self.fileChanged(test, state, stem)
             fileName = test.makeTmpFileName(stem)
-            return fileBugData.findBugs(fileName, test.state.executionHosts, isChanged, multipleDiffs)
+            return fileBugData.findBugs(fileName, state.executionHosts, isChanged, multipleDiffs)
         else:
             return []
 
-    def changeState(self, test, bugState):
-        if hasattr(test.state, "failedPrediction"):
+    def getNewState(self, oldState, bugState):
+        if hasattr(oldState, "failedPrediction"):
             # if we've already compared, slot our things into the comparison object
-            newState = copy(test.state)
+            newState = copy(oldState)
             newState.setFailedPrediction(bugState, usePreviousText=True)
-            test.changeState(newState)
+            return newState
         else:
-            test.changeState(bugState)
+            return bugState
 
-    def hasMultipleDifferences(self, test):
-        if not test.state.hasResults():
+    def hasMultipleDifferences(self, test, state):
+        if not state.hasResults():
             # check for unrunnables...
             return False
-        comparisons = test.state.getComparisons()
+        comparisons = state.getComparisons()
         diffCount = len(comparisons)
         if diffCount <= 1:
             return False
-        perfStems = test.state.getPerformanceStems(test)
+        perfStems = state.getPerformanceStems(test)
         for comp in comparisons:
             if comp.stem in perfStems:
                 diffCount -= 1
         return diffCount > 1
-    def fileChanged(self, test, stem):
-        comparison, list = test.state.findComparison(stem)
+    
+    def fileChanged(self, test, state, stem):
+        comparison, list = state.findComparison(stem)
         return bool(comparison)
+
     def readBugs(self, test):
         bugMap = BugMap()
         # Mostly for backwards compatibility, reverse the list so that more specific bugs
@@ -329,6 +336,7 @@ class CheckForBugs(plugins.Action):
             self.diag.info("Reading bugs from file " + bugFile)
             bugMap.readFromFile(bugFile)
         return bugMap
+
             
 # For migrating from knownbugs files which are from TextTest 3.7 and older
 class MigrateFiles(plugins.Action):

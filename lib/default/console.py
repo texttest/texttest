@@ -49,7 +49,7 @@ class InteractiveResponder(plugins.Responder):
             saveDesc += "(overwriting succeeded files also)"
         plugins.log.info(self.getPrefix(test) + "Saving " + repr(test) + saveDesc)
         test.state.save(test, exact, version, self.overwriteSuccess)
-        newState = test.state.makeNewState(test.app, "saved")
+        newState = test.state.makeNewState(test, "saved")
         test.changeState(newState)
 
     def useInteractiveResponse(self, test):

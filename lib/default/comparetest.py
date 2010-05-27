@@ -1,4 +1,4 @@
-import os, performance, filecmp, string, plugins, shutil, logging
+import os, performance, knownbugs, filecmp, string, plugins, shutil, logging
 from ndict import seqdict
 from tempfile import mktemp
 from comparefile import FileComparison
@@ -332,6 +332,7 @@ class TestComparison(BaseTestComparison):
             return resultList
         else:
             return filter(lambda comp: comp.stem in onlyStems, resultList)
+
     def updateStatus(self, test, compStr, versionString):
         testRepr = "Saving " + repr(test) + " : "
         if versionString != "":
@@ -340,12 +341,14 @@ class TestComparison(BaseTestComparison):
             versionRepr = ", no version"
         self.notifyIfMainThread("Status", testRepr + compStr + versionRepr)
         self.notifyIfMainThread("ActionProgress", "")
-    def makeNewState(self, app, lifeCycleDest):
-        newState = TestComparison(self, app, "be " + lifeCycleDest)
+
+    def makeNewState(self, test, lifeCycleDest):
+        newState = TestComparison(self, test.app, "be " + lifeCycleDest)
         for comparison in self.allResults:
             newState.addComparison(comparison)
         newState.categorise()
-        return newState
+        return knownbugs.CheckForBugs().checkTest(test, newState) or newState
+    
 
 # for back-compatibility, preserve old names
 performance.PerformanceTestComparison = TestComparison

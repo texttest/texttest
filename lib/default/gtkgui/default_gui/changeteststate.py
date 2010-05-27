@@ -164,7 +164,7 @@ class SaveTests(guiplugins.ActionDialogGUI):
                 testComparison = test.stateInGui
                 testComparison.setObservers(self.observers)
                 testComparison.save(test, self.getExactness(), version, overwriteSuccess, stemsToSave, backupVersions)
-                newState = testComparison.makeNewState(test.app, "saved")
+                newState = testComparison.makeNewState(test, "saved")
                 test.changeState(newState)
 
             self.notify("Status", "Saved " + testDesc + ".")

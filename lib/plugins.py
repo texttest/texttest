@@ -1019,7 +1019,10 @@ class PreviewGenerator:
         self.maxLength = maxLength
 
     def getCutLines(self, lines):
-        return lines[:self.maxLength] 
+        if len(lines) < self.maxLength:
+            return lines
+        else:
+            return lines[:self.maxLength] + [ "<truncated after showing first " + pluralise(self.maxLength, "line") + ">\n" ]
 
     def getPreview(self, file):
         fileLines = retryOnInterrupt(self.getFileLines, file)

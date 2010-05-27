@@ -1276,7 +1276,7 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         self.textDescGroup = plugins.OptionGroup("Link failure to a textual description")
         self.textGroup.addOption("search_string", "Text or regexp to match")
         self.textGroup.addSwitch("trigger_on_absence", "Trigger if given text is NOT present")
-        self.searchGroup.addSwitch("data_source", options = [ "Specific file", "Full difference report" ], description = [ "Search in a newly generated file (not its diff)", "Search in the whole difference report as it appears in the lower right window in the dynamic GUI" ])
+        self.searchGroup.addSwitch("data_source", options = [ "Specific file", "Brief text/details", "Full difference report" ], description = [ "Search in a newly generated file (not its diff)", "Search in the brief text describing the test result as it appears in the Details column in the dynamic GUI test view", "Search in the whole difference report as it appears in the lower right window in the dynamic GUI" ])
         self.searchGroup.addOption("search_file", "File to search in")
         self.searchGroup.addSwitch("ignore_other_errors", "Trigger even if other files differ", description="By default, this bug is only enabled if only the provided file is different. Check this box to enable it irrespective of what other difference exist. Note this increases the chances of it being reported erroneously and should be used carefully.")
         self.searchGroup.addSwitch("trigger_on_success", "Trigger even if file to search would otherwise compare as equal", description="By default, this bug is only enabled if a difference is detected in the provided file to search. Check this box to search for it even if the file compares as equal.")
@@ -1409,7 +1409,7 @@ class ReportBugs(guiplugins.ActionDialogGUI):
     
     def performOnCurrent(self):
         self.checkSanity()
-        dataSourceText = { 1 : "free_text" }
+        dataSourceText = { 1 : "brief_text", 2 : "free_text" }
         namesToIgnore = [ "version" ]
         fileName = self.getFileName()
         writeFile = open(fileName, "a")

@@ -293,6 +293,9 @@ class CheckForBugs(plugins.Action):
         self.diag.info("Looking for bugs in file " + stem)
         if stem == "free_text":
             return fileBugData.findBugsInText(state.freeText.split("\n"), state.executionHosts)
+        elif stem == "brief_text":
+            briefText = state.getTypeBreakdown()[1]
+            return fileBugData.findBugsInText(briefText.split("\n"), state.executionHosts)
         elif state.hasResults():
             # bugs are only relevant if the file itself is changed, unless marked to trigger on success also
             isChanged = self.fileChanged(test, state, stem)

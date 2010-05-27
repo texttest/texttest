@@ -281,8 +281,8 @@ class TextInfoGUI(TextViewGUI):
 
     def resetText(self, test, state):
         if state.category == "not_started":
-            self.preambleText = ""
             self.text = "\n" + self.getDescriptionText(self.currentTest)
+            self.preambleText = self.text
         else:
             self.text = ""
             freeText = state.getFreeText()
@@ -345,16 +345,22 @@ class TextInfoGUI(TextViewGUI):
     def makeSubText(self, files):
         newText = self.preambleText
         for fileName, comp in files:
-            if comp and not comp.hasSucceeded():
-                newText += comp.getFreeText()
+            if self.dynamic:
+                if comp and not comp.hasSucceeded():
+                    newText += comp.getFreeText()
+            elif os.path.isfile(fileName):
+                newText += self.getPreview(fileName)
         return newText, newText != self.text and newText != self.preambleText
 
-    def notifyNewFileSelection(self, files):
-        if self.dynamic:
-            self.updateSubText(files)
-        # TODO: static GUI could show some information here...
+    def getPreview(self, fileName):
+        text = "\n\nPreview of " + os.path.basename(fileName) + ":\n"
+        maxLength = self.currentTest.getConfigValue("lines_of_text_difference")
+        maxWidth = self.currentTest.getConfigValue("max_width_text_difference")
+        previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength)
+        text += previewGenerator.getPreview(open(fileName))
+        return text
 
-    def updateSubText(self, files):
+    def notifyNewFileSelection(self, files):
         if len(files) == 0:
             if self.showingSubText:
                 self.showingSubText = False

@@ -1268,15 +1268,21 @@ class SortTestSuiteFileDescending(SortTestSuiteFileAscending):
 class ReportBugs(guiplugins.ActionDialogGUI):
     def __init__(self, allApps, *args):
         guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
+        self.textGroup = plugins.OptionGroup("Search for")
+        self.searchGroup = plugins.OptionGroup("Search in")
+        self.boxes = {}
+        self.applyGroup = plugins.OptionGroup("Additional options to only apply to certain runs")
         self.bugSystemGroup = plugins.OptionGroup("Link failure to a reported bug")
         self.textDescGroup = plugins.OptionGroup("Link failure to a textual description")
-        self.addOption("search_string", "Text or regexp to match")
-        self.addOption("search_file", "File to search in", description="TextTest will search in the newly generated file (not the diff) with the stem you provide here. The exception is if you choose 'free_text', when it will search in the whole difference report as it appears in the lower right window in the dynamic GUI.")
-        self.addOption("version", "\nVersion to report for")
-        self.addOption("execution_hosts", "Trigger only when run on machine(s)")
-        self.addSwitch("trigger_on_absence", "Trigger if given text is NOT present")
-        self.addSwitch("ignore_other_errors", "Trigger even if other files differ", description="By default, this bug is only enabled if only the provided file is different. Check this box to enable it irrespective of what other difference exist. Note this increases the chances of it being reported erroneously and should be used carefully.")
-        self.addSwitch("trigger_on_success", "Trigger even if file to search would otherwise compare as equal", description="By default, this bug is only enabled if a difference is detected in the provided file to search. Check this box to search for it even if the file compares as equal.")
+        self.textGroup.addOption("search_string", "Text or regexp to match")
+        self.textGroup.addSwitch("trigger_on_absence", "Trigger if given text is NOT present")
+        self.searchGroup.addSwitch("data_source", options = [ "Specific file", "Full difference report" ], description = [ "Search in a newly generated file (not its diff)", "Search in the whole difference report as it appears in the lower right window in the dynamic GUI" ])
+        self.searchGroup.addOption("search_file", "File to search in")
+        self.searchGroup.addSwitch("ignore_other_errors", "Trigger even if other files differ", description="By default, this bug is only enabled if only the provided file is different. Check this box to enable it irrespective of what other difference exist. Note this increases the chances of it being reported erroneously and should be used carefully.")
+        self.searchGroup.addSwitch("trigger_on_success", "Trigger even if file to search would otherwise compare as equal", description="By default, this bug is only enabled if a difference is detected in the provided file to search. Check this box to search for it even if the file compares as equal.")
+        
+        self.applyGroup.addOption("version", "\nVersion to report for")
+        self.applyGroup.addOption("execution_hosts", "Trigger only when run on machine(s)")
         self.bugSystemGroup.addOption("bug_system", "\nExtract info from bug system", "<none>", self.findBugSystems(allApps))
         self.bugSystemGroup.addOption("bug_id", "Bug ID")
         self.textDescGroup.addOption("full_description", "\nFull description")
@@ -1286,6 +1292,12 @@ class ReportBugs(guiplugins.ActionDialogGUI):
     def fillVBox(self, vbox, optionGroup):
         retValue = guiplugins.ActionDialogGUI.fillVBox(self, vbox, optionGroup)
         if optionGroup is self.optionGroup:
+            for group in [ self.textGroup, self.searchGroup, self.applyGroup ]:
+                if group is self.applyGroup:
+                    widget = self.createExpander(group)
+                else:
+                    widget = self.createFrame(group)
+                vbox.pack_start(widget, fill=False, expand=False, padding=8)
             vbox.pack_start(gtk.HSeparator(), padding=8)
             header = gtk.Label()
             header.set_markup("<u>Fill in exactly <i>one</i> of the sections below</u>\n")
@@ -1299,11 +1311,39 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         frame = gtk.Frame(group.name)
         frame.set_label_align(0.5, 0.5)
         frame.set_shadow_type(gtk.SHADOW_IN)
+        frame.add(self.createBox(group))
+        return frame
+
+    def createExpander(self, group):
+        expander = gtk.Expander(group.name)
+        expander.add(self.createBox(group))
+        return expander
+
+    def createBox(self, group):
         frameBox = gtk.VBox()
         frameBox.set_border_width(10)
         self.fillVBox(frameBox, group)
-        frame.add(frameBox)
-        return frame
+        self.boxes[group] = frameBox
+        return frameBox
+
+    def createRadioButtons(self, *args):
+        buttons = guiplugins.ActionDialogGUI.createRadioButtons(self, *args)
+        buttons[0].connect("toggled", self.dataSourceChanged)
+        return buttons
+
+    def dataSourceChanged(self, *args):
+        sensitive = not self.searchGroup.getOptionValue("data_source")
+        vbox = self.boxes.get(self.searchGroup)
+        self.setChildSensitivity(vbox, sensitive)
+
+    def setChildSensitivity(self, widget, sensitive):
+        if isinstance(widget, gtk.RadioButton):
+            return
+        elif isinstance(widget, (gtk.Entry, gtk.CheckButton)):
+            widget.set_sensitive(sensitive)
+        elif hasattr(widget, "get_children"):
+            for child in widget.get_children():
+                self.setChildSensitivity(child, sensitive)
         
     def findBugSystems(self, allApps):
         bugSystems = []
@@ -1326,10 +1366,10 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         return "Enter information for automatic interpretation of test failures"
 
     def updateOptions(self):
-        if not self.optionGroup.getOptionValue("search_file"):
-            self.optionGroup.setOptionValue("search_file", self.currTestSelection[0].getConfigValue("log_file"))
+        if not self.searchGroup.getOptionValue("search_file"):
+            self.searchGroup.setOptionValue("search_file", self.currTestSelection[0].getConfigValue("log_file"))
 
-        self.optionGroup.setPossibleValues("search_file", self.getPossibleFileStems())
+        self.searchGroup.setPossibleValues("search_file", self.getPossibleFileStems())
         return False
 
     def getPossibleFileStems(self):
@@ -1339,12 +1379,10 @@ class ReportBugs(guiplugins.ActionDialogGUI):
             for stem in test.dircache.findAllStems():
                 if stem not in stems and stem not in excludeStems:
                     stems.append(stem)
-        # use for unrunnable tests...
-        stems.append("free_text")
         return stems
 
     def checkSanity(self):
-        if len(self.optionGroup.getOptionValue("search_string")) == 0:
+        if len(self.textGroup.getOptionValue("search_string")) == 0:
             raise plugins.TextTestError, "Must fill in the field 'text or regexp to match'"
         if self.bugSystemGroup.getOptionValue("bug_system") == "<none>":
             if len(self.textDescGroup.getOptionValue("full_description")) == 0 or \
@@ -1355,7 +1393,7 @@ class ReportBugs(guiplugins.ActionDialogGUI):
                 raise plugins.TextTestError, "Must provide a bug ID if bug system is given"
 
     def versionSuffix(self):
-        version = self.optionGroup.getOptionValue("version")
+        version = self.applyGroup.getOptionValue("version")
         if len(version) == 0:
             return ""
         else:
@@ -1371,13 +1409,20 @@ class ReportBugs(guiplugins.ActionDialogGUI):
     
     def performOnCurrent(self):
         self.checkSanity()
+        dataSourceText = { 1 : "free_text" }
+        namesToIgnore = [ "version" ]
         fileName = self.getFileName()
         writeFile = open(fileName, "a")
         writeFile.write("\n[Reported by " + os.getenv("USER", "Windows") + " at " + plugins.localtime() + "]\n")
-        for group in [ self.optionGroup, self.bugSystemGroup, self.textDescGroup ]:
+        for group in [ self.textGroup, self.searchGroup, self.applyGroup, self.bugSystemGroup, self.textDescGroup ]:
             for name, option in group.options.items():
                 value = option.getValue()
-                if name != "version" and value and value != "<none>":
+                if name in namesToIgnore or not value or value == "<none>":
+                    continue
+                if name == "data_source":
+                    writeFile.write("search_file:" + dataSourceText[value] + "\n")
+                    namesToIgnore += [ "search_file", "trigger_on_success", "ignore_other_errors" ]
+                else:
                     writeFile.write(name + ":" + str(value) + "\n")
         writeFile.close()
         self.currTestSelection[0].filesChanged()

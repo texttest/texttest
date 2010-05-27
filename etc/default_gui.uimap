@@ -941,3 +941,6 @@ activate = test the run-dependent text filtering
 [Name=Test Filtering Window]
 response.accept = close file-viewing window
 
+[Label=Full difference report]
+toggled.true = search in the full difference report
+

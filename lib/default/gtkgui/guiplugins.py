@@ -961,6 +961,10 @@ class ActionDialogGUI(OptionGroupGUI):
         vbox.pack_start(hbox, expand=False, fill=False)
                 
     def createRadioButtonCollection(self, switch, optionGroup):
+        if optionGroup is not self.optionGroup:
+            # If we're not part of the main group, we've got a frame already, store horizontally in this case
+            return OptionGroupGUI.createRadioButtonCollection(self, switch, optionGroup)
+
         if switch.name:
             frame = gtk.Frame(switch.name)
         else:

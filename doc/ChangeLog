@@ -1778,20 +1778,43 @@ Bug Fixes:
 
 Version trunk
 =============
+General GUI Enhancements:
+    - "App names containing" field will only be shown if more than one app name is present (selectandfilter.py)
+    - "Execution time" field will only be shown if performance testing is enabled (selectandfilter.py)
+    - Status bar now includes the full path to the test when actions on single tests are performed (guiplugins.py)
+    - When performance testing is enabled, can now select the n fastest or slowest tests (performance.py)
+	New spin buttons appear on the Selection tab as appropriate.
 Static GUI Enhancements:
     - Description boxes are now much larger and easier to enter multiple lines (guiplugins.py)
 	For Add Test and Rename Test.
+    - When you select a file, a preview of it appears in the bottom right window (textinfo.py)
+	Similar to existing functionality in the dynamic GUI.
+    - When a test is copied or cut, its foreground colour changes in the test view (adminactions.py)
+	Makes it easier to keep track of what is being done
     - Can now test your run_dependent_text filtering directly without running a test (runningactions.py)
 	Can be selected rom the file popup menu
+    - "Enter failure information" dialog reorganised (adminactions.py)
+	Mostly to group the various trigger criteria and make it easier to create bugs on free_text.
     - Text info field now shows the full path to the test underneath the description (textinfo.py)
     - "Times to run" entry on Running tab is now a spin button, a bit nicer to handle and less error-prone (guiplugins.py)
 Dynamic GUI Enhancements:
     - Can now select all tests with the same diff as the currently selected one (statusviews.py)
 	New action in file popup menu
+    - Missing and New files appear in separate branches in the status view tree (statusviews.py)
     - Run Info tab now shows times at which individual tests started and ended (textinfo.py)
     - Run Info tab now shows full path to the test instead of just the name (textinfo.py)
     - When running tests are viewed, completion percentage is estimated from stored CPU time as well as file sizes (textinfo.py)
 Framework Enhancements:
+    - New naming scheme introduced for standard streams (default/__init__.py)
+	"stdout", "stderr" and "stdin" replace "output", "errors" and "input". See migration notes.
+    - Known bugs can now also search in the test's "brief_text", i.e. the Details column in dynamic GUI (knownbugs/__init__.py)
+	"Enter Failure Information" dialog helps make it easy to request this
+    - Known bug information is now correctly updated when a test is saved or recomputed (knownbugs/__init__.py)
+    - "base_version" and "extra_search_directory" can now nest to arbitrary levels (testmodel.py)
+	Previously didn't work for base version's config file to identify these things.
+	Now it will go on reading config files identified by the ones its already read until there aren't any more.
+    - File difference previews now indicate when they have truncated some long text (plugins.py)
+	In either batch mode reports or the dynamic GUI's text window at the bottom right.
     - System warnings reviewed (plugins.py)
 	Many that were previously largely invisible when running the GUI will now turn up as GUI popup windows. 
 	Others will also appear on the console. One example is when a test is referred to but cannot be found.
@@ -1806,5 +1829,10 @@ Bug Fixes:
     - File previews in bottom-right Text Info window no longer get confused by files with "---" separators in them (textinfo.py)
     - If a collate_script hangs, killing the test /terminating TextTest now works smoothely (sandbox.py)
     - Traffic server no longer relies on centrally installed PyUseCase. (traffic_server.py)
+    - Python interception now handles module objects being returned (traffic_server.py)
+    - Python interception correctly intercepts objects belonging to submodules (traffic_server.py)
+    - Python interception handles intercepted objects being passed as keyword arguments (traffic_server.py)
+    - Python interception sorts keyword arguments so they are reported deterministically (traffic_server.py)
+    - Python interception reports float values to 2dp rather than arbitrary precision (traffic_server.py)
     - slow_motion_replay_speed now allows floating-point values. (default/__init__.py)
     - Recording no longer eliminates unsaveable versions from the default version used (runningactions.py)

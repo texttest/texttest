@@ -298,13 +298,13 @@ class TextFilter(Filter, TextTriggerGroup):
 
 
 class ApplicationFilter(TextFilter):
-    option = "a"
+    option = "app"
     def acceptsTestCase(self, test):
         return self.acceptsApplication(test.app)
     def acceptsTestSuite(self, suite):
         return self.acceptsApplication(suite.app)
     def acceptsApplication(self, app):
-        return self.stringContainsText(app.name + app.versionSuffix())
+        return self.stringContainsText(app.name)
     def acceptsTestSuiteContents(self, suite):
         # Allow empty suites through
         return True

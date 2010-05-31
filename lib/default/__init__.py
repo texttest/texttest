@@ -36,7 +36,6 @@ class Config:
             if group.name.startswith("Select"):
                 group.addOption("t", "Test names containing", description="Select tests for which the name contains the entered text. The text can be a regular expression.")
                 group.addOption("ts", "Test paths containing", description="Select tests for which the full path to the test (e.g. suite1/subsuite/testname) contains the entered text. The text can be a regular expression. You can select tests by suite name this way.")
-                group.addOption("a", "App names containing", description="Select tests for which the application name matches the entered text. The text can be a regular expression.")
                 possibleDirs = self.getFilterFileDirectories(apps, useOwnTmpDir=True)
                 group.addOption("f", "Tests listed in file", possibleDirs=possibleDirs, selectFile=True)
                 group.addOption("desc", "Descriptions containing", description="Select tests for which the description (comment) matches the entered text. The text can be a regular expression.")
@@ -72,6 +71,7 @@ class Config:
                 group.addSwitch("ignorefilters", "Ignore all run-dependent text filtering")
             elif group.name.startswith("Invisible"):
                 # Options that don't make sense with the GUI should be invisible there...
+                group.addOption("a", "Load test applications named")
                 group.addOption("s", "Run this script")
                 group.addOption("d", "Look for test files under")
                 group.addSwitch("help", "Print configuration help text on stdout")

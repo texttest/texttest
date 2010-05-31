@@ -43,13 +43,16 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         self.filteringGroup.addSwitch("current_filtering", options = [ "Discard", "Refine", "Extend" ], description=currFilterDesc)
         excludeKeys = set(self.optionGroup.keys()) # remember these so we don't try and save them to selections
         self.addApplicationOptions(allApps, self.optionGroup)
+        appNames = set([ app.name for app in allApps ])
+        if len(appNames) > 1:
+            self.addOption("app", "App names containing", description="Select tests for which the application name matches the entered text. The text can be a regular expression.")
         if self.hasPerformance(allApps, "performance"):
             self.optionGroup.moveToEnd([ "r" ])
             self.addOption("fastest", "Only fastest tests", "0", 
                            description="Select the given number of tests which match the other selected criteria and have the fastest runtimes")
             self.addOption("slowest", "Only slowest tests", "0", 
                            description="Select the given number of tests which match the other selected criteria and have the longest runtimes")
-            self.optionGroup.moveToEnd([ "grep", "grepfile" ])
+        self.optionGroup.moveToEnd([ "grep", "grepfile" ])
         if self.dynamic:
             self.addSwitch("std", options = [ "Use test-files from current run", "Use stored test-files" ], description = [ "When searching using 'test-files containing', look in the results of tests in the current run", "When searching using 'test-files containing', look in the stored results, i.e. the same search as would be done in the static GUI" ])
         self.appKeys = set(self.optionGroup.keys())

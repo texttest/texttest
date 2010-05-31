@@ -40,7 +40,8 @@ class Config:
                 possibleDirs = self.getFilterFileDirectories(apps, useOwnTmpDir=True)
                 group.addOption("f", "Tests listed in file", possibleDirs=possibleDirs, selectFile=True)
                 group.addOption("desc", "Descriptions containing", description="Select tests for which the description (comment) matches the entered text. The text can be a regular expression.")
-                group.addOption("r", "Execution time", description="Specify execution time limits, either as '<min>,<max>', or as a list of comma-separated expressions, such as >=0:45,<=1:00. Digit-only numbers are interpreted as minutes, while colon-separated numbers are interpreted as hours:minutes:seconds.")
+                if self.anyAppHas(apps, self.hasPerformance):
+                    group.addOption("r", "Execution time", description="Specify execution time limits, either as '<min>,<max>', or as a list of comma-separated expressions, such as >=0:45,<=1:00. Digit-only numbers are interpreted as minutes, while colon-separated numbers are interpreted as hours:minutes:seconds.")
                 group.addOption("grep", "Test-files containing", description="Select tests which have a file containing the entered text. The text can be a regular expression : e.g. enter '.*' to only look for the file without checking the contents.")
                 group.addOption("grepfile", "Test-file to search", allocateNofValues=2, description="When the 'test-files containing' field is non-empty, apply the search in files with the given stem. Unix-style file expansion (note not regular expressions) may be used. For example '*' will look in any file.")
             elif group.name.startswith("Basic"):
@@ -428,7 +429,7 @@ class Config:
     def hasPerformance(self, app):
         if len(app.getConfigValue("performance_logfile_extractor")) > 0:
             return True
-        return self.hasAutomaticCputimeChecking(app)
+        return app.hasAutomaticCputimeChecking()
     def hasAutomaticCputimeChecking(self, app):
         return len(app.getCompositeConfigValue("performance_test_machine", "cputime")) > 0
     def getFilterFileDirectories(self, apps, useOwnTmpDir):

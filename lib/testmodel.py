@@ -1429,6 +1429,7 @@ class Application:
         self.setConfigDefault("version_priority", { "default": 99 }, \
                               "Mapping of version names to a priority order in case of conflict.")
         self.setConfigDefault("extra_search_directory", { "default" : [] }, "Additional directories to search for TextTest files")
+        self.setConfigDefault("filename_convention_scheme", "classic", "Naming scheme to use for files for stdin,stdout and stderr")
         self.setConfigAlias("test_data_searchpath", "extra_search_directory")
         self.setConfigAlias("extra_config_directory", "extra_search_directory")
 

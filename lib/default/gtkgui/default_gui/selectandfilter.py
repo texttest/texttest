@@ -73,13 +73,14 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         radioButton.set_name(option + " for " + optionGroup.name)
 
     def findDefaultTestFile(self, allStems):
-        if len(allStems) == 0:
-            return "output"
         for app in self.validApps:
             logFile = app.getConfigValue("log_file")
-            if logFile in allStems:
+            if len(allStems) == 0 or logFile in allStems:
                 return logFile
-        return allStems[0]
+        if len(allStems) > 0:
+            return allStems[0]
+        else:
+            return "none"
 
     def findAllStems(self):
         stems = set()

@@ -512,6 +512,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         if javaClass:
             executable = javaClass
         configEntries = seqdict({ "executable" : executable })
+        configEntries["filename_convention_scheme"] = "standard"
         if javaClass:
             configEntries["interpreter"] = "java"
         fullName = self.optionGroup.getOptionValue("name")
@@ -705,7 +706,8 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         if self.currTestSelection[0].classId() == "test-case":
             recordMode = self.currTestSelection[0].getConfigValue("use_case_record_mode")
             if recordMode == "disabled":
-                defFiles.append("input")
+                namingScheme = self.currTestSelection[0].getConfigValue("filename_convention_scheme")
+                defFiles.append(self.currTestSelection[0].app.getStdinName(namingScheme))
             else:
                 defFiles.append("usecase")
         # We only want to create files this way that
@@ -715,10 +717,12 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         return defFiles + self.currTestSelection[0].expandedDefFileStems("default")
 
     def getStandardFiles(self):
-        collateKeys = self.currTestSelection[0].getConfigValue("collate_file").keys()
+        app = self.currTestSelection[0].app
+        collateKeys = app.getConfigValue("collate_file").keys()
         # Don't pick up "dummy" indicators on Windows...
-        stdFiles = [ "output", "errors" ] + filter(lambda k: k, collateKeys)
-        discarded = [ "stacktrace" ] + self.currTestSelection[0].getConfigValue("discard_file")
+        namingScheme = app.getConfigValue("filename_convention_scheme")
+        stdFiles = [ app.getStdoutName(namingScheme), app.getStderrName(namingScheme) ] + filter(lambda k: k, collateKeys)
+        discarded = [ "stacktrace" ] + app.getConfigValue("discard_file")
         return filter(lambda f: f not in discarded, stdFiles)
 
     def updateStems(self, fileType):

@@ -976,28 +976,52 @@ class Config:
         severities = {}
         severities["errors"] = 1
         severities["output"] = 1
+        severities["stderr"] = 1
+        severities["stdout"] = 1
         severities["traffic"] = 1
         severities["usecase"] = 1
         severities["performance"] = 2
         severities["catalogue"] = 2
         severities["default"] = 99
         return severities
+
     def defaultDisplayPriorities(self):
         prios = {}
         prios["default"] = 99
         return prios
+
     def getDefaultCollations(self):
         if os.name == "posix":
             return { "stacktrace" : [ "core*" ] }
         else:
             return { "" : [] }
+
     def getDefaultCollateScripts(self):
         if os.name == "posix":
             return { "default" : [], "stacktrace" : [ "interpretcore.py" ] }
         else:
             return { "default" : [] }
-    def setComparisonDefaults(self, app, homeOS):
-        app.setConfigDefault("log_file", "output", "Result file to search, by default")
+
+    def getStdoutName(self, namingScheme):
+        if namingScheme == "classic":
+            return "output"
+        else:
+            return "stdout"
+
+    def getStderrName(self, namingScheme):
+        if namingScheme == "classic":
+            return "errors"
+        else:
+            return "stderr"
+
+    def getStdinName(self, namingScheme):
+        if namingScheme == "classic":
+            return "input"
+        else:
+            return "stdin"
+
+    def setComparisonDefaults(self, app, homeOS, namingScheme):
+        app.setConfigDefault("log_file", self.getStdoutName(namingScheme), "Result file to search, by default")
         app.setConfigDefault("failure_severity", self.defaultSeverities(), \
                              "Mapping of result files to how serious diffs in them are")
         app.setConfigDefault("failure_display_priority", self.defaultDisplayPriorities(), \
@@ -1123,7 +1147,7 @@ class Config:
         argStr = app.getCompositeConfigValue("remote_program_options", progArgs[0])
         return progArgs + plugins.splitcmd(argStr)
 
-    def setMiscDefaults(self, app):
+    def setMiscDefaults(self, app, namingScheme):
         app.setConfigDefault("default_texttest_tmp", "$TEXTTEST_PERSONAL_CONFIG/tmp", "Default value for $TEXTTEST_TMP, if it is not set")
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
         app.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")
@@ -1143,16 +1167,17 @@ class Config:
         app.addConfigEntry("builtin", "interpreter_options", "definition_file_stems")
         app.addConfigEntry("regenerate", "usecase", "definition_file_stems")
         app.addConfigEntry("regenerate", "traffic", "definition_file_stems")
-        app.addConfigEntry("builtin", "input", "definition_file_stems")
+        app.addConfigEntry("builtin", self.getStdinName(namingScheme), "definition_file_stems")
         app.addConfigEntry("builtin", "knownbugs", "definition_file_stems")
         app.setConfigAlias("test_list_files_directory", "filter_file_directory")
         
     def setApplicationDefaults(self, app):
         homeOS = app.getConfigValue("home_operating_system")
-        self.setComparisonDefaults(app, homeOS)
+        namingScheme = app.getConfigValue("filename_convention_scheme")
+        self.setComparisonDefaults(app, homeOS, namingScheme)
         self.setExternalToolDefaults(app, homeOS)
         self.setInterfaceDefaults(app)
-        self.setMiscDefaults(app)
+        self.setMiscDefaults(app, namingScheme)
         self.setBatchDefaults(app)
         self.setPerformanceDefaults(app)
         self.setUsecaseDefaults(app)
@@ -1406,10 +1431,14 @@ class RunTest(plugins.Action):
         commandArgs = self.getExecuteCmdArgs(test, machine)
         testEnv = test.getRunEnvironment()
         self.diagnose(testEnv, commandArgs)
+        namingScheme = test.app.getConfigValue("filename_convention_scheme")
+        stdoutStem = test.app.getStdoutName(namingScheme)
+        stderrStem = test.app.getStderrName(namingScheme)
+        inputStem = test.app.getStdinName(namingScheme)
         try:
             return subprocess.Popen(commandArgs, preexec_fn=self.getPreExecFunction(), \
-                                    stdin=open(self.getInputFile(test)), cwd=test.getDirectory(temporary=1), \
-                                    stdout=self.makeFile(test, "output"), stderr=self.makeFile(test, "errors"), \
+                                    stdin=open(self.getInputFile(test, inputStem)), cwd=test.getDirectory(temporary=1), \
+                                    stdout=self.makeFile(test, stdoutStem), stderr=self.makeFile(test, stderrStem), \
                                     env=testEnv, startupinfo=plugins.getProcessStartUpInfo(test.environment))
         except OSError:
             message = "OS-related error starting the test command - probably cannot find the program " + repr(commandArgs[0])
@@ -1516,12 +1545,13 @@ class RunTest(plugins.Action):
         fileName = test.makeTmpFileName(name)
         return open(fileName, "w")
 
-    def getInputFile(self, test):
-        inputFileName = test.getFileName("input")
+    def getInputFile(self, test, inputStem):
+        inputFileName = test.getFileName(inputStem)
         if inputFileName:
             return inputFileName
         else:
             return os.devnull
+
     def setUpSuite(self, suite):
         self.describe(suite)
                     

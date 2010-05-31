@@ -183,7 +183,7 @@ class PasteTests(FocusDependentAction):
                     if self.removeAfter:
                         message = "Failed to remove old test: didn't have sufficient write permission to the test files. Test copied instead of moved."
                         plugins.tryFileChange(test.remove, message)
-                except (OSError, IOError, shutil.Error), e:
+                except EnvironmentError, e:
                     if os.path.isdir(testDir):
                         shutil.rmtree(testDir)
                     self.showErrorDialog("Failed to paste test:\n" + str(e))

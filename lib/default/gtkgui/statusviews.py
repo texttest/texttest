@@ -254,6 +254,14 @@ class TestProgressMonitor(guiutils.SubGUI):
                 filteredDiff += line + "\n"
         return filteredDiff
 
+    def getDifferenceType(self, fileComp):
+        if fileComp.missingResult():
+            return "Missing"
+        elif fileComp.newResult():
+            return "New"
+        else:
+            return "Differences"
+
     def getClassifiers(self, test, state, changeDesc):
         classifiers = ClassificationTree()
         catDesc = self.getCategoryDescription(state)
@@ -281,7 +289,7 @@ class TestProgressMonitor(guiutils.SubGUI):
         comparisons = state.getComparisons()
         for fileComp in filter(lambda c: c.getType() == "failure", comparisons):
             summary = self.getFileSummary(fileComp)
-            fileClass = [ "Failed", "Differences", summary ]
+            fileClass = [ "Failed", self.getDifferenceType(fileComp), summary ]
 
             filteredDiff = self.getFilteredDiff(fileComp)
             if filteredDiff is not None:

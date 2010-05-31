@@ -245,17 +245,59 @@ class TimeFilter(plugins.Filter):
                     self.adjustMinTime(parsedExpression[1] + 1) # We don't care about fractions of seconds ...
                 else:
                     self.adjustMinTime(parsedExpression[1])
+
     def adjustMinTime(self, newMinTime):
         if newMinTime > self.minTime:
             self.minTime = newMinTime
+
     def adjustMaxTime(self, newMaxTime):
         if newMaxTime < self.maxTime:
             self.maxTime = newMaxTime
+
     def acceptsTestCase(self, test):
         testPerformance = getTestPerformance(test)
         if testPerformance < 0:
-            return 1
+            return True
         return testPerformance >= self.minTime and testPerformance <= self.maxTime       
+
+
+class TimeGroupFilter(plugins.Filter):
+    def __init__(self, testCount, *args):
+        self.testCount = int(testCount)
+
+    def makePerformanceDictionary(self, tests):
+        dict = {}
+        for test in tests:
+            testPerformance = getTestPerformance(test)
+            if testPerformance >= 0:
+                dict.setdefault(testPerformance, set()).add(test)
+        return dict
+
+    def refine(self, tests):
+        if self.testCount <= 0 or self.testCount >= len(tests):
+            return tests
+
+        testPerfDict = self.makePerformanceDictionary(tests)
+        perfs = testPerfDict.keys()
+        perfs.sort(self.comparePerformance)
+        newTests = []
+        for perf in perfs:
+            for test in testPerfDict.get(perf):
+                newTests.append(test)
+                if len(newTests) == self.testCount:
+                    return newTests
+        return newTests
+        
+class FastestFilter(TimeGroupFilter):
+    option = "fastest"
+    def comparePerformance(self, perf1, perf2):
+        return cmp(perf1, perf2)
+
+class SlowestFilter(TimeGroupFilter):
+    option = "slowest"    
+    def comparePerformance(self, perf1, perf2):
+        return cmp(perf2, perf1)
+
         
 class PerformanceStatistics(plugins.ScriptWithArgs):
     scriptDoc = "Prints a report on system resource usage per test. Can compare versions"

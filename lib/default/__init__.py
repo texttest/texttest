@@ -424,14 +424,20 @@ class Config:
                  self.getWriteDirectoryPreparer(ignoreCatalogues), \
                  trafficHandler, catalogueCreator, collator, self.getOriginalFilterer(), self.getTestRunner(), \
                  trafficHandler, catalogueCreator, collator, self.getTestEvaluator() ]
+    
     def shouldIgnoreCatalogues(self):
         return self.optionMap.has_key("ignorecat") or self.optionMap.has_key("record")
-    def hasPerformance(self, app):
-        if len(app.getConfigValue("performance_logfile_extractor")) > 0:
+    
+    def hasPerformance(self, app, perfType=""):
+        extractors = app.getConfigValue("performance_logfile_extractor")
+        if (perfType and extractors.has_key(perfType)) or (not perfType and len(extractors) > 0):
             return True
-        return app.hasAutomaticCputimeChecking()
+        else:
+            return app.hasAutomaticCputimeChecking()
+    
     def hasAutomaticCputimeChecking(self, app):
         return len(app.getCompositeConfigValue("performance_test_machine", "cputime")) > 0
+    
     def getFilterFileDirectories(self, apps, useOwnTmpDir):
         # 
         # - For each application, collect
@@ -466,8 +472,8 @@ class Config:
             return os.path.join(app.writeDirectory, "temporary_filter_files")
         
     def getFilterClasses(self):
-        return [ TestNameFilter, plugins.TestSelectionFilter, \
-                 TestRelPathFilter, performance.TimeFilter, \
+        return [ TestNameFilter, plugins.TestSelectionFilter, TestRelPathFilter,
+                 performance.TimeFilter, performance.FastestFilter, performance.SlowestFilter,
                  plugins.ApplicationFilter, TestDescriptionFilter ]
             
     def getAbsoluteFilterFileName(self, filterFileName, app):

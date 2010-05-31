@@ -82,6 +82,7 @@ class SaveTests(guiplugins.ActionDialogGUI):
             return "<default> - " + saveVersions
         else:
             return saveVersions
+    
     def getPossibleVersions(self):
         extensions = []
         for app in self.currAppSelection:
@@ -91,6 +92,7 @@ class SaveTests(guiplugins.ActionDialogGUI):
         # Include the default version always
         extensions.append("")
         return extensions
+    
     def getSaveVersions(self):
         if self.isAllNew():
             return ""
@@ -101,20 +103,19 @@ class SaveTests(guiplugins.ActionDialogGUI):
             if not ver in saveVersions:
                 saveVersions.append(ver)
         return ",".join(saveVersions)
+    
     def getDefaultSaveVersion(self, app):
         return app.getFullVersion(forSave = 1)
-    def hasPerformance(self, apps):
-        for app in apps:
-            if app.hasPerformance():
-                return True
-        return False
+    
     def getExactness(self):
         return int(self.optionGroup.getSwitchValue("ex", 1))
+    
     def isAllNew(self):
         for test in self.getSaveableTests():
             if not test.stateInGui.isAllNew():
                 return False
         return True
+    
     def getVersion(self, test):
         versionString = self.optionGroup.getOptionValue("v")
         if versionString.startswith("<default>"):

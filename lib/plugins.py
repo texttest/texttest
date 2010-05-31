@@ -264,7 +264,6 @@ def parseBytes(text): # pragma: no cover
 def convertForMarkup(message):
     return message.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-# Filter interface: all must provide these three methods
 class Filter:
     def acceptsTestCase(self, test):
         return 1 # pragma: no cover - implemented in all base classes
@@ -272,6 +271,8 @@ class Filter:
         return 1
     def acceptsTestSuiteContents(self, suite):
         return 1
+    def refine(self, tests):
+        return tests
 
 class TextTriggerGroup:
     def __init__(self, texts):
@@ -1499,6 +1500,11 @@ class OptionGroup:
                 commandLines.append((key, option.getCmdLineValue()))
         return commandLines
     
+    def moveToEnd(self, keys):
+        for key in keys:
+            option = self.options.pop(key)
+            self.options[key] = option
+
     def accept(self, key, option, onlyKeys):
         if not option.getValue():
             return False

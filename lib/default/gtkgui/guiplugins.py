@@ -689,6 +689,12 @@ class OptionGroupGUI(ActionGUI):
                 args.append(value)
         return args
 
+    def hasPerformance(self, apps, *args):
+        for app in apps:
+            if app.hasPerformance(*args):
+                return True
+        return False
+
     def addApplicationOptions(self, allApps, optionGroup, inputOptions={}):
         if len(allApps) > 0:
             for app in allApps:

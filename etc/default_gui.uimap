@@ -944,3 +944,9 @@ response.accept = close file-viewing window
 [Label=Full difference report]
 toggled.true = search in the full difference report
 
+[Name=Only slowest tests]
+changed = set number of slowest tests to select =
+
+[Name=Only fastest tests]
+changed = set number of fastest tests to select =
+

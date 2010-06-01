@@ -233,7 +233,8 @@ class CheckForCrashes(plugins.Action):
             crashState = FailedPrediction("crash", errorInfo, summary)
             newState.setFailedPrediction(crashState)
             test.changeState(newState)
-            os.remove(stackTraceFile)
+            if not test.app.keepTemporaryDirectories():
+                os.remove(stackTraceFile)
 
     def parseStackTrace(self, test, stackTraceFile):
         lines = open(stackTraceFile).readlines()

@@ -41,10 +41,21 @@ class BaseTestComparison(plugins.TestState):
         else:
             return "regenerate"
 
+    def removeDefinitionFiles(self, test, tmpFiles):
+        for defFile in test.defFileStems("builtin") + test.defFileStems("default"):
+            if tmpFiles.has_key(defFile):
+                plugins.printWarning("A file was generated with stem '" + defFile + "'.\n" +
+                                     "This stem is intended to indicate a definition file and hence should not be generated.\n" +
+                                     "Please change the configuration so that the file is called something else,\n" +
+                                     "or adjust the config file setting 'definition_file_stems' accordingly.")
+                del tmpFiles[defFile]
+
     def makeComparisons(self, test, ignoreMissing=False):
         # Might have saved some new ones or removed some old ones in the meantime...
         test.refreshFiles()
         tmpFiles = self.makeStemDict(test.listTmpFiles())
+        if not ignoreMissing:
+            self.removeDefinitionFiles(test, tmpFiles)
         defFileCategory = self.definitionFileCategory(ignoreMissing)
         resultFiles, defFiles = test.listStandardFiles(allVersions=False, defFileCategory=defFileCategory)
         resultFilesToCompare = filter(self.shouldCompare, resultFiles + defFiles)

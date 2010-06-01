@@ -245,7 +245,15 @@ class ReconnectTest(plugins.Action):
         for file in os.listdir(reconnLocation):
             fullPath = os.path.join(reconnLocation, file)
             if os.path.isfile(fullPath):
-                shutil.copyfile(fullPath, test.makeTmpFileName(file, forComparison=0))
+                targetPath = test.makeTmpFileName(file, forComparison=0)
+                try:
+                    shutil.copyfile(fullPath, targetPath)
+                except EnvironmentError, e:
+                    # File could not be copied, may not have been readable
+                    # Write the exception to it instead
+                    targetFile = open(targetPath, "w")
+                    targetFile.write("Failed to copy file - exception info follows :\n" + str(e) + "\n")
+                    targetFile.close()
 
     def modifyState(self, test, newState):
         if self.fullRecalculate:                

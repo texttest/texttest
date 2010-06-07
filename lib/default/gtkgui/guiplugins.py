@@ -660,7 +660,8 @@ class OptionGroupGUI(ActionGUI):
             else:
                 value = option.getValue()
                 if self.isNumeric(value):
-                    adjustment = gtk.Adjustment(value=int(value), lower=0, upper=1000, step_incr=1)
+                    adjustment = gtk.Adjustment(value=int(value), lower=self.getLowerBoundForSpinButtons(),
+                                                upper=1000, step_incr=1)
                     entry = gtk.SpinButton(adjustment)
                     entry.set_numeric(True)
                 else:
@@ -674,6 +675,9 @@ class OptionGroupGUI(ActionGUI):
                 entrycompletion.manager.addTextCompletion(text)
 
             return box, entry
+
+    def getLowerBoundForSpinButtons(self):
+        return 0
   
     def getConfigOptions(self, option):
         fromConfig = guiConfig.getCompositeValue("gui_entry_options", option.name)

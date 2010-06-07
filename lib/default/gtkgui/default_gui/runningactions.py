@@ -200,18 +200,25 @@ class RunTests(RunningAction,guiplugins.ActionTabGUI):
 
     def _getTitle(self):
         return "_Run"
+
     def _getStockId(self):
         return "execute"
+
     def getTooltip(self):
         return "Run selected tests"
+
     def getOptionGroups(self):
         return self.optionGroups
+
     def getCountMultiplier(self):
         return self.getCopyCount() * self.getVersionCount()
+
     def getCopyCount(self):
         return int(self.optionGroups[0].getOptionValue("cp"))
+
     def getVersionCount(self):
         return self.optionGroups[0].getOptionValue("v").count(",") + 1
+
     def performedDescription(self):
         timesToRun = self.getCopyCount()
         numberOfTests = self.testCount
@@ -222,14 +229,20 @@ class RunTests(RunningAction,guiplugins.ActionTabGUI):
                 return "Started " + str(timesToRun) + " copies of"
         else:
             return "Started"
+
     def getUseCaseName(self):
         return "dynamic"
+
     def getMultipleTestWarning(self):
         app = self.currTestSelection[0].app
         for group in self.optionGroups:
             for switchName, desc in app.getInteractiveReplayOptions():
                 if group.getSwitchValue(switchName, False):
                     return "run " + self.describeTests() + " with " + desc + " replay enabled"
+
+    def getLowerBoundForSpinButtons(self):
+        return 1
+
 
 class RunTestsBasic(RunTests):
     def getTabTitle(self):

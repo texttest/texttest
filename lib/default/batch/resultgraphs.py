@@ -80,6 +80,9 @@ class Graph:
         pylab.setp(self.sub1.get_xticklabels(), 'rotation', 90, fontsize=7)
 
     def finalise_graph(self):
+        lower, upper = self.sub1.get_ylim()
+        if lower < 0:
+            self.sub1.set_ylim(ymin=0) # don't get less than 0, which matplotlib 0.99 does sometimes
         self.sub1.autoscale_view(tight=True, scaley=False)
         leg = self.sub1.legend(self.legendItems, tuple(self.plotLabels), 'best', shadow=False)
         leg.get_frame().set_alpha(0.5) # transparent legend box		

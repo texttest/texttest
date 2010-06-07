@@ -353,11 +353,16 @@ class TextInfoGUI(TextViewGUI):
         return newText, newText != self.text and newText != self.preambleText
 
     def getPreview(self, fileName):
-        text = "\n\nPreview of " + os.path.basename(fileName) + ":\n"
-        maxLength = self.currentTest.getConfigValue("lines_of_text_difference")
-        maxWidth = self.currentTest.getConfigValue("max_width_text_difference")
-        previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength)
-        text += previewGenerator.getPreview(open(fileName))
+        baseName = os.path.basename(fileName)
+        stem = baseName.split(".")[0]
+        text = "\n\nPreview of " + baseName + ":\n"
+        if self.currentTest.configValueMatches("binary_file", stem):
+            text += "Contents of file are marked as binary via the 'binary_file' setting."
+        else:
+            maxLength = self.currentTest.getConfigValue("lines_of_text_difference")
+            maxWidth = self.currentTest.getConfigValue("max_width_text_difference")
+            previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength)
+            text += previewGenerator.getPreview(open(fileName))
         return text
 
     def notifyNewFileSelection(self, files):

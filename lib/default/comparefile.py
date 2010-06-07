@@ -26,7 +26,7 @@ class FileComparison:
         # It would be nice if this could be replaced by some automagic file type detection
         # mechanism, such as the *nix 'file' command, but as the first implementation I've
         # chosen to use a manually created list instead.
-        self.binaryFile = self.stemInConfigValue(test, "binary_file")
+        self.binaryFile = test.configValueMatches("binary_file", self.stem)
         self.previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength)
         self.textDiffTool = test.getConfigValue("text_diff_program")
         self.textDiffToolMaxSize = plugins.parseBytes(test.getCompositeConfigValue("max_file_size", self.textDiffTool))
@@ -65,12 +65,6 @@ class FileComparison:
     def __repr__(self):
         return self.stem
     
-    def stemInConfigValue(self, test, configName):
-        for stemPattern in test.getConfigValue(configName):
-            if fnmatch(self.stem, stemPattern):
-                return True
-        return False
-
     def modifiedDates(self):
         files = [ self.stdFile, self.tmpFile, self.stdCmpFile, self.tmpCmpFile ]
         return " : ".join(map(self.modifiedDate, files))
@@ -273,7 +267,7 @@ class FileComparison:
         self.saveTmpFile(test)
 
     def getTmpFileForSave(self, test):
-        if not self.stemInConfigValue(test, "save_filtered_file_stems"):
+        if not test.configValueMatches("save_filtered_file_stems", self.stem):
             return self.tmpFile
 
         # Don't include the sorting when saving filtered files...

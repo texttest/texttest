@@ -429,6 +429,12 @@ class Test(plugins.Observable):
     def getConfigValue(self, key, expandVars=True):
         return self.app.getConfigValue(key, expandVars, self.environment)
 
+    def configValueMatches(self, key, filePattern):
+        for currPattern in self.getConfigValue(key):
+            if fnmatch.fnmatch(filePattern, currPattern):
+                return True
+        return False
+
     def getDataFileNames(self):
         return self.app.getDataFileNames(self.environment)
 

@@ -274,6 +274,7 @@ class TextInfoGUI(TextViewGUI):
     def __init__(self, *args):
         TextViewGUI.__init__(self, *args)
         self.currentTest = None
+        self.currFileSelection = []
         self.preambleText = ""
 
     def getTabTitle(self):
@@ -328,6 +329,7 @@ class TextInfoGUI(TextViewGUI):
 
     def notifyDescriptionChange(self, test):
         self.resetText(self.currentTest, self.currentTest.stateInGui)
+        self.notifyNewFileSelection(self.currFileSelection)
         self.updateView()
 
     def notifyLifecycleChange(self, test, state, changeDesc):
@@ -365,7 +367,14 @@ class TextInfoGUI(TextViewGUI):
             text += previewGenerator.getPreview(open(fileName))
         return text
 
+    def notifyNameChange(self, test, origRelPath):
+        if test is self.currentTest:
+            self.resetText(self.currentTest, self.currentTest.stateInGui)
+            self.notifyNewFileSelection(self.currFileSelection)
+            self.updateView()
+
     def notifyNewFileSelection(self, files):
+        self.currFileSelection = files
         if len(files) == 0:
             if self.showingSubText:
                 self.showingSubText = False

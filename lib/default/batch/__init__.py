@@ -417,7 +417,7 @@ class SaveState(plugins.Responder):
             except IOError:
                 plugins.printWarning("Could not write file at " + targetFile)
     def addSuite(self, suite):
-        testStateRepository = suite.app.getCompositeConfigValue("batch_result_repository", self.batchSession)
+        testStateRepository = os.path.expanduser(suite.app.getCompositeConfigValue("batch_result_repository", self.batchSession))
         self.diag.info("Test state repository is " + repr(testStateRepository))
         if testStateRepository:
             self.repositories[suite.app] = os.path.abspath(testStateRepository)
@@ -442,7 +442,7 @@ class ArchiveRepository(plugins.ScriptWithArgs):
     def dateInSeconds(self, val):
         return time.mktime(time.strptime(val, "%d%b%Y"))
     def setUpApplication(self, app):
-        repository = app.getCompositeConfigValue("batch_result_repository", self.batchSession)
+        repository = os.path.expanduser(app.getCompositeConfigValue("batch_result_repository", self.batchSession))
         self.repository = os.path.join(repository, app.name)
         if not os.path.isdir(self.repository):
             raise plugins.TextTestError, "Batch result repository " + self.repository + " does not exist"
@@ -540,7 +540,7 @@ class WebPageResponder(plugins.Responder):
 
     def generatePagePerApp(self, pageTitle, pageInfo):
         for app, repository in pageInfo:
-            pageTopDir = app.getCompositeConfigValue("historical_report_location", self.batchSession)
+            pageTopDir = os.path.expanduser(app.getCompositeConfigValue("historical_report_location", self.batchSession))
             pageDir = os.path.join(pageTopDir, app.name)
             extraVersions = self.getExtraVersions(app)
             self.diag.info("Found extra versions " + repr(extraVersions))
@@ -567,7 +567,7 @@ class WebPageResponder(plugins.Responder):
     def getAppRepositoryInfo(self):
         appInfo = seqdict()
         for app in self.appsToGenerate:
-            repository = app.getCompositeConfigValue("batch_result_repository", self.batchSession)
+            repository = os.path.expanduser(app.getCompositeConfigValue("batch_result_repository", self.batchSession))
             if not repository:
                 continue
             repository = os.path.join(repository, app.name)
@@ -601,7 +601,7 @@ class WebPageResponder(plugins.Responder):
     
     def generateCommonPage(self, pageTitle, pageInfo):
         relevantSubDirs, getConfigValue, version, extraVersions, pageSubTitle, descriptionInfo = self.transformToCommon(pageInfo)
-        pageDir = getConfigValue("historical_report_location", self.batchSession)
+        pageDir = os.path.expanduser(getConfigValue("historical_report_location", self.batchSession))
         self.makeAndGenerate(relevantSubDirs, getConfigValue, pageDir, pageTitle,
                              pageSubTitle, version, extraVersions, descriptionInfo)
         

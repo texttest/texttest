@@ -315,7 +315,11 @@ class TopWindowGUI(guiutils.ContainerGUI):
         except: #pragma : no cover - should never happen
             plugins.printWarning("Failed to register texttest stock icons.")
             plugins.printException()
-        self.topWindow.set_icon_from_file(self.getIcon())
+        iconFile = self.getIcon()
+        try:
+            self.topWindow.set_icon_from_file(iconFile)
+        except Exception, e:
+            plugins.printWarning("Failed to set texttest window icon.\n" + str(e), stdout=True)
         self.setWindowTitle()
 
         self.topWindow.add(self.subguis[0].createView())

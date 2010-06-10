@@ -33,7 +33,7 @@ def convertToString(value):
         if type(ret) == unicode:
             import locale
             encoding = locale.getdefaultlocale()[1]
-            return ret.encode(encoding)
+            return ret.encode(encoding, "replace")
         else:
             return ret
     else:

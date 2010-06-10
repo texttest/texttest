@@ -1821,6 +1821,7 @@ Framework Enhancements:
 Batch Report Enhancements:
     - Cell text generator rewritten (testoverview.py)
 	More closely based on text that appears in the UI. Less prone to being horribly long.
+    - batch_result_respository and historical_report_location now expand ~ to home directory (batch/__init__.py)
 Grid Engine (LSF/SGE) enhancements:
     - We now poll the grid engine every 15 seconds for job information (masterprocess.py)
 	Means that the GUI shows if a test job is suspended or in some other internal grid states
@@ -1836,3 +1837,9 @@ Bug Fixes:
     - Python interception reports float values to 2dp rather than arbitrary precision (traffic_server.py)
     - slow_motion_replay_speed now allows floating-point values. (default/__init__.py)
     - Recording no longer eliminates unsaveable versions from the default version used (runningactions.py)
+    - Don't stacktrace linking to Jira issues if the issue description contains illegal characters (jira.py)
+    - Don't stacktrace if the window icon cannot be set for some reason (controller.py)
+    - Fixed graph bug where negative test numbers sometimes shown with matplotlib 0.99 (resultgraphs.py)
+    - Definition files that get incorrectly regenerated produce a warning now rather than being shown as "New" (comparetest.py)
+    - Reconnecting (with reconnfull flag) to a test containing unreadable files now works (reconnect.py)
+    - Reconnecting to crashed tests now shows the original stack trace correctly (knownbugs/__init__.py)

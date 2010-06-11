@@ -13,6 +13,7 @@ class Cancelled(plugins.TestState):
 
 # We're set up for running in a thread but we don't do so by default, for simplicity
 class BaseActionRunner(plugins.Responder, plugins.Observable):
+    cancelFreeText = "Test run was cancelled before it had started"
     def __init__(self, optionMap, diag):
         plugins.Responder.__init__(self)
         plugins.Observable.__init__(self)
@@ -24,16 +25,23 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
         self.killSignal = None
         self.diag = diag
         self.lockDiag = logging.getLogger("locks")
+        
     def notifyAdd(self, test, initial):
         if test.classId() == "test-case":
             self.diag.info("Adding test " + repr(test))
             self.addTest(test)
+
     def addTest(self, test):
         self.testQueue.put(test)
 
     def notifyAllRead(self, suites):
         self.diag.info("All read, adding terminator")
         self.testQueue.put(None)    
+
+    def notifyComplete(self, test):
+        if not self.exited and self.optionMap.has_key("stop") and test.state.hasFailed():
+            self.exited = True
+            self.cancelFreeText = "Test run was cancelled due to previous failure of test " + test.getRelPath()
 
     def runAllTests(self):
         self.runQueue(self.getTestForRun, self.runTest, "running")
@@ -62,11 +70,15 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
         self.notify("Status", "Killed all running tests.")
         self.lock.release()
         
-    def cancel(self, test, briefText="cancelled", freeText="Test run was cancelled before it had started", **kwargs):
+    def cancel(self, test, briefText="cancelled", freeText="", **kwargs):
         if not test.state.isComplete():
+            if not freeText:
+                freeText = self.cancelFreeText
             self.changeState(test, Cancelled(briefText, freeText), **kwargs)
+            
     def changeState(self, test, state):
         test.changeState(state) # for overriding in case we need other notifiers
+        
     def runQueue(self, getMethod, runMethod, desc):
         while True:
             test = getMethod()
@@ -80,6 +92,7 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
                 self.diag.info(desc.capitalize() + " test " + repr(test))
                 runMethod(test)
                 self.diag.info("Completed " + desc + " " + repr(test))
+
     def getItemFromQueue(self, queue, block, replaceTerminators=False):
         try:
             item = queue.get(block=block)
@@ -91,8 +104,10 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
 
     def getTestForRun(self):
         return self.getItemFromQueue(self.testQueue, block=True)
+
     def canBeMainThread(self):
         return False # We block, so we shouldn't be the main thread...
+
             
 class ActionRunner(BaseActionRunner):
     def __init__(self, optionMap, allApps):

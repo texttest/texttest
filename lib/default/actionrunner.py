@@ -139,6 +139,7 @@ class ActionRunner(BaseActionRunner):
 
             self.lock.acquire()
             self.currentTestRunner = None
+            self.notifyComplete(test)
             self.lock.release()
 
     def killTests(self):

@@ -341,22 +341,43 @@ class TopWindowGUI(guiutils.ContainerGUI):
         return self.topWindow
 
     def setWindowTitle(self):
-        allAppNames = [ repr(app) for app in self.allApps ]
-        appNameDesc = ",".join(allAppNames)
         if self.dynamic:
             title = "TextTest dynamic GUI : "
             if self.name:
                 title += self.name
             else:
+                appNameDesc = self.dynamicAppNameTitle()
                 checkoutTitle = self.getCheckoutTitle()
                 title += "testing " + appNameDesc + checkoutTitle + \
                          " (started at " + plugins.startTimeString() + ")"
             self.topWindow.set_title(title)
         else:
+            appNameDesc = self.staticAppNameTitle()
             if len(appNameDesc) > 0:
                 appNameDesc = " for " + appNameDesc
             self.topWindow.set_title("TextTest static GUI : management of tests" + appNameDesc)
 
+    def staticAppNameTitle(self):
+        allAppNames = [ repr(app) for app in self.allApps ]
+        return ",".join(allAppNames)
+
+    def dynamicAppNameTitle(self):
+        appsWithVersions = self.organiseApps()
+        allAppNames = [ self.appRepresentation(appName, versionSuffices) for appName, versionSuffices in appsWithVersions.items() ]
+        return ",".join(allAppNames)
+
+    def appRepresentation(self, appName, versionSuffices):
+        if len(versionSuffices) == 1:
+            return appName + versionSuffices[0]
+        else:
+            return appName
+
+    def organiseApps(self):
+        appsWithVersions = seqdict()
+        for app in self.allApps:
+            appsWithVersions.setdefault(app.fullName(), []).append(app.versionSuffix())
+        return appsWithVersions
+        
     def getIcon(self):
         imageDir = plugins.installationDir("images")
         if self.dynamic:

@@ -218,6 +218,8 @@ class Config:
             for batchExtra in app.getCompositeConfigValue("batch_extra_version", batchSession):
                 if batchExtra not in basic:
                     basic.append(batchExtra)
+        if self.optionMap.has_key("count"):
+            return [] # dynamic GUI started from static GUI, rely on it telling us what to load
         for extra in basic:
             if extra in app.versions:
                 return []

@@ -124,8 +124,11 @@ class RunningAction:
     def getTmpFilterDir(self, app):
         return os.path.join(app.writeDirectory, "temporary_filter_files")
 
+    def getAppIdentifier(self, app):
+        return app.name + app.versionSuffix()
+    
     def getCmdlineOptionForApps(self):
-        appNames = set([ app.name for app in self.currAppSelection ])
+        appNames = set(map(self.getAppIdentifier, self.currAppSelection))
         return [ "-a", ",".join(sorted(list(appNames))) ]
 
     def checkTestRun(self, errFile, testSel, filterFile, usecase):
@@ -188,7 +191,10 @@ class ReconnectToTests(RunningAction,guiplugins.ActionDialogGUI):
         return "reconnect"
     def performOnCurrent(self):
         self.startTextTestProcess(self.getUseCaseName(), [ "-g" ] + self.getVanillaOption())
-    
+    def getAppIdentifier(self, app):
+        # Don't send version data, we have our own field with that info and it has a slightly different meaning
+        return app.name
+
 
 class RunTests(RunningAction,guiplugins.ActionTabGUI):
     optionGroups = []
@@ -304,6 +310,10 @@ class RerunTests(RunningAction,guiplugins.ActionGUI):
             if os.path.basename(logRootDir).startswith("dynamic_run"):
                 return logRootDir
         return RunningAction.getLogRootDirectory(self, app)
+
+    def getAppIdentifier(self, app):
+        parts = filter(lambda part: not part.startswith("copy_"), [ app.name ] + app.versions)
+        return ".".join(parts)
 
     def checkTestRun(self, errFile, testSel, filterFile, usecase):
         # Don't do anything with the files, but do produce popups on failures and notify when complete

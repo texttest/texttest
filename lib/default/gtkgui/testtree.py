@@ -382,8 +382,9 @@ class TestTreeGUI(guiutils.ContainerGUI):
 
     def notifyRefreshTestSelection(self):
         # The selection hasn't changed, but we want to e.g.
-        # recalculate the action sensitiveness.
+        # recalculate the action sensitiveness and make sure we can still see the selected tests.
         self.sendSelectionNotification(self.selectedTests)
+        self.scrollToFirstTest()
         
     def notifyRecomputed(self, test):
         iter = self.itermap.getIterator(test)

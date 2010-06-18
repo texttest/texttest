@@ -86,6 +86,7 @@ class GUIController(plugins.Responder, plugins.Observable):
         includeSite, includePersonal = optionMap.configPathOptions()
         self.readGtkRCFiles(includeSite, includePersonal)
         self.dynamic = not optionMap.has_key("gx")
+        self.initialApps = self.storeInitial(allApps)
         self.interactiveActionHandler = InteractiveActionHandler(self.dynamic, allApps, optionMap)
         self.setUpGlobals(allApps, includePersonal)
         plugins.Responder.__init__(self)
@@ -111,6 +112,13 @@ class GUIController(plugins.Responder, plugins.Observable):
         self.statusMonitor = statusviews.StatusMonitorGUI()
 
         self.topWindowGUI = self.createTopWindowGUI(allApps, runName)
+
+    def storeInitial(self, allApps):
+        initial = set()
+        for app in allApps:
+            initial.add(app)
+            initial.update(set(app.extras))
+        return initial
 
     def setUpGlobals(self, allApps, includePersonal):
         global guilog, guiConfig
@@ -199,13 +207,14 @@ class GUIController(plugins.Responder, plugins.Observable):
         for observer in self.getAddSuitesObservers():
             observer.addSuites(suites)
 
-        self.updateValidApps([ suite.app for suite in suites ])
+        currApps = set([ suite.app for suite in suites ])
+        newApps = currApps.difference(self.initialApps)
+        self.updateValidApps(newApps)
 
-    def updateValidApps(self, apps):
+    def updateValidApps(self, newApps):
         for actionGUI in self.allActionGUIs():
-            for app in apps:
-                if self.interactiveActionHandler.classValid(actionGUI.__class__, app):
-                    actionGUI.checkValid(app)
+            for app in newApps:
+                actionGUI.checkValid(app)
         
     def shouldShrinkMainPanes(self):
         # If we maximise there is no point in banning pane shrinking: there is nothing to gain anyway and
@@ -670,8 +679,9 @@ class InteractiveActionHandler:
         else:
             classNames = seqdict()
             for app in self.allApps:
-                replacements = plugins.ResponseAggregator([ x.getReplacements for x in self.getAllIntvConfigs([ app ]) ])()
-                for config in self.getAllIntvConfigs([ app ]):
+                allConfigsForApp = self.getAllIntvConfigs([ app ])
+                replacements = plugins.ResponseAggregator([ x.getReplacements for x in allConfigsForApp])()
+                for config in allConfigsForApp:
                     if className in config.getInteractiveActionClasses(self.dynamic):
                         realClassName = replacements.get(className, className)
                         classNames.setdefault(realClassName, []).append(app)
@@ -687,11 +697,3 @@ class InteractiveActionHandler:
             # If some invalid interactive action is provided, need to know which
             sys.stderr.write("Error with interactive action " + str(className) + "\n")
             raise
-
-    def classValid(self, className, app):
-        for config in self.getAllIntvConfigs([ app ]):
-            if config.isValid(className):
-                return True
-            
-        self.diag.info("All configuration objects rejected " + str(className) + " class as invalid")
-        return False

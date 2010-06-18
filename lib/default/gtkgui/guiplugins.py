@@ -346,7 +346,7 @@ class ActionGUI(BasicActionGUI):
             self.tooltips.set_tip(widget, text)
         
     def checkValid(self, app):
-        self._checkAllValid(app)
+        self._checkValid(app)
         self.noApps = False
 
     def _checkAllValid(self, app):
@@ -1039,13 +1039,3 @@ class InteractiveActionConfig:
             if isinstance(currCls, plugins.Callable) and currCls.method == cls:
                 return True
         return False
-    
-    def isValid(self, className):
-        replacements = self.getReplacements()
-        if className in replacements.values():
-            return True
-        elif replacements.has_key(className):
-            return False
-        else:
-            return self.contains(className, self.getInteractiveActionClasses(True)) or \
-                   self.contains(className, self.getInteractiveActionClasses(False))

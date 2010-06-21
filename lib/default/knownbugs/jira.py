@@ -44,6 +44,8 @@ def convertDictToString(dict):
         return dict["name"]
     elif dict.has_key("values"):
         return dict["values"]
+    else:
+        return "No value defined"
 
 def transfer(oldDict, newDict, key, postfix=""):
     if oldDict.has_key(key):

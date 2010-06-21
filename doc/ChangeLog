@@ -1784,6 +1784,7 @@ General GUI Enhancements:
     - Status bar now includes the full path to the test when actions on single tests are performed (guiplugins.py)
     - When performance testing is enabled, can now select the n fastest or slowest tests (performance.py)
 	New spin buttons appear on the Selection tab as appropriate.
+    - Some startup optimizations: GUI should come up sooner on large suites now (controller.py)
 Static GUI Enhancements:
     - Description boxes are now much larger and easier to enter multiple lines (guiplugins.py)
 	For Add Test and Rename Test.
@@ -1804,6 +1805,8 @@ Dynamic GUI Enhancements:
     - Run Info tab now shows times at which individual tests started and ended (textinfo.py)
     - Run Info tab now shows full path to the test instead of just the name (textinfo.py)
     - When running tests are viewed, completion percentage is estimated from stored CPU time as well as file sizes (textinfo.py)
+    - Now told explicitly which extra versions to load by the static GUI (runningactions.py)
+	Saves time on startup, especially when running multiple copies of tests with many extra versions present.
 Framework Enhancements:
     - New naming scheme introduced for standard streams (default/__init__.py)
 	"stdout", "stderr" and "stdin" replace "output", "errors" and "input". See migration notes.
@@ -1818,6 +1821,8 @@ Framework Enhancements:
     - System warnings reviewed (plugins.py)
 	Many that were previously largely invisible when running the GUI will now turn up as GUI popup windows. 
 	Others will also appear on the console. One example is when a test is referred to but cannot be found.
+    - Can now stop test execution after the first test failure (actionrunner.py)
+	-stop on the command line, or appropriate check box on Running tab. See docs.
 Batch Report Enhancements:
     - Cell text generator rewritten (testoverview.py)
 	More closely based on text that appears in the UI. Less prone to being horribly long.
@@ -1838,8 +1843,11 @@ Bug Fixes:
     - slow_motion_replay_speed now allows floating-point values. (default/__init__.py)
     - Recording no longer eliminates unsaveable versions from the default version used (runningactions.py)
     - Don't stacktrace linking to Jira issues if the issue description contains illegal characters (jira.py)
+    - Don't stacktrace linking to Jira issues with custom fields defined but no values present (jira.py)
     - Don't stacktrace if the window icon cannot be set for some reason (controller.py)
     - Fixed graph bug where negative test numbers sometimes shown with matplotlib 0.99 (resultgraphs.py)
     - Definition files that get incorrectly regenerated produce a warning now rather than being shown as "New" (comparetest.py)
     - Reconnecting (with reconnfull flag) to a test containing unreadable files now works (reconnect.py)
     - Reconnecting to crashed tests now shows the original stack trace correctly (knownbugs/__init__.py)
+    - When test suites are reordered, scroll to show the new position in the tree (testtree.py)
+    - Grid engine: pass on -xr flag to grid slaves so that logging proceeds correctly (masterprocess.py)

@@ -617,11 +617,12 @@ class TestDetails:
                     newLine = " ".join(words[:-1])
                     fullText.append(HTMLgen.Href(linkTarget, newLine))
                     fullText.append(HTMLgen.BR())
-                    fullText.append(HTMLgen.BR())
                 else:
                     currFreeText += line + "\n"
         else:
-            fullText.append(HTMLgen.RawText("<PRE>" + freeText + "</PRE>"))
+            currFreeText = freeText
+        if currFreeText:
+            fullText.append(HTMLgen.RawText("<PRE>" + currFreeText + "</PRE>"))
     
     def getHeaderLine(self, tests, version, linkFromDetailsToOverview):
         testName, state, extraVersion = tests[0]

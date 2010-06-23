@@ -184,9 +184,12 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         versionSelection = self.optionGroup.getOptionValue("vs")
         if len(versionSelection) == 0:
             return True
-        
-        versions = versionSelection.split(".")
-        return self.allVersionsMatch(versions, test.app.versions)        
+        elif versionSelection == "<default>":
+            return len(test.app.versions) == 0
+        else:
+            versions = set(versionSelection.split("."))
+            appVersions = set(test.app.versions + test.app.getBaseVersions())
+            return versions.issubset(appVersions)
 
     def getSuitesToTry(self):
         # If only some of the suites present match the version selection, only consider them.
@@ -196,17 +199,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
             return self.rootTestSuites
         else:
             return toTry
-        
-    def allVersionsMatch(self, versions, appVersions):
-        for version in versions:
-            if version == "<default>":
-                if len(appVersions) > 0:
-                    return False
-            else:
-                if not version in appVersions:
-                    return False
-        return True
-    
+            
     def getRequestedTests(self, suite, filters, strategy):
         self.notify("ActionProgress", "") # Just to update gui ...
         if strategy == 1: # refine, don't check the whole suite
@@ -254,18 +247,23 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
             version = ""
 
         fullVersion = suite.app.getFullVersion()
-        versionToUse = self.findCombinedVersion(version, fullVersion)
+        baseVersions = suite.app.getBaseVersions()
+        versionToUse = self.findCombinedVersion(version, fullVersion, baseVersions)
         self.selectDiag.info("Trying to get test cases for " + repr(suite) + ", version " + versionToUse)
         return suite.findTestCases(versionToUse)
 
-    def findCombinedVersion(self, version, fullVersion):
-        combined = version
-        if len(fullVersion) > 0 and len(version) > 0:
+    def findCombinedVersion(self, version, fullVersion, baseVersions):
+        combined = self.getGivenVersion(version, baseVersions)
+        if len(fullVersion) > 0 and len(combined) > 0:
             parts = version.split(".")
             for appVer in fullVersion.split("."):
-                if not appVer in parts:
+                if appVer not in parts:
                     combined += "." + appVer
         return combined
+
+    def getGivenVersion(self, version, baseVersions):
+        parts = filter(lambda v: v not in baseVersions, version.split("."))
+        return ".".join(parts)
 
     def filterTests(self, *args):
         self.notify("Status", "Filtering tests ...")

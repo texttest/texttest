@@ -653,21 +653,42 @@ class Unrunnable(TestState):
                            executionHosts=executionHosts, lifecycleChange=lifecycleChange)
     def shouldAbandon(self):
         return True
+    
 
 class MarkedTestState(TestState):
     def __init__(self, freeText, briefText, oldState, executionHosts=[]):
+        self.oldState = oldState
+        self.myFreeText = freeText
         fullText = freeText + "\n\nORIGINAL STATE:\nTest " + repr(oldState) + "\n " + oldState.freeText
         TestState.__init__(self, "marked", fullText, briefText, completed=1, \
                            executionHosts=executionHosts, lifecycleChange="marked")
-        self.oldState = oldState
+        
     # We must implement this ourselves, since we want to be neither successful nor
     # failed, and by default hasFailed is implemented as 'not hasSucceeded()'.
     def hasFailed(self):
         return False
+
+    def hasResults(self):
+        return True
+
     def isMarked(self):
         return True
+
     def getTypeBreakdown(self):
         return self.category, self.briefText
+
+    def getComparisonsForRecalculation(self):
+        # Is some aspect of the state out of date
+        return self.oldState.getComparisonsForRecalculation()
+
+    def __getattr__(self, name):
+        # Anything not implemented should be called on the actual state...
+        return getattr(self.oldState, name)
+
+    def makeNewState(self, *args):
+        newOldState = self.oldState.makeNewState(*args)
+        return MarkedTestState(self.myFreeText, self.briefText, newOldState, self.executionHosts)
+    
 
 log = None
 def configureLogging(configFile=None):

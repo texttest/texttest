@@ -1776,8 +1776,8 @@ Bug Fixes:
     - Completed workaround from 3.17 for symbolic link bug in Mercurial: found a related case (hg.py)
     - Link to homepage on credits dialog now works with newest PyGTK versions (2.16) (helpdialogs.py)
 
-Version trunk
-=============
+Version 3.19
+============
 General GUI Enhancements:
     - "App names containing" field will only be shown if more than one app name is present (selectandfilter.py)
     - "Execution time" field will only be shown if performance testing is enabled (selectandfilter.py)
@@ -1851,3 +1851,20 @@ Bug Fixes:
     - Reconnecting to crashed tests now shows the original stack trace correctly (knownbugs/__init__.py)
     - When test suites are reordered, scroll to show the new position in the tree (testtree.py)
     - Grid engine: pass on -xr flag to grid slaves so that logging proceeds correctly (masterprocess.py)
+
+
+Version trunk
+============
+General GUI Enhancements:
+Static GUI Enhancements:
+    - Selecting for a version picks up versions where the given one is a base_version (selectandfilter.py)
+	Version matching is now the same as that used for other purposes
+Dynamic GUI Enhancements:
+    - Recomputing marked tests now works correctly (plugins.py)
+	Icons also displayed when appropriate, irrespective of test marking
+Framework Enhancements:
+Batch Report Enhancements:
+    - HTML report now shows file diffs as well as bug information when tests have "known bugs" (testoverview.py)
+	Makes it consistent with GUI and email report
+Grid Engine (LSF/SGE) enhancements:
+Bug Fixes:

@@ -191,12 +191,33 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
             appVersions = set(test.app.versions + test.app.getBaseVersions())
             return versions.issubset(appVersions)
 
+    def findMainApps(self):
+        apps = set(self.validApps)
+        for app in self.validApps:
+            apps.difference_update(app.extras)
+        return apps
+
+    def adjustForExtraVersions(self, rootSuites):
+        apps = self.findMainApps()
+        if len(apps) == len(self.rootTestSuites):
+            return self.rootTestSuites
+
+        versionSelection = self.optionGroup.getOptionValue("vs")
+        removeApps = []
+        for app in apps:
+            refApp = app.getRefVersionApplication(versionSelection)
+            newExtras = set(refApp.getConfigValue("extra_version"))
+            for extra in app.extras:
+                if len(set(extra.versions).intersection(newExtras)) == 0:
+                    removeApps.append(extra)
+        return filter(lambda s: s.app not in removeApps, self.rootTestSuites)
+
     def getSuitesToTry(self):
         # If only some of the suites present match the version selection, only consider them.
         # If none of them do, try to filter them all
         toTry = filter(self.matchesVersions, self.rootTestSuites)
         if len(toTry) == 0:
-            return self.rootTestSuites
+            return self.adjustForExtraVersions(self.rootTestSuites)
         else:
             return toTry
             

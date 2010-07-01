@@ -9,7 +9,7 @@
 # - Clean up after Xvfb as it leaks lock files from time to time.
 
 try:
-    import interceptor # the usual test hook...
+    import startxvfb_interceptor # the usual test hook...
 except ImportError:
     pass
 

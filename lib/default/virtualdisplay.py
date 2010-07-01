@@ -111,6 +111,7 @@ class VirtualDisplayResponder(plugins.Responder):
             if "Time Out!" in line:
                 self.displayProc.wait()
                 self.displayProc.stdout.close()
+                self.diag.info("Timed out waiting for Xvfb to come up")
                 # We try again and hope for a better process ID!
                 continue
             try:

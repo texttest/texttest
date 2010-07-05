@@ -8,10 +8,11 @@ from glob import glob
 
 # Class to allocate unique names to tests for script identification and cross process communication
 class UniqueNameFinder(plugins.Responder):
-    def __init__(self, optionMap, allApps):
+    def __init__(self, optionMap, *args):
         plugins.Responder.__init__(self, optionMap)
         self.name2test = {}
         self.diag = logging.getLogger("Unique Names")
+        
     def notifyAdd(self, test, *args, **kw):
         if self.name2test.has_key(test.name):
             oldTest = self.name2test[test.name]

@@ -2,7 +2,6 @@
 # This file (at the moment) has the sole purpose of specifying the texttest version number.
 # It's in a separate file to make it easy to find.
 
-import os
 version = "trunk"
 
 # Note: Decided it's not a good idea to require debug versions here. Even if we have Python 2.4.3 it's

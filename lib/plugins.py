@@ -1,10 +1,9 @@
 
-import sys, os, logging.config, string, shutil, socket, time, re, stat, subprocess, shlex, types, operator, fnmatch
+import sys, os, logging.config, string, shutil, socket, time, re, stat, subprocess, shlex, types, fnmatch
 from ndict import seqdict
 from traceback import format_exception
 from threading import currentThread
 from Queue import Queue, Empty
-from copy import copy
 from glob import glob
 
 # We standardise around UNIX paths, it's all much easier that way. They work fine,
@@ -68,7 +67,6 @@ weekdays = [ "monday", "tuesday", "wednesday", "thursday", "friday", "saturday",
 controlDirNames = [ "CVS", ".svn", ".bzr", ".hg", ".git", "RCS", "_darcs", "{arch}" ]
 
 def startTimeString():
-    global globalStartTime
     return localtime(seconds=globalStartTime)
 
 def importAndCall(moduleName, callableName, *args):
@@ -172,7 +170,7 @@ def parseBytes(text): # pragma: no cover
         # Try this first, to save time if it works
         try:
             return float(text)
-        except:
+        except ValueError:
             pass
 
         if lcText.endswith("kb") or lcText.endswith("kbytes") or lcText.endswith("k") or lcText.endswith("kilobytes"):
@@ -265,11 +263,11 @@ def convertForMarkup(message):
     return message.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 class Filter:
-    def acceptsTestCase(self, test):
+    def acceptsTestCase(self, testArg):
         return 1 # pragma: no cover - implemented in all base classes
-    def acceptsTestSuite(self, suite):
+    def acceptsTestSuite(self, suiteArg):
         return 1
-    def acceptsTestSuiteContents(self, suite):
+    def acceptsTestSuiteContents(self, suiteArg):
         return 1
     def refine(self, tests):
         return tests
@@ -405,7 +403,7 @@ class Action:
         pass
     def kill(self, test, sig):
         pass
-    def callDuringAbandon(self, test):
+    def callDuringAbandon(self, testArg):
         # set to True if tests should have this action called even after all is reckoned complete (e.g. UNRUNNABLE)
         return False
     # Useful for printing in a certain format...
@@ -524,7 +522,7 @@ class Observable:
                 
     def notifyObserver(self, observer, methodName, *args, **kwargs):
         # doesn't matter if only some of the observers have the method
-        method = eval("observer." + methodName)
+        method = getattr(observer, methodName)
         # unpickled objects have not called __init__, and
         # hence do not have self.passSelf ...
         try:
@@ -532,7 +530,7 @@ class Observable:
                 method(self, *args, **kwargs)
             else:
                 method(*args, **kwargs)
-        except:
+        except Exception:
             sys.stderr.write("Observer raised exception while calling " + methodName + " :\n")
             printException()
 
@@ -585,7 +583,7 @@ class TestState(Observable):
     def categoryRepr(self):
         if not self.categoryDescriptions.has_key(self.category):
             return self.category
-        briefDescription, longDescription = self.categoryDescriptions[self.category]
+        longDescription = self.categoryDescriptions[self.category][1]
         return longDescription
     def hostString(self):
         if len(self.executionHosts) == 0:
@@ -728,11 +726,11 @@ def hostsMatch(hostname, localhost):
     
 
 # Hacking around os.path.getcwd not working with AMD automounter
-def abspath(relpath):
+def abspath(path):
     if os.environ.has_key("PWD"):
-        return os.path.join(os.environ["PWD"], relpath)
+        return os.path.join(os.environ["PWD"], path)
     else:
-        return os.path.abspath(relpath)
+        return os.path.abspath(path)
 
 # deepcopy(os.environ) still seems to retain links to the actual environment, create a clean copy
 def copyEnvironment():
@@ -758,7 +756,7 @@ def commandLineString(cmdArgs):
         else:
             return '"'
 
-    def quote(arg):
+    def quoteArg(arg):
         quoteChars = "'\"|* "
         for char in quoteChars:
             if char in arg:
@@ -766,7 +764,7 @@ def commandLineString(cmdArgs):
                 return quoteChar + arg + quoteChar
         return arg.replace("\\", "/")
 
-    return " ".join(map(quote, cmdArgs))
+    return " ".join(map(quoteArg, cmdArgs))
 
 def relpath(fullpath, parentdir):
     normFull = os.path.normpath(fullpath)
@@ -829,7 +827,7 @@ def splitcmd(s):
 def samefile(writeDir, currDir):
     try:
         return os.path.samefile(writeDir, currDir)
-    except:
+    except Exception: # AttributeError for Windows, OSError if currDir doesn't exist
         # samefile doesn't exist on Windows, but nor do soft links so we can
         # do a simpler version
         return os.path.normpath(writeDir.replace("\\", "/")) == os.path.normpath(currDir.replace("\\", "/"))
@@ -849,7 +847,7 @@ def rmtree(dir, attempts=100):
     # Don't be somewhere under the directory when it's removed
     try:
         if os.getcwd().startswith(realDir):
-            root, local = os.path.split(dir)
+            root = os.path.dirname(os.path.normpath(dir))
             os.chdir(root)
     except OSError:
         pass
@@ -958,7 +956,7 @@ def openForWrite(path):
 
 # Make sure the dir exists
 def ensureDirExistsForFile(path):
-    dir, localName = os.path.split(path)
+    dir = os.path.split(path)[0]
     ensureDirectoryExists(dir)
 
 def addLocalPrefix(fullPath, prefix):
@@ -973,7 +971,7 @@ def ensureDirectoryExists(path, attempts=5):
             return
         try:
             os.makedirs(path)
-        except OSError, detail:
+        except OSError:
             if attempt == attempts - 1:
                 raise
 
@@ -1113,11 +1111,11 @@ class TextTrigger:
         if isRegularExpression(text):
             try:
                 self.regex = re.compile(text)
-            except:
+            except re.error:
                 pass
     def __repr__(self):
         return self.text
-    def matches(self, line, lineNumber=0):
+    def matches(self, line, *args):
         if self.regex:
             return self.regex.search(line)
         else:
@@ -1200,7 +1198,7 @@ class MultiEntryDictionary(seqdict):
         currDict, currSection = self.getSectionInfo(sectionName)
         try:
             self._addEntry(entryName, entry, currDict, currSection, *args, **kwargs)
-        except ValueError, e:
+        except ValueError:
             self.warn("Config entry name '" + entryName + "' in section '" + currSection +
                       "' given an invalid value '" + entry + "', ignoring.")
 
@@ -1227,7 +1225,7 @@ class MultiEntryDictionary(seqdict):
         else:
             return type(val[0])
 
-    def castEntry(self, entryName, entry, currDict):
+    def castEntry(self, dummy, entry, currDict):
         if type(entry) != types.StringType:
             return entry
         dictValType = self.getDictionaryValueType(currDict)
@@ -1333,6 +1331,7 @@ class TextOption(Option):
         Option.__init__(self, name, value, description, changeMethod)
         self.possValAppendMethod = None
         self.possValListMethod = None
+        self.possibleValues = []
         self.nofValues = allocateNofValues
         self.selectDir = selectDir
         self.selectFile = selectFile
@@ -1535,10 +1534,9 @@ class OptionGroup:
     
 
 # pwd and grp doesn't exist on windows ...
-import stat
 try:
     import pwd, grp
-except:
+except ImportError:
     pass
 
 class FileProperties:
@@ -1573,13 +1571,13 @@ class FileProperties:
         try:
             uid = self.status[stat.ST_UID]
             return str(pwd.getpwuid(uid)[0])
-        except:
+        except Exception: # KeyError, AttributeError (on Windows) possible
             return "?"
     def inqGroup(self):
         try:
             gid = self.status[stat.ST_GID]
             return str(grp.getgrgid(gid)[0])
-        except:
+        except Exception: # KeyError, AttributeError (on Windows) possible
             return "?"
     def inqSize(self):
         return self.status[stat.ST_SIZE]

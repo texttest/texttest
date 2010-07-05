@@ -1799,7 +1799,7 @@ class OptionFinder(plugins.OptionFinder):
 # Simple responder that collects completion notifications and sends one out when
 # it thinks everything is done.
 class AllCompleteResponder(plugins.Responder,plugins.Observable):
-    def __init__(self, inputOptions, allApps):
+    def __init__(self, *args):
         plugins.Responder.__init__(self)
         plugins.Observable.__init__(self)
         self.unfinishedTests = 0
@@ -1807,6 +1807,7 @@ class AllCompleteResponder(plugins.Responder,plugins.Observable):
         self.checkInCompletion = False
         self.hadCompletion = False
         self.diag = logging.getLogger("test objects")
+        
     def notifyAdd(self, test, *args, **kw):
         if test.classId() == "test-case":
             # Locking long thought to be unnecessary

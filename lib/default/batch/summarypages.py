@@ -91,7 +91,7 @@ class SummaryDataFinder:
     def getAppsWithVersions(self):
         appsWithVersions = seqdict()
         for appName, appDir in self.appDirs.items():
-            versionInfo = self.getVersionInfoFor(appName, appDir)
+            versionInfo = self.getVersionInfoFor(appDir)
             self.appVersionInfo[appName] = versionInfo
             appsWithVersions[appName] = versionInfo.keys()
         return appsWithVersions
@@ -100,7 +100,7 @@ class SummaryDataFinder:
         appDir = self.appDirs[fullName]
         return os.path.basename(appDir)
 
-    def getVersionInfoFor(self, app, appDir):
+    def getVersionInfoFor(self, appDir):
         versionDates = {}
         for path in glob(os.path.join(appDir, "test_*.html")):
             fileName = os.path.basename(path)

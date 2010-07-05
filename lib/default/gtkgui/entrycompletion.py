@@ -8,7 +8,9 @@ class EntryCompletionManager:
         self.entries = []
         self.enabled = False
         self.useContainsFunction = False
+        self.inlineCompletions = False
         self.diag = None
+        
     def start(self, matching, inline, completions, diag):
         self.enabled = True
         self.diag = diag
@@ -50,7 +52,7 @@ class EntryCompletionManager:
                 self.addCompletion(entry)
 
     # Return true for any completion containing the key
-    def containsMatchFunction(self, completion, key_string, iter):
+    def containsMatchFunction(self, dummy, key_string, iter):
         value = self.completions.get_value(iter, 0)
         return value and value.lower().find(key_string) != -1
     

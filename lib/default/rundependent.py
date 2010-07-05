@@ -8,8 +8,6 @@ if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(sys.argv[0]))))
 
 import plugins, fpdiff, logging, shutil
-from ndict import seqdict
-from re import sub
 from optparse import OptionParser
 from StringIO import StringIO
 
@@ -59,7 +57,7 @@ class FilterAction(plugins.Action):
         stem = self.getStem(fileName)
         filters = self.makeAllFilters(test, stem, app)
         inFile = open(fileName)
-        for fileFilter, extraPostfix in filters:
+        for fileFilter, _ in filters:
             self.diag.info("Applying " + fileFilter.__class__.__name__ + " to " + fileName) 
             outFile = StringIO()
             fileFilter.filterFile(inFile, outFile)
@@ -224,9 +222,9 @@ class LineNumberTrigger:
         self.lineNumber = lineNumber
     def __repr__(self):
         return "Line number trigger for line " + str(self.lineNumber)
-    def matches(self, line, lineNumber):
+    def matches(self, lineArg, lineNumber):
         return lineNumber == self.lineNumber
-    def replace(self, line, newText):
+    def replace(self, lineArg, newText):
         return newText + "\n"
 
 def getWriteDirRegexp(testId):
@@ -270,7 +268,7 @@ class LineFilter:
         for divider in self.dividers:
             dividerPoint = self.originalText.find(divider)
             if dividerPoint != -1:
-                beforeText, afterText, parameter = self.extractParameter(self.originalText, dividerPoint, divider)
+                beforeText, afterText, _ = self.extractParameter(self.originalText, dividerPoint, divider)
                 self.divider = divider
                 self.triggers = self.parseText(beforeText)
                 self.untrigger = self.parseText(afterText)[0]
@@ -291,7 +289,7 @@ class LineFilter:
         for matcherString in self.matcherStrings:
             linePoint = text.find(matcherString)
             if linePoint != -1:
-                beforeText, afterText, parameter = self.extractParameter(text, linePoint, matcherString)
+                parameter = self.extractParameter(text, linePoint, matcherString)[-1]
                 return matcherString, parameter
         return "", text
 

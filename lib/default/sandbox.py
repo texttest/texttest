@@ -1,4 +1,4 @@
-import os, shutil, plugins, re, stat, subprocess, glob, types, logging, difflib
+import os, shutil, plugins, re, stat, subprocess, glob, logging, difflib
 
 from jobprocess import killArbitaryProcess, killSubProcessAndChildren
 from ndict import seqdict
@@ -106,7 +106,7 @@ class PrepareWriteDirectory(plugins.Action):
         propFile = test.getCompositeConfigValue("test_data_properties", configName)
         return envVarDict.get(configName), propFile
     
-    def copyTestPath(self, test, fullPath, target):
+    def copyTestPath(self, dummy, fullPath, target):
         if os.path.isfile(fullPath):
             self.copyfile(fullPath, target)
         if os.path.isdir(fullPath):
@@ -140,7 +140,7 @@ class PrepareWriteDirectory(plugins.Action):
                 else:
                     self.copyfile(srcname, dstname)
             except (IOError, os.error), why:
-                print "Can't copy %s to %s: %s" % (`srcname`, `dstname`, str(why))
+                print "Can't copy", srcname, "to", dstname, ":", why
         # Last of all, keep the modification time as it was
         self.copytimes(src, dst)
     def copylink(self, srcname, dstname):
@@ -209,18 +209,20 @@ class PrepareWriteDirectory(plugins.Action):
             self.copylink(sourceFile, targetFile)
         except OSError: #pragma : no cover
             print "Failed to create symlink " + targetFile
-    def isWriteDir(self, targetPath, modPaths):
+            
+    def isWriteDir(self, dummy, modPaths):
         for modPath in modPaths:
             if not os.path.isdir(modPath):
                 return True
         return False
+    
     def getModifiedPaths(self, test, sourcePath, sourceNameInCatalogue):
         catFile = test.getFileName("catalogue")
         if not catFile or self.ignoreCatalogues:
             # This means we don't know
             return None
         # Catalogue file is actually relative to temporary directory, need to take one level above...
-        rootDir, local = os.path.split(sourcePath)
+        rootDir = os.path.split(sourcePath)[0]
         fullPaths = { rootDir : [] }
         currentPaths = [ rootDir ]
         for line in open(catFile).readlines():
@@ -493,7 +495,7 @@ class CollateFiles(plugins.Action):
             try:
                 # Checking for existence too dependent on file server (?)
                 os.remove(filePath)
-            except:
+            except EnvironmentError:
                 pass
 
     def findEditedFile(self, test, patterns):
@@ -520,7 +522,7 @@ class CollateFiles(plugins.Action):
     
     def getFilesPresent(self, test):
         files = seqdict()
-        for targetStem, sourcePatterns in self.collations.items():
+        for sourcePatterns in self.collations.values():
             for sourcePattern in sourcePatterns:
                 for fullPath in self.findPaths(test, sourcePattern):
                     self.diag.info("Pre-existing file found " + fullPath)
@@ -743,15 +745,13 @@ class CreateCatalogue(plugins.Action):
             return os.path.realpath(fullPath)
         else:
             return plugins.localtime(seconds=plugins.modifiedTime(fullPath))
-
-    def editInfoChanged(self, fullPath, oldInfo, newInfo):
-        return oldInfo != newInfo
+    
     def findDifferences(self, oldPaths, newPaths, writeDir):
         pathsGained, pathsEdited, pathsLost = [], [], []
         for path, modTime in newPaths.items():
             if not oldPaths.has_key(path):
                 pathsGained.append(self.outputPathName(path, writeDir))
-            elif self.editInfoChanged(path, oldPaths[path], modTime):
+            elif oldPaths[path] != modTime:
                 pathsEdited.append(self.outputPathName(path, writeDir))
         for path, modTime in oldPaths.items():
             if not newPaths.has_key(path):
@@ -766,7 +766,7 @@ class CreateCatalogue(plugins.Action):
     def removeParents(self, toRemove, toFind):
         removeList = []
         for path in toFind:
-            parent, local = os.path.split(path)
+            parent = os.path.split(path)[0]
             if parent in toRemove and not parent in removeList:
                 removeList.append(parent)
         for path in removeList:
@@ -781,7 +781,7 @@ class MachineInfoFinder:
         return app.getCompositeConfigValue("performance_test_machine", fileStem)
     def setUpApplication(self, app):
         pass
-    def getMachineInformation(self, test):
+    def getMachineInformation(self, testArg):
         # A space for subclasses to write whatever they think is relevant about
         # the machine environment right now.
         return ""
@@ -878,13 +878,16 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
     def __init__(self, machineInfoFinder):
         PerformanceFileCreator.__init__(self, machineInfoFinder)
         self.entryFinders = None
+        self.entryFiles = None
         self.logFileStem = None
+        
     def setUpApplication(self, app):
         PerformanceFileCreator.setUpApplication(self, app)
         self.entryFinders = app.getConfigValue("performance_logfile_extractor")
         self.entryFiles = app.getConfigValue("performance_logfile")
         self.logFileStem = app.getConfigValue("log_file")
         self.diag.info("Found the following entry finders:" + str(self.entryFinders))
+
     def makePerformanceFiles(self, test):
         for fileStem, entryFinder in self.entryFinders.items():
             if len(entryFinder) == 0:

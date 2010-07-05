@@ -1,9 +1,8 @@
 
-import os, sys, plugins, sandbox, console, rundependent, pyusecase_interface, comparetest, batch, performance, subprocess, operator, signal, shutil, logging
+import os, sys, plugins, sandbox, console, rundependent, pyusecase_interface, comparetest, batch, batch.junitreport, performance, subprocess, operator, signal, shutil, logging
 
 from copy import copy
 from fnmatch import fnmatch
-from string import Template
 from threading import Lock, Timer
 from knownbugs import CheckForBugs, CheckForCrashes
 from reconnect import ReconnectConfig
@@ -317,7 +316,7 @@ class Config:
         return classes
 
     def isActionReplay(self):
-        for option, desc in self.getInteractiveReplayOptions():
+        for option, _ in self.getInteractiveReplayOptions():
             if self.optionMap.has_key(option):
                 return True
         return False
@@ -854,7 +853,7 @@ class Config:
         return RunTest().getRunDescription(test)
 
     # For display in the GUI
-    def extraReadFiles(self, test):
+    def extraReadFiles(self, testArg):
         return {}
     def printHelpScripts(self):
         pass
@@ -1302,7 +1301,7 @@ class RunTest(plugins.Action):
         freeText = "Running on " + ",".join(execMachines)
         newState = Running(execMachines, briefText=briefText, freeText=freeText)
         test.changeState(newState)
-    def getBriefText(self, execMachines):
+    def getBriefText(self, execMachinesArg):
         # Default to not bothering to print the machine name: all is local anyway
         return ""
     def runTest(self, test):
@@ -1382,7 +1381,7 @@ class RunTest(plugins.Action):
         timeStr = plugins.localtime("%H:%M")
         return "KILLED", "killed explicitly at " + timeStr
 
-    def getUserSignalKillInfo(self, test, userSignalNumber):
+    def getUserSignalKillInfo(self, testArg, userSignalNumber):
         return "SIGUSR" + userSignalNumber, "terminated by user signal " + userSignalNumber
 
     def kill(self, test, sig):
@@ -1496,7 +1495,7 @@ class RunTest(plugins.Action):
         else:
             args = []
             localTmpDir = test.app.writeDirectory
-            machine, remoteTmp = test.app.getRemoteTmpDirectory()
+            remoteTmp = test.app.getRemoteTmpDirectory()[1]
             for var, value in vars:
                 if remoteTmp:
                     remoteValue = value.replace(localTmpDir, remoteTmp)
@@ -1511,7 +1510,7 @@ class RunTest(plugins.Action):
             return args
     
     def getTmpDirectory(self, test):
-        machine, remoteTmp = test.app.getRemoteTestTmpDir(test)
+        remoteTmp = test.app.getRemoteTestTmpDir(test)[1]
         if remoteTmp:
             return remoteTmp
         else:
@@ -1712,7 +1711,7 @@ class DocumentEnvironment(plugins.Action):
                 return [ self.interpretArgument(str(allArgs[1])) ]
             else:
                 return []
-        except: # could be anything at all
+        except Exception: # could be anything at all
             return []
 
     def interpretArgument(self, arg):
@@ -1855,7 +1854,7 @@ class ExportTests(plugins.ScriptWithArgs):
                 targetFile = os.path.join(newDir, local)
                 shutil.copy2(sourceFile, targetFile)
 
-        root, extFiles = test.listExternallyEditedFiles()
+        extFiles = test.listExternallyEditedFiles()[1]
         dataFiles = test.listDataFiles() + extFiles
         for sourcePath in dataFiles:
             if os.path.isdir(sourcePath):

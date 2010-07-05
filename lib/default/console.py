@@ -18,6 +18,7 @@ class TextDisplayResponder(plugins.Responder):
             
 class InteractiveResponder(plugins.Responder):
     def __init__(self, optionMap, *args):
+        plugins.Responder.__init__(self)
         self.overwriteSuccess = optionMap.has_key("n")
         self.overwriteFailure = optionMap.has_key("o")
         self.overwriteVersion = optionMap.get("o")
@@ -82,7 +83,7 @@ class InteractiveResponder(plugins.Responder):
 
     def viewLogFileGraphically(self, test):
         logFile = test.getConfigValue("log_file")
-        logFileComparison, list = test.state.findComparison(logFile)
+        logFileComparison = test.state.findComparison(logFile)[0]
         if logFileComparison:
             tool, cmdArgs = self.getViewCmdInfo(test, logFileComparison)
             if tool:

@@ -63,7 +63,7 @@ class TestColumnGUI(guiutils.SubGUI):
                 self.column.set_sort_indicator(False)
                 order = 0
 
-        self.notify("ActionStart", "")
+        self.notify("ActionStart")
         self.setSortingOrder(order)
         if order == 1:
             self.notify("Status", "Tests sorted in alphabetical order.")

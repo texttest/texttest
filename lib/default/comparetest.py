@@ -119,7 +119,7 @@ class TestComparison(BaseTestComparison):
         
     def categoryRepr(self):    
         if self.failedPrediction:
-            briefDescription, longDescription = self.categoryDescriptions[self.category]
+            longDescription = self.categoryDescriptions[self.category][1]
             return longDescription + " (" + self.failedPrediction.briefText + ")"
         else:
             return plugins.TestState.categoryRepr(self)
@@ -261,7 +261,7 @@ class TestComparison(BaseTestComparison):
                 # Don't care if performance is missing
                 return None
         else:
-            return FileComparison(test, stem, standardFile, tmpFile, testInProgress=0, observers=self.observers)
+            return FileComparison(test, stem, standardFile, tmpFile, testInProgress=0)
     def categorise(self):
         if self.failedPrediction:
             # Keep the category we had before
@@ -316,7 +316,7 @@ class TestComparison(BaseTestComparison):
         if versionString:
             fileEditDir += "." + versionString
         if os.path.isdir(tmpFileEditDir):
-            for root, dirs, files in os.walk(tmpFileEditDir):
+            for root, _, files in os.walk(tmpFileEditDir):
                 for file in sorted(files):
                     fullPath = os.path.join(root, file)
                     savePath = fullPath.replace(tmpFileEditDir, fileEditDir)
@@ -372,7 +372,7 @@ class ProgressTestComparison(BaseTestComparison):
         else:
             self.runningState = previousInfo
     def createFileComparison(self, test, stem, standardFile, tmpFile):
-        return FileComparison(test, stem, standardFile, tmpFile, testInProgress=1, observers=self.observers)
+        return FileComparison(test, stem, standardFile, tmpFile, testInProgress=1)
     def categorise(self):
         self.briefText = self.runningState.briefText
         self.freeText = self.runningState.freeText + self.progressText()
@@ -440,7 +440,7 @@ class PrintObsoleteVersions(plugins.Action):
     def __call__(self, test):
         self.describe(test)
         compFiles = {}
-        resultFiles, defFiles = test.listStandardFiles(allVersions=True)
+        resultFiles = test.listStandardFiles(allVersions=True)[0]
         for file in resultFiles:
             stem = file.split(".")[0]
             compFile = self.filterFile(test, file)
@@ -453,12 +453,12 @@ class PrintObsoleteVersions(plugins.Action):
                     self.compareFiles(test, compFilesMatchingStem[index1], compFilesMatchingStem[index2])
                 os.remove(compFilesMatchingStem[index1][1])
         
-    def cmpFile(self, test, file):
+    def cmpFile(self, file):
         basename = os.path.basename(file)
         return mktemp(basename + "cmp")
     
     def filterFile(self, test, file):
-        newFile = self.cmpFile(test, file)
+        newFile = self.cmpFile(file)
         stem = os.path.basename(file).split(".")[0]
         from rundependent import FilterAction
         action = FilterAction()

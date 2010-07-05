@@ -1,5 +1,5 @@
 
-import os, stat, sys, plugins, logging, shutil, socket, subprocess
+import os, sys, plugins, shutil, socket, subprocess
 
 class SetUpTrafficHandlers(plugins.Action):
     def __init__(self, record):
@@ -29,7 +29,7 @@ class SetUpTrafficHandlers(plugins.Action):
             except socket.error:
                 print "Could not send terminate message to traffic server, seemed not to be running anyway."
         if self.trafficServerProcess:
-            out, err = self.trafficServerProcess.communicate()
+            err = self.trafficServerProcess.communicate()[1]
             if err:
                 sys.stderr.write("Error from Traffic Server :\n" + err)
             self.trafficServerProcess = None

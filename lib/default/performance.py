@@ -1,5 +1,5 @@
 
-import os, string, plugins, sys, time
+import os, plugins, sys, time
 from comparefile import FileComparison
 
 # This module won't work without an external module creating a file called performance.app
@@ -117,9 +117,12 @@ class PerformanceConfigSettings:
         
 
 class PerformanceFileComparison(FileComparison):
+    def __init__(self, *args, **kw):
+        self.perfComparison = None
+        FileComparison.__init__(self, *args, **kw)
+        
     def cacheDifferences(self, test, testInProgress):
         # Don't allow process count of 0, which screws things up...
-        self.perfComparison = None
         if self.stdFile and self.tmpFile:
             oldPerf = getPerformance(self.stdFile)
             # If we didn't understand the old performance, overwrite it and behave like it didn't exist
@@ -304,6 +307,7 @@ class PerformanceStatistics(plugins.ScriptWithArgs):
     printedTitle = False
     def __init__(self, args = []):
         optDict = self.parseArguments(args, [ "compv", "file" ])
+        self.settings = None
         self.compareVersion = optDict.get("compv")
         self.compareTotal = 0.0
         self.total = 0.0

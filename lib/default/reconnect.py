@@ -128,7 +128,7 @@ class ReconnectConfig:
         if vlist is not None:
             return frozenset(vlist)
 
-    def getAllVersionLists(self, app, givenExtras, versionLists, groupDirs):
+    def getAllVersionLists(self, app, givenExtras, groupDirs):
         vlists = []
         givenSet = frozenset(givenExtras)
         for groupDir in groupDirs:
@@ -151,7 +151,7 @@ class ReconnectConfig:
         for versionLists, groupDirIter in groupby(dirs, self.getVersionListsTopDir):
             groupDirs = list(groupDirIter)
             self.diag.info("Considering version lists " + repr(versionLists) + " with dirs " + repr(groupDirs))
-            for versionList in self.getAllVersionLists(app, givenExtras, versionLists, groupDirs):
+            for versionList in self.getAllVersionLists(app, givenExtras, groupDirs):
                 version = ".".join(versionList)
                 self.diag.info("Considering version list " + repr(versionList))
                 versionSet = frozenset(versionList)

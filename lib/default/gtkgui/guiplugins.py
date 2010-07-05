@@ -1,11 +1,8 @@
 
 
-import gtk, gobject, entrycompletion, plugins, os, shutil, time, subprocess, operator, types, logging
+import gtk, gobject, entrycompletion, plugins, os, subprocess, types, logging
 from guiutils import guilog, guiConfig, SubGUI, GUIConfig
 from jobprocess import killSubProcessAndChildren
-from copy import copy, deepcopy
-from glob import glob
-from stat import *
 from ndict import seqdict
         
 # The purpose of this class is to provide a means to monitor externally
@@ -228,7 +225,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         self.showErrorWarningDialog(message, gtk.STOCK_DIALOG_WARNING, "Warning") 
     def showErrorWarningDialog(self, message, stockIcon, alarmLevel):
         dialog = self.createAlarmDialog(self.getParentWindow(), message, stockIcon, alarmLevel)
-        yesButton = dialog.add_button(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT)
+        dialog.add_button(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT)
         dialog.set_default_response(gtk.RESPONSE_ACCEPT)
         dialog.connect("response", self._cleanDialog)
         dialog.show_all()
@@ -245,12 +242,12 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
     def showQueryDialog(self, parent, message, stockIcon, alarmLevel, respondMethod):
         dialog = self.createAlarmDialog(parent, message, stockIcon, alarmLevel)
         dialog.set_default_response(gtk.RESPONSE_NO)
-        noButton = dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
-        yesButton = dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
+        dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
+        dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
         dialog.connect("response", respondMethod)
         dialog.show_all()
         
-    def cleanDialog(self, button, saidOK, dialog):
+    def cleanDialog(self, dummy1, dummy2, dialog):
         self._cleanDialog(dialog)
 
     def _cleanDialog(self, dialog, *args):
@@ -311,7 +308,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         message = self.messageBeforePerform()
         if message != None:
             self.notify("Status", message)
-        self.notify("ActionStart", message)
+        self.notify("ActionStart")
         self.notify("ActionProgress")
         self.performOnCurrent()
         message = self.messageAfterPerform()
@@ -336,15 +333,7 @@ class ActionGUI(BasicActionGUI):
         BasicActionGUI.__init__(self)
         for app in allApps:
             self._checkAllValid(app)
-
-    def setTooltipText(self, widget, text):
-        if hasattr(widget, "set_tooltip_text"): # New tooltip API
-            widget.set_tooltip_text(text)
-        else:
-            if not hasattr(self, "tooltips"):
-                self.tooltips = gtk.Tooltips()
-            self.tooltips.set_tip(widget, text)
-        
+    
     def checkValid(self, app):
         self._checkValid(app)
         self.noApps = False
@@ -360,7 +349,7 @@ class ActionGUI(BasicActionGUI):
         else:
             self.diag.info(str(self.__class__) + " invalid for " + repr(app))
         
-    def isValidForApp(self, app):
+    def isValidForApp(self, dummyApp):
         return True
 
     def shouldShow(self):
@@ -392,7 +381,7 @@ class ActionGUI(BasicActionGUI):
         self.diag.info("New test selection for " + self.getTitle() + "=" + repr(tests) + " : new active = " + repr(newActive))
         return newActive
         
-    def notifyLifecycleChange(self, test, state, desc):
+    def notifyLifecycleChange(self, test, state, *args):
         newActive = self.isActiveOnCurrent(test, state)
         self.setSensitivity(newActive)
 
@@ -437,7 +426,7 @@ class ActionGUI(BasicActionGUI):
         # In theory all this should be automatic, but it appears not to work
         if self.getStockId():
             button.set_image(gtk.image_new_from_stock(self.getStockId(), gtk.ICON_SIZE_BUTTON))
-        self.setTooltipText(button, self.getTooltip())
+        button.set_tooltip_text(self.getTooltip())
         button.show()
         return button
     
@@ -445,9 +434,13 @@ class ActionGUI(BasicActionGUI):
 # These actions consist of bringing up a dialog and only doing that
 # (i.e. the dialog is not a mechanism to steer how the action should be run)
 class ActionResultDialogGUI(ActionGUI):
+    def __init__(self, *args, **kw):
+        self.dialog = None
+        ActionGUI.__init__(self, *args, **kw)
+        
     def performOnCurrent(self):
         self.dialog = self.createDialog()
-        textContents = self.addContents()
+        self.addContents()
         self.createButtons()
         self.dialog.show_all()
         
@@ -455,7 +448,7 @@ class ActionResultDialogGUI(ActionGUI):
         pass
     
     def createButtons(self):
-        okButton = self.dialog.add_button(gtk.STOCK_CLOSE, gtk.RESPONSE_ACCEPT)
+        self.dialog.add_button(gtk.STOCK_CLOSE, gtk.RESPONSE_ACCEPT)
         self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
         self.dialog.connect("response", self.respond)
 
@@ -471,8 +464,8 @@ class ComboBoxListFinder:
         entries = []
         self.model.foreach(self.getText, entries)
         return entries
-    def getText(self, model, path, iter, entries):
-        text = self.model.get_value(iter, self.textColumn)
+    def getText(self, model, dummyPath, iter, entries):
+        text = model.get_value(iter, self.textColumn)
         entries.append(text)
 
 
@@ -512,7 +505,7 @@ class OptionGroupGUI(ActionGUI):
         label = gtk.EventBox()
         label.add(gtk.Label(option.name + separator))
         if option.description and type(option.description) == types.StringType:
-            self.setTooltipText(label, option.description)
+            label.set_tooltip_text(option.description)
         return label
 
     def connectEntry(self, option, entryOrBuffer):
@@ -548,16 +541,15 @@ class OptionGroupGUI(ActionGUI):
         return hbox
 
     def setConfigOverride(self, switch, index, option, *args):
-        cleanOption = option.split("\n")[0].replace("_", "")
         configName = self.getNaming(switch.name, option, *args)
         if index == switch.getValue() or guiConfig.getCompositeValue("gui_entry_overrides", configName) == "1":
             switch.setValue(index)
 
-    def getNaming(self, switchName, cleanOption, *args):
+    def getNaming(self, switchName, option, *args):
         if len(switchName) > 0:
-            return switchName + ":" + cleanOption
+            return switchName + ":" + option
         else:
-            return cleanOption
+            return option
 
     def createRadioButtons(self, switch, optionGroup):
         buttons = []
@@ -568,7 +560,7 @@ class OptionGroupGUI(ActionGUI):
             radioButton = gtk.RadioButton(mainRadioButton, option, use_underline=True)
             self.setRadioButtonName(radioButton, option, optionGroup)
             if individualToolTips:
-                self.setTooltipText(radioButton, switch.description[index])
+                radioButton.set_tooltip_text(switch.description[index])
                 
             buttons.append(radioButton)
             if not mainRadioButton:
@@ -613,7 +605,7 @@ class OptionGroupGUI(ActionGUI):
         self.updateForConfig(switch)
         checkButton = gtk.CheckButton(switch.name)
         if switch.description:
-            self.setTooltipText(checkButton, switch.description)
+            checkButton.set_tooltip_text(switch.description)
         
         if int(switch.getValue()):
             checkButton.set_active(True)
@@ -777,7 +769,7 @@ class ActionTabGUI(OptionGroupGUI):
         button = gtk.Button("Reset Tab")
         button.set_name("Reset " + self.getTabTitle() + " Tab")
         button.connect("clicked", self.notifyReset)
-        self.setTooltipText(button, "Reset all the settings in the current tab to their default values")
+        button.set_tooltip_text("Reset all the settings in the current tab to their default values")
         button.show()
         return button
     
@@ -798,7 +790,7 @@ class ActionTabGUI(OptionGroupGUI):
             button.connect("clicked", self.showFileChooser, entry, option)
         return (box, entry)
     
-    def showFileChooser(self, widget, entry, option):
+    def showFileChooser(self, dummyWidget, entry, option):
         dialog = gtk.FileChooserDialog("Select a file",
                                        self.getParentWindow(),
                                        gtk.FILE_CHOOSER_ACTION_OPEN,
@@ -815,7 +807,7 @@ class ActionTabGUI(OptionGroupGUI):
         dialog.connect("response", self.respondChooser, entry)
         # If current entry forms a valid path, set that as default
         currPath = entry.get_text()
-        currDir, currFile = os.path.split(currPath)
+        currDir = os.path.split(currPath)[0]
         if os.path.isdir(currDir):
             dialog.set_current_folder(currDir)
         elif defaultFolder and os.path.isdir(os.path.abspath(defaultFolder)):
@@ -916,9 +908,9 @@ class ActionDialogGUI(OptionGroupGUI):
             return gtk.STOCK_OK
 
     def createButtons(self, dialog, fileChooser, fileChooserOption):
-        cancelButton = dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL)
+        dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL)
         actionScriptName = self.getTooltip()
-        okButton = dialog.add_button(self.getOkStock(actionScriptName.lower()), gtk.RESPONSE_ACCEPT)
+        dialog.add_button(self.getOkStock(actionScriptName.lower()), gtk.RESPONSE_ACCEPT)
         dialog.set_default_response(gtk.RESPONSE_ACCEPT)
         if fileChooser:
             fileChooser.connect("file-activated", self.simulateResponse, dialog)
@@ -927,7 +919,7 @@ class ActionDialogGUI(OptionGroupGUI):
         
         dialog.connect("response", self.respond)
 
-    def simulateResponse(self, fileChooser, dialog):
+    def simulateResponse(self, dummy, dialog):
         dialog.response(gtk.RESPONSE_ACCEPT)
         
     def fillVBox(self, vbox, optionGroup):

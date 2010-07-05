@@ -1,8 +1,8 @@
 # Code to generate HTML report of historical information. This report generated
 # either via the -coll flag, or via -s 'batch.GenerateHistoricalReport <batchid>'
 
-import os, plugins, time, re, HTMLgen, HTMLcolors, operator, sys, logging
-from cPickle import Pickler, Unpickler, UnpicklingError
+import os, plugins, time, HTMLgen, HTMLcolors, sys, logging
+from cPickle import Unpickler, UnpicklingError
 from ndict import seqdict
 from glob import glob
 HTMLgen.PRINTECHO = 0
@@ -18,7 +18,7 @@ class ColourFinder:
         return self.htmlColour(colourName)
     def htmlColour(self, colourName):
         if not colourName.startswith("#"):
-            exec "colourName = HTMLcolors." + colourName.upper()
+            colourName = getattr(HTMLcolors, colourName.upper())
         return colourName
 
 def getDisplayText(tag):
@@ -183,8 +183,8 @@ class GenerateWebPages(object):
     def findTestStateFilesAndTags(self, repositoryDirs):
         allFiles = []
         allTags = set()
-        for extraVersion, dir in repositoryDirs:
-            for root, dirs, files in os.walk(dir):
+        for _, dir in repositoryDirs:
+            for root, _, files in os.walk(dir):
                 for file in files:
                     if file.startswith("teststate_"):
                         allFiles.append((os.path.join(root, file), dir))
@@ -451,7 +451,7 @@ class TestTable:
         if state:
             if self.cellInfo:
                 if hasattr(state, "findComparison"):
-                    fileComp, fileCompList = state.findComparison(self.cellInfo, includeSuccess=True)
+                    fileComp = state.findComparison(self.cellInfo, includeSuccess=True)[0]
                     if fileComp:
                         return self.getCellDataFromFileComp(fileComp)
             else:
@@ -594,7 +594,7 @@ class TestDetails:
         fullText = HTMLgen.Container()
         for freeText, tests in freeTextData:
             tests.sort(key=lambda info: info[0])
-            for testName, state, extraVersion in tests:
+            for testName, _, extraVersion in tests:
                 fullText.append(HTMLgen.Name(version + testName + extraVersion))
             fullText.append(self.getHeaderLine(tests, version, linkFromDetailsToOverview))
             self.appendFreeText(fullText, freeText)
@@ -661,7 +661,7 @@ class CategoryHandler:
         self.testsInCategory.setdefault(state.category, []).append((testId, state, extraVersion))
 
     def getDescription(self, cat, count):
-        shortDescr, longDescr = getCategoryDescription(cat)
+        shortDescr, _ = getCategoryDescription(cat)
         return str(count) + " " + shortDescr
 
     def getTestCountDescription(self, count):

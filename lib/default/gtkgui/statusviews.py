@@ -24,7 +24,7 @@ class StatusMonitorGUI(guiutils.SubGUI):
     def getWidgetName(self):
         return "_Status bar"
 
-    def notifyActionStart(self, message="", lock = True):
+    def notifyActionStart(self, lock=True):
         if self.throbber:
             if self.pixbuf: # pragma: no cover : Only occurs if some code forgot to do ActionStop ...
                 self.notifyActionStop()

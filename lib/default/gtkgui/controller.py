@@ -21,13 +21,13 @@ pygtkVersion = gtk.pygtk_version
 requiredPygtkVersion = texttest_version.required_pygtk_version
 if pygtkVersion < requiredPygtkVersion:
     raiseException("TextTest " + texttest_version.version + " GUI requires at least PyGTK " +
-                   ".".join(map(lambda l: str(l), requiredPygtkVersion)) + ": found version " +
-                   ".".join(map(lambda l: str(l), pygtkVersion)))
+                   ".".join(map(str, requiredPygtkVersion)) + ": found version " +
+                   ".".join(map(str, pygtkVersion)))
 
 try:
     import gobject
-except:
-    raiseException("Unable to import module 'gobject'")
+except Exception, e:
+    raiseException("Unable to import module 'gobject' - " + str(e))
 
 import gtkusecase, testtree, filetrees, statusviews, textinfo, actionholders, version_control, guiplugins, guiutils, plugins, os, sys, logging
 from copy import copy
@@ -38,7 +38,8 @@ class IdleHandlerManager:
     def __init__(self):
         self.sourceId = -1
         self.diag = logging.getLogger("Idle Handlers")
-    def notifyActionStart(self, message="", lock=True):
+        
+    def notifyActionStart(self, lock=True):
         # To make it possible to have an while-events-process loop
         # to update the GUI during actions, we need to make sure the idle
         # process isn't run. We hence remove that for a while here ...
@@ -103,7 +104,7 @@ class GUIController(plugins.Responder, plugins.Observable):
         self.idleManager = IdleHandlerManager()
         uiManager = gtk.UIManager()
         self.defaultActionGUIs, self.actionTabGUIs = self.interactiveActionHandler.getPluginGUIs(uiManager)
-        self.menuBarGUI, self.toolBarGUI, testPopupGUI, testFilePopupGUI = self.createMenuAndToolBarGUIs(allApps, uiManager, includeSite, includePersonal)
+        self.menuBarGUI, self.toolBarGUI, testPopupGUI, testFilePopupGUI = self.createMenuAndToolBarGUIs(uiManager, includeSite, includePersonal)
         self.testColumnGUI = testtree.TestColumnGUI(self.dynamic, testCount)
         self.testTreeGUI = testtree.TestTreeGUI(self.dynamic, allApps, testPopupGUI, self.testColumnGUI)
         self.testFileGUI = filetrees.TestFileGUI(self.dynamic, testFilePopupGUI)
@@ -227,9 +228,9 @@ class GUIController(plugins.Responder, plugins.Observable):
         boxGUI = VBoxGUI(parts)
         return TopWindowGUI(boxGUI, self.dynamic, allApps, name)
 
-    def createMenuAndToolBarGUIs(self, allApps, uiManager, *args):
+    def createMenuAndToolBarGUIs(self, uiManager, *args):
         menuNames = self.interactiveActionHandler.getMenuNames()
-        menu = actionholders.MenuBarGUI(allApps, self.dynamic, uiManager, self.allActionGUIs(), menuNames, *args)
+        menu = actionholders.MenuBarGUI(self.dynamic, uiManager, self.allActionGUIs(), menuNames, *args)
         toolbar = actionholders.ToolBarGUI(uiManager, self.progressBarGUI)
         testPopup, testFilePopup = actionholders.createPopupGUIs(uiManager)
         return menu, toolbar, testPopup, testFilePopup
@@ -258,7 +259,7 @@ class GUIController(plugins.Responder, plugins.Observable):
     def notifyStartRead(self):
         if not self.dynamic:
             self.notify("Status", "Reading tests ...")
-            self.notify("ActionStart", "", False)
+            self.notify("ActionStart", False)
     def notifyAllRead(self, suites):
         if not self.dynamic:
             self.notify("Status", "Reading tests completed at " + plugins.localtime() + ".")
@@ -321,7 +322,7 @@ class TopWindowGUI(guiutils.ContainerGUI):
         try:
             import stockitems
             stockitems.register(self.topWindow)
-        except: #pragma : no cover - should never happen
+        except Exception: #pragma : no cover - should never happen
             plugins.printWarning("Failed to register texttest stock icons.")
             plugins.printException()
         iconFile = self.getIcon()
@@ -436,6 +437,7 @@ class TopWindowGUI(guiutils.ContainerGUI):
 
 class ShortcutBarGUI(guiutils.SubGUI):
     def __init__(self, *args):
+        guiutils.SubGUI.__init__(self)
         # Do this first, so we set up interceptors and so on early on
         try:
             from gtkusecase import createShortcutBar
@@ -472,6 +474,7 @@ class PaneGUI(guiutils.ContainerGUI):
         self.separatorHandler = None
         self.position = 0
         self.maxPosition = 0
+        self.initialMaxSize = 0
         self.shrink = shrink
 
     def getSeparatorPositionFromConfig(self):

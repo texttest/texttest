@@ -1,16 +1,14 @@
 #!/usr/local/bin/python
 
 
-import os, filecmp, plugins, time, stat, subprocess, logging
-from ndict import seqdict
+import os, filecmp, plugins, time, subprocess, logging
 from shutil import copyfile
-from fnmatch import fnmatch
 
 class FileComparison:
     SAME = 0
     DIFFERENT = 1
     SAVED = 2
-    def __init__(self, test, stem, standardFile, tmpFile, testInProgress=False, observers={}):
+    def __init__(self, test, stem, standardFile, tmpFile, testInProgress=False, **kw):
         self.stdFile = standardFile
         self.stdCmpFile = self.stdFile
         self.tmpFile = tmpFile
@@ -238,7 +236,7 @@ class FileComparison:
         return os.path.join(dirname, localRoot)
     def versionMatchesStd(self, versionString):
         versions = set(versionString.split("."))
-        dirname, local = os.path.split(self.stdFile)
+        local = os.path.basename(self.stdFile)
         localVersions = set(local.split(".")[2:])
         return versions == localVersions
     def getStdFileForSave(self, versionString):

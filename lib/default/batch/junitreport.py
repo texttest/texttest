@@ -10,6 +10,7 @@ class JUnitResponder(plugins.Responder):
     report writer. Only does anything if the app has batch_junit_format:true in its config file """
     
     def __init__(self, optionMap, *args):
+        plugins.Responder.__init__(self)
         self.sessionName = optionMap["b"]
         self.runId = optionMap.get("name", calculateBatchDate()) # use the command-line name if given, else the date
         self.allApps = seqdict()
@@ -27,7 +28,7 @@ class JUnitResponder(plugins.Responder):
         
     def notifyAllComplete(self):
         # allApps is {appname : [app]}
-        for appname, appList in self.allApps.items():
+        for appList in self.allApps.values():
             # appData is {app : data}
             for app in appList:
                 if self.useJUnitFormat(app):
@@ -54,7 +55,7 @@ class JUnitApplicationData:
         if not test.state.hasResults():
             self._error(test, result)
         elif test.state.hasSucceeded():
-            self._success(test, result)
+            self._success(result)
         else:
             self._failure(test, result)
         
@@ -78,7 +79,7 @@ class JUnitApplicationData:
         result["short_message"] = self._shortMessage(test)
         result["long_message"] = self._longMessage(test)                   
 
-    def _success(self, test, result):
+    def _success(self, result):
         result["error"] = False
         result["success"] = True
         result["failure"] = False        
@@ -91,8 +92,7 @@ class JUnitApplicationData:
         result["long_message"] = self._longMessage(test)                    
     
     def _shortMessage(self, test):
-        overall, postText = test.state.getTypeBreakdown()
-        return postText 
+        return test.state.getTypeBreakdown()[1]
     
     def _longMessage(self, test):
         message = test.state.freeText.replace("]]>", "END_MARKER")

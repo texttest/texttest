@@ -8,7 +8,7 @@ import gtk, guiutils, plugins, os, sys, logging, types
 from ndict import seqdict
 
 class MenuBarGUI(guiutils.SubGUI):
-    def __init__(self, allApps, dynamic, uiManager, actionGUIs, menuNames, *args):
+    def __init__(self, dynamic, uiManager, actionGUIs, menuNames, *args):
         guiutils.SubGUI.__init__(self)
         # Create GUI manager, and a few default action groups
         self.menuNames = menuNames
@@ -196,7 +196,6 @@ class PopupMenuGUI(guiutils.SubGUI):
                 if pathInfo[0] not in selectedRows[1]:
                     selection.unselect_all()
                     selection.select_path(pathInfo[0])
-                path, col, cellx, celly = pathInfo
                 treeview.grab_focus()
                 self.widget.popup(None, None, None, event.button, time)
                 treeview.emit_stop_by_name("button-press-event")
@@ -232,10 +231,7 @@ class NotebookGUI(guiutils.SubGUI):
         return tabGUI.createView()
 
     def shouldShowCurrent(self, *args):
-        for name, tabGUI in self.tabInfo:
-            if tabGUI.shouldShowCurrent(*args):
-                return True
-        return False
+        return any((tg.shouldShowCurrent(*args) for _, tg in self.tabInfo))
 
 
 # Notebook GUI that adds and removes tabs as appropriate...
@@ -307,7 +303,7 @@ class ChangeableNotebookGUI(NotebookGUI):
         notebook.connect("switch-page", self.pageSwitched)
         return notebook
     
-    def pageSwitched(self, notebook, page, newNum, *args):
+    def pageSwitched(self, dummy, dummy2, newNum, *args):
         newName, newTabGUI = self.tabInfo[newNum]
         self.diag.info("Resetting current page to page " + repr(newNum) + " = " + repr(newName))
         # Must do this afterwards, otherwise the above change doesn't propagate
@@ -316,7 +312,7 @@ class ChangeableNotebookGUI(NotebookGUI):
 
     def findPagesToHide(self, *args):
         pages = seqdict()
-        for pageNum, (name, tabGUI) in enumerate(self.tabInfo):
+        for pageNum, (_, tabGUI) in enumerate(self.tabInfo):
             page = self.notebook.get_nth_page(pageNum)
             if not tabGUI.shouldShowCurrent(*args) and page.get_property("visible"):
                 pages[pageNum] = page
@@ -341,11 +337,11 @@ class ChangeableNotebookGUI(NotebookGUI):
         return True
 
     def updateCurrentPage(self, rowCount):
-        for pageNum, (tabName, tabGUI) in enumerate(self.tabInfo):
+        for pageNum, (_, tabGUI) in enumerate(self.tabInfo):
             if tabGUI.shouldShowCurrent() and tabGUI.forceVisible(rowCount):
                 return self.notebook.set_current_page(pageNum)
 
-    def notifyNewTestSelection(self, tests, apps, rowCount, direct):
+    def notifyNewTestSelection(self, tests, dummyApps, rowCount, direct):
         # This is mostly an attempt to work around the tree search problems.
         # Don't hide the tab for user-deselections of all tests because it trashes the search.
         if len(tests) > 0 or not direct:
@@ -358,13 +354,13 @@ class ChangeableNotebookGUI(NotebookGUI):
     def updatePages(self, test=None, state=None, rowCount=0, changeCurrentPage=False):
         if not self.notebook:
             return
-        pagesShown = self.showNewPages(test, state)
-        pagesHidden = self.hideOldPages(test, state)
+        self.showNewPages(test, state)
+        self.hideOldPages(test, state)
         if changeCurrentPage:
             self.updateCurrentPage(rowCount)
 
-    def notifyLifecycleChange(self, test, state, changeDesc):
+    def notifyLifecycleChange(self, test, state, *args):
         self.updatePages(test, state)
 
-    def addSuites(self, suites):
+    def addSuites(self, *args):
         self.updatePages()

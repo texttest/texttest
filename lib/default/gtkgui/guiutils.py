@@ -34,7 +34,7 @@ class Utf8Converter:
         for encoding in encodings:
             try:
                 return unicode(text, encoding, errors="strict")
-            except:
+            except Exception:
                 pass
 
         sys.stderr.write("WARNING: TextTest's textual display had some trouble with character encodings.\n" + \
@@ -82,17 +82,17 @@ class RefreshTips:
         else:
             return model[path][self.refreshIndex]
 
-    def getTooltip(self, view, widget_x, widget_y, keyboard_mode, tooltip): # pragma: no cover - PyUseCase cannot test tooltips (future?)
+    def getTooltip(self, view, widget_x, widget_y, dummy, tooltip): # pragma: no cover - PyUseCase cannot test tooltips (future?)
         x, y = view.convert_widget_to_tree_coords(widget_x, widget_y)
         pathInfo = view.get_path_at_pos(x, y)
         if pathInfo is None:
             return False
         
-        path, column, cell_x, cell_y = pathInfo
+        path, column, cell_x, _ = pathInfo
         if column is not self.refreshColumn or not self.hasRefreshIcon(view, path):
             return False
 
-        cell_pos, cell_size = column.cell_get_position(self.refreshCell)
+        cell_pos = column.cell_get_position(self.refreshCell)[0]
         if cell_x > cell_pos:
             tooltip.set_text("Indicates that this " + self.name + "'s saved result has changed since the status was calculated. " + \
                              "It's therefore recommended to recompute the status.")
@@ -323,7 +323,7 @@ class SubGUI(plugins.Observable):
     def getGroupTabTitle(self):
         return "Test"
 
-    def forceVisible(self, rowCount):
+    def forceVisible(self, *args):
         return False
 
     def addScrollBars(self, view, hpolicy):
@@ -344,7 +344,7 @@ class SubGUI(plugins.Observable):
             from usecase import applicationEvent
             # Everything that comes from here is to do with editing files in external programs
             applicationEvent(name, "files", **kw)
-        except:
+        except ImportError:
             pass
 
 

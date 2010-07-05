@@ -1,12 +1,13 @@
 #!/usr/local/bin/python
 
-import default, plugins, os, sys, subprocess, signal, logging
+import plugins, os, sys, subprocess, signal, logging
         
 # Unlike earlier incarnations of this functionality,
 # we don't rely on sharing displays but create our own for each test run.
 class VirtualDisplayResponder(plugins.Responder):
     instance = None
     def __init__(self, *args):
+        plugins.Responder.__init__(self, *args)
         self.displayName = None
         self.displayMachine = None
         self.displayPid = None
@@ -104,7 +105,7 @@ class VirtualDisplayResponder(plugins.Responder):
         return self.startXvfb(startArgs, machine)
 
     def startXvfb(self, startArgs, machine):
-        for attempt in range(5):
+        for i in range(5):
             self.diag.info("Starting Xvfb using args " + repr(startArgs))
             self.displayProc = subprocess.Popen(startArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             line = plugins.retryOnInterrupt(self.displayProc.stdout.readline)

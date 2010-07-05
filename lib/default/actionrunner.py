@@ -1,5 +1,5 @@
 
-import plugins, os, sys, time, logging, types
+import plugins, sys, logging, types
 from Queue import Queue, Empty
 from ndict import seqdict
 from threading import Lock
@@ -34,7 +34,7 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
     def addTest(self, test):
         self.testQueue.put(test)
 
-    def notifyAllRead(self, suites):
+    def notifyAllRead(self, *args):
         self.diag.info("All read, adding terminator")
         self.testQueue.put(None)    
 
@@ -110,7 +110,7 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
 
             
 class ActionRunner(BaseActionRunner):
-    def __init__(self, optionMap, allApps):
+    def __init__(self, optionMap, *args):
         BaseActionRunner.__init__(self, optionMap, logging.getLogger("Action Runner"))
         self.currentTestRunner = None
         self.previousTestRunner = None

@@ -319,7 +319,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         button = gtk.Button()
         self.filterAction.connect_proxy(button)
         button.set_image(gtk.image_new_from_stock(self.getStockId(), gtk.ICON_SIZE_BUTTON))
-        self.setTooltipText(button, self.getFilterTooltip())
+        button.set_tooltip_text(self.getFilterTooltip())
         return button
 
     def createFrame(self, name, group, button):

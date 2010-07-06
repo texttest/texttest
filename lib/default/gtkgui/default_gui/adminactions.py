@@ -13,7 +13,7 @@ class FocusDependentAction(guiplugins.ActionGUI):
         guiplugins.ActionGUI.notifyTopWindow(self, window)
         window.connect("set-focus", self.focusChanged)
 
-    def focusChanged(self, window, widget):
+    def focusChanged(self, dummy, widget):
         freeTextWidget = isinstance(widget, gtk.Entry) or isinstance(widget, gtk.TextView)
         if freeTextWidget:
             self.setSensitivity(False)
@@ -68,7 +68,7 @@ class CutTests(ClipboardAction):
 
 class PasteTests(FocusDependentAction):
     def __init__(self, *args):
-        guiplugins.ActionGUI.__init__(self, *args)
+        FocusDependentAction.__init__(self, *args)
         self.clipboardTests = []
         self.removeAfter = False
     def singleTestOnly(self):
@@ -388,10 +388,10 @@ class ImportTestCase(ImportTest):
             optionFile.write(optionString + "\n")
         return optionString
 
-    def getOptions(self, suite):
+    def getOptions(self, *args):
         return self.optionGroup.getOptionValue("opt")
 
-    def getEnvironment(self, suite):
+    def getEnvironment(self, *args):
         return {}
 
     def writeResultsFiles(self, suite, testDir):
@@ -646,7 +646,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
 
     def createComboBoxEntry(self, *args):
         combobox, entry = guiplugins.ActionDialogGUI.createComboBoxEntry(self, *args)
-        handler = combobox.connect("changed", self.stemChanged)
+        combobox.connect("changed", self.stemChanged)
         return combobox, entry
 
     def createRadioButtons(self, *args):
@@ -780,6 +780,10 @@ class ImportFiles(guiplugins.ActionDialogGUI):
 
 
 class RemoveTests(guiplugins.ActionGUI):
+    def __init__(self, *args, **kw):
+        self.distinctTestCount = 0
+        guiplugins.ActionGUI.__init__(self, *args, **kw)
+    
     def isActiveOnCurrent(self, *args):
         if len(self.currFileSelection) > 0:
             return False
@@ -921,10 +925,10 @@ class RemoveFiles(guiplugins.ActionGUI):
         test = self.currTestSelection[0]
         warnings = ""
         removed = 0
-        for filePath, comparison in self.currFileSelection:
+        for filePath, _ in self.currFileSelection:
             fileType = self.getType(filePath)
             self.notify("Status", "Removing " + fileType + " " + os.path.basename(filePath))
-            self.notify("ActionProgress", "")
+            self.notify("ActionProgress")
             permMessage = "Insufficient permissions to remove " + fileType + " '" + filePath + "'"
             if plugins.tryFileChange(self.removePath, permMessage, filePath):
                 removed += 1
@@ -1230,21 +1234,18 @@ class SortTestSuiteFileAscending(guiplugins.ActionGUI):
         self.performRecursively(self.currTestSelection[0], True)
     def performRecursively(self, suite, ascending):
         # First ask all sub-suites to sort themselves
-        errors = ""
         if guiutils.guiConfig.getValue("sort_test_suites_recursively"):
             for test in suite.testcases:
                 if test.classId() == "test-suite":
-                    try:
-                        self.performRecursively(test, ascending)
-                    except Exception, e:
-                        errors += str(e) + "\n"
-
+                    self.performRecursively(test, ascending)
+                    
         self.notify("Status", "Sorting " + repr(suite))
-        self.notify("ActionProgress", "")
+        self.notify("ActionProgress")
         if self.hasNonDefaultTests():
             self.showWarningDialog("\nThe test suite\n'" + suite.name + "'\ncontains tests which are not present in the default version.\nTests which are only present in some versions will not be\nmixed with tests in the default version, which might lead to\nthe suite not looking entirely sorted.")
 
         suite.sortTests(ascending)
+        
     def hasNonDefaultTests(self):
         if len(self.currTestSelection) == 1:
             return False

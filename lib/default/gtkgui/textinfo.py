@@ -4,14 +4,14 @@ The various text info views, i.e. the bottom right-corner "Text Info" and
 the "Run Info" tab from the dynamic GUI
 """
 
-import gtk, pango, guiutils, plugins, os, sys, subprocess, time
+import gtk, pango, guiutils, plugins, os, sys, time
 from default import performance
 
 class TimeMonitor:
     def __init__(self):
         self.timingInfo = {}
         
-    def notifyLifecycleChange(self, test, state, changeDesc):
+    def notifyLifecycleChange(self, test, dummyState, changeDesc):
         if changeDesc in [ "start", "complete" ]:
             self.timingInfo.setdefault(test, []).append((changeDesc, time.time()))
 
@@ -122,7 +122,6 @@ class TextViewGUI(guiutils.SubGUI):
     def set_cursor_if_appropriate(self, text_view, x, y): # pragma : no cover - external code
         hovering = False
 
-        buffer = text_view.get_buffer()
         iter = text_view.get_iter_at_location(x, y)
 
         hovering = bool(self.findLinkTarget(iter))
@@ -294,12 +293,12 @@ class TextInfoGUI(TextViewGUI):
                 self.preambleText = self.text
             self.text += str(freeText)
             if state.hasStarted() and not state.isComplete():
-                self.text += self.getPerformanceEstimate(test, state)
+                self.text += self.getPerformanceEstimate(test)
                 self.text += "\n\nTo obtain the latest progress information and an up-to-date comparison of the files above, " + \
                              "perform 'recompute status' (press '" + \
                              guiutils.guiConfig.getCompositeValue("gui_accelerators", "recompute_status") + "')"
 
-    def getPerformanceEstimate(self, test, state):
+    def getPerformanceEstimate(self, test):
         expected = performance.getTestPerformance(test)
         if expected > 0:
             elapsed = self.timeMonitor.getElapsedTime(test)
@@ -327,19 +326,19 @@ class TextInfoGUI(TextViewGUI):
             self.resetText(self.currentTest, self.currentTest.stateInGui)
             self.updateView()
 
-    def notifyDescriptionChange(self, test):
+    def notifyDescriptionChange(self, *args):
         self.resetText(self.currentTest, self.currentTest.stateInGui)
         self.notifyNewFileSelection(self.currFileSelection)
         self.updateView()
 
-    def notifyLifecycleChange(self, test, state, changeDesc):
+    def notifyLifecycleChange(self, test, state, *args):
         if not test is self.currentTest:
             return
         self.resetText(test, state)
         self.updateView()
 
     def hasStem(self, line, files):
-        for fileName, comp in files:
+        for _, comp in files:
             if comp.stem and line.find(" " + repr(comp) + " ") != -1:
                 return True
         return False
@@ -367,7 +366,7 @@ class TextInfoGUI(TextViewGUI):
             text += previewGenerator.getPreview(open(fileName))
         return text
 
-    def notifyNameChange(self, test, origRelPath):
+    def notifyNameChange(self, test, *args):
         if test is self.currentTest:
             self.resetText(self.currentTest, self.currentTest.stateInGui)
             self.notifyNewFileSelection(self.currFileSelection)

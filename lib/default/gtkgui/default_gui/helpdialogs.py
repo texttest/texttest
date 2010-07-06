@@ -8,6 +8,12 @@ from types import StringType
 # to show pygtk/gtk/python versions in our dialog, so we create our own ...
 class AboutTextTest(guiplugins.ActionResultDialogGUI):
     website = "http://www.texttest.org"
+    def __init__(self, *args, **kw):
+        self.creditsButton = None
+        self.licenseButton = None
+        self.versionsButton = None
+        guiplugins.ActionResultDialogGUI.__init__(self, *args, **kw)
+        
     def getDialogTitle(self):
         return "About TextTest"
     def isActiveOnCurrent(self, *args):

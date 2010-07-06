@@ -22,6 +22,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         guiplugins.ActionTabGUI.__init__(self, allApps)
         AllTestsHandler.__init__(self)
         self.dynamic = dynamic
+        self.filterAccel = None
         self.filterAction = gtk.Action("Filter", "Filter", \
                                        self.getFilterTooltip(), self.getStockId())
         self.filterAction.connect("activate", self.filterTests)
@@ -199,8 +200,8 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
 
     def adjustForExtraVersions(self, rootSuites):
         apps = self.findMainApps()
-        if len(apps) == len(self.rootTestSuites):
-            return self.rootTestSuites
+        if len(apps) == len(rootSuites):
+            return rootSuites
 
         versionSelection = self.optionGroup.getOptionValue("vs")
         removeApps = []
@@ -210,7 +211,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
             for extra in app.extras:
                 if len(set(extra.versions).intersection(newExtras)) == 0:
                     removeApps.append(extra)
-        return filter(lambda s: s.app not in removeApps, self.rootTestSuites)
+        return filter(lambda s: s.app not in removeApps, rootSuites)
 
     def getSuitesToTry(self):
         # If only some of the suites present match the version selection, only consider them.
@@ -222,7 +223,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
             return toTry
             
     def getRequestedTests(self, suite, filters, strategy):
-        self.notify("ActionProgress", "") # Just to update gui ...
+        self.notify("ActionProgress") # Just to update gui ...
         if strategy == 1: # refine, don't check the whole suite
             tests = filter(lambda test: test.app is suite.app and test.isAcceptedByAll(filters), self.currTestSelection)
         else:
@@ -240,7 +241,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
             if suite.classId() == "test-suite":
                 tests = []
                 for subSuite in self.findTestCaseList(suite):
-                    self.notify("ActionProgress", "") # Just to update gui ...
+                    self.notify("ActionProgress") # Just to update gui ...
                     tests += self.getRequestedTestsFromSuite(subSuite, filters)
                 return tests
             else:
@@ -293,7 +294,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         strategy = self.filteringGroup.getSwitchValue("current_filtering")
         toShow = self.findTestsToShow(newSelection, strategy)
         self.notify("Visibility", toShow, True)
-        self.notify("ActionProgress", "")
+        self.notify("ActionProgress")
         toHide = self.findTestsToHide(newSelection, strategy)
         self.notify("Visibility", toHide, False)
         self.notify("ActionStop")
@@ -440,7 +441,7 @@ class SaveSelection(guiplugins.ActionDialogGUI):
             for test in suite.testCaseList():
                 self.notify("WriteTestIfSelected", test, file)
     
-    def notifySetTestSelection(self, tests, criteria="", *args):
+    def notifySetTestSelection(self, dummy, criteria="", *args):
         self.selectionCriteria = criteria
     
     def getConfirmationMessage(self):

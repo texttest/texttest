@@ -24,7 +24,7 @@ class TestColumnGUI(guiutils.SubGUI):
     def addSuites(self, suites):
         self.allSuites = suites
 
-    def createView(self, treeview):
+    def createView(self):
         testRenderer = gtk.CellRendererText()
         self.column = gtk.TreeViewColumn(self.getTitle(), testRenderer, text=0, background=1, foreground=7)
         self.column.set_data("name", "Test Name") # Not a widget, so we can't set a name, do this instead
@@ -43,13 +43,13 @@ class TestColumnGUI(guiutils.SubGUI):
             self.column.set_sort_order(gtk.SORT_DESCENDING)
         return self.column
     
-    def renderSuitesBold(self, column, cell, model, iter):
+    def renderSuitesBold(self, dummy, cell, model, iter):
         if model.get_value(iter, 2)[0].classId() == "test-case":
             cell.set_property('font', "")
         else:
             cell.set_property('font', "bold")
 
-    def columnClicked(self, treeviewcolumn):
+    def columnClicked(self, *args):
         if not self.column.get_sort_indicator():
             self.column.set_sort_indicator(True)
             self.column.set_sort_order(gtk.SORT_ASCENDING)
@@ -72,7 +72,7 @@ class TestColumnGUI(guiutils.SubGUI):
         else:
             self.notify("Status", "Tests sorted according to testsuite file.")
         self.notify("RefreshTestSelection")
-        self.notify("ActionStop", "")
+        self.notify("ActionStop")
         
     def setSortingOrder(self, order, suite = None):
         if not suite:
@@ -150,7 +150,7 @@ class TestColumnGUI(guiutils.SubGUI):
         else:
             return testCount, False
 
-    def notifyNewTestSelection(self, tests, apps, distinctTestCount, direct=False):
+    def notifyNewTestSelection(self, tests, dummyApps, distinctTestCount, *args, **kw):
         newCount, suitesOnly = self.countTests(tests)
         if distinctTestCount > newCount:
             distinctTestCount = newCount
@@ -239,7 +239,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         else:
             return guiutils.guiConfig.getValue("static_collapse_suites")
 
-    def notifyAllRead(self, suites):
+    def notifyAllRead(self, *args):
         if self.dynamic:
             self.filteredModel.connect('row-inserted', self.rowInserted)
         else:
@@ -251,8 +251,8 @@ class TestTreeGUI(guiutils.ContainerGUI):
                 self.treeView.expand_all()
         self.notify("AllRead")
         
-    def makeRowVisible(self, model, path, iter):
-        self.model.set_value(iter, 5, True)
+    def makeRowVisible(self, model, dummyPath, iter):
+        model.set_value(iter, 5, True)
 
     def getNodeName(self, suite, parent):
         nodeName = suite.name
@@ -289,7 +289,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         if self.dynamic:
             self.selection.set_select_function(self.canSelect)
 
-        testsColumn = self.subguis[0].createView(self.treeView)
+        testsColumn = self.subguis[0].createView()
         self.treeView.append_column(testsColumn)
         if self.dynamic:
             detailsRenderer = gtk.CellRendererText()
@@ -316,7 +316,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         self.popupGUI.createView()
         return self.addScrollBars(self.treeView, hpolicy=gtk.POLICY_NEVER)
     
-    def notifyTopWindow(self, window):
+    def notifyTopWindow(self, *args):
         # avoid the quit button getting initial focus, give it to the tree view (why not?)
         self.treeView.grab_focus()
 
@@ -332,8 +332,8 @@ class TestTreeGUI(guiutils.ContainerGUI):
                 del self.collapsedRows[realPath]
         self.expandLevel(treeview, self.filteredModel.iter_children(iter), not self.collapseStatic)
 
-    def rowInserted(self, model, path, iter):
-        self.expandRow(self.filteredModel.iter_parent(iter), False)
+    def rowInserted(self, model, dummy, iter):
+        self.expandRow(model.iter_parent(iter), False)
 
     def expandRow(self, iter, recurse):
         if iter == None:
@@ -365,7 +365,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         try:
             filterPath = self.filteredModel.convert_child_path_to_path(path)
             self.selection.get_tree_view().collapse_row(filterPath)
-        except:
+        except RuntimeError:
             pass
         self.selecting = False
         self.selectionChanged(direct=False)
@@ -409,7 +409,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         else:
             return False
         
-    def updateRecalculationMarker(self, model, path, iter):
+    def updateRecalculationMarker(self, model, dummy, iter):
         tests = model.get_value(iter, 2)
         if not tests[0].stateInGui.isComplete():
             return
@@ -458,7 +458,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         self.diag.info("Selected tests are " + repr(allSelected))
         return allSelected
 
-    def addSelTest(self, model, path, iter, args):
+    def addSelTest(self, model, dummy, iter, args):
         selected, prevSelected = args
         selected += self.getNewSelected(model.get_value(iter, 2), prevSelected)
 
@@ -589,7 +589,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         self.model.foreach(self.appendTest, tests)
         return tests
     
-    def appendTest(self, model, path, iter, tests):
+    def appendTest(self, model, dummy, iter, tests):
         for test in model.get_value(iter, 2):
             if test.classId() == "test-case":
                 tests.append(test)
@@ -706,10 +706,10 @@ class TestTreeGUI(guiutils.ContainerGUI):
 
     def notifyContentChange(self, suite):
         suiteIter = self.itermap.getIterator(suite)
-        newOrder = self.findNewOrder(suite, suiteIter)
+        newOrder = self.findNewOrder(suiteIter)
         self.model.reorder(suiteIter, newOrder)
 
-    def findNewOrder(self, suite, suiteIter):
+    def findNewOrder(self, suiteIter):
         child = self.model.iter_children(suiteIter)
         index = 0
         posMap = {}

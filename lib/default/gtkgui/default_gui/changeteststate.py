@@ -9,6 +9,7 @@ from default.gtkgui import guiplugins # from .. import guiplugins when we drop P
 class SaveTests(guiplugins.ActionDialogGUI):
     def __init__(self, allApps, *args):
         guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
+        self.directAccel = None
         self.directAction = gtk.Action("Save", "_Save", \
                                        self.getDirectTooltip(), self.getStockId())
         self.directAction.connect("activate", self._respond)
@@ -132,7 +133,7 @@ class SaveTests(guiplugins.ActionDialogGUI):
         return False
 
     def getStemsToSave(self):
-        return [ os.path.basename(fileName).split(".")[0] for fileName, comparison in self.currFileSelection ]
+        return [ os.path.basename(fileName).split(".")[0] for fileName, _ in self.currFileSelection ]
 
     def getBackupVersions(self):
         versionString = self.optionGroup.getOptionValue("old")
@@ -146,13 +147,8 @@ class SaveTests(guiplugins.ActionDialogGUI):
         if self.optionGroup.getOptionValue("v") in backupVersions:
             raise plugins.TextTestError, "Cannot backup to the same version we're trying to save! Choose another name."
         
-        saveDesc = ", exactness " + str(self.getExactness())
         stemsToSave = self.getStemsToSave()
-        if len(stemsToSave) > 0:
-            saveDesc += ", only " + ",".join(stemsToSave)
         overwriteSuccess = self.optionGroup.getSwitchValue("over")
-        if overwriteSuccess:
-            saveDesc += ", overwriting both failed and succeeded files"
 
         tests = self.getSaveableTests()
         # Calculate the versions beforehand, as saving tests can change the selection,
@@ -208,13 +204,13 @@ class RecomputeTests(guiplugins.ActionGUI):
         self.latestNumberOfRecomputations = 0
         for app in self.currAppSelection:
             self.notify("Status", "Rereading configuration for " + repr(app) + " ...")
-            self.notify("ActionProgress", "")
+            self.notify("ActionProgress")
             app.setUpConfiguration()
 
         for test in self.currTestSelection:
             self.latestNumberOfRecomputations += 1
             self.notify("Status", "Recomputing status of " + repr(test) + " ...")
-            self.notify("ActionProgress", "")
+            self.notify("ActionProgress")
             test.app.recomputeProgress(test, test.stateInGui, self.observers)
             self.notify("Recomputed", test)
 
@@ -237,7 +233,7 @@ class MarkTest(guiplugins.ActionDialogGUI):
                 newState = plugins.MarkedTestState(self.optionGroup.getOptionValue("free"),
                                                    self.optionGroup.getOptionValue("brief"), oldState)
                 test.changeState(newState)
-                self.notify("ActionProgress", "") # Just to update gui ...
+                self.notify("ActionProgress") # Just to update gui ...
     def isActiveOnCurrent(self, test=None, state=None):
         if state and state.isComplete():
             return True
@@ -256,7 +252,7 @@ class UnmarkTest(guiplugins.ActionGUI):
             if test.stateInGui.isMarked():
                 test.stateInGui.oldState.lifecycleChange = "unmarked" # To avoid triggering completion ...
                 test.changeState(test.stateInGui.oldState)
-                self.notify("ActionProgress", "") # Just to update gui ...
+                self.notify("ActionProgress") # Just to update gui ...
     def isActiveOnCurrent(self, *args):
         for test in self.currTestSelection:
             if test.stateInGui.isMarked():
@@ -288,7 +284,7 @@ class KillTests(guiplugins.ActionGUI):
         testDesc = str(len(tests)) + " tests"
         self.notify("Status", "Killing " + testDesc + " ...")
         for test in tests:
-            self.notify("ActionProgress", "")
+            self.notify("ActionProgress")
             guiplugins.guilog.info("Killing " + repr(test))
             test.notify("Kill")
 
@@ -296,5 +292,5 @@ class KillTests(guiplugins.ActionGUI):
 
 
 def getInteractiveActionClasses():
-     return [ SaveTests, KillTests, MarkTest, UnmarkTest, RecomputeTests ]
+    return [ SaveTests, KillTests, MarkTest, UnmarkTest, RecomputeTests ]
  

@@ -204,7 +204,7 @@ class BugMap(seqdict):
             parser.read(fileName)
             parser._sections.__getitem__ = realLookup
             return parser
-        except:
+        except Exception:
             plugins.printWarning("Bug file at " + fileName + " not understood, ignoring")
     def readFromParser(self, parser):
         for section in reversed(sorted(parser.sections())):
@@ -221,7 +221,7 @@ class CheckForCrashes(plugins.Action):
         if test.state.category == "killed":
             return
         # Hard-coded prediction: check test didn't crash
-        comparison, newList = test.state.findComparison("stacktrace")
+        comparison, _ = test.state.findComparison("stacktrace")
         if comparison and comparison.newResult():
             stackTraceFile = comparison.tmpFile
             self.diag.info("Parsing " + stackTraceFile)
@@ -328,8 +328,8 @@ class CheckForBugs(plugins.Action):
                 diffCount -= 1
         return diffCount > 1
     
-    def fileChanged(self, test, state, stem):
-        comparison, list = state.findComparison(stem)
+    def fileChanged(self, testArg, state, stem):
+        comparison, _ = state.findComparison(stem)
         return bool(comparison)
 
     def readBugs(self, test):
@@ -357,7 +357,7 @@ class MigrateFiles(plugins.Action):
             parser.optionxform = str
             try:
                 parser.read(bugFileName)
-            except:
+            except Exception:
                 plugins.printWarning("Bug file at " + bugFileName + " not understood, ignoring")
                 continue
             if not parser.has_section("Migrated section 1"):

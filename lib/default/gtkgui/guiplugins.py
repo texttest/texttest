@@ -62,7 +62,7 @@ class ProcessTerminationMonitor(plugins.Observable):
         for pid, (process, description) in self.processesForKill.items():
             if self.exitHandlers.has_key(pid):
                 self.exitHandlers.pop(pid) # don't call exit handlers in this case, we're terminating
-            self.notify("ActionProgress", "")
+            self.notify("ActionProgress")
             guilog.info("Killing '" + description + "' interactive process")
             killSubProcessAndChildren(process, sig)
         
@@ -316,7 +316,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
             self.notify("Status", message)
         
     def endPerform(self):
-        self.notify("ActionStop", "")
+        self.notify("ActionStop")
 
     def cancel(self):
         self.notify("Status", "Action cancelled.")

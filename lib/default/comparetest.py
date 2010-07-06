@@ -61,7 +61,7 @@ class BaseTestComparison(plugins.TestState):
         resultFilesToCompare = filter(self.shouldCompare, resultFiles + defFiles)
         stdFiles = self.makeStemDict(resultFilesToCompare)
         for tmpStem, tmpFile in tmpFiles.items():
-            self.notifyIfMainThread("ActionProgress", "")
+            self.notifyIfMainThread("ActionProgress")
             stdFile = stdFiles.get(tmpStem)
             self.diag.info("Comparing " + repr(stdFile) + "\nwith " + tmpFile) 
             comparison = self.createFileComparison(test, tmpStem, stdFile, tmpFile)
@@ -72,7 +72,7 @@ class BaseTestComparison(plugins.TestState):
 
     def makeMissingComparisons(self, test, stdFiles, tmpFiles):
         for stdStem, stdFile in stdFiles.items():
-            self.notifyIfMainThread("ActionProgress", "")
+            self.notifyIfMainThread("ActionProgress")
             if not tmpFiles.has_key(stdStem):
                 comparison = self.createFileComparison(test, stdStem, stdFile, None)
                 if comparison:
@@ -351,7 +351,7 @@ class TestComparison(BaseTestComparison):
         else:
             versionRepr = ", no version"
         self.notifyIfMainThread("Status", testRepr + compStr + versionRepr)
-        self.notifyIfMainThread("ActionProgress", "")
+        self.notifyIfMainThread("ActionProgress")
 
     def makeNewState(self, test, lifeCycleDest):
         newState = TestComparison(self, test.app, "be " + lifeCycleDest)

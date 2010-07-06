@@ -98,9 +98,9 @@ class RefreshAll(guiplugins.BasicActionGUI):
         self.performOnCurrent()
     def performOnCurrent(self):
         for suite in self.rootTestSuites:
-            self.notify("ActionProgress", "")
+            self.notify("ActionProgress")
             suite.app.setUpConfiguration()
-            self.notify("ActionProgress", "")
+            self.notify("ActionProgress")
             filters = suite.app.getFilterList(self.rootTestSuites)
             suite.refresh(filters)
 

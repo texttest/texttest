@@ -53,7 +53,7 @@ class IdleHandlerManager:
         if self.sourceId >= 0:
             raise plugins.TextTestError, "No Action currently exists to have progress on!"
 
-    def notifyActionStop(self, *args):
+    def notifyActionStop(self):
         # Activate idle function again, see comment in notifyActionStart
         self.enableHandler()
         

@@ -181,7 +181,7 @@ class RunDependentTextFilter(plugins.Observable):
         lineNumber = 0
         for line in file:
             # We don't want to stack up ActionProgreess calls in ThreaderNotificationHandler ...
-            self.notifyIfMainThread("ActionProgress", "")
+            self.notifyIfMainThread("ActionProgress")
             lineNumber += 1
             lineFilter, filteredLine = self.getFilteredLine(line, lineNumber)
             if filteredLine:

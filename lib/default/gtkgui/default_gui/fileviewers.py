@@ -9,6 +9,10 @@ from ndict import seqdict
 from string import Template
 
 class FileViewAction(guiplugins.ActionGUI):
+    def __init__(self, *args, **kw):
+        self.performArgs = []
+        guiplugins.ActionGUI.__init__(self, *args, **kw)
+        
     def singleTestOnly(self):
         return True
 
@@ -25,13 +29,6 @@ class FileViewAction(guiplugins.ActionGUI):
 
     def useFiltered(self):
         return False
-
-    def getConfirmationMessage(self):
-        maxFileSize = self.getMaxFileSize()
-        if maxFileSize >= 0:
-            largestFileSize = self.getLargestFileSize()
-            
-        return ""
 
     def getLargestFileSize(self, f, *args):
         return os.path.getsize(f)            
@@ -238,7 +235,7 @@ class ViewConfigFileInEditor(ViewInEditor):
         self.currFileSelection = [ (fileName, apps) ]
         self.runInteractive()
 
-    def findExitHandlerInfo(self, fileName, apps):
+    def findExitHandlerInfo(self, dummy, apps):
         return self.configFileChanged, (apps,)
 
     def configFileChanged(self, apps):
@@ -467,7 +464,8 @@ class FollowFile(FileViewAction):
 class ShowFileProperties(guiplugins.ActionResultDialogGUI):
     def __init__(self, allApps, dynamic, *args):
         self.dynamic = dynamic
-        guiplugins.ActionGUI.__init__(self, allApps)
+        guiplugins.ActionResultDialogGUI.__init__(self, allApps)
+        
     def _getStockId(self):
         return "properties"
     def isActiveOnCurrent(self, *args):
@@ -497,7 +495,7 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
             try:
                 prop = plugins.FileProperties(file)
                 properties.append(prop)
-            except Exception, e:
+            except Exception:
                 errors.append(plugins.getExceptionString())
 
     # xalign = 1.0 means right aligned, 0.0 means left aligned

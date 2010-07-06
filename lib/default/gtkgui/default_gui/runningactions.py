@@ -3,7 +3,7 @@
 The various ways to launch the dynamic GUI from the static GUI
 """
 
-import gtk, plugins, os, sys, shutil 
+import gtk, plugins, os, sys
 from default.gtkgui import guiplugins # from .. import guiplugins, guiutils when we drop Python 2.4 support
 from copy import copy, deepcopy
 
@@ -11,6 +11,7 @@ class RunningAction:
     runNumber = 1
     def __init__(self, inputOptions):
         self.inputOptions = inputOptions
+        self.testCount = 0
         
     def getGroupTabTitle(self):
         return "Running"
@@ -105,7 +106,7 @@ class RunningAction:
             ttOptions += [ "-fd", tmpFilterDir ]
         return ttOptions
 
-    def getCommandLineKeys(self, usecase):
+    def getCommandLineKeys(self, *args):
         # assume everything by default
         return []
 
@@ -198,7 +199,7 @@ class ReconnectToTests(RunningAction,guiplugins.ActionDialogGUI):
 
 class RunTests(RunningAction,guiplugins.ActionTabGUI):
     optionGroups = []
-    def __init__(self, allApps, dynamic, inputOptions):
+    def __init__(self, allApps, dummy, inputOptions):
         guiplugins.ActionTabGUI.__init__(self, allApps)
         RunningAction.__init__(self, inputOptions)
         self.optionGroups.append(self.optionGroup)
@@ -269,7 +270,7 @@ class RunTestsAdvanced(RunTests):
         return "Advanced"
 
 class RerunTests(RunningAction,guiplugins.ActionGUI):
-    def __init__(self, allApps, dynamic, inputOptions):
+    def __init__(self, allApps, dummy, inputOptions):
         self.reconnecting = inputOptions.has_key("reconnect")
         guiplugins.ActionGUI.__init__(self, allApps)
         RunningAction.__init__(self, inputOptions)
@@ -291,7 +292,7 @@ class RerunTests(RunningAction,guiplugins.ActionGUI):
     def getTmpFilterDir(self, app):
         return "" # don't want selections returned here, send them to the static GUI
 
-    def isValidForApp(self, app):
+    def isValidForApp(self, *args):
         return not self.reconnecting
     
     def getTextTestOptions(self, *args):

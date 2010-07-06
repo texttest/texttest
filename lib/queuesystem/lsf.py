@@ -1,5 +1,5 @@
 
-import os, subprocess
+import os
 
 # Used by the master to submit, monitor and delete jobs...
 class QueueSystem:

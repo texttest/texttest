@@ -34,7 +34,7 @@ class SocketResponder(plugins.Responder,plugins.Observable):
         host, port = servAddrStr.split(":")
         return host, int(port)
     def connect(self, sendSocket):
-        for attempt in range(5):
+        for i in range(5):
             try:
                 sendSocket.connect(self.serverAddress)
                 return True
@@ -48,7 +48,7 @@ class SocketResponder(plugins.Responder,plugins.Observable):
         from traceback import format_exception_only
         return "".join(format_exception_only(exctype, value))
 
-    def notifyKillProcesses(self, sig):
+    def notifyKillProcesses(self, *args):
         self.killed = True
 
     def getProcessIdentifier(self):
@@ -62,7 +62,7 @@ class SocketResponder(plugins.Responder,plugins.Observable):
         pickleData = dumps(state)
         fullData = self.getProcessIdentifier() + os.linesep + testData + os.linesep + pickleData
         sleepTime = 1
-        for attempt in range(9):
+        for i in range(9):
             sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             if not self.connect(sendSocket):
                 return self.notify("NoMoreExtraTests")

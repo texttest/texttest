@@ -5,7 +5,7 @@ Code to do with the grid engine master process, i.e. submitting slave jobs and w
 
 import plugins, os, sys, socket, subprocess, signal, logging, time
 from utils import *
-from Queue import Queue, Empty
+from Queue import Queue
 from SocketServer import ThreadingTCPServer, StreamRequestHandler
 from threading import RLock
 from ndict import seqdict
@@ -102,7 +102,7 @@ class QueueSystemServer(BaseActionRunner):
         # Start by polling after 5 seconds, ever after try every 15
         attempts = int(os.getenv("TEXTTEST_QS_POLL_WAIT", "5")) * 2 # Amount of time to wait before initiating polling of SGE
         while True:
-            for attempt in range(attempts):
+            for i in range(attempts):
                 time.sleep(0.5)
                 if self.allComplete or self.exited:
                     return
@@ -118,7 +118,7 @@ class QueueSystemServer(BaseActionRunner):
         self.diag.info("Got status for all jobs : " + repr(statusInfo))
         for test, jobs in self.jobs.items():
             if not test.state.isComplete():
-                for jobId, jobName in jobs:
+                for jobId, _ in jobs:
                     status = statusInfo.get(jobId)
                     if status and test.state.hasStarted() and test.state.briefText:
                         # Only do this to test jobs (might make a difference for derived configurations)
@@ -435,7 +435,7 @@ class QueueSystemServer(BaseActionRunner):
             return "No job has been submitted to " + queueSystemName(test)
         queueSystem = self.getQueueSystem(test)
         # Take the most recent job, it's hopefully the most interesting
-        jobId, jobName = jobInfo[-1]
+        jobId = jobInfo[-1][0]
         return queueSystem.getJobFailureInfo(jobId)
     def getSlaveErrors(self, test, name):
         slaveErrFile = self.getSlaveErrFile(test)
@@ -446,7 +446,7 @@ class QueueSystemServer(BaseActionRunner):
                        "\n" + errors
  
     def getSlaveErrFile(self, test):
-        for jobId, jobName in self.getJobInfo(test):
+        for _, jobName in self.getJobInfo(test):
             errFile = os.path.join(self.getSlaveLogDir(test), jobName + ".errors")
             if os.path.isfile(errFile):
                 return errFile
@@ -584,7 +584,7 @@ class QueueSystemServer(BaseActionRunner):
         name = queueSystemName(test.app)
         return "in " + name + " (job " + jobId + ")"
 
-    def describeJob(self, test, jobId, jobName):
+    def describeJob(self, test, jobId, *args):
         postText = self.getPostText(test, jobId)
         plugins.log.info("T: Cancelling " + repr(test) + " " + postText)
 
@@ -680,7 +680,7 @@ class SlaveRequestHandler(StreamRequestHandler):
         identifier = self.rfile.readline().strip()
         if identifier == "TERMINATE_SERVER":
             return
-        clientHost, clientPort = self.client_address
+        clientHost = self.client_address[0]
         # Don't use port, it changes all the time
         self.handleRequestFromHost(self.getHostName(clientHost), identifier)
 
@@ -702,7 +702,7 @@ class SlaveRequestHandler(StreamRequestHandler):
                 oldBt = test.state.briefText
                 # The updates are only for testing against old slave traffic,
                 # a bit sad we can't disable them when not testing...
-                loaded, state = test.getNewState(self.rfile, updatePaths=True)
+                _, state = test.getNewState(self.rfile, updatePaths=True)
                 self.server.changeState(test, state)
                 self.connection.shutdown(socket.SHUT_RD)
                 self.server.diag.info("Changed from '" + oldBt + "' to '" + state.briefText + "'")
@@ -764,7 +764,7 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
         
         self.diag.info("Terminating slave server")
         
-    def notifyAllRead(self, suites):
+    def notifyAllRead(self, *args):
         if len(self.testMap) == 0:
             self.notifyAllComplete()
             

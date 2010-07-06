@@ -1,6 +1,6 @@
 
 import os, string, subprocess
-from plugins import localtime, gethostname, log
+from plugins import gethostname, log
 from time import sleep
 
 # Used by master process for submitting, deleting and monitoring slave jobs
@@ -62,7 +62,7 @@ class QueueSystem:
     def getStatusForAllJobs(self):
         statusDict = {}
         proc = subprocess.Popen([ "qstat" ], stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        outMsg, errMsg = proc.communicate()
+        outMsg = proc.communicate()[0]
         for line in outMsg.splitlines():
             words = line.split()
             if len(words) >= 5:
@@ -90,7 +90,7 @@ class QueueSystem:
 
     def retryAccountInfo(self, jobId):
         sleepTime = 0.5
-        for trial in range(9): # would be 10 but we had one already
+        for i in range(9): # would be 10 but we had one already
             # assume failure is because the job hasn't propagated yet, wait a bit
             sleep(sleepTime)
             if sleepTime < 5:

@@ -100,7 +100,7 @@ class QueueSystemServer(BaseActionRunner):
 
     def pollQueueSystem(self):
         # Start by polling after 5 seconds, ever after try every 15
-        attempts = 10
+        attempts = int(os.getenv("TEXTTEST_QS_POLL_WAIT", "5")) * 2 # Amount of time to wait before initiating polling of SGE
         while True:
             for attempt in range(attempts):
                 time.sleep(0.5)

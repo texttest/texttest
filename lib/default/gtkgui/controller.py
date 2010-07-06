@@ -247,6 +247,9 @@ class GUIController(plugins.Responder, plugins.Observable):
         gtk.main_quit()
     def notifyLifecycleChange(self, test, state, changeDesc):
         test.stateInGui = state
+        if state.isComplete():
+            # Don't allow GUI-related changes to override the completed status
+            test.state = state
         self.notify("LifecycleChange", test, state, changeDesc)
     def notifyDescriptionChange(self, test):
         self.notify("DescriptionChange", test)

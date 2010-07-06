@@ -63,7 +63,7 @@ def openLinkInBrowser(target):
     else:
         browser = os.getenv("BROWSER", "firefox")
         cmdArgs = [ browser, target ]
-        subprocess.Popen(cmdArgs)
+        subprocess.call(cmdArgs)
         return 'Started "' + " ".join(cmdArgs) + '" in background.'
 
 

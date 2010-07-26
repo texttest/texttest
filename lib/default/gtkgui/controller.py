@@ -202,7 +202,7 @@ class GUIController(plugins.Responder, plugins.Observable):
 
     def readGtkRCFiles(self, *args):
         for file in plugins.findDataPaths([ ".gtkrc-2.0" ], *args):
-            gtk.rc_add_default_file(file)
+            gtk.rc_parse(file)
 
     def addSuites(self, suites):
         for observer in self.getAddSuitesObservers():

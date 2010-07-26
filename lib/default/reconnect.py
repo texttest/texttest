@@ -48,9 +48,9 @@ class ReconnectConfig:
         if self.reconnectTmpInfo and os.path.isdir(self.reconnectTmpInfo):
             # See if this is an explicitly provided run directory
             dirName = os.path.normpath(self.reconnectTmpInfo)
-            versionSets = self.getVersionSetsTopDir(dirName)
-            self.diag.info("Directory has version sets " + repr(versionSets))
-            if versionSets is not None:
+            versionLists = self.getVersionListsTopDir(dirName)
+            self.diag.info("Directory has version lists " + repr(versionLists))
+            if versionLists is not None:
                 return self.getVersionsFromDirs(app, [ dirName ], givenExtras)
 
         fetchDir = app.getPreviousWriteDirInfo(self.reconnectTmpInfo)
@@ -70,14 +70,6 @@ class ReconnectConfig:
             return []
         else:
             return self.getVersionsFromDirs(app, runDirs, givenExtras)
-
-    def versionsCorrect(self, app, dirName):
-        versionSets = self.getVersionSetsTopDir(dirName)
-        self.diag.info("Directory has version sets " + repr(versionSets))
-        if versionSets is None:
-            return False
-        appVersionSet = frozenset(app.versions)
-        return reduce(operator.or_, (appVersionSet.issubset(s) for s in versionSets), False)
     
     def findAppDirUnder(self, app, runDir):
         # Don't pay attention to dated versions here...
@@ -89,13 +81,12 @@ class ReconnectConfig:
                 return os.path.join(runDir, f)
     
     def getReconnectRunDirs(self, app, fetchDir):
-        correctNames = filter(lambda f: self.versionsCorrect(app, f), os.listdir(fetchDir))
-        correctNames.sort() # Need to do this for determinism, and because itertools.groupby (lower down) requires it
+        correctNames = sorted(os.listdir(fetchDir))
         fullPaths = [ os.path.join(fetchDir, d) for d in correctNames ]
         return filter(lambda d: self.isRunDirectoryFor(app, d), fullPaths)
 
     def isRunDirectoryFor(self, app, d):
-        appDirRoot = os.path.join(d, app.name)
+        appDirRoot = os.path.join(d, app.name + app.versionSuffix())
         if os.path.isdir(appDirRoot):
             return True
         else:
@@ -110,11 +101,6 @@ class ReconnectConfig:
             versionParts = ".".join(parts[1:-2]).split("++")
             return [ part.split(".") for part in versionParts ]
             
-    def getVersionSetsTopDir(self, fileName):
-        vlists = self.getVersionListsTopDir(fileName)
-        if vlists is not None:
-            return [ frozenset(vlist) for vlist in vlists ]
-
     def getVersionListSubDir(self, fileName, stem):
         # Show the framework how to find the version list given a file name
         # If it doesn't match, return None

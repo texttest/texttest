@@ -1731,7 +1731,10 @@ class OptionFinder(plugins.OptionFinder):
         elif len(v2) == 0:
             return v1
         else:
-            return v1 + "." + v2
+            parts1 = v1.split(".")
+            parts2 = v2.split(".")
+            parts = parts1 + filter(lambda p: p not in parts1, parts2)
+            return ".".join(parts)
 
     def addToAppDict(self, appDict, appName, versionName):
         versions = appDict.setdefault(appName, [])

@@ -104,9 +104,9 @@ class QueueSystemConfig(default.Config):
         if self.slaveRun():
             if self.isReconnecting():
                 fromConfig = self.getExtraVersionsFromConfig(app)
-                return self.reconnectConfig.getExtraVersions(app, fromConfig)
-            else:
-                return []
+                # This has side-effects which we need, but we shouldn't actually have any extra versions...
+                self.reconnectConfig.getExtraVersions(app, fromConfig)
+            return []
         else:
             return default.Config.getExtraVersions(self, app)
 

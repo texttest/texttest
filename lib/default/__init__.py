@@ -18,9 +18,12 @@ def getConfig(optionMap):
     return Config(optionMap)
 
 class Config:
+    loggingSetup = False
     def __init__(self, optionMap):
         self.optionMap = optionMap
         self.filterFileMap = {}
+        if self.hasExplicitInterface():
+            self.trySetUpLogging()
         self.reconnectConfig = ReconnectConfig(optionMap)
     def getMachineNameForDisplay(self, machine):
         return machine # override for queuesystems
@@ -261,6 +264,11 @@ class Config:
             return [ "console", "batch" ]
         else:
             return [ "console" ]
+
+    def trySetUpLogging(self):
+        if not self.loggingSetup:
+            self.setUpLogging()
+            Config.loggingSetup = True
         
     def setUpLogging(self):
         filePatterns = [ "logging." + postfix for postfix in self.getLogfilePostfixes() ]
@@ -275,8 +283,8 @@ class Config:
         # Global side effects first :)
         if not self.hasExplicitInterface():
             self.setDefaultInterface(allApps)
+            self.trySetUpLogging()
 
-        self.setUpLogging()
         return self._getResponderClasses(allApps)
 
     def _getResponderClasses(self, allApps):

@@ -44,6 +44,7 @@ class ReconnectConfig:
             return self._findRunDir(".".join(parts[:-1]))
 
     def getExtraVersions(self, app, givenExtras):
+        self.diag = logging.getLogger("Reconnection")
         self.diag.info("Finding reconnect 'extra versions' for " + repr(app) + " given tmp info '" + repr(self.reconnectTmpInfo) + "'")
         if self.reconnectTmpInfo and os.path.isdir(self.reconnectTmpInfo):
             # See if this is an explicitly provided run directory
@@ -116,7 +117,6 @@ class ReconnectConfig:
 
     def getAllVersionLists(self, app, givenExtras, groupDirs):
         vlists = []
-        givenSet = frozenset(givenExtras)
         for groupDir in groupDirs:
             for path in os.listdir(groupDir):
                 fullPath = os.path.join(groupDir, path)
@@ -124,20 +124,30 @@ class ReconnectConfig:
                     vlist = self.getVersionListSubDir(path, app.name)
                     if vlist is None:
                         continue
-                    if givenSet:
-                        vset = frozenset(vlist).difference(givenSet)
+                    self.diag.info("Found list " + repr(vlist))
+                    if givenExtras:
+                        vset = frozenset(vlist).difference(givenExtras)
                         vlist = filter(lambda v: v in vset, vlist)
                     if vlist not in vlists:
                         vlists.append(vlist)
         return vlists
 
+    def expandExtraVersions(self, extras):
+        expanded = set()
+        for extra in extras:
+            expanded.add(extra)
+            expanded.update(extra.split("."))
+        return expanded    
+
     def getVersionsFromDirs(self, app, dirs, givenExtras):
         versions = []
+        allGivenExtras = self.expandExtraVersions(givenExtras)
+        self.diag.info("Getting extra versions from directories, versions from config = " + repr(allGivenExtras))
         appVersions = frozenset(app.versions)
         for versionLists, groupDirIter in groupby(dirs, self.getVersionListsTopDir):
             groupDirs = list(groupDirIter)
             self.diag.info("Considering version lists " + repr(versionLists) + " with dirs " + repr(groupDirs))
-            for versionList in self.getAllVersionLists(app, givenExtras, groupDirs):
+            for versionList in self.getAllVersionLists(app, allGivenExtras, groupDirs):
                 version = ".".join(versionList)
                 self.diag.info("Considering version list " + repr(versionList))
                 versionSet = frozenset(versionList)

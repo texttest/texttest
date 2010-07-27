@@ -354,7 +354,7 @@ class QueueSystemServer(BaseActionRunner):
 
     def getSubmitCmdArgs(self, test, submissionRules):
         queueSystem = self.getQueueSystem(test)
-        extraArgs = test.getEnvironment("QUEUE_SYSTEM_SUBMIT_ARGS", "") # Extra arguments to provide on submission to grid engine
+        extraArgs = submissionRules.getExtraSubmitArgs()
         cmdArgs = queueSystem.getSubmitCmdArgs(submissionRules)
         if extraArgs:
             cmdArgs += plugins.splitcmd(extraArgs)
@@ -595,16 +595,32 @@ class SubmissionRules:
         self.optionMap = optionMap
         self.envResource = self.getEnvironmentResource()
         self.processesNeeded = self.getProcessesNeeded()
+
     def getEnvironmentResource(self):
-        return os.path.expandvars(self.test.getEnvironment("QUEUE_SYSTEM_RESOURCE", "")) # Grid engine resources required for the test
+        if not self.optionMap.has_key("reconnect"):
+            return os.path.expandvars(self.test.getEnvironment("QUEUE_SYSTEM_RESOURCE", "")) # Grid engine resources required for the test
+        else:
+            return ""
+
     def getProcessesNeeded(self):
-        return self.test.getEnvironment("QUEUE_SYSTEM_PROCESSES", "1") # Number of processes the test needs to run
+        if not self.optionMap.has_key("reconnect"):
+            return self.test.getEnvironment("QUEUE_SYSTEM_PROCESSES", "1") # Number of processes the test needs to run
+        else:
+            return "1"
+
+    def getExtraSubmitArgs(self):
+        if not self.optionMap.has_key("reconnect"):
+            return os.path.expandvars(self.test.getEnvironment("QUEUE_SYSTEM_SUBMIT_ARGS", "")) # Extra arguments to provide on submission to grid engine
+        else:
+            return ""
+
     def getJobName(self):
         path = self.test.getRelPath()
         parts = path.split("/")
         parts.reverse()
         name = "Test-" + ".".join(parts) + "-" + repr(self.test.app).replace(" ", "_")
         return name.replace(":", "_")
+
     def getSubmitSuffix(self):
         name = queueSystemName(self.test)
         queue = self.findQueue()

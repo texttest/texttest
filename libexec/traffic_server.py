@@ -1046,7 +1046,6 @@ class TrafficRequestHandler(StreamRequestHandler):
         text = self.rfile.read()
         self.server.diag.info("Request text : " + text)
         if text.startswith("TERMINATE_SERVER"):
-            self.connection.shutdown(socket.SHUT_RDWR)
             self.server.shutdown()
         else:
             traffic = self.parseTraffic(text)

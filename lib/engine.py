@@ -206,8 +206,9 @@ class TextTest(plugins.Responder, plugins.Observable):
             if selectedAppDict.has_key(appName):
                 versionList = selectedAppDict[appName]
             extraVersionsDuplicating = []
-            for version in versionList:
-                app, currExtra = self.addApplication(appName, dircache, version, versionList)
+            for versionStr in versionList:
+                appVersions = filter(len, versionStr.split(".")) # remove empty versions
+                app, currExtra = self.addApplication(appName, dircache, appVersions, versionList)
                 if app:
                     appList.append(app)
                     extraVersionsDuplicating += currExtra
@@ -216,27 +217,26 @@ class TextTest(plugins.Responder, plugins.Observable):
             for toRemove in filter(lambda app: app.getFullVersion() in extraVersionsDuplicating, appList):
                 appList.remove(toRemove)
         return raisedError, appList
-    def createApplication(self, appName, dircache, versionStr):
+    
+    def createApplication(self, appName, dircache, versions):
         try:
-            versions = filter(len, versionStr.split(".")) # remove empty versions
             return testmodel.Application(appName, dircache, versions, self.inputOptions)
         except (testmodel.BadConfigError, plugins.TextTestError), e:
             sys.stderr.write("Could not use application '" + appName +  "' - " + str(e) + "\n")
-    def addApplication(self, appName, dircache, version, allVersions):
-        app = self.createApplication(appName, dircache, version)
+
+    def addApplication(self, appName, dircache, appVersions, allVersions=[]):
+        app = self.createApplication(appName, dircache, appVersions)
         if not app:
             return None, []
         extraVersionsDuplicating = []
         for extraVersion in app.getExtraVersions():
             if extraVersion in allVersions:
                 extraVersionsDuplicating.append(extraVersion)
-            aggVersion = extraVersion
-            if len(version) > 0:
-                aggVersion = version + "." + extraVersion
-            extraApp = self.createApplication(appName, dircache, aggVersion)
+            extraApp = self.createApplication(appName, dircache, appVersions + extraVersion.split("."))
             if extraApp:
                 app.extras.append(extraApp)
         return app, extraVersionsDuplicating
+
     def getAllConfigObjects(self, allApps):
         if len(allApps) > 0:
             return allApps
@@ -400,7 +400,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             if app.name == appName and app.versions == versions:
                 return testSuite
 
-        newApp = testmodel.Application(appName, self.makeDirectoryCache(appName), versions, self.inputOptions)
+        newApp = self.addApplication(appName, self.makeDirectoryCache(appName), versions)[0]
         return self.createEmptySuite(newApp)
 
     def createEmptySuite(self, newApp):

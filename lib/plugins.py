@@ -589,7 +589,7 @@ class TestState(Observable):
         if len(self.executionHosts) == 0:
             return "(no execution hosts given)"
         else:
-            return "on " + string.join(self.executionHosts, ",")
+            return "on " + ", ".join(self.executionHosts)
     def hostRepr(self):
         if self.showExecHosts and len(self.executionHosts) > 0:
             return " " + self.hostString()

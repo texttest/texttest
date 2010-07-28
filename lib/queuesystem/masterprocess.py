@@ -628,8 +628,10 @@ class SubmissionRules:
             return " to " + name + " queue " + queue
         else:
             return " to default " + name + " queue"
+
     def getParallelEnvironment(self):
         return self.test.getConfigValue("parallel_environment_name")
+
     def findResourceList(self):
         resourceList = []
         if self.optionMap.has_key("R"):
@@ -644,6 +646,7 @@ class SubmissionRules:
             for resource in resources:
                 resourceList.append(resource)
         return resourceList
+
     def getConfigValue(self, configKey):
         configDict = self.test.getConfigValue(configKey)
         defVal = configDict.get("default")
@@ -653,8 +656,10 @@ class SubmissionRules:
             if len(val) > 0 and val[0] != "any" and val[0] != "none":
                 return val
         return []
+
     def findPriority(self):
         return 0
+
     def findQueue(self):
         if self.optionMap.has_key("q"):
             return self.optionMap["q"]
@@ -663,8 +668,10 @@ class SubmissionRules:
             return configQueue
 
         return self.findDefaultQueue()
+
     def findDefaultQueue(self):
         return ""
+
     def findMachineList(self):
         if not self.forceOnPerformanceMachines():
             return []
@@ -673,9 +680,11 @@ class SubmissionRules:
             return []
 
         return performanceMachines
+
     def getJobFiles(self):
         jobName = self.getJobName()
         return jobName + ".log", jobName + ".errors"
+
     def forceOnPerformanceMachines(self):
         if self.optionMap.has_key("perf"):
             return 1
@@ -686,9 +695,14 @@ class SubmissionRules:
         # If we haven't got a log_file yet, we should do this so we collect performance reliably
         logFile = self.test.getFileName(self.test.getConfigValue("log_file"))
         return logFile is None
+
     def allowsReuse(self, newRules):
-        return self.findResourceList() == newRules.findResourceList() and \
-               self.getProcessesNeeded() == newRules.getProcessesNeeded()
+        if self.optionMap.has_key("reconnect"):
+            return True # should be able to reconnect anywhere...
+        else:
+            return self.findResourceList() == newRules.findResourceList() and \
+                   self.getProcessesNeeded() == newRules.getProcessesNeeded()
+
 
 class SlaveRequestHandler(StreamRequestHandler):
     noReusePostfix = ".NO_REUSE"

@@ -62,11 +62,11 @@ class SetUpTrafficHandlers(plugins.Action):
             return val
         else:
             return "+".join(val)
-            
+        
     def makeTrafficServer(self, test, replayFile):
         recordFile = test.makeTmpFileName("traffic")
         recordEditDir = test.makeTmpFileName("file_edits", forComparison=0)
-        cmdArgs = [ sys.executable, self.trafficServerFile, "-t", test.getRelPath(),
+        cmdArgs = plugins.getSubprocessInterpreterArgs() + [ self.trafficServerFile, "-t", test.getRelPath(),
                     "-r", recordFile, "-F", recordEditDir, "-l", os.getenv("TEXTTEST_PERSONAL_LOG") ]
         if not self.record:
             cmdArgs += [ "-p", replayFile ]

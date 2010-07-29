@@ -124,8 +124,6 @@ class VirtualDisplayResponder(plugins.Responder):
                 return None, None
 
         messages = "Failed to start Xvfb in 5 attempts, giving up"
-        if len(startArgs) > 4:
-            messages += "\nAdditional Xvfb arguments were " + repr(" ".join(startArgs[4:]))
         plugins.printWarning(messages)
         return None, None
     
@@ -134,21 +132,21 @@ class VirtualDisplayResponder(plugins.Responder):
         fullPath = os.path.join(binDir, "startXvfb.py")
         logDir = os.path.join(app.writeDirectory, "Xvfb") 
         plugins.ensureDirectoryExists(logDir)
-        python = self.findPython(machine)
+        pythonArgs = self.findPythonArgs(machine)
         xvfbExtraArgs = plugins.splitcmd(app.getConfigValue("virtual_display_extra_args"))
-        cmdArgs = [ python, "-u", fullPath, logDir ] + xvfbExtraArgs
+        cmdArgs = pythonArgs + [ fullPath, logDir ] + xvfbExtraArgs
         return app.getCommandArgsOn(machine, cmdArgs)
 
-    def findPython(self, machine):
+    def findPythonArgs(self, machine):
         # In case it isn't the default, allow for a ttpython script in the installation
         if machine == "localhost":
-            return sys.executable
+            return plugins.getSubprocessInterpreterArgs(["-u"])
         
         localPointer = plugins.installationPath("bin/ttpython")
         if localPointer:
-            return localPointer
+            return [ localPointer, "-u" ]
         else: # pragma : no cover -there is one in our local installation whether we like it or not...
-            return "python"
+            return [ "python", "-u" ]
         
     def getDisplayName(self, machine, displayNumber):
         # No point in using the port if we don't have to, this seems less reliable if the process is local

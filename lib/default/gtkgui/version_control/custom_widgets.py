@@ -17,17 +17,11 @@ class ButtonedTreeViewColumn(gtk.TreeViewColumn):
     def get_button(self):
         return self.get_widget().get_ancestor(gtk.Button)
 
-    def get_name(self):
-        return "GtkButtonedTreeViewColumn"
-
     def get_title(self):
         return self.get_widget().get_text()
 
     def connect(self, *args):
         return self.get_button().connect(*args)
-
-    def disconnect(self, *args):
-        return self.get_button().disconnect(*args)
 
     def emit(self, *args):
         return self.get_button().emit(*args)

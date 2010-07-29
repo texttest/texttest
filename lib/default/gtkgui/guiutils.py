@@ -7,22 +7,20 @@ import plugins, os, sys, operator, types, subprocess
 from copy import copy
 from locale import getdefaultlocale
 
-try:
-    import gtk
-except ImportError:
-    pass # We might want to document the config entries, silly to fail on lack of GTK...
-
-
-guilog, guiConfig = None, None
-
-
 # gtk.accelerator_valid appears utterly broken on Windows
 def windowsAcceleratorValid(key, mod):
     name = gtk.accelerator_name(key, mod)
     return len(name) > 0 and name != "VoidSymbol"
 
-if os.name == "nt":
-    gtk.accelerator_valid = windowsAcceleratorValid
+try:
+    import gtk
+    if os.name == "nt":
+        gtk.accelerator_valid = windowsAcceleratorValid
+except ImportError:
+    pass # We might want to document the config entries, silly to fail on lack of GTK...
+
+
+guilog, guiConfig = None, None
 
 class Utf8Converter:
     def convert(self, text):

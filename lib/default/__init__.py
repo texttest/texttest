@@ -206,12 +206,22 @@ class Config:
             copyCount = 1
         return [ "copy_" + str(i) for i in range(1, copyCount) ]
 
-    def versionNameFromCheckout(self, c):
-        return c.replace("\\", "_").replace("/", "_").replace(".", "_")
+    def makeParts(self, c):
+        return c.replace("\\", "/").split("/")
+
+    def versionNameFromCheckout(self, c, checkoutNames):
+        checkoutParts = self.makeParts(c)
+        for other in checkoutNames:
+            if other != c:
+                for otherPart in self.makeParts(other):
+                    if otherPart in checkoutParts:
+                        checkoutParts.remove(otherPart)
+                
+        return checkoutParts[-1].replace(".", "_")
 
     def getCheckoutExtraVersions(self):    
-        checkoutNames = plugins.commasplit(self.optionValue("c"))[1:]
-        return map(self.versionNameFromCheckout, checkoutNames)
+        checkoutNames = plugins.commasplit(self.optionValue("c"))
+        return [ self.versionNameFromCheckout(c, checkoutNames) for c in checkoutNames[1:] ]
         
     def getExtraVersionsFromConfig(self, app):
         basic = app.getConfigValue("extra_version")
@@ -813,7 +823,7 @@ class Config:
         if self.optionMap.has_key("c"):
             allCheckouts = plugins.commasplit(self.optionMap["c"])
             for checkout in allCheckouts[1:]:
-                versionName = self.versionNameFromCheckout(checkout)
+                versionName = self.versionNameFromCheckout(checkout, allCheckouts)
                 if versionName in app.versions:
                     return checkout
             return allCheckouts[0]

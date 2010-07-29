@@ -1859,6 +1859,8 @@ General GUI Enhancements:
 Static GUI Enhancements:
     - Selecting for a version picks up versions where the given one is a base_version (selectandfilter.py)
 	Version matching is now the same as that used for other purposes
+    - Selecting for a version works correctly when the given one resets "extra_version" (selectandfilter.py)
+	Picks up the reset correctly.
 Dynamic GUI Enhancements:
     - Recomputing marked tests now works correctly (plugins.py)
 	Icons also displayed when appropriate, irrespective of test marking
@@ -1867,4 +1869,13 @@ Batch Report Enhancements:
     - HTML report now shows file diffs as well as bug information when tests have "known bugs" (testoverview.py)
 	Makes it consistent with GUI and email report
 Grid Engine (LSF/SGE) enhancements:
+    - Reconnecting using the grid no longer insists on using the resources etc. from the test itself (masterprocess.py)
+	Means it should be faster and make better use of available machines
+    - Parallel job machine name formatting improved
+	Should make for less wide boxes in HTML report
 Bug Fixes:
+    - Fixed Mac OS-specific bug that made traffic server fail (and by extension, recording with default settings) (traffic_server.py)
+    - Various fixes for issues to do with handling extra_versions when reconnecting via a grid (queuesystem/__init__.py)
+    - Reconnecting now works if an extra_version is provided explicitly (reconnect.py)
+    - Workaround for GTK+ 2.20 bug around RC file handling in .gtkrc-2.0 files (controller.py)
+    - Fixed race condition when recomputing a running test just as it completes (controller.py)

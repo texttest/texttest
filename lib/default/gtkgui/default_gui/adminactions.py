@@ -377,7 +377,6 @@ class ImportTestCase(ImportTest):
             return
         envFile = self.getWriteFile("environment", suite, testDir)
         for var, value in envDir.items():
-            guiutils.guilog.info("Setting test env: " + var + " = " + value)
             envFile.write(var + ":" + value + "\n")
         envFile.close()
 

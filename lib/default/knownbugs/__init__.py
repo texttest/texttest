@@ -131,14 +131,14 @@ class FileBugData:
             self.presentList.append(bugTrigger)
 
     def findBugs(self, fileName, execHosts, isChanged, multipleDiffs):
-        self.diag.info("Looking for bugs in " + fileName)
         if not self.checkUnchanged and not isChanged:
             self.diag.info("File not changed, ignoring all bugs")
             return []
-        if not os.path.isfile(fileName):
+        if not fileName:
             self.diag.info("File doesn't exist, checking only for absence bugs")
             return self.findAbsenceBugs(self.absentList, execHosts, isChanged, multipleDiffs)
         
+        self.diag.info("Looking for bugs in " + fileName)
         return self.findBugsInText(open(fileName).readlines(), execHosts, isChanged, multipleDiffs)
 
     def findBugsInText(self, lines, execHosts, isChanged=True, multipleDiffs=False):
@@ -299,11 +299,11 @@ class CheckForBugs(plugins.Action):
             return fileBugData.findBugsInText(briefText.split("\n"), state.executionHosts)
         elif state.hasResults():
             # bugs are only relevant if the file itself is changed, unless marked to trigger on success also
-            isChanged = self.fileChanged(test, state, stem)
-            fileName = test.makeTmpFileName(stem)
-            return fileBugData.findBugs(fileName, state.executionHosts, isChanged, multipleDiffs)
-        else:
-            return []
+            comp = state.findComparison(stem, includeSuccess=True)[0]
+            if comp:
+                isChanged = not comp.hasSucceeded()
+                return fileBugData.findBugs(comp.tmpFile, state.executionHosts, isChanged, multipleDiffs)
+        return []
 
     def getNewState(self, oldState, bugState):
         if hasattr(oldState, "failedPrediction"):
@@ -328,10 +328,6 @@ class CheckForBugs(plugins.Action):
                 diffCount -= 1
         return diffCount > 1
     
-    def fileChanged(self, testArg, state, stem):
-        comparison, _ = state.findComparison(stem)
-        return bool(comparison)
-
     def readBugs(self, test):
         bugMap = BugMap()
         # Mostly for backwards compatibility, reverse the list so that more specific bugs

@@ -45,7 +45,7 @@ def getDisplayNumber():
     # Display numbers up to 32768 seem to be allowed, which is less than most process IDs on systems I've observed...
     return str(os.getpid() % MAX_DISPLAY)
 
-def getLockFiles(self, num):
+def getLockFiles(num):
     lockFile = "/tmp/.X" + num + "-lock"
     xFile = "/tmp/.X11-unix/X" + num
     return [ lockFile, xFile ]

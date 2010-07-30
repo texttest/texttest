@@ -1501,12 +1501,8 @@ class Application:
         return "Rejected " + self.description() + " - " + str(message) + "\n"
 
     def filterUnsaveable(self, versions):
-        saveableVersions = []
         unsaveableVersions = self.getConfigValue("unsaveable_version")
-        for version in versions:
-            if not version in unsaveableVersions and not version.startswith("copy_"):
-                saveableVersions.append(version)
-        return saveableVersions
+        return filter(lambda v: v not in unsaveableVersions, versions)
 
     def getBaseVersions(self, baseVersionKey="implied"):
         # By default, this gets all names in base_version, not just those marked

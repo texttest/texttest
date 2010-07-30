@@ -197,6 +197,9 @@ class Config:
         else:
             copyVersions = self.getCopyExtraVersions()
             checkoutVersions = self.getCheckoutExtraVersions()
+            # Generated automatically to be able to distinguish, don't save them
+            for ver in copyVersions + checkoutVersions:
+                app.addConfigEntry("unsaveable_version", ver)
             return self.createComposites(checkoutVersions, copyVersions)
 
     def getCopyExtraVersions(self):

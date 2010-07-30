@@ -741,7 +741,7 @@ class StatusGUI(VersionControlDialogGUI):
         VersionControlDialogGUI.addContents(self)
         self.popupMenu = self.createPopupMenu()
         self.infoColumn.set_clickable(True)
-        self.infoColumn.connect("button-press-event", self.showPopupMenu)
+        self.infoColumn.get_button().connect("button-press-event", self.showPopupMenu)
         self.treeView.grab_focus() # Or the column button gets focus ...
         
     def showPopupMenu(self, button, event):

@@ -444,7 +444,9 @@ class ShortcutBarGUI(guiutils.SubGUI):
         # Do this first, so we set up interceptors and so on early on
         try:
             from gtkusecase import createShortcutBar
-            self.widget = createShortcutBar(uiMapFiles=plugins.findDataPaths([ "*.uimap" ], *args))
+            from version_control.custom_widgets_pyusecase import customEventTypes
+            uiMapFiles = plugins.findDataPaths([ "*.uimap" ], *args)
+            self.widget = createShortcutBar(uiMapFiles=uiMapFiles, customEventTypes=customEventTypes)
             self.widget.show()
         except ImportError:
             self.widget = gtk.HBox() # Anything really, but it should be a widget (for if PyUseCase isn't installed)

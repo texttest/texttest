@@ -26,7 +26,7 @@ class SetUpTrafficHandlers(plugins.Action):
                 sendSocket.connect(serverAddress)
                 sendSocket.sendall("TERMINATE_SERVER\n")
                 sendSocket.shutdown(2)
-            except socket.error:
+            except socket.error: # pragma: no cover - should be unreachable, just for robustness
                 print "Could not send terminate message to traffic server, seemed not to be running anyway."
         if self.trafficServerProcess:
             err = self.trafficServerProcess.communicate()[1]
@@ -54,14 +54,8 @@ class SetUpTrafficHandlers(plugins.Action):
             test.setEnvironment(pathVar, interceptDir + os.pathsep + test.getEnvironment(pathVar, ""))
 
     def makeArgFromDict(self, dict):
-        args = [ key + "=" + self.makeArgFromVal(val) for key, val in dict.items() if key ]
+        args = [ key + "=" + "+".join(val) for key, val in dict.items() if key ]
         return ",".join(args)
-
-    def makeArgFromVal(self, val):
-        if type(val) == str:
-            return val
-        else:
-            return "+".join(val)
         
     def makeTrafficServer(self, test, replayFile):
         recordFile = test.makeTmpFileName("traffic")

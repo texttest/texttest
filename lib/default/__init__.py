@@ -1087,6 +1087,7 @@ class Config:
             return "xterm -bg white -T $TEXTTEST_FOLLOW_FILE_TITLE -e tail -f"
         else:
             return "baretail"
+        
     def setExternalToolDefaults(self, app, homeOS):
         app.setConfigDefault("text_diff_program", "diff", \
                              "External program to use for textual comparison of files")
@@ -1097,6 +1098,7 @@ class Config:
         app.setConfigDefault("diff_program", { "default": "tkdiff" }, "External program to use for graphical file comparison")
         app.setConfigDefault("view_program", { "default": self.defaultViewProgram(homeOS) },  \
                               "External program(s) to use for viewing and editing text files")
+        app.setConfigDefault("view_file_on_remote_machine", { "default" : 0 }, "Do we try to start viewing programs on the test execution machine?")
         app.setConfigDefault("follow_program", { "default": self.defaultFollowProgram() }, "External program to use for following progress of a file")
         app.setConfigDefault("follow_file_by_default", 0, "When double-clicking running files, should we follow progress or just view them?")
         app.setConfigDefault("bug_system_location", {}, "The location of the bug system we wish to extract failure information from.")
@@ -1121,11 +1123,25 @@ class Config:
         return { "default": "", "ssh" : sshOptions,
                  "rsync" : "-azLp", "scp": "-Crp " + sshOptions }
 
-    def getCommandArgsOn(self, app, machine, cmdArgs):
+    def getCommandArgsOn(self, app, machine, cmdArgs, graphical=False):
         if machine == "localhost":
             return cmdArgs
         else:
-            return self.getRemoteProgramArgs(app, "remote_shell_program") + [ machine ] + cmdArgs
+            args = self.getRemoteProgramArgs(app, "remote_shell_program")
+            if graphical and args[0] == "ssh":
+                args.append("-Y")
+            args.append(machine)
+            if graphical and args[0] == "rsh":
+                args += [ "env", "DISPLAY=" + self.getFullDisplay() ]
+            return args + cmdArgs
+
+    def getFullDisplay(self):
+        display = os.getenv("DISPLAY", "")
+        hostaddr = plugins.gethostname()
+        if display.startswith(":"):
+            return hostaddr + display
+        else:
+            return display.replace("localhost", hostaddr)
 
     def runCommandOn(self, app, machine, cmdArgs, collectExitCode=False):
         allArgs = self.getCommandArgsOn(app, machine, cmdArgs)

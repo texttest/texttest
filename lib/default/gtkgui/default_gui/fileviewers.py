@@ -114,17 +114,12 @@ class FileViewAction(guiplugins.ActionGUI):
         if os.name == "posix" and len(self.currTestSelection) > 0:
             state = self.currTestSelection[0].stateInGui
             if hasattr(state, "executionHosts") and len(state.executionHosts) > 0:
-                remoteHost = state.executionHosts[0]
-                localhost = plugins.gethostname()
-                if remoteHost != localhost:
-                    return remoteHost
+                return plugins.interpretHostname(state.executionHosts[0])
+        return "localhost"
 
-    def getFullDisplay(self):
-        display = os.getenv("DISPLAY", "")
-        if display.startswith(":"):
-            return plugins.gethostname() + display
-        else:
-            return display.replace("localhost", plugins.gethostname())
+    def getRemoteArgs(self, cmdArgs):
+        remoteHost = self.getRemoteHost()
+        return self.currTestSelection[0].app.getCommandArgsOn(remoteHost, cmdArgs, graphical=True)
 
     def getSignalsSent(self):
         return [ "ViewerStarted" ]
@@ -202,10 +197,7 @@ class ViewInEditor(FileViewAction):
             cmdArgs = [ interpreter ] + cmdArgs
 
         if guiplugins.guiConfig.getCompositeValue("view_file_on_remote_machine", self.getStem(fileName)):
-            remoteHost = self.getRemoteHost()
-            if remoteHost:
-                remoteShellProgram = guiplugins.guiConfig.getValue("remote_shell_program")
-                cmdArgs = [ remoteShellProgram, remoteHost, "env DISPLAY=" + self.getFullDisplay() + " " + " ".join(cmdArgs) ]
+            cmdArgs = self.getRemoteArgs(cmdArgs)
 
         return cmdArgs, descriptor, env
 
@@ -385,7 +377,7 @@ class ViewFileDifferences(FileViewAction):
         self.startViewer(cmdArgs, description=description, exitHandler=self.diffingComplete)
 
     def diffingComplete(self, *args):
-        self.applicationEvent("the graphical diff program to terminate")
+        self.applicationEvent("the " + self.getToolDescription() + " to terminate")
 
 
 class ViewFilteredFileDifferences(ViewFileDifferences):
@@ -441,14 +433,9 @@ class FollowFile(FileViewAction):
         return Template(followProgram).safe_substitute(envDir)
 
     def getFollowCommand(self, program, fileName):
-        remoteHost = self.getRemoteHost()
-        if remoteHost:
-            remoteShellProgram = guiplugins.guiConfig.getValue("remote_shell_program")
-            return [ remoteShellProgram, remoteHost, "env DISPLAY=" + self.getFullDisplay() + " " + \
-                     program + " " + fileName ]
-        else:
-            return plugins.splitcmd(program) + [ fileName ]
-
+        localArgs = plugins.splitcmd(program) + [ fileName ]
+        return self.getRemoteArgs(localArgs)
+        
     def _performOnFile(self, followProgram, fileName, comparison):
         useFile = self.fileToFollow(fileName, comparison)
         useProgram = self.getFollowProgram(followProgram, fileName)
@@ -458,7 +445,7 @@ class FollowFile(FileViewAction):
         self.startViewer(cmdArgs, description=description, exitHandler=self.followComplete)
 
     def followComplete(self, *args):
-        self.applicationEvent("the file-following program to terminate")
+        self.applicationEvent("the " + self.getToolDescription() + " to terminate")
 
 
 class ShowFileProperties(guiplugins.ActionResultDialogGUI):

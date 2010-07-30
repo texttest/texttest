@@ -470,7 +470,7 @@ class TestTable:
             cellContent = "ok"
         else:
             cellContent = state.getTypeBreakdown()[1]
-        cellContent += " " + ",".join(state.executionHosts)
+        cellContent += " " + ", ".join(state.executionHosts)
         return cellContent.strip(), success, fgcol, bgcol
 
     def getCellDataFromFileComp(self, fileComp):

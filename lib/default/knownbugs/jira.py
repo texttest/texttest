@@ -32,7 +32,7 @@ def convertToString(value):
         ret = value.replace("\r", "") # Get given Windows line endings but Python doesn't use them internally
         if type(ret) == unicode:
             import locale
-            encoding = locale.getdefaultlocale()[1]
+            encoding = locale.getdefaultlocale()[1] or "utf-8"
             return ret.encode(encoding, "replace")
         else:
             return ret

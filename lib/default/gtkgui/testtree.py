@@ -362,11 +362,9 @@ class TestTreeGUI(guiutils.ContainerGUI):
         self.collapsedRows[path] = 1
         # Collapsing rows can cause indirect changes of selection, make sure we indicate this.
         self.selecting = True
-        try:
-            filterPath = self.filteredModel.convert_child_path_to_path(path)
+        filterPath = self.filteredModel.convert_child_path_to_path(path)
+        if filterPath is not None: # don't collapse if it's already hidden
             self.selection.get_tree_view().collapse_row(filterPath)
-        except RuntimeError:
-            pass
         self.selecting = False
         self.selectionChanged(direct=False)
 

@@ -10,7 +10,7 @@
 
 try:
     import startxvfb_interceptor # the usual test hook...
-except ImportError:
+except ImportError: # pragma: no cover - all tests need an interceptor to be able to control PID
     pass
 
 import os, signal, sys, subprocess
@@ -25,7 +25,7 @@ class ConnectionComplete:
 class ConnectionTimeout:
     pass
     
-def setReadyFlag(self, *args):
+def setReadyFlag(self, *args): # pragma: no cover - only here to deal with pathological and probably impossible race condition
     global Xvfb_ready
     Xvfb_ready = True
 

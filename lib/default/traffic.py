@@ -154,20 +154,24 @@ class ModifyTraffic(plugins.ScriptWithArgs):
     def __repr__(self):
         return "Updating traffic in"
     def __call__(self, test):
+        fileName = test.getFileName("traffic")
+        if not fileName:
+            return
+
+        self.describe(test)
         try:
-            fileName = test.getFileName("traffic")
-            if fileName:
-                self.describe(test)
-                newFileName = fileName + "tmpedit"
-                newFile = open(newFileName, "w")
-                for trafficText in self.readIntoList(fileName):
-                    newTrafficText = self.getModified(trafficText, test.getDirectory())
-                    self.write(newFile, newTrafficText) 
-                newFile.close()
-                shutil.move(newFileName, fileName)
+            newTrafficTexts = [ self.getModified(t, test.getDirectory()) for t in self.readIntoList(fileName) ]
         except plugins.TextTestError, e:
             print e
+            return
 
+        newFileName = fileName + "tmpedit"
+        newFile = open(newFileName, "w")
+        for trafficText in newTrafficTexts:
+            self.write(newFile, trafficText) 
+        newFile.close()
+        shutil.move(newFileName, fileName)
+        
     def readIntoList(self, fileName):
         # Copied from traffic server ReplayInfo, easier than trying to reuse it
         trafficList = []

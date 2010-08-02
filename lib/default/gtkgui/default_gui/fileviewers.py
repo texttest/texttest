@@ -428,7 +428,7 @@ class FollowFile(FileViewAction):
                guiplugins.guiConfig.getValue("follow_file_by_default")
 
     def getFollowProgram(self, followProgram, fileName):
-        title = '"' + self.currTestSelection[0].name + " (" + os.path.basename(fileName) + ')"'
+        title = '"File ' + os.path.basename(fileName) + " from test " + self.currTestSelection[0].name + '"'
         envDir = { "TEXTTEST_FOLLOW_FILE_TITLE" : title } # Title of the window when following file progress
         return Template(followProgram).safe_substitute(envDir)
 

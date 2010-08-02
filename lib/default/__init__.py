@@ -865,6 +865,8 @@ class Config:
                 newState = state.makeNewState(test, "recalculated")
                 test.changeState(newState)
         else:
+            collator = test.app.getTestCollator()
+            collator.tryFetchRemoteFiles(test)
             fileFilter = rundependent.FilterProgressRecompute()
             fileFilter(test)
             comparator = self.getTestComparator()
@@ -1138,6 +1140,9 @@ class Config:
                 remoteTmp = app.getRemoteTmpDirectory()[1]
                 if remoteTmp:
                     args[-1] = args[-1].replace(app.writeDirectory, remoteTmp)
+                for i in range(len(args)):
+                    # Remote shells cause spaces etc to be interpreted several times
+                    args[i] = args[i].replace(" ", "\ ")
             return args
 
     def getFullDisplay(self):

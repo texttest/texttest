@@ -1133,7 +1133,12 @@ class Config:
             args.append(machine)
             if graphical and args[0] == "rsh":
                 args += [ "env", "DISPLAY=" + self.getFullDisplay() ]
-            return args + cmdArgs
+            args += cmdArgs
+            if graphical:
+                remoteTmp = app.getRemoteTmpDirectory()[1]
+                if remoteTmp:
+                    args[-1] = args[-1].replace(app.writeDirectory, remoteTmp)
+            return args
 
     def getFullDisplay(self):
         display = os.getenv("DISPLAY", "")

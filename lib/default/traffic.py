@@ -162,7 +162,7 @@ class ModifyTraffic(plugins.ScriptWithArgs):
         try:
             newTrafficTexts = [ self.getModified(t, test.getDirectory()) for t in self.readIntoList(fileName) ]
         except plugins.TextTestError, e:
-            print e
+            print str(e).strip()
             return
 
         newFileName = fileName + "tmpedit"

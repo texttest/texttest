@@ -1,12 +1,12 @@
 
-import sys
+import sys, plugins
 
 # Temporary code to track down nightjob pyc problems
 major, minor = sys.version_info[:2]
 if (major, minor) < (2, 6):
     raise plugins.TextTestError, "Imported default from the wrong python version!"
 
-import os, plugins, sandbox, console, rundependent, pyusecase_interface, comparetest, batch, batch.junitreport, performance, subprocess, operator, signal, shutil, logging
+import os, sandbox, console, rundependent, pyusecase_interface, comparetest, batch, batch.junitreport, performance, subprocess, operator, signal, shutil, logging
 
 from copy import copy
 from fnmatch import fnmatch

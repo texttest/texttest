@@ -199,12 +199,16 @@ class ReconnectToTests(RunningAction,guiplugins.ActionDialogGUI):
 
 class RunTests(RunningAction,guiplugins.ActionTabGUI):
     optionGroups = []
+    originalVersion = ""
     def __init__(self, allApps, dummy, inputOptions):
         guiplugins.ActionTabGUI.__init__(self, allApps)
         RunningAction.__init__(self, inputOptions)
         self.optionGroups.append(self.optionGroup)
         self.addApplicationOptions(allApps, self.optionGroup, inputOptions)
-
+        vOption = self.optionGroup.getOption("v")
+        if vOption:
+            RunTests.originalVersion = vOption.getValue()
+        
     def _getTitle(self):
         return "_Run"
 
@@ -247,11 +251,23 @@ class RunTests(RunningAction,guiplugins.ActionTabGUI):
                 if group.getSwitchValue(switchName, False):
                     return "run " + self.describeTests() + " with " + desc + " replay enabled"
 
+    def getConfirmationMessage(self):
+        runVersion = self.optionGroups[0].getOptionValue("v")
+        if self.originalVersion and self.originalVersion not in runVersion:
+            return "You have tried to run a version ('" + runVersion + \
+                   "') which is not based on the version you started with ('" + self.originalVersion + "').\n" + \
+                   "This will result in an attempt to amalgamate the versions, i.e. to run version '" + \
+                   self.originalVersion + "." + runVersion + "'.\n" + \
+                   "If this isn't what you want, you will need to restart the static GUI with a different '-v' flag.\n\n" + \
+                   "Are you sure you want to continue?"
+        else:
+            return RunningAction.getConfirmationMessage(self)
+
     def getLowerBoundForSpinButtons(self):
         return 1
 
 
-class RunTestsBasic(RunTests):
+class RunTestsBasic(RunTests):        
     def getTabTitle(self):
         return "Basic"
 

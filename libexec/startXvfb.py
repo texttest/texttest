@@ -56,7 +56,7 @@ def cleanLeakedLockFiles(displayNum):
         if os.path.isfile(lockFile):
             try:
                 os.remove(lockFile)
-            except:
+            except: # pragma: no cover - pathological case of ending up in race condition with Xvfb
                 pass
 
 def writeAndWait(text, proc, displayNum):

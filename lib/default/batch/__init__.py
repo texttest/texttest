@@ -31,10 +31,7 @@ class BatchCategory(plugins.Filter):
         self.tests[test.getRelPath()] = test
     def getTestLine(self, test):
         postText = test.state.getTypeBreakdown()[1]
-        if postText == self.name.upper():
-            # Don't double report here
-            postText = ""
-        elif len(postText) > 0:
+        if len(postText) > 0:
             postText = " : " + postText
             return test.getIndent() + "- " + test.paddedRepr() + postText + "\n"
         return test.getIndent() + "- " + repr(test) + postText + "\n"

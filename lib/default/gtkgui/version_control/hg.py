@@ -52,7 +52,7 @@ class HgInterface(vcs_independent.VersionControlInterface):
         if len(words) > 0:
             statusLetter = words[0]
             return self.allStateInfo.get(statusLetter, statusLetter)
-        else:
+        else: # pragma: no cover - robustness fix only. Could be triggered before 'correctForLinks' was introduced
             # We don't really know, but we assume an error message means we probably don't control the file
             return "Unknown"
         

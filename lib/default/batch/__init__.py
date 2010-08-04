@@ -616,7 +616,7 @@ class WebPageResponder(plugins.Responder):
             plugins.ensureDirectoryExists(os.path.join(pageDir, resourcePage))
         try:
             self.generateWebPages(subDirs, getConfigValue, pageDir, resourcePages, *args)
-        except Exception:
+        except Exception: # pragma: no cover - robustness only, shouldn't be reachable
             sys.stderr.write("Caught exception while generating web pages :\n")
             plugins.printException()
         

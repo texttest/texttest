@@ -1,10 +1,9 @@
 import os, shutil, plugins, re, stat, subprocess, glob, logging, difflib
 
+from runtest import Killed
 from jobprocess import killArbitaryProcess, killSubProcessAndChildren
 from ndict import seqdict
 from string import Template
-
-plugins.addCategory("killed", "killed", "were terminated before completion")
 
 
 class MakeWriteDirectory(plugins.Action):
@@ -398,14 +397,6 @@ class TestEnvironmentCreator:
             elif (dataFile.endswith(".jar") or dataFile.endswith(".class")) and "CLASSPATH" not in pathVars:
                 pathVars.append("CLASSPATH")
         return pathVars
-
-class Killed(plugins.TestState):
-    def __init__(self, briefText, freeText, prevState):
-        plugins.TestState.__init__(self, "killed", briefText=briefText, freeText=freeText, \
-                                   started=1, completed=1, executionHosts=prevState.executionHosts)
-        # Cache running information, it can be useful to have this available...
-        self.prevState = prevState
-        self.failedPrediction = self
 
 
 class CollateFiles(plugins.Action):

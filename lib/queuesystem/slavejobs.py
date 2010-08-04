@@ -5,7 +5,7 @@ Module containing code that's only run in the slave jobs when running with a gri
 
 import plugins, os, sys, time, socket
 from utils import *
-from default import RunTest
+from default.runtest import RunTest
 from default.sandbox import FindExecutionHosts, MachineInfoFinder
 from default.actionrunner import ActionRunner
 from cPickle import dumps

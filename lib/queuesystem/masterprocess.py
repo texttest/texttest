@@ -13,7 +13,7 @@ from default.console import TextDisplayResponder, InteractiveResponder
 from default.knownbugs import CheckForBugs
 from default.actionrunner import BaseActionRunner
 from default.performance import getTestPerformance
-from default import Running
+from default.runtest import Running
 from types import StringType
 from glob import glob
 

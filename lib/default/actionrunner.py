@@ -185,9 +185,7 @@ class ApplicationRunner:
         self.diag.info("Performing " + str(action) + " set up on " + repr(self.testSuite.app))
         try:
             action.setUpApplication(self.testSuite.app)
-        except KeyboardInterrupt:
-            raise
-        except:
+        except Exception:
             sys.stderr.write("Exception thrown performing " + str(action) + " set up on " + repr(self.testSuite.app) + " :\n")
             plugins.printException()
     def markForSetUp(self, suite):

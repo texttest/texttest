@@ -1299,14 +1299,19 @@ class Application:
             
     def readExplicitConfigFiles(self, configModuleInitialised):
         prevFiles = []
+        dependentsSetUp = False
         while True:
             dircaches = self.getExtraDirCaches("config") + [ self.dircache ]
             allFiles = self.getAllFileNames(dircaches, "config")
             if len(allFiles) == len(prevFiles):
-                return
-            self.diag.info("Reading explicit config files : " + "\n".join(allFiles))
-            self.configDir.readValues(allFiles, insert=False, errorOnUnknown=configModuleInitialised)
-            prevFiles = allFiles
+                if configModuleInitialised and not dependentsSetUp and self.configObject.setDependentConfigDefaults(self):
+                    dependentsSetUp = True
+                else:
+                    return
+            else:
+                self.diag.info("Reading explicit config files : " + "\n".join(allFiles))
+                self.configDir.readValues(allFiles, insert=False, errorOnUnknown=configModuleInitialised)
+                prevFiles = allFiles
         
     def readValues(self, multiEntryDict, stem, dircaches, insert=True, errorOnUnknown=False):
         allFiles = self.getAllFileNames(dircaches, stem)

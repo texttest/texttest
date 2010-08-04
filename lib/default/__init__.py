@@ -1233,6 +1233,12 @@ class Config:
         self.setPerformanceDefaults(app)
         self.setUsecaseDefaults(app)
 
+    def setDependentConfigDefaults(self, app):
+        # For setting up configuration where the config file needs to have been read first
+        # Should return True if it does anything
+        return False
+
+
 class SaveState(plugins.Responder):
     def notifyComplete(self, test):
         if test.state.isComplete(): # might look weird but this notification also comes in scripts etc.

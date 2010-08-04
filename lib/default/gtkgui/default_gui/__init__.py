@@ -7,6 +7,7 @@ try:
     from helpdialogs import *
     from adminactions import *
     from fileviewers import *
+    from fileproperties import *
     from selectandfilter import *
     from runningactions import *
     from changeteststate import *
@@ -35,6 +36,7 @@ class InteractiveActionConfig(BaseInteractiveActionConfig):
 
         classes += runningactions.getInteractiveActionClasses(dynamic)    
         classes += helpdialogs.getInteractiveActionClasses()
+        classes += fileproperties.getInteractiveActionClasses()
         classes += fileviewers.getInteractiveActionClasses(dynamic)
         classes += selectandfilter.getInteractiveActionClasses(dynamic)
         return classes

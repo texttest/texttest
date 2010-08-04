@@ -310,10 +310,7 @@ class ApplicationFilter(TextFilter):
         return self.acceptsApplication(suite.app)
     def acceptsApplication(self, app):
         return self.stringContainsText(app.name)
-    def acceptsTestSuiteContents(self, suite):
-        # Allow empty suites through
-        return True
-
+    
 class TestSelectionFilter(TextFilter):
     option = "tp"
     def __init__(self, *args):
@@ -456,9 +453,6 @@ class ThreadedNotificationHandler:
     def enablePoll(self, idleHandleMethod, **kwargs):
         self.active = True
         return idleHandleMethod(self.pollQueue, **kwargs)
-
-    def disablePoll(self):
-        self.active = False
 
     def pollQueue(self):
         try:
@@ -610,17 +604,17 @@ class TestState(Observable):
     def getComparisonsForRecalculation(self):
         # Is some aspect of the state out of date
         return []
+
     # Used by text interface to print states
     def description(self):
-        if self.freeText:
-            if self.freeText.find("\n") == -1:
-                return "not compared:  " + self.freeText
-            else:
-                return "not compared:\n" + self.freeText
+        if "\n" in self.freeText:
+            return "not compared:\n" + self.freeText
         else:
-            return "not compared"
+            return "not compared:  " + self.freeText
+
     def getFreeText(self):
         return self.freeText # some subclasses might want to calculate this...
+
     def getTypeBreakdown(self):
         if self.isComplete():
             return "failure", self.briefText
@@ -747,14 +741,11 @@ def copyEnvironment():
     return environ
 
 def getInterpreter(executable):
-    if executable.endswith(".py"):
-        return "python"
-    elif executable.endswith(".rb"):
-        return "ruby"
-    elif executable.endswith(".jar"):
-        return "java -jar"
-    else:
-        return ""
+    extension = executable.rsplit(".", 1)[-1]
+    cache = { "py" : "python",
+              "rb" : "ruby",
+              "jar" : "java -jar" }
+    return cache.get(extension, "")
 
 def commandLineString(cmdArgs):
     def getQuoteChar(char):
@@ -856,7 +847,7 @@ def rmtree(dir, attempts=100):
         if os.getcwd().startswith(realDir):
             root = os.path.dirname(os.path.normpath(dir))
             os.chdir(root)
-    except OSError:
+    except OSError: # pragma: no cover - robustness only
         pass
     for i in range(attempts):
         try:
@@ -1540,69 +1531,3 @@ class OptionGroup:
         return key in onlyKeys
     
 
-# pwd and grp doesn't exist on windows ...
-try:
-    import pwd, grp
-except ImportError:
-    pass
-
-class FileProperties:
-    def __init__(self, path):
-        self.abspath = path
-        self.filename = os.path.basename(self.abspath)
-        self.dir = os.path.dirname(self.abspath)
-        self.status = os.stat(self.abspath)
-        self.now = int(time.time())
-        self.recent = self.now - (6 * 30 * 24 * 60 * 60) #6 months ago
-    def inqType(self):
-        # The stat.S_IS* functions don't seem to work on links ...
-        if os.path.islink(self.abspath):
-            return "l"
-        elif os.path.isdir(self.abspath):
-            return "d"
-        else:
-            return "-"
-    def inqMode(self):
-        permissions = ""
-        for who in "USR", "GRP", "OTH":
-            for what in "R", "W", "X":
-                #lookup attribute at runtime using getattr
-                if self.status[stat.ST_MODE] & getattr(stat,"S_I" + what + who):
-                    permissions = permissions + what.lower()
-                else:
-                    permissions = permissions + "-"
-        return permissions
-    def inqLinks(self):
-        return self.status[stat.ST_NLINK]
-    def inqOwner(self):
-        try:
-            uid = self.status[stat.ST_UID]
-            return str(pwd.getpwuid(uid)[0])
-        except Exception: # KeyError, AttributeError (on Windows) possible
-            return "?"
-    def inqGroup(self):
-        try:
-            gid = self.status[stat.ST_GID]
-            return str(grp.getgrgid(gid)[0])
-        except Exception: # KeyError, AttributeError (on Windows) possible
-            return "?"
-    def inqSize(self):
-        return self.status[stat.ST_SIZE]
-    def formatTime(self, timeStamp):
-        # %e is more appropriate than %d below, as it fills with space
-        # rather than 0, but it is not supported on Windows, it seems.
-        if timeStamp < self.recent or timeStamp > self.now:
-            timeFormat = "%b %d  %Y"
-        else:
-            timeFormat = "%b %d %H:%M"
-        return time.strftime(timeFormat, time.localtime(timeStamp))
-    def inqModificationTime(self):
-        return self.formatTime(self.status[stat.ST_MTIME])
-    # Return the *nix type format:
-    # -rwxr--r--    1 mattias carm       1675 Nov 16  1998 .xinitrc_old
-    def getUnixRepresentation(self):
-        return (self.inqType(), self.inqMode(),
-                self.inqLinks(), self.inqOwner(),
-                self.inqGroup(), self.inqSize(),
-                self.inqModificationTime(), self.filename)
-    

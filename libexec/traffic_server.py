@@ -872,6 +872,22 @@ class CommandLineTraffic(Traffic):
                 currValue = os.getenv(var)
                 self.diag.info("Checking environment " + var + "=" + value + " against " + repr(currValue))
                 if value != currValue:
+                    if var.endswith("PATH"):
+                        interceptStr = "traffic_intercepts" + os.pathsep
+                        # Fix the traffic interception mechanisms's own files:
+                        # the program will have been given a separate directory here.
+                        # Don't report this in the traffic file
+                        pos = value.find(interceptStr)
+                        if pos != -1:
+                            endPos = pos + len(interceptStr)
+                            startPos = value.rfind(os.pathsep, 0, pos)
+                            if startPos < 0:
+                                value = value[endPos:]
+                            else:
+                                value = value[:startPos + 1] + value[endPos:]
+                            self.diag.info("Filtered PATH variable " + var + "=" + value)
+                            if value == currValue:
+                                continue
                     interestingEnviron.append((var, value))
         return interestingEnviron
 
@@ -895,15 +911,8 @@ class CommandLineTraffic(Traffic):
 
     def getEnvValueString(self, var, value):
         oldVal = os.getenv(var)
-        if oldVal and oldVal != value:
-            newVal = value.replace(oldVal, "$" + var)
-            # Fix the traffic interception mechanisms's own files: the program will have been given a separate directory here.
-            # Don't report this in the traffic file
-            interceptStr = "traffic_intercepts" + os.pathsep + "$" + var
-            if interceptStr in newVal:
-                return newVal.split(os.pathsep, 1)[1]
-            else:
-                return newVal
+        if oldVal and oldVal != value:            
+            return value.replace(oldVal, "$" + var)
         else:
             return value
 
@@ -995,6 +1004,7 @@ class CommandLineTraffic(Traffic):
                 self.diag.info("Searching " + currDir)
                 fullPath = os.path.join(currDir, fileName)
                 if self.isRealCommand(fullPath, fullCommand):
+                    self.realCommands[fileName] = fullPath
                     return fullPath
 
     def findRealCmdInfo(self, cmdName, cmdPath):

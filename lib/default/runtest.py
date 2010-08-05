@@ -148,14 +148,8 @@ class RunTest(plugins.Action):
     def wait(self, process):
         try:
             plugins.retryOnInterrupt(process.wait)
-        except OSError:
+        except OSError: # pragma: no cover - workaround for Python bugs only
             pass # safest, as there are python bugs in this area
-
-    def diagnose(self, testEnv, commandArgs):
-        if self.diag.isEnabledFor(logging.INFO):
-            for var, value in testEnv.items():
-                self.diag.info("Environment: " + var + " = " + value)
-            self.diag.info("Running test with args : " + repr(commandArgs))
 
     def getRunDescription(self, test):
         commandArgs = self.getLocalExecuteCmdArgs(test, makeDirs=False)
@@ -175,7 +169,7 @@ class RunTest(plugins.Action):
     def getTestProcess(self, test, machine):
         commandArgs = self.getExecuteCmdArgs(test, machine)
         testEnv = test.getRunEnvironment()
-        self.diagnose(testEnv, commandArgs)
+        self.diag.info("Running test with args : " + repr(commandArgs))
         namingScheme = test.app.getConfigValue("filename_convention_scheme")
         stdoutStem = test.app.getStdoutName(namingScheme)
         stderrStem = test.app.getStderrName(namingScheme)
@@ -231,24 +225,21 @@ class RunTest(plugins.Action):
 
     def getEnvironmentArgs(self, test):
         vars = self.getEnvironmentChanges(test)
-        if len(vars) == 0:
-            return []
-        else:
-            args = []
-            localTmpDir = test.app.writeDirectory
-            remoteTmp = test.app.getRemoteTmpDirectory()[1]
-            for var, value in vars:
-                if remoteTmp:
-                    remoteValue = value.replace(localTmpDir, remoteTmp)
-                else:
-                    remoteValue = value
-                if var == "PATH":
-                    # This needs to be correctly reset remotely
-                    remoteValue = plugins.quote(remoteValue.replace(os.getenv(var), "${" + var + "}"), '"')
-                else:
-                    remoteValue = plugins.quote(remoteValue, "'")
-                args.append((var, remoteValue))
-            return args
+        args = []
+        localTmpDir = test.app.writeDirectory
+        remoteTmp = test.app.getRemoteTmpDirectory()[1]
+        for var, value in vars:
+            if remoteTmp:
+                remoteValue = value.replace(localTmpDir, remoteTmp)
+            else:
+                remoteValue = value
+            if var == "PATH":
+                # This needs to be correctly reset remotely
+                remoteValue = plugins.quote(remoteValue.replace(os.getenv(var), "${" + var + "}"), '"')
+            else:
+                remoteValue = plugins.quote(remoteValue, "'")
+            args.append((var, remoteValue))
+        return args
     
     def getTmpDirectory(self, test):
         remoteTmp = test.app.getRemoteTestTmpDir(test)[1]

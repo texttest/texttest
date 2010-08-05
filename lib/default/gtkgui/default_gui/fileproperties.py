@@ -105,7 +105,7 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
                 self.processFile(file, properties, errors)
 
         if len(errors):
-            self.showErrorDialog("Failed to get file properties:\n" + "\n".join(errors))
+            raise plugins.TextTestError, "Failed to get file properties:\n" + "\n".join(errors)
 
         return properties
     def processFile(self, file, properties, errors):
@@ -113,8 +113,8 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
             try:
                 prop = FileProperties(file)
                 properties.append(prop)
-            except Exception:
-                errors.append(plugins.getExceptionString())
+            except Exception, e:
+                errors.append(str(e))
 
     # xalign = 1.0 means right aligned, 0.0 means left aligned
     def justify(self, text, xalign = 0.0):

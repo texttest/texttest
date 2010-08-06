@@ -218,8 +218,10 @@ class ReplaceText(plugins.ScriptWithArgs):
         argDict = self.parseArguments(args, [ "old", "new", "file" ])
         self.oldTextTrigger = plugins.TextTrigger(argDict["old"])
         self.newText = argDict["new"].replace("\\n", "\n")
-        fileStr = argDict.get("file", "")
-        self.stems = plugins.commasplit(fileStr)
+        self.stems = []
+        fileStr = argDict.get("file")
+        if fileStr:
+            self.stems = plugins.commasplit(fileStr)
 
     def __repr__(self):
         return "Replacing " + self.oldTextTrigger.text + " with " + self.newText + " for"

@@ -297,10 +297,11 @@ class TopWindowGUI(guiutils.ContainerGUI):
 
     def getCheckoutTitle(self):
         allCheckouts = []
-        for app in self.allApps:
-            checkout = app.checkout
-            if checkout and not checkout in allCheckouts:
-                allCheckouts.append(checkout)
+        for topApp in self.allApps:
+            for app in [ topApp ] + topApp.extras:
+                checkout = app.checkout
+                if checkout and not checkout in allCheckouts:
+                    allCheckouts.append(checkout)
         if len(allCheckouts) == 0:
             return ""
         elif len(allCheckouts) == 1:

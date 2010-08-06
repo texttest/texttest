@@ -337,12 +337,6 @@ class TextInfoGUI(TextViewGUI):
         self.resetText(test, state)
         self.updateView()
 
-    def hasStem(self, line, files):
-        for _, comp in files:
-            if comp.stem and line.find(" " + repr(comp) + " ") != -1:
-                return True
-        return False
-
     def makeSubText(self, files):
         newText = self.preambleText
         for fileName, comp in files:

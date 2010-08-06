@@ -100,11 +100,8 @@ class DocumentEnvironment(plugins.Action):
         self.exceptions = [ "TEXTTEST_DELETION", "TEXTTEST_SYMLINK", "TEXTTEST_PERSONAL_" ]
         
     def getEntriesToUse(self, app):
-        if len(self.onlyEntries) > 0:
-            return self.onlyEntries
-        else:
-            rootDir = plugins.installationRoots[0]
-            return self.findAllVariables(app, self.prefixes, rootDir)
+        rootDir = plugins.installationRoots[0]
+        return self.findAllVariables(app, self.prefixes, rootDir)
 
     def findAllVariables(self, app, prefixes, rootDir):
         includeSite = app.inputOptions.configPathOptions()[0]
@@ -166,7 +163,8 @@ class DocumentEnvironment(plugins.Action):
             return arg
 
     def isRelevant(self, var, vars, prefixes):
-        if var in self.exceptions or var in prefixes or "SLEEP" in var:
+        if var in self.exceptions or var in prefixes or "SLEEP" in var or \
+               (len(self.onlyEntries) > 0 and var not in self.onlyEntries):
             return False
         prevVal = vars.get(var, [])
         return not prevVal or not prevVal[0]

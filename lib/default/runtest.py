@@ -106,24 +106,27 @@ class RunTest(plugins.Action):
             return self.getExplicitKillInfo()
         elif self.killSignal == "timeout":
             return "TIMEOUT", "exceeded wallclock time limit of " + str(test.getConfigValue("kill_timeout")) + " seconds"
-        elif self.killSignal == signal.SIGUSR1:
-            return self.getUserSignalKillInfo(test, "1")
-        elif self.killSignal == signal.SIGUSR2:
-            return self.getUserSignalKillInfo(test, "2")
         elif self.killSignal == signal.SIGXCPU:
             return "CPULIMIT", "exceeded maximum cpu time allowed"
         elif self.killSignal == signal.SIGINT:
             return "INTERRUPT", "terminated via a keyboard interrupt (Ctrl-C)"
         else:
-            briefText = "signal " + str(self.killSignal)
-            return briefText, "terminated by " + briefText
+            return self.getKillInfoOtherSignal(test)
+
+    def getSignalName(self, sigNum):
+        for entry in dir(signal):
+            if entry.startswith("SIG") and not entry.startswith("SIG_"):
+                number = getattr(signal, entry)
+                if number == sigNum:
+                    return entry
+
+    def getKillInfoOtherSignal(self, test):
+        briefText = self.getSignalName(self.killSignal)
+        return briefText, "terminated by signal " + briefText
         
     def getExplicitKillInfo(self):
         timeStr = plugins.localtime("%H:%M")
         return "KILLED", "killed explicitly at " + timeStr
-
-    def getUserSignalKillInfo(self, testArg, userSignalNumber):
-        return "SIGUSR" + userSignalNumber, "terminated by user signal " + userSignalNumber
 
     def kill(self, test, sig):
         self.lock.acquire()
@@ -154,11 +157,8 @@ class RunTest(plugins.Action):
     def getRunDescription(self, test):
         commandArgs = self.getLocalExecuteCmdArgs(test, makeDirs=False)
         text =  "Command Line   : " + plugins.commandLineString(commandArgs) + "\n"
-        interestingVars = self.getEnvironmentChanges(test)
-        if len(interestingVars) == 0:
-            return text
         text += "\nEnvironment variables :\n"
-        for var, value in interestingVars:
+        for var, value in self.getEnvironmentChanges(test):
             text += var + "=" + value + "\n"
         return text
 

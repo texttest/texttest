@@ -3,7 +3,7 @@
 Module containing code that's only run in the slave jobs when running with a grid engine / queue system
 """
 
-import plugins, os, sys, time, socket
+import plugins, os, sys, time, socket, signal
 from utils import *
 from default.runtest import RunTest
 from default.sandbox import FindExecutionHosts, MachineInfoFinder
@@ -14,6 +14,15 @@ from cPickle import dumps
 class RunTestInSlave(RunTest):
     def getBriefText(self, execMachines):
         return "RUN (" + ",".join(execMachines) + ")"
+
+    def getKillInfoOtherSignal(self, test):
+        if self.killSignal == signal.SIGUSR1:
+            return self.getUserSignalKillInfo(test, "1")
+        elif self.killSignal == signal.SIGUSR2:
+            return self.getUserSignalKillInfo(test, "2")
+        else:
+            return RunTest.getKillInfoOtherSignal(self, test)
+    
     def getUserSignalKillInfo(self, test, userSignalNumber):
         moduleName = queueSystemName(test.app).lower()
         command = "from " + moduleName + " import getUserSignalKillInfo as _getUserSignalKillInfo"

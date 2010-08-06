@@ -247,9 +247,6 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         dialog.connect("response", respondMethod)
         dialog.show_all()
         
-    def cleanDialog(self, dummy1, dummy2, dialog):
-        self._cleanDialog(dialog)
-
     def _cleanDialog(self, dialog, *args):
         entrycompletion.manager.collectCompletions()
         dialog.hide() # Can't destroy it, we might still want to read stuff from it
@@ -444,7 +441,7 @@ class ActionResultDialogGUI(ActionGUI):
         self.createButtons()
         self.dialog.show_all()
         
-    def addContents(self):
+    def addContents(self): # pragma: no cover - documentation only
         pass
     
     def createButtons(self):

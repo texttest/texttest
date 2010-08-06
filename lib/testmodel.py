@@ -1144,10 +1144,10 @@ class ConfigurationCall:
             else:
                 self.firstAttemptException = plugins.getExceptionString()
                 return self(self.app, *args, **kwargs)
-        except (plugins.TextTestError, KeyboardInterrupt):
+        except plugins.TextTestError:
             # Just pass it through here, these are deliberate
             raise
-        except:
+        except Exception:
             self.raiseException()
     def raiseException(self):
         message = "Exception thrown by '" + self.app.getConfigValue("config_module") + \

@@ -286,9 +286,7 @@ class TextTest(plugins.Responder, plugins.Observable):
                 except plugins.TextTestError, e:
                     sys.stderr.write(partApp.rejectionMessage(str(e)))
                     raisedError = True
-                except KeyboardInterrupt:
-                    raise
-                except:  
+                except Exception:  
                     sys.stderr.write("Error creating test suite for " + partApp.description() + " :\n")
                     plugins.printException()
             fullMsg = "".join(warningMessages)

@@ -42,7 +42,10 @@ class MenuBarGUI(guiutils.SubGUI):
             actionTitle = observer.getWidgetName()
             actionName = actionTitle.replace("_", "")
             gtkAction = gtk.ToggleAction(actionName, actionTitle, None, None)
-            gtkAction.set_active(True)
+            if observer.shouldShow():
+                gtkAction.set_active(True)
+            else:
+                gtkAction.set_sensitive(False)
             self.actionGroup.add_action(gtkAction)
             gtkAction.connect("toggled", self.toggleVisibility, observer)
             self.toggleActions.append(gtkAction)

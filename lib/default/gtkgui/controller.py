@@ -29,7 +29,7 @@ try:
 except Exception, e:
     raiseException("Unable to import module 'gobject' - " + str(e))
 
-import gtkusecase, testtree, filetrees, statusviews, textinfo, actionholders, version_control, guiplugins, guiutils, plugins, os, sys, logging
+import testtree, filetrees, statusviews, textinfo, actionholders, version_control, guiplugins, guiutils, plugins, os, sys, logging
 from copy import copy
 from ndict import seqdict
 
@@ -60,12 +60,21 @@ class IdleHandlerManager:
     def addSuites(self, *args):
         self.enableHandler()
 
-    def enableHandler(self):
-        if self.sourceId == -1:
+    def getIdlePriority(self):
+        try:
             # Same priority as PyUseCase replay, so they get called interchangeably
             # Non-default as a workaround for bugs in filechooser handling in GTK
+            from gtkusecase import PRIORITY_PYUSECASE_IDLE
+            return PRIORITY_PYUSECASE_IDLE
+        except ImportError:
+            # It should still work if we can't find PyUseCase
+            # so we hardcode the right answer...
+            return gobject.PRIORITY_DEFAULT_IDLE + 20
+
+    def enableHandler(self):
+        if self.sourceId == -1:
             self.sourceId = plugins.Observable.threadedNotificationHandler.enablePoll(gobject.idle_add,
-                                                                                      priority=gtkusecase.PRIORITY_PYUSECASE_IDLE)
+                                                                                      priority=self.getIdlePriority())
             self.diag.info("Adding idle handler")
 
     def disableHandler(self):
@@ -450,7 +459,10 @@ class ShortcutBarGUI(guiutils.SubGUI):
             self.widget = createShortcutBar(uiMapFiles=uiMapFiles, customEventTypes=customEventTypes)
             self.widget.show()
         except ImportError:
-            self.widget = gtk.HBox() # Anything really, but it should be a widget (for if PyUseCase isn't installed)
+            self.widget = None
+
+    def shouldShow(self):
+        return self.widget is not None
         
     def getWidgetName(self):
         return "_Shortcut bar"
@@ -464,9 +476,10 @@ class VBoxGUI(guiutils.ContainerGUI):
         box = gtk.VBox()
         expandWidgets = [ gtk.HPaned, gtk.ScrolledWindow ]
         for subgui in self.subguis:
-            view = subgui.createView()
-            expand = view.__class__ in expandWidgets
-            box.pack_start(view, expand=expand, fill=expand)
+            if subgui.shouldShow():
+                view = subgui.createView()
+                expand = view.__class__ in expandWidgets
+                box.pack_start(view, expand=expand, fill=expand)
 
         box.show()
         return box

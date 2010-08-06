@@ -33,7 +33,7 @@ class FilterAction(plugins.Action):
     def getStem(self, fileName):
         return os.path.basename(fileName).split(".")[0]
 
-    def changeToFilteringState(self, *args):
+    def changeToFilteringState(self, *args): # pragma: no cover - documentation only
         pass
 
     def performAllFilterings(self, test, stem, fileName, newFileName):

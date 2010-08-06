@@ -87,7 +87,7 @@ class RunningAction:
         interpreterArg = os.getenv("TEXTTEST_DYNAMIC_GUI_INTERPRETER", "") # Alternative interpreter for the dynamic GUI : mostly useful for coverage / testing
         if interpreterArg:
             return plugins.splitcmd(interpreterArg.replace("ttpython", sys.executable))
-        else:
+        else: # pragma: no cover - cannot test without PyUseCase on dynamic GUI
             return [ sys.executable ]
 
     def getOptionGroups(self):

@@ -19,7 +19,7 @@ except ImportError, e:
     if "No module named gtk" in str(e):
         class BaseInteractiveActionConfig:
             pass
-    else:
+    else: # pragma: no cover - debugging aid only
         raise
 
 

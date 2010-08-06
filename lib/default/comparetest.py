@@ -135,9 +135,6 @@ class TestComparison(BaseTestComparison):
     def __setstate__(self, state):
         self.__dict__ = state
         self.diag = logging.getLogger("TestComparison")
-        # If loaded from old pickle files, can get out of date objects...
-        if not hasattr(self, "missingResults"):
-            self.missingResults = []
 
     def updateAfterLoad(self, app=None, updatePaths=False, newTmpPath=None):
         pathsToChange = []

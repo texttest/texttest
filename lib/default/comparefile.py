@@ -53,12 +53,11 @@ class FileComparison:
             if var != "diag" and var != "recalculationTime":
                 state[var] = value
         return state
+
     def __setstate__(self, state):
         self.__dict__ = state
         self.diag = logging.getLogger("TestComparison")
         self.recalculationTime = None
-        if not hasattr(self, "differenceCache"):
-            self.differenceCache = self.differenceId
         
     def __repr__(self):
         return self.stem

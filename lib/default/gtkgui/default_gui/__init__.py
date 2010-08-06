@@ -13,7 +13,7 @@ try:
     from changeteststate import *
     from housekeeping import *
     
-    from default.gtkgui.guiplugins import InteractiveActionConfig as BaseInteractiveActionConfig
+    from ..guiplugins import InteractiveActionConfig as BaseInteractiveActionConfig
 except ImportError, e:
     # Might want the default accelerators, don't crash if so
     if "No module named gtk" in str(e):

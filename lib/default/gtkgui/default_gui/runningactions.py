@@ -4,7 +4,7 @@ The various ways to launch the dynamic GUI from the static GUI
 """
 
 import gtk, plugins, os, sys
-from default.gtkgui import guiplugins # from .. import guiplugins, guiutils when we drop Python 2.4 support
+from .. import guiplugins
 from copy import copy, deepcopy
 
 class RunningAction:

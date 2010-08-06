@@ -4,7 +4,7 @@ All the actions for administering the files and directories in a test suite
 """
 
 import gtk, plugins, os, shutil
-from default.gtkgui import guiplugins, guiutils # from .. import guiplugins, guiutils when we drop Python 2.4 support
+from .. import guiplugins, guiutils
 from ndict import seqdict
 
 # Cut, copy and paste

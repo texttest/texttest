@@ -4,7 +4,7 @@ The actions in the dynamic GUI that affect the state of a test
 """
 
 import gtk, plugins, os
-from default.gtkgui import guiplugins # from .. import guiplugins when we drop Python 2.4 support
+from .. import guiplugins
 
 class SaveTests(guiplugins.ActionDialogGUI):
     def __init__(self, allApps, *args):

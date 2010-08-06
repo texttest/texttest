@@ -1,6 +1,6 @@
 
 import gtk, vcs_independent, plugins, datetime, shutil, time, os
-from default.gtkgui import guiutils
+from .. import guiutils
 from ndict import seqdict
 
 #

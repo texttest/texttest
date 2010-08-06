@@ -2,8 +2,8 @@
 # Generic interface to version control systems. We try to keep it as general as possible.
 
 import gtk, gobject, plugins, custom_widgets, os, datetime, subprocess, shutil
-from default.gtkgui import guiplugins, guiutils, entrycompletion
-from default.gtkgui.default_gui import adminactions
+from .. import guiplugins, guiutils, entrycompletion
+from ..default_gui import adminactions
 
 vcsClass, vcs, annotateClass = None, None, None
     

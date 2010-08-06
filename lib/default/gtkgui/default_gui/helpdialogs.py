@@ -1,6 +1,6 @@
 
 import gtk, gobject, plugins, texttest_version, os, sys, glob
-from default.gtkgui import guiplugins, guiutils # from .. import guiplugins, guiutils when we drop Python 2.4 support
+from .. import guiplugins, guiutils
 from types import StringType
 
 # Show useful info about TextTest.

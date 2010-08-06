@@ -922,7 +922,6 @@ class RemoveFiles(guiplugins.ActionGUI):
 
     def performOnCurrent(self):
         test = self.currTestSelection[0]
-        warnings = ""
         removed = 0
         for filePath, _ in self.currFileSelection:
             fileType = self.getType(filePath)
@@ -935,8 +934,6 @@ class RemoveFiles(guiplugins.ActionGUI):
         test.filesChanged()
         self.notify("Status", "Removed " + plugins.pluralise(removed, fileType) + " from the " +
                     test.classDescription() + " " + test.name + "")
-        if warnings:
-            self.showWarningDialog(warnings)
 
     def messageAfterPerform(self):
         pass # do it as part of the method, uses lots of local data

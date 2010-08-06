@@ -334,9 +334,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         return frame
 
     def getNewSwitchName(self, switchName, optionGroup):
-        if len(switchName):
-            return switchName
-        elif optionGroup is self.selectionGroup:
+        if optionGroup is self.selectionGroup:
             return "Current selection"
         elif optionGroup is self.filteringGroup:
             return "Current filtering"

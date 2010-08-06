@@ -96,7 +96,8 @@ class QueueSystemServer(BaseActionRunner):
         self.runAllTests()
         if len(self.jobs):
             self.diag.info("All jobs submitted, polling the queue system now.")
-            self.pollQueueSystem()
+            if self.canPoll():
+                self.pollQueueSystem()
 
     def pollQueueSystem(self):
         # Start by polling after 5 seconds, ever after try every 15
@@ -106,14 +107,15 @@ class QueueSystemServer(BaseActionRunner):
                 time.sleep(0.5)
                 if self.allComplete or self.exited:
                     return
-            if not self.updateJobStatus():
-                return
+            self.updateJobStatus()
             attempts = 30
+
+    def canPoll(self):
+        queueSystem = self.getQueueSystem(self.jobs.keys()[0])
+        return queueSystem.supportsPolling()
 
     def updateJobStatus(self):
         queueSystem = self.getQueueSystem(self.jobs.keys()[0])
-        if not queueSystem.supportsPolling():
-            return False
         statusInfo = queueSystem.getStatusForAllJobs()
         self.diag.info("Got status for all jobs : " + repr(statusInfo))
         for test, jobs in self.jobs.items():
@@ -127,8 +129,7 @@ class QueueSystemServer(BaseActionRunner):
                     elif not status and not self.jobStarted(test):
                         # Do this to any jobs
                         self.setSlaveFailed(test, False, True)
-        return True
-
+        
     def updateRunStatus(self, test, status):
         oldState = test.state
         currRunStatus = oldState.briefText.split()[0]

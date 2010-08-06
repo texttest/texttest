@@ -85,14 +85,13 @@ class QueueSystemConfig(default.Config):
     
     def hasExplicitInterface(self):
         return self.slaveRun() or default.Config.hasExplicitInterface(self)
+
     def slaveRun(self):
         return self.optionMap.has_key("slave")
+
     def getWriteDirectoryName(self, app):
-        slaveDir = self.optionMap.get("slave")
-        if slaveDir:
-            return slaveDir
-        else:
-            return default.Config.getWriteDirectoryName(self, app)
+        return self.optionMap.get("slave") or default.Config.getWriteDirectoryName(self, app)
+    
     def noFileAdvice(self):
         if self.useQueueSystem:
             return "Try re-running the test, and either use local mode, or check the box for keeping\n" + \

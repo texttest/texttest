@@ -682,7 +682,7 @@ class InteractiveActionHandler:
             return InteractiveActionConfig()
         except ImportError:
             self.rejectedModules.append(module) # Make sure we don't try and import it again
-            if module == "default_gui":
+            if module == "default_gui": # pragma: no cover - only to aid debugging default_gui
                 raise
         
     def getInstances(self):

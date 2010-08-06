@@ -93,6 +93,7 @@ class Config:
                 group.addSwitch("reconnfull", "Recompute file filters when reconnecting", options=self.getReconnFullOptions())
                 group.addSwitch("n", "Create new results files (overwrite everything)")
                 group.addSwitch("new", "Start static GUI with no applications loaded")
+                group.addOption("bs", "Select tests exactly as for batch mode session")
                 group.addOption("bx", "Use extra versions as for batch mode session")
                 if recordsUseCases:
                     group.addSwitch("record", "Private: Record usecase rather than replay what is present")
@@ -225,10 +226,13 @@ class Config:
     def getCheckoutExtraVersions(self):    
         checkoutNames = plugins.commasplit(self.optionValue("c"))
         return [ self.versionNameFromCheckout(c, checkoutNames) for c in checkoutNames[1:] ]
+
+    def getBatchSessionForSelect(self):
+        return self.optionMap.get("b") or self.optionMap.get("bs")
         
     def getExtraVersionsFromConfig(self, app):
         basic = app.getConfigValue("extra_version")
-        batchSession = self.optionMap.get("b") or self.optionMap.get("bx")
+        batchSession = self.getBatchSessionForSelect() or self.optionMap.get("bx")
         if batchSession is not None:
             for batchExtra in app.getCompositeConfigValue("batch_extra_version", batchSession):
                 if batchExtra not in basic:
@@ -529,8 +533,9 @@ class Config:
         names = self.optionListValue(options, "f") + self.optionListValue(options, "fintersect")
         if includeConfig:
             names += app.getConfigValue("default_filter_file")
-            if self.batchMode():
-                names += app.getCompositeConfigValue("batch_filter_file", options["b"])
+            batchSession = self.getBatchSessionForSelect()
+            if batchSession:
+                names += app.getCompositeConfigValue("batch_filter_file", batchSession)
         return names
 
     def findAllFilterFileNames(self, app, options, includeConfig):
@@ -585,7 +590,7 @@ class Config:
             argument = optionMap.get(filterClass.option)
             if argument:
                 filters.append(filterClass(argument, app, suites))
-        batchSession = self.optionMap.get("b")
+        batchSession = self.getBatchSessionForSelect()
         if batchSession:
             timeLimit = app.getCompositeConfigValue("batch_timelimit", batchSession)
             if timeLimit:

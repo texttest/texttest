@@ -837,6 +837,13 @@ def makeWriteable(path):
     currPerm = stat.S_IMODE(currMode)
     newPerm = currPerm | 0220
     os.chmod(path, newPerm)
+
+def getPaths(d):
+    paths = [ d ]
+    for root, dirs, files in os.walk(d):
+        for path in dirs + files:
+            paths.append(os.path.join(root, path))
+    return paths
     
 # Version of rmtree not prone to crashing if directory in use or externally removed
 def rmtree(dir, attempts=100):
@@ -858,14 +865,13 @@ def rmtree(dir, attempts=100):
         except Exception, e:
             if str(e).find("Permission") != -1 or str(e).find("Access") != -1:
                 # We own this stuff, don't respect readonly flags set by ourselves, it might just be the SUT doing so...
-                for root, dirs, files in os.walk(realDir):
-                    for path in dirs + files:
-                        try:
-                            makeWriteable(os.path.join(root, path))
-                        except OSError, e:
-                            log.info("Could not change permissions to be able to remove directory " +
-                                     dir + " : - " + str(e))
-                            return
+                for path in getPaths(realDir):
+                    try:
+                        makeWriteable(path)
+                    except OSError, e:
+                        log.info("Could not change permissions to be able to remove directory " +
+                                 dir + " : - " + str(e))
+                        return
                 continue
             if os.path.isdir(realDir):
                 if i == attempts - 1:

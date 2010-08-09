@@ -767,13 +767,11 @@ def commandLineString(cmdArgs):
 def relpath(fullpath, parentdir):
     normFull = os.path.normpath(fullpath)
     relPath = normFull.replace(os.path.normpath(parentdir), "")
-    if relPath == normFull:
-        # unrelated
-        return None
-    if relPath.startswith(os.sep):
-        return relPath[1:]
-    else:
-        return relPath
+    if relPath != normFull:
+        if relPath.startswith(os.sep):
+            return relPath[1:]
+        else:
+            return relPath
 
 def getProcessStartUpInfo(envMapping=os.environ):
     # Used for hiding the windows if we're on Windows!

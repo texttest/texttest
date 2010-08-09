@@ -910,7 +910,7 @@ class ActionDialogGUI(OptionGroupGUI):
         dialog.add_button(self.getOkStock(actionScriptName.lower()), gtk.RESPONSE_ACCEPT)
         dialog.set_default_response(gtk.RESPONSE_ACCEPT)
         if fileChooser:
-#            fileChooser.connect("file-activated", self.simulateResponse, dialog)
+            fileChooser.connect("file-activated", self.simulateResponse, dialog)
             # Don't pass set_filename directly, will interfere with PyUseCase's attempts to intercept it
             fileChooserOption.setMethods(fileChooser.get_filename, lambda f: fileChooser.set_filename(f))
         

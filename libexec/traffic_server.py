@@ -1,7 +1,6 @@
 
-import optparse, os, stat, sys, logging, logging.config, shutil, socket, subprocess, types
+import optparse, os, stat, sys, logging, logging.config, shutil, socket, subprocess, types, threading
 from SocketServer import TCPServer, StreamRequestHandler
-from threading import Thread, Lock
 from copy import copy
 
 install_root = os.path.dirname(os.path.dirname(os.path.normpath(os.path.abspath(sys.argv[0]))))
@@ -81,6 +80,11 @@ class TrafficServer(TCPServer):
         self.diag.info("Starting traffic server")
         while not self.terminate:
             self.handle_request()
+        # Join all remaining request threads so they don't
+        # execute after Python interpreter has started to shut itself down.
+        for t in threading.enumerate():
+            if t.name == "request":
+                t.join()
         self.diag.info("Shut down traffic server")
             
     def shutdown(self):
@@ -111,8 +115,8 @@ class TrafficServer(TCPServer):
         self.requestCount += 1
         if self.useThreads:
             """Start a new thread to process the request."""
-            t = Thread(target = self.process_request_thread,
-                       args = (request, client_address, self.requestCount))
+            t = threading.Thread(target = self.process_request_thread, name="request",
+                                 args = (request, client_address, self.requestCount))
             t.start()
         else:
             self.process_request_thread(request, client_address, self.requestCount)
@@ -1080,7 +1084,7 @@ class RecordFileHandler:
         self.recordingRequest = 1
         self.cache = {}
         self.completedRequests = []
-        self.lock = Lock()
+        self.lock = threading.Lock()
 
     def requestComplete(self, requestNumber):
         self.lock.acquire()

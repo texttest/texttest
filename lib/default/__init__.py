@@ -34,6 +34,7 @@ class Config:
     def addToOptionGroups(self, apps, groups):
         recordsUseCases = len(apps) == 0 or self.anyAppHas(apps, lambda app: app.getConfigValue("use_case_record_mode") != "disabled")
         useCatalogues = self.anyAppHas(apps, self.isolatesDataUsingCatalogues)
+        useTraffic = self.anyAppHas(apps, self.usesTrafficMechanism)
         for group in groups:
             if group.name.startswith("Select"):
                 group.addOption("t", "Test names containing", description="Select tests for which the name contains the entered text. The text can be a regular expression.")
@@ -67,7 +68,8 @@ class Config:
                 group.addOption("xw", "Write self-diagnostics to", defaultDiagDir)
                 group.addOption("b", "Run batch mode session")
                 group.addOption("name", "Name this run", self.optionValue("name"))
-                group.addSwitch("rectraffic", "(Re-)record command-line or client-server traffic")
+                if useTraffic:
+                    group.addSwitch("rectraffic", "(Re-)record command-line or client-server traffic")
                 group.addSwitch("keeptmp", "Keep temporary write-directories")
                 group.addOption("vanilla", "Ignore configuration files", self.defaultVanillaValue(),
                                 possibleValues = [ "", "site", "personal", "all" ])
@@ -103,6 +105,8 @@ class Config:
                     group.addSwitch("actrep", "Run with slow motion replay")
                 if not useCatalogues:
                     group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
+                if not useTraffic:
+                    group.addSwitch("rectraffic", "(Re-)record command-line or client-server traffic")
 
     def getReconnFullOptions(self):
         return ["Display results exactly as they were in the original run",
@@ -369,6 +373,11 @@ class Config:
     def isolatesDataUsingCatalogues(self, app):
         return app.getConfigValue("create_catalogues") == "true" and \
                len(app.getConfigValue("partial_copy_test_path")) > 0
+
+    def usesTrafficMechanism(self, app):
+        return app.getConfigValue("collect_traffic_client_server") == "true" or \
+               len(app.getCompositeConfigValue("collect_traffic", "asynchronous")) > 0 or \
+               len(app.getConfigValue("collect_traffic_py_module")) > 0
 
     def hasWritePermission(self, path):
         if os.path.isdir(path):
@@ -1072,6 +1081,7 @@ class Config:
         app.setConfigDefault("collect_traffic_py_module", [], "List of Python modules to intercept")
         app.setConfigDefault("collect_traffic_py_attributes", { "": []}, "List of Python attributes to intercept per intercepted module.")
         app.setConfigDefault("collect_traffic_use_threads", "true", "Whether to enable threading, and hence concurrent requests, in traffic mechanism")
+        app.setConfigDefault("collect_traffic_client_server", "false", "Whether to intercept client-server traffic sent by the SUT")
         app.setConfigDefault("run_dependent_text", { "default" : [] }, "Mapping of patterns to remove from result files")
         app.setConfigDefault("unordered_text", { "default" : [] }, "Mapping of patterns to extract and sort from result files")
         app.setConfigDefault("create_catalogues", "false", "Do we create a listing of files created/removed by tests")

@@ -38,7 +38,7 @@ class SetUpTrafficHandlers(plugins.Action):
         if self.trafficServerProcess:
             # After the test is complete we shut down the traffic server and allow it to flush itself
             self.terminateServer(test)
-        else:
+        elif test.app.usesTrafficMechanism():
             replayFile = test.getFileName("traffic")
             if self.record or replayFile:
                 self.setUpServer(test, replayFile)

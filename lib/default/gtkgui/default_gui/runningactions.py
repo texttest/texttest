@@ -360,7 +360,8 @@ class RecordTest(RunningAction,guiplugins.ActionDialogGUI):
         self.addOption("c", "Checkout to use for recording", defaultCheckout)
 
     def addSwitches(self):
-        self.addSwitch("rectraffic", "Also record command-line or client-server traffic", 1)
+        if self.currentApp and self.currentApp.usesTrafficMechanism():
+            self.addSwitch("rectraffic", "Also record command-line or client-server traffic", 1)
         self.addSwitch("rep", "Automatically replay test after recording it", 1,
                        options = [ "Disabled", "In background", "Using dynamic GUI" ])
 

@@ -339,31 +339,36 @@ class RerunTests(RunningAction,guiplugins.ActionGUI):
 
 
 
-class RecordTest(RunningAction,guiplugins.ActionTabGUI):
+class RecordTest(RunningAction,guiplugins.ActionDialogGUI):
     def __init__(self, allApps, dynamic, inputOptions):
-        guiplugins.ActionTabGUI.__init__(self, allApps, dynamic)
+        guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic)
         RunningAction.__init__(self, inputOptions)
-        self.currentApp = None
         self.recordTime = None
-        defaultVersion, defaultCheckout = "", ""
+        self.currentApp = None
         if len(allApps) > 0:
             self.currentApp = allApps[0]
+        self.addOptions()
+        self.addSwitches()
+
+    def addOptions(self):
+        defaultVersion, defaultCheckout = "", ""
+        if self.currentApp:
             defaultVersion = self.currentApp.getFullVersion()
             defaultCheckout = self.currentApp.checkout
+
         self.addOption("v", "Version to record", defaultVersion)
         self.addOption("c", "Checkout to use for recording", defaultCheckout)
+
+    def addSwitches(self):
         self.addSwitch("rectraffic", "Also record command-line or client-server traffic", 1)
-        self.addSwitch("rep", "Automatically replay test after recording it", 1)
-        self.addSwitch("repgui", options = ["Auto-replay invisible", "Auto-replay in dynamic GUI"])
+        self.addSwitch("rep", "Automatically replay test after recording it", 1,
+                       options = [ "Disabled", "In background", "Using dynamic GUI" ])
 
     def correctTestClass(self):
         return "test-case"
 
     def _getStockId(self):
         return "media-record"
-
-    def getTabTitle(self):
-        return "Recording"
 
     def messageAfterPerform(self):
         return "Started record session for " + self.describeTests()
@@ -374,14 +379,14 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
 
     def shouldShowCurrent(self, *args):
         # override the default so it's disabled if there are no apps
-        return len(self.validApps) > 0 and guiplugins.ActionTabGUI.shouldShowCurrent(self, *args) 
+        return len(self.validApps) > 0 and guiplugins.ActionDialogGUI.shouldShowCurrent(self, *args) 
 
     def isValidForApp(self, app):
         return app.getConfigValue("use_case_record_mode") != "disabled" and \
                app.getConfigValue("use_case_recorder") != "none"
 
     def checkValid(self, app):
-        guiplugins.ActionTabGUI.checkValid(self, app)
+        guiplugins.ActionDialogGUI.checkValid(self, app)
         if self.widget and len(self.validApps) == 0:
             self.widget.hide()
 
@@ -423,7 +428,8 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
         test = testSel[0]
         if usecase == "record":
             changedUseCaseVersion = self.getChangedUseCaseVersion(test)
-            if changedUseCaseVersion is not None and self.optionGroup.getSwitchValue("rep"):
+            replay = self.optionGroup.getSwitchValue("rep")
+            if changedUseCaseVersion is not None and replay:
                 replayOptions = self.getVanillaOption() + self.getReplayRunModeOptions(changedUseCaseVersion)
                 self.startTextTestProcess("replay", replayOptions, testSel, filterFile)
                 message = "Recording completed for " + repr(test) + \
@@ -441,13 +447,14 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
         return keys
 
     def getReplayRunModeOptions(self, overwriteVersion):
-        if self.optionGroup.getSwitchValue("repgui"):
+        if self.optionGroup.getSwitchValue("rep") == 2:
             return [ "-autoreplay", "-g" ]
         else:
             return [ "-autoreplay", "-o", overwriteVersion ]
 
     def _getTitle(self):
         return "Record _Use-Case"
+
 
 class RunScriptAction(RunningAction,guiplugins.ActionDialogGUI):
     def __init__(self, allApps, dynamic, inputOptions):

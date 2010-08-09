@@ -560,14 +560,13 @@ activate = activate from checkout to use for recording
 toggled.true = check also record command-line or client-server traffic
 toggled.false = uncheck also record command-line or client-server traffic
 
-[Label=Automatically replay test after recording it]
-toggled.true = check automatically replay test after recording it
-toggled.false = uncheck automatically replay test after recording it
+[Label=Disabled]
+toggled.true = disable auto-replay
 
 [Label=Auto-replay invisible]
 toggled.true = choose auto-replay invisible
 
-[Label=Auto-replay in dynamic GUI]
+[Label=Using dynamic GUI]
 toggled.true = choose auto-replay in dynamic gui
 
 [Name=Suite Name]
@@ -950,3 +949,6 @@ changed = set number of slowest tests to select =
 [Name=Only fastest tests]
 changed = set number of fastest tests to select =
 
+[Title=Record Use-Case]
+response.accept = press record
+response.cancel = press cancel

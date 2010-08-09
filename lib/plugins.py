@@ -577,30 +577,34 @@ class TestState(Observable):
         self.completed = completed
         self.executionHosts = executionHosts
         self.lifecycleChange = lifecycleChange
+
     def __str__(self):
         return self.freeText
+
     def __repr__(self):
         return self.categoryRepr() + self.hostRepr() + self.colonRepr()
+
     def categoryRepr(self):
         if not self.categoryDescriptions.has_key(self.category):
             return self.category
         longDescription = self.categoryDescriptions[self.category][1]
         return longDescription
+
     def hostString(self):
-        if len(self.executionHosts) == 0:
-            return "(no execution hosts given)"
-        else:
-            return "on " + ", ".join(self.executionHosts)
+        return "on " + ", ".join(self.executionHosts)
+
     def hostRepr(self):
         if self.showExecHosts and len(self.executionHosts) > 0:
             return " " + self.hostString()
         else:
             return ""
+
     def colonRepr(self):
         if self.hasSucceeded():
             return ""
         else:
             return " :"
+
     def getComparisonsForRecalculation(self):
         # Is some aspect of the state out of date
         return []

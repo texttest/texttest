@@ -1884,8 +1884,8 @@ Framework Enhancements:
 Batch Report Enhancements:
     - HTML report now shows file diffs as well as bug information when tests have "known bugs" (testoverview.py)
 	Makes it consistent with GUI and email report
-    - Can now select the tests for a batch run without actually running that batch run (default/__init__.py)
-	New command-line flag "-bs".
+    - "-bx" flag will now find the exact tests run by a particular batch session (default/__init__.py)
+	Previously just picked up "batch_extra_version". See migration notes.
 Grid Engine (LSF/SGE) enhancements:
     - Reconnecting using the grid no longer insists on using the resources etc. from the test itself (masterprocess.py)
 	Means it should be faster and make better use of available machines

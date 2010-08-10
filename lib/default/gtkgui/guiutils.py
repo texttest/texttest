@@ -171,43 +171,32 @@ class GUIConfig:
             completions = self.getCompositeValue("gui_entry_completions", "", modeDependent=True)
             from entrycompletion import manager
             manager.start(matching, inline, completions, entryCompletionLogger)
+
     def _simpleValue(self, app, entryName):
         return app.getConfigValue(entryName)
+
     def _compositeValue(self, app, *args, **kwargs):
         return app.getCompositeConfigValue(*args, **kwargs)
+
     def _getFromApps(self, method, *args, **kwargs):
         prevValue = None
-        for app in self.apps:
-            currValue = method(app, *args, **kwargs)
-            toUse = self.chooseValueFrom(prevValue, currValue)
-            if toUse is None and prevValue is not None:
-                plugins.printWarning("GUI configuration '" + "::".join(args) +\
-                                     "' differs between applications, ignoring that from " + repr(app) + "\n" + \
-                                     "Value was " + repr(currValue) + ", change from " + repr(prevValue), stdout=True)
-            else:
-                prevValue = toUse
-        return prevValue
-    def chooseValueFrom(self, value1, value2):
-        if value2 is None or value1 == value2:
-            return value1
-        if value1 is None:
-            return value2
-        if type(value1) == types.ListType:
-            return self.createUnion(value1, value2)
-
-    def createUnion(self, list1, list2):
-        result = []
-        result += list1
-        for entry in list2:
-            if not entry in list1:
-                result.append(entry)
-        return result
+        callables = [ plugins.Callable(method, app, *args) for app in self.apps ]
+        aggregator = plugins.ResponseAggregator(callables)
+        try:
+            return aggregator(**kwargs)
+        except plugins.AggregationError, e:
+            app = self.apps[e.index]
+            plugins.printWarning("GUI configuration '" + "::".join(args) +\
+                                 "' differs between applications, ignoring that from " + repr(app) + "\n" + \
+                                 "Value was " + repr(e.value2) + ", change from " + repr(e.value1), stdout=True)
+            return e.value1
     
     def getModeName(self):
         if self.dynamic:
             return "dynamic"
         else:
             return "static"
+
     def getConfigName(self, name, modeDependent=False):
         formattedName = name.lower().replace(" ", "_").replace(":", "_")
         if modeDependent:

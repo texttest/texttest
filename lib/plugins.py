@@ -38,9 +38,9 @@ class Callable:
     def __init__(self, method, *args):
         self.method = method
         self.extraArgs = args
-    def __call__(self, *calledArgs):
+    def __call__(self, *calledArgs, **kw):
         toUse = calledArgs + self.extraArgs
-        return self.method(*toUse)
+        return self.method(*toUse, **kw)
     def __eq__(self, other):
         return isinstance(other, Callable) and self.method == other.method and self.extraArgs == other.extraArgs
     def __hash__(self):
@@ -881,21 +881,34 @@ def rmtree(dir, attempts=100):
                     log.info("Problems removing directory " + dir + " - waiting 1 second to retry...")
                     time.sleep(1)
 
+class AggregationError(RuntimeError):
+    def __init__(self, value1, value2, index):
+        self.value1 = value1
+        self.value2 = value2
+        self.index = index
+    
+
 # Useful utility for combining different response values for a series of method calls
 class ResponseAggregator:
     def __init__(self, methods):
         self.methods = methods
 
     def __call__(self, *args, **kwargs):
+        if len(self.methods) == 0:
+            return
+        
         basicValue = self.methods[0](*args, **kwargs)
-        if type(basicValue) == types.ListType:
-            for extraMethod in self.methods[1:]:
-                for item in extraMethod(*args, **kwargs):
+        for i, extraMethod in enumerate(self.methods[1:]):
+            extraValue = extraMethod(*args, **kwargs)
+            if type(basicValue) == types.ListType:
+                for item in extraValue:
                     if not item in basicValue:
                         basicValue.append(item)
-        elif type(basicValue) == types.DictType:
-            for extraMethod in self.methods[1:]:
-                basicValue.update(extraMethod(*args, **kwargs))
+            elif type(basicValue) == types.DictType:
+                basicValue.update(extraValue)
+            elif extraValue != basicValue:
+                raise AggregationError(basicValue, extraValue, i + 1)
+                
         return basicValue
 
 

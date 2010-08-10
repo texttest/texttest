@@ -34,11 +34,9 @@ class TestColumnGUI(guiutils.SubGUI):
             self.column.set_clickable(True)
             self.column.connect("clicked", self.columnClicked)
         if guiutils.guiConfig.getValue("auto_sort_test_suites") == 1:
-            guiutils.guilog.info("Initially sorting tests in alphabetical order.")
             self.column.set_sort_indicator(True)
             self.column.set_sort_order(gtk.SORT_ASCENDING)
         elif guiutils.guiConfig.getValue("auto_sort_test_suites") == -1:
-            guiutils.guilog.info("Initially sorting tests in descending alphabetical order.")
             self.column.set_sort_indicator(True)
             self.column.set_sort_order(gtk.SORT_DESCENDING)
         return self.column
@@ -475,7 +473,6 @@ class TestTreeGUI(guiutils.ContainerGUI):
             pass # convert_child_iter_to_iter throws RunTimeError if the row is hidden in the TreeModelFilter
     def notifySetTestSelection(self, selTests, criteria="", selectCollapsed=True):
         actualSelection = self.selectTestRows(selTests, selectCollapsed)
-        guiutils.guilog.info("Marking " + str(self.selection.count_selected_rows()) + " tests as selected")
         # Here it's been set via some indirect mechanism, might want to behave differently
         self.sendSelectionNotification(actualSelection, direct=False)
 
@@ -604,7 +601,6 @@ class TestTreeGUI(guiutils.ContainerGUI):
         if self.selection.get_tree_view():
             test = self.getTestForAutoSelect()
             if test:
-                guiutils.guilog.info("Only one test found, selecting " + test.uniqueName)
                 actualSelection = self.selectTestRows([ test ])
                 self.sendSelectionNotification(actualSelection)
 
@@ -680,7 +676,6 @@ class TestTreeGUI(guiutils.ContainerGUI):
         else:
             self.notify("TestTreeCounters", totalDelta=delta, totalShownDelta=delta, totalRowsDelta=0)
             allTests.remove(test)
-            guiutils.guilog.info("Removing additional test from path " + test.getRelPath())
 
     def removeTest(self, test, iter):
         filteredIter = self.findIter(test)

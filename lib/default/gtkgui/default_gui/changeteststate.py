@@ -285,7 +285,6 @@ class KillTests(guiplugins.ActionGUI):
         self.notify("Status", "Killing " + testDesc + " ...")
         for test in tests:
             self.notify("ActionProgress")
-            guiplugins.guilog.info("Killing " + repr(test))
             test.notify("Kill")
 
         self.notify("Status", "Killed " + testDesc + ".")

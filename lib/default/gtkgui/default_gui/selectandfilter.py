@@ -172,7 +172,6 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
             else:
                 newTests = self.combineWithPrevious([], suite.app, strategy)
 
-            guiplugins.guilog.info("Selected " + str(len(newTests)) + " out of a possible " + str(suite.size()))
             selectedTests += newTests
         return selectedTests
 
@@ -502,7 +501,6 @@ class LoadSelection(guiplugins.ActionDialogGUI):
         fileName = self.optionGroup.getOptionValue("f")
         if fileName:
             newSelection = self.makeNewSelection(fileName)
-            guiplugins.guilog.info("Loaded " + str(len(newSelection)) + " tests from " + fileName)
             self.notify("SetTestSelection", newSelection, "-f " + fileName, True)
             self.notify("Status", "Loaded test selection from file '" + fileName + "'.")
         else:

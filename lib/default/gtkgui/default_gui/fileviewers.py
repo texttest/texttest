@@ -175,7 +175,6 @@ class ViewInEditor(FileViewAction):
         cmdArgs, descriptor, env = self.getViewCommand(fileName, viewTool)
         description = descriptor + " " + os.path.basename(fileName)
         refresh = str(exitHandler != self.editingComplete)
-        guiplugins.guilog.info("Viewing file " + fileName + " using '" + descriptor + "', refresh set to " + refresh)
         self.startViewer(cmdArgs, description=description, env=env,
                          exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
         
@@ -369,9 +368,6 @@ class ViewFileDifferences(FileViewAction):
     def _performOnFile(self, diffProgram, tmpFile, comparison):
         stdFile = comparison.getStdFile(self.useFiltered(), self.extraPostfix())
         description = diffProgram + " " + os.path.basename(stdFile) + " " + os.path.basename(tmpFile)
-        guiplugins.guilog.info("Starting graphical difference comparison using '" + diffProgram + "':")
-        guiplugins.guilog.info("-- original file : " + stdFile)
-        guiplugins.guilog.info("--  current file : " + tmpFile)
         cmdArgs = plugins.splitcmd(diffProgram) + [ stdFile, tmpFile ]
         self.startViewer(cmdArgs, description=description, exitHandler=self.diffingComplete)
 
@@ -438,7 +434,6 @@ class FollowFile(FileViewAction):
     def _performOnFile(self, followProgram, fileName, comparison):
         useFile = self.fileToFollow(fileName, comparison)
         useProgram = self.getFollowProgram(followProgram, fileName)
-        guiplugins.guilog.info("Following file " + useFile + " using '" + useProgram + "'")
         description = useProgram + " " + os.path.basename(useFile)
         cmdArgs = self.getFollowCommand(useProgram, useFile)
         self.startViewer(cmdArgs, description=description, exitHandler=self.followComplete)

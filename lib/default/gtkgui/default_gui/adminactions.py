@@ -158,8 +158,6 @@ class PasteTests(FocusDependentAction):
         for test, (suite, placement, newName) in destInfo.items():
             suiteDeltas.setdefault(suite, 0)
             realPlacement = placement + suiteDeltas.get(suite)
-            guiutils.guilog.info("Pasting test " + newName + " under test suite " + \
-                        repr(suite) + ", in position " + str(realPlacement))
             if self.removeAfter and newName == test.name and suite is test.parent:
                 # Cut + paste to the same suite is basically a reposition, do it as one action
                 repositionPlacement = self.getRepositionPlacement(test, realPlacement)
@@ -188,7 +186,6 @@ class PasteTests(FocusDependentAction):
                         shutil.rmtree(testDir)
                     self.showErrorDialog("Failed to paste test:\n" + str(e))
                     
-        guiutils.guilog.info("Selecting new tests : " + repr(newTests))
         self.notify("SetTestSelection", newTests)
         self.currTestSelection = newTests
         self.notify("Status", self.getStatusMessage(suiteDeltas))
@@ -754,18 +751,15 @@ class ImportFiles(guiplugins.ActionDialogGUI):
                 plugins.ensureDirExistsForFile(targetPath)
                 file = open(targetPath, "w")
                 file.close()
-                guiutils.guilog.info("Creating new empty file...")
                 self.newFileInfo = targetPath, False
             elif action == 2:
                 plugins.ensureDirectoryExists(targetPath)
-                guiutils.guilog.info("Creating new empty directory...")
                 test.filesChanged()
         else:
             sourcePath = self.optionGroup.getOptionValue("src")
             appendAppName = os.path.basename(sourcePath).startswith(stem + "." + test.app.name)
             targetPath = self.getTargetPath(stem, version, appendAppName) 
             fileExisted = os.path.exists(targetPath)
-            guiutils.guilog.info("Creating new path, copying " + sourcePath)
             plugins.copyPath(sourcePath, targetPath)
             self.newFileInfo = targetPath, fileExisted
 

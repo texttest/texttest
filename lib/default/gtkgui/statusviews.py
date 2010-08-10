@@ -233,7 +233,6 @@ class TestProgressMonitor(guiutils.SubGUI):
         self.notify("SetTestSelection", tests)
 
     def selectCorrespondingTests(self, treemodel, dummyPath, iter, tests , *args):
-        guiutils.guilog.info("Selecting all " + str(treemodel.get_value(iter, 1)) + " tests in category " + treemodel.get_value(iter, 0))
         for test in treemodel.get_value(iter, 5):
             if test not in tests:
                 tests.append(test)

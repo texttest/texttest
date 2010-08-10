@@ -278,7 +278,6 @@ class GUIController(plugins.Responder, plugins.Observable):
             self.notify("ActionStop")
         self.notify("AllRead", suites)
         if self.dynamic and len(suites) == 0:
-            guilog.info("There weren't any tests to run, terminating...")
             self.topWindowGUI.forceQuit()
 
     def notifyAdd(self, test, *args, **kwargs):

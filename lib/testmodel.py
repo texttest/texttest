@@ -1674,13 +1674,13 @@ class OptionFinder(plugins.OptionFinder):
             return value
 
     def normalisePath(self, path):
-        return os.path.normpath(plugins.abspath(path)).replace("\\", "/")
+        return os.path.normpath(plugins.abspath(os.path.expanduser(path))).replace("\\", "/")
 
     def getPathFromOptionsOrEnv(self, envVar, defaultValue, optionName=""):
         if optionName and self.has_key(optionName):
             return self[optionName]
         else:
-            return os.getenv(envVar, os.path.expanduser(os.path.expandvars(defaultValue)))
+            return os.getenv(envVar, os.path.expandvars(defaultValue))
 
     def setUpLogging(self):
         if os.path.isfile(self.diagConfigFile):

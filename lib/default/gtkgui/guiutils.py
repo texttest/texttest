@@ -179,7 +179,6 @@ class GUIConfig:
         return app.getCompositeConfigValue(*args, **kwargs)
 
     def _getFromApps(self, method, *args, **kwargs):
-        prevValue = None
         callables = [ plugins.Callable(method, app, *args) for app in self.apps ]
         aggregator = plugins.ResponseAggregator(callables)
         try:

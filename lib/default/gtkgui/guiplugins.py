@@ -995,7 +995,10 @@ class ActionDialogGUI(OptionGroupGUI):
         # with which name, to save the selection.
         fileChooser.set_current_folder(startFolder)
         for folder in folders:
-            fileChooser.add_shortcut_folder(folder)
+            try:
+                fileChooser.add_shortcut_folder(folder)
+            except gobject.GError:
+                pass # Get this if the folder is already added, e.g. if it's the home directory
         if option.selectFile and option.defaultValue:
             fileChooser.set_filename(option.defaultValue)
             

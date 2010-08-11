@@ -658,7 +658,6 @@ class ImportFiles(guiplugins.ActionDialogGUI):
     
     def addText(self, vbox, text):
         header = gtk.Label()
-        guiutils.guilog.info("Adding text '" + text + "'")
         header.set_markup(text + "\n")
         vbox.pack_start(header, expand=False, fill=False)
     

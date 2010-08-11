@@ -127,10 +127,11 @@ class RunningAction:
 
     def getAppIdentifier(self, app):
         return app.name + app.versionSuffix()
-    
+        
     def getCmdlineOptionForApps(self):
-        appNames = set(map(self.getAppIdentifier, self.currAppSelection))
-        return [ "-a", ",".join(sorted(list(appNames))) ]
+        apps = sorted(self.currAppSelection, key=self.validApps.index)
+        appNames = map(self.getAppIdentifier, apps)
+        return [ "-a", ",".join(appNames) ]
 
     def checkTestRun(self, errFile, testSel, filterFile, usecase):
         if self.checkErrorFile(errFile, testSel, usecase):

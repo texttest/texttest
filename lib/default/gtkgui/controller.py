@@ -131,14 +131,12 @@ class GUIController(plugins.Responder, plugins.Observable):
         return initial
 
     def setUpGlobals(self, allApps, includePersonal):
-        global guilog, guiConfig
-        guilog = logging.getLogger("gui log")
+        global guiConfig
         defaultColours = self.interactiveActionHandler.getColourDictionary()
         defaultAccelerators = self.interactiveActionHandler.getDefaultAccelerators()
-        guiConfig = guiutils.GUIConfig(self.dynamic, allApps, defaultColours, defaultAccelerators, guilog, includePersonal)
+        guiConfig = guiutils.GUIConfig(self.dynamic, allApps, defaultColours, defaultAccelerators, includePersonal)
 
         for module in [ guiutils, guiplugins ]:
-            module.guilog = guilog
             module.guiConfig = guiConfig
 
     def getTestTreeObservers(self):
@@ -425,6 +423,7 @@ class TopWindowGUI(guiutils.ContainerGUI):
         self.setWindowTitle()
 
     def adjustSize(self):
+        guilog = logging.getLogger("gui log")
         if guiConfig.getWindowOption("maximize"):
             self.topWindow.maximize()
             guilog.info("Maximising top window...")

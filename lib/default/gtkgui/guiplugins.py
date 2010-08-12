@@ -1,7 +1,7 @@
 
 
 import gtk, gobject, entrycompletion, plugins, os, subprocess, types, logging
-from guiutils import guilog, guiConfig, SubGUI, GUIConfig
+from guiutils import guiConfig, SubGUI, GUIConfig
 from jobprocess import killSubProcessAndChildren
 from ndict import seqdict
         
@@ -58,12 +58,13 @@ class ProcessTerminationMonitor(plugins.Observable):
         # Don't leak processes
         if len(self.processesForKill) == 0:
             return
+        diag = logging.getLogger("kill processes")
         self.notify("Status", "Terminating all external viewers ...")
         for pid, (process, description) in self.processesForKill.items():
             if self.exitHandlers.has_key(pid):
                 self.exitHandlers.pop(pid) # don't call exit handlers in this case, we're terminating
             self.notify("ActionProgress")
-            guilog.info("Killing '" + description + "' interactive process")
+            diag.info("Killing '" + description + "' interactive process")
             killSubProcessAndChildren(process, sig)
         
 processMonitor = ProcessTerminationMonitor()

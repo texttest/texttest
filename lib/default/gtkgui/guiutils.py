@@ -20,7 +20,7 @@ except ImportError:
     pass # We might want to document the config entries, silly to fail on lack of GTK...
 
 
-guilog, guiConfig = None, None
+guiConfig = None
 
 class Utf8Converter:
     def convert(self, text):
@@ -107,7 +107,7 @@ def addRefreshTips(view, *args):
 
 
 class GUIConfig:
-    def __init__(self, dynamic, allApps, defaultColours, defaultAccelerators, entryCompletionLogger=None, includePersonal=True):
+    def __init__(self, dynamic, allApps, defaultColours, defaultAccelerators, includePersonal=True):
         self.apps = copy(allApps)
         self.dynamic = dynamic
         self.configDir = plugins.MultiEntryDictionary()
@@ -118,8 +118,7 @@ class GUIConfig:
 
         self.hiddenCategories = map(self.getConfigName, self.configDir.get("hide_test_category"))
         self.colourDict = self.makeColourDictionary()
-        if entryCompletionLogger:
-            self.setUpEntryCompletion(entryCompletionLogger)
+        self.setUpEntryCompletion()
 
     def getAllPersonalConfigFiles(self):
         allPersonalFiles = []
@@ -164,13 +163,13 @@ class GUIConfig:
         self.configDir[key] = value
         self.configDocs[key] = docString
 
-    def setUpEntryCompletion(self, entryCompletionLogger):
+    def setUpEntryCompletion(self):
         matching = self.configDir.get("gui_entry_completion_matching")
         if matching != 0:
             inline = self.configDir.get("gui_entry_completion_inline")
             completions = self.getCompositeValue("gui_entry_completions", "", modeDependent=True)
             from entrycompletion import manager
-            manager.start(matching, inline, completions, entryCompletionLogger)
+            manager.start(matching, inline, completions)
 
     def _simpleValue(self, app, entryName):
         return app.getConfigValue(entryName)

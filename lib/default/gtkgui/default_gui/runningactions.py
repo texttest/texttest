@@ -35,7 +35,7 @@ class RunningAction:
         plugins.ensureDirectoryExists(writeDir)
         filterFile = self.getFilterFile(writeDir, filterFileOverride)
         ttOptions = runModeOptions + self.getTextTestOptions(filterFile, app, usecase)
-        guiplugins.guilog.info("Starting " + usecase + " run of TextTest with arguments " + repr(ttOptions))
+        self.diag.info("Starting " + usecase + " run of TextTest with arguments " + repr(ttOptions))
         logFile = os.path.join(writeDir, "output.log")
         errFile = os.path.join(writeDir, "errors.log")
         RunningAction.runNumber += 1

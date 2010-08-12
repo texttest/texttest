@@ -9,16 +9,11 @@ class EntryCompletionManager:
         self.enabled = False
         self.useContainsFunction = False
         self.inlineCompletions = False
-        self.diag = None
         
-    def start(self, matching, inline, completions, diag):
+    def start(self, matching, inline, completions):
         self.enabled = True
-        self.diag = diag
         self.useContainsFunction = matching == 2
-        self.diag.info("Enabling entry completion, using matching " + str(matching))
         self.inlineCompletions = inline
-        if self.inlineCompletions:
-            self.diag.info(" - Inlining common completion prefixes in entries.")
                 
         for completion in completions:
             self.addTextCompletion(completion)
@@ -43,7 +38,6 @@ class EntryCompletionManager:
 
     def addTextCompletion(self, text):
         if self.enabled and text and text not in [row[0] for row in self.completions]:
-            self.diag.info("Adding entry completion " + repr(text) + " ...")
             self.completions.prepend([text])            
 
     def collectCompletions(self):

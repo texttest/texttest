@@ -135,9 +135,18 @@ class GUIController(plugins.Responder, plugins.Observable):
         defaultColours = self.interactiveActionHandler.getColourDictionary()
         defaultAccelerators = self.interactiveActionHandler.getDefaultAccelerators()
         guiConfig = guiutils.GUIConfig(self.dynamic, allApps, defaultColours, defaultAccelerators, includePersonal)
+        self.setUpEntryCompletion(guiConfig)
 
         for module in [ guiutils, guiplugins ]:
             module.guiConfig = guiConfig
+
+    def setUpEntryCompletion(self, guiConfig):
+        matching = guiConfig.getValue("gui_entry_completion_matching")
+        if matching != 0:
+            inline = guiConfig.getValue("gui_entry_completion_inline")
+            completions = guiConfig.getCompositeValue("gui_entry_completions", "", modeDependent=True)
+            from entrycompletion import manager
+            manager.start(matching, inline, completions)
 
     def getTestTreeObservers(self):
         return [ self.testColumnGUI, self.testFileGUI, self.textInfoGUI, self.testRunInfoGUI ] + \
@@ -298,6 +307,7 @@ class TopWindowGUI(guiutils.ContainerGUI):
         self.name = name
         self.allApps = copy(allApps)
         self.exitStatus = 0
+        self.diag = logging.getLogger("Top Window")
         if not self.dynamic:
             self.exitStatus |= self.COMPLETION_NOTIFIED # no tests to wait for...
 
@@ -426,23 +436,20 @@ class TopWindowGUI(guiutils.ContainerGUI):
         if guiConfig.getWindowOption("maximize"):
             self.topWindow.maximize()
         else:
-            width, widthDescriptor = self.getWindowDimension("width")
-            height, heightDescriptor  = self.getWindowDimension("height")
+            width = self.getWindowDimension("width")
+            height = self.getWindowDimension("height")
             self.topWindow.set_default_size(width, height)
-            guilog = logging.getLogger("gui log")
-            guilog.info(widthDescriptor)
-            guilog.info(heightDescriptor)
 
     def getWindowDimension(self, dimensionName):
         pixelDimension = guiConfig.getWindowOption(dimensionName + "_pixels")
         if pixelDimension != "<not set>":
-            descriptor = "Setting window " + dimensionName + " to " + pixelDimension + " pixels."
-            return int(pixelDimension), descriptor
+            self.diag.info("Setting window " + dimensionName + " to " + pixelDimension + " pixels.")
+            return int(pixelDimension)
         else:
-            fullSize = eval("gtk.gdk.screen_" + dimensionName + "()")
+            fullSize = getattr(gtk.gdk, "screen_" + dimensionName)()
             proportion = float(guiConfig.getWindowOption(dimensionName + "_screen"))
-            descriptor = "Setting window " + dimensionName + " to " + repr(int(100.0 * proportion)) + "% of screen."
-            return int(fullSize * proportion), descriptor
+            self.diag.info("Setting window " + dimensionName + " to " + repr(int(100.0 * proportion)) + "% of screen.")
+            return int(fullSize * proportion)
 
 
 class ShortcutBarGUI(guiutils.SubGUI):

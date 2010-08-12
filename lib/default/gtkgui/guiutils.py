@@ -118,8 +118,7 @@ class GUIConfig:
 
         self.hiddenCategories = map(self.getConfigName, self.configDir.get("hide_test_category"))
         self.colourDict = self.makeColourDictionary()
-        self.setUpEntryCompletion()
-
+        
     def getAllPersonalConfigFiles(self):
         allPersonalFiles = []
         # Always include app-independent version
@@ -162,14 +161,6 @@ class GUIConfig:
     def setConfigDefault(self, key, value, docString):
         self.configDir[key] = value
         self.configDocs[key] = docString
-
-    def setUpEntryCompletion(self):
-        matching = self.configDir.get("gui_entry_completion_matching")
-        if matching != 0:
-            inline = self.configDir.get("gui_entry_completion_inline")
-            completions = self.getCompositeValue("gui_entry_completions", "", modeDependent=True)
-            from entrycompletion import manager
-            manager.start(matching, inline, completions)
 
     def _simpleValue(self, app, entryName):
         return app.getConfigValue(entryName)

@@ -401,18 +401,13 @@ class TestEnvironmentCreator:
 
 class CollateFiles(plugins.Action):
     def __init__(self):
-        self.collations = {}
-        self.discardFiles = []
         self.filesPresentBefore = {}
         self.collationProc = None
         self.diag = logging.getLogger("Collate Files")
 
-    def setUpApplication(self, app):
-        self.collations.update(app.getConfigValue("collate_file"))
-        self.discardFiles = app.getConfigValue("discard_file")
-
-    def expandCollations(self, test, coll):
+    def expandCollations(self, test):
         newColl = seqdict()
+        coll = test.getConfigValue("collate_file")
         self.diag.info("coll initial:" + str(coll))
         for targetPattern, sourcePatterns in coll.items():
             if not glob.has_magic(targetPattern):
@@ -427,7 +422,7 @@ class CollateFiles(plugins.Action):
                     newTargetStem = self.makeTargetStem(targetPattern, sourcePattern, relativeSourcePath)
                     self.diag.info("New collation to " + newTargetStem + " : from " + relativeSourcePath)
                     newColl.setdefault(newTargetStem, []).append(sourcePath)
-        return newColl
+        return newColl.items()
 
     def makeTargetStem(self, targetPattern, sourcePattern, sourcePath):
         newTargetStem = targetPattern
@@ -477,7 +472,7 @@ class CollateFiles(plugins.Action):
             self.removeUnwanted(test)
 
     def removeUnwanted(self, test):
-        for stem in self.discardFiles:
+        for stem in test.getConfigValue("discard_file"):
             self.diag.info("Trying to remove generated file with stem " + stem)
             filePath = test.makeTmpFileName(stem)
             try:
@@ -495,8 +490,7 @@ class CollateFiles(plugins.Action):
                     self.diag.info("Found " + fullpath + " but it wasn't edited")
 
     def collate(self, test):
-        testCollations = self.expandCollations(test, self.collations)
-        for targetStem, sourcePatterns in testCollations.items():
+        for targetStem, sourcePatterns in self.expandCollations(test):
             sourceFile = self.findEditedFile(test, sourcePatterns)
             if sourceFile:
                 targetFile = test.makeTmpFileName(targetStem)
@@ -515,7 +509,7 @@ class CollateFiles(plugins.Action):
     
     def getFilesPresent(self, test):
         files = seqdict()
-        for sourcePatterns in self.collations.values():
+        for sourcePatterns in test.getConfigValue("collate_file").values():
             for sourcePattern in sourcePatterns:
                 for fullPath in self.findPaths(test, sourcePattern):
                     self.diag.info("Pre-existing file found " + fullPath)

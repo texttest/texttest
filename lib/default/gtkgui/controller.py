@@ -423,14 +423,13 @@ class TopWindowGUI(guiutils.ContainerGUI):
         self.setWindowTitle()
 
     def adjustSize(self):
-        guilog = logging.getLogger("gui log")
         if guiConfig.getWindowOption("maximize"):
             self.topWindow.maximize()
-            guilog.info("Maximising top window...")
         else:
             width, widthDescriptor = self.getWindowDimension("width")
             height, heightDescriptor  = self.getWindowDimension("height")
             self.topWindow.set_default_size(width, height)
+            guilog = logging.getLogger("gui log")
             guilog.info(widthDescriptor)
             guilog.info(heightDescriptor)
 

@@ -690,6 +690,9 @@ class TestCase(Test):
         else:
             return os.path.join(dir, stem)
 
+    def makeBackupFileName(self, number):
+        return self.makeTmpFileName("backup.previous." + str(number), forFramework=1)
+
     def getNewState(self, file, **updateArgs):
         try:
             # Would like to do load(file) here... but it doesn't work with universal line endings, see Python bug 1724366

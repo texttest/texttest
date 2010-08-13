@@ -20,6 +20,8 @@ class PrepareWriteDirectory(plugins.Action):
             self.diag.info("Ignoring all information in catalogue files")
 
     def __call__(self, test):
+        if self.hasPreviousData(test):
+            self.backupPreviousData(test)
         machine, remoteTmpDir = test.app.getRemoteTestTmpDir(test)
         if remoteTmpDir:
             test.app.ensureRemoteDirExists(machine, remoteTmpDir)
@@ -29,6 +31,33 @@ class PrepareWriteDirectory(plugins.Action):
 
         self.collateAllPaths(test, remoteCopy)
         test.createPropertiesFiles()
+
+    def hasPreviousData(self, test):
+        tmpDir = test.getDirectory(temporary=1)
+        allFiles = os.listdir(tmpDir)
+        return allFiles != [ "framework_tmp" ]
+
+    def backupPreviousData(self, test):
+        writeDir = test.getDirectory(temporary=1)
+        newBackupPath, oldBackupPaths = self.findBackupPaths(test)
+        localTmpDir = os.path.join(os.path.dirname(writeDir), os.path.basename(newBackupPath))
+        os.rename(writeDir, localTmpDir)
+        test.makeWriteDirectory()
+        for oldBackupPath in oldBackupPaths:
+            currLocation = os.path.join(localTmpDir, plugins.relpath(oldBackupPath, writeDir))
+            os.rename(currLocation, oldBackupPath)
+        os.rename(localTmpDir, newBackupPath)
+
+    def findBackupPaths(self, test):
+        number = 1
+        oldPaths = []
+        while True:
+            path = test.makeBackupFileName(number)
+            if os.path.exists(path):
+                oldPaths.append(path)
+                number += 1
+            else:
+                return path, oldPaths
 
     def collateAllPaths(self, test, remoteCopy):
         self.collatePaths(test, "copy_test_path", self.copyTestPath, remoteCopy)

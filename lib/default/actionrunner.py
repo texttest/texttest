@@ -126,6 +126,10 @@ class ActionRunner(BaseActionRunner):
         # everyone's been notified of the reading.
         self.runAllTests() 
 
+    def notifyRerun(self, test):
+        if self.currentTestRunner and self.currentTestRunner.test is test:
+            self.currentTestRunner.resetActionSequence()
+
     def runTest(self, test):
         # We have the lock coming in to here...
         appRunner = self.appRunners.get(test.app)
@@ -241,7 +245,10 @@ class TestRunner:
         self.killSignal = killSignal
         self.currentAction = None
         self.lock = Lock()
-        self.setActionSequence(appRunner.actionSequence)
+        self.resetActionSequence()
+
+    def resetActionSequence(self):
+        self.setActionSequence(self.appRunner.actionSequence)
 
     def setActionSequence(self, actionSequence):
         self.actionSequence = []
@@ -275,15 +282,13 @@ class TestRunner:
             self.appRunner.markForSetUp(suite)
         abandon = self.test.state.shouldAbandon()
         while len(self.actionSequence):
-            action = self.actionSequence[0]
+            action = self.actionSequence.pop(0)
             if abandon and not action.callDuringAbandon(self.test):
-                self.actionSequence.pop(0)
                 continue
             self.diag.info("->Performing action " + str(action) + " on " + repr(self.test))
             if self.handleExceptions(self.appRunner.setUpSuites, action, self.test):
                 self.callAction(action)
             self.diag.info("<-End Performing action " + str(action))
-            self.actionSequence.pop(0)
             if not abandon and self.test.state.shouldAbandon():
                 self.diag.info("Abandoning test...")
                 abandon = True

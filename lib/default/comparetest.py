@@ -355,7 +355,7 @@ class TestComparison(BaseTestComparison):
         for comparison in self.allResults:
             newState.addComparison(comparison)
         newState.categorise()
-        return knownbugs.CheckForBugs().checkTest(test, newState) or newState
+        return knownbugs.CheckForBugs().checkTest(test, newState)[0] or newState
     
 
 # for back-compatibility, preserve old names

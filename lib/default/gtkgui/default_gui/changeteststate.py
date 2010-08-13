@@ -179,6 +179,11 @@ class RecomputeTests(guiplugins.ActionGUI):
     def __init__(self, *args):
         guiplugins.ActionGUI.__init__(self, *args)
         self.latestNumberOfRecomputations = 0
+        self.allComplete = False
+
+    def notifyAllComplete(self):
+        self.allComplete = True
+
     def isActiveOnCurrent(self, test=None, state=None):
         for currTest in self.currTestSelection:
             if currTest is test:
@@ -187,25 +192,33 @@ class RecomputeTests(guiplugins.ActionGUI):
             elif currTest.stateInGui.hasStarted():
                 return True
         return False
+
     def _getTitle(self):
         return "Recompute Status"
+
     def _getStockId(self):
         return "refresh"
+
     def getTooltip(self):
         return "Recompute test status, including progress information if appropriate"
+
     def getSignalsSent(self):
         return [ "Recomputed" ]
+
     def messageAfterPerform(self):
         if self.latestNumberOfRecomputations == 0:
             return "No test needed recomputation."
         else:
             return "Recomputed status of " + plugins.pluralise(self.latestNumberOfRecomputations, "test") + "."
+        
     def performOnCurrent(self):
         self.latestNumberOfRecomputations = 0
-        for app in self.currAppSelection:
-            self.notify("Status", "Rereading configuration for " + repr(app) + " ...")
-            self.notify("ActionProgress")
-            app.setUpConfiguration()
+        if self.allComplete:
+            # not a good idea to reread configuration while tests are still running, can lead to race conditions
+            for app in self.currAppSelection:
+                self.notify("Status", "Rereading configuration for " + repr(app) + " ...")
+                self.notify("ActionProgress")
+                app.setUpConfiguration()
 
         for test in self.currTestSelection:
             self.latestNumberOfRecomputations += 1

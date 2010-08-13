@@ -153,11 +153,14 @@ class GUIController(plugins.Responder, plugins.Observable):
                self.allActionGUIs() + [ self.rightWindowGUI ]
     def allActionGUIs(self):
         return self.defaultActionGUIs + self.actionTabGUIs
+
     def getLifecycleObservers(self):
         # only the things that want to know about lifecycle changes irrespective of what's selected,
         # otherwise we go via the test tree. Include add/remove as lifecycle, also final completion
         return [ self.progressBarGUI, self.progressMonitor, self.textInfoGUI.timeMonitor, self.testTreeGUI, 
-                 self.statusMonitor, self.runInfoGUI, self.idleManager, self.topWindowGUI ]
+                 self.statusMonitor, self.runInfoGUI, self.idleManager, self.topWindowGUI ] + \
+                 filter(lambda obs: hasattr(obs, "notifyAllComplete"), self.defaultActionGUIs)
+
     def getActionObservers(self):
         return [ self.progressMonitor, self.testTreeGUI, self.testFileGUI, self.statusMonitor,
                  self.runInfoGUI, self.idleManager, self.topWindowGUI ]

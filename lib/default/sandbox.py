@@ -409,7 +409,8 @@ class CollateFiles(plugins.Action):
         newColl = seqdict()
         coll = test.getConfigValue("collate_file")
         self.diag.info("coll initial:" + str(coll))
-        for targetPattern, sourcePatterns in coll.items():
+        for targetPattern in sorted(coll.keys()):
+            sourcePatterns = coll.get(targetPattern)
             if not glob.has_magic(targetPattern):
                 newColl[targetPattern] = sourcePatterns
                 continue

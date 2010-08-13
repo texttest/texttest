@@ -35,6 +35,7 @@ class SocketResponder(plugins.Responder,plugins.Observable):
         plugins.Responder.__init__(self)
         plugins.Observable.__init__(self)
         self.killed = False
+        self.testsForRerun = []
         self.serverAddress = self.getServerAddress(optionMap)
     def getServerAddress(self, optionMap):
         servAddrStr = optionMap.get("servaddr", os.getenv("TEXTTEST_MIM_SERVER"))
@@ -60,16 +61,22 @@ class SocketResponder(plugins.Responder,plugins.Observable):
     def notifyKillProcesses(self, *args):
         self.killed = True
 
-    def getProcessIdentifier(self):
+    def getProcessIdentifier(self, test):
         identifier = str(os.getpid())
         if self.killed:
             identifier += ".NO_REUSE"
+        if test in self.testsForRerun:
+            self.testsForRerun.remove(test)
+            identifier += ".RERUN_TEST"
         return identifier
+
+    def notifyRerun(self, test):
+        self.testsForRerun.append(test)
 
     def notifyLifecycleChange(self, test, state, changeDesc):
         testData = socketSerialise(test)
         pickleData = dumps(state)
-        fullData = self.getProcessIdentifier() + os.linesep + testData + os.linesep + pickleData
+        fullData = self.getProcessIdentifier(test) + os.linesep + testData + os.linesep + pickleData
         sleepTime = 1
         for i in range(9):
             sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -108,6 +115,9 @@ class SocketResponder(plugins.Responder,plugins.Observable):
 class SlaveActionRunner(ActionRunner):
     def notifyAllRead(self, *args):
         pass # don't add a terminator, we might get given more tests via the socket (code above)
+
+    def notifyRerun(self, *args):
+        pass # don't rerun directly in the slave, tell the master and give it a chance to send the job elsewhere
 
     def notifyNoMoreExtraTests(self):
         self.diag.info("No more extra tests, adding terminator")

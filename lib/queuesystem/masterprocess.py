@@ -155,9 +155,11 @@ class QueueSystemServer(BaseActionRunner):
         if self.testCount == 0 or (self.reuseOnly and self.testsSubmitted == 0):
             self.diag.info("Submitting terminators after local error")
             self.submitTerminators()
+            
     def submitTerminators(self):
         # snap out of our loop if this was the last one. Rely on others to manage the test queue
         self.reuseFailureQueue.put(None)
+
     def getTestForReuse(self, test, state, tryReuse):
         # Pick up any test that matches the current one's resource requirements
         if not self.exited:
@@ -168,18 +170,20 @@ class QueueSystemServer(BaseActionRunner):
                     self.jobs[newTest] = self.getJobInfo(test)
                     if self.testCount > 1:
                         self.testCount -= 1
-                        self.diag.info("Reusing slave for " + repr(newTest) + self.remainStr())
+                        postText = self.remainStr()
                     else:
-                        self.diag.info("Last test : submitting terminators")
                         # Don't allow test count to drop to 0 here, can cause race conditions
                         self.submitTerminators() 
+                        postText = ": submitting terminators as final test"
+                    self.diag.info("Reusing slave from " + test.getRelPath() + " for " + newTest.getRelPath() + postText)
                     return newTest
                 else:
+                    self.diag.info("Adding to reuse failure queue : " + test.getRelPath())
                     self.reuseFailureQueue.put(newTest)
                 
         # Allowed a submitted job to terminate
         self.testsSubmitted -= 1
-        self.diag.info("No reuse for " + repr(test) + " : " + repr(self.testsSubmitted) + " tests still submitted")
+        self.diag.info("No reuse for " + test.getRelPath() + " : " + repr(self.testsSubmitted) + " tests still submitted")
         if self.exited and self.testsSubmitted == 0:
             self.diag.info("Forcing termination")
             self.submitTerminators()
@@ -707,6 +711,7 @@ class SubmissionRules:
 
 class SlaveRequestHandler(StreamRequestHandler):
     noReusePostfix = ".NO_REUSE"
+    rerunPostfix = ".RERUN_TEST"
     def handle(self):
         identifier = self.rfile.readline().strip()
         if identifier == "TERMINATE_SERVER":
@@ -717,13 +722,22 @@ class SlaveRequestHandler(StreamRequestHandler):
 
     def getHostName(self, ipAddress):
         return socket.gethostbyaddr(ipAddress)[0].split(".")[0]
+
+    def parseIdentifier(self, identifier):
+        rerun = identifier.endswith(self.rerunPostfix)
+        if rerun:
+            identifier = identifier.replace(self.rerunPostfix, "")
+            
+        tryReuse = not identifier.endswith(self.noReusePostfix)
+        if not tryReuse:
+            identifier = identifier.replace(self.noReusePostfix, "")
+
+        return identifier, tryReuse, rerun
         
     def handleRequestFromHost(self, hostname, identifier):
         testString = self.rfile.readline().strip()
         test = self.server.getTest(testString)
-        tryReuse = not identifier.endswith(self.noReusePostfix)
-        if not tryReuse:
-            identifier = identifier.replace(self.noReusePostfix, "")
+        identifier, tryReuse, rerun = self.parseIdentifier(identifier)
         if test is None:
             sys.stderr.write("WARNING: Received request from hostname " + hostname +
                              " (process " + identifier + ")\nwhich could not be parsed:\n'" + testString + "'\n")
@@ -734,9 +748,13 @@ class SlaveRequestHandler(StreamRequestHandler):
                 # The updates are only for testing against old slave traffic,
                 # a bit sad we can't disable them when not testing...
                 _, state = test.getNewState(self.rfile, updatePaths=True)
-                self.server.changeState(test, state)
+                self.server.diag.info("Changed from '" + oldBt + "' to '" + state.briefText + "'")    
+                if rerun:
+                    self.server.diag.info("Instructed to rerun test " + test.getRelPath())
+                    QueueSystemServer.instance.addTest(test)
+                else:
+                    self.server.changeState(test, state)
                 self.connection.shutdown(socket.SHUT_RD)
-                self.server.diag.info("Changed from '" + oldBt + "' to '" + state.briefText + "'")
                 if state.isComplete():
                     newTest = QueueSystemServer.instance.getTestForReuse(test, state, tryReuse)
                     if newTest:

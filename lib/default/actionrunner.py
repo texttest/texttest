@@ -28,7 +28,7 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
         
     def notifyAdd(self, test, initial):
         if test.classId() == "test-case":
-            self.diag.info("Adding test " + repr(test))
+            self.diag.info("Adding test " + test.getRelPath())
             self.addTest(test)
 
     def addTest(self, test):
@@ -97,7 +97,9 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
         try:
             item = queue.get(block=block)
             if replaceTerminators and item is None:
-                queue.put(item) 
+                if not block:
+                    item = self.getItemFromQueue(queue, False, True)
+                queue.put(None) 
             return item
         except Empty:
             return

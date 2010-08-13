@@ -1026,9 +1026,8 @@ class TestSuite(Test):
         pathElements = testPath.split("/", 1)
         subSuite = self.findSubtest(pathElements[0])
         if len(pathElements) == 1:
-            if not subSuite:
-                return self.addTestCase(testPath)
-            # if it already exists, don't return anything
+            # add it even if it already exists, then we get two of them :)
+            return self.addTestCase(testPath)
         else:
             if not subSuite:
                 subSuite = self.addTestSuite(pathElements[0])

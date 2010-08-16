@@ -124,9 +124,12 @@ class QueueSystemConfig(default.Config):
             writeDir = test.getDirectory(temporary=1)
             plugins.rmtree(writeDir)
         else:
-            for dataFile in test.getDataFileNames():
+            for dataFile in self.getDataFiles(test):
                 fullPath = test.makeTmpFileName(dataFile, forComparison=0)
                 plugins.removePath(fullPath)
+
+    def getDataFiles(self, test):
+        return test.getDataFileNames()
                 
     def _cleanWriteDirectory(self, suite):
         if self.slaveRun():

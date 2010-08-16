@@ -144,10 +144,10 @@ class QueueSystemServer(BaseActionRunner):
     def findQueueForTest(self, test):
         # If we've gone into reuse mode and there are no active tests for reuse, use the "reuse failure queue"
         if self.reuseOnly and self.testsSubmitted == 0:
-            self.diag.info("Putting " + repr(test) + " in reuse failure queue " + self.remainStr())
+            self.diag.info("Putting " + test.uniqueName + " in reuse failure queue " + self.remainStr())
             return self.reuseFailureQueue
         else:
-            self.diag.info("Putting " + repr(test) + " in normal queue " + self.remainStr())
+            self.diag.info("Putting " + test.uniqueName + " in normal queue " + self.remainStr())
             return self.testQueue
                 
     def handleLocalError(self, test, previouslySubmitted):
@@ -175,15 +175,15 @@ class QueueSystemServer(BaseActionRunner):
                         # Don't allow test count to drop to 0 here, can cause race conditions
                         self.submitTerminators() 
                         postText = ": submitting terminators as final test"
-                    self.diag.info("Reusing slave from " + test.getRelPath() + " for " + newTest.getRelPath() + postText)
+                    self.diag.info("Reusing slave from " + test.uniqueName + " for " + newTest.uniqueName + postText)
                     return newTest
                 else:
-                    self.diag.info("Adding to reuse failure queue : " + test.getRelPath())
+                    self.diag.info("Adding to reuse failure queue : " + newTest.uniqueName)
                     self.reuseFailureQueue.put(newTest)
                 
         # Allowed a submitted job to terminate
         self.testsSubmitted -= 1
-        self.diag.info("No reuse for " + test.getRelPath() + " : " + repr(self.testsSubmitted) + " tests still submitted")
+        self.diag.info("No reuse for " + test.uniqueName + " : " + repr(self.testsSubmitted) + " tests still submitted")
         if self.exited and self.testsSubmitted == 0:
             self.diag.info("Forcing termination")
             self.submitTerminators()
@@ -750,7 +750,8 @@ class SlaveRequestHandler(StreamRequestHandler):
                 _, state = test.getNewState(self.rfile, updatePaths=True)
                 self.server.diag.info("Changed from '" + oldBt + "' to '" + state.briefText + "'")    
                 if rerun:
-                    self.server.diag.info("Instructed to rerun test " + test.getRelPath())
+                    self.server.diag.info("Instructed to rerun test " + test.uniqueName)
+                    self.server.clearClient(test) # it might come back from a different process
                     QueueSystemServer.instance.addTest(test)
                 else:
                     self.server.changeState(test, state)
@@ -871,6 +872,9 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
 
     def storeClient(self, test, clientInfo):
         self.testClientInfo[test] = clientInfo
+
+    def clearClient(self, test):
+        del self.testClientInfo[test]
 
 
 class MasterTextResponder(TextDisplayResponder):

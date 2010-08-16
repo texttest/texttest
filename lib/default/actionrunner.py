@@ -87,11 +87,11 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
 
             if self.exited:
                 self.cancel(test)
-                self.diag.info("Cancelled " + desc + " " + repr(test))
+                self.diag.info("Cancelled " + desc + " " + test.uniqueName)
             elif not test.state.isComplete():
-                self.diag.info(desc.capitalize() + " test " + repr(test))
+                self.diag.info(desc.capitalize() + " test " + test.uniqueName)
                 runMethod(test)
-                self.diag.info("Completed " + desc + " " + repr(test))
+                self.diag.info("Completed " + desc + " " + test.uniqueName)
 
     def getItemFromQueue(self, queue, block, replaceTerminators=False):
         try:

@@ -200,7 +200,7 @@ class Config:
             return self.reconnectConfig.getExtraVersions(app, fromConfig)
         else:
             copyVersions = self.getCopyExtraVersions()
-            checkoutVersions = self.getCheckoutExtraVersions()
+            checkoutVersions, _ = self.getCheckoutExtraVersions(app)
             # Generated automatically to be able to distinguish, don't save them
             for ver in copyVersions + checkoutVersions:
                 app.addConfigEntry("unsaveable_version", ver)
@@ -226,9 +226,14 @@ class Config:
                 
         return checkoutParts[-1].replace(".", "_")
 
-    def getCheckoutExtraVersions(self):    
+    def getCheckoutExtraVersions(self, app):    
         checkoutNames = plugins.commasplit(self.optionValue("c"))
-        return [ self.versionNameFromCheckout(c, checkoutNames) for c in checkoutNames[1:] ]
+        if len(checkoutNames) > 1:
+            expandedNames = [ self.expandCheckout(c, app) for c in checkoutNames ]
+            extraCheckouts = expandedNames[1:]
+            return [ self.versionNameFromCheckout(c, expandedNames) for c in extraCheckouts ], extraCheckouts
+        else:
+            return [], []
 
     def getBatchSessionForSelect(self):
         return self.optionMap.get("b") or self.optionMap.get("bx")
@@ -830,9 +835,18 @@ class Config:
                 raise plugins.TextTestError, "Cannot collate files to stem '" + key + "' - '.' and '/' characters are not allowed"
 
     def getGivenCheckoutPath(self, app):
+        if self.optionMap.has_key("c"):
+            extraVersions, extraCheckouts = self.getCheckoutExtraVersions(app)
+            for versionName, checkout in zip(extraVersions, extraCheckouts):
+                if versionName in app.versions:
+                    return checkout
+
         checkout = self.getCheckout(app)
+        return self.expandCheckout(checkout, app)
+
+    def expandCheckout(self, checkout, app):
         if os.path.isabs(checkout):
-            return checkout
+            return os.path.normpath(checkout)
         checkoutLocations = app.getCompositeConfigValue("checkout_location", checkout, expandVars=False)
         # do this afterwards, so it doesn't get expanded (yet)
         os.environ["TEXTTEST_CHECKOUT_NAME"] = checkout # Local name of the checkout directory
@@ -843,12 +857,7 @@ class Config:
 
     def getCheckout(self, app):
         if self.optionMap.has_key("c"):
-            allCheckouts = plugins.commasplit(self.optionMap["c"])
-            for checkout in allCheckouts[1:]:
-                versionName = self.versionNameFromCheckout(checkout, allCheckouts)
-                if versionName in app.versions:
-                    return checkout
-            return allCheckouts[0]
+            return plugins.commasplit(self.optionMap["c"])[0]
 
         # Under some circumstances infer checkout from batch session
         batchSession = self.optionValue("b")
@@ -867,7 +876,7 @@ class Config:
         return self.absCheckout(locations[0], checkout, isSpecific)
 
     def absCheckout(self, location, checkout, isSpecific):
-        fullLocation = os.path.expanduser(os.path.expandvars(location))
+        fullLocation = os.path.normpath(os.path.expanduser(os.path.expandvars(location)))
         if isSpecific or location.find("TEXTTEST_CHECKOUT_NAME") != -1:
             return fullLocation
         else:

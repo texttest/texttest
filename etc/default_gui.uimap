@@ -959,3 +959,6 @@ clicked =
 [Label=gtk-cancel]
 clicked = 
 
+[Name=Number of times to try to rerun the test if the issue is triggered]
+changed = set rerun attempts to
+

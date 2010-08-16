@@ -1282,9 +1282,9 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         self.textDescGroup.addOption("full_description", "\nFull description")
         self.textDescGroup.addOption("brief_description", "Few-word summary")
         self.textDescGroup.addSwitch("internal_error", "Report as 'internal error' rather than 'known bug'")
+        self.optionGroup.addOption("rerun_count", "Number of times to try to rerun the test if the issue is triggered", "0")
 
     def fillVBox(self, vbox, optionGroup):
-        retValue = guiplugins.ActionDialogGUI.fillVBox(self, vbox, optionGroup)
         if optionGroup is self.optionGroup:
             for group in [ self.textGroup, self.searchGroup, self.applyGroup ]:
                 if group is self.applyGroup:
@@ -1299,7 +1299,7 @@ class ReportBugs(guiplugins.ActionDialogGUI):
             for group in [ self.bugSystemGroup, self.textDescGroup ]:
                 frame = self.createFrame(group)
                 vbox.pack_start(frame, fill=False, expand=False, padding=8)
-        return retValue
+        return guiplugins.ActionDialogGUI.fillVBox(self, vbox, optionGroup)
 
     def createFrame(self, group):
         frame = gtk.Frame(group.name)
@@ -1408,10 +1408,11 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         fileName = self.getFileName()
         writeFile = open(fileName, "a")
         writeFile.write("\n[Reported by " + os.getenv("USER", "Windows") + " at " + plugins.localtime() + "]\n")
-        for group in [ self.textGroup, self.searchGroup, self.applyGroup, self.bugSystemGroup, self.textDescGroup ]:
+        for group in [ self.textGroup, self.searchGroup, self.applyGroup,
+                       self.bugSystemGroup, self.textDescGroup, self.optionGroup ]:
             for name, option in group.options.items():
                 value = option.getValue()
-                if name in namesToIgnore or not value or value == "<none>":
+                if name in namesToIgnore or not value or value in [ "0", "<none>" ]:
                     continue
                 if name == "data_source":
                     writeFile.write("search_file:" + dataSourceText[value] + "\n")

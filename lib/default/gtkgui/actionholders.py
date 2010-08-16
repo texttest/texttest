@@ -279,8 +279,6 @@ class ChangeableNotebookGUI(NotebookGUI):
             if tabGUI.shouldShowCurrent():
                 return tabName, tabGUI
 
-        return self.tabInfo[0]
-
     def findFirstRemaining(self, pagesRemoved):
         for page in self.notebook.get_children():
             if page.get_property("visible"):

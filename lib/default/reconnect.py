@@ -86,12 +86,28 @@ class ReconnectConfig:
         fullPaths = [ os.path.join(fetchDir, d) for d in correctNames ]
         return filter(lambda d: self.isRunDirectoryFor(app, d), fullPaths)
 
-    def isRunDirectoryFor(self, app, d):
-        appDirRoot = os.path.join(d, app.name + app.versionSuffix())
-        if os.path.isdir(appDirRoot):
-            return True
+    @classmethod
+    def all_perms(cls, items):
+        # Lifted from a standard recipe
+        if len(items) <= 1:
+            yield items
         else:
-            return len(glob(appDirRoot + ".*")) > 0
+            for perm in cls.all_perms(items[1:]):
+                for i in range(len(perm)+1):
+                    yield perm[:i] + items[0:1] + perm[i:]
+
+    def versionSuffix(self, parts):
+        fullVersion = ".".join(parts)
+        if len(fullVersion) == 0:
+            return ""
+        return "." + fullVersion
+                    
+    def isRunDirectoryFor(self, app, d):
+        for permutation in self.all_perms(app.versions):
+            appDirRoot = os.path.join(d, app.name + self.versionSuffix(permutation))
+            if os.path.isdir(appDirRoot) or len(glob(appDirRoot + ".*")) > 0:
+                return True
+        return False 
 
     def getVersionListsTopDir(self, fileName):
         # Show the framework how to find the version list given a file name

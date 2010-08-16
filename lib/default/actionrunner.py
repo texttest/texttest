@@ -28,7 +28,7 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
         
     def notifyAdd(self, test, initial):
         if test.classId() == "test-case":
-            self.diag.info("Adding test " + test.getRelPath())
+            self.diag.info("Adding test " + test.uniqueName)
             self.addTest(test)
 
     def addTest(self, test):
@@ -330,18 +330,17 @@ class TestRunner:
         # We want to set up the earlier ones first
         setUpSuites.reverse()
         return tearDownSuites, setUpSuites
+    
     def findCommonAncestor(self, test1, test2):
-        if self.hasAncestor(test1, test2):
-            self.diag.info(test1.getRelPath() + " has ancestor " + test2.getRelPath())
-            return test2
         if self.hasAncestor(test2, test1):
-            self.diag.info(test2.getRelPath() + " has ancestor " + test1.getRelPath())
+            self.diag.info(test2.uniqueName + " has ancestor " + test1.uniqueName)
             return test1
-        if test1.parent:
+        elif test1.parent:
             return self.findCommonAncestor(test1.parent, test2)
         else:
-            self.diag.info(test1.getRelPath() + " unrelated to " + test2.getRelPath())
+            self.diag.info(test1.uniqueName + " unrelated to " + test2.uniqueName)
             return None
+
     def hasAncestor(self, test1, test2):
         if test1 == test2:
             return 1
@@ -349,6 +348,7 @@ class TestRunner:
             return self.hasAncestor(test1.parent, test2)
         else:
             return 0
+
     def findSuitesUpTo(self, ancestor):
         suites = []
         currCheck = self.test.parent

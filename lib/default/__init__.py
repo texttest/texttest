@@ -60,6 +60,8 @@ class Config:
                     group.addSwitch("actrep", "Run with slow motion replay")
                 if useCatalogues:
                     group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
+                if useTraffic:
+                    group.addSwitch("rectraffic", "(Re-)record command-line or client-server traffic")
             elif group.name.startswith("Advanced"):
                 group.addSwitch("x", "Enable self-diagnostics")
                 defaultDiagDir = plugins.getPersonalDir("log")
@@ -68,8 +70,6 @@ class Config:
                 group.addOption("xw", "Write self-diagnostics to", defaultDiagDir)
                 group.addOption("b", "Run batch mode session")
                 group.addOption("name", "Name this run", self.optionValue("name"))
-                if useTraffic:
-                    group.addSwitch("rectraffic", "(Re-)record command-line or client-server traffic")
                 group.addSwitch("keeptmp", "Keep temporary write-directories")
                 group.addOption("vanilla", "Ignore configuration files", self.defaultVanillaValue(),
                                 possibleValues = [ "", "site", "personal", "all" ])

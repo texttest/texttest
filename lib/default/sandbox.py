@@ -828,6 +828,7 @@ class UNIXPerformanceInfoFinder:
     def __init__(self, diag):
         self.diag = diag
         self.includeSystemTime = 0
+        
     def findTimesUsedBy(self, test):
         # Read the UNIX performance file, allowing us to discount system time.
         tmpFile = test.makeTmpFileName("unixperf", forFramework=1)
@@ -847,13 +848,12 @@ class UNIXPerformanceInfoFinder:
             if line.startswith("real") or line.startswith("Real"):
                 realTime = self.parseUnixTime(line)
         return cpuTime, realTime
-    def parseUnixTime(self, line):
-        timeVal = line.strip().split()[-1]
-        if timeVal.find(":") == -1:
-            return float(timeVal)
 
-        parts = timeVal.split(":")
-        return 60 * float(parts[0]) + float(parts[1])
+    def parseUnixTime(self, line):
+        # Assumes output of GNU time
+        words = line.strip().split()
+        return float(words[-1])
+
     def setUpApplication(self, app):
         self.includeSystemTime = app.getConfigValue("cputime_include_system_time")
 

@@ -34,8 +34,10 @@ class PrepareWriteDirectory(plugins.Action):
 
     def hasPreviousData(self, test):
         tmpDir = test.getDirectory(temporary=1)
-        allFiles = os.listdir(tmpDir)
-        return allFiles != [ "framework_tmp" ]
+        for f in os.listdir(tmpDir):
+            if os.path.isfile(os.path.join(tmpDir, f)):
+                return True
+        return False
 
     def backupPreviousData(self, test):
         writeDir = test.getDirectory(temporary=1)

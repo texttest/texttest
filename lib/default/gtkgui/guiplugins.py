@@ -694,8 +694,11 @@ class OptionGroupGUI(ActionGUI):
             for app in allApps:
                 app.addToOptionGroups(allApps, [ optionGroup ])
         else:
-            configObject = plugins.importAndCall("default", "getConfig", inputOptions)
+            configObject = self.makeDefaultConfigObject(inputOptions)
             configObject.addToOptionGroups(allApps, [ optionGroup ])
+
+    def makeDefaultConfigObject(self, inputOptions):
+        return plugins.importAndCall("default", "getConfig", inputOptions)
 
 
     
@@ -878,12 +881,12 @@ class ActionDialogGUI(OptionGroupGUI):
         OptionGroupGUI._respond(self, *args)
 
     def tryResize(self, dialog):
-        hordiv, verdiv = self.getResizeDivisors()
-        if hordiv is not None:
-            parentSize = self.topWindow.get_size()
-            dialog.resize(int(parentSize[0] / hordiv), int(parentSize[0] / verdiv))
+        horfrac, verfrac = self.getSizeAsWindowFraction()
+        if horfrac is not None:
+            width, height = self.topWindow.get_size()
+            dialog.resize(int(width * horfrac), int(height * verfrac))
         
-    def getResizeDivisors(self):
+    def getSizeAsWindowFraction(self):
         return None, None
     
     def setSensitivity(self, newValue):
@@ -958,7 +961,7 @@ class ActionDialogGUI(OptionGroupGUI):
     def addLabel(self, vbox, label):
         hbox = gtk.HBox()
         hbox.pack_start(label, expand=False, fill=False)        
-        vbox.pack_start(hbox, expand=False, fill=False)
+        vbox.pack_start(hbox, expand=False, fill=False, padding=2)
                 
     def createRadioButtonCollection(self, switch, optionGroup):
         if optionGroup is not self.optionGroup:

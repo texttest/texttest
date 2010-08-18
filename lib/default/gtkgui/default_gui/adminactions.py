@@ -253,9 +253,9 @@ class ImportTest(guiplugins.ActionDialogGUI):
     def _getStockId(self):
         return "add"
     
-    def getResizeDivisors(self):
+    def getSizeAsWindowFraction(self):
         # size of the dialog
-        return 1.5, 2.8
+        return 0.5, 0.36
 
     def testFilesExist(self, dir, app):
         for fileName in os.listdir(dir):
@@ -583,9 +583,9 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         return "Create/Import Files and Directories"
     def isActiveOnCurrent(self, *args):
         return self.creationDir is not None and guiplugins.ActionDialogGUI.isActiveOnCurrent(self, *args)
-    def getResizeDivisors(self):
+    def getSizeAsWindowFraction(self):
         # size of the dialog
-        return 1.4, 1.4
+        return 0.7, 0.9
     def getSignalsSent(self):
         return [ "NewFile" ]
     def messageAfterPerform(self):
@@ -1058,9 +1058,9 @@ class RenameTest(RenameAction):
         self.oldName = ""
         self.oldDescription = ""
 
-    def getResizeDivisors(self):
+    def getSizeAsWindowFraction(self):
         # size of the dialog
-        return 1.5, 2.8
+        return 0.5, 0.36
     
     def isActiveOnCurrent(self, *args):
         # Don't allow renaming of the root suite
@@ -1397,9 +1397,9 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         name = "knownbugs." + self.currTestSelection[0].app.name + self.versionSuffix()
         return os.path.join(self.currTestSelection[0].getDirectory(), name)
 
-    def getResizeDivisors(self):
+    def getSizeAsWindowFraction(self):
         # size of the dialog
-        return 1.4, 1.7
+        return 0.6, 0.6
     
     def performOnCurrent(self):
         self.checkSanity()

@@ -512,9 +512,9 @@ class LoadSelection(guiplugins.ActionDialogGUI):
             filters = suite.app.getFiltersFromFile(fileName, self.rootTestSuites)
             tests += suite.testCaseList(filters)
         return tests
-    def getResizeDivisors(self):
+    def getSizeAsWindowFraction(self):
         # size of the dialog
-        return 1.2, 1.7
+        return 0.6, 0.8
 
     def messageBeforePerform(self):
         return "Loading test selection ..."

@@ -671,15 +671,16 @@ class CollectFiles(plugins.ScriptWithArgs):
         self.mailSender = MailSender(self.batchSession)
         self.runId = "" # depends on what we pick up from collected files
         self.diag = logging.getLogger("batch collect")
-        self.userName = argDict.get("tmp", "")
-        if self.userName:
-            plugins.log.info("Collecting batch files created by user " + self.userName + "...")
+        self.tmpInfo = argDict.get("tmp", "")
+        if self.tmpInfo:
+            plugins.log.info("Collecting batch files from temp directory " + self.tmpInfo + "...")
         else:
             plugins.log.info("Collecting batch files locally...")
+            
     def setUpApplication(self, app):
         fileBodies = []
         totalValues = seqdict()
-        rootDir = app.getPreviousWriteDirInfo(self.userName)
+        rootDir = app.getPreviousWriteDirInfo(self.tmpInfo)
         if not os.path.isdir(rootDir):
             sys.stderr.write("No temporary directory found at " + rootDir + " - not collecting batch reports.\n")
             return
@@ -704,6 +705,7 @@ class CollectFiles(plugins.ScriptWithArgs):
         mailContents += self.getBody(fileBodies, missingVersions)
         allSuccess = len(totalValues.keys()) == 1 and totalValues.keys()[0] == "succeeded"
         self.mailSender.sendOrStoreMail(app, mailContents, isAllSuccess=allSuccess)
+
     def matchesApp(self, dir, app):
         suffix = app.versionSuffix()
         return dir.startswith(app.name + suffix) or dir.startswith(self.batchSession + suffix)

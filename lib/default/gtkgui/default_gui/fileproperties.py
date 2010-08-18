@@ -14,15 +14,15 @@ class FileProperties:
         self.abspath = path
         self.filename = os.path.basename(self.abspath)
         self.dir = os.path.dirname(self.abspath)
-        self.status = os.stat(self.abspath)
+        self.status = os.lstat(self.abspath)
         self.now = int(time.time())
         self.recent = self.now - (6 * 30 * 24 * 60 * 60) #6 months ago
 
     def inqType(self):
-        # The stat.S_IS* functions don't seem to work on links ...
-        if os.path.islink(self.abspath):
+        mode = self.status[stat.ST_MODE]
+        if stat.S_ISLNK(mode):
             return "l"
-        elif os.path.isdir(self.abspath):
+        elif stat.S_ISDIR(mode):
             return "d"
         else:
             return "-"

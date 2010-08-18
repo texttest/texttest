@@ -962,3 +962,9 @@ clicked =
 [Name=Number of times to try to rerun the test if the issue is triggered]
 changed = set rerun attempts to
 
+[Label=gtk-close]
+clicked = 
+
+[Label=gtk-no]
+clicked = 
+

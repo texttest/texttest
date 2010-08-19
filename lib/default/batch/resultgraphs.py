@@ -177,8 +177,7 @@ class GraphGenerator:
         # Interval between labels (10 labels in total, use '' between the labels)
         interval = max(numresults / 10, 1)
         for i, (tag, _) in enumerate(results):
-            if i % interval == 0:
-                xticks.append(tag)
-            else:
-                xticks.append('')
+            useTag = i % interval == 0
+            tick = useTag and tag or ""
+            xticks.append(tick)
         graph.setXticks(xticks)

@@ -860,19 +860,21 @@ class CommandLineTraffic(Traffic):
         self.commandName = os.path.basename(self.fullCommand)
         self.cmdArgs = argv[1:]
         self.argStr = plugins.commandLineString(argv[1:])
-        self.environ = self.filterEnvironment(self.cmdEnviron)
+        envVarsSet, envVarsUnset = self.filterEnvironment(self.cmdEnviron)
         self.path = self.cmdEnviron.get("PATH")
-        text = self.getEnvString() + self.commandName + " " + self.argStr
+        text = self.getEnvString(envVarsSet, envVarsUnset) + self.commandName + " " + self.argStr
         super(CommandLineTraffic, self).__init__(text, responseFile)
         
     def filterEnvironment(self, cmdEnviron):
-        interestingEnviron = []
+        envVarsSet, envVarsUnset = [], []
         for var in self.getEnvironmentVariables():
             value = cmdEnviron.get(var)
-            if value is not None:
-                currValue = os.getenv(var)
-                self.diag.info("Checking environment " + var + "=" + value + " against " + repr(currValue))
-                if value != currValue:
+            currValue = os.getenv(var)
+            self.diag.info("Checking environment " + var + "=" + repr(value) + " against " + repr(currValue))
+            if value != currValue:
+                if value is None:
+                    envVarsUnset.append(var)
+                else:
                     if var.endswith("PATH"):
                         interceptStr = "traffic_intercepts" + os.pathsep
                         # Fix the traffic interception mechanisms's own files:
@@ -889,8 +891,8 @@ class CommandLineTraffic(Traffic):
                             self.diag.info("Filtered PATH variable " + var + "=" + value)
                             if value == currValue:
                                 continue
-                    interestingEnviron.append((var, value))
-        return interestingEnviron
+                    envVarsSet.append((var, value))
+        return envVarsSet, envVarsUnset
 
     def getEnvironmentVariables(self):
         return self.environmentDict.get(self.commandName, []) + \
@@ -899,14 +901,16 @@ class CommandLineTraffic(Traffic):
     def hasChangedWorkingDirectory(self):
         return not plugins.samefile(self.cmdCwd, os.getenv("TEXTTEST_SANDBOX"))
 
-    def getEnvString(self):
+    def getEnvString(self, envVarsSet, envVarsUnset):
         recStr = ""
         if self.hasChangedWorkingDirectory():
             recStr += "cd " + self.cmdCwd.replace("\\", "/") + "; "
-        if len(self.environ) == 0:
+        if len(envVarsSet) == 0 and len(envVarsUnset) == 0:
             return recStr
         recStr += "env "
-        for var, value in self.environ:
+        for var in envVarsUnset:
+            recStr += "--unset=" + var + " "
+        for var, value in envVarsSet:
             recStr += "'" + var + "=" + self.getEnvValueString(var, value) + "' "
         return recStr
 

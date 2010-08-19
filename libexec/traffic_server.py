@@ -1162,9 +1162,6 @@ class ReplayInfo:
     def readReplayResponses(self, traffic):
         # We return the response matching the traffic in if we can, otherwise
         # the one that is most similar to it
-        if not traffic.hasInfo():
-            return []
-
         responseMapKey = self.getResponseMapKey(traffic)
         if responseMapKey:
             return self.responseMap[responseMapKey].makeResponses(traffic)

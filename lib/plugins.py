@@ -738,11 +738,11 @@ def abspath(path):
         return os.path.abspath(path)
 
 # deepcopy(os.environ) still seems to retain links to the actual environment, create a clean copy
-def copyEnvironment():
-    environ = {}
+def copyEnvironment(values={}, ignoreVars=[]):
     for var, value in os.environ.items():
-        environ[var] = value
-    return environ
+        if not values.has_key(var) and var not in ignoreVars:
+            values[var] = value
+    return values
 
 def getInterpreter(executable):
     extension = executable.rsplit(".", 1)[-1]

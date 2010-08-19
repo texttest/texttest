@@ -93,30 +93,29 @@ class TestEnvironment(seqdict):
         self.diag = logging.getLogger("read environment")
         self.populateFunction = populateFunction
         self.populated = False
+
     def checkPopulated(self):
         if not self.populated:
             self.populated = True
             self.populateFunction()
+
     def definesValue(self, var):
         self.checkPopulated()
         return self.has_key(var)
-    def getValues(self, onlyVars = []):
+    
+    def getValues(self, onlyVars=[], ignoreVars=[]):
         self.checkPopulated()
         values = {}
-        removed = []
         for key, value in self.items():
             # Anything set to none is to not to be set in the target environment
             if value is not None and value != "{CLEAR}":
                 if len(onlyVars) == 0 or key in onlyVars:
                     values[key] = value
             else:
-                removed.append(key)
-        self.diag.info("Removing variables " + repr(removed))
+                ignoreVars.append(key)
+        self.diag.info("Removing variables " + repr(ignoreVars))
         # copy in the external environment last
-        for var, value in os.environ.items():
-            if not values.has_key(var) and var not in removed:
-                values[var] = value
-        return values
+        return plugins.copyEnvironment(values, ignoreVars)
 
     def __getitem__(self, var):
         value = self.getSingleValue(var)
@@ -496,8 +495,8 @@ class Test(plugins.Observable):
             os.close(tmpFile)
             shutil.move(tmpFileName, targetFile)
             
-    def getRunEnvironment(self, onlyVars = []):
-        return self.environment.getValues(onlyVars)
+    def getRunEnvironment(self, *args, **kw):
+        return self.environment.getValues(*args, **kw)
 
     def getIndent(self):
         relPath = self.getRelPath()

@@ -282,8 +282,10 @@ class QueueSystemServer(BaseActionRunner):
     
     def cleanup(self):
         self.sendServerState("Completed submission of all tests")
+
     def remainStr(self):
         return " : " + str(self.testCount) + " tests remain, " + str(self.testsSubmitted) + " are submitted."
+
     def runTest(self, test):   
         submissionRules = self.getSubmissionRules(test)
         command = self.getSlaveCommand(test, submissionRules)
@@ -300,18 +302,20 @@ class QueueSystemServer(BaseActionRunner):
             test.changeState(self.getPendingState(test))
         if self.testsSubmitted == self.maxCapacity:
             self.sendServerState("Completed submission of tests up to capacity")
+
+    def getSlaveVarsToBlock(self):
+        """Make sure we clear out the master scripts so the slave doesn't use them too,
+        otherwise just use the environment as is.
+        
+        If we're being run via SSH, don't pass this on to the slave jobs
+        This has been known to trip up shell starter scripts, e.g. on SuSE 10
+        making them believe that the SGE job is an SSH login and setting things wrongly
+        as a result."""
+        return [ "USECASE_REPLAY_SCRIPT", "USECASE_RECORD_SCRIPT", "SSH_TTY" ]
+
     def getSlaveEnvironment(self):
-        env = plugins.copyEnvironment()
-        self.fixUseCaseVariables(env)
-        return env
-
-    def fixUseCaseVariables(self, env):
-        # Make sure we clear out the master scripts so the slave doesn't use them too,
-        # otherwise just use the environment as is
-        if env.has_key("USECASE_REPLAY_SCRIPT") or env.has_key("USECASE_RECORD_SCRIPT"):
-            env["USECASE_REPLAY_SCRIPT"] = ""
-            env["USECASE_RECORD_SCRIPT"] = ""
-
+        return plugins.copyEnvironment(ignoreVars=self.getSlaveVarsToBlock())
+ 
     def fixDisplay(self, env):
         # Must make sure SGE jobs don't get a locally referencing DISPLAY
         display = env.get("DISPLAY")

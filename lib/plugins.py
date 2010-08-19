@@ -425,7 +425,7 @@ class ScriptWithArgs(Action):
         dict = {}
         for arg in args:
             if "=" in arg:
-                currKey, val = arg.split("=")
+                currKey, val = arg.split("=", 1)
                 if currKey in allowedArgs:
                     dict[currKey] = val
                 else:

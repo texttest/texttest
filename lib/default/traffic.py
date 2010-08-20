@@ -7,7 +7,6 @@ class SetUpTrafficHandlers(plugins.Action):
         self.trafficServerProcess = None
         libexecDir = plugins.installationDir("libexec")
         self.trafficFiles = self.findTrafficFiles(libexecDir)
-        self.trafficPthFile = os.path.join(libexecDir, "zzz_traffic_interceptor.pth")
         self.trafficPyModuleFile = os.path.join(libexecDir, "traffic_pymodule.py")
         self.trafficServerFile = os.path.join(libexecDir, "traffic_server.py")
         
@@ -134,9 +133,11 @@ class SetUpTrafficHandlers(plugins.Action):
         self.makePackageFiles(interceptDir, modulePath)
 
     def interceptPythonAttributes(self, moduleInfo, interceptDir):
-        for fileName in [ self.trafficPyModuleFile, self.trafficPthFile ]:
-            self.intercept(interceptDir, os.path.basename(fileName), [ fileName ], executable=False)
-        interceptorModule = os.path.join(interceptDir, "traffic_pymodule_interceptor.py")
+        self.intercept(interceptDir, os.path.basename(self.trafficPyModuleFile),
+                       [ self.trafficPyModuleFile ], executable=False)
+        # We use the "sitecustomize" hook so this works on Python programs older than 2.6
+        # Should probably run the user's real one, assuming they have one
+        interceptorModule = os.path.join(interceptDir, "sitecustomize.py")
         interceptorFile = open(interceptorModule, "w")
         interceptorFile.write("import traffic_pymodule\n")
         for moduleName, attributes in moduleInfo:

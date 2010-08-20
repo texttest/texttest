@@ -488,9 +488,7 @@ class ClientSocketTraffic(Traffic):
                 sys.stderr.write("WARNING: Server process reset the connection while TextTest's 'fake client' was trying to read a response from it!\n")
                 sys.stderr.write("(while running test at " + CommandLineTraffic.currentTestPath + ")\n")
                 sock.close()
-                return []
-        else:
-            return [] # client is alone, nowhere to forward
+        return []
 
 class ServerTraffic(Traffic):
     typeId = "SRV"

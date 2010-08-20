@@ -2,10 +2,10 @@
 import sys
 
 class ModuleProxy:
-    def __init__(self, name, fileName):
+    def __init__(self, name, fileName=None, realModule=None):
         self.name = name
         self.__file__ = fileName
-        self.realModule = None
+        self.realModule = realModule
         self.AttributeProxy(self, self).tryImport() # make sure "our module" can really be imported
 
     def __getattr__(self, attrname):
@@ -189,6 +189,42 @@ class ModuleProxy:
                 sock.connect(serverAddress)
                 return sock
 
+# Workaround for stuff where we can't do setattr
+class TransparentProxy:
+    def __init__(self, obj):
+        self.obj = obj
+        
+    def __getattr__(self, name):
+        return getattr(self.obj, name)
 
 
-sys.modules[__name__] = ModuleProxy(__name__, __file__)
+class PartialModuleProxy(ModuleProxy):
+    def __init__(self, moduleName):
+        try:
+            exec "import " + moduleName + " as realModule"
+            ModuleProxy.__init__(self, moduleName, realModule=realModule) 
+        except ImportError:
+            self.realModule = None
+
+    def interceptAttributes(self, attrNames):
+        if self.realModule:
+            for attrName in attrNames:
+                self.interceptAttribute(self, self.realModule, attrName)
+
+    def interceptAttribute(self, proxyObj, realObj, attrName):
+        parts = attrName.split(".", 1)
+        currAttrName = parts[0]
+        currAttrProxy = getattr(proxyObj, currAttrName)
+        if len(parts) == 1:
+            setattr(realObj, currAttrName, currAttrProxy)
+        else:
+            currRealAttr = getattr(realObj, currAttrName)
+            try:
+                self.interceptAttribute(currAttrProxy, currRealAttr, parts[1])
+            except TypeError: # it's a builtin (assume setattr threw), so we hack around...
+                realAttrProxy = TransparentProxy(currRealAttr)
+                self.interceptAttribute(currAttrProxy, realAttrProxy, parts[1])
+                setattr(realObj, currAttrName, realAttrProxy)
+
+if __name__ != "traffic_pymodule":
+    sys.modules[__name__] = ModuleProxy(__name__, __file__)

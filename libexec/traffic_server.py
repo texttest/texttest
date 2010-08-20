@@ -36,8 +36,8 @@ react to the above module to repoint where it sends socket interactions"""
                       help="restore edited files referred to in replayed file from DIR.", metavar="DIR")
     parser.add_option("-m", "--python-module-intercepts", 
                       help="Python modules whose objects should be stored locally rather than returned as they are", metavar="MODULES")
-    parser.add_option("-A", "--python-module-attributes", 
-                      help="For the intercepted modules listed, only intercept the attributes listed", metavar="ATTRS")
+    parser.add_option("-P", "--python-module-partial-intercepts", 
+                      help="Python modules for whom only some attributes are being intercepted", metavar="MODULES")
     parser.add_option("-r", "--record", 
                       help="record traffic to FILE.", metavar="FILE")
     parser.add_option("-F", "--record-file-edits", 
@@ -550,14 +550,16 @@ class PythonModuleTraffic(Traffic):
     typeId = "PYT"
     direction = "<-"
     interceptModules = []
-    interceptModuleAttrs = {}
+    partialInterceptModules = {}
     @classmethod
     def configure(cls, options):
         modStr = options.python_module_intercepts
         if modStr:
             cls.interceptModules = modStr.split(",")
             cls.interceptModules += cls.getModuleParents(cls.interceptModules)
-            cls.interceptModuleAttrs = parseCmdDictionary(options.python_module_attributes)
+            partialModStr = options.python_module_partial_intercepts
+            if partialModStr:
+                cls.partialInterceptModules = partialModStr.split(",")
             
     @staticmethod
     def getModuleParents(modules):
@@ -566,13 +568,6 @@ class PythonModuleTraffic(Traffic):
             for ix in range(module.count(".")):
                 parents.append(module.rsplit(".", ix + 1)[0])
         return parents
-
-    def shouldIntercept(self):
-        attrs = self.interceptModuleAttrs.get(self.modOrObjName, [])
-        if len(attrs) > 0:
-            return self.attrName in attrs
-        else:
-            return True
 
     def enquiryOnly(self, responses=[]):
         return not self.shouldIntercept()
@@ -644,7 +639,7 @@ class PythonImportTraffic(PythonModuleTraffic):
         super(PythonImportTraffic, self).__init__(text, responseFile)
 
     def shouldIntercept(self, responses=[]):
-        return not self.interceptModuleAttrs.has_key(self.moduleName)
+        return self.moduleName not in self.partialInterceptModules
 
     def forwardToDestination(self):
         try:
@@ -668,20 +663,7 @@ class PythonAttributeTraffic(PythonModuleTraffic):
                                  types.ClassType, types.TypeType, types.ModuleType) and \
                                  not hasattr(obj, "__call__")
 
-    def interceptionPossible(self):
-        attrs = self.interceptModuleAttrs.get(self.modOrObjName, [])
-        if len(attrs) > 0:
-            for attr in attrs:
-                if attr.startswith(self.attrName):
-                    return True
-            return False
-        else:
-            return True
-
     def forwardToDestination(self):
-        if not self.interceptionPossible():
-            # Shortcut to tell the application to use the real version
-            return [ PythonResponseTraffic(self.text, self.responseFile) ]
         instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
         try:
             attr = self.getPossibleCompositeAttribute(instance, self.attrName)

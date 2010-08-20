@@ -5,15 +5,16 @@ class SetUpTrafficHandlers(plugins.Action):
     def __init__(self, record):
         self.record = record
         self.trafficServerProcess = None
-        self.trafficFiles = self.findTrafficFiles()
-        self.trafficPyModuleFile = os.path.join(plugins.installationDir("libexec"), "traffic_pymodule.py")
-        self.trafficServerFile = os.path.join(plugins.installationDir("libexec"), "traffic_server.py")
+        libexecDir = plugins.installationDir("libexec")
+        self.trafficFiles = self.findTrafficFiles(libexecDir)
+        self.trafficPthFile = os.path.join(libexecDir, "zzz_traffic_interceptor.pth")
+        self.trafficPyModuleFile = os.path.join(libexecDir, "traffic_pymodule.py")
+        self.trafficServerFile = os.path.join(libexecDir, "traffic_server.py")
         
-    def findTrafficFiles(self):
-        libExecDir = plugins.installationDir("libexec") 
-        files = [ os.path.join(libExecDir, "traffic_cmd.py") ]
+    def findTrafficFiles(self, libexecDir):
+        files = [ os.path.join(libexecDir, "traffic_cmd.py") ]
         if os.name == "nt":
-            files.append(os.path.join(libExecDir, "traffic_cmd.exe"))
+            files.append(os.path.join(libexecDir, "traffic_cmd.exe"))
         return files
 
     def terminateServer(self, test):
@@ -83,10 +84,10 @@ class SetUpTrafficHandlers(plugins.Action):
         if pythonModules:
             cmdArgs += [ "-m", ",".join(pythonModules) ]
 
-        pythonAttrDict = test.getConfigValue("collect_traffic_py_attributes")
-        if pythonAttrDict:
-            cmdArgs += [ "-A", self.makeArgFromDict(pythonAttrDict) ]
-
+        partialPythonModules = test.getConfigValue("collect_traffic_py_attributes").keys()
+        if partialPythonModules:
+            cmdArgs += [ "-P", ",".join(partialPythonModules) ]
+            
         asynchronousFileEditCmds = test.getConfigValue("collect_traffic").get("asynchronous")
         if asynchronousFileEditCmds:
             cmdArgs += [ "-a", ",".join(asynchronousFileEditCmds) ]
@@ -99,11 +100,12 @@ class SetUpTrafficHandlers(plugins.Action):
         for cmd in commands:
             self.intercept(interceptDir, cmd, self.trafficFiles, executable=True)
 
-        pythonModules = test.getConfigValue("collect_traffic_py_module")
-        for moduleName in pythonModules:
-            modulePath = moduleName.replace(".", "/")
-            self.intercept(interceptDir, modulePath + ".py", [ self.trafficPyModuleFile ], executable=False)
-            self.makePackageFiles(interceptDir, modulePath)
+        pyModuleIntercepts, pyAttributeIntercepts = self.getPythonModuleInfo(test)
+        for moduleName in pyModuleIntercepts:
+            self.interceptPythonModule(moduleName, interceptDir)
+
+        if len(pyAttributeIntercepts) > 0:
+            self.interceptPythonAttributes(pyAttributeIntercepts, interceptDir)
 
         pathVars = []
         if len(commands) and os.name == "posix":
@@ -111,10 +113,37 @@ class SetUpTrafficHandlers(plugins.Action):
             # "current working directory beats all" rule there and also intercept things that ignore PATH
             # (like Java)
             pathVars.append("PATH")
-        if len(pythonModules):
+        if len(pyModuleIntercepts) or len(pyAttributeIntercepts):
             pathVars.append("PYTHONPATH")
         return pathVars
-     
+
+    def getPythonModuleInfo(self, test):
+        fullIntercept, partialIntercept = [], []
+        pythonModules = test.getConfigValue("collect_traffic_py_module")
+        for moduleName in pythonModules:
+            attributes = test.getCompositeConfigValue("collect_traffic_py_attributes", moduleName)
+            if attributes:
+                partialIntercept.append((moduleName, attributes))
+            else:
+                fullIntercept.append(moduleName)
+        return fullIntercept, partialIntercept
+
+    def interceptPythonModule(self, moduleName, interceptDir):
+        modulePath = moduleName.replace(".", "/")
+        self.intercept(interceptDir, modulePath + ".py", [ self.trafficPyModuleFile ], executable=False)
+        self.makePackageFiles(interceptDir, modulePath)
+
+    def interceptPythonAttributes(self, moduleInfo, interceptDir):
+        for fileName in [ self.trafficPyModuleFile, self.trafficPthFile ]:
+            self.intercept(interceptDir, os.path.basename(fileName), [ fileName ], executable=False)
+        interceptorModule = os.path.join(interceptDir, "traffic_pymodule_interceptor.py")
+        interceptorFile = open(interceptorModule, "w")
+        interceptorFile.write("import traffic_pymodule\n")
+        for moduleName, attributes in moduleInfo:
+            interceptorFile.write("proxy = traffic_pymodule.PartialModuleProxy(" + repr(moduleName) + ")\n")
+            interceptorFile.write("proxy.interceptAttributes(" + repr(attributes) + ")\n")
+        interceptorFile.close()
+    
     def makePackageFiles(self, interceptDir, modulePath):
         parts = modulePath.rsplit("/", 1)
         if len(parts) == 2:

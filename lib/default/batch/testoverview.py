@@ -413,7 +413,7 @@ class TestTable:
                 colourCount[colourKey] = 0
             categoryHandler = self.categoryHandlers[tag]
             basicData = categoryHandler.getSummaryData()[-1]
-            for category, count in basicData.items():
+            for category, count in basicData:
                 colourKey = self.getBackgroundColourKey(category)
                 colourCount[colourKey] += count
             fullData.append((getDisplayText(tag), colourCount))
@@ -669,13 +669,13 @@ class CategoryHandler:
 
     def generateTextSummary(self):
         numTests, summaryData = self.getSummaryData()
-        categoryDescs = [ self.getDescription(cat, count) for cat, count in summaryData.items() ]
+        categoryDescs = [ self.getDescription(cat, count) for cat, count in summaryData ]
         return self.getTestCountDescription(numTests) + " ".join(categoryDescs)
 
     def generateHTMLSummary(self, detailPageRef, extraVersion=None):
         numTests, summaryData = self.getSummaryData(extraVersion)
         container = HTMLgen.Container()
-        for cat, count in summaryData.items():
+        for cat, count in summaryData:
             summary = HTMLgen.Text(self.getDescription(cat, count))
             if cat == "success":
                 container.append(summary)
@@ -694,25 +694,21 @@ class CategoryHandler:
 
     def getSummaryData(self, extraVersion=None):
         numTests = 0
-        summaryData = seqdict()
-        for cat, testInfo in sorted(self.testsInCategory.items(), self.compareCategories):
+        summaryData = []
+        for cat, testInfo in self.testsInCategory.items():
             testCount = self.countTests(testInfo, extraVersion)
             if testCount > 0:
-                summaryData[cat] = testCount
+                summaryData.append((cat, testCount))
                 numTests += testCount
+        summaryData.sort(key=self.getSummarySortKey)
         return numTests, summaryData
     
     def getTestsWithDescriptions(self):
         return [ (getCategoryDescription(cat)[1], testInfo) for cat, testInfo in self.testsInCategory.items() ]
 
-    def compareCategories(self, data1, data2):
+    def getSummarySortKey(self, data):
         # Put success at the start, it's neater like that
-        if data1[0] == "success":
-            return -1
-        elif data2[0] == "success":
-            return 1
-        else:
-            return 0
+        return data[0] != "success", -data[1]
                           
 
 def getCategoryDescription(cat):

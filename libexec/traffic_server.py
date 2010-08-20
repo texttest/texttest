@@ -490,6 +490,7 @@ class ClientSocketTraffic(Traffic):
                 sock.close()
         return []
 
+
 class ServerTraffic(Traffic):
     typeId = "SRV"
     direction = "->"

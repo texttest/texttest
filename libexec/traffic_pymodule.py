@@ -2,27 +2,12 @@
 import sys
 
 class ModuleProxy:
-    def __init__(self, name, fileName=None, realModule=None):
+    def __init__(self, name):
         self.name = name
-        self.__file__ = fileName
-        self.realModule = realModule
         self.AttributeProxy(self, self).tryImport() # make sure "our module" can really be imported
 
     def __getattr__(self, attrname):
         return self.AttributeProxy(self, self, attrname).tryEvaluate()
-
-    def getRealModule(self):
-        if self.realModule is not None:
-            return self.realModule
-        import sys, os
-        currDir = os.path.dirname(self.__file__)
-        sys.path.remove(currDir)
-        del sys.modules[self.name]
-        exec "import " + self.name + " as moduleName"
-        sys.modules[self.name] = self
-        sys.path.insert(0, currDir)
-        self.realModule = moduleName
-        return moduleName
 
     class InstanceProxy:
         moduleProxy = None
@@ -142,11 +127,7 @@ class ModuleProxy:
                 return eval(response)
             except NameError: # standard exceptions end up here
                 module = response.split(".", 1)[0]
-                if module == self.moduleProxy.name:
-                    realModule = self.moduleProxy.getRealModule()
-                    exec module + " = realModule"
-                else:
-                    exec "import " + module
+                exec "import " + module
                 return eval(response)
 
         def createAndSend(self, *args, **kw):
@@ -202,7 +183,8 @@ class PartialModuleProxy(ModuleProxy):
     def __init__(self, moduleName):
         try:
             exec "import " + moduleName + " as realModule"
-            ModuleProxy.__init__(self, moduleName, realModule=realModule) 
+            self.realModule = realModule
+            ModuleProxy.__init__(self, moduleName) 
         except ImportError:
             self.realModule = None
 
@@ -227,4 +209,4 @@ class PartialModuleProxy(ModuleProxy):
                 setattr(realObj, currAttrName, realAttrProxy)
 
 if __name__ != "traffic_pymodule":
-    sys.modules[__name__] = ModuleProxy(__name__, __file__)
+    sys.modules[__name__] = ModuleProxy(__name__)

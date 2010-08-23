@@ -143,6 +143,7 @@ class SetUpTrafficHandlers(plugins.Action):
         for moduleName, attributes in moduleInfo:
             interceptorFile.write("proxy = traffic_pymodule.PartialModuleProxy(" + repr(moduleName) + ")\n")
             interceptorFile.write("proxy.interceptAttributes(" + repr(attributes) + ")\n")
+        interceptorFile.write("traffic_pymodule.importOriginal('sitecustomize', __file__)\n")
         interceptorFile.close()
     
     def makePackageFiles(self, interceptDir, modulePath):

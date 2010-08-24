@@ -208,15 +208,6 @@ class PartialModuleProxy(ModuleProxy):
                 self.interceptAttribute(currAttrProxy, realAttrProxy, parts[1])
                 setattr(realObj, currAttrName, realAttrProxy)
 
-def importOriginal(moduleName, moduleFile):
-    import os
-    currDir = os.path.dirname(moduleFile)
-    sys.path.remove(currDir)
-    del sys.modules[moduleName]
-    try:
-        exec "import " + moduleName
-    finally:
-        sys.path.insert(0, currDir)
 
 if __name__ != "traffic_pymodule":
     sys.modules[__name__] = ModuleProxy(__name__)

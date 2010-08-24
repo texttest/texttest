@@ -7,6 +7,7 @@ class SetUpTrafficHandlers(plugins.Action):
         self.trafficServerProcess = None
         libexecDir = plugins.installationDir("libexec")
         self.trafficFiles = self.findTrafficFiles(libexecDir)
+        self.siteCustomizeFile = os.path.join(libexecDir, "sitecustomize.py")
         self.trafficPyModuleFile = os.path.join(libexecDir, "traffic_pymodule.py")
         self.trafficServerFile = os.path.join(libexecDir, "traffic_server.py")
         
@@ -16,39 +17,22 @@ class SetUpTrafficHandlers(plugins.Action):
             files.append(os.path.join(libexecDir, "traffic_cmd.exe"))
         return files
 
-    def terminateServer(self, test):
-        servAddr = test.getEnvironment("TEXTTEST_MIM_SERVER")
-        if servAddr:
-            sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            host, port = servAddr.split(":")
-            serverAddress = (host, int(port))
-            try:
-                sendSocket.connect(serverAddress)
-                sendSocket.sendall("TERMINATE_SERVER\n")
-                sendSocket.shutdown(2)
-            except socket.error: # pragma: no cover - should be unreachable, just for robustness
-                print "Could not send terminate message to traffic server, seemed not to be running anyway."
-        if self.trafficServerProcess:
-            err = self.trafficServerProcess.communicate()[1]
-            if err:
-                sys.stderr.write("Error from Traffic Server :\n" + err)
-            self.trafficServerProcess = None
-
     def __call__(self, test):
-        if self.trafficServerProcess:
-            # After the test is complete we shut down the traffic server and allow it to flush itself
-            self.terminateServer(test)
-        elif test.app.usesTrafficMechanism():
+        pythonCoverage = test.hasEnvironment("COVERAGE_PROCESS_START")
+        if test.app.usesTrafficMechanism() or pythonCoverage:
             replayFile = test.getFileName("traffic")
-            if self.record or replayFile:
-                self.setUpServer(test, replayFile)
+            serverActive = self.record or replayFile
+            if serverActive or pythonCoverage:
+                self.setUpIntercepts(test, replayFile, serverActive)
 
-    def setUpServer(self, test, replayFile):
+    def setUpIntercepts(self, test, replayFile, serverActive):
         interceptDir = test.makeTmpFileName("traffic_intercepts", forComparison=0)
-        pathVars = self.makeIntercepts(test, interceptDir)
-        self.trafficServerProcess = self.makeTrafficServer(test, replayFile)
-        address = self.trafficServerProcess.stdout.readline().strip()
-        test.setEnvironment("TEXTTEST_MIM_SERVER", address) # Address of TextTest's server for recording client/server traffic
+        pathVars = self.makeIntercepts(test, interceptDir, serverActive)
+        if serverActive:
+            self.trafficServerProcess = self.makeTrafficServer(test, replayFile)
+            address = self.trafficServerProcess.stdout.readline().strip()
+            test.setEnvironment("TEXTTEST_MIM_SERVER", address) # Address of TextTest's server for recording client/server traffic
+            
         for pathVar in pathVars:
             # Change test environment to pick up the intercepts
             test.setEnvironment(pathVar, interceptDir + os.pathsep + test.getEnvironment(pathVar, ""))
@@ -94,25 +78,30 @@ class SetUpTrafficHandlers(plugins.Action):
         return subprocess.Popen(cmdArgs, env=test.getRunEnvironment(), universal_newlines=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     
-    def makeIntercepts(self, test, interceptDir):
-        commands = self.getCommandsForInterception(test)
-        for cmd in commands:
-            self.intercept(interceptDir, cmd, self.trafficFiles, executable=True)
+    def makeIntercepts(self, test, interceptDir, serverActive):
+        pathVars, pyModuleIntercepts, pyAttributeIntercepts = [], [], []
+        if serverActive:
+            commands = self.getCommandsForInterception(test)
+            for cmd in commands:
+                self.intercept(interceptDir, cmd, self.trafficFiles, executable=True)
+        
+            if len(commands) and os.name == "posix":
+                # Intercepts on Windows go directly into the sandbox so they can take advantage of the
+                # "current working directory beats all" rule there and also intercept things that ignore PATH
+                # (like Java)
+                pathVars.append("PATH")
 
-        pyModuleIntercepts, pyAttributeIntercepts = self.getPythonModuleInfo(test)
-        for moduleName in pyModuleIntercepts:
-            self.interceptPythonModule(moduleName, interceptDir)
+            pyModuleIntercepts, pyAttributeIntercepts = self.getPythonModuleInfo(test)
+            for moduleName in pyModuleIntercepts:
+                self.interceptPythonModule(moduleName, interceptDir)
 
-        if len(pyAttributeIntercepts) > 0:
-            self.interceptPythonAttributes(pyAttributeIntercepts, interceptDir)
+            if len(pyAttributeIntercepts) > 0:
+                self.interceptPythonAttributes(pyAttributeIntercepts, interceptDir)
 
-        pathVars = []
-        if len(commands) and os.name == "posix":
-            # Intercepts on Windows go directly into the sandbox so they can take advantage of the
-            # "current working directory beats all" rule there and also intercept things that ignore PATH
-            # (like Java)
-            pathVars.append("PATH")
-        if len(pyModuleIntercepts) or len(pyAttributeIntercepts):
+        useSiteCustomize = len(pyAttributeIntercepts) > 0 or not serverActive # implies python coverage
+        if useSiteCustomize:
+            self.interceptOwnModule(self.siteCustomizeFile, interceptDir)
+        if len(pyModuleIntercepts) or useSiteCustomize:
             pathVars.append("PYTHONPATH")
         return pathVars
 
@@ -132,18 +121,19 @@ class SetUpTrafficHandlers(plugins.Action):
         self.intercept(interceptDir, modulePath + ".py", [ self.trafficPyModuleFile ], executable=False)
         self.makePackageFiles(interceptDir, modulePath)
 
+    def interceptOwnModule(self, moduleFile, interceptDir):
+        self.intercept(interceptDir, os.path.basename(moduleFile), [ moduleFile ], executable=False)
+
     def interceptPythonAttributes(self, moduleInfo, interceptDir):
-        self.intercept(interceptDir, os.path.basename(self.trafficPyModuleFile),
-                       [ self.trafficPyModuleFile ], executable=False)
+        self.interceptOwnModule(self.trafficPyModuleFile, interceptDir)
         # We use the "sitecustomize" hook so this works on Python programs older than 2.6
         # Should probably run the user's real one, assuming they have one
-        interceptorModule = os.path.join(interceptDir, "sitecustomize.py")
+        interceptorModule = os.path.join(interceptDir, "traffic_customize.py")
         interceptorFile = open(interceptorModule, "w")
         interceptorFile.write("import traffic_pymodule\n")
         for moduleName, attributes in moduleInfo:
             interceptorFile.write("proxy = traffic_pymodule.PartialModuleProxy(" + repr(moduleName) + ")\n")
             interceptorFile.write("proxy.interceptAttributes(" + repr(attributes) + ")\n")
-        interceptorFile.write("traffic_pymodule.importOriginal('sitecustomize', __file__)\n")
         interceptorFile.close()
     
     def makePackageFiles(self, interceptDir, modulePath):
@@ -174,6 +164,35 @@ class SetUpTrafficHandlers(plugins.Action):
                 shutil.copy(trafficFile, interceptName + extension)
             else:
                 shutil.copy(trafficFile, interceptName)
+
+
+class TerminateTrafficServer(plugins.Action):
+    def __init__(self, setupHandler):
+        self.setupHandler = setupHandler
+
+    def __call__(self, test):
+        if self.setupHandler.trafficServerProcess:
+            servAddr = test.getEnvironment("TEXTTEST_MIM_SERVER")
+            if servAddr:
+                self.sendTerminationMessage(servAddr)
+            self.writeServerErrors(self.setupHandler.trafficServerProcess)
+            self.setupHandler.trafficServerProcess = None
+
+    def sendTerminationMessage(self, servAddr):
+        sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        host, port = servAddr.split(":")
+        serverAddress = (host, int(port))
+        try:
+            sendSocket.connect(serverAddress)
+            sendSocket.sendall("TERMINATE_SERVER\n")
+            sendSocket.shutdown(2)
+        except socket.error: # pragma: no cover - should be unreachable, just for robustness
+            plugins.log.info("Could not send terminate message to traffic server at " + servAddr + ", seemed not to be running anyway.")
+        
+    def writeServerErrors(self, process):
+        err = process.communicate()[1]
+        if err:
+            sys.stderr.write("Error from Traffic Server :\n" + err)
 
 
 class ModifyTraffic(plugins.ScriptWithArgs):

@@ -463,12 +463,13 @@ class Config:
         catalogueCreator = self.getCatalogueCreator()
         ignoreCatalogues = self.shouldIgnoreCatalogues()
         collator = self.getTestCollator()
-        from traffic import SetUpTrafficHandlers
-        trafficHandler = SetUpTrafficHandlers(self.optionMap.has_key("rectraffic"))
+        from traffic import SetUpTrafficHandlers, TerminateTrafficServer
+        trafficSetup = SetUpTrafficHandlers(self.optionMap.has_key("rectraffic"))
+        trafficTerminator = TerminateTrafficServer(trafficSetup)
         return [ self.getExecHostFinder(), self.getWriteDirectoryMaker(), \
                  self.getWriteDirectoryPreparer(ignoreCatalogues), \
-                 trafficHandler, catalogueCreator, collator, self.getOriginalFilterer(), self.getTestRunner(), \
-                 trafficHandler, catalogueCreator, collator, self.getTestEvaluator() ]
+                 trafficSetup, catalogueCreator, collator, self.getOriginalFilterer(), self.getTestRunner(), \
+                 trafficTerminator, catalogueCreator, collator, self.getTestEvaluator() ]
     
     def shouldIgnoreCatalogues(self):
         return self.optionMap.has_key("ignorecat") or self.optionMap.has_key("record")

@@ -140,7 +140,7 @@ class VirtualDisplayResponder(plugins.Responder):
     def findPythonArgs(self, machine):
         # In case it isn't the default, allow for a ttpython script in the installation
         if machine == "localhost":
-            return plugins.getSubprocessInterpreterArgs(["-u"])
+            return [ sys.executable, "-u" ]
         
         localPointer = plugins.installationPath("bin/ttpython")
         if localPointer:

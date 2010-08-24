@@ -85,13 +85,6 @@ def getTextTestProgram():
         slaveCmd = sys.argv[0]
     return slaveCmd
 
-def getSubprocessInterpreterArgs(defaultArgs=[]):
-    interpreterArg = os.getenv("TEXTTEST_SUBPROCESS_INTERPRETER", "") # Alternative interpreter for subprocesses : mostly useful for coverage / testing
-    if interpreterArg:
-        return splitcmd(interpreterArg)
-    else:
-        return [ sys.executable ] + defaultArgs
-
 def installationPath(*pathElems):
     for instRoot in installationRoots:
         instPath = os.path.join(instRoot, *pathElems)

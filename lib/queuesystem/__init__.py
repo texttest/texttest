@@ -14,6 +14,11 @@ class QueueSystemConfig(default.Config):
     def __init__(self, *args):
         default.Config.__init__(self, *args)
         self.useQueueSystem = None
+
+    def getRunningGroupNames(self):
+        groups = default.Config.getRunningGroupNames(self)
+        groups.insert(1, "Grid")
+        return groups
         
     def addToOptionGroups(self, apps, groups):
         default.Config.addToOptionGroups(self, apps, groups)
@@ -34,7 +39,7 @@ class QueueSystemConfig(default.Config):
                     descriptions.append("Submit the tests to " + qsName + " only if " + str(minTestCount) + " or more are selected.")
                     defaultValue = 2
                 group.addSwitch("l", "Use grid", value=defaultValue, options=options, description=descriptions)
-            elif group.name.startswith("Advanced"):
+            elif group.name.startswith("Grid"):
                 group.addOption("R", "Request grid resource", possibleValues = self.getPossibleResources())
                 group.addOption("q", "Request grid queue", possibleValues = self.getPossibleQueues())
                 group.addSwitch("keepslave", "Keep data files and successful tests until termination")

@@ -138,8 +138,6 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         return "Select indicated tests"
     def getTabTitle(self):
         return "Selection"
-    def getGroupTabTitle(self):
-        return "Selection"
     def messageBeforePerform(self):
         return "Selecting tests ..."
     def messageAfterPerform(self):

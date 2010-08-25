@@ -174,10 +174,13 @@ class TestProgressMonitor(guiutils.SubGUI):
                 colour = guiutils.guiConfig.getTestColour("not_started")
                 visibility = guiutils.guiConfig.showCategoryByDefault("not_started")
                 self.addNewIter("Not started", None, colour, visibility, testCount)
-    def getGroupTabTitle(self):
+
+    def getTabTitle(self):
         return "Status"
+
     def shouldShow(self):
         return self.dynamic
+
     def createView(self):
         self.treeView = gtk.TreeView(self.treeModel)
         self.treeView.set_name("Test Status View")

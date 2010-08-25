@@ -257,8 +257,8 @@ class GUIController(plugins.Responder, plugins.Observable):
     def createRightWindowGUI(self):
         testTab = PaneGUI(self.testFileGUI, self.textInfoGUI, horizontal=False)
         runInfoTab = PaneGUI(self.runInfoGUI, self.testRunInfoGUI, horizontal=False)
-        tabGUIs = [ self.appFileGUI, testTab, self.progressMonitor, runInfoTab ] + self.actionTabGUIs
-        return actionholders.ChangeableNotebookGUI(tabGUIs)
+        tabGUIs = [ testTab, self.progressMonitor] + self.actionTabGUIs + [ self.appFileGUI, runInfoTab ]
+        return actionholders.NotebookGUI(tabGUIs)
 
     def run(self):
         gtk.main()

@@ -296,9 +296,6 @@ class SubGUI(plugins.Observable):
     def getTabTitle(self):
         return ""
 
-    def getGroupTabTitle(self):
-        return "Test"
-
     def forceVisible(self, *args):
         return False
 
@@ -339,5 +336,5 @@ class ContainerGUI(SubGUI):
     def shouldShowCurrent(self, *args):
         return reduce(operator.and_, (subgui.shouldShowCurrent(*args) for subgui in self.subguis))
 
-    def getGroupTabTitle(self):
-        return self.subguis[0].getGroupTabTitle()
+    def getTabTitle(self):
+        return self.subguis[0].getTabTitle()

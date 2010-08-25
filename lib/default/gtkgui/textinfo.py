@@ -199,9 +199,6 @@ class RunInfoGUI(TextViewGUI):
     def getTabTitle(self):
         return "Run Info"
 
-    def getGroupTabTitle(self):
-        return self.getTabTitle()
-
     def shouldShow(self):
         return self.dynamic
 

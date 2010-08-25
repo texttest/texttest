@@ -13,7 +13,7 @@ class RunningAction:
         self.inputOptions = inputOptions
         self.testCount = 0
         
-    def getGroupTabTitle(self):
+    def getTabTitle(self):
         return "Running"
 
     def messageAfterPerform(self):
@@ -199,16 +199,31 @@ class ReconnectToTests(RunningAction,guiplugins.ActionDialogGUI):
 
 
 class RunTests(RunningAction,guiplugins.ActionTabGUI):
-    optionGroups = []
     originalVersion = ""
     def __init__(self, allApps, dummy, inputOptions):
         guiplugins.ActionTabGUI.__init__(self, allApps)
         RunningAction.__init__(self, inputOptions)
-        self.optionGroups.append(self.optionGroup)
-        self.addApplicationOptions(allApps, self.optionGroup, inputOptions)
-        vOption = self.optionGroup.getOption("v")
+        self.optionGroups = []
+        for groupName in self.getGroupNames(allApps):
+            group = plugins.OptionGroup(groupName)
+            self.addApplicationOptions(allApps, group, inputOptions)
+            self.optionGroups.append(group)
+        vOption = self.getOption("v")
         if vOption:
             RunTests.originalVersion = vOption.getValue()
+
+    def getGroupNames(self, allApps):
+        if len(allApps) > 0:
+            return allApps[0].getAllRunningGroupNames(allApps)
+        else:
+            configObject = self.makeDefaultConfigObject(self.inputOptions)
+            return configObject.getAllRunningGroupNames(allApps)
+
+    def getOption(self, optName):
+        for group in self.optionGroups:
+            opt = group.getOption(optName)
+            if opt:
+                return opt
         
     def _getTitle(self):
         return "_Run"
@@ -226,10 +241,10 @@ class RunTests(RunningAction,guiplugins.ActionTabGUI):
         return self.getCopyCount() * self.getVersionCount()
 
     def getCopyCount(self):
-        return int(self.optionGroups[0].getOptionValue("cp"))
+        return int(self.getOption("cp").getValue())
 
     def getVersionCount(self):
-        return self.optionGroups[0].getOptionValue("v").count(",") + 1
+        return self.getOption("v").getValue().count(",") + 1
 
     def performedDescription(self):
         timesToRun = self.getCopyCount()
@@ -247,13 +262,13 @@ class RunTests(RunningAction,guiplugins.ActionTabGUI):
 
     def getMultipleTestWarning(self):
         app = self.currTestSelection[0].app
-        for group in self.optionGroups:
+        for group in self.getOptionGroups():
             for switchName, desc in app.getInteractiveReplayOptions():
                 if group.getSwitchValue(switchName, False):
                     return "run " + self.describeTests() + " with " + desc + " replay enabled"
 
     def getConfirmationMessage(self):
-        runVersion = self.optionGroups[0].getOptionValue("v")
+        runVersion = self.getOption("v").getValue()
         if self.originalVersion and self.originalVersion not in runVersion:
             return "You have tried to run a version ('" + runVersion + \
                    "') which is not based on the version you started with ('" + self.originalVersion + "').\n" + \
@@ -267,11 +282,6 @@ class RunTests(RunningAction,guiplugins.ActionTabGUI):
     def getLowerBoundForSpinButtons(self):
         return 1
 
-
-class RunTestsBasic(RunTests):        
-    def getTabTitle(self):
-        return "Basic"
-
     def checkValid(self, app):
         if app.getConfigValue("use_case_record_mode") == "disabled" and app not in self.validApps:
             switch = self.optionGroup.getOption("actrep")
@@ -279,12 +289,22 @@ class RunTestsBasic(RunTests):
                 for child in self.vbox.get_children():
                     if hasattr(child, "get_label") and child.get_label() == switch.name:
                         child.hide()
-        return RunTests.checkValid(self, app)
+        return ActionTabGUI.checkValid(self, app)
 
-
-class RunTestsAdvanced(RunTests):
-    def getTabTitle(self):
-        return "Advanced"
+    def createView(self):
+        notebook = gtk.Notebook()
+        notebook.set_name("sub-notebook for running")
+        for group in self.optionGroups:
+            label = gtk.Label(group.name)
+            tabBox = gtk.VBox()
+            self.fillVBox(tabBox, group)
+            self.createButtons(tabBox)
+            widget = self.addScrollBars(tabBox, hpolicy=gtk.POLICY_AUTOMATIC)
+            widget.set_name(group.name + " Tab")
+            notebook.append_page(widget, label)
+        notebook.show_all()
+        return notebook
+    
 
 class RerunTests(RunningAction,guiplugins.ActionGUI):
     def __init__(self, allApps, dummy, inputOptions):
@@ -547,4 +567,4 @@ def getInteractiveActionClasses(dynamic):
     if dynamic:
         return [ RerunTests ]
     else:
-        return [ RunTestsBasic, RunTestsAdvanced, RecordTest, ReconnectToTests, ReplaceText, TestFileFiltering ]
+        return [ RunTests, RecordTest, ReconnectToTests, ReplaceText, TestFileFiltering ]

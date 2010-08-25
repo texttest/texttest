@@ -182,7 +182,7 @@ class ApplicationFileGUI(FileViewGUI):
     def shouldShow(self):
         return not self.dynamic
     
-    def getGroupTabTitle(self):
+    def getTabTitle(self):
         return "Config"
     
     def getViewFileSignal(self):
@@ -293,6 +293,9 @@ class TestFileGUI(FileViewGUI):
         else:
             return True
 
+    def getTabTitle(self):
+        return "Test"
+    
     def getWidgetName(self):
         return "File Tree"
 

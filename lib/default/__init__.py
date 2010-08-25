@@ -63,17 +63,18 @@ class Config:
                 if useTraffic:
                     group.addSwitch("rectraffic", "(Re-)record command-line or client-server traffic")
             elif group.name.startswith("Advanced"):
+                group.addOption("b", "Run batch mode session")
+                group.addOption("name", "Name this run", self.optionValue("name"))
+                group.addOption("vanilla", "Ignore configuration files", self.defaultVanillaValue(),
+                                possibleValues = [ "", "site", "personal", "all" ])
+                group.addSwitch("keeptmp", "Keep temporary write-directories")
+                group.addSwitch("ignorefilters", "Ignore all run-dependent text filtering")
+            elif group.name.startswith("Internal logs"):
                 group.addSwitch("x", "Enable self-diagnostics")
                 defaultDiagDir = plugins.getPersonalDir("log")
                 group.addOption("xr", "Configure self-diagnostics from", os.path.join(defaultDiagDir, "logging.debug"),
                                 possibleValues=[ os.path.join(plugins.installationDir("log"), "logging.debug") ])
                 group.addOption("xw", "Write self-diagnostics to", defaultDiagDir)
-                group.addOption("b", "Run batch mode session")
-                group.addOption("name", "Name this run", self.optionValue("name"))
-                group.addSwitch("keeptmp", "Keep temporary write-directories")
-                group.addOption("vanilla", "Ignore configuration files", self.defaultVanillaValue(),
-                                possibleValues = [ "", "site", "personal", "all" ])
-                group.addSwitch("ignorefilters", "Ignore all run-dependent text filtering")
             elif group.name.startswith("Invisible"):
                 # Options that don't make sense with the GUI should be invisible there...
                 group.addOption("a", "Load test applications named")
@@ -127,8 +128,22 @@ class Config:
         else:
             return "all"
 
+    def getRunningGroupNames(self):
+        return [ "Basic", "Internal logs", "Advanced" ]
+
+    def getAllRunningGroupNames(self, allApps):
+        if len(allApps) == 0:
+            return self.getRunningGroupNames()
+        
+        names = []
+        for app in allApps:
+            for name in app.getRunningGroupNames():
+                if name not in names:
+                    names.append(name)
+        return names
+
     def createOptionGroups(self, allApps):
-        groupNames = [ "Selection", "Basic", "Advanced", "Invisible" ]
+        groupNames = [ "Selection", "Invisible" ] + self.getAllRunningGroupNames(allApps)
         optionGroups = map(plugins.OptionGroup, groupNames)
         self.addToOptionGroups(allApps, optionGroups)
         return optionGroups

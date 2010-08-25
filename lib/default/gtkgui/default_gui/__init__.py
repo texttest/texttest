@@ -34,11 +34,11 @@ class InteractiveActionConfig(BaseInteractiveActionConfig):
         else:
             classes += adminactions.getInteractiveActionClasses()
 
+        classes += selectandfilter.getInteractiveActionClasses(dynamic)
         classes += runningactions.getInteractiveActionClasses(dynamic)    
         classes += helpdialogs.getInteractiveActionClasses()
         classes += fileproperties.getInteractiveActionClasses()
         classes += fileviewers.getInteractiveActionClasses(dynamic)
-        classes += selectandfilter.getInteractiveActionClasses(dynamic)
         return classes
     
     def getDefaultAccelerators(self):

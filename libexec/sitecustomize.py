@@ -27,9 +27,8 @@ def restoreOriginal():
     import os, sys, imp
     from copy import copy
     myDir = os.path.dirname(__file__)
-    pathToSearch = copy(sys.path)
-    pathToSearch.remove(myDir)
-    modInfo = imp.find_module("sitecustomize", pathToSearch)
+    pos = sys.path.index(myDir)
+    modInfo = imp.find_module("sitecustomize", sys.path[pos + 1:])
     imp.load_module("sitecustomize", *modInfo)
 
 trySetupCoverage() # pragma: no cover - coverage not set up yet

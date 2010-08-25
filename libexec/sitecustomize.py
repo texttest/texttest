@@ -24,21 +24,14 @@ def trySetupTraffic():
 
 def restoreOriginal():
     # Need to load the "real" sitecustomize now
-    import os, sys
-    # Can't store local variables beyond a module wipe
-    sys.currDir = os.path.dirname(__file__)
-    sys.path.remove(sys.currDir)
-    del sys.modules["sitecustomize"]
-    try:
-        import sitecustomize
-    finally:
-        import sys # local variables all wiped when we invalidate the module...
-        sys.path.insert(0, sys.currDir)
-        delattr(sys, "currDir")
+    import os, sys, imp
+    from copy import copy
+    myDir = os.path.dirname(__file__)
+    pathToSearch = copy(sys.path)
+    pathToSearch.remove(myDir)
+    modInfo = imp.find_module("sitecustomize", pathToSearch)
+    imp.load_module("sitecustomize", *modInfo)
 
-if not hasattr(sys, "currDir"): # pragma: no cover - coverage not set up yet
-    # Can get called by the code above when TextTest testing itself
-    # Don't allow ourselves to be restored as the 'original'
-    trySetupCoverage()
-    trySetupTraffic()
-    restoreOriginal()
+trySetupCoverage() # pragma: no cover - coverage not set up yet
+trySetupTraffic() # pragma: no cover - coverage not set up yet
+restoreOriginal() # pragma: no cover - coverage not set up yet

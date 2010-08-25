@@ -204,10 +204,15 @@ class RunTests(RunningAction,guiplugins.ActionTabGUI):
         guiplugins.ActionTabGUI.__init__(self, allApps)
         RunningAction.__init__(self, inputOptions)
         self.optionGroups = []
-        for groupName in self.getGroupNames(allApps):
+        self.disablingInfo = {}
+        self.disableWidgets = {}
+        for groupName, disablingOption, disablingOptionValue in self.getGroupNames(allApps):
             group = plugins.OptionGroup(groupName)
             self.addApplicationOptions(allApps, group, inputOptions)
             self.optionGroups.append(group)
+            if disablingOption:
+                self.disablingInfo[self.getOption(disablingOption)] = disablingOptionValue, group
+            
         vOption = self.getOption("v")
         if vOption:
             RunTests.originalVersion = vOption.getValue()
@@ -219,6 +224,21 @@ class RunTests(RunningAction,guiplugins.ActionTabGUI):
             configObject = self.makeDefaultConfigObject(self.inputOptions)
             return configObject.getAllRunningGroupNames(allApps)
 
+    def createCheckBox(self, switch):
+        widget = guiplugins.ActionTabGUI.createCheckBox(self, switch)
+        self.storeSwitch(switch, [ widget ])
+        return widget
+
+    def createRadioButtons(self, switch, *args):
+        buttons = guiplugins.ActionTabGUI.createRadioButtons(self, switch, *args)
+        self.storeSwitch(switch, buttons)
+        return buttons
+
+    def storeSwitch(self, switch, widgets):
+        if self.disablingInfo.has_key(switch):
+            disablingOptionValue, group = self.disablingInfo[switch]
+            self.disableWidgets[widgets[disablingOptionValue]] = switch, disablingOptionValue, group
+            
     def getOption(self, optName):
         for group in self.optionGroups:
             opt = group.getOption(optName)
@@ -284,27 +304,62 @@ class RunTests(RunningAction,guiplugins.ActionTabGUI):
 
     def checkValid(self, app):
         if app.getConfigValue("use_case_record_mode") == "disabled" and app not in self.validApps:
-            switch = self.optionGroup.getOption("actrep")
+            switch = self.getOption("actrep")
             if switch:
-                for child in self.vbox.get_children():
-                    if hasattr(child, "get_label") and child.get_label() == switch.name:
-                        child.hide()
-        return ActionTabGUI.checkValid(self, app)
+                self.hideChildWithLabel(self.widget, switch.name)
+        return guiplugins.ActionTabGUI.checkValid(self, app)
+
+    def hideChildWithLabel(self, widget, label):
+        if hasattr(widget, "get_label") and widget.get_label() == label:
+            widget.hide()
+        elif hasattr(widget, "get_children"):
+            for child in widget.get_children():
+                self.hideChildWithLabel(child, label)
 
     def createView(self):
         notebook = gtk.Notebook()
         notebook.set_name("sub-notebook for running")
+        tabNames = [ "Basic", "Advanced" ]
+        frames = []
         for group in self.optionGroups:
-            label = gtk.Label(group.name)
-            tabBox = gtk.VBox()
-            self.fillVBox(tabBox, group)
-            self.createButtons(tabBox)
-            widget = self.addScrollBars(tabBox, hpolicy=gtk.POLICY_AUTOMATIC)
-            widget.set_name(group.name + " Tab")
-            notebook.append_page(widget, label)
+            if group.name in tabNames:
+                label = gtk.Label(group.name)
+                tab = self.createTab(group, frames)
+                notebook.append_page(tab, label)
+            else:
+                frames.append(self.createFrame(group, group.name))
+        self.connectDisablingSwitches()
         notebook.show_all()
+        self.widget = notebook
         return notebook
-    
+
+    def createTab(self, group, frames):
+        tabBox = gtk.VBox()
+        if frames:
+            frames.append(self.createFrame(group, "Miscellaneous"))
+            for frame in frames:
+                tabBox.pack_start(frame, fill=False, expand=False, padding=8)
+        else:
+            self.fillVBox(tabBox, group)
+        self.createButtons(tabBox)
+        widget = self.addScrollBars(tabBox, hpolicy=gtk.POLICY_AUTOMATIC)
+        widget.set_name(group.name + " Tab")
+        return widget
+
+    def updateSensitivity(self, widget, data):
+        switch, disablingOptionValue, group = data
+        sensitive = switch.getValue() != disablingOptionValue
+        self.setGroupSensitivity(group, sensitive, ignoreWidget=widget)
+
+    def connectDisablingSwitches(self):
+        for widget, data in self.disableWidgets.items():
+            self.updateSensitivity(widget, data)
+            widget.connect("toggled", self.updateSensitivity, data)
+        self.disableWidgets = {} # not needed any more
+
+    def notifyReset(self, *args):
+        for optionGroup in self.optionGroups:
+            optionGroup.reset()
 
 class RerunTests(RunningAction,guiplugins.ActionGUI):
     def __init__(self, allApps, dummy, inputOptions):

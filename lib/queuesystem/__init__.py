@@ -17,7 +17,7 @@ class QueueSystemConfig(default.Config):
 
     def getRunningGroupNames(self):
         groups = default.Config.getRunningGroupNames(self)
-        groups.insert(1, "Grid")
+        groups.insert(2, ("Grid", "l", 1))
         return groups
         
     def addToOptionGroups(self, apps, groups):

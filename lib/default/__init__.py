@@ -69,7 +69,7 @@ class Config:
                                 possibleValues = [ "", "site", "personal", "all" ])
                 group.addSwitch("keeptmp", "Keep temporary write-directories")
                 group.addSwitch("ignorefilters", "Ignore all run-dependent text filtering")
-            elif group.name.startswith("Internal logs"):
+            elif group.name.startswith("Self-diagnostics"):
                 group.addSwitch("x", "Enable self-diagnostics")
                 defaultDiagDir = plugins.getPersonalDir("log")
                 group.addOption("xr", "Configure self-diagnostics from", os.path.join(defaultDiagDir, "logging.debug"),
@@ -129,7 +129,7 @@ class Config:
             return "all"
 
     def getRunningGroupNames(self):
-        return [ "Basic", "Internal logs", "Advanced" ]
+        return [ ("Basic", None, None), ("Self-diagnostics (internal logging)", "x", 0), ("Advanced", None, None) ]
 
     def getAllRunningGroupNames(self, allApps):
         if len(allApps) == 0:
@@ -143,7 +143,7 @@ class Config:
         return names
 
     def createOptionGroups(self, allApps):
-        groupNames = [ "Selection", "Invisible" ] + self.getAllRunningGroupNames(allApps)
+        groupNames = [ "Selection", "Invisible" ] + [ x[0] for x in self.getAllRunningGroupNames(allApps) ]
         optionGroups = map(plugins.OptionGroup, groupNames)
         self.addToOptionGroups(allApps, optionGroups)
         return optionGroups

@@ -484,6 +484,7 @@ class RadioGroupIndexer:
 class OptionGroupGUI(ActionGUI):
     def __init__(self, *args):
         ActionGUI.__init__(self, *args)
+        self.groupBoxes = {}
         self.optionGroup = plugins.OptionGroup(self.getTabTitle())
         # convenience shortcuts...
         self.addOption = self.optionGroup.addOption
@@ -572,6 +573,33 @@ class OptionGroupGUI(ActionGUI):
         switch.setMethods(indexer.getActiveIndex, indexer.setActiveIndex)
         return buttons
 
+    def createFrame(self, group, name):
+        frame = gtk.Frame(name)
+        frame.set_label_align(0.5, 0.5)
+        frame.set_shadow_type(gtk.SHADOW_IN)
+        frame.add(self.createGroupBox(group))
+        return frame
+
+    def createGroupBox(self, group):
+        frameBox = gtk.VBox()
+        frameBox.set_border_width(10)
+        self.fillVBox(frameBox, group)
+        self.groupBoxes[group] = frameBox
+        return frameBox
+
+    def setGroupSensitivity(self, group, *args, **kw):
+        widget = self.groupBoxes.get(group)
+        self.setChildSensitivity(widget, *args, **kw)
+
+    def setChildSensitivity(self, widget, sensitive, ignoreWidget=None):
+        if widget is ignoreWidget or isinstance(widget, gtk.RadioButton):
+            return
+        elif isinstance(widget, (gtk.Entry, gtk.CheckButton, gtk.ComboBoxEntry)):
+            widget.set_sensitive(sensitive)
+        elif hasattr(widget, "get_children"):
+            for child in widget.get_children():
+                self.setChildSensitivity(child, sensitive, ignoreWidget)
+
     def setRadioButtonName(self, *args):
         pass # Don't bother by default, it's easy to set stupid names...
 
@@ -646,6 +674,7 @@ class OptionGroupGUI(ActionGUI):
             box = gtk.HBox()
             if option.usePossibleValues():
                 widget, entry = self.createComboBoxEntry(option)
+                widget.set_name(optionName + " (Combo Box)")
                 box.pack_start(widget, expand=True, fill=True)
             else:
                 value = option.getValue()

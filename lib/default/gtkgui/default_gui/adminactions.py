@@ -1264,7 +1264,6 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
         self.textGroup = plugins.OptionGroup("Search for")
         self.searchGroup = plugins.OptionGroup("Search in")
-        self.boxes = {}
         self.applyGroup = plugins.OptionGroup("Additional options to only apply to certain runs")
         self.bugSystemGroup = plugins.OptionGroup("Link failure to a reported bug")
         self.textDescGroup = plugins.OptionGroup("Link failure to a textual description")
@@ -1290,35 +1289,21 @@ class ReportBugs(guiplugins.ActionDialogGUI):
                 if group is self.applyGroup:
                     widget = self.createExpander(group)
                 else:
-                    widget = self.createFrame(group)
+                    widget = self.createFrame(group, group.name)
                 vbox.pack_start(widget, fill=False, expand=False, padding=8)
             vbox.pack_start(gtk.HSeparator(), padding=8)
             header = gtk.Label()
             header.set_markup("<u>Fill in exactly <i>one</i> of the sections below</u>\n")
             vbox.pack_start(header, expand=False, fill=False, padding=8)
             for group in [ self.bugSystemGroup, self.textDescGroup ]:
-                frame = self.createFrame(group)
+                frame = self.createFrame(group, group.name)
                 vbox.pack_start(frame, fill=False, expand=False, padding=8)
         return guiplugins.ActionDialogGUI.fillVBox(self, vbox, optionGroup)
 
-    def createFrame(self, group):
-        frame = gtk.Frame(group.name)
-        frame.set_label_align(0.5, 0.5)
-        frame.set_shadow_type(gtk.SHADOW_IN)
-        frame.add(self.createBox(group))
-        return frame
-
     def createExpander(self, group):
         expander = gtk.Expander(group.name)
-        expander.add(self.createBox(group))
+        expander.add(self.createGroupBox(group))
         return expander
-
-    def createBox(self, group):
-        frameBox = gtk.VBox()
-        frameBox.set_border_width(10)
-        self.fillVBox(frameBox, group)
-        self.boxes[group] = frameBox
-        return frameBox
 
     def createRadioButtons(self, *args):
         buttons = guiplugins.ActionDialogGUI.createRadioButtons(self, *args)
@@ -1327,17 +1312,7 @@ class ReportBugs(guiplugins.ActionDialogGUI):
 
     def dataSourceChanged(self, *args):
         sensitive = not self.searchGroup.getOptionValue("data_source")
-        vbox = self.boxes.get(self.searchGroup)
-        self.setChildSensitivity(vbox, sensitive)
-
-    def setChildSensitivity(self, widget, sensitive):
-        if isinstance(widget, gtk.RadioButton):
-            return
-        elif isinstance(widget, (gtk.Entry, gtk.CheckButton)):
-            widget.set_sensitive(sensitive)
-        elif hasattr(widget, "get_children"):
-            for child in widget.get_children():
-                self.setChildSensitivity(child, sensitive)
+        self.setGroupSensitivity(self.searchGroup, sensitive)
         
     def findBugSystems(self, allApps):
         bugSystems = []

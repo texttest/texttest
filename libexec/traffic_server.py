@@ -812,6 +812,9 @@ class CommandLineKillTraffic(Traffic):
             JobProcess(self.pid).killAll(self.killSignal)
         return []
 
+    def hasInfo(self):
+        return False # We can get these during replay, but should ignore them
+
     def record(self, *args):
         pass # We replay these entirely from the return code, so that replay works on Windows
 

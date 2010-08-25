@@ -48,10 +48,13 @@ class DocumentOptions(plugins.Action):
             print keyOutput + ";" + groupOutput + ";" + docOutput.replace("SGE", "SGE/LSF")
 
     def groupOutput(self, group):
+        knownGroups = [ "Selection", "Basic", "Advanced" ]
         if group.name == "Invisible":
             return "N/A"
-        else:
+        elif group.name in knownGroups:
             return group.name
+        else:
+            return "Advanced"
 
     def optionOutput(self, key, group, option):
         keyOutput = "-" + key

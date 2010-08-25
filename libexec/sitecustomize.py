@@ -25,7 +25,6 @@ def trySetupTraffic():
 def restoreOriginal():
     # Need to load the "real" sitecustomize now
     import os, sys, imp
-    from copy import copy
     myDir = os.path.dirname(__file__)
     pos = sys.path.index(myDir)
     modInfo = imp.find_module("sitecustomize", sys.path[pos + 1:])

@@ -23,11 +23,11 @@ class SetUpTrafficHandlers(plugins.Action):
             replayFile = test.getFileName("traffic")
             serverActive = self.record or replayFile
             if serverActive or pythonCoverage:
-                self.setUpIntercepts(test, replayFile, serverActive)
+                self.setUpIntercepts(test, replayFile, serverActive, pythonCoverage)
 
-    def setUpIntercepts(self, test, replayFile, serverActive):
+    def setUpIntercepts(self, test, replayFile, serverActive, pythonCoverage):
         interceptDir = test.makeTmpFileName("traffic_intercepts", forComparison=0)
-        pathVars = self.makeIntercepts(test, interceptDir, serverActive)
+        pathVars = self.makeIntercepts(test, interceptDir, serverActive, pythonCoverage)
         if serverActive:
             self.trafficServerProcess = self.makeTrafficServer(test, replayFile)
             address = self.trafficServerProcess.stdout.readline().strip()
@@ -78,7 +78,7 @@ class SetUpTrafficHandlers(plugins.Action):
         return subprocess.Popen(cmdArgs, env=test.getRunEnvironment(), universal_newlines=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     
-    def makeIntercepts(self, test, interceptDir, serverActive):
+    def makeIntercepts(self, test, interceptDir, serverActive, pythonCoverage):
         pathVars, pyModuleIntercepts, pyAttributeIntercepts = [], [], []
         if serverActive:
             commands = self.getCommandsForInterception(test)
@@ -98,7 +98,7 @@ class SetUpTrafficHandlers(plugins.Action):
             if len(pyAttributeIntercepts) > 0:
                 self.interceptPythonAttributes(pyAttributeIntercepts, interceptDir)
 
-        useSiteCustomize = len(pyAttributeIntercepts) > 0 or not serverActive # implies python coverage
+        useSiteCustomize = len(pyAttributeIntercepts) > 0 or pythonCoverage
         if useSiteCustomize:
             self.interceptOwnModule(self.siteCustomizeFile, interceptDir)
         if len(pyModuleIntercepts) or useSiteCustomize:

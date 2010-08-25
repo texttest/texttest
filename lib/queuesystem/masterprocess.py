@@ -69,15 +69,15 @@ class QueueSystemServer(BaseActionRunner):
     def addTest(self, test):
         capacityForApp = self.remainingForApp[test.app.name]
         if capacityForApp > 0:
-            self._addTest(test)
+            self.addTestToQueues(test)
             self.remainingForApp[test.app.name] = capacityForApp - 1
         else:
             if test.app.name == self.remainingForApp.keys()[-1]:
-                self._addTest(test) # For the last app (which may be the only one) there is no point in delaying
+                self.addTestToQueues(test) # For the last app (which may be the only one) there is no point in delaying
             else:
                 self.delayedTestsForAdd.append(test)
 
-    def _addTest(self, test):
+    def addTestToQueues(self, test):
         self.testCount += 1
         queue = self.findQueueForTest(test)
         if queue:
@@ -85,7 +85,7 @@ class QueueSystemServer(BaseActionRunner):
 
     def addDelayedTests(self):
         for test in self.delayedTestsForAdd:
-            self._addTest(test)
+            self.addTestToQueues(test)
         self.delayedTestsForAdd = []
 
     def notifyAllRead(self, suites):
@@ -756,7 +756,7 @@ class SlaveRequestHandler(StreamRequestHandler):
                 if rerun:
                     self.server.diag.info("Instructed to rerun test " + test.uniqueName)
                     self.server.clearClient(test) # it might come back from a different process
-                    QueueSystemServer.instance.addTest(test)
+                    QueueSystemServer.instance.addTestToQueues(test)
                 else:
                     self.server.changeState(test, state)
                 self.connection.shutdown(socket.SHUT_RD)

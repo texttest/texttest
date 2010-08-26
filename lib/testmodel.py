@@ -106,16 +106,18 @@ class TestEnvironment(seqdict):
     def getValues(self, onlyVars=[], ignoreVars=[]):
         self.checkPopulated()
         values = {}
+        varsToUnset = []
         for key, value in self.items():
             # Anything set to none is to not to be set in the target environment
             if value is not None and value != "{CLEAR}":
                 if len(onlyVars) == 0 or key in onlyVars:
                     values[key] = value
             else:
-                ignoreVars.append(key)
-        self.diag.info("Removing variables " + repr(ignoreVars))
+                varsToUnset.append(key)
+        varsToUnset += ignoreVars
+        self.diag.info("Removing variables " + repr(varsToUnset))
         # copy in the external environment last
-        return plugins.copyEnvironment(values, ignoreVars)
+        return plugins.copyEnvironment(values, varsToUnset)
 
     def __getitem__(self, var):
         value = self.getSingleValue(var)
@@ -496,6 +498,7 @@ class Test(plugins.Observable):
             shutil.move(tmpFileName, targetFile)
             
     def getRunEnvironment(self, *args, **kw):
+        self.environment.diag.info("Reading cached environment for " + repr(self))
         return self.environment.getValues(*args, **kw)
 
     def getIndent(self):

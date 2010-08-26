@@ -549,17 +549,18 @@ class PythonInstanceWrapper:
 class PythonModuleTraffic(Traffic):
     typeId = "PYT"
     direction = "<-"
-    interceptModules = []
-    partialInterceptModules = {}
+    interceptModules = set()
+    partialInterceptModules = set()
     @classmethod
     def configure(cls, options):
         modStr = options.python_module_intercepts
         if modStr:
-            cls.interceptModules = modStr.split(",")
-            cls.interceptModules += cls.getModuleParents(cls.interceptModules)
-            partialModStr = options.python_module_partial_intercepts
-            if partialModStr:
-                cls.partialInterceptModules = partialModStr.split(",")
+            cls.interceptModules.update(modStr.split(","))
+            cls.interceptModules.update(cls.getModuleParents(cls.interceptModules))
+        partialModStr = options.python_module_partial_intercepts
+        if partialModStr:
+            cls.partialInterceptModules.update(partialModStr.split(","))
+            cls.interceptModules.update(cls.partialInterceptModules)
             
     @staticmethod
     def getModuleParents(modules):

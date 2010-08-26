@@ -1,5 +1,6 @@
 
 import os, sys, plugins, shutil, socket, subprocess
+from ndict import seqdict
 
 class SetUpTrafficHandlers(plugins.Action):
     def __init__(self, record):
@@ -27,9 +28,11 @@ class SetUpTrafficHandlers(plugins.Action):
 
     def setUpIntercepts(self, test, replayFile, serverActive, pythonCoverage):
         interceptDir = test.makeTmpFileName("traffic_intercepts", forComparison=0)
-        pathVars = self.makeIntercepts(test, interceptDir, serverActive, pythonCoverage)
+        pyModuleIntercepts, pyAttributeIntercepts = self.getPythonModuleInfo(test)
+        pathVars = self.makeIntercepts(test, interceptDir, pyModuleIntercepts,
+                                       pyAttributeIntercepts, serverActive, pythonCoverage)
         if serverActive:
-            self.trafficServerProcess = self.makeTrafficServer(test, replayFile)
+            self.trafficServerProcess = self.makeTrafficServer(test, replayFile, pyModuleIntercepts, pyAttributeIntercepts)
             address = self.trafficServerProcess.stdout.readline().strip()
             test.setEnvironment("TEXTTEST_MIM_SERVER", address) # Address of TextTest's server for recording client/server traffic
             
@@ -41,7 +44,7 @@ class SetUpTrafficHandlers(plugins.Action):
         args = [ key + "=" + "+".join(val) for key, val in dict.items() if key ]
         return ",".join(args)
         
-    def makeTrafficServer(self, test, replayFile):
+    def makeTrafficServer(self, test, replayFile, pyModuleIntercepts, pyAttributeIntercepts):
         recordFile = test.makeTmpFileName("traffic")
         recordEditDir = test.makeTmpFileName("file_edits", forComparison=0)
         cmdArgs = [ sys.executable, self.trafficServerFile, "-t", test.getRelPath(),
@@ -63,13 +66,11 @@ class SetUpTrafficHandlers(plugins.Action):
         if environmentDict:
             cmdArgs += [ "-e", self.makeArgFromDict(environmentDict) ]
 
-        pythonModules = test.getConfigValue("collect_traffic_py_module")
-        if pythonModules:
-            cmdArgs += [ "-m", ",".join(pythonModules) ]
+        if pyModuleIntercepts:
+            cmdArgs += [ "-m", ",".join(pyModuleIntercepts) ]
 
-        partialPythonModules = test.getConfigValue("collect_traffic_py_attributes").keys()
-        if partialPythonModules:
-            cmdArgs += [ "-P", ",".join(partialPythonModules) ]
+        if pyAttributeIntercepts:
+            cmdArgs += [ "-P", ",".join(pyAttributeIntercepts.keys()) ]
             
         asynchronousFileEditCmds = test.getConfigValue("collect_traffic").get("asynchronous")
         if asynchronousFileEditCmds:
@@ -78,8 +79,9 @@ class SetUpTrafficHandlers(plugins.Action):
         return subprocess.Popen(cmdArgs, env=test.getRunEnvironment(), universal_newlines=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     
-    def makeIntercepts(self, test, interceptDir, serverActive, pythonCoverage):
-        pathVars, pyModuleIntercepts, pyAttributeIntercepts = [], [], []
+    def makeIntercepts(self, test, interceptDir, pyModuleIntercepts,
+                       pyAttributeIntercepts, serverActive, pythonCoverage):
+        pathVars = []
         if serverActive:
             commands = self.getCommandsForInterception(test)
             for cmd in commands:
@@ -91,29 +93,32 @@ class SetUpTrafficHandlers(plugins.Action):
                 # (like Java)
                 pathVars.append("PATH")
 
-            pyModuleIntercepts, pyAttributeIntercepts = self.getPythonModuleInfo(test)
             for moduleName in pyModuleIntercepts:
                 self.interceptPythonModule(moduleName, interceptDir)
 
             if len(pyAttributeIntercepts) > 0:
                 self.interceptPythonAttributes(pyAttributeIntercepts, interceptDir)
 
-        useSiteCustomize = len(pyAttributeIntercepts) > 0 or pythonCoverage
+        useSiteCustomize = (serverActive and len(pyAttributeIntercepts) > 0) or pythonCoverage
         if useSiteCustomize:
             self.interceptOwnModule(self.siteCustomizeFile, interceptDir)
-        if len(pyModuleIntercepts) or useSiteCustomize:
+        if (serverActive and len(pyModuleIntercepts)) or useSiteCustomize:
             pathVars.append("PYTHONPATH")
         return pathVars
 
     def getPythonModuleInfo(self, test):
-        fullIntercept, partialIntercept = [], []
+        fullIntercept, partialIntercept = [], seqdict()
         pythonModules = test.getConfigValue("collect_traffic_py_module")
+        attrDict = test.getConfigValue("collect_traffic_py_attributes")
         for moduleName in pythonModules:
-            attributes = test.getCompositeConfigValue("collect_traffic_py_attributes", moduleName)
+            attributes = attrDict.get(moduleName)
             if attributes:
-                partialIntercept.append((moduleName, attributes))
+                partialIntercept[moduleName] = attributes
             else:
                 fullIntercept.append(moduleName)
+        for fullAttrName in attrDict.get("default", []):
+            moduleName, attrName = fullAttrName.split(".", 1)
+            partialIntercept.setdefault(moduleName, []).append(attrName)
         return fullIntercept, partialIntercept
 
     def interceptPythonModule(self, moduleName, interceptDir):
@@ -131,7 +136,7 @@ class SetUpTrafficHandlers(plugins.Action):
         interceptorModule = os.path.join(interceptDir, "traffic_customize.py")
         interceptorFile = open(interceptorModule, "w")
         interceptorFile.write("import traffic_pymodule\n")
-        for moduleName, attributes in moduleInfo:
+        for moduleName, attributes in moduleInfo.items():
             interceptorFile.write("proxy = traffic_pymodule.PartialModuleProxy(" + repr(moduleName) + ")\n")
             interceptorFile.write("proxy.interceptAttributes(" + repr(attributes) + ")\n")
         interceptorFile.close()

@@ -396,7 +396,8 @@ class Config:
     def usesTrafficMechanism(self, app):
         return app.getConfigValue("collect_traffic_client_server") == "true" or \
                len(app.getCompositeConfigValue("collect_traffic", "asynchronous")) > 0 or \
-               len(app.getConfigValue("collect_traffic_py_module")) > 0
+               len(app.getConfigValue("collect_traffic_py_module")) > 0 or \
+               len(app.getConfigValue("collect_traffic_py_attributes")) > 0
 
     def hasWritePermission(self, path):
         if os.path.isdir(path):
@@ -1103,7 +1104,7 @@ class Config:
         app.setConfigDefault("collect_traffic", { "default": [], "asynchronous": [] }, "List of command-line programs to intercept")
         app.setConfigDefault("collect_traffic_environment", { "default" : [] }, "Mapping of collected programs to environment variables they care about")
         app.setConfigDefault("collect_traffic_py_module", [], "List of Python modules to intercept")
-        app.setConfigDefault("collect_traffic_py_attributes", { "": []}, "List of Python attributes to intercept per intercepted module.")
+        app.setConfigDefault("collect_traffic_py_attributes", { "default": []}, "List of Python attributes to intercept per intercepted module.")
         app.setConfigDefault("collect_traffic_use_threads", "true", "Whether to enable threading, and hence concurrent requests, in traffic mechanism")
         app.setConfigDefault("collect_traffic_client_server", "false", "Whether to intercept client-server traffic sent by the SUT")
         app.setConfigDefault("run_dependent_text", { "default" : [] }, "Mapping of patterns to remove from result files")

@@ -28,7 +28,7 @@ class SetUpTrafficHandlers(plugins.Action):
 
     def setUpIntercepts(self, test, replayFile, serverActive, pythonCoverage):
         interceptDir = test.makeTmpFileName("traffic_intercepts", forComparison=0)
-        interceptInfo = InterceptInfo(test)
+        interceptInfo = InterceptInfo(test, replayFile if not self.record else None)
         pathVars = self.makeIntercepts(interceptDir, interceptInfo, serverActive, pythonCoverage)
         if serverActive:
             self.trafficServerProcess = self.makeTrafficServer(test, replayFile, interceptInfo)
@@ -176,24 +176,75 @@ class TerminateTrafficServer(plugins.Action):
         if err:
             sys.stderr.write("Error from Traffic Server :\n" + err)
 
+class LineFilter(plugins.TextTrigger):
+    def __init__(self, item):
+        self.item = item
+        plugins.TextTrigger.__init__(self, self.getMatchText())
+
+class CommandLineFilter(LineFilter):
+    def getMatchText(self):
+        return "<-CMD:([^ ]* )*" + self.item + " "
+
+    def removeItem(self, info):
+        info.commands.remove(self.item)
+
+class ModuleLineFilter(LineFilter):
+    def getMatchText(self):
+        return "<-PYT:import " + self.item 
+
+    def removeItem(self, info):
+        info.pyModules.remove(self.item)
+
+class AttributeLineFilter(LineFilter):
+    def getMatchText(self):
+        return "<-PYT:" + self.item 
+
+    def removeItem(self, info):
+        info.pyAttributeStrings.remove(self.item)
+        
 
 class InterceptInfo:
-    def __init__(self, test):
+    def __init__(self, test, replayFile):
         self.commands = self.getCommandsForInterception(test)
         self.pyModules = test.getConfigValue("collect_traffic_py_module")
-        self.pyAttributes = self.getPythonPartialIntercepts(test)
-
+        self.pyAttributeStrings = test.getConfigValue("collect_traffic_py_attributes")
+        if replayFile:
+            self.filterForReplay(replayFile)
+        self.pyAttributes = self.getPythonPartialIntercepts()
+        
     def getCommandsForInterception(self, test):
         # This gets all names in collect_traffic, not just those marked
         # "asynchronous"! (it will also pick up "default").
         return test.getCompositeConfigValue("collect_traffic", "asynchronous")
 
-    def getPythonPartialIntercepts(self, test):
+    def getPythonPartialIntercepts(self):
         partialIntercept = seqdict()
-        for fullAttrName in test.getConfigValue("collect_traffic_py_attributes"):
+        for fullAttrName in self.pyAttributeStrings:
             moduleName, attrName = fullAttrName.split(".", 1)
             partialIntercept.setdefault(moduleName, []).append(attrName)
         return partialIntercept
+
+    def makeLineFilters(self):
+        return map(CommandLineFilter, self.commands) + \
+               map(ModuleLineFilter, self.pyModules) + \
+               map(AttributeLineFilter, self.pyAttributeStrings)
+
+    def filterForReplay(self, replayFile):
+        lineFilters = self.makeLineFilters()
+        with open(replayFile) as f:
+            for line in f:
+                lineFilter = self.findMatchingFilter(line, lineFilters)
+                if lineFilter:
+                    lineFilters.remove(lineFilter)
+                if len(lineFilters) == 0:
+                    break
+        for lineFilter in lineFilters:
+            lineFilter.removeItem(self)
+
+    def findMatchingFilter(self, line, lineFilters):
+        for lineFilter in lineFilters:
+            if lineFilter.matches(line):
+                return lineFilter
 
 
 

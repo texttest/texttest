@@ -639,7 +639,7 @@ class PythonImportTraffic(PythonModuleTraffic):
         text = "import " + self.moduleName
         super(PythonImportTraffic, self).__init__(text, responseFile)
 
-    def shouldIntercept(self, responses=[]):
+    def shouldIntercept(self):
         return self.moduleName not in self.partialInterceptModules
 
     def forwardToDestination(self):
@@ -657,7 +657,7 @@ class PythonAttributeTraffic(PythonModuleTraffic):
         super(PythonAttributeTraffic, self).__init__(text, responseFile)
 
     def enquiryOnly(self, responses=[]):
-        return len(responses) == 0 or not self.shouldIntercept()
+        return len(responses) == 0
 
     def shouldCache(self, obj):
         return type(obj) not in (types.FunctionType, types.GeneratorType, types.MethodType, types.BuiltinFunctionType,

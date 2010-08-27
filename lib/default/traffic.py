@@ -28,10 +28,10 @@ class SetUpTrafficHandlers(plugins.Action):
 
     def setUpIntercepts(self, test, replayFile, serverActive, pythonCoverage):
         interceptDir = test.makeTmpFileName("traffic_intercepts", forComparison=0)
-        pyAttributeIntercepts = self.getPythonPartialIntercepts(test)
-        pathVars = self.makeIntercepts(test, interceptDir, pyAttributeIntercepts, serverActive, pythonCoverage)
+        interceptInfo = InterceptInfo(test)
+        pathVars = self.makeIntercepts(interceptDir, interceptInfo, serverActive, pythonCoverage)
         if serverActive:
-            self.trafficServerProcess = self.makeTrafficServer(test, replayFile, pyAttributeIntercepts)
+            self.trafficServerProcess = self.makeTrafficServer(test, replayFile, interceptInfo)
             address = self.trafficServerProcess.stdout.readline().strip()
             test.setEnvironment("TEXTTEST_MIM_SERVER", address) # Address of TextTest's server for recording client/server traffic
             
@@ -43,7 +43,7 @@ class SetUpTrafficHandlers(plugins.Action):
         args = [ key + "=" + "+".join(val) for key, val in dict.items() if key ]
         return ",".join(args)
         
-    def makeTrafficServer(self, test, replayFile, pyAttributeIntercepts):
+    def makeTrafficServer(self, test, replayFile, interceptInfo):
         recordFile = test.makeTmpFileName("traffic")
         recordEditDir = test.makeTmpFileName("file_edits", forComparison=0)
         cmdArgs = [ sys.executable, self.trafficServerFile, "-t", test.getRelPath(),
@@ -65,12 +65,11 @@ class SetUpTrafficHandlers(plugins.Action):
         if environmentDict:
             cmdArgs += [ "-e", self.makeArgFromDict(environmentDict) ]
 
-        pyModuleIntercepts = test.getConfigValue("collect_traffic_py_module")
-        if pyModuleIntercepts:
-            cmdArgs += [ "-m", ",".join(pyModuleIntercepts) ]
+        if interceptInfo.pyModules:
+            cmdArgs += [ "-m", ",".join(interceptInfo.pyModules) ]
 
-        if pyAttributeIntercepts:
-            cmdArgs += [ "-P", ",".join(pyAttributeIntercepts.keys()) ]
+        if interceptInfo.pyAttributes:
+            cmdArgs += [ "-P", ",".join(interceptInfo.pyAttributes.keys()) ]
             
         asynchronousFileEditCmds = test.getConfigValue("collect_traffic").get("asynchronous")
         if asynchronousFileEditCmds:
@@ -79,39 +78,30 @@ class SetUpTrafficHandlers(plugins.Action):
         return subprocess.Popen(cmdArgs, env=test.getRunEnvironment(), universal_newlines=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     
-    def makeIntercepts(self, test, interceptDir, pyAttributeIntercepts, serverActive, pythonCoverage):
+    def makeIntercepts(self, interceptDir, interceptInfo, serverActive, pythonCoverage):
         pathVars = []
-        pyModuleIntercepts = test.getConfigValue("collect_traffic_py_module")
         if serverActive:
-            commands = self.getCommandsForInterception(test)
-            for cmd in commands:
+            for cmd in interceptInfo.commands:
                 self.intercept(interceptDir, cmd, self.trafficFiles, executable=True)
         
-            if len(commands) and os.name == "posix":
+            if len(interceptInfo.commands) and os.name == "posix":
                 # Intercepts on Windows go directly into the sandbox so they can take advantage of the
                 # "current working directory beats all" rule there and also intercept things that ignore PATH
                 # (like Java)
                 pathVars.append("PATH")
 
-            for moduleName in pyModuleIntercepts:
+            for moduleName in interceptInfo.pyModules:
                 self.interceptPythonModule(moduleName, interceptDir)
 
-            if len(pyAttributeIntercepts) > 0:
-                self.interceptPythonAttributes(pyAttributeIntercepts, interceptDir)
+            if len(interceptInfo.pyAttributes) > 0:
+                self.interceptPythonAttributes(interceptInfo.pyAttributes, interceptDir)
 
-        useSiteCustomize = (serverActive and len(pyAttributeIntercepts) > 0) or pythonCoverage
+        useSiteCustomize = (serverActive and len(interceptInfo.pyAttributes) > 0) or pythonCoverage
         if useSiteCustomize:
             self.interceptOwnModule(self.siteCustomizeFile, interceptDir)
-        if (serverActive and len(pyModuleIntercepts)) or useSiteCustomize:
+        if (serverActive and len(interceptInfo.pyModules)) or useSiteCustomize:
             pathVars.append("PYTHONPATH")
         return pathVars
-
-    def getPythonPartialIntercepts(self, test):
-        partialIntercept = seqdict()
-        for fullAttrName in test.getConfigValue("collect_traffic_py_attributes"):
-            moduleName, attrName = fullAttrName.split(".", 1)
-            partialIntercept.setdefault(moduleName, []).append(attrName)
-        return partialIntercept
 
     def interceptPythonModule(self, moduleName, interceptDir):
         modulePath = moduleName.replace(".", "/")
@@ -140,11 +130,6 @@ class SetUpTrafficHandlers(plugins.Action):
             fileName = os.path.join(interceptDir, localFileName)
             open(fileName, "w").close() # make an empty package file
             self.makePackageFiles(interceptDir, parts[0])
-
-    def getCommandsForInterception(self, test):
-        # This gets all names in collect_traffic, not just those marked
-        # "asynchronous"! (it will also pick up "default").
-        return test.getCompositeConfigValue("collect_traffic", "asynchronous")
 
     def intercept(self, interceptDir, cmd, trafficFiles, executable):
         interceptName = os.path.join(interceptDir, cmd)
@@ -190,6 +175,26 @@ class TerminateTrafficServer(plugins.Action):
         err = process.communicate()[1]
         if err:
             sys.stderr.write("Error from Traffic Server :\n" + err)
+
+
+class InterceptInfo:
+    def __init__(self, test):
+        self.commands = self.getCommandsForInterception(test)
+        self.pyModules = test.getConfigValue("collect_traffic_py_module")
+        self.pyAttributes = self.getPythonPartialIntercepts(test)
+
+    def getCommandsForInterception(self, test):
+        # This gets all names in collect_traffic, not just those marked
+        # "asynchronous"! (it will also pick up "default").
+        return test.getCompositeConfigValue("collect_traffic", "asynchronous")
+
+    def getPythonPartialIntercepts(self, test):
+        partialIntercept = seqdict()
+        for fullAttrName in test.getConfigValue("collect_traffic_py_attributes"):
+            moduleName, attrName = fullAttrName.split(".", 1)
+            partialIntercept.setdefault(moduleName, []).append(attrName)
+        return partialIntercept
+
 
 
 class ModifyTraffic(plugins.ScriptWithArgs):

@@ -28,11 +28,10 @@ class SetUpTrafficHandlers(plugins.Action):
 
     def setUpIntercepts(self, test, replayFile, serverActive, pythonCoverage):
         interceptDir = test.makeTmpFileName("traffic_intercepts", forComparison=0)
-        pyModuleIntercepts, pyAttributeIntercepts = self.getPythonModuleInfo(test)
-        pathVars = self.makeIntercepts(test, interceptDir, pyModuleIntercepts,
-                                       pyAttributeIntercepts, serverActive, pythonCoverage)
+        pyAttributeIntercepts = self.getPythonPartialIntercepts(test)
+        pathVars = self.makeIntercepts(test, interceptDir, pyAttributeIntercepts, serverActive, pythonCoverage)
         if serverActive:
-            self.trafficServerProcess = self.makeTrafficServer(test, replayFile, pyModuleIntercepts, pyAttributeIntercepts)
+            self.trafficServerProcess = self.makeTrafficServer(test, replayFile, pyAttributeIntercepts)
             address = self.trafficServerProcess.stdout.readline().strip()
             test.setEnvironment("TEXTTEST_MIM_SERVER", address) # Address of TextTest's server for recording client/server traffic
             
@@ -44,7 +43,7 @@ class SetUpTrafficHandlers(plugins.Action):
         args = [ key + "=" + "+".join(val) for key, val in dict.items() if key ]
         return ",".join(args)
         
-    def makeTrafficServer(self, test, replayFile, pyModuleIntercepts, pyAttributeIntercepts):
+    def makeTrafficServer(self, test, replayFile, pyAttributeIntercepts):
         recordFile = test.makeTmpFileName("traffic")
         recordEditDir = test.makeTmpFileName("file_edits", forComparison=0)
         cmdArgs = [ sys.executable, self.trafficServerFile, "-t", test.getRelPath(),
@@ -66,6 +65,7 @@ class SetUpTrafficHandlers(plugins.Action):
         if environmentDict:
             cmdArgs += [ "-e", self.makeArgFromDict(environmentDict) ]
 
+        pyModuleIntercepts = test.getConfigValue("collect_traffic_py_module")
         if pyModuleIntercepts:
             cmdArgs += [ "-m", ",".join(pyModuleIntercepts) ]
 
@@ -79,9 +79,9 @@ class SetUpTrafficHandlers(plugins.Action):
         return subprocess.Popen(cmdArgs, env=test.getRunEnvironment(), universal_newlines=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     
-    def makeIntercepts(self, test, interceptDir, pyModuleIntercepts,
-                       pyAttributeIntercepts, serverActive, pythonCoverage):
+    def makeIntercepts(self, test, interceptDir, pyAttributeIntercepts, serverActive, pythonCoverage):
         pathVars = []
+        pyModuleIntercepts = test.getConfigValue("collect_traffic_py_module")
         if serverActive:
             commands = self.getCommandsForInterception(test)
             for cmd in commands:
@@ -106,20 +106,12 @@ class SetUpTrafficHandlers(plugins.Action):
             pathVars.append("PYTHONPATH")
         return pathVars
 
-    def getPythonModuleInfo(self, test):
-        fullIntercept, partialIntercept = [], seqdict()
-        pythonModules = test.getConfigValue("collect_traffic_py_module")
-        attrDict = test.getConfigValue("collect_traffic_py_attributes")
-        for moduleName in pythonModules:
-            attributes = attrDict.get(moduleName)
-            if attributes:
-                partialIntercept[moduleName] = attributes
-            else:
-                fullIntercept.append(moduleName)
-        for fullAttrName in attrDict.get("default", []):
+    def getPythonPartialIntercepts(self, test):
+        partialIntercept = seqdict()
+        for fullAttrName in test.getConfigValue("collect_traffic_py_attributes"):
             moduleName, attrName = fullAttrName.split(".", 1)
             partialIntercept.setdefault(moduleName, []).append(attrName)
-        return fullIntercept, partialIntercept
+        return partialIntercept
 
     def interceptPythonModule(self, moduleName, interceptDir):
         modulePath = moduleName.replace(".", "/")

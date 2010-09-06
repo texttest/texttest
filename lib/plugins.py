@@ -1268,7 +1268,10 @@ class MultiEntryDictionary(seqdict):
             currDict[entryName] = self.getListValue(entry, currDict[entryName])
         elif currType == types.DictType:
             newCurrDict = self.getSectionInfo(entryName)[0]
-            self.insertEntry("default", entry, newCurrDict)
+            if "default" in newCurrDict:
+                self.insertEntry("default", entry, newCurrDict)
+            else:
+                self.warn("Config entry name '" + entryName + "' is only valid as a section marker.")
         else:
             currDict[entryName] = currType(entry)
 

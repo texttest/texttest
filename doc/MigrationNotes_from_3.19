@@ -1,0 +1,23 @@
+
+
+The main things that need migrating are "collect_traffic_py_attributes" settings.
+
+=========================================================
+COMPULSORY MIGRATION
+=========================================================
+
+(1) collect_traffic_py_attributes
+===================================
+
+This was only introduced in 3.19 so it didn't seem worth preserving the old format.
+
+To intercept the python function datetime.datetime.now, it previously worked like this
+
+collect_traffic_py_module:datetime
+
+[collect_traffic_py_attributes]
+datetime:datetime.now
+
+This was deemed unnecessarily wordy. It should now be done simply via
+
+collect_traffic_py_attributes:datetime.datetime.now

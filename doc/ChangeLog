@@ -1865,6 +1865,9 @@ Static GUI Enhancements:
 	Previously just tried to silently amalgamate them.
     - Old "Recording" tab is now a dialog (runningactions.py)
 	Hopefully less easy to get ignored now
+    - Running/Advanced tab better organised (runningactions.py)
+	Now has frames and various things get greyed out when not appropriate
+    - Traffic interception record checkbutton moved to Basic tab (when enabled)
     - Shortcut bar setting now greyed out if PyUseCase cannot be found (actionholders.py)
 Dynamic GUI Enhancements:
     - Recomputing marked tests now works correctly (plugins.py)
@@ -1883,6 +1886,12 @@ Framework Enhancements:
     - "Traffic interception" is no longer enabled by default (traffic.py)
 	New setting "collect_traffic_client_server" which enables it for client server testing.
 	Relevant options will only be available if that, "collect_traffic" or "collect_traffic_py_module" are set.
+    - Traffic interception no longer records for new modules just because old modules exist (traffic.py)
+	Need to explicitly request recording for new items
+    - collect_traffic_py_attributes now works on builtin modules (traffic.py)
+	Changed how it operates. Also config form of it has changed, see migration notes.
+    - collect_traffic now handles environment variables being unset (traffic.py)
+	Previously only recorded them being set to something else.
     - New hook for custom config modules to set up config file variables that depend on other ones (testmodel.py)
 	setDependentConfigDefaults is now called as it is in the core. Does nothing by default.
 Batch Report Enhancements:
@@ -1895,16 +1904,21 @@ Grid Engine (LSF/SGE) enhancements:
 	Means it should be faster and make better use of available machines
     - Parallel job machine name formatting improved
 	Should make for less wide boxes in HTML report
+    - Don't leak SSH_TTY to SGE jobs (masterprocess.py)
+	Seems to cause trouble on SuSE 11.
 Bug Fixes:
     - Fixed Mac OS-specific bug that made traffic server fail (and by extension, recording with default settings) (traffic_server.py)
     - When recomputing, don't reload the configuration while tests are still running (changeteststate.py)
 	Can lead to indeterministic errors
+    - Fixed bug around selecting a particular version from a filter file containing tests for many versions (plugins.py)
     - Various fixes for issues to do with handling extra_versions when reconnecting via a grid (queuesystem/__init__.py)
+    - If externally set environment variable is reset in one test, don't leak this fact to other tests (testmodel.py)
     - Reconnecting now works if an extra_version is provided explicitly (reconnect.py)
     - Reconnecting and then recomputing a test with a known bug now works properly (knownbugs/__init__.py)
     - Removed incorrect warning when "unordered_text" differed between several applications run (guiutils.py)
     - Workaround for GTK+ 2.20 bug around RC file handling in .gtkrc-2.0 files (controller.py)
     - Fixed race condition when recomputing a running test just as it completes (controller.py)
+    - Fixed race condition when recomputing a running test simultaneous to a grid engine poll (changeteststate.py)
     - traffic.ModifyTraffic script doesn't leak temporary files if it fails (traffic.py)
     - Viewing files on remote machines now works together with ssh, instead of just with rsh (fileviewers.py)
     - Fixed stacktrace when viewing Jira issue with unicode characters with no encoding, i.e. LANG=C (jira.py)
@@ -1912,10 +1926,12 @@ Bug Fixes:
     - Fixed stacktrace on shortcut folders when e.g. starting from scratch in your home directory (guiplugins.py)
     - Fixed stacktrace on extracting GUI config entry documentation on Windows when GTK not installed (!) (guiutils.py)
     - Fixed bug where failure to clean previous batch temp directories was not reported properly (plugins.py)
+    - Fixed stacktrace when Dictionary config file entries used as basic types (plugins.py)
     - Fixed race condition in traffic server where shutdown could complete before all requests were handled (traffic_server.py)
     - Traffic mechanism now handles SUT changes to PATH correctly (traffic_server.py)
     - Dynamic GUI window title now reports correctly when more than one checkout is being used (controller.py)
     - default.ReplaceText now works without an explicitly provided file, as it once did (scripts.py)
+    - default.ReplaceText now works with text containing "=" characters (scripts.py)
     - default.DocumentEnvironment now works with an explicitly provided variable name (scripts.py)
     - Fixed stack trace on trying to view file properties on a file that has been removed (fileproperties.py)
     - Various error messages tidied up (e.g. filetrees.py)

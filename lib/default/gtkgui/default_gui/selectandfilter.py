@@ -432,7 +432,9 @@ class SaveSelection(guiplugins.ActionDialogGUI):
     def writeTestList(self, file):
         file.write("-tp ")
         for suite in self.rootTestSuites:
-            file.write("appdata=" + suite.app.name + suite.app.versionSuffix() + "\n")
+            versionSuffix = suite.app.versionSuffix()
+            if "copy_" not in versionSuffix: # Don't save copy names in selections, causes confusion
+                file.write("appdata=" + suite.app.name + versionSuffix + "\n")
             for test in suite.testCaseList():
                 self.notify("WriteTestIfSelected", test, file)
     

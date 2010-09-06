@@ -303,12 +303,14 @@ class ApplicationFilter(TextFilter):
         return self.acceptsApplication(suite.app)
     def acceptsApplication(self, app):
         return self.stringContainsText(app.name)
+
     
 class TestSelectionFilter(TextFilter):
     option = "tp"
     def __init__(self, *args):
         self.diag = logging.getLogger("TestSelectionFilter")
         TextFilter.__init__(self, *args)
+
     def parseInput(self, filterText, app, suites):
         allEntries = TextFilter.parseInput(self, filterText, app, suites)
         if allEntries[0].startswith("appdata="):
@@ -317,6 +319,7 @@ class TestSelectionFilter(TextFilter):
         else:
             # old style, one size fits all
             return allEntries
+
     def parseForApp(self, allEntries, app, suites):
         active = False
         myEntries = []
@@ -331,6 +334,7 @@ class TestSelectionFilter(TextFilter):
                 myEntries.append(entry)
         self.diag.info("Found " + repr(myEntries) + " from " + repr(allEntries))
         return myEntries
+
     def getSectionsToFind(self, allEntries, app, suites):        
         allHeaders = filter(lambda entry: entry.startswith("appdata=" + app.name), allEntries)
         if len(allHeaders) == 1:
@@ -338,55 +342,49 @@ class TestSelectionFilter(TextFilter):
         allApps = filter(lambda a: a.name == app.name, [ suite.app for suite in suites ])
         sections = []
         for header in allHeaders:
-            bestApp = self.findAppMatchingSection(header, allApps)
+            versionSet = set(header.split(".")[1:])
+            self.diag.info("Looking for app matching " + repr(versionSet))
+            bestApp = self.findAppMatchingVersions(versionSet, allApps)
             self.diag.info("Best app for " + header + " = " + repr(bestApp))
             if bestApp is app:
                 sections.append(header)
 
         if len(sections) == 0:
             # We aren't a best-fit for any of them, so we do our best to find one anyway...
-            return [ self.findSectionMatchingApp(app, allHeaders) ]
-                     
-        return sections
+            return self.findSectionsMatchingApp(app, allHeaders)
+        elif len(sections) == 1:             
+            return sections
 
-    def findSectionMatchingApp(self, app, allHeaders):
+        return self.findSectionsMatchingApp(app, sections)
+
+    def findSectionsMatchingApp(self, app, allHeaders):
         myVersionSet = set(app.versions)
-        bestVersionSet, bestHeader = None, None
-        for header in allHeaders:
+        def matchKey(header):
             currVersionSet = set(header.split(".")[1:])
-            if bestVersionSet is None or self.isBetterMatch(currVersionSet, bestVersionSet, myVersionSet):
-                bestHeader = header
-                bestVersionSet = currVersionSet
-        return bestHeader
+            return self.getVersionSetMatchKey(currVersionSet, myVersionSet)
 
-    def findAppMatchingSection(self, header, allApps):
-        bestVersionSet, bestApp = None, None
-        myVersionSet = set(header.split(".")[1:])
-        self.diag.info("Looking for app matching " + repr(myVersionSet))
-        for app in allApps:
-            appVersionSet = set(app.versions)
-            if bestVersionSet is None or self.isBetterMatch(appVersionSet, bestVersionSet, myVersionSet):
-                bestApp = app
-                bestVersionSet = appVersionSet
-        return bestApp
+        # Really want some kind of "multimax" here
+        bestHeader = max(allHeaders, key=matchKey)
+        bestKey = matchKey(bestHeader)
+        return filter(lambda h: matchKey(h) == bestKey, allHeaders)
 
-    def isBetterMatch(self, curr, best, mine):
-        # We want the most in common with mine, and the least not in common
-        currCommon = curr.intersection(mine)
-        bestCommon = best.intersection(mine)
-        if len(currCommon) > len(bestCommon):
-            return True
-        currDiff = curr.symmetric_difference(mine)
-        bestDiff = best.symmetric_difference(mine)
-        return len(currDiff) < len(bestDiff)
+    def getVersionSetMatchKey(self, vset1, vset2):
+        return len(vset1.intersection(vset2)), -len(vset1.symmetric_difference(vset2))
+
+    def findAppMatchingVersions(self, myVersionSet, allApps):
+        def matchKey(app):
+            return self.getVersionSetMatchKey(set(app.versions), myVersionSet)
+        return max(allApps, key=matchKey)
 
     def acceptsTestCase(self, test):
         return test.getRelPath() in self.texts
+    
     def acceptsTestSuite(self, suite):
         for relPath in self.texts:
             if relPath.startswith(suite.getRelPath()):
                 return True
         return False
+
 
 # Generic action to be performed: all actions need to provide these methods
 class Action:

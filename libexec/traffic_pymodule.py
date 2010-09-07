@@ -215,6 +215,7 @@ class InterceptHandler:
                     if subAttrName:
                         self.partialIntercepts.setdefault(moduleName, []).append(subAttrName)
                     else:
+                        del sys.modules[attrName] # We imported the real version, get rid of it again...
                         self.fullIntercepts.append(attrName)
             else:
                 self.fullIntercepts.append(attrName)

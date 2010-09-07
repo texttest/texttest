@@ -207,6 +207,18 @@ class ImportHandler:
 def interceptModules(moduleNames):
     sys.meta_path.append(ImportHandler(moduleNames))
 
+def groupByModule(attributeNames):
+    info = {}
+    for fullAttrName in attributeNames:
+        moduleName, attrName = fullAttrName.split(".", 1)
+        info.setdefault(moduleName, []).append(attrName)
+    return info.items()
+
+def interceptAttributes(attributeNames):
+    for moduleName, attributes in groupByModule(attributeNames):
+        proxy = PartialModuleProxy(moduleName)
+        proxy.interceptAttributes(attributes)
+    
 
 # Workaround for stuff where we can't do setattr
 class TransparentProxy:

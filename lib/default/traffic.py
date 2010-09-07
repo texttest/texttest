@@ -108,9 +108,8 @@ class SetUpTrafficHandlers(plugins.Action):
         interceptorFile.write("import traffic_pymodule\n")
         if len(interceptInfo.pyModules) > 0:
             interceptorFile.write("traffic_pymodule.interceptModules(" + repr(interceptInfo.pyModules) + ")\n")
-        for moduleName, attributes in interceptInfo.pyAttributes.items():
-            interceptorFile.write("proxy = traffic_pymodule.PartialModuleProxy(" + repr(moduleName) + ")\n")
-            interceptorFile.write("proxy.interceptAttributes(" + repr(attributes) + ")\n")
+        if len(interceptInfo.pyAttributes) > 0:
+            interceptorFile.write("traffic_pymodule.interceptAttributes(" + repr(interceptInfo.pyAttributes) + ")\n")
         interceptorFile.close()
     
     def intercept(self, interceptDir, cmd, trafficFiles, executable):
@@ -182,34 +181,26 @@ class AttributeLineFilter(LineFilter):
         return "<-PYT:" + self.item 
 
     def removeItem(self, info):
-        info.pyAttributeStrings.remove(self.item)
+        info.pyAttributes.remove(self.item)
         
 
 class InterceptInfo:
     def __init__(self, test, replayFile):
         self.commands = self.getCommandsForInterception(test)
         self.pyModules = test.getConfigValue("collect_traffic_py_module")
-        self.pyAttributeStrings = test.getConfigValue("collect_traffic_py_attributes")
+        self.pyAttributes = test.getConfigValue("collect_traffic_py_attributes")
         if replayFile:
             self.filterForReplay(replayFile)
-        self.pyAttributes = self.getPythonPartialIntercepts()
         
     def getCommandsForInterception(self, test):
         # This gets all names in collect_traffic, not just those marked
         # "asynchronous"! (it will also pick up "default").
         return test.getCompositeConfigValue("collect_traffic", "asynchronous")
 
-    def getPythonPartialIntercepts(self):
-        partialIntercept = seqdict()
-        for fullAttrName in self.pyAttributeStrings:
-            moduleName, attrName = fullAttrName.split(".", 1)
-            partialIntercept.setdefault(moduleName, []).append(attrName)
-        return partialIntercept
-
     def makeLineFilters(self):
         return map(CommandLineFilter, self.commands) + \
                map(ModuleLineFilter, self.pyModules) + \
-               map(AttributeLineFilter, self.pyAttributeStrings)
+               map(AttributeLineFilter, self.pyAttributes)
 
     def filterForReplay(self, replayFile):
         lineFilters = self.makeLineFilters()

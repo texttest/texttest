@@ -4,7 +4,6 @@ import sys, os, socket
 class ModuleProxy:
     def __init__(self, name):
         self.name = name
-        self.tryImport() # make sure "our module" can really be imported
 
     def __getattr__(self, attrname):
         return AttributeProxy(self, self, attrname).tryEvaluate()
@@ -18,15 +17,6 @@ class ModuleProxy:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.connect(serverAddress)
             return sock
-
-    def tryImport(self):
-        sock = self.createSocket()
-        text = "SUT_PYTHON_IMPORT:" + self.name
-        sock.sendall(text)
-        sock.shutdown(1)
-        response = sock.makefile().read()
-        if response:
-            self.handleResponse(response, "InstanceProxy")
 
     def handleResponse(self, response, cls):
         if response.startswith("raise "):
@@ -54,6 +44,23 @@ class ModuleProxy:
             module = response.split(".", 1)[0]
             exec "import " + module
             return eval(response)
+
+
+
+class FullModuleProxy(ModuleProxy):
+    def __init__(self, name):
+        ModuleProxy.__init__(self, name)
+        self.tryImport() # Creating one of these implies someone tried to import the module
+        
+    def tryImport(self):
+        sock = self.createSocket()
+        text = "SUT_PYTHON_IMPORT:" + self.name
+        sock.sendall(text)
+        sock.shutdown(1)
+        response = sock.makefile().read()
+        if response:
+            self.handleResponse(response, "InstanceProxy")
+
 
 class InstanceProxy:
     moduleProxy = None
@@ -172,52 +179,71 @@ class AttributeProxy:
         return tuple(map(self.getArgForSend, args))
 
 
-class PackageProxyLoader:
-    def load_module(self, name):
-        # Just create an empty package
-        import imp
-        new_mod = imp.new_module(name)
-        new_mod.__path__ = []
-        sys.modules[name] = new_mod
-        return new_mod
-
-
 class ImportHandler:
     def __init__(self, moduleNames):
         self.moduleNames = moduleNames
-        self.packageNames = []
-        for name in moduleNames:
-            self.addAllPackages(name)
 
-    def addAllPackages(self, name):
-        if "." in name:
-            parentPackage = name.rsplit(".", 1)[0]
-            self.packageNames.append(parentPackage)
-            self.addAllPackages(parentPackage)
+    def shouldIntercept(self, name):
+        if name in self.moduleNames:
+            return True
+        elif "." in name:
+            for modName in self.moduleNames:
+                if name.startswith(modName + "."):
+                    return True
+        return False
         
     def find_module(self, name, *args):
-        if name in self.moduleNames:
+        if self.shouldIntercept(name):
             return self
-        elif name in self.packageNames:
-            return PackageProxyLoader()
 
     def load_module(self, name):
-        return sys.modules.setdefault(name, ModuleProxy(name))
+        return sys.modules.setdefault(name, FullModuleProxy(name))
 
-def interceptModules(moduleNames):
-    sys.meta_path.append(ImportHandler(moduleNames))
-
-def groupByModule(attributeNames):
-    info = {}
-    for fullAttrName in attributeNames:
-        moduleName, attrName = fullAttrName.split(".", 1)
-        info.setdefault(moduleName, []).append(attrName)
-    return info.items()
 
 def interceptAttributes(attributeNames):
-    for moduleName, attributes in groupByModule(attributeNames):
-        proxy = PartialModuleProxy(moduleName)
-        proxy.interceptAttributes(attributes)
+    handler = InterceptHandler(attributeNames)
+    handler.makeIntercepts()
+
+class InterceptHandler:
+    def __init__(self, attributeNames):
+        self.fullIntercepts = []
+        self.partialIntercepts = {}
+        for attrName in attributeNames:
+            if "." in attrName:
+                moduleName, subAttrName = self.splitByModule(attrName)
+                if moduleName:
+                    if subAttrName:
+                        self.partialIntercepts.setdefault(moduleName, []).append(subAttrName)
+                    else:
+                        self.fullIntercepts.append(attrName)
+            else:
+                self.fullIntercepts.append(attrName)
+
+    def makeIntercepts(self):
+        if len(self.fullIntercepts):
+            sys.meta_path.append(ImportHandler(self.fullIntercepts))
+        for moduleName, attributes in self.partialIntercepts.items():
+            proxy = PartialModuleProxy(moduleName)
+            proxy.interceptAttributes(attributes)
+
+    def splitByModule(self, attrName):
+        if self.canImport(attrName):
+            return attrName, ""
+        elif "." in attrName:
+            parentName, localName = attrName.rsplit(".", 1)
+            parentModule, parentAttr = self.splitByModule(parentName)
+            if parentAttr:
+                localName = parentAttr + "." + localName
+            return parentModule, localName
+        else:
+            return "", "" # Cannot import any parent, so don't do anything
+
+    def canImport(self, moduleName):
+        try:
+            exec "import " + moduleName
+            return True
+        except ImportError:
+            return False
     
 
 # Workaround for stuff where we can't do setattr
@@ -230,22 +256,15 @@ class TransparentProxy:
 
 
 class PartialModuleProxy(ModuleProxy):
-    def tryImport(self):
-        # We do this locally rather than remotely: if the module can't be found, there's not much point...
-        try:
-            exec "import " + self.name + " as realModule"
-            self.realModule = realModule
-        except ImportError:
-            self.realModule = None
-
     def interceptAttributes(self, attrNames):
-        if self.realModule:
-            for attrName in attrNames:
-                self.interceptAttribute(self, self.realModule, attrName)
-
+        for attrName in attrNames:
+            self.interceptAttribute(self, sys.modules.get(self.name), attrName)
+            
     def interceptAttribute(self, proxyObj, realObj, attrName):
         parts = attrName.split(".", 1)
         currAttrName = parts[0]
+        if not hasattr(realObj, currAttrName):
+            return # If the real object doesn't have it, assume the fake one doesn't either...
         currAttrProxy = getattr(proxyObj, currAttrName)
         if len(parts) == 1:
             setattr(realObj, currAttrName, currAttrProxy)

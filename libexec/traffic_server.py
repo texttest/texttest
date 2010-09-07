@@ -574,14 +574,6 @@ class PythonModuleTraffic(Traffic):
         else:
             return obj.__class__.__module__ # many other instances
 
-    def belongsToInterceptedModule(self, moduleName):
-        if moduleName in self.interceptModules:
-            return True
-        elif "." in moduleName:
-            return self.belongsToInterceptedModule(moduleName.rsplit(".", 1)[0])
-        else:
-            return False
-
     def isBasicType(self, obj):
         return obj is None or obj is NotImplemented or type(obj) in (bool, float, int, long, str, unicode, list, dict, tuple)
 
@@ -620,7 +612,7 @@ class PythonModuleTraffic(Traffic):
             for key, value in result.items():
                 newResult[key] = self.addInstanceWrappers(value)
             return newResult
-        elif not self.isBasicType(result) and self.belongsToInterceptedModule(self.getModuleName(result)):
+        elif not self.isBasicType(result) and self.getModuleName(result) in self.interceptModules:
             return PythonInstanceWrapper(result, self.modOrObjName)
         else:
             return result
@@ -769,7 +761,7 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
         except:
             exc_value = sys.exc_info()[1]
             moduleName = self.getModuleName(exc_value)
-            if self.belongsToInterceptedModule(moduleName):
+            if moduleName in self.interceptModules:
                 # We own the exception object also, handle it like an ordinary instance
                 return "raise " + PythonInstanceWrapper(exc_value, moduleName).exceptionRepr()
             else:

@@ -106,10 +106,10 @@ class SetUpTrafficHandlers(plugins.Action):
         interceptorModule = os.path.join(interceptDir, "traffic_customize.py")
         interceptorFile = open(interceptorModule, "w")
         interceptorFile.write("import traffic_pymodule\n")
-        if len(interceptInfo.pyModules) > 0:
-            interceptorFile.write("traffic_pymodule.interceptModules(" + repr(interceptInfo.pyModules) + ")\n")
-        if len(interceptInfo.pyAttributes) > 0:
-            interceptorFile.write("traffic_pymodule.interceptAttributes(" + repr(interceptInfo.pyAttributes) + ")\n")
+        #if len(interceptInfo.pyModules) > 0:
+        #    interceptorFile.write("traffic_pymodule.interceptModules(" + repr(interceptInfo.pyModules) + ")\n")
+        if len(interceptInfo.pyAttributes) > 0 or len(interceptInfo.pyModules) > 0:
+            interceptorFile.write("traffic_pymodule.interceptAttributes(" + repr(interceptInfo.pyModules + interceptInfo.pyAttributes) + ")\n")
         interceptorFile.close()
     
     def intercept(self, interceptDir, cmd, trafficFiles, executable):

@@ -618,9 +618,7 @@ class PythonModuleTraffic(Traffic):
             return eval(argStr, globals(), NameFinder())
     
     def addInstanceWrappers(self, result):
-        if not self.shouldIntercept():
-            return result
-        elif type(result) in (list, tuple):
+        if type(result) in (list, tuple):
             return type(result)(map(self.addInstanceWrappers, result))
         elif type(result) == dict:
             newResult = {}

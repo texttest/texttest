@@ -526,7 +526,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
 
             if useGui == 2:
                 # PyUseCase doesn't handle tkMessageBox, deal with it via interception by default
-                configEntries["collect_traffic_py_module"] = "tkMessageBox"
+                configEntries["collect_traffic_python"] = "tkMessageBox"
                 configEntries["collect_traffic_use_threads"] = "false"
             
             pyusecaseDir = os.path.join(directory, "pyusecase_files")

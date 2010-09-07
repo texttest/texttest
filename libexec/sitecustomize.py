@@ -1,5 +1,5 @@
 
-import sys
+import sys, os
 
 def trySetupCoverage(): # pragma: no cover - can hardly measure coverage here :)
     # This check shouldn't really be there.
@@ -15,16 +15,14 @@ def trySetupCoverage(): # pragma: no cover - can hardly measure coverage here :)
 
 
 def trySetupTraffic():
-    try:
-        # partial traffic interception?
-        import traffic_customize
-    except ImportError:
-        pass
-
+    pythonVarStr = os.getenv("TEXTTEST_MIM_PYTHON")
+    if pythonVarStr:
+        import traffic_pymodule
+        traffic_pymodule.interceptPython(pythonVarStr.split(","))
 
 def restoreOriginal():
     # Need to load the "real" sitecustomize now
-    import os, sys, imp
+    import imp
     myDir = os.path.dirname(__file__)
     pos = sys.path.index(myDir)
     modInfo = imp.find_module("sitecustomize", sys.path[pos + 1:])

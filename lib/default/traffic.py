@@ -31,6 +31,9 @@ class SetUpTrafficHandlers(plugins.Action):
         interceptInfo = InterceptInfo(test, replayFile if not self.record else None)
         pathVars = self.makeIntercepts(interceptDir, interceptInfo, serverActive, pythonCoverage)
         if serverActive:
+            if interceptInfo.pyAttributes:
+                test.setEnvironment("TEXTTEST_MIM_PYTHON", ",".join(interceptInfo.pyAttributes))
+
             self.trafficServerProcess = self.makeTrafficServer(test, replayFile, interceptInfo)
             address = self.trafficServerProcess.stdout.readline().strip()
             test.setEnvironment("TEXTTEST_MIM_SERVER", address) # Address of TextTest's server for recording client/server traffic
@@ -65,8 +68,8 @@ class SetUpTrafficHandlers(plugins.Action):
         if environmentDict:
             cmdArgs += [ "-e", self.makeArgFromDict(environmentDict) ]
 
-        if interceptInfo.pyModules:
-            cmdArgs += [ "-m", ",".join(interceptInfo.pyModules) ]
+        if interceptInfo.pyAttributes:
+            cmdArgs += [ "-m", ",".join(interceptInfo.pyAttributes) ]
             
         asynchronousFileEditCmds = test.getConfigValue("collect_traffic").get("asynchronous")
         if asynchronousFileEditCmds:
@@ -87,10 +90,10 @@ class SetUpTrafficHandlers(plugins.Action):
                 # (like Java)
                 pathVars.append("PATH")
 
-            if len(interceptInfo.pyModules) > 0 or len(interceptInfo.pyAttributes) > 0:
-                self.interceptPythonAttributes(interceptInfo, interceptDir)
-
-        useSiteCustomize = (serverActive and (len(interceptInfo.pyAttributes) > 0 or len(interceptInfo.pyModules) > 0)) or pythonCoverage
+            if len(interceptInfo.pyAttributes) > 0:
+                self.interceptOwnModule(self.trafficPyModuleFile, interceptDir)
+                
+        useSiteCustomize = (serverActive and len(interceptInfo.pyAttributes) > 0) or pythonCoverage
         if useSiteCustomize:
             self.interceptOwnModule(self.siteCustomizeFile, interceptDir)
             pathVars.append("PYTHONPATH")
@@ -98,19 +101,6 @@ class SetUpTrafficHandlers(plugins.Action):
 
     def interceptOwnModule(self, moduleFile, interceptDir):
         self.intercept(interceptDir, os.path.basename(moduleFile), [ moduleFile ], executable=False)
-
-    def interceptPythonAttributes(self, interceptInfo, interceptDir):
-        self.interceptOwnModule(self.trafficPyModuleFile, interceptDir)
-        # We use the "sitecustomize" hook so this works on Python programs older than 2.6
-        # Should probably run the user's real one, assuming they have one
-        interceptorModule = os.path.join(interceptDir, "traffic_customize.py")
-        interceptorFile = open(interceptorModule, "w")
-        interceptorFile.write("import traffic_pymodule\n")
-        #if len(interceptInfo.pyModules) > 0:
-        #    interceptorFile.write("traffic_pymodule.interceptModules(" + repr(interceptInfo.pyModules) + ")\n")
-        if len(interceptInfo.pyAttributes) > 0 or len(interceptInfo.pyModules) > 0:
-            interceptorFile.write("traffic_pymodule.interceptAttributes(" + repr(interceptInfo.pyModules + interceptInfo.pyAttributes) + ")\n")
-        interceptorFile.close()
     
     def intercept(self, interceptDir, cmd, trafficFiles, executable):
         interceptName = os.path.join(interceptDir, cmd)
@@ -169,16 +159,10 @@ class CommandLineFilter(LineFilter):
     def removeItem(self, info):
         info.commands.remove(self.item)
 
-class ModuleLineFilter(LineFilter):
-    def getMatchText(self):
-        return "<-PYT:import " + self.item 
-
-    def removeItem(self, info):
-        info.pyModules.remove(self.item)
 
 class AttributeLineFilter(LineFilter):
     def getMatchText(self):
-        return "<-PYT:" + self.item 
+        return "<-PYT:(import )?" + self.item 
 
     def removeItem(self, info):
         info.pyAttributes.remove(self.item)
@@ -187,8 +171,7 @@ class AttributeLineFilter(LineFilter):
 class InterceptInfo:
     def __init__(self, test, replayFile):
         self.commands = self.getCommandsForInterception(test)
-        self.pyModules = test.getConfigValue("collect_traffic_py_module")
-        self.pyAttributes = test.getConfigValue("collect_traffic_py_attributes")
+        self.pyAttributes = test.getConfigValue("collect_traffic_python")
         if replayFile:
             self.filterForReplay(replayFile)
         
@@ -199,7 +182,6 @@ class InterceptInfo:
 
     def makeLineFilters(self):
         return map(CommandLineFilter, self.commands) + \
-               map(ModuleLineFilter, self.pyModules) + \
                map(AttributeLineFilter, self.pyAttributes)
 
     def filterForReplay(self, replayFile):

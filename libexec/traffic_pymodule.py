@@ -200,7 +200,7 @@ class ImportHandler:
         return sys.modules.setdefault(name, FullModuleProxy(name))
 
 
-def interceptAttributes(attributeNames):
+def interceptPython(attributeNames):
     handler = InterceptHandler(attributeNames)
     handler.makeIntercepts()
 

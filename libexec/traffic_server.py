@@ -573,17 +573,17 @@ class PythonModuleTraffic(Traffic):
     def enquiryOnly(self, responses=[]):
         return not self.shouldIntercept()
 
-    def belongsToInterceptedModule(self, obj):
-        try:
-            return self._belongsToInterceptedModule(obj.__module__)
-        except AttributeError: # Global exceptions like AttributeError itself on Windows cause this
-            return False
+    def getModuleName(self, obj):
+        if hasattr(obj, "__module__"): # classes, functions, many instances
+            return obj.__module__
+        else:
+            return obj.__class__.__module__ # many other instances
 
-    def _belongsToInterceptedModule(self, moduleName):
+    def belongsToInterceptedModule(self, moduleName):
         if moduleName in self.interceptModules:
             return True
         elif "." in moduleName:
-            return self._belongsToInterceptedModule(moduleName.rsplit(".", 1)[0])
+            return self.belongsToInterceptedModule(moduleName.rsplit(".", 1)[0])
         else:
             return False
 
@@ -627,7 +627,7 @@ class PythonModuleTraffic(Traffic):
             for key, value in result.items():
                 newResult[key] = self.addInstanceWrappers(value)
             return newResult
-        elif not self.isBasicType(result) and self.belongsToInterceptedModule(result):
+        elif not self.isBasicType(result) and self.belongsToInterceptedModule(self.getModuleName(result)):
             return PythonInstanceWrapper(result, self.modOrObjName)
         else:
             return result
@@ -778,9 +778,10 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
             return repr(self.addInstanceWrappers(result))
         except:
             exc_value = sys.exc_info()[1]
-            if self.belongsToInterceptedModule(exc_value):
+            moduleName = self.getModuleName(exc_value)
+            if self.belongsToInterceptedModule(moduleName):
                 # We own the exception object also, handle it like an ordinary instance
-                return "raise " + PythonInstanceWrapper(exc_value, exc_value.__module__).exceptionRepr()
+                return "raise " + PythonInstanceWrapper(exc_value, moduleName).exceptionRepr()
             else:
                 return self.getExceptionText(exc_value)
 

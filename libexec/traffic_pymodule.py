@@ -4,10 +4,57 @@ import sys
 class ModuleProxy:
     def __init__(self, name):
         self.name = name
-        self.AttributeProxy(self, self).tryImport() # make sure "our module" can really be imported
+        self.tryImport() # make sure "our module" can really be imported
 
     def __getattr__(self, attrname):
         return self.AttributeProxy(self, self, attrname).tryEvaluate()
+
+    @staticmethod
+    def createSocket():
+        import os, socket
+        servAddr = os.getenv("TEXTTEST_MIM_SERVER")
+        if servAddr:
+            host, port = servAddr.split(":")
+            serverAddress = (host, int(port))
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.connect(serverAddress)
+            return sock
+
+    def tryImport(self):
+        sock = self.createSocket()
+        text = "SUT_PYTHON_IMPORT:" + self.name
+        sock.sendall(text)
+        sock.shutdown(1)
+        response = sock.makefile().read()
+        if response:
+            self.handleResponse(response, "self.InstanceProxy")
+
+    def handleResponse(self, response, cls):
+        if response.startswith("raise "):
+            rest = response.replace("raise ", "")
+            raise self.handleResponse(rest, "self.ExceptionProxy")
+        else:
+            def Instance(className, instanceName):
+                # Call separate function to avoid exec problems
+                return self.makeInstance(className, instanceName, cls)
+            def NewStyleInstance(className, instanceName):
+                return self.makeInstance(className, instanceName, "self.NewStyleInstanceProxy")
+            return self.evaluateResponse(response, cls, Instance, NewStyleInstance)
+
+    def makeInstance(self, className, instanceName, baseClass):
+        exec "class " + className + "(" + baseClass + "): pass"
+        classObj = eval(className)
+        setattr(self, className, classObj)
+        return classObj(givenInstanceName=instanceName, moduleProxy=self)
+
+    @staticmethod
+    def evaluateResponse(response, cls, Instance, NewStyleInstance):
+        try:
+            return eval(response)
+        except NameError: # standard exceptions end up here
+            module = response.split(".", 1)[0]
+            exec "import " + module
+            return eval(response)
 
     class InstanceProxy:
         moduleProxy = None
@@ -56,7 +103,7 @@ class ModuleProxy:
 
     
     class AttributeProxy:
-        def __init__(self, modOrObjProxy, moduleProxy, attributeName=None):
+        def __init__(self, modOrObjProxy, moduleProxy, attributeName):
             self.modOrObjProxy = modOrObjProxy
             self.moduleProxy = moduleProxy
             self.attributeName = attributeName
@@ -65,27 +112,18 @@ class ModuleProxy:
             return self.modOrObjProxy.name + "." + self.attributeName
 
         def tryEvaluate(self):
-            sock = self.createSocket()
+            sock = self.moduleProxy.createSocket()
             text = "SUT_PYTHON_ATTR:" + self.modOrObjProxy.name + ":SUT_SEP:" + self.attributeName
             sock.sendall(text)
             sock.shutdown(1)
             response = sock.makefile().read()
             if response:
-                return self.handleResponse(response, "self.moduleProxy.InstanceProxy")
+                return self.moduleProxy.handleResponse(response, "self.InstanceProxy")
             else:
                 return self
 
-        def tryImport(self):
-            sock = self.createSocket()
-            text = "SUT_PYTHON_IMPORT:" + self.modOrObjProxy.name
-            sock.sendall(text)
-            sock.shutdown(1)
-            response = sock.makefile().read()
-            if response:
-                self.handleResponse(response, "self.moduleProxy.InstanceProxy")
-
         def setValue(self, value):
-            sock = self.createSocket()
+            sock = self.moduleProxy.createSocket()
             text = "SUT_PYTHON_SETATTR:" + self.modOrObjProxy.name + ":SUT_SEP:" + self.attributeName + \
                    ":SUT_SEP:" + repr(self.getArgForSend(value))
             sock.sendall(text)
@@ -97,41 +135,15 @@ class ModuleProxy:
         def __call__(self, *args, **kw):
             response = self.makeResponse(*args, **kw)
             if response:
-                return self.handleResponse(response, "self.moduleProxy.InstanceProxy")
+                return self.moduleProxy.handleResponse(response, "self.InstanceProxy")
 
         def makeResponse(self, *args, **kw):
             sock = self.createAndSend(*args, **kw)
             sock.shutdown(1)
             return sock.makefile().read()
         
-        def handleResponse(self, response, cls):
-            if response.startswith("raise "):
-                rest = response.replace("raise ", "")
-                raise self.handleResponse(rest, "self.moduleProxy.ExceptionProxy")
-            else:
-                def Instance(className, instanceName):
-                    # Call separate function to avoid exec problems
-                    return self.makeInstance(className, instanceName, cls)
-                def NewStyleInstance(className, instanceName):
-                    return self.makeInstance(className, instanceName, "self.moduleProxy.NewStyleInstanceProxy")
-                return self.evaluateResponse(response, cls, Instance, NewStyleInstance)
-
-        def makeInstance(self, className, instanceName, baseClass):
-            exec "class " + className + "(" + baseClass + "): pass"
-            classObj = eval(className)
-            setattr(self.moduleProxy, className, classObj)
-            return classObj(givenInstanceName=instanceName, moduleProxy=self.moduleProxy)
-
-        def evaluateResponse(self, response, cls, Instance, NewStyleInstance):
-            try:
-                return eval(response)
-            except NameError: # standard exceptions end up here
-                module = response.split(".", 1)[0]
-                exec "import " + module
-                return eval(response)
-
         def createAndSend(self, *args, **kw):
-            sock = self.createSocket()
+            sock = self.moduleProxy.createSocket()
             text = "SUT_PYTHON_CALL:" + self.modOrObjProxy.name + ":SUT_SEP:" + self.attributeName + \
                    ":SUT_SEP:" + repr(self.getArgsForSend(args)) + ":SUT_SEP:" + repr(self.getArgForSend(kw))
             sock.sendall(text)
@@ -160,15 +172,6 @@ class ModuleProxy:
         def getArgsForSend(self, args):
             return tuple(map(self.getArgForSend, args))
 
-        def createSocket(self):
-            import os, socket
-            servAddr = os.getenv("TEXTTEST_MIM_SERVER")
-            if servAddr:
-                host, port = servAddr.split(":")
-                serverAddress = (host, int(port))
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.connect(serverAddress)
-                return sock
 
 # Workaround for stuff where we can't do setattr
 class TransparentProxy:

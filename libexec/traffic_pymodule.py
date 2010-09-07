@@ -183,11 +183,11 @@ class TransparentProxy:
 
 
 class PartialModuleProxy(ModuleProxy):
-    def __init__(self, moduleName):
+    def tryImport(self):
+        # We do this locally rather than remotely: if the module can't be found, there's not much point...
         try:
-            exec "import " + moduleName + " as realModule"
+            exec "import " + self.name + " as realModule"
             self.realModule = realModule
-            ModuleProxy.__init__(self, moduleName) 
         except ImportError:
             self.realModule = None
 

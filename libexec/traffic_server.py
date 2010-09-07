@@ -36,8 +36,6 @@ react to the above module to repoint where it sends socket interactions"""
                       help="restore edited files referred to in replayed file from DIR.", metavar="DIR")
     parser.add_option("-m", "--python-module-intercepts", 
                       help="Python modules whose objects should be stored locally rather than returned as they are", metavar="MODULES")
-    parser.add_option("-P", "--python-module-partial-intercepts", 
-                      help="Python modules for whom only some attributes are being intercepted", metavar="MODULES")
     parser.add_option("-r", "--record", 
                       help="record traffic to FILE.", metavar="FILE")
     parser.add_option("-F", "--record-file-edits", 
@@ -197,7 +195,7 @@ class TrafficServer(TCPServer):
             self.diag.info("Completed response " + str(response.__class__))            
 
     def getResponses(self, traffic, hasFileEdits):
-        if self.replayInfo.isActive() and traffic.shouldIntercept():
+        if self.replayInfo.isActive():
             replayedResponses = []
             filesMatched = []
             for responseClass, text in self.replayInfo.readReplayResponses(traffic):
@@ -318,9 +316,6 @@ class Traffic(object):
     
     def enquiryOnly(self, responses=[]):
         return False
-
-    def shouldIntercept(self):
-        return True
     
     def write(self, message):
         if self.responseFile:
@@ -519,7 +514,15 @@ class PythonInstanceWrapper:
 
     @classmethod
     def getInstance(cls, instanceName):
-        return cls.allInstances.get(instanceName, sys.modules.get(instanceName))
+        return cls.allInstances.get(instanceName, sys.modules.get(instanceName, cls.forceImport(instanceName)))
+
+    @classmethod
+    def forceImport(cls, moduleName):
+        try:
+            exec "import " + moduleName
+            return sys.modules.get(moduleName)
+        except ImportError:
+            pass
 
     def getInstanceType(self):
         if issubclass(self.instance.__class__, object):
@@ -550,17 +553,12 @@ class PythonModuleTraffic(Traffic):
     typeId = "PYT"
     direction = "<-"
     interceptModules = set()
-    partialInterceptModules = set()
     @classmethod
     def configure(cls, options):
         modStr = options.python_module_intercepts
         if modStr:
             cls.interceptModules.update(modStr.split(","))
             cls.interceptModules.update(cls.getModuleParents(cls.interceptModules))
-        partialModStr = options.python_module_partial_intercepts
-        if partialModStr:
-            cls.partialInterceptModules.update(partialModStr.split(","))
-            cls.interceptModules.update(cls.partialInterceptModules)
             
     @staticmethod
     def getModuleParents(modules):
@@ -569,9 +567,6 @@ class PythonModuleTraffic(Traffic):
             for ix in range(module.count(".")):
                 parents.append(module.rsplit(".", ix + 1)[0])
         return parents
-
-    def enquiryOnly(self, responses=[]):
-        return not self.shouldIntercept()
 
     def getModuleName(self, obj):
         if hasattr(obj, "__module__"): # classes, functions, many instances
@@ -636,9 +631,6 @@ class PythonImportTraffic(PythonModuleTraffic):
         self.moduleName = inText
         text = "import " + self.moduleName
         super(PythonImportTraffic, self).__init__(text, responseFile)
-
-    def shouldIntercept(self):
-        return self.moduleName not in self.partialInterceptModules
 
     def forwardToDestination(self):
         try:

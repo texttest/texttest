@@ -67,9 +67,6 @@ class SetUpTrafficHandlers(plugins.Action):
 
         if interceptInfo.pyModules:
             cmdArgs += [ "-m", ",".join(interceptInfo.pyModules) ]
-
-        if interceptInfo.pyAttributes:
-            cmdArgs += [ "-P", ",".join(interceptInfo.pyAttributes.keys()) ]
             
         asynchronousFileEditCmds = test.getConfigValue("collect_traffic").get("asynchronous")
         if asynchronousFileEditCmds:

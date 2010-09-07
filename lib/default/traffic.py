@@ -87,47 +87,32 @@ class SetUpTrafficHandlers(plugins.Action):
                 # (like Java)
                 pathVars.append("PATH")
 
-            for moduleName in interceptInfo.pyModules:
-                self.interceptPythonModule(moduleName, interceptDir)
+            if len(interceptInfo.pyModules) > 0 or len(interceptInfo.pyAttributes) > 0:
+                self.interceptPythonAttributes(interceptInfo, interceptDir)
 
-            if len(interceptInfo.pyAttributes) > 0:
-                self.interceptPythonAttributes(interceptInfo.pyAttributes, interceptDir)
-
-        useSiteCustomize = (serverActive and len(interceptInfo.pyAttributes) > 0) or pythonCoverage
+        useSiteCustomize = (serverActive and (len(interceptInfo.pyAttributes) > 0 or len(interceptInfo.pyModules) > 0)) or pythonCoverage
         if useSiteCustomize:
             self.interceptOwnModule(self.siteCustomizeFile, interceptDir)
-        if (serverActive and len(interceptInfo.pyModules)) or useSiteCustomize:
             pathVars.append("PYTHONPATH")
         return pathVars
-
-    def interceptPythonModule(self, moduleName, interceptDir):
-        modulePath = moduleName.replace(".", "/")
-        self.intercept(interceptDir, modulePath + ".py", [ self.trafficPyModuleFile ], executable=False)
-        self.makePackageFiles(interceptDir, modulePath)
 
     def interceptOwnModule(self, moduleFile, interceptDir):
         self.intercept(interceptDir, os.path.basename(moduleFile), [ moduleFile ], executable=False)
 
-    def interceptPythonAttributes(self, moduleInfo, interceptDir):
+    def interceptPythonAttributes(self, interceptInfo, interceptDir):
         self.interceptOwnModule(self.trafficPyModuleFile, interceptDir)
         # We use the "sitecustomize" hook so this works on Python programs older than 2.6
         # Should probably run the user's real one, assuming they have one
         interceptorModule = os.path.join(interceptDir, "traffic_customize.py")
         interceptorFile = open(interceptorModule, "w")
         interceptorFile.write("import traffic_pymodule\n")
-        for moduleName, attributes in moduleInfo.items():
+        if len(interceptInfo.pyModules) > 0:
+            interceptorFile.write("traffic_pymodule.interceptModules(" + repr(interceptInfo.pyModules) + ")\n")
+        for moduleName, attributes in interceptInfo.pyAttributes.items():
             interceptorFile.write("proxy = traffic_pymodule.PartialModuleProxy(" + repr(moduleName) + ")\n")
             interceptorFile.write("proxy.interceptAttributes(" + repr(attributes) + ")\n")
         interceptorFile.close()
     
-    def makePackageFiles(self, interceptDir, modulePath):
-        parts = modulePath.rsplit("/", 1)
-        if len(parts) == 2:
-            localFileName = os.path.join(parts[0], "__init__.py")
-            fileName = os.path.join(interceptDir, localFileName)
-            open(fileName, "w").close() # make an empty package file
-            self.makePackageFiles(interceptDir, parts[0])
-
     def intercept(self, interceptDir, cmd, trafficFiles, executable):
         interceptName = os.path.join(interceptDir, cmd)
         plugins.ensureDirExistsForFile(interceptName)

@@ -1,5 +1,5 @@
 
-import sys
+import sys, os, socket
 
 class ModuleProxy:
     def __init__(self, name):
@@ -7,11 +7,10 @@ class ModuleProxy:
         self.tryImport() # make sure "our module" can really be imported
 
     def __getattr__(self, attrname):
-        return self.AttributeProxy(self, self, attrname).tryEvaluate()
+        return AttributeProxy(self, self, attrname).tryEvaluate()
 
     @staticmethod
     def createSocket():
-        import os, socket
         servAddr = os.getenv("TEXTTEST_MIM_SERVER")
         if servAddr:
             host, port = servAddr.split(":")
@@ -27,18 +26,18 @@ class ModuleProxy:
         sock.shutdown(1)
         response = sock.makefile().read()
         if response:
-            self.handleResponse(response, "self.InstanceProxy")
+            self.handleResponse(response, "InstanceProxy")
 
     def handleResponse(self, response, cls):
         if response.startswith("raise "):
             rest = response.replace("raise ", "")
-            raise self.handleResponse(rest, "self.ExceptionProxy")
+            raise self.handleResponse(rest, "ExceptionProxy")
         else:
             def Instance(className, instanceName):
                 # Call separate function to avoid exec problems
                 return self.makeInstance(className, instanceName, cls)
             def NewStyleInstance(className, instanceName):
-                return self.makeInstance(className, instanceName, "self.NewStyleInstanceProxy")
+                return self.makeInstance(className, instanceName, "NewStyleInstanceProxy")
             return self.evaluateResponse(response, cls, Instance, NewStyleInstance)
 
     def makeInstance(self, className, instanceName, baseClass):
@@ -56,121 +55,157 @@ class ModuleProxy:
             exec "import " + module
             return eval(response)
 
-    class InstanceProxy:
-        moduleProxy = None
-        def __init__(self, *args, **kw):
-            self.name = kw.get("givenInstanceName")
-            moduleProxy = kw.get("moduleProxy")
-            if moduleProxy is not None:
-                self.__class__.moduleProxy = moduleProxy
-            if self.name is None:
-                attrProxy = self.moduleProxy.AttributeProxy(self.moduleProxy, self.moduleProxy, self.__class__.__name__)
-                response = attrProxy.makeResponse(*args, **kw)
-                def Instance(className, instanceName):
-                    return instanceName
-                NewStyleInstance = Instance
-                self.name = eval(response)
+class InstanceProxy:
+    moduleProxy = None
+    def __init__(self, *args, **kw):
+        self.name = kw.get("givenInstanceName")
+        moduleProxy = kw.get("moduleProxy")
+        if moduleProxy is not None:
+            self.__class__.moduleProxy = moduleProxy
+        if self.name is None:
+            attrProxy = AttributeProxy(self.moduleProxy, self.moduleProxy, self.__class__.__name__)
+            response = attrProxy.makeResponse(*args, **kw)
+            def Instance(className, instanceName):
+                return instanceName
+            NewStyleInstance = Instance
+            self.name = eval(response)
 
-        def getRepresentationForSendToTrafficServer(self):
-            return self.name
+    def getRepresentationForSendToTrafficServer(self):
+        return self.name
 
-        def __getattr__(self, attrname):
-            return self.moduleProxy.AttributeProxy(self, self.moduleProxy, attrname).tryEvaluate()
+    def __getattr__(self, attrname):
+        return AttributeProxy(self, self.moduleProxy, attrname).tryEvaluate()
 
-        def __setattr__(self, attrname, value):
-            self.__dict__[attrname] = value
-            if attrname != "name":
-                self.moduleProxy.AttributeProxy(self, self.moduleProxy, attrname).setValue(value)
+    def __setattr__(self, attrname, value):
+        self.__dict__[attrname] = value
+        if attrname != "name":
+            AttributeProxy(self, self.moduleProxy, attrname).setValue(value)
 
-    class NewStyleInstanceProxy(InstanceProxy, object):
-        # Must intercept these as they are defined in "object"
-        def __repr__(self):
-            return self.__getattr__("__repr__")()
+class NewStyleInstanceProxy(InstanceProxy, object):
+    # Must intercept these as they are defined in "object"
+    def __repr__(self):
+        return self.__getattr__("__repr__")()
 
-        def __str__(self):
-            return self.__getattr__("__str__")()
+    def __str__(self):
+        return self.__getattr__("__str__")()
+
+class ExceptionProxy(InstanceProxy, Exception):
+    def __str__(self):
+        return self.__getattr__("__str__")()
+
+    # Only used in Python >= 2.5 where Exception is a new-style class
+    def __getattribute__(self, attrname):
+        if attrname in [ "name", "moduleProxy", "__dict__", "__class__", "__getattr__" ]:
+            return object.__getattribute__(self, attrname)
+        else:
+            return self.__getattr__(attrname)
+
+
+class AttributeProxy:
+    def __init__(self, modOrObjProxy, moduleProxy, attributeName):
+        self.modOrObjProxy = modOrObjProxy
+        self.moduleProxy = moduleProxy
+        self.attributeName = attributeName
+
+    def getRepresentationForSendToTrafficServer(self):
+        return self.modOrObjProxy.name + "." + self.attributeName
+
+    def tryEvaluate(self):
+        sock = self.moduleProxy.createSocket()
+        text = "SUT_PYTHON_ATTR:" + self.modOrObjProxy.name + ":SUT_SEP:" + self.attributeName
+        sock.sendall(text)
+        sock.shutdown(1)
+        response = sock.makefile().read()
+        if response:
+            return self.moduleProxy.handleResponse(response, "InstanceProxy")
+        else:
+            return self
+
+    def setValue(self, value):
+        sock = self.moduleProxy.createSocket()
+        text = "SUT_PYTHON_SETATTR:" + self.modOrObjProxy.name + ":SUT_SEP:" + self.attributeName + \
+               ":SUT_SEP:" + repr(self.getArgForSend(value))
+        sock.sendall(text)
+        sock.shutdown(2)
+
+    def __getattr__(self, name):
+        return self.__class__(self.modOrObjProxy, self.moduleProxy, self.attributeName + "." + name).tryEvaluate()
+
+    def __call__(self, *args, **kw):
+        response = self.makeResponse(*args, **kw)
+        if response:
+            return self.moduleProxy.handleResponse(response, "InstanceProxy")
+
+    def makeResponse(self, *args, **kw):
+        sock = self.createAndSend(*args, **kw)
+        sock.shutdown(1)
+        return sock.makefile().read()
+
+    def createAndSend(self, *args, **kw):
+        sock = self.moduleProxy.createSocket()
+        text = "SUT_PYTHON_CALL:" + self.modOrObjProxy.name + ":SUT_SEP:" + self.attributeName + \
+               ":SUT_SEP:" + repr(self.getArgsForSend(args)) + ":SUT_SEP:" + repr(self.getArgForSend(kw))
+        sock.sendall(text)
+        return sock
+
+    def getArgForSend(self, arg):
+        class ArgWrapper:
+            def __init__(self, arg, moduleProxy):
+                self.arg = arg
+                self.moduleProxy = moduleProxy
+            def __repr__(self):
+                if hasattr(self.arg, "getRepresentationForSendToTrafficServer"):
+                    # We choose a long and obscure name to avoid accident clashes with something else
+                    return self.arg.getRepresentationForSendToTrafficServer()
+                elif isinstance(self.arg, list):
+                    return repr([ ArgWrapper(subarg, self.moduleProxy) for subarg in self.arg ])
+                elif isinstance(self.arg, dict):
+                    newDict = {}
+                    for key, val in self.arg.items():
+                        newDict[key] = ArgWrapper(val, self.moduleProxy)
+                    return repr(newDict)
+                else:
+                    return repr(self.arg)
+        return ArgWrapper(arg, self.moduleProxy)
+
+    def getArgsForSend(self, args):
+        return tuple(map(self.getArgForSend, args))
+
+
+class PackageProxyLoader:
+    def load_module(self, name):
+        # Just create an empty package
+        import imp
+        new_mod = imp.new_module(name)
+        new_mod.__path__ = []
+        sys.modules[name] = new_mod
+        return new_mod
+
+
+class ImportHandler:
+    def __init__(self, moduleNames):
+        self.moduleNames = moduleNames
+        self.packageNames = []
+        for name in moduleNames:
+            self.addAllPackages(name)
+
+    def addAllPackages(self, name):
+        if "." in name:
+            parentPackage = name.rsplit(".", 1)[0]
+            self.packageNames.append(parentPackage)
+            self.addAllPackages(parentPackage)
         
-    class ExceptionProxy(InstanceProxy, Exception):
-        def __str__(self):
-            return self.__getattr__("__str__")()
+    def find_module(self, name, *args):
+        if name in self.moduleNames:
+            return self
+        elif name in self.packageNames:
+            return PackageProxyLoader()
 
-        # Only used in Python >= 2.5 where Exception is a new-style class
-        def __getattribute__(self, attrname):
-            if attrname in [ "name", "moduleProxy", "__dict__", "__class__", "__getattr__" ]:
-                return object.__getattribute__(self, attrname)
-            else:
-                return self.__getattr__(attrname)
+    def load_module(self, name):
+        return sys.modules.setdefault(name, ModuleProxy(name))
 
-    
-    class AttributeProxy:
-        def __init__(self, modOrObjProxy, moduleProxy, attributeName):
-            self.modOrObjProxy = modOrObjProxy
-            self.moduleProxy = moduleProxy
-            self.attributeName = attributeName
-
-        def getRepresentationForSendToTrafficServer(self):
-            return self.modOrObjProxy.name + "." + self.attributeName
-
-        def tryEvaluate(self):
-            sock = self.moduleProxy.createSocket()
-            text = "SUT_PYTHON_ATTR:" + self.modOrObjProxy.name + ":SUT_SEP:" + self.attributeName
-            sock.sendall(text)
-            sock.shutdown(1)
-            response = sock.makefile().read()
-            if response:
-                return self.moduleProxy.handleResponse(response, "self.InstanceProxy")
-            else:
-                return self
-
-        def setValue(self, value):
-            sock = self.moduleProxy.createSocket()
-            text = "SUT_PYTHON_SETATTR:" + self.modOrObjProxy.name + ":SUT_SEP:" + self.attributeName + \
-                   ":SUT_SEP:" + repr(self.getArgForSend(value))
-            sock.sendall(text)
-            sock.shutdown(2)
-
-        def __getattr__(self, name):
-            return self.__class__(self.modOrObjProxy, self.moduleProxy, self.attributeName + "." + name).tryEvaluate()
-
-        def __call__(self, *args, **kw):
-            response = self.makeResponse(*args, **kw)
-            if response:
-                return self.moduleProxy.handleResponse(response, "self.InstanceProxy")
-
-        def makeResponse(self, *args, **kw):
-            sock = self.createAndSend(*args, **kw)
-            sock.shutdown(1)
-            return sock.makefile().read()
-        
-        def createAndSend(self, *args, **kw):
-            sock = self.moduleProxy.createSocket()
-            text = "SUT_PYTHON_CALL:" + self.modOrObjProxy.name + ":SUT_SEP:" + self.attributeName + \
-                   ":SUT_SEP:" + repr(self.getArgsForSend(args)) + ":SUT_SEP:" + repr(self.getArgForSend(kw))
-            sock.sendall(text)
-            return sock
-
-        def getArgForSend(self, arg):
-            class ArgWrapper:
-                def __init__(self, arg, moduleProxy):
-                    self.arg = arg
-                    self.moduleProxy = moduleProxy
-                def __repr__(self):
-                    if hasattr(self.arg, "getRepresentationForSendToTrafficServer"):
-                        # We choose a long and obscure name to avoid accident clashes with something else
-                        return self.arg.getRepresentationForSendToTrafficServer()
-                    elif isinstance(self.arg, list):
-                        return repr([ ArgWrapper(subarg, self.moduleProxy) for subarg in self.arg ])
-                    elif isinstance(self.arg, dict):
-                        newDict = {}
-                        for key, val in self.arg.items():
-                            newDict[key] = ArgWrapper(val, self.moduleProxy)
-                        return repr(newDict)
-                    else:
-                        return repr(self.arg)
-            return ArgWrapper(arg, self.moduleProxy)
-                    
-        def getArgsForSend(self, args):
-            return tuple(map(self.getArgForSend, args))
+def interceptModules(moduleNames):
+    sys.meta_path.append(ImportHandler(moduleNames))
 
 
 # Workaround for stuff where we can't do setattr
@@ -211,6 +246,3 @@ class PartialModuleProxy(ModuleProxy):
                 self.interceptAttribute(currAttrProxy, realAttrProxy, parts[1])
                 setattr(realObj, currAttrName, realAttrProxy)
 
-
-if __name__ != "traffic_pymodule":
-    sys.modules[__name__] = ModuleProxy(__name__)

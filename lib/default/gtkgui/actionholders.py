@@ -227,9 +227,6 @@ class NotebookGUI(guiutils.SubGUI):
         self.notebook.connect("switch-page", self.pageSwitched)
         return self.notebook
 
-    def shouldShowCurrent(self, *args):
-        return any((tg.shouldShowCurrent(*args) for tg in self.tabInfo))
-
     def createPage(self, tabGUI, tabName):
         self.diag.info("Adding page " + tabName)
         page = tabGUI.createView()

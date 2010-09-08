@@ -19,7 +19,6 @@ def trySetupTraffic():
     if pythonVarStr:
         import traffic_pymodule
         traffic_pymodule.interceptPython(pythonVarStr.split(","))
-        del os.environ["TEXTTEST_MIM_PYTHON"] # Don't propagate it further, we've used it now...
 
 def restoreOriginal():
     # Need to load the "real" sitecustomize now

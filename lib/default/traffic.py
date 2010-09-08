@@ -169,16 +169,13 @@ class AttributeLineFilter(LineFilter):
 
 class InterceptInfo:
     def __init__(self, test, replayFile):
-        self.commands = self.getCommandsForInterception(test)
+        # This gets all names in collect_traffic, not just those marked
+        # "asynchronous"! (it will also pick up "default").
+        self.commands = test.getCompositeConfigValue("collect_traffic", "asynchronous")
         self.pyAttributes = test.getConfigValue("collect_traffic_python")
         if replayFile:
             self.filterForReplay(replayFile)
         
-    def getCommandsForInterception(self, test):
-        # This gets all names in collect_traffic, not just those marked
-        # "asynchronous"! (it will also pick up "default").
-        return test.getCompositeConfigValue("collect_traffic", "asynchronous")
-
     def makeLineFilters(self):
         return map(CommandLineFilter, self.commands) + \
                map(AttributeLineFilter, self.pyAttributes)

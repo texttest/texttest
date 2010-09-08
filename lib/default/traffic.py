@@ -31,13 +31,12 @@ class SetUpTrafficHandlers(plugins.Action):
         interceptInfo = InterceptInfo(test, replayFile if not self.record else None)
         pathVars = self.makeIntercepts(interceptDir, interceptInfo, serverActive, pythonCoverage)
         if serverActive:
-            if interceptInfo.pyAttributes:
-                test.setEnvironment("TEXTTEST_MIM_PYTHON", ",".join(interceptInfo.pyAttributes))
-
             self.trafficServerProcess = self.makeTrafficServer(test, replayFile, interceptInfo)
             address = self.trafficServerProcess.stdout.readline().strip()
             test.setEnvironment("TEXTTEST_MIM_SERVER", address) # Address of TextTest's server for recording client/server traffic
-            
+            if interceptInfo.pyAttributes:
+                test.setEnvironment("TEXTTEST_MIM_PYTHON", ",".join(interceptInfo.pyAttributes))
+
         for pathVar in pathVars:
             # Change test environment to pick up the intercepts
             test.setEnvironment(pathVar, interceptDir + os.pathsep + test.getEnvironment(pathVar, ""))

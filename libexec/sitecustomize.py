@@ -14,20 +14,21 @@ def trySetupCoverage(): # pragma: no cover - can hardly measure coverage here :)
             pass
 
 
-def trySetupTraffic():
+def doInterceptions():
     pythonVarStr = os.getenv("TEXTTEST_MIM_PYTHON")
     if pythonVarStr:
         import traffic_pymodule
         traffic_pymodule.interceptPython(pythonVarStr.split(","))
+        del os.environ["TEXTTEST_MIM_PYTHON"] # Guard against double setup when in the self-tests
 
-def restoreOriginal():
     # Need to load the "real" sitecustomize now
     import imp
     myDir = os.path.dirname(__file__)
     pos = sys.path.index(myDir)
     modInfo = imp.find_module("sitecustomize", sys.path[pos + 1:])
     imp.load_module("sitecustomize", *modInfo)
+    if pythonVarStr:
+        os.environ["TEXTTEST_MIM_PYTHON"] = pythonVarStr
 
 trySetupCoverage() # pragma: no cover - coverage not set up yet
-trySetupTraffic() # pragma: no cover - coverage not set up yet
-restoreOriginal() # pragma: no cover - coverage not set up yet
+doInterceptions() # pragma: no cover - coverage not set up yet

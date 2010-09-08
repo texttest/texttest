@@ -144,7 +144,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         self.diag.info("Using test suite at " + repr(roots))
         subDirs = []
         for root in roots:
-            for f in os.listdir(root):
+            for f in sorted(os.listdir(root)):
                 path = os.path.join(root, f)
                 if os.path.isdir(path):
                     subDirs.append(path)
@@ -164,7 +164,8 @@ class TextTest(plugins.Responder, plugins.Observable):
         raisedError = False
         selectedAppDict = self.inputOptions.findSelectedAppNames()
         for dir in searchDirs:
-            subRaisedError, apps = self.findAppsUnder(dir, selectedAppDict)
+            ignoreNames = [ app.name for app in appList ]
+            subRaisedError, apps = self.findAppsUnder(dir, selectedAppDict, ignoreNames)
             appList += apps
             raisedError |= subRaisedError
 
@@ -185,7 +186,7 @@ class TextTest(plugins.Responder, plugins.Observable):
 
     def compareApps(self, app1, app2):
         return cmp(app1.name, app2.name)
-    def findAppsUnder(self, dirName, selectedAppDict):
+    def findAppsUnder(self, dirName, selectedAppDict, ignoreNames):
         appList = []
         raisedError = False
         self.diag.info("Selecting apps in " + dirName + " according to dictionary :" + repr(selectedAppDict))
@@ -199,7 +200,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             appName = components[1]
             
             # Ignore emacs backup files and stuff we haven't selected
-            if appName.endswith("~") or (len(selectedAppDict) and not selectedAppDict.has_key(appName)):
+            if appName.endswith("~") or (len(selectedAppDict) and not selectedAppDict.has_key(appName)) or appName in ignoreNames:
                 continue
 
             self.diag.info("Building apps from " + f)

@@ -223,7 +223,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         try:
             return testmodel.Application(appName, dircache, versions, self.inputOptions)
         except (testmodel.BadConfigError, plugins.TextTestError), e:
-            sys.stderr.write("Could not use application '" + appName +  "' - " + str(e) + "\n")
+            sys.stderr.write("Unable to load application from file 'config." + appName +  "' - " + str(e) + ".\n")
 
     def addApplication(self, appName, dircache, appVersions, allVersions=[]):
         app = self.createApplication(appName, dircache, appVersions)

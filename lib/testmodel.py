@@ -1138,7 +1138,7 @@ class ConfigurationCall:
         self.name = name
         self.app = app
         self.firstAttemptException = ""
-        self.targetCall = eval("app.configObject." + name)
+        self.targetCall = getattr(app.configObject, name)
     def __call__(self, *args, **kwargs):
         try:
             return self.targetCall(*args, **kwargs)
@@ -1175,17 +1175,22 @@ class Application:
         self.diag = logging.getLogger("application")
         self.inputOptions = inputOptions
         self.setUpConfiguration(configEntries)
+        self.checkSanity()
         self.writeDirectory = self.getWriteDirectory()
         self.rootTmpDir = os.path.dirname(self.writeDirectory)
         self.diag.info("Write directory at " + self.writeDirectory)
         self.checkout = self.configObject.setUpCheckout(self)
         self.diag.info("Checkout set to " + self.checkout)
+        
     def __repr__(self):
         return self.fullName() + self.versionSuffix()
+
     def __hash__(self):
         return id(self)
+
     def fullName(self):
         return self.getConfigValue("full_name")
+
     def getPersonalConfigFiles(self):
         includePersonal = self.inputOptions.configPathOptions()[1]
         if not includePersonal:
@@ -1270,11 +1275,11 @@ class Application:
             if sys.exc_type == exceptions.ImportError:
                 errorString = "No module named " + moduleName
                 if str(sys.exc_value) == errorString:
-                    raise BadConfigError, "could not find config_module " + moduleName
+                    raise BadConfigError, "could not find config_module " + repr(moduleName)
                 elif str(sys.exc_value) == "cannot import name getConfig":
-                    raise BadConfigError, "module " + moduleName + " is not intended for use as a config_module"
+                    raise BadConfigError, "module " + repr(moduleName) + " is not intended for use as a config_module"
             plugins.printException()
-            raise BadConfigError, "config_module " + moduleName + " contained errors and could not be imported"
+            raise BadConfigError, "config_module " + repr(moduleName) + " contained errors and could not be imported"
 
     def __getattr__(self, name): # If we can't find a method, assume the configuration has got one
         if hasattr(self.configObject, name):
@@ -1284,6 +1289,10 @@ class Application:
 
     def getDirectory(self):
         return self.dircache.dir
+
+    def checkSanity(self):
+        if not self.getConfigValue("executable"):
+            raise BadConfigError, "config file entry 'executable' not defined"
 
     def getRunMachine(self):
         if self.inputOptions.has_key("m"):

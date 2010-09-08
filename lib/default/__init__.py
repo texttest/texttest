@@ -789,8 +789,6 @@ class Config:
                 
     def checkExecutableExists(self, suite):
         executable = suite.getConfigValue("executable")
-        if not executable:
-            raise plugins.TextTestError, "config file entry 'executable' not defined"
         if self.executableShouldBeFile(suite.app, executable) and not os.path.isfile(executable):
             self.handleNonExistent(executable, "executable program", suite.app)
 

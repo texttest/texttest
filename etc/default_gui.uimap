@@ -968,3 +968,6 @@ clicked =
 [Label=gtk-no]
 clicked = 
 
+[Title=Rerun selected tests]
+response.accept = perform rerun
+

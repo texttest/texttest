@@ -25,10 +25,12 @@ def doInterceptions():
     import imp
     myDir = os.path.dirname(__file__)
     pos = sys.path.index(myDir)
-    modInfo = imp.find_module("sitecustomize", sys.path[pos + 1:])
-    imp.load_module("sitecustomize", *modInfo)
-    if pythonVarStr:
-        os.environ["TEXTTEST_MIM_PYTHON"] = pythonVarStr
+    try:
+        modInfo = imp.find_module("sitecustomize", sys.path[pos + 1:])
+        imp.load_module("sitecustomize", *modInfo)
+    finally:
+        if pythonVarStr:
+            os.environ["TEXTTEST_MIM_PYTHON"] = pythonVarStr
 
 trySetupCoverage() # pragma: no cover - coverage not set up yet
 doInterceptions() # pragma: no cover - coverage not set up yet

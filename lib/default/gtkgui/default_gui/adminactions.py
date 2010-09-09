@@ -552,6 +552,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
 class ImportFiles(guiplugins.ActionDialogGUI):
     def __init__(self, allApps, dynamic, inputOptions):
         self.creationDir = None
+        self.defaultAppendAppName = False
         self.appendAppName = False
         self.currentStem = ""
         self.fileChooser = None
@@ -610,6 +611,8 @@ class ImportFiles(guiplugins.ActionDialogGUI):
             version = self.optionGroup.getOptionValue("v")
             sourcePath = self.getDefaultSourcePath(newStem, version)
             self.optionGroup.setValue("src", sourcePath)
+            if self.defaultAppendAppName:
+                self.updateAppendAppName(newStem != "testcustomize.py")
 
     def actionChanged(self, *args):
         if self.fileChooser:
@@ -679,8 +682,12 @@ class ImportFiles(guiplugins.ActionDialogGUI):
             self.setSensitivity(newActive)
             if newActive:
                 self.updateStems(fileType)
-                self.appendAppName = (fileType == "definition" or fileType == "standard")
-                self.optionGroup.setValue("act", int(self.appendAppName))
+                self.defaultAppendAppName = (fileType == "definition" or fileType == "standard")
+                self.updateAppendAppName(self.defaultAppendAppName)
+
+    def updateAppendAppName(self, setting):
+        self.appendAppName = setting
+        self.optionGroup.setValue("act", int(setting))
 
     def findAllStems(self, fileType):
         if fileType == "definition":

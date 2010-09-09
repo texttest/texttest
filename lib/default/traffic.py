@@ -19,17 +19,18 @@ class SetUpTrafficHandlers(plugins.Action):
         return files
 
     def __call__(self, test):
+        pythonCustomizeFiles = test.getAllPathNames("testcustomize.py") 
         pythonCoverage = test.hasEnvironment("COVERAGE_PROCESS_START")
-        if test.app.usesTrafficMechanism() or pythonCoverage:
+        if test.app.usesTrafficMechanism() or pythonCoverage or pythonCustomizeFiles:
             replayFile = test.getFileName("traffic")
             serverActive = self.record or replayFile
-            if serverActive or pythonCoverage:
-                self.setUpIntercepts(test, replayFile, serverActive, pythonCoverage)
+            if serverActive or pythonCoverage or pythonCustomizeFiles:
+                self.setUpIntercepts(test, replayFile, serverActive, pythonCoverage, pythonCustomizeFiles)
 
-    def setUpIntercepts(self, test, replayFile, serverActive, pythonCoverage):
+    def setUpIntercepts(self, test, replayFile, serverActive, pythonCoverage, pythonCustomizeFiles):
         interceptDir = test.makeTmpFileName("traffic_intercepts", forComparison=0)
         interceptInfo = InterceptInfo(test, replayFile if not self.record else None)
-        pathVars = self.makeIntercepts(interceptDir, interceptInfo, serverActive, pythonCoverage)
+        pathVars = self.makeIntercepts(interceptDir, interceptInfo, serverActive, pythonCoverage, pythonCustomizeFiles)
         if serverActive:
             self.trafficServerProcess = self.makeTrafficServer(test, replayFile, interceptInfo)
             address = self.trafficServerProcess.stdout.readline().strip()
@@ -77,7 +78,7 @@ class SetUpTrafficHandlers(plugins.Action):
         return subprocess.Popen(cmdArgs, env=test.getRunEnvironment(), universal_newlines=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     
-    def makeIntercepts(self, interceptDir, interceptInfo, serverActive, pythonCoverage):
+    def makeIntercepts(self, interceptDir, interceptInfo, serverActive, pythonCoverage, pythonCustomizeFiles):
         pathVars = []
         if serverActive:
             for cmd in interceptInfo.commands:
@@ -91,8 +92,11 @@ class SetUpTrafficHandlers(plugins.Action):
 
             if len(interceptInfo.pyAttributes) > 0:
                 self.interceptOwnModule(self.trafficPyModuleFile, interceptDir)
+
+        if pythonCustomizeFiles:
+            self.interceptOwnModule(pythonCustomizeFiles[-1], interceptDir) # most specific
                 
-        useSiteCustomize = (serverActive and len(interceptInfo.pyAttributes) > 0) or pythonCoverage
+        useSiteCustomize = (serverActive and len(interceptInfo.pyAttributes) > 0) or pythonCoverage or pythonCustomizeFiles
         if useSiteCustomize:
             self.interceptOwnModule(self.siteCustomizeFile, interceptDir)
             pathVars.append("PYTHONPATH")

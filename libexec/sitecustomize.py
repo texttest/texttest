@@ -15,6 +15,12 @@ def trySetupCoverage(): # pragma: no cover - can hardly measure coverage here :)
 
 
 def doInterceptions():
+    try:
+        # Generic file name to customize the behaviour of Python per test
+        import testcustomize
+    except ImportError:
+        pass
+    
     pythonVarStr = os.getenv("TEXTTEST_MIM_PYTHON")
     if pythonVarStr:
         import traffic_pymodule

@@ -278,7 +278,7 @@ class Test(plugins.Observable):
 
     def listStandardFiles(self, allVersions, defFileCategory="all"):
         resultFiles, defFiles = [],[]
-        self.diagnose("Looking for all standard files")
+        self.diagnose("Looking for standard files, definition files in category " + repr(defFileCategory))
         defFileStems = self.expandedDefFileStems(defFileCategory)
         for stem in defFileStems:
             defFiles += self.listStdFilesWithStem(stem, allVersions)
@@ -353,7 +353,7 @@ class Test(plugins.Observable):
         return False
     
     def findAllStdFiles(self, stem):
-        if stem in [ "environment", "properties" ]:
+        if stem in [ "environment", "properties", "testcustomize.py" ]:
             otherApps = self.app.findOtherAppNames()
             self.diagnose("Finding environment files, excluding " + repr(otherApps))
             otherAppExcludor = lambda vset: len(vset.intersection(otherApps)) == 0

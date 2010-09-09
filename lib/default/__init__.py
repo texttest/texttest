@@ -1280,7 +1280,10 @@ class Config:
 
     def setDependentConfigDefaults(self, app):
         # For setting up configuration where the config file needs to have been read first
-        # Should return True if it does anything
+        # Should return True if it does anything that could cause new config files to be found
+        interpreter = app.getConfigValue("interpreter")
+        if "python" in interpreter or "pyusecase" in interpreter:
+            app.addConfigEntry("default", "testcustomize.py", "definition_file_stems")
         return False
 
 

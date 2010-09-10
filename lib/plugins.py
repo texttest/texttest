@@ -5,6 +5,7 @@ from traceback import format_exception
 from threading import currentThread
 from Queue import Queue, Empty
 from glob import glob
+from copy import deepcopy
 
 # We standardise around UNIX paths, it's all much easier that way. They work fine,
 # and they don't run into weird issues in being confused with escape characters
@@ -1139,12 +1140,16 @@ class TextTrigger:
 # Used for application and personal configuration files
 class MultiEntryDictionary(seqdict):
     warnings = []
-    def __init__(self, importKey="", importFileFinder=None):
-        seqdict.__init__(self)
+    def __init__(self, importKey="", importFileFinder=None, aliases={}, **kw):
+        seqdict.__init__(self, **kw)
         self.diag = logging.getLogger("MultiEntryDictionary")
-        self.aliases = {}
+        self.aliases = aliases
         self.importKey = importKey
         self.importFileFinder= importFileFinder
+
+    def __deepcopy__(self, memo):
+        return MultiEntryDictionary(self.importKey, self.importFileFinder, self.aliases,
+                                    List=deepcopy(self.list, memo), Dict=deepcopy(self.dict, memo))
 
     def getSectionInfo(self, sectionName=""):
         if sectionName and sectionName != "end":

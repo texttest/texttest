@@ -4,6 +4,7 @@ from ndict import seqdict
 from cPickle import Pickler, loads, UnpicklingError
 from threading import Lock
 from tempfile import mkstemp
+from copy import deepcopy
 
 helpIntro = """
 Note: the purpose of this help is primarily to document derived configurations and how they differ from the
@@ -168,7 +169,7 @@ class TestEnvironment(seqdict):
         
 # Base class for TestCase and TestSuite
 class Test(plugins.Observable):
-    def __init__(self, name, description, dircache, app, parent = None):
+    def __init__(self, name, description, dircache, app, parent=None, configDir=None):
         # Should notify which test it is
         plugins.Observable.__init__(self, passSelf=True)
         self.name = name
@@ -178,6 +179,8 @@ class Test(plugins.Observable):
         self.app = app
         self.parent = parent
         self.dircache = dircache
+        self.configDir = configDir
+        self.tryPopulateConfig()
         populateFunction = plugins.Callable(app.setEnvironment, self)
         self.environment = TestEnvironment(populateFunction)
         # Java equivalent of the environment mechanism...
@@ -185,10 +188,23 @@ class Test(plugins.Observable):
         self.diag = logging.getLogger("test objects")
         # Test suites never change state, but it's convenient that they have one
         self.state = plugins.TestState("not_started")
+
+    def tryPopulateConfig(self):
+        if self.configDir is None and self.dircache.hasStem("config"):
+            self.configDir = self.copyParentConfigDir()
+            self.app.readValues(self.configDir, "config", [ self.dircache ], insert=False, errorOnUnknown=True)
+
+    def copyParentConfigDir(self):
+        for suite in self.getAllTestsToRoot():
+            if suite.configDir:
+                return deepcopy(suite.configDir)
+        
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.name
+
     def paddedRepr(self):
         return repr(self.app) + " " + self.classId() + " " + self.paddedName()
+
     def paddedName(self):
         if not self.parent:
             return self.name
@@ -427,11 +443,21 @@ class Test(plugins.Observable):
             appToUse = self.app.getRefVersionApplication(refVersion)
         return appToUse.getAllFileNames([ self.dircache ], stem)
 
-    def getConfigValue(self, key, expandVars=True):
-        return self.app.getConfigValue(key, expandVars, self.environment)
+    def getConfigValue(self, key, expandVars=True, envMapping=None):
+        if envMapping is None:
+            envMapping = self.environment
+        if self.configDir:
+            return self.configDir.getSingle(key, expandVars, envMapping)
+        else:
+            return self.parent.getConfigValue(key, expandVars, envMapping)
 
-    def getCompositeConfigValue(self, key, subKey, expandVars=True):
-        return self.app.getCompositeConfigValue(key, subKey, expandVars, self.environment)
+    def getCompositeConfigValue(self, key, subKey, expandVars=True, envMapping=None):
+        if envMapping is None:
+            envMapping = self.environment
+        if self.configDir:
+            return self.configDir.getComposite(key, subKey, expandVars, envMapping)
+        else:
+            return self.parent.getCompositeConfigValue(key, subKey, expandVars, envMapping)
 
     def configValueMatches(self, key, filePattern):
         for currPattern in self.getConfigValue(key):
@@ -831,8 +857,8 @@ class TestSuiteFileHandler:
 
 class TestSuite(Test):
     testSuiteFileHandler = TestSuiteFileHandler()
-    def __init__(self, name, description, dircache, app, parent=None):
-        Test.__init__(self, name, description, dircache, app, parent)
+    def __init__(self, name, description, dircache, app, parent=None, configDir=None):
+        Test.__init__(self, name, description, dircache, app, parent, configDir)
         self.testcases = []
         contentFile = self.getContentFileName()
         if not contentFile:
@@ -1174,6 +1200,7 @@ class Application:
         self.versions = versions
         self.diag = logging.getLogger("application")
         self.inputOptions = inputOptions
+        self.configDir = plugins.MultiEntryDictionary(importKey="import_config_file", importFileFinder=self.configPath)
         self.setUpConfiguration(configEntries)
         self.checkSanity()
         self.writeDirectory = self.getWriteDirectory()
@@ -1200,7 +1227,7 @@ class Application:
             return self.getAllFileNames([ dircache ], "config")
         
     def setUpConfiguration(self, configEntries={}):
-        self.configDir = plugins.MultiEntryDictionary(importKey="import_config_file", importFileFinder=self.configPath)
+        self.configDir.clear()
         self.configDocs = {}
         self.extraDirCaches = {}
         self.setConfigDefaults()
@@ -1494,7 +1521,7 @@ class Application:
             dircache = DirectoryCache(otherDir)
         else:
             dircache = self.dircache
-        suite = TestSuite(os.path.basename(dircache.dir), "Root test suite", dircache, self)
+        suite = TestSuite(os.path.basename(dircache.dir), "Root test suite", dircache, self, configDir=self.configDir)
         suite.setObservers(responders)
         return suite
 

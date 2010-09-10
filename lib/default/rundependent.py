@@ -77,11 +77,14 @@ class FilterAction(plugins.Action):
 
     def _makeAllFilters(self, test, stem, app):                    
         filters = []
-        runDepTexts = app.getCompositeConfigValue("run_dependent_text", stem)
+        configObj = test
+        if test.app is not app: # happens when testing filtering in the static GUI
+            configObj = app
+        runDepTexts = configObj.getCompositeConfigValue("run_dependent_text", stem)
         if runDepTexts:
             filters.append((RunDependentTextFilter(runDepTexts, test.getRelPath()), ".normal"))
 
-        unorderedTexts = app.getCompositeConfigValue("unordered_text", stem)
+        unorderedTexts = configObj.getCompositeConfigValue("unordered_text", stem)
         if unorderedTexts:
             filters.append((UnorderedTextFilter(unorderedTexts, test.getRelPath()), ".sorted"))
         return filters

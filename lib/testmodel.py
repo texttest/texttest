@@ -1450,7 +1450,7 @@ class Application:
         self.setConfigDefault("link_test_path", [], "Paths to be linked from the temp. directory when running tests")
         self.setConfigDefault("test_data_ignore", { "default" : [] }, \
                               "Elements under test data structures which should not be viewed or change-monitored")
-        self.setConfigDefault("definition_file_stems", { "default": [], "builtin": [ "environment", "properties", "testsuite" ]}, \
+        self.setConfigDefault("definition_file_stems", { "default": [], "builtin": [ "config", "environment", "properties", "testsuite" ]}, \
                               "files to be shown as definition files by the static GUI")
         self.setConfigDefault("unsaveable_version", [], "Versions which should not have results saved for them")
         self.setConfigDefault("version_priority", { "default": 99 }, \

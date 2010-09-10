@@ -558,15 +558,6 @@ class PythonModuleTraffic(Traffic):
         modStr = options.python_module_intercepts
         if modStr:
             cls.interceptModules.update(modStr.split(","))
-            cls.interceptModules.update(cls.getModuleParents(cls.interceptModules))
-            
-    @staticmethod
-    def getModuleParents(modules):
-        parents = []
-        for module in modules:
-            for ix in range(module.count(".")):
-                parents.append(module.rsplit(".", ix + 1)[0])
-        return parents
 
     def getModuleName(self, obj):
         if hasattr(obj, "__module__"): # classes, functions, many instances

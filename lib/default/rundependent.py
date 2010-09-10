@@ -229,7 +229,8 @@ class LineNumberTrigger:
 
 def getWriteDirRegexp(testId):
     # Some stuff, a date, and the testId (ignore the appId as we don't know when or where)
-    return "[^ \"=]*/[^ \"=]*[0-3][0-9][A-Za-z][a-z][a-z][0-9]{6}[^ \"=]*/" + testId
+    # Doesn't handle paths with spaces, which seems hard, but does hardcode the default location of $HOME on Windows...
+    return '([A-Za-z]:/Documents and Settings)?[^ "=]*/[^ "=]*[0-3][0-9][A-Za-z][a-z][a-z][0-9]{6}[^ "=]*/' + testId
 
 class LineFilter:
     dividers = [ "{->}", "{[->]}", "{[->}", "{->]}" ]

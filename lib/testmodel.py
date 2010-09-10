@@ -430,6 +430,9 @@ class Test(plugins.Observable):
     def getConfigValue(self, key, expandVars=True):
         return self.app.getConfigValue(key, expandVars, self.environment)
 
+    def getCompositeConfigValue(self, key, subKey, expandVars=True):
+        return self.app.getCompositeConfigValue(key, subKey, expandVars, self.environment)
+
     def configValueMatches(self, key, filePattern):
         for currPattern in self.getConfigValue(key):
             if fnmatch.fnmatch(filePattern, currPattern):
@@ -438,9 +441,6 @@ class Test(plugins.Observable):
 
     def getDataFileNames(self):
         return self.app.getDataFileNames(self.environment)
-
-    def getCompositeConfigValue(self, key, subKey, expandVars=True):
-        return self.app.getCompositeConfigValue(key, subKey, expandVars, self.environment)
             
     def getRelPath(self):
         if self.parent:
@@ -1625,33 +1625,12 @@ class Application:
         print header
         self.configObject.printHelpText()
 
-    def getConfigValue(self, key, expandVars=True, envMapping=os.environ):
-        value = self.configDir.get(key)
-        if expandVars:
-            return self.expandEnvironment(value, envMapping)
-        else:
-            return value
+    def getConfigValue(self, *args, **kw):
+        return self.configDir.getSingle(*args, **kw)
 
-    def expandEnvironment(self, value, envMapping):
-        if type(value) == types.StringType:
-            return string.Template(value).safe_substitute(envMapping)
-        elif type(value) == types.ListType:
-            return [ string.Template(element).safe_substitute(envMapping) for element in value ]
-        elif type(value) == types.DictType:
-            newDict = {}
-            for key, val in value.items():
-                newDict[key] = self.expandEnvironment(val, envMapping)
-            return newDict
-        else:
-            return value
-
-    def getCompositeConfigValue(self, key, subKey, expandVars=True, envMapping=os.environ, defaultKey="default"):
-        value = self.configDir.getComposite(key, subKey, defaultKey)
-        if expandVars:
-            return self.expandEnvironment(value, envMapping)
-        else:
-            return value
-
+    def getCompositeConfigValue(self, *args, **kw):
+        return self.configDir.getComposite(*args, **kw)
+       
     def addConfigEntry(self, key, value, sectionName = ""):
         self.configDir.addEntry(key, value, sectionName, insert=False, errorOnUnknown=True)
     def setConfigDefault(self, key, value, docString = ""):

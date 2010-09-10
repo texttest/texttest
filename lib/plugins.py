@@ -1275,7 +1275,21 @@ class MultiEntryDictionary(seqdict):
         else:
             currDict[entryName] = currType(entry)
 
-    def getComposite(self, key, subKey, defaultSubKey="default"):
+    def getSingle(self, key, expandVars=True, envMapping=os.environ):
+        value = self.get(key)
+        if expandVars:
+            return self.expandEnvironment(value, envMapping)
+        else:
+            return value
+
+    def getComposite(self, key, subKey, expandVars=True, envMapping=os.environ, defaultKey="default"):
+        value = self.getCompositeUnexpanded(key, subKey, defaultKey)
+        if expandVars:
+            return self.expandEnvironment(value, envMapping)
+        else:
+            return value
+
+    def getCompositeUnexpanded(self, key, subKey, defaultSubKey="default"):
         dict = self.get(key)
         # If it wasn't a dictionary, return None
         if not hasattr(dict, "items"):
@@ -1301,6 +1315,20 @@ class MultiEntryDictionary(seqdict):
                     return defValue
         if usingList:
             return listVal
+
+    @classmethod
+    def expandEnvironment(cls, value, envMapping):
+        if isinstance(value, str):
+            return string.Template(value).safe_substitute(envMapping)
+        elif isinstance(value, list):
+            return [ string.Template(element).safe_substitute(envMapping) for element in value ]
+        elif isinstance(value, dict):
+            newDict = {}
+            for key, val in value.items():
+                newDict[key] = cls.expandEnvironment(val, envMapping)
+            return newDict
+        else:
+            return value
 
 
 class Option:

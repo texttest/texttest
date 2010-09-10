@@ -205,7 +205,7 @@ class GUIConfig:
             return self._getFromApps(self._simpleValue, nameToUse)
     def getCompositeValue(self, sectionName, entryName, modeDependent=False, defaultKey="default"):
         nameToUse = self.getConfigName(entryName, modeDependent)
-        value = self.configDir.getComposite(sectionName, nameToUse, defaultKey)
+        value = self.configDir.getComposite(sectionName, nameToUse, defaultKey=defaultKey)
         if value is None:
             value = self._getFromApps(self._compositeValue, sectionName, nameToUse, defaultKey=defaultKey)
         if modeDependent and value is None:

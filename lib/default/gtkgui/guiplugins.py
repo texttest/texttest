@@ -508,14 +508,20 @@ class OptionGroupGUI(ActionGUI):
         return label
 
     def connectEntry(self, option, entryOrBuffer):
-        entryOrBuffer.set_text(option.getValue())
+        entryOrBuffer.set_text(str(option.getValue()))
         # Don't pass entry.set_text directly, it will mess up PyUseCase's programmatic method interception
-        option.setMethods(self.getGetTextMethod(entryOrBuffer), lambda t: entryOrBuffer.set_text(t))
+        option.setMethods(self.getGetTextMethod(entryOrBuffer), lambda t: entryOrBuffer.set_text(str(t)))
         if option.changeMethod:
             entryOrBuffer.connect("changed", option.changeMethod)
         
     def getGetTextMethod(self, widget):
-        if isinstance(widget, gtk.Entry):
+        if isinstance(widget, gtk.SpinButton):
+            # Would be nice to return widget.get_value_as_int but that returns the wrong answer from
+            # dialogs that have been closed
+            def get_text():
+                return int(widget.get_text())
+            return get_text
+        elif isinstance(widget, gtk.Entry):
             return widget.get_text
         else:
             def get_text():
@@ -653,13 +659,6 @@ class OptionGroupGUI(ActionGUI):
         text = model.get_value(iter, 0)
         return text == "-" * 10
 
-    def isNumeric(self, value):
-        try:
-            int(value)
-            return True
-        except ValueError:
-            return False
-
     def createOptionWidget(self, option):
         optionName = option.name.strip()
         if option.multilineEntry:
@@ -678,8 +677,8 @@ class OptionGroupGUI(ActionGUI):
                 box.pack_start(widget, expand=True, fill=True)
             else:
                 value = option.getValue()
-                if self.isNumeric(value):
-                    adjustment = gtk.Adjustment(value=int(value), lower=self.getLowerBoundForSpinButtons(),
+                if isinstance(value, int):
+                    adjustment = gtk.Adjustment(value=value, lower=self.getLowerBoundForSpinButtons(),
                                                 upper=1000, step_incr=1)
                     entry = gtk.SpinButton(adjustment)
                     entry.set_numeric(True)
@@ -709,7 +708,7 @@ class OptionGroupGUI(ActionGUI):
         for key, value in optionGroup.getOptionsForCmdLine(onlyKeys):
             args.append("-" + key)
             if value:
-                args.append(value)
+                args.append(str(value))
         return args
 
     def hasPerformance(self, apps, *args):

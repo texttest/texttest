@@ -49,9 +49,9 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
             self.addOption("app", "App names containing", description="Select tests for which the application name matches the entered text. The text can be a regular expression.")
         if self.hasPerformance(allApps, "performance"):
             self.optionGroup.moveToEnd([ "r" ])
-            self.addOption("fastest", "Only fastest tests", "0", 
+            self.addOption("fastest", "Only fastest tests", 0, 
                            description="Select the given number of tests which match the other selected criteria and have the fastest runtimes")
-            self.addOption("slowest", "Only slowest tests", "0", 
+            self.addOption("slowest", "Only slowest tests", 0, 
                            description="Select the given number of tests which match the other selected criteria and have the longest runtimes")
         self.optionGroup.moveToEnd([ "grep", "grepfile" ])
         if self.dynamic:

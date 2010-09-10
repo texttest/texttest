@@ -252,7 +252,7 @@ class RunningAction(BasicRunningAction):
         return self.getCopyCount() * self.getVersionCount()
 
     def getCopyCount(self):
-        return int(self.getOption("cp").getValue())
+        return self.getOption("cp").getValue()
 
     def getVersionCount(self):
         return self.getOption("v").getValue().count(",") + 1

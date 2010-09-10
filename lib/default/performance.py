@@ -266,7 +266,7 @@ class TimeFilter(plugins.Filter):
 
 class TimeGroupFilter(plugins.Filter):
     def __init__(self, testCount, *args):
-        self.testCount = int(testCount)
+        self.testCount = testCount
 
     def makePerformanceDictionary(self, tests):
         dict = {}

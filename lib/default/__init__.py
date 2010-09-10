@@ -54,7 +54,7 @@ class Config:
                 group.addOption("v", "Run this version", version)
                 group.addOption("c", self.getCheckoutLabel(), checkout)
                 group.addOption("m", self.getMachineLabel(), self.getMachineNameForDisplay(machine))
-                group.addOption("cp", "Times to run", "1", description="Set this to some number larger than 1 to run the same test multiple times, for example to try to catch indeterminism in the system under test")
+                group.addOption("cp", "Times to run", 1, description="Set this to some number larger than 1 to run the same test multiple times, for example to try to catch indeterminism in the system under test")
                 group.addSwitch("stop", "Stop after first failure")
                 if recordsUseCases:
                     group.addSwitch("actrep", "Run with slow motion replay")

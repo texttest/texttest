@@ -1,5 +1,5 @@
 
-import os, shutil, plugins, operator, logging
+import os, shutil, plugins, operator, logging, time, datetime
 from glob import glob
 from itertools import groupby
 
@@ -173,29 +173,45 @@ class ReconnectConfig:
                 # Important to preserve the order of the versions as received
                 extraVersionList = filter(lambda v: v in extraVersionSet, versionList)
                 extraVersion = ".".join(extraVersionList)
-                if extraVersion:
-                    if len(groupDirs) == 1:
+                if len(groupDirs) == 1:
+                    if extraVersion:
                         versions.append(extraVersion)
                         self.cacheRunDir(app, groupDirs[0], version)
                     else:
-                        for dir in groupDirs:
-                            datedVersion = os.path.basename(dir).split(".")[-2]
-                            self.datedVersions.add(datedVersion)
+                        self.cacheRunDir(app, groupDirs[0])
+                else:
+                    datedVersionMap = {}
+                    for dir in groupDirs:
+                        datedVersionMap[os.path.basename(dir).split(".")[-2]] = dir
+                    datedVersions = sorted(datedVersionMap.keys(), key=self.dateValue, reverse=True)
+                    self.datedVersions.update(datedVersions)
+                    self.diag.info("Found candidate dated versions: " + repr(datedVersions))
+                    if not extraVersion: # one of them has to be the main version...
+                        mainVersion = datedVersions.pop(0)
+                        self.cacheRunDir(app, datedVersionMap.get(mainVersion))
+                    for datedVersion in datedVersions:
+                        dir = datedVersionMap.get(datedVersion)
+                        if extraVersion:
                             versions.append(extraVersion + "." + datedVersion)
                             self.cacheRunDir(app, dir, version + "." + datedVersion)
-                else:
-                    self.cacheRunDir(app, groupDirs[0])
-                    for dir in groupDirs[1:]:
-                        datedVersion = os.path.basename(dir).split(".")[-2]
-                        self.datedVersions.add(datedVersion)
-                        versions.append(datedVersion)
-                        if version:
-                            self.cacheRunDir(app, dir, version + "." + datedVersion)
                         else:
-                            self.cacheRunDir(app, dir, datedVersion)
-        versions.sort()
+                            versions.append(datedVersion)
+                            if version:
+                                self.cacheRunDir(app, dir, version + "." + datedVersion)
+                            else:
+                                self.cacheRunDir(app, dir, datedVersion)
         self.diag.info("Extra versions found as " + repr(versions))
         return versions
+
+    @staticmethod
+    def dateValue(version):
+        yearlessDatetime = datetime.datetime.strptime(version, "%d%b%H%M%S")
+        now = datetime.datetime.now()
+        currYearDatetime = yearlessDatetime.replace(year=now.year)
+        if currYearDatetime > now:
+            return currYearDatetime.replace(year=now.year - 1)
+        else:
+            return currYearDatetime
 
     def checkSanity(self, app):
         if self.errorMessage: # We failed already, basically

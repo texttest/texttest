@@ -23,8 +23,6 @@ class Abandoned(plugins.TestState):
     def __init__(self, freeText):
         plugins.TestState.__init__(self, "abandoned", briefText="job deletion failed", \
                                                       freeText=freeText, completed=1, lifecycleChange="complete")
-    def shouldAbandon(self):
-        return 1
 
 
 class QueueSystemServer(BaseActionRunner):

@@ -1236,8 +1236,6 @@ class ReplayedResponseHandler:
     def addResponse(self, trafficStr):
         self.responses[-1].append(trafficStr)
     def getCurrentStrings(self):
-        if len(self.responses) == 0:
-            return []
         if self.timesChosen < len(self.responses):
             currStrings = self.responses[self.timesChosen]
         else:

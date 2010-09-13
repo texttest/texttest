@@ -600,24 +600,27 @@ class SubmissionRules:
     def __init__(self, optionMap, test):
         self.test = test
         self.optionMap = optionMap
-        self.envResource = self.getEnvironmentResource()
+        self.configResources = self.getConfigResources()
         self.processesNeeded = self.getProcessesNeeded()
 
-    def getEnvironmentResource(self):
+    def getConfigResources(self):
         if not self.optionMap.has_key("reconnect"):
-            return os.path.expandvars(self.test.getEnvironment("QUEUE_SYSTEM_RESOURCE", "")) # Grid engine resources required for the test
+            envSetting = os.path.expandvars(self.test.getEnvironment("QUEUE_SYSTEM_RESOURCE", "")) # Grid engine resources required for the test (deprecated - use config setting)
+            return [ envSetting ] if envSetting else self.test.getConfigValue("queue_system_resource")
         else:
             return ""
 
     def getProcessesNeeded(self):
         if not self.optionMap.has_key("reconnect"):
-            return self.test.getEnvironment("QUEUE_SYSTEM_PROCESSES", "1") # Number of processes the test needs to run
+            envSetting = self.test.getEnvironment("QUEUE_SYSTEM_PROCESSES", "") # Number of processes the test needs to run (deprecated - use config setting)
+            return int(envSetting) or self.test.getConfigValue("queue_system_processes")
         else:
-            return "1"
+            return 1
 
     def getExtraSubmitArgs(self):
         if not self.optionMap.has_key("reconnect"):
-            return os.path.expandvars(self.test.getEnvironment("QUEUE_SYSTEM_SUBMIT_ARGS", "")) # Extra arguments to provide on submission to grid engine
+            envSetting = os.path.expandvars(self.test.getEnvironment("QUEUE_SYSTEM_SUBMIT_ARGS", "")) # Extra arguments to provide on submission to grid engine (deprecated - use config setting)
+            return envSetting or self.test.getConfigValue("queue_system_submit_args")
         else:
             return ""
 
@@ -643,8 +646,7 @@ class SubmissionRules:
         resourceList = []
         if self.optionMap.has_key("R"):
             resourceList.append(self.optionMap["R"])
-        if len(self.envResource):
-            resourceList.append(self.envResource)
+        resourceList += self.configResources
         machine = self.test.app.getRunMachine()
         if machine != "localhost":
             resourceList.append("hostname=" + machine) # Won't work with LSF, but can't be bothered to figure it out there for now...
@@ -708,7 +710,7 @@ class SubmissionRules:
             return True # should be able to reconnect anywhere...
         else:
             return self.findResourceList() == newRules.findResourceList() and \
-                   self.getProcessesNeeded() == newRules.getProcessesNeeded()
+                   self.processesNeeded == newRules.processesNeeded
 
 
 class SlaveRequestHandler(StreamRequestHandler):

@@ -5,8 +5,8 @@ import os
 class QueueSystem:
     def getSubmitCmdArgs(self, submissionRules):
         bsubArgs = [ "bsub", "-J", submissionRules.getJobName() ]
-        if submissionRules.processesNeeded != "1":
-            bsubArgs += [ "-n", submissionRules.processesNeeded ]
+        if submissionRules.processesNeeded != 1:
+            bsubArgs += [ "-n", str(submissionRules.processesNeeded) ]
         queue = submissionRules.findQueue()
         if queue:
             bsubArgs += [ "-q", queue ]

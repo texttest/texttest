@@ -238,8 +238,11 @@ class QueueSystemConfig(default.Config):
         app.setConfigDefault("parallel_environment_name", "*", "(SGE) Which SGE parallel environment to use when SUT is parallel")
         app.setConfigDefault("queue_system_max_capacity", 100000, "Maximum possible number of parallel similar jobs in the available grid")
         app.setConfigDefault("queue_system_min_test_count", 0, "Minimum number of tests before it's worth submitting them to the grid")
-        
+        app.setConfigDefault("queue_system_resource", [], "Grid engine resources required to locate test execution machines")
+        app.setConfigDefault("queue_system_processes", 1, "Number of processes the grid engine should reserve for tests")
+        app.setConfigDefault("queue_system_submit_args", "", "Additional arguments to provide to grid engine submission command")
 
+        
 class DocumentEnvironment(default.DocumentEnvironment):
     def setUpApplication(self, app):
         default.DocumentEnvironment.setUpApplication(self, app)

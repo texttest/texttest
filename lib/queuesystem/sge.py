@@ -15,9 +15,9 @@ class QueueSystem:
                     "T" : ("THRESH", "Suspended by SGE as it exceeded allowed thresholds") }
     def getSubmitCmdArgs(self, submissionRules):
         qsubArgs = [ "qsub", "-N", submissionRules.getJobName() ]
-        if submissionRules.processesNeeded != "1":
+        if submissionRules.processesNeeded != 1:
             qsubArgs += [ "-pe", submissionRules.getParallelEnvironment(), \
-                          submissionRules.processesNeeded ]
+                          str(submissionRules.processesNeeded) ]
         queue = submissionRules.findQueue()
         if queue:
             qsubArgs += [ "-q", queue ]

@@ -613,7 +613,7 @@ class SubmissionRules:
     def getProcessesNeeded(self):
         if not self.optionMap.has_key("reconnect"):
             envSetting = self.test.getEnvironment("QUEUE_SYSTEM_PROCESSES", "") # Number of processes the test needs to run (deprecated - use config setting)
-            return int(envSetting) or self.test.getConfigValue("queue_system_processes")
+            return int(envSetting) if envSetting else self.test.getConfigValue("queue_system_processes")
         else:
             return 1
 

@@ -903,6 +903,18 @@ class ResponseAggregator:
                 
         return basicValue
 
+def getAggregateString(items, method):
+    values = []
+    for item in items:
+        value = method(item)
+        if value not in values:
+            values.append(value)
+    
+    if len(values) > 1:
+        return "<default> - " + ",".join(values)
+    else:
+        return values[0]
+
 
 def readList(filename):
     try:
@@ -1572,7 +1584,8 @@ class OptionGroup:
             self.options[key] = option
 
     def accept(self, key, option, onlyKeys):
-        if not option.getValue():
+        value = option.getValue()
+        if not value or (isinstance(value, str) and value.startswith("<default>")):
             return False
         if len(onlyKeys) == 0:
             return True

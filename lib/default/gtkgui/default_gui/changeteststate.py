@@ -65,6 +65,7 @@ class SaveTests(guiplugins.ActionDialogGUI):
 
     def getSaveableTests(self):
         return filter(lambda test: test.stateInGui.isSaveable(), self.currTestSelection)
+
     def updateOptions(self):
         defaultSaveOption = self.getDefaultSaveOption()
         versionOption = self.optionGroup.getOption("v")
@@ -77,12 +78,6 @@ class SaveTests(guiplugins.ActionDialogGUI):
         self.diag.info("Setting default save version to " + defaultSaveOption)
         self.optionGroup.setPossibleValues("v", newVersions)
         return True
-    def getDefaultSaveOption(self):
-        saveVersions = self.getSaveVersions()
-        if saveVersions.find(",") != -1:
-            return "<default> - " + saveVersions
-        else:
-            return saveVersions
     
     def getPossibleVersions(self):
         extensions = []
@@ -93,20 +88,15 @@ class SaveTests(guiplugins.ActionDialogGUI):
         # Include the default version always
         extensions.append("")
         return extensions
-    
-    def getSaveVersions(self):
+
+    def getDefaultSaveOption(self):
         if self.isAllNew():
             return ""
-
-        saveVersions = []
-        for app in self.currAppSelection:
-            ver = self.getDefaultSaveVersion(app)
-            if not ver in saveVersions:
-                saveVersions.append(ver)
-        return ",".join(saveVersions)
+        else:
+            return plugins.getAggregateString(self.currAppSelection, self.getDefaultSaveVersion)
     
     def getDefaultSaveVersion(self, app):
-        return app.getFullVersion(forSave = 1)
+        return app.getFullVersion(forSave=1)
     
     def getExactness(self):
         return int(self.optionGroup.getSwitchValue("ex", 1))

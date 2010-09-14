@@ -48,7 +48,9 @@ class Config:
                 group.addOption("grepfile", "Test-file to search", allocateNofValues=2, description="When the 'test-files containing' field is non-empty, apply the search in files with the given stem. Unix-style file expansion (note not regular expressions) may be used. For example '*' will look in any file.")
             elif group.name.startswith("Basic"):
                 if len(apps) > 0:
-                    version, checkout, machine = apps[0].getFullVersion(), apps[0].checkout, apps[0].getRunMachine()
+                    version = plugins.getAggregateString(apps, lambda app: app.getFullVersion())
+                    checkout = plugins.getAggregateString(apps, lambda app: app.checkout)
+                    machine = plugins.getAggregateString(apps, lambda app: app.getRunMachine())
                 else:
                     version, checkout, machine = "", "", ""
                 group.addOption("v", "Run this version", version)

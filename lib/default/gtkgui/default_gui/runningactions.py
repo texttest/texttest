@@ -255,7 +255,11 @@ class RunningAction(BasicRunningAction):
         return self.getOption("cp").getValue()
 
     def getVersionCount(self):
-        return self.getOption("v").getValue().count(",") + 1
+        versionString = self.getOption("v").getValue()
+        if versionString.startswith("<default>"):
+            return 1
+        else:
+            return versionString.count(",") + 1
 
     def performedDescription(self):
         timesToRun = self.getCopyCount()

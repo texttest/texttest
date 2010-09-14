@@ -765,7 +765,8 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         else:
             sourcePath = self.optionGroup.getOptionValue("src")
             appendAppName = os.path.basename(sourcePath).startswith(stem + "." + test.app.name)
-            targetPath = self.getTargetPath(stem, version, appendAppName) 
+            targetPath = self.getTargetPath(stem, version, appendAppName)
+            plugins.ensureDirExistsForFile(targetPath)
             fileExisted = os.path.exists(targetPath)
             plugins.copyPath(sourcePath, targetPath)
             self.newFileInfo = targetPath, fileExisted

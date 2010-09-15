@@ -8,11 +8,6 @@
 #   way to tell these signals from ordinary job control
 # - Clean up after Xvfb as it leaks lock files from time to time.
 
-try:
-    import startxvfb_interceptor # the usual test hook...
-except ImportError: # pragma: no cover - all tests need an interceptor to be able to control PID
-    pass
-
 import os, signal, sys, subprocess
 from socket import gethostname
 

@@ -605,21 +605,21 @@ class SubmissionRules:
 
     def getConfigResources(self):
         if not self.optionMap.has_key("reconnect"):
-            envSetting = os.path.expandvars(self.test.getEnvironment("QUEUE_SYSTEM_RESOURCE", "")) # Grid engine resources required for the test (deprecated - use config setting)
+            envSetting = os.path.expandvars(self.test.getEnvironment("QUEUE_SYSTEM_RESOURCE", "")) # Deprecated. See "queue_system_resource" in config file docs
             return [ envSetting ] if envSetting else self.test.getConfigValue("queue_system_resource")
         else:
             return ""
 
     def getProcessesNeeded(self):
         if not self.optionMap.has_key("reconnect"):
-            envSetting = self.test.getEnvironment("QUEUE_SYSTEM_PROCESSES", "") # Number of processes the test needs to run (deprecated - use config setting)
+            envSetting = self.test.getEnvironment("QUEUE_SYSTEM_PROCESSES", "") # Deprecated. See "queue_system_processes" in config file docs
             return int(envSetting) if envSetting else self.test.getConfigValue("queue_system_processes")
         else:
             return 1
 
     def getExtraSubmitArgs(self):
         if not self.optionMap.has_key("reconnect"):
-            envSetting = os.path.expandvars(self.test.getEnvironment("QUEUE_SYSTEM_SUBMIT_ARGS", "")) # Extra arguments to provide on submission to grid engine (deprecated - use config setting)
+            envSetting = os.path.expandvars(self.test.getEnvironment("QUEUE_SYSTEM_SUBMIT_ARGS", "")) #  Deprecated. See "queue_system_submit_args" in config file docs
             return envSetting or self.test.getConfigValue("queue_system_submit_args")
         else:
             return ""

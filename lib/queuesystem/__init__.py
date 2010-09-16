@@ -73,20 +73,19 @@ class QueueSystemConfig(default.Config):
             if self.optionMap.has_key(localFlag):
                 return False
 
-        if self.optionMap.has_key("l"):
-            value = self.optionValue("l")
-            if value is None or value == "1":
-                return False
-            elif value == "2" and self.optionMap.has_key("count"):
-                count = int(self.optionMap.get("count"))
-                minCount = min((app.getConfigValue("queue_system_min_test_count") for app in allApps))
-                return count >= minCount
-
-        if self.optionMap.has_key("reconnect"):
-            # GUI gives us a numeric value, can also get it from the command line
-            return self.optionValue("reconnfull") in [ "2", "grid" ]
+        value = self.optionIntValue("l")
+        if value == 1: # local
+            return False
+        elif value == 2 and self.optionMap.has_key("count"):
+            count = int(self.optionMap.get("count"))
+            minCount = min((app.getConfigValue("queue_system_min_test_count") for app in allApps))
+            return count >= minCount
         else:
-            return True
+            if self.optionMap.has_key("reconnect"):
+                # GUI gives us a numeric value, can also get it from the command line
+                return self.optionValue("reconnfull") in [ "2", "grid" ]
+            else:
+                return True
     
     def hasExplicitInterface(self):
         return self.slaveRun() or default.Config.hasExplicitInterface(self)

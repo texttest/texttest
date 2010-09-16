@@ -3,8 +3,11 @@ import os, sys, plugins, shutil, socket, subprocess
 from ndict import seqdict
 
 class SetUpTrafficHandlers(plugins.Action):
-    def __init__(self, record):
-        self.record = record
+    REPLAY_ONLY = 0
+    RECORD_ONLY = 1
+    RECORD_NEW_REPLAY_OLD = 2
+    def __init__(self, recordSetting):
+        self.recordSetting = recordSetting
         self.trafficServerProcess = None
         libexecDir = plugins.installationDir("libexec")
         self.trafficFiles = self.findTrafficFiles(libexecDir)
@@ -23,20 +26,21 @@ class SetUpTrafficHandlers(plugins.Action):
         pythonCoverage = test.hasEnvironment("COVERAGE_PROCESS_START")
         if test.app.usesTrafficMechanism() or pythonCoverage or pythonCustomizeFiles:
             replayFile = test.getFileName("traffic")
-            serverActive = self.record or replayFile
+            serverActive = self.recordSetting != self.REPLAY_ONLY or replayFile is not None
             if serverActive or pythonCoverage or pythonCustomizeFiles:
                 self.setUpIntercepts(test, replayFile, serverActive, pythonCoverage, pythonCustomizeFiles)
 
     def setUpIntercepts(self, test, replayFile, serverActive, pythonCoverage, pythonCustomizeFiles):
         interceptDir = test.makeTmpFileName("traffic_intercepts", forComparison=0)
-        interceptInfo = InterceptInfo(test, replayFile if not self.record else None)
+        interceptInfo = InterceptInfo(test, replayFile if self.recordSetting == self.REPLAY_ONLY else None)
         pathVars = self.makeIntercepts(interceptDir, interceptInfo, serverActive, pythonCoverage, pythonCustomizeFiles)
         if serverActive:
+            interceptAttributes = ",".join(interceptInfo.pyAttributes)
             self.trafficServerProcess = self.makeTrafficServer(test, replayFile, interceptInfo)
             address = self.trafficServerProcess.stdout.readline().strip()
             test.setEnvironment("TEXTTEST_MIM_SERVER", address) # Address of TextTest's server for recording client/server traffic
-            if interceptInfo.pyAttributes:
-                test.setEnvironment("TEXTTEST_MIM_PYTHON", ",".join(interceptInfo.pyAttributes))
+            if interceptAttributes:
+                test.setEnvironment("TEXTTEST_MIM_PYTHON", interceptAttributes)
 
         for pathVar in pathVars:
             # Change test environment to pick up the intercepts
@@ -51,12 +55,7 @@ class SetUpTrafficHandlers(plugins.Action):
         recordEditDir = test.makeTmpFileName("file_edits", forComparison=0)
         cmdArgs = [ sys.executable, self.trafficServerFile, "-t", test.getRelPath(),
                     "-r", recordFile, "-F", recordEditDir, "-l", os.getenv("TEXTTEST_PERSONAL_LOG") ]
-        if not self.record:
-            cmdArgs += [ "-p", replayFile ]
-            replayEditDir = test.getFileName("file_edits")
-            if replayEditDir:
-                cmdArgs += [ "-f", replayEditDir ]
-
+        
         if test.getConfigValue("collect_traffic_use_threads") != "true":
             cmdArgs += [ "-s" ]
             
@@ -74,6 +73,16 @@ class SetUpTrafficHandlers(plugins.Action):
         asynchronousFileEditCmds = test.getConfigValue("collect_traffic").get("asynchronous")
         if asynchronousFileEditCmds:
             cmdArgs += [ "-a", ",".join(asynchronousFileEditCmds) ]
+
+        if self.recordSetting != self.RECORD_ONLY:
+            cmdArgs += [ "-p", replayFile ]
+            replayEditDir = test.getFileName("file_edits")
+            if replayEditDir:
+                cmdArgs += [ "-f", replayEditDir ]
+            if self.recordSetting == self.RECORD_NEW_REPLAY_OLD:
+                replayItems = interceptInfo.getReplayItems(replayFile)
+                if replayItems:
+                    cmdArgs += [ "--replay-items=" + ",".join(replayItems) ]
 
         return subprocess.Popen(cmdArgs, env=test.getRunEnvironment(), universal_newlines=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -201,6 +210,9 @@ class InterceptInfo:
             if lineFilter.matches(line):
                 return lineFilter
 
+    def getReplayItems(self, replayFile):
+        self.filterForReplay(replayFile)
+        return self.commands + self.pyAttributes
 
 
 class ModifyTraffic(plugins.ScriptWithArgs):

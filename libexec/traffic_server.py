@@ -30,6 +30,8 @@ react to the above module to repoint where it sends socket interactions"""
                       help="When monitoring which files have been edited by a program, ignore files and directories with the given names")
     parser.add_option("-p", "--replay", 
                       help="replay traffic recorded in FILE.", metavar="FILE")
+    parser.add_option("-I", "--replay-items", 
+                      help="attempt replay only items in ITEMS, record the rest", metavar="ITEMS")
     parser.add_option("-l", "--logdir",
                       help="Log diagnostics to LOGDIR", metavar="LOGDIR")
     parser.add_option("-f", "--replay-file-edits", 
@@ -62,7 +64,7 @@ class TrafficServer(TCPServer):
         if options.ignore_edits:
             self.filesToIgnore = options.ignore_edits.split(",")
         self.recordFileHandler = RecordFileHandler(options.record)
-        self.replayInfo = ReplayInfo(options.replay)
+        self.replayInfo = ReplayInfo(options.replay, options.replay_items)
         self.requestCount = 0
         self.diag = logging.getLogger("Traffic Server")
         self.topLevelForEdit = [] # contains only paths explicitly given. Always present.
@@ -157,7 +159,7 @@ class TrafficServer(TCPServer):
             self.topLevelForEdit.insert(0, file)
 
             # edit times are only interesting when recording
-            if not self.replayInfo.isActive():
+            if not self.replayInfo.isActiveFor(traffic):
                 for subPath in self.findFilesAndLinks(file):                
                     modTime, modSize = self.getLatestModification(subPath)
                     self.fileEditData[subPath] = modTime, modSize
@@ -166,7 +168,7 @@ class TrafficServer(TCPServer):
         return len(allEdits) > 0
     
     def process(self, traffic, reqNo):
-        if not self.replayInfo.isActive():
+        if not self.replayInfo.isActiveFor(traffic):
             # If we're recording, check for file changes before we do
             # Must do this before as they may be a side effect of whatever it is we're processing
             for fileTraffic in self.getLatestFileEdits():
@@ -195,7 +197,7 @@ class TrafficServer(TCPServer):
             self.diag.info("Completed response " + str(response.__class__))            
 
     def getResponses(self, traffic, hasFileEdits):
-        if self.replayInfo.isActive():
+        if self.replayInfo.isActiveFor(traffic):
             replayedResponses = []
             filesMatched = []
             for responseClass, text in self.replayInfo.readReplayResponses(traffic):
@@ -304,6 +306,9 @@ class Traffic(object):
     
     def hasInfo(self):
         return len(self.text) > 0
+
+    def isMarkedForReplay(self, replayItems):
+        return True # Some things can't be disabled and hence can't be added on piecemeal afterwards
 
     def getDescription(self):
         return self.direction + self.typeId + ":" + self.text
@@ -549,9 +554,35 @@ class PythonInstanceWrapper:
         return getattr(self.instance, name)
 
 
-class PythonModuleTraffic(Traffic):
+class PythonTraffic(Traffic):
     typeId = "PYT"
     direction = "<-"
+    def getExceptionResponse(self):
+        exc_value = sys.exc_info()[1]
+        return PythonResponseTraffic(self.getExceptionText(exc_value), self.responseFile)
+
+    def getExceptionText(self, exc_value):
+        return "raise " + exc_value.__class__.__module__ + "." + exc_value.__class__.__name__ + "(" + repr(str(exc_value)) + ")"
+
+
+class PythonImportTraffic(PythonTraffic):
+    def __init__(self, inText, responseFile):
+        self.moduleName = inText
+        text = "import " + self.moduleName
+        super(PythonImportTraffic, self).__init__(text, responseFile)
+
+    def isMarkedForReplay(self, replayItems):
+        return self.moduleName in replayItems
+
+    def forwardToDestination(self):
+        try:
+            exec self.text
+            return []
+        except:
+            return [ self.getExceptionResponse() ]
+
+
+class PythonModuleTraffic(PythonTraffic):
     interceptModules = set()
     @classmethod
     def configure(cls, options):
@@ -559,11 +590,22 @@ class PythonModuleTraffic(Traffic):
         if modStr:
             cls.interceptModules.update(modStr.split(","))
 
+    def __init__(self, modOrObjName, attrName, *args):
+        self.modOrObjName = modOrObjName
+        self.attrName = attrName
+        super(PythonModuleTraffic, self).__init__(*args)
+
     def getModuleName(self, obj):
         if hasattr(obj, "__module__"): # classes, functions, many instances
             return obj.__module__
         else:
             return obj.__class__.__module__ # many other instances
+
+    def isMarkedForReplay(self, replayItems):
+        if PythonInstanceWrapper.getInstance(self.modOrObjName) is None:
+            return True
+        textMarker = self.modOrObjName + "." + self.attrName
+        return any((item == textMarker or textMarker.startswith(item + ".") for item in replayItems))
 
     def belongsToInterceptedModule(self, moduleName):
         if moduleName in self.interceptModules:
@@ -575,13 +617,6 @@ class PythonModuleTraffic(Traffic):
 
     def isBasicType(self, obj):
         return obj is None or obj is NotImplemented or type(obj) in (bool, float, int, long, str, unicode, list, dict, tuple)
-
-    def getExceptionText(self, exc_value):
-        return "raise " + exc_value.__class__.__module__ + "." + exc_value.__class__.__name__ + "(" + repr(str(exc_value)) + ")"
-
-    def getExceptionResponse(self):
-        exc_value = sys.exc_info()[1]
-        return PythonResponseTraffic(self.getExceptionText(exc_value), self.responseFile)
 
     def getPossibleCompositeAttribute(self, instance, attrName):
         attrParts = attrName.split(".", 1)
@@ -615,27 +650,13 @@ class PythonModuleTraffic(Traffic):
             return PythonInstanceWrapper(result, self.modOrObjName)
         else:
             return result
-
-
-class PythonImportTraffic(PythonModuleTraffic):
-    def __init__(self, inText, responseFile):
-        self.moduleName = inText
-        text = "import " + self.moduleName
-        super(PythonImportTraffic, self).__init__(text, responseFile)
-
-    def forwardToDestination(self):
-        try:
-            exec self.text
-            return []
-        except:
-            return [ self.getExceptionResponse() ]
         
 
 class PythonAttributeTraffic(PythonModuleTraffic):
     def __init__(self, inText, responseFile):
-        self.modOrObjName, self.attrName = inText.split(":SUT_SEP:")
-        text = self.modOrObjName + "." + self.attrName
-        super(PythonAttributeTraffic, self).__init__(text, responseFile)
+        modOrObjName, attrName = inText.split(":SUT_SEP:")
+        text = modOrObjName + "." + attrName
+        super(PythonAttributeTraffic, self).__init__(modOrObjName, attrName, text, responseFile)
 
     def enquiryOnly(self, responses=[]):
         return len(responses) == 0
@@ -666,9 +687,9 @@ class PythonAttributeTraffic(PythonModuleTraffic):
         
 class PythonSetAttributeTraffic(PythonModuleTraffic):
     def __init__(self, inText, responseFile):
-        self.modOrObjName, self.attrName, self.valueStr = inText.split(":SUT_SEP:")
-        text = self.modOrObjName + "." + self.attrName + " = " + self.valueStr
-        super(PythonSetAttributeTraffic, self).__init__(text, responseFile)
+        modOrObjName, attrName, self.valueStr = inText.split(":SUT_SEP:")
+        text = modOrObjName + "." + attrName + " = " + self.valueStr
+        super(PythonSetAttributeTraffic, self).__init__(modOrObjName, attrName, text, responseFile)
 
     def forwardToDestination(self):
         instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
@@ -679,7 +700,7 @@ class PythonSetAttributeTraffic(PythonModuleTraffic):
 
 class PythonFunctionCallTraffic(PythonModuleTraffic):        
     def __init__(self, inText, responseFile):
-        self.modOrObjName, self.attrName, argStr, keywDictStr = inText.split(":SUT_SEP:")
+        modOrObjName, attrName, argStr, keywDictStr = inText.split(":SUT_SEP:")
         self.args = ()
         self.keyw = {}
         argsForRecord = []
@@ -704,8 +725,11 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
             # If this happens we probably can't handle the keyword objects anyway
             # Slightly daring text-munging of Python dictionary repr, main thing is to print something vaguely representative
             argsForRecord += keywDictStr.replace("': ", "=").replace(", '", ", ")[2:-1].split(", ")
-        text = self.modOrObjName + "." + self.attrName + "(" + ", ".join(argsForRecord) + ")"
-        super(PythonModuleTraffic, self).__init__(text, responseFile)
+        text = modOrObjName + "." + attrName + "(" + ", ".join(argsForRecord) + ")"
+        super(PythonFunctionCallTraffic, self).__init__(modOrObjName, attrName, text, responseFile)
+
+    def getTextMarker(self):
+        return self.modOrObjName + "." + self.attrName
 
     def getArgForRecord(self, arg):
         class ArgWrapper:
@@ -860,6 +884,9 @@ class CommandLineTraffic(Traffic):
                                 continue
                     envVarsSet.append((var, value))
         return envVarsSet, envVarsUnset
+
+    def isMarkedForReplay(self, replayItems):
+        return self.commandName in replayItems
 
     def getEnvironmentVariables(self):
         return self.environmentDict.get(self.commandName, []) + \
@@ -1092,14 +1119,22 @@ class RecordFileHandler:
 
 
 class ReplayInfo:
-    def __init__(self, replayFile):
+    def __init__(self, replayFile, replayItemString):
         self.responseMap = seqdict()
         self.diag = logging.getLogger("Traffic Replay")
         if replayFile:
             self.readReplayFile(replayFile)
+        self.replayItems = []
+        if replayItemString:
+            self.replayItems = replayItemString.split(",")
             
-    def isActive(self):
-        return len(self.responseMap) > 0
+    def isActiveFor(self, traffic):
+        if len(self.responseMap) == 0:
+            return False
+        elif len(self.replayItems) == 0:
+            return True
+        else:
+            return traffic.isMarkedForReplay(set(self.replayItems))
 
     def readReplayFile(self, replayFile):
         trafficList = self.readIntoList(replayFile)

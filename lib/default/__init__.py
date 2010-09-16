@@ -63,7 +63,7 @@ class Config:
                 if useCatalogues:
                     group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
                 if useTraffic:
-                    group.addSwitch("rectraffic", "(Re-)record command-line or client-server traffic")
+                    self.addTrafficSwitch(group)
             elif group.name.startswith("Advanced"):
                 group.addOption("b", "Run batch mode session")
                 group.addOption("name", "Name this run", self.optionValue("name"))
@@ -108,7 +108,15 @@ class Config:
                 if not useCatalogues:
                     group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
                 if not useTraffic:
-                    group.addSwitch("rectraffic", "(Re-)record command-line or client-server traffic")
+                    self.addTrafficSwitch(group)
+
+    def addTrafficSwitch(self, group):
+        options = [ "Replay All", "Record All", "Record New Only"  ]
+        descriptions = [ "Replay all existing interactions from the information in the traffic files. Do not record anything new.",
+                         "Ignore any existing traffic files and record all the interactions afresh.",
+                         "Replay all existing interactions from the information in the traffic files. " + \
+                         "Record any other interactions that occur." ]
+        group.addSwitch("rectraffic", "Traffic Files", options=options, description=descriptions)
 
     def getReconnFullOptions(self):
         return ["Display results exactly as they were in the original run",
@@ -481,7 +489,7 @@ class Config:
         ignoreCatalogues = self.shouldIgnoreCatalogues()
         collator = self.getTestCollator()
         from traffic import SetUpTrafficHandlers, TerminateTrafficServer
-        trafficSetup = SetUpTrafficHandlers(self.optionMap.has_key("rectraffic"))
+        trafficSetup = SetUpTrafficHandlers(self.optionIntValue("rectraffic"))
         trafficTerminator = TerminateTrafficServer(trafficSetup)
         return [ self.getExecHostFinder(), self.getWriteDirectoryMaker(), \
                  self.getWriteDirectoryPreparer(ignoreCatalogues), \
@@ -725,13 +733,24 @@ class Config:
         return [ ("actrep", "slow motion") ]
     def getTextResponder(self):
         return console.InteractiveResponder
+
     # Utilities, which prove useful in many derived classes
     def optionValue(self, option):
         return self.optionMap.get(option, "")
+
+    def optionIntValue(self, option):
+        if self.optionMap.has_key(option):
+            value = self.optionMap.get(option)
+            return int(value) if value is not None else 1
+        else:
+            return 0
+        
     def ignoreExecutable(self):
         return self.optionMap.has_key("s") or self.ignoreCheckout() or self.optionMap.has_key("coll") or self.optionMap.has_key("gx")
+
     def ignoreCheckout(self):
         return self.isReconnecting() # No use of checkouts has yet been thought up when reconnecting :)
+
     def setUpCheckout(self, app):
         if self.ignoreCheckout():
             return ""
@@ -1113,7 +1132,10 @@ class Config:
         app.setConfigDefault("binary_file", [], "Which output files are known to be binary, and hence should not be shown/diffed?")
         
         app.setConfigDefault("discard_file", [], "List of generated result files which should not be compared")
-        if self.optionMap.has_key("rectraffic"):
+        rectrafficValue = self.optionIntValue("rectraffic")
+        if rectrafficValue == 1:
+            # Re-record everything. Don't use this when only recording additional new stuff
+            # Should possibly have some way to configure this
             app.addConfigEntry("implied", "rectraffic", "base_version")
         if self.optionMap.has_key("record"):
             app.addConfigEntry("implied", "recusecase", "base_version")

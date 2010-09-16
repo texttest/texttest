@@ -280,10 +280,6 @@ activate = activate from ignore configuration files
 toggled.true = check enable self-diagnostics
 toggled.false = uncheck enable self-diagnostics
 
-[Label=(Re-)record command-line or client-server traffic]
-toggled.true = check (re-)record command-line or client-server traffic
-toggled.false = uncheck (re-)record command-line or client-server traffic
-
 [Label=Keep temporary write-directories]
 toggled.true = check keep temporary write-directories
 toggled.false = uncheck keep temporary write-directories
@@ -970,4 +966,10 @@ clicked =
 
 [Title=Rerun selected tests]
 response.accept = perform rerun
+
+[Label=Record New Only]
+toggled.true = set option for recording only new traffic interactions
+
+[Label=Record All]
+toggled.true = set option for recording all traffic interactions
 

@@ -6,6 +6,7 @@ from threading import currentThread
 from Queue import Queue, Empty
 from glob import glob
 from copy import deepcopy
+from datetime import datetime
 
 # We standardise around UNIX paths, it's all much easier that way. They work fine,
 # and they don't run into weird issues in being confused with escape characters
@@ -28,12 +29,6 @@ if os.name == "nt":
     os.sep = posixpath.sep
     os.path.sep = posixpath.sep
     os.path.normpath = posixpath.normpath
-
-# Useful utility...
-def localtime(format= "%d%b%H:%M:%S", seconds=None):
-    if not seconds:
-        seconds = time.time()
-    return time.strftime(format, time.localtime(seconds))
 
 class Callable:
     def __init__(self, method, *args):
@@ -59,7 +54,8 @@ def findInstallationRoots():
         else:
             return [ installationRoot ]
 
-globalStartTime = time.time()
+globalStartTime = datetime.now()
+datetimeFormat = "%d%b%H:%M:%S"
 installationRoots = findInstallationRoots()
 # Don't read these from Python as the names depend on the locale!
 weekdays = [ "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday" ]
@@ -67,8 +63,12 @@ weekdays = [ "monday", "tuesday", "wednesday", "thursday", "friday", "saturday",
 # and removed the ones I'd never heard of...
 controlDirNames = [ "CVS", ".svn", ".bzr", ".hg", ".git", "RCS", "_darcs", "{arch}" ]
 
+# Useful utility...
+def localtime(format=datetimeFormat):
+    return datetime.now().strftime(format)
+
 def startTimeString():
-    return localtime(seconds=globalStartTime)
+    return globalStartTime.strftime(datetimeFormat)
 
 def importAndCall(moduleName, callableName, *args):
     command = "from " + moduleName + " import " + callableName + " as _callable"

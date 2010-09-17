@@ -1,5 +1,5 @@
 
-import optparse, os, stat, sys, logging, logging.config, shutil, socket, subprocess, types, threading
+import optparse, os, stat, sys, logging, logging.config, shutil, socket, subprocess, types, threading, time
 from SocketServer import TCPServer, StreamRequestHandler
 from copy import copy
 
@@ -164,7 +164,7 @@ class TrafficServer(TCPServer):
                     modTime, modSize = self.getLatestModification(subPath)
                     self.fileEditData[subPath] = modTime, modSize
                     self.diag.info("Adding possible sub-path edit for " + subPath + " with mod time " +
-                                   plugins.localtime(seconds=modTime) + " and size " + str(modSize))
+                                   time.strftime(plugins.datetimeFormat, time.localtime(modTime)) + " and size " + str(modSize))
         return len(allEdits) > 0
     
     def process(self, traffic, reqNo):

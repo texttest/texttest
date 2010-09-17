@@ -1,4 +1,4 @@
-import os, shutil, plugins, re, stat, subprocess, glob, logging, difflib
+import os, shutil, plugins, re, stat, subprocess, glob, logging, difflib, time
 
 from runtest import Killed
 from jobprocess import killArbitaryProcess, killSubProcessAndChildren
@@ -763,7 +763,7 @@ class CreateCatalogue(plugins.Action):
         if os.path.islink(fullPath):
             return os.path.realpath(fullPath)
         else:
-            return plugins.localtime(seconds=plugins.modifiedTime(fullPath))
+            return time.strftime(plugins.datetimeFormat, time.localtime(plugins.modifiedTime(fullPath)))
     
     def findDifferences(self, oldPaths, newPaths, writeDir):
         pathsGained, pathsEdited, pathsLost = [], [], []

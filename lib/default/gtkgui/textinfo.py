@@ -4,7 +4,7 @@ The various text info views, i.e. the bottom right-corner "Text Info" and
 the "Run Info" tab from the dynamic GUI
 """
 
-import gtk, pango, guiutils, plugins, os, sys, time
+import gtk, pango, guiutils, plugins, os, sys, datetime
 from default import performance
 
 class TimeMonitor:
@@ -13,7 +13,7 @@ class TimeMonitor:
         
     def notifyLifecycleChange(self, test, dummyState, changeDesc):
         if changeDesc in [ "start", "complete" ]:
-            self.timingInfo.setdefault(test, []).append((changeDesc, time.time()))
+            self.timingInfo.setdefault(test, []).append((changeDesc, datetime.datetime.now()))
 
     def shouldShow(self):
         # Nothing to show, but needed to be a GUI observer
@@ -22,7 +22,7 @@ class TimeMonitor:
     def getElapsedTime(self, test):
         timingInfo = self.timingInfo.get(test)
         if timingInfo:
-            return time.time() - timingInfo[0][1]
+            return (datetime.datetime.now() - timingInfo[0][1]).seconds
         else:
             return -1
 
@@ -33,7 +33,7 @@ class TimeMonitor:
             text += "\n"
             for desc, timestamp in timingInfo:
                 descToUse = self.getTimeDescription(desc)
-                text += descToUse + ": " + plugins.localtime(seconds=timestamp) + "\n"
+                text += descToUse + ": " + timestamp.strftime(plugins.datetimeFormat) + "\n"
         return text
 
     def getTimeDescription(self, changeDesc):

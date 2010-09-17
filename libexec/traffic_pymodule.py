@@ -136,7 +136,7 @@ class AttributeProxy:
         sock.shutdown(2)
 
     def __getattr__(self, name):
-        return self.__class__(self.modOrObjName, self.moduleProxy, self.attributeName + "." + name).tryEvaluate()
+        return AttributeProxy(self.modOrObjName, self.moduleProxy, self.attributeName + "." + name).tryEvaluate()
 
     def __call__(self, *args, **kw):
         response = self.makeResponse(*args, **kw)
@@ -259,22 +259,22 @@ class TransparentProxy:
 class PartialModuleProxy(ModuleProxy):
     def interceptAttributes(self, attrNames):
         for attrName in attrNames:
-            self.interceptAttribute(self, sys.modules.get(self.name), attrName)
+            attrProxy = AttributeProxy(self.name, self, attrName)
+            self.interceptAttribute(attrProxy, sys.modules.get(self.name), attrName)
             
     def interceptAttribute(self, proxyObj, realObj, attrName):
         parts = attrName.split(".", 1)
         currAttrName = parts[0]
         if not hasattr(realObj, currAttrName):
             return # If the real object doesn't have it, assume the fake one doesn't either...
-        currAttrProxy = getattr(proxyObj, currAttrName)
         if len(parts) == 1:
-            setattr(realObj, currAttrName, currAttrProxy)
+            setattr(realObj, currAttrName, proxyObj.tryEvaluate())
         else:
             currRealAttr = getattr(realObj, currAttrName)
             try:
-                self.interceptAttribute(currAttrProxy, currRealAttr, parts[1])
+                self.interceptAttribute(proxyObj, currRealAttr, parts[1])
             except TypeError: # it's a builtin (assume setattr threw), so we hack around...
                 realAttrProxy = TransparentProxy(currRealAttr)
-                self.interceptAttribute(currAttrProxy, realAttrProxy, parts[1])
+                self.interceptAttribute(proxyObj, realAttrProxy, parts[1])
                 setattr(realObj, currAttrName, realAttrProxy)
 

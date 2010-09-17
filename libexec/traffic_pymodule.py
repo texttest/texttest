@@ -140,18 +140,29 @@ class AttributeProxy:
         return AttributeProxy(self.modOrObjName, self.moduleProxy, self.attributeName + "." + name).tryEvaluate()
 
     def __call__(self, *args, **kw):
-        if self.realVersion is None or not self.calledFromStdlib(): 
+        if self.realVersion is None or not self.callerExcluded(): 
             response = self.makeResponse(*args, **kw)
             if response:
                 return self.moduleProxy.handleResponse(response, "InstanceProxy")
         else:
             return self.realVersion(*args, **kw)
 
-    def calledFromStdlib(self):
+    def callerExcluded(self):
+        # Don't intercept if we've been called from within the standard library or
+        # from our own command line interceptors
         stdlibDir = os.path.dirname(os.__file__)
         for framerecord in inspect.stack()[1:]:
-            if framerecord[1] != __file__:
-                return framerecord[1].startswith(stdlibDir)
+            fileName = framerecord[1]
+            if fileName != __file__:
+                dirName = self.getDirectory(fileName)
+                return dirName == stdlibDir or os.path.basename(dirName) == "traffic_intercepts"
+
+    def getDirectory(self, fileName):
+        dirName, local = os.path.split(fileName)
+        if local.startswith("__init__"):
+            return self.getDirectory(dirName)
+        else:
+            return dirName
 
     def makeResponse(self, *args, **kw):
         sock = self.createAndSend(*args, **kw)

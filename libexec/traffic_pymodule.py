@@ -6,7 +6,7 @@ class ModuleProxy:
         self.name = name
 
     def __getattr__(self, attrname):
-        return AttributeProxy(self, self, attrname).tryEvaluate()
+        return AttributeProxy(self.name, self, attrname).tryEvaluate()
 
     @staticmethod
     def createSocket():
@@ -70,7 +70,7 @@ class InstanceProxy:
         if moduleProxy is not None:
             self.__class__.moduleProxy = moduleProxy
         if self.name is None:
-            attrProxy = AttributeProxy(self.moduleProxy, self.moduleProxy, self.__class__.__name__)
+            attrProxy = AttributeProxy(self.moduleProxy.name, self.moduleProxy, self.__class__.__name__)
             response = attrProxy.makeResponse(*args, **kw)
             def Instance(className, instanceName):
                 return instanceName
@@ -81,12 +81,12 @@ class InstanceProxy:
         return self.name
 
     def __getattr__(self, attrname):
-        return AttributeProxy(self, self.moduleProxy, attrname).tryEvaluate()
+        return AttributeProxy(self.name, self.moduleProxy, attrname).tryEvaluate()
 
     def __setattr__(self, attrname, value):
         self.__dict__[attrname] = value
         if attrname != "name":
-            AttributeProxy(self, self.moduleProxy, attrname).setValue(value)
+            AttributeProxy(self.name, self.moduleProxy, attrname).setValue(value)
 
 class NewStyleInstanceProxy(InstanceProxy, object):
     # Must intercept these as they are defined in "object"
@@ -109,17 +109,17 @@ class ExceptionProxy(InstanceProxy, Exception):
 
 
 class AttributeProxy:
-    def __init__(self, modOrObjProxy, moduleProxy, attributeName):
-        self.modOrObjProxy = modOrObjProxy
+    def __init__(self, modOrObjName, moduleProxy, attributeName):
+        self.modOrObjName = modOrObjName
         self.moduleProxy = moduleProxy
         self.attributeName = attributeName
 
     def getRepresentationForSendToTrafficServer(self):
-        return self.modOrObjProxy.name + "." + self.attributeName
+        return self.modOrObjName + "." + self.attributeName
 
     def tryEvaluate(self):
         sock = self.moduleProxy.createSocket()
-        text = "SUT_PYTHON_ATTR:" + self.modOrObjProxy.name + ":SUT_SEP:" + self.attributeName
+        text = "SUT_PYTHON_ATTR:" + self.modOrObjName + ":SUT_SEP:" + self.attributeName
         sock.sendall(text)
         sock.shutdown(1)
         response = sock.makefile().read()
@@ -130,13 +130,13 @@ class AttributeProxy:
 
     def setValue(self, value):
         sock = self.moduleProxy.createSocket()
-        text = "SUT_PYTHON_SETATTR:" + self.modOrObjProxy.name + ":SUT_SEP:" + self.attributeName + \
+        text = "SUT_PYTHON_SETATTR:" + self.modOrObjName + ":SUT_SEP:" + self.attributeName + \
                ":SUT_SEP:" + repr(self.getArgForSend(value))
         sock.sendall(text)
         sock.shutdown(2)
 
     def __getattr__(self, name):
-        return self.__class__(self.modOrObjProxy, self.moduleProxy, self.attributeName + "." + name).tryEvaluate()
+        return self.__class__(self.modOrObjName, self.moduleProxy, self.attributeName + "." + name).tryEvaluate()
 
     def __call__(self, *args, **kw):
         response = self.makeResponse(*args, **kw)
@@ -150,7 +150,7 @@ class AttributeProxy:
 
     def createAndSend(self, *args, **kw):
         sock = self.moduleProxy.createSocket()
-        text = "SUT_PYTHON_CALL:" + self.modOrObjProxy.name + ":SUT_SEP:" + self.attributeName + \
+        text = "SUT_PYTHON_CALL:" + self.modOrObjName + ":SUT_SEP:" + self.attributeName + \
                ":SUT_SEP:" + repr(self.getArgsForSend(args)) + ":SUT_SEP:" + repr(self.getArgForSend(kw))
         sock.sendall(text)
         return sock

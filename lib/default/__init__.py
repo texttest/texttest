@@ -1142,8 +1142,7 @@ class Config:
         if homeOS != "any" and homeOS != os.name:
             app.addConfigEntry("implied", os.name, "base_version")
         app.setConfigAlias("collect_traffic_py_module", "collect_traffic_python")
-        app.setConfigAlias("collect_traffic_py_attributes", "collect_traffic_python")
-
+        
     def defaultViewProgram(self, homeOS):
         if os.name == "posix":
             return "emacs"

@@ -728,9 +728,6 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
         text = modOrObjName + "." + attrName + "(" + ", ".join(argsForRecord) + ")"
         super(PythonFunctionCallTraffic, self).__init__(modOrObjName, attrName, text, responseFile)
 
-    def getTextMarker(self):
-        return self.modOrObjName + "." + self.attrName
-
     def getArgForRecord(self, arg):
         class ArgWrapper:
             def __init__(self, arg):

@@ -1,5 +1,5 @@
 
-import sys, os, socket
+import sys, os, socket, inspect
 
 class ModuleProxy:
     def __init__(self, name):
@@ -113,7 +113,8 @@ class AttributeProxy:
         self.modOrObjName = modOrObjName
         self.moduleProxy = moduleProxy
         self.attributeName = attributeName
-
+        self.realVersion = None
+        
     def getRepresentationForSendToTrafficServer(self):
         return self.modOrObjName + "." + self.attributeName
 
@@ -139,9 +140,18 @@ class AttributeProxy:
         return AttributeProxy(self.modOrObjName, self.moduleProxy, self.attributeName + "." + name).tryEvaluate()
 
     def __call__(self, *args, **kw):
-        response = self.makeResponse(*args, **kw)
-        if response:
-            return self.moduleProxy.handleResponse(response, "InstanceProxy")
+        if self.realVersion is None or not self.calledFromStdlib(): 
+            response = self.makeResponse(*args, **kw)
+            if response:
+                return self.moduleProxy.handleResponse(response, "InstanceProxy")
+        else:
+            return self.realVersion(*args, **kw)
+
+    def calledFromStdlib(self):
+        stdlibDir = os.path.dirname(os.__file__)
+        for framerecord in inspect.stack()[1:]:
+            if framerecord[1] != __file__:
+                return framerecord[1].startswith(stdlibDir)
 
     def makeResponse(self, *args, **kw):
         sock = self.createAndSend(*args, **kw)
@@ -267,10 +277,12 @@ class PartialModuleProxy(ModuleProxy):
         currAttrName = parts[0]
         if not hasattr(realObj, currAttrName):
             return # If the real object doesn't have it, assume the fake one doesn't either...
+
+        currRealAttr = getattr(realObj, currAttrName)
         if len(parts) == 1:
+            proxyObj.realVersion = currRealAttr
             setattr(realObj, currAttrName, proxyObj.tryEvaluate())
         else:
-            currRealAttr = getattr(realObj, currAttrName)
             try:
                 self.interceptAttribute(proxyObj, currRealAttr, parts[1])
             except TypeError: # it's a builtin (assume setattr threw), so we hack around...

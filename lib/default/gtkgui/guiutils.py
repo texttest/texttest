@@ -23,24 +23,8 @@ except ImportError:
 guiConfig = None
 
 class Utf8Converter:
-    def convert(self, text):
-        unicodeInfo = self.decodeText(text)
-        return unicodeInfo.encode('utf-8', 'replace')
-
-    def decodeText(self, text):
-        encodings = self.getEncodings()
-        for encoding in encodings:
-            try:
-                return unicode(text, encoding, errors="strict")
-            except Exception:
-                pass
-
-        sys.stderr.write("WARNING: TextTest's textual display had some trouble with character encodings.\n" + \
-                         "It tried the encoding(s) " + " and ".join(encodings) + \
-                         ",\nbut the Unicode replacement character still had to be used.\n" + \
-                         "Please ensure your locale is compatible with the encodings in your test files.\n" + \
-                         "The problematic text follows:\n\n" + text.strip() + "\n")
-        return unicode(text, encodings[0], errors="replace")
+    def __init__(self):
+        self.encodings = self.getEncodings()
 
     def getEncodings(self):
         encodings = [ 'utf-8' ]
@@ -48,10 +32,29 @@ class Utf8Converter:
         if localeEncoding and not localeEncoding in encodings:
             encodings.insert(0, localeEncoding)
         return encodings
+    
+    def convert(self, text):
+        unicodeInfo = self.decodeText(text)
+        return unicodeInfo.encode('utf-8', 'replace')
 
+    def decodeText(self, text):
+        for encoding in self.encodings:
+            try:
+                return unicode(text, encoding, errors="strict")
+            except Exception:
+                pass
+
+        sys.stderr.write("WARNING: TextTest's textual display had some trouble with character encodings.\n" + \
+                         "It tried the encoding(s) " + " and ".join(self.encodings) + \
+                         ",\nbut the Unicode replacement character still had to be used.\n" + \
+                         "Please ensure your locale is compatible with the encodings in your test files.\n" + \
+                         "The problematic text follows:\n\n" + text.strip() + "\n")
+        return unicode(text, self.encodings[0], errors="replace")
+
+utf8Converter = Utf8Converter()
 
 def convertToUtf8(text): # gtk.TextViews insist we do the conversion ourselves
-    return Utf8Converter().convert(text)
+    return utf8Converter.convert(text)
 
 
 def openLinkInBrowser(target):

@@ -151,9 +151,11 @@ class AttributeProxy:
         # Don't intercept if we've been called from within the standard library or
         # from our own command line interceptors
         stdlibDir = os.path.dirname(os.__file__)
-        for framerecord in inspect.stack()[1:]:
+        stack = inspect.stack()
+        currentFile = stack[0][1]
+        for framerecord in stack[1:]:
             fileName = framerecord[1]
-            if fileName != __file__:
+            if fileName != currentFile:
                 dirName = self.getDirectory(fileName)
                 return dirName == stdlibDir or os.path.basename(dirName) == "traffic_intercepts"
 

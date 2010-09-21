@@ -110,13 +110,13 @@ class Config:
                 if not useTraffic:
                     self.addTrafficSwitch(group)
 
-    def addTrafficSwitch(self, group):
+    def addTrafficSwitch(self, group, value=0):
         options = [ "Replay All", "Record All", "Record New Only"  ]
         descriptions = [ "Replay all existing interactions from the information in the traffic files. Do not record anything new.",
                          "Ignore any existing traffic files and record all the interactions afresh.",
                          "Replay all existing interactions from the information in the traffic files. " + \
                          "Record any other interactions that occur." ]
-        group.addSwitch("rectraffic", "Traffic Files", options=options, description=descriptions)
+        group.addSwitch("rectraffic", "Traffic Files", value=value, options=options, description=descriptions)
 
     def getReconnFullOptions(self):
         return ["Display results exactly as they were in the original run",

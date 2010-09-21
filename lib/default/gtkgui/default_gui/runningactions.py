@@ -452,7 +452,7 @@ class RecordTest(BasicRunningAction,guiplugins.ActionDialogGUI):
 
     def addSwitches(self):
         if self.currentApp and self.currentApp.usesTrafficMechanism():
-            self.addSwitch("rectraffic", "Also record command-line or client-server traffic", 1)
+            self.currentApp.addTrafficSwitch(self.optionGroup, value=1) # record new by default
         self.addSwitch("rep", "Automatically replay test after recording it", 1,
                        options = [ "Disabled", "In background", "Using dynamic GUI" ])
 

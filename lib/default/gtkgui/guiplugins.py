@@ -38,7 +38,7 @@ class ProcessTerminationMonitor(plugins.Observable):
             return process._handle
 
     def startProcess(self, cmdArgs, description = "", killOnTermination=True, exitHandler=None, exitHandlerArgs=(), **kwargs):
-        process = subprocess.Popen(cmdArgs, stdin=open(os.devnull), startupinfo=plugins.getProcessStartUpInfo(), **kwargs)
+        process = subprocess.Popen(cmdArgs, stdin=open(os.devnull), **kwargs)
         pidOrHandle = self.getProcessIdentifier(process)
         self.exitHandlers[int(pidOrHandle)] = (exitHandler, exitHandlerArgs)
         if killOnTermination:

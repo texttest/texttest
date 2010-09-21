@@ -347,11 +347,12 @@ class TestEnvironmentCreator:
                     if not usecaseRecorder:
                         usecaseRecorder = "ui_simulation"
                     vars.append(("USECASE_HOME", os.path.join(self.test.app.getDirectory(), usecaseRecorder + "_files")))
-                from virtualdisplay import VirtualDisplayResponder
-                if VirtualDisplayResponder.instance:
-                    virtualDisplay = VirtualDisplayResponder.instance.displayName
-                    if virtualDisplay:
-                        vars.append(("DISPLAY", virtualDisplay))
+                if os.name == "posix":
+                    from virtualdisplay import VirtualDisplayResponder
+                    if VirtualDisplayResponder.instance:
+                        virtualDisplay = VirtualDisplayResponder.instance.displayName
+                        if virtualDisplay:
+                            vars.append(("DISPLAY", virtualDisplay))
         elif self.testCase():
             useCaseVars = self.getUseCaseVariables()
             if self.useJavaRecorder():

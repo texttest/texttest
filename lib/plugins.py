@@ -769,14 +769,6 @@ def relpath(fullpath, parentdir):
         else:
             return relPath
 
-def getProcessStartUpInfo(envMapping=os.environ):
-    # Used for hiding the windows if we're on Windows!
-    if os.name == "nt" and envMapping.get("DISPLAY") == "HIDE_WINDOWS":
-        info = subprocess.STARTUPINFO()
-        info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        info.wShowWindow = subprocess.SW_HIDE
-        return info
-
 def copyPath(srcPath, dstPath):
     if os.path.isdir(srcPath):
         removePath(dstPath)

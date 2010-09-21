@@ -88,8 +88,7 @@ class InteractiveResponder(plugins.Responder):
             tool, cmdArgs = self.getViewCmdInfo(test, logFileComparison)
             if tool:
                 try:
-                    proc = subprocess.Popen(cmdArgs, stdout=open(os.devnull, "w"),
-                                            stderr=subprocess.STDOUT, startupinfo=plugins.getProcessStartUpInfo())
+                    proc = subprocess.Popen(cmdArgs, stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
                     plugins.log.info("<See also " + tool + " window for details of " + logFile + ">")
                     return proc
                 except OSError:

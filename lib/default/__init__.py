@@ -364,7 +364,7 @@ class Config:
                 from batch.junitreport import JUnitResponder
                 classes.append(JUnitResponder)
                 
-        if self.useVirtualDisplay():
+        if os.name == "posix" and self.useVirtualDisplay():
             from virtualdisplay import VirtualDisplayResponder
             classes.append(VirtualDisplayResponder)
         if self.keepTemporaryDirectories():

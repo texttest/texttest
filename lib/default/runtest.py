@@ -178,10 +178,19 @@ class RunTest(plugins.Action):
             return subprocess.Popen(commandArgs, preexec_fn=self.getPreExecFunction(), \
                                     stdin=open(self.getInputFile(test, inputStem)), cwd=test.getDirectory(temporary=1), \
                                     stdout=self.makeFile(test, stdoutStem), stderr=self.makeFile(test, stderrStem), \
-                                    env=testEnv, startupinfo=plugins.getProcessStartUpInfo(test.environment))
+                                    env=testEnv, startupinfo=self.getProcessStartUpInfo(test))
         except OSError:
             message = "OS-related error starting the test command - probably cannot find the program " + repr(commandArgs[0])
             raise plugins.TextTestError, message
+
+    def getProcessStartUpInfo(self, test):
+        # Used for hiding the windows if we're on Windows!
+        if os.name == "nt" and test.getConfigValue("use_case_record_mode") == "GUI" and \
+               test.getConfigValue("virtual_display_hide_windows") == "true" and test.app.useVirtualDisplay():
+            info = subprocess.STARTUPINFO()
+            info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            info.wShowWindow = subprocess.SW_HIDE
+            return info
         
     def getPreExecFunction(self):
         if os.name == "posix": # pragma: no cover - only run in the subprocess!

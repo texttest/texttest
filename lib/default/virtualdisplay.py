@@ -19,16 +19,8 @@ class VirtualDisplayResponder(plugins.Responder):
         
     def addSuites(self, suites):
         guiSuites = filter(lambda suite : suite.getConfigValue("use_case_record_mode") == "GUI", suites)
-        # On UNIX this is a virtual display to set the DISPLAY variable to, on Windows it's just a marker to hide the windows
-        if os.name != "posix":
-            self.setHideWindows(guiSuites)
-        elif not self.displayName:
+        if not self.displayName:
             self.setUpVirtualDisplay(guiSuites)
-
-    def setHideWindows(self, suites):
-        if len(suites) > 0 and not self.displayName and \
-               any((suite.getConfigValue("virtual_display_hide_windows") == "true" for suite in suites)):
-            self.displayName = "HIDE_WINDOWS"
                               
     def setUpVirtualDisplay(self, guiSuites):
         if len(guiSuites) == 0:

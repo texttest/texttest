@@ -1040,6 +1040,7 @@ class Config:
                              "(UNIX) List of machines to run virtual display server (Xvfb) on")
         app.setConfigDefault("virtual_display_extra_args", "", \
                              "(UNIX) Extra arguments (e.g. bitdepth) to supply to virtual display server (Xvfb)")
+        app.setConfigDefault("virtual_display_hide_windows", "true", "(Windows) Whether to emulate the virtual display handling on Windows by hiding the SUT's windows")
 
     def defaultPerfUnits(self):
         units = {}

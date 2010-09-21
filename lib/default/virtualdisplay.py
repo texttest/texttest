@@ -26,7 +26,8 @@ class VirtualDisplayResponder(plugins.Responder):
             self.setUpVirtualDisplay(guiSuites)
 
     def setHideWindows(self, suites):
-        if len(suites) > 0 and not self.displayName:
+        if len(suites) > 0 and not self.displayName and \
+               any((suite.getConfigValue("virtual_display_hide_windows") == "true" for suite in suites)):
             self.displayName = "HIDE_WINDOWS"
                               
     def setUpVirtualDisplay(self, guiSuites):

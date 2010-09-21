@@ -421,7 +421,15 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         possibleSubDirs = self.findSubDirectories()
         self.addOption("subdir", "\nSubdirectory name to store the above application files under (leave blank for local storage)", possibleValues=possibleSubDirs)
         self.addOption("javaclass", "\nJava Class name (instead of executable program)")
-        self.addSwitch("gui", "GUI testing option chooser", options = [ "Disable GUI testing options", "PyGTK GUI with PyUseCase 3.x", "Tkinter GUI with PyUseCase 3.2+", "Java GUI with JUseCase", "Other embedded Use-case Recorder (e.g. PyUseCase 2.x, NUseCase)", "Other GUI-test tool (enable virtual display only)" ], hideOptions=True)
+        self.addSwitch("gui", "GUI testing option chooser",
+                       options = [ "Disable GUI testing options",
+                                   "PyGTK GUI with PyUseCase 3.x",
+                                   "Tkinter GUI with PyUseCase 3.2+",
+                                   "wxPython GUI with PyUseCase 3.4+",
+                                   "Java GUI with JUseCase",
+                                   "Other embedded Use-case Recorder (e.g. PyUseCase 2.x, NUseCase)",
+                                   "Other GUI-test tool (enable virtual display only)" ],
+                       hideOptions=True)
 
         possibleDirs = []
         for app in allApps:
@@ -517,10 +525,12 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         useGui = self.optionGroup.getSwitchValue("gui")
         if useGui > 0:
             configEntries["use_case_record_mode"] = "GUI"
-        if useGui == 1 or useGui == 2:
+        if useGui in [ 1, 2, 3 ]:
             interpreter = "pyusecase"
             if useGui == 2:
                 interpreter += " -i tkinter"
+            elif useGui == 3:
+                interpreter += " -i wx"
             configEntries["use_case_recorder"] = "pyusecase"
             configEntries["interpreter"] = interpreter
 
@@ -533,9 +543,9 @@ class ImportApplication(guiplugins.ActionDialogGUI):
             plugins.ensureDirectoryExists(pyusecaseDir) 
             # Create an empty UI map file so it shows up in the Config tab...
             open(os.path.join(pyusecaseDir, "ui_map.conf"), "w")
-        elif useGui == 3:
+        elif useGui == 4:
             configEntries["use_case_recorder"] = "jusecase"
-        elif useGui == 5:
+        elif useGui == 6:
             configEntries["use_case_recorder"] = "none"            
 
         self.notify("NewApplication", ext, directory, configEntries)

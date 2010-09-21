@@ -41,13 +41,19 @@ class SetUpTrafficHandlers(plugins.Action):
             test.setEnvironment("TEXTTEST_MIM_SERVER", address) # Address of TextTest's server for recording client/server traffic
             if interceptAttributes:
                 test.setEnvironment("TEXTTEST_MIM_PYTHON", interceptAttributes)
+                ignoreCallers = test.getConfigValue("collect_traffic_python_ignore_callers")
+                if ignoreCallers:
+                    test.setEnvironment("TEXTTEST_MIM_PYTHON_IGNORE", ",".join(ignoreCallers))
 
         for pathVar in pathVars:
             # Change test environment to pick up the intercepts
             test.setEnvironment(pathVar, interceptDir + os.pathsep + test.getEnvironment(pathVar, ""))
 
     def makeArgFromDict(self, dict):
-        args = [ key + "=" + "+".join(val) for key, val in dict.items() if key ]
+        args = []
+        for key, values in dict.items():
+            if key and values:
+                args.append(key + "=" + "+".join(values))
         return ",".join(args)
         
     def makeTrafficServer(self, test, replayFile, interceptInfo):
@@ -63,9 +69,9 @@ class SetUpTrafficHandlers(plugins.Action):
         if filesToIgnore:
             cmdArgs += [ "-i", ",".join(filesToIgnore) ]
 
-        environmentDict = test.getConfigValue("collect_traffic_environment")
-        if environmentDict:
-            cmdArgs += [ "-e", self.makeArgFromDict(environmentDict) ]
+        environmentArg = self.makeArgFromDict(test.getConfigValue("collect_traffic_environment"))
+        if environmentArg:
+            cmdArgs += [ "-e", environmentArg ]
 
         if interceptInfo.pyAttributes:
             cmdArgs += [ "-m", ",".join(interceptInfo.pyAttributes) ]

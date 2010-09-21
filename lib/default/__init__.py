@@ -1124,6 +1124,7 @@ class Config:
         app.setConfigDefault("collect_traffic", { "default": [], "asynchronous": [] }, "List of command-line programs to intercept")
         app.setConfigDefault("collect_traffic_environment", { "default" : [] }, "Mapping of collected programs to environment variables they care about")
         app.setConfigDefault("collect_traffic_python", [], "List of Python modules and attributes to intercept")
+        app.setConfigDefault("collect_traffic_python_ignore_callers", [], "List of Python modules from where calls to intercepted items should be ignored")
         app.setConfigDefault("collect_traffic_use_threads", "true", "Whether to enable threading, and hence concurrent requests, in traffic mechanism")
         app.setConfigDefault("collect_traffic_client_server", "false", "Whether to intercept client-server traffic sent by the SUT")
         app.setConfigDefault("run_dependent_text", { "default" : [] }, "Mapping of patterns to remove from result files")

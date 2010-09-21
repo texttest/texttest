@@ -24,7 +24,12 @@ def doInterceptions():
     pythonVarStr = os.getenv("TEXTTEST_MIM_PYTHON")
     if pythonVarStr:
         import traffic_pymodule
-        traffic_pymodule.interceptPython(pythonVarStr.split(","))
+        attributeNames = pythonVarStr.split(",")
+        ignoreVar = os.getenv("TEXTTEST_MIM_PYTHON_IGNORE")
+        ignoreCallers = []
+        if ignoreVar:
+            ignoreCallers = ignoreVar.split(",")
+        traffic_pymodule.interceptPython(attributeNames, ignoreCallers)
         del os.environ["TEXTTEST_MIM_PYTHON"] # Guard against double setup when in the self-tests
 
     # Need to load the "real" sitecustomize now

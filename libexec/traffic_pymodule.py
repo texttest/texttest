@@ -109,11 +109,13 @@ class ExceptionProxy(InstanceProxy, Exception):
 
 
 class AttributeProxy:
-    def __init__(self, modOrObjName, moduleProxy, attributeName):
+    def __init__(self, modOrObjName, moduleProxy, attributeName, ignoreModuleCalls=[]):
         self.modOrObjName = modOrObjName
         self.moduleProxy = moduleProxy
         self.attributeName = attributeName
         self.realVersion = None
+        # Always ignore our own command line interceptors
+        self.ignoreModuleCalls = [ "traffic_intercepts" ] + ignoreModuleCalls
         
     def getRepresentationForSendToTrafficServer(self):
         return self.modOrObjName + "." + self.attributeName
@@ -148,8 +150,7 @@ class AttributeProxy:
             return self.realVersion(*args, **kw)
 
     def callerExcluded(self):
-        # Don't intercept if we've been called from within the standard library or
-        # from our own command line interceptors
+        # Don't intercept if we've been called from within the standard library
         stdlibDir = os.path.dirname(os.__file__)
         stack = inspect.stack()
         currentFile = stack[0][1]
@@ -157,7 +158,9 @@ class AttributeProxy:
             fileName = framerecord[1]
             if fileName != currentFile:
                 dirName = self.getDirectory(fileName)
-                return dirName == stdlibDir or os.path.basename(dirName) in [ "coverage", "traffic_intercepts" ]
+                moduleName = inspect.getmodulename(fileName)
+                return dirName == stdlibDir or os.path.basename(dirName) in self.ignoreModuleCalls or \
+                       moduleName in self.ignoreModuleCalls
 
     def getDirectory(self, fileName):
         dirName, local = os.path.split(fileName)
@@ -223,9 +226,9 @@ class ImportHandler:
         return sys.modules.setdefault(name, FullModuleProxy(name))
 
 
-def interceptPython(attributeNames):
+def interceptPython(attributeNames, ignoreCallers):
     handler = InterceptHandler(attributeNames)
-    handler.makeIntercepts()
+    handler.makeIntercepts(ignoreCallers)
 
 class InterceptHandler:
     def __init__(self, attributeNames):
@@ -243,12 +246,12 @@ class InterceptHandler:
             else:
                 self.fullIntercepts.append(attrName)
 
-    def makeIntercepts(self):
+    def makeIntercepts(self, ignoreCallers):
         if len(self.fullIntercepts):
             sys.meta_path.append(ImportHandler(self.fullIntercepts))
         for moduleName, attributes in self.partialIntercepts.items():
             proxy = PartialModuleProxy(moduleName)
-            proxy.interceptAttributes(attributes)
+            proxy.interceptAttributes(attributes, ignoreCallers)
 
     def splitByModule(self, attrName):
         if self.canImport(attrName):
@@ -280,9 +283,9 @@ class TransparentProxy:
 
 
 class PartialModuleProxy(ModuleProxy):
-    def interceptAttributes(self, attrNames):
+    def interceptAttributes(self, attrNames, ignoreCallers):
         for attrName in attrNames:
-            attrProxy = AttributeProxy(self.name, self, attrName)
+            attrProxy = AttributeProxy(self.name, self, attrName, ignoreCallers)
             self.interceptAttribute(attrProxy, sys.modules.get(self.name), attrName)
             
     def interceptAttribute(self, proxyObj, realObj, attrName):

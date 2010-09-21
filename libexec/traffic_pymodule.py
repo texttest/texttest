@@ -158,9 +158,16 @@ class AttributeProxy:
             fileName = framerecord[1]
             if fileName != currentFile:
                 dirName = self.getDirectory(fileName)
-                moduleName = inspect.getmodulename(fileName)
+                moduleName = self.getModuleName(fileName)
                 return dirName == stdlibDir or os.path.basename(dirName) in self.ignoreModuleCalls or \
                        moduleName in self.ignoreModuleCalls
+
+    def getModuleName(self, fileName):
+        given = inspect.getmodulename(fileName)
+        if given == "__init__":
+            return os.path.basename(os.path.dirname(fileName))
+        else:
+            return given
 
     def getDirectory(self, fileName):
         dirName, local = os.path.split(fileName)

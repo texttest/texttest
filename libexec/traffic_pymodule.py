@@ -157,7 +157,7 @@ class AttributeProxy:
             fileName = framerecord[1]
             if fileName != currentFile:
                 dirName = self.getDirectory(fileName)
-                return dirName == stdlibDir or os.path.basename(dirName) == "traffic_intercepts"
+                return dirName == stdlibDir or os.path.basename(dirName) in [ "coverage", "traffic_intercepts" ]
 
     def getDirectory(self, fileName):
         dirName, local = os.path.split(fileName)

@@ -383,7 +383,7 @@ class TestFileGUI(FileViewGUI):
             if hasattr(realState, "correctResults"):
                 # failed on comparison
                 self.addComparisonsToModel(realState)
-            elif not realState.isComplete():
+            else:
                 self.addTmpFilesToModel(realState)
         else:
             self.addStaticFilesToModel(realState)
@@ -432,10 +432,12 @@ class TestFileGUI(FileViewGUI):
     def getState(self):
         if self.currentTest:
             return self.currentTest.stateInGui
+
     def addComparisonsToModel(self, state):
         self.addComparisons(state, state.correctResults + state.changedResults, "Comparison Files")
         self.addComparisons(state, state.newResults, "New Files")
         self.addComparisons(state, state.missingResults, "Missing Files")
+
     def addComparisons(self, state, compList, title):
         if len(compList) == 0:
             return
@@ -449,6 +451,7 @@ class TestFileGUI(FileViewGUI):
             filelist.append(file)
         filelist.sort()
         self.addStandardFilesUnderIter(state, iter, filelist, fileCompMap)
+
     def addStandardFilesUnderIter(self, state, iter, files, compMap = {}):
         for file in files:
             comparison = compMap.get(file)
@@ -457,13 +460,15 @@ class TestFileGUI(FileViewGUI):
             if comparison:
                 details = comparison.getDetails()
             self.addFileToModel(iter, file, colour, comparison, details)
+
     def getComparisonColour(self, state, fileComp):
         if not state.isComplete():
             return self.getColour("running")
-        if fileComp.hasSucceeded():
+        if fileComp and fileComp.hasSucceeded():
             return self.getColour("success")
         else:
             return self.getColour("failure")
+
     def addTmpFilesToModel(self, state):
         tmpFiles = self.currentTest.listTmpFiles()
         tmpIter = self.model.insert_before(None, None)

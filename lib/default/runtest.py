@@ -209,15 +209,19 @@ class RunTest(plugins.Action):
 
     def getRemoteExecuteCmdArgs(self, test, runMachine, localArgs):
         scriptFileName = test.makeTmpFileName("run_test.sh", forComparison=0)
-        scriptFile = open(scriptFileName, "w")
+        openType = "w" if os.name == "posix" else "wb" # the 'b' is necessary so we don't get \r\n written when we just want \n
+        scriptFile = open(scriptFileName, openType)
         scriptFile.write("#!/bin/sh\n\n")
 
         # Need to change working directory remotely
         tmpDir = self.getTmpDirectory(test)
         scriptFile.write("cd " + plugins.quote(tmpDir, "'") + "\n")
 
-        for arg, value in self.getEnvironmentArgs(test): # Must set the environment remotely
-            scriptFile.write("export " + arg + "=" + value + "\n")
+        # Must set the environment remotely
+        for arg, value in self.getEnvironmentArgs(test):
+            # Two step export process for compatibility with CYGWIN and older versions of 'sh'
+            scriptFile.write(arg + "=" + value + "\n")
+            scriptFile.write("export " + arg + "\n")
         if test.app.getConfigValue("remote_shell_program") == "ssh":
             # SSH doesn't kill remote processes, create a kill script
             scriptFile.write('echo "kill $$" > kill_test.sh\n')

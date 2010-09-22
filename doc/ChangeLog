@@ -1857,7 +1857,6 @@ Version trunk
 ============
 System requirements (see Migration Notes):
     - TextTest GUI now requires at least Python 2.6 and PyGTK 2.16.
-General GUI Enhancements:
 Static GUI Enhancements:
     - Selecting for a version picks up versions where the given one is a base_version (selectandfilter.py)
 	Version matching is now the same as that used for other purposes
@@ -1870,8 +1869,8 @@ Static GUI Enhancements:
     - Running/Advanced tab better organised (runningactions.py)
 	Now has frames and various things get greyed out when not appropriate
     - Traffic interception record checkbutton moved to Basic tab and become a radio button (when enabled) (default/__init__.py)
-	Now a third option to record new traffic and replay already recorded traffic simultaneously.
-    - Initial dialog GUI settings has an option for wxPython GUIs in PyUseCase 3.4 (adminacations.py)
+	Now a third option to record new traffic and replay already recorded traffic simultaneously. See migration notes.
+    - Initial dialog GUI settings has an option for wxPython GUIs in PyUseCase 3.4 (adminactions.py)
     - Shortcut bar setting now greyed out if PyUseCase cannot be found (actionholders.py)
 Dynamic GUI Enhancements:
     - Rerun now fires up a dialog (runningactions.py)

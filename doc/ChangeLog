@@ -1869,7 +1869,9 @@ Static GUI Enhancements:
 	Hopefully less easy to get ignored now
     - Running/Advanced tab better organised (runningactions.py)
 	Now has frames and various things get greyed out when not appropriate
-    - Traffic interception record checkbutton moved to Basic tab (when enabled)
+    - Traffic interception record checkbutton moved to Basic tab and become a radio button (when enabled) (default/__init__.py)
+	Now a third option to record new traffic and replay already recorded traffic simultaneously.
+    - Initial dialog GUI settings has an option for wxPython GUIs in PyUseCase 3.4 (adminacations.py)
     - Shortcut bar setting now greyed out if PyUseCase cannot be found (actionholders.py)
 Dynamic GUI Enhancements:
     - Rerun now fires up a dialog (runningactions.py)
@@ -1898,10 +1900,15 @@ Framework Enhancements:
 	Need to explicitly request recording for new items
     - "collect_traffic_py_attributes" now called "collect_traffic_python" and works on builtin modules (traffic.py)
 	Changed how it operates. Config form of it has changed and unified with "collect_traffic_py_module", see migration notes.
+    - Can now filter out certain calling modules/directories when doing Python interception (traffic.py)
+	New config setting "collect_traffic_python_ignore_callers". 
+	By default it includes the whole standard library and TextTest itself. See website docs.
     - collect_traffic now handles environment variables being unset (traffic.py)
 	Previously only recorded them being set to something else.
     - New definition file "testcustomize.py" for Python programs (traffic.py)
 	Intention is for it to work like "sitecustomize.py". Useful usually for monkey-patching on startup.
+    - Window hiding is now configurable for GUI testing on Windows (virtualdisplay.py)
+	New config setting "virtual_display_hide_windows". Still enabled by default.
     - New hook for custom config modules to set up config file variables that depend on other ones (testmodel.py)
 	setDependentConfigDefaults is now called as it is in the core. Does nothing by default.
 Batch Report Enhancements:
@@ -1916,6 +1923,8 @@ Grid Engine (LSF/SGE) enhancements:
 	Same names but lower case. Because config files can now be created per test. See migration notes.
     - Parallel job machine name formatting improved
 	Should make for less wide boxes in HTML report
+    - Uncompared temporary files are now shown if a slave job is killed but does not report in (filetrees.py)
+	Usually happens when comparing the results takes longer than SGE's notify period
     - Don't leak SSH_TTY to SGE jobs (masterprocess.py)
 	Seems to cause trouble on SuSE 11.
 Bug Fixes:
@@ -1948,6 +1957,8 @@ Bug Fixes:
     - Fixed race condition in traffic server where shutdown could complete before all requests were handled (traffic_server.py)
     - Traffic mechanism now handles SUT changes to PATH correctly (traffic_server.py)
     - Fixed occasional module lookup bug in Python interception (traffic_server.py)
+    - Fixed Python interception bug on Windows paths with an 'n', that got confused with linebreaks (traffic_server.py)
+    - Rerun no longer repeats versions in sandbox root directory name (default/__init__.py)
     - Dynamic GUI window title now reports correctly when more than one checkout is being used (controller.py)
     - default.ReplaceText now works without an explicitly provided file, as it once did (scripts.py)
     - default.ReplaceText now works with text containing "=" characters (scripts.py)

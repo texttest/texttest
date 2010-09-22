@@ -49,6 +49,13 @@ the batch version provided. That means it will now look up not only "batch_extra
 but also "batch_filter_file", "batch_version" and "batch_timelimit" for the session that you
 provide.
 
+(2) "Re-record" control for traffic files becomes a radio button
+================================================================
+"Replay All" and "Record All" are the equivalent of the old check button being unchecked and 
+checked respectively. "Record New Only" instructs TextTest to replay from the traffic file 
+everything stored there, while recording any traffic programs/python attributes for which 
+it does not yet have information. See the tooltips for more info.
+
 =========================================================
 NEW STUFF THAT WILL REQUIRE MIGRATION IN FUTURE VERSIONS
 =========================================================

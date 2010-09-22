@@ -747,7 +747,10 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
                     return str(round(self.arg, 2))
                 else:
                     out = repr(self.arg)
-                    if "\\n" in out:
+                    # Replace linebreaks but don't mangle e.g. Windows paths
+                    # This won't work if both exist in the same string - fixing that requires
+                    # using a regex and I couldn't make it work [gjb 100922]
+                    if "\\n" in out and "\\\\n" not in out: 
                         pos = out.find("'", 0, 2)
                         if pos != -1:
                             return out[:pos] + "''" + out[pos:].replace("\\n", "\n") + "''"

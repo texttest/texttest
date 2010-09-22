@@ -421,42 +421,51 @@ class Config:
         return os.path.join(rootDir, self.getWriteDirectoryName(app))
 
     def getWriteDirectoryName(self, app):
-        parts = self.getBasicRunDescriptors(app) + self.getVersionDescriptors() + [ self.getTimeDescriptor(), str(os.getpid()) ]
+        selectedAppDict = self.optionMap.findSelectedAppNames()        
+        parts = self.getBasicRunDescriptors(app, selectedAppDict) + \
+                self.getVersionDescriptors(selectedAppDict) + [ self.getTimeDescriptor(), str(os.getpid()) ]
         return ".".join(parts)
 
-    def getBasicRunDescriptors(self, app):
-        appDescriptors = self.getAppDescriptors()
+    def getBasicRunDescriptors(self, app, selectedAppDict):
+        appDescriptors = self.getAppDescriptors(selectedAppDict)
         if self.useStaticGUI(app):
             return [ "static_gui" ] + appDescriptors
         elif appDescriptors:
             return appDescriptors
-        elif self.optionValue("b"):
-            return [ self.optionValue("b") ]
-        elif self.optionMap.has_key("g"):
-            return [ "dynamic_gui" ]
         else:
-            return [ "console" ]
+            return [ self.getInterfaceDescriptor() ]
+
+    def getInterfaceDescriptor(self):
+        if self.optionValue("b"):
+            return self.optionValue("b")
+        elif self.optionMap.has_key("g"):
+            return "dynamic_gui"
+        else:
+            return "console"
 
     def getTimeDescriptor(self):
         return plugins.startTimeString().replace(":", "")
 
-    def getAppDescriptors(self):
-        givenAppDescriptor = self.optionValue("a")
-        if givenAppDescriptor and givenAppDescriptor.find(",") == -1:
-            return [ givenAppDescriptor ]
+    def getAppDescriptors(self, selectedAppDict):
+        if len(selectedAppDict) == 1:
+            return selectedAppDict.keys()
         else:
             return []
 
-    def getVersionDescriptors(self):
-        givenVersion = self.optionValue("v")
-        if givenVersion:
-            # Commas in path names are a bit dangerous, some applications may have arguments like
-            # -path path1,path2 and just do split on the path argument.
-            # We try something more obscure instead...
-            return [ "++".join(plugins.commasplit(givenVersion)) ]
+    def getVersionDescriptors(self, selectedAppDict):
+        if len(selectedAppDict) == 1:
+            versions = selectedAppDict.values()[0]
         else:
-            return []
+            # Ideally, we would extract the common factor from selectedAppDict,
+            # but that's complicated. We use the original argument and hope for the best...
+            versions = plugins.commasplit(self.optionValue("v"))
 
+        # Commas in path names are a bit dangerous, some applications may have arguments like
+        # -path path1,path2 and just do split on the path argument.
+        # We try something more obscure instead...
+        versionStr = "++".join(versions)
+        return [ versionStr ] if versionStr else []
+        
     def addGuiResponder(self, classes):
         from gtkgui.controller import GUIController
         classes.append(GUIController)

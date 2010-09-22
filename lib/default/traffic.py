@@ -80,7 +80,7 @@ class SetUpTrafficHandlers(plugins.Action):
         if asynchronousFileEditCmds:
             cmdArgs += [ "-a", ",".join(asynchronousFileEditCmds) ]
 
-        if self.recordSetting != self.RECORD_ONLY:
+        if replayFile and self.recordSetting != self.RECORD_ONLY:
             cmdArgs += [ "-p", replayFile ]
             replayEditDir = test.getFileName("file_edits")
             if replayEditDir:

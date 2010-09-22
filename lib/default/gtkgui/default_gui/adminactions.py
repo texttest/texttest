@@ -538,7 +538,8 @@ class ImportApplication(guiplugins.ActionDialogGUI):
                 # PyUseCase doesn't handle tkMessageBox, deal with it via interception by default
                 configEntries["collect_traffic_python"] = "tkMessageBox"
                 configEntries["collect_traffic_use_threads"] = "false"
-            
+            elif useGui == 3:
+                configEntries["virtual_display_hide_windows"] = "false"
             pyusecaseDir = os.path.join(directory, "pyusecase_files")
             plugins.ensureDirectoryExists(pyusecaseDir) 
             # Create an empty UI map file so it shows up in the Config tab...

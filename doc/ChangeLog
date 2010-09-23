@@ -1892,6 +1892,9 @@ Framework Enhancements:
 	i.e. behave as if they were in the config setting "unsaveable_version"
     - "collate_file" can now reference environment variables (sandbox.py)
 	including those set in specific tests
+    - Running tests remotely should work better on Cygwin and on hosts with older shells (runtest.py)
+	Quoting consistently uses hard quoting throughout and scripts don't use ~ or "export VAR=val" syntax any more.
+	Thanks to Matt Baker for assistance here.
     - "Traffic interception" is no longer enabled by default (traffic.py)
 	New setting "collect_traffic_client_server" which enables it for client server testing.
 	Relevant options will only be available if that, "collect_traffic" or "collect_traffic_py_module" are set.

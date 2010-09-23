@@ -852,7 +852,7 @@ class Config:
         if remoteCopy:
             runMachine = app.getRunMachine()
             if runMachine != "localhost":
-                return runMachine, "~/.texttest/tmp/" + os.path.basename(app.writeDirectory)
+                return runMachine, "${HOME}/.texttest/tmp/" + os.path.basename(app.writeDirectory)
         return "localhost", None
 
     def getRemoteTestTmpDir(self, test):
@@ -1257,13 +1257,13 @@ class Config:
                   " ".join(allArgs) + "\n\nThe command produced the following output:\n" + output
 
     def ensureRemoteDirExists(self, app, machine, dirname):
-        self.runCommandAndCheckMachine(app, machine, [ "mkdir", "-p", plugins.quote(dirname, '"') ])
+        self.runCommandAndCheckMachine(app, machine, [ "mkdir", "-p", plugins.quote(dirname) ])
 
     def getRemotePath(self, file, machine):
         if machine == "localhost":
             return file
         else:
-            return machine + ":" + plugins.quote(file, '"')
+            return machine + ":" + plugins.quote(file)
                                                  
     def copyFileRemotely(self, app, srcFile, srcMachine, dstFile, dstMachine):
         srcPath = self.getRemotePath(srcFile, srcMachine)

@@ -96,14 +96,19 @@ def getPersonalDir(dataDirName):
     envVar = "TEXTTEST_PERSONAL_" + dataDirName.upper()
     return os.getenv(envVar, os.path.join(getPersonalConfigDir(), dataDirName))
 
-def quote(value, quoteChar):
+def quote(value):
+    quoteChar = "'"
     if quoteChar in value:
         return value # don't double-quote
     # Make sure the home directory gets expanded...
-    if value.startswith("~/"):
-        return value[:2] + quoteChar + value[2:] + quoteChar
-    else:
-        return quoteChar + value + quoteChar
+    quotedValue = quoteChar + value + quoteChar
+    quotedValue = quotedValue.replace("${", quoteChar + "${")
+    quotedValue = quotedValue.replace("}", "}" + quoteChar)
+    if quotedValue.startswith(quoteChar * 2):
+        quotedValue = quotedValue[2:]
+    if quotedValue.endswith(quoteChar * 2):
+        quotedValue = quotedValue[:-2]
+    return quotedValue
 
 
 def pluralise(num, name):

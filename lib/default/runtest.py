@@ -146,7 +146,7 @@ class RunTest(plugins.Action):
     def killRemoteProcess(self, test, machine):
         tmpDir = self.getTmpDirectory(test)
         remoteScript = os.path.join(tmpDir, "kill_test.sh")
-        test.app.runCommandOn(machine, [ "sh", plugins.quote(remoteScript, '"') ])
+        test.app.runCommandOn(machine, [ "sh", plugins.quote(remoteScript) ])
         
     def wait(self, process):
         try:
@@ -200,8 +200,8 @@ class RunTest(plugins.Action):
         for signum in [ signal.SIGQUIT, signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU ]:
             signal.signal(signum, signal.SIG_IGN)
 
-    def getInterpreterArgs(self, test):
-        args = plugins.splitcmd(test.getConfigValue("interpreter"))
+    def getInterpreterArgs(self, test, expandVars):
+        args = plugins.splitcmd(test.getConfigValue("interpreter", expandVars=expandVars))
         if len(args) > 0 and args[0] == "ttpython": # interpreted to mean "whatever python TextTest runs with"
             return [ sys.executable, "-u" ] + args[1:]
         else:
@@ -215,7 +215,7 @@ class RunTest(plugins.Action):
 
         # Need to change working directory remotely
         tmpDir = self.getTmpDirectory(test)
-        scriptFile.write("cd " + plugins.quote(tmpDir, "'") + "\n")
+        scriptFile.write("cd " + plugins.quote(tmpDir) + "\n")
 
         # Must set the environment remotely
         for arg, value in self.getEnvironmentArgs(test):
@@ -232,25 +232,28 @@ class RunTest(plugins.Action):
         if remoteTmp:
             test.app.copyFileRemotely(scriptFileName, "localhost", remoteTmp, runMachine)
             remoteScript = os.path.join(remoteTmp, os.path.basename(scriptFileName))
-            return test.app.getCommandArgsOn(runMachine, [ plugins.quote(remoteScript, '"') ])
+            return test.app.getCommandArgsOn(runMachine, [ plugins.quote(remoteScript) ])
         else:
-            return test.app.getCommandArgsOn(runMachine, [ plugins.quote(scriptFileName, '"') ])
+            return test.app.getCommandArgsOn(runMachine, [ plugins.quote(scriptFileName) ])
 
     def getEnvironmentArgs(self, test):
         vars = self.getEnvironmentChanges(test)
         args = []
         localTmpDir = test.app.writeDirectory
         remoteTmp = test.app.getRemoteTmpDirectory()[1]
+        builtinVars = [ "TEXTTEST_CHECKOUT", "TEXTTEST_ROOT", "TEXTTEST_SANDBOX", "TEXTTEST_SANDBOX_ROOT" ]
         for var, value in vars:
+            if var in builtinVars:
+                continue
             if remoteTmp:
                 remoteValue = value.replace(localTmpDir, remoteTmp)
             else:
                 remoteValue = value
-            if var == "PATH":
-                # This needs to be correctly reset remotely
-                remoteValue = plugins.quote(remoteValue.replace(os.getenv(var), "${" + var + "}"), '"')
-            else:
-                remoteValue = plugins.quote(remoteValue, "'")
+
+            currentValue = os.getenv(var)
+            if currentValue:
+                remoteValue = remoteValue.replace(currentValue, "${" + var + "}")
+            remoteValue = plugins.quote(remoteValue)
             args.append((var, remoteValue))
         return args
     
@@ -277,9 +280,11 @@ class RunTest(plugins.Action):
         if test.app.hasAutomaticCputimeChecking():
             args += self.getTimingArgs(test, makeDirs)
 
-        args += self.getInterpreterArgs(test)
+        # Don't expand environment if we're running on a different file system
+        expandVars = test.app.getRunMachine() == "localhost" or not test.getConfigValue("remote_copy_program")
+        args += self.getInterpreterArgs(test, expandVars)
         args += test.getInterpreterOptions()
-        args += plugins.splitcmd(test.getConfigValue("executable"))
+        args += plugins.splitcmd(test.getConfigValue("executable", expandVars=expandVars))
         args += test.getCommandLineOptions()
         return args
         

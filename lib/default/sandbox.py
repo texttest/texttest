@@ -312,15 +312,15 @@ class PrepareWriteDirectory(plugins.Action):
         remoteCheckout = self.tryCopyPathRemotely(checkout, fullTmpDir, machine, suite.app)
         if remoteCheckout:
             suite.app.checkout = remoteCheckout
-            suite.setEnvironment("TEXTTEST_CHECKOUT", remoteCheckout)
-            os.environ["TEXTTEST_CHECKOUT"] = remoteCheckout
             
         for setting in [ "interpreter", "executable" ]:
-            file = suite.getConfigValue(setting)
-            if remoteCheckout and file.startswith(checkout):
-                continue # We've copied it already, don't do it again...
-            remoteFile = self.tryCopyPathRemotely(file, fullTmpDir, machine, suite.app)
+            localFile = suite.getConfigValue(setting)
+            if remoteCheckout and localFile.startswith(checkout):
+                remoteFile = localFile.replace(checkout, remoteCheckout) # We've copied it already, don't do it again...
+            else:
+                remoteFile = self.tryCopyPathRemotely(localFile, fullTmpDir, machine, suite.app)
             if remoteFile:
+                self.diag.info("Setting " + repr(setting) + " to " + repr(remoteFile))
                 # For convenience, so we don't have to set it everywhere...
                 suite.app.setConfigDefault(setting, remoteFile)
         
@@ -537,7 +537,7 @@ class CollateFiles(plugins.Action):
             self.fetchRemoteFiles(test, machine, remoteTmpDir)
                 
     def fetchRemoteFiles(self, test, machine, tmpDir):
-        sourcePaths = os.path.join(plugins.quote(tmpDir, '"'), "*")
+        sourcePaths = os.path.join(plugins.quote(tmpDir), "*")
         test.app.copyFileRemotely(sourcePaths, machine, test.getDirectory(temporary=1), "localhost")
     
     def getFilesPresent(self, test):

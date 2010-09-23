@@ -1,5 +1,9 @@
 
-import sys, os, socket, inspect
+import sys, os, inspect
+
+# Allow interception of 'socket'
+import socket as realsocket
+del sys.modules["socket"]
 
 class ModuleProxy:
     def __init__(self, name):
@@ -14,7 +18,7 @@ class ModuleProxy:
         if servAddr:
             host, port = servAddr.split(":")
             serverAddress = (host, int(port))
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock = realsocket.socket(realsocket.AF_INET, realsocket.SOCK_STREAM)
             sock.connect(serverAddress)
             return sock
 
@@ -48,9 +52,11 @@ class ModuleProxy:
 
 
 class FullModuleProxy(ModuleProxy):
-    def __init__(self, name):
+    def __init__(self, name, importHandler):
         ModuleProxy.__init__(self, name)
-        self.tryImport() # Creating one of these implies someone tried to import the module
+        self.importHandler = importHandler
+        self.realModule = None
+        self.tryImport() # trigger a remote import to make sure we're connected to something
         
     def tryImport(self):
         sock = self.createSocket()
@@ -61,6 +67,24 @@ class FullModuleProxy(ModuleProxy):
         if response:
             self.handleResponse(response, "InstanceProxy")
 
+    def __getattr__(self, attrname):
+        if self.importHandler.callStackChecker.callerExcluded():
+            if self.realModule is None:
+                self.realModule = self.loadRealModule()
+            return getattr(self.realModule, attrname)
+        else:
+            return ModuleProxy.__getattr__(self, attrname)
+
+    def loadRealModule(self):
+        del sys.modules[self.name]
+        sys.meta_path.remove(self.importHandler)
+        try:
+            exec "import " + self.name + " as _realModule"
+        finally:
+            sys.meta_path.append(self.importHandler)
+            sys.modules[self.name] = self
+        return _realModule
+    
 
 class InstanceProxy:
     moduleProxy = None
@@ -109,13 +133,12 @@ class ExceptionProxy(InstanceProxy, Exception):
 
 
 class AttributeProxy:
-    def __init__(self, modOrObjName, moduleProxy, attributeName, ignoreModuleCalls=[]):
+    def __init__(self, modOrObjName, moduleProxy, attributeName, callStackChecker=None):
         self.modOrObjName = modOrObjName
         self.moduleProxy = moduleProxy
         self.attributeName = attributeName
         self.realVersion = None
-        # Always ignore our own command line interceptors
-        self.ignoreModuleCalls = [ "traffic_intercepts" ] + ignoreModuleCalls
+        self.callStackChecker = callStackChecker
         
     def getRepresentationForSendToTrafficServer(self):
         return self.modOrObjName + "." + self.attributeName
@@ -142,39 +165,12 @@ class AttributeProxy:
         return AttributeProxy(self.modOrObjName, self.moduleProxy, self.attributeName + "." + name).tryEvaluate()
 
     def __call__(self, *args, **kw):
-        if self.realVersion is None or not self.callerExcluded(): 
+        if self.realVersion is None or self.callStackChecker is None or not self.callStackChecker.callerExcluded(): 
             response = self.makeResponse(*args, **kw)
             if response:
                 return self.moduleProxy.handleResponse(response, "InstanceProxy")
         else:
             return self.realVersion(*args, **kw)
-
-    def callerExcluded(self):
-        # Don't intercept if we've been called from within the standard library
-        stdlibDir = os.path.dirname(os.__file__)
-        stack = inspect.stack()
-        currentFile = stack[0][1]
-        for framerecord in stack[1:]:
-            fileName = framerecord[1]
-            if fileName != currentFile:
-                dirName = self.getDirectory(fileName)
-                moduleName = self.getModuleName(fileName)
-                return dirName == stdlibDir or os.path.basename(dirName) in self.ignoreModuleCalls or \
-                       moduleName in self.ignoreModuleCalls
-
-    def getModuleName(self, fileName):
-        given = inspect.getmodulename(fileName)
-        if given == "__init__":
-            return os.path.basename(os.path.dirname(fileName))
-        else:
-            return given
-
-    def getDirectory(self, fileName):
-        dirName, local = os.path.split(fileName)
-        if local.startswith("__init__"):
-            return self.getDirectory(dirName)
-        else:
-            return dirName
 
     def makeResponse(self, *args, **kw):
         sock = self.createAndSend(*args, **kw)
@@ -212,9 +208,41 @@ class AttributeProxy:
         return tuple(map(self.getArgForSend, args))
 
 
+class CallStackChecker:
+    def __init__(self, ignoreModuleCalls):
+        # Always ignore our own command line interceptors
+        self.ignoreModuleCalls = [ "traffic_intercepts" ] + ignoreModuleCalls
+
+    def callerExcluded(self):
+        # Don't intercept if we've been called from within the standard library
+        stdlibDir = os.path.dirname(os.__file__)
+        framerecord = inspect.stack()[2] # parent of parent. If you extract method you need to change this number :)
+        fileName = framerecord[1]
+        dirName = self.getDirectory(fileName)
+        moduleName = self.getModuleName(fileName)
+        return dirName == stdlibDir or os.path.basename(dirName) in self.ignoreModuleCalls or \
+               moduleName in self.ignoreModuleCalls
+
+    def getModuleName(self, fileName):
+        given = inspect.getmodulename(fileName)
+        if given == "__init__":
+            return os.path.basename(os.path.dirname(fileName))
+        else:
+            return given
+
+    def getDirectory(self, fileName):
+        dirName, local = os.path.split(fileName)
+        if local.startswith("__init__"):
+            return self.getDirectory(dirName)
+        else:
+            return dirName
+
+
+
 class ImportHandler:
-    def __init__(self, moduleNames):
+    def __init__(self, moduleNames, callStackChecker):
         self.moduleNames = moduleNames
+        self.callStackChecker = callStackChecker
 
     def shouldIntercept(self, name):
         if name in self.moduleNames:
@@ -230,7 +258,7 @@ class ImportHandler:
             return self
 
     def load_module(self, name):
-        return sys.modules.setdefault(name, FullModuleProxy(name))
+        return sys.modules.setdefault(name, FullModuleProxy(name, self))
 
 
 def interceptPython(attributeNames, ignoreCallers):
@@ -254,11 +282,12 @@ class InterceptHandler:
                 self.fullIntercepts.append(attrName)
 
     def makeIntercepts(self, ignoreCallers):
+        callStackChecker = CallStackChecker(ignoreCallers)
         if len(self.fullIntercepts):
-            sys.meta_path.append(ImportHandler(self.fullIntercepts))
+            sys.meta_path.append(ImportHandler(self.fullIntercepts, callStackChecker))
         for moduleName, attributes in self.partialIntercepts.items():
             proxy = PartialModuleProxy(moduleName)
-            proxy.interceptAttributes(attributes, ignoreCallers)
+            proxy.interceptAttributes(attributes, callStackChecker)
 
     def splitByModule(self, attrName):
         if self.canImport(attrName):
@@ -290,9 +319,9 @@ class TransparentProxy:
 
 
 class PartialModuleProxy(ModuleProxy):
-    def interceptAttributes(self, attrNames, ignoreCallers):
+    def interceptAttributes(self, attrNames, callStackChecker):
         for attrName in attrNames:
-            attrProxy = AttributeProxy(self.name, self, attrName, ignoreCallers)
+            attrProxy = AttributeProxy(self.name, self, attrName, callStackChecker)
             self.interceptAttribute(attrProxy, sys.modules.get(self.name), attrName)
             
     def interceptAttribute(self, proxyObj, realObj, attrName):

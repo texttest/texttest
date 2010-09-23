@@ -421,51 +421,54 @@ class Config:
         return os.path.join(rootDir, self.getWriteDirectoryName(app))
 
     def getWriteDirectoryName(self, app):
-        selectedAppDict = self.optionMap.findSelectedAppNames()        
-        parts = self.getBasicRunDescriptors(app, selectedAppDict) + \
-                self.getVersionDescriptors(selectedAppDict) + [ self.getTimeDescriptor(), str(os.getpid()) ]
+        appDescriptor = self.getAppDescriptor()
+        parts = self.getBasicRunDescriptors(app, appDescriptor) + self.getVersionDescriptors(appDescriptor) + \
+                [ self.getTimeDescriptor(), str(os.getpid()) ]
         return ".".join(parts)
 
-    def getBasicRunDescriptors(self, app, selectedAppDict):
-        appDescriptors = self.getAppDescriptors(selectedAppDict)
+    def getBasicRunDescriptors(self, app, appDescriptor):
+        appDescriptors = [ appDescriptor ] if appDescriptor else []
         if self.useStaticGUI(app):
             return [ "static_gui" ] + appDescriptors
         elif appDescriptors:
             return appDescriptors
-        else:
-            return [ self.getInterfaceDescriptor() ]
-
-    def getInterfaceDescriptor(self):
-        if self.optionValue("b"):
-            return self.optionValue("b")
+        elif self.optionValue("b"):
+            return [ self.optionValue("b") ]
         elif self.optionMap.has_key("g"):
-            return "dynamic_gui"
+            return [ "dynamic_gui" ]
         else:
-            return "console"
+            return [ "console" ]
 
     def getTimeDescriptor(self):
         return plugins.startTimeString().replace(":", "")
 
-    def getAppDescriptors(self, selectedAppDict):
-        if len(selectedAppDict) == 1:
-            return selectedAppDict.keys()
+    def getAppDescriptor(self):
+        givenAppDescriptor = self.optionValue("a")
+        if givenAppDescriptor and "," not in givenAppDescriptor:
+            return givenAppDescriptor
+
+    def getVersionDescriptors(self, appDescriptor):
+        givenVersion = self.optionValue("v")
+        if givenVersion:
+            # Commas in path names are a bit dangerous, some applications may have arguments like
+            # -path path1,path2 and just do split on the path argument.
+            # We try something more obscure instead...
+            versionList = plugins.commasplit(givenVersion)
+            if appDescriptor:
+                parts = appDescriptor.split(".", 1)
+                if len(parts) > 1:
+                    versionList = self.filterForApp(versionList, parts[1])
+            return [ "++".join(versionList) ] if versionList else []
         else:
             return []
 
-    def getVersionDescriptors(self, selectedAppDict):
-        if len(selectedAppDict) == 1:
-            versions = selectedAppDict.values()[0]
-        else:
-            # Ideally, we would extract the common factor from selectedAppDict,
-            # but that's complicated. We use the original argument and hope for the best...
-            versions = plugins.commasplit(self.optionValue("v"))
+    def filterForApp(self, versionList, appVersionDescriptor):
+        filteredVersions = []
+        for version in versionList:
+            if version != appVersionDescriptor:
+                filteredVersions.append(version.replace(appVersionDescriptor + ".", ""))
+        return filteredVersions
 
-        # Commas in path names are a bit dangerous, some applications may have arguments like
-        # -path path1,path2 and just do split on the path argument.
-        # We try something more obscure instead...
-        versionStr = "++".join(versions)
-        return [ versionStr ] if versionStr else []
-        
     def addGuiResponder(self, classes):
         from gtkgui.controller import GUIController
         classes.append(GUIController)

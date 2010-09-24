@@ -334,6 +334,13 @@ class TextInfoGUI(TextViewGUI):
         self.resetText(test, state)
         self.updateView()
 
+    def notifyRefreshFilePreviews(self, test, fileName):
+        if self.isSelected(fileName):
+            self.notifyNewFileSelection(self.currFileSelection)
+
+    def isSelected(self, fileName):
+        return any((currFile == fileName for currFile, _ in self.currFileSelection))
+
     def makeSubText(self, files):
         newText = self.preambleText
         for fileName, comp in files:

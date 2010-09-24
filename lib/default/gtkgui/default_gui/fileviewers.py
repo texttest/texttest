@@ -6,6 +6,7 @@ The various classes that launch external programs to view files
 import plugins, os
 from .. import guiplugins
 from string import Template
+from copy import copy
 
 class FileViewAction(guiplugins.ActionGUI):
     def __init__(self, *args, **kw):
@@ -271,8 +272,7 @@ class ViewTestFileInEditor(ViewInEditor):
             if len(tests) > 0:
                 # refresh tests if this edited
                 return self.handleTestSuiteEdit, (tests,)
-
-        return self.editingComplete, ()
+        return self.staticGUIEditingComplete, (copy(self.currTestSelection), fileName)
 
     def getTestsForFile(self, stem, fileName):
         tests = []
@@ -290,6 +290,14 @@ class ViewTestFileInEditor(ViewInEditor):
     def handleOptionsEdit(self, tests):
         for test in tests:
             test.filesChanged()
+        self.editingComplete()
+
+    def getSignalsSent(self):
+        return [ "RefreshFilePreviews" ] + ViewInEditor.getSignalsSent(self)
+
+    def staticGUIEditingComplete(self, tests, fileName):
+        for test in tests:
+            self.notify("RefreshFilePreviews", test, fileName)
         self.editingComplete()
 
 

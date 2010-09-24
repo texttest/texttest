@@ -539,12 +539,18 @@ class TestTreeGUI(guiutils.ContainerGUI):
     def notifyLifecycleChange(self, test, *args):
         if test in self.selectedTests:
             self.notify("LifecycleChange", test, *args)
+            
     def notifyFileChange(self, test, *args):
         if test in self.selectedTests:
             self.notify("FileChange", test, *args)
+
     def notifyDescriptionChange(self, test, *args):
         if test in self.selectedTests:
             self.notify("DescriptionChange", test, *args)
+
+    def notifyRefreshFilePreviews(self, test, *args):
+        if test in self.selectedTests:
+            self.notify("RefreshFilePreviews", test, *args)
 
     def updateSuiteSuccess(self, test, colour):
         suite = test.parent

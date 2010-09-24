@@ -70,20 +70,10 @@ class FullModuleProxy(ModuleProxy):
     def __getattr__(self, attrname):
         if self.importHandler.callStackChecker.callerExcluded():
             if self.realModule is None:
-                self.realModule = self.loadRealModule()
+                self.realModule = self.importHandler.loadRealModule(self.name)
             return getattr(self.realModule, attrname)
         else:
             return ModuleProxy.__getattr__(self, attrname)
-
-    def loadRealModule(self):
-        del sys.modules[self.name]
-        sys.meta_path.remove(self.importHandler)
-        try:
-            exec "import " + self.name + " as _realModule"
-        finally:
-            sys.meta_path.append(self.importHandler)
-            sys.modules[self.name] = self
-        return _realModule
     
 
 class InstanceProxy:
@@ -258,7 +248,28 @@ class ImportHandler:
             return self
 
     def load_module(self, name):
-        return sys.modules.setdefault(name, FullModuleProxy(name, self))
+        if self.callStackChecker.callerExcluded():
+            # return the real module, but don't put it in sys.modules so we trigger
+            # a new import next time around
+            return self.loadRealModule(name)
+        else:
+            return sys.modules.setdefault(name, FullModuleProxy(name, self))
+
+    def loadRealModule(self, name):
+        currentModule = sys.modules.get(name)
+        if currentModule is not None:
+            del sys.modules[name]
+        sys.meta_path.remove(self)
+        try:
+            exec "import " + name + " as _realModule"
+        finally:
+            sys.meta_path.append(self)
+            if currentModule is not None:
+                sys.modules[name] = currentModule
+            else:
+                del sys.modules[name]
+        return _realModule
+
 
 
 def interceptPython(attributeNames, ignoreCallers):

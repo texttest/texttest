@@ -100,13 +100,14 @@ class QueueSystemServer(BaseActionRunner):
     def pollQueueSystem(self):
         # Start by polling after 5 seconds, ever after try every 15
         attempts = int(os.getenv("TEXTTEST_QS_POLL_WAIT", "5")) * 2 # Amount of time to wait before initiating polling of SGE
-        while True:
-            for i in range(attempts):
-                time.sleep(0.5)
-                if self.allComplete or self.exited:
-                    return
-            self.updateJobStatus()
-            attempts = 30
+        if attempts >= 0: 
+            while True:
+                for i in range(attempts):
+                    time.sleep(0.5)
+                    if self.allComplete or self.exited:
+                        return
+                self.updateJobStatus()
+                attempts = 30
 
     def canPoll(self):
         queueSystem = self.getQueueSystem(self.jobs.keys()[0])

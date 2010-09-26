@@ -182,19 +182,19 @@ class TrafficServer(TCPServer):
             self.fileEditData = seqdict()
         
     def _process(self, traffic, reqNo):
-        self.diag.info("Processing traffic " + str(traffic.__class__))
+        self.diag.info("Processing traffic " + traffic.__class__.__name__)
         hasFileEdits = self.addPossibleFileEdits(traffic)
         responses = self.getResponses(traffic, hasFileEdits)
         shouldRecord = not traffic.enquiryOnly(responses)
         if shouldRecord:
             traffic.record(self.recordFileHandler, reqNo)
         for response in responses:
-            self.diag.info("Providing response " + str(response.__class__))
+            self.diag.info("Response of type " + response.__class__.__name__ + " with text " + repr(response.text))
             if shouldRecord:
                 response.record(self.recordFileHandler, reqNo)
             for chainResponse in response.forwardToDestination():
                 self._process(chainResponse, reqNo)
-            self.diag.info("Completed response " + str(response.__class__))            
+            self.diag.info("Completed response of type " + response.__class__.__name__)            
 
     def getResponses(self, traffic, hasFileEdits):
         if self.replayInfo.isActiveFor(traffic):

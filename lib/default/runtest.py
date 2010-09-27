@@ -188,8 +188,14 @@ class RunTest(plugins.Action):
         if os.name == "nt" and test.getConfigValue("use_case_record_mode") == "GUI" and \
                test.getConfigValue("virtual_display_hide_windows") == "true" and test.app.useVirtualDisplay():
             info = subprocess.STARTUPINFO()
-            info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            info.wShowWindow = subprocess.SW_HIDE
+            # Python doesn't make this easy for us: in 2.6.6 and later these flags became inaccessible
+            # Alternative is to use win32api which seems excessive just for this purpose.
+            if hasattr(subprocess, "STARTF_USESHOWWINDOW"):
+                info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                info.wShowWindow = subprocess.SW_HIDE
+            else:
+                info.dwFlags |= subprocess._subprocess.STARTF_USESHOWWINDOW
+                info.wShowWindow = subprocess._subprocess.SW_HIDE
             return info
         
     def getPreExecFunction(self):

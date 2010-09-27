@@ -1857,6 +1857,7 @@ Version trunk
 ============
 System requirements (see Migration Notes):
     - TextTest GUI now requires at least Python 2.6 and PyGTK 2.16.
+	Should also be compatible with Python 2.7 now
 Static GUI Enhancements:
     - Selecting for a version picks up versions where the given one is a base_version (selectandfilter.py)
 	Version matching is now the same as that used for other purposes
@@ -1868,8 +1869,9 @@ Static GUI Enhancements:
 	Hopefully less easy to get ignored now
     - Running/Advanced tab better organised (runningactions.py)
 	Now has frames and various things get greyed out when not appropriate
-    - Traffic interception record checkbutton moved to Basic tab and become a radio button (when enabled) (default/__init__.py)
+    - Traffic interception record checkbutton moved to Basic tab and became a radio button (when enabled) (default/__init__.py)
 	Now a third option to record new traffic and replay already recorded traffic simultaneously. See migration notes.
+    - File previews in "Text info" now get updated when a file editor is closed (fileviewers.py)
     - Initial dialog GUI settings has an option for wxPython GUIs in PyUseCase 3.4 (adminactions.py)
     - Shortcut bar setting now greyed out if PyUseCase cannot be found (actionholders.py)
 Dynamic GUI Enhancements:
@@ -1905,6 +1907,8 @@ Framework Enhancements:
     - Can now filter out certain calling modules/directories when doing Python interception (traffic.py)
 	New config setting "collect_traffic_python_ignore_callers". 
 	By default it includes the whole standard library and TextTest itself. See website docs.
+    - Python attributes that get requested repeatedly don't cause extra traffic file entires (traffic_server.py)
+	Just causes traffic files to be long and there is little point keeping track of the number of calls.
     - collect_traffic now handles environment variables being unset (traffic.py)
 	Previously only recorded them being set to something else.
     - New definition file "testcustomize.py" for Python programs (traffic.py)

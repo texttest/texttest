@@ -56,6 +56,10 @@ checked respectively. "Record New Only" instructs TextTest to replay from the tr
 everything stored there, while recording any traffic programs/python attributes for which 
 it does not yet have information. See the tooltips for more info.
 
+(3) Traffic files with Python interception no longer repeat attributes
+======================================================================
+This may cause your traffic files to get shorter. But they'll hopefully be easier to read also.
+
 =========================================================
 NEW STUFF THAT WILL REQUIRE MIGRATION IN FUTURE VERSIONS
 =========================================================

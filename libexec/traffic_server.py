@@ -510,12 +510,14 @@ class ServerStateTraffic(ServerTraffic):
 
 class PythonInstanceWrapper:
     allInstances = {}
+    wrappersByInstance = {}
     def __init__(self, instance, moduleName):
         self.instance = instance
         self.moduleName = moduleName
         self.className = self.instance.__class__.__name__
         self.instanceName = self.getNewInstanceName(self.className.lower())
         self.allInstances[self.instanceName] = self
+        self.wrappersByInstance[id(self.instance)] = self
 
     @classmethod
     def getInstance(cls, instanceName):
@@ -528,6 +530,11 @@ class PythonInstanceWrapper:
             return sys.modules.get(moduleName)
         except ImportError:
             pass
+
+    @classmethod
+    def getWrapperFor(cls, instance, moduleName):
+        storedWrapper = cls.wrappersByInstance.get(id(instance))
+        return storedWrapper or cls(instance, moduleName)
 
     def getInstanceType(self):
         if issubclass(self.instance.__class__, object):
@@ -647,19 +654,24 @@ class PythonModuleTraffic(PythonTraffic):
                 newResult[key] = self.addInstanceWrappers(value)
             return newResult
         elif not self.isBasicType(result) and self.belongsToInterceptedModule(self.getModuleName(result)):
-            return PythonInstanceWrapper(result, self.modOrObjName)
+            return PythonInstanceWrapper.getWrapperFor(result, self.modOrObjName)
         else:
             return result
         
 
 class PythonAttributeTraffic(PythonModuleTraffic):
+    cachedAttributes = set()
     def __init__(self, inText, responseFile):
         modOrObjName, attrName = inText.split(":SUT_SEP:")
         text = modOrObjName + "." + attrName
+        # Should record these at most once, and only then if they return something in their own right
+        # rather than a function etc
+        self.foundInCache = text in self.cachedAttributes
+        self.cachedAttributes.add(text)
         super(PythonAttributeTraffic, self).__init__(modOrObjName, attrName, text, responseFile)
 
     def enquiryOnly(self, responses=[]):
-        return len(responses) == 0
+        return len(responses) == 0 or self.foundInCache
 
     def shouldCache(self, obj):
         return type(obj) not in (types.FunctionType, types.GeneratorType, types.MethodType, types.BuiltinFunctionType,

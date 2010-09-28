@@ -173,9 +173,10 @@ class TrafficServer(TCPServer):
             # Must do this before as they may be a side effect of whatever it is we're processing
             for fileTraffic in self.getLatestFileEdits():
                 self._process(fileTraffic, reqNo)
+            self.hasAsynchronousEdits |= traffic.makesAsynchronousEdits()
+
         self._process(traffic, reqNo)
         self.recordFileHandler.requestComplete(reqNo)
-        self.hasAsynchronousEdits |= traffic.makesAsynchronousEdits()
         if not self.hasAsynchronousEdits:
             # Unless we've marked it as asynchronous we start again for the next traffic.
             self.topLevelForEdit = []
@@ -198,6 +199,7 @@ class TrafficServer(TCPServer):
 
     def getResponses(self, traffic, hasFileEdits):
         if self.replayInfo.isActiveFor(traffic):
+            self.diag.info("Replay active for current command")
             replayedResponses = []
             filesMatched = []
             for responseClass, text in self.replayInfo.readReplayResponses(traffic):

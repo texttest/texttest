@@ -195,7 +195,8 @@ class Test(plugins.Observable):
             self.app.readValues(self.configDir, "config", [ self.dircache ], insert=False, errorOnUnknown=True)
 
     def copyParentConfigDir(self):
-        for suite in self.getAllTestsToRoot():
+        # Take the immediate parent first, upwards to the root suite
+        for suite in reversed(self.getAllTestsToRoot()):
             if suite.configDir:
                 return deepcopy(suite.configDir)
         

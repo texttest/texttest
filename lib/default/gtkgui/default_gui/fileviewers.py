@@ -111,7 +111,7 @@ class FileViewAction(guiplugins.ActionGUI):
             return ""
 
     def getRemoteHost(self):
-        if os.name == "posix" and len(self.currTestSelection) > 0:
+        if len(self.currTestSelection) > 0:
             state = self.currTestSelection[0].stateInGui
             if hasattr(state, "executionHosts") and len(state.executionHosts) > 0:
                 return plugins.interpretHostname(state.executionHosts[0])

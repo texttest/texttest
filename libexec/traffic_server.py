@@ -158,8 +158,8 @@ class TrafficServer(TCPServer):
             # Always move them to the beginning, most recent edits are most relevant
             self.topLevelForEdit.insert(0, file)
 
-            # edit times are only interesting when recording
-            if not self.replayInfo.isActiveFor(traffic):
+            # edit times aren't interesting when doing pure replay
+            if not self.replayInfo.isActiveForAll():
                 for subPath in self.findFilesAndLinks(file):                
                     modTime, modSize = self.getLatestModification(subPath)
                     self.fileEditData[subPath] = modTime, modSize
@@ -173,9 +173,9 @@ class TrafficServer(TCPServer):
             # Must do this before as they may be a side effect of whatever it is we're processing
             for fileTraffic in self.getLatestFileEdits():
                 self._process(fileTraffic, reqNo)
-            self.hasAsynchronousEdits |= traffic.makesAsynchronousEdits()
 
         self._process(traffic, reqNo)
+        self.hasAsynchronousEdits |= traffic.makesAsynchronousEdits()
         self.recordFileHandler.requestComplete(reqNo)
         if not self.hasAsynchronousEdits:
             # Unless we've marked it as asynchronous we start again for the next traffic.
@@ -233,7 +233,7 @@ class TrafficServer(TCPServer):
                 if matchScore > bestScore:
                     bestMatch, bestScore = editedFile, matchScore
 
-        if bestMatch.startswith("/cygdrive"): # on Windows, paths may be referred to by cygwin path, handle this
+        if bestMatch and bestMatch.startswith("/cygdrive"): # on Windows, paths may be referred to by cygwin path, handle this
             bestMatch = bestMatch[10] + ":" + bestMatch[11:]
         return bestMatch
 
@@ -256,9 +256,10 @@ class TrafficServer(TCPServer):
             storedFile, fileType = FileEditTraffic.getFileWithType(fileName)
             if storedFile:
                 editedFile = self.getFileBeingEdited(fileName, fileType, filesMatched)
-                self.diag.info("File being edited for '" + fileName + "' : will replace " + str(editedFile) + " with " + str(storedFile))
-                changedPaths = self.findFilesAndLinks(storedFile)
-                return FileEditTraffic(fileName, editedFile, storedFile, changedPaths, reproduce=True)
+                if editedFile:
+                    self.diag.info("File being edited for '" + fileName + "' : will replace " + str(editedFile) + " with " + str(storedFile))
+                    changedPaths = self.findFilesAndLinks(storedFile)
+                    return FileEditTraffic(fileName, editedFile, storedFile, changedPaths, reproduce=True)
         else:
             return responseClass(text, traffic.responseFile)
 
@@ -1143,6 +1144,9 @@ class ReplayInfo:
         self.replayItems = []
         if replayItemString:
             self.replayItems = replayItemString.split(",")
+
+    def isActiveForAll(self):
+        return len(self.responseMap) > 0 and len(self.replayItems) == 0
             
     def isActiveFor(self, traffic):
         if len(self.responseMap) == 0:

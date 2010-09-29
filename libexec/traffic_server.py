@@ -233,6 +233,8 @@ class TrafficServer(TCPServer):
                 if matchScore > bestScore:
                     bestMatch, bestScore = editedFile, matchScore
 
+        if bestMatch.startswith("/cygdrive"): # on Windows, paths may be referred to by cygwin path, handle this
+            bestMatch = bestMatch[10] + ":" + bestMatch[11:]
         return bestMatch
 
     def getFileMatchScore(self, givenName, actualName):

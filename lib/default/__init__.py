@@ -1264,7 +1264,13 @@ class Config:
 
     def getRemotePath(self, file, machine):
         if machine == "localhost":
-            return file
+            #right now the only way we can run remote execution on a Windows system is using Cygwin
+            #and Cygwin applications need Unix paths to function
+            if os.name != "posix":
+                path = file.replace('C:', '/cygdrive/c')
+                return path
+            else:
+                return file
         else:
             return machine + ":" + plugins.quote(file)
                                                  

@@ -1262,17 +1262,21 @@ class Config:
     def ensureRemoteDirExists(self, app, machine, dirname):
         self.runCommandAndCheckMachine(app, machine, [ "mkdir", "-p", plugins.quote(dirname) ])
 
-    def getRemotePath(self, file, machine):
+    @staticmethod
+    def getRemotePath(fileName, machine):
         if machine == "localhost":
-            #right now the only way we can run remote execution on a Windows system is using Cygwin
-            #and Cygwin applications need Unix paths to function
-            if os.name != "posix":
-                path = file.replace('C:', '/cygdrive/c')
-                return path
+            # Right now the only way we can run remote execution on a Windows system is using Cygwin
+            # Remote copy programs like 'scp' assume that colons separate hostnames and so don't work
+            # on classic Windows paths.
+            # Assume for now that we can convert it to a Cygwin path.
+            drive, tail = os.path.splitdrive(fileName)
+            if drive:
+                cygwinDrive = '/cygdrive/' + drive[0].lower()
+                return cygwinDrive + tail
             else:
-                return file
+                return fileName
         else:
-            return machine + ":" + plugins.quote(file)
+            return machine + ":" + plugins.quote(fileName)
                                                  
     def copyFileRemotely(self, app, srcFile, srcMachine, dstFile, dstMachine):
         srcPath = self.getRemotePath(srcFile, srcMachine)

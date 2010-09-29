@@ -369,6 +369,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
     def userChangedSelection(self, *args):
         if not self.selecting and not hasattr(self.selection, "unseen_changes"):
             self.selectionChanged(direct=True)
+            
     def selectionChanged(self, direct):
         newSelection = self.getSelected()
         if newSelection != self.selectedTests:
@@ -450,20 +451,21 @@ class TestTreeGUI(guiutils.ContainerGUI):
 
     def getSelected(self):
         allSelected = []
-        self.selection.selected_foreach(self.addSelTest, (allSelected, set(self.selectedTests)))
+        prevSelected = set(self.selectedTests)
+        def addSelTest(model, dummy, iter, selected):
+            selected += self.getNewSelected(model.get_value(iter, 2), prevSelected)
+
+        self.selection.selected_foreach(addSelTest, allSelected)
         self.diag.info("Selected tests are " + repr(allSelected))
         return allSelected
 
-    def addSelTest(self, model, dummy, iter, args):
-        selected, prevSelected = args
-        selected += self.getNewSelected(model.get_value(iter, 2), prevSelected)
-
     def getNewSelected(self, tests, prevSelected):
         intersection = prevSelected.intersection(set(tests))
-        if len(intersection) == 0 or len(intersection) == len(tests):
+        if len(intersection) == 0 or len(intersection) == len(tests) or len(intersection) == len(prevSelected):
             return tests
         else:
             return list(intersection)
+        
     def findIter(self, test):
         try:
             childIter = self.itermap.getIterator(test)
@@ -471,6 +473,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
                 return self.filteredModel.convert_child_iter_to_iter(childIter)
         except RuntimeError:
             pass # convert_child_iter_to_iter throws RunTimeError if the row is hidden in the TreeModelFilter
+
     def notifySetTestSelection(self, selTests, criteria="", selectCollapsed=True):
         actualSelection = self.selectTestRows(selTests, selectCollapsed)
         # Here it's been set via some indirect mechanism, might want to behave differently

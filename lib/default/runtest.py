@@ -259,6 +259,9 @@ class RunTest(plugins.Action):
             currentValue = os.getenv(var)
             if currentValue:
                 remoteValue = remoteValue.replace(currentValue, "${" + var + "}")
+                if var == "PATH" and os.name == "nt":
+                    # We assume cygwin paths, make sure we use POSIX path separators
+                    remoteValue = remoteValue.replace(";", ":")
             remoteValue = plugins.quote(remoteValue)
             args.append((var, remoteValue))
         return args

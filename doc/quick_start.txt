@@ -1,29 +1,21 @@
-To get started quickly, take a look in the self-tests. There are various "TargetApp" directories
-to be found. Each of these contains a test-suite for a simple program (which are in turn part
-of the larger test suite for TextTest, as it tests itself testing these programs)
+Some features are easiest to understand by example. For complete newcomers to TextTest it's recommended
+to follow the "Getting Started" tutorial and then possibly the "Course Material" which can be seen at
+http://www.texttest.org/index.php?page=documentation_trunk. For those who basically know the tool but
+want to explore features they haven't used, the self-tests provide a wealth of working examples.
 
-To run these apps by hand, go to the TargetApp directory in question and call it, via
+These can be found in the download, or the latest version of them can be had from source control.
+See http://www.texttest.org/index.php?page=download.
 
-texttest -gx  (static GUI - allows management of tests and starting dynamic GUI)
-texttest -g   (dynamic GUI - runs tests and shows results in GUI)
-texttest -con (console interface)
+There are various "TargetApp" directories to be found under it. Each of these contains a test-suite 
+for a simple program (which are in turn part of the larger test suite for TextTest, as it tests 
+itself testing these programs)
 
-To understand the test suite, there is always a file called config.<app> (and maybe a few more for 
-versions). This tells texttest about the application in question. If nothing else it will have an 
-entry called "executable" (or "binary", which is a back-compatibility alias) to tell you what 
-executable is being tested.
+To run these apps by hand, you can view and run them in TextTest:
 
-There will also be a file called testsuite.<app>. This lists subdirectories to be considered either 
-as test cases or test suites themselves. Applies recursively you can find the directories which 
-represent tests.
+1) Set the environment variable STANDARD to point at the "standard" file at the top level of the self-tests
+2) texttest -d <path to TargetApp> -gx  
 
-A test can define command-line options via the options.<app> file, and also standard input contents 
-via the input.<app> file. For GUIs it can define use-case style actions to be performed on the GUI via
-the usecase.<app> file. Anything else under the test is "standard results", for example output.<app> 
-for the standard output and errors.<app> for the standard error. When the test is run these will be 
-compared with the actual results from running the program with the input as defined.
-
-What there is to find:
+What there is to find (below is just a selection):
 
 TargetApp                                  : used by default as it's very basic, this test suite has
                                                one test (that fails) on a "Hello World" program.
@@ -110,5 +102,5 @@ QueueSystems/TargetApp                     : useful for understanding the queues
                                                the associated plugin for LSF and Sun Grid Engine
 
 
-Once you've browsed these a bit and can read them, you might start using the actual self-tests to see how 
+Once you've browsed these a bit and can read them, you can also use the actual self-tests to see how 
 TextTest itself works and what features it has...

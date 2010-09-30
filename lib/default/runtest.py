@@ -190,12 +190,9 @@ class RunTest(plugins.Action):
             info = subprocess.STARTUPINFO()
             # Python doesn't make this easy for us: in 2.6.6 and later these flags became inaccessible
             # Alternative is to use win32api which seems excessive just for this purpose.
-            if hasattr(subprocess, "STARTF_USESHOWWINDOW"):
-                info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                info.wShowWindow = subprocess.SW_HIDE
-            else:
-                info.dwFlags |= subprocess._subprocess.STARTF_USESHOWWINDOW
-                info.wShowWindow = subprocess._subprocess.SW_HIDE
+            winFlagModule = subprocess if hasattr(subprocess, "STARTF_USESHOWWINDOW") else subprocess._subprocess
+            info.dwFlags |= winFlagModule.STARTF_USESHOWWINDOW
+            info.wShowWindow = winFlagModule.SW_HIDE
             return info
         
     def getPreExecFunction(self):

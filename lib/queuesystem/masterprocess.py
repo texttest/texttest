@@ -710,7 +710,8 @@ class SubmissionRules:
         if self.optionMap.has_key("reconnect"):
             return True # should be able to reconnect anywhere...
         else:
-            return self.findResourceList() == newRules.findResourceList() and \
+            # Don't care about the order of the resources
+            return set(self.findResourceList()) == set(newRules.findResourceList()) and \
                    self.processesNeeded == newRules.processesNeeded
 
 

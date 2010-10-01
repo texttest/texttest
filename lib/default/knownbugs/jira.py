@@ -87,7 +87,9 @@ def parseReply(bugInfo, statuses, resolutions, location):
         bugId = newBugInfo['key']
         message += "View bug " + bugId + " using Jira URL=" + location + "/browse/" + str(bugId) + "\n\n"
         message += convertToString(bugInfo["description"])
-        return newBugInfo['status'], message, newBugInfo.has_key("resolution")
+        isResolved = newBugInfo.has_key("resolution")
+        statusText = newBugInfo["resolution"].strip() if isResolved else newBugInfo['status']
+        return statusText, message, isResolved
     except (IndexError, KeyError):
         message = "Could not parse reply from Jira's web service, maybe incompatible interface. Text of reply follows : \n" + str(bugInfo)
         return "BAD SCRIPT", message, False

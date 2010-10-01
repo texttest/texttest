@@ -224,10 +224,6 @@ class QueueSystemConfig(default.Config):
         else:
             return default.Config.getMachineInfoFinder(self)
 
-    def printHelpDescription(self):
-        print """The queuesystem configuration is a published configuration, 
-               documented online at http://www.texttest.org/TextTest/docs/queuesystem"""
-
     def setApplicationDefaults(self, app):
         default.Config.setApplicationDefaults(self, app)
         app.setConfigDefault("default_queue", "texttest_default", "Which queue to submit tests to by default")

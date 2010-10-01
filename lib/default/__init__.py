@@ -957,7 +957,7 @@ class Config:
     def printHelpScripts(self):
         pass
     def printHelpDescription(self):
-        print "The default configuration is a published configuration. Consult the online documentation."
+        print "The " + self.__class__.__module__ + " configuration is a published configuration. Consult the online documentation."
     def printHelpOptions(self):
         pass
     def printHelpText(self):

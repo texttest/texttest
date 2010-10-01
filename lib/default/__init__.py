@@ -882,6 +882,14 @@ class Config:
             if "." in key or "/" in key:
                 raise plugins.TextTestError, "Cannot collate files to stem '" + key + "' - '.' and '/' characters are not allowed"
 
+        definitionFileStems = app.defFileStems()
+        definitionFileStems += [ stem + "." + app.name for stem in definitionFileStems ]
+        for dataFileName in app.getDataFileNames():
+            if dataFileName in definitionFileStems:
+                raise plugins.TextTestError, "Cannot name data files '" + dataFileName + \
+                      "' - this name is reserved by TextTest for a particular kind of definition file.\n" + \
+                      "Please adjust the naming in your config file."
+
     def getGivenCheckoutPath(self, app):
         if self.optionMap.has_key("c"):
             extraVersions, extraCheckouts = self.getCheckoutExtraVersions(app)

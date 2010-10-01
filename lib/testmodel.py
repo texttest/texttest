@@ -274,12 +274,8 @@ class Test(plugins.Observable):
     def isDefinitionFileStem(self, stem):
         return self.fileMatches(stem, self.defFileStems())
                 
-    def defFileStems(self, category="all"):
-        dict = self.getConfigValue("definition_file_stems")
-        if category == "all":
-            return dict.get("builtin") + dict.get("regenerate") + dict.get("default")
-        else:
-            return dict.get(category)
+    def defFileStems(self, *args, **kw):
+        return self.app.defFileStems(*args, **kw)
 
     def expandedDefFileStems(self, category="all"):
         stems = []
@@ -1408,6 +1404,13 @@ class Application:
 
     def isLocalDataFile(self, name):
         return name and (self.writeDirectory in name or not os.path.isabs(name))
+
+    def defFileStems(self, category="all"):
+        dict = self.getConfigValue("definition_file_stems")
+        if category == "all":
+            return dict.get("builtin") + dict.get("regenerate") + dict.get("default")
+        else:
+            return dict.get(category)
 
     def getFileName(self, dirList, stem):
         dircaches = map(DirectoryCache, dirList)

@@ -1049,9 +1049,6 @@ class CommandLineTraffic(Traffic):
         if len(trafficList) == insertIndex or not isinstance(trafficList[insertIndex], SysExitTraffic):
             trafficList.insert(insertIndex, SysExitTraffic("0", self.responseFile))
 
-        insertIndex += 1
-        for extraTraffic in trafficList[insertIndex:]:
-            extraTraffic.responseFile = None
         return trafficList
     
 

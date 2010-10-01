@@ -372,8 +372,7 @@ class TextTest(plugins.Responder, plugins.Observable):
                 return sys.stderr.write(str(e) + "\n")
             
             # Set the signal handlers to use when running, if we actually plan to do any
-            if not self.ignoreAllExecutables():
-                self.setSignalHandlers(self.handleSignal)
+            self.setSignalHandlers(self.handleSignal)
         
             self.runThreads()
 
@@ -443,8 +442,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         mainThreadRunner = filter(lambda x: x.canBeMainThread(), allRunners)[0]
         allRunners.remove(mainThreadRunner)
         return mainThreadRunner, allRunners
-    def ignoreAllExecutables(self):
-        return reduce(operator.and_, (app.ignoreExecutable() for app in self.appSuites.keys()), True)
+
     def runThreads(self):
         # Run the first one as the main thread and the rest in subthreads
         # Make sure all of them are finished before we stop
@@ -461,6 +459,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             mainThreadRunner.run()
             
         self.waitForThreads(allThreads)
+
     def waitForThreads(self, allThreads):
         # Need to wait for the threads to terminate in a way that allows signals to be
         # caught. thread.join doesn't do this. signal.pause seems like a good idea but
@@ -475,8 +474,10 @@ class TextTest(plugins.Responder, plugins.Observable):
         while len(currThreads) > 0:
             sleep(0.5)
             currThreads = self.aliveThreads(currThreads)
+
     def aliveThreads(self, threads):
         return filter(lambda thread: thread.isAlive(), threads)
+
     def getSignals(self):
         if hasattr(signal, "SIGUSR1"):
             # Signals used on UNIX to signify running out of CPU time, wallclock time etc.
@@ -484,16 +485,21 @@ class TextTest(plugins.Responder, plugins.Observable):
         else:
             # Windows, which doesn't do signals
             return []
+
     def setSignalHandlers(self, handler):
         for sig in self.getSignals():
             signal.signal(sig, handler)
+
     def handleSignal(self, sig, *args):
         # Don't respond to the same signal more than once!
         signal.signal(sig, signal.SIG_IGN)
         signalText = self.getSignalText(sig)
         self.writeTermMessage(signalText)
-        self.notify("KillProcesses", sig)
+        self.notify("Quit", sig)
+        if len(self.appSuites) > 0: # If the above succeeds in quitting they will be reset
+            self.notify("KillProcesses", sig)
         return signalText
+    
     def handleSignalWhileStarting(self, sig, *args):
         signalText = self.handleSignal(sig)
         raise KeyboardInterrupt, signalText
@@ -504,6 +510,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             message += " (" + signalText + ")"
         print message
         sys.stdout.flush() # Try not to lose log file information...
+
     def getSignalText(self, sig):
         if sig == signal.SIGUSR1:
             return "RUNLIMIT1"

@@ -262,26 +262,34 @@ class GUIController(plugins.Responder, plugins.Observable):
 
     def run(self):
         gtk.main()
+        
     def notifyExit(self):
         gtk.main_quit()
+
     def notifyLifecycleChange(self, test, state, changeDesc):
         test.stateInGui = state
         if state.isComplete():
             # Don't allow GUI-related changes to override the completed status
             test.state = state
         self.notify("LifecycleChange", test, state, changeDesc)
+
     def notifyDescriptionChange(self, test):
         self.notify("DescriptionChange", test)
+
     def notifyFileChange(self, test):
         self.notify("FileChange", test)
+
     def notifyContentChange(self, *args, **kwargs):
         self.notify("ContentChange", *args, **kwargs)
+
     def notifyNameChange(self, *args, **kwargs):
         self.notify("NameChange", *args, **kwargs)
+
     def notifyStartRead(self):
         if not self.dynamic:
             self.notify("Status", "Reading tests ...")
             self.notify("ActionStart", False)
+
     def notifyAllRead(self, suites):
         if not self.dynamic:
             self.notify("Status", "Reading tests completed at " + plugins.localtime() + ".")
@@ -293,12 +301,19 @@ class GUIController(plugins.Responder, plugins.Observable):
     def notifyAdd(self, test, *args, **kwargs):
         test.stateInGui = test.state
         self.notify("Add", test, *args, **kwargs)
+
     def notifyStatus(self, *args, **kwargs):
         self.notify("Status", *args, **kwargs)
+
     def notifyRemove(self, test):
         self.notify("Remove", test)
+
     def notifyAllComplete(self):
         self.notify("AllComplete")
+
+    def notifyQuit(self, *args):
+        self.notify("Quit", *args)
+
 
 class TopWindowGUI(guiutils.ContainerGUI):
     EXIT_NOTIFIED = 1
@@ -424,7 +439,7 @@ class TopWindowGUI(guiutils.ContainerGUI):
 
     def notifyQuit(self, *args):
         self.exitStatus |= self.EXIT_NOTIFIED
-        self.notify("KillProcesses")
+        self.notify("KillProcesses", *args)
         if self.exitStatus & self.COMPLETION_NOTIFIED:
             self.notify("Exit")
         else:

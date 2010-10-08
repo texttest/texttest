@@ -1748,7 +1748,7 @@ class OptionFinder(plugins.OptionFinder):
             if len(parts) > 1:
                 appVersion = parts[1]
             for version in versionList:
-                self.addToAppDict(appDict, appName, self.combineVersions(appVersion, version))
+                self.addToAppDict(appDict, appName, self.combineVersions(version, appVersion))
 
         return appDict
 

@@ -1853,7 +1853,7 @@ Bug Fixes:
     - Grid engine: pass on -xr flag to grid slaves so that logging proceeds correctly (masterprocess.py)
 
 
-Version trunk
+Version 3.20
 ============
 System requirements (see Migration Notes):
     - TextTest GUI now requires at least Python 2.6 and PyGTK 2.16.
@@ -1974,3 +1974,22 @@ Bug Fixes:
     - Fixed stack trace on trying to view file properties on a file that has been removed (fileproperties.py)
     - Fixed stack trace importing and copying a file to make a new directory (adminactions.py)
     - Various error messages tidied up (e.g. filetrees.py)
+
+Version trunk
+=============
+System requirements (see Migration Notes):
+General GUI Enhancements:
+    - GUI now cleans up appropriately on receiving SIGINT on UNIX (engine.py)
+	Means dynamic GUIs can be closed from static GUI without leaking files.
+Static GUI Enhancements:
+Dynamic GUI Enhancements:
+Framework Enhancements:
+    - Jira plugin now highlights 'resolution' field if it is set, instead of 'status' (jira.py)
+	This information is usually more interesting.
+Batch Report Enhancements:
+Grid Engine (LSF/SGE) enhancements:
+    - Ignore order of lists of resources when deciding about reuse (masterprocess.py)
+	Previously started new jobs if one test required resources a,b and the other required b,a.
+Bug Fixes:
+    - Running extra versions with an explicit version from the static GUI does not flip version order any more (testmodel.py)
+    - TextTest no longer allows data file names to clash with its own pre-defined definition file names (testmodel.py)

@@ -191,8 +191,9 @@ class TextViewGUI(guiutils.SubGUI):
 
 
 class RunInfoGUI(TextViewGUI):
-    def __init__(self, dynamic, runName):
+    def __init__(self, dynamic, runName, reconnect):
         TextViewGUI.__init__(self, dynamic)
+        self.reconnect = reconnect
         self.text = "Information will be available here when all tests have been read..."
         self.runName = runName
 
@@ -206,7 +207,8 @@ class RunInfoGUI(TextViewGUI):
         textToUse  = "Application name : " + suite.app.fullName() + "\n"
         textToUse += "Version          : " + suite.app.getFullVersion() + "\n"
         textToUse += "Number of tests  : " + str(suite.size()) + "\n"
-        textToUse += "Executable       : " + suite.getConfigValue("executable") + "\n"
+        if not self.reconnect:
+            textToUse += "Executable       : " + suite.getConfigValue("executable") + "\n"
         return textToUse
 
     def notifySetRunName(self, name):
@@ -232,13 +234,14 @@ class RunInfoGUI(TextViewGUI):
 
 
 class TestRunInfoGUI(TextViewGUI):
-    def __init__(self, *args):
-        TextViewGUI.__init__(self, *args)
+    def __init__(self, dynamic, reconnect):
+        TextViewGUI.__init__(self, dynamic)
         self.currentTest = None
+        self.reconnect = reconnect
         self.resetText()
 
     def shouldShow(self):
-        return self.dynamic
+        return self.dynamic and not self.reconnect
 
     def getTabTitle(self):
         return "Test Run Info"

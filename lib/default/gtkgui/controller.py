@@ -106,8 +106,9 @@ class GUIController(plugins.Responder, plugins.Observable):
         self.appFileGUI = filetrees.ApplicationFileGUI(self.dynamic, allApps)
         self.textInfoGUI = textinfo.TextInfoGUI(self.dynamic)
         runName = optionMap.get("name", "")
-        self.runInfoGUI = textinfo.RunInfoGUI(self.dynamic, runName)
-        self.testRunInfoGUI = textinfo.TestRunInfoGUI(self.dynamic)
+        reconnect = optionMap.has_key("reconnect")
+        self.runInfoGUI = textinfo.RunInfoGUI(self.dynamic, runName, reconnect)
+        self.testRunInfoGUI = textinfo.TestRunInfoGUI(self.dynamic, reconnect)
         self.progressMonitor = statusviews.TestProgressMonitor(self.dynamic, testCount)
         self.progressBarGUI = statusviews.ProgressBarGUI(self.dynamic, testCount)
         self.idleManager = IdleHandlerManager()
@@ -531,20 +532,25 @@ class PaneGUI(guiutils.ContainerGUI):
             return gtk.VPaned()
 
     def createView(self):
-        self.paned = self.createPaned()
-        self.separatorHandler = self.paned.connect('notify::max-position', self.adjustSeparator)
         frames = []
         for subgui in self.subguis:
-            frame = gtk.Frame()
-            frame.set_shadow_type(gtk.SHADOW_IN)
-            frame.add(subgui.createView())
-            frame.show()
-            frames.append(frame)
+            if subgui.shouldShow():
+                frame = gtk.Frame()
+                frame.set_shadow_type(gtk.SHADOW_IN)
+                frame.add(subgui.createView())
+                frame.show()
+                frames.append(frame)
 
-        self.paned.pack1(frames[0], resize=True)
-        self.paned.pack2(frames[1], resize=True)
-        self.paned.show()
-        return self.paned
+        if len(frames) > 1:
+            self.paned = self.createPaned()
+            self.paned.pack1(frames[0], resize=True)
+            self.paned.pack2(frames[1], resize=True)
+            self.separatorHandler = self.paned.connect('notify::max-position', self.adjustSeparator)
+            self.paned.show()
+            return self.paned
+        else:
+            frames[0].show()
+            return frames[0]
 
     def adjustSeparator(self, *args):
         self.initialMaxSize = self.paned.get_property("max-position")

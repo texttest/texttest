@@ -155,18 +155,12 @@ toggled.false = hide shortcut bar
 toggled.true = show status bar
 toggled.false = hide status bar
 
-[Type=HPaned]
-notify-position = drag vertical pane separator so left half uses
-
 [Name=Test Tree]
 clicked.Test Name = toggle test sorting order
 row-expanded = show test suite
 row-collapsed = hide test suite
 button-press-event = view actions for test
 changed.selection = set test selection to
-
-[Type=VPaned]
-notify-position = drag horizonal pane separator so top half uses
 
 [Name=File Tree]
 row-activated = select file
@@ -896,9 +890,6 @@ activate = show help menu
 
 [Name=GUI testing option chooser]
 changed = select gui-testing option named
-
-[Name=VCS dialog separator]
-notify-position = drag vertical pane separator so left half uses
 
 [Name=Use stored test-files for Selection]
 toggled.true = use stored test-files

@@ -4,7 +4,42 @@ The various text info views, i.e. the bottom right-corner "Text Info" and
 the "Run Info" tab from the dynamic GUI
 """
 
-import gtk, pango, guiutils, plugins, os, sys, subprocess
+import gtk, pango, guiutils, plugins, os, sys, datetime
+from default import performance
+
+class TimeMonitor:
+    def __init__(self):
+        self.timingInfo = {}
+        
+    def notifyLifecycleChange(self, test, dummyState, changeDesc):
+        if changeDesc in [ "start", "complete" ]:
+            self.timingInfo.setdefault(test, []).append((changeDesc, datetime.datetime.now()))
+
+    def shouldShow(self):
+        # Nothing to show, but needed to be a GUI observer
+        return True
+
+    def getElapsedTime(self, test):
+        timingInfo = self.timingInfo.get(test)
+        if timingInfo:
+            return (datetime.datetime.now() - timingInfo[0][1]).seconds
+        else:
+            return -1
+
+    def getTimingReport(self, test):
+        timingInfo = self.timingInfo.get(test)
+        text = ""
+        if timingInfo:
+            text += "\n"
+            for desc, timestamp in timingInfo:
+                descToUse = self.getTimeDescription(desc)
+                text += descToUse + ": " + timestamp.strftime(plugins.datetimeFormat) + "\n"
+        return text
+
+    def getTimeDescription(self, changeDesc):
+        descToUse = changeDesc.replace("complete", "end").capitalize() + " time"
+        return descToUse.ljust(17)
+
 
 
 class TextViewGUI(guiutils.SubGUI):
@@ -12,7 +47,8 @@ class TextViewGUI(guiutils.SubGUI):
     hand_cursor = gtk.gdk.Cursor(gtk.gdk.HAND2)
     regular_cursor = gtk.gdk.Cursor(gtk.gdk.XTERM)
     linkMarker = "URL=http"
-
+    timeMonitor = TimeMonitor()
+    
     def __init__(self, dynamic):
         guiutils.SubGUI.__init__(self)
         self.dynamic = dynamic
@@ -86,7 +122,6 @@ class TextViewGUI(guiutils.SubGUI):
     def set_cursor_if_appropriate(self, text_view, x, y): # pragma : no cover - external code
         hovering = False
 
-        buffer = text_view.get_buffer()
         iter = text_view.get_iter_at_location(x, y)
 
         hovering = bool(self.findLinkTarget(iter))
@@ -132,13 +167,20 @@ class TextViewGUI(guiutils.SubGUI):
         buffer.insert_with_tags(iter, newLine, tag)
 
     def getDescriptionText(self, test):
+        paragraphs = self.getDescriptionParagraphs(test)
+        return "\n\n".join(paragraphs)
+
+    def getDescriptionParagraphs(self, test):
         paragraphs = [ self.getDescription(test) ]
         for stem in sorted(set([ "performance" ] + test.getConfigValue("performance_logfile_extractor").keys())):
             fileName = test.getFileName(stem)
             if fileName:
-                paragraphs.append(test.app.getFilePreview(fileName))
+                paragraphs.append(self.getFilePreview(fileName))
+        return paragraphs
 
-        return "\n\n".join(paragraphs)
+    def getFilePreview(self, fileName):
+        return "Expected " + os.path.basename(fileName).split(".")[0] + " for the default version:\n" + \
+               performance.describePerformance(fileName)
 
     def getDescription(self, test):
         header = "Description:\n"
@@ -149,16 +191,14 @@ class TextViewGUI(guiutils.SubGUI):
 
 
 class RunInfoGUI(TextViewGUI):
-    def __init__(self, dynamic, runName):
+    def __init__(self, dynamic, runName, reconnect):
         TextViewGUI.__init__(self, dynamic)
+        self.reconnect = reconnect
         self.text = "Information will be available here when all tests have been read..."
         self.runName = runName
 
     def getTabTitle(self):
         return "Run Info"
-
-    def getGroupTabTitle(self):
-        return self.getTabTitle()
 
     def shouldShow(self):
         return self.dynamic
@@ -167,7 +207,8 @@ class RunInfoGUI(TextViewGUI):
         textToUse  = "Application name : " + suite.app.fullName() + "\n"
         textToUse += "Version          : " + suite.app.getFullVersion() + "\n"
         textToUse += "Number of tests  : " + str(suite.size()) + "\n"
-        textToUse += "Executable       : " + suite.getConfigValue("executable") + "\n"
+        if not self.reconnect:
+            textToUse += "Executable       : " + suite.getConfigValue("executable") + "\n"
         return textToUse
 
     def notifySetRunName(self, name):
@@ -193,13 +234,14 @@ class RunInfoGUI(TextViewGUI):
 
 
 class TestRunInfoGUI(TextViewGUI):
-    def __init__(self, *args):
-        TextViewGUI.__init__(self, *args)
+    def __init__(self, dynamic, reconnect):
+        TextViewGUI.__init__(self, dynamic)
         self.currentTest = None
+        self.reconnect = reconnect
         self.resetText()
 
     def shouldShow(self):
-        return self.dynamic
+        return self.dynamic and not self.reconnect
 
     def getTabTitle(self):
         return "Test Run Info"
@@ -215,13 +257,14 @@ class TestRunInfoGUI(TextViewGUI):
     def resetText(self):
         self.text = "Selected test  : "
         if self.currentTest:
-            self.text += self.currentTest.name + "\n"
+            self.text += self.currentTest.getRelPath() + "\n"
             self.appendTestInfo(self.currentTest)
         else:
             self.text += "none\n"
         self.updateView()
 
     def appendTestInfo(self, test):
+        self.text += self.timeMonitor.getTimingReport(test)
         self.text += "\n" + self.getDescriptionText(test)
         self.text += "\n\n" + test.app.getRunDescription(test)
 
@@ -230,15 +273,16 @@ class TextInfoGUI(TextViewGUI):
     def __init__(self, *args):
         TextViewGUI.__init__(self, *args)
         self.currentTest = None
+        self.currFileSelection = []
         self.preambleText = ""
 
     def getTabTitle(self):
         return "Text Info"
 
-    def resetText(self, state):
+    def resetText(self, test, state):
         if state.category == "not_started":
-            self.preambleText = ""
             self.text = "\n" + self.getDescriptionText(self.currentTest)
+            self.preambleText = self.text
         else:
             self.text = ""
             freeText = state.getFreeText()
@@ -249,9 +293,27 @@ class TextInfoGUI(TextViewGUI):
                 self.preambleText = self.text
             self.text += str(freeText)
             if state.hasStarted() and not state.isComplete():
+                self.text += self.getPerformanceEstimate(test)
                 self.text += "\n\nTo obtain the latest progress information and an up-to-date comparison of the files above, " + \
                              "perform 'recompute status' (press '" + \
                              guiutils.guiConfig.getCompositeValue("gui_accelerators", "recompute_status") + "')"
+
+    def getPerformanceEstimate(self, test):
+        expected = performance.getTestPerformance(test)
+        if expected > 0:
+            elapsed = self.timeMonitor.getElapsedTime(test)
+            if elapsed >= 0:
+                perc = (elapsed * 100) / expected
+                return "\nReckoned to be " + str(int(perc)) + "% complete comparing elapsed time with expected performance.\n" + \
+                       "(" + performance.getTimeDescription(elapsed) + " of " + performance.getTimeDescription(expected) + ")" 
+        return ""
+
+    def getDescriptionParagraphs(self, test):
+        paragraphs = TextViewGUI.getDescriptionParagraphs(self, test)
+        testPath = test.getRelPath()
+        if testPath: # Don't include this for root suite
+            paragraphs.insert(1, "Full path:\n" + testPath)
+        return paragraphs
 
     def notifyNewTestSelection(self, tests, *args):
         if len(tests) == 0:
@@ -261,38 +323,58 @@ class TextInfoGUI(TextViewGUI):
             self.updateView()
         elif self.currentTest not in tests:
             self.currentTest = tests[0]
-            self.resetText(self.currentTest.stateInGui)
+            self.resetText(self.currentTest, self.currentTest.stateInGui)
             self.updateView()
 
-    def notifyDescriptionChange(self, test):
-        self.resetText(self.currentTest.stateInGui)
+    def notifyDescriptionChange(self, *args):
+        self.resetText(self.currentTest, self.currentTest.stateInGui)
+        self.notifyNewFileSelection(self.currFileSelection)
         self.updateView()
 
-    def notifyLifecycleChange(self, test, state, changeDesc):
+    def notifyLifecycleChange(self, test, state, *args):
         if not test is self.currentTest:
             return
-        self.resetText(state)
+        self.resetText(test, state)
         self.updateView()
 
-    def hasStem(self, line, files):
-        for fileName, comp in files:
-            if comp.stem and line.find(" " + repr(comp) + " ") != -1:
-                return True
-        return False
+    def notifyRefreshFilePreviews(self, test, fileName):
+        if self.isSelected(fileName):
+            self.notifyNewFileSelection(self.currFileSelection)
+
+    def isSelected(self, fileName):
+        return any((currFile == fileName for currFile, _ in self.currFileSelection))
 
     def makeSubText(self, files):
         newText = self.preambleText
         for fileName, comp in files:
-            if comp and not comp.hasSucceeded():
-                newText += comp.getFreeText()
+            if self.dynamic:
+                if comp and not comp.hasSucceeded():
+                    newText += comp.getFreeText()
+            elif os.path.isfile(fileName):
+                newText += self.getPreview(fileName)
         return newText, newText != self.text and newText != self.preambleText
 
-    def notifyNewFileSelection(self, files):
-        if self.dynamic:
-            self.updateSubText(files)
-        # TODO: static GUI could show some information here...
+    def getPreview(self, fileName):
+        baseName = os.path.basename(fileName)
+        stem = baseName.split(".")[0]
+        text = "\n\nPreview of " + baseName + ":\n"
+        if self.currentTest.configValueMatches("binary_file", stem):
+            text += "Contents of file are marked as binary via the 'binary_file' setting."
+        else:
+            maxLength = self.currentTest.getConfigValue("lines_of_text_difference")
+            maxWidth = self.currentTest.getConfigValue("max_width_text_difference")
+            previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength)
+            text += previewGenerator.getPreview(open(fileName))
+        return text
 
-    def updateSubText(self, files):
+    def notifyNameChange(self, test, *args):
+        if test is self.currentTest:
+            self.resetText(self.currentTest, self.currentTest.stateInGui)
+            self.notifyNewFileSelection(self.currFileSelection)
+            self.updateView()
+
+    def notifyNewFileSelection(self, files):
+        self.currFileSelection = files
         if len(files) == 0:
             if self.showingSubText:
                 self.showingSubText = False

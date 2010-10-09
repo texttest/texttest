@@ -1,8 +1,8 @@
 import plugins
-import time
+import datetime
 
 def calculateBatchDate():
     # Batch mode uses a standardised date that give a consistent answer for night-jobs.
     # Hence midnight is a bad cutover point. The day therefore starts and ends at 8am :)
-    timeinseconds = plugins.globalStartTime - 8*60*60
-    return time.strftime("%d%b%Y", time.localtime(timeinseconds))
+    timeToUse = plugins.globalStartTime - datetime.timedelta(hours=8)
+    return timeToUse.strftime("%d%b%Y")

@@ -1,0 +1,72 @@
+
+
+The main things that need migrating are "collect_traffic_py_attributes" settings.
+
+=========================================================
+COMPULSORY MIGRATION
+=========================================================
+
+(1) Python version and PyGTK version
+====================================
+TextTest 3.20 now requires at least Python 2.6 and at least PyGTK 2.16 and an 
+equivalent GTK+ installation. 3.19 supported Python back to 2.4 and PyGTK back to 2.10.
+
+(2) collect_traffic_py_attributes -> collect_traffic_python
+===========================================================
+
+This was only introduced in 3.19 so it didn't seem worth preserving the old format.
+
+To intercept the python function datetime.datetime.now, it previously worked like this
+
+collect_traffic_py_module:datetime
+
+[collect_traffic_py_attributes]
+datetime:datetime.now
+
+This was deemed unnecessarily wordy. It should now be done simply via
+
+collect_traffic_python:datetime.datetime.now
+
+It is also integrated with the old "collect_traffic_py_module" setting which is
+now an alias for "collect_traffic_python". To intercept a whole module you can do
+
+collect_traffic_python:smtplib
+
+The old form "collect_traffic_py_module" will still work, but "collect_traffic_py_attributes"
+is removed.
+
+=========================================================
+CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
+=========================================================
+
+(1) -bx flag
+============
+In TextTest 3.19 and earlier this was purely a way of starting with the "batch_extra_version"s
+defined for a particular session.
+
+Its behaviour is now changed such that it will try to select exactly the tests provided by
+the batch version provided. That means it will now look up not only "batch_extra_version",
+but also "batch_filter_file", "batch_version" and "batch_timelimit" for the session that you
+provide.
+
+(2) "Re-record" control for traffic files becomes a radio button
+================================================================
+"Replay All" and "Record All" are the equivalent of the old check button being unchecked and 
+checked respectively. "Record New Only" instructs TextTest to replay from the traffic file 
+everything stored there, while recording any traffic programs/python attributes for which 
+it does not yet have information. See the tooltips for more info.
+
+(3) Traffic files with Python interception no longer repeat attributes
+======================================================================
+This may cause your traffic files to get shorter. But they'll hopefully be easier to read also.
+
+=========================================================
+NEW STUFF THAT WILL REQUIRE MIGRATION IN FUTURE VERSIONS
+=========================================================
+
+(1) QUEUE_SYSTEM* environment variables for grid engine integration
+===================================================================
+
+Now that you can provide config files per test in 3.20, these settings have been superceded by
+equivalently named config values "queue_system_resource", "queue_system_processes" and 
+"queue_system_submit_args". The environment variables still work but will be deprecated in 3.21.

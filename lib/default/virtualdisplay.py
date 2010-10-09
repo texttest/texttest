@@ -1,12 +1,13 @@
 #!/usr/local/bin/python
 
-import default, plugins, os, sys, subprocess, signal, logging
+import plugins, os, sys, subprocess, signal, logging
         
 # Unlike earlier incarnations of this functionality,
 # we don't rely on sharing displays but create our own for each test run.
 class VirtualDisplayResponder(plugins.Responder):
     instance = None
     def __init__(self, *args):
+        plugins.Responder.__init__(self, *args)
         self.displayName = None
         self.displayMachine = None
         self.displayPid = None
@@ -18,15 +19,8 @@ class VirtualDisplayResponder(plugins.Responder):
         
     def addSuites(self, suites):
         guiSuites = filter(lambda suite : suite.getConfigValue("use_case_record_mode") == "GUI", suites)
-        # On UNIX this is a virtual display to set the DISPLAY variable to, on Windows it's just a marker to hide the windows
-        if os.name != "posix":
-            self.setHideWindows(guiSuites)
-        elif not self.displayName:
+        if not self.displayName:
             self.setUpVirtualDisplay(guiSuites)
-
-    def setHideWindows(self, suites):
-        if len(suites) > 0 and not self.displayName:
-            self.displayName = "HIDE_WINDOWS"
                               
     def setUpVirtualDisplay(self, guiSuites):
         if len(guiSuites) == 0:
@@ -104,13 +98,14 @@ class VirtualDisplayResponder(plugins.Responder):
         return self.startXvfb(startArgs, machine)
 
     def startXvfb(self, startArgs, machine):
-        for attempt in range(5):
+        for i in range(5):
             self.diag.info("Starting Xvfb using args " + repr(startArgs))
             self.displayProc = subprocess.Popen(startArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             line = plugins.retryOnInterrupt(self.displayProc.stdout.readline)
             if "Time Out!" in line:
                 self.displayProc.wait()
                 self.displayProc.stdout.close()
+                self.diag.info("Timed out waiting for Xvfb to come up")
                 # We try again and hope for a better process ID!
                 continue
             try:
@@ -122,8 +117,6 @@ class VirtualDisplayResponder(plugins.Responder):
                 return None, None
 
         messages = "Failed to start Xvfb in 5 attempts, giving up"
-        if len(startArgs) > 4:
-            messages += "\nAdditional Xvfb arguments were " + repr(" ".join(startArgs[4:]))
         plugins.printWarning(messages)
         return None, None
     
@@ -132,21 +125,21 @@ class VirtualDisplayResponder(plugins.Responder):
         fullPath = os.path.join(binDir, "startXvfb.py")
         logDir = os.path.join(app.writeDirectory, "Xvfb") 
         plugins.ensureDirectoryExists(logDir)
-        python = self.findPython(machine)
+        pythonArgs = self.findPythonArgs(machine)
         xvfbExtraArgs = plugins.splitcmd(app.getConfigValue("virtual_display_extra_args"))
-        cmdArgs = [ python, "-u", fullPath, logDir ] + xvfbExtraArgs
+        cmdArgs = pythonArgs + [ fullPath, logDir ] + xvfbExtraArgs
         return app.getCommandArgsOn(machine, cmdArgs)
 
-    def findPython(self, machine):
+    def findPythonArgs(self, machine):
         # In case it isn't the default, allow for a ttpython script in the installation
         if machine == "localhost":
-            return sys.executable
+            return [ sys.executable, "-u" ]
         
         localPointer = plugins.installationPath("bin/ttpython")
         if localPointer:
-            return localPointer
+            return [ localPointer, "-u" ]
         else: # pragma : no cover -there is one in our local installation whether we like it or not...
-            return "python"
+            return [ "python", "-u" ]
         
     def getDisplayName(self, machine, displayNumber):
         # No point in using the port if we don't have to, this seems less reliable if the process is local

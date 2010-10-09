@@ -1,0 +1,73 @@
+
+> setenv INSTALLATION_DIR <my_installation_directory>
+> setenv SOURCE_DIR <my_source_directory>
+
+Unless otherwise indicated, the procedure for building a package is as follows:
+
+> cd $SOURCE_DIR
+> tar zvxf package-1.2.3.tar.gz
+> cd package-1.2.3
+> ./configure --prefix=$INSTALLATION_DIR
+> make
+> make install
+
+1. Build Glib 2.22
+==================
+
+Do the above with glib-2.22.5.tar.gz
+On e.g. RHEL4 you'll also need to build your own pkg-config, suggest pkg-config-0.21.tar.gz
+
+2. Set up environment
+=====================
+
+Now, to make sure the build system finds our newly installed glib (and other packages, as we continue), set
+
+> setenv PKG_CONFIG_PATH ${INSTALLATION_DIR}/lib/pkgconfig/:/usr/lib/pkgconfig
+> setenv LD_LIBRARY_PATH $INSTALLATION_DIR/lib/:${LD_LIBRARY_PATH}
+> setenv PATH ${INSTALLATION_DIR}/bin:${PATH}
+
+We include /usr/lib/pkgconfig in the config path since on our system libxml-2.0 is installed in /usr/lib.
+On 64-bit systems this may well need to be /usr/lib64/pkgconfig instead. Check for the existence of
+/usr/lib64/pkgconfig/libxml-2.0.pc and /usr/lib/pkgconfig/libxml-2.0.pc if unsure.
+
+3. Build GTK+ 2.18. 
+===================
+
+That means the following packages, in this order
+
+fontconfig-2.8.0.tar.gz
+pixman-0.16.6.tar.gz
+cairo-1.8.10.tar.gz
+atk-1.28.0.tar.gz
+pango-1.26.2.tar.gz
+gtk+-2.18.9.tar.gz
+
+# (Note that on SuSE you may need cups-devel installed for the last package, see the note in overview.txt)
+
+4. Build PyGTK 2.16.
+====================
+
+Now we're integrating with Python. That means you need python-devel installed if you haven't done so already.
+It also means that if you want these packages to work with a non-standard Python, you should make sure that the correct Python
+is first in your PATH, i.e. set
+
+> setenv PATH /path/to/python/binary:${PATH}
+
+Build the packages in this order:
+
+py2cairo-1.8.10.tar.gz
+pygobject-2.20.0.tar.gz
+pygtk-2.16.0.tar.gz
+
+5. Install a nice theme
+=======================
+Well, that's optional, but the default theme often looks quite ugly. I recommend
+installing Clearlooks:
+
+clearlooks-0.6.2.tar.bz2
+
+You can then change your theme by adding a file at $INSTALLATION_DIR/etc/gtk-2.0/gtkrc
+with the contents
+
+gtk-theme-name = "Clearlooks"
+gtk-icon-theme-name = "Clearlooks"

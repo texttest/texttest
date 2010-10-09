@@ -7,42 +7,24 @@ import plugins, os, sys, operator, types, subprocess
 from copy import copy
 from locale import getdefaultlocale
 
-try:
-    import gtk
-except ImportError:
-    pass # We might want to document the config entries, silly to fail on lack of GTK...
-
-
-guilog, guiConfig = None, None
-
-
 # gtk.accelerator_valid appears utterly broken on Windows
 def windowsAcceleratorValid(key, mod):
     name = gtk.accelerator_name(key, mod)
     return len(name) > 0 and name != "VoidSymbol"
 
-if os.name == "nt":
-    gtk.accelerator_valid = windowsAcceleratorValid
+try:
+    import gtk
+    if os.name == "nt":
+        gtk.accelerator_valid = windowsAcceleratorValid
+except ImportError:
+    pass # We might want to document the config entries, silly to fail on lack of GTK...
+
+
+guiConfig = None
 
 class Utf8Converter:
-    def convert(self, text):
-        unicodeInfo = self.decodeText(text)
-        return unicodeInfo.encode('utf-8', 'replace')
-
-    def decodeText(self, text):
-        encodings = self.getEncodings()
-        for encoding in encodings:
-            try:
-                return unicode(text, encoding, errors="strict")
-            except:
-                pass
-
-        sys.stderr.write("WARNING: TextTest's textual display had some trouble with character encodings.\n" + \
-                         "It tried the encoding(s) " + " and ".join(encodings) + \
-                         ",\nbut the Unicode replacement character still had to be used.\n" + \
-                         "Please ensure your locale is compatible with the encodings in your test files.\n" + \
-                         "The problematic text follows:\n\n" + text.strip() + "\n")
-        return unicode(text, encodings[0], errors="replace")
+    def __init__(self):
+        self.encodings = self.getEncodings()
 
     def getEncodings(self):
         encodings = [ 'utf-8' ]
@@ -50,10 +32,29 @@ class Utf8Converter:
         if localeEncoding and not localeEncoding in encodings:
             encodings.insert(0, localeEncoding)
         return encodings
+    
+    def convert(self, text):
+        unicodeInfo = self.decodeText(text)
+        return unicodeInfo.encode('utf-8', 'replace')
 
+    def decodeText(self, text):
+        for encoding in self.encodings:
+            try:
+                return unicode(text, encoding, errors="strict")
+            except Exception:
+                pass
+
+        sys.stderr.write("WARNING: TextTest's textual display had some trouble with character encodings.\n" + \
+                         "It tried the encoding(s) " + " and ".join(self.encodings) + \
+                         ",\nbut the Unicode replacement character still had to be used.\n" + \
+                         "Please ensure your locale is compatible with the encodings in your test files.\n" + \
+                         "The problematic text follows:\n\n" + text.strip() + "\n")
+        return unicode(text, self.encodings[0], errors="replace")
+
+utf8Converter = Utf8Converter()
 
 def convertToUtf8(text): # gtk.TextViews insist we do the conversion ourselves
-    return Utf8Converter().convert(text)
+    return utf8Converter.convert(text)
 
 
 def openLinkInBrowser(target):
@@ -63,7 +64,7 @@ def openLinkInBrowser(target):
     else:
         browser = os.getenv("BROWSER", "firefox")
         cmdArgs = [ browser, target ]
-        subprocess.Popen(cmdArgs)
+        subprocess.call(cmdArgs)
         return 'Started "' + " ".join(cmdArgs) + '" in background.'
 
 
@@ -82,17 +83,17 @@ class RefreshTips:
         else:
             return model[path][self.refreshIndex]
 
-    def getTooltip(self, view, widget_x, widget_y, keyboard_mode, tooltip): # pragma: no cover - PyUseCase cannot test tooltips (future?)
+    def getTooltip(self, view, widget_x, widget_y, dummy, tooltip): # pragma: no cover - PyUseCase cannot test tooltips (future?)
         x, y = view.convert_widget_to_tree_coords(widget_x, widget_y)
         pathInfo = view.get_path_at_pos(x, y)
         if pathInfo is None:
             return False
         
-        path, column, cell_x, cell_y = pathInfo
+        path, column, cell_x, _ = pathInfo
         if column is not self.refreshColumn or not self.hasRefreshIcon(view, path):
             return False
 
-        cell_pos, cell_size = column.cell_get_position(self.refreshCell)
+        cell_pos = column.cell_get_position(self.refreshCell)[0]
         if cell_x > cell_pos:
             tooltip.set_text("Indicates that this " + self.name + "'s saved result has changed since the status was calculated. " + \
                              "It's therefore recommended to recompute the status.")
@@ -109,7 +110,7 @@ def addRefreshTips(view, *args):
 
 
 class GUIConfig:
-    def __init__(self, dynamic, allApps, defaultColours, defaultAccelerators, entryCompletionLogger=None, includePersonal=True):
+    def __init__(self, dynamic, allApps, defaultColours, defaultAccelerators, includePersonal=True):
         self.apps = copy(allApps)
         self.dynamic = dynamic
         self.configDir = plugins.MultiEntryDictionary()
@@ -120,9 +121,7 @@ class GUIConfig:
 
         self.hiddenCategories = map(self.getConfigName, self.configDir.get("hide_test_category"))
         self.colourDict = self.makeColourDictionary()
-        if entryCompletionLogger:
-            self.setUpEntryCompletion(entryCompletionLogger)
-
+        
     def getAllPersonalConfigFiles(self):
         allPersonalFiles = []
         # Always include app-independent version
@@ -166,50 +165,30 @@ class GUIConfig:
         self.configDir[key] = value
         self.configDocs[key] = docString
 
-    def setUpEntryCompletion(self, entryCompletionLogger):
-        matching = self.configDir.get("gui_entry_completion_matching")
-        if matching != 0:
-            inline = self.configDir.get("gui_entry_completion_inline")
-            completions = self.getCompositeValue("gui_entry_completions", "", modeDependent=True)
-            from entrycompletion import manager
-            manager.start(matching, inline, completions, entryCompletionLogger)
     def _simpleValue(self, app, entryName):
         return app.getConfigValue(entryName)
+
     def _compositeValue(self, app, *args, **kwargs):
         return app.getCompositeConfigValue(*args, **kwargs)
-    def _getFromApps(self, method, *args, **kwargs):
-        prevValue = None
-        for app in self.apps:
-            currValue = method(app, *args, **kwargs)
-            toUse = self.chooseValueFrom(prevValue, currValue)
-            if toUse is None and prevValue is not None:
-                plugins.printWarning("GUI configuration '" + "::".join(args) +\
-                                     "' differs between applications, ignoring that from " + repr(app) + "\n" + \
-                                     "Value was " + repr(currValue) + ", change from " + repr(prevValue), stdout=True)
-            else:
-                prevValue = toUse
-        return prevValue
-    def chooseValueFrom(self, value1, value2):
-        if value2 is None or value1 == value2:
-            return value1
-        if value1 is None:
-            return value2
-        if type(value1) == types.ListType:
-            return self.createUnion(value1, value2)
 
-    def createUnion(self, list1, list2):
-        result = []
-        result += list1
-        for entry in list2:
-            if not entry in list1:
-                result.append(entry)
-        return result
+    def _getFromApps(self, method, *args, **kwargs):
+        callables = [ plugins.Callable(method, app, *args) for app in self.apps ]
+        aggregator = plugins.ResponseAggregator(callables)
+        try:
+            return aggregator(**kwargs)
+        except plugins.AggregationError, e:
+            app = self.apps[e.index]
+            plugins.printWarning("GUI configuration '" + "::".join(args) +\
+                                 "' differs between applications, ignoring that from " + repr(app) + "\n" + \
+                                 "Value was " + repr(e.value2) + ", change from " + repr(e.value1), stdout=True)
+            return e.value1
     
     def getModeName(self):
         if self.dynamic:
             return "dynamic"
         else:
             return "static"
+
     def getConfigName(self, name, modeDependent=False):
         formattedName = name.lower().replace(" ", "_").replace(":", "_")
         if modeDependent:
@@ -229,7 +208,7 @@ class GUIConfig:
             return self._getFromApps(self._simpleValue, nameToUse)
     def getCompositeValue(self, sectionName, entryName, modeDependent=False, defaultKey="default"):
         nameToUse = self.getConfigName(entryName, modeDependent)
-        value = self.configDir.getComposite(sectionName, nameToUse, defaultKey)
+        value = self.configDir.getComposite(sectionName, nameToUse, defaultKey=defaultKey)
         if value is None:
             value = self._getFromApps(self._compositeValue, sectionName, nameToUse, defaultKey=defaultKey)
         if modeDependent and value is None:
@@ -259,7 +238,10 @@ class GUIConfig:
             else:
                 return self.colourDict.get("failure")
         else:
-            return self.colourDict.get("static")
+            if category.startswith("clipboard"):
+                return self.colourDict.get(category)
+            else:
+                return self.colourDict.get("static")
 
     @staticmethod
     def getWindowSizeSettings():
@@ -293,6 +275,8 @@ class GUIConfig:
         dict["not_started"] = "white"
         dict["pending"] = "grey80"
         dict["static"] = "grey90"
+        dict["clipboard_cut"] = "red"
+        dict["clipboard_copy"] = "grey60"
         dict["marked"] = "orange"
         return dict
 
@@ -315,10 +299,7 @@ class SubGUI(plugins.Observable):
     def getTabTitle(self):
         return ""
 
-    def getGroupTabTitle(self):
-        return "Test"
-
-    def forceVisible(self, rowCount):
+    def forceVisible(self, *args):
         return False
 
     def addScrollBars(self, view, hpolicy):
@@ -339,7 +320,7 @@ class SubGUI(plugins.Observable):
             from usecase import applicationEvent
             # Everything that comes from here is to do with editing files in external programs
             applicationEvent(name, "files", **kw)
-        except:
+        except ImportError:
             pass
 
 
@@ -358,5 +339,5 @@ class ContainerGUI(SubGUI):
     def shouldShowCurrent(self, *args):
         return reduce(operator.and_, (subgui.shouldShowCurrent(*args) for subgui in self.subguis))
 
-    def getGroupTabTitle(self):
-        return self.subguis[0].getGroupTabTitle()
+    def getTabTitle(self):
+        return self.subguis[0].getTabTitle()

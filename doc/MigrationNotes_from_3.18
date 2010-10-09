@@ -1,0 +1,29 @@
+
+Nothing to migrate as such, but note the following behaviour changes:
+
+=========================================================
+CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
+=========================================================
+
+(1) Naming scheme for new test suites
+=====================================
+If you create a new test suite with TextTest 3.19 or later you'll find it has different
+naming conventions for the standard streams. Files that were called "input.<app>", "output.<app>"
+and "errors.<app>" will now get called "stdin.<app>", "stdout.<app>" and "stderr.<app>". This is
+because the old naming scheme was deemed confusing to newbies and the hope is the newer names
+make it easier to infer what the file is.
+
+You can convert to the new naming scheme by setting
+
+filename_convention_scheme:standard
+
+after which you'll of course have to rename your files. To suppress this for new test suites,
+delete the line from the generated config file that looks like the one above.
+
+It would basically have introduced too much migration to have just removed the old naming scheme.
+
+(2) Various warnings "upgraded"
+===============================
+Various errors and warnings that previously only got written in batch mode log files will now
+appears also when you run the UI. For example, if a "testsuite" file refers to a test that cannot
+be found. Basically you'll need to fix these things now whereas before they could largely be ignored.

@@ -80,6 +80,9 @@ class Graph:
         pylab.setp(self.sub1.get_xticklabels(), 'rotation', 90, fontsize=7)
 
     def finalise_graph(self):
+        lower = self.sub1.get_ylim()[0]
+        if lower < 0:
+            self.sub1.set_ylim(ymin=0) # don't get less than 0, which matplotlib 0.99 does sometimes
         self.sub1.autoscale_view(tight=True, scaley=False)
         leg = self.sub1.legend(self.legendItems, tuple(self.plotLabels), 'best', shadow=False)
         leg.get_frame().set_alpha(0.5) # transparent legend box		
@@ -143,7 +146,7 @@ class GraphGenerator:
         prevYlist = [ 0 ] * len(results)
         plotData = seqdict()
         for category in self.labels.keys():
-            currYlist = [ summary.get(category, 0) for tag, summary in results ]
+            currYlist = [ summary.get(category, 0) for _, summary in results ]
             if self.hasNonZero(currYlist):
                 ylist = [ (currYlist[x] + prevYlist[x]) for x in range(len(prevYlist)) ]
                 plotData[category] = prevYlist, ylist
@@ -173,9 +176,7 @@ class GraphGenerator:
         numresults = len(results)
         # Interval between labels (10 labels in total, use '' between the labels)
         interval = max(numresults / 10, 1)
-        for i, (tag, summary) in enumerate(results):
-            if i % interval == 0:
-                xticks.append(tag)
-            else:
-                xticks.append('')
+        for i, (tag, _) in enumerate(results):
+            tick = tag if i % interval == 0 else ""
+            xticks.append(tick)
         graph.setXticks(xticks)

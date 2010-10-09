@@ -1776,9 +1776,220 @@ Bug Fixes:
     - Completed workaround from 3.17 for symbolic link bug in Mercurial: found a related case (hg.py)
     - Link to homepage on credits dialog now works with newest PyGTK versions (2.16) (helpdialogs.py)
 
+Version 3.19
+============
+General GUI Enhancements:
+    - "App names containing" field will only be shown if more than one app name is present (selectandfilter.py)
+    - "Execution time" field will only be shown if performance testing is enabled (selectandfilter.py)
+    - Status bar now includes the full path to the test when actions on single tests are performed (guiplugins.py)
+    - When performance testing is enabled, can now select the n fastest or slowest tests (performance.py)
+	New spin buttons appear on the Selection tab as appropriate.
+    - Some startup optimizations: GUI should come up sooner on large suites now (controller.py)
+Static GUI Enhancements:
+    - Description boxes are now much larger and easier to enter multiple lines (guiplugins.py)
+	For Add Test and Rename Test.
+    - When you select a file, a preview of it appears in the bottom right window (textinfo.py)
+	Similar to existing functionality in the dynamic GUI.
+    - When a test is copied or cut, its foreground colour changes in the test view (adminactions.py)
+	Makes it easier to keep track of what is being done
+    - Can now test your run_dependent_text filtering directly without running a test (runningactions.py)
+	Can be selected rom the file popup menu
+    - "Enter failure information" dialog reorganised (adminactions.py)
+	Mostly to group the various trigger criteria and make it easier to create bugs on free_text.
+    - Text info field now shows the full path to the test underneath the description (textinfo.py)
+    - "Times to run" entry on Running tab is now a spin button, a bit nicer to handle and less error-prone (guiplugins.py)
+Dynamic GUI Enhancements:
+    - Can now select all tests with the same diff as the currently selected one (statusviews.py)
+	New action in file popup menu
+    - Missing and New files appear in separate branches in the status view tree (statusviews.py)
+    - Run Info tab now shows times at which individual tests started and ended (textinfo.py)
+    - Run Info tab now shows full path to the test instead of just the name (textinfo.py)
+    - When running tests are viewed, completion percentage is estimated from stored CPU time as well as file sizes (textinfo.py)
+    - Now told explicitly which extra versions to load by the static GUI (runningactions.py)
+	Saves time on startup, especially when running multiple copies of tests with many extra versions present.
+Framework Enhancements:
+    - New naming scheme introduced for standard streams (default/__init__.py)
+	"stdout", "stderr" and "stdin" replace "output", "errors" and "input". See migration notes.
+    - Known bugs can now also search in the test's "brief_text", i.e. the Details column in dynamic GUI (knownbugs/__init__.py)
+	"Enter Failure Information" dialog helps make it easy to request this
+    - Known bug information is now correctly updated when a test is saved or recomputed (knownbugs/__init__.py)
+    - "base_version" and "extra_search_directory" can now nest to arbitrary levels (testmodel.py)
+	Previously didn't work for base version's config file to identify these things.
+	Now it will go on reading config files identified by the ones its already read until there aren't any more.
+    - File difference previews now indicate when they have truncated some long text (plugins.py)
+	In either batch mode reports or the dynamic GUI's text window at the bottom right.
+    - System warnings reviewed (plugins.py)
+	Many that were previously largely invisible when running the GUI will now turn up as GUI popup windows. 
+	Others will also appear on the console. One example is when a test is referred to but cannot be found.
+    - Can now stop test execution after the first test failure (actionrunner.py)
+	-stop on the command line, or appropriate check box on Running tab. See docs.
+Batch Report Enhancements:
+    - Cell text generator rewritten (testoverview.py)
+	More closely based on text that appears in the UI. Less prone to being horribly long.
+    - batch_result_respository and historical_report_location now expand ~ to home directory (batch/__init__.py)
+Grid Engine (LSF/SGE) enhancements:
+    - We now poll the grid engine every 15 seconds for job information (masterprocess.py)
+	Means that the GUI shows if a test job is suspended or in some other internal grid states
+	Also means that crashed jobs (e.g. on bad hardware) are picked up automatically rather than remaining pending.
+Bug Fixes:
+    - File previews in bottom-right Text Info window no longer get confused by files with "---" separators in them (textinfo.py)
+    - If a collate_script hangs, killing the test /terminating TextTest now works smoothely (sandbox.py)
+    - Traffic server no longer relies on centrally installed PyUseCase. (traffic_server.py)
+    - Python interception now handles module objects being returned (traffic_server.py)
+    - Python interception correctly intercepts objects belonging to submodules (traffic_server.py)
+    - Python interception handles intercepted objects being passed as keyword arguments (traffic_server.py)
+    - Python interception sorts keyword arguments so they are reported deterministically (traffic_server.py)
+    - Python interception reports float values to 2dp rather than arbitrary precision (traffic_server.py)
+    - slow_motion_replay_speed now allows floating-point values. (default/__init__.py)
+    - Recording no longer eliminates unsaveable versions from the default version used (runningactions.py)
+    - Don't stacktrace linking to Jira issues if the issue description contains illegal characters (jira.py)
+    - Don't stacktrace linking to Jira issues with custom fields defined but no values present (jira.py)
+    - Don't stacktrace if the window icon cannot be set for some reason (controller.py)
+    - Fixed graph bug where negative test numbers sometimes shown with matplotlib 0.99 (resultgraphs.py)
+    - Definition files that get incorrectly regenerated produce a warning now rather than being shown as "New" (comparetest.py)
+    - Reconnecting (with reconnfull flag) to a test containing unreadable files now works (reconnect.py)
+    - Reconnecting to crashed tests now shows the original stack trace correctly (knownbugs/__init__.py)
+    - When test suites are reordered, scroll to show the new position in the tree (testtree.py)
+    - Grid engine: pass on -xr flag to grid slaves so that logging proceeds correctly (masterprocess.py)
+
+
+Version 3.20
+============
+System requirements (see Migration Notes):
+    - TextTest GUI now requires at least Python 2.6 and PyGTK 2.16.
+	Should also be compatible with Python 2.7 now
+Static GUI Enhancements:
+    - Selecting for a version picks up versions where the given one is a base_version (selectandfilter.py)
+	Version matching is now the same as that used for other purposes
+    - Selecting for a version works correctly when the given one resets "extra_version" (selectandfilter.py)
+	Picks up the reset correctly.
+    - Now warns you if you load tests of one version and try to run tests of an unrelated one (runningactions.py)
+	Previously just tried to silently amalgamate them.
+    - Old "Recording" tab is now a dialog (runningactions.py)
+	Hopefully less easy to get ignored now
+    - Running/Advanced tab better organised (runningactions.py)
+	Now has frames and various things get greyed out when not appropriate
+    - Traffic interception record checkbutton moved to Basic tab and became a radio button (when enabled) (default/__init__.py)
+	Now a third option to record new traffic and replay already recorded traffic simultaneously. See migration notes.
+    - File previews in "Text info" now get updated when a file editor is closed (fileviewers.py)
+    - Initial dialog GUI settings has an option for wxPython GUIs in PyUseCase 3.4 (adminactions.py)
+    - Shortcut bar setting now greyed out if PyUseCase cannot be found (actionholders.py)
+Dynamic GUI Enhancements:
+    - Rerun now fires up a dialog (runningactions.py)
+	This means you can change the run options before rerunning.
+    - Recomputing marked tests now works correctly (plugins.py)
+	Icons also displayed when appropriate, irrespective of test marking
+    - Recomputing running tests on remote file systems now works (sandbox.py)
+	Also allows following files remotely on such tests.
+Framework Enhancements:
+    - Config files may now be created per test instead of just per application (testmodel.py)
+	Not all settings will work per test. See website for details.
+    - {INTERNAL writedir} in "run_dependent_text" now works on Windows with the default TEXTTEST_TMP (rundependent.py)
+	Works by hardcoding the string "Documents and Settings". Still won't work with other paths with spaces.
+    - Can now get known bugs to automatically trigger a rerun of the test (default/knownbugs/__init__.py)
+	Useful for example when environment failures are periodically present.
+    - Autogenerated version names when running multiple checkouts are shorter (default/__init__.py)
+	Leads to less wide windows being created
+    - Autogenerated version names from multiple checkouts are automatically made unsaveable (testmodel.py)
+	i.e. behave as if they were in the config setting "unsaveable_version"
+    - "collate_file" can now reference environment variables (sandbox.py)
+	including those set in specific tests
+    - Running tests remotely should work better on Cygwin and on hosts with older shells (runtest.py)
+	Quoting consistently uses hard quoting throughout and scripts don't use ~ or "export VAR=val" syntax any more.
+	Also explicitly assume Cygwin-format paths when doing this on Windows.
+	Thanks to Matt Baker for assistance here.
+    - "Traffic interception" is no longer enabled by default (traffic.py)
+	New setting "collect_traffic_client_server" which enables it for client server testing.
+	Relevant options will only be available if that, "collect_traffic" or "collect_traffic_py_module" are set.
+    - Traffic interception no longer records for new modules just because old modules exist (traffic.py)
+	Need to explicitly request recording for new items
+    - "collect_traffic_py_attributes" now called "collect_traffic_python" and works on builtin modules (traffic.py)
+	Changed how it operates. Config form of it has changed and unified with "collect_traffic_py_module", see migration notes.
+    - Can now filter out certain calling modules/directories when doing Python interception (traffic.py)
+	New config setting "collect_traffic_python_ignore_callers". 
+	By default it includes the whole standard library and TextTest itself. See website docs.
+    - Python attributes that get requested repeatedly don't cause extra traffic file entires (traffic_server.py)
+	Just causes traffic files to be long and there is little point keeping track of the number of calls.
+    - collect_traffic now handles environment variables being unset (traffic.py)
+	Previously only recorded them being set to something else.
+    - New definition file "testcustomize.py" for Python programs (traffic.py)
+	Intention is for it to work like "sitecustomize.py". Useful usually for monkey-patching on startup.
+    - Window hiding is now configurable for GUI testing on Windows (virtualdisplay.py)
+	New config setting "virtual_display_hide_windows". Still enabled by default.
+    - New hook for custom config modules to set up config file variables that depend on other ones (testmodel.py)
+	setDependentConfigDefaults is now called as it is in the core. Does nothing by default.
+Batch Report Enhancements:
+    - HTML report now shows file diffs as well as bug information when tests have "known bugs" (testoverview.py)
+	Makes it consistent with GUI and email report
+    - "-bx" flag will now find the exact tests run by a particular batch session (default/__init__.py)
+	Previously just picked up "batch_extra_version". See migration notes.
+Grid Engine (LSF/SGE) enhancements:
+    - Reconnecting using the grid no longer insists on using the resources etc. from the test itself (masterprocess.py)
+	Means it should be faster and make better use of available machines
+    - New config file settings to replace QUEUE_SYSTEM environment variables (masterprocess.py)
+	Same names but lower case. Because config files can now be created per test. See migration notes.
+    - Parallel job machine name formatting improved
+	Should make for less wide boxes in HTML report
+    - Uncompared temporary files are now shown if a slave job is killed but does not report in (filetrees.py)
+	Usually happens when comparing the results takes longer than SGE's notify period
+    - Don't leak SSH_TTY to SGE jobs (masterprocess.py)
+	Seems to cause trouble on SuSE 11.
+Bug Fixes:
+    - Fixed Mac OS-specific bug that made traffic server fail (and by extension, recording with default settings) (traffic_server.py)
+    - When recomputing, don't reload the configuration while tests are still running (changeteststate.py)
+	Can lead to indeterministic errors
+    - No longer try to run with multiple apps with the same name (testmodel.py)
+	Pick the first one we find and run with that.
+    - Fixed bug around selecting a particular version from a filter file containing tests for many versions (plugins.py)
+    - Reselecting a test row when only some of the test versions are selected now reselects all versions again (testtree.py)
+    - If "executable" isn't defined in a config file, don't try to make an application out of it or create testsuite files (testmodel.py)
+    - Static GUI no longer makes spin buttons for text fields that just happen to have a numeric value (guiplugins.py)
+    - Fixed run version problems when running the static GUI with multiple versions (default/__init__.py)
+    - Various fixes for issues to do with handling extra_versions when reconnecting via a grid (queuesystem/__init__.py)
+    - If externally set environment variable is reset in one test, don't leak this fact to other tests (testmodel.py)
+    - Reconnecting to several runs that differ only by date will now provide the most recent as "main version" (reconnect.py)
+    - Reconnecting now works if an extra_version is provided explicitly (reconnect.py)
+    - Reconnecting and then recomputing a test with a known bug now works properly (knownbugs/__init__.py)
+    - Removed incorrect warning when "unordered_text" differed between several applications run (guiutils.py)
+    - Workaround for GTK+ 2.20 bug around RC file handling in .gtkrc-2.0 files (controller.py)
+    - Fixed race condition when recomputing a running test just as it completes (controller.py)
+    - Fixed race condition when recomputing a running test simultaneous to a grid engine poll (changeteststate.py)
+    - traffic.ModifyTraffic script doesn't leak temporary files if it fails (traffic.py)
+    - Viewing files on remote machines now works together with ssh, instead of just with rsh (fileviewers.py)
+    - Fixed stacktrace when viewing Jira issue with unicode characters with no encoding, i.e. LANG=C (jira.py)
+    - Code to clean up leaked Xvfb lock files now actually works (startXvfb.py)
+    - Fixed stacktrace on shortcut folders when e.g. starting from scratch in your home directory (guiplugins.py)
+    - Fixed stacktrace on extracting GUI config entry documentation on Windows when GTK not installed (!) (guiutils.py)
+    - Fixed bug where failure to clean previous batch temp directories was not reported properly (plugins.py)
+    - Fixed stacktrace when Dictionary config file entries used as basic types (plugins.py)
+    - Fixed race condition in traffic server where shutdown could complete before all requests were handled (traffic_server.py)
+    - Traffic mechanism now handles SUT changes to PATH correctly (traffic_server.py)
+    - Fixed occasional module lookup bug in Python interception (traffic_server.py)
+    - Fixed Python interception bug on Windows paths with an 'n', that got confused with linebreaks (traffic_server.py)
+    - Rerun no longer repeats versions in sandbox root directory name (default/__init__.py)
+    - Dynamic GUI window title now reports correctly when more than one checkout is being used (controller.py)
+    - default.ReplaceText now works without an explicitly provided file, as it once did (scripts.py)
+    - default.ReplaceText now works with text containing "=" characters (scripts.py)
+    - default.DocumentEnvironment now works with an explicitly provided variable name (scripts.py)
+    - Fixed stack trace on trying to view file properties on a file that has been removed (fileproperties.py)
+    - Fixed stack trace importing and copying a file to make a new directory (adminactions.py)
+    - Various error messages tidied up (e.g. filetrees.py)
+
 Version trunk
 =============
+System requirements (see Migration Notes):
+General GUI Enhancements:
+    - GUI now cleans up appropriately on receiving SIGINT on UNIX (engine.py)
+	Means dynamic GUIs can be closed from static GUI without leaking files.
 Static GUI Enhancements:
+Dynamic GUI Enhancements:
 Framework Enhancements:
+    - Jira plugin now highlights 'resolution' field if it is set, instead of 'status' (jira.py)
+	This information is usually more interesting.
 Batch Report Enhancements:
+Grid Engine (LSF/SGE) enhancements:
+    - Ignore order of lists of resources when deciding about reuse (masterprocess.py)
+	Previously started new jobs if one test required resources a,b and the other required b,a.
 Bug Fixes:
+    - Running extra versions with an explicit version from the static GUI does not flip version order any more (testmodel.py)
+    - TextTest no longer allows data file names to clash with its own pre-defined definition file names (testmodel.py)

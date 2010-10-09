@@ -1,16 +1,14 @@
 #!/usr/local/bin/python
 
 
-import os, filecmp, plugins, time, stat, subprocess, logging
-from ndict import seqdict
+import os, filecmp, plugins, time, subprocess, logging
 from shutil import copyfile
-from fnmatch import fnmatch
 
 class FileComparison:
     SAME = 0
     DIFFERENT = 1
     SAVED = 2
-    def __init__(self, test, stem, standardFile, tmpFile, testInProgress=False, observers={}):
+    def __init__(self, test, stem, standardFile, tmpFile, testInProgress=False, **kw):
         self.stdFile = standardFile
         self.stdCmpFile = self.stdFile
         self.tmpFile = tmpFile
@@ -26,7 +24,7 @@ class FileComparison:
         # It would be nice if this could be replaced by some automagic file type detection
         # mechanism, such as the *nix 'file' command, but as the first implementation I've
         # chosen to use a manually created list instead.
-        self.binaryFile = self.stemInConfigValue(test, "binary_file")
+        self.binaryFile = test.configValueMatches("binary_file", self.stem)
         self.previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength)
         self.textDiffTool = test.getConfigValue("text_diff_program")
         self.textDiffToolMaxSize = plugins.parseBytes(test.getCompositeConfigValue("max_file_size", self.textDiffTool))
@@ -55,22 +53,15 @@ class FileComparison:
             if var != "diag" and var != "recalculationTime":
                 state[var] = value
         return state
+
     def __setstate__(self, state):
         self.__dict__ = state
         self.diag = logging.getLogger("TestComparison")
         self.recalculationTime = None
-        if not hasattr(self, "differenceCache"):
-            self.differenceCache = self.differenceId
         
     def __repr__(self):
         return self.stem
     
-    def stemInConfigValue(self, test, configName):
-        for stemPattern in test.getConfigValue(configName):
-            if fnmatch(self.stem, stemPattern):
-                return True
-        return False
-
     def modifiedDates(self):
         files = [ self.stdFile, self.tmpFile, self.stdCmpFile, self.tmpCmpFile ]
         return " : ".join(map(self.modifiedDate, files))
@@ -244,7 +235,7 @@ class FileComparison:
         return os.path.join(dirname, localRoot)
     def versionMatchesStd(self, versionString):
         versions = set(versionString.split("."))
-        dirname, local = os.path.split(self.stdFile)
+        local = os.path.basename(self.stdFile)
         localVersions = set(local.split(".")[2:])
         return versions == localVersions
     def getStdFileForSave(self, versionString):
@@ -273,7 +264,7 @@ class FileComparison:
         self.saveTmpFile(test)
 
     def getTmpFileForSave(self, test):
-        if not self.stemInConfigValue(test, "save_filtered_file_stems"):
+        if not test.configValueMatches("save_filtered_file_stems", self.stem):
             return self.tmpFile
 
         # Don't include the sorting when saving filtered files...

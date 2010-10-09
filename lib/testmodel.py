@@ -4,6 +4,7 @@ from ndict import seqdict
 from cPickle import Pickler, loads, UnpicklingError
 from threading import Lock
 from tempfile import mkstemp
+from copy import deepcopy
 
 helpIntro = """
 Note: the purpose of this help is primarily to document derived configurations and how they differ from the
@@ -93,30 +94,31 @@ class TestEnvironment(seqdict):
         self.diag = logging.getLogger("read environment")
         self.populateFunction = populateFunction
         self.populated = False
+
     def checkPopulated(self):
         if not self.populated:
             self.populated = True
             self.populateFunction()
+
     def definesValue(self, var):
         self.checkPopulated()
         return self.has_key(var)
-    def getValues(self, onlyVars = []):
+    
+    def getValues(self, onlyVars=[], ignoreVars=[]):
         self.checkPopulated()
         values = {}
-        removed = []
+        varsToUnset = []
         for key, value in self.items():
             # Anything set to none is to not to be set in the target environment
             if value is not None and value != "{CLEAR}":
                 if len(onlyVars) == 0 or key in onlyVars:
                     values[key] = value
             else:
-                removed.append(key)
-        self.diag.info("Removing variables " + repr(removed))
+                varsToUnset.append(key)
+        varsToUnset += ignoreVars
+        self.diag.info("Removing variables " + repr(varsToUnset))
         # copy in the external environment last
-        for var, value in os.environ.items():
-            if not values.has_key(var) and var not in removed:
-                values[var] = value
-        return values
+        return plugins.copyEnvironment(values, varsToUnset)
 
     def __getitem__(self, var):
         value = self.getSingleValue(var)
@@ -167,7 +169,7 @@ class TestEnvironment(seqdict):
         
 # Base class for TestCase and TestSuite
 class Test(plugins.Observable):
-    def __init__(self, name, description, dircache, app, parent = None):
+    def __init__(self, name, description, dircache, app, parent=None, configDir=None):
         # Should notify which test it is
         plugins.Observable.__init__(self, passSelf=True)
         self.name = name
@@ -177,6 +179,8 @@ class Test(plugins.Observable):
         self.app = app
         self.parent = parent
         self.dircache = dircache
+        self.configDir = configDir
+        self.tryPopulateConfig()
         populateFunction = plugins.Callable(app.setEnvironment, self)
         self.environment = TestEnvironment(populateFunction)
         # Java equivalent of the environment mechanism...
@@ -184,10 +188,24 @@ class Test(plugins.Observable):
         self.diag = logging.getLogger("test objects")
         # Test suites never change state, but it's convenient that they have one
         self.state = plugins.TestState("not_started")
+
+    def tryPopulateConfig(self):
+        if self.configDir is None and self.dircache.hasStem("config"):
+            self.configDir = self.copyParentConfigDir()
+            self.app.readValues(self.configDir, "config", [ self.dircache ], insert=False, errorOnUnknown=True)
+
+    def copyParentConfigDir(self):
+        # Take the immediate parent first, upwards to the root suite
+        for suite in reversed(self.getAllTestsToRoot()):
+            if suite.configDir:
+                return deepcopy(suite.configDir)
+        
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.name
+
     def paddedRepr(self):
         return repr(self.app) + " " + self.classId() + " " + self.paddedName()
+
     def paddedName(self):
         if not self.parent:
             return self.name
@@ -256,12 +274,8 @@ class Test(plugins.Observable):
     def isDefinitionFileStem(self, stem):
         return self.fileMatches(stem, self.defFileStems())
                 
-    def defFileStems(self, category="all"):
-        dict = self.getConfigValue("definition_file_stems")
-        if category == "all":
-            return dict.get("builtin") + dict.get("regenerate") + dict.get("default")
-        else:
-            return dict.get(category)
+    def defFileStems(self, *args, **kw):
+        return self.app.defFileStems(*args, **kw)
 
     def expandedDefFileStems(self, category="all"):
         stems = []
@@ -277,7 +291,7 @@ class Test(plugins.Observable):
 
     def listStandardFiles(self, allVersions, defFileCategory="all"):
         resultFiles, defFiles = [],[]
-        self.diagnose("Looking for all standard files")
+        self.diagnose("Looking for standard files, definition files in category " + repr(defFileCategory))
         defFileStems = self.expandedDefFileStems(defFileCategory)
         for stem in defFileStems:
             defFiles += self.listStdFilesWithStem(stem, allVersions)
@@ -352,7 +366,7 @@ class Test(plugins.Observable):
         return False
     
     def findAllStdFiles(self, stem):
-        if stem in [ "environment", "properties" ]:
+        if stem in [ "environment", "properties", "testcustomize.py" ]:
             otherApps = self.app.findOtherAppNames()
             self.diagnose("Finding environment files, excluding " + repr(otherApps))
             otherAppExcludor = lambda vset: len(vset.intersection(otherApps)) == 0
@@ -426,14 +440,30 @@ class Test(plugins.Observable):
             appToUse = self.app.getRefVersionApplication(refVersion)
         return appToUse.getAllFileNames([ self.dircache ], stem)
 
-    def getConfigValue(self, key, expandVars=True):
-        return self.app.getConfigValue(key, expandVars, self.environment)
+    def getConfigValue(self, key, expandVars=True, envMapping=None):
+        if envMapping is None:
+            envMapping = self.environment
+        if self.configDir:
+            return self.configDir.getSingle(key, expandVars, envMapping)
+        else:
+            return self.parent.getConfigValue(key, expandVars, envMapping)
+
+    def getCompositeConfigValue(self, key, subKey, expandVars=True, envMapping=None):
+        if envMapping is None:
+            envMapping = self.environment
+        if self.configDir:
+            return self.configDir.getComposite(key, subKey, expandVars, envMapping)
+        else:
+            return self.parent.getCompositeConfigValue(key, subKey, expandVars, envMapping)
+
+    def configValueMatches(self, key, filePattern):
+        for currPattern in self.getConfigValue(key):
+            if fnmatch.fnmatch(filePattern, currPattern):
+                return True
+        return False
 
     def getDataFileNames(self):
         return self.app.getDataFileNames(self.environment)
-
-    def getCompositeConfigValue(self, key, subKey, expandVars=True):
-        return self.app.getCompositeConfigValue(key, subKey, expandVars, self.environment)
             
     def getRelPath(self):
         if self.parent:
@@ -490,8 +520,9 @@ class Test(plugins.Observable):
             os.close(tmpFile)
             shutil.move(tmpFileName, targetFile)
             
-    def getRunEnvironment(self, onlyVars = []):
-        return self.environment.getValues(onlyVars)
+    def getRunEnvironment(self, *args, **kw):
+        self.environment.diag.info("Reading cached environment for " + repr(self))
+        return self.environment.getValues(*args, **kw)
 
     def getIndent(self):
         relPath = self.getRelPath()
@@ -684,6 +715,9 @@ class TestCase(Test):
         else:
             return os.path.join(dir, stem)
 
+    def makeBackupFileName(self, number):
+        return self.makeTmpFileName("backup.previous." + str(number), forFramework=1)
+
     def getNewState(self, file, **updateArgs):
         try:
             # Would like to do load(file) here... but it doesn't work with universal line endings, see Python bug 1724366
@@ -820,8 +854,8 @@ class TestSuiteFileHandler:
 
 class TestSuite(Test):
     testSuiteFileHandler = TestSuiteFileHandler()
-    def __init__(self, name, description, dircache, app, parent=None):
-        Test.__init__(self, name, description, dircache, app, parent)
+    def __init__(self, name, description, dircache, app, parent=None, configDir=None):
+        Test.__init__(self, name, description, dircache, app, parent, configDir)
         self.testcases = []
         contentFile = self.getContentFileName()
         if not contentFile:
@@ -1017,9 +1051,8 @@ class TestSuite(Test):
         pathElements = testPath.split("/", 1)
         subSuite = self.findSubtest(pathElements[0])
         if len(pathElements) == 1:
-            if not subSuite:
-                return self.addTestCase(testPath)
-            # if it already exists, don't return anything
+            # add it even if it already exists, then we get two of them :)
+            return self.addTestCase(testPath)
         else:
             if not subSuite:
                 subSuite = self.addTestSuite(pathElements[0])
@@ -1128,7 +1161,7 @@ class ConfigurationCall:
         self.name = name
         self.app = app
         self.firstAttemptException = ""
-        self.targetCall = eval("app.configObject." + name)
+        self.targetCall = getattr(app.configObject, name)
     def __call__(self, *args, **kwargs):
         try:
             return self.targetCall(*args, **kwargs)
@@ -1138,10 +1171,10 @@ class ConfigurationCall:
             else:
                 self.firstAttemptException = plugins.getExceptionString()
                 return self(self.app, *args, **kwargs)
-        except (plugins.TextTestError, KeyboardInterrupt):
+        except plugins.TextTestError:
             # Just pass it through here, these are deliberate
             raise
-        except:
+        except Exception:
             self.raiseException()
     def raiseException(self):
         message = "Exception thrown by '" + self.app.getConfigValue("config_module") + \
@@ -1164,18 +1197,24 @@ class Application:
         self.versions = versions
         self.diag = logging.getLogger("application")
         self.inputOptions = inputOptions
+        self.configDir = plugins.MultiEntryDictionary(importKey="import_config_file", importFileFinder=self.configPath)
         self.setUpConfiguration(configEntries)
+        self.checkSanity()
         self.writeDirectory = self.getWriteDirectory()
         self.rootTmpDir = os.path.dirname(self.writeDirectory)
         self.diag.info("Write directory at " + self.writeDirectory)
         self.checkout = self.configObject.setUpCheckout(self)
         self.diag.info("Checkout set to " + self.checkout)
+        
     def __repr__(self):
         return self.fullName() + self.versionSuffix()
+
     def __hash__(self):
         return id(self)
+
     def fullName(self):
         return self.getConfigValue("full_name")
+
     def getPersonalConfigFiles(self):
         includePersonal = self.inputOptions.configPathOptions()[1]
         if not includePersonal:
@@ -1185,7 +1224,7 @@ class Application:
             return self.getAllFileNames([ dircache ], "config")
         
     def setUpConfiguration(self, configEntries={}):
-        self.configDir = plugins.MultiEntryDictionary(importKey="import_config_file", importFileFinder=self.configPath)
+        self.configDir.clear()
         self.configDocs = {}
         self.extraDirCaches = {}
         self.setConfigDefaults()
@@ -1260,11 +1299,11 @@ class Application:
             if sys.exc_type == exceptions.ImportError:
                 errorString = "No module named " + moduleName
                 if str(sys.exc_value) == errorString:
-                    raise BadConfigError, "could not find config_module " + moduleName
+                    raise BadConfigError, "could not find config_module " + repr(moduleName)
                 elif str(sys.exc_value) == "cannot import name getConfig":
-                    raise BadConfigError, "module " + moduleName + " is not intended for use as a config_module"
+                    raise BadConfigError, "module " + repr(moduleName) + " is not intended for use as a config_module"
             plugins.printException()
-            raise BadConfigError, "config_module " + moduleName + " contained errors and could not be imported"
+            raise BadConfigError, "config_module " + repr(moduleName) + " contained errors and could not be imported"
 
     def __getattr__(self, name): # If we can't find a method, assume the configuration has got one
         if hasattr(self.configObject, name):
@@ -1274,6 +1313,10 @@ class Application:
 
     def getDirectory(self):
         return self.dircache.dir
+
+    def checkSanity(self):
+        if not self.getConfigValue("executable"):
+            raise BadConfigError, "config file entry 'executable' not defined"
 
     def getRunMachine(self):
         if self.inputOptions.has_key("m"):
@@ -1291,10 +1334,21 @@ class Application:
         # don't error check as there might be settings there for all sorts of config modules...
         self.readValues(self.configDir, "config", dirCaches, insert=False, errorOnUnknown=False)
             
-    def readExplicitConfigFiles(self, errorOnUnknown):
-        self.readValues(self.configDir, "config", [ self.dircache ], insert=False, errorOnUnknown=errorOnUnknown)
-        extra = self.getExtraDirCaches("config")
-        self.readValues(self.configDir, "config", extra, insert=False, errorOnUnknown=errorOnUnknown)
+    def readExplicitConfigFiles(self, configModuleInitialised):
+        prevFiles = []
+        dependentsSetUp = False
+        while True:
+            dircaches = self.getExtraDirCaches("config") + [ self.dircache ]
+            allFiles = self.getAllFileNames(dircaches, "config")
+            if len(allFiles) == len(prevFiles):
+                if configModuleInitialised and not dependentsSetUp and self.configObject.setDependentConfigDefaults(self):
+                    dependentsSetUp = True
+                else:
+                    return
+            else:
+                self.diag.info("Reading explicit config files : " + "\n".join(allFiles))
+                self.configDir.readValues(allFiles, insert=False, errorOnUnknown=configModuleInitialised)
+                prevFiles = allFiles
         
     def readValues(self, multiEntryDict, stem, dircaches, insert=True, errorOnUnknown=False):
         allFiles = self.getAllFileNames(dircaches, stem)
@@ -1346,7 +1400,17 @@ class Application:
                    self.getConfigValue("copy_test_path_merge", envMapping=envMapping) + \
                    self.getConfigValue("partial_copy_test_path", envMapping=envMapping)
         # Don't manage data that has an external path name, only accept absolute paths built by ourselves...
-        return filter(lambda name: name and (self.writeDirectory in name or not os.path.isabs(name)), allNames)
+        return filter(self.isLocalDataFile, allNames)
+
+    def isLocalDataFile(self, name):
+        return name and (self.writeDirectory in name or not os.path.isabs(name))
+
+    def defFileStems(self, category="all"):
+        dict = self.getConfigValue("definition_file_stems")
+        if category == "all":
+            return dict.get("builtin") + dict.get("regenerate") + dict.get("default")
+        else:
+            return dict.get(category)
 
     def getFileName(self, dirList, stem):
         dircaches = map(DirectoryCache, dirList)
@@ -1417,12 +1481,13 @@ class Application:
         self.setConfigDefault("link_test_path", [], "Paths to be linked from the temp. directory when running tests")
         self.setConfigDefault("test_data_ignore", { "default" : [] }, \
                               "Elements under test data structures which should not be viewed or change-monitored")
-        self.setConfigDefault("definition_file_stems", { "default": [], "builtin": [ "environment", "properties", "testsuite" ]}, \
+        self.setConfigDefault("definition_file_stems", { "default": [], "builtin": [ "config", "environment", "properties", "testsuite" ]}, \
                               "files to be shown as definition files by the static GUI")
         self.setConfigDefault("unsaveable_version", [], "Versions which should not have results saved for them")
         self.setConfigDefault("version_priority", { "default": 99 }, \
                               "Mapping of version names to a priority order in case of conflict.")
         self.setConfigDefault("extra_search_directory", { "default" : [] }, "Additional directories to search for TextTest files")
+        self.setConfigDefault("filename_convention_scheme", "classic", "Naming scheme to use for files for stdin,stdout and stderr")
         self.setConfigAlias("test_data_searchpath", "extra_search_directory")
         self.setConfigAlias("extra_config_directory", "extra_search_directory")
 
@@ -1460,7 +1525,7 @@ class Application:
             dircache = DirectoryCache(otherDir)
         else:
             dircache = self.dircache
-        suite = TestSuite(os.path.basename(dircache.dir), "Root test suite", dircache, self)
+        suite = TestSuite(os.path.basename(dircache.dir), "Root test suite", dircache, self, configDir=self.configDir)
         suite.setObservers(responders)
         return suite
 
@@ -1488,12 +1553,8 @@ class Application:
         return "Rejected " + self.description() + " - " + str(message) + "\n"
 
     def filterUnsaveable(self, versions):
-        saveableVersions = []
         unsaveableVersions = self.getConfigValue("unsaveable_version")
-        for version in versions:
-            if not version in unsaveableVersions and not version.startswith("copy_"):
-                saveableVersions.append(version)
-        return saveableVersions
+        return filter(lambda v: v not in unsaveableVersions, versions)
 
     def getBaseVersions(self, baseVersionKey="implied"):
         # By default, this gets all names in base_version, not just those marked
@@ -1595,33 +1656,12 @@ class Application:
         print header
         self.configObject.printHelpText()
 
-    def getConfigValue(self, key, expandVars=True, envMapping=os.environ):
-        value = self.configDir.get(key)
-        if expandVars:
-            return self.expandEnvironment(value, envMapping)
-        else:
-            return value
+    def getConfigValue(self, *args, **kw):
+        return self.configDir.getSingle(*args, **kw)
 
-    def expandEnvironment(self, value, envMapping):
-        if type(value) == types.StringType:
-            return string.Template(value).safe_substitute(envMapping)
-        elif type(value) == types.ListType:
-            return [ string.Template(element).safe_substitute(envMapping) for element in value ]
-        elif type(value) == types.DictType:
-            newDict = {}
-            for key, val in value.items():
-                newDict[key] = self.expandEnvironment(val, envMapping)
-            return newDict
-        else:
-            return value
-
-    def getCompositeConfigValue(self, key, subKey, expandVars=True, envMapping=os.environ, defaultKey="default"):
-        value = self.configDir.getComposite(key, subKey, defaultKey)
-        if expandVars:
-            return self.expandEnvironment(value, envMapping)
-        else:
-            return value
-
+    def getCompositeConfigValue(self, *args, **kw):
+        return self.configDir.getComposite(*args, **kw)
+       
     def addConfigEntry(self, key, value, sectionName = ""):
         self.configDir.addEntry(key, value, sectionName, insert=False, errorOnUnknown=True)
     def setConfigDefault(self, key, value, docString = ""):
@@ -1660,13 +1700,13 @@ class OptionFinder(plugins.OptionFinder):
             return value
 
     def normalisePath(self, path):
-        return os.path.normpath(plugins.abspath(path)).replace("\\", "/")
+        return os.path.normpath(plugins.abspath(os.path.expanduser(path))).replace("\\", "/")
 
     def getPathFromOptionsOrEnv(self, envVar, defaultValue, optionName=""):
         if optionName and self.has_key(optionName):
             return self[optionName]
         else:
-            return os.getenv(envVar, os.path.expanduser(os.path.expandvars(defaultValue)))
+            return os.getenv(envVar, os.path.expandvars(defaultValue))
 
     def setUpLogging(self):
         if os.path.isfile(self.diagConfigFile):
@@ -1708,7 +1748,7 @@ class OptionFinder(plugins.OptionFinder):
             if len(parts) > 1:
                 appVersion = parts[1]
             for version in versionList:
-                self.addToAppDict(appDict, appName, self.combineVersions(appVersion, version))
+                self.addToAppDict(appDict, appName, self.combineVersions(version, appVersion))
 
         return appDict
 
@@ -1718,7 +1758,10 @@ class OptionFinder(plugins.OptionFinder):
         elif len(v2) == 0:
             return v1
         else:
-            return v1 + "." + v2
+            parts1 = v1.split(".")
+            parts2 = v2.split(".")
+            parts = parts1 + filter(lambda p: p not in parts1, parts2)
+            return ".".join(parts)
 
     def addToAppDict(self, appDict, appName, versionName):
         versions = appDict.setdefault(appName, [])
@@ -1786,7 +1829,7 @@ class OptionFinder(plugins.OptionFinder):
 # Simple responder that collects completion notifications and sends one out when
 # it thinks everything is done.
 class AllCompleteResponder(plugins.Responder,plugins.Observable):
-    def __init__(self, inputOptions, allApps):
+    def __init__(self, *args):
         plugins.Responder.__init__(self)
         plugins.Observable.__init__(self)
         self.unfinishedTests = 0
@@ -1794,6 +1837,7 @@ class AllCompleteResponder(plugins.Responder,plugins.Observable):
         self.checkInCompletion = False
         self.hadCompletion = False
         self.diag = logging.getLogger("test objects")
+        
     def notifyAdd(self, test, *args, **kw):
         if test.classId() == "test-case":
             # Locking long thought to be unnecessary

@@ -4,11 +4,12 @@ The actions in the dynamic GUI that affect the state of a test
 """
 
 import gtk, plugins, os
-from default.gtkgui import guiplugins # from .. import guiplugins when we drop Python 2.4 support
+from .. import guiplugins
 
 class SaveTests(guiplugins.ActionDialogGUI):
     def __init__(self, allApps, *args):
         guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
+        self.directAccel = None
         self.directAction = gtk.Action("Save", "_Save", \
                                        self.getDirectTooltip(), self.getStockId())
         self.directAction.connect("activate", self._respond)
@@ -64,6 +65,7 @@ class SaveTests(guiplugins.ActionDialogGUI):
 
     def getSaveableTests(self):
         return filter(lambda test: test.stateInGui.isSaveable(), self.currTestSelection)
+
     def updateOptions(self):
         defaultSaveOption = self.getDefaultSaveOption()
         versionOption = self.optionGroup.getOption("v")
@@ -76,12 +78,7 @@ class SaveTests(guiplugins.ActionDialogGUI):
         self.diag.info("Setting default save version to " + defaultSaveOption)
         self.optionGroup.setPossibleValues("v", newVersions)
         return True
-    def getDefaultSaveOption(self):
-        saveVersions = self.getSaveVersions()
-        if saveVersions.find(",") != -1:
-            return "<default> - " + saveVersions
-        else:
-            return saveVersions
+    
     def getPossibleVersions(self):
         extensions = []
         for app in self.currAppSelection:
@@ -91,30 +88,25 @@ class SaveTests(guiplugins.ActionDialogGUI):
         # Include the default version always
         extensions.append("")
         return extensions
-    def getSaveVersions(self):
+
+    def getDefaultSaveOption(self):
         if self.isAllNew():
             return ""
-
-        saveVersions = []
-        for app in self.currAppSelection:
-            ver = self.getDefaultSaveVersion(app)
-            if not ver in saveVersions:
-                saveVersions.append(ver)
-        return ",".join(saveVersions)
+        else:
+            return plugins.getAggregateString(self.currAppSelection, self.getDefaultSaveVersion)
+    
     def getDefaultSaveVersion(self, app):
-        return app.getFullVersion(forSave = 1)
-    def hasPerformance(self, apps):
-        for app in apps:
-            if app.hasPerformance():
-                return True
-        return False
+        return app.getFullVersion(forSave=1)
+    
     def getExactness(self):
         return int(self.optionGroup.getSwitchValue("ex", 1))
+    
     def isAllNew(self):
         for test in self.getSaveableTests():
             if not test.stateInGui.isAllNew():
                 return False
         return True
+    
     def getVersion(self, test):
         versionString = self.optionGroup.getOptionValue("v")
         if versionString.startswith("<default>"):
@@ -131,7 +123,7 @@ class SaveTests(guiplugins.ActionDialogGUI):
         return False
 
     def getStemsToSave(self):
-        return [ os.path.basename(fileName).split(".")[0] for fileName, comparison in self.currFileSelection ]
+        return [ os.path.basename(fileName).split(".")[0] for fileName, _ in self.currFileSelection ]
 
     def getBackupVersions(self):
         versionString = self.optionGroup.getOptionValue("old")
@@ -145,13 +137,8 @@ class SaveTests(guiplugins.ActionDialogGUI):
         if self.optionGroup.getOptionValue("v") in backupVersions:
             raise plugins.TextTestError, "Cannot backup to the same version we're trying to save! Choose another name."
         
-        saveDesc = ", exactness " + str(self.getExactness())
         stemsToSave = self.getStemsToSave()
-        if len(stemsToSave) > 0:
-            saveDesc += ", only " + ",".join(stemsToSave)
         overwriteSuccess = self.optionGroup.getSwitchValue("over")
-        if overwriteSuccess:
-            saveDesc += ", overwriting both failed and succeeded files"
 
         tests = self.getSaveableTests()
         # Calculate the versions beforehand, as saving tests can change the selection,
@@ -164,7 +151,7 @@ class SaveTests(guiplugins.ActionDialogGUI):
                 testComparison = test.stateInGui
                 testComparison.setObservers(self.observers)
                 testComparison.save(test, self.getExactness(), version, overwriteSuccess, stemsToSave, backupVersions)
-                newState = testComparison.makeNewState(test.app, "saved")
+                newState = testComparison.makeNewState(test, "saved")
                 test.changeState(newState)
 
             self.notify("Status", "Saved " + testDesc + ".")
@@ -182,6 +169,11 @@ class RecomputeTests(guiplugins.ActionGUI):
     def __init__(self, *args):
         guiplugins.ActionGUI.__init__(self, *args)
         self.latestNumberOfRecomputations = 0
+        self.allComplete = False
+
+    def notifyAllComplete(self):
+        self.allComplete = True
+
     def isActiveOnCurrent(self, test=None, state=None):
         for currTest in self.currTestSelection:
             if currTest is test:
@@ -190,30 +182,38 @@ class RecomputeTests(guiplugins.ActionGUI):
             elif currTest.stateInGui.hasStarted():
                 return True
         return False
+
     def _getTitle(self):
         return "Recompute Status"
+
     def _getStockId(self):
         return "refresh"
+
     def getTooltip(self):
         return "Recompute test status, including progress information if appropriate"
+
     def getSignalsSent(self):
         return [ "Recomputed" ]
+
     def messageAfterPerform(self):
         if self.latestNumberOfRecomputations == 0:
             return "No test needed recomputation."
         else:
             return "Recomputed status of " + plugins.pluralise(self.latestNumberOfRecomputations, "test") + "."
+        
     def performOnCurrent(self):
         self.latestNumberOfRecomputations = 0
-        for app in self.currAppSelection:
-            self.notify("Status", "Rereading configuration for " + repr(app) + " ...")
-            self.notify("ActionProgress", "")
-            app.setUpConfiguration()
+        if self.allComplete:
+            # not a good idea to reread configuration while tests are still running, can lead to race conditions
+            for app in self.currAppSelection:
+                self.notify("Status", "Rereading configuration for " + repr(app) + " ...")
+                self.notify("ActionProgress")
+                app.setUpConfiguration()
 
         for test in self.currTestSelection:
             self.latestNumberOfRecomputations += 1
             self.notify("Status", "Recomputing status of " + repr(test) + " ...")
-            self.notify("ActionProgress", "")
+            self.notify("ActionProgress")
             test.app.recomputeProgress(test, test.stateInGui, self.observers)
             self.notify("Recomputed", test)
 
@@ -236,7 +236,7 @@ class MarkTest(guiplugins.ActionDialogGUI):
                 newState = plugins.MarkedTestState(self.optionGroup.getOptionValue("free"),
                                                    self.optionGroup.getOptionValue("brief"), oldState)
                 test.changeState(newState)
-                self.notify("ActionProgress", "") # Just to update gui ...
+                self.notify("ActionProgress") # Just to update gui ...
     def isActiveOnCurrent(self, test=None, state=None):
         if state and state.isComplete():
             return True
@@ -255,7 +255,7 @@ class UnmarkTest(guiplugins.ActionGUI):
             if test.stateInGui.isMarked():
                 test.stateInGui.oldState.lifecycleChange = "unmarked" # To avoid triggering completion ...
                 test.changeState(test.stateInGui.oldState)
-                self.notify("ActionProgress", "") # Just to update gui ...
+                self.notify("ActionProgress") # Just to update gui ...
     def isActiveOnCurrent(self, *args):
         for test in self.currTestSelection:
             if test.stateInGui.isMarked():
@@ -287,13 +287,12 @@ class KillTests(guiplugins.ActionGUI):
         testDesc = str(len(tests)) + " tests"
         self.notify("Status", "Killing " + testDesc + " ...")
         for test in tests:
-            self.notify("ActionProgress", "")
-            guiplugins.guilog.info("Killing " + repr(test))
+            self.notify("ActionProgress")
             test.notify("Kill")
 
         self.notify("Status", "Killed " + testDesc + ".")
 
 
 def getInteractiveActionClasses():
-     return [ SaveTests, KillTests, MarkTest, UnmarkTest, RecomputeTests ]
+    return [ SaveTests, KillTests, MarkTest, UnmarkTest, RecomputeTests ]
  

@@ -1,6 +1,5 @@
 
-import vcs_independent, plugins, datetime, time, os
-from ndict import seqdict
+import vcs_independent, datetime, time, os
 
 
 class BzrInterface(vcs_independent.VersionControlInterface):

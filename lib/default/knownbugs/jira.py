@@ -32,8 +32,8 @@ def convertToString(value):
         ret = value.replace("\r", "") # Get given Windows line endings but Python doesn't use them internally
         if type(ret) == unicode:
             import locale
-            encoding = locale.getdefaultlocale()[1]
-            return ret.encode(encoding)
+            encoding = locale.getdefaultlocale()[1] or "utf-8"
+            return ret.encode(encoding, "replace")
         else:
             return ret
     else:
@@ -44,6 +44,8 @@ def convertDictToString(dict):
         return dict["name"]
     elif dict.has_key("values"):
         return dict["values"]
+    else:
+        return "No value defined"
 
 def transfer(oldDict, newDict, key, postfix=""):
     if oldDict.has_key(key):
@@ -85,7 +87,9 @@ def parseReply(bugInfo, statuses, resolutions, location):
         bugId = newBugInfo['key']
         message += "View bug " + bugId + " using Jira URL=" + location + "/browse/" + str(bugId) + "\n\n"
         message += convertToString(bugInfo["description"])
-        return newBugInfo['status'], message, newBugInfo.has_key("resolution")
+        isResolved = newBugInfo.has_key("resolution")
+        statusText = newBugInfo["resolution"].strip() if isResolved else newBugInfo['status']
+        return statusText, message, isResolved
     except (IndexError, KeyError):
         message = "Could not parse reply from Jira's web service, maybe incompatible interface. Text of reply follows : \n" + str(bugInfo)
         return "BAD SCRIPT", message, False

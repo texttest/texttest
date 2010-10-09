@@ -4,7 +4,7 @@ Actions for managing selections and filterings of the test tree
 """
 
 import gtk, plugins, os, operator, logging
-from default.gtkgui import guiplugins # from .. import guiplugins when we drop Python 2.4 support
+from .. import guiplugins
 
 class AllTestsHandler:
     def __init__(self):
@@ -22,6 +22,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         guiplugins.ActionTabGUI.__init__(self, allApps)
         AllTestsHandler.__init__(self)
         self.dynamic = dynamic
+        self.filterAccel = None
         self.filterAction = gtk.Action("Filter", "Filter", \
                                        self.getFilterTooltip(), self.getStockId())
         self.filterAction.connect("activate", self.filterTests)
@@ -43,6 +44,16 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         self.filteringGroup.addSwitch("current_filtering", options = [ "Discard", "Refine", "Extend" ], description=currFilterDesc)
         excludeKeys = set(self.optionGroup.keys()) # remember these so we don't try and save them to selections
         self.addApplicationOptions(allApps, self.optionGroup)
+        appNames = set([ app.name for app in allApps ])
+        if len(appNames) > 1:
+            self.addOption("app", "App names containing", description="Select tests for which the application name matches the entered text. The text can be a regular expression.")
+        if self.hasPerformance(allApps, "performance"):
+            self.optionGroup.moveToEnd([ "r" ])
+            self.addOption("fastest", "Only fastest tests", 0, 
+                           description="Select the given number of tests which match the other selected criteria and have the fastest runtimes")
+            self.addOption("slowest", "Only slowest tests", 0, 
+                           description="Select the given number of tests which match the other selected criteria and have the longest runtimes")
+        self.optionGroup.moveToEnd([ "grep", "grepfile" ])
         if self.dynamic:
             self.addSwitch("std", options = [ "Use test-files from current run", "Use stored test-files" ], description = [ "When searching using 'test-files containing', look in the results of tests in the current run", "When searching using 'test-files containing', look in the stored results, i.e. the same search as would be done in the static GUI" ])
         self.appKeys = set(self.optionGroup.keys())
@@ -63,13 +74,14 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         radioButton.set_name(option + " for " + optionGroup.name)
 
     def findDefaultTestFile(self, allStems):
-        if len(allStems) == 0:
-            return "output"
         for app in self.validApps:
             logFile = app.getConfigValue("log_file")
-            if logFile in allStems:
+            if len(allStems) == 0 or logFile in allStems:
                 return logFile
-        return allStems[0]
+        if len(allStems) > 0:
+            return allStems[0]
+        else:
+            return "none"
 
     def findAllStems(self):
         stems = set()
@@ -126,8 +138,6 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         return "Select indicated tests"
     def getTabTitle(self):
         return "Selection"
-    def getGroupTabTitle(self):
-        return "Selection"
     def messageBeforePerform(self):
         return "Selecting tests ..."
     def messageAfterPerform(self):
@@ -160,7 +170,6 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
             else:
                 newTests = self.combineWithPrevious([], suite.app, strategy)
 
-            guiplugins.guilog.info("Selected " + str(len(newTests)) + " out of a possible " + str(suite.size()))
             selectedTests += newTests
         return selectedTests
 
@@ -173,35 +182,54 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         versionSelection = self.optionGroup.getOptionValue("vs")
         if len(versionSelection) == 0:
             return True
-        
-        versions = versionSelection.split(".")
-        return self.allVersionsMatch(versions, test.app.versions)        
+        elif versionSelection == "<default>":
+            return len(test.app.versions) == 0
+        else:
+            versions = set(versionSelection.split("."))
+            appVersions = set(test.app.versions + test.app.getBaseVersions())
+            return versions.issubset(appVersions)
+
+    def findMainApps(self):
+        apps = set(self.validApps)
+        for app in self.validApps:
+            apps.difference_update(app.extras)
+        return apps
+
+    def adjustForExtraVersions(self, rootSuites):
+        apps = self.findMainApps()
+        if len(apps) == len(rootSuites):
+            return rootSuites
+
+        versionSelection = self.optionGroup.getOptionValue("vs")
+        removeApps = []
+        for app in apps:
+            refApp = app.getRefVersionApplication(versionSelection)
+            newExtras = set(refApp.getConfigValue("extra_version"))
+            for extra in app.extras:
+                if len(set(extra.versions).intersection(newExtras)) == 0:
+                    removeApps.append(extra)
+        return filter(lambda s: s.app not in removeApps, rootSuites)
 
     def getSuitesToTry(self):
         # If only some of the suites present match the version selection, only consider them.
         # If none of them do, try to filter them all
         toTry = filter(self.matchesVersions, self.rootTestSuites)
         if len(toTry) == 0:
-            return self.rootTestSuites
+            return self.adjustForExtraVersions(self.rootTestSuites)
         else:
             return toTry
-        
-    def allVersionsMatch(self, versions, appVersions):
-        for version in versions:
-            if version == "<default>":
-                if len(appVersions) > 0:
-                    return False
-            else:
-                if not version in appVersions:
-                    return False
-        return True
-    
+            
     def getRequestedTests(self, suite, filters, strategy):
-        self.notify("ActionProgress", "") # Just to update gui ...
+        self.notify("ActionProgress") # Just to update gui ...
         if strategy == 1: # refine, don't check the whole suite
-            return filter(lambda test: test.app is suite.app and test.isAcceptedByAll(filters), self.currTestSelection)
+            tests = filter(lambda test: test.app is suite.app and test.isAcceptedByAll(filters), self.currTestSelection)
         else:
-            return self.getRequestedTestsFromSuite(suite, filters)
+            tests = self.getRequestedTestsFromSuite(suite, filters)
+
+        # Some filters need to look at the selection as a whole to decide what to do
+        for testFilter in filters:
+            tests = testFilter.refine(tests)
+        return tests
         
     def getRequestedTestsFromSuite(self, suite, filters):
         if not suite.isAcceptedByAll(filters):
@@ -210,7 +238,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
             if suite.classId() == "test-suite":
                 tests = []
                 for subSuite in self.findTestCaseList(suite):
-                    self.notify("ActionProgress", "") # Just to update gui ...
+                    self.notify("ActionProgress") # Just to update gui ...
                     tests += self.getRequestedTestsFromSuite(subSuite, filters)
                 return tests
             else:
@@ -238,18 +266,23 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
             version = ""
 
         fullVersion = suite.app.getFullVersion()
-        versionToUse = self.findCombinedVersion(version, fullVersion)
+        baseVersions = suite.app.getBaseVersions()
+        versionToUse = self.findCombinedVersion(version, fullVersion, baseVersions)
         self.selectDiag.info("Trying to get test cases for " + repr(suite) + ", version " + versionToUse)
         return suite.findTestCases(versionToUse)
 
-    def findCombinedVersion(self, version, fullVersion):
-        combined = version
-        if len(fullVersion) > 0 and len(version) > 0:
+    def findCombinedVersion(self, version, fullVersion, baseVersions):
+        combined = self.getGivenVersion(version, baseVersions)
+        if len(fullVersion) > 0 and len(combined) > 0:
             parts = version.split(".")
             for appVer in fullVersion.split("."):
-                if not appVer in parts:
+                if appVer not in parts:
                     combined += "." + appVer
         return combined
+
+    def getGivenVersion(self, version, baseVersions):
+        parts = filter(lambda v: v not in baseVersions, version.split("."))
+        return ".".join(parts)
 
     def filterTests(self, *args):
         self.notify("Status", "Filtering tests ...")
@@ -258,7 +291,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         strategy = self.filteringGroup.getSwitchValue("current_filtering")
         toShow = self.findTestsToShow(newSelection, strategy)
         self.notify("Visibility", toShow, True)
-        self.notify("ActionProgress", "")
+        self.notify("ActionProgress")
         toHide = self.findTestsToHide(newSelection, strategy)
         self.notify("Visibility", toHide, False)
         self.notify("ActionStop")
@@ -284,7 +317,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         button = gtk.Button()
         self.filterAction.connect_proxy(button)
         button.set_image(gtk.image_new_from_stock(self.getStockId(), gtk.ICON_SIZE_BUTTON))
-        self.setTooltipText(button, self.getFilterTooltip())
+        button.set_tooltip_text(self.getFilterTooltip())
         return button
 
     def createFrame(self, name, group, button):
@@ -298,9 +331,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         return frame
 
     def getNewSwitchName(self, switchName, optionGroup):
-        if len(switchName):
-            return switchName
-        elif optionGroup is self.selectionGroup:
+        if optionGroup is self.selectionGroup:
             return "Current selection"
         elif optionGroup is self.filteringGroup:
             return "Current filtering"
@@ -401,11 +432,13 @@ class SaveSelection(guiplugins.ActionDialogGUI):
     def writeTestList(self, file):
         file.write("-tp ")
         for suite in self.rootTestSuites:
-            file.write("appdata=" + suite.app.name + suite.app.versionSuffix() + "\n")
+            versionSuffix = suite.app.versionSuffix()
+            if "copy_" not in versionSuffix: # Don't save copy names in selections, causes confusion
+                file.write("appdata=" + suite.app.name + versionSuffix + "\n")
             for test in suite.testCaseList():
                 self.notify("WriteTestIfSelected", test, file)
     
-    def notifySetTestSelection(self, tests, criteria="", *args):
+    def notifySetTestSelection(self, dummy, criteria="", *args):
         self.selectionCriteria = criteria
     
     def getConfirmationMessage(self):
@@ -468,7 +501,6 @@ class LoadSelection(guiplugins.ActionDialogGUI):
         fileName = self.optionGroup.getOptionValue("f")
         if fileName:
             newSelection = self.makeNewSelection(fileName)
-            guiplugins.guilog.info("Loaded " + str(len(newSelection)) + " tests from " + fileName)
             self.notify("SetTestSelection", newSelection, "-f " + fileName, True)
             self.notify("Status", "Loaded test selection from file '" + fileName + "'.")
         else:
@@ -480,9 +512,9 @@ class LoadSelection(guiplugins.ActionDialogGUI):
             filters = suite.app.getFiltersFromFile(fileName, self.rootTestSuites)
             tests += suite.testCaseList(filters)
         return tests
-    def getResizeDivisors(self):
+    def getSizeAsWindowFraction(self):
         # size of the dialog
-        return 1.2, 1.7
+        return 0.6, 0.8
 
     def messageBeforePerform(self):
         return "Loading test selection ..."

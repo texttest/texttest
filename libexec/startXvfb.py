@@ -8,11 +8,6 @@
 #   way to tell these signals from ordinary job control
 # - Clean up after Xvfb as it leaks lock files from time to time.
 
-try:
-    import interceptor # the usual test hook...
-except ImportError:
-    pass
-
 import os, signal, sys, subprocess
 from socket import gethostname
 
@@ -25,7 +20,7 @@ class ConnectionComplete:
 class ConnectionTimeout:
     pass
     
-def setReadyFlag(self, *args):
+def setReadyFlag(self, *args): # pragma: no cover - only here to deal with pathological and probably impossible race condition
     global Xvfb_ready
     Xvfb_ready = True
 
@@ -45,7 +40,7 @@ def getDisplayNumber():
     # Display numbers up to 32768 seem to be allowed, which is less than most process IDs on systems I've observed...
     return str(os.getpid() % MAX_DISPLAY)
 
-def getLockFiles(self, num):
+def getLockFiles(num):
     lockFile = "/tmp/.X" + num + "-lock"
     xFile = "/tmp/.X11-unix/X" + num
     return [ lockFile, xFile ]
@@ -56,7 +51,7 @@ def cleanLeakedLockFiles(displayNum):
         if os.path.isfile(lockFile):
             try:
                 os.remove(lockFile)
-            except:
+            except: # pragma: no cover - pathological case of ending up in race condition with Xvfb
                 pass
 
 def writeAndWait(text, proc, displayNum):
@@ -70,7 +65,7 @@ def runXvfb(logDir, extraArgs):
     ignoreSignals()
     signal.signal(signal.SIGUSR1, setReadyFlag)
     displayNum = getDisplayNumber()
-    logFile = os.path.join(logDir, "Xvfb." + gethostname() + "." + displayNum)
+    logFile = os.path.join(logDir, "Xvfb." + displayNum + "." + gethostname())
     startArgs = [ "Xvfb", "-ac" ] + extraArgs + [ "-audit", "2", ":" + displayNum ]
     proc = subprocess.Popen(startArgs, preexec_fn=ignoreSignals,
                             stdout=open(logFile, "w"), stderr=subprocess.STDOUT, stdin=open(os.devnull))

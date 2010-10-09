@@ -1,6 +1,6 @@
 
 import gtk, gobject, plugins, texttest_version, os, sys, glob
-from default.gtkgui import guiplugins, guiutils # from .. import guiplugins, guiutils when we drop Python 2.4 support
+from .. import guiplugins, guiutils
 from types import StringType
 
 # Show useful info about TextTest.
@@ -8,6 +8,12 @@ from types import StringType
 # to show pygtk/gtk/python versions in our dialog, so we create our own ...
 class AboutTextTest(guiplugins.ActionResultDialogGUI):
     website = "http://www.texttest.org"
+    def __init__(self, *args, **kw):
+        self.creditsButton = None
+        self.licenseButton = None
+        self.versionsButton = None
+        guiplugins.ActionResultDialogGUI.__init__(self, *args, **kw)
+        
     def getDialogTitle(self):
         return "About TextTest"
     def isActiveOnCurrent(self, *args):

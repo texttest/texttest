@@ -3,7 +3,7 @@
 Miscellaneous actions for generally housekeeping the state of the GUI
 """
 
-from default.gtkgui import guiplugins # from .. import guiplugins when we drop Python 2.4 support
+from .. import guiplugins
 
 class Quit(guiplugins.BasicActionGUI):
     def __init__(self, allApps, dynamic, inputOptions):
@@ -98,9 +98,9 @@ class RefreshAll(guiplugins.BasicActionGUI):
         self.performOnCurrent()
     def performOnCurrent(self):
         for suite in self.rootTestSuites:
-            self.notify("ActionProgress", "")
+            self.notify("ActionProgress")
             suite.app.setUpConfiguration()
-            self.notify("ActionProgress", "")
+            self.notify("ActionProgress")
             filters = suite.app.getFilterList(self.rootTestSuites)
             suite.refresh(filters)
 

@@ -1,4 +1,4 @@
-import os, performance, filecmp, string, plugins, shutil, logging
+import os, performance, knownbugs, filecmp, string, plugins, shutil, logging
 from ndict import seqdict
 from tempfile import mktemp
 from comparefile import FileComparison
@@ -41,16 +41,27 @@ class BaseTestComparison(plugins.TestState):
         else:
             return "regenerate"
 
+    def removeDefinitionFiles(self, test, tmpFiles):
+        for defFile in test.defFileStems("builtin") + test.defFileStems("default"):
+            if tmpFiles.has_key(defFile):
+                plugins.printWarning("A file was generated with stem '" + defFile + "'.\n" +
+                                     "This stem is intended to indicate a definition file and hence should not be generated.\n" +
+                                     "Please change the configuration so that the file is called something else,\n" +
+                                     "or adjust the config file setting 'definition_file_stems' accordingly.")
+                del tmpFiles[defFile]
+
     def makeComparisons(self, test, ignoreMissing=False):
         # Might have saved some new ones or removed some old ones in the meantime...
         test.refreshFiles()
         tmpFiles = self.makeStemDict(test.listTmpFiles())
+        if not ignoreMissing:
+            self.removeDefinitionFiles(test, tmpFiles)
         defFileCategory = self.definitionFileCategory(ignoreMissing)
         resultFiles, defFiles = test.listStandardFiles(allVersions=False, defFileCategory=defFileCategory)
         resultFilesToCompare = filter(self.shouldCompare, resultFiles + defFiles)
         stdFiles = self.makeStemDict(resultFilesToCompare)
         for tmpStem, tmpFile in tmpFiles.items():
-            self.notifyIfMainThread("ActionProgress", "")
+            self.notifyIfMainThread("ActionProgress")
             stdFile = stdFiles.get(tmpStem)
             self.diag.info("Comparing " + repr(stdFile) + "\nwith " + tmpFile) 
             comparison = self.createFileComparison(test, tmpStem, stdFile, tmpFile)
@@ -61,7 +72,7 @@ class BaseTestComparison(plugins.TestState):
 
     def makeMissingComparisons(self, test, stdFiles, tmpFiles):
         for stdStem, stdFile in stdFiles.items():
-            self.notifyIfMainThread("ActionProgress", "")
+            self.notifyIfMainThread("ActionProgress")
             if not tmpFiles.has_key(stdStem):
                 comparison = self.createFileComparison(test, stdStem, stdFile, None)
                 if comparison:
@@ -108,7 +119,7 @@ class TestComparison(BaseTestComparison):
         
     def categoryRepr(self):    
         if self.failedPrediction:
-            briefDescription, longDescription = self.categoryDescriptions[self.category]
+            longDescription = self.categoryDescriptions[self.category][1]
             return longDescription + " (" + self.failedPrediction.briefText + ")"
         else:
             return plugins.TestState.categoryRepr(self)
@@ -124,9 +135,6 @@ class TestComparison(BaseTestComparison):
     def __setstate__(self, state):
         self.__dict__ = state
         self.diag = logging.getLogger("TestComparison")
-        # If loaded from old pickle files, can get out of date objects...
-        if not hasattr(self, "missingResults"):
-            self.missingResults = []
 
     def updateAfterLoad(self, app=None, updatePaths=False, newTmpPath=None):
         pathsToChange = []
@@ -250,7 +258,7 @@ class TestComparison(BaseTestComparison):
                 # Don't care if performance is missing
                 return None
         else:
-            return FileComparison(test, stem, standardFile, tmpFile, testInProgress=0, observers=self.observers)
+            return FileComparison(test, stem, standardFile, tmpFile, testInProgress=0)
     def categorise(self):
         if self.failedPrediction:
             # Keep the category we had before
@@ -305,7 +313,7 @@ class TestComparison(BaseTestComparison):
         if versionString:
             fileEditDir += "." + versionString
         if os.path.isdir(tmpFileEditDir):
-            for root, dirs, files in os.walk(tmpFileEditDir):
+            for root, _, files in os.walk(tmpFileEditDir):
                 for file in sorted(files):
                     fullPath = os.path.join(root, file)
                     savePath = fullPath.replace(tmpFileEditDir, fileEditDir)
@@ -332,6 +340,7 @@ class TestComparison(BaseTestComparison):
             return resultList
         else:
             return filter(lambda comp: comp.stem in onlyStems, resultList)
+
     def updateStatus(self, test, compStr, versionString):
         testRepr = "Saving " + repr(test) + " : "
         if versionString != "":
@@ -339,13 +348,15 @@ class TestComparison(BaseTestComparison):
         else:
             versionRepr = ", no version"
         self.notifyIfMainThread("Status", testRepr + compStr + versionRepr)
-        self.notifyIfMainThread("ActionProgress", "")
-    def makeNewState(self, app, lifeCycleDest):
-        newState = TestComparison(self, app, "be " + lifeCycleDest)
+        self.notifyIfMainThread("ActionProgress")
+
+    def makeNewState(self, test, lifeCycleDest):
+        newState = TestComparison(self, test.app, "be " + lifeCycleDest)
         for comparison in self.allResults:
             newState.addComparison(comparison)
         newState.categorise()
-        return newState
+        return knownbugs.CheckForBugs().checkTest(test, newState)[0] or newState
+    
 
 # for back-compatibility, preserve old names
 performance.PerformanceTestComparison = TestComparison
@@ -358,14 +369,14 @@ class ProgressTestComparison(BaseTestComparison):
         else:
             self.runningState = previousInfo
     def createFileComparison(self, test, stem, standardFile, tmpFile):
-        return FileComparison(test, stem, standardFile, tmpFile, testInProgress=1, observers=self.observers)
+        return FileComparison(test, stem, standardFile, tmpFile, testInProgress=1)
     def categorise(self):
         self.briefText = self.runningState.briefText
         self.freeText = self.runningState.freeText + self.progressText()
     def progressText(self):
         perc = self.calculatePercentage()
         if perc is not None:
-            return "\nReckoned to be " + str(perc) + "% complete at " + plugins.localtime() + "."
+            return "\nReckoned to be " + str(perc) + "% complete by comparing total file sizes at " + plugins.localtime() + "."
         else:
             return ""
     def getSize(self, fileName):
@@ -426,7 +437,7 @@ class PrintObsoleteVersions(plugins.Action):
     def __call__(self, test):
         self.describe(test)
         compFiles = {}
-        resultFiles, defFiles = test.listStandardFiles(allVersions=True)
+        resultFiles = test.listStandardFiles(allVersions=True)[0]
         for file in resultFiles:
             stem = file.split(".")[0]
             compFile = self.filterFile(test, file)
@@ -439,12 +450,12 @@ class PrintObsoleteVersions(plugins.Action):
                     self.compareFiles(test, compFilesMatchingStem[index1], compFilesMatchingStem[index2])
                 os.remove(compFilesMatchingStem[index1][1])
         
-    def cmpFile(self, test, file):
+    def cmpFile(self, file):
         basename = os.path.basename(file)
         return mktemp(basename + "cmp")
     
     def filterFile(self, test, file):
-        newFile = self.cmpFile(test, file)
+        newFile = self.cmpFile(file)
         stem = os.path.basename(file).split(".")[0]
         from rundependent import FilterAction
         action = FilterAction()

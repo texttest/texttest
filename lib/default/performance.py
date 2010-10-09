@@ -1,5 +1,5 @@
 
-import os, string, plugins, sys, time
+import os, plugins, sys, time
 from comparefile import FileComparison
 
 # This module won't work without an external module creating a file called performance.app
@@ -37,7 +37,11 @@ def describePerformance(fileName):
     
     # Assume seconds
     perf = getPerformanceFromLine(line)
-    values = list(time.gmtime(perf)[2:6])
+    description = getTimeDescription(perf)
+    return line.replace(str(perf) + " sec.", description)
+    
+def getTimeDescription(seconds):
+    values = list(time.gmtime(seconds)[2:6])
     values[0] -= 1 # not actually using timedelta which doesn't support formatting...
     units = [ "day", "hour", "minute", "second" ]
     parts = []
@@ -49,7 +53,7 @@ def describePerformance(fileName):
         description = " and ".join(parts).replace(" and ", ", ", len(parts) - 2)
     else:
         description = "Less than 1 second"
-    return line.replace(str(perf) + " sec.", description)
+    return description
 
 
 def parseTimeExpression(timeExpression):
@@ -113,9 +117,12 @@ class PerformanceConfigSettings:
         
 
 class PerformanceFileComparison(FileComparison):
+    def __init__(self, *args, **kw):
+        self.perfComparison = None
+        FileComparison.__init__(self, *args, **kw)
+        
     def cacheDifferences(self, test, testInProgress):
         # Don't allow process count of 0, which screws things up...
-        self.perfComparison = None
         if self.stdFile and self.tmpFile:
             oldPerf = getPerformance(self.stdFile)
             # If we didn't understand the old performance, overwrite it and behave like it didn't exist
@@ -241,23 +248,66 @@ class TimeFilter(plugins.Filter):
                     self.adjustMinTime(parsedExpression[1] + 1) # We don't care about fractions of seconds ...
                 else:
                     self.adjustMinTime(parsedExpression[1])
+
     def adjustMinTime(self, newMinTime):
         if newMinTime > self.minTime:
             self.minTime = newMinTime
+
     def adjustMaxTime(self, newMaxTime):
         if newMaxTime < self.maxTime:
             self.maxTime = newMaxTime
+
     def acceptsTestCase(self, test):
         testPerformance = getTestPerformance(test)
         if testPerformance < 0:
-            return 1
+            return True
         return testPerformance >= self.minTime and testPerformance <= self.maxTime       
+
+
+class TimeGroupFilter(plugins.Filter):
+    def __init__(self, testCount, *args):
+        self.testCount = testCount
+
+    def makePerformanceDictionary(self, tests):
+        dict = {}
+        for test in tests:
+            testPerformance = getTestPerformance(test)
+            if testPerformance >= 0:
+                dict.setdefault(testPerformance, set()).add(test)
+        return dict
+
+    def refine(self, tests):
+        if self.testCount <= 0 or self.testCount >= len(tests):
+            return tests
+
+        testPerfDict = self.makePerformanceDictionary(tests)
+        perfs = testPerfDict.keys()
+        perfs.sort(self.comparePerformance)
+        newTests = []
+        for perf in perfs:
+            for test in testPerfDict.get(perf):
+                newTests.append(test)
+                if len(newTests) == self.testCount:
+                    return newTests
+        return newTests
+        
+class FastestFilter(TimeGroupFilter):
+    option = "fastest"
+    def comparePerformance(self, perf1, perf2):
+        return cmp(perf1, perf2)
+
+class SlowestFilter(TimeGroupFilter):
+    option = "slowest"    
+    def comparePerformance(self, perf1, perf2):
+        return cmp(perf2, perf1)
+
         
 class PerformanceStatistics(plugins.ScriptWithArgs):
     scriptDoc = "Prints a report on system resource usage per test. Can compare versions"
     printedTitle = False
     def __init__(self, args = []):
         optDict = self.parseArguments(args, [ "compv", "file" ])
+        self.settings = None
         self.compareVersion = optDict.get("compv")
         self.compareTotal = 0.0
         self.total = 0.0

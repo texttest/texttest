@@ -3,16 +3,18 @@
 The various ways to launch the dynamic GUI from the static GUI
 """
 
-import gtk, plugins, os, sys, shutil 
-from default.gtkgui import guiplugins # from .. import guiplugins, guiutils when we drop Python 2.4 support
+import gtk, plugins, os, sys
+from .. import guiplugins
 from copy import copy, deepcopy
 
-class RunningAction:
+# Runs the dynamic GUI, but not necessarily with all the options available from the configuration
+class BasicRunningAction:
     runNumber = 1
     def __init__(self, inputOptions):
         self.inputOptions = inputOptions
+        self.testCount = 0
         
-    def getGroupTabTitle(self):
+    def getTabTitle(self):
         return "Running"
 
     def messageAfterPerform(self):
@@ -34,10 +36,10 @@ class RunningAction:
         plugins.ensureDirectoryExists(writeDir)
         filterFile = self.getFilterFile(writeDir, filterFileOverride)
         ttOptions = runModeOptions + self.getTextTestOptions(filterFile, app, usecase)
-        guiplugins.guilog.info("Starting " + usecase + " run of TextTest with arguments " + repr(ttOptions))
+        self.diag.info("Starting " + usecase + " run of TextTest with arguments " + repr(ttOptions))
         logFile = os.path.join(writeDir, "output.log")
         errFile = os.path.join(writeDir, "errors.log")
-        RunningAction.runNumber += 1
+        BasicRunningAction.runNumber += 1
         description = "Dynamic GUI started at " + plugins.localtime()
         cmdArgs = self.getInterpreterArgs() + [ sys.argv[0] ] + ttOptions
         env = self.getNewUseCaseEnvironment(usecase)
@@ -86,7 +88,7 @@ class RunningAction:
         interpreterArg = os.getenv("TEXTTEST_DYNAMIC_GUI_INTERPRETER", "") # Alternative interpreter for the dynamic GUI : mostly useful for coverage / testing
         if interpreterArg:
             return plugins.splitcmd(interpreterArg.replace("ttpython", sys.executable))
-        else:
+        else: # pragma: no cover - cannot test without PyUseCase on dynamic GUI
             return [ sys.executable ]
 
     def getOptionGroups(self):
@@ -105,7 +107,7 @@ class RunningAction:
             ttOptions += [ "-fd", tmpFilterDir ]
         return ttOptions
 
-    def getCommandLineKeys(self, usecase):
+    def getCommandLineKeys(self, *args):
         # assume everything by default
         return []
 
@@ -124,9 +126,13 @@ class RunningAction:
     def getTmpFilterDir(self, app):
         return os.path.join(app.writeDirectory, "temporary_filter_files")
 
+    def getAppIdentifier(self, app):
+        return app.name + app.versionSuffix()
+        
     def getCmdlineOptionForApps(self):
-        appNames = set([ app.name for app in self.currAppSelection ])
-        return [ "-a", ",".join(sorted(list(appNames))) ]
+        apps = sorted(self.currAppSelection, key=self.validApps.index)
+        appNames = map(self.getAppIdentifier, apps)
+        return [ "-a", ",".join(appNames) ]
 
     def checkTestRun(self, errFile, testSel, filterFile, usecase):
         if self.checkErrorFile(errFile, testSel, usecase):
@@ -166,10 +172,10 @@ class RunningAction:
         pass
 
 
-class ReconnectToTests(RunningAction,guiplugins.ActionDialogGUI):
+class ReconnectToTests(BasicRunningAction,guiplugins.ActionDialogGUI):
     def __init__(self, allApps, dynamic, inputOptions):
         guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic)
-        RunningAction.__init__(self, inputOptions)
+        BasicRunningAction.__init__(self, inputOptions)
         self.addOption("v", "Version to reconnect to")
         self.addOption("reconnect", "Temporary result directory", os.getenv("TEXTTEST_TMP", ""), selectDir=True, description="Specify a directory containing temporary texttest results. The reconnection will use a random subdirectory matching the version used.")
         appGroup = plugins.OptionGroup("Invisible")
@@ -188,30 +194,73 @@ class ReconnectToTests(RunningAction,guiplugins.ActionDialogGUI):
         return "reconnect"
     def performOnCurrent(self):
         self.startTextTestProcess(self.getUseCaseName(), [ "-g" ] + self.getVanillaOption())
-    
+    def getAppIdentifier(self, app):
+        # Don't send version data, we have our own field with that info and it has a slightly different meaning
+        return app.name
 
-class RunTests(RunningAction,guiplugins.ActionTabGUI):
-    optionGroups = []
-    def __init__(self, allApps, dynamic, inputOptions):
-        guiplugins.ActionTabGUI.__init__(self, allApps)
-        RunningAction.__init__(self, inputOptions)
-        self.optionGroups.append(self.optionGroup)
-        self.addApplicationOptions(allApps, self.optionGroup, inputOptions)
+# base class for RunTests and RerunTests, i.e. all the options are available
+class RunningAction(BasicRunningAction):
+    originalVersion = ""
+    def __init__(self, allApps, inputOptions):
+        BasicRunningAction.__init__(self, inputOptions)
+        self.optionGroups = []
+        self.disablingInfo = {}
+        self.disableWidgets = {}
+        for groupName, disablingOption, disablingOptionValue in self.getGroupNames(allApps):
+            group = plugins.OptionGroup(groupName)
+            self.addApplicationOptions(allApps, group, inputOptions)
+            self.optionGroups.append(group)
+            if disablingOption:
+                self.disablingInfo[self.getOption(disablingOption)] = disablingOptionValue, group
+            
+        vOption = self.getOption("v")
+        if vOption:
+            RunningAction.originalVersion = vOption.getValue()
 
-    def _getTitle(self):
-        return "_Run"
-    def _getStockId(self):
-        return "execute"
-    def getTooltip(self):
-        return "Run selected tests"
+    def getGroupNames(self, allApps):
+        if len(allApps) > 0:
+            return allApps[0].getAllRunningGroupNames(allApps)
+        else:
+            configObject = self.makeDefaultConfigObject(self.inputOptions)
+            return configObject.getAllRunningGroupNames(allApps)
+
+    def createCheckBox(self, switch):
+        widget = guiplugins.OptionGroupGUI.createCheckBox(self, switch)
+        self.storeSwitch(switch, [ widget ])
+        return widget
+
+    def createRadioButtons(self, switch, *args):
+        buttons = guiplugins.OptionGroupGUI.createRadioButtons(self, switch, *args)
+        self.storeSwitch(switch, buttons)
+        return buttons
+
+    def storeSwitch(self, switch, widgets):
+        if self.disablingInfo.has_key(switch):
+            disablingOptionValue, group = self.disablingInfo[switch]
+            self.disableWidgets[widgets[disablingOptionValue]] = switch, disablingOptionValue, group
+            
+    def getOption(self, optName):
+        for group in self.optionGroups:
+            opt = group.getOption(optName)
+            if opt:
+                return opt
+
     def getOptionGroups(self):
         return self.optionGroups
+
     def getCountMultiplier(self):
         return self.getCopyCount() * self.getVersionCount()
+
     def getCopyCount(self):
-        return int(self.optionGroups[0].getOptionValue("cp"))
+        return self.getOption("cp").getValue()
+
     def getVersionCount(self):
-        return self.optionGroups[0].getOptionValue("v").count(",") + 1
+        versionString = self.getOption("v").getValue()
+        if versionString.startswith("<default>"):
+            return 1
+        else:
+            return versionString.count(",") + 1
+
     def performedDescription(self):
         timesToRun = self.getCopyCount()
         numberOfTests = self.testCount
@@ -222,108 +271,196 @@ class RunTests(RunningAction,guiplugins.ActionTabGUI):
                 return "Started " + str(timesToRun) + " copies of"
         else:
             return "Started"
-    def getUseCaseName(self):
-        return "dynamic"
+
     def getMultipleTestWarning(self):
         app = self.currTestSelection[0].app
-        for group in self.optionGroups:
+        for group in self.getOptionGroups():
             for switchName, desc in app.getInteractiveReplayOptions():
                 if group.getSwitchValue(switchName, False):
                     return "run " + self.describeTests() + " with " + desc + " replay enabled"
 
-class RunTestsBasic(RunTests):
-    def getTabTitle(self):
-        return "Basic"
+    def getConfirmationMessage(self):
+        runVersion = self.getOption("v").getValue()
+        if self.originalVersion and self.originalVersion not in runVersion:
+            return "You have tried to run a version ('" + runVersion + \
+                   "') which is not based on the version you started with ('" + self.originalVersion + "').\n" + \
+                   "This will result in an attempt to amalgamate the versions, i.e. to run version '" + \
+                   self.originalVersion + "." + runVersion + "'.\n" + \
+                   "If this isn't what you want, you will need to restart the static GUI with a different '-v' flag.\n\n" + \
+                   "Are you sure you want to continue?"
+        else:
+            return BasicRunningAction.getConfirmationMessage(self)
+
+    def getLowerBoundForSpinButtons(self):
+        return 1
 
     def checkValid(self, app):
         if app.getConfigValue("use_case_record_mode") == "disabled" and app not in self.validApps:
-            switch = self.optionGroup.getOption("actrep")
+            switch = self.getOption("actrep")
             if switch:
-                for child in self.vbox.get_children():
-                    if hasattr(child, "get_label") and child.get_label() == switch.name:
-                        child.hide()
-        return RunTests.checkValid(self, app)
+                self.hideChildWithLabel(self.widget, switch.name)
+        return guiplugins.ActionTabGUI.checkValid(self, app)
+
+    def hideChildWithLabel(self, widget, label):
+        if hasattr(widget, "get_label") and widget.get_label() == label:
+            widget.hide()
+        elif hasattr(widget, "get_children"):
+            for child in widget.get_children():
+                self.hideChildWithLabel(child, label)
+
+    def createNotebook(self):
+        notebook = gtk.Notebook()
+        notebook.set_name("sub-notebook for running")
+        tabNames = [ "Basic", "Advanced" ]
+        frames = []
+        for group in self.optionGroups:
+            if group.name in tabNames:
+                label = gtk.Label(group.name)
+                tab = self.createTab(group, frames)
+                notebook.append_page(tab, label)
+            else:
+                frames.append(self.createFrame(group, group.name))
+        self.connectDisablingSwitches()
+        notebook.show_all()
+        self.widget = notebook
+        return notebook
+
+    def createTab(self, group, frames):
+        tabBox = gtk.VBox()
+        if frames:
+            frames.append(self.createFrame(group, "Miscellaneous"))
+            for frame in frames:
+                tabBox.pack_start(frame, fill=False, expand=False, padding=8)
+        else:
+            self.fillVBox(tabBox, group)
+        if isinstance(self, guiplugins.ActionTabGUI):
+            # In a tab, we need to duplicate the buttons for each subtab
+            # In a dialog we should not do this
+            self.createButtons(tabBox)
+        widget = self.addScrollBars(tabBox, hpolicy=gtk.POLICY_AUTOMATIC)
+        widget.set_name(group.name + " Tab")
+        return widget
+
+    def updateSensitivity(self, widget, data):
+        switch, disablingOptionValue, group = data
+        sensitive = switch.getValue() != disablingOptionValue
+        self.setGroupSensitivity(group, sensitive, ignoreWidget=widget)
+
+    def connectDisablingSwitches(self):
+        for widget, data in self.disableWidgets.items():
+            self.updateSensitivity(widget, data)
+            widget.connect("toggled", self.updateSensitivity, data)
+        self.disableWidgets = {} # not needed any more
+
+    def notifyReset(self, *args):
+        for optionGroup in self.optionGroups:
+            optionGroup.reset()
+
+    def _getStockId(self):
+        return "execute"
 
 
-class RunTestsAdvanced(RunTests):
-    def getTabTitle(self):
-        return "Advanced"
+class RunTests(RunningAction,guiplugins.ActionTabGUI):
+    def __init__(self, allApps, dummy, inputOptions):
+        guiplugins.ActionTabGUI.__init__(self, allApps)
+        RunningAction.__init__(self, allApps, inputOptions)
+        
+    def _getTitle(self):
+        return "_Run"
 
-class RerunTests(RunningAction,guiplugins.ActionGUI):
-    def __init__(self, allApps, dynamic, inputOptions):
+    def getTooltip(self):
+        return "Run selected tests"
+
+    def getUseCaseName(self):
+        return "dynamic"
+
+    def createView(self):
+        return self.createNotebook()
+
+
+class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
+    def __init__(self, allApps, dummy, inputOptions):
         self.reconnecting = inputOptions.has_key("reconnect")
-        guiplugins.ActionGUI.__init__(self, allApps)
-        RunningAction.__init__(self, inputOptions)
+        guiplugins.ActionDialogGUI.__init__(self, allApps)
+        RunningAction.__init__(self, allApps, inputOptions)
 
     def _getTitle(self):
         return "_Rerun"
-    def _getStockId(self):
-        return "execute"
+
     def getTooltip(self):
         return "Rerun selected tests"
-    def performedDescription(self):
-        return "Started"
+
     def getUseCaseName(self):
         return "rerun"
-    def getOptionGroups(self):
-        return []
+
     def killOnTermination(self):
         return False # don't want rerun GUIs to disturb each other like this
+
     def getTmpFilterDir(self, app):
         return "" # don't want selections returned here, send them to the static GUI
 
-    def isValidForApp(self, app):
+    def isValidForApp(self, *args):
         return not self.reconnecting
     
-    def getTextTestOptions(self, *args):
-        ttOptions = RunningAction.getTextTestOptions(self, *args)
-        ignoreInput = [ "a", "cp", "count", "f", "g" ]
-        for key, value in self.inputOptions.items():
-            if key not in ignoreInput:
-                ttOptions.append("-" + key)
-                if value is not None:
-                    ttOptions.append(value)
-        return ttOptions
-
     def getLogRootDirectory(self, app):
         if self.inputOptions.has_key("f"):
             logRootDir = os.path.dirname(self.inputOptions["f"])
             if os.path.basename(logRootDir).startswith("dynamic_run"):
                 return logRootDir
-        return RunningAction.getLogRootDirectory(self, app)
+        return BasicRunningAction.getLogRootDirectory(self, app)
+
+    def getAppIdentifier(self, app):
+        parts = filter(lambda part: not part.startswith("copy_"), [ app.name ] + app.versions)
+        return ".".join(parts)
 
     def checkTestRun(self, errFile, testSel, filterFile, usecase):
         # Don't do anything with the files, but do produce popups on failures and notify when complete
         self.checkErrorFile(errFile, testSel, usecase)
         testSel[0].notify("CloseDynamic", usecase)
 
+    def fillVBox(self, vbox, optionGroup):
+        if optionGroup is self.optionGroup:
+            notebook = self.createNotebook()
+            vbox.pack_start(notebook)
+            return None, None # no file chooser info
+        else:
+            return guiplugins.ActionDialogGUI.fillVBox(self, vbox, optionGroup)
+
+    def getSizeAsWindowFraction(self):
+        return 0.8, 0.9
 
 
-class RecordTest(RunningAction,guiplugins.ActionTabGUI):
+class RecordTest(BasicRunningAction,guiplugins.ActionDialogGUI):
     def __init__(self, allApps, dynamic, inputOptions):
-        guiplugins.ActionTabGUI.__init__(self, allApps, dynamic)
-        RunningAction.__init__(self, inputOptions)
-        self.currentApp = None
+        guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic)
+        BasicRunningAction.__init__(self, inputOptions)
         self.recordTime = None
-        defaultVersion, defaultCheckout = "", ""
+        self.currentApp = None
         if len(allApps) > 0:
             self.currentApp = allApps[0]
+        self.addOptions()
+        self.addSwitches()
+
+    def addOptions(self):
+        defaultVersion, defaultCheckout = "", ""
+        if self.currentApp:
             defaultVersion = self.currentApp.getFullVersion()
             defaultCheckout = self.currentApp.checkout
+
         self.addOption("v", "Version to record", defaultVersion)
         self.addOption("c", "Checkout to use for recording", defaultCheckout)
-        self.addSwitch("rectraffic", "Also record command-line or client-server traffic", 1)
-        self.addSwitch("rep", "Automatically replay test after recording it", 1)
-        self.addSwitch("repgui", options = ["Auto-replay invisible", "Auto-replay in dynamic GUI"])
+
+    def addSwitches(self):
+        if self.currentApp and self.currentApp.usesTrafficMechanism():
+            self.currentApp.addTrafficSwitch(self.optionGroup, value=1) # record new by default
+        self.addSwitch("rep", "Automatically replay test after recording it", 1,
+                       options = [ "Disabled", "In background", "Using dynamic GUI" ])
 
     def correctTestClass(self):
         return "test-case"
 
     def _getStockId(self):
         return "media-record"
-
-    def getTabTitle(self):
-        return "Recording"
 
     def messageAfterPerform(self):
         return "Started record session for " + self.describeTests()
@@ -334,14 +471,14 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
 
     def shouldShowCurrent(self, *args):
         # override the default so it's disabled if there are no apps
-        return len(self.validApps) > 0 and guiplugins.ActionTabGUI.shouldShowCurrent(self, *args) 
+        return len(self.validApps) > 0 and guiplugins.ActionDialogGUI.shouldShowCurrent(self, *args) 
 
     def isValidForApp(self, app):
         return app.getConfigValue("use_case_record_mode") != "disabled" and \
                app.getConfigValue("use_case_recorder") != "none"
 
     def checkValid(self, app):
-        guiplugins.ActionTabGUI.checkValid(self, app)
+        guiplugins.ActionDialogGUI.checkValid(self, app)
         if self.widget and len(self.validApps) == 0:
             self.widget.hide()
 
@@ -383,7 +520,8 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
         test = testSel[0]
         if usecase == "record":
             changedUseCaseVersion = self.getChangedUseCaseVersion(test)
-            if changedUseCaseVersion is not None and self.optionGroup.getSwitchValue("rep"):
+            replay = self.optionGroup.getSwitchValue("rep")
+            if changedUseCaseVersion is not None and replay:
                 replayOptions = self.getVanillaOption() + self.getReplayRunModeOptions(changedUseCaseVersion)
                 self.startTextTestProcess("replay", replayOptions, testSel, filterFile)
                 message = "Recording completed for " + repr(test) + \
@@ -401,7 +539,7 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
         return keys
 
     def getReplayRunModeOptions(self, overwriteVersion):
-        if self.optionGroup.getSwitchValue("repgui"):
+        if self.optionGroup.getSwitchValue("rep") == 2:
             return [ "-autoreplay", "-g" ]
         else:
             return [ "-autoreplay", "-o", overwriteVersion ]
@@ -409,10 +547,11 @@ class RecordTest(RunningAction,guiplugins.ActionTabGUI):
     def _getTitle(self):
         return "Record _Use-Case"
 
-class RunScriptAction(RunningAction,guiplugins.ActionDialogGUI):
+
+class RunScriptAction(BasicRunningAction,guiplugins.ActionDialogGUI):
     def __init__(self, allApps, dynamic, inputOptions):
         guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic)
-        RunningAction.__init__(self, inputOptions)
+        BasicRunningAction.__init__(self, inputOptions)
         
     def getUseCaseName(self):
         return "script"
@@ -460,7 +599,7 @@ class TestFileFiltering(guiplugins.ActionResultDialogGUI):
         return "Filtered contents of " + os.path.basename(self.currFileSelection[0][0])
 
     def isActiveOnCurrent(self, *args):
-        return guiplugins.ActionGUI.isActiveOnCurrent(self) and len(self.currFileSelection) == 1
+        return guiplugins.ActionResultDialogGUI.isActiveOnCurrent(self) and len(self.currFileSelection) == 1
 
     def getVersion(self, test, fileName):
         fileVersions = set(fileName.split(".")[1:])
@@ -498,4 +637,4 @@ def getInteractiveActionClasses(dynamic):
     if dynamic:
         return [ RerunTests ]
     else:
-        return [ RunTestsBasic, RunTestsAdvanced, RecordTest, ReconnectToTests, ReplaceText, TestFileFiltering ]
+        return [ RunTests, RecordTest, ReconnectToTests, ReplaceText, TestFileFiltering ]

@@ -8,10 +8,11 @@ from glob import glob
 
 # Class to allocate unique names to tests for script identification and cross process communication
 class UniqueNameFinder(plugins.Responder):
-    def __init__(self, optionMap, allApps):
+    def __init__(self, optionMap, *args):
         plugins.Responder.__init__(self, optionMap)
         self.name2test = {}
         self.diag = logging.getLogger("Unique Names")
+        
     def notifyAdd(self, test, *args, **kw):
         if self.name2test.has_key(test.name):
             oldTest = self.name2test[test.name]
@@ -54,8 +55,9 @@ class UniqueNameFinder(plugins.Responder):
         elif oldTest.app.getFullVersion() != newTest.app.getFullVersion():
             self.storeBothWays(oldTest.name + " version " + self.getVersionName(oldTest), oldTest)
             self.storeBothWays(newTest.name + " version " + self.getVersionName(newTest), newTest)
-        else: #pragma: no cover - this statement should be unreachable, is there for completeness
-            raise plugins.TextTestError, "Could not find unique name for tests with name " + oldTest.name
+        else:
+            # Overwrite the old with the new if they can't be distinguished
+            self.storeBothWays(newTest.name + newParentId, newTest)
     def getVersionName(self, test):
         version = test.app.getFullVersion()
         if len(version):
@@ -142,7 +144,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         self.diag.info("Using test suite at " + repr(roots))
         subDirs = []
         for root in roots:
-            for f in os.listdir(root):
+            for f in sorted(os.listdir(root)):
                 path = os.path.join(root, f)
                 if os.path.isdir(path):
                     subDirs.append(path)
@@ -162,7 +164,8 @@ class TextTest(plugins.Responder, plugins.Observable):
         raisedError = False
         selectedAppDict = self.inputOptions.findSelectedAppNames()
         for dir in searchDirs:
-            subRaisedError, apps = self.findAppsUnder(dir, selectedAppDict)
+            ignoreNames = [ app.name for app in appList ]
+            subRaisedError, apps = self.findAppsUnder(dir, selectedAppDict, ignoreNames)
             appList += apps
             raisedError |= subRaisedError
 
@@ -183,7 +186,7 @@ class TextTest(plugins.Responder, plugins.Observable):
 
     def compareApps(self, app1, app2):
         return cmp(app1.name, app2.name)
-    def findAppsUnder(self, dirName, selectedAppDict):
+    def findAppsUnder(self, dirName, selectedAppDict, ignoreNames):
         appList = []
         raisedError = False
         self.diag.info("Selecting apps in " + dirName + " according to dictionary :" + repr(selectedAppDict))
@@ -197,7 +200,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             appName = components[1]
             
             # Ignore emacs backup files and stuff we haven't selected
-            if appName.endswith("~") or (len(selectedAppDict) and not selectedAppDict.has_key(appName)):
+            if appName.endswith("~") or (len(selectedAppDict) and not selectedAppDict.has_key(appName)) or appName in ignoreNames:
                 continue
 
             self.diag.info("Building apps from " + f)
@@ -205,8 +208,9 @@ class TextTest(plugins.Responder, plugins.Observable):
             if selectedAppDict.has_key(appName):
                 versionList = selectedAppDict[appName]
             extraVersionsDuplicating = []
-            for version in versionList:
-                app, currExtra = self.addApplication(appName, dircache, version, versionList)
+            for versionStr in versionList:
+                appVersions = filter(len, versionStr.split(".")) # remove empty versions
+                app, currExtra = self.addApplication(appName, dircache, appVersions, versionList)
                 if app:
                     appList.append(app)
                     extraVersionsDuplicating += currExtra
@@ -215,27 +219,30 @@ class TextTest(plugins.Responder, plugins.Observable):
             for toRemove in filter(lambda app: app.getFullVersion() in extraVersionsDuplicating, appList):
                 appList.remove(toRemove)
         return raisedError, appList
-    def createApplication(self, appName, dircache, versionStr):
+    
+    def createApplication(self, appName, dircache, versions):
         try:
-            versions = filter(len, versionStr.split(".")) # remove empty versions
             return testmodel.Application(appName, dircache, versions, self.inputOptions)
         except (testmodel.BadConfigError, plugins.TextTestError), e:
-            sys.stderr.write("Could not use application '" + appName +  "' - " + str(e) + "\n")
-    def addApplication(self, appName, dircache, version, allVersions):
-        app = self.createApplication(appName, dircache, version)
+            sys.stderr.write("Unable to load application from file 'config." + appName +  "' - " + str(e) + ".\n")
+
+    def addApplication(self, appName, dircache, appVersions, allVersions=[]):
+        app = self.createApplication(appName, dircache, appVersions)
         if not app:
             return None, []
         extraVersionsDuplicating = []
         for extraVersion in app.getExtraVersions():
             if extraVersion in allVersions:
                 extraVersionsDuplicating.append(extraVersion)
-            aggVersion = extraVersion
-            if len(version) > 0:
-                aggVersion = version + "." + extraVersion
-            extraApp = self.createApplication(appName, dircache, aggVersion)
+            extraApp = self.createApplication(appName, dircache, appVersions + extraVersion.split("."))
             if extraApp:
+                # Autogenerated extra versions are marked unsaveable on the parent,
+                # obviously needs transferring to the extraApp here
+                if extraVersion in app.getConfigValue("unsaveable_version"):
+                    extraApp.addConfigEntry("unsaveable_version", extraVersion)
                 app.extras.append(extraApp)
         return app, extraVersionsDuplicating
+
     def getAllConfigObjects(self, allApps):
         if len(allApps) > 0:
             return allApps
@@ -281,9 +288,7 @@ class TextTest(plugins.Responder, plugins.Observable):
                 except plugins.TextTestError, e:
                     sys.stderr.write(partApp.rejectionMessage(str(e)))
                     raisedError = True
-                except KeyboardInterrupt:
-                    raise
-                except:  
+                except Exception:  
                     sys.stderr.write("Error creating test suite for " + partApp.description() + " :\n")
                     plugins.printException()
             fullMsg = "".join(warningMessages)
@@ -367,8 +372,7 @@ class TextTest(plugins.Responder, plugins.Observable):
                 return sys.stderr.write(str(e) + "\n")
             
             # Set the signal handlers to use when running, if we actually plan to do any
-            if not self.ignoreAllExecutables():
-                self.setSignalHandlers(self.handleSignal)
+            self.setSignalHandlers(self.handleSignal)
         
             self.runThreads()
 
@@ -399,7 +403,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             if app.name == appName and app.versions == versions:
                 return testSuite
 
-        newApp = testmodel.Application(appName, self.makeDirectoryCache(appName), versions, self.inputOptions)
+        newApp = self.addApplication(appName, self.makeDirectoryCache(appName), versions)[0]
         return self.createEmptySuite(newApp)
 
     def createEmptySuite(self, newApp):
@@ -438,8 +442,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         mainThreadRunner = filter(lambda x: x.canBeMainThread(), allRunners)[0]
         allRunners.remove(mainThreadRunner)
         return mainThreadRunner, allRunners
-    def ignoreAllExecutables(self):
-        return reduce(operator.and_, (app.ignoreExecutable() for app in self.appSuites.keys()), True)
+
     def runThreads(self):
         # Run the first one as the main thread and the rest in subthreads
         # Make sure all of them are finished before we stop
@@ -456,6 +459,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             mainThreadRunner.run()
             
         self.waitForThreads(allThreads)
+
     def waitForThreads(self, allThreads):
         # Need to wait for the threads to terminate in a way that allows signals to be
         # caught. thread.join doesn't do this. signal.pause seems like a good idea but
@@ -470,8 +474,10 @@ class TextTest(plugins.Responder, plugins.Observable):
         while len(currThreads) > 0:
             sleep(0.5)
             currThreads = self.aliveThreads(currThreads)
+
     def aliveThreads(self, threads):
         return filter(lambda thread: thread.isAlive(), threads)
+
     def getSignals(self):
         if hasattr(signal, "SIGUSR1"):
             # Signals used on UNIX to signify running out of CPU time, wallclock time etc.
@@ -479,16 +485,21 @@ class TextTest(plugins.Responder, plugins.Observable):
         else:
             # Windows, which doesn't do signals
             return []
+
     def setSignalHandlers(self, handler):
         for sig in self.getSignals():
             signal.signal(sig, handler)
+
     def handleSignal(self, sig, *args):
         # Don't respond to the same signal more than once!
         signal.signal(sig, signal.SIG_IGN)
         signalText = self.getSignalText(sig)
         self.writeTermMessage(signalText)
-        self.notify("KillProcesses", sig)
+        self.notify("Quit", sig)
+        if len(self.appSuites) > 0: # If the above succeeds in quitting they will be reset
+            self.notify("KillProcesses", sig)
         return signalText
+    
     def handleSignalWhileStarting(self, sig, *args):
         signalText = self.handleSignal(sig)
         raise KeyboardInterrupt, signalText
@@ -499,6 +510,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             message += " (" + signalText + ")"
         print message
         sys.stdout.flush() # Try not to lose log file information...
+
     def getSignalText(self, sig):
         if sig == signal.SIGUSR1:
             return "RUNLIMIT1"

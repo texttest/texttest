@@ -1,7 +1,6 @@
 
-import optparse, os, stat, sys, logging, logging.config, shutil, socket, subprocess, types
+import optparse, os, stat, sys, logging, logging.config, shutil, socket, subprocess, types, threading, time
 from SocketServer import TCPServer, StreamRequestHandler
-from threading import Thread, Lock
 from copy import copy
 
 install_root = os.path.dirname(os.path.dirname(os.path.normpath(os.path.abspath(sys.argv[0]))))
@@ -31,14 +30,14 @@ react to the above module to repoint where it sends socket interactions"""
                       help="When monitoring which files have been edited by a program, ignore files and directories with the given names")
     parser.add_option("-p", "--replay", 
                       help="replay traffic recorded in FILE.", metavar="FILE")
+    parser.add_option("-I", "--replay-items", 
+                      help="attempt replay only items in ITEMS, record the rest", metavar="ITEMS")
     parser.add_option("-l", "--logdir",
                       help="Log diagnostics to LOGDIR", metavar="LOGDIR")
     parser.add_option("-f", "--replay-file-edits", 
                       help="restore edited files referred to in replayed file from DIR.", metavar="DIR")
     parser.add_option("-m", "--python-module-intercepts", 
                       help="Python modules whose objects should be stored locally rather than returned as they are", metavar="MODULES")
-    parser.add_option("-A", "--python-module-attributes", 
-                      help="For the intercepted modules listed, only intercept the attributes listed", metavar="ATTRS")
     parser.add_option("-r", "--record", 
                       help="record traffic to FILE.", metavar="FILE")
     parser.add_option("-F", "--record-file-edits", 
@@ -65,7 +64,7 @@ class TrafficServer(TCPServer):
         if options.ignore_edits:
             self.filesToIgnore = options.ignore_edits.split(",")
         self.recordFileHandler = RecordFileHandler(options.record)
-        self.replayInfo = ReplayInfo(options.replay)
+        self.replayInfo = ReplayInfo(options.replay, options.replay_items)
         self.requestCount = 0
         self.diag = logging.getLogger("Traffic Server")
         self.topLevelForEdit = [] # contains only paths explicitly given. Always present.
@@ -81,6 +80,11 @@ class TrafficServer(TCPServer):
         self.diag.info("Starting traffic server")
         while not self.terminate:
             self.handle_request()
+        # Join all remaining request threads so they don't
+        # execute after Python interpreter has started to shut itself down.
+        for t in threading.enumerate():
+            if t.name == "request":
+                t.join()
         self.diag.info("Shut down traffic server")
             
     def shutdown(self):
@@ -111,8 +115,8 @@ class TrafficServer(TCPServer):
         self.requestCount += 1
         if self.useThreads:
             """Start a new thread to process the request."""
-            t = Thread(target = self.process_request_thread,
-                       args = (request, client_address, self.requestCount))
+            t = threading.Thread(target = self.process_request_thread, name="request",
+                                 args = (request, client_address, self.requestCount))
             t.start()
         else:
             self.process_request_thread(request, client_address, self.requestCount)
@@ -154,46 +158,48 @@ class TrafficServer(TCPServer):
             # Always move them to the beginning, most recent edits are most relevant
             self.topLevelForEdit.insert(0, file)
 
-            # edit times are only interesting when recording
-            if not self.replayInfo.isActive():
+            # edit times aren't interesting when doing pure replay
+            if not self.replayInfo.isActiveForAll():
                 for subPath in self.findFilesAndLinks(file):                
                     modTime, modSize = self.getLatestModification(subPath)
                     self.fileEditData[subPath] = modTime, modSize
                     self.diag.info("Adding possible sub-path edit for " + subPath + " with mod time " +
-                                   plugins.localtime(seconds=modTime) + " and size " + str(modSize))
+                                   time.strftime(plugins.datetimeFormat, time.localtime(modTime)) + " and size " + str(modSize))
         return len(allEdits) > 0
     
     def process(self, traffic, reqNo):
-        if not self.replayInfo.isActive():
+        if not self.replayInfo.isActiveFor(traffic):
             # If we're recording, check for file changes before we do
             # Must do this before as they may be a side effect of whatever it is we're processing
             for fileTraffic in self.getLatestFileEdits():
                 self._process(fileTraffic, reqNo)
+
         self._process(traffic, reqNo)
-        self.recordFileHandler.requestComplete(reqNo)
         self.hasAsynchronousEdits |= traffic.makesAsynchronousEdits()
+        self.recordFileHandler.requestComplete(reqNo)
         if not self.hasAsynchronousEdits:
             # Unless we've marked it as asynchronous we start again for the next traffic.
             self.topLevelForEdit = []
             self.fileEditData = seqdict()
         
     def _process(self, traffic, reqNo):
-        self.diag.info("Processing traffic " + str(traffic.__class__))
+        self.diag.info("Processing traffic " + traffic.__class__.__name__)
         hasFileEdits = self.addPossibleFileEdits(traffic)
         responses = self.getResponses(traffic, hasFileEdits)
         shouldRecord = not traffic.enquiryOnly(responses)
         if shouldRecord:
             traffic.record(self.recordFileHandler, reqNo)
         for response in responses:
-            self.diag.info("Providing response " + str(response.__class__))
+            self.diag.info("Response of type " + response.__class__.__name__ + " with text " + repr(response.text))
             if shouldRecord:
                 response.record(self.recordFileHandler, reqNo)
             for chainResponse in response.forwardToDestination():
                 self._process(chainResponse, reqNo)
-            self.diag.info("Completed response " + str(response.__class__))            
+            self.diag.info("Completed response of type " + response.__class__.__name__)            
 
     def getResponses(self, traffic, hasFileEdits):
-        if self.replayInfo.isActive() and traffic.shouldIntercept():
+        if self.replayInfo.isActiveFor(traffic):
+            self.diag.info("Replay active for current command")
             replayedResponses = []
             filesMatched = []
             for responseClass, text in self.replayInfo.readReplayResponses(traffic):
@@ -227,6 +233,8 @@ class TrafficServer(TCPServer):
                 if matchScore > bestScore:
                     bestMatch, bestScore = editedFile, matchScore
 
+        if bestMatch and bestMatch.startswith("/cygdrive"): # on Windows, paths may be referred to by cygwin path, handle this
+            bestMatch = bestMatch[10] + ":" + bestMatch[11:]
         return bestMatch
 
     def getFileMatchScore(self, givenName, actualName):
@@ -248,9 +256,10 @@ class TrafficServer(TCPServer):
             storedFile, fileType = FileEditTraffic.getFileWithType(fileName)
             if storedFile:
                 editedFile = self.getFileBeingEdited(fileName, fileType, filesMatched)
-                self.diag.info("File being edited for '" + fileName + "' : will replace " + str(editedFile) + " with " + str(storedFile))
-                changedPaths = self.findFilesAndLinks(storedFile)
-                return FileEditTraffic(fileName, editedFile, storedFile, changedPaths, reproduce=True)
+                if editedFile:
+                    self.diag.info("File being edited for '" + fileName + "' : will replace " + str(editedFile) + " with " + str(storedFile))
+                    changedPaths = self.findFilesAndLinks(storedFile)
+                    return FileEditTraffic(fileName, editedFile, storedFile, changedPaths, reproduce=True)
         else:
             return responseClass(text, traffic.responseFile)
 
@@ -303,6 +312,9 @@ class Traffic(object):
     def hasInfo(self):
         return len(self.text) > 0
 
+    def isMarkedForReplay(self, replayItems):
+        return True # Some things can't be disabled and hence can't be added on piecemeal afterwards
+
     def getDescription(self):
         return self.direction + self.typeId + ":" + self.text
 
@@ -314,9 +326,6 @@ class Traffic(object):
     
     def enquiryOnly(self, responses=[]):
         return False
-
-    def shouldIntercept(self):
-        return True
     
     def write(self, message):
         if self.responseFile:
@@ -484,9 +493,8 @@ class ClientSocketTraffic(Traffic):
                 sys.stderr.write("WARNING: Server process reset the connection while TextTest's 'fake client' was trying to read a response from it!\n")
                 sys.stderr.write("(while running test at " + CommandLineTraffic.currentTestPath + ")\n")
                 sock.close()
-                return []
-        else:
-            return [] # client is alone, nowhere to forward
+        return []
+
 
 class ServerTraffic(Traffic):
     typeId = "SRV"
@@ -507,16 +515,31 @@ class ServerStateTraffic(ServerTraffic):
 
 class PythonInstanceWrapper:
     allInstances = {}
+    wrappersByInstance = {}
     def __init__(self, instance, moduleName):
         self.instance = instance
         self.moduleName = moduleName
         self.className = self.instance.__class__.__name__
         self.instanceName = self.getNewInstanceName(self.className.lower())
         self.allInstances[self.instanceName] = self
+        self.wrappersByInstance[id(self.instance)] = self
 
     @classmethod
     def getInstance(cls, instanceName):
-        return cls.allInstances.get(instanceName, sys.modules.get(instanceName))
+        return cls.allInstances.get(instanceName, sys.modules.get(instanceName, cls.forceImport(instanceName)))
+
+    @classmethod
+    def forceImport(cls, moduleName):
+        try:
+            exec "import " + moduleName
+            return sys.modules.get(moduleName)
+        except ImportError:
+            pass
+
+    @classmethod
+    def getWrapperFor(cls, instance, moduleName):
+        storedWrapper = cls.wrappersByInstance.get(id(instance))
+        return storedWrapper or cls(instance, moduleName)
 
     def getInstanceType(self):
         if issubclass(self.instance.__class__, object):
@@ -543,52 +566,69 @@ class PythonInstanceWrapper:
         return getattr(self.instance, name)
 
 
-class PythonModuleTraffic(Traffic):
+class PythonTraffic(Traffic):
     typeId = "PYT"
     direction = "<-"
-    interceptModules = []
-    interceptModuleAttrs = {}
-    @classmethod
-    def configure(cls, options):
-        modStr = options.python_module_intercepts
-        if modStr:
-            cls.interceptModules = modStr.split(",")
-            cls.interceptModules += cls.getModuleParents(cls.interceptModules)
-            cls.interceptModuleAttrs = parseCmdDictionary(options.python_module_attributes)
-            
-    @staticmethod
-    def getModuleParents(modules):
-        parents = []
-        for module in modules:
-            for ix in range(module.count(".")):
-                parents.append(module.rsplit(".", ix + 1)[0])
-        return parents
-
-    def shouldIntercept(self):
-        attrs = self.interceptModuleAttrs.get(self.modOrObjName, [])
-        if len(attrs) > 0:
-            return self.attrName in attrs
-        else:
-            return True
-
-    def enquiryOnly(self, responses=[]):
-        return not self.shouldIntercept()
-
-    def belongsToModule(self, obj):
-        try:
-            return obj.__module__ in self.interceptModules
-        except AttributeError: # Global exceptions like AttributeError itself on Windows cause this
-            return False
-    
-    def isBasicType(self, obj):
-        return obj is None or obj is NotImplemented or type(obj) in (bool, float, int, long, str, unicode, list, dict, tuple)
+    def getExceptionResponse(self):
+        exc_value = sys.exc_info()[1]
+        return PythonResponseTraffic(self.getExceptionText(exc_value), self.responseFile)
 
     def getExceptionText(self, exc_value):
         return "raise " + exc_value.__class__.__module__ + "." + exc_value.__class__.__name__ + "(" + repr(str(exc_value)) + ")"
 
-    def getExceptionResponse(self):
-        exc_value = sys.exc_info()[1]
-        return PythonResponseTraffic(self.getExceptionText(exc_value), self.responseFile)
+
+class PythonImportTraffic(PythonTraffic):
+    def __init__(self, inText, responseFile):
+        self.moduleName = inText
+        text = "import " + self.moduleName
+        super(PythonImportTraffic, self).__init__(text, responseFile)
+
+    def isMarkedForReplay(self, replayItems):
+        return self.moduleName in replayItems
+
+    def forwardToDestination(self):
+        try:
+            exec self.text
+            return []
+        except:
+            return [ self.getExceptionResponse() ]
+
+
+class PythonModuleTraffic(PythonTraffic):
+    interceptModules = set()
+    @classmethod
+    def configure(cls, options):
+        modStr = options.python_module_intercepts
+        if modStr:
+            cls.interceptModules.update(modStr.split(","))
+
+    def __init__(self, modOrObjName, attrName, *args):
+        self.modOrObjName = modOrObjName
+        self.attrName = attrName
+        super(PythonModuleTraffic, self).__init__(*args)
+
+    def getModuleName(self, obj):
+        if hasattr(obj, "__module__"): # classes, functions, many instances
+            return obj.__module__
+        else:
+            return obj.__class__.__module__ # many other instances
+
+    def isMarkedForReplay(self, replayItems):
+        if PythonInstanceWrapper.getInstance(self.modOrObjName) is None:
+            return True
+        textMarker = self.modOrObjName + "." + self.attrName
+        return any((item == textMarker or textMarker.startswith(item + ".") for item in replayItems))
+
+    def belongsToInterceptedModule(self, moduleName):
+        if moduleName in self.interceptModules:
+            return True
+        elif "." in moduleName:
+            return self.belongsToInterceptedModule(moduleName.rsplit(".", 1)[0])
+        else:
+            return False
+
+    def isBasicType(self, obj):
+        return obj is None or obj is NotImplemented or type(obj) in (bool, float, int, long, str, unicode, list, dict, tuple)
 
     def getPossibleCompositeAttribute(self, instance, attrName):
         attrParts = attrName.split(".", 1)
@@ -599,74 +639,51 @@ class PythonModuleTraffic(Traffic):
             return self.getPossibleCompositeAttribute(firstAttr, attrParts[1])
 
     def evaluate(self, argStr):
+        class UnknownInstanceWrapper:
+            def __init__(self, name):
+                self.instanceName = name
+        class NameFinder:
+            def __getitem__(self, name):
+                return PythonInstanceWrapper.getInstance(name) or UnknownInstanceWrapper(name)
         try:
-            return eval(argStr, PythonInstanceWrapper.allInstances, sys.modules)
-        except:
-            # Not ideal, but better than exit with exception
-            # If this happens we probably can't handle the arguments properly anyway
-            return ()
-
+            return eval(argStr)
+        except NameError:
+            return eval(argStr, globals(), NameFinder())
+    
     def addInstanceWrappers(self, result):
-        if not self.shouldIntercept():
-            return result
-        elif type(result) in (list, tuple):
+        if type(result) in (list, tuple):
             return type(result)(map(self.addInstanceWrappers, result))
         elif type(result) == dict:
             newResult = {}
             for key, value in result.items():
                 newResult[key] = self.addInstanceWrappers(value)
             return newResult
-        elif not self.isBasicType(result) and self.belongsToModule(result):
-            return PythonInstanceWrapper(result, self.modOrObjName)
+        elif not self.isBasicType(result) and self.belongsToInterceptedModule(self.getModuleName(result)):
+            return PythonInstanceWrapper.getWrapperFor(result, self.modOrObjName)
         else:
             return result
-
-
-class PythonImportTraffic(PythonModuleTraffic):
-    def __init__(self, inText, responseFile):
-        self.moduleName = inText
-        text = "import " + self.moduleName
-        super(PythonImportTraffic, self).__init__(text, responseFile)
-
-    def shouldIntercept(self, responses=[]):
-        return not self.interceptModuleAttrs.has_key(self.moduleName)
-
-    def forwardToDestination(self):
-        try:
-            exec self.text
-            return []
-        except:
-            return [ self.getExceptionResponse() ]
         
 
 class PythonAttributeTraffic(PythonModuleTraffic):
+    cachedAttributes = set()
     def __init__(self, inText, responseFile):
-        self.modOrObjName, self.attrName = inText.split(":SUT_SEP:")
-        text = self.modOrObjName + "." + self.attrName
-        super(PythonAttributeTraffic, self).__init__(text, responseFile)
+        modOrObjName, attrName = inText.split(":SUT_SEP:")
+        text = modOrObjName + "." + attrName
+        # Should record these at most once, and only then if they return something in their own right
+        # rather than a function etc
+        self.foundInCache = text in self.cachedAttributes
+        self.cachedAttributes.add(text)
+        super(PythonAttributeTraffic, self).__init__(modOrObjName, attrName, text, responseFile)
 
     def enquiryOnly(self, responses=[]):
-        return len(responses) == 0 or not self.shouldIntercept()
+        return len(responses) == 0 or self.foundInCache
 
     def shouldCache(self, obj):
         return type(obj) not in (types.FunctionType, types.GeneratorType, types.MethodType, types.BuiltinFunctionType,
-                                 types.ClassType, types.TypeType) and \
+                                 types.ClassType, types.TypeType, types.ModuleType) and \
                                  not hasattr(obj, "__call__")
 
-    def interceptionPossible(self):
-        attrs = self.interceptModuleAttrs.get(self.modOrObjName, [])
-        if len(attrs) > 0:
-            for attr in attrs:
-                if attr.startswith(self.attrName):
-                    return True
-            return False
-        else:
-            return True
-
     def forwardToDestination(self):
-        if not self.interceptionPossible():
-            # Shortcut to tell the application to use the real version
-            return [ PythonResponseTraffic(self.text, self.responseFile) ]
         instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
         try:
             attr = self.getPossibleCompositeAttribute(instance, self.attrName)
@@ -687,9 +704,9 @@ class PythonAttributeTraffic(PythonModuleTraffic):
         
 class PythonSetAttributeTraffic(PythonModuleTraffic):
     def __init__(self, inText, responseFile):
-        self.modOrObjName, self.attrName, self.valueStr = inText.split(":SUT_SEP:")
-        text = self.modOrObjName + "." + self.attrName + " = " + self.valueStr
-        super(PythonSetAttributeTraffic, self).__init__(text, responseFile)
+        modOrObjName, attrName, self.valueStr = inText.split(":SUT_SEP:")
+        text = modOrObjName + "." + attrName + " = " + self.valueStr
+        super(PythonSetAttributeTraffic, self).__init__(modOrObjName, attrName, text, responseFile)
 
     def forwardToDestination(self):
         instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
@@ -700,29 +717,66 @@ class PythonSetAttributeTraffic(PythonModuleTraffic):
 
 class PythonFunctionCallTraffic(PythonModuleTraffic):        
     def __init__(self, inText, responseFile):
-        self.modOrObjName, self.attrName, self.argStr, keywDictStr = inText.split(":SUT_SEP:")
+        modOrObjName, attrName, argStr, keywDictStr = inText.split(":SUT_SEP:")
+        self.args = ()
+        self.keyw = {}
+        argsForRecord = []
         try:
-            self.keyw = eval(keywDictStr)
-            keyws = [ key + "=" + repr(value) for key, value in self.keyw.items() ]
-            keywStr = ", ".join(keyws)
+            internalArgs = self.evaluate(argStr)
+            self.args = tuple(map(self.getArgInstance, internalArgs))
+            argsForRecord += [ self.getArgForRecord(arg) for arg in internalArgs ]
+        except:
+            # Not ideal, but better than exit with exception
+            # If this happens we probably can't handle the arguments anyway
+            # Slightly daring text-munging of Python tuple repr, main thing is to print something vaguely representative
+            argsForRecord += argStr.replace(",)", ")")[1:-1].split(", ")
+        try:
+            internalKw = self.evaluate(keywDictStr)
+            for key, value in internalKw.items():
+                self.keyw[key] = self.getArgInstance(value)
+            for key in sorted(internalKw.keys()):
+                value = internalKw[key]
+                argsForRecord.append(key + "=" + self.getArgForRecord(value))
         except:
             # Not ideal, but better than exit with exception
             # If this happens we probably can't handle the keyword objects anyway
-            self.keyw = {}
             # Slightly daring text-munging of Python dictionary repr, main thing is to print something vaguely representative
-            keywStr = keywDictStr.replace("': ", "=").replace(", '", ", ")[2:-1]
-        text = self.modOrObjName + "." + self.attrName + self.findArgString(keywStr)
-        super(PythonModuleTraffic, self).__init__(text, responseFile)
+            argsForRecord += keywDictStr.replace("': ", "=").replace(", '", ", ")[2:-1].split(", ")
+        text = modOrObjName + "." + attrName + "(" + ", ".join(argsForRecord) + ")"
+        super(PythonFunctionCallTraffic, self).__init__(modOrObjName, attrName, text, responseFile)
 
-    def findArgString(self, keywStr):
-        # Fix the format for single-entry tuples
-        argStr = self.argStr.replace(",)", ")")
-        if argStr == "()":
-            return "(" + keywStr + ")"
-        elif keywStr:
-            return argStr[:-1] + ", " + keywStr + ")"
-        else:
-            return argStr
+    def getArgForRecord(self, arg):
+        class ArgWrapper:
+            def __init__(self, arg):
+                self.arg = arg
+            def __repr__(self):
+                if hasattr(self.arg, "instanceName"):
+                    return self.arg.instanceName
+                elif isinstance(self.arg, list):
+                    return repr([ ArgWrapper(subarg) for subarg in self.arg ])
+                elif isinstance(self.arg, dict):
+                    newDict = {}
+                    for key, val in self.arg.items():
+                        newDict[key] = ArgWrapper(val)
+                    return repr(newDict)
+                elif isinstance(self.arg, float):
+                    # Stick to 2 dp for recording floating point values
+                    return str(round(self.arg, 2))
+                else:
+                    out = repr(self.arg)
+                    # Replace linebreaks but don't mangle e.g. Windows paths
+                    # This won't work if both exist in the same string - fixing that requires
+                    # using a regex and I couldn't make it work [gjb 100922]
+                    if "\\n" in out and "\\\\n" not in out: 
+                        pos = out.find("'", 0, 2)
+                        if pos != -1:
+                            return out[:pos] + "''" + out[pos:].replace("\\n", "\n") + "''"
+                        else:
+                            pos = out.find('"', 0, 2)
+                            return out[:pos] + '""' + out[pos:].replace("\\n", "\n") + '""'
+                    else:
+                        return out
+        return repr(ArgWrapper(arg))
             
     def getArgInstance(self, arg):
         if isinstance(arg, PythonInstanceWrapper):
@@ -732,16 +786,12 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
         else:
             return arg
 
-    def parseArgs(self):
-        args = self.evaluate(self.argStr)
-        return tuple(map(self.getArgInstance, args))
-
     def callFunction(self, instance):
         if self.attrName == "__repr__" and isinstance(instance, PythonInstanceWrapper): # Has to be special case as we use it internally
             return repr(instance.instance)
         else:
             func = self.getPossibleCompositeAttribute(instance, self.attrName)
-            return func(*self.parseArgs(), **self.keyw)
+            return func(*self.args, **self.keyw)
     
     def getResult(self):
         instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
@@ -750,9 +800,10 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
             return repr(self.addInstanceWrappers(result))
         except:
             exc_value = sys.exc_info()[1]
-            if self.belongsToModule(exc_value):
+            moduleName = self.getModuleName(exc_value)
+            if self.belongsToInterceptedModule(moduleName):
                 # We own the exception object also, handle it like an ordinary instance
-                return "raise " + PythonInstanceWrapper(exc_value, exc_value.__module__).exceptionRepr()
+                return "raise " + PythonInstanceWrapper(exc_value, moduleName).exceptionRepr()
             else:
                 return self.getExceptionText(exc_value)
 
@@ -786,7 +837,7 @@ class CommandLineKillTraffic(Traffic):
         return []
 
     def hasInfo(self):
-        return False # no responses
+        return False # We can get these during replay, but should ignore them
 
     def record(self, *args):
         pass # We replay these entirely from the return code, so that replay works on Windows
@@ -817,21 +868,42 @@ class CommandLineTraffic(Traffic):
         self.commandName = os.path.basename(self.fullCommand)
         self.cmdArgs = argv[1:]
         self.argStr = plugins.commandLineString(argv[1:])
-        self.environ = self.filterEnvironment(self.cmdEnviron)
+        envVarsSet, envVarsUnset = self.filterEnvironment(self.cmdEnviron)
         self.path = self.cmdEnviron.get("PATH")
-        text = self.getEnvString() + self.commandName + " " + self.argStr
+        text = self.getEnvString(envVarsSet, envVarsUnset) + self.commandName + " " + self.argStr
         super(CommandLineTraffic, self).__init__(text, responseFile)
         
     def filterEnvironment(self, cmdEnviron):
-        interestingEnviron = []
+        envVarsSet, envVarsUnset = [], []
         for var in self.getEnvironmentVariables():
             value = cmdEnviron.get(var)
-            if value is not None:
-                currValue = os.getenv(var)
-                self.diag.info("Checking environment " + var + "=" + value + " against " + repr(currValue))
-                if value != currValue:
-                    interestingEnviron.append((var, value))
-        return interestingEnviron
+            currValue = os.getenv(var)
+            self.diag.info("Checking environment " + var + "=" + repr(value) + " against " + repr(currValue))
+            if value != currValue:
+                if value is None:
+                    envVarsUnset.append(var)
+                else:
+                    if var.endswith("PATH"):
+                        interceptStr = "traffic_intercepts" + os.pathsep
+                        # Fix the traffic interception mechanisms's own files:
+                        # the program will have been given a separate directory here.
+                        # Don't report this in the traffic file
+                        pos = value.find(interceptStr)
+                        if pos != -1:
+                            endPos = pos + len(interceptStr)
+                            startPos = value.rfind(os.pathsep, 0, pos)
+                            if startPos < 0:
+                                value = value[endPos:]
+                            else:
+                                value = value[:startPos + 1] + value[endPos:]
+                            self.diag.info("Filtered PATH variable " + var + "=" + value)
+                            if value == currValue:
+                                continue
+                    envVarsSet.append((var, value))
+        return envVarsSet, envVarsUnset
+
+    def isMarkedForReplay(self, replayItems):
+        return self.commandName in replayItems
 
     def getEnvironmentVariables(self):
         return self.environmentDict.get(self.commandName, []) + \
@@ -840,28 +912,23 @@ class CommandLineTraffic(Traffic):
     def hasChangedWorkingDirectory(self):
         return not plugins.samefile(self.cmdCwd, os.getenv("TEXTTEST_SANDBOX"))
 
-    def getEnvString(self):
+    def getEnvString(self, envVarsSet, envVarsUnset):
         recStr = ""
         if self.hasChangedWorkingDirectory():
             recStr += "cd " + self.cmdCwd.replace("\\", "/") + "; "
-        if len(self.environ) == 0:
+        if len(envVarsSet) == 0 and len(envVarsUnset) == 0:
             return recStr
         recStr += "env "
-        for var, value in self.environ:
+        for var in envVarsUnset:
+            recStr += "--unset=" + var + " "
+        for var, value in envVarsSet:
             recStr += "'" + var + "=" + self.getEnvValueString(var, value) + "' "
         return recStr
 
     def getEnvValueString(self, var, value):
         oldVal = os.getenv(var)
-        if oldVal and oldVal != value:
-            newVal = value.replace(oldVal, "$" + var)
-            # Fix the traffic interception mechanisms's own files: the program will have been given a separate directory here.
-            # Don't report this in the traffic file
-            interceptStr = "traffic_intercepts" + os.pathsep + "$" + var
-            if interceptStr in newVal:
-                return newVal.split(os.pathsep, 1)[1]
-            else:
-                return newVal
+        if oldVal and oldVal != value:            
+            return value.replace(oldVal, "$" + var)
         else:
             return value
 
@@ -953,6 +1020,7 @@ class CommandLineTraffic(Traffic):
                 self.diag.info("Searching " + currDir)
                 fullPath = os.path.join(currDir, fileName)
                 if self.isRealCommand(fullPath, fullCommand):
+                    self.realCommands[fileName] = fullPath
                     return fullPath
 
     def findRealCmdInfo(self, cmdName, cmdPath):
@@ -981,9 +1049,6 @@ class CommandLineTraffic(Traffic):
         if len(trafficList) == insertIndex or not isinstance(trafficList[insertIndex], SysExitTraffic):
             trafficList.insert(insertIndex, SysExitTraffic("0", self.responseFile))
 
-        insertIndex += 1
-        for extraTraffic in trafficList[insertIndex:]:
-            extraTraffic.responseFile = None
         return trafficList
     
 
@@ -1004,7 +1069,6 @@ class TrafficRequestHandler(StreamRequestHandler):
         text = self.rfile.read()
         self.server.diag.info("Request text : " + text)
         if text.startswith("TERMINATE_SERVER"):
-            self.connection.shutdown(socket.SHUT_RDWR)
             self.server.shutdown()
         else:
             traffic = self.parseTraffic(text)
@@ -1029,7 +1093,7 @@ class RecordFileHandler:
         self.recordingRequest = 1
         self.cache = {}
         self.completedRequests = []
-        self.lock = Lock()
+        self.lock = threading.Lock()
 
     def requestComplete(self, requestNumber):
         self.lock.acquire()
@@ -1069,14 +1133,25 @@ class RecordFileHandler:
 
 
 class ReplayInfo:
-    def __init__(self, replayFile):
+    def __init__(self, replayFile, replayItemString):
         self.responseMap = seqdict()
         self.diag = logging.getLogger("Traffic Replay")
         if replayFile:
             self.readReplayFile(replayFile)
+        self.replayItems = []
+        if replayItemString:
+            self.replayItems = replayItemString.split(",")
+
+    def isActiveForAll(self):
+        return len(self.responseMap) > 0 and len(self.replayItems) == 0
             
-    def isActive(self):
-        return len(self.responseMap) > 0
+    def isActiveFor(self, traffic):
+        if len(self.responseMap) == 0:
+            return False
+        elif len(self.replayItems) == 0:
+            return True
+        else:
+            return traffic.isMarkedForReplay(set(self.replayItems))
 
     def readReplayFile(self, replayFile):
         trafficList = self.readIntoList(replayFile)
@@ -1213,8 +1288,6 @@ class ReplayedResponseHandler:
     def addResponse(self, trafficStr):
         self.responses[-1].append(trafficStr)
     def getCurrentStrings(self):
-        if len(self.responses) == 0:
-            return []
         if self.timesChosen < len(self.responses):
             currStrings = self.responses[self.timesChosen]
         else:

@@ -18,6 +18,9 @@ class FailedPrediction(plugins.TestState):
             return "failure", self.briefText
 
 class Bug:
+    def __init__(self, rerunCount):
+        self.rerunCount = rerunCount
+    
     def __cmp__(self, other):
         return cmp(self.getPriority(), other.getPriority())
                    
@@ -31,9 +34,10 @@ class Bug:
         return False
 
 class BugSystemBug(Bug):
-    def __init__(self, bugSystem, bugId):
+    def __init__(self, bugSystem, bugId, *args):
         self.bugId = bugId
         self.bugSystem = bugSystem
+        Bug.__init__(self, *args)
 
     def getPriority(self):
         return 2
@@ -50,10 +54,11 @@ class BugSystemBug(Bug):
 
     
 class UnreportedBug(Bug):
-    def __init__(self, fullText, briefText, internalError):
+    def __init__(self, fullText, briefText, internalError, *args):
         self.fullText = fullText
         self.briefText = briefText
         self.internalError = internalError
+        Bug.__init__(self, *args)
 
     def isCancellation(self):
         return not self.briefText and not self.fullText
@@ -77,22 +82,28 @@ class BugTrigger:
         self.ignoreOtherErrors = int(getOption("ignore_other_errors", self.reportInternalError))
         self.bugInfo = self.createBugInfo(getOption)
         self.diag = logging.getLogger("Check For Bugs")
+        
     def __repr__(self):
         return repr(self.textTrigger)
+
     def getTriggerHosts(self, getOption):
         hostStr = getOption("execution_hosts")
         if hostStr:
             return hostStr.split(",")
         else:
             return []
+
     def createBugInfo(self, getOption):
         bugSystem = getOption("bug_system")
+        rerunCount = int(getOption("rerun_count", "0"))
         if bugSystem:
-            return BugSystemBug(bugSystem, getOption("bug_id"))
+            return BugSystemBug(bugSystem, getOption("bug_id"), rerunCount)
         else:
-            return UnreportedBug(getOption("full_description"), getOption("brief_description"), self.reportInternalError)
+            return UnreportedBug(getOption("full_description"), getOption("brief_description"), self.reportInternalError, rerunCount)
+
     def matchesText(self, line):
         return self.textTrigger.matches(line)
+
     def findBug(self, execHosts, isChanged, multipleDiffs, line=None):
         if not self.checkUnchanged and not isChanged:
             self.diag.info("File not changed, ignoring")
@@ -106,6 +117,7 @@ class BugTrigger:
             return self.bugInfo
         else:
             self.diag.info("No match " + repr(execHosts) + " with " + repr(self.triggerHosts))
+
     def hostsMatch(self, execHosts):
         if len(self.triggerHosts) == 0:
             return True
@@ -113,6 +125,7 @@ class BugTrigger:
             if not host in self.triggerHosts:
                 return False
         return True
+
 
 class FileBugData:
     def __init__(self):
@@ -131,14 +144,14 @@ class FileBugData:
             self.presentList.append(bugTrigger)
 
     def findBugs(self, fileName, execHosts, isChanged, multipleDiffs):
-        self.diag.info("Looking for bugs in " + fileName)
         if not self.checkUnchanged and not isChanged:
             self.diag.info("File not changed, ignoring all bugs")
             return []
-        if not os.path.isfile(fileName):
+        if not fileName:
             self.diag.info("File doesn't exist, checking only for absence bugs")
             return self.findAbsenceBugs(self.absentList, execHosts, isChanged, multipleDiffs)
         
+        self.diag.info("Looking for bugs in " + fileName)
         return self.findBugsInText(open(fileName).readlines(), execHosts, isChanged, multipleDiffs)
 
     def findBugsInText(self, lines, execHosts, isChanged=True, multipleDiffs=False):
@@ -204,7 +217,7 @@ class BugMap(seqdict):
             parser.read(fileName)
             parser._sections.__getitem__ = realLookup
             return parser
-        except:
+        except Exception:
             plugins.printWarning("Bug file at " + fileName + " not understood, ignoring")
     def readFromParser(self, parser):
         for section in reversed(sorted(parser.sections())):
@@ -221,7 +234,7 @@ class CheckForCrashes(plugins.Action):
         if test.state.category == "killed":
             return
         # Hard-coded prediction: check test didn't crash
-        comparison, newList = test.state.findComparison("stacktrace")
+        comparison, _ = test.state.findComparison("stacktrace")
         if comparison and comparison.newResult():
             stackTraceFile = comparison.tmpFile
             self.diag.info("Parsing " + stackTraceFile)
@@ -233,7 +246,8 @@ class CheckForCrashes(plugins.Action):
             crashState = FailedPrediction("crash", errorInfo, summary)
             newState.setFailedPrediction(crashState)
             test.changeState(newState)
-            os.remove(stackTraceFile)
+            if not test.app.keepTemporaryDirectories():
+                os.remove(stackTraceFile)
 
     def parseStackTrace(self, test, stackTraceFile):
         lines = open(stackTraceFile).readlines()
@@ -251,24 +265,39 @@ class CheckForBugs(plugins.Action):
     def callDuringAbandon(self, test):
         # want to be able to mark UNRUNNABLE tests as known bugs too...
         return test.state.lifecycleChange != "complete"
-    def __call__(self, test):
-        activeBugs = self.readBugs(test)
-        if not activeBugs.checkUnchanged() and not test.state.hasFailed():
-            self.diag.info(repr(test) + " succeeded, not looking for bugs")
-            return
 
-        bug = self.findBug(test, activeBugs)
+    def __repr__(self):
+        return "Checking known bugs for"
+
+    def __call__(self, test):
+        newState, rerunCount = self.checkTest(test, test.state)
+        if newState:
+            test.changeState(newState)
+            if rerunCount and not os.path.exists(test.makeBackupFileName(rerunCount)):
+                self.describe(test, " - found an issue that triggered a rerun")
+                test.saveState()
+                test.notify("Rerun")        
+
+    def checkTest(self, test, state):
+        activeBugs = self.readBugs(test)
+        if not activeBugs.checkUnchanged() and not state.hasFailed():
+            self.diag.info(repr(test) + " succeeded, not looking for bugs")
+            return None, 0
+
+        bug = self.findBug(test, state, activeBugs)
         if bug:
             category, briefText, fullText = bug.findInfo(test)
             self.diag.info("Changing to " + category + " with text " + briefText)
             bugState = FailedPrediction(category, fullText, briefText, completed=1)
-            self.changeState(test, bugState)
+            return self.getNewState(state, bugState), bug.rerunCount
+        else:
+            return None, 0
             
-    def findBug(self, test, activeBugs):
-        multipleDiffs = self.hasMultipleDifferences(test)
+    def findBug(self, test, state, activeBugs):
+        multipleDiffs = self.hasMultipleDifferences(test, state)
         bugs = []
         for stem, fileBugData in activeBugs.items():
-            bugs += self.findBugsInFile(test, stem, fileBugData, multipleDiffs)
+            bugs += self.findBugsInFile(test, state, stem, fileBugData, multipleDiffs)
 
         unblockedBugs = self.findUnblockedBugs(bugs)
         if len(unblockedBugs) > 0:
@@ -284,43 +313,44 @@ class CheckForBugs(plugins.Action):
                 unblockedBugs.append(bug)
         return unblockedBugs
         
-    def findBugsInFile(self, test, stem, fileBugData, multipleDiffs):
+    def findBugsInFile(self, test, state, stem, fileBugData, multipleDiffs):
         self.diag.info("Looking for bugs in file " + stem)
         if stem == "free_text":
-            return fileBugData.findBugsInText(test.state.freeText.split("\n"), test.state.executionHosts)
-        elif test.state.hasResults():
+            return fileBugData.findBugsInText(state.freeText.split("\n"), state.executionHosts)
+        elif stem == "brief_text":
+            briefText = state.getTypeBreakdown()[1]
+            return fileBugData.findBugsInText(briefText.split("\n"), state.executionHosts)
+        elif state.hasResults():
             # bugs are only relevant if the file itself is changed, unless marked to trigger on success also
-            isChanged = self.fileChanged(test, stem)
-            fileName = test.makeTmpFileName(stem)
-            return fileBugData.findBugs(fileName, test.state.executionHosts, isChanged, multipleDiffs)
-        else:
-            return []
+            comp = state.findComparison(stem, includeSuccess=True)[0]
+            if comp:
+                isChanged = not comp.hasSucceeded()
+                return fileBugData.findBugs(comp.tmpFile, state.executionHosts, isChanged, multipleDiffs)
+        return []
 
-    def changeState(self, test, bugState):
-        if hasattr(test.state, "failedPrediction"):
+    def getNewState(self, oldState, bugState):
+        if hasattr(oldState, "failedPrediction"):
             # if we've already compared, slot our things into the comparison object
-            newState = copy(test.state)
+            newState = copy(oldState)
             newState.setFailedPrediction(bugState, usePreviousText=True)
-            test.changeState(newState)
+            return newState
         else:
-            test.changeState(bugState)
+            return bugState
 
-    def hasMultipleDifferences(self, test):
-        if not test.state.hasResults():
+    def hasMultipleDifferences(self, test, state):
+        if not state.hasResults():
             # check for unrunnables...
             return False
-        comparisons = test.state.getComparisons()
+        comparisons = state.getComparisons()
         diffCount = len(comparisons)
         if diffCount <= 1:
             return False
-        perfStems = test.state.getPerformanceStems(test)
+        perfStems = state.getPerformanceStems(test)
         for comp in comparisons:
             if comp.stem in perfStems:
                 diffCount -= 1
         return diffCount > 1
-    def fileChanged(self, test, stem):
-        comparison, list = test.state.findComparison(stem)
-        return bool(comparison)
+    
     def readBugs(self, test):
         bugMap = BugMap()
         # Mostly for backwards compatibility, reverse the list so that more specific bugs
@@ -329,6 +359,7 @@ class CheckForBugs(plugins.Action):
             self.diag.info("Reading bugs from file " + bugFile)
             bugMap.readFromFile(bugFile)
         return bugMap
+
             
 # For migrating from knownbugs files which are from TextTest 3.7 and older
 class MigrateFiles(plugins.Action):
@@ -345,7 +376,7 @@ class MigrateFiles(plugins.Action):
             parser.optionxform = str
             try:
                 parser.read(bugFileName)
-            except:
+            except Exception:
                 plugins.printWarning("Bug file at " + bugFileName + " not understood, ignoring")
                 continue
             if not parser.has_section("Migrated section 1"):

@@ -1,12 +1,5 @@
 #!/usr/bin/env python
 
-try:
-    # For self-testing, make it easy to intercept methods by providing a natural point to do it
-    # without screwing up the namespace
-    import interceptor
-except ImportError:
-    pass
-
 import sys, os
 
 install_root = os.path.dirname(os.path.dirname(os.path.normpath(os.path.abspath(sys.argv[0]))))

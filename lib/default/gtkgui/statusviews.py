@@ -24,7 +24,7 @@ class StatusMonitorGUI(guiutils.SubGUI):
     def getWidgetName(self):
         return "_Status bar"
 
-    def notifyActionStart(self, message="", lock = True):
+    def notifyActionStart(self, lock=True):
         if self.throbber:
             if self.pixbuf: # pragma: no cover : Only occurs if some code forgot to do ActionStop ...
                 self.notifyActionStop()
@@ -33,11 +33,11 @@ class StatusMonitorGUI(guiutils.SubGUI):
             if lock:
                 self.throbber.grab_add()
 
-    def notifyActionProgress(self, message=""):
+    def notifyActionProgress(self, *args):
         while gtk.events_pending():
             gtk.main_iteration(False)
 
-    def notifyActionStop(self, message=""):
+    def notifyActionStop(self):
         if self.throbber:
             self.throbber.set_from_pixbuf(self.pixbuf)
             self.pixbuf = None
@@ -114,7 +114,7 @@ class ProgressBarGUI(guiutils.SubGUI):
             self.totalNofTests = self.addedCount
             self.resetBar()
 
-    def notifyLifecycleChange(self, test, state, changeDesc):
+    def notifyLifecycleChange(self, dummyTest, dummyState, changeDesc):
         if changeDesc == "complete":
             self.nofCompletedTests += 1
             self.resetBar()
@@ -174,10 +174,13 @@ class TestProgressMonitor(guiutils.SubGUI):
                 colour = guiutils.guiConfig.getTestColour("not_started")
                 visibility = guiutils.guiConfig.showCategoryByDefault("not_started")
                 self.addNewIter("Not started", None, colour, visibility, testCount)
-    def getGroupTabTitle(self):
+
+    def getTabTitle(self):
         return "Status"
+
     def shouldShow(self):
         return self.dynamic
+
     def createView(self):
         self.treeView = gtk.TreeView(self.treeModel)
         self.treeView.set_name("Test Status View")
@@ -232,8 +235,7 @@ class TestProgressMonitor(guiutils.SubGUI):
         selection.selected_foreach(self.selectCorrespondingTests, tests)
         self.notify("SetTestSelection", tests)
 
-    def selectCorrespondingTests(self, treemodel, path, iter, tests , *args):
-        guiutils.guilog.info("Selecting all " + str(treemodel.get_value(iter, 1)) + " tests in category " + treemodel.get_value(iter, 0))
+    def selectCorrespondingTests(self, treemodel, dummyPath, iter, tests , *args):
         for test in treemodel.get_value(iter, 5):
             if test not in tests:
                 tests.append(test)
@@ -244,7 +246,7 @@ class TestProgressMonitor(guiutils.SubGUI):
     def getCategoryDescription(self, state, categoryName=None):
         if not categoryName:
             categoryName = state.category
-        briefDesc, fullDesc = state.categoryDescriptions.get(categoryName, (categoryName, categoryName))
+        briefDesc, _ = state.categoryDescriptions.get(categoryName, (categoryName, categoryName))
         return briefDesc.replace("_", " ").capitalize()
 
     def filterDiff(self, diff):
@@ -253,6 +255,14 @@ class TestProgressMonitor(guiutils.SubGUI):
             if self.diffFilterGroup.stringContainsText(line):
                 filteredDiff += line + "\n"
         return filteredDiff
+
+    def getDifferenceType(self, fileComp):
+        if fileComp.missingResult():
+            return "Missing"
+        elif fileComp.newResult():
+            return "New"
+        else:
+            return "Differences"
 
     def getClassifiers(self, test, state, changeDesc):
         classifiers = ClassificationTree()
@@ -273,7 +283,7 @@ class TestProgressMonitor(guiutils.SubGUI):
             return classifiers
 
         if not state.isSaveable() or state.warnOnSave(): # If it's not saveable, don't classify it by the files
-            overall, details = state.getTypeBreakdown()
+            details = state.getTypeBreakdown()[1]
             self.diag.info("Adding unsaveable : " + catDesc + " " + details)
             classifiers.addClassification([ "Failed", catDesc, details ])
             return classifiers
@@ -281,7 +291,7 @@ class TestProgressMonitor(guiutils.SubGUI):
         comparisons = state.getComparisons()
         for fileComp in filter(lambda c: c.getType() == "failure", comparisons):
             summary = self.getFileSummary(fileComp)
-            fileClass = [ "Failed", "Differences", summary ]
+            fileClass = [ "Failed", self.getDifferenceType(fileComp), summary ]
 
             filteredDiff = self.getFilteredDiff(fileComp)
             if filteredDiff is not None:
@@ -337,7 +347,7 @@ class TestProgressMonitor(guiutils.SubGUI):
 
     def removeFromDiffStore(self, test):
         for fileInfo in self.diffStore.values():
-            for testList, hasGroup in fileInfo.values():
+            for testList, _ in fileInfo.values():
                 if test in testList:
                     testList.remove(test)
 
@@ -370,7 +380,7 @@ class TestProgressMonitor(guiutils.SubGUI):
                 diffNumber = int(nodeClassifier[6:]) - 1
                 parentName = self.treeModel.get_value(parentIter, 0)
                 testLists = self.diffStore.get(parentName)
-                testList, hasGroup = testLists.values()[diffNumber]
+                testList = testLists.values()[diffNumber][0]
                 return copy(testList)
         except ValueError:
             pass
@@ -483,7 +493,7 @@ class TestProgressMonitor(guiutils.SubGUI):
             childIter = self.treeModel.iter_next(childIter)
         return childIters
 
-    def showToggled(self, cellrenderer, path):
+    def showToggled(self, dummyWidget, path):
         # Toggle the toggle button
         newValue = not self.treeModel[path][2]
         self.treeModel[path][2] = newValue
@@ -508,6 +518,6 @@ class TestProgressMonitor(guiutils.SubGUI):
         self.treeModel.foreach(self.resetNodeVisibility, testsForReset)
         self.notify("Visibility", testsForReset, True)
 
-    def resetNodeVisibility(self, model, path, iter, testsForReset):
+    def resetNodeVisibility(self, model, dummyPath, iter, testsForReset):
         if model.get_value(iter, 2) and not model.iter_has_child(iter):
             testsForReset += model.get_value(iter, 5)

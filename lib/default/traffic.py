@@ -1,79 +1,67 @@
 
-import os, stat, sys, plugins, logging, shutil, socket, subprocess
+import os, sys, plugins, shutil, socket, subprocess
+from ndict import seqdict
 
 class SetUpTrafficHandlers(plugins.Action):
-    def __init__(self, record):
-        self.record = record
+    REPLAY_ONLY = 0
+    RECORD_ONLY = 1
+    RECORD_NEW_REPLAY_OLD = 2
+    def __init__(self, recordSetting):
+        self.recordSetting = recordSetting
         self.trafficServerProcess = None
-        self.trafficFiles = self.findTrafficFiles()
-        self.trafficPyModuleFile = os.path.join(plugins.installationDir("libexec"), "traffic_pymodule.py")
-        self.trafficServerFile = os.path.join(plugins.installationDir("libexec"), "traffic_server.py")
+        libexecDir = plugins.installationDir("libexec")
+        self.trafficFiles = self.findTrafficFiles(libexecDir)
+        self.siteCustomizeFile = os.path.join(libexecDir, "sitecustomize.py")
+        self.trafficPyModuleFile = os.path.join(libexecDir, "traffic_pymodule.py")
+        self.trafficServerFile = os.path.join(libexecDir, "traffic_server.py")
         
-    def findTrafficFiles(self):
-        libExecDir = plugins.installationDir("libexec") 
-        files = [ os.path.join(libExecDir, "traffic_cmd.py") ]
+    def findTrafficFiles(self, libexecDir):
+        files = [ os.path.join(libexecDir, "traffic_cmd.py") ]
         if os.name == "nt":
-            files.append(os.path.join(libExecDir, "traffic_cmd.exe"))
+            files.append(os.path.join(libexecDir, "traffic_cmd.exe"))
         return files
 
-    def terminateServer(self, test):
-        servAddr = test.getEnvironment("TEXTTEST_MIM_SERVER")
-        if servAddr:
-            sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            host, port = servAddr.split(":")
-            serverAddress = (host, int(port))
-            try:
-                sendSocket.connect(serverAddress)
-                sendSocket.sendall("TERMINATE_SERVER\n")
-                sendSocket.shutdown(2)
-            except socket.error:
-                print "Could not send terminate message to traffic server, seemed not to be running anyway."
-        if self.trafficServerProcess:
-            out, err = self.trafficServerProcess.communicate()
-            if err:
-                sys.stderr.write("Error from Traffic Server :\n" + err)
-            self.trafficServerProcess = None
-
     def __call__(self, test):
-        if self.trafficServerProcess:
-            # After the test is complete we shut down the traffic server and allow it to flush itself
-            self.terminateServer(test)
-        else:
+        pythonCustomizeFiles = test.getAllPathNames("testcustomize.py") 
+        pythonCoverage = test.hasEnvironment("COVERAGE_PROCESS_START")
+        if test.app.usesTrafficMechanism() or pythonCoverage or pythonCustomizeFiles:
             replayFile = test.getFileName("traffic")
-            if self.record or replayFile:
-                self.setUpServer(test, replayFile)
+            serverActive = self.recordSetting != self.REPLAY_ONLY or replayFile is not None
+            if serverActive or pythonCoverage or pythonCustomizeFiles:
+                self.setUpIntercepts(test, replayFile, serverActive, pythonCoverage, pythonCustomizeFiles)
 
-    def setUpServer(self, test, replayFile):
+    def setUpIntercepts(self, test, replayFile, serverActive, pythonCoverage, pythonCustomizeFiles):
         interceptDir = test.makeTmpFileName("traffic_intercepts", forComparison=0)
-        pathVars = self.makeIntercepts(test, interceptDir)
-        self.trafficServerProcess = self.makeTrafficServer(test, replayFile)
-        address = self.trafficServerProcess.stdout.readline().strip()
-        test.setEnvironment("TEXTTEST_MIM_SERVER", address) # Address of TextTest's server for recording client/server traffic
+        interceptInfo = InterceptInfo(test, replayFile if self.recordSetting == self.REPLAY_ONLY else None)
+        pathVars = self.makeIntercepts(interceptDir, interceptInfo, serverActive, pythonCoverage, pythonCustomizeFiles)
+        if serverActive:
+            interceptAttributes = ",".join(interceptInfo.pyAttributes)
+            self.trafficServerProcess = self.makeTrafficServer(test, replayFile, interceptInfo)
+            address = self.trafficServerProcess.stdout.readline().strip()
+            test.setEnvironment("TEXTTEST_MIM_SERVER", address) # Address of TextTest's server for recording client/server traffic
+            if interceptAttributes:
+                test.setEnvironment("TEXTTEST_MIM_PYTHON", interceptAttributes)
+                ignoreCallers = test.getConfigValue("collect_traffic_python_ignore_callers")
+                if ignoreCallers:
+                    test.setEnvironment("TEXTTEST_MIM_PYTHON_IGNORE", ",".join(ignoreCallers))
+
         for pathVar in pathVars:
             # Change test environment to pick up the intercepts
             test.setEnvironment(pathVar, interceptDir + os.pathsep + test.getEnvironment(pathVar, ""))
 
     def makeArgFromDict(self, dict):
-        args = [ key + "=" + self.makeArgFromVal(val) for key, val in dict.items() if key ]
+        args = []
+        for key, values in dict.items():
+            if key and values:
+                args.append(key + "=" + "+".join(values))
         return ",".join(args)
-
-    def makeArgFromVal(self, val):
-        if type(val) == str:
-            return val
-        else:
-            return "+".join(val)
-            
-    def makeTrafficServer(self, test, replayFile):
+        
+    def makeTrafficServer(self, test, replayFile, interceptInfo):
         recordFile = test.makeTmpFileName("traffic")
         recordEditDir = test.makeTmpFileName("file_edits", forComparison=0)
         cmdArgs = [ sys.executable, self.trafficServerFile, "-t", test.getRelPath(),
                     "-r", recordFile, "-F", recordEditDir, "-l", os.getenv("TEXTTEST_PERSONAL_LOG") ]
-        if not self.record:
-            cmdArgs += [ "-p", replayFile ]
-            replayEditDir = test.getFileName("file_edits")
-            if replayEditDir:
-                cmdArgs += [ "-f", replayEditDir ]
-
+        
         if test.getConfigValue("collect_traffic_use_threads") != "true":
             cmdArgs += [ "-s" ]
             
@@ -81,59 +69,57 @@ class SetUpTrafficHandlers(plugins.Action):
         if filesToIgnore:
             cmdArgs += [ "-i", ",".join(filesToIgnore) ]
 
-        environmentDict = test.getConfigValue("collect_traffic_environment")
-        if environmentDict:
-            cmdArgs += [ "-e", self.makeArgFromDict(environmentDict) ]
+        environmentArg = self.makeArgFromDict(test.getConfigValue("collect_traffic_environment"))
+        if environmentArg:
+            cmdArgs += [ "-e", environmentArg ]
 
-        pythonModules = test.getConfigValue("collect_traffic_py_module")
-        if pythonModules:
-            cmdArgs += [ "-m", ",".join(pythonModules) ]
-
-        pythonAttrDict = test.getConfigValue("collect_traffic_py_attributes")
-        if pythonAttrDict:
-            cmdArgs += [ "-A", self.makeArgFromDict(pythonAttrDict) ]
-
+        if interceptInfo.pyAttributes:
+            cmdArgs += [ "-m", ",".join(interceptInfo.pyAttributes) ]
+            
         asynchronousFileEditCmds = test.getConfigValue("collect_traffic").get("asynchronous")
         if asynchronousFileEditCmds:
             cmdArgs += [ "-a", ",".join(asynchronousFileEditCmds) ]
 
+        if replayFile and self.recordSetting != self.RECORD_ONLY:
+            cmdArgs += [ "-p", replayFile ]
+            replayEditDir = test.getFileName("file_edits")
+            if replayEditDir:
+                cmdArgs += [ "-f", replayEditDir ]
+            if self.recordSetting == self.RECORD_NEW_REPLAY_OLD:
+                replayItems = interceptInfo.getReplayItems(replayFile)
+                if replayItems:
+                    cmdArgs += [ "--replay-items=" + ",".join(replayItems) ]
+
         return subprocess.Popen(cmdArgs, env=test.getRunEnvironment(), universal_newlines=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     
-    def makeIntercepts(self, test, interceptDir):
-        commands = self.getCommandsForInterception(test)
-        for cmd in commands:
-            self.intercept(interceptDir, cmd, self.trafficFiles, executable=True)
-
-        pythonModules = test.getConfigValue("collect_traffic_py_module")
-        for moduleName in pythonModules:
-            modulePath = moduleName.replace(".", "/")
-            self.intercept(interceptDir, modulePath + ".py", [ self.trafficPyModuleFile ], executable=False)
-            self.makePackageFiles(interceptDir, modulePath)
-
+    def makeIntercepts(self, interceptDir, interceptInfo, serverActive, pythonCoverage, pythonCustomizeFiles):
         pathVars = []
-        if len(commands) and os.name == "posix":
-            # Intercepts on Windows go directly into the sandbox so they can take advantage of the
-            # "current working directory beats all" rule there and also intercept things that ignore PATH
-            # (like Java)
-            pathVars.append("PATH")
-        if len(pythonModules):
+        if serverActive:
+            for cmd in interceptInfo.commands:
+                self.intercept(interceptDir, cmd, self.trafficFiles, executable=True)
+        
+            if len(interceptInfo.commands) and os.name == "posix":
+                # Intercepts on Windows go directly into the sandbox so they can take advantage of the
+                # "current working directory beats all" rule there and also intercept things that ignore PATH
+                # (like Java)
+                pathVars.append("PATH")
+
+            if len(interceptInfo.pyAttributes) > 0:
+                self.interceptOwnModule(self.trafficPyModuleFile, interceptDir)
+
+        if pythonCustomizeFiles:
+            self.interceptOwnModule(pythonCustomizeFiles[-1], interceptDir) # most specific
+                
+        useSiteCustomize = (serverActive and len(interceptInfo.pyAttributes) > 0) or pythonCoverage or pythonCustomizeFiles
+        if useSiteCustomize:
+            self.interceptOwnModule(self.siteCustomizeFile, interceptDir)
             pathVars.append("PYTHONPATH")
         return pathVars
-     
-    def makePackageFiles(self, interceptDir, modulePath):
-        parts = modulePath.rsplit("/", 1)
-        if len(parts) == 2:
-            localFileName = os.path.join(parts[0], "__init__.py")
-            fileName = os.path.join(interceptDir, localFileName)
-            open(fileName, "w").close() # make an empty package file
-            self.makePackageFiles(interceptDir, parts[0])
 
-    def getCommandsForInterception(self, test):
-        # This gets all names in collect_traffic, not just those marked
-        # "asynchronous"! (it will also pick up "default").
-        return test.getCompositeConfigValue("collect_traffic", "asynchronous")
-
+    def interceptOwnModule(self, moduleFile, interceptDir):
+        self.intercept(interceptDir, os.path.basename(moduleFile), [ moduleFile ], executable=False)
+    
     def intercept(self, interceptDir, cmd, trafficFiles, executable):
         interceptName = os.path.join(interceptDir, cmd)
         plugins.ensureDirExistsForFile(interceptName)
@@ -151,6 +137,90 @@ class SetUpTrafficHandlers(plugins.Action):
                 shutil.copy(trafficFile, interceptName)
 
 
+class TerminateTrafficServer(plugins.Action):
+    def __init__(self, setupHandler):
+        self.setupHandler = setupHandler
+
+    def __call__(self, test):
+        if self.setupHandler.trafficServerProcess:
+            servAddr = test.getEnvironment("TEXTTEST_MIM_SERVER")
+            if servAddr:
+                self.sendTerminationMessage(servAddr)
+            self.writeServerErrors(self.setupHandler.trafficServerProcess)
+            self.setupHandler.trafficServerProcess = None
+
+    def sendTerminationMessage(self, servAddr):
+        sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        host, port = servAddr.split(":")
+        serverAddress = (host, int(port))
+        try:
+            sendSocket.connect(serverAddress)
+            sendSocket.sendall("TERMINATE_SERVER\n")
+            sendSocket.shutdown(2)
+        except socket.error: # pragma: no cover - should be unreachable, just for robustness
+            plugins.log.info("Could not send terminate message to traffic server at " + servAddr + ", seemed not to be running anyway.")
+        
+    def writeServerErrors(self, process):
+        err = process.communicate()[1]
+        if err:
+            sys.stderr.write("Error from Traffic Server :\n" + err)
+
+class LineFilter(plugins.TextTrigger):
+    def __init__(self, item):
+        self.item = item
+        plugins.TextTrigger.__init__(self, self.getMatchText())
+
+class CommandLineFilter(LineFilter):
+    def getMatchText(self):
+        return "<-CMD:([^ ]* )*" + self.item + " "
+
+    def removeItem(self, info):
+        info.commands.remove(self.item)
+
+
+class AttributeLineFilter(LineFilter):
+    def getMatchText(self):
+        return "<-PYT:(import )?" + self.item 
+
+    def removeItem(self, info):
+        info.pyAttributes.remove(self.item)
+        
+
+class InterceptInfo:
+    def __init__(self, test, replayFile):
+        # This gets all names in collect_traffic, not just those marked
+        # "asynchronous"! (it will also pick up "default").
+        self.commands = test.getCompositeConfigValue("collect_traffic", "asynchronous")
+        self.pyAttributes = test.getConfigValue("collect_traffic_python")
+        if replayFile:
+            self.filterForReplay(replayFile)
+        
+    def makeLineFilters(self):
+        return map(CommandLineFilter, self.commands) + \
+               map(AttributeLineFilter, self.pyAttributes)
+
+    def filterForReplay(self, replayFile):
+        lineFilters = self.makeLineFilters()
+        with open(replayFile) as f:
+            for line in f:
+                lineFilter = self.findMatchingFilter(line, lineFilters)
+                if lineFilter:
+                    lineFilters.remove(lineFilter)
+                if len(lineFilters) == 0:
+                    break
+        for lineFilter in lineFilters:
+            lineFilter.removeItem(self)
+
+    def findMatchingFilter(self, line, lineFilters):
+        for lineFilter in lineFilters:
+            if lineFilter.matches(line):
+                return lineFilter
+
+    def getReplayItems(self, replayFile):
+        self.filterForReplay(replayFile)
+        return self.commands + self.pyAttributes
+
+
 class ModifyTraffic(plugins.ScriptWithArgs):
     # For now, only bother with the client server traffic which is mostly what needs tweaking...
     scriptDoc = "Apply a script to all the client server data"
@@ -160,20 +230,24 @@ class ModifyTraffic(plugins.ScriptWithArgs):
     def __repr__(self):
         return "Updating traffic in"
     def __call__(self, test):
-        try:
-            fileName = test.getFileName("traffic")
-            if fileName:
-                self.describe(test)
-                newFileName = fileName + "tmpedit"
-                newFile = open(newFileName, "w")
-                for trafficText in self.readIntoList(fileName):
-                    newTrafficText = self.getModified(trafficText, test.getDirectory())
-                    self.write(newFile, newTrafficText) 
-                newFile.close()
-                shutil.move(newFileName, fileName)
-        except plugins.TextTestError, e:
-            print e
+        fileName = test.getFileName("traffic")
+        if not fileName:
+            return
 
+        self.describe(test)
+        try:
+            newTrafficTexts = [ self.getModified(t, test.getDirectory()) for t in self.readIntoList(fileName) ]
+        except plugins.TextTestError, e:
+            print str(e).strip()
+            return
+
+        newFileName = fileName + "tmpedit"
+        newFile = open(newFileName, "w")
+        for trafficText in newTrafficTexts:
+            self.write(newFile, trafficText) 
+        newFile.close()
+        shutil.move(newFileName, fileName)
+        
     def readIntoList(self, fileName):
         # Copied from traffic server ReplayInfo, easier than trying to reuse it
         trafficList = []

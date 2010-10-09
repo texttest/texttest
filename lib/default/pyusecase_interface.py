@@ -14,6 +14,7 @@ except ImportError:
 # Compulsory responder to generate application events. Always present. See respond module
 class ApplicationEventResponder(plugins.Responder):
     def __init__(self, *args):
+        plugins.Responder.__init__(self)
         applicationEvent("test configuration to be read", "read")
 
     def notifyLifecycleChange(self, test, state, changeDesc):
@@ -47,5 +48,5 @@ class ApplicationEventResponder(plugins.Responder):
     def notifyAllComplete(self):
         applicationEvent("completion of test actions", "lifecycle")
 
-    def notifyCloseDynamic(self, test, name):
+    def notifyCloseDynamic(self, testArg, name):
         applicationEvent(name + " GUI to be closed")

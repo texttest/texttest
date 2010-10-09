@@ -1,10 +1,8 @@
 #!/usr/local/bin/python
 
-import os, plugins, sys, string, time, types, shutil, datetime, testoverview, logging, operator
-from summarypages import GenerateSummaryPage, GenerateGraphs
-import junitreport
+import os, plugins, sys, time, shutil, datetime, testoverview, logging
+from summarypages import GenerateSummaryPage, GenerateGraphs # only so they become package level entities
 from ndict import seqdict
-from cPickle import Pickler
 from batchutils import calculateBatchDate
 
 class BatchVersionFilter:
@@ -32,11 +30,8 @@ class BatchCategory(plugins.Filter):
     def addTest(self, test):
         self.tests[test.getRelPath()] = test
     def getTestLine(self, test):
-        overall, postText = test.state.getTypeBreakdown()
-        if postText == self.name.upper():
-            # Don't double report here
-            postText = ""
-        elif len(postText) > 0:
+        postText = test.state.getTypeBreakdown()[1]
+        if len(postText) > 0:
             postText = " : " + postText
             return test.getIndent() + "- " + test.paddedRepr() + postText + "\n"
         return test.getIndent() + "- " + repr(test) + postText + "\n"
@@ -156,6 +151,7 @@ class BatchApplicationData:
 
 class BatchResponder(plugins.Responder):
     def __init__(self, optionMap, *args):
+        plugins.Responder.__init__(self)
         self.sessionName = optionMap["b"]
         self.runId = optionMap.get("name", calculateBatchDate()) # use the command-line name if given, else the date
         self.batchAppData = seqdict()
@@ -194,9 +190,6 @@ class MailSender:
         self.runId = runId
         self.diag = logging.getLogger("Mail Sender")
     def send(self, batchDataList):
-        if len(batchDataList) == 0:
-            self.diag.info("No responders for " + repr(app))
-            return
         app = batchDataList[0].suite.app
         mailTitle = self.getMailTitle(app, batchDataList)
         mailContents = self.createMailHeaderSection(mailTitle, app, batchDataList)
@@ -241,10 +234,12 @@ class MailSender:
                     plugins.log.info("done.")
             else:
                 plugins.log.info("not sent: all tests succeeded.")
+
     def exceptionOutput(self):
         exctype, value = sys.exc_info()[:2]
         from traceback import format_exception_only
-        return string.join(format_exception_only(exctype, value), "")       
+        return "".join(format_exception_only(exctype, value))
+    
     def sendMail(self, app, mailContents):
         smtpServer = app.getConfigValue("smtp_server")
         smtpUsername = app.getConfigValue("smtp_server_username")
@@ -255,23 +250,23 @@ class MailSender:
         smtp = SMTP()    
         try:
             smtp.connect(smtpServer)
-        except:
+        except Exception: # Can't use SMTPException, because this raises socket.error usually
             return "Could not connect to SMTP server at " + smtpServer + "\n" + self.exceptionOutput()
         if smtpUsername:
             try:
                 smtp.login(smtpUsername, smtpPassword)
-            except:
+            except Exception:
                 return "Failed to login as '" + smtpUsername + "' to SMTP server at " + smtpServer + \
                     "\n" + self.exceptionOutput()
         try:
             smtp.sendmail(fromAddress, toAddresses, mailContents)
-        except:
+        except Exception:
             return "Mail could not be sent\n" + self.exceptionOutput()
         smtp.quit()
     
     def createMailHeaderSection(self, title, app, batchDataList):
         if self.useCollection(app):
-            return self.getMachineTitle(app, batchDataList) + "\n" + self.runId + "\n" + \
+            return self.getMachineTitle(batchDataList) + "\n" + self.runId + "\n" + \
                    title + "\n\n" # blank line separating headers from body
         else:
             return self.createMailHeaderForSend(self.runId, title, app)
@@ -316,13 +311,15 @@ class MailSender:
             title += self.briefText(totalInCategory, briefDesc)
         # Lose trailing comma
         return title[:-1]
-    def getMachineTitle(self, app, batchDataList):
+
+    def getMachineTitle(self, batchDataList):
         values = []
         for categoryName in self.getCategoryNames(batchDataList):
             countStr = str(self.getCategoryCount(categoryName, batchDataList))
             briefDesc = self.getBriefDescription(categoryName, batchDataList)
             values.append(briefDesc + "=" + countStr)
-        return string.join(values, ',')
+        return ",".join(values)
+    
     def getTotalString(self, batchDataList, method):
         total = 0
         for resp in batchDataList:
@@ -340,7 +337,7 @@ class MailSender:
                 return resp.categories[categoryName].briefDescription
     def getVersionString(self, versions):
         if len(versions) > 0:
-            return " " + string.join(versions, ".")
+            return " " + ".".join(versions)
         else:
             return ""
     def briefText(self, count, description):
@@ -385,17 +382,20 @@ def getVersionName(app, allApps):
 # Allow saving results to a historical repository
 class SaveState(plugins.Responder):
     def __init__(self, optionMap, allApps):
+        plugins.Responder.__init__(self)
         self.batchSession = optionMap["b"]
         self.fileName = self.createFileName(optionMap.get("name"))
         self.repositories = {}
         self.allApps = allApps
         self.diag = logging.getLogger("Save Repository")
+
     def createFileName(self, nameGiven):
         # include the date and the name, if any. Date is used for archiving, name for display
         parts = [ "teststate", calculateBatchDate() ]
         if nameGiven:
             parts.append(nameGiven)
-        return string.join(parts, "_")
+        return "_".join(parts)
+    
     def notifyComplete(self, test):
         if test.state.isComplete(): # might look weird but this notification also comes in scripts, e.g collecting
             test.saveState()
@@ -404,6 +404,7 @@ class SaveState(plugins.Responder):
                 self.saveToRepository(test)
             else:
                 self.diag.info("No repositories for " + repr(test.app) + " in " + repr(self.repositories))
+
     def saveToRepository(self, test):
         testRepository = self.repositories[test.app]
         targetFile = os.path.join(testRepository, test.app.name, getVersionName(test.app, self.allApps), \
@@ -417,10 +418,10 @@ class SaveState(plugins.Responder):
             except IOError:
                 plugins.printWarning("Could not write file at " + targetFile)
     def addSuite(self, suite):
-        testStateRepository = suite.app.getCompositeConfigValue("batch_result_repository", self.batchSession)
+        testStateRepository = os.path.expanduser(suite.app.getCompositeConfigValue("batch_result_repository", self.batchSession))
         self.diag.info("Test state repository is " + repr(testStateRepository))
         if testStateRepository:
-            self.repositories[suite.app] = os.path.abspath(testStateRepository)
+            self.repositories[suite.app] = os.path.abspath(testStateRepository).replace("\\", "/")
 
 class ArchiveRepository(plugins.ScriptWithArgs):
     scriptDoc = "Archive parts of the batch result repository to a history directory"
@@ -442,7 +443,7 @@ class ArchiveRepository(plugins.ScriptWithArgs):
     def dateInSeconds(self, val):
         return time.mktime(time.strptime(val, "%d%b%Y"))
     def setUpApplication(self, app):
-        repository = app.getCompositeConfigValue("batch_result_repository", self.batchSession)
+        repository = os.path.expanduser(app.getCompositeConfigValue("batch_result_repository", self.batchSession))
         self.repository = os.path.join(repository, app.name)
         if not os.path.isdir(self.repository):
             raise plugins.TextTestError, "Batch result repository " + self.repository + " does not exist"
@@ -465,7 +466,7 @@ class ArchiveRepository(plugins.ScriptWithArgs):
         plugins.ensureDirExistsForFile(targetPath)
         try:
             os.rename(fullPath, targetPath)
-        except:
+        except EnvironmentError:
             plugins.log.info("Rename failed: " + fullPath + " " + targetPath)
 
     def getTargetPath(self, fullPath, appName):
@@ -474,7 +475,7 @@ class ArchiveRepository(plugins.ScriptWithArgs):
         appIndex = parts.index(appName)
         parts[appIndex] = appName + "_history"
         parts.reverse()
-        return string.join(parts, os.sep)
+        return os.sep.join(parts)
     def shouldArchive(self, file):
         if not file.startswith("teststate"):
             return False
@@ -489,6 +490,7 @@ class ArchiveRepository(plugins.ScriptWithArgs):
 
 class WebPageResponder(plugins.Responder):
     def __init__(self, optionMap, allApps):
+        plugins.Responder.__init__(self)
         self.batchSession = optionMap.get("b", "default")
         self.cmdLineResourcePage = self.findResourcePage(optionMap.get("coll"))
         self.diag = logging.getLogger("GenerateWebPages")
@@ -517,7 +519,7 @@ class WebPageResponder(plugins.Responder):
                     try:
                         batchFilter.verifyVersions(extra)
                         toGenerate.append(extra)
-                    except:
+                    except plugins.TextTestError:
                         pass # one error message is enough...
         return toGenerate
             
@@ -540,7 +542,7 @@ class WebPageResponder(plugins.Responder):
 
     def generatePagePerApp(self, pageTitle, pageInfo):
         for app, repository in pageInfo:
-            pageTopDir = app.getCompositeConfigValue("historical_report_location", self.batchSession)
+            pageTopDir = os.path.expanduser(app.getCompositeConfigValue("historical_report_location", self.batchSession))
             pageDir = os.path.join(pageTopDir, app.name)
             extraVersions = self.getExtraVersions(app)
             self.diag.info("Found extra versions " + repr(extraVersions))
@@ -567,7 +569,7 @@ class WebPageResponder(plugins.Responder):
     def getAppRepositoryInfo(self):
         appInfo = seqdict()
         for app in self.appsToGenerate:
-            repository = app.getCompositeConfigValue("batch_result_repository", self.batchSession)
+            repository = os.path.expanduser(app.getCompositeConfigValue("batch_result_repository", self.batchSession))
             if not repository:
                 continue
             repository = os.path.join(repository, app.name)
@@ -580,7 +582,7 @@ class WebPageResponder(plugins.Responder):
         return appInfo
 
     def transformToCommon(self, pageInfo):
-        allApps = [ app for app, r in pageInfo ]
+        allApps = [ app for app, _ in pageInfo ]
         version = getVersionName(allApps[0], self.appsToGenerate)
         extraVersions, relevantSubDirs = [], seqdict()
         for app, repository in pageInfo:
@@ -601,7 +603,7 @@ class WebPageResponder(plugins.Responder):
     
     def generateCommonPage(self, pageTitle, pageInfo):
         relevantSubDirs, getConfigValue, version, extraVersions, pageSubTitle, descriptionInfo = self.transformToCommon(pageInfo)
-        pageDir = getConfigValue("historical_report_location", self.batchSession)
+        pageDir = os.path.expanduser(getConfigValue("historical_report_location", self.batchSession))
         self.makeAndGenerate(relevantSubDirs, getConfigValue, pageDir, pageTitle,
                              pageSubTitle, version, extraVersions, descriptionInfo)
         
@@ -611,7 +613,7 @@ class WebPageResponder(plugins.Responder):
             plugins.ensureDirectoryExists(os.path.join(pageDir, resourcePage))
         try:
             self.generateWebPages(subDirs, getConfigValue, pageDir, resourcePages, *args)
-        except:
+        except Exception: # pragma: no cover - robustness only, shouldn't be reachable
             sys.stderr.write("Caught exception while generating web pages :\n")
             plugins.printException()
         
@@ -669,15 +671,16 @@ class CollectFiles(plugins.ScriptWithArgs):
         self.mailSender = MailSender(self.batchSession)
         self.runId = "" # depends on what we pick up from collected files
         self.diag = logging.getLogger("batch collect")
-        self.userName = argDict.get("tmp", "")
-        if self.userName:
-            plugins.log.info("Collecting batch files created by user " + self.userName + "...")
+        self.tmpInfo = argDict.get("tmp", "")
+        if self.tmpInfo:
+            plugins.log.info("Collecting batch files from temp directory " + self.tmpInfo + "...")
         else:
             plugins.log.info("Collecting batch files locally...")
+            
     def setUpApplication(self, app):
         fileBodies = []
         totalValues = seqdict()
-        rootDir = app.getPreviousWriteDirInfo(self.userName)
+        rootDir = app.getPreviousWriteDirInfo(self.tmpInfo)
         if not os.path.isdir(rootDir):
             sys.stderr.write("No temporary directory found at " + rootDir + " - not collecting batch reports.\n")
             return
@@ -702,6 +705,7 @@ class CollectFiles(plugins.ScriptWithArgs):
         mailContents += self.getBody(fileBodies, missingVersions)
         allSuccess = len(totalValues.keys()) == 1 and totalValues.keys()[0] == "succeeded"
         self.mailSender.sendOrStoreMail(app, mailContents, isAllSuccess=allSuccess)
+
     def matchesApp(self, dir, app):
         suffix = app.versionSuffix()
         return dir.startswith(app.name + suffix) or dir.startswith(self.batchSession + suffix)
@@ -805,7 +809,6 @@ class CollectFiles(plugins.ScriptWithArgs):
             parsedBodies.append((header, parsedSubBody))
         totalBody += "\n"
 
-        sectionMap = {}
         prevSectionHeader = ""
         for sectionHeader in sectionHeaders:
             parsedSections = []

@@ -79,8 +79,9 @@ if __name__ == "__main__":
         sys.stderr.write(stderr)
         sys.stderr.flush()
         exitCode = int(exitStr)
-        if exitCode < 0:
+        if exitCode < 0 or (exitCode > 128 and exitCode <= 160):
             # process was killed (on UNIX...)
+            # We use the conventions of negative exit code, or 128 + killed signal for this
             # We should hang if we haven't been killed ourselves (though we might be replaying on Windows anyway)
             if os.name == "posix":
                 signal.signal(signal.SIGINT, signal.SIG_DFL)

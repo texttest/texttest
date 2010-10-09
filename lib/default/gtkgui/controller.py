@@ -21,15 +21,15 @@ pygtkVersion = gtk.pygtk_version
 requiredPygtkVersion = texttest_version.required_pygtk_version
 if pygtkVersion < requiredPygtkVersion:
     raiseException("TextTest " + texttest_version.version + " GUI requires at least PyGTK " +
-                   ".".join(map(lambda l: str(l), requiredPygtkVersion)) + ": found version " +
-                   ".".join(map(lambda l: str(l), pygtkVersion)))
+                   ".".join(map(str, requiredPygtkVersion)) + ": found version " +
+                   ".".join(map(str, pygtkVersion)))
 
 try:
     import gobject
-except:
-    raiseException("Unable to import module 'gobject'")
+except Exception, e:
+    raiseException("Unable to import module 'gobject' - " + str(e))
 
-import gtkusecase, testtree, filetrees, statusviews, textinfo, actionholders, version_control, guiplugins, guiutils, plugins, os, sys, logging
+import testtree, filetrees, statusviews, textinfo, actionholders, version_control, guiplugins, guiutils, plugins, os, sys, logging
 from copy import copy
 from ndict import seqdict
 
@@ -38,7 +38,8 @@ class IdleHandlerManager:
     def __init__(self):
         self.sourceId = -1
         self.diag = logging.getLogger("Idle Handlers")
-    def notifyActionStart(self, message="", lock=True):
+        
+    def notifyActionStart(self, lock=True):
         # To make it possible to have an while-events-process loop
         # to update the GUI during actions, we need to make sure the idle
         # process isn't run. We hence remove that for a while here ...
@@ -52,19 +53,28 @@ class IdleHandlerManager:
         if self.sourceId >= 0:
             raise plugins.TextTestError, "No Action currently exists to have progress on!"
 
-    def notifyActionStop(self, *args):
+    def notifyActionStop(self):
         # Activate idle function again, see comment in notifyActionStart
         self.enableHandler()
         
     def addSuites(self, *args):
         self.enableHandler()
 
-    def enableHandler(self):
-        if self.sourceId == -1:
+    def getIdlePriority(self):
+        try:
             # Same priority as PyUseCase replay, so they get called interchangeably
             # Non-default as a workaround for bugs in filechooser handling in GTK
+            from gtkusecase import PRIORITY_PYUSECASE_IDLE
+            return PRIORITY_PYUSECASE_IDLE
+        except ImportError:
+            # It should still work if we can't find PyUseCase
+            # so we hardcode the right answer...
+            return gobject.PRIORITY_DEFAULT_IDLE + 20
+
+    def enableHandler(self):
+        if self.sourceId == -1:
             self.sourceId = plugins.Observable.threadedNotificationHandler.enablePoll(gobject.idle_add,
-                                                                                      priority=gtkusecase.PRIORITY_PYUSECASE_IDLE)
+                                                                                      priority=self.getIdlePriority())
             self.diag.info("Adding idle handler")
 
     def disableHandler(self):
@@ -86,6 +96,7 @@ class GUIController(plugins.Responder, plugins.Observable):
         includeSite, includePersonal = optionMap.configPathOptions()
         self.readGtkRCFiles(includeSite, includePersonal)
         self.dynamic = not optionMap.has_key("gx")
+        self.initialApps = self.storeInitial(allApps)
         self.interactiveActionHandler = InteractiveActionHandler(self.dynamic, allApps, optionMap)
         self.setUpGlobals(allApps, includePersonal)
         plugins.Responder.__init__(self)
@@ -95,14 +106,15 @@ class GUIController(plugins.Responder, plugins.Observable):
         self.appFileGUI = filetrees.ApplicationFileGUI(self.dynamic, allApps)
         self.textInfoGUI = textinfo.TextInfoGUI(self.dynamic)
         runName = optionMap.get("name", "")
-        self.runInfoGUI = textinfo.RunInfoGUI(self.dynamic, runName)
-        self.testRunInfoGUI = textinfo.TestRunInfoGUI(self.dynamic)
+        reconnect = optionMap.has_key("reconnect")
+        self.runInfoGUI = textinfo.RunInfoGUI(self.dynamic, runName, reconnect)
+        self.testRunInfoGUI = textinfo.TestRunInfoGUI(self.dynamic, reconnect)
         self.progressMonitor = statusviews.TestProgressMonitor(self.dynamic, testCount)
         self.progressBarGUI = statusviews.ProgressBarGUI(self.dynamic, testCount)
         self.idleManager = IdleHandlerManager()
         uiManager = gtk.UIManager()
         self.defaultActionGUIs, self.actionTabGUIs = self.interactiveActionHandler.getPluginGUIs(uiManager)
-        self.menuBarGUI, self.toolBarGUI, testPopupGUI, testFilePopupGUI = self.createMenuAndToolBarGUIs(allApps, uiManager, includeSite, includePersonal)
+        self.menuBarGUI, self.toolBarGUI, testPopupGUI, testFilePopupGUI = self.createMenuAndToolBarGUIs(uiManager, includeSite, includePersonal)
         self.testColumnGUI = testtree.TestColumnGUI(self.dynamic, testCount)
         self.testTreeGUI = testtree.TestTreeGUI(self.dynamic, allApps, testPopupGUI, self.testColumnGUI)
         self.testFileGUI = filetrees.TestFileGUI(self.dynamic, testFilePopupGUI)
@@ -112,27 +124,44 @@ class GUIController(plugins.Responder, plugins.Observable):
 
         self.topWindowGUI = self.createTopWindowGUI(allApps, runName)
 
+    def storeInitial(self, allApps):
+        initial = set()
+        for app in allApps:
+            initial.add(app)
+            initial.update(set(app.extras))
+        return initial
+
     def setUpGlobals(self, allApps, includePersonal):
-        global guilog, guiConfig
-        guilog = logging.getLogger("gui log")
+        global guiConfig
         defaultColours = self.interactiveActionHandler.getColourDictionary()
         defaultAccelerators = self.interactiveActionHandler.getDefaultAccelerators()
-        guiConfig = guiutils.GUIConfig(self.dynamic, allApps, defaultColours, defaultAccelerators, guilog, includePersonal)
+        guiConfig = guiutils.GUIConfig(self.dynamic, allApps, defaultColours, defaultAccelerators, includePersonal)
+        self.setUpEntryCompletion(guiConfig)
 
         for module in [ guiutils, guiplugins ]:
-            module.guilog = guilog
             module.guiConfig = guiConfig
+
+    def setUpEntryCompletion(self, guiConfig):
+        matching = guiConfig.getValue("gui_entry_completion_matching")
+        if matching != 0:
+            inline = guiConfig.getValue("gui_entry_completion_inline")
+            completions = guiConfig.getCompositeValue("gui_entry_completions", "", modeDependent=True)
+            from entrycompletion import manager
+            manager.start(matching, inline, completions)
 
     def getTestTreeObservers(self):
         return [ self.testColumnGUI, self.testFileGUI, self.textInfoGUI, self.testRunInfoGUI ] + \
                self.allActionGUIs() + [ self.rightWindowGUI ]
     def allActionGUIs(self):
         return self.defaultActionGUIs + self.actionTabGUIs
+
     def getLifecycleObservers(self):
         # only the things that want to know about lifecycle changes irrespective of what's selected,
         # otherwise we go via the test tree. Include add/remove as lifecycle, also final completion
-        return [ self.progressBarGUI, self.progressMonitor, self.testTreeGUI,
-                 self.statusMonitor, self.runInfoGUI, self.idleManager, self.topWindowGUI ]
+        return [ self.progressBarGUI, self.progressMonitor, self.textInfoGUI.timeMonitor, self.testTreeGUI, 
+                 self.statusMonitor, self.runInfoGUI, self.idleManager, self.topWindowGUI ] + \
+                 filter(lambda obs: hasattr(obs, "notifyAllComplete"), self.defaultActionGUIs)
+
     def getActionObservers(self):
         return [ self.progressMonitor, self.testTreeGUI, self.testFileGUI, self.statusMonitor,
                  self.runInfoGUI, self.idleManager, self.topWindowGUI ]
@@ -193,19 +222,20 @@ class GUIController(plugins.Responder, plugins.Observable):
 
     def readGtkRCFiles(self, *args):
         for file in plugins.findDataPaths([ ".gtkrc-2.0" ], *args):
-            gtk.rc_add_default_file(file)
+            gtk.rc_parse(file)
 
     def addSuites(self, suites):
         for observer in self.getAddSuitesObservers():
             observer.addSuites(suites)
 
-        self.updateValidApps([ suite.app for suite in suites ])
+        currApps = set([ suite.app for suite in suites ])
+        newApps = currApps.difference(self.initialApps)
+        self.updateValidApps(newApps)
 
-    def updateValidApps(self, apps):
+    def updateValidApps(self, newApps):
         for actionGUI in self.allActionGUIs():
-            for app in apps:
-                if self.interactiveActionHandler.classValid(actionGUI.__class__, app):
-                    actionGUI.checkValid(app)
+            for app in newApps:
+                actionGUI.checkValid(app)
         
     def shouldShrinkMainPanes(self):
         # If we maximise there is no point in banning pane shrinking: there is nothing to gain anyway and
@@ -218,9 +248,9 @@ class GUIController(plugins.Responder, plugins.Observable):
         boxGUI = VBoxGUI(parts)
         return TopWindowGUI(boxGUI, self.dynamic, allApps, name)
 
-    def createMenuAndToolBarGUIs(self, allApps, uiManager, *args):
+    def createMenuAndToolBarGUIs(self, uiManager, *args):
         menuNames = self.interactiveActionHandler.getMenuNames()
-        menu = actionholders.MenuBarGUI(allApps, self.dynamic, uiManager, self.allActionGUIs(), menuNames, *args)
+        menu = actionholders.MenuBarGUI(self.dynamic, uiManager, self.allActionGUIs(), menuNames, *args)
         toolbar = actionholders.ToolBarGUI(uiManager, self.progressBarGUI)
         testPopup, testFilePopup = actionholders.createPopupGUIs(uiManager)
         return menu, toolbar, testPopup, testFilePopup
@@ -228,46 +258,63 @@ class GUIController(plugins.Responder, plugins.Observable):
     def createRightWindowGUI(self):
         testTab = PaneGUI(self.testFileGUI, self.textInfoGUI, horizontal=False)
         runInfoTab = PaneGUI(self.runInfoGUI, self.testRunInfoGUI, horizontal=False)
-        tabGUIs = [ self.appFileGUI, testTab, self.progressMonitor, runInfoTab ] + self.actionTabGUIs
-        return actionholders.ChangeableNotebookGUI(tabGUIs)
+        tabGUIs = [ testTab, self.progressMonitor] + self.actionTabGUIs + [ self.appFileGUI, runInfoTab ]
+        return actionholders.NotebookGUI(tabGUIs)
 
     def run(self):
         gtk.main()
+        
     def notifyExit(self):
         gtk.main_quit()
+
     def notifyLifecycleChange(self, test, state, changeDesc):
         test.stateInGui = state
+        if state.isComplete():
+            # Don't allow GUI-related changes to override the completed status
+            test.state = state
         self.notify("LifecycleChange", test, state, changeDesc)
+
     def notifyDescriptionChange(self, test):
         self.notify("DescriptionChange", test)
+
     def notifyFileChange(self, test):
         self.notify("FileChange", test)
+
     def notifyContentChange(self, *args, **kwargs):
         self.notify("ContentChange", *args, **kwargs)
+
     def notifyNameChange(self, *args, **kwargs):
         self.notify("NameChange", *args, **kwargs)
+
     def notifyStartRead(self):
         if not self.dynamic:
             self.notify("Status", "Reading tests ...")
-            self.notify("ActionStart", "", False)
+            self.notify("ActionStart", False)
+
     def notifyAllRead(self, suites):
         if not self.dynamic:
             self.notify("Status", "Reading tests completed at " + plugins.localtime() + ".")
             self.notify("ActionStop")
         self.notify("AllRead", suites)
         if self.dynamic and len(suites) == 0:
-            guilog.info("There weren't any tests to run, terminating...")
             self.topWindowGUI.forceQuit()
 
     def notifyAdd(self, test, *args, **kwargs):
         test.stateInGui = test.state
         self.notify("Add", test, *args, **kwargs)
+
     def notifyStatus(self, *args, **kwargs):
         self.notify("Status", *args, **kwargs)
+
     def notifyRemove(self, test):
         self.notify("Remove", test)
+
     def notifyAllComplete(self):
         self.notify("AllComplete")
+
+    def notifyQuit(self, *args):
+        self.notify("Quit", *args)
+
 
 class TopWindowGUI(guiutils.ContainerGUI):
     EXIT_NOTIFIED = 1
@@ -279,15 +326,17 @@ class TopWindowGUI(guiutils.ContainerGUI):
         self.name = name
         self.allApps = copy(allApps)
         self.exitStatus = 0
+        self.diag = logging.getLogger("Top Window")
         if not self.dynamic:
             self.exitStatus |= self.COMPLETION_NOTIFIED # no tests to wait for...
 
     def getCheckoutTitle(self):
         allCheckouts = []
-        for app in self.allApps:
-            checkout = app.checkout
-            if checkout and not checkout in allCheckouts:
-                allCheckouts.append(checkout)
+        for topApp in self.allApps:
+            for app in [ topApp ] + topApp.extras:
+                checkout = app.checkout
+                if checkout and not checkout in allCheckouts:
+                    allCheckouts.append(checkout)
         if len(allCheckouts) == 0:
             return ""
         elif len(allCheckouts) == 1:
@@ -312,10 +361,14 @@ class TopWindowGUI(guiutils.ContainerGUI):
         try:
             import stockitems
             stockitems.register(self.topWindow)
-        except: #pragma : no cover - should never happen
+        except Exception: #pragma : no cover - should never happen
             plugins.printWarning("Failed to register texttest stock icons.")
             plugins.printException()
-        self.topWindow.set_icon_from_file(self.getIcon())
+        iconFile = self.getIcon()
+        try:
+            self.topWindow.set_icon_from_file(iconFile)
+        except Exception, e:
+            plugins.printWarning("Failed to set texttest window icon.\n" + str(e), stdout=True)
         self.setWindowTitle()
 
         self.topWindow.add(self.subguis[0].createView())
@@ -328,22 +381,43 @@ class TopWindowGUI(guiutils.ContainerGUI):
         return self.topWindow
 
     def setWindowTitle(self):
-        allAppNames = [ repr(app) for app in self.allApps ]
-        appNameDesc = ",".join(allAppNames)
         if self.dynamic:
             title = "TextTest dynamic GUI : "
             if self.name:
                 title += self.name
             else:
+                appNameDesc = self.dynamicAppNameTitle()
                 checkoutTitle = self.getCheckoutTitle()
                 title += "testing " + appNameDesc + checkoutTitle + \
                          " (started at " + plugins.startTimeString() + ")"
             self.topWindow.set_title(title)
         else:
+            appNameDesc = self.staticAppNameTitle()
             if len(appNameDesc) > 0:
                 appNameDesc = " for " + appNameDesc
             self.topWindow.set_title("TextTest static GUI : management of tests" + appNameDesc)
 
+    def staticAppNameTitle(self):
+        allAppNames = [ repr(app) for app in self.allApps ]
+        return ",".join(allAppNames)
+
+    def dynamicAppNameTitle(self):
+        appsWithVersions = self.organiseApps()
+        allAppNames = [ self.appRepresentation(appName, versionSuffices) for appName, versionSuffices in appsWithVersions.items() ]
+        return ",".join(allAppNames)
+
+    def appRepresentation(self, appName, versionSuffices):
+        if len(versionSuffices) == 1:
+            return appName + versionSuffices[0]
+        else:
+            return appName
+
+    def organiseApps(self):
+        appsWithVersions = seqdict()
+        for app in self.allApps:
+            appsWithVersions.setdefault(app.fullName(), []).append(app.versionSuffix())
+        return appsWithVersions
+        
     def getIcon(self):
         imageDir = plugins.installationDir("images")
         if self.dynamic:
@@ -366,7 +440,7 @@ class TopWindowGUI(guiutils.ContainerGUI):
 
     def notifyQuit(self, *args):
         self.exitStatus |= self.EXIT_NOTIFIED
-        self.notify("KillProcesses")
+        self.notify("KillProcesses", *args)
         if self.exitStatus & self.COMPLETION_NOTIFIED:
             self.notify("Exit")
         else:
@@ -380,35 +454,38 @@ class TopWindowGUI(guiutils.ContainerGUI):
     def adjustSize(self):
         if guiConfig.getWindowOption("maximize"):
             self.topWindow.maximize()
-            guilog.info("Maximising top window...")
         else:
-            width, widthDescriptor = self.getWindowDimension("width")
-            height, heightDescriptor  = self.getWindowDimension("height")
+            width = self.getWindowDimension("width")
+            height = self.getWindowDimension("height")
             self.topWindow.set_default_size(width, height)
-            guilog.info(widthDescriptor)
-            guilog.info(heightDescriptor)
 
     def getWindowDimension(self, dimensionName):
         pixelDimension = guiConfig.getWindowOption(dimensionName + "_pixels")
         if pixelDimension != "<not set>":
-            descriptor = "Setting window " + dimensionName + " to " + pixelDimension + " pixels."
-            return int(pixelDimension), descriptor
+            self.diag.info("Setting window " + dimensionName + " to " + pixelDimension + " pixels.")
+            return int(pixelDimension)
         else:
-            fullSize = eval("gtk.gdk.screen_" + dimensionName + "()")
+            fullSize = getattr(gtk.gdk, "screen_" + dimensionName)()
             proportion = float(guiConfig.getWindowOption(dimensionName + "_screen"))
-            descriptor = "Setting window " + dimensionName + " to " + repr(int(100.0 * proportion)) + "% of screen."
-            return int(fullSize * proportion), descriptor
+            self.diag.info("Setting window " + dimensionName + " to " + repr(int(100.0 * proportion)) + "% of screen.")
+            return int(fullSize * proportion)
 
 
 class ShortcutBarGUI(guiutils.SubGUI):
     def __init__(self, *args):
+        guiutils.SubGUI.__init__(self)
         # Do this first, so we set up interceptors and so on early on
         try:
             from gtkusecase import createShortcutBar
-            self.widget = createShortcutBar(uiMapFiles=plugins.findDataPaths([ "*.uimap" ], *args))
+            from version_control.custom_widgets_pyusecase import customEventTypes
+            uiMapFiles = plugins.findDataPaths([ "*.uimap" ], *args)
+            self.widget = createShortcutBar(uiMapFiles=uiMapFiles, customEventTypes=customEventTypes)
             self.widget.show()
         except ImportError:
-            self.widget = gtk.HBox() # Anything really, but it should be a widget (for if PyUseCase isn't installed)
+            self.widget = None
+
+    def shouldShow(self):
+        return self.widget is not None
         
     def getWidgetName(self):
         return "_Shortcut bar"
@@ -422,9 +499,10 @@ class VBoxGUI(guiutils.ContainerGUI):
         box = gtk.VBox()
         expandWidgets = [ gtk.HPaned, gtk.ScrolledWindow ]
         for subgui in self.subguis:
-            view = subgui.createView()
-            expand = view.__class__ in expandWidgets
-            box.pack_start(view, expand=expand, fill=expand)
+            if subgui.shouldShow():
+                view = subgui.createView()
+                expand = view.__class__ in expandWidgets
+                box.pack_start(view, expand=expand, fill=expand)
 
         box.show()
         return box
@@ -438,6 +516,7 @@ class PaneGUI(guiutils.ContainerGUI):
         self.separatorHandler = None
         self.position = 0
         self.maxPosition = 0
+        self.initialMaxSize = 0
         self.shrink = shrink
 
     def getSeparatorPositionFromConfig(self):
@@ -453,20 +532,25 @@ class PaneGUI(guiutils.ContainerGUI):
             return gtk.VPaned()
 
     def createView(self):
-        self.paned = self.createPaned()
-        self.separatorHandler = self.paned.connect('notify::max-position', self.adjustSeparator)
         frames = []
         for subgui in self.subguis:
-            frame = gtk.Frame()
-            frame.set_shadow_type(gtk.SHADOW_IN)
-            frame.add(subgui.createView())
-            frame.show()
-            frames.append(frame)
+            if subgui.shouldShow():
+                frame = gtk.Frame()
+                frame.set_shadow_type(gtk.SHADOW_IN)
+                frame.add(subgui.createView())
+                frame.show()
+                frames.append(frame)
 
-        self.paned.pack1(frames[0], resize=True)
-        self.paned.pack2(frames[1], resize=True)
-        self.paned.show()
-        return self.paned
+        if len(frames) > 1:
+            self.paned = self.createPaned()
+            self.paned.pack1(frames[0], resize=True)
+            self.paned.pack2(frames[1], resize=True)
+            self.separatorHandler = self.paned.connect('notify::max-position', self.adjustSeparator)
+            self.paned.show()
+            return self.paned
+        else:
+            frames[0].show()
+            return frames[0]
 
     def adjustSeparator(self, *args):
         self.initialMaxSize = self.paned.get_property("max-position")
@@ -626,7 +710,7 @@ class InteractiveActionHandler:
             return InteractiveActionConfig()
         except ImportError:
             self.rejectedModules.append(module) # Make sure we don't try and import it again
-            if module == "default_gui":
+            if module == "default_gui": # pragma: no cover - only to aid debugging default_gui
                 raise
         
     def getInstances(self):
@@ -666,8 +750,9 @@ class InteractiveActionHandler:
         else:
             classNames = seqdict()
             for app in self.allApps:
-                replacements = plugins.ResponseAggregator([ x.getReplacements for x in self.getAllIntvConfigs([ app ]) ])()
-                for config in self.getAllIntvConfigs([ app ]):
+                allConfigsForApp = self.getAllIntvConfigs([ app ])
+                replacements = plugins.ResponseAggregator([ x.getReplacements for x in allConfigsForApp])()
+                for config in allConfigsForApp:
                     if className in config.getInteractiveActionClasses(self.dynamic):
                         realClassName = replacements.get(className, className)
                         classNames.setdefault(realClassName, []).append(app)
@@ -683,11 +768,3 @@ class InteractiveActionHandler:
             # If some invalid interactive action is provided, need to know which
             sys.stderr.write("Error with interactive action " + str(className) + "\n")
             raise
-
-    def classValid(self, className, app):
-        for config in self.getAllIntvConfigs([ app ]):
-            if config.isValid(className):
-                return True
-            
-        self.diag.info("All configuration objects rejected " + str(className) + " class as invalid")
-        return False

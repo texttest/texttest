@@ -3,12 +3,16 @@
 The various classes that launch external programs to view files
 """
 
-import gtk, plugins, os
-from default.gtkgui import guiplugins # from .. import guiplugins when we drop Python 2.4 support
-from ndict import seqdict
+import plugins, os
+from .. import guiplugins
 from string import Template
+from copy import copy
 
 class FileViewAction(guiplugins.ActionGUI):
+    def __init__(self, *args, **kw):
+        self.performArgs = []
+        guiplugins.ActionGUI.__init__(self, *args, **kw)
+        
     def singleTestOnly(self):
         return True
 
@@ -25,13 +29,6 @@ class FileViewAction(guiplugins.ActionGUI):
 
     def useFiltered(self):
         return False
-
-    def getConfirmationMessage(self):
-        maxFileSize = self.getMaxFileSize()
-        if maxFileSize >= 0:
-            largestFileSize = self.getLargestFileSize()
-            
-        return ""
 
     def getLargestFileSize(self, f, *args):
         return os.path.getsize(f)            
@@ -114,20 +111,15 @@ class FileViewAction(guiplugins.ActionGUI):
             return ""
 
     def getRemoteHost(self):
-        if os.name == "posix" and len(self.currTestSelection) > 0:
+        if len(self.currTestSelection) > 0:
             state = self.currTestSelection[0].stateInGui
             if hasattr(state, "executionHosts") and len(state.executionHosts) > 0:
-                remoteHost = state.executionHosts[0]
-                localhost = plugins.gethostname()
-                if remoteHost != localhost:
-                    return remoteHost
+                return plugins.interpretHostname(state.executionHosts[0])
+        return "localhost"
 
-    def getFullDisplay(self):
-        display = os.getenv("DISPLAY", "")
-        if display.startswith(":"):
-            return plugins.gethostname() + display
-        else:
-            return display.replace("localhost", plugins.gethostname())
+    def getRemoteArgs(self, cmdArgs):
+        remoteHost = self.getRemoteHost()
+        return self.currTestSelection[0].app.getCommandArgsOn(remoteHost, cmdArgs, graphical=True)
 
     def getSignalsSent(self):
         return [ "ViewerStarted" ]
@@ -184,7 +176,6 @@ class ViewInEditor(FileViewAction):
         cmdArgs, descriptor, env = self.getViewCommand(fileName, viewTool)
         description = descriptor + " " + os.path.basename(fileName)
         refresh = str(exitHandler != self.editingComplete)
-        guiplugins.guilog.info("Viewing file " + fileName + " using '" + descriptor + "', refresh set to " + refresh)
         self.startViewer(cmdArgs, description=description, env=env,
                          exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
         
@@ -205,10 +196,7 @@ class ViewInEditor(FileViewAction):
             cmdArgs = [ interpreter ] + cmdArgs
 
         if guiplugins.guiConfig.getCompositeValue("view_file_on_remote_machine", self.getStem(fileName)):
-            remoteHost = self.getRemoteHost()
-            if remoteHost:
-                remoteShellProgram = guiplugins.guiConfig.getValue("remote_shell_program")
-                cmdArgs = [ remoteShellProgram, remoteHost, "env DISPLAY=" + self.getFullDisplay() + " " + " ".join(cmdArgs) ]
+            cmdArgs = self.getRemoteArgs(cmdArgs)
 
         return cmdArgs, descriptor, env
 
@@ -238,7 +226,7 @@ class ViewConfigFileInEditor(ViewInEditor):
         self.currFileSelection = [ (fileName, apps) ]
         self.runInteractive()
 
-    def findExitHandlerInfo(self, fileName, apps):
+    def findExitHandlerInfo(self, dummy, apps):
         return self.configFileChanged, (apps,)
 
     def configFileChanged(self, apps):
@@ -284,8 +272,7 @@ class ViewTestFileInEditor(ViewInEditor):
             if len(tests) > 0:
                 # refresh tests if this edited
                 return self.handleTestSuiteEdit, (tests,)
-
-        return self.editingComplete, ()
+        return self.staticGUIEditingComplete, (copy(self.currTestSelection), fileName)
 
     def getTestsForFile(self, stem, fileName):
         tests = []
@@ -303,6 +290,14 @@ class ViewTestFileInEditor(ViewInEditor):
     def handleOptionsEdit(self, tests):
         for test in tests:
             test.filesChanged()
+        self.editingComplete()
+
+    def getSignalsSent(self):
+        return [ "RefreshFilePreviews" ] + ViewInEditor.getSignalsSent(self)
+
+    def staticGUIEditingComplete(self, tests, fileName):
+        for test in tests:
+            self.notify("RefreshFilePreviews", test, fileName)
         self.editingComplete()
 
 
@@ -381,14 +376,11 @@ class ViewFileDifferences(FileViewAction):
     def _performOnFile(self, diffProgram, tmpFile, comparison):
         stdFile = comparison.getStdFile(self.useFiltered(), self.extraPostfix())
         description = diffProgram + " " + os.path.basename(stdFile) + " " + os.path.basename(tmpFile)
-        guiplugins.guilog.info("Starting graphical difference comparison using '" + diffProgram + "':")
-        guiplugins.guilog.info("-- original file : " + stdFile)
-        guiplugins.guilog.info("--  current file : " + tmpFile)
         cmdArgs = plugins.splitcmd(diffProgram) + [ stdFile, tmpFile ]
         self.startViewer(cmdArgs, description=description, exitHandler=self.diffingComplete)
 
     def diffingComplete(self, *args):
-        self.applicationEvent("the graphical diff program to terminate")
+        self.applicationEvent("the " + self.getToolDescription() + " to terminate")
 
 
 class ViewFilteredFileDifferences(ViewFileDifferences):
@@ -439,117 +431,27 @@ class FollowFile(FileViewAction):
                guiplugins.guiConfig.getValue("follow_file_by_default")
 
     def getFollowProgram(self, followProgram, fileName):
-        title = '"' + self.currTestSelection[0].name + " (" + os.path.basename(fileName) + ')"'
+        title = '"File ' + os.path.basename(fileName) + " from test " + self.currTestSelection[0].name + '"'
         envDir = { "TEXTTEST_FOLLOW_FILE_TITLE" : title } # Title of the window when following file progress
         return Template(followProgram).safe_substitute(envDir)
 
     def getFollowCommand(self, program, fileName):
-        remoteHost = self.getRemoteHost()
-        if remoteHost:
-            remoteShellProgram = guiplugins.guiConfig.getValue("remote_shell_program")
-            return [ remoteShellProgram, remoteHost, "env DISPLAY=" + self.getFullDisplay() + " " + \
-                     program + " " + fileName ]
-        else:
-            return plugins.splitcmd(program) + [ fileName ]
-
+        localArgs = plugins.splitcmd(program) + [ fileName ]
+        return self.getRemoteArgs(localArgs)
+        
     def _performOnFile(self, followProgram, fileName, comparison):
         useFile = self.fileToFollow(fileName, comparison)
         useProgram = self.getFollowProgram(followProgram, fileName)
-        guiplugins.guilog.info("Following file " + useFile + " using '" + useProgram + "'")
         description = useProgram + " " + os.path.basename(useFile)
         cmdArgs = self.getFollowCommand(useProgram, useFile)
         self.startViewer(cmdArgs, description=description, exitHandler=self.followComplete)
 
     def followComplete(self, *args):
-        self.applicationEvent("the file-following program to terminate")
-
-
-class ShowFileProperties(guiplugins.ActionResultDialogGUI):
-    def __init__(self, allApps, dynamic, *args):
-        self.dynamic = dynamic
-        guiplugins.ActionGUI.__init__(self, allApps)
-    def _getStockId(self):
-        return "properties"
-    def isActiveOnCurrent(self, *args):
-        return ((not self.dynamic) or len(self.currTestSelection) == 1) and \
-               len(self.currFileSelection) > 0
-    def _getTitle(self):
-        return "_File Properties"
-    def getTooltip(self):
-        return "Show properties of selected files"
-    def describeTests(self):
-        return str(len(self.currFileSelection)) + " files"
-    def getAllProperties(self):
-        errors, properties = [], []
-        for file, comp in self.currFileSelection:
-            if self.dynamic and comp:
-                self.processFile(comp.tmpFile, properties, errors)
-                self.processFile(comp.stdFile, properties, errors)
-            else:
-                self.processFile(file, properties, errors)
-
-        if len(errors):
-            self.showErrorDialog("Failed to get file properties:\n" + "\n".join(errors))
-
-        return properties
-    def processFile(self, file, properties, errors):
-        if file:
-            try:
-                prop = plugins.FileProperties(file)
-                properties.append(prop)
-            except Exception, e:
-                errors.append(plugins.getExceptionString())
-
-    # xalign = 1.0 means right aligned, 0.0 means left aligned
-    def justify(self, text, xalign = 0.0):
-        alignment = gtk.Alignment()
-        alignment.set(xalign, 0.0, 0.0, 0.0)
-        label = gtk.Label(text)
-        alignment.add(label)
-        return alignment
-
-    def addContents(self):
-        dirToProperties = seqdict()
-        props = self.getAllProperties()
-        for prop in props:
-            dirToProperties.setdefault(prop.dir, []).append(prop)
-        vbox = self.createVBox(dirToProperties)
-        self.dialog.vbox.pack_start(vbox, expand=True, fill=True)
-
-    def createVBox(self, dirToProperties):
-        vbox = gtk.VBox()
-        for dir, properties in dirToProperties.items():
-            expander = gtk.Expander()
-            expander.set_label_widget(self.justify(dir))
-            table = gtk.Table(len(properties), 7)
-            table.set_col_spacings(5)
-            row = 0
-            for prop in properties:
-                values = prop.getUnixRepresentation()
-                table.attach(self.justify(values[0] + values[1], 1.0), 0, 1, row, row + 1)
-                table.attach(self.justify(values[2], 1.0), 1, 2, row, row + 1)
-                table.attach(self.justify(values[3], 0.0), 2, 3, row, row + 1)
-                table.attach(self.justify(values[4], 0.0), 3, 4, row, row + 1)
-                table.attach(self.justify(values[5], 1.0), 4, 5, row, row + 1)
-                table.attach(self.justify(values[6], 1.0), 5, 6, row, row + 1)
-                table.attach(self.justify(prop.filename, 0.0), 6, 7, row, row + 1)
-                row += 1
-            hbox = gtk.HBox()
-            hbox.pack_start(table, expand=False, fill=False)
-            innerBorder = gtk.Alignment()
-            innerBorder.set_padding(5, 0, 0, 0)
-            innerBorder.add(hbox)
-            expander.add(innerBorder)
-            expander.set_expanded(True)
-            border = gtk.Alignment()
-            border.set_padding(5, 5, 5, 5)
-            border.add(expander)
-            vbox.pack_start(border, expand=False, fill=False)
-        return vbox
+        self.applicationEvent("the " + self.getToolDescription() + " to terminate")
 
 
 def getInteractiveActionClasses(dynamic):
-    classes = [ ShowFileProperties, ViewTestFileInEditor ]
+    classes = [ ViewTestFileInEditor ]
     if dynamic:
         classes += [ ViewFilteredTestFileInEditor, ViewContentFilteredTestFileInEditor,
                      ViewOrigFileInEditor, ViewContentFilteredOrigFileInEditor, ViewFilteredOrigFileInEditor,

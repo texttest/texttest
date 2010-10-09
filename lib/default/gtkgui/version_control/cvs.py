@@ -1,6 +1,6 @@
 
 import gtk, vcs_independent, plugins, datetime, shutil, time, os
-from default.gtkgui import guiutils
+from .. import guiutils
 from ndict import seqdict
 
 #
@@ -94,12 +94,9 @@ class CVSInterface(vcs_independent.VersionControlInterface):
     # Move in source control also. In CVS this implies a remove and then an add
     def _movePath(self, oldPath, newPath):
         self.checkInstalled() # throws if it isn't, avoid moving paths around
-        if self.isVersionControlled(oldPath):
-            self.copyPath(oldPath, newPath)
-            self.removePath(oldPath)
-            self.callProgramOnFiles("add", newPath, recursive=True)
-        else:
-            vcs_independent.VersionControlInterface._movePath(oldPath, newPath)
+        self.copyPath(oldPath, newPath)
+        self.removePath(oldPath)
+        self.callProgramOnFiles("add", newPath, recursive=True)
             
     def getMoveCommand(self):
         return "cvs rm' and 'cvs add"

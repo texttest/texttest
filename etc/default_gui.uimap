@@ -155,18 +155,12 @@ toggled.false = hide shortcut bar
 toggled.true = show status bar
 toggled.false = hide status bar
 
-[Type=HPaned]
-notify-position = drag vertical pane separator so left half uses
-
 [Name=Test Tree]
 clicked.Test Name = toggle test sorting order
 row-expanded = show test suite
 row-collapsed = hide test suite
 button-press-event = view actions for test
 changed.selection = set test selection to
-
-[Type=VPaned]
-notify-position = drag horizonal pane separator so top half uses
 
 [Name=File Tree]
 row-activated = select file
@@ -279,10 +273,6 @@ activate = activate from ignore configuration files
 [Label=Enable self-diagnostics]
 toggled.true = check enable self-diagnostics
 toggled.false = uncheck enable self-diagnostics
-
-[Label=(Re-)record command-line or client-server traffic]
-toggled.true = check (re-)record command-line or client-server traffic
-toggled.false = uncheck (re-)record command-line or client-server traffic
 
 [Label=Keep temporary write-directories]
 toggled.true = check keep temporary write-directories
@@ -560,14 +550,13 @@ activate = activate from checkout to use for recording
 toggled.true = check also record command-line or client-server traffic
 toggled.false = uncheck also record command-line or client-server traffic
 
-[Label=Automatically replay test after recording it]
-toggled.true = check automatically replay test after recording it
-toggled.false = uncheck automatically replay test after recording it
+[Label=Disabled]
+toggled.true = disable auto-replay
 
 [Label=Auto-replay invisible]
 toggled.true = choose auto-replay invisible
 
-[Label=Auto-replay in dynamic GUI]
+[Label=Using dynamic GUI]
 toggled.true = choose auto-replay in dynamic gui
 
 [Name=Suite Name]
@@ -902,9 +891,6 @@ activate = show help menu
 [Name=GUI testing option chooser]
 changed = select gui-testing option named
 
-[Name=VCS dialog separator]
-notify-position = drag vertical pane separator so left half uses
-
 [Name=Use stored test-files for Selection]
 toggled.true = use stored test-files
 
@@ -940,4 +926,41 @@ activate = test the run-dependent text filtering
 
 [Name=Test Filtering Window]
 response.accept = close file-viewing window
+
+[Label=Full difference report]
+toggled.true = search in the full difference report
+
+[Name=Only slowest tests]
+changed = set number of slowest tests to select =
+
+[Name=Only fastest tests]
+changed = set number of fastest tests to select =
+
+[Title=Record Use-Case]
+response.accept = press record
+response.cancel = press cancel
+
+[Label=gtk-ok]
+clicked = 
+
+[Label=gtk-cancel]
+clicked = 
+
+[Name=Number of times to try to rerun the test if the issue is triggered]
+changed = set rerun attempts to
+
+[Label=gtk-close]
+clicked = 
+
+[Label=gtk-no]
+clicked = 
+
+[Title=Rerun selected tests]
+response.accept = perform rerun
+
+[Label=Record New Only]
+toggled.true = set option for recording only new traffic interactions
+
+[Label=Record All]
+toggled.true = set option for recording all traffic interactions
 

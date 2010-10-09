@@ -3,9 +3,9 @@
 Module containing code that's only run in the slave jobs when running with a grid engine / queue system
 """
 
-import plugins, os, sys, time, socket
+import plugins, os, sys, time, socket, signal
 from utils import *
-from default import RunTest
+from default.runtest import RunTest
 from default.sandbox import FindExecutionHosts, MachineInfoFinder
 from default.actionrunner import ActionRunner
 from cPickle import dumps
@@ -14,6 +14,15 @@ from cPickle import dumps
 class RunTestInSlave(RunTest):
     def getBriefText(self, execMachines):
         return "RUN (" + ",".join(execMachines) + ")"
+
+    def getKillInfoOtherSignal(self, test):
+        if self.killSignal == signal.SIGUSR1:
+            return self.getUserSignalKillInfo(test, "1")
+        elif self.killSignal == signal.SIGUSR2:
+            return self.getUserSignalKillInfo(test, "2")
+        else:
+            return RunTest.getKillInfoOtherSignal(self, test)
+    
     def getUserSignalKillInfo(self, test, userSignalNumber):
         moduleName = queueSystemName(test.app).lower()
         command = "from " + moduleName + " import getUserSignalKillInfo as _getUserSignalKillInfo"
@@ -26,6 +35,7 @@ class SocketResponder(plugins.Responder,plugins.Observable):
         plugins.Responder.__init__(self)
         plugins.Observable.__init__(self)
         self.killed = False
+        self.testsForRerun = []
         self.serverAddress = self.getServerAddress(optionMap)
     def getServerAddress(self, optionMap):
         servAddrStr = optionMap.get("servaddr", os.getenv("TEXTTEST_MIM_SERVER"))
@@ -34,7 +44,7 @@ class SocketResponder(plugins.Responder,plugins.Observable):
         host, port = servAddrStr.split(":")
         return host, int(port)
     def connect(self, sendSocket):
-        for attempt in range(5):
+        for i in range(5):
             try:
                 sendSocket.connect(self.serverAddress)
                 return True
@@ -48,21 +58,27 @@ class SocketResponder(plugins.Responder,plugins.Observable):
         from traceback import format_exception_only
         return "".join(format_exception_only(exctype, value))
 
-    def notifyKillProcesses(self, sig):
+    def notifyKillProcesses(self, *args):
         self.killed = True
 
-    def getProcessIdentifier(self):
+    def getProcessIdentifier(self, test):
         identifier = str(os.getpid())
         if self.killed:
             identifier += ".NO_REUSE"
+        if test in self.testsForRerun:
+            self.testsForRerun.remove(test)
+            identifier += ".RERUN_TEST"
         return identifier
+
+    def notifyRerun(self, test):
+        self.testsForRerun.append(test)
 
     def notifyLifecycleChange(self, test, state, changeDesc):
         testData = socketSerialise(test)
         pickleData = dumps(state)
-        fullData = self.getProcessIdentifier() + os.linesep + testData + os.linesep + pickleData
+        fullData = self.getProcessIdentifier(test) + os.linesep + testData + os.linesep + pickleData
         sleepTime = 1
-        for attempt in range(9):
+        for i in range(9):
             sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             if not self.connect(sendSocket):
                 return self.notify("NoMoreExtraTests")
@@ -99,6 +115,9 @@ class SocketResponder(plugins.Responder,plugins.Observable):
 class SlaveActionRunner(ActionRunner):
     def notifyAllRead(self, *args):
         pass # don't add a terminator, we might get given more tests via the socket (code above)
+
+    def notifyRerun(self, *args):
+        pass # don't rerun directly in the slave, tell the master and give it a chance to send the job elsewhere
 
     def notifyNoMoreExtraTests(self):
         self.diag.info("No more extra tests, adding terminator")

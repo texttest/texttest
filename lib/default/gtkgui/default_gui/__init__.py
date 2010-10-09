@@ -7,18 +7,19 @@ try:
     from helpdialogs import *
     from adminactions import *
     from fileviewers import *
+    from fileproperties import *
     from selectandfilter import *
     from runningactions import *
     from changeteststate import *
     from housekeeping import *
     
-    from default.gtkgui.guiplugins import InteractiveActionConfig as BaseInteractiveActionConfig
+    from ..guiplugins import InteractiveActionConfig as BaseInteractiveActionConfig
 except ImportError, e:
     # Might want the default accelerators, don't crash if so
     if "No module named gtk" in str(e):
         class BaseInteractiveActionConfig:
             pass
-    else:
+    else: # pragma: no cover - debugging aid only
         raise
 
 
@@ -33,10 +34,11 @@ class InteractiveActionConfig(BaseInteractiveActionConfig):
         else:
             classes += adminactions.getInteractiveActionClasses()
 
+        classes += selectandfilter.getInteractiveActionClasses(dynamic)
         classes += runningactions.getInteractiveActionClasses(dynamic)    
         classes += helpdialogs.getInteractiveActionClasses()
+        classes += fileproperties.getInteractiveActionClasses()
         classes += fileviewers.getInteractiveActionClasses(dynamic)
-        classes += selectandfilter.getInteractiveActionClasses(dynamic)
         return classes
     
     def getDefaultAccelerators(self):

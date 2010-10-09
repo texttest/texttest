@@ -14,6 +14,11 @@ class QueueSystemConfig(default.Config):
     def __init__(self, *args):
         default.Config.__init__(self, *args)
         self.useQueueSystem = None
+
+    def getRunningGroupNames(self):
+        groups = default.Config.getRunningGroupNames(self)
+        groups.insert(2, ("Grid", "l", 1))
+        return groups
         
     def addToOptionGroups(self, apps, groups):
         default.Config.addToOptionGroups(self, apps, groups)
@@ -34,7 +39,7 @@ class QueueSystemConfig(default.Config):
                     descriptions.append("Submit the tests to " + qsName + " only if " + str(minTestCount) + " or more are selected.")
                     defaultValue = 2
                 group.addSwitch("l", "Use grid", value=defaultValue, options=options, description=descriptions)
-            elif group.name.startswith("Advanced"):
+            elif group.name.startswith("Grid"):
                 group.addOption("R", "Request grid resource", possibleValues = self.getPossibleResources())
                 group.addOption("q", "Request grid queue", possibleValues = self.getPossibleQueues())
                 group.addSwitch("keepslave", "Keep data files and successful tests until termination")
@@ -68,31 +73,29 @@ class QueueSystemConfig(default.Config):
             if self.optionMap.has_key(localFlag):
                 return False
 
-        if self.optionMap.has_key("l"):
-            value = self.optionValue("l")
-            if value is None or value == "1":
-                return False
-            elif value == "2" and self.optionMap.has_key("count"):
-                count = int(self.optionMap.get("count"))
-                minCount = min((app.getConfigValue("queue_system_min_test_count") for app in allApps))
-                return count >= minCount
-
-        if self.optionMap.has_key("reconnect"):
-            # GUI gives us a numeric value, can also get it from the command line
-            return self.optionValue("reconnfull") in [ "2", "grid" ]
+        value = self.optionIntValue("l")
+        if value == 1: # local
+            return False
+        elif value == 2 and self.optionMap.has_key("count"):
+            count = int(self.optionMap.get("count"))
+            minCount = min((app.getConfigValue("queue_system_min_test_count") for app in allApps))
+            return count >= minCount
         else:
-            return True
+            if self.optionMap.has_key("reconnect"):
+                # GUI gives us a numeric value, can also get it from the command line
+                return self.optionValue("reconnfull") in [ "2", "grid" ]
+            else:
+                return True
     
     def hasExplicitInterface(self):
         return self.slaveRun() or default.Config.hasExplicitInterface(self)
+
     def slaveRun(self):
         return self.optionMap.has_key("slave")
+
     def getWriteDirectoryName(self, app):
-        slaveDir = self.optionMap.get("slave")
-        if slaveDir:
-            return slaveDir
-        else:
-            return default.Config.getWriteDirectoryName(self, app)
+        return self.optionMap.get("slave") or default.Config.getWriteDirectoryName(self, app)
+    
     def noFileAdvice(self):
         if self.useQueueSystem:
             return "Try re-running the test, and either use local mode, or check the box for keeping\n" + \
@@ -104,9 +107,9 @@ class QueueSystemConfig(default.Config):
         if self.slaveRun():
             if self.isReconnecting():
                 fromConfig = self.getExtraVersionsFromConfig(app)
-                return self.reconnectConfig.getExtraVersions(app, fromConfig)
-            else:
-                return []
+                # This has side-effects which we need, but we shouldn't actually have any extra versions...
+                self.reconnectConfig.getExtraVersions(app, fromConfig)
+            return []
         else:
             return default.Config.getExtraVersions(self, app)
 
@@ -125,9 +128,12 @@ class QueueSystemConfig(default.Config):
             writeDir = test.getDirectory(temporary=1)
             plugins.rmtree(writeDir)
         else:
-            for dataFile in test.getDataFileNames():
+            for dataFile in self.getDataFiles(test):
                 fullPath = test.makeTmpFileName(dataFile, forComparison=0)
                 plugins.removePath(fullPath)
+
+    def getDataFiles(self, test):
+        return test.getDataFileNames()
                 
     def _cleanWriteDirectory(self, suite):
         if self.slaveRun():
@@ -218,22 +224,20 @@ class QueueSystemConfig(default.Config):
         else:
             return default.Config.getMachineInfoFinder(self)
 
-    def printHelpDescription(self):
-        print """The queuesystem configuration is a published configuration, 
-               documented online at http://www.texttest.org/TextTest/docs/queuesystem"""
-
     def setApplicationDefaults(self, app):
         default.Config.setApplicationDefaults(self, app)
         app.setConfigDefault("default_queue", "texttest_default", "Which queue to submit tests to by default")
         app.setConfigDefault("min_time_for_performance_force", -1, "Minimum CPU time for test to always run on performance machines")
-        app.setConfigDefault("view_file_on_remote_machine", { "default" : 0 }, "Do we try to start viewing programs on the test execution machine?")
         app.setConfigDefault("queue_system_module", "SGE", "Which queue system (grid engine) software to use. (\"SGE\" or \"LSF\")")
         app.setConfigDefault("performance_test_resource", { "default" : [] }, "Resources to request from queue system for performance testing")
         app.setConfigDefault("parallel_environment_name", "*", "(SGE) Which SGE parallel environment to use when SUT is parallel")
         app.setConfigDefault("queue_system_max_capacity", 100000, "Maximum possible number of parallel similar jobs in the available grid")
         app.setConfigDefault("queue_system_min_test_count", 0, "Minimum number of tests before it's worth submitting them to the grid")
-        
+        app.setConfigDefault("queue_system_resource", [], "Grid engine resources required to locate test execution machines")
+        app.setConfigDefault("queue_system_processes", 1, "Number of processes the grid engine should reserve for tests")
+        app.setConfigDefault("queue_system_submit_args", "", "Additional arguments to provide to grid engine submission command")
 
+        
 class DocumentEnvironment(default.DocumentEnvironment):
     def setUpApplication(self, app):
         default.DocumentEnvironment.setUpApplication(self, app)

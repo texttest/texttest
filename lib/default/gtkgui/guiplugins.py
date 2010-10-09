@@ -1,11 +1,8 @@
 
 
-import gtk, gobject, entrycompletion, plugins, os, shutil, time, subprocess, operator, types, logging
-from guiutils import guilog, guiConfig, SubGUI, GUIConfig
+import gtk, gobject, entrycompletion, plugins, os, subprocess, types, logging
+from guiutils import guiConfig, SubGUI, GUIConfig
 from jobprocess import killSubProcessAndChildren
-from copy import copy, deepcopy
-from glob import glob
-from stat import *
 from ndict import seqdict
         
 # The purpose of this class is to provide a means to monitor externally
@@ -41,7 +38,7 @@ class ProcessTerminationMonitor(plugins.Observable):
             return process._handle
 
     def startProcess(self, cmdArgs, description = "", killOnTermination=True, exitHandler=None, exitHandlerArgs=(), **kwargs):
-        process = subprocess.Popen(cmdArgs, stdin=open(os.devnull), startupinfo=plugins.getProcessStartUpInfo(), **kwargs)
+        process = subprocess.Popen(cmdArgs, stdin=open(os.devnull), **kwargs)
         pidOrHandle = self.getProcessIdentifier(process)
         self.exitHandlers[int(pidOrHandle)] = (exitHandler, exitHandlerArgs)
         if killOnTermination:
@@ -61,12 +58,13 @@ class ProcessTerminationMonitor(plugins.Observable):
         # Don't leak processes
         if len(self.processesForKill) == 0:
             return
+        diag = logging.getLogger("kill processes")
         self.notify("Status", "Terminating all external viewers ...")
         for pid, (process, description) in self.processesForKill.items():
             if self.exitHandlers.has_key(pid):
                 self.exitHandlers.pop(pid) # don't call exit handlers in this case, we're terminating
-            self.notify("ActionProgress", "")
-            guilog.info("Killing '" + description + "' interactive process")
+            self.notify("ActionProgress")
+            diag.info("Killing '" + description + "' interactive process")
             killSubProcessAndChildren(process, sig)
         
 processMonitor = ProcessTerminationMonitor()
@@ -228,7 +226,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         self.showErrorWarningDialog(message, gtk.STOCK_DIALOG_WARNING, "Warning") 
     def showErrorWarningDialog(self, message, stockIcon, alarmLevel):
         dialog = self.createAlarmDialog(self.getParentWindow(), message, stockIcon, alarmLevel)
-        yesButton = dialog.add_button(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT)
+        dialog.add_button(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT)
         dialog.set_default_response(gtk.RESPONSE_ACCEPT)
         dialog.connect("response", self._cleanDialog)
         dialog.show_all()
@@ -245,14 +243,11 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
     def showQueryDialog(self, parent, message, stockIcon, alarmLevel, respondMethod):
         dialog = self.createAlarmDialog(parent, message, stockIcon, alarmLevel)
         dialog.set_default_response(gtk.RESPONSE_NO)
-        noButton = dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
-        yesButton = dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
+        dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
+        dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
         dialog.connect("response", respondMethod)
         dialog.show_all()
         
-    def cleanDialog(self, button, saidOK, dialog):
-        self._cleanDialog(dialog)
-
     def _cleanDialog(self, dialog, *args):
         entrycompletion.manager.collectCompletions()
         dialog.hide() # Can't destroy it, we might still want to read stuff from it
@@ -311,7 +306,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         message = self.messageBeforePerform()
         if message != None:
             self.notify("Status", message)
-        self.notify("ActionStart", message)
+        self.notify("ActionStart")
         self.notify("ActionProgress")
         self.performOnCurrent()
         message = self.messageAfterPerform()
@@ -319,7 +314,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
             self.notify("Status", message)
         
     def endPerform(self):
-        self.notify("ActionStop", "")
+        self.notify("ActionStop")
 
     def cancel(self):
         self.notify("Status", "Action cancelled.")
@@ -336,17 +331,9 @@ class ActionGUI(BasicActionGUI):
         BasicActionGUI.__init__(self)
         for app in allApps:
             self._checkAllValid(app)
-
-    def setTooltipText(self, widget, text):
-        if hasattr(widget, "set_tooltip_text"): # New tooltip API
-            widget.set_tooltip_text(text)
-        else:
-            if not hasattr(self, "tooltips"):
-                self.tooltips = gtk.Tooltips()
-            self.tooltips.set_tip(widget, text)
-        
+    
     def checkValid(self, app):
-        self._checkAllValid(app)
+        self._checkValid(app)
         self.noApps = False
 
     def _checkAllValid(self, app):
@@ -360,7 +347,7 @@ class ActionGUI(BasicActionGUI):
         else:
             self.diag.info(str(self.__class__) + " invalid for " + repr(app))
         
-    def isValidForApp(self, app):
+    def isValidForApp(self, dummyApp):
         return True
 
     def shouldShow(self):
@@ -392,7 +379,7 @@ class ActionGUI(BasicActionGUI):
         self.diag.info("New test selection for " + self.getTitle() + "=" + repr(tests) + " : new active = " + repr(newActive))
         return newActive
         
-    def notifyLifecycleChange(self, test, state, desc):
+    def notifyLifecycleChange(self, test, state, *args):
         newActive = self.isActiveOnCurrent(test, state)
         self.setSensitivity(newActive)
 
@@ -421,7 +408,7 @@ class ActionGUI(BasicActionGUI):
 
     def describeTests(self):
         if len(self.currTestSelection) == 1:
-            return repr(self.currTestSelection[0])
+            return "test " + self.currTestSelection[0].getRelPath()
         else:
             return str(len(self.currTestSelection)) + " tests"
 
@@ -437,7 +424,7 @@ class ActionGUI(BasicActionGUI):
         # In theory all this should be automatic, but it appears not to work
         if self.getStockId():
             button.set_image(gtk.image_new_from_stock(self.getStockId(), gtk.ICON_SIZE_BUTTON))
-        self.setTooltipText(button, self.getTooltip())
+        button.set_tooltip_text(self.getTooltip())
         button.show()
         return button
     
@@ -445,17 +432,21 @@ class ActionGUI(BasicActionGUI):
 # These actions consist of bringing up a dialog and only doing that
 # (i.e. the dialog is not a mechanism to steer how the action should be run)
 class ActionResultDialogGUI(ActionGUI):
+    def __init__(self, *args, **kw):
+        self.dialog = None
+        ActionGUI.__init__(self, *args, **kw)
+        
     def performOnCurrent(self):
         self.dialog = self.createDialog()
-        textContents = self.addContents()
+        self.addContents()
         self.createButtons()
         self.dialog.show_all()
         
-    def addContents(self):
+    def addContents(self): # pragma: no cover - documentation only
         pass
     
     def createButtons(self):
-        okButton = self.dialog.add_button(gtk.STOCK_CLOSE, gtk.RESPONSE_ACCEPT)
+        self.dialog.add_button(gtk.STOCK_CLOSE, gtk.RESPONSE_ACCEPT)
         self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
         self.dialog.connect("response", self.respond)
 
@@ -471,8 +462,8 @@ class ComboBoxListFinder:
         entries = []
         self.model.foreach(self.getText, entries)
         return entries
-    def getText(self, model, path, iter, entries):
-        text = self.model.get_value(iter, self.textColumn)
+    def getText(self, model, dummyPath, iter, entries):
+        text = model.get_value(iter, self.textColumn)
         entries.append(text)
 
 
@@ -493,6 +484,7 @@ class RadioGroupIndexer:
 class OptionGroupGUI(ActionGUI):
     def __init__(self, *args):
         ActionGUI.__init__(self, *args)
+        self.groupBoxes = {}
         self.optionGroup = plugins.OptionGroup(self.getTabTitle())
         # convenience shortcuts...
         self.addOption = self.optionGroup.addOption
@@ -512,18 +504,24 @@ class OptionGroupGUI(ActionGUI):
         label = gtk.EventBox()
         label.add(gtk.Label(option.name + separator))
         if option.description and type(option.description) == types.StringType:
-            self.setTooltipText(label, option.description)
+            label.set_tooltip_text(option.description)
         return label
 
     def connectEntry(self, option, entryOrBuffer):
-        entryOrBuffer.set_text(option.getValue())
+        entryOrBuffer.set_text(str(option.getValue()))
         # Don't pass entry.set_text directly, it will mess up PyUseCase's programmatic method interception
-        option.setMethods(self.getGetTextMethod(entryOrBuffer), lambda t: entryOrBuffer.set_text(t))
+        option.setMethods(self.getGetTextMethod(entryOrBuffer), lambda t: entryOrBuffer.set_text(str(t)))
         if option.changeMethod:
             entryOrBuffer.connect("changed", option.changeMethod)
         
     def getGetTextMethod(self, widget):
-        if isinstance(widget, gtk.Entry):
+        if isinstance(widget, gtk.SpinButton):
+            # Would be nice to return widget.get_value_as_int but that returns the wrong answer from
+            # dialogs that have been closed
+            def get_text():
+                return int(widget.get_text())
+            return get_text
+        elif isinstance(widget, gtk.Entry):
             return widget.get_text
         else:
             def get_text():
@@ -548,16 +546,15 @@ class OptionGroupGUI(ActionGUI):
         return hbox
 
     def setConfigOverride(self, switch, index, option, *args):
-        cleanOption = option.split("\n")[0].replace("_", "")
         configName = self.getNaming(switch.name, option, *args)
         if index == switch.getValue() or guiConfig.getCompositeValue("gui_entry_overrides", configName) == "1":
             switch.setValue(index)
 
-    def getNaming(self, switchName, cleanOption, *args):
+    def getNaming(self, switchName, option, *args):
         if len(switchName) > 0:
-            return switchName + ":" + cleanOption
+            return switchName + ":" + option
         else:
-            return cleanOption
+            return option
 
     def createRadioButtons(self, switch, optionGroup):
         buttons = []
@@ -568,7 +565,7 @@ class OptionGroupGUI(ActionGUI):
             radioButton = gtk.RadioButton(mainRadioButton, option, use_underline=True)
             self.setRadioButtonName(radioButton, option, optionGroup)
             if individualToolTips:
-                self.setTooltipText(radioButton, switch.description[index])
+                radioButton.set_tooltip_text(switch.description[index])
                 
             buttons.append(radioButton)
             if not mainRadioButton:
@@ -581,6 +578,33 @@ class OptionGroupGUI(ActionGUI):
         indexer = RadioGroupIndexer(buttons)
         switch.setMethods(indexer.getActiveIndex, indexer.setActiveIndex)
         return buttons
+
+    def createFrame(self, group, name):
+        frame = gtk.Frame(name)
+        frame.set_label_align(0.5, 0.5)
+        frame.set_shadow_type(gtk.SHADOW_IN)
+        frame.add(self.createGroupBox(group))
+        return frame
+
+    def createGroupBox(self, group):
+        frameBox = gtk.VBox()
+        frameBox.set_border_width(10)
+        self.fillVBox(frameBox, group)
+        self.groupBoxes[group] = frameBox
+        return frameBox
+
+    def setGroupSensitivity(self, group, *args, **kw):
+        widget = self.groupBoxes.get(group)
+        self.setChildSensitivity(widget, *args, **kw)
+
+    def setChildSensitivity(self, widget, sensitive, ignoreWidget=None):
+        if widget is ignoreWidget or isinstance(widget, gtk.RadioButton):
+            return
+        elif isinstance(widget, (gtk.Entry, gtk.CheckButton, gtk.ComboBoxEntry)):
+            widget.set_sensitive(sensitive)
+        elif hasattr(widget, "get_children"):
+            for child in widget.get_children():
+                self.setChildSensitivity(child, sensitive, ignoreWidget)
 
     def setRadioButtonName(self, *args):
         pass # Don't bother by default, it's easy to set stupid names...
@@ -613,7 +637,7 @@ class OptionGroupGUI(ActionGUI):
         self.updateForConfig(switch)
         checkButton = gtk.CheckButton(switch.name)
         if switch.description:
-            self.setTooltipText(checkButton, switch.description)
+            checkButton.set_tooltip_text(switch.description)
         
         if int(switch.getValue()):
             checkButton.set_active(True)
@@ -649,9 +673,17 @@ class OptionGroupGUI(ActionGUI):
             box = gtk.HBox()
             if option.usePossibleValues():
                 widget, entry = self.createComboBoxEntry(option)
+                widget.set_name(optionName + " (Combo Box)")
                 box.pack_start(widget, expand=True, fill=True)
             else:
-                entry = gtk.Entry()
+                value = option.getValue()
+                if isinstance(value, int):
+                    adjustment = gtk.Adjustment(value=value, lower=self.getLowerBoundForSpinButtons(),
+                                                upper=1000, step_incr=1)
+                    entry = gtk.SpinButton(adjustment)
+                    entry.set_numeric(True)
+                else:
+                    entry = gtk.Entry()
                 box.pack_start(entry, expand=True, fill=True)
 
             entry.set_name(optionName)
@@ -661,6 +693,9 @@ class OptionGroupGUI(ActionGUI):
                 entrycompletion.manager.addTextCompletion(text)
 
             return box, entry
+
+    def getLowerBoundForSpinButtons(self):
+        return 0
   
     def getConfigOptions(self, option):
         fromConfig = guiConfig.getCompositeValue("gui_entry_options", option.name)
@@ -673,16 +708,25 @@ class OptionGroupGUI(ActionGUI):
         for key, value in optionGroup.getOptionsForCmdLine(onlyKeys):
             args.append("-" + key)
             if value:
-                args.append(value)
+                args.append(str(value))
         return args
+
+    def hasPerformance(self, apps, *args):
+        for app in apps:
+            if app.hasPerformance(*args):
+                return True
+        return False
 
     def addApplicationOptions(self, allApps, optionGroup, inputOptions={}):
         if len(allApps) > 0:
             for app in allApps:
                 app.addToOptionGroups(allApps, [ optionGroup ])
         else:
-            configObject = plugins.importAndCall("default", "getConfig", inputOptions)
+            configObject = self.makeDefaultConfigObject(inputOptions)
             configObject.addToOptionGroups(allApps, [ optionGroup ])
+
+    def makeDefaultConfigObject(self, inputOptions):
+        return plugins.importAndCall("default", "getConfig", inputOptions)
 
 
     
@@ -754,7 +798,7 @@ class ActionTabGUI(OptionGroupGUI):
         button = gtk.Button("Reset Tab")
         button.set_name("Reset " + self.getTabTitle() + " Tab")
         button.connect("clicked", self.notifyReset)
-        self.setTooltipText(button, "Reset all the settings in the current tab to their default values")
+        button.set_tooltip_text("Reset all the settings in the current tab to their default values")
         button.show()
         return button
     
@@ -775,7 +819,7 @@ class ActionTabGUI(OptionGroupGUI):
             button.connect("clicked", self.showFileChooser, entry, option)
         return (box, entry)
     
-    def showFileChooser(self, widget, entry, option):
+    def showFileChooser(self, dummyWidget, entry, option):
         dialog = gtk.FileChooserDialog("Select a file",
                                        self.getParentWindow(),
                                        gtk.FILE_CHOOSER_ACTION_OPEN,
@@ -792,7 +836,7 @@ class ActionTabGUI(OptionGroupGUI):
         dialog.connect("response", self.respondChooser, entry)
         # If current entry forms a valid path, set that as default
         currPath = entry.get_text()
-        currDir, currFile = os.path.split(currPath)
+        currDir = os.path.split(currPath)[0]
         if os.path.isdir(currDir):
             dialog.set_current_folder(currDir)
         elif defaultFolder and os.path.isdir(os.path.abspath(defaultFolder)):
@@ -865,12 +909,12 @@ class ActionDialogGUI(OptionGroupGUI):
         OptionGroupGUI._respond(self, *args)
 
     def tryResize(self, dialog):
-        hordiv, verdiv = self.getResizeDivisors()
-        if hordiv is not None:
-            parentSize = self.topWindow.get_size()
-            dialog.resize(int(parentSize[0] / hordiv), int(parentSize[0] / verdiv))
+        horfrac, verfrac = self.getSizeAsWindowFraction()
+        if horfrac is not None:
+            width, height = self.topWindow.get_size()
+            dialog.resize(int(width * horfrac), int(height * verfrac))
         
-    def getResizeDivisors(self):
+    def getSizeAsWindowFraction(self):
         return None, None
     
     def setSensitivity(self, newValue):
@@ -893,9 +937,9 @@ class ActionDialogGUI(OptionGroupGUI):
             return gtk.STOCK_OK
 
     def createButtons(self, dialog, fileChooser, fileChooserOption):
-        cancelButton = dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL)
+        dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL)
         actionScriptName = self.getTooltip()
-        okButton = dialog.add_button(self.getOkStock(actionScriptName.lower()), gtk.RESPONSE_ACCEPT)
+        dialog.add_button(self.getOkStock(actionScriptName.lower()), gtk.RESPONSE_ACCEPT)
         dialog.set_default_response(gtk.RESPONSE_ACCEPT)
         if fileChooser:
             fileChooser.connect("file-activated", self.simulateResponse, dialog)
@@ -904,7 +948,7 @@ class ActionDialogGUI(OptionGroupGUI):
         
         dialog.connect("response", self.respond)
 
-    def simulateResponse(self, fileChooser, dialog):
+    def simulateResponse(self, dummy, dialog):
         dialog.response(gtk.RESPONSE_ACCEPT)
         
     def fillVBox(self, vbox, optionGroup):
@@ -945,9 +989,13 @@ class ActionDialogGUI(OptionGroupGUI):
     def addLabel(self, vbox, label):
         hbox = gtk.HBox()
         hbox.pack_start(label, expand=False, fill=False)        
-        vbox.pack_start(hbox, expand=False, fill=False)
+        vbox.pack_start(hbox, expand=False, fill=False, padding=2)
                 
     def createRadioButtonCollection(self, switch, optionGroup):
+        if optionGroup is not self.optionGroup:
+            # If we're not part of the main group, we've got a frame already, store horizontally in this case
+            return OptionGroupGUI.createRadioButtonCollection(self, switch, optionGroup)
+
         if switch.name:
             frame = gtk.Frame(switch.name)
         else:
@@ -979,7 +1027,10 @@ class ActionDialogGUI(OptionGroupGUI):
         # with which name, to save the selection.
         fileChooser.set_current_folder(startFolder)
         for folder in folders:
-            fileChooser.add_shortcut_folder(folder)
+            try:
+                fileChooser.add_shortcut_folder(folder)
+            except gobject.GError:
+                pass # Get this if the folder is already added, e.g. if it's the home directory
         if option.selectFile and option.defaultValue:
             fileChooser.set_filename(option.defaultValue)
             
@@ -1003,22 +1054,3 @@ class InteractiveActionConfig:
     def getReplacements(self):
         # Return a dictionary mapping classes above to what to replace them with
         return {}
-
-    def contains(self, cls, classes):
-        if cls in classes:
-            return True
-        
-        for currCls in classes:
-            if isinstance(currCls, plugins.Callable) and currCls.method == cls:
-                return True
-        return False
-    
-    def isValid(self, className):
-        replacements = self.getReplacements()
-        if className in replacements.values():
-            return True
-        elif replacements.has_key(className):
-            return False
-        else:
-            return self.contains(className, self.getInteractiveActionClasses(True)) or \
-                   self.contains(className, self.getInteractiveActionClasses(False))

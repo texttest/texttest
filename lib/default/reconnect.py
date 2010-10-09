@@ -1,5 +1,5 @@
 
-import os, shutil, plugins, operator, logging
+import os, shutil, plugins, operator, logging, time, datetime
 from glob import glob
 from itertools import groupby
 
@@ -44,13 +44,14 @@ class ReconnectConfig:
             return self._findRunDir(".".join(parts[:-1]))
 
     def getExtraVersions(self, app, givenExtras):
+        self.diag = logging.getLogger("Reconnection")
         self.diag.info("Finding reconnect 'extra versions' for " + repr(app) + " given tmp info '" + repr(self.reconnectTmpInfo) + "'")
         if self.reconnectTmpInfo and os.path.isdir(self.reconnectTmpInfo):
             # See if this is an explicitly provided run directory
             dirName = os.path.normpath(self.reconnectTmpInfo)
-            versionSets = self.getVersionSetsTopDir(dirName)
-            self.diag.info("Directory has version sets " + repr(versionSets))
-            if versionSets is not None:
+            versionLists = self.getVersionListsTopDir(dirName)
+            self.diag.info("Directory has version lists " + repr(versionLists))
+            if versionLists is not None:
                 return self.getVersionsFromDirs(app, [ dirName ], givenExtras)
 
         fetchDir = app.getPreviousWriteDirInfo(self.reconnectTmpInfo)
@@ -70,14 +71,6 @@ class ReconnectConfig:
             return []
         else:
             return self.getVersionsFromDirs(app, runDirs, givenExtras)
-
-    def versionsCorrect(self, app, dirName):
-        versionSets = self.getVersionSetsTopDir(dirName)
-        self.diag.info("Directory has version sets " + repr(versionSets))
-        if versionSets is None:
-            return False
-        appVersionSet = frozenset(app.versions)
-        return reduce(operator.or_, (appVersionSet.issubset(s) for s in versionSets), False)
     
     def findAppDirUnder(self, app, runDir):
         # Don't pay attention to dated versions here...
@@ -89,17 +82,32 @@ class ReconnectConfig:
                 return os.path.join(runDir, f)
     
     def getReconnectRunDirs(self, app, fetchDir):
-        correctNames = filter(lambda f: self.versionsCorrect(app, f), os.listdir(fetchDir))
-        correctNames.sort() # Need to do this for determinism, and because itertools.groupby (lower down) requires it
+        correctNames = sorted(os.listdir(fetchDir))
         fullPaths = [ os.path.join(fetchDir, d) for d in correctNames ]
         return filter(lambda d: self.isRunDirectoryFor(app, d), fullPaths)
 
-    def isRunDirectoryFor(self, app, d):
-        appDirRoot = os.path.join(d, app.name)
-        if os.path.isdir(appDirRoot):
-            return True
+    @classmethod
+    def all_perms(cls, items):
+        # Lifted from a standard recipe
+        if len(items) <= 1:
+            yield items
         else:
-            return len(glob(appDirRoot + ".*")) > 0
+            for perm in cls.all_perms(items[1:]):
+                for i in range(len(perm)+1):
+                    yield perm[:i] + items[0:1] + perm[i:]
+
+    def versionSuffix(self, parts):
+        fullVersion = ".".join(parts)
+        if len(fullVersion) == 0:
+            return ""
+        return "." + fullVersion
+                    
+    def isRunDirectoryFor(self, app, d):
+        for permutation in self.all_perms(app.versions):
+            appDirRoot = os.path.join(d, app.name + self.versionSuffix(permutation))
+            if os.path.isdir(appDirRoot) or len(glob(appDirRoot + ".*")) > 0:
+                return True
+        return False 
 
     def getVersionListsTopDir(self, fileName):
         # Show the framework how to find the version list given a file name
@@ -110,11 +118,6 @@ class ReconnectConfig:
             versionParts = ".".join(parts[1:-2]).split("++")
             return [ part.split(".") for part in versionParts ]
             
-    def getVersionSetsTopDir(self, fileName):
-        vlists = self.getVersionListsTopDir(fileName)
-        if vlists is not None:
-            return [ frozenset(vlist) for vlist in vlists ]
-
     def getVersionListSubDir(self, fileName, stem):
         # Show the framework how to find the version list given a file name
         # If it doesn't match, return None
@@ -128,9 +131,8 @@ class ReconnectConfig:
         if vlist is not None:
             return frozenset(vlist)
 
-    def getAllVersionLists(self, app, givenExtras, versionLists, groupDirs):
+    def getAllVersionLists(self, app, givenExtras, groupDirs):
         vlists = []
-        givenSet = frozenset(givenExtras)
         for groupDir in groupDirs:
             for path in os.listdir(groupDir):
                 fullPath = os.path.join(groupDir, path)
@@ -138,20 +140,30 @@ class ReconnectConfig:
                     vlist = self.getVersionListSubDir(path, app.name)
                     if vlist is None:
                         continue
-                    if givenSet:
-                        vset = frozenset(vlist).difference(givenSet)
+                    self.diag.info("Found list " + repr(vlist))
+                    if givenExtras:
+                        vset = frozenset(vlist).difference(givenExtras)
                         vlist = filter(lambda v: v in vset, vlist)
                     if vlist not in vlists:
                         vlists.append(vlist)
         return vlists
 
+    def expandExtraVersions(self, extras):
+        expanded = set()
+        for extra in extras:
+            expanded.add(extra)
+            expanded.update(extra.split("."))
+        return expanded    
+
     def getVersionsFromDirs(self, app, dirs, givenExtras):
         versions = []
+        allGivenExtras = self.expandExtraVersions(givenExtras)
+        self.diag.info("Getting extra versions from directories, versions from config = " + repr(allGivenExtras))
         appVersions = frozenset(app.versions)
         for versionLists, groupDirIter in groupby(dirs, self.getVersionListsTopDir):
             groupDirs = list(groupDirIter)
             self.diag.info("Considering version lists " + repr(versionLists) + " with dirs " + repr(groupDirs))
-            for versionList in self.getAllVersionLists(app, givenExtras, versionLists, groupDirs):
+            for versionList in self.getAllVersionLists(app, allGivenExtras, groupDirs):
                 version = ".".join(versionList)
                 self.diag.info("Considering version list " + repr(versionList))
                 versionSet = frozenset(versionList)
@@ -161,29 +173,45 @@ class ReconnectConfig:
                 # Important to preserve the order of the versions as received
                 extraVersionList = filter(lambda v: v in extraVersionSet, versionList)
                 extraVersion = ".".join(extraVersionList)
-                if extraVersion:
-                    if len(groupDirs) == 1:
+                if len(groupDirs) == 1:
+                    if extraVersion:
                         versions.append(extraVersion)
                         self.cacheRunDir(app, groupDirs[0], version)
                     else:
-                        for dir in groupDirs:
-                            datedVersion = os.path.basename(dir).split(".")[-2]
-                            self.datedVersions.add(datedVersion)
+                        self.cacheRunDir(app, groupDirs[0])
+                else:
+                    datedVersionMap = {}
+                    for dir in groupDirs:
+                        datedVersionMap[os.path.basename(dir).split(".")[-2]] = dir
+                    datedVersions = sorted(datedVersionMap.keys(), key=self.dateValue, reverse=True)
+                    self.datedVersions.update(datedVersions)
+                    self.diag.info("Found candidate dated versions: " + repr(datedVersions))
+                    if not extraVersion: # one of them has to be the main version...
+                        mainVersion = datedVersions.pop(0)
+                        self.cacheRunDir(app, datedVersionMap.get(mainVersion))
+                    for datedVersion in datedVersions:
+                        dir = datedVersionMap.get(datedVersion)
+                        if extraVersion:
                             versions.append(extraVersion + "." + datedVersion)
                             self.cacheRunDir(app, dir, version + "." + datedVersion)
-                else:
-                    self.cacheRunDir(app, groupDirs[0])
-                    for dir in groupDirs[1:]:
-                        datedVersion = os.path.basename(dir).split(".")[-2]
-                        self.datedVersions.add(datedVersion)
-                        versions.append(datedVersion)
-                        if version:
-                            self.cacheRunDir(app, dir, version + "." + datedVersion)
                         else:
-                            self.cacheRunDir(app, dir, datedVersion)
-        versions.sort()
+                            versions.append(datedVersion)
+                            if version:
+                                self.cacheRunDir(app, dir, version + "." + datedVersion)
+                            else:
+                                self.cacheRunDir(app, dir, datedVersion)
         self.diag.info("Extra versions found as " + repr(versions))
         return versions
+
+    @staticmethod
+    def dateValue(version):
+        yearlessDatetime = datetime.datetime.strptime(version, "%d%b%H%M%S")
+        now = datetime.datetime.now()
+        currYearDatetime = yearlessDatetime.replace(year=now.year)
+        if currYearDatetime > now:
+            return currYearDatetime.replace(year=now.year - 1)
+        else:
+            return currYearDatetime
 
     def checkSanity(self, app):
         if self.errorMessage: # We failed already, basically
@@ -245,7 +273,15 @@ class ReconnectTest(plugins.Action):
         for file in os.listdir(reconnLocation):
             fullPath = os.path.join(reconnLocation, file)
             if os.path.isfile(fullPath):
-                shutil.copyfile(fullPath, test.makeTmpFileName(file, forComparison=0))
+                targetPath = test.makeTmpFileName(file, forComparison=0)
+                try:
+                    shutil.copyfile(fullPath, targetPath)
+                except EnvironmentError, e:
+                    # File could not be copied, may not have been readable
+                    # Write the exception to it instead
+                    targetFile = open(targetPath, "w")
+                    targetFile.write("Failed to copy file - exception info follows :\n" + str(e) + "\n")
+                    targetFile.close()
 
     def modifyState(self, test, newState):
         if self.fullRecalculate:                

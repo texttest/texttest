@@ -1,11 +1,12 @@
 
-import sys, os, logging.config, string, shutil, socket, time, re, stat, subprocess, shlex, types, operator, fnmatch
+import sys, os, logging.config, string, shutil, socket, time, re, stat, subprocess, shlex, types, fnmatch
 from ndict import seqdict
 from traceback import format_exception
 from threading import currentThread
 from Queue import Queue, Empty
-from copy import copy
 from glob import glob
+from copy import deepcopy
+from datetime import datetime
 
 # We standardise around UNIX paths, it's all much easier that way. They work fine,
 # and they don't run into weird issues in being confused with escape characters
@@ -29,19 +30,13 @@ if os.name == "nt":
     os.path.sep = posixpath.sep
     os.path.normpath = posixpath.normpath
 
-# Useful utility...
-def localtime(format= "%d%b%H:%M:%S", seconds=None):
-    if not seconds:
-        seconds = time.time()
-    return time.strftime(format, time.localtime(seconds))
-
 class Callable:
     def __init__(self, method, *args):
         self.method = method
         self.extraArgs = args
-    def __call__(self, *calledArgs):
+    def __call__(self, *calledArgs, **kw):
         toUse = calledArgs + self.extraArgs
-        return self.method(*toUse)
+        return self.method(*toUse, **kw)
     def __eq__(self, other):
         return isinstance(other, Callable) and self.method == other.method and self.extraArgs == other.extraArgs
     def __hash__(self):
@@ -59,7 +54,8 @@ def findInstallationRoots():
         else:
             return [ installationRoot ]
 
-globalStartTime = time.time()
+globalStartTime = datetime.now()
+datetimeFormat = "%d%b%H:%M:%S"
 installationRoots = findInstallationRoots()
 # Don't read these from Python as the names depend on the locale!
 weekdays = [ "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday" ]
@@ -67,9 +63,12 @@ weekdays = [ "monday", "tuesday", "wednesday", "thursday", "friday", "saturday",
 # and removed the ones I'd never heard of...
 controlDirNames = [ "CVS", ".svn", ".bzr", ".hg", ".git", "RCS", "_darcs", "{arch}" ]
 
+# Useful utility...
+def localtime(format=datetimeFormat):
+    return datetime.now().strftime(format)
+
 def startTimeString():
-    global globalStartTime
-    return localtime(seconds=globalStartTime)
+    return globalStartTime.strftime(datetimeFormat)
 
 def importAndCall(moduleName, callableName, *args):
     command = "from " + moduleName + " import " + callableName + " as _callable"
@@ -97,14 +96,19 @@ def getPersonalDir(dataDirName):
     envVar = "TEXTTEST_PERSONAL_" + dataDirName.upper()
     return os.getenv(envVar, os.path.join(getPersonalConfigDir(), dataDirName))
 
-def quote(value, quoteChar):
+def quote(value):
+    quoteChar = "'"
     if quoteChar in value:
         return value # don't double-quote
     # Make sure the home directory gets expanded...
-    if value.startswith("~/"):
-        return value[:2] + quoteChar + value[2:] + quoteChar
-    else:
-        return quoteChar + value + quoteChar
+    quotedValue = quoteChar + value + quoteChar
+    quotedValue = quotedValue.replace("${", quoteChar + "${")
+    quotedValue = quotedValue.replace("}", "}" + quoteChar)
+    if quotedValue.startswith(quoteChar * 2):
+        quotedValue = quotedValue[2:]
+    if quotedValue.endswith(quoteChar * 2):
+        quotedValue = quotedValue[:-2]
+    return quotedValue
 
 
 def pluralise(num, name):
@@ -172,7 +176,7 @@ def parseBytes(text): # pragma: no cover
         # Try this first, to save time if it works
         try:
             return float(text)
-        except:
+        except ValueError:
             pass
 
         if lcText.endswith("kb") or lcText.endswith("kbytes") or lcText.endswith("k") or lcText.endswith("kilobytes"):
@@ -264,14 +268,15 @@ def parseBytes(text): # pragma: no cover
 def convertForMarkup(message):
     return message.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-# Filter interface: all must provide these three methods
 class Filter:
-    def acceptsTestCase(self, test):
+    def acceptsTestCase(self, testArg):
         return 1 # pragma: no cover - implemented in all base classes
-    def acceptsTestSuite(self, suite):
+    def acceptsTestSuite(self, suiteArg):
         return 1
-    def acceptsTestSuiteContents(self, suite):
+    def acceptsTestSuiteContents(self, suiteArg):
         return 1
+    def refine(self, tests):
+        return tests
 
 class TextTriggerGroup:
     def __init__(self, texts):
@@ -297,22 +302,21 @@ class TextFilter(Filter, TextTriggerGroup):
 
 
 class ApplicationFilter(TextFilter):
-    option = "a"
+    option = "app"
     def acceptsTestCase(self, test):
         return self.acceptsApplication(test.app)
     def acceptsTestSuite(self, suite):
         return self.acceptsApplication(suite.app)
     def acceptsApplication(self, app):
-        return self.stringContainsText(app.name + app.versionSuffix())
-    def acceptsTestSuiteContents(self, suite):
-        # Allow empty suites through
-        return True
+        return self.stringContainsText(app.name)
 
+    
 class TestSelectionFilter(TextFilter):
     option = "tp"
     def __init__(self, *args):
         self.diag = logging.getLogger("TestSelectionFilter")
         TextFilter.__init__(self, *args)
+
     def parseInput(self, filterText, app, suites):
         allEntries = TextFilter.parseInput(self, filterText, app, suites)
         if allEntries[0].startswith("appdata="):
@@ -321,6 +325,7 @@ class TestSelectionFilter(TextFilter):
         else:
             # old style, one size fits all
             return allEntries
+
     def parseForApp(self, allEntries, app, suites):
         active = False
         myEntries = []
@@ -335,6 +340,7 @@ class TestSelectionFilter(TextFilter):
                 myEntries.append(entry)
         self.diag.info("Found " + repr(myEntries) + " from " + repr(allEntries))
         return myEntries
+
     def getSectionsToFind(self, allEntries, app, suites):        
         allHeaders = filter(lambda entry: entry.startswith("appdata=" + app.name), allEntries)
         if len(allHeaders) == 1:
@@ -342,55 +348,49 @@ class TestSelectionFilter(TextFilter):
         allApps = filter(lambda a: a.name == app.name, [ suite.app for suite in suites ])
         sections = []
         for header in allHeaders:
-            bestApp = self.findAppMatchingSection(header, allApps)
+            versionSet = set(header.split(".")[1:])
+            self.diag.info("Looking for app matching " + repr(versionSet))
+            bestApp = self.findAppMatchingVersions(versionSet, allApps)
             self.diag.info("Best app for " + header + " = " + repr(bestApp))
             if bestApp is app:
                 sections.append(header)
 
         if len(sections) == 0:
             # We aren't a best-fit for any of them, so we do our best to find one anyway...
-            return [ self.findSectionMatchingApp(app, allHeaders) ]
-                     
-        return sections
+            return self.findSectionsMatchingApp(app, allHeaders)
+        elif len(sections) == 1:             
+            return sections
 
-    def findSectionMatchingApp(self, app, allHeaders):
+        return self.findSectionsMatchingApp(app, sections)
+
+    def findSectionsMatchingApp(self, app, allHeaders):
         myVersionSet = set(app.versions)
-        bestVersionSet, bestHeader = None, None
-        for header in allHeaders:
+        def matchKey(header):
             currVersionSet = set(header.split(".")[1:])
-            if bestVersionSet is None or self.isBetterMatch(currVersionSet, bestVersionSet, myVersionSet):
-                bestHeader = header
-                bestVersionSet = currVersionSet
-        return bestHeader
+            return self.getVersionSetMatchKey(currVersionSet, myVersionSet)
 
-    def findAppMatchingSection(self, header, allApps):
-        bestVersionSet, bestApp = None, None
-        myVersionSet = set(header.split(".")[1:])
-        self.diag.info("Looking for app matching " + repr(myVersionSet))
-        for app in allApps:
-            appVersionSet = set(app.versions)
-            if bestVersionSet is None or self.isBetterMatch(appVersionSet, bestVersionSet, myVersionSet):
-                bestApp = app
-                bestVersionSet = appVersionSet
-        return bestApp
+        # Really want some kind of "multimax" here
+        bestHeader = max(allHeaders, key=matchKey)
+        bestKey = matchKey(bestHeader)
+        return filter(lambda h: matchKey(h) == bestKey, allHeaders)
 
-    def isBetterMatch(self, curr, best, mine):
-        # We want the most in common with mine, and the least not in common
-        currCommon = curr.intersection(mine)
-        bestCommon = best.intersection(mine)
-        if len(currCommon) > len(bestCommon):
-            return True
-        currDiff = curr.symmetric_difference(mine)
-        bestDiff = best.symmetric_difference(mine)
-        return len(currDiff) < len(bestDiff)
+    def getVersionSetMatchKey(self, vset1, vset2):
+        return len(vset1.intersection(vset2)), -len(vset1.symmetric_difference(vset2))
+
+    def findAppMatchingVersions(self, myVersionSet, allApps):
+        def matchKey(app):
+            return self.getVersionSetMatchKey(set(app.versions), myVersionSet)
+        return max(allApps, key=matchKey)
 
     def acceptsTestCase(self, test):
         return test.getRelPath() in self.texts
+    
     def acceptsTestSuite(self, suite):
         for relPath in self.texts:
             if relPath.startswith(suite.getRelPath()):
                 return True
         return False
+
 
 # Generic action to be performed: all actions need to provide these methods
 class Action:
@@ -404,7 +404,7 @@ class Action:
         pass
     def kill(self, test, sig):
         pass
-    def callDuringAbandon(self, test):
+    def callDuringAbandon(self, testArg):
         # set to True if tests should have this action called even after all is reckoned complete (e.g. UNRUNNABLE)
         return False
     # Useful for printing in a certain format...
@@ -422,7 +422,7 @@ class ScriptWithArgs(Action):
         dict = {}
         for arg in args:
             if "=" in arg:
-                currKey, val = arg.split("=")
+                currKey, val = arg.split("=", 1)
                 if currKey in allowedArgs:
                     dict[currKey] = val
                 else:
@@ -450,9 +450,6 @@ class ThreadedNotificationHandler:
     def enablePoll(self, idleHandleMethod, **kwargs):
         self.active = True
         return idleHandleMethod(self.pollQueue, **kwargs)
-
-    def disablePoll(self):
-        self.active = False
 
     def pollQueue(self):
         try:
@@ -523,7 +520,7 @@ class Observable:
                 
     def notifyObserver(self, observer, methodName, *args, **kwargs):
         # doesn't matter if only some of the observers have the method
-        method = eval("observer." + methodName)
+        method = getattr(observer, methodName)
         # unpickled objects have not called __init__, and
         # hence do not have self.passSelf ...
         try:
@@ -531,7 +528,7 @@ class Observable:
                 method(self, *args, **kwargs)
             else:
                 method(*args, **kwargs)
-        except:
+        except Exception:
             sys.stderr.write("Observer raised exception while calling " + methodName + " :\n")
             printException()
 
@@ -577,44 +574,48 @@ class TestState(Observable):
         self.completed = completed
         self.executionHosts = executionHosts
         self.lifecycleChange = lifecycleChange
+
     def __str__(self):
         return self.freeText
+
     def __repr__(self):
         return self.categoryRepr() + self.hostRepr() + self.colonRepr()
+
     def categoryRepr(self):
         if not self.categoryDescriptions.has_key(self.category):
             return self.category
-        briefDescription, longDescription = self.categoryDescriptions[self.category]
+        longDescription = self.categoryDescriptions[self.category][1]
         return longDescription
+
     def hostString(self):
-        if len(self.executionHosts) == 0:
-            return "(no execution hosts given)"
-        else:
-            return "on " + string.join(self.executionHosts, ",")
+        return "on " + ", ".join(self.executionHosts)
+
     def hostRepr(self):
         if self.showExecHosts and len(self.executionHosts) > 0:
             return " " + self.hostString()
         else:
             return ""
+
     def colonRepr(self):
         if self.hasSucceeded():
             return ""
         else:
             return " :"
+
     def getComparisonsForRecalculation(self):
         # Is some aspect of the state out of date
         return []
+
     # Used by text interface to print states
     def description(self):
-        if self.freeText:
-            if self.freeText.find("\n") == -1:
-                return "not compared:  " + self.freeText
-            else:
-                return "not compared:\n" + self.freeText
+        if "\n" in self.freeText:
+            return "not compared:\n" + self.freeText
         else:
-            return "not compared"
+            return "not compared:  " + self.freeText
+
     def getFreeText(self):
         return self.freeText # some subclasses might want to calculate this...
+
     def getTypeBreakdown(self):
         if self.isComplete():
             return "failure", self.briefText
@@ -652,21 +653,42 @@ class Unrunnable(TestState):
                            executionHosts=executionHosts, lifecycleChange=lifecycleChange)
     def shouldAbandon(self):
         return True
+    
 
 class MarkedTestState(TestState):
     def __init__(self, freeText, briefText, oldState, executionHosts=[]):
+        self.oldState = oldState
+        self.myFreeText = freeText
         fullText = freeText + "\n\nORIGINAL STATE:\nTest " + repr(oldState) + "\n " + oldState.freeText
         TestState.__init__(self, "marked", fullText, briefText, completed=1, \
                            executionHosts=executionHosts, lifecycleChange="marked")
-        self.oldState = oldState
+        
     # We must implement this ourselves, since we want to be neither successful nor
     # failed, and by default hasFailed is implemented as 'not hasSucceeded()'.
     def hasFailed(self):
         return False
+
+    def hasResults(self):
+        return True
+
     def isMarked(self):
         return True
+
     def getTypeBreakdown(self):
         return self.category, self.briefText
+
+    def getComparisonsForRecalculation(self):
+        # Is some aspect of the state out of date
+        return self.oldState.getComparisonsForRecalculation()
+
+    def __getattr__(self, name):
+        # Anything not implemented should be called on the actual state...
+        return getattr(self.oldState, name)
+
+    def makeNewState(self, *args):
+        newOldState = self.oldState.makeNewState(*args)
+        return MarkedTestState(self.myFreeText, self.briefText, newOldState, self.executionHosts)
+    
 
 log = None
 def configureLogging(configFile=None):
@@ -706,28 +728,25 @@ def hostsMatch(hostname, localhost):
     
 
 # Hacking around os.path.getcwd not working with AMD automounter
-def abspath(relpath):
+def abspath(path):
     if os.environ.has_key("PWD"):
-        return os.path.join(os.environ["PWD"], relpath)
+        return os.path.join(os.environ["PWD"], path)
     else:
-        return os.path.abspath(relpath)
+        return os.path.abspath(path)
 
 # deepcopy(os.environ) still seems to retain links to the actual environment, create a clean copy
-def copyEnvironment():
-    environ = {}
+def copyEnvironment(values={}, ignoreVars=[]):
     for var, value in os.environ.items():
-        environ[var] = value
-    return environ
+        if not values.has_key(var) and var not in ignoreVars:
+            values[var] = value
+    return values
 
 def getInterpreter(executable):
-    if executable.endswith(".py"):
-        return "python"
-    elif executable.endswith(".rb"):
-        return "ruby"
-    elif executable.endswith(".jar"):
-        return "java -jar"
-    else:
-        return ""
+    extension = executable.rsplit(".", 1)[-1]
+    cache = { "py" : "python",
+              "rb" : "ruby",
+              "jar" : "java -jar" }
+    return cache.get(extension, "")
 
 def commandLineString(cmdArgs):
     def getQuoteChar(char):
@@ -736,7 +755,7 @@ def commandLineString(cmdArgs):
         else:
             return '"'
 
-    def quote(arg):
+    def quoteArg(arg):
         quoteChars = "'\"|* "
         for char in quoteChars:
             if char in arg:
@@ -744,26 +763,16 @@ def commandLineString(cmdArgs):
                 return quoteChar + arg + quoteChar
         return arg.replace("\\", "/")
 
-    return " ".join(map(quote, cmdArgs))
+    return " ".join(map(quoteArg, cmdArgs))
 
 def relpath(fullpath, parentdir):
     normFull = os.path.normpath(fullpath)
     relPath = normFull.replace(os.path.normpath(parentdir), "")
-    if relPath == normFull:
-        # unrelated
-        return None
-    if relPath.startswith(os.sep):
-        return relPath[1:]
-    else:
-        return relPath
-
-def getProcessStartUpInfo(envMapping=os.environ):
-    # Used for hiding the windows if we're on Windows!
-    if os.name == "nt" and envMapping.get("DISPLAY") == "HIDE_WINDOWS":
-        info = subprocess.STARTUPINFO()
-        info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        info.wShowWindow = subprocess.SW_HIDE
-        return info
+    if relPath != normFull:
+        if relPath.startswith(os.sep):
+            return relPath[1:]
+        else:
+            return relPath
 
 def copyPath(srcPath, dstPath):
     if os.path.isdir(srcPath):
@@ -807,7 +816,7 @@ def splitcmd(s):
 def samefile(writeDir, currDir):
     try:
         return os.path.samefile(writeDir, currDir)
-    except:
+    except Exception: # AttributeError for Windows, OSError if currDir doesn't exist
         # samefile doesn't exist on Windows, but nor do soft links so we can
         # do a simpler version
         return os.path.normpath(writeDir.replace("\\", "/")) == os.path.normpath(currDir.replace("\\", "/"))
@@ -817,6 +826,13 @@ def makeWriteable(path):
     currPerm = stat.S_IMODE(currMode)
     newPerm = currPerm | 0220
     os.chmod(path, newPerm)
+
+def getPaths(d):
+    paths = [ d ]
+    for root, dirs, files in os.walk(d):
+        for path in dirs + files:
+            paths.append(os.path.join(root, path))
+    return paths
     
 # Version of rmtree not prone to crashing if directory in use or externally removed
 def rmtree(dir, attempts=100):
@@ -827,9 +843,9 @@ def rmtree(dir, attempts=100):
     # Don't be somewhere under the directory when it's removed
     try:
         if os.getcwd().startswith(realDir):
-            root, local = os.path.split(dir)
+            root = os.path.dirname(os.path.normpath(dir))
             os.chdir(root)
-    except OSError:
+    except OSError: # pragma: no cover - robustness only
         pass
     for i in range(attempts):
         try:
@@ -838,14 +854,13 @@ def rmtree(dir, attempts=100):
         except Exception, e:
             if str(e).find("Permission") != -1 or str(e).find("Access") != -1:
                 # We own this stuff, don't respect readonly flags set by ourselves, it might just be the SUT doing so...
-                for root, dirs, files in os.walk(realDir):
-                    for path in dirs + files:
-                        try:
-                            makeWriteable(os.path.join(root, path))
-                        except OSError, e:
-                            log.info("Could not change permissions to be able to remove directory " +
-                                     dir + " : - " + str(e))
-                            return
+                for path in getPaths(realDir):
+                    try:
+                        makeWriteable(path)
+                    except OSError, e:
+                        log.info("Could not change permissions to be able to remove directory " +
+                                 dir + " : - " + str(e))
+                        return
                 continue
             if os.path.isdir(realDir):
                 if i == attempts - 1:
@@ -855,22 +870,47 @@ def rmtree(dir, attempts=100):
                     log.info("Problems removing directory " + dir + " - waiting 1 second to retry...")
                     time.sleep(1)
 
+class AggregationError(RuntimeError):
+    def __init__(self, value1, value2, index):
+        self.value1 = value1
+        self.value2 = value2
+        self.index = index
+    
+
 # Useful utility for combining different response values for a series of method calls
 class ResponseAggregator:
     def __init__(self, methods):
         self.methods = methods
 
     def __call__(self, *args, **kwargs):
+        if len(self.methods) == 0:
+            return
+        
         basicValue = self.methods[0](*args, **kwargs)
-        if type(basicValue) == types.ListType:
-            for extraMethod in self.methods[1:]:
-                for item in extraMethod(*args, **kwargs):
+        for i, extraMethod in enumerate(self.methods[1:]):
+            extraValue = extraMethod(*args, **kwargs)
+            if type(basicValue) == types.ListType:
+                for item in extraValue:
                     if not item in basicValue:
                         basicValue.append(item)
-        elif type(basicValue) == types.DictType:
-            for extraMethod in self.methods[1:]:
-                basicValue.update(extraMethod(*args, **kwargs))
+            elif type(basicValue) == types.DictType:
+                basicValue.update(extraValue)
+            elif extraValue != basicValue:
+                raise AggregationError(basicValue, extraValue, i + 1)
+                
         return basicValue
+
+def getAggregateString(items, method):
+    values = []
+    for item in items:
+        value = method(item)
+        if value not in values:
+            values.append(value)
+    
+    if len(values) > 1:
+        return "<default> - " + ",".join(values)
+    else:
+        return values[0]
 
 
 def readList(filename):
@@ -936,7 +976,7 @@ def openForWrite(path):
 
 # Make sure the dir exists
 def ensureDirExistsForFile(path):
-    dir, localName = os.path.split(path)
+    dir = os.path.split(path)[0]
     ensureDirectoryExists(dir)
 
 def addLocalPrefix(fullPath, prefix):
@@ -951,7 +991,7 @@ def ensureDirectoryExists(path, attempts=5):
             return
         try:
             os.makedirs(path)
-        except OSError, detail:
+        except OSError:
             if attempt == attempts - 1:
                 raise
 
@@ -1019,7 +1059,10 @@ class PreviewGenerator:
         self.maxLength = maxLength
 
     def getCutLines(self, lines):
-        return lines[:self.maxLength] 
+        if len(lines) < self.maxLength:
+            return lines
+        else:
+            return lines[:self.maxLength] + [ "<truncated after showing first " + pluralise(self.maxLength, "line") + ">\n" ]
 
     def getPreview(self, file):
         fileLines = retryOnInterrupt(self.getFileLines, file)
@@ -1088,11 +1131,11 @@ class TextTrigger:
         if isRegularExpression(text):
             try:
                 self.regex = re.compile(text)
-            except:
+            except re.error:
                 pass
     def __repr__(self):
         return self.text
-    def matches(self, line, lineNumber=0):
+    def matches(self, line, *args):
         if self.regex:
             return self.regex.search(line)
         else:
@@ -1106,12 +1149,16 @@ class TextTrigger:
 # Used for application and personal configuration files
 class MultiEntryDictionary(seqdict):
     warnings = []
-    def __init__(self, importKey="", importFileFinder=None):
-        seqdict.__init__(self)
+    def __init__(self, importKey="", importFileFinder=None, aliases={}, **kw):
+        seqdict.__init__(self, **kw)
         self.diag = logging.getLogger("MultiEntryDictionary")
-        self.aliases = {}
+        self.aliases = aliases
         self.importKey = importKey
         self.importFileFinder= importFileFinder
+
+    def __deepcopy__(self, memo):
+        return MultiEntryDictionary(self.importKey, self.importFileFinder, self.aliases,
+                                    List=deepcopy(self.list, memo), Dict=deepcopy(self.dict, memo))
 
     def getSectionInfo(self, sectionName=""):
         if sectionName and sectionName != "end":
@@ -1175,7 +1222,7 @@ class MultiEntryDictionary(seqdict):
         currDict, currSection = self.getSectionInfo(sectionName)
         try:
             self._addEntry(entryName, entry, currDict, currSection, *args, **kwargs)
-        except ValueError, e:
+        except ValueError:
             self.warn("Config entry name '" + entryName + "' in section '" + currSection +
                       "' given an invalid value '" + entry + "', ignoring.")
 
@@ -1202,7 +1249,7 @@ class MultiEntryDictionary(seqdict):
         else:
             return type(val[0])
 
-    def castEntry(self, entryName, entry, currDict):
+    def castEntry(self, dummy, entry, currDict):
         if type(entry) != types.StringType:
             return entry
         dictValType = self.getDictionaryValueType(currDict)
@@ -1235,11 +1282,28 @@ class MultiEntryDictionary(seqdict):
             currDict[entryName] = self.getListValue(entry, currDict[entryName])
         elif currType == types.DictType:
             newCurrDict = self.getSectionInfo(entryName)[0]
-            self.insertEntry("default", entry, newCurrDict)
+            if "default" in newCurrDict:
+                self.insertEntry("default", entry, newCurrDict)
+            else:
+                self.warn("Config entry name '" + entryName + "' is only valid as a section marker.")
         else:
             currDict[entryName] = currType(entry)
 
-    def getComposite(self, key, subKey, defaultSubKey="default"):
+    def getSingle(self, key, expandVars=True, envMapping=os.environ):
+        value = self.get(key)
+        if expandVars:
+            return self.expandEnvironment(value, envMapping)
+        else:
+            return value
+
+    def getComposite(self, key, subKey, expandVars=True, envMapping=os.environ, defaultKey="default"):
+        value = self.getCompositeUnexpanded(key, subKey, defaultKey)
+        if expandVars:
+            return self.expandEnvironment(value, envMapping)
+        else:
+            return value
+
+    def getCompositeUnexpanded(self, key, subKey, defaultSubKey="default"):
         dict = self.get(key)
         # If it wasn't a dictionary, return None
         if not hasattr(dict, "items"):
@@ -1265,6 +1329,20 @@ class MultiEntryDictionary(seqdict):
                     return defValue
         if usingList:
             return listVal
+
+    @classmethod
+    def expandEnvironment(cls, value, envMapping):
+        if isinstance(value, str):
+            return string.Template(value).safe_substitute(envMapping)
+        elif isinstance(value, list):
+            return [ string.Template(element).safe_substitute(envMapping) for element in value ]
+        elif isinstance(value, dict):
+            newDict = {}
+            for key, val in value.items():
+                newDict[key] = cls.expandEnvironment(val, envMapping)
+            return newDict
+        else:
+            return value
 
 
 class Option:
@@ -1308,6 +1386,7 @@ class TextOption(Option):
         Option.__init__(self, name, value, description, changeMethod)
         self.possValAppendMethod = None
         self.possValListMethod = None
+        self.possibleValues = []
         self.nofValues = allocateNofValues
         self.selectDir = selectDir
         self.selectFile = selectFile
@@ -1496,78 +1575,17 @@ class OptionGroup:
                 commandLines.append((key, option.getCmdLineValue()))
         return commandLines
     
+    def moveToEnd(self, keys):
+        for key in keys:
+            option = self.options.pop(key)
+            self.options[key] = option
+
     def accept(self, key, option, onlyKeys):
-        if not option.getValue():
+        value = option.getValue()
+        if not value or (isinstance(value, str) and value.startswith("<default>")):
             return False
         if len(onlyKeys) == 0:
             return True
         return key in onlyKeys
     
 
-# pwd and grp doesn't exist on windows ...
-import stat
-try:
-    import pwd, grp
-except:
-    pass
-
-class FileProperties:
-    def __init__(self, path):
-        self.abspath = path
-        self.filename = os.path.basename(self.abspath)
-        self.dir = os.path.dirname(self.abspath)
-        self.status = os.stat(self.abspath)
-        self.now = int(time.time())
-        self.recent = self.now - (6 * 30 * 24 * 60 * 60) #6 months ago
-    def inqType(self):
-        # The stat.S_IS* functions don't seem to work on links ...
-        if os.path.islink(self.abspath):
-            return "l"
-        elif os.path.isdir(self.abspath):
-            return "d"
-        else:
-            return "-"
-    def inqMode(self):
-        permissions = ""
-        for who in "USR", "GRP", "OTH":
-            for what in "R", "W", "X":
-                #lookup attribute at runtime using getattr
-                if self.status[stat.ST_MODE] & getattr(stat,"S_I" + what + who):
-                    permissions = permissions + what.lower()
-                else:
-                    permissions = permissions + "-"
-        return permissions
-    def inqLinks(self):
-        return self.status[stat.ST_NLINK]
-    def inqOwner(self):
-        try:
-            uid = self.status[stat.ST_UID]
-            return str(pwd.getpwuid(uid)[0])
-        except:
-            return "?"
-    def inqGroup(self):
-        try:
-            gid = self.status[stat.ST_GID]
-            return str(grp.getgrgid(gid)[0])
-        except:
-            return "?"
-    def inqSize(self):
-        return self.status[stat.ST_SIZE]
-    def formatTime(self, timeStamp):
-        # %e is more appropriate than %d below, as it fills with space
-        # rather than 0, but it is not supported on Windows, it seems.
-        if timeStamp < self.recent or timeStamp > self.now:
-            timeFormat = "%b %d  %Y"
-        else:
-            timeFormat = "%b %d %H:%M"
-        return time.strftime(timeFormat, time.localtime(timeStamp))
-    def inqModificationTime(self):
-        return self.formatTime(self.status[stat.ST_MTIME])
-    # Return the *nix type format:
-    # -rwxr--r--    1 mattias carm       1675 Nov 16  1998 .xinitrc_old
-    def getUnixRepresentation(self):
-        return (self.inqType(), self.inqMode(),
-                self.inqLinks(), self.inqOwner(),
-                self.inqGroup(), self.inqSize(),
-                self.inqModificationTime(), self.filename)
-    

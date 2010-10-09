@@ -4,7 +4,7 @@ All the actions for administering the files and directories in a test suite
 """
 
 import gtk, plugins, os, shutil
-from default.gtkgui import guiplugins, guiutils # from .. import guiplugins, guiutils when we drop Python 2.4 support
+from .. import guiplugins, guiutils
 from ndict import seqdict
 
 # Cut, copy and paste
@@ -13,7 +13,7 @@ class FocusDependentAction(guiplugins.ActionGUI):
         guiplugins.ActionGUI.notifyTopWindow(self, window)
         window.connect("set-focus", self.focusChanged)
 
-    def focusChanged(self, window, widget):
+    def focusChanged(self, dummy, widget):
         freeTextWidget = isinstance(widget, gtk.Entry) or isinstance(widget, gtk.TextView)
         if freeTextWidget:
             self.setSensitivity(False)
@@ -68,7 +68,7 @@ class CutTests(ClipboardAction):
 
 class PasteTests(FocusDependentAction):
     def __init__(self, *args):
-        guiplugins.ActionGUI.__init__(self, *args)
+        FocusDependentAction.__init__(self, *args)
         self.clipboardTests = []
         self.removeAfter = False
     def singleTestOnly(self):
@@ -158,8 +158,6 @@ class PasteTests(FocusDependentAction):
         for test, (suite, placement, newName) in destInfo.items():
             suiteDeltas.setdefault(suite, 0)
             realPlacement = placement + suiteDeltas.get(suite)
-            guiutils.guilog.info("Pasting test " + newName + " under test suite " + \
-                        repr(suite) + ", in position " + str(realPlacement))
             if self.removeAfter and newName == test.name and suite is test.parent:
                 # Cut + paste to the same suite is basically a reposition, do it as one action
                 repositionPlacement = self.getRepositionPlacement(test, realPlacement)
@@ -183,15 +181,17 @@ class PasteTests(FocusDependentAction):
                     if self.removeAfter:
                         message = "Failed to remove old test: didn't have sufficient write permission to the test files. Test copied instead of moved."
                         plugins.tryFileChange(test.remove, message)
-                except (OSError, IOError), e:
+                except EnvironmentError, e:
+                    if os.path.isdir(testDir):
+                        shutil.rmtree(testDir)
                     self.showErrorDialog("Failed to paste test:\n" + str(e))
                     
-        guiutils.guilog.info("Selecting new tests : " + repr(newTests))
         self.notify("SetTestSelection", newTests)
         self.currTestSelection = newTests
         self.notify("Status", self.getStatusMessage(suiteDeltas))
         if self.removeAfter:
             # After a paste from cut, subsequent pastes should behave like copies of the new tests
+            self.notify("Clipboard", newTests, cut=False)
             self.clipboardTests = newTests
             self.removeAfter = False
         for suite, placement, newName in destInfo.values():
@@ -205,7 +205,7 @@ class PasteTests(FocusDependentAction):
             return "Pasted " +  self.describeTests() + " to suite '" + suiteName + "'"
 
     def getSignalsSent(self):
-        return [ "SetTestSelection" ]
+        return [ "SetTestSelection", "Clipboard" ]
 
     def moveOrCopy(self, test, newDirName):
         # If it exists it's because a previous copy has already taken across the directory
@@ -253,9 +253,9 @@ class ImportTest(guiplugins.ActionDialogGUI):
     def _getStockId(self):
         return "add"
     
-    def getResizeDivisors(self):
+    def getSizeAsWindowFraction(self):
         # size of the dialog
-        return 1.5, 2.8
+        return 0.5, 0.36
 
     def testFilesExist(self, dir, app):
         for fileName in os.listdir(dir):
@@ -374,7 +374,6 @@ class ImportTestCase(ImportTest):
             return
         envFile = self.getWriteFile("environment", suite, testDir)
         for var, value in envDir.items():
-            guiutils.guilog.info("Setting test env: " + var + " = " + value)
             envFile.write(var + ":" + value + "\n")
         envFile.close()
 
@@ -385,10 +384,10 @@ class ImportTestCase(ImportTest):
             optionFile.write(optionString + "\n")
         return optionString
 
-    def getOptions(self, suite):
+    def getOptions(self, *args):
         return self.optionGroup.getOptionValue("opt")
 
-    def getEnvironment(self, suite):
+    def getEnvironment(self, *args):
         return {}
 
     def writeResultsFiles(self, suite, testDir):
@@ -422,7 +421,15 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         possibleSubDirs = self.findSubDirectories()
         self.addOption("subdir", "\nSubdirectory name to store the above application files under (leave blank for local storage)", possibleValues=possibleSubDirs)
         self.addOption("javaclass", "\nJava Class name (instead of executable program)")
-        self.addSwitch("gui", "GUI testing option chooser", options = [ "Disable GUI testing options", "PyGTK GUI with PyUseCase 3.x", "Tkinter GUI with PyUseCase 3.2+", "Java GUI with JUseCase", "Other embedded Use-case Recorder (e.g. PyUseCase 2.x, NUseCase)", "Other GUI-test tool (enable virtual display only)" ], hideOptions=True)
+        self.addSwitch("gui", "GUI testing option chooser",
+                       options = [ "Disable GUI testing options",
+                                   "PyGTK GUI with PyUseCase 3.x",
+                                   "Tkinter GUI with PyUseCase 3.2+",
+                                   "wxPython GUI with PyUseCase 3.4+",
+                                   "Java GUI with JUseCase",
+                                   "Other embedded Use-case Recorder (e.g. PyUseCase 2.x, NUseCase)",
+                                   "Other GUI-test tool (enable virtual display only)" ],
+                       hideOptions=True)
 
         possibleDirs = []
         for app in allApps:
@@ -509,6 +516,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         if javaClass:
             executable = javaClass
         configEntries = seqdict({ "executable" : executable })
+        configEntries["filename_convention_scheme"] = "standard"
         if javaClass:
             configEntries["interpreter"] = "java"
         fullName = self.optionGroup.getOptionValue("name")
@@ -517,25 +525,28 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         useGui = self.optionGroup.getSwitchValue("gui")
         if useGui > 0:
             configEntries["use_case_record_mode"] = "GUI"
-        if useGui == 1 or useGui == 2:
+        if useGui in [ 1, 2, 3 ]:
             interpreter = "pyusecase"
             if useGui == 2:
                 interpreter += " -i tkinter"
+            elif useGui == 3:
+                interpreter += " -i wx"
             configEntries["use_case_recorder"] = "pyusecase"
             configEntries["interpreter"] = interpreter
 
             if useGui == 2:
                 # PyUseCase doesn't handle tkMessageBox, deal with it via interception by default
-                configEntries["collect_traffic_py_module"] = "tkMessageBox"
+                configEntries["collect_traffic_python"] = "tkMessageBox"
                 configEntries["collect_traffic_use_threads"] = "false"
-            
+            elif useGui == 3:
+                configEntries["virtual_display_hide_windows"] = "false"
             pyusecaseDir = os.path.join(directory, "pyusecase_files")
             plugins.ensureDirectoryExists(pyusecaseDir) 
             # Create an empty UI map file so it shows up in the Config tab...
             open(os.path.join(pyusecaseDir, "ui_map.conf"), "w")
-        elif useGui == 3:
+        elif useGui == 4:
             configEntries["use_case_recorder"] = "jusecase"
-        elif useGui == 5:
+        elif useGui == 6:
             configEntries["use_case_recorder"] = "none"            
 
         self.notify("NewApplication", ext, directory, configEntries)
@@ -552,6 +563,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
 class ImportFiles(guiplugins.ActionDialogGUI):
     def __init__(self, allApps, dynamic, inputOptions):
         self.creationDir = None
+        self.defaultAppendAppName = False
         self.appendAppName = False
         self.currentStem = ""
         self.fileChooser = None
@@ -583,9 +595,9 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         return "Create/Import Files and Directories"
     def isActiveOnCurrent(self, *args):
         return self.creationDir is not None and guiplugins.ActionDialogGUI.isActiveOnCurrent(self, *args)
-    def getResizeDivisors(self):
+    def getSizeAsWindowFraction(self):
         # size of the dialog
-        return 1.4, 1.4
+        return 0.7, 0.9
     def getSignalsSent(self):
         return [ "NewFile" ]
     def messageAfterPerform(self):
@@ -610,6 +622,8 @@ class ImportFiles(guiplugins.ActionDialogGUI):
             version = self.optionGroup.getOptionValue("v")
             sourcePath = self.getDefaultSourcePath(newStem, version)
             self.optionGroup.setValue("src", sourcePath)
+            if self.defaultAppendAppName:
+                self.updateAppendAppName(newStem != "testcustomize.py")
 
     def actionChanged(self, *args):
         if self.fileChooser:
@@ -642,7 +656,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
 
     def createComboBoxEntry(self, *args):
         combobox, entry = guiplugins.ActionDialogGUI.createComboBoxEntry(self, *args)
-        handler = combobox.connect("changed", self.stemChanged)
+        combobox.connect("changed", self.stemChanged)
         return combobox, entry
 
     def createRadioButtons(self, *args):
@@ -658,7 +672,6 @@ class ImportFiles(guiplugins.ActionDialogGUI):
     
     def addText(self, vbox, text):
         header = gtk.Label()
-        guiutils.guilog.info("Adding text '" + text + "'")
         header.set_markup(text + "\n")
         vbox.pack_start(header, expand=False, fill=False)
     
@@ -680,8 +693,12 @@ class ImportFiles(guiplugins.ActionDialogGUI):
             self.setSensitivity(newActive)
             if newActive:
                 self.updateStems(fileType)
-                self.appendAppName = (fileType == "definition" or fileType == "standard")
-                self.optionGroup.setValue("act", int(self.appendAppName))
+                self.defaultAppendAppName = (fileType == "definition" or fileType == "standard")
+                self.updateAppendAppName(self.defaultAppendAppName)
+
+    def updateAppendAppName(self, setting):
+        self.appendAppName = setting
+        self.optionGroup.setValue("act", int(setting))
 
     def findAllStems(self, fileType):
         if fileType == "definition":
@@ -696,13 +713,15 @@ class ImportFiles(guiplugins.ActionDialogGUI):
     def getDefinitionFiles(self):
         defFiles = []
         defFiles.append("environment")
+        defFiles.append("config")
         defFiles.append("options")
         if self.currTestSelection[0].getConfigValue("interpreter"):
             defFiles.append("interpreter_options")
         if self.currTestSelection[0].classId() == "test-case":
             recordMode = self.currTestSelection[0].getConfigValue("use_case_record_mode")
             if recordMode == "disabled":
-                defFiles.append("input")
+                namingScheme = self.currTestSelection[0].getConfigValue("filename_convention_scheme")
+                defFiles.append(self.currTestSelection[0].app.getStdinName(namingScheme))
             else:
                 defFiles.append("usecase")
         # We only want to create files this way that
@@ -712,10 +731,12 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         return defFiles + self.currTestSelection[0].expandedDefFileStems("default")
 
     def getStandardFiles(self):
-        collateKeys = self.currTestSelection[0].getConfigValue("collate_file").keys()
+        app = self.currTestSelection[0].app
+        collateKeys = app.getConfigValue("collate_file").keys()
         # Don't pick up "dummy" indicators on Windows...
-        stdFiles = [ "output", "errors" ] + filter(lambda k: k, collateKeys)
-        discarded = [ "stacktrace" ] + self.currTestSelection[0].getConfigValue("discard_file")
+        namingScheme = app.getConfigValue("filename_convention_scheme")
+        stdFiles = [ app.getStdoutName(namingScheme), app.getStderrName(namingScheme) ] + filter(lambda k: k, collateKeys)
+        discarded = [ "stacktrace" ] + app.getConfigValue("discard_file")
         return filter(lambda f: f not in discarded, stdFiles)
 
     def updateStems(self, fileType):
@@ -748,18 +769,16 @@ class ImportFiles(guiplugins.ActionDialogGUI):
                 plugins.ensureDirExistsForFile(targetPath)
                 file = open(targetPath, "w")
                 file.close()
-                guiutils.guilog.info("Creating new empty file...")
                 self.newFileInfo = targetPath, False
             elif action == 2:
                 plugins.ensureDirectoryExists(targetPath)
-                guiutils.guilog.info("Creating new empty directory...")
                 test.filesChanged()
         else:
             sourcePath = self.optionGroup.getOptionValue("src")
             appendAppName = os.path.basename(sourcePath).startswith(stem + "." + test.app.name)
-            targetPath = self.getTargetPath(stem, version, appendAppName) 
+            targetPath = self.getTargetPath(stem, version, appendAppName)
+            plugins.ensureDirExistsForFile(targetPath)
             fileExisted = os.path.exists(targetPath)
-            guiutils.guilog.info("Creating new path, copying " + sourcePath)
             plugins.copyPath(sourcePath, targetPath)
             self.newFileInfo = targetPath, fileExisted
 
@@ -773,6 +792,10 @@ class ImportFiles(guiplugins.ActionDialogGUI):
 
 
 class RemoveTests(guiplugins.ActionGUI):
+    def __init__(self, *args, **kw):
+        self.distinctTestCount = 0
+        guiplugins.ActionGUI.__init__(self, *args, **kw)
+    
     def isActiveOnCurrent(self, *args):
         if len(self.currFileSelection) > 0:
             return False
@@ -912,12 +935,11 @@ class RemoveFiles(guiplugins.ActionGUI):
 
     def performOnCurrent(self):
         test = self.currTestSelection[0]
-        warnings = ""
         removed = 0
-        for filePath, comparison in self.currFileSelection:
+        for filePath, _ in self.currFileSelection:
             fileType = self.getType(filePath)
             self.notify("Status", "Removing " + fileType + " " + os.path.basename(filePath))
-            self.notify("ActionProgress", "")
+            self.notify("ActionProgress")
             permMessage = "Insufficient permissions to remove " + fileType + " '" + filePath + "'"
             if plugins.tryFileChange(self.removePath, permMessage, filePath):
                 removed += 1
@@ -925,8 +947,6 @@ class RemoveFiles(guiplugins.ActionGUI):
         test.filesChanged()
         self.notify("Status", "Removed " + plugins.pluralise(removed, fileType) + " from the " +
                     test.classDescription() + " " + test.name + "")
-        if warnings:
-            self.showWarningDialog(warnings)
 
     def messageAfterPerform(self):
         pass # do it as part of the method, uses lots of local data
@@ -1058,9 +1078,9 @@ class RenameTest(RenameAction):
         self.oldName = ""
         self.oldDescription = ""
 
-    def getResizeDivisors(self):
+    def getSizeAsWindowFraction(self):
         # size of the dialog
-        return 1.5, 2.8
+        return 0.5, 0.36
     
     def isActiveOnCurrent(self, *args):
         # Don't allow renaming of the root suite
@@ -1223,21 +1243,18 @@ class SortTestSuiteFileAscending(guiplugins.ActionGUI):
         self.performRecursively(self.currTestSelection[0], True)
     def performRecursively(self, suite, ascending):
         # First ask all sub-suites to sort themselves
-        errors = ""
         if guiutils.guiConfig.getValue("sort_test_suites_recursively"):
             for test in suite.testcases:
                 if test.classId() == "test-suite":
-                    try:
-                        self.performRecursively(test, ascending)
-                    except Exception, e:
-                        errors += str(e) + "\n"
-
+                    self.performRecursively(test, ascending)
+                    
         self.notify("Status", "Sorting " + repr(suite))
-        self.notify("ActionProgress", "")
+        self.notify("ActionProgress")
         if self.hasNonDefaultTests():
             self.showWarningDialog("\nThe test suite\n'" + suite.name + "'\ncontains tests which are not present in the default version.\nTests which are only present in some versions will not be\nmixed with tests in the default version, which might lead to\nthe suite not looking entirely sorted.")
 
         suite.sortTests(ascending)
+        
     def hasNonDefaultTests(self):
         if len(self.currTestSelection) == 1:
             return False
@@ -1265,42 +1282,57 @@ class SortTestSuiteFileDescending(SortTestSuiteFileAscending):
 class ReportBugs(guiplugins.ActionDialogGUI):
     def __init__(self, allApps, *args):
         guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
+        self.textGroup = plugins.OptionGroup("Search for")
+        self.searchGroup = plugins.OptionGroup("Search in")
+        self.applyGroup = plugins.OptionGroup("Additional options to only apply to certain runs")
         self.bugSystemGroup = plugins.OptionGroup("Link failure to a reported bug")
         self.textDescGroup = plugins.OptionGroup("Link failure to a textual description")
-        self.addOption("search_string", "Text or regexp to match")
-        self.addOption("search_file", "File to search in", description="TextTest will search in the newly generated file (not the diff) with the stem you provide here. The exception is if you choose 'free_text', when it will search in the whole difference report as it appears in the lower right window in the dynamic GUI.")
-        self.addOption("version", "\nVersion to report for")
-        self.addOption("execution_hosts", "Trigger only when run on machine(s)")
-        self.addSwitch("trigger_on_absence", "Trigger if given text is NOT present")
-        self.addSwitch("ignore_other_errors", "Trigger even if other files differ", description="By default, this bug is only enabled if only the provided file is different. Check this box to enable it irrespective of what other difference exist. Note this increases the chances of it being reported erroneously and should be used carefully.")
-        self.addSwitch("trigger_on_success", "Trigger even if file to search would otherwise compare as equal", description="By default, this bug is only enabled if a difference is detected in the provided file to search. Check this box to search for it even if the file compares as equal.")
+        self.textGroup.addOption("search_string", "Text or regexp to match")
+        self.textGroup.addSwitch("trigger_on_absence", "Trigger if given text is NOT present")
+        self.searchGroup.addSwitch("data_source", options = [ "Specific file", "Brief text/details", "Full difference report" ], description = [ "Search in a newly generated file (not its diff)", "Search in the brief text describing the test result as it appears in the Details column in the dynamic GUI test view", "Search in the whole difference report as it appears in the lower right window in the dynamic GUI" ])
+        self.searchGroup.addOption("search_file", "File to search in")
+        self.searchGroup.addSwitch("ignore_other_errors", "Trigger even if other files differ", description="By default, this bug is only enabled if only the provided file is different. Check this box to enable it irrespective of what other difference exist. Note this increases the chances of it being reported erroneously and should be used carefully.")
+        self.searchGroup.addSwitch("trigger_on_success", "Trigger even if file to search would otherwise compare as equal", description="By default, this bug is only enabled if a difference is detected in the provided file to search. Check this box to search for it even if the file compares as equal.")
+        
+        self.applyGroup.addOption("version", "\nVersion to report for")
+        self.applyGroup.addOption("execution_hosts", "Trigger only when run on machine(s)")
         self.bugSystemGroup.addOption("bug_system", "\nExtract info from bug system", "<none>", self.findBugSystems(allApps))
         self.bugSystemGroup.addOption("bug_id", "Bug ID")
         self.textDescGroup.addOption("full_description", "\nFull description")
         self.textDescGroup.addOption("brief_description", "Few-word summary")
         self.textDescGroup.addSwitch("internal_error", "Report as 'internal error' rather than 'known bug'")
+        self.optionGroup.addOption("rerun_count", "Number of times to try to rerun the test if the issue is triggered", 0)
 
     def fillVBox(self, vbox, optionGroup):
-        retValue = guiplugins.ActionDialogGUI.fillVBox(self, vbox, optionGroup)
         if optionGroup is self.optionGroup:
+            for group in [ self.textGroup, self.searchGroup, self.applyGroup ]:
+                if group is self.applyGroup:
+                    widget = self.createExpander(group)
+                else:
+                    widget = self.createFrame(group, group.name)
+                vbox.pack_start(widget, fill=False, expand=False, padding=8)
             vbox.pack_start(gtk.HSeparator(), padding=8)
             header = gtk.Label()
             header.set_markup("<u>Fill in exactly <i>one</i> of the sections below</u>\n")
             vbox.pack_start(header, expand=False, fill=False, padding=8)
             for group in [ self.bugSystemGroup, self.textDescGroup ]:
-                frame = self.createFrame(group)
+                frame = self.createFrame(group, group.name)
                 vbox.pack_start(frame, fill=False, expand=False, padding=8)
-        return retValue
+        return guiplugins.ActionDialogGUI.fillVBox(self, vbox, optionGroup)
 
-    def createFrame(self, group):
-        frame = gtk.Frame(group.name)
-        frame.set_label_align(0.5, 0.5)
-        frame.set_shadow_type(gtk.SHADOW_IN)
-        frameBox = gtk.VBox()
-        frameBox.set_border_width(10)
-        self.fillVBox(frameBox, group)
-        frame.add(frameBox)
-        return frame
+    def createExpander(self, group):
+        expander = gtk.Expander(group.name)
+        expander.add(self.createGroupBox(group))
+        return expander
+
+    def createRadioButtons(self, *args):
+        buttons = guiplugins.ActionDialogGUI.createRadioButtons(self, *args)
+        buttons[0].connect("toggled", self.dataSourceChanged)
+        return buttons
+
+    def dataSourceChanged(self, *args):
+        sensitive = not self.searchGroup.getOptionValue("data_source")
+        self.setGroupSensitivity(self.searchGroup, sensitive)
         
     def findBugSystems(self, allApps):
         bugSystems = []
@@ -1323,10 +1355,10 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         return "Enter information for automatic interpretation of test failures"
 
     def updateOptions(self):
-        if not self.optionGroup.getOptionValue("search_file"):
-            self.optionGroup.setOptionValue("search_file", self.currTestSelection[0].getConfigValue("log_file"))
+        if not self.searchGroup.getOptionValue("search_file"):
+            self.searchGroup.setOptionValue("search_file", self.currTestSelection[0].getConfigValue("log_file"))
 
-        self.optionGroup.setPossibleValues("search_file", self.getPossibleFileStems())
+        self.searchGroup.setPossibleValues("search_file", self.getPossibleFileStems())
         return False
 
     def getPossibleFileStems(self):
@@ -1336,12 +1368,10 @@ class ReportBugs(guiplugins.ActionDialogGUI):
             for stem in test.dircache.findAllStems():
                 if stem not in stems and stem not in excludeStems:
                     stems.append(stem)
-        # use for unrunnable tests...
-        stems.append("free_text")
         return stems
 
     def checkSanity(self):
-        if len(self.optionGroup.getOptionValue("search_string")) == 0:
+        if len(self.textGroup.getOptionValue("search_string")) == 0:
             raise plugins.TextTestError, "Must fill in the field 'text or regexp to match'"
         if self.bugSystemGroup.getOptionValue("bug_system") == "<none>":
             if len(self.textDescGroup.getOptionValue("full_description")) == 0 or \
@@ -1352,7 +1382,7 @@ class ReportBugs(guiplugins.ActionDialogGUI):
                 raise plugins.TextTestError, "Must provide a bug ID if bug system is given"
 
     def versionSuffix(self):
-        version = self.optionGroup.getOptionValue("version")
+        version = self.applyGroup.getOptionValue("version")
         if len(version) == 0:
             return ""
         else:
@@ -1362,19 +1392,27 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         name = "knownbugs." + self.currTestSelection[0].app.name + self.versionSuffix()
         return os.path.join(self.currTestSelection[0].getDirectory(), name)
 
-    def getResizeDivisors(self):
+    def getSizeAsWindowFraction(self):
         # size of the dialog
-        return 1.4, 1.7
+        return 0.6, 0.6
     
     def performOnCurrent(self):
         self.checkSanity()
+        dataSourceText = { 1 : "brief_text", 2 : "free_text" }
+        namesToIgnore = [ "version" ]
         fileName = self.getFileName()
         writeFile = open(fileName, "a")
         writeFile.write("\n[Reported by " + os.getenv("USER", "Windows") + " at " + plugins.localtime() + "]\n")
-        for group in [ self.optionGroup, self.bugSystemGroup, self.textDescGroup ]:
+        for group in [ self.textGroup, self.searchGroup, self.applyGroup,
+                       self.bugSystemGroup, self.textDescGroup, self.optionGroup ]:
             for name, option in group.options.items():
                 value = option.getValue()
-                if name != "version" and value and value != "<none>":
+                if name in namesToIgnore or not value or value in [ "0", "<none>" ]:
+                    continue
+                if name == "data_source":
+                    writeFile.write("search_file:" + dataSourceText[value] + "\n")
+                    namesToIgnore += [ "search_file", "trigger_on_success", "ignore_other_errors" ]
+                else:
                     writeFile.write(name + ":" + str(value) + "\n")
         writeFile.close()
         self.currTestSelection[0].filesChanged()

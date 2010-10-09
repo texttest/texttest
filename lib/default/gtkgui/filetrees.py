@@ -39,7 +39,7 @@ class FileViewGUI(guiutils.SubGUI):
         self.selection.selected_foreach(self.storeIter, selectionStore)
         return selectionStore
 
-    def storeIter(self, model, path, iter, selectionStore):
+    def storeIter(self, dummyModel, dummyPath, iter, selectionStore):
         selectionStore.append(self._storeIter(iter))
 
     def _storeIter(self, iter):
@@ -105,7 +105,7 @@ class FileViewGUI(guiutils.SubGUI):
         return self.addScrollBars(view, hpolicy=gtk.POLICY_NEVER)
         # only used in test view
 
-    def renderParentsBold(self, column, cell, model, iter):
+    def renderParentsBold(self, dummyColumn, cell, model, iter):
         if model.iter_has_child(iter):
             cell.set_property('font', "bold")
         else:
@@ -130,7 +130,7 @@ class FileViewGUI(guiutils.SubGUI):
         else:
             return None, None
 
-    def fileActivated(self, view, path, column, *args):
+    def fileActivated(self, dummy, path, *args):
         iter = self.model.get_iter(path)
         fileName = self.model.get_value(iter, 2)
         if not fileName:
@@ -160,7 +160,7 @@ class FileViewGUI(guiutils.SubGUI):
         dirIters = { root : iter }
         parentIter = iter
         for file in files:
-            parent, local = os.path.split(file)
+            parent = os.path.split(file)[0]
             parentIter = dirIters.get(parent)
             if parentIter is None:
                 subDirIters = self.addDataFilesUnderIter(iter, [ parent ], colour, root)
@@ -182,7 +182,7 @@ class ApplicationFileGUI(FileViewGUI):
     def shouldShow(self):
         return not self.dynamic
     
-    def getGroupTabTitle(self):
+    def getTabTitle(self):
         return "Config"
     
     def getViewFileSignal(self):
@@ -203,7 +203,7 @@ class ApplicationFileGUI(FileViewGUI):
                 self.allApps.append(suite.app)
                 self.recreateModel(self.getState(), preserveSelection=False)
 
-    def addFilesToModel(self, state):
+    def addFilesToModel(self, *args):
         colour = guiutils.guiConfig.getCompositeValue("file_colours", "static")
         importedFiles = {}
         allTitles = self.getApplicationTitles()
@@ -293,6 +293,9 @@ class TestFileGUI(FileViewGUI):
         else:
             return True
 
+    def getTabTitle(self):
+        return "Test"
+    
     def getWidgetName(self):
         return "File Tree"
 
@@ -304,7 +307,7 @@ class TestFileGUI(FileViewGUI):
             self.model.foreach(self.updatePath, (origRelPath, test.getRelPath()))
             self.setName( [ test ], 1)
 
-    def updatePath(self, model, path, iter, data):
+    def updatePath(self, model, dummyPath, iter, data):
         origPath, newPath = data
         origFile = model.get_value(iter, 2)
         if origFile:
@@ -322,7 +325,7 @@ class TestFileGUI(FileViewGUI):
         if test is self.currentTest:
             self.model.foreach(self.setRecalculateIcon, [ comparisons, newIcon ])
             
-    def setRecalculateIcon(self, model, path, iter, data):
+    def setRecalculateIcon(self, model, dummyPath, iter, data):
         comparisons, newIcon = data
         comparison = model.get_value(iter, 3)
         if comparison in comparisons:
@@ -333,7 +336,7 @@ class TestFileGUI(FileViewGUI):
     def forceVisible(self, rowCount):
         return rowCount == 1
 
-    def notifyNewTestSelection(self, tests, apps, rowCount, *args):
+    def notifyNewTestSelection(self, tests, dummyApps, rowCount, *args):
         if len(tests) == 0 or (not self.dynamic and rowCount > 1): # multiple tests in static GUI result in removal
             self.currentTest = None
             self.setName(tests, rowCount)
@@ -380,7 +383,7 @@ class TestFileGUI(FileViewGUI):
             if hasattr(realState, "correctResults"):
                 # failed on comparison
                 self.addComparisonsToModel(realState)
-            elif not realState.isComplete():
+            else:
                 self.addTmpFilesToModel(realState)
         else:
             self.addStaticFilesToModel(realState)
@@ -395,7 +398,7 @@ class TestFileGUI(FileViewGUI):
         self.notify("NewFileSelection", filelist)
         if not self.dynamic:
             if selection.count_selected_rows() == 1:
-                model, paths = selection.get_selected_rows()
+                paths = selection.get_selected_rows()[1]
                 selectedIter = self.model.get_iter(paths[0])
                 dirName = self.getDirectory(selectedIter)
                 fileType = self.getFileType(selectedIter)
@@ -419,7 +422,7 @@ class TestFileGUI(FileViewGUI):
             name = self.model.get_value(iter, 0)
             return name.split()[0].lower()
 
-    def fileSelected(self, treemodel, path, iter, filelist):
+    def fileSelected(self, dummyModel, dummyPath, iter, filelist):
         # Do not include the top level which are just headers that don't currently correspond to files
         if self.model.iter_parent(iter) is not None:
             filePath = self.model.get_value(iter, 2)
@@ -429,10 +432,12 @@ class TestFileGUI(FileViewGUI):
     def getState(self):
         if self.currentTest:
             return self.currentTest.stateInGui
+
     def addComparisonsToModel(self, state):
         self.addComparisons(state, state.correctResults + state.changedResults, "Comparison Files")
         self.addComparisons(state, state.newResults, "New Files")
         self.addComparisons(state, state.missingResults, "Missing Files")
+
     def addComparisons(self, state, compList, title):
         if len(compList) == 0:
             return
@@ -446,6 +451,7 @@ class TestFileGUI(FileViewGUI):
             filelist.append(file)
         filelist.sort()
         self.addStandardFilesUnderIter(state, iter, filelist, fileCompMap)
+
     def addStandardFilesUnderIter(self, state, iter, files, compMap = {}):
         for file in files:
             comparison = compMap.get(file)
@@ -454,13 +460,15 @@ class TestFileGUI(FileViewGUI):
             if comparison:
                 details = comparison.getDetails()
             self.addFileToModel(iter, file, colour, comparison, details)
+
     def getComparisonColour(self, state, fileComp):
         if not state.isComplete():
             return self.getColour("running")
-        if fileComp.hasSucceeded():
+        if fileComp and fileComp.hasSucceeded():
             return self.getColour("success")
         else:
             return self.getColour("failure")
+
     def addTmpFilesToModel(self, state):
         tmpFiles = self.currentTest.listTmpFiles()
         tmpIter = self.model.insert_before(None, None)
@@ -480,7 +488,7 @@ class TestFileGUI(FileViewGUI):
         for file in stdFiles:
             self.addFileToModel(stditer, file, colour)
 
-    def addStaticFilesToModel(self, state):
+    def addStaticFilesToModel(self, *args):
         stdFiles, defFiles = self.currentTest.listStandardFiles(allVersions=True)
         if self.currentTest.classId() == "test-case":
             self.addStaticFilesWithHeading("Standard", stdFiles)
@@ -493,10 +501,9 @@ class TestFileGUI(FileViewGUI):
     def getExternalDataFiles(self):
         try:
             return self.currentTest.app.extraReadFiles(self.currentTest).items()
-        except:
+        except Exception:
             sys.stderr.write("WARNING - ignoring exception thrown by '" + self.currentTest.getConfigValue("config_module") + \
-                             "' configuration while requesting extra data files, not displaying any such files")
-            plugins.printException()
+                             "' configuration while requesting extra data files, not displaying any such files\n")
             return seqdict()
 
     def addStaticDataFilesToModel(self):

@@ -1,8 +1,8 @@
 # Code to generate HTML report of historical information. This report generated
 # either via the -coll flag, or via -s 'batch.GenerateHistoricalReport <batchid>'
 
-import os, plugins, time, re, HTMLgen, HTMLcolors, operator, sys, logging
-from cPickle import Pickler, Unpickler, UnpicklingError
+import os, plugins, time, HTMLgen, HTMLcolors, sys, logging
+from cPickle import Unpickler, UnpicklingError
 from ndict import seqdict
 from glob import glob
 HTMLgen.PRINTECHO = 0
@@ -18,7 +18,7 @@ class ColourFinder:
         return self.htmlColour(colourName)
     def htmlColour(self, colourName):
         if not colourName.startswith("#"):
-            exec "colourName = HTMLcolors." + colourName.upper()
+            colourName = getattr(HTMLcolors, colourName.upper())
         return colourName
 
 def getDisplayText(tag):
@@ -183,8 +183,8 @@ class GenerateWebPages(object):
     def findTestStateFilesAndTags(self, repositoryDirs):
         allFiles = []
         allTags = set()
-        for extraVersion, dir in repositoryDirs:
-            for root, dirs, files in os.walk(dir):
+        for _, dir in repositoryDirs:
+            for root, _, files in os.walk(dir):
                 for file in files:
                     if file.startswith("teststate_"):
                         allFiles.append((os.path.join(root, file), dir))
@@ -413,7 +413,7 @@ class TestTable:
                 colourCount[colourKey] = 0
             categoryHandler = self.categoryHandlers[tag]
             basicData = categoryHandler.getSummaryData()[-1]
-            for category, count in basicData.items():
+            for category, count in basicData:
                 colourKey = self.getBackgroundColourKey(category)
                 colourCount[colourKey] += count
             fullData.append((getDisplayText(tag), colourCount))
@@ -451,7 +451,7 @@ class TestTable:
         if state:
             if self.cellInfo:
                 if hasattr(state, "findComparison"):
-                    fileComp, fileCompList = state.findComparison(self.cellInfo, includeSuccess=True)
+                    fileComp = state.findComparison(self.cellInfo, includeSuccess=True)[0]
                     if fileComp:
                         return self.getCellDataFromFileComp(fileComp)
             else:
@@ -470,7 +470,7 @@ class TestTable:
             cellContent = "ok"
         else:
             cellContent = state.getTypeBreakdown()[1]
-        cellContent += " " + ",".join(state.executionHosts)
+        cellContent += " " + ", ".join(state.executionHosts)
         return cellContent.strip(), success, fgcol, bgcol
 
     def getCellDataFromFileComp(self, fileComp):
@@ -594,7 +594,7 @@ class TestDetails:
         fullText = HTMLgen.Container()
         for freeText, tests in freeTextData:
             tests.sort(key=lambda info: info[0])
-            for testName, state, extraVersion in tests:
+            for testName, _, extraVersion in tests:
                 fullText.append(HTMLgen.Name(version + testName + extraVersion))
             fullText.append(self.getHeaderLine(tests, version, linkFromDetailsToOverview))
             self.appendFreeText(fullText, freeText)
@@ -617,11 +617,12 @@ class TestDetails:
                     newLine = " ".join(words[:-1])
                     fullText.append(HTMLgen.Href(linkTarget, newLine))
                     fullText.append(HTMLgen.BR())
-                    fullText.append(HTMLgen.BR())
                 else:
                     currFreeText += line + "\n"
         else:
-            fullText.append(HTMLgen.RawText("<PRE>" + freeText + "</PRE>"))
+            currFreeText = freeText
+        if currFreeText:
+            fullText.append(HTMLgen.RawText("<PRE>" + currFreeText + "</PRE>"))
     
     def getHeaderLine(self, tests, version, linkFromDetailsToOverview):
         testName, state, extraVersion = tests[0]
@@ -660,7 +661,7 @@ class CategoryHandler:
         self.testsInCategory.setdefault(state.category, []).append((testId, state, extraVersion))
 
     def getDescription(self, cat, count):
-        shortDescr, longDescr = getCategoryDescription(cat)
+        shortDescr, _ = getCategoryDescription(cat)
         return str(count) + " " + shortDescr
 
     def getTestCountDescription(self, count):
@@ -668,13 +669,13 @@ class CategoryHandler:
 
     def generateTextSummary(self):
         numTests, summaryData = self.getSummaryData()
-        categoryDescs = [ self.getDescription(cat, count) for cat, count in summaryData.items() ]
+        categoryDescs = [ self.getDescription(cat, count) for cat, count in summaryData ]
         return self.getTestCountDescription(numTests) + " ".join(categoryDescs)
 
     def generateHTMLSummary(self, detailPageRef, extraVersion=None):
         numTests, summaryData = self.getSummaryData(extraVersion)
         container = HTMLgen.Container()
-        for cat, count in summaryData.items():
+        for cat, count in summaryData:
             summary = HTMLgen.Text(self.getDescription(cat, count))
             if cat == "success":
                 container.append(summary)
@@ -693,25 +694,21 @@ class CategoryHandler:
 
     def getSummaryData(self, extraVersion=None):
         numTests = 0
-        summaryData = seqdict()
-        for cat, testInfo in sorted(self.testsInCategory.items(), self.compareCategories):
+        summaryData = []
+        for cat, testInfo in self.testsInCategory.items():
             testCount = self.countTests(testInfo, extraVersion)
             if testCount > 0:
-                summaryData[cat] = testCount
+                summaryData.append((cat, testCount))
                 numTests += testCount
+        summaryData.sort(key=self.getSummarySortKey)
         return numTests, summaryData
     
     def getTestsWithDescriptions(self):
         return [ (getCategoryDescription(cat)[1], testInfo) for cat, testInfo in self.testsInCategory.items() ]
 
-    def compareCategories(self, data1, data2):
+    def getSummarySortKey(self, data):
         # Put success at the start, it's neater like that
-        if data1[0] == "success":
-            return -1
-        elif data2[0] == "success":
-            return 1
-        else:
-            return 0
+        return data[0] != "success", -data[1]
                           
 
 def getCategoryDescription(cat):

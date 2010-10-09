@@ -8,8 +8,6 @@ if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(sys.argv[0]))))
 
 import plugins, fpdiff, logging, shutil
-from ndict import seqdict
-from re import sub
 from optparse import OptionParser
 from StringIO import StringIO
 
@@ -35,7 +33,7 @@ class FilterAction(plugins.Action):
     def getStem(self, fileName):
         return os.path.basename(fileName).split(".")[0]
 
-    def changeToFilteringState(self, *args):
+    def changeToFilteringState(self, *args): # pragma: no cover - documentation only
         pass
 
     def performAllFilterings(self, test, stem, fileName, newFileName):
@@ -59,7 +57,7 @@ class FilterAction(plugins.Action):
         stem = self.getStem(fileName)
         filters = self.makeAllFilters(test, stem, app)
         inFile = open(fileName)
-        for fileFilter, extraPostfix in filters:
+        for fileFilter, _ in filters:
             self.diag.info("Applying " + fileFilter.__class__.__name__ + " to " + fileName) 
             outFile = StringIO()
             fileFilter.filterFile(inFile, outFile)
@@ -79,11 +77,14 @@ class FilterAction(plugins.Action):
 
     def _makeAllFilters(self, test, stem, app):                    
         filters = []
-        runDepTexts = app.getCompositeConfigValue("run_dependent_text", stem)
+        configObj = test
+        if test.app is not app: # happens when testing filtering in the static GUI
+            configObj = app
+        runDepTexts = configObj.getCompositeConfigValue("run_dependent_text", stem)
         if runDepTexts:
             filters.append((RunDependentTextFilter(runDepTexts, test.getRelPath()), ".normal"))
 
-        unorderedTexts = app.getCompositeConfigValue("unordered_text", stem)
+        unorderedTexts = configObj.getCompositeConfigValue("unordered_text", stem)
         if unorderedTexts:
             filters.append((UnorderedTextFilter(unorderedTexts, test.getRelPath()), ".sorted"))
         return filters
@@ -183,7 +184,7 @@ class RunDependentTextFilter(plugins.Observable):
         lineNumber = 0
         for line in file:
             # We don't want to stack up ActionProgreess calls in ThreaderNotificationHandler ...
-            self.notifyIfMainThread("ActionProgress", "")
+            self.notifyIfMainThread("ActionProgress")
             lineNumber += 1
             lineFilter, filteredLine = self.getFilteredLine(line, lineNumber)
             if filteredLine:
@@ -224,14 +225,16 @@ class LineNumberTrigger:
         self.lineNumber = lineNumber
     def __repr__(self):
         return "Line number trigger for line " + str(self.lineNumber)
-    def matches(self, line, lineNumber):
+    def matches(self, lineArg, lineNumber):
         return lineNumber == self.lineNumber
-    def replace(self, line, newText):
+    def replace(self, lineArg, newText):
         return newText + "\n"
 
 def getWriteDirRegexp(testId):
     # Some stuff, a date, and the testId (ignore the appId as we don't know when or where)
-    return "[^ \"=]*/[^ \"=]*[0-3][0-9][A-Za-z][a-z][a-z][0-9]{6}[^ \"=]*/" + testId
+    # Doesn't handle paths with spaces, which seems hard, but does hardcode the default location of $HOME on Windows...
+    posixVersion = '([A-Za-z]:/Documents and Settings)?[^ "=]*/[^ "=]*[0-3][0-9][A-Za-z][a-z][a-z][0-9]{6}[^ "=]*/' + testId
+    return posixVersion.replace("/", "[/\\\\]")
 
 class LineFilter:
     dividers = [ "{->}", "{[->]}", "{[->}", "{->]}" ]
@@ -244,7 +247,7 @@ class LineFilter:
         self.originalText = text
         self.testId = testId
         self.diag = diag
-        self.triggers = []
+        self.trigger = None
         self.untrigger = None
         self.linesToRemove = 1
         self.autoRemove = 0
@@ -253,29 +256,26 @@ class LineFilter:
         self.divider = None
         self.removeWordsAfter = 0
         self.parseOriginalText()
-        self.diag.info("Created triggers : " + repr(self.triggers))
+        self.diag.info("Created trigger : " + repr(self.trigger))
         
     def getInternalExpression(self, parameter):
         method = self.internalExpressions.get(parameter)
         return method(self.testId)
     
-    def makeRegexTriggers(self, parameter):
+    def makeRegexTrigger(self, parameter):
         expression = self.getInternalExpression(parameter)
-        triggers = [ plugins.TextTrigger(expression) ]
-        if parameter == "writedir":
-            triggers.append(plugins.TextTrigger(expression.replace("/", "\\\\")))
-        return triggers
+        return plugins.TextTrigger(expression)
 
     def parseOriginalText(self):
         for divider in self.dividers:
             dividerPoint = self.originalText.find(divider)
             if dividerPoint != -1:
-                beforeText, afterText, parameter = self.extractParameter(self.originalText, dividerPoint, divider)
+                beforeText, afterText, _ = self.extractParameter(self.originalText, dividerPoint, divider)
                 self.divider = divider
-                self.triggers = self.parseText(beforeText)
-                self.untrigger = self.parseText(afterText)[0]
+                self.trigger = self.parseText(beforeText)
+                self.untrigger = self.parseText(afterText)
                 return
-        self.triggers = self.parseText(self.originalText)
+        self.trigger = self.parseText(self.originalText)
         
     def parseText(self, text):
         for matchModifierString in self.matchModifierStrings:
@@ -285,13 +285,13 @@ class LineFilter:
                 self.readMatchModifier(matchModifierString, parameter)
                 text = beforeText + afterText
         matcherString, parameter = self.findMatcherInfo(text)
-        return self.createTriggers(matcherString, parameter)
+        return self.createTrigger(matcherString, parameter)
 
     def findMatcherInfo(self, text):
         for matcherString in self.matcherStrings:
             linePoint = text.find(matcherString)
             if linePoint != -1:
-                beforeText, afterText, parameter = self.extractParameter(text, linePoint, matcherString)
+                parameter = self.extractParameter(text, linePoint, matcherString)[-1]
                 return matcherString, parameter
         return "", text
 
@@ -318,21 +318,21 @@ class LineFilter:
         elif matchModifierString == "{LINES ":
             self.linesToRemove = int(parameter)
 
-    def createTriggers(self, matcherString, parameter):
+    def createTrigger(self, matcherString, parameter):
         if matcherString == "{LINE ":
-            return [ LineNumberTrigger(int(parameter)) ]
+            return LineNumberTrigger(int(parameter))
         elif matcherString == "{INTERNAL " and self.internalExpressions.has_key(parameter):
-            return self.makeRegexTriggers(parameter)
+            return self.makeRegexTrigger(parameter)
         else:
-            return [ plugins.TextTrigger(parameter) ]
+            return plugins.TextTrigger(parameter)
 
     def applyTo(self, line, lineNumber=0):
         if self.autoRemove:
             return self.applyAutoRemove(line)
 
-        trigger = self.getMatchingTrigger(line, lineNumber)
-        if trigger:
-            return self.applyMatchingTrigger(line, trigger)
+        if self.trigger.matches(line, lineNumber):
+            self.diag.info(repr(self.trigger) + " matched " + line.strip())
+            return self.applyMatchingTrigger(line)
         else:
             return False, line
         
@@ -349,19 +349,13 @@ class LineFilter:
             self.autoRemove -= 1
         return True, self.filterWords(line)
 
-    def applyMatchingTrigger(self, line, trigger):
+    def applyMatchingTrigger(self, line):
         if self.untrigger:
             self.autoRemove = 1
-            return self.divider.startswith("{["), self.filterWords(line, trigger)
+            return self.divider.startswith("{["), self.filterWords(line)
         if self.linesToRemove:
             self.autoRemove = self.linesToRemove - 1
-        return True, self.filterWords(line, trigger)
-
-    def getMatchingTrigger(self, line, lineNumber):
-        for trigger in self.triggers:
-            if trigger.matches(line, lineNumber):
-                self.diag.info(repr(trigger) + " matched " + line.strip())
-                return trigger
+        return True, self.filterWords(line, self.trigger)
             
     def filterWords(self, line, trigger=None):
         if self.wordNumber != None:

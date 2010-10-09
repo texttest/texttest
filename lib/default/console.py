@@ -18,6 +18,7 @@ class TextDisplayResponder(plugins.Responder):
             
 class InteractiveResponder(plugins.Responder):
     def __init__(self, optionMap, *args):
+        plugins.Responder.__init__(self)
         self.overwriteSuccess = optionMap.has_key("n")
         self.overwriteFailure = optionMap.has_key("o")
         self.overwriteVersion = optionMap.get("o")
@@ -49,7 +50,7 @@ class InteractiveResponder(plugins.Responder):
             saveDesc += "(overwriting succeeded files also)"
         plugins.log.info(self.getPrefix(test) + "Saving " + repr(test) + saveDesc)
         test.state.save(test, exact, version, self.overwriteSuccess)
-        newState = test.state.makeNewState(test.app, "saved")
+        newState = test.state.makeNewState(test, "saved")
         test.changeState(newState)
 
     def useInteractiveResponse(self, test):
@@ -82,13 +83,12 @@ class InteractiveResponder(plugins.Responder):
 
     def viewLogFileGraphically(self, test):
         logFile = test.getConfigValue("log_file")
-        logFileComparison, list = test.state.findComparison(logFile)
+        logFileComparison = test.state.findComparison(logFile)[0]
         if logFileComparison:
             tool, cmdArgs = self.getViewCmdInfo(test, logFileComparison)
             if tool:
                 try:
-                    proc = subprocess.Popen(cmdArgs, stdout=open(os.devnull, "w"),
-                                            stderr=subprocess.STDOUT, startupinfo=plugins.getProcessStartUpInfo())
+                    proc = subprocess.Popen(cmdArgs, stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
                     plugins.log.info("<See also " + tool + " window for details of " + logFile + ">")
                     return proc
                 except OSError:

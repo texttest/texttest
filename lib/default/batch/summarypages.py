@@ -119,9 +119,16 @@ class SummaryDataFinder:
     def getOverviewPage(self, appName, version):
         return os.path.join(self.basePath, self.getShortAppName(appName), self.getOverviewPageName(version))
 
+    def getMostRecentDate(self):
+        allDates = []
+        for appInfo in self.appVersionInfo.values():
+            for versionData in appInfo.values():
+                allDates.append(max(versionData.keys()))
+        return max(allDates)
+
     def getLatestSummary(self, appName, version):
         versionData = self.appVersionInfo[appName][version]
-        lastDate = sorted(versionData.keys())[-1]
+        lastDate = max(versionData.keys())
         path = versionData[lastDate]
         summary = self.extractSummary(path)
         self.diag.info("For version " + version + ", found summary info " + repr(summary))
@@ -256,7 +263,7 @@ class SummaryGenerator:
         allVersions = reduce(operator.add, pageInfo.values(), [])
         return set(filter(lambda v: allVersions.count(v) > 1, allVersions))
 
-    def createPieChart(self, dataFinder, resultSummary, summaryGraphName, version, lastDate):
+    def createPieChart(self, dataFinder, resultSummary, summaryGraphName, version, lastDate, oldResults):
         from resultgraphs import PieGraph
         fracs = []
         colours = []
@@ -267,7 +274,12 @@ class SummaryGenerator:
                 fracs.append(count)
                 colours.append(colour)
                 tests += count
-        pg = PieGraph(version, time.strftime("%d%b%Y",lastDate) + " - " + str(tests) + " tests", size=5)
+        title = time.strftime("%d%b%Y",lastDate) + " - "
+        if oldResults:
+            title += "(" + str(tests) + " tests)"
+        else:
+            title += str(tests) + " tests"
+        pg = PieGraph(version, title, size=5)
         pg.pie(fracs, colours)
         pg.save(os.path.join(dataFinder.location, summaryGraphName))
 
@@ -278,6 +290,7 @@ class SummaryGenerator:
         minColumnIndices = self.getMinColumnIndices(pageInfo, versionOrder)
         self.diag.info("Minimum column indices are " + repr(minColumnIndices))
         columnVersions = {}
+        mostRecentDate = dataFinder.getMostRecentDate()
         for appName in self.getOrderedVersions(appOrder, pageInfo):
             file.write("<tr>\n")
             file.write("  <td><h3>" + appName + "</h3></td>\n")
@@ -292,17 +305,24 @@ class SummaryGenerator:
                         columnVersions[columnIndex] = version
 
                     resultSummary, lastDate = dataFinder.getLatestSummary(appName, version)
+                    oldResults = lastDate != mostRecentDate
                     fileToLink = dataFinder.getOverviewPage(appName, version)
                     if dataFinder.appUsePie[appName] == "true":
                         summaryGraphName = "summary_pie_" + version + ".png"
-                        self.createPieChart(dataFinder, resultSummary, summaryGraphName, version, lastDate)
+                        self.createPieChart(dataFinder, resultSummary, summaryGraphName, version, lastDate, oldResults)
                         file.write('    <td><a href="' + fileToLink + '"><img border=\"0\" src=\"' + summaryGraphName + '\"></a></td>\n')
                     else:
                         file.write('    <td><h3><a href="' + fileToLink + '">' + version + '</a></h3></td>\n')
                         for colourKey, count in resultSummary.items():
                             if count:
                                 colour = dataFinder.getColour(colourKey)
-                                file.write('    <td bgcolor="' + colour + '"><h3>' + str(count) + "</h3></td>\n")
+                                file.write('    <td bgcolor="' + colour + '"><h3>')
+                                if oldResults:
+                                    # Highlight old data by putting it in a paler foreground colour
+                                    file.write('<font color="#999999">' + str(count) + "</font>")
+                                else:
+                                    file.write(str(count))
+                                file.write("</h3></td>\n")
                     file.write("  </tr></table>")
                 file.write("</td>\n")
             file.write("</tr>\n")

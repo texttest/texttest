@@ -1993,3 +1993,5 @@ Grid Engine (LSF/SGE) enhancements:
 Bug Fixes:
     - Running extra versions with an explicit version from the static GUI does not flip version order any more (testmodel.py)
     - TextTest no longer allows data file names to clash with its own pre-defined definition file names (testmodel.py)
+    - "Run Info" information when reconnecting is heavily reduced (textinfo.py)
+	This to avoid the impression it's describing the environment where the original test ran

@@ -360,9 +360,12 @@ class Config:
                 if self.optionValue("b") is None:
                     plugins.log.info("No batch session identifier provided, using 'default'")
                     self.optionMap["b"] = "default"
-                classes.append(batch.BatchResponder)
-                from batch.junitreport import JUnitResponder
-                classes.append(JUnitResponder)
+                batchSession = self.optionValue("b")
+                if self.anyAppHas(allApps, lambda app: self.emailEnabled(app, batchSession)):
+                    classes.append(batch.EmailResponder)
+                if self.anyAppHas(allApps, lambda app: app.getCompositeConfigValue("batch_junit_format", batchSession) == "true"):
+                    from batch.junitreport import JUnitResponder
+                    classes.append(JUnitResponder)
                 
         if os.name == "posix" and self.useVirtualDisplay():
             from virtualdisplay import VirtualDisplayResponder
@@ -375,6 +378,10 @@ class Config:
         from pyusecase_interface import ApplicationEventResponder
         classes.append(ApplicationEventResponder)
         return classes
+
+    def emailEnabled(self, app, sessionName):
+        return app.getCompositeConfigValue("batch_recipients", sessionName) or \
+               app.getCompositeConfigValue("batch_use_collection", sessionName) == "true"
 
     def isActionReplay(self):
         for option, _ in self.getInteractiveReplayOptions():
@@ -1020,7 +1027,7 @@ class Config:
         app.setConfigDefault("historical_report_resource_page_tables", { "default": []}, "Resource names to generate the tables for the relevant performance/memory pages")
         app.setConfigDefault("historical_report_piechart_summary", { "default": "false" }, "Generate pie chart summary page rather than default HTML tables.")
         app.setConfigDefault("batch_sender", { "default" : self.getDefaultMailAddress() }, "Sender address to use sending mail in batch mode")
-        app.setConfigDefault("batch_recipients", { "default" : self.getDefaultMailAddress() }, "Addresses to send mail to in batch mode")
+        app.setConfigDefault("batch_recipients", { "default" : "" }, "Comma-separated addresses to send mail to in batch mode")
         app.setConfigDefault("batch_timelimit", { "default" : "" }, "Maximum length of test to include in batch mode runs")
         app.setConfigDefault("batch_filter_file", { "default" : [] }, "Generic filter for batch session, more flexible than timelimit")
         app.setConfigDefault("batch_use_collection", { "default" : "false" }, "Do we collect multiple mails into one in batch mode")

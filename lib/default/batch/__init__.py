@@ -149,18 +149,19 @@ class BatchApplicationData:
         return contents
 
 
-class BatchResponder(plugins.Responder):
+class EmailResponder(plugins.Responder):
     def __init__(self, optionMap, *args):
         plugins.Responder.__init__(self)
         self.sessionName = optionMap["b"]
         self.runId = optionMap.get("name", calculateBatchDate()) # use the command-line name if given, else the date
         self.batchAppData = seqdict()
         self.allApps = seqdict()
-        
+
     def notifyComplete(self, test):
-        if not self.batchAppData.has_key(test.app):
-            self.addApplication(test)
-        self.batchAppData[test.app].storeCategory(test)
+        if test.app.emailEnabled(self.sessionName):
+            if not self.batchAppData.has_key(test.app):
+                self.addApplication(test)
+            self.batchAppData[test.app].storeCategory(test)
 
     def getRootSuite(self, test):
         if test.parent:
@@ -177,7 +178,7 @@ class BatchResponder(plugins.Responder):
     def notifyAllComplete(self):
         mailSender = MailSender(self.sessionName, self.runId)
         for appList in self.allApps.values():
-            batchDataList = map(lambda x: self.batchAppData[x], appList)
+            batchDataList = map(self.batchAppData.get, appList)
             mailSender.send(batchDataList)
             
     

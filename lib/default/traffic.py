@@ -225,8 +225,9 @@ class ModifyTraffic(plugins.ScriptWithArgs):
     # For now, only bother with the client server traffic which is mostly what needs tweaking...
     scriptDoc = "Apply a script to all the client server data"
     def __init__(self, args):
-        argDict = self.parseArguments(args, [ "script" ])
+        argDict = self.parseArguments(args, [ "script", "types" ])
         self.script = argDict.get("script")
+        self.trafficTypes = plugins.commasplit(argDict.get("types", "CLI,SRV"))
     def __repr__(self):
         return "Updating traffic in"
     def __call__(self, test):
@@ -264,7 +265,7 @@ class ModifyTraffic(plugins.ScriptWithArgs):
             
     def getModified(self, fullLine, dir):
         trafficType = fullLine[2:5]
-        if trafficType in [ "CLI", "SRV" ]:
+        if trafficType in self.trafficTypes:
             proc = subprocess.Popen([ self.script, fullLine[6:]], cwd=dir,
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=os.name=="nt")
             stdout, stderr = proc.communicate()

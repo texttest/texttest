@@ -247,8 +247,8 @@ class MailSender:
         smtpPassword = app.getConfigValue("smtp_server_password")
         fromAddress = app.getCompositeConfigValue("batch_sender", self.sessionName)
         toAddresses = plugins.commasplit(app.getCompositeConfigValue("batch_recipients", self.sessionName))
-        from smtplib import SMTP
-        smtp = SMTP()    
+        import smtplib
+        smtp = smtplib.SMTP()    
         try:
             smtp.connect(smtpServer)
         except Exception: # Can't use SMTPException, because this raises socket.error usually
@@ -256,12 +256,12 @@ class MailSender:
         if smtpUsername:
             try:
                 smtp.login(smtpUsername, smtpPassword)
-            except Exception:
+            except smtplib.SMTPException:
                 return "Failed to login as '" + smtpUsername + "' to SMTP server at " + smtpServer + \
                     "\n" + self.exceptionOutput()
         try:
             smtp.sendmail(fromAddress, toAddresses, mailContents)
-        except Exception:
+        except smtplib.SMTPException:
             return "Mail could not be sent\n" + self.exceptionOutput()
         smtp.quit()
     

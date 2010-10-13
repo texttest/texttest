@@ -5,9 +5,47 @@ import sys, os, inspect
 import socket as realsocket
 del sys.modules["socket"]
 
+class NameFinder(dict):
+    def __init__(self, moduleProxy):
+        dict.__init__(self)
+        self["InstanceProxy"] = InstanceProxy
+        self["Instance"] = moduleProxy.makeInstance
+        self.makeNewClasses = False
+        self.newClassNames = []
+
+    def defineClass(self, className, classDefStr, moduleProxy):
+        self.defineClassLocally(classDefStr)
+        for newClassName in [ className ] + self.newClassNames:
+            setattr(moduleProxy, newClassName, dict.__getitem__(self, newClassName))
+        self.newClassNames = []
+        return dict.__getitem__(self, className)
+
+    def defineClassLocally(self, classDefStr):
+        try:
+            exec classDefStr in self
+        except NameError:
+            self.makeNewClasses = True
+            self.defineClassLocally(classDefStr)
+            self.makeNewClasses = False
+        
+    def __getitem__(self, name):
+        if name not in self:
+            if self.makeNewClasses:
+                exec "class " + name + ": pass" in self
+                self.newClassNames.append(name)
+                self.makeNewClasses = False
+            else:
+                try:
+                    exec "import " + name in self
+                except ImportError:
+                    pass
+        return dict.__getitem__(self, name)
+            
+
 class ModuleProxy:
     def __init__(self, name):
         self.name = name
+        self.trafficServerNameFinder = NameFinder(self)
 
     def __getattr__(self, attrname):
         return AttributeProxy(self.name, self, attrname).tryEvaluate()
@@ -22,32 +60,24 @@ class ModuleProxy:
             sock.connect(serverAddress)
             return sock
 
-    def handleResponse(self, response, cls):
+    def handleResponse(self, response):
         if response.startswith("raise "):
             rest = response.replace("raise ", "")
-            raise self.handleResponse(rest, "ExceptionProxy")
+            raise self.makeResponse(rest)
         else:
-            def Instance(className, instanceName):
-                # Call separate function to avoid exec problems
-                return self.makeInstance(className, instanceName, cls)
-            def NewStyleInstance(className, instanceName):
-                return self.makeInstance(className, instanceName, "NewStyleInstanceProxy")
-            return self.evaluateResponse(response, cls, Instance, NewStyleInstance)
+            return self.makeResponse(response)
 
-    def makeInstance(self, className, instanceName, baseClass):
-        exec "class " + className + "(" + baseClass + "): pass"
-        classObj = eval(className)
-        setattr(self, className, classObj)
-        return classObj(givenInstanceName=instanceName, moduleProxy=self)
-
-    @staticmethod
-    def evaluateResponse(response, cls, Instance, NewStyleInstance):
-        try:
-            return eval(response)
-        except NameError: # standard exceptions end up here
-            module = response.split(".", 1)[0]
-            exec "import " + module
-            return eval(response)
+    def makeResponse(self, response):
+        return eval(response, self.trafficServerNameFinder)
+        
+    def makeInstance(self, className, instanceName):
+        if "(" in className:
+            classDefStr = "class " + className.replace("(", "(InstanceProxy, ") + " : pass"
+        else:
+            classDefStr = "class " + className + "(InstanceProxy): pass"
+        actualClassName = className.split("(")[0]
+        actualClassObj = self.trafficServerNameFinder.defineClass(actualClassName, classDefStr, self)
+        return actualClassObj(givenInstanceName=instanceName, moduleProxy=self)
 
 
 
@@ -65,7 +95,7 @@ class FullModuleProxy(ModuleProxy):
         sock.shutdown(1)
         response = sock.makefile().read()
         if response:
-            self.handleResponse(response, "InstanceProxy")
+            self.handleResponse(response)
 
     def __getattr__(self, attrname):
         if self.importHandler.callStackChecker.callerExcluded():
@@ -102,24 +132,19 @@ class InstanceProxy:
         if attrname != "name":
             AttributeProxy(self.name, self.moduleProxy, attrname).setValue(value)
 
-class NewStyleInstanceProxy(InstanceProxy, object):
-    # Must intercept these as they are defined in "object"
-    def __repr__(self):
-        return self.__getattr__("__repr__")()
-
-    def __str__(self):
-        return self.__getattr__("__str__")()
-
-class ExceptionProxy(InstanceProxy, Exception):
-    def __str__(self):
-        return self.__getattr__("__str__")()
-
-    # Only used in Python >= 2.5 where Exception is a new-style class
+    # Used by mixins of this class and new-style classes
     def __getattribute__(self, attrname):
-        if attrname in [ "name", "moduleProxy", "__dict__", "__class__", "__getattr__" ]:
+        if attrname in [ "name", "moduleProxy", "__dict__", "__class__", "__getattr__",
+                         "getRepresentationForSendToTrafficServer" ]:
             return object.__getattribute__(self, attrname)
         else:
             return self.__getattr__(attrname)
+
+    def __str__(self):
+        return self.__getattr__("__str__")()
+
+    def __repr__(self):
+        return self.__getattr__("__repr__")()
 
 
 class AttributeProxy:
@@ -140,7 +165,7 @@ class AttributeProxy:
         sock.shutdown(1)
         response = sock.makefile().read()
         if response:
-            return self.moduleProxy.handleResponse(response, "InstanceProxy")
+            return self.moduleProxy.handleResponse(response)
         else:
             return self
 
@@ -158,7 +183,7 @@ class AttributeProxy:
         if self.realVersion is None or self.callStackChecker is None or not self.callStackChecker.callerExcluded(): 
             response = self.makeResponse(*args, **kw)
             if response:
-                return self.moduleProxy.handleResponse(response, "InstanceProxy")
+                return self.moduleProxy.handleResponse(response)
         else:
             return self.realVersion(*args, **kw)
 

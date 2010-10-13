@@ -1,5 +1,5 @@
 
-import optparse, os, stat, sys, logging, logging.config, shutil, socket, subprocess, types, threading, time
+import optparse, os, stat, sys, logging, logging.config, shutil, socket, subprocess, types, threading, time, inspect
 from SocketServer import TCPServer, StreamRequestHandler
 from copy import copy
 
@@ -516,11 +516,11 @@ class ServerStateTraffic(ServerTraffic):
 class PythonInstanceWrapper:
     allInstances = {}
     wrappersByInstance = {}
-    def __init__(self, instance, moduleName):
+    def __init__(self, instance, moduleName, classDesc):
         self.instance = instance
         self.moduleName = moduleName
-        self.className = self.instance.__class__.__name__
-        self.instanceName = self.getNewInstanceName(self.className.lower())
+        self.classDesc = classDesc
+        self.instanceName = self.getNewInstanceName()
         self.allInstances[self.instanceName] = self
         self.wrappersByInstance[id(self.instance)] = self
 
@@ -537,26 +537,15 @@ class PythonInstanceWrapper:
             pass
 
     @classmethod
-    def getWrapperFor(cls, instance, moduleName):
+    def getWrapperFor(cls, instance, *args):
         storedWrapper = cls.wrappersByInstance.get(id(instance))
-        return storedWrapper or cls(instance, moduleName)
-
-    def getInstanceType(self):
-        if issubclass(self.instance.__class__, object):
-            return "NewStyleInstance"
-        else:
-            return "Instance"
-
-    def exceptionRepr(self):
-        return "Instance" + self.argRepr()
+        return storedWrapper or cls(instance, *args)        
 
     def __repr__(self):
-        return self.getInstanceType() + self.argRepr()
+        return "Instance(" + repr(self.classDesc) + ", " + repr(self.instanceName) + ")"
 
-    def argRepr(self):
-        return "(" + repr(self.className) + ", " + repr(self.instanceName) + ")"
-
-    def getNewInstanceName(self, className):
+    def getNewInstanceName(self):
+        className = self.classDesc.split("(")[0].lower()
         num = 1
         while self.allInstances.has_key(className + str(num)):
             num += 1
@@ -659,10 +648,35 @@ class PythonModuleTraffic(PythonTraffic):
                 newResult[key] = self.addInstanceWrappers(value)
             return newResult
         elif not self.isBasicType(result) and self.belongsToInterceptedModule(self.getModuleName(result)):
-            return PythonInstanceWrapper.getWrapperFor(result, self.modOrObjName)
+            return self.getWrapper(result, self.modOrObjName)
         else:
             return result
-        
+
+    def getWrapper(self, instance, moduleName):
+        classDesc = self.getClassDescription(instance.__class__)
+        return PythonInstanceWrapper.getWrapperFor(instance, moduleName, classDesc)
+
+    def getClassDescription(self, cls):
+        baseClasses = self.findRelevantBaseClasses(cls)
+        if len(baseClasses):
+            return cls.__name__ + "(" + ", ".join(baseClasses) + ")"
+        else:
+            return cls.__name__
+
+    def findRelevantBaseClasses(self, cls):
+        classes = []
+        for baseClass in inspect.getmro(cls)[1:]:
+            name = baseClass.__name__
+            if self.belongsToInterceptedModule(baseClass.__module__):
+                classes.append(name)
+            else:
+                module = baseClass.__module__
+                if module != "__builtin__":
+                    name = module + "." + name
+                classes.append(name)
+                break
+        return classes
+    
 
 class PythonAttributeTraffic(PythonModuleTraffic):
     cachedAttributes = set()
@@ -803,7 +817,8 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
             moduleName = self.getModuleName(exc_value)
             if self.belongsToInterceptedModule(moduleName):
                 # We own the exception object also, handle it like an ordinary instance
-                return "raise " + PythonInstanceWrapper(exc_value, moduleName).exceptionRepr()
+                wrapper = self.getWrapper(exc_value, moduleName)
+                return "raise " + repr(wrapper)
             else:
                 return self.getExceptionText(exc_value)
 

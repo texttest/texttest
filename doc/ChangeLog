@@ -42,7 +42,7 @@ Version 1.0:
 	(5) Prevent internal environment variables from "leaking" outside where they are set
 	(6) Some bug fixes for aggregated versions (-v a.b etc.)
 	(7) Improved error handling when incorrect scripts given to -s option
-	
+
 Version 2.0:
 
     - Default configuration development (default.py)
@@ -1986,7 +1986,13 @@ Dynamic GUI Enhancements:
 Framework Enhancements:
     - Jira plugin now highlights 'resolution' field if it is set, instead of 'status' (jira.py)
 	This information is usually more interesting.
+    - Python interception of classes now handles base classes correctly (traffic_server.py)
+	Base classes now listed explicitly. Some recorded traffic may not work. See migration notes.
 Batch Report Enhancements:
+    - Email-sending in batch mode is no longer enabled by default (batch/__init__.py)
+	Previously automatically sent mail to $USER: now many only use the HTML reports.
+    - Old results are now shown in a light-grey foregound colour on the HTML report summary pages (summarypages.py)
+	This to prevent confusion when several processes update the same table in sequence.
 Grid Engine (LSF/SGE) enhancements:
     - Ignore order of lists of resources when deciding about reuse (masterprocess.py)
 	Previously started new jobs if one test required resources a,b and the other required b,a.

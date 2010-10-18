@@ -1,0 +1,66 @@
+
+
+More migration (potentially) in the Python traffic interception mechanism.
+
+=========================================================
+COMPULSORY MIGRATION
+=========================================================
+
+(1) Base classes in intercepted Python traffic
+==============================================
+
+These are now handled correctly, i.e. listed explicitly in the traffic files. This means
+that two previous conventions in the traffic files are now obsolete.
+
+NewStyleInstance('Blah', 'blah1')
+
+becomes 
+
+Instance('Blah(object)', 'blah1')
+
+while
+
+raise Instance('MyException', 'myexception1')
+
+will no longer assume MyException derives from Exception, this must be written/recorded explicitly:
+
+raise Instance('MyException(exceptions.Exception)', 'myexception1')
+
+There are two ways to fix this. The first, and most obvious, is to simply re-record the 
+traffic files, when this will happen automatically. If that isn't possible, the next best option is
+to modify them via the ModifyTraffic script. Paste the following onto your PATH somewhere
+
+#!/usr/bin/env python
+
+### migrate_traffic_from_3.20.py
+
+import sys
+
+lineIn = sys.argv[1]
+pos = lineIn.find("NewStyle")
+while pos != -1:
+    parts = lineIn[pos + 8:].split("'")
+    parts[1] = parts[1] + "(object)"
+    lineIn = lineIn[:pos] + "'".join(parts)
+    pos = lineIn.find("NewStyle")
+
+if lineIn.startswith("raise Instance"):
+    parts = lineIn.split("'")
+    if "(" not in parts[1]:
+        parts[1] += "(exceptions.Exception)"
+    lineIn = "'".join(parts)
+sys.stdout.write(lineIn)
+
+and then run
+
+texttest.py -s "traffic.ModifyTraffic types=RET script=migrate_traffic_from_3.20.py"
+
+=========================================================
+CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
+=========================================================
+
+(1) Default value of batch_recipients
+=====================================
+Previously TextTest has always sent batch emails to $USER unless this was explicitly disabled.
+As more and more people rely on the HTML reports alone and don't read the emails this was becoming
+a pain. So no "batch_receipients" entry now means no email.

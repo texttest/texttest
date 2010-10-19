@@ -213,9 +213,7 @@ class RunningAction(BasicRunningAction):
             if disablingOption:
                 self.disablingInfo[self.getOption(disablingOption)] = disablingOptionValue, group
             
-        vOption = self.getOption("v")
-        if vOption:
-            RunningAction.originalVersion = vOption.getValue()
+        RunningAction.originalVersion = self.getVersionString()
 
     def getGroupNames(self, allApps):
         if len(allApps) > 0:
@@ -254,12 +252,16 @@ class RunningAction(BasicRunningAction):
     def getCopyCount(self):
         return self.getOption("cp").getValue()
 
-    def getVersionCount(self):
-        versionString = self.getOption("v").getValue()
-        if versionString.startswith("<default>"):
-            return 1
+    def getVersionString(self):
+        vOption = self.getOption("v")
+        if vOption:
+            versionString = vOption.getValue()
+            return "" if versionString.startswith("<default>") else versionString
         else:
-            return versionString.count(",") + 1
+            return ""
+
+    def getVersionCount(self):
+        return self.getVersionString().count(",") + 1
 
     def performedDescription(self):
         timesToRun = self.getCopyCount()
@@ -280,7 +282,7 @@ class RunningAction(BasicRunningAction):
                     return "run " + self.describeTests() + " with " + desc + " replay enabled"
 
     def getConfirmationMessage(self):
-        runVersion = self.getOption("v").getValue()
+        runVersion = self.getVersionString()
         if self.originalVersion and self.originalVersion not in runVersion:
             return "You have tried to run a version ('" + runVersion + \
                    "') which is not based on the version you started with ('" + self.originalVersion + "').\n" + \

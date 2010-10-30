@@ -1,13 +1,25 @@
 
-import sys, os, plugins, subprocess
+import sys, os, plugins, subprocess, colorer
 from jobprocess import killSubProcessAndChildren
 from time import sleep
 
 
 class TextDisplayResponder(plugins.Responder):
+    def __init__(self, optionMap, *args):
+        plugins.Responder.__init__(self)
+        self.enableColor = optionMap.has_key("zen")
+        
     def notifyComplete(self, test):
         if test.state.hasFailed():
-            self.describe(test)
+            if self.enableColor:
+                self.printTestWithColorEnabled(test, colorer.RED)
+            else:
+                self.describe(test)  
+     
+    def printTestWithColorEnabled(self, test, color):
+        colorer.enableOutputColor(color)
+        self.describe(test)
+        colorer.disableOutputColor()
 
     def getPrefix(self, test):
         return test.getIndent()

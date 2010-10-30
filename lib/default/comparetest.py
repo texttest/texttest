@@ -394,10 +394,11 @@ class ProgressTestComparison(BaseTestComparison):
             return (tmpSize * 100) / stdSize 
 
 class MakeComparisons(plugins.Action):
-    def __init__(self, testComparisonClass=None, progressComparisonClass=None, ignoreMissing=False):
+    def __init__(self, testComparisonClass=None, progressComparisonClass=None, ignoreMissing=False, enableColor=False):
         self.testComparisonClass = self.getClass(testComparisonClass, TestComparison)
         self.progressComparisonClass = self.getClass(progressComparisonClass, ProgressTestComparison)
         self.ignoreMissing = ignoreMissing
+        self.enableColor = enableColor
         
     def getClass(self, given, defaultClass):
         if given:
@@ -411,7 +412,13 @@ class MakeComparisons(plugins.Action):
     def __call__(self, test):
         newState = self.testComparisonClass(test.state, test.app)
         newState.computeFor(test, ignoreMissing=self.ignoreMissing)
-        self.describe(test, newState.getPostText())
+        import colorer
+        if self.enableColor and not test.state.hasFailed():
+            colorer.enableOutputColor(colorer.GREEN)
+            self.describe(test, newState.getPostText())
+            colorer.disableOutputColor()
+        else:
+            self.describe(test, newState.getPostText())
 
     def recomputeProgress(self, test, state, observers):
         newState = self.progressComparisonClass(state)

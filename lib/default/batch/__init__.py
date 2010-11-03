@@ -393,7 +393,7 @@ class SaveState(plugins.Responder):
     def createFileName(self, nameGiven):
         # include the date and the name, if any. Date is used for archiving, name for display
         parts = [ "teststate", calculateBatchDate() ]
-        if nameGiven:
+        if nameGiven and nameGiven not in parts:
             parts.append(nameGiven)
         return "_".join(parts)
     

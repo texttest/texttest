@@ -1158,6 +1158,7 @@ class Config:
         app.setConfigDefault("collect_traffic_python_ignore_callers", [], "List of Python modules from where calls to intercepted items should be ignored")
         app.setConfigDefault("collect_traffic_use_threads", "true", "Whether to enable threading, and hence concurrent requests, in traffic mechanism")
         app.setConfigDefault("collect_traffic_client_server", "false", "Whether to intercept client-server traffic sent by the SUT")
+        app.setConfigDefault("collect_traffic_alter_response", [], "List of textual transformations to perform on response traffic")
         app.setConfigDefault("run_dependent_text", { "default" : [] }, "Mapping of patterns to remove from result files")
         app.setConfigDefault("unordered_text", { "default" : [] }, "Mapping of patterns to extract and sort from result files")
         app.setConfigDefault("create_catalogues", "false", "Do we create a listing of files created/removed by tests")

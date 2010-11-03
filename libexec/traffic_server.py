@@ -1,5 +1,5 @@
 
-import optparse, os, stat, sys, logging, logging.config, shutil, socket, subprocess, types, threading, time, inspect
+import optparse, os, stat, sys, logging, logging.config, shutil, socket, subprocess, types, threading, time, inspect, re
 from SocketServer import TCPServer, StreamRequestHandler
 from copy import copy
 
@@ -24,6 +24,8 @@ react to the above module to repoint where it sends socket interactions"""
     parser = optparse.OptionParser(usage)
     parser.add_option("-a", "--asynchronous-file-edit-commands", metavar="ENV",
                       help="Commands which may cause files to be edited after they have exited (presumably via background processes they start)")
+    parser.add_option("-A", "--alter-response", metavar="REPLACEMENTS",
+                      help="Response alterations to perform on the text before recording or returning it")
     parser.add_option("-e", "--transfer-environment", metavar="ENV",
                       help="Environment variables that are significant to particular programs and should be recorded if changed.")
     parser.add_option("-i", "--ignore-edits", metavar="FILES",
@@ -585,11 +587,17 @@ class PythonImportTraffic(PythonTraffic):
 
 class PythonModuleTraffic(PythonTraffic):
     interceptModules = set()
+    alterations = {}
     @classmethod
     def configure(cls, options):
         modStr = options.python_module_intercepts
         if modStr:
             cls.interceptModules.update(modStr.split(","))
+        fullAlterStr = options.alter_response
+        if fullAlterStr:
+            for alterStr in fullAlterStr.split(","):
+                toFind, toReplace = alterStr[:-1].split("{REPLACE ")
+                cls.alterations[re.compile(toFind)] = toReplace        
 
     def __init__(self, modOrObjName, attrName, *args):
         self.modOrObjName = modOrObjName
@@ -638,6 +646,12 @@ class PythonModuleTraffic(PythonTraffic):
             return eval(argStr)
         except NameError:
             return eval(argStr, globals(), NameFinder())
+
+    def getResultText(self, result):
+        text = repr(self.addInstanceWrappers(result))
+        for regex, repl in self.alterations.items():
+            text = regex.sub(repl, text)
+        return text
     
     def addInstanceWrappers(self, result):
         if type(result) in (list, tuple):
@@ -708,8 +722,8 @@ class PythonAttributeTraffic(PythonModuleTraffic):
             else:
                 return [ self.getExceptionResponse() ]
         if self.shouldCache(attr):
-            wrappedAttr = self.addInstanceWrappers(attr)
-            return [ PythonResponseTraffic(repr(wrappedAttr), self.responseFile) ]
+            resultText = self.getResultText(attr)
+            return [ PythonResponseTraffic(resultText, self.responseFile) ]
         else:
             # Makes things more readable if we delay evaluating this until the function is called
             # It's rare in Python to cache functions/classes before calling: it's normal to cache other things
@@ -811,7 +825,7 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
         instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
         try:
             result = self.callFunction(instance)
-            return repr(self.addInstanceWrappers(result))
+            return self.getResultText(result)
         except:
             exc_value = sys.exc_info()[1]
             moduleName = self.getModuleName(exc_value)

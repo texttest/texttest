@@ -80,6 +80,10 @@ class SetUpTrafficHandlers(plugins.Action):
         if asynchronousFileEditCmds:
             cmdArgs += [ "-a", ",".join(asynchronousFileEditCmds) ]
 
+        responseAlterations = test.getConfigValue("collect_traffic_alter_response")
+        if responseAlterations:
+            cmdArgs.append("--alter-response=" + ",".join(responseAlterations))
+
         if replayFile and self.recordSetting != self.RECORD_ONLY:
             cmdArgs += [ "-p", replayFile ]
             replayEditDir = test.getFileName("file_edits")
@@ -88,7 +92,7 @@ class SetUpTrafficHandlers(plugins.Action):
             if self.recordSetting == self.RECORD_NEW_REPLAY_OLD:
                 replayItems = interceptInfo.getReplayItems(replayFile)
                 if replayItems:
-                    cmdArgs += [ "--replay-items=" + ",".join(replayItems) ]
+                    cmdArgs.append("--replay-items=" + ",".join(replayItems))
 
         return subprocess.Popen(cmdArgs, env=test.getRunEnvironment(), universal_newlines=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)

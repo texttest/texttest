@@ -35,31 +35,36 @@ class BaseTestComparison(plugins.TestState):
         firstLine = open(resultFile).readline()
         return firstLine.strip() != self.fakeMissingFileText().strip()
 
-    def definitionFileCategory(self, ignoreMissing):
+    def findDefinitionFileStems(self, test, tmpFiles, ignoreMissing):
         if ignoreMissing:
-            return "all"
-        else:
-            return "regenerate"
+            return test.expandedDefFileStems()
 
-    def removeDefinitionFiles(self, test, tmpFiles):
+        stems = test.expandedDefFileStems("regenerate")
         for defFile in test.defFileStems("builtin") + test.defFileStems("default"):
             if tmpFiles.has_key(defFile):
-                plugins.printWarning("A file was generated with stem '" + defFile + "'.\n" +
-                                     "This stem is intended to indicate a definition file and hence should not be generated.\n" +
-                                     "Please change the configuration so that the file is called something else,\n" +
-                                     "or adjust the config file setting 'definition_file_stems' accordingly.")
-                del tmpFiles[defFile]
+                stems.append(defFile)
+                # On the whole, warn the user if unexpected things get generated
+                # Make an exception for recording as usecase-related files may be recorded that
+                # won't necessarily be re-recorded
+                if not test.app.isRecording():
+                    plugins.printWarning("A file was generated with stem '" + defFile + "'.\n" +
+                                         "This stem is intended to indicate a definition file and hence should not be generated.\n" +
+                                         "Please change the configuration so that the file is called something else,\n" +
+                                         "or adjust the config file setting 'definition_file_stems' accordingly.")
+        return stems
+
+    def makeStandardStemDict(self, test, tmpFiles, ignoreMissing):
+        defFileStems = self.findDefinitionFileStems(test, tmpFiles, ignoreMissing)
+        defFiles = test.getFilesFromStems(defFileStems, allVersions=False)
+        resultFiles = test.listResultFiles(allVersions=False)
+        resultFilesToCompare = filter(self.shouldCompare, resultFiles + defFiles)
+        return self.makeStemDict(resultFilesToCompare)
 
     def makeComparisons(self, test, ignoreMissing=False):
         # Might have saved some new ones or removed some old ones in the meantime...
         test.refreshFiles()
         tmpFiles = self.makeStemDict(test.listTmpFiles())
-        if not ignoreMissing:
-            self.removeDefinitionFiles(test, tmpFiles)
-        defFileCategory = self.definitionFileCategory(ignoreMissing)
-        resultFiles, defFiles = test.listStandardFiles(allVersions=False, defFileCategory=defFileCategory)
-        resultFilesToCompare = filter(self.shouldCompare, resultFiles + defFiles)
-        stdFiles = self.makeStemDict(resultFilesToCompare)
+        stdFiles = self.makeStandardStemDict(test, tmpFiles, ignoreMissing)
         for tmpStem, tmpFile in tmpFiles.items():
             self.notifyIfMainThread("ActionProgress")
             stdFile = stdFiles.get(tmpStem)

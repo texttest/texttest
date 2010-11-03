@@ -397,7 +397,7 @@ class Config:
     def useVirtualDisplay(self):
         # Don't try to set it if we're using the static GUI or
         # we've requested a slow motion replay or we're trying to record a new usecase.
-        return not self.optionMap.has_key("record") and not self.optionMap.has_key("gx") and \
+        return not self.isRecording() and not self.optionMap.has_key("gx") and \
                not self.isActionReplay() and not self.optionMap.has_key("coll") and not self.optionMap.runScript()
     
     def getThreadActionClasses(self):
@@ -515,9 +515,12 @@ class Config:
                  self.getWriteDirectoryPreparer(ignoreCatalogues), \
                  trafficSetup, catalogueCreator, collator, self.getOriginalFilterer(), self.getTestRunner(), \
                  trafficTerminator, catalogueCreator, collator, self.getTestEvaluator() ]
+
+    def isRecording(self):
+        return self.optionMap.has_key("record")
     
     def shouldIgnoreCatalogues(self):
-        return self.optionMap.has_key("ignorecat") or self.optionMap.has_key("record")
+        return self.optionMap.has_key("ignorecat") or self.isRecording()
     
     def hasPerformance(self, app, perfType=""):
         extractors = app.getConfigValue("performance_logfile_extractor")
@@ -1167,7 +1170,7 @@ class Config:
             # Re-record everything. Don't use this when only recording additional new stuff
             # Should possibly have some way to configure this
             app.addConfigEntry("implied", "rectraffic", "base_version")
-        if self.optionMap.has_key("record"):
+        if self.isRecording():
             app.addConfigEntry("implied", "recusecase", "base_version")
         if homeOS != "any" and homeOS != os.name:
             app.addConfigEntry("implied", os.name, "base_version")

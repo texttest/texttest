@@ -290,18 +290,25 @@ class Test(plugins.Observable):
         return stems
 
     def listStandardFiles(self, allVersions, defFileCategory="all"):
-        resultFiles, defFiles = [],[]
         self.diagnose("Looking for standard files, definition files in category " + repr(defFileCategory))
         defFileStems = self.expandedDefFileStems(defFileCategory)
-        for stem in defFileStems:
-            defFiles += self.listStdFilesWithStem(stem, allVersions)
+        defFiles = self.getFilesFromStems(defFileStems, allVersions)
+        resultFiles = self.listResultFiles(allVersions)
+        self.diagnose("Found " + repr(resultFiles) + " and " + repr(defFiles))
+        return resultFiles, defFiles
+
+    def listResultFiles(self, allVersions):
         exclude = self.expandedDefFileStems() + self.app.getDataFileNames() + [ "file_edits" ]
         self.diagnose("Excluding " + repr(exclude))
         predicate = lambda stem, vset: stem not in exclude and len(vset) > 0
-        for stem in self.dircache.findAllStems(predicate):
-            resultFiles += self.listStdFilesWithStem(stem, allVersions)
-        self.diagnose("Found " + repr(resultFiles) + " and " + repr(defFiles))
-        return resultFiles, defFiles
+        stems = self.dircache.findAllStems(predicate)
+        return self.getFilesFromStems(stems, allVersions)
+
+    def getFilesFromStems(self, stems, allVersions):
+        files = []
+        for stem in stems:
+            files += self.listStdFilesWithStem(stem, allVersions)
+        return files
     
     def listStdFilesWithStem(self, stem, allVersions):
         self.diagnose("Getting files for stem " + stem)

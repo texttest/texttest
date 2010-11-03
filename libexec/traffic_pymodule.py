@@ -227,16 +227,22 @@ class CallStackChecker:
     def __init__(self, ignoreModuleCalls):
         # Always ignore our own command line interceptors
         self.ignoreModuleCalls = [ "traffic_intercepts" ] + ignoreModuleCalls
+        self.inCallStackChecker = False
 
     def callerExcluded(self):
+        if self.inCallStackChecker:
+            # If we get called recursively, must call the real thing to avoid infinite loop...
+            return True 
         # Don't intercept if we've been called from within the standard library
+        self.inCallStackChecker = True
         stdlibDir = os.path.dirname(os.__file__)
         framerecord = inspect.stack()[2] # parent of parent. If you extract method you need to change this number :)
         fileName = framerecord[1]
         dirName = self.getDirectory(fileName)
         moduleName = self.getModuleName(fileName)
-        return dirName == stdlibDir or os.path.basename(dirName) in self.ignoreModuleCalls or \
-               moduleName in self.ignoreModuleCalls
+        baseName = os.path.basename(dirName)
+        self.inCallStackChecker = False
+        return dirName == stdlibDir or baseName in self.ignoreModuleCalls or moduleName in self.ignoreModuleCalls
 
     def getModuleName(self, fileName):
         given = inspect.getmodulename(fileName)

@@ -1258,10 +1258,25 @@ class Application:
         configFileName = self.dircache.pathName("config." + self.name)
         configFile = open(configFileName, "w")
         for key, value in configEntries.items():
-            self.configDir.addEntry(key, value, insert=False, errorOnUnknown=True)
-            configFile.write("# " + self.configDocs.get(key) + "\n")
-            configFile.write(key + ":" + value + "\n\n")
+            if key == "section_comment":
+                configFile.write("## " + value.replace("\n", "\n## ") + "\n\n")
+            else:
+                configFile.write("# " + self.configDocs.get(key) + "\n")
+                if isinstance(value, tuple):
+                    subKey, subValue = value
+                    self.importAndWriteSection(key, subKey, subValue, configFile)
+                else:
+                    self.importAndWriteEntry(key, value, configFile)
 
+    def importAndWriteEntry(self, key, value, configFile):
+        self.configDir.addEntry(key, value, insert=False, errorOnUnknown=True)
+        configFile.write(key + ":" + value + "\n\n")
+
+    def importAndWriteSection(self, sectionName, key, value, configFile):
+        self.configDir.addEntry(key, value, sectionName, insert=False, errorOnUnknown=True)
+        configFile.write("[" + sectionName + "]\n")
+        configFile.write(key + ":" + value + "\n[end]\n")
+        
     def makeExtraDirCache(self, envDir):
         if envDir == "":
             return

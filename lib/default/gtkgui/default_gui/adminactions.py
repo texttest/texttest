@@ -525,6 +525,8 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         useGui = self.optionGroup.getSwitchValue("gui")
         if useGui > 0:
             configEntries["use_case_record_mode"] = "GUI"
+            if useGui != 6:
+                configEntries["slow_motion_replay_speed"] = "3.0"
         if useGui in [ 1, 2, 3 ]:
             interpreter = "pyusecase"
             if useGui == 2:
@@ -533,12 +535,26 @@ class ImportApplication(guiplugins.ActionDialogGUI):
                 interpreter += " -i wx"
             configEntries["use_case_recorder"] = "pyusecase"
             configEntries["interpreter"] = interpreter
-
-            if useGui == 2:
+            if useGui == 1: # PyGTK
+                comment = "XDG_CONFIG_HOME points to user's ~/.config directory.\n" + \
+                          "Behaviour of e.g. FileChoosers can vary wildly depending on settings there.\n" + \
+                          "The following settings makes sure it uses an empty test-dependent directory instead."
+                configEntries["section_comment"] = comment
+                configEntries["copy_test_path"] = "xdg_config_home"
+                configEntries["test_data_ignore"] = "xdg_config_home"
+                configEntries["test_data_environment"] = ("xdg_config_home", "XDG_CONFIG_HOME")
+            elif useGui == 2:
                 # PyUseCase doesn't handle tkMessageBox, deal with it via interception by default
+                comment = "Tkinter doesn't provide any means to simulate interaction with tkMessageBox.\n" + \
+                          "Therefore PyUseCase cannot handle it. So we capture interaction with it instead.\n" + \
+                          "Cannot have multiple threads interacting with tkinter so we disable the threading also."
+                configEntries["section_comment"] = comment
                 configEntries["collect_traffic_python"] = "tkMessageBox"
                 configEntries["collect_traffic_use_threads"] = "false"
             elif useGui == 3:
+                comment = "wxPython GUIs don't seem to work very well when the hide flag is set on Windows.\n" + \
+                          "So we disable it by default here: multiple desktops may be useful."
+                configEntries["section_comment"] = comment
                 configEntries["virtual_display_hide_windows"] = "false"
             pyusecaseDir = os.path.join(directory, "pyusecase_files")
             plugins.ensureDirectoryExists(pyusecaseDir) 

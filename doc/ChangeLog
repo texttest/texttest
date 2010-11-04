@@ -1982,18 +1982,29 @@ General GUI Enhancements:
     - GUI now cleans up appropriately on receiving SIGINT on UNIX (engine.py)
 	Means dynamic GUIs can be closed from static GUI without leaking files.
 Static GUI Enhancements:
+    - Local "wrapper" scripts now appear in static GUI config tab (filetrees.py)
+	Any "executable" that depends on "TEXTTEST_ROOT" will be shown.
 Dynamic GUI Enhancements:
 Framework Enhancements:
     - Jira plugin now highlights 'resolution' field if it is set, instead of 'status' (jira.py)
 	This information is usually more interesting.
     - Python interception of classes now handles base classes correctly (traffic_server.py)
 	Base classes now listed explicitly. Some recorded traffic may not work. See migration notes.
+    - Python interception: can now "fix up" objects which aren't repr-eval compatible (traffic_server.py)
+	New setting "collect_traffic_alter_response". See website for details.
 Batch Report Enhancements:
+    - Can now get green/red colourings from the batch console output (colorer.py)
+	Use the new -zen option. Thanks to Matt Baker for this.
     - Email-sending in batch mode is no longer enabled by default (batch/__init__.py)
 	Previously automatically sent mail to $USER: now many only use the HTML reports.
+    - Allow setting the date for a date-based batch job (batch/__init__.py)
+	Using e.g. -name 04Nov2010 will now achieve this. Useful for very long continuous integration jobs,
+	e.g. running over a weekend.
     - Old results are now shown in a light-grey foregound colour on the HTML report summary pages (summarypages.py)
 	This to prevent confusion when several processes update the same table in sequence.
 Grid Engine (LSF/SGE) enhancements:
+    - Status tab now shows grid engine status (e.g. suspension) also (statusview.py)
+	Previously only visible in the test tree view.
     - Ignore order of lists of resources when deciding about reuse (masterprocess.py)
 	Previously started new jobs if one test required resources a,b and the other required b,a.
 Bug Fixes:
@@ -2001,3 +2012,8 @@ Bug Fixes:
     - TextTest no longer allows data file names to clash with its own pre-defined definition file names (testmodel.py)
     - "Run Info" information when reconnecting is heavily reduced (textinfo.py)
 	This to avoid the impression it's describing the environment where the original test ran
+    - Python interception: __getitem__ now intercepted correctly for new-style classes (traffic_pymodule.py)
+    - Python interception: fixed infinite recusion bug if something used by inspect.getstack is intercepted (traffic_pymodule.py)
+    - Disabled "regeneration" warning when recording UI tests (comparetest.py)
+    - If unexpected things get regenerated, compare them as well as producing a warning (comparetest.py)
+    - Fixed spurious warnings in the dynamic GUI if "<default>" setting is deleted when rerunning tests (runningactions.py)

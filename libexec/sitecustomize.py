@@ -22,7 +22,8 @@ def doInterceptions():
         pass
     
     pythonVarStr = os.getenv("TEXTTEST_MIM_PYTHON")
-    if pythonVarStr:
+    if pythonVarStr and sys.version_info[:2] >= (2, 4):
+        # traffic_pymodule uses Python 2.4 syntax, won't work on earlier versions
         import traffic_pymodule
         attributeNames = pythonVarStr.split(",")
         ignoreVar = os.getenv("TEXTTEST_MIM_PYTHON_IGNORE")

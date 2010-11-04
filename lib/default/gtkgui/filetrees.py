@@ -178,6 +178,7 @@ class ApplicationFileGUI(FileViewGUI):
         self.allApps = copy(allApps)
         self.extras = reduce(operator.add, (app.extras for app in allApps), [])
         self.usecaseDirs = {}
+        self.testScripts = {}
     
     def shouldShow(self):
         return not self.dynamic
@@ -199,6 +200,9 @@ class ApplicationFileGUI(FileViewGUI):
             currUsecaseHome = suite.getEnvironment("USECASE_HOME")
             if currUsecaseHome != os.getenv("USECASE_HOME") and os.path.isdir(currUsecaseHome):
                 self.usecaseDirs[suite.app] = currUsecaseHome
+            rawExecutable = suite.getConfigValue("executable", expandVars=False)
+            if "TEXTTEST_ROOT" in rawExecutable:
+                self.testScripts.setdefault(suite.app.name, set()).add(suite.getConfigValue("executable"))
             if suite.app not in self.allApps and suite.app not in self.extras:
                 self.allApps.append(suite.app)
                 self.recreateModel(self.getState(), preserveSelection=False)
@@ -219,6 +223,11 @@ class ApplicationFileGUI(FileViewGUI):
                 files = [ usecaseDir ] + [ os.path.join(usecaseDir, f) for f in os.listdir(usecaseDir) ]
                 self.addDataFilesUnderIter(confiter, files, colour, 
                                            app.getDirectory(), associatedObject=self.allApps)
+            testScripts = self.testScripts.get(app.name)
+            if testScripts:
+                headerRow = [ "Scripts for " + allTitles[index], "white", app.getDirectory(), None, "", "" ]
+                scriptiter = self.model.insert_before(None, None, headerRow)
+                self.addDataFilesUnderIter(scriptiter, sorted(testScripts), colour, app.getDirectory(), associatedObject=self.allApps)
             
         # Handle recursive imports here ...
 

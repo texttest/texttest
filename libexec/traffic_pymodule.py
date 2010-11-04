@@ -146,6 +146,9 @@ class InstanceProxy:
     def __repr__(self):
         return self.__getattr__("__repr__")()
 
+    def __getitem__(self, *args):
+        return self.__getattr__("__getitem__")(*args)
+
 
 class AttributeProxy:
     def __init__(self, modOrObjName, moduleProxy, attributeName, callStackChecker=None):

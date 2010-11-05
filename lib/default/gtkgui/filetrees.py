@@ -200,9 +200,10 @@ class ApplicationFileGUI(FileViewGUI):
             currUsecaseHome = suite.getEnvironment("USECASE_HOME")
             if currUsecaseHome != os.getenv("USECASE_HOME") and os.path.isdir(currUsecaseHome):
                 self.usecaseDirs[suite.app] = currUsecaseHome
-            rawExecutable = suite.getConfigValue("executable", expandVars=False)
-            if "TEXTTEST_ROOT" in rawExecutable:
-                self.testScripts.setdefault(suite.app.name, set()).add(suite.getConfigValue("executable"))
+            for configVar in [ "executable" , "interpreter" ]:
+                rawScript = suite.getConfigValue(configVar, expandVars=False)
+                if "TEXTTEST_ROOT" in rawScript:
+                    self.testScripts.setdefault(suite.app.name, set()).add(suite.getConfigValue(configVar))
             if suite.app not in self.allApps and suite.app not in self.extras:
                 self.allApps.append(suite.app)
                 self.recreateModel(self.getState(), preserveSelection=False)

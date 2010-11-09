@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os, sys
+import os, sys, subprocess
 from tempfile import mktemp
 
 def interpretCore(corefile):
@@ -75,13 +75,13 @@ def writeCmdFile():
     file.close()
     return fileName
 
-def parseGdbOutput(stdout):
+def parseGdbOutput(output):
     summaryLine = ""
     signalDesc = ""
     stackLines = []
     prevLine = ""
     stackStarted = False
-    for line in stdout.readlines():
+    for line in output.splitlines():
         if line.find("Program terminated") != -1:
             summaryLine = line.strip()
             signalDesc = summaryLine.split(",")[-1].strip().replace(".", "")
@@ -102,12 +102,12 @@ def parseGdbOutput(stdout):
 
     return signalDesc, summaryLine, stackLines    
 
-def parseDbxOutput(stdout):
+def parseDbxOutput(output):
     summaryLine = ""
     signalDesc = ""
     stackLines = []
     prevLine = ""
-    for line in stdout.readlines():
+    for line in output.splitlines():
         stripLine = line.strip()
         if line.find("program terminated") != -1:
             summaryLine = stripLine
@@ -153,23 +153,25 @@ def assembleInfo(signalDesc, summaryLine, stackLines, debugger):
 
 def writeGdbStackTrace(corefile, binary):
     fileName = writeCmdFile()
-    gdbCommand = "gdb -q -batch -x " + fileName + " " + binary + " " + corefile
-    stdin, stdout, stderr = os.popen3(gdbCommand)
-    signalDesc, summaryLine, stackLines = parseGdbOutput(stdout)
+    cmdArgs = [ "gdb", "-q", "-batch", "-x", fileName, binary, corefile ]
+    proc = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output, errors = proc.communicate()
+    signalDesc, summaryLine, stackLines = parseGdbOutput(output)
     os.remove(fileName)
     if summaryLine:
         return assembleInfo(signalDesc, summaryLine, stackLines, "GDB")
     else:
-        return parseFailure(stderr.read(), "GDB")
+        return parseFailure(errors, "GDB")
 
 def writeDbxStackTrace(corefile, binary):
-    dbxCommand = "dbx -f -q -c 'where; quit' " + binary + " " + corefile + " < /dev/null"
-    stdin, stdout, stderr = os.popen3(dbxCommand)
-    signalDesc, summaryLine, stackLines = parseDbxOutput(stdout)
+    cmdArgs = [ "dbx", "-f", "-q", "-c", "where; quit", binary, corefile ]
+    proc = subprocess.Popen(cmdArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output, errors = proc.communicate()
+    signalDesc, summaryLine, stackLines = parseDbxOutput(output)
     if summaryLine:
         return assembleInfo(signalDesc, summaryLine, stackLines, "DBX")
     else:
-        return parseFailure(stderr.read(), "DBX")
+        return parseFailure(errors, "DBX")
 
 def printCoreInfo(corefile):
     compression = corefile.endswith(".Z")

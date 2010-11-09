@@ -228,24 +228,28 @@ class AttributeProxy:
 
 class CallStackChecker:
     def __init__(self, ignoreModuleCalls):
-        # Always ignore our own command line interceptors
-        self.ignoreModuleCalls = [ "traffic_intercepts" ] + ignoreModuleCalls
+        self.ignoreModuleCalls = set([ "traffic_intercepts" ] + ignoreModuleCalls)
         self.inCallStackChecker = False
 
     def callerExcluded(self):
         if self.inCallStackChecker:
             # If we get called recursively, must call the real thing to avoid infinite loop...
-            return True 
+            return True
+
         # Don't intercept if we've been called from within the standard library
         self.inCallStackChecker = True
         stdlibDir = os.path.dirname(os.path.realpath(os.__file__))
         framerecord = inspect.stack()[2] # parent of parent. If you extract method you need to change this number :)
         fileName = framerecord[1]
-        dirName = self.getDirectory(fileName)
+        moduleNames = set()
+        moduleNames.add(os.path.basename(self.getDirectory(fileName)))
+        dirName = self.getDirectory(os.path.realpath(fileName))
         moduleName = self.getModuleName(fileName)
+        moduleNames.add(moduleName)
         baseName = os.path.basename(dirName)
+        moduleNames.add(baseName)
         self.inCallStackChecker = False
-        return dirName == stdlibDir or baseName in self.ignoreModuleCalls or moduleName in self.ignoreModuleCalls
+        return dirName == stdlibDir or len(moduleNames.intersection(self.ignoreModuleCalls)) > 0
 
     def getModuleName(self, fileName):
         given = inspect.getmodulename(fileName)
@@ -255,7 +259,7 @@ class CallStackChecker:
             return given
 
     def getDirectory(self, fileName):
-        dirName, local = os.path.split(os.path.realpath(fileName))
+        dirName, local = os.path.split(fileName)
         if local.startswith("__init__"):
             return self.getDirectory(dirName)
         else:

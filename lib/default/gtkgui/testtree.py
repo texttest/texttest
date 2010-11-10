@@ -734,7 +734,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
             self.selecting = True
         changedTests = []
         for test in tests:
-            if self.updateVisibilityInModel(test, newValue):
+            if self.updateVisibilityWithParents(test, newValue):
                 changedTests.append(test)
 
         self.selecting = False
@@ -754,8 +754,25 @@ class TestTreeGUI(guiutils.ContainerGUI):
         else:
             self.selectionChanged(direct=False)
 
+    def updateVisibilityWithParents(self, test, newValue):
+        changed = False
+        if test.parent and newValue:
+            changed |= self.updateVisibilityWithParents(test.parent, newValue)
+
+        changed |= self.updateVisibilityInModel(test, newValue)
+        if test.parent and not newValue and not self.hasVisibleChildren(test.parent):
+            self.diag.info("No visible children : hiding parent " + repr(test.parent))
+            changed |= self.updateVisibilityWithParents(test.parent, newValue)
+        return changed
+
+    def isMarkedVisible(self, test):
+        testIter = self.itermap.getIterator(test)
+        visibleTests = self.model.get_value(testIter, 2)
+        return self.model.get_value(testIter, 5) and test in visibleTests
+
     def updateVisibilityInModel(self, test, newValue):
-        visibleTests = self.model.get_value(self.itermap.getIterator(test), 2)
+        testIter = self.itermap.getIterator(test)
+        visibleTests = self.model.get_value(testIter, 2)
         isVisible = test in visibleTests
         changed = False
         if newValue and not isVisible:
@@ -766,44 +783,19 @@ class TestTreeGUI(guiutils.ContainerGUI):
             changed = True
 
         if (newValue and len(visibleTests) > 1) or (not newValue and len(visibleTests) > 0):
-            self.diag.info("Other tests mean no row visibility change : " + repr(test))
+            self.diag.info("No row visibility change : " + repr(test))
             return changed
+        else:
+            return self.setVisibility(testIter, newValue)
 
-        allIterators = self.findVisibilityIterators(test) # returns leaf-to-root order, good for hiding
-        if newValue:
-            allIterators.reverse()  # but when showing, we want to go root-to-leaf
-
-        changed = False
-        for iterator, currTest in allIterators:
-            if newValue or not self.hasVisibleChildren(iterator):
-                changed |= self.setVisibility(iterator, currTest, newValue)
-        return changed
-
-    def setVisibility(self, iter, test, newValue):
+    def setVisibility(self, iter, newValue):
         oldValue = self.model.get_value(iter, 5)
         if oldValue == newValue:
-            self.diag.info("Not changing test : " + repr(test))
             return False
 
         self.model.set_value(iter, 5, newValue)
         return True
 
-    def findVisibilityIterators(self, test):
-        iter = self.itermap.getIterator(test)
-        parents = []
-        parent = self.model.iter_parent(iter)
-        currTest = test
-        while parent != None:
-            currTest = currTest.parent
-            parents.append((parent, currTest))
-            parent = self.model.iter_parent(parent)
-        return [ (iter, test) ] + parents
+    def hasVisibleChildren(self, suite):
+        return any((self.isMarkedVisible(test) for test in suite.testcases))
 
-    def hasVisibleChildren(self, iter):
-        child = self.model.iter_children(iter)
-        while (child != None):
-            if self.model.get_value(child, 5):
-                return True
-            else:
-                child = self.model.iter_next(child)
-        return False

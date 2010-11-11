@@ -768,8 +768,9 @@ class TestTreeGUI(guiutils.ContainerGUI):
 
     def isMarkedVisible(self, test):
         testIter = self.itermap.getIterator(test)
-        visibleTests = self.model.get_value(testIter, 2)
-        return self.model.get_value(testIter, 5) and test in visibleTests
+        # Can get None here when using queue systems, so that some tests in a suite
+        # start processing when others have not yet notified the GUI that they have been read.
+        return testIter is not None and self.model.get_value(testIter, 5) and test in self.model.get_value(testIter, 2)
 
     def updateVisibilityInModel(self, test, newValue):
         testIter = self.itermap.getIterator(test)

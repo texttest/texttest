@@ -1364,7 +1364,7 @@ class OrFilter(plugins.Filter):
     def __init__(self, filterLists):
         self.filterLists = filterLists
     def accepts(self, test):
-        return reduce(operator.or_, (test.isAcceptedByAll(filters) for filters in self.filterLists), False)
+        return reduce(operator.or_, (test.isAcceptedByAll(filters, checkContents=False) for filters in self.filterLists), False)
     def acceptsTestCase(self, test):
         return self.accepts(test)
     def acceptsTestSuite(self, suite):

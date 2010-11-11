@@ -9,10 +9,20 @@ from .. import guiplugins
 class AllTestsHandler:
     def __init__(self):
         self.rootTestSuites = []
+
     def addSuites(self, suites):
         self.rootTestSuites += suites
+
+    def getTests(self, suite):
+        if suite.classId() == "test-suite" and len(suite.testcases):
+            return reduce(operator.add, (self.getTests(subsuite) for subsuite in suite.testcases), [])
+        else:
+            # include empty suites here, if they match
+            return [ suite ]
+
     def findAllTests(self):
-        return reduce(operator.add, (suite.testCaseList() for suite in self.rootTestSuites), [])
+        return reduce(operator.add, (self.getTests(suite) for suite in self.rootTestSuites), [])
+
     def findTestsNotIn(self, tests):
         return filter(lambda test: test not in tests, self.findAllTests())
 
@@ -152,20 +162,20 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
     def makeNewSelection(self):
         # Get strategy. 0 = discard, 1 = refine, 2 = extend, 3 = exclude
         strategy = self.selectionGroup.getSwitchValue("current_selection")
-        return self._makeNewSelection(strategy)
+        return self._makeNewSelection(strategy, includeEmptySuites=False)
 
     def notifyReset(self, *args):
         self.optionGroup.reset()
         self.selectionGroup.reset()
         self.filteringGroup.reset()
 
-    def _makeNewSelection(self, strategy=0):
+    def _makeNewSelection(self, strategy, includeEmptySuites):
         selectedTests = []
         suitesToTry = self.getSuitesToTry()
         for suite in self.rootTestSuites:
             if suite in suitesToTry:
                 filters = self.getFilterList(suite.app)
-                reqTests = self.getRequestedTests(suite, filters, strategy)
+                reqTests = self.getRequestedTests(suite, filters, strategy, includeEmptySuites)
                 newTests = self.combineWithPrevious(reqTests, suite.app, strategy)
             else:
                 newTests = self.combineWithPrevious([], suite.app, strategy)
@@ -219,30 +229,32 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         else:
             return toTry
             
-    def getRequestedTests(self, suite, filters, strategy):
+    def getRequestedTests(self, suite, filters, strategy, includeEmptySuites):
         self.notify("ActionProgress") # Just to update gui ...
         if strategy == 1: # refine, don't check the whole suite
             tests = filter(lambda test: test.app is suite.app and test.isAcceptedByAll(filters), self.currTestSelection)
         else:
-            tests = self.getRequestedTestsFromSuite(suite, filters)
+            tests = self.getRequestedTestsFromSuite(suite, filters, includeEmptySuites)
 
         # Some filters need to look at the selection as a whole to decide what to do
         for testFilter in filters:
             tests = testFilter.refine(tests)
         return tests
         
-    def getRequestedTestsFromSuite(self, suite, filters):
+    def getRequestedTestsFromSuite(self, suite, filters, includeEmptySuites):
         if not suite.isAcceptedByAll(filters):
             return []
         else:
             if suite.classId() == "test-suite":
                 tests = []
-                for subSuite in self.findTestCaseList(suite):
-                    self.notify("ActionProgress") # Just to update gui ...
-                    tests += self.getRequestedTestsFromSuite(subSuite, filters)
-                return tests
-            else:
-                return [ suite ]
+                testcases = self.findTestCaseList(suite)
+                if len(testcases) or not includeEmptySuites:
+                    for subSuite in testcases:
+                        self.notify("ActionProgress") # Just to update gui ...
+                        tests += self.getRequestedTestsFromSuite(subSuite, filters, includeEmptySuites)
+                    return tests
+            # include empty suites here, if they match
+            return [ suite ]
 
     def combineWithPrevious(self, reqTests, app, strategy):
         # Strategies: 0 - discard, 1 - refine, 2 - extend, 3 - exclude
@@ -287,7 +299,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
     def filterTests(self, *args):
         self.notify("Status", "Filtering tests ...")
         self.notify("ActionStart")
-        newSelection = self._makeNewSelection()
+        newSelection = self._makeNewSelection(strategy=0, includeEmptySuites=True)
         strategy = self.filteringGroup.getSwitchValue("current_filtering")
         toShow = self.findTestsToShow(newSelection, strategy)
         self.notify("Visibility", toShow, True)
@@ -296,7 +308,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         self.notify("Visibility", toHide, False)
         self.notify("ActionStop")
         self.notify("Status", "Changed filtering by showing " + str(len(toShow)) +
-                    " tests and hiding " + str(len(toHide)) + ".")
+                    " tests/suites and hiding " + str(len(toHide)) + ".")
 
     def findTestsToShow(self, newSelection, strategy):
         if strategy == 0 or strategy == 2:

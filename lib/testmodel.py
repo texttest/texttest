@@ -544,9 +544,9 @@ class Test(plugins.Observable):
         else:
             return []
 
-    def isAcceptedByAll(self, filters):
+    def isAcceptedByAll(self, filters, checkContents=True):
         for filter in filters:
-            if not self.isAcceptedBy(filter):
+            if not self.isAcceptedBy(filter, checkContents):
                 self.diagnose("Rejected due to " + repr(filter))
                 return False
         return True
@@ -746,7 +746,7 @@ class TestCase(Test):
         pickler.dump(self.state)
         file.close()
 
-    def isAcceptedBy(self, filter):
+    def isAcceptedBy(self, filter, *args):
         return filter.acceptsTestCase(self)
 
     def createPropertiesFiles(self):
@@ -915,8 +915,8 @@ class TestSuite(Test):
     def isEmpty(self):
         return len(self.testcases) == 0
 
-    def isAcceptedBy(self, filter):
-        return filter.acceptsTestSuite(self)
+    def isAcceptedBy(self, filter, checkContents):
+        return filter.acceptsTestSuite(self) and (not checkContents or filter.acceptsTestSuiteContents(self))
 
     def findTestSuiteFiles(self):
         contentFile = self.getContentFileName()
@@ -1024,7 +1024,7 @@ class TestSuite(Test):
     def createTestOrSuite(self, testName, description, dirCache, filters, initial=True):
         className = self.getSubtestClass(dirCache)
         subTest = self.createSubtest(testName, description, dirCache, className)
-        if subTest.isAcceptedByAll(filters) and subTest.readContents(filters, initial):
+        if subTest.isAcceptedByAll(filters, checkContents=False) and subTest.readContents(filters, initial):
             self.testcases.append(subTest)
             subTest.notify("Add", initial)
 

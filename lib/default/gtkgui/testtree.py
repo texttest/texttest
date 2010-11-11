@@ -161,10 +161,11 @@ class TestColumnGUI(guiutils.SubGUI):
             self.updateTitle()
             
     def notifyVisibility(self, tests, newValue):
+        testCount = sum((int(test.classId() == "test-case") for test in tests))
         if newValue:
-            self.totalNofTestsShown += len(tests)
+            self.totalNofTestsShown += testCount
         else:
-            self.totalNofTestsShown -= len(tests)
+            self.totalNofTestsShown -= testCount
         self.updateTitle()
 
 

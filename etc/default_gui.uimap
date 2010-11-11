@@ -964,3 +964,6 @@ toggled.true = set option for recording only new traffic interactions
 [Label=Record All]
 toggled.true = set option for recording all traffic interactions
 
+[Name=Test paths containing]
+changed = set test paths to contain
+

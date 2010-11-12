@@ -7,6 +7,11 @@ def make_windows_script(src):
     outFile.write("#!python.exe\nimport site\n\n")
     outFile.write(open(src).read())
 
+if os.name == "nt":
+    package_data= { "capturemock" : [ "python_script.exe" ]}
+else:
+    package_data = {}
+
 ## if os.name == "nt":
 ##     make_windows_script("bin/capturemock_server")
 ##     shutil.copyfile("capturemock/python_script.exe", "bin/capturemock_server.exe")
@@ -23,6 +28,7 @@ setup(name='CaptureMock',
       description="A tool for creating mocks via a capture-replay style approach",
       long_description='Breaking away from TextTest and coming soon',
       packages=["capturemock"],
+      package_data=package_data,
       classifiers=[ "Programming Language :: Python",
                     "License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)",
                     "Operating System :: OS Independent",

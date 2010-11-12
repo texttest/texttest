@@ -136,13 +136,13 @@ class SlaveMachineInfoFinder(MachineInfoFinder):
     def __init__(self):
         self.queueMachineInfo = None
         
-    def findPerformanceMachines(self, app, fileStem):
+    def findPerformanceMachines(self, test, fileStem):
         perfMachines = []
-        resources = app.getCompositeConfigValue("performance_test_resource", fileStem)
+        resources = test.getCompositeConfigValue("performance_test_resource", fileStem)
         for resource in resources:
             perfMachines += plugins.retryOnInterrupt(self.queueMachineInfo.findResourceMachines, resource)
 
-        rawPerfMachines = MachineInfoFinder.findPerformanceMachines(self, app, fileStem)
+        rawPerfMachines = MachineInfoFinder.findPerformanceMachines(self, test, fileStem)
         for machine in rawPerfMachines:
             if machine != "any":
                 perfMachines += self.queueMachineInfo.findActualMachines(machine)

@@ -797,10 +797,12 @@ class CreateCatalogue(plugins.Action):
         return path.replace(writeDir, "<Test Directory>")
 
 class MachineInfoFinder:
-    def findPerformanceMachines(self, app, fileStem):
-        return app.getCompositeConfigValue("performance_test_machine", fileStem)
+    def findPerformanceMachines(self, test, fileStem):
+        return test.getCompositeConfigValue("performance_test_machine", fileStem)
+
     def setUpApplication(self, app):
         pass
+
     def getMachineInformation(self, testArg):
         # A space for subclasses to write whatever they think is relevant about
         # the machine environment right now.
@@ -811,10 +813,12 @@ class PerformanceFileCreator(plugins.Action):
     def __init__(self, machineInfoFinder):
         self.diag = logging.getLogger("makeperformance")
         self.machineInfoFinder = machineInfoFinder
+
     def setUpApplication(self, app):
         self.machineInfoFinder.setUpApplication(app)
+        
     def allMachinesTestPerformance(self, test, fileStem):
-        performanceMachines = self.machineInfoFinder.findPerformanceMachines(test.app, fileStem)
+        performanceMachines = self.machineInfoFinder.findPerformanceMachines(test, fileStem)
         self.diag.info("Found performance machines as " + repr(performanceMachines))
         if "any" in performanceMachines:
             return True
@@ -824,8 +828,10 @@ class PerformanceFileCreator(plugins.Action):
                 self.diag.info("Real host rejected for performance " + host)
                 return False
         return True
+
     def __call__(self, test):
         return self.makePerformanceFiles(test)
+
 
 class UNIXPerformanceInfoFinder:
     def __init__(self, diag):

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 
 import optparse, os, stat, sys, logging, logging.config, shutil, socket, subprocess, types, threading, time, inspect, re
 from SocketServer import TCPServer, StreamRequestHandler

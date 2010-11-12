@@ -886,7 +886,7 @@ class Config:
         
         # For finding java classes, don't warn if they don't exist as files...
         interpreter = app.getConfigValue("interpreter")
-        return not interpreter.startswith("java") or executable.endswith(".jar")
+        return (not interpreter.startswith("java") and not interpreter.startswith("jy")) or executable.endswith(".jar")
     
     def checkConfigSanity(self, app):
         for key in app.getConfigValue("collate_file"):

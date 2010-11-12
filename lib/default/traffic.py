@@ -1,5 +1,6 @@
 
 import os, sys, plugins, shutil, socket, subprocess
+from capturemock import makePathIntercept
 from ndict import seqdict
 
 class SetUpTrafficHandlers(plugins.Action):
@@ -10,17 +11,9 @@ class SetUpTrafficHandlers(plugins.Action):
         self.recordSetting = recordSetting
         self.trafficServerProcess = None
         libexecDir = plugins.installationDir("libexec")
-        self.trafficFiles = self.findTrafficFiles(libexecDir)
         self.siteCustomizeFile = os.path.join(libexecDir, "sitecustomize.py")
-        self.trafficPyModuleFile = os.path.join(libexecDir, "traffic_pymodule.py")
         self.trafficServerFile = os.path.join(libexecDir, "traffic_server.py")
         
-    def findTrafficFiles(self, libexecDir):
-        files = [ os.path.join(libexecDir, "traffic_cmd.py") ]
-        if os.name == "nt":
-            files.append(os.path.join(libexecDir, "traffic_cmd.exe"))
-        return files
-
     def __call__(self, test):
         pythonCustomizeFiles = test.getAllPathNames("testcustomize.py") 
         pythonCoverage = test.hasEnvironment("COVERAGE_PROCESS_START")
@@ -101,16 +94,13 @@ class SetUpTrafficHandlers(plugins.Action):
         pathVars = []
         if serverActive:
             for cmd in interceptInfo.commands:
-                self.intercept(interceptDir, cmd, self.trafficFiles, executable=True)
+                makePathIntercept(cmd, self.getPathInterceptDirectory(interceptDir))
         
             if len(interceptInfo.commands) and os.name == "posix":
                 # Intercepts on Windows go directly into the sandbox so they can take advantage of the
                 # "current working directory beats all" rule there and also intercept things that ignore PATH
                 # (like Java)
                 pathVars.append("PATH")
-
-            if len(interceptInfo.pyAttributes) > 0:
-                self.interceptOwnModule(self.trafficPyModuleFile, interceptDir)
 
         if pythonCustomizeFiles:
             self.interceptOwnModule(pythonCustomizeFiles[-1], interceptDir) # most specific
@@ -123,6 +113,12 @@ class SetUpTrafficHandlers(plugins.Action):
 
     def interceptOwnModule(self, moduleFile, interceptDir):
         self.intercept(interceptDir, os.path.basename(moduleFile), [ moduleFile ], executable=False)
+
+    def getPathInterceptDirectory(self, interceptDir):
+        # Windows PATH interception isn't straightforward. Only .exe files get found.
+        # Put them directly into the sandbox directory rather than the purpose-built directory:
+        # that way they can also intercept stuff that is otherwise picked up directly from the registry (like Java)
+        return interceptDir if os.name == "posix" else os.path.dirname(interceptDir)
     
     def intercept(self, interceptDir, cmd, trafficFiles, executable):
         interceptName = os.path.join(interceptDir, cmd)
@@ -131,9 +127,6 @@ class SetUpTrafficHandlers(plugins.Action):
             if os.name == "posix":
                 os.symlink(trafficFile, interceptName)
             elif executable:
-                # Windows PATH interception isn't straightforward. Only .exe files get found.
-                # Put them directly into the sandbox directory rather than the purpose-built directory:
-                # that way they can also intercept stuff that is otherwise picked up directly from the registry (like Java)
                 interceptName = os.path.join(os.path.dirname(interceptDir), cmd)
                 extension = os.path.splitext(trafficFile)[-1]
                 shutil.copy(trafficFile, interceptName + extension)

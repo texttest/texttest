@@ -228,7 +228,8 @@ class AttributeProxy:
 
 class CallStackChecker:
     def __init__(self, ignoreModuleCalls):
-        self.ignoreModuleCalls = set([ "traffic_intercepts" ] + ignoreModuleCalls)
+        # Always ignore our own command-line capture module
+        self.ignoreModuleCalls = set([ "capturecommand" ] + ignoreModuleCalls)
         self.inCallStackChecker = False
 
     def callerExcluded(self):
@@ -241,13 +242,9 @@ class CallStackChecker:
         stdlibDir = os.path.dirname(os.path.realpath(os.__file__))
         framerecord = inspect.stack()[2] # parent of parent. If you extract method you need to change this number :)
         fileName = framerecord[1]
-        moduleNames = set()
-        moduleNames.add(os.path.basename(self.getDirectory(fileName)))
-        dirName = self.getDirectory(os.path.realpath(fileName))
+        dirName = self.getDirectory(fileName)
         moduleName = self.getModuleName(fileName)
-        moduleNames.add(moduleName)
-        baseName = os.path.basename(dirName)
-        moduleNames.add(baseName)
+        moduleNames = set([ moduleName, os.path.basename(dirName) ])
         self.inCallStackChecker = False
         return dirName == stdlibDir or len(moduleNames.intersection(self.ignoreModuleCalls)) > 0
 
@@ -259,7 +256,7 @@ class CallStackChecker:
             return given
 
     def getDirectory(self, fileName):
-        dirName, local = os.path.split(fileName)
+        dirName, local = os.path.split(os.path.realpath(fileName))
         if local.startswith("__init__"):
             return self.getDirectory(dirName)
         else:

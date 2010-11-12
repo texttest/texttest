@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 
 import signal, os
 
@@ -33,10 +32,6 @@ def handleKill(sigNum, *args):
     if sentInfo:
         sendKill()
 
-if os.name == "posix":
-    signal.signal(signal.SIGINT, handleKill)
-    signal.signal(signal.SIGTERM, handleKill)
-
 def readFromSocket(sock):
     from socket import error
     try:
@@ -65,7 +60,11 @@ def infoSent():
         sendKill()
     sentInfo = True
         
-if __name__ == "__main__":
+def interceptCommand():
+    if os.name == "posix":
+        signal.signal(signal.SIGINT, handleKill)
+        signal.signal(signal.SIGTERM, handleKill)
+
     sock = createAndSend()
     sock.shutdown(1)
     infoSent()

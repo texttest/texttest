@@ -101,6 +101,23 @@ class ShowVersions(guiplugins.ActionResultDialogGUI):
             return versionTuple
         else:
             return ".".join(map(str, versionTuple))
+
+    def addTable(self, vbox, name, data, alignRight, columnSpacings, **kw):
+        table = gtk.Table(len(data), 2, homogeneous=False)
+        table.set_row_spacings(1)
+        table.set_col_spacings(columnSpacings)
+        for rowNo, (title, versionTuple) in enumerate(data):
+            table.attach(self.justify(title + ":", 0.0), 0, 1, rowNo, rowNo + 1, xoptions=gtk.FILL, xpadding=1)
+            table.attach(self.justify(self.makeString(versionTuple), float(alignRight)), 1, 2, rowNo, rowNo + 1)
+
+        header = gtk.Label()
+        header.set_markup("<b>You are using these " + name + "s:\n</b>")
+        tableVbox = gtk.VBox()
+        tableVbox.pack_start(header, expand=False, fill=False)
+        tableVbox.pack_start(table, expand=True, fill=True)
+        centeredTable = gtk.Alignment(0.5)
+        centeredTable.add(tableVbox)
+        vbox.pack_start(centeredTable, expand=True, fill=True, **kw)
     
     def addContents(self):
         versionList = [ ("TextTest", texttest_version.version),
@@ -109,27 +126,14 @@ class ShowVersions(guiplugins.ActionResultDialogGUI):
                         ("PyGTK",  gtk.pygtk_version),
                         ("PyGObject", gobject.pygobject_version),
                         ("GLib", gobject.glib_version) ]
-        
-        table = gtk.Table(len(versionList), 2, homogeneous=False)
-        table.set_row_spacings(1)
-        for rowNo, (title, versionTuple) in enumerate(versionList):
-            table.attach(self.justify(title + ":", 0.0), 0, 1, rowNo, rowNo + 1, xoptions=gtk.FILL, xpadding=1)
-            table.attach(self.justify(self.makeString(versionTuple), 1.0), 1, 2, rowNo, rowNo + 1)
 
-        header = gtk.Label()
-        header.set_markup("<b>You are using these versions:\n</b>")
-        tableVbox = gtk.VBox()
-        tableVbox.pack_start(header, expand=False, fill=False)
-        tableVbox.pack_start(table, expand=True, fill=True)
-        centeredTable = gtk.Alignment(0.5)
-        centeredTable.add(tableVbox)
-        sourceDirLabel = gtk.Label()
-        sourceDirLabel.set_markup("")
-        sourceDir = gtk.Label(plugins.installationRoots[0])
+        installationList = [ ("Test Suite", os.getenv("TEXTTEST_HOME")),
+                             ("TextTest", plugins.installationRoots[0]),
+                             ("Python", sys.executable) ]
+        
         vbox = gtk.VBox()
-        vbox.pack_start(centeredTable, expand=True, fill=True)
-        vbox.pack_start(self.justify("\n<b>TextTest source directory:</b>", 0.0, True), expand=True, fill=True)
-        vbox.pack_start(sourceDir, expand=True, fill=True)
+        self.addTable(vbox, "version", versionList, alignRight=True, columnSpacings=0)
+        self.addTable(vbox, "installation", installationList, alignRight=False, columnSpacings=5, padding=10)
         frame = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
         frame.set_padding(10, 10, 10, 10)
         frame.add(vbox)

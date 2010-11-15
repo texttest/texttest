@@ -1983,7 +1983,9 @@ General GUI Enhancements:
 	Means dynamic GUIs can be closed from static GUI without leaking files.
 Static GUI Enhancements:
     - Local "wrapper" scripts now appear in static GUI config tab (filetrees.py)
-	Any "executable" that depends on "TEXTTEST_ROOT" will be shown.
+	Any "executable" or "interpreter" that depends on "TEXTTEST_ROOT" will be shown.
+    - Creating an application for testing PyGTK will now generate a repoint of XDG_CONFIG_HOME
+	This is basically always needed in theory and quite a gotcha if you aren't familiar with it.
 Dynamic GUI Enhancements:
 Framework Enhancements:
     - Jira plugin now highlights 'resolution' field if it is set, instead of 'status' (jira.py)
@@ -2017,3 +2019,7 @@ Bug Fixes:
     - Disabled "regeneration" warning when recording UI tests (comparetest.py)
     - If unexpected things get regenerated, compare them as well as producing a warning (comparetest.py)
     - Fixed spurious warnings in the dynamic GUI if "<default>" setting is deleted when rerunning tests (runningactions.py)
+    - Performance-related config settings can now depend on tests and suites (sandbox.py)
+    - Filtering for a version and then selecting a suite no longer selects versions that should be filtered away (testtree.py)
+    - Selecting from the static GUI now handles empty suites correctly (selectandfilter.py)
+    - Python interception mechanism no longer stacktraces if called on Python earlier than 2.4 (sitecustomize.py)

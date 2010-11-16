@@ -169,7 +169,7 @@ class LineFilter(plugins.TextTrigger):
 
 class CommandLineFilter(LineFilter):
     def getMatchText(self):
-        return "<-CMD:([^ ]* )*" + self.item + " "
+        return "<-CMD:([^ ]* )*" + self.item + "( [^ ]*)*"
 
     def removeItem(self, info):
         info.commands.remove(self.item)

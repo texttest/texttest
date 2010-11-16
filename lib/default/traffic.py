@@ -1,6 +1,5 @@
 
 import os, sys, plugins, shutil, socket, subprocess
-from capturemock import makePathIntercept
 from ndict import seqdict
 
 class SetUpTrafficHandlers(plugins.Action):
@@ -93,6 +92,7 @@ class SetUpTrafficHandlers(plugins.Action):
     def makeIntercepts(self, interceptDir, interceptInfo, serverActive, pythonCoverage, pythonCustomizeFiles):
         pathVars = []
         if serverActive:
+            from capturemock import makePathIntercept
             for cmd in interceptInfo.commands:
                 makePathIntercept(cmd, self.getPathInterceptDirectory(interceptDir))
         

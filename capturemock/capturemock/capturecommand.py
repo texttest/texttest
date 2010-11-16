@@ -39,17 +39,26 @@ def readFromSocket(sock):
     except error: # If we're interrupted, try again
         return sock.makefile().read()
 
-def getCommandLine():
-    from sys import argv
+def getCommandLine(argv):
     if os.name == "posix":
         return argv
     else:
         base = os.path.splitext(argv[0])[0]
         return [ base ] + argv[1:]
 
+def getEnvironment(argv):
+    # Don't send the path element that caught us
+    pathElems = os.getenv("PATH").split(os.pathsep)
+    myDir = os.path.dirname(argv[0])
+    if myDir in pathElems:
+        pathElems.remove(myDir)
+        os.environ["PATH"] = os.pathsep.join(pathElems)
+    return os.environ
+    
 def createAndSend():
+    from sys import argv
     sock = createSocket()
-    text = "SUT_COMMAND_LINE:" + repr(getCommandLine()) + ":SUT_SEP:" + repr(os.environ) + \
+    text = "SUT_COMMAND_LINE:" + repr(getCommandLine(argv)) + ":SUT_SEP:" + repr(getEnvironment(argv)) + \
            ":SUT_SEP:" + os.getcwd() + ":SUT_SEP:" + str(os.getpid())
     sock.sendall(text)
     return sock

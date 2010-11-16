@@ -167,7 +167,7 @@ class TrafficServer(TCPServer):
                     modTime, modSize = self.getLatestModification(subPath)
                     self.fileEditData[subPath] = modTime, modSize
                     self.diag.info("Adding possible sub-path edit for " + subPath + " with mod time " +
-                                   time.strftime(plugins.datetimeFormat, time.localtime(modTime)) + " and size " + str(modSize))
+                                   time.strftime("%d%b%H:%M:%S", time.localtime(modTime)) + " and size " + str(modSize))
         return len(allEdits) > 0
     
     def process(self, traffic, reqNo):
@@ -436,17 +436,25 @@ class FileEditTraffic(ResponseTraffic):
             name += ".edit_" + str(timesUsed)
         return name
 
+    def removePath(self, path):
+        if os.path.isfile(path) or os.path.islink(path):
+            os.remove(path)
+        elif os.path.isdir(path):
+            shutil.rmtree(path)
+
     def copy(self, srcRoot, dstRoot):
         for srcPath in self.changedPaths:
             dstPath = srcPath.replace(srcRoot, dstRoot)
             try:
-                plugins.ensureDirExistsForFile(dstPath)
+                dstParent = os.path.dirname(dstPath)
+                if not os.path.isdir(dstParent):
+                    os.makedirs(dstParent)
                 if srcPath.endswith(self.linkSuffix):
                     self.restoreLink(srcPath, dstPath.replace(self.linkSuffix, ""))
                 elif os.path.islink(srcPath):
                     self.storeLinkAsFile(srcPath, dstPath + self.linkSuffix)
                 elif srcPath.endswith(self.deleteSuffix):
-                    plugins.removePath(dstPath.replace(self.deleteSuffix, ""))
+                    self.removePath(dstPath.replace(self.deleteSuffix, ""))
                 elif not os.path.exists(srcPath):
                     open(dstPath + self.deleteSuffix, "w").close()
                 else:
@@ -896,11 +904,10 @@ class CommandLineTraffic(Traffic):
         self.diag.info("Received command with cwd = " + cmdCwd)
         self.fullCommand = argv[0].replace("\\", "/")
         self.commandName = os.path.basename(self.fullCommand)
-        self.cmdArgs = argv[1:]
-        self.argStr = plugins.commandLineString(argv[1:])
+        self.cmdArgs = [ self.commandName ] + argv[1:]
         envVarsSet, envVarsUnset = self.filterEnvironment(self.cmdEnviron)
-        self.path = self.cmdEnviron.get("PATH")
-        text = self.getEnvString(envVarsSet, envVarsUnset) + self.commandName + " " + self.argStr
+        cmdString = " ".join(map(self.quoteArg, self.cmdArgs))
+        text = self.getEnvString(envVarsSet, envVarsUnset) + cmdString
         super(CommandLineTraffic, self).__init__(text, responseFile)
         
     def filterEnvironment(self, cmdEnviron):
@@ -913,22 +920,6 @@ class CommandLineTraffic(Traffic):
                 if value is None:
                     envVarsUnset.append(var)
                 else:
-                    if var.endswith("PATH"):
-                        interceptStr = "traffic_intercepts" + os.pathsep
-                        # Fix the traffic interception mechanisms's own files:
-                        # the program will have been given a separate directory here.
-                        # Don't report this in the traffic file
-                        pos = value.find(interceptStr)
-                        if pos != -1:
-                            endPos = pos + len(interceptStr)
-                            startPos = value.rfind(os.pathsep, 0, pos)
-                            if startPos < 0:
-                                value = value[endPos:]
-                            else:
-                                value = value[:startPos + 1] + value[endPos:]
-                            self.diag.info("Filtered PATH variable " + var + "=" + value)
-                            if value == currValue:
-                                continue
                     envVarsSet.append((var, value))
         return envVarsSet, envVarsUnset
 
@@ -940,7 +931,13 @@ class CommandLineTraffic(Traffic):
                self.environmentDict.get("default", [])
 
     def hasChangedWorkingDirectory(self):
-        return not plugins.samefile(self.cmdCwd, os.getenv("TEXTTEST_SANDBOX"))
+        return os.path.realpath(self.cmdCwd) != os.path.realpath(os.getenv("TEXTTEST_SANDBOX"))
+
+    def quoteArg(self, arg):
+        if " " in arg:
+            return '"' + arg + '"'
+        else:
+            return arg
 
     def getEnvString(self, envVarsSet, envVarsUnset):
         recStr = ""
@@ -980,7 +977,7 @@ class CommandLineTraffic(Traffic):
         changedCwd = self.hasChangedWorkingDirectory()
         if changedCwd:
             edits.append(self.cmdCwd)
-        for arg in self.cmdArgs:
+        for arg in self.cmdArgs[1:]:
             for word in self.getFileWordsFromArg(arg):
                 if os.path.isabs(word):
                     edits.append(word)
@@ -1018,50 +1015,21 @@ class CommandLineTraffic(Traffic):
             return arg.split()
         
     def forwardToDestination(self):
-        realCmd = self.findRealCommand()
-        if realCmd:                
-            fullArgs = [ realCmd ] + self.cmdArgs
-            interpreter = plugins.getInterpreter(realCmd)
-            if interpreter:
-                fullArgs = [ interpreter ] + fullArgs
-            self.diag.info("Running real command with args : " + repr(fullArgs))
-            proc = subprocess.Popen(fullArgs, env=self.cmdEnviron, cwd=self.cmdCwd, 
-                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        try:
+            self.diag.info("Running real command with args : " + repr(self.cmdArgs))
+            proc = subprocess.Popen(self.cmdArgs, env=self.cmdEnviron, cwd=self.cmdCwd, 
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
             CommandLineKillTraffic.pidMap[self.proxyPid] = proc
             output, errors = proc.communicate()
             response = self.makeResponse(output, errors, proc.returncode)
             del CommandLineKillTraffic.pidMap[self.proxyPid]
             return response
-        else:
+        except OSError:
             return self.makeResponse("", "ERROR: Traffic server could not find command '" + self.commandName + "' in PATH\n", 1)
 
     def makeResponse(self, output, errors, exitCode):
         return [ StdoutTraffic(output, self.responseFile), StderrTraffic(errors, self.responseFile), \
                  SysExitTraffic(exitCode, self.responseFile) ]
-    
-    def findRealCommand(self):
-        # If we found a link already, use that, otherwise look on the path
-        for fileName, fullCommand in self.findRealCmdInfo(self.commandName, self.fullCommand):
-            if self.realCommands.has_key(fileName):
-                return self.realCommands[fileName]
-            # Find the first one in the path that isn't us :)
-            self.diag.info("Finding real command to replace " + fullCommand)
-            for currDir in self.path.split(os.pathsep):
-                self.diag.info("Searching " + currDir)
-                fullPath = os.path.join(currDir, fileName)
-                if self.isRealCommand(fullPath, fullCommand):
-                    self.realCommands[fileName] = fullPath
-                    return fullPath
-
-    def findRealCmdInfo(self, cmdName, cmdPath):
-        cmds = [ (cmdName, cmdPath) ]
-        if os.name == "nt" and not cmdName.endswith(".exe"):
-            cmds.insert(0, (cmdName + ".exe", cmdPath + ".exe"))
-        return cmds
-
-    def isRealCommand(self, fullPath, fullCommand):
-        return os.path.isfile(fullPath) and os.access(fullPath, os.X_OK) and \
-               not plugins.samefile(fullPath, fullCommand)
     
     def filterReplay(self, trafficList):
         insertIndex = 0

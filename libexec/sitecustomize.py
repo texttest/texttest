@@ -36,8 +36,11 @@ def loadRealSiteCustomize(): # pragma: no cover - coverage not set up yet
     myDir = os.path.dirname(__file__)
     pos = sys.path.index(myDir)
     try:
-        modInfo = imp.find_module("sitecustomize", sys.path[pos + 1:])
-        imp.load_module("sitecustomize", *modInfo)
+        try:
+            modInfo = imp.find_module("sitecustomize", sys.path[pos + 1:])
+            imp.load_module("sitecustomize", *modInfo)
+        except ImportError:
+            pass
     finally:
         if os.environ.has_key("TEXTTEST_SITECUSTOMIZE"):
             del os.environ["TEXTTEST_SITECUSTOMIZE"]

@@ -48,7 +48,7 @@ def getCommandLine(argv):
 
 def getEnvironment(argv):
     # Don't send the path element that caught us
-    pathElems = os.getenv("PATH").split(os.pathsep)
+    pathElems = map(os.path.normpath, os.getenv("PATH").split(os.pathsep))
     myDir = os.path.dirname(argv[0])
     if myDir in pathElems:
         pathElems.remove(myDir)

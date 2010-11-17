@@ -94,12 +94,9 @@ class SetUpTrafficHandlers(plugins.Action):
         if serverActive:
             from capturemock import makePathIntercept
             for cmd in interceptInfo.commands:
-                makePathIntercept(cmd, self.getPathInterceptDirectory(interceptDir))
+                makePathIntercept(cmd, interceptDir)
         
-            if len(interceptInfo.commands) and os.name == "posix":
-                # Intercepts on Windows go directly into the sandbox so they can take advantage of the
-                # "current working directory beats all" rule there and also intercept things that ignore PATH
-                # (like Java)
+            if len(interceptInfo.commands):
                 pathVars.append("PATH")
 
         if pythonCustomizeFiles:
@@ -113,12 +110,6 @@ class SetUpTrafficHandlers(plugins.Action):
 
     def interceptOwnModule(self, moduleFile, interceptDir):
         self.intercept(interceptDir, os.path.basename(moduleFile), [ moduleFile ], executable=False)
-
-    def getPathInterceptDirectory(self, interceptDir):
-        # Windows PATH interception isn't straightforward. Only .exe files get found.
-        # Put them directly into the sandbox directory rather than the purpose-built directory:
-        # that way they can also intercept stuff that is otherwise picked up directly from the registry (like Java)
-        return interceptDir if os.name == "posix" else os.path.dirname(interceptDir)
     
     def intercept(self, interceptDir, cmd, trafficFiles, executable):
         interceptName = os.path.join(interceptDir, cmd)

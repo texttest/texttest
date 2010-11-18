@@ -7,11 +7,9 @@ from copy import copy
 install_root = os.path.dirname(os.path.dirname(os.path.normpath(os.path.abspath(sys.argv[0]))))
 sys.path.insert(0, os.path.join(install_root, "pyusecase/lib"))
 sys.path.insert(0, os.path.join(install_root, "lib"))
-                
+
 from ndict import seqdict
 from jobprocess import JobProcess
-import default.rundependent
-
 
 def create_option_parser():
     usage = """usage: %prog [options] 
@@ -325,9 +323,6 @@ class Traffic(object):
 
     def getDescription(self):
         return self.direction + self.typeId + ":" + self.text
-
-    def getFilteredDescription(self):
-        return self.getDescription(), None
 
     def makesAsynchronousEdits(self):
         return False
@@ -963,19 +958,6 @@ class CommandLineTraffic(Traffic):
             return value.replace(oldVal, "$" + var)
         else:
             return value
-
-    def getFilteredDescription(self):
-        desc = self.getDescription()
-        sandbox = os.getenv("TEXTTEST_SANDBOX")
-        writeDirs = set([ sandbox, os.path.realpath(sandbox) ])
-        filteredDesc = desc
-        for dir in writeDirs:
-            filteredDesc = filteredDesc.replace(dir, "<sandbox>")
-        if filteredDesc != desc:
-            filter = default.rundependent.LineFilter("{INTERNAL writedir}{REPLACE <sandbox>}", self.currentTestPath, self.diag)
-            return filteredDesc, filter
-        else:
-            return desc, None
         
     def findPossibleFileEdits(self):
         edits = []
@@ -1198,27 +1180,21 @@ class ReplayInfo:
             return []
 
     def getResponseMapKey(self, traffic):
-        desc, filter = traffic.getFilteredDescription()
+        desc = traffic.getDescription()
         self.diag.info("Trying to match '" + desc + "'")
         if self.responseMap.has_key(desc):
             self.diag.info("Found exact match")
             return desc
         elif not traffic.enquiryOnly():
-            return self.findBestMatch(desc, filter)
+            return self.findBestMatch(desc)
 
-    def findBestMatch(self, desc, filter):
+    def findBestMatch(self, desc):
         descWords = self.getWords(desc)
         bestMatch = None
         bestMatchInfo = set(), 100000
         for currDesc, responseHandler in self.responseMap.items():
             if self.sameType(desc, currDesc):
                 descToCompare = currDesc
-                if filter:
-                    changed, descToCompare = filter.applyTo(currDesc)
-                    if changed and descToCompare == desc:
-                        self.diag.info("Found exact match")
-                        return currDesc
-                    
                 self.diag.info("Comparing with '" + descToCompare + "'")
                 matchInfo = self.getWords(descToCompare), responseHandler.getUnmatchedResponseCount()
                 if self.isBetterMatch(matchInfo, bestMatchInfo, descWords):
@@ -1253,7 +1229,8 @@ class ReplayInfo:
         for item in list1:
             if item in ref:
                 count += 1
-                ref.remove(item)
+                itemIndex = ref.index(item)
+                ref = ref[itemIndex + 1:]
         return count
             
     def isBetterMatch(self, info1, info2, targetWords):

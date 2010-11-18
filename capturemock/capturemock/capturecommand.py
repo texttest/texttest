@@ -48,11 +48,10 @@ def getCommandLine(argv):
 
 def getEnvironment(argv):
     # Don't send the path element that caught us
-    pathElems = map(os.path.normpath, os.getenv("PATH").split(os.pathsep))
     myDir = os.path.dirname(argv[0])
-    if myDir in pathElems:
-        pathElems.remove(myDir)
-        os.environ["PATH"] = os.pathsep.join(pathElems)
+    pathElems = os.getenv("PATH").split(os.pathsep)
+    filteredPathElems = filter(lambda p: myDir != os.path.normpath(p), pathElems)
+    os.environ["PATH"] = os.pathsep.join(filteredPathElems)
     return os.environ
     
 def createAndSend():

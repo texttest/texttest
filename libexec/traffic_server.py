@@ -1229,7 +1229,7 @@ class ReplayInfo:
 
     def getWords(self, desc):
         # Heuristic decisions trying to make the best of inexact matches
-        separators = [ "/", "(", ")", None ] # the last means whitespace...
+        separators = [ "/", "(", ")", "\\", None ] # the last means whitespace...
         return self._getWords(desc, separators)
 
     def _getWords(self, desc, separators):

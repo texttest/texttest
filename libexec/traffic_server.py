@@ -931,7 +931,7 @@ class CommandLineTraffic(Traffic):
                self.environmentDict.get("default", [])
 
     def hasChangedWorkingDirectory(self):
-        return os.path.realpath(self.cmdCwd) != os.path.realpath(os.getenv("TEXTTEST_SANDBOX"))
+        return self.cmdCwd != os.getcwd()
 
     def quoteArg(self, arg):
         if " " in arg:

@@ -87,7 +87,7 @@ class SetUpTrafficHandlers(plugins.Action):
                     cmdArgs.append("--replay-items=" + ",".join(replayItems))
 
         return subprocess.Popen(cmdArgs, env=test.getRunEnvironment(), universal_newlines=True,
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                                cwd=test.getDirectory(temporary=1), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     
     def makeIntercepts(self, interceptDir, interceptInfo, serverActive, pythonCoverage, pythonCustomizeFiles):
         pathVars = []

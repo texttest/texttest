@@ -47,12 +47,20 @@ class SetUpTrafficHandlers(plugins.Action):
             if key and values:
                 args.append(key + "=" + "+".join(values))
         return ",".join(args)
+
+    def getTrafficServerLogDefaults(self):
+        return "TEXTTEST_CWD=" + os.getcwd() + ",TEXTTEST_PERSONAL_LOG=" + os.getenv("TEXTTEST_PERSONAL_LOG")
+
+    def getTrafficServerLogConfig(self):
+        allPaths = plugins.findDataPaths([ "logging.traffic" ], dataDirName="log", includePersonal=True)
+        return allPaths[-1]
         
     def makeTrafficServer(self, test, replayFile, interceptInfo):
         recordFile = test.makeTmpFileName("traffic")
         recordEditDir = test.makeTmpFileName("file_edits", forComparison=0)
         cmdArgs = [ sys.executable, self.trafficServerFile, "-t", test.getRelPath(),
-                    "-r", recordFile, "-F", recordEditDir, "-l", os.getenv("TEXTTEST_PERSONAL_LOG") ]
+                    "-r", recordFile, "-F", recordEditDir, "-l", self.getTrafficServerLogDefaults(),
+                    "-L", self.getTrafficServerLogConfig() ]
         
         if test.getConfigValue("collect_traffic_use_threads") != "true":
             cmdArgs += [ "-s" ]

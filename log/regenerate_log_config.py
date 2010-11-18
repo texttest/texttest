@@ -18,7 +18,8 @@ def generateForSelfTests(selftestDir, trafficLoggers, *args):
                                          ("kill processes", "dynamic_gui_log") ]
         dynamicGen.generate(enabledLoggerNames, *args)
 
-        trafficGen = logconfiggen.PythonLoggingGenerator(os.path.join(selftestDir, "logging.traffic"), postfix="texttest")
+        trafficGen = logconfiggen.PythonLoggingGenerator(os.path.join(selftestDir, "logging.traffic"),
+                                                         prefix="%(TEXTTEST_CWD)s/", postfix="texttest")
         trafficGen.generate([], trafficLoggers)
 
 def getSelfTestDir(subdir):

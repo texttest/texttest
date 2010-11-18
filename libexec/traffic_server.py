@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.join(install_root, "lib"))
                 
 from ndict import seqdict
 from jobprocess import JobProcess
-import plugins, default.rundependent
+import default.rundependent
 
 
 def create_option_parser():
@@ -35,8 +35,10 @@ react to the above module to repoint where it sends socket interactions"""
                       help="replay traffic recorded in FILE.", metavar="FILE")
     parser.add_option("-I", "--replay-items", 
                       help="attempt replay only items in ITEMS, record the rest", metavar="ITEMS")
-    parser.add_option("-l", "--logdir",
-                      help="Log diagnostics to LOGDIR", metavar="LOGDIR")
+    parser.add_option("-l", "--logdefaults",
+                      help="Default values to pass to log configuration file. Only useful with -L", metavar="LOGDEFAULTS")
+    parser.add_option("-L", "--logconfigfile",
+                      help="Configure logging via the log configuration file at FILE.", metavar="LOGCONFIGFILE")
     parser.add_option("-f", "--replay-file-edits", 
                       help="restore edited files referred to in replayed file from DIR.", metavar="DIR")
     parser.add_option("-m", "--python-module-intercepts", 
@@ -51,12 +53,15 @@ react to the above module to repoint where it sends socket interactions"""
                       help="Set a test path name for TextTest filtering and/or error messages")
     return parser
 
-def parseCmdDictionary(cmdStr):
+def parseCmdDictionary(cmdStr, listvals):
     dict = {}
     if cmdStr:
         for part in cmdStr.split(","):
             cmd, varString = part.split("=")
-            dict[cmd] = varString.split("+")
+            if listvals:
+                dict[cmd] = varString.split("+")
+            else:
+                dict[cmd] = varString
     return dict
 
 
@@ -890,7 +895,7 @@ class CommandLineTraffic(Traffic):
     @classmethod
     def configure(cls, options):
         cls.currentTestPath = options.test_path
-        cls.environmentDict = parseCmdDictionary(options.transfer_environment)
+        cls.environmentDict = parseCmdDictionary(options.transfer_environment, listvals=True)
         if options.asynchronous_file_edit_commands:
             cls.asynchronousFileEditCmds = options.asynchronous_file_edit_commands.split(",")
         
@@ -1312,13 +1317,7 @@ class ReplayedResponseHandler:
 if __name__ == "__main__":
     parser = create_option_parser()
     options = parser.parse_args()[0] # no positional arguments
-
-    allPaths = plugins.findDataPaths([ "logging.traffic" ], dataDirName="log")
-    defaults = { "TEXTTEST_PERSONAL_LOG": options.logdir }
-    personalFile = os.path.join(options.logdir, "logging.traffic")
-    if os.path.isfile(personalFile):
-        allPaths.append(personalFile)
-    logging.config.fileConfig(allPaths[-1], defaults)
+    logging.config.fileConfig(options.logconfigfile, parseCmdDictionary(options.logdefaults, listvals=False))
 
     for cls in [ CommandLineTraffic, FileEditTraffic, PythonModuleTraffic ]:
         cls.configure(options)

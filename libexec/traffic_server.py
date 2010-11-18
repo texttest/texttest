@@ -9,7 +9,6 @@ sys.path.insert(0, os.path.join(install_root, "pyusecase/lib"))
 sys.path.insert(0, os.path.join(install_root, "lib"))
 
 from ndict import seqdict
-from jobprocess import JobProcess
 
 def create_option_parser():
     usage = """usage: %prog [options] 
@@ -863,15 +862,12 @@ class CommandLineKillTraffic(Traffic):
     def __init__(self, inText, responseFile):
         killStr, proxyPid = inText.split(":SUT_SEP:")
         self.killSignal = int(killStr)
-        realProc = self.pidMap.get(proxyPid)
-        self.pid = None
-        if realProc:
-            self.pid = realProc.pid
+        self.proc = self.pidMap.get(proxyPid)
         Traffic.__init__(self, killStr, responseFile)
             
     def forwardToDestination(self):
-        if self.pid:
-            JobProcess(self.pid).killAll(self.killSignal)
+        if self.proc:
+            self.proc.send_signal(self.killSignal)
         return []
 
     def hasInfo(self):

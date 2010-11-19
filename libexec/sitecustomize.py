@@ -28,25 +28,23 @@ def trySetupCaptureMock():
             ignoreCallers = ignoreVar.split(",")
         interceptPython(attributeNames, ignoreCallers)
 
-def loadRealSiteCustomize(): # pragma: no cover - coverage not set up yet
+def loadRealSiteCustomize(fileName): # pragma: no cover - coverage not set up yet
     # must do this before setting up coverage as real sitecustomize might
     # manipulate PYTHONPATH in such a way that coverage can be found
     import imp
-    os.environ["TEXTTEST_SITECUSTOMIZE"] = "1" # Guard against double setup when in the self-tests
-    myDir = os.path.dirname(__file__)
+    myDir = os.path.dirname(fileName)
     pos = sys.path.index(myDir)
     try:
-        try:
-            modInfo = imp.find_module("sitecustomize", sys.path[pos + 1:])
-            imp.load_module("sitecustomize", *modInfo)
-        except ImportError:
-            pass
-    finally:
-        if os.environ.has_key("TEXTTEST_SITECUSTOMIZE"):
-            del os.environ["TEXTTEST_SITECUSTOMIZE"]
+        file, pathname, description = imp.find_module("sitecustomize", sys.path[pos + 1:])
+        if os.path.basename(os.path.dirname(pathname)) == "traffic_intercepts":
+            # For the self-tests: don't load another copy ourselves recursively
+            loadRealSiteCustomize(pathname)
+        else:
+            imp.load_module("sitecustomize", file, pathname, description)
+    except ImportError:
+        pass
 
-loadRealSiteCustomize() # pragma: no cover - coverage not set up yet
-if not os.environ.has_key("TEXTTEST_SITECUSTOMIZE"): # pragma: no cover - coverage not set up yet
-    trySetupCoverage()
-    loadTestCustomize()
-    trySetupCaptureMock() 
+loadRealSiteCustomize(__file__) # pragma: no cover - coverage not set up yet
+trySetupCoverage() # pragma: no cover - coverage not set up yet
+loadTestCustomize() # pragma: no cover - coverage not set up yet
+trySetupCaptureMock() # pragma: no cover - coverage not set up yet

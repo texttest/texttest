@@ -101,7 +101,7 @@ class DocumentEnvironment(plugins.Action):
         self.onlyEntries = args
         self.prefixes = [ "TEXTTEST_", "USECASE_" ]
         self.exceptions = [ "TEXTTEST_DELETION", "TEXTTEST_MIM_PYTHON", "TEXTTEST_MIM_PYTHON_IGNORE",
-                            "TEXTTEST_SYMLINK", "TEXTTEST_SITECUSTOMIZE", "TEXTTEST_PERSONAL_" ]
+                            "TEXTTEST_SYMLINK", "TEXTTEST_CWD=", "TEXTTEST_PERSONAL_" ]
         
     def getEntriesToUse(self, app):
         rootDir = plugins.installationRoots[0]

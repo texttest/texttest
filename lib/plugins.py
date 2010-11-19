@@ -29,8 +29,7 @@ if os.name == "nt":
     os.sep = posixpath.sep
     os.path.sep = posixpath.sep
     os.path.normpath = posixpath.normpath
-    os.path.realpath = posixpath.normpath
-
+    
 class Callable:
     def __init__(self, method, *args):
         self.method = method

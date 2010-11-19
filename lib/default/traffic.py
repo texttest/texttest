@@ -49,7 +49,7 @@ class SetUpTrafficHandlers(plugins.Action):
         return ",".join(args)
 
     def getTrafficServerLogDefaults(self):
-        return "TEXTTEST_CWD=" + os.getcwd() + ",TEXTTEST_PERSONAL_LOG=" + os.getenv("TEXTTEST_PERSONAL_LOG")
+        return "TEXTTEST_CWD=" + os.getcwd().replace("\\", "/") + ",TEXTTEST_PERSONAL_LOG=" + os.getenv("TEXTTEST_PERSONAL_LOG")
 
     def getTrafficServerLogConfig(self):
         allPaths = plugins.findDataPaths([ "logging.traffic" ], dataDirName="log", includePersonal=True)

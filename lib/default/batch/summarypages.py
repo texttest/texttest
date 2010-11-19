@@ -274,14 +274,14 @@ class SummaryGenerator:
                 fracs.append(count)
                 colours.append(colour)
                 tests += count
-        title = time.strftime("%d%b%Y",lastDate) + " - "
-        if oldResults:
-            title += "(" + str(tests) + " tests)"
-        else:
-            title += str(tests) + " tests"
+        title = time.strftime("%d%b%Y",lastDate) + " - " + str(tests) + " tests"
         pg = PieGraph(version, title, size=5)
         pg.pie(fracs, colours)
-        pg.save(os.path.join(dataFinder.location, summaryGraphName))
+        summaryGraphFile = os.path.join(dataFinder.location, summaryGraphName)
+        if oldResults:
+            pg.save(summaryGraphFile, facecolor="#999999")
+        else:
+            pg.save(summaryGraphFile)
 
     def insertSummaryTable(self, file, dataFinder, appOrder, versionOrder):
         pageInfo = dataFinder.getAppsWithVersions()

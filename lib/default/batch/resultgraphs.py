@@ -112,8 +112,8 @@ class PieGraph:
         self.fig1.suptitle(self.title, fontsize = 10, family='monospace')
         self.fig1.text(0.5,0, self.extratitle, fontsize = 10, family='monospace', horizontalalignment='center')
 
-    def save(self, fn):
-        self.fig1.savefig(fn, dpi=100)
+    def save(self, fn, **kw):
+        self.fig1.savefig(fn, dpi=100, **kw)
 
 class GraphGenerator:
     labels = seqdict()

@@ -29,6 +29,12 @@ if os.name == "nt":
     os.sep = posixpath.sep
     os.path.sep = posixpath.sep
     os.path.normpath = posixpath.normpath
+    orig_abspath = os.path.abspath
+    def abspath(f):
+        return orig_abspath(f).replace("\\", "/")
+    os.path.abspath = abspath
+    os.path.realpath = abspath
+        
     
 class Callable:
     def __init__(self, method, *args):

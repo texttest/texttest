@@ -422,7 +422,7 @@ class SaveState(plugins.Responder):
         testStateRepository = os.path.expanduser(suite.app.getCompositeConfigValue("batch_result_repository", self.batchSession))
         self.diag.info("Test state repository is " + repr(testStateRepository))
         if testStateRepository:
-            self.repositories[suite.app] = os.path.abspath(testStateRepository).replace("\\", "/")
+            self.repositories[suite.app] = os.path.abspath(testStateRepository)
 
 class ArchiveRepository(plugins.ScriptWithArgs):
     scriptDoc = "Archive parts of the batch result repository to a history directory"

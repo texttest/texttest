@@ -1722,7 +1722,7 @@ class OptionFinder(plugins.OptionFinder):
             return value
 
     def normalisePath(self, path):
-        return os.path.normpath(plugins.abspath(os.path.expanduser(path))).replace("\\", "/")
+        return os.path.normpath(plugins.abspath(os.path.expanduser(path)))
 
     def getPathFromOptionsOrEnv(self, envVar, defaultValue, optionName=""):
         if optionName and self.has_key(optionName):

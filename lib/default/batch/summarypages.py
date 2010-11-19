@@ -18,7 +18,7 @@ class GenerateFromSummaryData(plugins.ScriptWithArgs):
             GenerateFromSummaryData.summaryFileName = argDict["file"]
 
     def setUpApplication(self, app):
-        location = os.path.realpath(app.getCompositeConfigValue("historical_report_location", self.batchSession)).replace("\\", "/")
+        location = os.path.realpath(app.getCompositeConfigValue("historical_report_location", self.batchSession))
         usePie = app.getCompositeConfigValue("historical_report_piechart_summary", self.batchSession)
         self.locationApps.setdefault(location, []).append( (app, usePie))
 

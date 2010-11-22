@@ -1978,9 +1978,12 @@ Bug Fixes:
 Version trunk
 =============
 System requirements (see Migration Notes):
+    - "Traffic mechanism" is now a separate library called "capturemock" and should be managed separately
+	For now, just means you have to do "setup.py install" under capturemock in TextTest source.
 General GUI Enhancements:
     - GUI now cleans up appropriately on receiving SIGINT on UNIX (engine.py)
 	Means dynamic GUIs can be closed from static GUI without leaking files.
+    - Help dialog now reports location of test suite and Python installation (helpdialogs.py)
 Static GUI Enhancements:
     - Local "wrapper" scripts now appear in static GUI config tab (filetrees.py)
 	Any "executable" or "interpreter" that depends on "TEXTTEST_ROOT" will be shown.
@@ -1994,6 +1997,13 @@ Framework Enhancements:
 	Base classes now listed explicitly. Some recorded traffic may not work. See migration notes.
     - Python interception: can now "fix up" objects which aren't repr-eval compatible (traffic_server.py)
 	New setting "collect_traffic_alter_response". See website for details.
+    - No longer works to intercept command line programs in the Windows system directory (e.g. Java)
+	Windows doesn't want you to do this and it's hard to get right.
+    - Windows paths no longer magically converted to UNIX ones
+    - "Shell-like" quoting in command recording is largely removed (traffic_server.py)
+	Made it difficult to see which quoting came from the program and which came from TextTest.
+	Only thing that remains is double-quoting when arguments contain spaces.
+    - Now enable Java features if "java" appears anywhere in "interpreter" setting (default/__init__.py)
 Batch Report Enhancements:
     - Can now get green/red colourings from the batch console output (colorer.py)
 	Use the new -zen option. Thanks to Matt Baker for this.
@@ -2003,12 +2013,14 @@ Batch Report Enhancements:
 	Using e.g. -name 04Nov2010 will now achieve this. Useful for very long continuous integration jobs,
 	e.g. running over a weekend.
     - Old results are now shown in a light-grey foregound colour on the HTML report summary pages (summarypages.py)
+	(or light-grey background in the case of the pie-chart version)
 	This to prevent confusion when several processes update the same table in sequence.
-Grid Engine (LSF/SGE) enhancements:
+Grid Engine (LSF/SGE) enhancements/bug fixes:
     - Status tab now shows grid engine status (e.g. suspension) also (statusview.py)
 	Previously only visible in the test tree view.
     - Ignore order of lists of resources when deciding about reuse (masterprocess.py)
 	Previously started new jobs if one test required resources a,b and the other required b,a.
+    - SGE errors beginning with a blank line are no longer ignored (sge.py)
 Bug Fixes:
     - Running extra versions with an explicit version from the static GUI does not flip version order any more (testmodel.py)
     - TextTest no longer allows data file names to clash with its own pre-defined definition file names (testmodel.py)
@@ -2023,3 +2035,6 @@ Bug Fixes:
     - Filtering for a version and then selecting a suite no longer selects versions that should be filtered away (testtree.py)
     - Selecting from the static GUI now handles empty suites correctly (selectandfilter.py)
     - Python interception mechanism no longer stacktraces if called on Python earlier than 2.4 (sitecustomize.py)
+    - Python interception no longer writes a trailing space if the program is called with no arguments (capturepython.py)
+    - Now works if system sitecustomize.py adds things to PYTHONPATH where e.g. coverage, capturemock are found. (sitecustomize.py)
+

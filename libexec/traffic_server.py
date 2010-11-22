@@ -1213,27 +1213,42 @@ class ReplayInfo:
             words += self._getWords(part, separators[1:])
         return words
 
-    def commonElementCount(self, list1, list2):
+    def getMatchingBlocks(self, list1, list2):
         matcher = difflib.SequenceMatcher(None, list1, list2)
-        return sum((n for i, j, n in matcher.get_matching_blocks()))
+        return matcher.get_matching_blocks()
+
+    def commonElementCount(self, blocks):
+        return sum((block.size for block in blocks))
+
+    def nonMatchingSequenceCount(self, blocks):
+        if len(blocks) > 1 and self.lastBlockReachesEnd(blocks):
+            return len(blocks) - 2
+        else:
+            return len(blocks) - 1
+
+    def lastBlockReachesEnd(self, blocks):
+        return blocks[-2].a + blocks[-2].size == blocks[-1].a and \
+               blocks[-2].b + blocks[-2].size == blocks[-1].b
             
     def isBetterMatch(self, info1, info2, targetWords):
         words1, unmatchedCount1 = info1
         words2, unmatchedCount2 = info2
-        common1 = self.commonElementCount(words1, targetWords)
-        common2 = self.commonElementCount(words2, targetWords)
+        blocks1 = self.getMatchingBlocks(words1, targetWords)
+        blocks2 = self.getMatchingBlocks(words2, targetWords)
+        common1 = self.commonElementCount(blocks1)
+        common2 = self.commonElementCount(blocks2)
         self.diag.info("Words in common " + repr(common1) + " vs " + repr(common2))
         if common1 > common2:
             return True
         elif common1 < common2:
             return False
 
-        lengthDiff1 = abs(len(words1) - len(targetWords))
-        lengthDiff2 = abs(len(words2) - len(targetWords))
-        self.diag.info("Length difference " + repr(lengthDiff1) + " vs " + repr(lengthDiff2))
-        if lengthDiff1 < lengthDiff2:
+        nonMatchCount1 = self.nonMatchingSequenceCount(blocks1)
+        nonMatchCount2 = self.nonMatchingSequenceCount(blocks2)
+        self.diag.info("Non matching sequences " + repr(nonMatchCount1) + " vs " + repr(nonMatchCount2))
+        if nonMatchCount1 < nonMatchCount2:
             return True
-        elif lengthDiff1 > lengthDiff2:
+        elif nonMatchCount1 > nonMatchCount2:
             return False
 
         self.diag.info("Unmatched count difference " + repr(unmatchedCount1) + " vs " + repr(unmatchedCount2))

@@ -13,6 +13,7 @@ class QueueSystem:
                     "R" : ("RESTART", "Restarted"),
                     "S" : ("SSUSP", "Suspended by SGE due to other higher priority jobs"),
                     "T" : ("THRESH", "Suspended by SGE as it exceeded allowed thresholds") }
+
     def getSubmitCmdArgs(self, submissionRules):
         qsubArgs = [ "qsub", "-N", submissionRules.getJobName() ]
         if submissionRules.processesNeeded != 1:
@@ -30,14 +31,16 @@ class QueueSystem:
         outputFile, errorsFile = submissionRules.getJobFiles()
         qsubArgs += [ "-w", "e", "-notify", "-m", "n", "-cwd", "-b", "y", "-V", "-o", outputFile, "-e", errorsFile ]
         return qsubArgs
+
     def getResourceArg(self, submissionRules):
         resourceList = submissionRules.findResourceList()
         machines = submissionRules.findMachineList()
         if len(machines):
             resourceList.append("hostname=" + "|".join(machines))
         return ",".join(resourceList)
+    
     def findSubmitError(self, stderr):
-        return stderr.splitlines()[0].strip()
+        return stderr.strip().splitlines()[0]
 
     def killJob(self, jobId):
         proc = subprocess.Popen([ "qdel", jobId ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)

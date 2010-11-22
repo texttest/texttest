@@ -2,11 +2,11 @@
 """ All the standard scripts that come with the default configuration """
 
 import plugins, sandbox, operator, os, shutil, sys
-from ndict import seqdict
+from ordereddict import OrderedDict
                     
 class CountTest(plugins.Action):
     scriptDoc = "report on the number of tests selected, by application"
-    appCount = seqdict()
+    appCount = OrderedDict()
     @classmethod
     def finalise(self):
         for app, count in self.appCount.items():

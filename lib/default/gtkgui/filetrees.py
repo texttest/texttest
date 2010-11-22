@@ -4,7 +4,7 @@ Module to handle the various file-trees in the GUI
 """
 
 import gtk, gobject, guiutils, plugins, os, sys, operator, logging
-from ndict import seqdict
+from ordereddict import OrderedDict
 from copy import copy
 
 class FileViewGUI(guiutils.SubGUI):
@@ -514,7 +514,7 @@ class TestFileGUI(FileViewGUI):
         except Exception:
             sys.stderr.write("WARNING - ignoring exception thrown by '" + self.currentTest.getConfigValue("config_module") + \
                              "' configuration while requesting extra data files, not displaying any such files\n")
-            return seqdict()
+            return OrderedDict()
 
     def addStaticDataFilesToModel(self):
         if len(self.currentTest.getDataFileNames()) == 0:

@@ -3,7 +3,7 @@
 import plugins, os, string, shutil, sys, logging
 from ConfigParser import ConfigParser, NoOptionError
 from copy import copy
-from ndict import seqdict
+from ordereddict import OrderedDict
 
 plugins.addCategory("bug", "known bugs", "had known bugs")
 plugins.addCategory("badPredict", "internal errors", "had internal errors")
@@ -188,7 +188,7 @@ class ParseMethod:
         except NoOptionError:
             return default
 
-class BugMap(seqdict):
+class BugMap(OrderedDict):
     def checkUnchanged(self):
         for bugData in self.values():
             if bugData.checkUnchanged:
@@ -205,10 +205,9 @@ class BugMap(seqdict):
         return realLookup(name)
     
     def makeParser(self, fileName):
-        parser = ConfigParser()
+        parser = ConfigParser(dict_type=OrderedDict)
         # Default behaviour transforms to lower case: we want case-sensitive
         parser.optionxform = str
-        parser._sections = seqdict()
         # There isn't a nice way to change the behaviour on getting a duplicate section
         # so we use a nasty way :)
         realLookup = parser._sections.__getitem__

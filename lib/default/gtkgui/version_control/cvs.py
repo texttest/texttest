@@ -1,7 +1,7 @@
 
 import gtk, vcs_independent, plugins, datetime, shutil, time, os
 from .. import guiutils
-from ndict import seqdict
+from ordereddict import OrderedDict
 
 #
 # Todo/improvements:
@@ -194,7 +194,7 @@ class CVSLogLatest(vcs_independent.LogGUI):
         self.pages[test.uniqueName] += linesToShow
     
     def addContents(self):
-        self.pages = seqdict()
+        self.pages = OrderedDict()
         self.runAndParse() 
         self.vbox = gtk.VBox()
         self.addHeader()

@@ -5,7 +5,7 @@ to store the simple actions and the dialogs, and a notebook to store the tabs in
 """
 
 import gtk, guiutils, plugins, os, sys, logging, types
-from ndict import seqdict
+from ordereddict import OrderedDict
 
 class MenuBarGUI(guiutils.SubGUI):
     def __init__(self, dynamic, uiManager, actionGUIs, menuNames, *args):
@@ -269,7 +269,7 @@ class NotebookGUI(guiutils.SubGUI):
         self.diag.info("Resetting done.")
 
     def findPagesToHide(self, *args):
-        pages = seqdict()
+        pages = OrderedDict()
         for pageNum, tabGUI in enumerate(self.tabInfo):
             page = self.notebook.get_nth_page(pageNum)
             if not tabGUI.shouldShowCurrent(*args) and page.get_property("visible"):

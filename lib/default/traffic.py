@@ -1,6 +1,6 @@
 
 import os, sys, plugins, shutil, socket, subprocess
-from ndict import seqdict
+from ordereddict import OrderedDict
 
 class SetUpTrafficHandlers(plugins.Action):
     REPLAY_ONLY = 0

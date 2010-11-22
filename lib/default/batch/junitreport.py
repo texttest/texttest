@@ -1,7 +1,7 @@
 
 import logging, os
 import plugins
-from ndict import seqdict
+from ordereddict import OrderedDict
 from batchutils import calculateBatchDate
 from string import Template
 
@@ -13,8 +13,8 @@ class JUnitResponder(plugins.Responder):
         plugins.Responder.__init__(self)
         self.sessionName = optionMap["b"]
         self.runId = optionMap.get("name", calculateBatchDate()) # use the command-line name if given, else the date
-        self.allApps = seqdict()
-        self.appData = seqdict()
+        self.allApps = OrderedDict()
+        self.appData = OrderedDict()
 
     def useJUnitFormat(self, app):
         return app.getCompositeConfigValue("batch_junit_format", self.sessionName) == "true"

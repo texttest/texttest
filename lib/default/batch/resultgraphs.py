@@ -17,7 +17,7 @@ if versionParts < (0, 98):
 
 matplotlib.use("Agg") # set backend to one that doesn't need a DISPLAY
 import plugins, pylab, logging, operator
-from ndict import seqdict
+from ordereddict import OrderedDict
     
 
 class Graph:
@@ -116,7 +116,7 @@ class PieGraph:
         self.fig1.savefig(fn, dpi=100, **kw)
 
 class GraphGenerator:
-    labels = seqdict()
+    labels = OrderedDict()
     labels["success"] = "Succeeded tests"
     labels["performance"] = "Performance difference"
     labels["memory"] = "Memory difference"
@@ -144,7 +144,7 @@ class GraphGenerator:
 
     def addAllPlots(self, graph, results, *args):
         prevYlist = [ 0 ] * len(results)
-        plotData = seqdict()
+        plotData = OrderedDict()
         for category in self.labels.keys():
             currYlist = [ summary.get(category, 0) for _, summary in results ]
             if self.hasNonZero(currYlist):

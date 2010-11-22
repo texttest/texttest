@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import os, sys, types, string, plugins, exceptions, shutil, operator, logging, glob, fnmatch
-from ndict import seqdict
+from ordereddict import OrderedDict
 from cPickle import Pickler, loads, UnpicklingError
 from threading import Lock
 from tempfile import mkstemp
@@ -57,7 +57,7 @@ class DirectoryCache:
             newCache = DirectoryCache(os.path.join(self.dir, root))
             return newCache.findVersionSets(local, predicate)
 
-        versionSets = seqdict()
+        versionSets = OrderedDict()
         for fileName in self.contents:
             versionSet = self.findVersionSet(fileName, stem)
             if versionSet is not None and (predicate is None or predicate(versionSet)):
@@ -88,9 +88,9 @@ class DynamicMapping:
             raise KeyError, "No such value " + key
 
 
-class TestEnvironment(seqdict):
+class TestEnvironment(OrderedDict):
     def __init__(self, populateFunction):
-        seqdict.__init__(self)
+        OrderedDict.__init__(self)
         self.diag = logging.getLogger("read environment")
         self.populateFunction = populateFunction
         self.populated = False
@@ -812,7 +812,7 @@ class TestSuiteFileHandler:
         self.write(fileName, cache)
 
     def addToCache(self, cache, testName, description, index):
-        newEntry = seqdict()
+        newEntry = OrderedDict()
         newEntry[testName] = description
         cache.insert(index, newEntry)
 
@@ -887,7 +887,7 @@ class TestSuite(Test):
         if fileName:
             return self.testSuiteFileHandler.read(fileName, warn, ignoreCache, self.fileExists)
         else:
-            return seqdict()
+            return OrderedDict()
 
     def findTestCases(self, version):
         versionFile = self.getFileName("testsuite", version)
@@ -1238,7 +1238,7 @@ class Application:
 
         # Read our pre-existing config files
         self.readConfigFiles(configModuleInitialised=False)
-        self.diag.info("Basic Config file settings are: " + "\n" + repr(self.configDir.dict))
+        self.diag.info("Basic Config file settings are: " + "\n" + repr(self.configDir))
         self.diag.info("Found application '" + self.name + "'")
         self.configObject = self.makeConfigObject()
         # Fill in the values we expect from the configurations, and read the file a second time
@@ -1250,7 +1250,7 @@ class Application:
             self.importAndWriteEntries(configEntries)
 
         self.configDir.readValues(self.getPersonalConfigFiles(), insert=False, errorOnUnknown=False)
-        self.diag.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
+        self.diag.info("Config file settings are: " + "\n" + repr(self.configDir))
         if not plugins.TestState.showExecHosts:
             plugins.TestState.showExecHosts = self.configObject.showExecHostsInFailures(self)
 
@@ -1445,7 +1445,7 @@ class Application:
 
     def getAllFileNames(self, dircaches, stem, allVersions=False):
         versionPred = self.getExtensionPredicate(allVersions)
-        versionSets = seqdict()
+        versionSets = {}
         for dircache in dircaches:
             # Sorts into order most specific first
             currVersionSets = dircache.findVersionSets(stem, versionPred)
@@ -1453,10 +1453,12 @@ class Application:
                 versionSets.setdefault(vset, []).extend(files)
 
         if allVersions:
-            versionSets.sort(self.compareForDisplay)
+            sortedVersionSets = sorted(versionSets.keys(), self.compareForDisplay)
         else:
-            versionSets.sort(self.compareForPriority)
-        allFiles =  reduce(operator.add, versionSets.values(), [])
+            sortedVersionSets = sorted(versionSets.keys(), self.compareForPriority)
+        allFiles = []
+        for vset in sortedVersionSets:
+            allFiles += versionSets[vset]
         self.diag.info("Files for stem " + stem + " found " + repr(allFiles))
         return allFiles
 

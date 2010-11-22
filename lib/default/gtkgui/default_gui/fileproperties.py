@@ -1,7 +1,7 @@
 
 import gtk, plugins, os, time, stat
 from .. import guiplugins
-from ndict import seqdict
+from ordereddict import OrderedDict
 
 # pwd and grp doesn't exist on windows ...
 try:
@@ -125,7 +125,7 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
         return alignment
 
     def addContents(self):
-        dirToProperties = seqdict()
+        dirToProperties = OrderedDict()
         props = self.getAllProperties()
         for prop in props:
             dirToProperties.setdefault(prop.dir, []).append(prop)

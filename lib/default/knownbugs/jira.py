@@ -25,7 +25,7 @@
 """
 
 import xmlrpclib
-from ndict import seqdict
+from ordereddict import OrderedDict
 
 def convertToString(value):
     if type(value) in (str, unicode):
@@ -61,7 +61,7 @@ def isInteresting(value):
 
 def filterReply(bugInfo, statuses, resolutions):
     ignoreFields = [ "id", "type", "description", "project" ]
-    newBugInfo = seqdict()
+    newBugInfo = OrderedDict()
     transfer(bugInfo, newBugInfo, "key")
     transfer(bugInfo, newBugInfo, "summary")
     newBugInfo["status"] = findId(statuses, bugInfo["status"])

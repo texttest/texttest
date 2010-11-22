@@ -5,7 +5,7 @@ All the actions for administering the files and directories in a test suite
 
 import gtk, plugins, os, shutil
 from .. import guiplugins, guiutils
-from ndict import seqdict
+from ordereddict import OrderedDict
 
 # Cut, copy and paste
 class FocusDependentAction(guiplugins.ActionGUI):
@@ -145,7 +145,7 @@ class PasteTests(FocusDependentAction):
         
     def performOnCurrent(self):
         newTests = []
-        destInfo = seqdict()
+        destInfo = OrderedDict()
         for test in self.clipboardTests:
             suite, placement = self.getDestinationInfo(test)
             if suite:
@@ -515,7 +515,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         plugins.ensureDirectoryExists(directory)
         if javaClass:
             executable = javaClass
-        configEntries = seqdict({ "executable" : executable })
+        configEntries = OrderedDict({ "executable" : executable })
         configEntries["filename_convention_scheme"] = "standard"
         if javaClass:
             configEntries["interpreter"] = "java"

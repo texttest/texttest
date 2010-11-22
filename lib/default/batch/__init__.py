@@ -2,7 +2,7 @@
 
 import os, plugins, sys, time, shutil, datetime, testoverview, logging
 from summarypages import GenerateSummaryPage, GenerateGraphs # only so they become package level entities
-from ndict import seqdict
+from ordereddict import OrderedDict
 from batchutils import calculateBatchDate
 
 class BatchVersionFilter:
@@ -70,7 +70,7 @@ class BatchCategory(plugins.Filter):
         else:
             return ""
     def getFreeTextData(self):
-        data = seqdict()
+        data = OrderedDict()
         for test in self.getAllTests():
             freeText = test.state.freeText
             if freeText:
@@ -154,8 +154,8 @@ class EmailResponder(plugins.Responder):
         plugins.Responder.__init__(self)
         self.sessionName = optionMap["b"]
         self.runId = optionMap.get("name", calculateBatchDate()) # use the command-line name if given, else the date
-        self.batchAppData = seqdict()
-        self.allApps = seqdict()
+        self.batchAppData = OrderedDict()
+        self.allApps = OrderedDict()
 
     def notifyComplete(self, test):
         if test.app.emailEnabled(self.sessionName):
@@ -568,7 +568,7 @@ class WebPageResponder(plugins.Responder):
         return cmd
 
     def getAppRepositoryInfo(self):
-        appInfo = seqdict()
+        appInfo = OrderedDict()
         for app in self.appsToGenerate:
             repository = os.path.expanduser(app.getCompositeConfigValue("batch_result_repository", self.batchSession))
             if not repository:
@@ -585,7 +585,7 @@ class WebPageResponder(plugins.Responder):
     def transformToCommon(self, pageInfo):
         allApps = [ app for app, _ in pageInfo ]
         version = getVersionName(allApps[0], self.appsToGenerate)
-        extraVersions, relevantSubDirs = [], seqdict()
+        extraVersions, relevantSubDirs = [], OrderedDict()
         for app, repository in pageInfo:
             extraVersions += self.getExtraVersions(app)
             relevantSubDirs.update(self.findRelevantSubdirectories(repository, app, extraVersions, self.getVersionTitle))
@@ -632,7 +632,7 @@ class WebPageResponder(plugins.Responder):
         return ""
         
     def findRelevantSubdirectories(self, repository, app, extraVersions, versionTitleMethod=None):
-        subdirs = seqdict()
+        subdirs = OrderedDict()
         dirlist = os.listdir(repository)
         dirlist.sort()
         appVersions = set(app.versions)
@@ -680,7 +680,7 @@ class CollectFiles(plugins.ScriptWithArgs):
             
     def setUpApplication(self, app):
         fileBodies = []
-        totalValues = seqdict()
+        totalValues = OrderedDict()
         rootDir = app.getPreviousWriteDirInfo(self.tmpInfo)
         if not os.path.isdir(rootDir):
             sys.stderr.write("No temporary directory found at " + rootDir + " - not collecting batch reports.\n")

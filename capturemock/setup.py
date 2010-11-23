@@ -12,13 +12,12 @@ if os.name == "nt":
 else:
     package_data = {}
 
-## if os.name == "nt":
-##     make_windows_script("bin/capturemock_server")
-##     shutil.copyfile("capturemock/python_script.exe", "bin/capturemock_server.exe")
-##     scripts=["bin/capturemock_server.py", "bin/capturemock_server.exe"]
-## else:
-##     scripts=["bin/capturemock_server"]
-scripts=[]
+if os.name == "nt":
+    make_windows_script("capturemock_server")
+    shutil.copyfile("capturemock/python_script.exe", "capturemock_server.exe")
+    scripts=["capturemock_server.py", "capturemock_server.exe"]
+else:
+    scripts=["capturemock_server"]
 
 setup(name='CaptureMock',
       version="0.1",
@@ -28,6 +27,7 @@ setup(name='CaptureMock',
       description="A tool for creating mocks via a capture-replay style approach",
       long_description='Breaking away from TextTest and coming soon',
       packages=["capturemock"],
+      py_modules=["ordereddict"],
       package_data=package_data,
       classifiers=[ "Programming Language :: Python",
                     "License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)",

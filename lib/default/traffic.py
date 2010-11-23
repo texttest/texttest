@@ -1,6 +1,5 @@
 
 import os, sys, plugins, shutil, socket, subprocess
-from ordereddict import OrderedDict
 
 class SetUpTrafficHandlers(plugins.Action):
     REPLAY_ONLY = 0
@@ -11,7 +10,6 @@ class SetUpTrafficHandlers(plugins.Action):
         self.trafficServerProcess = None
         libexecDir = plugins.installationDir("libexec")
         self.siteCustomizeFile = os.path.join(libexecDir, "sitecustomize.py")
-        self.trafficServerFile = os.path.join(libexecDir, "traffic_server.py")
         
     def __call__(self, test):
         pythonCustomizeFiles = test.getAllPathNames("testcustomize.py") 
@@ -58,7 +56,7 @@ class SetUpTrafficHandlers(plugins.Action):
     def makeTrafficServer(self, test, replayFile, interceptInfo):
         recordFile = test.makeTmpFileName("traffic")
         recordEditDir = test.makeTmpFileName("file_edits", forComparison=0)
-        cmdArgs = [ sys.executable, self.trafficServerFile, "-t", test.getRelPath(),
+        cmdArgs = [ "capturemock_server", "-t", test.getRelPath(),
                     "-r", recordFile, "-F", recordEditDir, "-l", self.getTrafficServerLogDefaults(),
                     "-L", self.getTrafficServerLogConfig() ]
         

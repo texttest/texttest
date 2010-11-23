@@ -115,18 +115,14 @@ class SetUpTrafficHandlers(plugins.Action):
         return pathVars
 
     def interceptOwnModule(self, moduleFile, interceptDir):
-        self.intercept(interceptDir, os.path.basename(moduleFile), [ moduleFile ], executable=False)
+        self.intercept(interceptDir, os.path.basename(moduleFile), [ moduleFile ])
     
-    def intercept(self, interceptDir, cmd, trafficFiles, executable):
+    def intercept(self, interceptDir, cmd, trafficFiles):
         interceptName = os.path.join(interceptDir, cmd)
         plugins.ensureDirExistsForFile(interceptName)
         for trafficFile in trafficFiles:
             if os.name == "posix":
                 os.symlink(trafficFile, interceptName)
-            elif executable:
-                interceptName = os.path.join(os.path.dirname(interceptDir), cmd)
-                extension = os.path.splitext(trafficFile)[-1]
-                shutil.copy(trafficFile, interceptName + extension)
             else:
                 shutil.copy(trafficFile, interceptName)
 

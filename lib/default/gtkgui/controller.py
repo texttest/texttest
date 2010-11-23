@@ -31,7 +31,7 @@ except Exception, e:
 
 import testtree, filetrees, statusviews, textinfo, actionholders, version_control, guiplugins, guiutils, plugins, os, sys, logging
 from copy import copy
-from ndict import seqdict
+from ordereddict import OrderedDict
 
 
 class IdleHandlerManager:
@@ -413,7 +413,7 @@ class TopWindowGUI(guiutils.ContainerGUI):
             return appName
 
     def organiseApps(self):
-        appsWithVersions = seqdict()
+        appsWithVersions = OrderedDict()
         for app in self.allApps:
             appsWithVersions.setdefault(app.fullName(), []).append(app.versionSuffix())
         return appsWithVersions
@@ -748,7 +748,7 @@ class InteractiveActionHandler:
         if len(self.allApps) == 0:
             return [ (className, []) ]
         else:
-            classNames = seqdict()
+            classNames = OrderedDict()
             for app in self.allApps:
                 allConfigsForApp = self.getAllIntvConfigs([ app ])
                 replacements = plugins.ResponseAggregator([ x.getReplacements for x in allConfigsForApp])()

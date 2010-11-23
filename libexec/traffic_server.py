@@ -3,7 +3,7 @@
 import optparse, os, stat, sys, logging, logging.config, shutil, socket, subprocess, types, threading, time, inspect, re, difflib
 from SocketServer import TCPServer, StreamRequestHandler
 from copy import copy
-from ndict import seqdict
+from ordereddict import OrderedDict
 
 def create_option_parser():
     usage = """usage: %prog [options] 
@@ -68,7 +68,7 @@ class TrafficServer(TCPServer):
         self.requestCount = 0
         self.diag = logging.getLogger("Traffic Server")
         self.topLevelForEdit = [] # contains only paths explicitly given. Always present.
-        self.fileEditData = seqdict() # contains all paths, including subpaths of the above. Empty when replaying.
+        self.fileEditData = OrderedDict() # contains all paths, including subpaths of the above. Empty when replaying.
         self.terminate = False
         self.hasAsynchronousEdits = False
         TCPServer.__init__(self, (socket.gethostname(), 0), TrafficRequestHandler)
@@ -180,7 +180,7 @@ class TrafficServer(TCPServer):
         if not self.hasAsynchronousEdits:
             # Unless we've marked it as asynchronous we start again for the next traffic.
             self.topLevelForEdit = []
-            self.fileEditData = seqdict()
+            self.fileEditData = OrderedDict()
         
     def _process(self, traffic, reqNo):
         self.diag.info("Processing traffic " + traffic.__class__.__name__)
@@ -1110,7 +1110,7 @@ class RecordFileHandler:
 
 class ReplayInfo:
     def __init__(self, replayFile, replayItemString):
-        self.responseMap = seqdict()
+        self.responseMap = OrderedDict()
         self.diag = logging.getLogger("Traffic Replay")
         if replayFile:
             self.readReplayFile(replayFile)

@@ -4,7 +4,7 @@ Code associated with the left-hand tree view for tests
 """
 
 import gtk, gobject, pango, guiutils, plugins, logging
-from ndict import seqdict
+from ordereddict import OrderedDict
 
 class TestColumnGUI(guiutils.SubGUI):
     def __init__(self, dynamic, testCount):
@@ -171,7 +171,7 @@ class TestColumnGUI(guiutils.SubGUI):
 
 class TestIteratorMap:
     def __init__(self, dynamic, allApps):
-        self.dict = seqdict()
+        self.dict = OrderedDict()
         self.dynamic = dynamic
         self.parentApps = {}
         for app in allApps:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import os, sys, types, string, plugins, exceptions, shutil, operator, logging, glob, fnmatch
-from ndict import seqdict
+from ordereddict import OrderedDict
 from cPickle import Pickler, loads, UnpicklingError
 from threading import Lock
 from tempfile import mkstemp
@@ -57,7 +57,7 @@ class DirectoryCache:
             newCache = DirectoryCache(os.path.join(self.dir, root))
             return newCache.findVersionSets(local, predicate)
 
-        versionSets = seqdict()
+        versionSets = OrderedDict()
         for fileName in self.contents:
             versionSet = self.findVersionSet(fileName, stem)
             if versionSet is not None and (predicate is None or predicate(versionSet)):
@@ -88,9 +88,9 @@ class DynamicMapping:
             raise KeyError, "No such value " + key
 
 
-class TestEnvironment(seqdict):
+class TestEnvironment(OrderedDict):
     def __init__(self, populateFunction):
-        seqdict.__init__(self)
+        OrderedDict.__init__(self)
         self.diag = logging.getLogger("read environment")
         self.populateFunction = populateFunction
         self.populated = False
@@ -130,40 +130,47 @@ class TestEnvironment(seqdict):
     def getSingleValue(self, var, defaultValue=None):
         self.checkPopulated()
         return self._getSingleValue(var, defaultValue)
+
     def _getSingleValue(self, var, defaultValue=None):
         value = self.get(var, os.getenv(var, defaultValue))
         self.diag.info("Single: got " + var + " = " + repr(value))
         return value
+    
     def getSelfReference(self, var, originalVar):
         if var == originalVar:
             return self._getSingleValue(var)
+
     def getSingleValueNoSelfRef(self, var, originalVar):
         if var != originalVar:
             return self._getSingleValue(var)
+
     def storeVariables(self, vars):
         for var, valueOrMethod in vars:
             newValue = self.expandSelfReferences(var, valueOrMethod)
-            self.diag.info("Storing " + var + " = " + repr(newValue))
-            self[var] = newValue
+            if newValue is not None:
+                self.diag.info("Storing " + var + " = " + repr(newValue))
+                self[var] = newValue
                 
         while self.expandVariables():
             pass
+
     def expandSelfReferences(self, var, valueOrMethod):
         if type(valueOrMethod) == types.StringType:
             mapping = DynamicMapping(self.getSelfReference, var)
+            self.diag.info("Expanding self references for " + repr(var) + " in " + repr(valueOrMethod))
             return string.Template(valueOrMethod).safe_substitute(mapping)
         else:
             return valueOrMethod(var, self._getSingleValue(var, ""))
+
     def expandVariables(self):
         expanded = False
-        for var, value in self.items():
-            if value is not None:
-                mapping = DynamicMapping(self.getSingleValueNoSelfRef, var)
-                newValue = string.Template(value).safe_substitute(mapping)
-                if newValue != value:
-                    expanded = True
-                    self.diag.info("Expanded " + var + " = " + newValue)
-                    self[var] = newValue
+        for var, value in self.iteritems():
+            mapping = DynamicMapping(self.getSingleValueNoSelfRef, var)
+            newValue = string.Template(value).safe_substitute(mapping)
+            if newValue != value:
+                expanded = True
+                self.diag.info("Expanded " + var + " = " + newValue)
+                self[var] = newValue
         return expanded
 
         
@@ -808,14 +815,15 @@ class TestSuiteFileHandler:
 
     def add(self, fileName, *args):
         cache = self.read(fileName)
-        self.addToCache(cache, *args)
-        self.write(fileName, cache)
-
-    def addToCache(self, cache, testName, description, index):
-        newEntry = seqdict()
-        newEntry[testName] = description
-        cache.insert(index, newEntry)
-
+        self.addToCache(fileName, cache, *args)
+        
+    def addToCache(self, fileName, cache, testName, description, index):
+        cacheList = cache.items()
+        cacheList.insert(index, (testName, description))
+        newCache = OrderedDict(cacheList)
+        self.cache[fileName] = newCache
+        self.write(fileName, newCache)
+    
     def remove(self, fileName, testName):
         cache = self.read(fileName)
         description = self.removeFromCache(cache, testName)[0]
@@ -825,7 +833,7 @@ class TestSuiteFileHandler:
     def removeFromCache(self, cache, testName):
         description = cache.get(testName)
         if description is not None:
-            index = cache.index(testName)
+            index = cache.keys().index(testName)
             del cache[testName]
             return description, index
         else:
@@ -839,8 +847,7 @@ class TestSuiteFileHandler:
 
         # intended to preserve comments that aren't tied to a test
         descToUse = plugins.replaceComment(description, newDescription)
-        self.addToCache(cache, newName, descToUse, index)
-        self.write(fileName, cache)
+        self.addToCache(fileName, cache, newName, descToUse, index)
         return True
 
     def reposition(self, fileName, testName, newIndex):
@@ -849,14 +856,16 @@ class TestSuiteFileHandler:
         if description is None:
             return False
 
-        self.addToCache(cache, testName, description, newIndex)
-        self.write(fileName, cache)
+        self.addToCache(fileName, cache, testName, description, newIndex)
         return True
 
     def sort(self, fileName, comparator):
         tests = self.read(fileName)
-        tests.sort(comparator)
-        self.write(fileName, tests)
+        newDict = OrderedDict()
+        for testName in sorted(tests.keys(), comparator):
+            newDict[testName] = tests[testName]
+        self.cache[fileName] = newDict
+        self.write(fileName, newDict)
 
 
 class TestSuite(Test):
@@ -887,7 +896,7 @@ class TestSuite(Test):
         if fileName:
             return self.testSuiteFileHandler.read(fileName, warn, ignoreCache, self.fileExists)
         else:
-            return seqdict()
+            return OrderedDict()
 
     def findTestCases(self, version):
         versionFile = self.getFileName("testsuite", version)
@@ -1238,7 +1247,7 @@ class Application:
 
         # Read our pre-existing config files
         self.readConfigFiles(configModuleInitialised=False)
-        self.diag.info("Basic Config file settings are: " + "\n" + repr(self.configDir.dict))
+        self.diag.info("Basic Config file settings are: " + "\n" + repr(self.configDir))
         self.diag.info("Found application '" + self.name + "'")
         self.configObject = self.makeConfigObject()
         # Fill in the values we expect from the configurations, and read the file a second time
@@ -1250,7 +1259,7 @@ class Application:
             self.importAndWriteEntries(configEntries)
 
         self.configDir.readValues(self.getPersonalConfigFiles(), insert=False, errorOnUnknown=False)
-        self.diag.info("Config file settings are: " + "\n" + repr(self.configDir.dict))
+        self.diag.info("Config file settings are: " + "\n" + repr(self.configDir))
         if not plugins.TestState.showExecHosts:
             plugins.TestState.showExecHosts = self.configObject.showExecHostsInFailures(self)
 
@@ -1445,7 +1454,7 @@ class Application:
 
     def getAllFileNames(self, dircaches, stem, allVersions=False):
         versionPred = self.getExtensionPredicate(allVersions)
-        versionSets = seqdict()
+        versionSets = OrderedDict()
         for dircache in dircaches:
             # Sorts into order most specific first
             currVersionSets = dircache.findVersionSets(stem, versionPred)
@@ -1453,10 +1462,12 @@ class Application:
                 versionSets.setdefault(vset, []).extend(files)
 
         if allVersions:
-            versionSets.sort(self.compareForDisplay)
+            sortedVersionSets = sorted(versionSets.keys(), self.compareForDisplay)
         else:
-            versionSets.sort(self.compareForPriority)
-        allFiles =  reduce(operator.add, versionSets.values(), [])
+            sortedVersionSets = sorted(versionSets.keys(), self.compareForPriority)
+        allFiles = []
+        for vset in sortedVersionSets:
+            allFiles += versionSets[vset]
         self.diag.info("Files for stem " + stem + " found " + repr(allFiles))
         return allFiles
 

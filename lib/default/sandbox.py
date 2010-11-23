@@ -2,7 +2,7 @@ import os, shutil, plugins, re, stat, subprocess, glob, logging, difflib, time
 
 from runtest import Killed
 from jobprocess import killArbitaryProcess, killSubProcessAndChildren
-from ndict import seqdict
+from ordereddict import OrderedDict
 from string import Template
 
 
@@ -438,7 +438,7 @@ class CollateFiles(plugins.Action):
         self.diag = logging.getLogger("Collate Files")
 
     def expandCollations(self, test):
-        newColl = seqdict()
+        newColl = OrderedDict()
         coll = test.getConfigValue("collate_file")
         self.diag.info("coll initial:" + str(coll))
         for targetPattern in sorted(coll.keys()):
@@ -541,7 +541,7 @@ class CollateFiles(plugins.Action):
         test.app.copyFileRemotely(sourcePaths, machine, test.getDirectory(temporary=1), "localhost")
     
     def getFilesPresent(self, test):
-        files = seqdict()
+        files = OrderedDict()
         for sourcePatterns in test.getConfigValue("collate_file").values():
             for sourcePattern in sourcePatterns:
                 for fullPath in self.findPaths(test, sourcePattern):
@@ -752,7 +752,7 @@ class CreateCatalogue(plugins.Action):
                     processes.append(parts[1])
         return processes
     def findAllPaths(self, test):
-        allPaths = seqdict()
+        allPaths = OrderedDict()
         for path in test.listUnownedTmpPaths():
             editInfo = self.getEditInfo(path)
             self.diag.info("Path " + path + " edit info " + editInfo)

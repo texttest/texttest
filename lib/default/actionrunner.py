@@ -1,7 +1,7 @@
 
 import plugins, sys, logging, types
 from Queue import Queue, Empty
-from ndict import seqdict
+from ordereddict import OrderedDict
 from threading import Lock
 
 plugins.addCategory("cancelled", "cancelled", "were cancelled before starting")
@@ -116,7 +116,7 @@ class ActionRunner(BaseActionRunner):
         BaseActionRunner.__init__(self, optionMap, logging.getLogger("Action Runner"))
         self.currentTestRunner = None
         self.previousTestRunner = None
-        self.appRunners = seqdict()
+        self.appRunners = OrderedDict()
 
     def addSuite(self, suite):
         plugins.log.info("Using " + suite.app.description(includeCheckout=True))

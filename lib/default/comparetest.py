@@ -1,5 +1,5 @@
 import os, performance, knownbugs, filecmp, string, plugins, shutil, logging
-from ndict import seqdict
+from ordereddict import OrderedDict
 from tempfile import mktemp
 from comparefile import FileComparison
 
@@ -105,7 +105,7 @@ class BaseTestComparison(plugins.TestState):
         self.diag.info(info)
 
     def makeStemDict(self, files):
-        stemDict = seqdict()
+        stemDict = OrderedDict()
         for file in files:
             stem = os.path.basename(file).split(".")[0]
             stemDict[stem] = file

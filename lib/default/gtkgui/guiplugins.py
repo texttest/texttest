@@ -3,7 +3,7 @@
 import gtk, gobject, entrycompletion, plugins, os, subprocess, types, logging
 from guiutils import guiConfig, SubGUI, GUIConfig
 from jobprocess import killSubProcessAndChildren
-from ndict import seqdict
+from ordereddict import OrderedDict
         
 # The purpose of this class is to provide a means to monitor externally
 # started process, so that (a) code can be called when they exit, and (b)
@@ -11,8 +11,8 @@ from ndict import seqdict
 class ProcessTerminationMonitor(plugins.Observable):
     def __init__(self):
         plugins.Observable.__init__(self)
-        self.processesForKill = seqdict()
-        self.exitHandlers = seqdict()
+        self.processesForKill = OrderedDict()
+        self.exitHandlers = OrderedDict()
 
     def listRunningProcesses(self):
         processesToCheck = guiConfig.getCompositeValue("query_kill_processes", "", modeDependent=True)

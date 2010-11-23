@@ -5,7 +5,7 @@ of the current run/setup
 """
 
 import gtk, gobject, pango, guiutils, plugins, os, logging
-from ndict import seqdict
+from ordereddict import OrderedDict
 from copy import copy
 
 #
@@ -137,7 +137,7 @@ class ProgressBarGUI(guiutils.SubGUI):
         else:
             return str(self.nofCompletedTests) + " of " + str(self.totalNofTests) + " tests completed"
 
-class ClassificationTree(seqdict):
+class ClassificationTree(OrderedDict):
     def addClassification(self, path):
         prevElement = None
         for element in path:
@@ -299,7 +299,7 @@ class TestProgressMonitor(guiutils.SubGUI):
 
             filteredDiff = self.getFilteredDiff(fileComp)
             if filteredDiff is not None:
-                summaryDiffs = self.diffStore.setdefault(summary, seqdict())
+                summaryDiffs = self.diffStore.setdefault(summary, OrderedDict())
                 testList, hasGroup = summaryDiffs.setdefault(filteredDiff, ([], False))
                 if test not in testList:
                     testList.append(test)
@@ -307,7 +307,7 @@ class TestProgressMonitor(guiutils.SubGUI):
                     hasGroup = True
                     summaryDiffs[filteredDiff] = (testList, hasGroup)
                 if hasGroup:
-                    group = summaryDiffs.index(filteredDiff) + 1
+                    group = summaryDiffs.keys().index(filteredDiff) + 1
                     fileClass.append("Group " + str(group))
 
             self.diag.info("Adding file classification for " + repr(fileComp) + " = " + repr(fileClass))

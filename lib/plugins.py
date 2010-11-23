@@ -1,6 +1,6 @@
 
 import sys, os, logging.config, string, shutil, socket, time, re, stat, subprocess, shlex, types, fnmatch
-from ndict import seqdict
+from ordereddict import OrderedDict
 from traceback import format_exception
 from threading import currentThread
 from Queue import Queue, Empty
@@ -568,7 +568,7 @@ class Responder:
 # Brief text should be at most two or three words: it appears in the details column in the main GUI window and in
 # the summary of batch mode
 class TestState(Observable):
-    categoryDescriptions = seqdict()
+    categoryDescriptions = OrderedDict()
     showExecHosts = 0
     def __init__(self, category, freeText = "", briefText = "", started = 0, completed = 0,\
                  executionHosts = [], lifecycleChange = ""):
@@ -933,7 +933,7 @@ def readList(filename):
 emptyLineSymbol = "__EMPTYLINE__"
 
 def readListWithComments(filename, filterMethod=None):
-    items = seqdict()
+    items = OrderedDict()
     currComment = ""
     for longline in open(filename).readlines():
         line = longline.strip()
@@ -1106,9 +1106,9 @@ class TextTestInformation(RuntimeError):
     pass
 
 # Yes, we know that getopt exists. However it throws exceptions when it finds unrecognised things, and we can't do that...
-class OptionFinder(seqdict):
+class OptionFinder(OrderedDict):
     def __init__(self, args, defaultKey = "default"):
-        seqdict.__init__(self)
+        OrderedDict.__init__(self)
         self.buildOptions(args, defaultKey)
     def buildOptions(self, args, defaultKey):
         optionKey = None
@@ -1153,19 +1153,22 @@ class TextTrigger:
             return line.replace(self.text, newText)
 
 # Used for application and personal configuration files
-class MultiEntryDictionary(seqdict):
+class MultiEntryDictionary(OrderedDict):
     warnings = []
-    def __init__(self, importKey="", importFileFinder=None, aliases={}, **kw):
-        seqdict.__init__(self, **kw)
+    def __init__(self, importKey="", importFileFinder=None, aliases={}, *args, **kw):
+        OrderedDict.__init__(self, *args, **kw)
         self.diag = logging.getLogger("MultiEntryDictionary")
         self.aliases = aliases
         self.importKey = importKey
         self.importFileFinder= importFileFinder
 
-    def __deepcopy__(self, memo):
-        return MultiEntryDictionary(self.importKey, self.importFileFinder, self.aliases,
-                                    List=deepcopy(self.list, memo), Dict=deepcopy(self.dict, memo))
-
+    def __reduce__(self):
+        # Need this because of __reduce__ in OrderedDict
+        # which merrily reduces all the attributes of the subclass without asking
+        # Used when doing deepcopy()
+        items = [[k, self[k]] for k in self]
+        return self.__class__, (self.importKey, None, self.aliases, items)
+        
     def getSectionInfo(self, sectionName=""):
         if sectionName and sectionName != "end":
             return self[sectionName], sectionName
@@ -1213,12 +1216,12 @@ class MultiEntryDictionary(seqdict):
         if name != "end":
             if self.has_key(name):
                 value = self[name]
-                if isinstance(value, seqdict) or type(value) == types.DictType:
+                if isinstance(value, OrderedDict) or type(value) == types.DictType:
                     return name
                 else:
                     self.warn("Config entry name '" + name + "' incorrectly used as a section marker.")
             elif insert:
-                self[name] = seqdict()
+                self[name] = OrderedDict()
                 return name
             elif errorOnUnknown:
                 self.warn("Config section name '" + name + "' not recognised.")
@@ -1518,7 +1521,7 @@ class Switch(Option):
 class OptionGroup:
     def __init__(self, name):
         self.name = name
-        self.options = seqdict()
+        self.options = OrderedDict()
         
     def reset(self):
         for option in self.options.values():

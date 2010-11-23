@@ -2,11 +2,11 @@
 """ Code related to building the summary page and the graphs etc. """
 
 import testoverview, plugins, logging, os, shutil, time, operator
-from ndict import seqdict
+from ordereddict import OrderedDict
 from glob import glob
 
 class GenerateFromSummaryData(plugins.ScriptWithArgs):
-    locationApps = seqdict()
+    locationApps = OrderedDict()
     summaryFileName = "index.html"
     basePath = ""
     def __init__(self, args=[""]):
@@ -61,7 +61,7 @@ class SummaryDataFinder:
         self.summaryPageName = os.path.join(location, summaryFileName)
         self.appVersionInfo = {}
         self.appUsePie = {}
-        self.appDirs = seqdict()
+        self.appDirs = OrderedDict()
         self.colourFinder, self.inputOptions = None, None
         if len(apps) > 0:
             self.colourFinder = testoverview.ColourFinder(apps[0][0].getCompositeConfigValue)
@@ -89,7 +89,7 @@ class SummaryDataFinder:
         return os.path.join(self.location, self.getShortAppName(appName), "images", "GenerateGraphs_" + version + ".png")
 
     def getAppsWithVersions(self):
-        appsWithVersions = seqdict()
+        appsWithVersions = OrderedDict()
         for appName, appDir in self.appDirs.items():
             versionInfo = self.getVersionInfoFor(appDir)
             self.appVersionInfo[appName] = versionInfo
@@ -159,7 +159,7 @@ class SummaryDataFinder:
                 categories[-1][0] += words[index]
             index += 1
         self.diag.info("Category information is " + repr(categories))
-        colourCount = seqdict()
+        colourCount = OrderedDict()
         for colourKey in [ "success", "knownbug", "performance", "failure", "incomplete" ]:
             colourCount[colourKey] = 0
         for categoryName, count in categories:

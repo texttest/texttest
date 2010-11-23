@@ -3,7 +3,7 @@
 import plugins, os, string, shutil, sys, logging
 from ConfigParser import ConfigParser, NoOptionError
 from copy import copy
-from ndict import seqdict
+from ordereddict import OrderedDict
 
 plugins.addCategory("bug", "known bugs", "had known bugs")
 plugins.addCategory("badPredict", "internal errors", "had internal errors")
@@ -188,7 +188,19 @@ class ParseMethod:
         except NoOptionError:
             return default
 
-class BugMap(seqdict):
+class ParserSectionDict(OrderedDict):
+    def __init__(self, fileName, *args, **kw):
+        OrderedDict.__init__(self, *args, **kw)
+        self.readingFile = fileName
+        
+    def __getitem__(self, key):
+        if self.readingFile:
+            msg = "Bug file at " + self.readingFile + " has duplicated sections named '" + key + "', the later ones will be ignored"
+            plugins.printWarning(msg)
+        return OrderedDict.__getitem__(self, key)
+
+
+class BugMap(OrderedDict):
     def checkUnchanged(self):
         for bugData in self.values():
             if bugData.checkUnchanged:
@@ -198,24 +210,17 @@ class BugMap(seqdict):
         parser = self.makeParser(fileName)
         if parser:
             self.readFromParser(parser)
-
-    def lookupSection(self, name, fileName, realLookup):
-        msg = "Bug file at " + fileName + " has duplicated sections named '" + name + "', the later ones will be ignored"
-        plugins.printWarning(msg)
-        return realLookup(name)
     
     def makeParser(self, fileName):
         parser = ConfigParser()
         # Default behaviour transforms to lower case: we want case-sensitive
         parser.optionxform = str
-        parser._sections = seqdict()
         # There isn't a nice way to change the behaviour on getting a duplicate section
         # so we use a nasty way :)
-        realLookup = parser._sections.__getitem__
-        parser._sections.__getitem__ = plugins.Callable(self.lookupSection, fileName, realLookup)
+        parser._sections = ParserSectionDict(fileName)
         try:
             parser.read(fileName)
-            parser._sections.__getitem__ = realLookup
+            parser._sections.readingFile = None
             return parser
         except Exception:
             plugins.printWarning("Bug file at " + fileName + " not understood, ignoring")

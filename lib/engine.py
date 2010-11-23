@@ -2,7 +2,7 @@
 
 import plugins, os, sys, testmodel, signal, operator, logging
 from threading import Thread
-from ndict import seqdict
+from ordereddict import OrderedDict
 from time import sleep
 from glob import glob
 
@@ -81,7 +81,7 @@ class Activator(plugins.Responder, plugins.Observable):
     
     def run(self):
         goodSuites = []
-        rejectionInfo = seqdict()
+        rejectionInfo = OrderedDict()
         self.notify("StartRead")
         for suite in self.suites:
             try:
@@ -131,7 +131,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             os.name = os.environ["FAKE_OS"]
         self.inputOptions = testmodel.OptionFinder()
         self.diag = logging.getLogger("Find Applications")
-        self.appSuites = seqdict()
+        self.appSuites = OrderedDict()
         self.exitCode = 0
         
     def printStackTrace(self, *args):
@@ -274,7 +274,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         return filter(lambda x: x not in toRemove, classes)
 
     def createTestSuites(self, allApps):
-        appSuites = seqdict()
+        appSuites = OrderedDict()
         raisedError = False
         for app in allApps:
             warningMessages = []

@@ -8,7 +8,7 @@ from utils import *
 from Queue import Queue
 from SocketServer import ThreadingTCPServer, StreamRequestHandler
 from threading import RLock
-from ndict import seqdict
+from ordereddict import OrderedDict
 from default.console import TextDisplayResponder, InteractiveResponder
 from default.knownbugs import CheckForBugs
 from default.actionrunner import BaseActionRunner
@@ -40,7 +40,7 @@ class QueueSystemServer(BaseActionRunner):
             if currCap is not None and currCap < self.maxCapacity:
                 self.maxCapacity = currCap
             
-        self.jobs = seqdict()
+        self.jobs = OrderedDict()
         self.submissionRules = {}
         self.killedJobs = {}
         self.queueSystems = {}
@@ -48,7 +48,7 @@ class QueueSystemServer(BaseActionRunner):
         self.submitAddress = None
         self.slaveLogDirs = set()
         self.delayedTestsForAdd = []
-        self.remainingForApp = seqdict()
+        self.remainingForApp = OrderedDict()
         capacityPerSuite = self.maxCapacity / len(allApps)
         for app in allApps:
             self.remainingForApp[app.name] = capacityPerSuite

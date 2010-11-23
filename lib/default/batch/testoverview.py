@@ -3,7 +3,7 @@
 
 import os, plugins, time, HTMLgen, HTMLcolors, sys, logging
 from cPickle import Unpickler, UnpicklingError
-from ndict import seqdict
+from ordereddict import OrderedDict
 from glob import glob
 HTMLgen.PRINTECHO = 0
 
@@ -43,8 +43,8 @@ class GenerateWebPages(object):
         self.pageVersion = pageVersion
         self.extraVersions = extraVersions
         self.pageDir = pageDir
-        self.pagesOverview = seqdict()
-        self.pagesDetails = seqdict()
+        self.pagesOverview = OrderedDict()
+        self.pagesDetails = OrderedDict()
         self.getConfigValue = getConfigValue
         self.resourceNames = resourceNames
         self.descriptionInfo = descriptionInfo
@@ -84,13 +84,13 @@ class GenerateWebPages(object):
                     tags = list(reduce(set.union, (set(selector.selectedTags) for selector in selectors), set()))
                     tags.sort(self.compareTags)
 
-                loggedTests = seqdict()
+                loggedTests = OrderedDict()
                 categoryHandlers = {}
                 for stateFile, repository in allFiles:
                     tag = self.getTagFromFile(stateFile)
                     if len(tags) == 0 or tag in tags:
                         testId, state, extraVersion = self.processTestStateFile(stateFile, repository)
-                        loggedTests.setdefault(extraVersion, seqdict()).setdefault(testId, seqdict())[tag] = state
+                        loggedTests.setdefault(extraVersion, OrderedDict()).setdefault(testId, OrderedDict())[tag] = state
                         categoryHandlers.setdefault(tag, CategoryHandler()).registerInCategory(testId, state, extraVersion)
 
                 versionToShow = self.removePageVersion(version)
@@ -408,7 +408,7 @@ class TestTable:
     def getColourKeySummaryData(self):
         fullData = []
         for tag in self.tags:
-            colourCount = seqdict()
+            colourCount = OrderedDict()
             for colourKey in [ "success", "knownbug", "performance", "memory", "failure", "incomplete" ]:
                 colourCount[colourKey] = 0
             categoryHandler = self.categoryHandlers[tag]
@@ -578,7 +578,7 @@ class TestDetails:
         self.document.write(fileName)
     
     def getFreeTextData(self, tests):
-        data = seqdict()
+        data = OrderedDict()
         for testName, state, extraVersion in tests:
             freeText = state.freeText
             if freeText:
@@ -650,7 +650,7 @@ class TestDetails:
         
 class CategoryHandler:
     def __init__(self):
-        self.testsInCategory = seqdict()
+        self.testsInCategory = OrderedDict()
 
     def update(self, categoryHandler):
         for category, testInfo in categoryHandler.testsInCategory.items():

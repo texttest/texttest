@@ -64,7 +64,7 @@ class IdleHandlerManager:
         try:
             # Same priority as PyUseCase replay, so they get called interchangeably
             # Non-default as a workaround for bugs in filechooser handling in GTK
-            from gtkusecase import PRIORITY_PYUSECASE_IDLE
+            from usecase.gtktoolkit import PRIORITY_PYUSECASE_IDLE
             return PRIORITY_PYUSECASE_IDLE
         except ImportError:
             # It should still work if we can't find PyUseCase
@@ -476,7 +476,7 @@ class ShortcutBarGUI(guiutils.SubGUI):
         guiutils.SubGUI.__init__(self)
         # Do this first, so we set up interceptors and so on early on
         try:
-            from gtkusecase import createShortcutBar
+            from usecase import createShortcutBar
             from version_control.custom_widgets_pyusecase import customEventTypes
             uiMapFiles = plugins.findDataPaths([ "*.uimap" ], *args)
             self.widget = createShortcutBar(uiMapFiles=uiMapFiles, customEventTypes=customEventTypes)

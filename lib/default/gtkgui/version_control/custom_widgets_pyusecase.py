@@ -2,8 +2,8 @@
 # Support for our custom widgets for PyUseCase, which needs to know how to handle them
 
 import gtk
-from gtkusecase.simulator.treeviewevents import TreeColumnHelper
-from gtkusecase.simulator.baseevents import RightClickEvent
+from usecase.gtktoolkit.simulator.treeviewevents import TreeColumnHelper
+from usecase.gtktoolkit.simulator.baseevents import RightClickEvent
 
 class TreeColumnRightClickEvent(RightClickEvent):
     def __init__(self, name, widget, argumentParseData):

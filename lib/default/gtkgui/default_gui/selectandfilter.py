@@ -439,7 +439,7 @@ class SaveSelection(guiplugins.ActionDialogGUI):
     def getTooltip(self):
         return "Save selected tests in file"
     def getSignalsSent(self):
-        return [ "WriteTestIfSelected" ]
+        return [ "WriteTestsIfSelected" ]
 
     def writeTestList(self, file):
         file.write("-tp ")
@@ -447,8 +447,7 @@ class SaveSelection(guiplugins.ActionDialogGUI):
             versionSuffix = suite.app.versionSuffix()
             if "copy_" not in versionSuffix: # Don't save copy names in selections, causes confusion
                 file.write("appdata=" + suite.app.name + versionSuffix + "\n")
-            for test in suite.testCaseList():
-                self.notify("WriteTestIfSelected", test, file)
+            self.notify("WriteTestsIfSelected", suite, file)
     
     def notifySetTestSelection(self, dummy, criteria="", *args):
         self.selectionCriteria = criteria

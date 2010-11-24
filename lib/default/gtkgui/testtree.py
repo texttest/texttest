@@ -389,23 +389,24 @@ class TestTreeGUI(guiutils.ContainerGUI):
         # If we've recomputed, clear the recalculation icons
         self.setNewRecalculationStatus(iter, test, [])
 
-    def notifyWriteTestIfSelected(self, test, file):
-        # From Save Selection.
-        if not self.isVisible(test):
-            self.diag.info("Test invisible " + repr(test))
-            return
-        if self.hasSelectedAncestor(test):
-            file.write(test.getRelPath() + "\n")
-        else:
-            self.diag.info("Test not selected " + repr(test))
+    def getSortedSelectedTests(self, suite):
+        appTests = filter(lambda test: test.app is suite.app, self.selectedTests)
+        allTests = suite.allTestsAndSuites()
+        appTests.sort(key=allTests.index)
+        return appTests
 
-    def hasSelectedAncestor(self, test):
-        if test in self.selectedTests:
-            return True
-        elif test.parent:
-            return self.hasSelectedAncestor(test.parent)
-        else:
-            return False
+    def notifyWriteTestsIfSelected(self, suite, file):
+        for test in self.getSortedSelectedTests(suite):
+            self.writeSelectedTest(test, file)
+
+    def writeSelectedTest(self, test, file):
+        if test.classId() == "test-suite":
+            if test.parent is None or not all((self.isVisible(test) for test in test.testCaseList())):
+                for subTest in test.testcases:
+                    if self.isVisible(subTest):
+                        self.writeSelectedTest(subTest, file)
+                return    
+        file.write(test.getRelPath() + "\n")        
         
     def updateRecalculationMarker(self, model, dummy, iter):
         tests = model.get_value(iter, 2)

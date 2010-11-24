@@ -558,6 +558,9 @@ class Test(plugins.Observable):
                 return False
         return True
 
+    def allTestsAndSuites(self):
+        return [ self ]
+
     def size(self):
         return 1
 
@@ -917,6 +920,12 @@ class TestSuite(Test):
         for case in self.testcases:
             list += case.testCaseList(filters)
         return list
+
+    def allTestsAndSuites(self):
+        result = [ self ]
+        for test in self.testcases:
+            result += test.allTestsAndSuites()
+        return result
 
     def classId(self):
         return "test-suite"

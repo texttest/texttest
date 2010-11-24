@@ -321,6 +321,7 @@ class TestSelectionFilter(TextFilter):
     option = "tp"
     def __init__(self, *args):
         self.diag = logging.getLogger("TestSelectionFilter")
+        self.fullSuites = []
         TextFilter.__init__(self, *args)
 
     def parseInput(self, filterText, app, suites):
@@ -389,11 +390,20 @@ class TestSelectionFilter(TextFilter):
         return max(allApps, key=matchKey)
 
     def acceptsTestCase(self, test):
-        return test.getRelPath() in self.texts
+        return test.getRelPath() in self.texts or self.hasFullSuiteAncestor(test.parent)
+
+    def hasFullSuiteAncestor(self, suite):
+        return suite in self.fullSuites or (suite.parent and self.hasFullSuiteAncestor(suite.parent))
     
     def acceptsTestSuite(self, suite):
+        return self.suiteInTexts(suite) or (suite.parent and self.hasFullSuiteAncestor(suite.parent))
+
+    def suiteInTexts(self, suite):
         for relPath in self.texts:
-            if relPath.startswith(suite.getRelPath()):
+            suitePath = suite.getRelPath()
+            if relPath.startswith(suitePath):
+                if relPath == suitePath:
+                    self.fullSuites.append(suite)
                 return True
         return False
 

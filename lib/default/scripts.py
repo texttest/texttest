@@ -113,6 +113,8 @@ class DocumentEnvironment(plugins.Action):
         for root, dirs, files in os.walk(rootDir):
             if "log" in dirs:
                 dirs.remove("log")
+            if "pyusecase" in dirs:
+                dirs.remove("pyusecase")
             if not includeSite and "site" in dirs:
                 dirs.remove("site")
             if root.endswith("lib"):
@@ -120,7 +122,7 @@ class DocumentEnvironment(plugins.Action):
                     if not sys.modules.has_key(dir):
                         dirs.remove(dir)
             for file in files:
-                if file.endswith(".py") and ("usecase" not in file and "gtk" not in file): # exclude PyUseCase, which may be linked/copied in
+                if file.endswith(".py"): 
                     path = os.path.join(root, file)
                     self.findVarsInFile(path, allVars, prefixes)
         return allVars

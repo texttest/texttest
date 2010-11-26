@@ -23,7 +23,8 @@ class SetUpTrafficHandlers(plugins.Action):
     def setUpIntercepts(self, test, replayFile, serverActive, pythonCoverage, pythonCustomizeFiles):
         interceptDir = test.makeTmpFileName("traffic_intercepts", forComparison=0)
         interceptInfo = InterceptInfo(test, replayFile if self.recordSetting == self.REPLAY_ONLY else None)
-        pathVars = self.makeIntercepts(interceptDir, interceptInfo, serverActive, pythonCoverage, pythonCustomizeFiles)
+        pathVars = self.makeIntercepts(interceptDir, interceptInfo.commands, serverActive,
+                                       pythonCoverage, pythonCustomizeFiles)
         if serverActive:
             interceptAttributes = ",".join(interceptInfo.pyAttributes)
             self.trafficServerProcess = self.makeTrafficServer(test, replayFile, interceptInfo)
@@ -95,14 +96,11 @@ class SetUpTrafficHandlers(plugins.Action):
         return subprocess.Popen(cmdArgs, env=test.getRunEnvironment(), universal_newlines=True,
                                 cwd=test.getDirectory(temporary=1), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     
-    def makeIntercepts(self, interceptDir, interceptInfo, serverActive, pythonCoverage, pythonCustomizeFiles):
+    def makeIntercepts(self, interceptDir, commands, serverActive, pythonCoverage, pythonCustomizeFiles):
         pathVars = []
         if serverActive:
-            from capturemock import makePathIntercept
-            for cmd in interceptInfo.commands:
-                makePathIntercept(cmd, interceptDir)
-        
-            if len(interceptInfo.commands):
+            from capturemock import makePathIntercepts
+            if makePathIntercepts(commands, interceptDir):
                 pathVars.append("PATH")
 
         if pythonCustomizeFiles:

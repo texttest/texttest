@@ -22,7 +22,6 @@ def makePosixIntercept(interceptName):
     file.close()
     os.chmod(interceptName, 0775) # make executable 
     
-
 def makePathIntercept(cmd, interceptDir):
     if not os.path.isdir(interceptDir):
         os.makedirs(interceptDir)
@@ -31,3 +30,8 @@ def makePathIntercept(cmd, interceptDir):
         makeWindowsIntercept(interceptName)
     else:
         makePosixIntercept(interceptName)
+
+def makePathIntercepts(commands, interceptDir):
+    for command in commands:
+        makePathIntercept(command, interceptDir)
+    return len(commands) > 0

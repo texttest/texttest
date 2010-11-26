@@ -108,7 +108,7 @@ class SetUpTrafficHandlers(plugins.Action):
         if pythonCustomizeFiles:
             self.interceptOwnModule(pythonCustomizeFiles[-1], interceptDir) # most specific
                 
-        useSiteCustomize = (serverActive and len(interceptInfo.pyAttributes) > 0) or pythonCoverage or pythonCustomizeFiles
+        useSiteCustomize = serverActive or pythonCoverage or pythonCustomizeFiles
         if useSiteCustomize:
             self.interceptOwnModule(self.siteCustomizeFile, interceptDir)
             pathVars.append("PYTHONPATH")

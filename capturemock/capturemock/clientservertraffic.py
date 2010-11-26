@@ -1,7 +1,7 @@
 
 """ Traffic classes for capturing client-server interaction """
 
-import traffic, commandlinetraffic, socket, sys
+import traffic, socket, sys
 
 class ClientSocketTraffic(traffic.Traffic):
     destination = None
@@ -19,8 +19,6 @@ class ClientSocketTraffic(traffic.Traffic):
                 return [ ServerTraffic(response, self.responseFile) ]
             except socket.error:
                 sys.stderr.write("WARNING: Server process reset the connection while TextTest's 'fake client' was trying to read a response from it!\n")
-                sys.stderr.write("(while running test at " +
-                                 commandlinetraffic.CommandLineTraffic.currentTestPath + ")\n")
                 sock.close()
         return []
 

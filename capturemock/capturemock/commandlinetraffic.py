@@ -18,13 +18,11 @@ def parseCmdDictionary(cmdStr, listvals):
 class CommandLineTraffic(traffic.Traffic):
     typeId = "CMD"
     direction = "<-"
-    currentTestPath = None
     environmentDict = {}
     asynchronousFileEditCmds = []
     realCommands = {}
     @classmethod
     def configure(cls, options):
-        cls.currentTestPath = options.test_path
         cls.environmentDict = parseCmdDictionary(options.transfer_environment, listvals=True)
         if options.asynchronous_file_edit_commands:
             cls.asynchronousFileEditCmds = options.asynchronous_file_edit_commands.split(",")

@@ -41,8 +41,6 @@ react to the above module to repoint where it sends socket interactions"""
                       help="store edited files under DIR.", metavar="DIR")
     parser.add_option("-s", "--sequential-mode", action="store_true",
                       help="Disable concurrent traffic, handle all incoming messages sequentially")
-    parser.add_option("-t", "--test-path", metavar="PATH", 
-                      help="Set a test path name for TextTest filtering and/or error messages")
     return parser
 
 

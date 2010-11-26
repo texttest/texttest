@@ -56,8 +56,8 @@ class SetUpTrafficHandlers(plugins.Action):
     def makeTrafficServer(self, test, replayFile, interceptInfo):
         recordFile = test.makeTmpFileName("traffic")
         recordEditDir = test.makeTmpFileName("file_edits", forComparison=0)
-        cmdArgs = [ "capturemock_server", "-t", test.getRelPath(),
-                    "-r", recordFile, "-F", recordEditDir, "-l", self.getTrafficServerLogDefaults(),
+        cmdArgs = [ "capturemock_server", "-r", recordFile, "-F", recordEditDir,
+                    "-l", self.getTrafficServerLogDefaults(),
                     "-L", self.getTrafficServerLogConfig() ]
         
         if test.getConfigValue("collect_traffic_use_threads") != "true":

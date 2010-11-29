@@ -1993,10 +1993,15 @@ Dynamic GUI Enhancements:
 Framework Enhancements:
     - Jira plugin now highlights 'resolution' field if it is set, instead of 'status' (jira.py)
 	This information is usually more interesting.
+    - Filter files can now list selected test suites as well as tests (default/__init__.py)
+	"Save selection" in the GUI will also just list selected suites instead of every test in them.
     - Python interception of classes now handles base classes correctly (traffic_server.py)
 	Base classes now listed explicitly. Some recorded traffic may not work. See migration notes.
     - Python interception: can now "fix up" objects which aren't repr-eval compatible (traffic_server.py)
 	New setting "collect_traffic_alter_response". See website for details.
+    - Traffic mechanism replay matcher improvements (traffic_server.py)
+	No longer has TextTest paths hardcoded into it
+	Instead counts items in matching sequences, followed by the number of non-matching sequences.
     - No longer works to intercept command line programs in the Windows system directory (e.g. Java)
 	Windows doesn't want you to do this and it's hard to get right.
     - Windows paths no longer magically converted to UNIX ones
@@ -2009,6 +2014,8 @@ Batch Report Enhancements:
 	Use the new -zen option. Thanks to Matt Baker for this.
     - Email-sending in batch mode is no longer enabled by default (batch/__init__.py)
 	Previously automatically sent mail to $USER: now many only use the HTML reports.
+    - Usage hint in the HTML report now includes -d flag (batch/__init__.py)
+	Helps actually locate the test checkout where they were run from
     - Allow setting the date for a date-based batch job (batch/__init__.py)
 	Using e.g. -name 04Nov2010 will now achieve this. Useful for very long continuous integration jobs,
 	e.g. running over a weekend.

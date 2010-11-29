@@ -107,3 +107,9 @@ class FileEditTraffic(traffic.ResponseTraffic):
         traffic.ResponseTraffic.record(self, *args)
         if not self.reproduce:
             self.copy(self.activeFile, self.storedFile)
+
+def getTrafficClasses(incoming):
+    if incoming:
+        return []
+    else:
+        return [ FileEditTraffic ]

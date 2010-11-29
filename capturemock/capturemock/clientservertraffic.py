@@ -6,6 +6,7 @@ import traffic, socket, sys
 class ClientSocketTraffic(traffic.Traffic):
     destination = None
     direction = "<-"
+    socketId = ""
     typeId = "CLI"
     def forwardToDestination(self):
         if self.destination:
@@ -28,6 +29,7 @@ class ServerTraffic(traffic.Traffic):
     direction = "->"
 
 class ServerStateTraffic(ServerTraffic):
+    socketId = "SUT_SERVER"
     def __init__(self, inText, responseFile):
         ServerTraffic.__init__(self, inText, responseFile)
         if not ClientSocketTraffic.destination:
@@ -37,5 +39,13 @@ class ServerStateTraffic(ServerTraffic):
             # If we get a server state message, switch the order around
             ClientSocketTraffic.direction = "->"
             ServerTraffic.direction = "<-"
+
     def forwardToDestination(self):
         return []
+
+
+def getTrafficClasses(incoming):
+    if incoming:    
+        return [ ServerStateTraffic, ClientSocketTraffic ]
+    else:
+        return [ ServerTraffic, ClientSocketTraffic ]

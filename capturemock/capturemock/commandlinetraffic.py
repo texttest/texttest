@@ -18,9 +18,9 @@ def parseCmdDictionary(cmdStr, listvals):
 class CommandLineTraffic(traffic.Traffic):
     typeId = "CMD"
     direction = "<-"
+    socketId = "SUT_COMMAND_LINE"
     environmentDict = {}
     asynchronousFileEditCmds = []
-    realCommands = {}
     @classmethod
     def configure(cls, options):
         cls.environmentDict = parseCmdDictionary(options.transfer_environment, listvals=True)
@@ -193,6 +193,7 @@ class SysExitTraffic(traffic.ResponseTraffic):
 
 # Only works on UNIX
 class CommandLineKillTraffic(traffic.Traffic):
+    socketId = "SUT_COMMAND_KILL"
     pidMap = {}
     def __init__(self, inText, responseFile):
         killStr, proxyPid = inText.split(":SUT_SEP:")
@@ -210,3 +211,9 @@ class CommandLineKillTraffic(traffic.Traffic):
 
     def record(self, *args):
         pass # We replay these entirely from the return code, so that replay works on Windows
+
+def getTrafficClasses(incoming):
+    if incoming:
+        return [ CommandLineTraffic, CommandLineKillTraffic ]
+    else:
+        return [ StderrTraffic, StdoutTraffic, SysExitTraffic ]

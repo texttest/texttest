@@ -57,6 +57,7 @@ class PythonTraffic(traffic.Traffic):
 
 
 class PythonImportTraffic(PythonTraffic):
+    socketId = "SUT_PYTHON_IMPORT"
     def __init__(self, inText, responseFile):
         self.moduleName = inText
         text = "import " + self.moduleName
@@ -72,7 +73,7 @@ class PythonImportTraffic(PythonTraffic):
         except:
             return [ self.getExceptionResponse() ]
 
-
+                  
 class PythonModuleTraffic(PythonTraffic):
     interceptModules = set()
     alterations = {}
@@ -178,9 +179,10 @@ class PythonModuleTraffic(PythonTraffic):
                 classes.append(name)
                 break
         return classes
-    
+
 
 class PythonAttributeTraffic(PythonModuleTraffic):
+    socketId = "SUT_PYTHON_ATTR"
     cachedAttributes = set()
     def __init__(self, inText, responseFile):
         modOrObjName, attrName = inText.split(":SUT_SEP:")
@@ -216,9 +218,10 @@ class PythonAttributeTraffic(PythonModuleTraffic):
             # Makes things more readable if we delay evaluating this until the function is called
             # It's rare in Python to cache functions/classes before calling: it's normal to cache other things
             return []
-        
+
         
 class PythonSetAttributeTraffic(PythonModuleTraffic):
+    socketId = "SUT_PYTHON_SETATTR"
     def __init__(self, inText, responseFile):
         modOrObjName, attrName, self.valueStr = inText.split(":SUT_SEP:")
         text = modOrObjName + "." + attrName + " = " + self.valueStr
@@ -231,7 +234,8 @@ class PythonSetAttributeTraffic(PythonModuleTraffic):
         return []
 
 
-class PythonFunctionCallTraffic(PythonModuleTraffic):        
+class PythonFunctionCallTraffic(PythonModuleTraffic):
+    socketId = "SUT_PYTHON_CALL"
     def __init__(self, inText, responseFile):
         modOrObjName, attrName, argStr, keywDictStr = inText.split(":SUT_SEP:")
         self.args = ()
@@ -334,3 +338,11 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
 
 class PythonResponseTraffic(traffic.ResponseTraffic):
     typeId = "RET"
+
+def getTrafficClasses(incoming):
+    if incoming:
+        return [ PythonFunctionCallTraffic, PythonAttributeTraffic,
+                 PythonSetAttributeTraffic, PythonImportTraffic ]
+    else:
+        return [ PythonResponseTraffic ] 
+

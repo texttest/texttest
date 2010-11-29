@@ -153,7 +153,23 @@ class TrafficServer(TCPServer):
                     self.diag.info("Adding possible sub-path edit for " + subPath + " with mod time " +
                                    time.strftime("%d%b%H:%M:%S", time.localtime(modTime)) + " and size " + str(modSize))
         return len(allEdits) > 0
-    
+
+    def processText(self, text, wfile, reqNo):
+        self.diag.info("Request text : " + text)
+        if text.startswith("TERMINATE_SERVER"):
+            self.shutdown()
+        else:
+            traffic = self.parseTraffic(text, wfile)
+            self.process(traffic, reqNo)
+            self.diag.info("Finished processing incoming request")
+
+    def parseTraffic(self, text, wfile):
+        for cls in self.getTrafficClasses(incoming=True):
+            prefix = cls.socketId + ":" if cls.socketId else ""
+            if text.startswith(prefix):
+                value = text[len(prefix):]
+                return cls(value, wfile)
+
     def process(self, traffic, reqNo):
         if not self.replayInfo.isActiveFor(traffic):
             # If we're recording, check for file changes before we do
@@ -184,18 +200,19 @@ class TrafficServer(TCPServer):
                 self._process(chainResponse, reqNo)
             self.diag.info("Completed response of type " + response.__class__.__name__)            
 
-    def getResponseClasses(self):
-        return [ fileedittraffic.FileEditTraffic,
-                 clientservertraffic.ClientSocketTraffic, clientservertraffic.ServerTraffic,
-                 commandlinetraffic.StdoutTraffic, commandlinetraffic.StderrTraffic,
-                 commandlinetraffic.SysExitTraffic, pythontraffic.PythonResponseTraffic ]
+    def getTrafficClasses(self, incoming):
+        classes = []
+        for mod in [ commandlinetraffic, pythontraffic, fileedittraffic, clientservertraffic ]:
+            classes += mod.getTrafficClasses(incoming)
+        return classes
 
     def getResponses(self, traffic, hasFileEdits):
         if self.replayInfo.isActiveFor(traffic):
             self.diag.info("Replay active for current command")
             replayedResponses = []
             filesMatched = []
-            for responseClass, text in self.replayInfo.readReplayResponses(traffic, self.getResponseClasses()):
+            responseClasses = self.getTrafficClasses(incoming=False)
+            for responseClass, text in self.replayInfo.readReplayResponses(traffic, responseClasses):
                 responseTraffic = self.makeResponseTraffic(traffic, responseClass, text, filesMatched)
                 if responseTraffic:
                     replayedResponses.append(responseTraffic)
@@ -295,13 +312,6 @@ class TrafficServer(TCPServer):
 
 
 class TrafficRequestHandler(StreamRequestHandler):
-    parseDict = { "SUT_SERVER"           : clientservertraffic.ServerStateTraffic,
-                  "SUT_COMMAND_LINE"     : commandlinetraffic.CommandLineTraffic,
-                  "SUT_COMMAND_KILL"     : commandlinetraffic.CommandLineKillTraffic,
-                  "SUT_PYTHON_CALL"      : pythontraffic.PythonFunctionCallTraffic,
-                  "SUT_PYTHON_ATTR"      : pythontraffic.PythonAttributeTraffic,
-                  "SUT_PYTHON_SETATTR"   : pythontraffic.PythonSetAttributeTraffic,
-                  "SUT_PYTHON_IMPORT"    : pythontraffic.PythonImportTraffic }
     def __init__(self, requestNumber, *args):
         self.requestNumber = requestNumber
         StreamRequestHandler.__init__(self, *args)
@@ -309,21 +319,7 @@ class TrafficRequestHandler(StreamRequestHandler):
     def handle(self):
         self.server.diag.info("Received incoming request...")
         text = self.rfile.read()
-        self.server.diag.info("Request text : " + text)
-        if text.startswith("TERMINATE_SERVER"):
-            self.server.shutdown()
-        else:
-            traffic = self.parseTraffic(text)
-            self.server.process(traffic, self.requestNumber)
-            self.server.diag.info("Finished processing incoming request")
-
-    def parseTraffic(self, text):
-        for key in self.parseDict.keys():
-            prefix = key + ":"
-            if text.startswith(prefix):
-                value = text[len(prefix):]
-                return self.parseDict[key](value, self.wfile)
-        return clientservertraffic.ClientSocketTraffic(text, self.wfile)
+        self.server.processText(text, self.wfile, self.requestNumber)
 
         
 # The basic point here is to make sure that traffic appears in the record

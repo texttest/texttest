@@ -47,6 +47,8 @@ class Callable:
         return isinstance(other, Callable) and self.method == other.method and self.extraArgs == other.extraArgs
     def __hash__(self):
         return hash((self.method, self.extraArgs))
+    def __deepcopy__(self, memo):
+        return self # don't copy these
 
 def findInstallationRoots():
     installationRoot = os.path.dirname(os.path.dirname(__file__)).replace("\\", "/")
@@ -1177,7 +1179,7 @@ class MultiEntryDictionary(OrderedDict):
         # which merrily reduces all the attributes of the subclass without asking
         # Used when doing deepcopy()
         items = [[k, self[k]] for k in self]
-        return self.__class__, (self.importKey, None, self.aliases, items)
+        return self.__class__, (self.importKey, Callable(self.importFileFinder), self.aliases, items)
         
     def getSectionInfo(self, sectionName=""):
         if sectionName and sectionName != "end":

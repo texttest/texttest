@@ -4,7 +4,7 @@
 import socket
 
 class Traffic(object):
-    def __init__(self, text, responseFile):
+    def __init__(self, text, responseFile, *args):
         self.text = text
         self.responseFile = responseFile
 

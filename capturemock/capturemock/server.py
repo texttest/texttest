@@ -4,6 +4,7 @@ import commandlinetraffic, pythontraffic, fileedittraffic, clientservertraffic
 from SocketServer import TCPServer, StreamRequestHandler
 from ordereddict import OrderedDict
 from replayinfo import ReplayInfo
+from config import RcFileHandler
 
 def create_option_parser():
     usage = """usage: %prog [options] 
@@ -19,20 +20,18 @@ react to the above module to repoint where it sends socket interactions"""
                       help="Commands which may cause files to be edited after they have exited (presumably via background processes they start)")
     parser.add_option("-A", "--alter-response", metavar="REPLACEMENTS",
                       help="Response alterations to perform on the text before recording or returning it")
-    parser.add_option("-e", "--transfer-environment", metavar="ENV",
-                      help="Environment variables that are significant to particular programs and should be recorded if changed.")
     parser.add_option("-i", "--ignore-edits", metavar="FILES",
                       help="When monitoring which files have been edited by a program, ignore files and directories with the given names")
     parser.add_option("-p", "--replay", 
                       help="replay traffic recorded in FILE.", metavar="FILE")
-    parser.add_option("-I", "--replay-items", 
-                      help="attempt replay only items in ITEMS, record the rest", metavar="ITEMS")
     parser.add_option("-l", "--logdefaults",
                       help="Default values to pass to log configuration file. Only useful with -L", metavar="LOGDEFAULTS")
     parser.add_option("-L", "--logconfigfile",
                       help="Configure logging via the log configuration file at FILE.", metavar="LOGCONFIGFILE")
     parser.add_option("-f", "--replay-file-edits", 
                       help="restore edited files referred to in replayed file from DIR.", metavar="DIR")
+    parser.add_option("-2", "--filter-replay-file", action="store_true",
+                      help="Whether to filter the replay file and record items not in it", metavar="MODULES")
     parser.add_option("-m", "--python-module-intercepts", 
                       help="Python modules whose objects should be stored locally rather than returned as they are", metavar="MODULES")
     parser.add_option("-r", "--record", 
@@ -41,8 +40,9 @@ react to the above module to repoint where it sends socket interactions"""
                       help="store edited files under DIR.", metavar="DIR")
     parser.add_option("-s", "--sequential-mode", action="store_true",
                       help="Disable concurrent traffic, handle all incoming messages sequentially")
+    parser.add_option("-R", "--rcfiles", help="Read configuration from given rc files, defaults to ~/.capturemock/config")
     return parser
-
+    
 
 class TrafficServer(TCPServer):
     def __init__(self, options):
@@ -50,8 +50,9 @@ class TrafficServer(TCPServer):
         self.filesToIgnore = []
         if options.ignore_edits:
             self.filesToIgnore = options.ignore_edits.split(",")
+        self.rcHandler = RcFileHandler(options.rcfiles.split(","))
         self.recordFileHandler = RecordFileHandler(options.record)
-        self.replayInfo = ReplayInfo(options.replay, options.replay_items)
+        self.replayInfo = ReplayInfo(options.replay, options.filter_replay_file, self.rcHandler)
         self.requestCount = 0
         self.diag = logging.getLogger("Traffic Server")
         self.topLevelForEdit = [] # contains only paths explicitly given. Always present.
@@ -168,7 +169,7 @@ class TrafficServer(TCPServer):
             prefix = cls.socketId + ":" if cls.socketId else ""
             if text.startswith(prefix):
                 value = text[len(prefix):]
-                return cls(value, wfile)
+                return cls(value, wfile, self.rcHandler)
 
     def process(self, traffic, reqNo):
         if not self.replayInfo.isActiveFor(traffic):
@@ -368,17 +369,26 @@ class RecordFileHandler:
         writeFile.write(text)
         writeFile.flush()
         writeFile.close()
+
+def parseCmdDictionary(cmdStr, listvals):
+    dict = {}
+    if cmdStr:
+        for part in cmdStr.split(","):
+            cmd, varString = part.split("=")
+            if listvals:
+                dict[cmd] = varString.split("+")
+            else:
+                dict[cmd] = varString
+    return dict
         
         
 def main():
     parser = create_option_parser()
     options = parser.parse_args()[0] # no positional arguments
-    defaults = commandlinetraffic.parseCmdDictionary(options.logdefaults, listvals=False)
+    defaults = parseCmdDictionary(options.logdefaults, listvals=False)
     logging.config.fileConfig(options.logconfigfile, defaults)
 
-    for cls in [ commandlinetraffic.CommandLineTraffic,
-                 fileedittraffic.FileEditTraffic,
-                 pythontraffic.PythonModuleTraffic ]:
+    for cls in [ fileedittraffic.FileEditTraffic, pythontraffic.PythonModuleTraffic ]:
         cls.configure(options)
 
     server = TrafficServer(options)

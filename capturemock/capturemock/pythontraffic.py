@@ -58,7 +58,7 @@ class PythonTraffic(traffic.Traffic):
 
 class PythonImportTraffic(PythonTraffic):
     socketId = "SUT_PYTHON_IMPORT"
-    def __init__(self, inText, responseFile):
+    def __init__(self, inText, responseFile, *args):
         self.moduleName = inText
         text = "import " + self.moduleName
         super(PythonImportTraffic, self).__init__(text, responseFile)
@@ -184,7 +184,7 @@ class PythonModuleTraffic(PythonTraffic):
 class PythonAttributeTraffic(PythonModuleTraffic):
     socketId = "SUT_PYTHON_ATTR"
     cachedAttributes = set()
-    def __init__(self, inText, responseFile):
+    def __init__(self, inText, responseFile, *args):
         modOrObjName, attrName = inText.split(":SUT_SEP:")
         text = modOrObjName + "." + attrName
         # Should record these at most once, and only then if they return something in their own right
@@ -222,7 +222,7 @@ class PythonAttributeTraffic(PythonModuleTraffic):
         
 class PythonSetAttributeTraffic(PythonModuleTraffic):
     socketId = "SUT_PYTHON_SETATTR"
-    def __init__(self, inText, responseFile):
+    def __init__(self, inText, responseFile, *args):
         modOrObjName, attrName, self.valueStr = inText.split(":SUT_SEP:")
         text = modOrObjName + "." + attrName + " = " + self.valueStr
         super(PythonSetAttributeTraffic, self).__init__(modOrObjName, attrName, text, responseFile)
@@ -236,7 +236,7 @@ class PythonSetAttributeTraffic(PythonModuleTraffic):
 
 class PythonFunctionCallTraffic(PythonModuleTraffic):
     socketId = "SUT_PYTHON_CALL"
-    def __init__(self, inText, responseFile):
+    def __init__(self, inText, responseFile, *args):
         modOrObjName, attrName, argStr, keywDictStr = inText.split(":SUT_SEP:")
         self.args = ()
         self.keyw = {}

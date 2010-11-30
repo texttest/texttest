@@ -3,31 +3,11 @@
 
 import traffic, fileedittraffic, os, logging, subprocess
 
-def parseCmdDictionary(cmdStr, listvals):
-    dict = {}
-    if cmdStr:
-        for part in cmdStr.split(","):
-            cmd, varString = part.split("=")
-            if listvals:
-                dict[cmd] = varString.split("+")
-            else:
-                dict[cmd] = varString
-    return dict
-
-
 class CommandLineTraffic(traffic.Traffic):
     typeId = "CMD"
-    direction = "<-"
     socketId = "SUT_COMMAND_LINE"
-    environmentDict = {}
-    asynchronousFileEditCmds = []
-    @classmethod
-    def configure(cls, options):
-        cls.environmentDict = parseCmdDictionary(options.transfer_environment, listvals=True)
-        if options.asynchronous_file_edit_commands:
-            cls.asynchronousFileEditCmds = options.asynchronous_file_edit_commands.split(",")
-        
-    def __init__(self, inText, responseFile):
+    direction = "<-"
+    def __init__(self, inText, responseFile, rcHandler):
         self.diag = logging.getLogger("Traffic Server")
         cmdText, environText, cmdCwd, proxyPid = inText.split(":SUT_SEP:")
         argv = eval(cmdText)
@@ -38,14 +18,15 @@ class CommandLineTraffic(traffic.Traffic):
         self.fullCommand = argv[0].replace("\\", "/")
         self.commandName = os.path.basename(self.fullCommand)
         self.cmdArgs = [ self.commandName ] + argv[1:]
-        envVarsSet, envVarsUnset = self.filterEnvironment(self.cmdEnviron)
+        self.asynchronousEdits = rcHandler.get("asynchronous", self.getRcSections(), False)
+        envVarsSet, envVarsUnset = self.filterEnvironment(self.cmdEnviron, rcHandler)
         cmdString = " ".join(map(self.quoteArg, self.cmdArgs))
         text = self.getEnvString(envVarsSet, envVarsUnset) + cmdString
         super(CommandLineTraffic, self).__init__(text, responseFile)
         
-    def filterEnvironment(self, cmdEnviron):
+    def filterEnvironment(self, cmdEnviron, rcHandler):
         envVarsSet, envVarsUnset = [], []
-        for var in self.getEnvironmentVariables():
+        for var in self.getEnvironmentVariables(rcHandler):
             value = cmdEnviron.get(var)
             currValue = os.getenv(var)
             self.diag.info("Checking environment " + var + "=" + repr(value) + " against " + repr(currValue))
@@ -59,9 +40,11 @@ class CommandLineTraffic(traffic.Traffic):
     def isMarkedForReplay(self, replayItems):
         return self.commandName in replayItems
 
-    def getEnvironmentVariables(self):
-        return self.environmentDict.get(self.commandName, []) + \
-               self.environmentDict.get("default", [])
+    def getRcSections(self):
+        return [ self.commandName, "command line" ]
+
+    def getEnvironmentVariables(self, rcHandler):
+        return rcHandler.getList("environment", self.getRcSections())
 
     def hasChangedWorkingDirectory(self):
         return self.cmdCwd != os.getcwd()
@@ -110,7 +93,7 @@ class CommandLineTraffic(traffic.Traffic):
         return edits
 
     def makesAsynchronousEdits(self):
-        return self.commandName in self.asynchronousFileEditCmds
+        return self.asynchronousEdits
     
     @staticmethod
     def removeSubPaths(paths):
@@ -195,7 +178,7 @@ class SysExitTraffic(traffic.ResponseTraffic):
 class CommandLineKillTraffic(traffic.Traffic):
     socketId = "SUT_COMMAND_KILL"
     pidMap = {}
-    def __init__(self, inText, responseFile):
+    def __init__(self, inText, responseFile, *args):
         killStr, proxyPid = inText.split(":SUT_SEP:")
         self.killSignal = int(killStr)
         self.proc = self.pidMap.get(proxyPid)

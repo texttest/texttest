@@ -16,25 +16,19 @@ class SetUpTrafficHandlers(plugins.Action):
         pythonCoverage = test.hasEnvironment("COVERAGE_PROCESS_START")
         if test.app.usesTrafficMechanism() or pythonCoverage or pythonCustomizeFiles:
             replayFile = test.getFileName("traffic")
+            rcFiles = test.getAllPathNames("capturemockrc")
             serverActive = self.recordSetting != self.REPLAY_ONLY or replayFile is not None
             if serverActive or pythonCoverage or pythonCustomizeFiles:
-                self.setUpIntercepts(test, replayFile, serverActive, pythonCoverage, pythonCustomizeFiles)
+                self.setUpIntercepts(test, replayFile, rcFiles, pythonCoverage, pythonCustomizeFiles)
 
-    def setUpIntercepts(self, test, replayFile, serverActive, pythonCoverage, pythonCustomizeFiles):
+    def setUpIntercepts(self, test, replayFile, rcFiles, pythonCoverage, pythonCustomizeFiles):
         interceptDir = test.makeTmpFileName("traffic_intercepts", forComparison=0)
-        interceptInfo = InterceptInfo(test, replayFile if self.recordSetting == self.REPLAY_ONLY else None)
-        pathVars = self.makeIntercepts(interceptDir, interceptInfo.commands, serverActive,
+        pathVars = self.makeIntercepts(interceptDir, rcFiles, replayFile,
                                        pythonCoverage, pythonCustomizeFiles)
-        if serverActive:
-            interceptAttributes = ",".join(interceptInfo.pyAttributes)
-            self.trafficServerProcess = self.makeTrafficServer(test, replayFile, interceptInfo)
+        if rcFiles:
+            self.trafficServerProcess = self.makeTrafficServer(test, rcFiles, replayFile)
             address = self.trafficServerProcess.stdout.readline().strip()
             test.setEnvironment("TEXTTEST_MIM_SERVER", address) # Address of TextTest's server for recording client/server traffic
-            if interceptAttributes:
-                test.setEnvironment("TEXTTEST_MIM_PYTHON", interceptAttributes)
-                ignoreCallers = test.getConfigValue("collect_traffic_python_ignore_callers")
-                if ignoreCallers:
-                    test.setEnvironment("TEXTTEST_MIM_PYTHON_IGNORE", ",".join(ignoreCallers))
 
         for pathVar in pathVars:
             # Change test environment to pick up the intercepts
@@ -54,10 +48,11 @@ class SetUpTrafficHandlers(plugins.Action):
         allPaths = plugins.findDataPaths([ "logging.traffic" ], dataDirName="log", includePersonal=True)
         return allPaths[-1]
         
-    def makeTrafficServer(self, test, replayFile, interceptInfo):
+    def makeTrafficServer(self, test, rcFiles, replayFile):
         recordFile = test.makeTmpFileName("traffic")
         recordEditDir = test.makeTmpFileName("file_edits", forComparison=0)
-        cmdArgs = [ "capturemock_server", "-r", recordFile, "-F", recordEditDir,
+        cmdArgs = [ "capturemock_server", "--rcfiles", ",".join(rcFiles),
+                    "-r", recordFile, "-F", recordEditDir,
                     "-l", self.getTrafficServerLogDefaults(),
                     "-L", self.getTrafficServerLogConfig() ]
         
@@ -67,13 +62,6 @@ class SetUpTrafficHandlers(plugins.Action):
         filesToIgnore = test.getCompositeConfigValue("test_data_ignore", "file_edits")
         if filesToIgnore:
             cmdArgs += [ "-i", ",".join(filesToIgnore) ]
-
-        environmentArg = self.makeArgFromDict(test.getConfigValue("collect_traffic_environment"))
-        if environmentArg:
-            cmdArgs += [ "-e", environmentArg ]
-
-        if interceptInfo.pyAttributes:
-            cmdArgs += [ "-m", ",".join(interceptInfo.pyAttributes) ]
             
         asynchronousFileEditCmds = test.getConfigValue("collect_traffic").get("asynchronous")
         if asynchronousFileEditCmds:
@@ -89,24 +77,22 @@ class SetUpTrafficHandlers(plugins.Action):
             if replayEditDir:
                 cmdArgs += [ "-f", replayEditDir ]
             if self.recordSetting == self.RECORD_NEW_REPLAY_OLD:
-                replayItems = interceptInfo.getReplayItems(replayFile)
-                if replayItems:
-                    cmdArgs.append("--replay-items=" + ",".join(replayItems))
+                cmdArgs.append("--filter-replay-file")
 
         return subprocess.Popen(cmdArgs, env=test.getRunEnvironment(), universal_newlines=True,
                                 cwd=test.getDirectory(temporary=1), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     
-    def makeIntercepts(self, interceptDir, commands, serverActive, pythonCoverage, pythonCustomizeFiles):
+    def makeIntercepts(self, interceptDir, rcFiles, replayFile, pythonCoverage, pythonCustomizeFiles):
         pathVars = []
-        if serverActive:
+        if rcFiles:
             from capturemock import makePathIntercepts
-            if makePathIntercepts(commands, interceptDir):
+            if makePathIntercepts(rcFiles, interceptDir, replayFile, self.recordSetting):
                 pathVars.append("PATH")
 
         if pythonCustomizeFiles:
             self.interceptOwnModule(pythonCustomizeFiles[-1], interceptDir) # most specific
                 
-        useSiteCustomize = serverActive or pythonCoverage or pythonCustomizeFiles
+        useSiteCustomize = rcFiles or pythonCoverage or pythonCustomizeFiles
         if useSiteCustomize:
             self.interceptOwnModule(self.siteCustomizeFile, interceptDir)
             pathVars.append("PYTHONPATH")
@@ -152,62 +138,7 @@ class TerminateTrafficServer(plugins.Action):
         err = process.communicate()[1]
         if err:
             sys.stderr.write("Error from Traffic Server :\n" + err)
-
-class LineFilter(plugins.TextTrigger):
-    def __init__(self, item):
-        self.item = item
-        plugins.TextTrigger.__init__(self, self.getMatchText())
-
-class CommandLineFilter(LineFilter):
-    def getMatchText(self):
-        return "<-CMD:([^ ]* )*" + self.item + "( [^ ]*)*"
-
-    def removeItem(self, info):
-        info.commands.remove(self.item)
-
-
-class AttributeLineFilter(LineFilter):
-    def getMatchText(self):
-        return "<-PYT:(import )?" + self.item 
-
-    def removeItem(self, info):
-        info.pyAttributes.remove(self.item)
         
-
-class InterceptInfo:
-    def __init__(self, test, replayFile):
-        # This gets all names in collect_traffic, not just those marked
-        # "asynchronous"! (it will also pick up "default").
-        self.commands = test.getCompositeConfigValue("collect_traffic", "asynchronous")
-        self.pyAttributes = test.getConfigValue("collect_traffic_python")
-        if replayFile:
-            self.filterForReplay(replayFile)
-        
-    def makeLineFilters(self):
-        return map(CommandLineFilter, self.commands) + \
-               map(AttributeLineFilter, self.pyAttributes)
-
-    def filterForReplay(self, replayFile):
-        lineFilters = self.makeLineFilters()
-        with open(replayFile) as f:
-            for line in f:
-                lineFilter = self.findMatchingFilter(line, lineFilters)
-                if lineFilter:
-                    lineFilters.remove(lineFilter)
-                if len(lineFilters) == 0:
-                    break
-        for lineFilter in lineFilters:
-            lineFilter.removeItem(self)
-
-    def findMatchingFilter(self, line, lineFilters):
-        for lineFilter in lineFilters:
-            if lineFilter.matches(line):
-                return lineFilter
-
-    def getReplayItems(self, replayFile):
-        self.filterForReplay(replayFile)
-        return self.commands + self.pyAttributes
-
 
 class ModifyTraffic(plugins.ScriptWithArgs):
     # For now, only bother with the client server traffic which is mostly what needs tweaking...
@@ -271,3 +202,27 @@ class ModifyTraffic(plugins.ScriptWithArgs):
 
     def setUpSuite(self, suite):
         self.describe(suite)
+
+
+class ConvertToCaptureMock(plugins.Action):
+    def setUpApplication(self, app):
+        newFile = os.path.join(app.getDirectory(), "capturemockrc")
+        from ConfigParser import ConfigParser
+        from ordereddict import OrderedDict
+        parser = ConfigParser(dict_type=OrderedDict)
+        cmdTraffic = app.getCompositeConfigValue("collect_traffic", "asynchronous")
+        if cmdTraffic:
+            parser.add_section("command line")
+            parser.set("command line", "intercepts", ",".join(cmdTraffic))
+
+        envVars = app.getConfigValue("collect_traffic_environment").get("default")
+        if envVars:
+            parser.set("command line", "environment", ",".join(envVars))
+
+        pyTraffic = app.getConfigValue("collect_traffic_python")
+        if pyTraffic:
+            parser.add_section("python")
+            parser.set("python", "intercepts", ",".join(pyTraffic))
+
+        print "Wrote file at", newFile
+        parser.write(open(newFile, "w"))

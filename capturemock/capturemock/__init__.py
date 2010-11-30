@@ -31,7 +31,13 @@ def makePathIntercept(cmd, interceptDir):
     else:
         makePosixIntercept(interceptName)
 
-def makePathIntercepts(commands, interceptDir):
+def makePathIntercepts(rcFiles, interceptDir, replayFile, mode):
+    import config
+    rcHandler = config.RcFileHandler(rcFiles)
+    commands = rcHandler.getIntercepts("command line")
+    if replayFile and mode == config.REPLAY_ONLY_MODE:
+        import replayinfo
+        commands = replayinfo.filterCommands(commands, replayFile)
     for command in commands:
         makePathIntercept(command, interceptDir)
     return len(commands) > 0

@@ -1,19 +1,39 @@
 
 """ Module to manage the information in the file and return appropriate matches """
 
-import logging, difflib
+import logging, difflib, re
 from ordereddict import OrderedDict
 
 class ReplayInfo:
-    def __init__(self, replayFile, replayItemString):
+    def __init__(self, replayFile, filterReplayFile, rcHandler):
         self.responseMap = OrderedDict()
         self.diag = logging.getLogger("Traffic Replay")
-        if replayFile:
-            self.readReplayFile(replayFile)
         self.replayItems = []
-        if replayItemString:
-            self.replayItems = replayItemString.split(",")
+        if replayFile:
+            trafficList = self.readIntoList(replayFile)
+            self.parseTrafficList(trafficList)
+            if filterReplayFile:
+                items = self.makeCommandItems(rcHandler.getIntercepts("command line")) + \
+                        self.makePythonItems(rcHandler.getIntercepts("python"))
+                self.replayItems = self.filterForReplay(items, trafficList)
 
+    @staticmethod
+    def filterForReplay(itemInfo, lines):
+        newItems = []
+        for line in lines:
+            for item, regexp in itemInfo:
+                if item not in newItems and regexp.search(line):
+                    newItems.append(item)
+        return newItems
+
+    @staticmethod
+    def makeCommandItems(commands):
+        return [ (command, re.compile("<-CMD:([^ ]* )*" + command + "( [^ ]*)*")) for command in commands ]
+
+    @staticmethod
+    def makePythonItems(pythonAttrs):
+        return [ (attr, re.compile("<-PYT:(import )?" + attr)) for attr in pythonAttrs ]
+            
     def isActiveForAll(self):
         return len(self.responseMap) > 0 and len(self.replayItems) == 0
             
@@ -25,8 +45,7 @@ class ReplayInfo:
         else:
             return traffic.isMarkedForReplay(set(self.replayItems))
 
-    def readReplayFile(self, replayFile):
-        trafficList = self.readIntoList(replayFile)
+    def parseTrafficList(self, trafficList):
         currResponseHandler = None
         for trafficStr in trafficList:
             if trafficStr.startswith("<-"):
@@ -182,3 +201,14 @@ class ReplayedResponseHandler:
                     responses.append((trafficClass, trafficStr[6:]))
         self.timesChosen += 1
         return responses
+
+
+def filterFileForReplay(itemInfo, replayFile):
+    with open(replayFile, "rU") as f:
+        return ReplayInfo.filterForReplay(itemInfo, f)
+
+def filterCommands(commands, replayFile):
+    return filterFileForReplay(ReplayInfo.makeCommandItems(commands), replayFile)
+
+def filterPython(pythonAttrs, replayFile):
+    return filterFileForReplay(ReplayInfo.makePythonItems(pythonAttrs), replayFile)

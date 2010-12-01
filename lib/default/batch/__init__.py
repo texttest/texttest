@@ -547,7 +547,7 @@ class WebPageResponder(plugins.Responder):
             checkout = checkouts.pop()
             if checkout:
                 cmd += " -c " + checkout
-        directories = set((app.getDirectory() for app in apps))
+        directories = set((app.getRootDirectory() for app in apps))
         cmd += " -d " + os.pathsep.join(directories)
         return cmd
 

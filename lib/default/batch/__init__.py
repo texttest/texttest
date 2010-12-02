@@ -3,23 +3,7 @@
 import os, plugins, sys, time, shutil, datetime, testoverview, logging
 from summarypages import GenerateSummaryPage, GenerateGraphs # only so they become package level entities
 from ordereddict import OrderedDict
-from batchutils import calculateBatchDate
-
-class BatchVersionFilter:
-    def __init__(self, batchSession):
-        self.batchSession = batchSession
-    def verifyVersions(self, app):
-        badVersion = self.findUnacceptableVersion(app)
-        if badVersion is not None:
-            raise plugins.TextTestError, "unregistered version '" + badVersion + "' for " + self.batchSession + " session."
-    def findUnacceptableVersion(self, app):
-        if app.getCompositeConfigValue("batch_use_version_filtering", self.batchSession) != "true":
-            return
-        
-        allowedVersions = app.getCompositeConfigValue("batch_version", self.batchSession)
-        for version in app.versions:
-            if len(version) > 0 and not version in allowedVersions:
-                return version
+from batchutils import calculateBatchDate, BatchVersionFilter
                 
 class BatchCategory(plugins.Filter):
     def __init__(self, state):
@@ -517,11 +501,9 @@ class WebPageResponder(plugins.Responder):
                 plugins.log.info("Not generating web page for " + app.description() + " : " + str(e))
                 # If the app is rejected, some of its extra versions may still not be...
                 for extra in app.extras:
-                    try:
-                        batchFilter.verifyVersions(extra)
+                    if not batchFilter.findUnacceptableVersion(extra):
                         toGenerate.append(extra)
-                    except plugins.TextTestError:
-                        pass # one error message is enough...
+                
         return toGenerate
             
     def notifyAllComplete(self):
@@ -565,7 +547,7 @@ class WebPageResponder(plugins.Responder):
             checkout = checkouts.pop()
             if checkout:
                 cmd += " -c " + checkout
-        directories = set((app.getDirectory() for app in apps))
+        directories = set((app.getRootDirectory() for app in apps))
         cmd += " -d " + os.pathsep.join(directories)
         return cmd
 

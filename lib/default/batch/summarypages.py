@@ -4,6 +4,7 @@
 import testoverview, plugins, logging, os, shutil, time, operator
 from ordereddict import OrderedDict
 from glob import glob
+from batchutils import BatchVersionFilter
 
 class GenerateFromSummaryData(plugins.ScriptWithArgs):
     locationApps = OrderedDict()
@@ -12,6 +13,7 @@ class GenerateFromSummaryData(plugins.ScriptWithArgs):
     def __init__(self, args=[""]):
         argDict = self.parseArguments(args, [ "batch", "basepath", "file" ])
         self.batchSession = argDict.get("batch", "default")
+        self.versionFilter = BatchVersionFilter(self.batchSession)
         if argDict.has_key("basepath"):
             GenerateFromSummaryData.basePath = argDict["basepath"]
         if argDict.has_key("file"):
@@ -20,14 +22,19 @@ class GenerateFromSummaryData(plugins.ScriptWithArgs):
     def setUpApplication(self, app):
         location = os.path.realpath(app.getCompositeConfigValue("historical_report_location", self.batchSession))
         usePie = app.getCompositeConfigValue("historical_report_piechart_summary", self.batchSession)
-        self.locationApps.setdefault(location, []).append( (app, usePie))
+        rejected = bool(self.versionFilter.findUnacceptableVersion(app))
+        self.locationApps.setdefault(location, []).append((app, usePie, rejected))
 
     @classmethod
     def finalise(cls):
         for location, apps in cls.locationApps.items():
-            dataFinder = SummaryDataFinder(location, apps, cls.summaryFileName, cls.basePath)
-            if dataFinder.hasInfo():
-                cls.generate(dataFinder)
+            if not all((rejected for app, usePie, rejected in apps)):
+                dataFinder = SummaryDataFinder(location, apps, cls.summaryFileName, cls.basePath)
+                if dataFinder.hasInfo():
+                    cls.generate(dataFinder)
+            else:
+                plugins.log.info("No applications generated for index page at " +
+                                 repr(os.path.join(location, cls.summaryFileName)) + ".")
 
 
 class GenerateSummaryPage(GenerateFromSummaryData):
@@ -66,7 +73,7 @@ class SummaryDataFinder:
         if len(apps) > 0:
             self.colourFinder = testoverview.ColourFinder(apps[0][0].getCompositeConfigValue)
             self.inputOptions = apps[0][0].inputOptions
-        for app, usePie in apps:
+        for app, usePie, rejected in apps:
             self.appUsePie[app.fullName()] = usePie
             appDir = os.path.join(location, app.name)
             self.diag.info("Searching under " + repr(appDir))

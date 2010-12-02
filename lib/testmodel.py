@@ -1354,6 +1354,11 @@ class Application:
     def getDirectory(self):
         return self.dircache.dir
 
+    def getRootDirectory(self):
+        for rootDir in self.inputOptions.rootDirectories:
+            if self.dircache.dir.startswith(rootDir):
+                return rootDir
+
     def checkSanity(self):
         if not self.getConfigValue("executable"):
             raise BadConfigError, "config file entry 'executable' not defined"

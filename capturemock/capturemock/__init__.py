@@ -41,3 +41,17 @@ def makePathIntercepts(rcFiles, interceptDir, replayFile, mode):
     for command in commands:
         makePathIntercept(command, interceptDir)
     return len(commands) > 0
+
+def process_startup():
+    rcFileStr = os.getenv("CAPTUREMOCK_PROCESS_START")
+    if rcFileStr:
+        import config
+        rcFiles = rcFileStr.split(",")
+        rcHandler = config.RcFileHandler(rcFiles)
+        pythonAttrs = rcHandler.getIntercepts("python")
+        replayFile = os.getenv("CAPTUREMOCK_FILE")
+        mode = int(os.getenv("CAPTUREMOCK_MODE"))
+        if replayFile and mode == config.REPLAY_ONLY_MODE:
+            import replayinfo
+            pythonAttrs = replayinfo.filterPython(pythonAttrs, replayFile)
+        interceptPython(pythonAttrs, rcHandler)

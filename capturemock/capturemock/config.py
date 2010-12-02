@@ -17,10 +17,16 @@ class RcFileHandler:
     def getIntercepts(self, section):
         return self.getList("intercepts", [ section ])
 
-    def get(self, setting, sections, defaultVal):
+    def get(self, *args):
+        return self._get(self.parser.get, *args)
+
+    def getboolean(self, *args):
+        return self._get(self.parser.getboolean, *args)
+
+    def _get(self, getMethod, setting, sections, defaultVal):
         for section in sections:
             if self.parser.has_section(section) and self.parser.has_option(section, setting):
-                return self.parser.get(section, setting)
+                return getMethod(section, setting)
         return defaultVal
 
     def getList(self, setting, sections):

@@ -16,10 +16,6 @@ intercept python modules while the system itself can be modified to "internally"
 react to the above module to repoint where it sends socket interactions"""
 
     parser = optparse.OptionParser(usage)
-    parser.add_option("-a", "--asynchronous-file-edit-commands", metavar="ENV",
-                      help="Commands which may cause files to be edited after they have exited (presumably via background processes they start)")
-    parser.add_option("-A", "--alter-response", metavar="REPLACEMENTS",
-                      help="Response alterations to perform on the text before recording or returning it")
     parser.add_option("-i", "--ignore-edits", metavar="FILES",
                       help="When monitoring which files have been edited by a program, ignore files and directories with the given names")
     parser.add_option("-p", "--replay", 
@@ -32,25 +28,21 @@ react to the above module to repoint where it sends socket interactions"""
                       help="restore edited files referred to in replayed file from DIR.", metavar="DIR")
     parser.add_option("-2", "--filter-replay-file", action="store_true",
                       help="Whether to filter the replay file and record items not in it", metavar="MODULES")
-    parser.add_option("-m", "--python-module-intercepts", 
-                      help="Python modules whose objects should be stored locally rather than returned as they are", metavar="MODULES")
     parser.add_option("-r", "--record", 
                       help="record traffic to FILE.", metavar="FILE")
     parser.add_option("-F", "--record-file-edits", 
                       help="store edited files under DIR.", metavar="DIR")
-    parser.add_option("-s", "--sequential-mode", action="store_true",
-                      help="Disable concurrent traffic, handle all incoming messages sequentially")
     parser.add_option("-R", "--rcfiles", help="Read configuration from given rc files, defaults to ~/.capturemock/config")
     return parser
     
 
 class TrafficServer(TCPServer):
     def __init__(self, options):
-        self.useThreads = not options.sequential_mode
         self.filesToIgnore = []
         if options.ignore_edits:
             self.filesToIgnore = options.ignore_edits.split(",")
         self.rcHandler = RcFileHandler(options.rcfiles.split(","))
+        self.useThreads = self.rcHandler.getboolean("server_multithreaded", [ "general" ], True)
         self.recordFileHandler = RecordFileHandler(options.record)
         self.replayInfo = ReplayInfo(options.replay, options.filter_replay_file, self.rcHandler)
         self.requestCount = 0
@@ -388,8 +380,7 @@ def main():
     defaults = parseCmdDictionary(options.logdefaults, listvals=False)
     logging.config.fileConfig(options.logconfigfile, defaults)
 
-    for cls in [ fileedittraffic.FileEditTraffic, pythontraffic.PythonModuleTraffic ]:
-        cls.configure(options)
+    fileedittraffic.FileEditTraffic.configure(options)
 
     server = TrafficServer(options)
     server.run()

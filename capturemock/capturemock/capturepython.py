@@ -1,9 +1,5 @@
 
-import sys, os, inspect
-
-# Allow interception of 'socket'
-import socket as realsocket
-del sys.modules["socket"]
+import sys, os, inspect, socket
 
 class NameFinder(dict):
     def __init__(self, moduleProxy):
@@ -56,7 +52,7 @@ class ModuleProxy:
         if servAddr:
             host, port = servAddr.split(":")
             serverAddress = (host, int(port))
-            sock = realsocket.socket(realsocket.AF_INET, realsocket.SOCK_STREAM)
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.connect(serverAddress)
             return sock
 
@@ -227,9 +223,10 @@ class AttributeProxy:
 
 
 class CallStackChecker:
-    def __init__(self, ignoreModuleCalls):
+    def __init__(self, rcHandler):
         # Always ignore our own command-line capture module
-        self.ignoreModuleCalls = set([ "capturecommand" ] + ignoreModuleCalls)
+        # TODO - ignore_callers list should be able to vary between different calls
+        self.ignoreModuleCalls = set([ "capturecommand" ] + rcHandler.getList("ignore_callers", [ "python" ]))
         self.inCallStackChecker = False
 
     def callerExcluded(self):
@@ -307,9 +304,9 @@ class ImportHandler:
 
 
 
-def interceptPython(attributeNames, ignoreCallers):
+def interceptPython(attributeNames, rcHandler):
     handler = InterceptHandler(attributeNames)
-    handler.makeIntercepts(ignoreCallers)
+    handler.makeIntercepts(rcHandler)
 
 class InterceptHandler:
     def __init__(self, attributeNames):
@@ -325,10 +322,12 @@ class InterceptHandler:
                         del sys.modules[attrName] # We imported the real version, get rid of it again...
                         self.fullIntercepts.append(attrName)
             else:
+                if attrName in sys.modules:
+                    del sys.modules[attrName]
                 self.fullIntercepts.append(attrName)
 
-    def makeIntercepts(self, ignoreCallers):
-        callStackChecker = CallStackChecker(ignoreCallers)
+    def makeIntercepts(self, rcHandler):
+        callStackChecker = CallStackChecker(rcHandler)
         if len(self.fullIntercepts):
             sys.meta_path.append(ImportHandler(self.fullIntercepts, callStackChecker))
         for moduleName, attributes in self.partialIntercepts.items():

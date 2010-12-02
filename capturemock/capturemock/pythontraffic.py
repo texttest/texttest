@@ -75,22 +75,14 @@ class PythonImportTraffic(PythonTraffic):
 
                   
 class PythonModuleTraffic(PythonTraffic):
-    interceptModules = set()
-    alterations = {}
-    @classmethod
-    def configure(cls, options):
-        modStr = options.python_module_intercepts
-        if modStr:
-            cls.interceptModules.update(modStr.split(","))
-        fullAlterStr = options.alter_response
-        if fullAlterStr:
-            for alterStr in fullAlterStr.split(","):
-                toFind, toReplace = alterStr[:-1].split("{REPLACE ")
-                cls.alterations[re.compile(toFind)] = toReplace        
-
-    def __init__(self, modOrObjName, attrName, *args):
+    def __init__(self, modOrObjName, attrName, rcHandler, *args):
         self.modOrObjName = modOrObjName
         self.attrName = attrName
+        self.interceptModules = set(rcHandler.getIntercepts("python"))
+        self.alterations = {}
+        for alterStr in rcHandler.getList("alterations", [ self.getTextMarker(), "python" ]):
+            toFind, toReplace = alterStr[:-1].split("{REPLACE ")
+            self.alterations[re.compile(toFind)] = toReplace        
         super(PythonModuleTraffic, self).__init__(*args)
 
     def getModuleName(self, obj):
@@ -99,10 +91,13 @@ class PythonModuleTraffic(PythonTraffic):
         else:
             return obj.__class__.__module__ # many other instances
 
+    def getTextMarker(self):
+        return self.modOrObjName + "." + self.attrName
+
     def isMarkedForReplay(self, replayItems):
         if PythonInstanceWrapper.getInstance(self.modOrObjName) is None:
             return True
-        textMarker = self.modOrObjName + "." + self.attrName
+        textMarker = self.getTextMarker()
         return any((item == textMarker or textMarker.startswith(item + ".") for item in replayItems))
 
     def belongsToInterceptedModule(self, moduleName):
@@ -184,14 +179,14 @@ class PythonModuleTraffic(PythonTraffic):
 class PythonAttributeTraffic(PythonModuleTraffic):
     socketId = "SUT_PYTHON_ATTR"
     cachedAttributes = set()
-    def __init__(self, inText, responseFile, *args):
+    def __init__(self, inText, responseFile, rcHandler):
         modOrObjName, attrName = inText.split(":SUT_SEP:")
         text = modOrObjName + "." + attrName
         # Should record these at most once, and only then if they return something in their own right
         # rather than a function etc
         self.foundInCache = text in self.cachedAttributes
         self.cachedAttributes.add(text)
-        super(PythonAttributeTraffic, self).__init__(modOrObjName, attrName, text, responseFile)
+        super(PythonAttributeTraffic, self).__init__(modOrObjName, attrName, rcHandler, text, responseFile)
 
     def enquiryOnly(self, responses=[]):
         return len(responses) == 0 or self.foundInCache
@@ -222,10 +217,10 @@ class PythonAttributeTraffic(PythonModuleTraffic):
         
 class PythonSetAttributeTraffic(PythonModuleTraffic):
     socketId = "SUT_PYTHON_SETATTR"
-    def __init__(self, inText, responseFile, *args):
+    def __init__(self, inText, responseFile, rcHandler):
         modOrObjName, attrName, self.valueStr = inText.split(":SUT_SEP:")
         text = modOrObjName + "." + attrName + " = " + self.valueStr
-        super(PythonSetAttributeTraffic, self).__init__(modOrObjName, attrName, text, responseFile)
+        super(PythonSetAttributeTraffic, self).__init__(modOrObjName, attrName, rcHandler, text, responseFile)
 
     def forwardToDestination(self):
         instance = PythonInstanceWrapper.getInstance(self.modOrObjName)
@@ -236,7 +231,7 @@ class PythonSetAttributeTraffic(PythonModuleTraffic):
 
 class PythonFunctionCallTraffic(PythonModuleTraffic):
     socketId = "SUT_PYTHON_CALL"
-    def __init__(self, inText, responseFile, *args):
+    def __init__(self, inText, responseFile, rcHandler):
         modOrObjName, attrName, argStr, keywDictStr = inText.split(":SUT_SEP:")
         self.args = ()
         self.keyw = {}
@@ -263,7 +258,7 @@ class PythonFunctionCallTraffic(PythonModuleTraffic):
             # Slightly daring text-munging of Python dictionary repr, main thing is to print something vaguely representative
             argsForRecord += keywDictStr.replace("': ", "=").replace(", '", ", ")[2:-1].split(", ")
         text = modOrObjName + "." + attrName + "(" + ", ".join(argsForRecord) + ")"
-        super(PythonFunctionCallTraffic, self).__init__(modOrObjName, attrName, text, responseFile)
+        super(PythonFunctionCallTraffic, self).__init__(modOrObjName, attrName, rcHandler, text, responseFile)
 
     def getArgForRecord(self, arg):
         class ArgWrapper:

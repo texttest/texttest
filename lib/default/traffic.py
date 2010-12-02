@@ -26,20 +26,19 @@ class SetUpTrafficHandlers(plugins.Action):
         pathVars = self.makeIntercepts(interceptDir, rcFiles, replayFile,
                                        pythonCoverage, pythonCustomizeFiles)
         if rcFiles:
+            # Environment which the server should get
+            test.setEnvironment("CAPTUREMOCK_MODE", str(self.recordSetting))
+            if replayFile:
+                test.setEnvironment("CAPTUREMOCK_FILE", replayFile)
             self.trafficServerProcess = self.makeTrafficServer(test, rcFiles, replayFile)
             address = self.trafficServerProcess.stdout.readline().strip()
+            # And environment it shouldn't get...
+            test.setEnvironment("CAPTUREMOCK_PROCESS_START", ",".join(rcFiles))
             test.setEnvironment("TEXTTEST_MIM_SERVER", address) # Address of TextTest's server for recording client/server traffic
 
         for pathVar in pathVars:
             # Change test environment to pick up the intercepts
             test.setEnvironment(pathVar, interceptDir + os.pathsep + test.getEnvironment(pathVar, ""))
-
-    def makeArgFromDict(self, dict):
-        args = []
-        for key, values in dict.items():
-            if key and values:
-                args.append(key + "=" + "+".join(values))
-        return ",".join(args)
 
     def getTrafficServerLogDefaults(self):
         return "TEXTTEST_CWD=" + os.getcwd().replace("\\", "/") + ",TEXTTEST_PERSONAL_LOG=" + os.getenv("TEXTTEST_PERSONAL_LOG")
@@ -55,22 +54,11 @@ class SetUpTrafficHandlers(plugins.Action):
                     "-r", recordFile, "-F", recordEditDir,
                     "-l", self.getTrafficServerLogDefaults(),
                     "-L", self.getTrafficServerLogConfig() ]
-        
-        if test.getConfigValue("collect_traffic_use_threads") != "true":
-            cmdArgs += [ "-s" ]
-            
+                    
         filesToIgnore = test.getCompositeConfigValue("test_data_ignore", "file_edits")
         if filesToIgnore:
             cmdArgs += [ "-i", ",".join(filesToIgnore) ]
             
-        asynchronousFileEditCmds = test.getConfigValue("collect_traffic").get("asynchronous")
-        if asynchronousFileEditCmds:
-            cmdArgs += [ "-a", ",".join(asynchronousFileEditCmds) ]
-
-        responseAlterations = test.getConfigValue("collect_traffic_alter_response")
-        if responseAlterations:
-            cmdArgs.append("--alter-response=" + ",".join(responseAlterations))
-
         if replayFile and self.recordSetting != self.RECORD_ONLY:
             cmdArgs += [ "-p", replayFile ]
             replayEditDir = test.getFileName("file_edits")
@@ -210,6 +198,9 @@ class ConvertToCaptureMock(plugins.Action):
         from ConfigParser import ConfigParser
         from ordereddict import OrderedDict
         parser = ConfigParser(dict_type=OrderedDict)
+        multiThreads = app.getConfigValue("collect_traffic_use_threads") == "true"
+        if not multiThreads:
+            parser.set("generic", "server_multithreaded", multiThreads)
         cmdTraffic = app.getCompositeConfigValue("collect_traffic", "asynchronous")
         if cmdTraffic:
             parser.add_section("command line")
@@ -222,7 +213,10 @@ class ConvertToCaptureMock(plugins.Action):
         pyTraffic = app.getConfigValue("collect_traffic_python")
         if pyTraffic:
             parser.add_section("python")
+            ignore_callers = app.getConfigValue("collect_traffic_python_ignore_callers")
             parser.set("python", "intercepts", ",".join(pyTraffic))
+            if ignore_callers:
+                parser.set("python", "ignore_callers", ",".join(ignore_callers))
 
         print "Wrote file at", newFile
         parser.write(open(newFile, "w"))

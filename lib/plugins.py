@@ -352,7 +352,7 @@ class TestSelectionFilter(TextFilter):
 
     def getSectionsToFind(self, allEntries, app, suites):        
         allHeaders = filter(lambda entry: entry.startswith("appdata=" + app.name), allEntries)
-        if len(allHeaders) == 1:
+        if len(allHeaders) <= 1:
             return allHeaders
         allApps = filter(lambda a: a.name == app.name, [ suite.app for suite in suites ])
         sections = []

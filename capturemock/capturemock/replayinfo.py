@@ -1,18 +1,18 @@
 
 """ Module to manage the information in the file and return appropriate matches """
 
-import logging, difflib, re
+import config, logging, difflib, re, os
 from ordereddict import OrderedDict
 
 class ReplayInfo:
-    def __init__(self, replayFile, filterReplayFile, rcHandler):
+    def __init__(self, replayFile, rcHandler):
         self.responseMap = OrderedDict()
         self.diag = logging.getLogger("Traffic Replay")
         self.replayItems = []
         if replayFile:
             trafficList = self.readIntoList(replayFile)
             self.parseTrafficList(trafficList)
-            if filterReplayFile:
+            if int(os.getenv("CAPTUREMOCK_MODE")) == config.REPLAY_OLD_RECORD_NEW_MODE:
                 items = self.makeCommandItems(rcHandler.getIntercepts("command line")) + \
                         self.makePythonItems(rcHandler.getIntercepts("python"))
                 self.replayItems = self.filterForReplay(items, trafficList)

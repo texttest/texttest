@@ -64,8 +64,6 @@ class SetUpTrafficHandlers(plugins.Action):
             replayEditDir = test.getFileName("file_edits")
             if replayEditDir:
                 cmdArgs += [ "-f", replayEditDir ]
-            if self.recordSetting == self.RECORD_NEW_REPLAY_OLD:
-                cmdArgs.append("--filter-replay-file")
 
         return subprocess.Popen(cmdArgs, env=test.getRunEnvironment(), universal_newlines=True,
                                 cwd=test.getDirectory(temporary=1), stdout=subprocess.PIPE, stderr=subprocess.PIPE)

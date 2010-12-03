@@ -26,8 +26,6 @@ react to the above module to repoint where it sends socket interactions"""
                       help="Configure logging via the log configuration file at FILE.", metavar="LOGCONFIGFILE")
     parser.add_option("-f", "--replay-file-edits", 
                       help="restore edited files referred to in replayed file from DIR.", metavar="DIR")
-    parser.add_option("-2", "--filter-replay-file", action="store_true",
-                      help="Whether to filter the replay file and record items not in it", metavar="MODULES")
     parser.add_option("-r", "--record", 
                       help="record traffic to FILE.", metavar="FILE")
     parser.add_option("-F", "--record-file-edits", 
@@ -44,7 +42,7 @@ class TrafficServer(TCPServer):
         self.rcHandler = RcFileHandler(options.rcfiles.split(","))
         self.useThreads = self.rcHandler.getboolean("server_multithreaded", [ "general" ], True)
         self.recordFileHandler = RecordFileHandler(options.record)
-        self.replayInfo = ReplayInfo(options.replay, options.filter_replay_file, self.rcHandler)
+        self.replayInfo = ReplayInfo(options.replay, self.rcHandler)
         self.requestCount = 0
         self.diag = logging.getLogger("Traffic Server")
         self.topLevelForEdit = [] # contains only paths explicitly given. Always present.

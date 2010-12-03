@@ -30,8 +30,8 @@ class ServerTraffic(traffic.Traffic):
 
 class ServerStateTraffic(ServerTraffic):
     socketId = "SUT_SERVER"
-    def __init__(self, inText, responseFile):
-        ServerTraffic.__init__(self, inText, responseFile)
+    def __init__(self, inText, *args):
+        ServerTraffic.__init__(self, inText, *args)
         if not ClientSocketTraffic.destination:
             lastWord = inText.strip().split()[-1]
             host, port = lastWord.split(":")

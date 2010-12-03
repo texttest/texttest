@@ -10,7 +10,7 @@ def create_option_parser():
     usage = """usage: %prog [options] 
 
 Standalone traffic server program. Basic usage is to grab the
-address it writes out and run a program with TEXTTEST_MIM_SERVER set to it.
+address it writes out and run a program with CAPTUREMOCK_SERVER set to it.
 capturecommand.py can then intercept command-line programs, .py can
 intercept python modules while the system itself can be modified to "internally"
 react to the above module to repoint where it sends socket interactions"""

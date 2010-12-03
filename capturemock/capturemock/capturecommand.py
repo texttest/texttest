@@ -12,7 +12,7 @@ def makeSocket():
         return socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     
 def createSocket():
-    servAddr = os.getenv("TEXTTEST_MIM_SERVER")
+    servAddr = os.getenv("CAPTUREMOCK_SERVER")
     if servAddr:
         host, port = servAddr.split(":")
         serverAddress = (host, int(port))

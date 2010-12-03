@@ -18,7 +18,7 @@ class CommandLineTraffic(traffic.Traffic):
         self.fullCommand = argv[0].replace("\\", "/")
         self.commandName = os.path.basename(self.fullCommand)
         self.cmdArgs = [ self.commandName ] + argv[1:]
-        self.asynchronousEdits = rcHandler.get("asynchronous", self.getRcSections(), False)
+        self.asynchronousEdits = rcHandler.getboolean("asynchronous", self.getRcSections(), False)
         envVarsSet, envVarsUnset = self.filterEnvironment(self.cmdEnviron, rcHandler)
         cmdString = " ".join(map(self.quoteArg, self.cmdArgs))
         text = self.getEnvString(envVarsSet, envVarsUnset) + cmdString

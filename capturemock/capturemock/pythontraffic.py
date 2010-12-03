@@ -81,8 +81,10 @@ class PythonModuleTraffic(PythonTraffic):
         self.interceptModules = set(rcHandler.getIntercepts("python"))
         self.alterations = {}
         for alterStr in rcHandler.getList("alterations", [ self.getTextMarker(), "python" ]):
-            toFind, toReplace = alterStr[:-1].split("{REPLACE ")
-            self.alterations[re.compile(toFind)] = toReplace        
+            toFind = rcHandler.get("match_pattern", [ alterStr ])
+            toReplace = rcHandler.get("replacement", [ alterStr ])
+            if toFind and toReplace:
+                self.alterations[re.compile(toFind)] = toReplace        
         super(PythonModuleTraffic, self).__init__(*args)
 
     def getModuleName(self, obj):

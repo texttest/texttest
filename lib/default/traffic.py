@@ -34,7 +34,7 @@ class SetUpTrafficHandlers(plugins.Action):
             address = self.trafficServerProcess.stdout.readline().strip()
             # And environment it shouldn't get...
             test.setEnvironment("CAPTUREMOCK_PROCESS_START", ",".join(rcFiles))
-            test.setEnvironment("TEXTTEST_MIM_SERVER", address) # Address of TextTest's server for recording client/server traffic
+            test.setEnvironment("CAPTUREMOCK_SERVER", address) # Address of TextTest's server for recording client/server traffic
 
         for pathVar in pathVars:
             # Change test environment to pick up the intercepts
@@ -105,7 +105,7 @@ class TerminateTrafficServer(plugins.Action):
 
     def __call__(self, test):
         if self.setupHandler.trafficServerProcess:
-            servAddr = test.getEnvironment("TEXTTEST_MIM_SERVER")
+            servAddr = test.getEnvironment("CAPTUREMOCK_SERVER")
             if servAddr:
                 self.sendTerminationMessage(servAddr)
             self.writeServerErrors(self.setupHandler.trafficServerProcess)
@@ -200,11 +200,22 @@ class ConvertToCaptureMock(plugins.Action):
         parser = ConfigParser(dict_type=OrderedDict)
         multiThreads = app.getConfigValue("collect_traffic_use_threads") == "true"
         if not multiThreads:
-            parser.set("generic", "server_multithreaded", multiThreads)
+            parser.add_section("general")
+            parser.set("general", "server_multithreaded", multiThreads)
         cmdTraffic = app.getCompositeConfigValue("collect_traffic", "asynchronous")
         if cmdTraffic:
             parser.add_section("command line")
             parser.set("command line", "intercepts", ",".join(cmdTraffic))
+            async = app.getConfigValue("collect_traffic").get("asynchronous", [])
+            for cmd in cmdTraffic:
+                env = app.getConfigValue("collect_traffic_environment").get("cmd")
+                cmdAsync = cmd in async
+                if env or cmdAsync:
+                    parser.add_section(cmd)
+                    if env:
+                        parser.set(cmd, "environment", ",".join(env))
+                    if cmdAsync:
+                        parser.set(cmd, "asynchronous", cmdAsync)
 
         envVars = app.getConfigValue("collect_traffic_environment").get("default")
         if envVars:

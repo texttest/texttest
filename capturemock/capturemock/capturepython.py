@@ -48,7 +48,7 @@ class ModuleProxy:
 
     @staticmethod
     def createSocket():
-        servAddr = os.getenv("TEXTTEST_MIM_SERVER")
+        servAddr = os.getenv("CAPTUREMOCK_SERVER")
         if servAddr:
             host, port = servAddr.split(":")
             serverAddress = (host, int(port))

@@ -38,7 +38,7 @@ class SocketResponder(plugins.Responder,plugins.Observable):
         self.testsForRerun = []
         self.serverAddress = self.getServerAddress(optionMap)
     def getServerAddress(self, optionMap):
-        servAddrStr = optionMap.get("servaddr", os.getenv("TEXTTEST_MIM_SERVER"))
+        servAddrStr = optionMap.get("servaddr", os.getenv("CAPTUREMOCK_SERVER"))
         if not servAddrStr:
             raise plugins.TextTestError, "Cannot run slave, no server address has been provided to send results to!"
         host, port = servAddrStr.split(":")

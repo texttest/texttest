@@ -61,7 +61,7 @@ class QueueSystemServer(BaseActionRunner):
                              suite.app.description(includeCheckout=True))
         
     def setSlaveServerAddress(self, address):
-        self.submitAddress = os.getenv("TEXTTEST_MIM_SERVER", address)
+        self.submitAddress = os.getenv("CAPTUREMOCK_SERVER", address)
         self.testQueue.put("TextTest slave server started on " + address)
 
     def addTest(self, test):
@@ -216,7 +216,7 @@ class QueueSystemServer(BaseActionRunner):
 
     def sendServerState(self, state):
         self.diag.info("Sending server state '" + state + "'")
-        mimServAddr = os.getenv("TEXTTEST_MIM_SERVER")
+        mimServAddr = os.getenv("CAPTUREMOCK_SERVER")
         if mimServAddr:
             host, port = mimServAddr.split(":")
             serverAddress = (host, int(port))

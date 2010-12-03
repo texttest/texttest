@@ -13,7 +13,7 @@ class FileEditTraffic(traffic.ResponseTraffic):
     diag = None
     @classmethod
     def configure(cls, options):
-        cls.diag = logging.getLogger("Traffic Server")
+        cls.diag = logging.getLogger("Server")
         cls.replayFileEditDir = options.replay_file_edits
         cls.recordFileEditDir = options.record_file_edits
         

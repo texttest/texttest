@@ -7,7 +7,7 @@ from ordereddict import OrderedDict
 class ReplayInfo:
     def __init__(self, replayFile, rcHandler):
         self.responseMap = OrderedDict()
-        self.diag = logging.getLogger("Traffic Replay")
+        self.diag = logging.getLogger("Replay")
         self.replayItems = []
         if replayFile:
             trafficList = self.readIntoList(replayFile)

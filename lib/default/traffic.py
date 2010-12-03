@@ -39,26 +39,13 @@ class SetUpTrafficHandlers(plugins.Action):
         for pathVar in pathVars:
             # Change test environment to pick up the intercepts
             test.setEnvironment(pathVar, interceptDir + os.pathsep + test.getEnvironment(pathVar, ""))
-
-    def getTrafficServerLogDefaults(self):
-        return "TEXTTEST_CWD=" + os.getcwd().replace("\\", "/") + ",TEXTTEST_PERSONAL_LOG=" + os.getenv("TEXTTEST_PERSONAL_LOG")
-
-    def getTrafficServerLogConfig(self):
-        allPaths = plugins.findDataPaths([ "logging.traffic" ], dataDirName="log", includePersonal=True)
-        return allPaths[-1]
         
     def makeTrafficServer(self, test, rcFiles, replayFile):
         recordFile = test.makeTmpFileName("traffic")
         recordEditDir = test.makeTmpFileName("file_edits", forComparison=0)
         cmdArgs = [ "capturemock_server", "--rcfiles", ",".join(rcFiles),
-                    "-r", recordFile, "-F", recordEditDir,
-                    "-l", self.getTrafficServerLogDefaults(),
-                    "-L", self.getTrafficServerLogConfig() ]
-                    
-        filesToIgnore = test.getCompositeConfigValue("test_data_ignore", "file_edits")
-        if filesToIgnore:
-            cmdArgs += [ "-i", ",".join(filesToIgnore) ]
-            
+                    "-r", recordFile, "-F", recordEditDir ]
+                                
         if replayFile and self.recordSetting != self.RECORD_ONLY:
             cmdArgs += [ "-p", replayFile ]
             replayEditDir = test.getFileName("file_edits")
@@ -91,10 +78,13 @@ class SetUpTrafficHandlers(plugins.Action):
         interceptName = os.path.join(interceptDir, cmd)
         plugins.ensureDirExistsForFile(interceptName)
         for trafficFile in trafficFiles:
-            if os.name == "posix":
-                os.symlink(trafficFile, interceptName)
-            else:
-                shutil.copy(trafficFile, interceptName)
+            self.copyOrLink(trafficFiles, interceptName)
+
+    def copyOrLink(self, src, dst):
+        if os.name == "posix":
+            os.symlink(src, dst)
+        else:
+            shutil.copy(src, dst)
 
 
 class TerminateTrafficServer(plugins.Action):

@@ -16,14 +16,8 @@ intercept python modules while the system itself can be modified to "internally"
 react to the above module to repoint where it sends socket interactions"""
 
     parser = optparse.OptionParser(usage)
-    parser.add_option("-i", "--ignore-edits", metavar="FILES",
-                      help="When monitoring which files have been edited by a program, ignore files and directories with the given names")
     parser.add_option("-p", "--replay", 
                       help="replay traffic recorded in FILE.", metavar="FILE")
-    parser.add_option("-l", "--logdefaults",
-                      help="Default values to pass to log configuration file. Only useful with -L", metavar="LOGDEFAULTS")
-    parser.add_option("-L", "--logconfigfile",
-                      help="Configure logging via the log configuration file at FILE.", metavar="LOGCONFIGFILE")
     parser.add_option("-f", "--replay-file-edits", 
                       help="restore edited files referred to in replayed file from DIR.", metavar="DIR")
     parser.add_option("-r", "--record", 
@@ -36,15 +30,14 @@ react to the above module to repoint where it sends socket interactions"""
 
 class TrafficServer(TCPServer):
     def __init__(self, options):
-        self.filesToIgnore = []
-        if options.ignore_edits:
-            self.filesToIgnore = options.ignore_edits.split(",")
         self.rcHandler = RcFileHandler(options.rcfiles.split(","))
+        self.setUpLogging()
+        self.filesToIgnore = self.rcHandler.getList("ignore_edits", [ "command line" ])
         self.useThreads = self.rcHandler.getboolean("server_multithreaded", [ "general" ], True)
         self.recordFileHandler = RecordFileHandler(options.record)
         self.replayInfo = ReplayInfo(options.replay, self.rcHandler)
         self.requestCount = 0
-        self.diag = logging.getLogger("Traffic Server")
+        self.diag = logging.getLogger("Server")
         self.topLevelForEdit = [] # contains only paths explicitly given. Always present.
         self.fileEditData = OrderedDict() # contains all paths, including subpaths of the above. Empty when replaying.
         self.terminate = False
@@ -53,6 +46,12 @@ class TrafficServer(TCPServer):
         host, port = self.socket.getsockname()
         sys.stdout.write(host + ":" + str(port) + "\n") # Tell our caller, so they can tell the program being handled
         sys.stdout.flush()
+
+    def setUpLogging(self):
+        logConfigFile = self.rcHandler.get("log_config_file", [ "general" ],
+                                           self.rcHandler.getPersonalPath("logging.conf"))
+        defaults = { "LOCAL_DIR" : os.path.dirname(logConfigFile) }
+        logging.config.fileConfig(logConfigFile, defaults)
         
     def run(self):
         self.diag.info("Starting traffic server")
@@ -359,25 +358,12 @@ class RecordFileHandler:
         writeFile.write(text)
         writeFile.flush()
         writeFile.close()
-
-def parseCmdDictionary(cmdStr, listvals):
-    dict = {}
-    if cmdStr:
-        for part in cmdStr.split(","):
-            cmd, varString = part.split("=")
-            if listvals:
-                dict[cmd] = varString.split("+")
-            else:
-                dict[cmd] = varString
-    return dict
         
         
 def main():
     parser = create_option_parser()
     options = parser.parse_args()[0] # no positional arguments
-    defaults = parseCmdDictionary(options.logdefaults, listvals=False)
-    logging.config.fileConfig(options.logconfigfile, defaults)
-
+    
     fileedittraffic.FileEditTraffic.configure(options)
 
     server = TrafficServer(options)

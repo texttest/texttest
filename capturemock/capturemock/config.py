@@ -11,8 +11,11 @@ class RcFileHandler:
     def __init__(self, rcFiles):
         self.parser = ConfigParser()
         if not rcFiles:
-            rcFiles = os.path.expanduser("~/.capturemock/config")
+            rcFiles = self.getPersonalPath("config")
         self.parser.read(rcFiles)
+
+    def getPersonalPath(self, fileName):
+        return os.path.join(os.path.expanduser("~/.capturemock"), fileName)
 
     def getIntercepts(self, section):
         return self.getList("intercepts", [ section ])

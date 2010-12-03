@@ -8,7 +8,7 @@ class CommandLineTraffic(traffic.Traffic):
     socketId = "SUT_COMMAND_LINE"
     direction = "<-"
     def __init__(self, inText, responseFile, rcHandler):
-        self.diag = logging.getLogger("Traffic Server")
+        self.diag = logging.getLogger("Server")
         cmdText, environText, cmdCwd, proxyPid = inText.split(":SUT_SEP:")
         argv = eval(cmdText)
         self.cmdEnviron = eval(environText)

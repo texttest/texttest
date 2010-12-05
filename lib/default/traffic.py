@@ -127,7 +127,7 @@ class ModifyTraffic(plugins.ScriptWithArgs):
 
 class ConvertToCaptureMock(plugins.Action):
     def setUpApplication(self, app):
-        newFile = os.path.join(app.getDirectory(), "capturemockrc")
+        newFile = os.path.join(app.getDirectory(), "capturemockrc" + app.versionSuffix())
         from ConfigParser import ConfigParser
         from ordereddict import OrderedDict
         parser = ConfigParser(dict_type=OrderedDict)

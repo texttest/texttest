@@ -1,10 +1,9 @@
 
-import optparse, os, stat, sys, logging, logging.config, socket, threading, time
-import commandlinetraffic, pythontraffic, fileedittraffic, clientservertraffic
+import optparse, os, stat, sys, logging, logging.config, socket, threading, time, subprocess
+import config, commandlinetraffic, pythontraffic, fileedittraffic, clientservertraffic
 from SocketServer import TCPServer, StreamRequestHandler
 from ordereddict import OrderedDict
 from replayinfo import ReplayInfo
-from config import RcFileHandler
 
 def create_option_parser():
     usage = """usage: %prog [options] 
@@ -26,11 +25,33 @@ react to the above module to repoint where it sends socket interactions"""
                       help="store edited files under DIR.", metavar="DIR")
     parser.add_option("-R", "--rcfiles", help="Read configuration from given rc files, defaults to ~/.capturemock/config")
     return parser
+
+def startServer(rcFiles, mode, replayFile, replayEditDir,
+                recordFile, recordEditDir, sutDirectory, environment):
+    cmdArgs = [ sys.executable, __file__, "--rcfiles", ",".join(rcFiles),
+                "-r", recordFile, "-F", recordEditDir ]
+                                
+    if replayFile and mode != config.RECORD_ONLY_MODE:
+        cmdArgs += [ "-p", replayFile ]
+        if replayEditDir:
+            cmdArgs += [ "-f", replayEditDir ]
+
+    return subprocess.Popen(cmdArgs, env=environment.copy(), universal_newlines=True,
+                            cwd=sutDirectory, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+def stopServer(servAddr):
+    host, port = servAddr.split(":")
+    serverAddress = (host, int(port))
+    try:
+        TrafficServer.sendTerminateMessage(serverAddress)
+    except socket.error: # pragma: no cover - should be unreachable, just for robustness
+        print "Could not send terminate message to CaptureMock server at " + servAddr + \
+                  ", seemed not to be running anyway."
     
 
 class TrafficServer(TCPServer):
     def __init__(self, options):
-        self.rcHandler = RcFileHandler(options.rcfiles.split(","))
+        self.rcHandler = config.RcFileHandler(options.rcfiles.split(","))
         self.setUpLogging()
         self.filesToIgnore = self.rcHandler.getList("ignore_edits", [ "command line" ])
         self.useThreads = self.rcHandler.getboolean("server_multithreaded", [ "general" ], True)
@@ -63,6 +84,13 @@ class TrafficServer(TCPServer):
             if t.name == "request":
                 t.join()
         self.diag.info("Shut down traffic server")
+
+    @staticmethod
+    def sendTerminateMessage(serverAddress):
+        sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sendSocket.connect(serverAddress)
+        sendSocket.sendall("TERMINATE_SERVER\n")
+        sendSocket.shutdown(2)
             
     def shutdown(self):
         self.diag.info("Told to shut down!")
@@ -71,10 +99,7 @@ class TrafficServer(TCPServer):
             # otherwise the main thread might be in a blocking call at the time
             # So we reset the thread flag and send a new message
             self.useThreads = False
-            sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sendSocket.connect(self.socket.getsockname())
-            sendSocket.sendall("TERMINATE_SERVER\n")
-            sendSocket.shutdown(2)
+            self.sendTerminateMessage(self.socket.getsockname())
         else:
             self.terminate = True
         
@@ -358,9 +383,10 @@ class RecordFileHandler:
         writeFile.write(text)
         writeFile.flush()
         writeFile.close()
+
         
         
-def main():
+if __name__ == "__main__":
     parser = create_option_parser()
     options = parser.parse_args()[0] # no positional arguments
     

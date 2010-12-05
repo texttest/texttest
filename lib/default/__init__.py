@@ -508,9 +508,9 @@ class Config:
         catalogueCreator = self.getCatalogueCreator()
         ignoreCatalogues = self.shouldIgnoreCatalogues()
         collator = self.getTestCollator()
-        from traffic import SetUpTrafficHandlers, TerminateTrafficServer
+        from traffic import SetUpTrafficHandlers, TerminateTrafficHandlers
         trafficSetup = SetUpTrafficHandlers(self.optionIntValue("rectraffic"))
-        trafficTerminator = TerminateTrafficServer(trafficSetup)
+        trafficTerminator = TerminateTrafficHandlers()
         return [ self.getExecHostFinder(), self.getWriteDirectoryMaker(), \
                  self.getWriteDirectoryPreparer(ignoreCatalogues), \
                  trafficSetup, catalogueCreator, collator, self.getOriginalFilterer(), self.getTestRunner(), \

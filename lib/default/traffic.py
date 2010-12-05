@@ -1,13 +1,9 @@
 
-import os, sys, plugins, shutil, socket, subprocess
+import os, plugins, shutil, subprocess
 
 class SetUpTrafficHandlers(plugins.Action):
-    REPLAY_ONLY = 0
-    RECORD_ONLY = 1
-    RECORD_NEW_REPLAY_OLD = 2
     def __init__(self, recordSetting):
         self.recordSetting = recordSetting
-        self.trafficServerProcess = None
         libexecDir = plugins.installationDir("libexec")
         self.siteCustomizeFile = os.path.join(libexecDir, "sitecustomize.py")
         
@@ -17,68 +13,37 @@ class SetUpTrafficHandlers(plugins.Action):
         if test.app.usesTrafficMechanism() or pythonCoverage or pythonCustomizeFiles:
             replayFile = test.getFileName("traffic")
             rcFiles = test.getAllPathNames("capturemockrc")
-            serverActive = self.recordSetting != self.REPLAY_ONLY or replayFile is not None
-            if serverActive or pythonCoverage or pythonCustomizeFiles:
+            if rcFiles or pythonCoverage or pythonCustomizeFiles:
                 self.setUpIntercepts(test, replayFile, rcFiles, pythonCoverage, pythonCustomizeFiles)
 
     def setUpIntercepts(self, test, replayFile, rcFiles, pythonCoverage, pythonCustomizeFiles):
         interceptDir = test.makeTmpFileName("traffic_intercepts", forComparison=0)
-        pathVars = self.makeIntercepts(interceptDir, rcFiles, replayFile,
-                                       pythonCoverage, pythonCustomizeFiles)
+        captureMockActive = False
         if rcFiles:
-            # Environment which the server should get
-            test.setEnvironment("CAPTUREMOCK_MODE", str(self.recordSetting))
-            if replayFile:
-                test.setEnvironment("CAPTUREMOCK_FILE", replayFile)
-            self.trafficServerProcess = self.makeTrafficServer(test, rcFiles, replayFile)
-            address = self.trafficServerProcess.stdout.readline().strip()
-            # And environment it shouldn't get...
-            test.setEnvironment("CAPTUREMOCK_PROCESS_START", ",".join(rcFiles))
-            test.setEnvironment("CAPTUREMOCK_SERVER", address) # Address of TextTest's server for recording client/server traffic
+            captureMockActive = self.setUpCaptureMock(test, interceptDir, replayFile, rcFiles)
+            
+        if pythonCustomizeFiles:
+            self.intercept(pythonCustomizeFiles[-1], interceptDir) # most specific
+                
+        useSiteCustomize = captureMockActive or pythonCoverage or pythonCustomizeFiles
+        if useSiteCustomize:
+            self.intercept(self.siteCustomizeFile, interceptDir)
+            test.setEnvironment("PYTHONPATH", interceptDir + os.pathsep + test.getEnvironment("PYTHONPATH", ""))
 
-        for pathVar in pathVars:
-            # Change test environment to pick up the intercepts
-            test.setEnvironment(pathVar, interceptDir + os.pathsep + test.getEnvironment(pathVar, ""))
-        
-    def makeTrafficServer(self, test, rcFiles, replayFile):
+    def setUpCaptureMock(self, test, interceptDir, replayFile, rcFiles):
         recordFile = test.makeTmpFileName("traffic")
         recordEditDir = test.makeTmpFileName("file_edits", forComparison=0)
-        cmdArgs = [ "capturemock_server", "--rcfiles", ",".join(rcFiles),
-                    "-r", recordFile, "-F", recordEditDir ]
-                                
-        if replayFile and self.recordSetting != self.RECORD_ONLY:
-            cmdArgs += [ "-p", replayFile ]
-            replayEditDir = test.getFileName("file_edits")
-            if replayEditDir:
-                cmdArgs += [ "-f", replayEditDir ]
-
-        return subprocess.Popen(cmdArgs, env=test.getRunEnvironment(), universal_newlines=True,
-                                cwd=test.getDirectory(temporary=1), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    
-    def makeIntercepts(self, interceptDir, rcFiles, replayFile, pythonCoverage, pythonCustomizeFiles):
-        pathVars = []
-        if rcFiles:
-            from capturemock import makePathIntercepts
-            if makePathIntercepts(rcFiles, interceptDir, replayFile, self.recordSetting):
-                pathVars.append("PATH")
-
-        if pythonCustomizeFiles:
-            self.interceptOwnModule(pythonCustomizeFiles[-1], interceptDir) # most specific
-                
-        useSiteCustomize = rcFiles or pythonCoverage or pythonCustomizeFiles
-        if useSiteCustomize:
-            self.interceptOwnModule(self.siteCustomizeFile, interceptDir)
-            pathVars.append("PYTHONPATH")
-        return pathVars
-
-    def interceptOwnModule(self, moduleFile, interceptDir):
-        self.intercept(interceptDir, os.path.basename(moduleFile), [ moduleFile ])
-    
-    def intercept(self, interceptDir, cmd, trafficFiles):
-        interceptName = os.path.join(interceptDir, cmd)
+        replayEditDir = test.getFileName("file_edits") if replayFile else None
+        sutDirectory = test.getDirectory(temporary=1)
+        from capturemock import capturemock
+        return capturemock(rcFiles, interceptDir, self.recordSetting, replayFile,
+                           replayEditDir, recordFile, recordEditDir, sutDirectory,
+                           test.environment)
+            
+    def intercept(self, moduleFile, interceptDir):
+        interceptName = os.path.join(interceptDir, os.path.basename(moduleFile))
         plugins.ensureDirExistsForFile(interceptName)
-        for trafficFile in trafficFiles:
-            self.copyOrLink(trafficFiles, interceptName)
+        self.copyOrLink(moduleFile, interceptName)
 
     def copyOrLink(self, src, dst):
         if os.name == "posix":
@@ -87,34 +52,14 @@ class SetUpTrafficHandlers(plugins.Action):
             shutil.copy(src, dst)
 
 
-class TerminateTrafficServer(plugins.Action):
-    def __init__(self, setupHandler):
-        self.setupHandler = setupHandler
-
+class TerminateTrafficHandlers(plugins.Action):
     def __call__(self, test):
-        if self.setupHandler.trafficServerProcess:
-            servAddr = test.getEnvironment("CAPTUREMOCK_SERVER")
-            if servAddr:
-                self.sendTerminationMessage(servAddr)
-            self.writeServerErrors(self.setupHandler.trafficServerProcess)
-            self.setupHandler.trafficServerProcess = None
-
-    def sendTerminationMessage(self, servAddr):
-        sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        host, port = servAddr.split(":")
-        serverAddress = (host, int(port))
         try:
-            sendSocket.connect(serverAddress)
-            sendSocket.sendall("TERMINATE_SERVER\n")
-            sendSocket.shutdown(2)
-        except socket.error: # pragma: no cover - should be unreachable, just for robustness
-            plugins.log.info("Could not send terminate message to traffic server at " + servAddr + ", seemed not to be running anyway.")
-        
-    def writeServerErrors(self, process):
-        err = process.communicate()[1]
-        if err:
-            sys.stderr.write("Error from Traffic Server :\n" + err)
-        
+            from capturemock import terminate
+            terminate()
+        except ImportError:
+            pass
+                
 
 class ModifyTraffic(plugins.ScriptWithArgs):
     # For now, only bother with the client server traffic which is mostly what needs tweaking...

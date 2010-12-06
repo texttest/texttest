@@ -141,7 +141,7 @@ class ConvertToCaptureMock(plugins.Action):
             parser.set("command line", "intercepts", ",".join(cmdTraffic))
             async = app.getConfigValue("collect_traffic").get("asynchronous", [])
             for cmd in cmdTraffic:
-                env = app.getConfigValue("collect_traffic_environment").get("cmd")
+                env = app.getConfigValue("collect_traffic_environment").get(cmd)
                 cmdAsync = cmd in async
                 if env or cmdAsync:
                     parser.add_section(cmd)

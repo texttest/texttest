@@ -110,6 +110,7 @@ class SetUpTrafficHandlers(plugins.Action):
         if useSiteCustomize:
             self.interceptOwnModule(self.siteCustomizeFile, interceptDir)
             pathVars.append("PYTHONPATH")
+            pathVars.append("JYTHONPATH")
         return pathVars
 
     def interceptOwnModule(self, moduleFile, interceptDir):

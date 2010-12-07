@@ -28,7 +28,8 @@ class SetUpTrafficHandlers(plugins.Action):
         useSiteCustomize = captureMockActive or pythonCoverage or pythonCustomizeFiles
         if useSiteCustomize:
             self.intercept(self.siteCustomizeFile, interceptDir)
-            test.setEnvironment("PYTHONPATH", interceptDir + os.pathsep + test.getEnvironment("PYTHONPATH", ""))
+            for var in [ "PYTHONPATH", "JYTHONPATH" ]:
+                test.setEnvironment(var, interceptDir + os.pathsep + test.getEnvironment(var, ""))
 
     def setUpCaptureMock(self, test, interceptDir, replayFile, rcFiles):
         recordFile = test.makeTmpFileName("traffic")

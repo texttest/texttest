@@ -127,22 +127,21 @@ class ModifyTraffic(plugins.ScriptWithArgs):
 
 
 class ConvertToCaptureMock(plugins.Action):
-    def setUpApplication(self, app):
-        newFile = os.path.join(app.getDirectory(), "capturemockrc" + app.versionSuffix())
+    def convert(self, confObj, newFile):
         from ConfigParser import ConfigParser
         from ordereddict import OrderedDict
         parser = ConfigParser(dict_type=OrderedDict)
-        multiThreads = app.getConfigValue("collect_traffic_use_threads") == "true"
+        multiThreads = confObj.getConfigValue("collect_traffic_use_threads") == "true"
         if not multiThreads:
             parser.add_section("general")
             parser.set("general", "server_multithreaded", multiThreads)
-        cmdTraffic = app.getCompositeConfigValue("collect_traffic", "asynchronous")
+        cmdTraffic = confObj.getCompositeConfigValue("collect_traffic", "asynchronous")
         if cmdTraffic:
             parser.add_section("command line")
             parser.set("command line", "intercepts", ",".join(cmdTraffic))
-            async = app.getConfigValue("collect_traffic").get("asynchronous", [])
+            async = confObj.getConfigValue("collect_traffic").get("asynchronous", [])
             for cmd in cmdTraffic:
-                env = app.getConfigValue("collect_traffic_environment").get(cmd)
+                env = confObj.getConfigValue("collect_traffic_environment").get(cmd)
                 cmdAsync = cmd in async
                 if env or cmdAsync:
                     parser.add_section(cmd)
@@ -151,17 +150,34 @@ class ConvertToCaptureMock(plugins.Action):
                     if cmdAsync:
                         parser.set(cmd, "asynchronous", cmdAsync)
 
-        envVars = app.getConfigValue("collect_traffic_environment").get("default")
+        envVars = confObj.getConfigValue("collect_traffic_environment").get("default")
         if envVars:
             parser.set("command line", "environment", ",".join(envVars))
 
-        pyTraffic = app.getConfigValue("collect_traffic_python")
+        pyTraffic = confObj.getConfigValue("collect_traffic_python")
         if pyTraffic:
             parser.add_section("python")
-            ignore_callers = app.getConfigValue("collect_traffic_python_ignore_callers")
+            ignore_callers = confObj.getConfigValue("collect_traffic_python_ignore_callers")
             parser.set("python", "intercepts", ",".join(pyTraffic))
             if ignore_callers:
                 parser.set("python", "ignore_callers", ",".join(ignore_callers))
 
-        print "Wrote file at", newFile
-        parser.write(open(newFile, "w"))
+        if len(parser.sections()) > 0: # don't write empty files
+            print "Wrote file at", newFile
+            parser.write(open(newFile, "w"))
+
+    def setUpApplication(self, app):
+        newFile = os.path.join(app.getDirectory(), "capturemockrc" + app.versionSuffix())
+        self.convert(app, newFile)
+
+    def __call__(self, test):
+        self.checkTest(test)
+
+    def setUpSuite(self, suite):
+        self.checkTest(suite)
+
+    def checkTest(self, test):
+        configFile = test.getFileName("config")
+        if configFile:
+            newFile = os.path.join(test.getDirectory(), "capturemockrc")
+            self.convert(test, newFile)

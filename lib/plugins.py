@@ -401,11 +401,14 @@ class TestSelectionFilter(TextFilter):
         return self.suiteInTexts(suite) or (suite.parent and self.hasFullSuiteAncestor(suite.parent))
 
     def suiteInTexts(self, suite):
+        if suite.parent is None:
+            return True # don't eliminate the root suite :)
         for relPath in self.texts:
             suitePath = suite.getRelPath()
-            if relPath.startswith(suitePath):
-                if relPath == suitePath:
-                    self.fullSuites.append(suite)
+            if relPath == suitePath:
+                self.fullSuites.append(suite)
+                return True
+            elif relPath.startswith(suitePath + "/"):
                 return True
         return False
 

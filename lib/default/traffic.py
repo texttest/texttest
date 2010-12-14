@@ -36,10 +36,10 @@ class SetUpTrafficHandlers(plugins.Action):
         recordEditDir = test.makeTmpFileName("file_edits", forComparison=0)
         replayEditDir = test.getFileName("file_edits") if replayFile else None
         sutDirectory = test.getDirectory(temporary=1)
-        from capturemock import capturemock
-        return capturemock(rcFiles, interceptDir, self.recordSetting, replayFile,
-                           replayEditDir, recordFile, recordEditDir, sutDirectory,
-                           test.environment)
+        from capturemock import setUp
+        return setUp(rcFiles, interceptDir, self.recordSetting, replayFile,
+                     replayEditDir, recordFile, recordEditDir, sutDirectory,
+                     test.environment)
             
     def intercept(self, moduleFile, interceptDir):
         interceptName = os.path.join(interceptDir, os.path.basename(moduleFile))

@@ -77,7 +77,7 @@ class CaptureMockManager:
 
 
 manager = None
-def capturemock(*args, **kw):
+def setUp(*args, **kw):
     global manager
     manager = CaptureMockManager(*args, **kw)
     return manager.active

@@ -2,31 +2,52 @@
 from capturepython import interceptPython
 from capturecommand import interceptCommand
 
-import os, sys, shutil, socket, config
+import os, sys, shutil, socket, config, filecmp
+
+class CaptureMockReplayError(RuntimeError):
+    pass
 
 class CaptureMockManager:
     fileContents = "import capturemock; capturemock.interceptCommand()\n"
-    def __init__(self, rcFiles, interceptDir, mode, replayFile,
-                 replayEditDir, recordFile, recordEditDir,
-                 sutDirectory=os.getcwd(), environment=os.environ):
-        self.active = mode != config.REPLAY_ONLY_MODE or replayFile is not None
-        if self.active:
+    def __init__(self):
+        self.serverProcess = None
+        self.serverAddress = None
+
+    def isActive(self, mode, replayFile):
+        return mode != config.REPLAY_ONLY_MODE or (replayFile is not None and os.path.isfile(replayFile))
+        
+    def start(self, mode, recordFile, replayFile=None, pythonAttrs=[], 
+              recordEditDir=None, replayEditDir=None, rcFiles=[], interceptDir=None,
+              sutDirectory=os.getcwd(), environment=os.environ, useServer=False):
+        if self.isActive(mode, replayFile):
             # Environment which the server should get
             environment["CAPTUREMOCK_MODE"] = str(mode)
             if replayFile:
                 environment["CAPTUREMOCK_FILE"] = replayFile
-            from server import startServer
-            self.serverProcess = startServer(rcFiles, mode, replayFile, replayEditDir,
-                                             recordFile, recordEditDir, sutDirectory, environment)
-            self.serverAddress = self.serverProcess.stdout.readline().strip()
-            # And environment it shouldn't get...
-            environment["CAPTUREMOCK_PROCESS_START"] = ",".join(rcFiles)
-            environment["CAPTUREMOCK_SERVER"] = self.serverAddress
-            if self.makePathIntercepts(rcFiles, interceptDir, replayFile, mode):
-                environment["PATH"] = interceptDir + os.pathsep + environment.get("PATH", "")
+            rcHandler = config.RcFileHandler(rcFiles)
+            commands = rcHandler.getIntercepts("command line")
+            if useServer or len(commands) > 0: # command line has to go via server
+                from server import startServer
+                self.serverProcess = startServer(rcFiles, mode, replayFile, replayEditDir,
+                                                 recordFile, recordEditDir, sutDirectory,
+                                                 environment)
+                self.serverAddress = self.serverProcess.stdout.readline().strip()
+                # And environment it shouldn't get...
+                environment["CAPTUREMOCK_PROCESS_START"] = ",".join(rcFiles)
+                environment["CAPTUREMOCK_SERVER"] = self.serverAddress
+                if self.makePathIntercepts(commands, interceptDir, replayFile, mode):
+                    environment["PATH"] = interceptDir + os.pathsep + environment.get("PATH", "")
+            else:
+                pythonAttrs += rcHandler.getIntercepts("python")
+                # not ready yet
+                ## if replayFile and mode != config.RECORD_ONLY_MODE:
+##                     import replayinfo
+##                     pythonAttrs = replayinfo.filterPython(pythonAttrs, replayFile)
+##                 interceptPython(pythonAttrs, rcHandler)
+            return True
         else:
-            self.serverProcess = None
-
+            return False
+        
     def makeWindowsIntercept(self, interceptName):
         file = open(interceptName + ".py", "w")    
         file.write("#!python.exe\nimport site\n")
@@ -52,9 +73,7 @@ class CaptureMockManager:
         else:
             self.makePosixIntercept(interceptName)
 
-    def makePathIntercepts(self, rcFiles, interceptDir, replayFile, mode):
-        rcHandler = config.RcFileHandler(rcFiles)
-        commands = rcHandler.getIntercepts("command line")
+    def makePathIntercepts(self, commands, interceptDir, replayFile, mode):
         if replayFile and mode == config.REPLAY_ONLY_MODE:
             import replayinfo
             commands = replayinfo.filterCommands(commands, replayFile)
@@ -79,12 +98,58 @@ class CaptureMockManager:
 manager = None
 def setUp(*args, **kw):
     global manager
-    manager = CaptureMockManager(*args, **kw)
-    return manager.active
+    manager = CaptureMockManager()
+    return manager.start(*args, **kw)
 
 def terminate():
     if manager:
         manager.terminate()
+
+# For use as a decorator in coded tests
+class capturemock(object):
+    def __init__(self, pythonAttrs=[], **kw):
+        self.pythonAttrs = pythonAttrs
+        if not isinstance(pythonAttrs, list):
+            self.pythonAttrs = [ pythonAttrs ]
+        self.kw = kw
+        self.mode = int(os.getenv("CAPTUREMOCK_MODE", "0"))
+
+    def __call__(self, func):
+        from inspect import stack
+        callingFile = stack()[1][1]
+        fileNameRoot = self.getFileNameRoot(func.__name__, callingFile)
+        if self.mode == config.RECORD_ONLY_MODE:
+            recordFile = fileNameRoot
+            replayFile = None
+        else:
+            replayFile = fileNameRoot
+            recordFile = fileNameRoot + ".tmp"
+        def wrapped_func(*funcargs, **funckw):
+            try:
+                setUp(self.mode, recordFile, replayFile, self.pythonAttrs, useServer=True, **self.kw)
+                process_startup()
+                func(*funcargs, **funckw)
+                if replayFile:
+                    self.checkMatching(recordFile, replayFile)
+            finally:
+                terminate()
+        return wrapped_func
+
+    def checkMatching(self, recordFile, replayFile):
+        if filecmp.cmp(recordFile, replayFile, 0):
+            os.remove(recordFile)
+        else:
+            # files don't match
+            raise CaptureMockReplayError("Replayed calls do not match those recorded. " +
+                                         "Either rerun with capturemock in record mode " +
+                                         "or update the stored mock file by hand.")
+
+    def getFileNameRoot(self, funcName, callingFile):
+        dirName = os.path.join(os.path.dirname(callingFile), "capturemock")
+        if not os.path.isdir(dirName):
+            os.makedirs(dirName)
+        return os.path.join(dirName, funcName.replace("test_", "") + ".mock")
+    
                             
 def process_startup():
     rcFileStr = os.getenv("CAPTUREMOCK_PROCESS_START")

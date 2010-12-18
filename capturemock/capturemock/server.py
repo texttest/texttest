@@ -29,7 +29,9 @@ react to the above module to repoint where it sends socket interactions"""
 def startServer(rcFiles, mode, replayFile, replayEditDir,
                 recordFile, recordEditDir, sutDirectory, environment):
     cmdArgs = [ sys.executable, __file__, "--rcfiles", ",".join(rcFiles),
-                "-r", recordFile, "-F", recordEditDir ]
+                "-r", recordFile ]
+    if recordEditDir:
+        cmdArgs += [ "-F", recordEditDir ]
                                 
     if replayFile and mode != config.RECORD_ONLY_MODE:
         cmdArgs += [ "-p", replayFile ]
@@ -343,6 +345,8 @@ class TrafficRequestHandler(StreamRequestHandler):
 class RecordFileHandler:
     def __init__(self, file):
         self.file = file
+        if os.path.isfile(self.file):
+            os.remove(self.file)
         self.recordingRequest = 1
         self.cache = {}
         self.completedRequests = []

@@ -22,7 +22,8 @@ class TimeMonitor:
     def getElapsedTime(self, test):
         timingInfo = self.timingInfo.get(test)
         if timingInfo:
-            return (datetime.datetime.now() - timingInfo[0][1]).seconds
+            delta = datetime.datetime.now() - timingInfo[0][1]
+            return delta.seconds + delta.days * 60 * 60 * 24
         else:
             return -1
 

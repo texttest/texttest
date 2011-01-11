@@ -187,7 +187,8 @@ class Test(plugins.Observable):
         self.parent = parent
         self.dircache = dircache
         self.configDir = configDir
-        self.tryPopulateConfig()
+        if configDir is None:
+            self.setUpConfiguration()
         populateFunction = plugins.Callable(app.setEnvironment, self)
         self.environment = TestEnvironment(populateFunction)
         # Java equivalent of the environment mechanism...
@@ -196,8 +197,8 @@ class Test(plugins.Observable):
         # Test suites never change state, but it's convenient that they have one
         self.state = plugins.TestState("not_started")
 
-    def tryPopulateConfig(self):
-        if self.configDir is None and self.dircache.hasStem("config"):
+    def setUpConfiguration(self):
+        if self.dircache.hasStem("config"):
             self.configDir = self.copyParentConfigDir()
             self.app.readValues(self.configDir, "config", [ self.dircache ], insert=False, errorOnUnknown=True)
 

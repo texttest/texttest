@@ -197,6 +197,8 @@ class ReconnectToTests(BasicRunningAction,guiplugins.ActionDialogGUI):
     def getAppIdentifier(self, app):
         # Don't send version data, we have our own field with that info and it has a slightly different meaning
         return app.name
+    def getSizeAsWindowFraction(self):
+        return 0.8, 0.7
 
 # base class for RunTests and RerunTests, i.e. all the options are available
 class RunningAction(BasicRunningAction):

@@ -601,9 +601,12 @@ class WebPageResponder(plugins.Responder):
         except Exception: # pragma: no cover - robustness only, shouldn't be reachable
             sys.stderr.write("Caught exception while generating web pages :\n")
             plugins.printException()
-        
+
+    def getWebPageGenerator(self, getConfigValue, *args):
+        return testoverview.GenerateWebPages(getConfigValue, *args)
+    
     def generateWebPages(self, subDirs, getConfigValue, *args):
-        generator = testoverview.GenerateWebPages(getConfigValue, *args)
+        generator = self.getWebPageGenerator(getConfigValue, *args)
         subPageNames = getConfigValue("historical_report_subpages", self.batchSession)
         generator.generate(subDirs, subPageNames)
 

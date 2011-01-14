@@ -279,8 +279,9 @@ class GenerateWebPages(object):
         return TestTable(*args)
         
     def addTable(self, page, cellInfo, categoryHandlers, version, loggedTests, selector, tableHeader, filePath, graphHeading):
+        graphDirname, graphFileRef = self.getGraphFileParts(filePath, version)
         testTable = self.getTestTable(self.getConfigValue, cellInfo, self.descriptionInfo,
-                              selector.selectedTags, categoryHandlers, self.pageVersion, version)
+                                      selector.selectedTags, categoryHandlers, self.pageVersion, version, os.path.join(graphDirname, graphFileRef))
         table = testTable.generate(loggedTests)
         if table:
             cells = []
@@ -289,10 +290,9 @@ class GenerateWebPages(object):
                 cells.append(self.makeTableHeaderCell(tableHeader))
 
             if not cellInfo: 
-                dirname, fileRef = self.getGraphFileParts(filePath, version)
-                fullPath = os.path.abspath(os.path.join(dirname, fileRef))
+                fullPath = os.path.abspath(os.path.join(graphDirname, graphFileRef))
                 if testTable.generateGraph(fullPath, graphHeading):
-                    cells.append(self.makeImageLink(fileRef))
+                    cells.append(self.makeImageLink(graphFileRef))
 
             if len(cells):
                 row = HTMLgen.TR(*cells)
@@ -340,7 +340,7 @@ class GenerateWebPages(object):
 
 
 class TestTable:
-    def __init__(self, getConfigValue, cellInfo, descriptionInfo, tags, categoryHandlers, pageVersion, version):
+    def __init__(self, getConfigValue, cellInfo, descriptionInfo, tags, categoryHandlers, pageVersion, version, graphFilePath):
         self.getConfigValue = getConfigValue
         self.cellInfo = cellInfo
         self.colourFinder = ColourFinder(getConfigValue)
@@ -349,6 +349,7 @@ class TestTable:
         self.categoryHandlers = categoryHandlers
         self.pageVersion = pageVersion
         self.version = version
+        self.graphFilePath = graphFilePath # For convenience in performance analyzer.
 
     def generateGraph(self, fileName, heading):
         if len(self.tags) > 1: # Don't bother with graphs when tests have only run once
@@ -374,7 +375,7 @@ class TestTable:
             currRows = []
             for test in sorted(testInfo.keys()):
                 results = testInfo[test]
-                rows = self.generateTestRow(test, extraVersion, results)
+                rows = self.generateTestRows(test, extraVersion, results)
                 if rows:
                     currRows += rows
 
@@ -435,7 +436,7 @@ class TestTable:
         columnHeader = HTMLgen.TH(extraVersionElement, colspan = len(self.tags) + 1, bgcolor=bgColour)
         return HTMLgen.TR(columnHeader)
     
-    def generateTestRow(self, testName, extraVersion, results):
+    def generateTestRows(self, testName, extraVersion, results):
         bgColour = self.colourFinder.find("row_header_bg")
         testId = self.version + testName + extraVersion
         container = HTMLgen.Container(HTMLgen.Name(testId), testName)

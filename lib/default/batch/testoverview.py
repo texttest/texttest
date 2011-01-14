@@ -274,9 +274,12 @@ class GenerateWebPages(object):
         image = HTMLgen.Image(filename=graphFile, src=graphFile, height=100, width=150, border=0)
         link = HTMLgen.Href(graphFile, image)
         return HTMLgen.TD(link)
+
+    def getTestTable(self, *args):
+        return TestTable(*args)
         
     def addTable(self, page, cellInfo, categoryHandlers, version, loggedTests, selector, tableHeader, filePath, graphHeading):
-        testTable = TestTable(self.getConfigValue, cellInfo, self.descriptionInfo,
+        testTable = self.getTestTable(self.getConfigValue, cellInfo, self.descriptionInfo,
                               selector.selectedTags, categoryHandlers, self.pageVersion, version)
         table = testTable.generate(loggedTests)
         if table:
@@ -371,9 +374,9 @@ class TestTable:
             currRows = []
             for test in sorted(testInfo.keys()):
                 results = testInfo[test]
-                row = self.generateTestRow(test, extraVersion, results)
-                if row:
-                    currRows.append(row)
+                rows = self.generateTestRow(test, extraVersion, results)
+                if rows:
+                    currRows += rows
 
             if len(currRows) == 0:
                 continue
@@ -445,7 +448,7 @@ class TestTable:
             foundData |= hasData
             
         if foundData:
-            return HTMLgen.TR(*row)
+            return [ HTMLgen.TR(*row) ]
 
     def getCellData(self, state):
         if state:

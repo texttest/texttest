@@ -399,9 +399,16 @@ class TestTreeGUI(guiutils.ContainerGUI):
         for test in self.getSortedSelectedTests(suite):
             self.writeSelectedTest(test, file)
 
+    def shouldListSubTests(self, test):
+        if test.parent is None or not all((self.isVisible(test) for test in test.testCaseList())):
+            return True
+
+        filters = test.app.getFilterList([test])
+        return len(filters) > 0
+
     def writeSelectedTest(self, test, file):
         if test.classId() == "test-suite":
-            if test.parent is None or not all((self.isVisible(test) for test in test.testCaseList())):
+            if self.shouldListSubTests(test):
                 for subTest in test.testcases:
                     if self.isVisible(subTest):
                         self.writeSelectedTest(subTest, file)

@@ -356,7 +356,7 @@ class Config:
         if self.batchMode() and not self.optionMap.has_key("s"):
             if self.optionMap.has_key("coll"):
                 if self.optionMap["coll"] != "mail": 
-                    classes.append(batch.WebPageResponder)
+                    classes.append(self.getWebPageResponder())
             else:
                 if self.optionValue("b") is None:
                     plugins.log.info("No batch session identifier provided, using 'default'")
@@ -754,6 +754,8 @@ class Config:
         return [ ("actrep", "slow motion") ]
     def getTextResponder(self):
         return console.InteractiveResponder
+    def getWebPageResponder(self):
+        return batch.WebPageResponder
 
     # Utilities, which prove useful in many derived classes
     def optionValue(self, option):

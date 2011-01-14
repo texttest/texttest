@@ -205,10 +205,10 @@ class RecomputeTests(guiplugins.ActionGUI):
         self.latestNumberOfRecomputations = 0
         if self.allComplete:
             # not a good idea to reread configuration while tests are still running, can lead to race conditions
-            for app in self.currAppSelection:
-                self.notify("Status", "Rereading configuration for " + repr(app) + " ...")
+            for appOrTest in self.currAppSelection + self.currTestSelection:
+                self.notify("Status", "Rereading configuration for " + repr(appOrTest) + " ...")
                 self.notify("ActionProgress")
-                app.setUpConfiguration()
+                appOrTest.setUpConfiguration()
 
         for test in self.currTestSelection:
             self.latestNumberOfRecomputations += 1

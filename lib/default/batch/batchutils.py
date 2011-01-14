@@ -15,7 +15,7 @@ class BatchVersionFilter:
         
         allowedVersions = app.getCompositeConfigValue("batch_version", self.batchSession)
         for version in app.versions:
-            if len(version) > 0 and not version in allowedVersions:
+            if len(version) > 0 and version not in allowedVersions and not version.startswith("copy_"):
                 return version
 
 

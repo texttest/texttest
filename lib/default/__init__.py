@@ -412,9 +412,7 @@ class Config:
                len(app.getConfigValue("partial_copy_test_path")) > 0
 
     def usesTrafficMechanism(self, app):
-        return app.getConfigValue("collect_traffic_client_server") == "true" or \
-               len(app.getCompositeConfigValue("collect_traffic", "asynchronous")) > 0 or \
-               len(app.getConfigValue("collect_traffic_python")) > 0
+        return len(app.getAllFileNames([ app.dircache ], "capturemockrc", allVersions=False)) > 0
     
     def hasWritePermission(self, path):
         if os.path.isdir(path):
@@ -508,9 +506,9 @@ class Config:
         catalogueCreator = self.getCatalogueCreator()
         ignoreCatalogues = self.shouldIgnoreCatalogues()
         collator = self.getTestCollator()
-        from traffic import SetUpTrafficHandlers, TerminateTrafficServer
+        from traffic import SetUpTrafficHandlers, TerminateTrafficHandlers
         trafficSetup = SetUpTrafficHandlers(self.optionIntValue("rectraffic"))
-        trafficTerminator = TerminateTrafficServer(trafficSetup)
+        trafficTerminator = TerminateTrafficHandlers()
         return [ self.getExecHostFinder(), self.getWriteDirectoryMaker(), \
                  self.getWriteDirectoryPreparer(ignoreCatalogues), \
                  trafficSetup, catalogueCreator, collator, self.getOriginalFilterer(), self.getTestRunner(), \

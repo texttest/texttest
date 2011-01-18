@@ -103,6 +103,10 @@ class TestEnvironment(OrderedDict):
     def definesValue(self, var):
         self.checkPopulated()
         return self.has_key(var)
+
+    def copy(self):
+        # Shallow copies should contain all the information locally, otherwise deepcopying effectively happens.
+        return self.getValues()
     
     def getValues(self, onlyVars=[], ignoreVars=[]):
         self.checkPopulated()

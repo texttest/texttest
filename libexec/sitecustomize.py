@@ -17,16 +17,11 @@ def loadTestCustomize():
         pass
 
 def trySetupCaptureMock():
-    pythonVarStr = os.getenv("TEXTTEST_MIM_PYTHON")
-    if pythonVarStr and sys.version_info[:2] >= (2, 4):
-        # Capturemock uses Python 2.4 syntax, won't work on earlier versions
-        from capturemock import interceptPython
-        attributeNames = pythonVarStr.split(",")
-        ignoreVar = os.getenv("TEXTTEST_MIM_PYTHON_IGNORE")
-        ignoreCallers = []
-        if ignoreVar:
-            ignoreCallers = ignoreVar.split(",")
-        interceptPython(attributeNames, ignoreCallers)
+    try:
+        import capturemock
+        capturemock.process_startup() # doesn't do anything unless CAPTUREMOCK_PROCESS_START is set
+    except Exception, e:
+        pass
 
 def loadRealSiteCustomize(fileName): # pragma: no cover - coverage not set up yet
     # must do this before setting up coverage as real sitecustomize might

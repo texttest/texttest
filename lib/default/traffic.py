@@ -168,7 +168,7 @@ class ConvertToCaptureMock(plugins.Action):
             parser.write(open(newFile, "w"))
 
     def setUpApplication(self, app):
-        newFile = os.path.join(app.getDirectory(), "capturemockrc" + app.versionSuffix())
+        newFile = os.path.join(app.getDirectory(), "capturemockrc." + app.name + app.versionSuffix())
         self.convert(app, newFile)
 
     def __call__(self, test):
@@ -180,5 +180,5 @@ class ConvertToCaptureMock(plugins.Action):
     def checkTest(self, test):
         configFile = test.getFileName("config")
         if configFile:
-            newFile = os.path.join(test.getDirectory(), "capturemockrc")
+            newFile = os.path.join(test.getDirectory(), "capturemockrc." + test.app.name)
             self.convert(test, newFile)

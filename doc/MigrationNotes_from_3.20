@@ -1,15 +1,42 @@
 
-
-More migration (potentially) in the Python traffic interception mechanism.
+The main migration concerns users of TextTest's traffic interception mechanism, now CaptureMock.
 
 =========================================================
 COMPULSORY MIGRATION
 =========================================================
 
-(1) Base classes in intercepted Python traffic
+(1) "Traffic Mechanism" is now a separate project called CaptureMock
+====================================================================
+If you were using this, you will now need to also install the CaptureMock program.
+You will also need to create files of the format it now expects. This will ordinarily consist
+of two parts:
+
+a) Generate capturemockrc files
+
+   The way to do that is to run the conversion script as follows
+
+   texttest.py -s traffic.ConvertToCaptureMock
+
+   This will automatically create capturemockrc.<app> files as appropiate based on your collect_traffic* 
+   settings in the config files. It may in some cases create more files than necessary so some duplicates
+   for versions may be able to be deleted.
+
+b) Adjust your config files
+
+   All collect_traffic settings should be removed from the config files after doing (a). TextTest will
+   refuse to start until they have been. In addition, you should enable capturemock by adding
+
+   import_config_file:capturemock_config
+
+   to your config file. 
+
+(2) Base classes in intercepted Python traffic
 ==============================================
 
-These are now handled correctly, i.e. listed explicitly in the traffic files. This means
+Once you've done that, if you have moderately complicated Python interception you may need some
+CaptureMock migration.
+
+Base classes are now handled correctly, i.e. listed explicitly in the traffic files. This means
 that two previous conventions in the traffic files are now obsolete.
 
 NewStyleInstance('Blah', 'blah1')

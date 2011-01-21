@@ -412,7 +412,7 @@ class Config:
                len(app.getConfigValue("partial_copy_test_path")) > 0
 
     def usesTrafficMechanism(self, app):
-        return len(app.getAllFileNames([ app.dircache ], "capturemockrc", allVersions=False)) > 0
+        return "traffic" in app.defFileStems()
     
     def hasWritePermission(self, path):
         if os.path.isdir(path):
@@ -1099,7 +1099,6 @@ class Config:
         severities["output"] = 1
         severities["stderr"] = 1
         severities["stdout"] = 1
-        severities["traffic"] = 1
         severities["usecase"] = 1
         severities["performance"] = 2
         severities["catalogue"] = 2
@@ -1329,7 +1328,6 @@ class Config:
         app.addConfigEntry("builtin", "options", "definition_file_stems")
         app.addConfigEntry("builtin", "interpreter_options", "definition_file_stems")
         app.addConfigEntry("regenerate", "usecase", "definition_file_stems")
-        app.addConfigEntry("regenerate", "traffic", "definition_file_stems")
         app.addConfigEntry("builtin", self.getStdinName(namingScheme), "definition_file_stems")
         app.addConfigEntry("builtin", "knownbugs", "definition_file_stems")
         app.setConfigAlias("test_list_files_directory", "filter_file_directory")

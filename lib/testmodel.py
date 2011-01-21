@@ -1256,6 +1256,7 @@ class Application:
     def setUpConfiguration(self, configEntries={}):
         self.configDir.clear()
         self.configDocs = {}
+        self.defaultDirCaches = self.getDefaultDirCaches()
         self.extraDirCaches = {}
         self.setConfigDefaults()
 
@@ -1378,11 +1379,13 @@ class Application:
         self.readDefaultConfigFiles()
         self.readExplicitConfigFiles(configModuleInitialised)
 
-    def readDefaultConfigFiles(self):
+    def getDefaultDirCaches(self):
         includeSite, includePersonal = self.inputOptions.configPathOptions()
-        dirCaches = map(DirectoryCache, plugins.findDataDirs(includeSite, includePersonal))
+        return map(DirectoryCache, plugins.findDataDirs(includeSite, includePersonal))
+
+    def readDefaultConfigFiles(self):
         # don't error check as there might be settings there for all sorts of config modules...
-        self.readValues(self.configDir, "config", dirCaches, insert=False, errorOnUnknown=False)
+        self.readValues(self.configDir, "config", self.defaultDirCaches, insert=False, errorOnUnknown=False)
             
     def readExplicitConfigFiles(self, configModuleInitialised):
         prevFiles = []
@@ -1437,7 +1440,9 @@ class Application:
         if os.path.isabs(fileName):
             return fileName
 
-        dirCaches = self.getExtraDirCaches(fileName, includeRoot=True)
+        dirCaches = []
+        dirCaches += self.defaultDirCaches
+        dirCaches += self.getExtraDirCaches(fileName, includeRoot=True)
         dirCaches.append(self.dircache)
         configPath = self.getFileNameFromCaches(dirCaches, fileName)
         if not configPath:

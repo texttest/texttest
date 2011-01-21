@@ -808,6 +808,7 @@ class Config:
             self.checkExecutableExists(suite)
 
         self.checkFilterFileSanity(suite)
+        self.checkCaptureMockMigration(suite)
         self.checkConfigSanity(suite.app)
         batchSession = self.getBatchSessionForSelect()
         if batchSession is not None and not self.optionMap.has_key("coll"):
@@ -819,6 +820,14 @@ class Config:
         if self.readsTestStateFiles():
             # Reading stuff from stored pickle files, need to set up categories independently
             self.setUpPerformanceCategories(suite.app)
+
+    def checkCaptureMockMigration(self, suite):
+        if (suite.getCompositeConfigValue("collect_traffic", "asynchronous") or \
+            suite.getConfigValue("collect_traffic_python")) and \
+               not self.optionMap.runScript():
+            raise plugins.TextTestError, "collect_traffic settings have been deprecated.\n" + \
+                  "They have been replaced by using the CaptureMock program which is now separate from TextTest.\n" + \
+                  "Please run with '-s traffic.ConvertToCaptureMock' and consult the migration notes.\n"
 
     def readsTestStateFiles(self):
         return self.isReconnecting() or self.optionMap.has_key("coll")

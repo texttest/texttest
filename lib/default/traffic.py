@@ -169,6 +169,7 @@ class ConvertToCaptureMock(plugins.Action):
 
     def setUpApplication(self, app):
         newFile = os.path.join(app.getDirectory(), "capturemockrc." + app.name + app.versionSuffix())
+        print "Converting", repr(app)
         self.convert(app, newFile)
 
     def __call__(self, test):
@@ -179,6 +180,7 @@ class ConvertToCaptureMock(plugins.Action):
 
     def checkTest(self, test):
         configFile = test.getFileName("config")
-        if configFile:
-            newFile = os.path.join(test.getDirectory(), "capturemockrc." + test.app.name)
+        if configFile and test.parent:
+            print "Converting", repr(test)
+            newFile = os.path.join(test.getDirectory(), "capturemockrc." + test.app.name + test.app.versionSuffix())
             self.convert(test, newFile)

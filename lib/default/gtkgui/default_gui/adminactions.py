@@ -549,8 +549,13 @@ class ImportApplication(guiplugins.ActionDialogGUI):
                           "Therefore PyUseCase cannot handle it. So we capture interaction with it instead.\n" + \
                           "Cannot have multiple threads interacting with tkinter so we disable the threading also."
                 configEntries["section_comment"] = comment
-                configEntries["collect_traffic_python"] = "tkMessageBox"
-                configEntries["collect_traffic_use_threads"] = "false"
+                configEntries["import_config_file"] = "capturemock_config"
+                cpMockFileName = os.path.join(directory, "capturemockrc." + ext)
+                with open(cpMockFileName, "w") as f:
+                    f.write("[python]\n" +
+                            "intercepts = tkMessageBox\n\n" + 
+                            "[general]\n" +
+                            "server_multithreaded = False\n")
             elif useGui == 3:
                 comment = "wxPython GUIs don't seem to work very well when the hide flag is set on Windows.\n" + \
                           "So we disable it by default here: multiple desktops may be useful."

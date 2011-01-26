@@ -1401,6 +1401,9 @@ class Option:
             self.updateMethod(self.defaultValue)
         else:
             self.valueMethod = None
+
+    def addPossibleValue(self, value):
+        pass
         
 
 class TextOption(Option):

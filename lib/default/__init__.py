@@ -827,7 +827,8 @@ class Config:
                not self.optionMap.runScript():
             raise plugins.TextTestError, "collect_traffic settings have been deprecated.\n" + \
                   "They have been replaced by using the CaptureMock program which is now separate from TextTest.\n" + \
-                  "Please run with '-s traffic.ConvertToCaptureMock' and consult the migration notes.\n"
+                  "Please run with '-s traffic.ConvertToCaptureMock' and consult the migration notes at\n" + \
+                  os.path.join(plugins.installationDir("doc"), "MigrationNotes_from_3.20") + "\n"
 
     def readsTestStateFiles(self):
         return self.isReconnecting() or self.optionMap.has_key("coll")

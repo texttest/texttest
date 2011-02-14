@@ -192,9 +192,21 @@ class QueueSystemServer(BaseActionRunner):
         if newTest.state.isComplete() or oldState.category == "killed":
             return False
 
-        oldRules = self.getSubmissionRules(oldTest)
-        newRules = self.getSubmissionRules(newTest)
+        oldRules = self.getJobSubmissionRules(oldTest)
+        newRules = self.getJobSubmissionRules(newTest)
         return oldRules.allowsReuse(newRules)
+
+    def getJobSubmissionRules(self, test):
+        proxyRules = self.getProxySubmissionRules(test)
+        if proxyRules:
+            return proxyRules
+        else:
+            return self.getSubmissionRules(test)
+
+    def getProxySubmissionRules(self, test):
+        proxyResources = test.getConfigValue("queue_system_proxy_resource")
+        if proxyResources:
+            return ProxySubmissionRules(test, proxyResources)
 
     def getSubmissionRules(self, test):
         if self.submissionRules.has_key(test):
@@ -371,8 +383,33 @@ class QueueSystemServer(BaseActionRunner):
     def getQueueSystemCommand(self, test):
         submissionRules = self.getSubmissionRules(test)
         cmdArgs = self.getSubmitCmdArgs(test, submissionRules)
-        return queueSystemName(test) + " Command   : " + plugins.commandLineString(cmdArgs) + " ...\n" + \
+        text = queueSystemName(test) + " Command   : " + plugins.commandLineString(cmdArgs) + " ...\n" + \
                "Slave Command : " + self.getSlaveCommand(test, submissionRules) + "\n"
+        proxyArgs = self.getProxyCmdArgs(test)
+        if proxyArgs:
+            return queueSystemName(test) + " Proxy Command   : " + plugins.commandLineString(proxyArgs) + "\n" + text
+        else:
+            return text
+
+    def getProxyCmdArgs(self, test):
+        proxyCmd = test.getConfigValue("queue_system_proxy_executable")
+        if proxyCmd:
+            proxyRules = self.getProxySubmissionRules(test)
+            proxyArgs = self.getSubmitCmdArgs(test, proxyRules)
+            proxyArgs.append(self.shellWrap(proxyCmd))
+            return proxyArgs
+        else:
+            return []
+        
+    def createSubmitProcess(self, test, cmdArgs, slaveEnv):
+        logDir = self.getSlaveLogDir(test)
+        proxyArgs = self.getProxyCmdArgs(test)
+        if proxyArgs:
+            cmdArgs[1:1] = [ "-sync", "y" ] # must synchronise in the proxy
+            slaveEnv["TEXTTEST_SUBMIT_COMMAND_ARGS"] = repr(cmdArgs) # Exact command arguments to run TextTest slave, for use by proxy
+            cmdArgs = proxyArgs
+        return subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                cwd=logDir, env=slaveEnv)
 
     def submitJob(self, test, submissionRules, command, slaveEnv):
         self.diag.info("Submitting job at " + plugins.localtime() + ":" + command)
@@ -392,8 +429,7 @@ class QueueSystemServer(BaseActionRunner):
         self.lockDiag.info("Got lock for submission")
         queueSystem = self.getQueueSystem(test)
         try:
-            process = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                       cwd=self.getSlaveLogDir(test), env=slaveEnv)
+            process = self.createSubmitProcess(test, cmdArgs, slaveEnv)
             stdout, stderr = process.communicate()
             errorMessage = self.findErrorMessage(stderr, queueSystem)
         except OSError:
@@ -596,18 +632,65 @@ class QueueSystemServer(BaseActionRunner):
         postText = self.getPostText(test, jobId)
         plugins.log.info("T: Cancelling " + repr(test) + " " + postText)
 
-
 class SubmissionRules:
-    def __init__(self, optionMap, test):
+    def __init__(self, test, configResources):
         self.test = test
-        self.optionMap = optionMap
-        self.configResources = self.getConfigResources()
+        self.configResources = configResources
         self.processesNeeded = self.getProcessesNeeded()
+        
+    def getProcessesNeeded(self):
+        return 1
 
-    def getConfigResources(self):
+    def getExtraSubmitArgs(self): # pragma: no cover - documentation only
+        return []
+
+    def getParallelEnvironment(self):
+        return ""
+
+    def findPriority(self):
+        return 0
+
+    def findResourceList(self):
+        return self.configResources
+
+    def getJobName(self):
+        path = self.test.getRelPath()
+        parts = path.split("/")
+        parts.reverse()
+        name = self.classPrefix + "-" + ".".join(parts) + "-" + repr(self.test.app).replace(" ", "_")
+        return name.replace(":", "_")
+
+    def findQueue(self):
+        return ""
+
+    def findMachineList(self):
+        return []
+
+    def getJobFiles(self):
+        jobName = self.getJobName()
+        return jobName + ".log", jobName + ".errors"
+
+    def forceOnPerformanceMachines(self):
+        return False
+
+    def allowsReuse(self, newRules):
+        # Don't care about the order of the resources
+        return set(self.configResources) == set(newRules.configResources)
+
+
+class ProxySubmissionRules(SubmissionRules):
+    classPrefix = "Proxy"
+
+class TestSubmissionRules(SubmissionRules):
+    classPrefix = "Test"
+    def __init__(self, optionMap, test):
+        self.optionMap = optionMap
+        SubmissionRules.__init__(self, test, self.getConfigResources(test))
+        
+    def getConfigResources(self, test):
         if not self.optionMap.has_key("reconnect"):
-            envSetting = os.path.expandvars(self.test.getEnvironment("QUEUE_SYSTEM_RESOURCE", "")) # Deprecated. See "queue_system_resource" in config file docs
-            return [ envSetting ] if envSetting else self.test.getConfigValue("queue_system_resource")
+            envSetting = os.path.expandvars(test.getEnvironment("QUEUE_SYSTEM_RESOURCE", "")) # Deprecated. See "queue_system_resource" in config file docs
+            return [ envSetting ] if envSetting else test.getConfigValue("queue_system_resource")
         else:
             return ""
 
@@ -624,13 +707,6 @@ class SubmissionRules:
             return envSetting or self.test.getConfigValue("queue_system_submit_args")
         else:
             return ""
-
-    def getJobName(self):
-        path = self.test.getRelPath()
-        parts = path.split("/")
-        parts.reverse()
-        name = "Test-" + ".".join(parts) + "-" + repr(self.test.app).replace(" ", "_")
-        return name.replace(":", "_")
 
     def getSubmitSuffix(self):
         name = queueSystemName(self.test)
@@ -666,9 +742,6 @@ class SubmissionRules:
             if len(val) > 0 and val[0] != "any" and val[0] != "none":
                 return val
         return []
-
-    def findPriority(self):
-        return 0
 
     def findQueue(self):
         if self.optionMap.has_key("q"):

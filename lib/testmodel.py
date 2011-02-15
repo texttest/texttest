@@ -310,7 +310,7 @@ class Test(plugins.Observable):
         return resultFiles, defFiles
 
     def listResultFiles(self, allVersions):
-        exclude = self.expandedDefFileStems() + self.app.getDataFileNames() + [ "file_edits" ]
+        exclude = self.expandedDefFileStems() + self.getDataFileNames() + [ "file_edits" ]
         self.diagnose("Excluding " + repr(exclude))
         predicate = lambda stem, vset: stem not in exclude and len(vset) > 0
         stems = self.dircache.findAllStems(predicate)
@@ -482,7 +482,7 @@ class Test(plugins.Observable):
         return False
 
     def getDataFileNames(self):
-        return self.app.getDataFileNames(self.environment)
+        return self.app.getDataFileNames(test=self)
             
     def getRelPath(self):
         if self.parent:
@@ -1461,11 +1461,12 @@ class Application:
             raise BadConfigError, "Cannot find file '" + fileName + "' to import config file settings from"
         return os.path.normpath(configPath)
 
-    def getDataFileNames(self, envMapping=os.environ):
-        allNames = self.getConfigValue("link_test_path", envMapping=envMapping) + \
-                   self.getConfigValue("copy_test_path", envMapping=envMapping) + \
-                   self.getConfigValue("copy_test_path_merge", envMapping=envMapping) + \
-                   self.getConfigValue("partial_copy_test_path", envMapping=envMapping)
+    def getDataFileNames(self, test=None):
+        confObj = test or self
+        allNames = confObj.getConfigValue("link_test_path") + \
+                   confObj.getConfigValue("copy_test_path") + \
+                   confObj.getConfigValue("copy_test_path_merge") + \
+                   confObj.getConfigValue("partial_copy_test_path")
         # Don't manage data that has an external path name, only accept absolute paths built by ourselves...
         return filter(self.isLocalDataFile, allNames)
 

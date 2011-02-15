@@ -725,7 +725,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         if fileType == "definition":
             return self.getDefinitionFiles()
         elif fileType == "data":
-            return self.currTestSelection[0].app.getDataFileNames()
+            return self.currTestSelection[0].getDataFileNames()
         elif fileType == "standard":
             return self.getStandardFiles()
         else:

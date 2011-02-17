@@ -163,5 +163,23 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
             vbox.pack_start(border, expand=False, fill=False)
         return vbox
 
+class CopyPathToClipboard(guiplugins.ActionGUI):
+    def _getTitle(self):
+        return "Copy Path To Clipboard"
+
+    def messageAfterPerform(self):
+        return "Copied full path of selected file to clipboard."
+
+    def isActiveOnCurrent(self, *args):
+        return len(self.currFileSelection) == 1
+
+    def performOnCurrent(self):
+        fileName, comp = self.currFileSelection[0]
+        if comp:
+            fileName = comp.tmpFile
+        # Copy to both, for good measure, avoid problems with e.g. Exceed configuration
+        for clipboard in [ gtk.clipboard_get(), gtk.clipboard_get("PRIMARY") ]:
+            clipboard.set_text(fileName)
+
 def getInteractiveActionClasses():
-    return [ ShowFileProperties ]
+    return [ ShowFileProperties, CopyPathToClipboard ]

@@ -963,10 +963,7 @@ class ActionDialogGUI(OptionGroupGUI):
                 widget = self.createSwitchWidget(option, optionGroup)
                 vbox.pack_start(widget, expand=False, fill=False)
             elif option.selectFile or option.selectDir or option.saveFile:
-                # Need to do this configurable somehow.
-                # Will do that in next check-in.
-                newDialog = False
-                if not newDialog:
+                if not self.showFileChooserAsDialog():
                     fileChooserOption = option
                     fileChooser = self.createFileChooser(option)
                     if len(allOptions) > 1 and not option.saveFile:
@@ -1018,6 +1015,9 @@ class ActionDialogGUI(OptionGroupGUI):
             frameBox.pack_start(button)
         frame.add(frameBox)
         return frame
+    
+    def showFileChooserAsDialog(self):
+        return False
     
     def getFileChooserFlag(self, option):
         if option.selectFile:

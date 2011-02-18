@@ -394,9 +394,11 @@ class QueueSystemServer(BaseActionRunner):
     def getProxyCmdArgs(self, test):
         proxyCmd = test.getConfigValue("queue_system_proxy_executable")
         if proxyCmd:
+            proxyOptions = test.getCommandLineOptions("proxy_options")
+            fullProxyCmd = proxyCmd + " " + " ".join(proxyOptions)
             proxyRules = self.getProxySubmissionRules(test)
             proxyArgs = self.getSubmitCmdArgs(test, proxyRules)
-            proxyArgs.append(self.shellWrap(proxyCmd))
+            proxyArgs.append(self.shellWrap(fullProxyCmd))
             return proxyArgs
         else:
             return []

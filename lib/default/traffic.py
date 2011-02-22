@@ -11,16 +11,15 @@ class SetUpTrafficHandlers(plugins.Action):
         pythonCustomizeFiles = test.getAllPathNames("testcustomize.py") 
         pythonCoverage = test.hasEnvironment("COVERAGE_PROCESS_START")
         if test.app.usesTrafficMechanism() or pythonCoverage or pythonCustomizeFiles:
-            replayFile = test.getFileName("traffic")
             rcFiles = test.getAllPathNames("capturemockrc")
             if rcFiles or pythonCoverage or pythonCustomizeFiles:
-                self.setUpIntercepts(test, replayFile, rcFiles, pythonCoverage, pythonCustomizeFiles)
+                self.setUpIntercepts(test, rcFiles, pythonCoverage, pythonCustomizeFiles)
 
-    def setUpIntercepts(self, test, replayFile, rcFiles, pythonCoverage, pythonCustomizeFiles):
+    def setUpIntercepts(self, test, rcFiles, pythonCoverage, pythonCustomizeFiles):
         interceptDir = test.makeTmpFileName("traffic_intercepts", forComparison=0)
         captureMockActive = False
         if rcFiles:
-            captureMockActive = self.setUpCaptureMock(test, interceptDir, replayFile, rcFiles)
+            captureMockActive = self.setUpCaptureMock(test, interceptDir, rcFiles)
             
         if pythonCustomizeFiles:
             self.intercept(pythonCustomizeFiles[-1], interceptDir) # most specific
@@ -31,16 +30,29 @@ class SetUpTrafficHandlers(plugins.Action):
             for var in [ "PYTHONPATH", "JYTHONPATH" ]:
                 test.setEnvironment(var, interceptDir + os.pathsep + test.getEnvironment(var, ""))
 
-    def setUpCaptureMock(self, test, interceptDir, replayFile, rcFiles):
-        recordFile = test.makeTmpFileName("traffic")
+    def setUpCaptureMock(self, test, interceptDir, rcFiles):
+        extReplayFile = test.getFileName("traffic")
+        if extReplayFile:
+            # "Legacy" setup to avoid the need to rename hundreds of files
+            extRecordFile = test.makeTmpFileName("traffic")
+            pyReplayFile = extReplayFile
+            pyRecordFile = extRecordFile
+        else:
+            extReplayFile = test.getFileName("externalmocks")
+            extRecordFile = test.makeTmpFileName("externalmocks")
+            pyReplayFile = test.getFileName("pythonmocks")
+            pyRecordFile = test.makeTmpFileName("pythonmocks")
         recordEditDir = test.makeTmpFileName("file_edits", forComparison=0)
         replayEditDir = test.getFileName("file_edits") if replayFile else None
         sutDirectory = test.getDirectory(temporary=1)
-        from capturemock import setUp
-        return setUp(self.recordSetting, recordFile, replayFile, useServer=True,
-                     recordEditDir=recordEditDir, replayEditDir=replayEditDir, 
-                     rcFiles=rcFiles, interceptDir=interceptDir,
-                     sutDirectory=sutDirectory, environment=test.environment)
+        from capturemock import setUpServer, setUpPython
+        externalActive = setUpServer(self.recordSetting, extRecordFile, extReplayFile,
+                                     recordEditDir=recordEditDir, replayEditDir=replayEditDir, 
+                                     rcFiles=rcFiles, interceptDir=interceptDir,
+                                     sutDirectory=sutDirectory, environment=test.environment)
+        pythonActive = setUpPython(self.recordSetting, pyRecordFile, pyReplayFile, rcFiles=rcFiles,
+                                   environment=test.environment)
+        return externalActive or pythonActive
             
     def intercept(self, moduleFile, interceptDir):
         interceptName = os.path.join(interceptDir, os.path.basename(moduleFile))

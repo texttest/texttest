@@ -192,8 +192,12 @@ class QueueSystemServer(BaseActionRunner):
         if newTest.state.isComplete() or oldState.category == "killed":
             return False
 
-        oldRules = self.getJobSubmissionRules(oldTest)
-        newRules = self.getJobSubmissionRules(newTest)
+        if oldTest.getConfigValue("queue_system_proxy_executable") or \
+           newTest.getConfigValue("queue_system_proxy_executable"):
+            return False
+        
+        oldRules = self.getSubmissionRules(oldTest)
+        newRules = self.getSubmissionRules(newTest)
         return oldRules.allowsReuse(newRules)
 
     def getJobSubmissionRules(self, test):
@@ -396,7 +400,7 @@ class QueueSystemServer(BaseActionRunner):
         if proxyCmd:
             proxyOptions = test.getCommandLineOptions("proxy_options")
             fullProxyCmd = proxyCmd + " " + " ".join(proxyOptions)
-            proxyRules = self.getProxySubmissionRules(test)
+            proxyRules = self.getJobSubmissionRules(test)
             proxyArgs = self.getSubmitCmdArgs(test, proxyRules)
             proxyArgs.append(self.shellWrap(fullProxyCmd))
             return proxyArgs

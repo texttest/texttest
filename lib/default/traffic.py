@@ -43,7 +43,7 @@ class SetUpTrafficHandlers(plugins.Action):
             pyReplayFile = test.getFileName("pythonmocks")
             pyRecordFile = test.makeTmpFileName("pythonmocks")
         recordEditDir = test.makeTmpFileName("file_edits", forComparison=0)
-        replayEditDir = test.getFileName("file_edits") if replayFile else None
+        replayEditDir = test.getFileName("file_edits") if extReplayFile else None
         sutDirectory = test.getDirectory(temporary=1)
         from capturemock import setUpServer, setUpPython
         externalActive = setUpServer(self.recordSetting, extRecordFile, extReplayFile,

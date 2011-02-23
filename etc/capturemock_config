@@ -1,7 +1,9 @@
 # Configuration for integration with "CaptureMock"
 [definition_file_stems]
 default:capturemockrc
-regenerate:*traffic
+regenerate:traffic
+regenerate:pythonmocks
+regenerate:externalmocks
 
 [failure_severity]
 *traffic:1

@@ -7,6 +7,7 @@ import gtk, plugins, os
 from .. import guiplugins
 
 class SaveTests(guiplugins.ActionDialogGUI):
+    defaultVersionStr = "<existing version>"
     def __init__(self, allApps, *args):
         guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
         self.directAccel = None
@@ -14,7 +15,7 @@ class SaveTests(guiplugins.ActionDialogGUI):
                                        self.getDirectTooltip(), self.getStockId())
         self.directAction.connect("activate", self._respond)
         self.directAction.set_property("sensitive", False)
-        self.addOption("v", "Version to save")
+        self.addOption("v", "Version to save", self.defaultVersionStr)
         self.addOption("old", "Version(s) to save previous results as")
         self.addSwitch("over", "Replace successfully compared files also", 0)
         if self.hasPerformance(allApps):
@@ -67,20 +68,19 @@ class SaveTests(guiplugins.ActionDialogGUI):
         return filter(lambda test: test.stateInGui.isSaveable(), self.currTestSelection)
 
     def updateOptions(self):
-        defaultSaveOption = self.getDefaultSaveOption()
         versionOption = self.optionGroup.getOption("v")
         currOption = versionOption.defaultValue
         newVersions = self.getPossibleVersions()
         currVersions = versionOption.possibleValues
-        if defaultSaveOption == currOption and newVersions == currVersions:
+        if self.defaultVersionStr == currOption and newVersions == currVersions:
             return False
-        self.optionGroup.setOptionValue("v", defaultSaveOption)
-        self.diag.info("Setting default save version to " + defaultSaveOption)
+        self.optionGroup.setOptionValue("v", self.defaultVersionStr)
+        self.diag.info("Setting default save version to " + self.defaultVersionStr)
         self.optionGroup.setPossibleValues("v", newVersions)
         return True
     
     def getPossibleVersions(self):
-        extensions = []
+        extensions = [ self.defaultVersionStr ]
         for app in self.currAppSelection:
             for ext in app.getSaveableVersions():
                 if not ext in extensions:
@@ -88,32 +88,10 @@ class SaveTests(guiplugins.ActionDialogGUI):
         # Include the default version always
         extensions.append("")
         return extensions
-
-    def getDefaultSaveOption(self):
-        if self.isAllNew():
-            return ""
-        else:
-            return plugins.getAggregateString(self.currAppSelection, self.getDefaultSaveVersion)
-    
-    def getDefaultSaveVersion(self, app):
-        return app.getFullVersion(forSave=1)
     
     def getExactness(self):
         return int(self.optionGroup.getSwitchValue("ex", 1))
-    
-    def isAllNew(self):
-        for test in self.getSaveableTests():
-            if not test.stateInGui.isAllNew():
-                return False
-        return True
-    
-    def getVersion(self, test):
-        versionString = self.optionGroup.getOptionValue("v")
-        if versionString.startswith("<default>"):
-            return self.getDefaultSaveVersion(test.app)
-        else:
-            return versionString
-
+        
     def isActiveOnCurrent(self, test=None, state=None):
         if state and state.isSaveable():
             return True
@@ -131,7 +109,12 @@ class SaveTests(guiplugins.ActionDialogGUI):
             return plugins.commasplit(versionString)
         else:
             return []
-    
+
+    def getVersion(self):
+        versionString = self.optionGroup.getOptionValue("v")
+        if versionString != self.defaultVersionStr:
+            return versionString
+
     def performOnCurrent(self):
         backupVersions = self.getBackupVersions()
         if self.optionGroup.getOptionValue("v") in backupVersions:
@@ -139,18 +122,15 @@ class SaveTests(guiplugins.ActionDialogGUI):
         
         stemsToSave = self.getStemsToSave()
         overwriteSuccess = self.optionGroup.getSwitchValue("over")
-
         tests = self.getSaveableTests()
-        # Calculate the versions beforehand, as saving tests can change the selection,
-        # which can affect the default version calculation...
-        testsWithVersions = [ (test, self.getVersion(test)) for test in tests ]
         testDesc = str(len(tests)) + " tests"
+        versionString = self.getVersion()
         self.notify("Status", "Saving " + testDesc + " ...")
         try:
-            for test, version in testsWithVersions:
+            for test in tests:
                 testComparison = test.stateInGui
                 testComparison.setObservers(self.observers)
-                testComparison.save(test, self.getExactness(), version, overwriteSuccess, stemsToSave, backupVersions)
+                testComparison.save(test, self.getExactness(), versionString, overwriteSuccess, stemsToSave, backupVersions)
                 newState = testComparison.makeNewState(test, "saved")
                 test.changeState(newState)
 

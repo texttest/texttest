@@ -100,7 +100,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         for suite in self.rootTestSuites:
             defStems.update(suite.defFileStems())
             importantStems.update(suite.getCompositeConfigValue("gui_entry_options", "test-file_to_search"))
-            exclude = suite.app.getDataFileNames() + [ "file_edits" ]
+            exclude = suite.getDataFileNames() + [ "file_edits" ]
             predicate = lambda stem, vset: stem not in exclude and (stem in defStems or len(vset) > 0)
             for test in suite.testCaseList():
                 stems.update(test.dircache.findAllStems(predicate))

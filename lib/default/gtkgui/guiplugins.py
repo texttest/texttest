@@ -696,6 +696,44 @@ class OptionGroupGUI(ActionGUI):
 
     def getLowerBoundForSpinButtons(self):
         return 0
+
+    def createFileChooserDialog(self, box, entry, option):
+        button = gtk.Button("...")
+        box.pack_start(button, expand=False, fill=False)
+        button.connect("clicked", self.showFileChooser, entry, option)
+        
+    def showFileChooser(self, dummyWidget, entry, option):
+        dialog = gtk.FileChooserDialog("Select a file",
+                                       self.getParentWindow(),
+                                       gtk.FILE_CHOOSER_ACTION_OPEN,
+                                       (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,                                        
+                                        gtk.STOCK_OPEN, gtk.RESPONSE_OK))
+        self.startFileChooser(dialog, entry, option)
+    
+    def startFileChooser(self, dialog, entry, option):
+        # Folders is a list of pairs (short name, absolute path),
+        # where 'short name' means the name given in the config file, e.g.
+        # 'temporary_filter_files' or 'filter_files' ...
+        dialog.set_modal(True)
+        folders, defaultFolder = option.getDirectories()
+        dialog.connect("response", self.respondFileChooser, entry)
+        # If current entry forms a valid path, set that as default
+        currPath = entry.get_text()
+        currDir = os.path.split(currPath)[0]
+        if os.path.isdir(currDir):
+            dialog.set_current_folder(currDir)
+        elif defaultFolder and os.path.isdir(os.path.abspath(defaultFolder)):
+            dialog.set_current_folder(os.path.abspath(defaultFolder))
+        for folder in folders:
+            dialog.add_shortcut_folder(folder)
+        dialog.set_default_response(gtk.RESPONSE_OK)
+        dialog.show()
+        
+    def respondFileChooser(self, dialog, response, entry):
+        if response == gtk.RESPONSE_OK:
+            entry.set_text(dialog.get_filename().replace("\\", "/"))
+            entry.set_position(-1) # Sets position last, makes it possible to see the vital part of long paths 
+        dialog.destroy()
   
     def getConfigOptions(self, option):
         fromConfig = guiConfig.getCompositeValue("gui_entry_options", option.name)
@@ -814,44 +852,8 @@ class ActionTabGUI(OptionGroupGUI):
     def createOptionWidget(self, option):
         box, entry = OptionGroupGUI.createOptionWidget(self, option)
         if option.selectFile:
-            button = gtk.Button("...")
-            box.pack_start(button, expand=False, fill=False)
-            button.connect("clicked", self.showFileChooser, entry, option)
+            self.createFileChooserDialog(box, entry, option)
         return (box, entry)
-    
-    def showFileChooser(self, dummyWidget, entry, option):
-        dialog = gtk.FileChooserDialog("Select a file",
-                                       self.getParentWindow(),
-                                       gtk.FILE_CHOOSER_ACTION_OPEN,
-                                       (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,                                        
-                                        gtk.STOCK_OPEN, gtk.RESPONSE_OK))
-        self.startChooser(dialog, entry, option)
-    
-    def startChooser(self, dialog, entry, option):
-        # Folders is a list of pairs (short name, absolute path),
-        # where 'short name' means the name given in the config file, e.g.
-        # 'temporary_filter_files' or 'filter_files' ...
-        dialog.set_modal(True)
-        folders, defaultFolder = option.getDirectories()
-        dialog.connect("response", self.respondChooser, entry)
-        # If current entry forms a valid path, set that as default
-        currPath = entry.get_text()
-        currDir = os.path.split(currPath)[0]
-        if os.path.isdir(currDir):
-            dialog.set_current_folder(currDir)
-        elif defaultFolder and os.path.isdir(os.path.abspath(defaultFolder)):
-            dialog.set_current_folder(os.path.abspath(defaultFolder))
-        for folder in folders:
-            dialog.add_shortcut_folder(folder)
-        dialog.set_default_response(gtk.RESPONSE_OK)
-        dialog.show()
-        
-    def respondChooser(self, dialog, response, entry):
-        if response == gtk.RESPONSE_OK:
-            entry.set_text(dialog.get_filename().replace("\\", "/"))
-            entry.set_position(-1) # Sets position last, makes it possible to see the vital part of long paths 
-        dialog.destroy()
-        
 
 class ActionDialogGUI(OptionGroupGUI):
     def runInteractive(self, *args):
@@ -961,30 +963,38 @@ class ActionDialogGUI(OptionGroupGUI):
                 widget = self.createSwitchWidget(option, optionGroup)
                 vbox.pack_start(widget, expand=False, fill=False)
             elif option.selectFile or option.selectDir or option.saveFile:
-                fileChooserOption = option
-                fileChooser = self.createFileChooser(option)
-                if len(allOptions) > 1 and not option.saveFile:
-                    # If there is other stuff, add a frame round the file chooser so we can see what it's for
-                    # Don't do this when saving as it shouldn't be necessary
-                    labelEventBox = self.createLabelEventBox(option, separator=":")
-                    frame = gtk.Frame()
-                    frame.set_label_widget(labelEventBox)
-                    frame.add(fileChooser)
-                    vbox.pack_start(frame, expand=True, fill=True)
+                if not self.showFileChooserAsDialog():
+                    fileChooserOption = option
+                    fileChooser = self.createFileChooser(option)
+                    if len(allOptions) > 1 and not option.saveFile:
+                        # If there is other stuff, add a frame round the file chooser so we can see what it's for
+                        # Don't do this when saving as it shouldn't be necessary
+                        labelEventBox = self.createLabelEventBox(option, separator=":")
+                        frame = gtk.Frame()
+                        frame.set_label_widget(labelEventBox)
+                        frame.add(fileChooser)
+                        vbox.pack_start(frame, expand=True, fill=True)
+                    else:
+                        vbox.pack_start(fileChooser, expand=True, fill=True)
                 else:
-                    vbox.pack_start(fileChooser, expand=True, fill=True)
+                    widget, entry = self.createOptWidget(vbox, option)
+                    self.createFileChooserDialog(widget, entry, option)
             else:
-                labelEventBox = self.createLabelEventBox(option, separator=":")
-                self.addLabel(vbox, labelEventBox)
-                entryWidget, entryOrBuffer = self.createOptionWidget(option)
-                if isinstance(entryOrBuffer, gtk.Entry):
-                    entryOrBuffer.set_activates_default(True)
-                    vbox.pack_start(entryWidget, expand=False, fill=False)
-                else:
-                    vbox.pack_start(entryWidget, expand=True, fill=True)
-                self.connectEntry(option, entryOrBuffer)
+                self.createOptWidget(vbox, option)
 
         return fileChooser, fileChooserOption
+
+    def createOptWidget(self, vbox, option):
+        labelEventBox = self.createLabelEventBox(option, separator=":")
+        self.addLabel(vbox, labelEventBox)
+        entryWidget, entryOrBuffer = self.createOptionWidget(option)
+        if isinstance(entryOrBuffer, gtk.Entry):
+            entryOrBuffer.set_activates_default(True)
+            vbox.pack_start(entryWidget, expand=False, fill=False)
+        else:
+            vbox.pack_start(entryWidget, expand=True, fill=True)
+        self.connectEntry(option, entryOrBuffer)
+        return entryWidget, entryOrBuffer
 
     def addLabel(self, vbox, label):
         hbox = gtk.HBox()
@@ -1005,6 +1015,9 @@ class ActionDialogGUI(OptionGroupGUI):
             frameBox.pack_start(button)
         frame.add(frameBox)
         return frame
+    
+    def showFileChooserAsDialog(self):
+        return False
     
     def getFileChooserFlag(self, option):
         if option.selectFile:

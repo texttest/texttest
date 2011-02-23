@@ -294,7 +294,7 @@ class TestComparison(BaseTestComparison):
         comparison, newList = self.findComparison(stem)
         newList.remove(comparison)
         self.allResults.remove(comparison)
-    def save(self, test, exact=True, versionString="", overwriteSuccessFiles=False, onlyStems=[], backupVersions=[]):
+    def save(self, test, exact=True, versionString=None, overwriteSuccessFiles=False, onlyStems=[], backupVersions=[]):
         self.diag.info("Saving " + repr(test) + " stems " + repr(onlyStems))
         for comparison in self.filterComparisons(self.changedResults, onlyStems):
             self.updateStatus(test, str(comparison), versionString)
@@ -348,10 +348,10 @@ class TestComparison(BaseTestComparison):
 
     def updateStatus(self, test, compStr, versionString):
         testRepr = "Saving " + repr(test) + " : "
-        if versionString != "":
-            versionRepr = ", version " + versionString
+        if versionString is not None:
+            versionRepr = ", version " + repr(versionString)
         else:
-            versionRepr = ", no version"
+            versionRepr = ", existing version"
         self.notifyIfMainThread("Status", testRepr + compStr + versionRepr)
         self.notifyIfMainThread("ActionProgress")
 

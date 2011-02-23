@@ -524,10 +524,10 @@ class WebPageResponder(plugins.Responder):
             return getConfigValue("historical_report_resource_pages", self.batchSession)
 
     def generatePagePerApp(self, pageTitle, pageInfo):
-        for app, repository in pageInfo:
+        for app, repository, extraApps in pageInfo:
             pageTopDir = os.path.expanduser(app.getCompositeConfigValue("historical_report_location", self.batchSession))
             pageDir = os.path.join(pageTopDir, app.name)
-            extraVersions = self.getExtraVersions(app)
+            extraVersions = self.getExtraVersions(app, extraApps)
             self.diag.info("Found extra versions " + repr(extraVersions))
             relevantSubDirs = self.findRelevantSubdirectories(repository, app, extraVersions)
             version = getVersionName(app, self.appsToGenerate)
@@ -563,15 +563,22 @@ class WebPageResponder(plugins.Responder):
                 continue
 
             pageTitle = app.getCompositeConfigValue("historical_report_page_name", self.batchSession)
-            appInfo.setdefault(pageTitle, []).append((app, repository))
+            extraApps = []
+            for extraApp in app.extras:
+                extraPageTitle = extraApp.getCompositeConfigValue("historical_report_page_name", self.batchSession)
+                if extraPageTitle != pageTitle and extraPageTitle != extraApp.getDefaultPageName():
+                    appInfo.setdefault(extraPageTitle, []).append((extraApp, repository, []))
+                else:
+                    extraApps.append(extraApp)
+            appInfo.setdefault(pageTitle, []).append((app, repository, extraApps))
         return appInfo
 
     def transformToCommon(self, pageInfo):
-        allApps = [ app for app, _ in pageInfo ]
+        allApps = [ app for app, _, _ in pageInfo ]
         version = getVersionName(allApps[0], self.appsToGenerate)
         extraVersions, relevantSubDirs = [], OrderedDict()
-        for app, repository in pageInfo:
-            extraVersions += self.getExtraVersions(app)
+        for app, repository, extraApps in pageInfo:
+            extraVersions += self.getExtraVersions(app, extraApps)
             relevantSubDirs.update(self.findRelevantSubdirectories(repository, app, extraVersions, self.getVersionTitle))
         getConfigValue = plugins.ResponseAggregator([ app.getCompositeConfigValue for app in allApps ])
         pageSubTitle = self.makeCommandLine(allApps)
@@ -641,10 +648,10 @@ class WebPageResponder(plugins.Responder):
                 subdirs.setdefault(versionTitle, []).append((currExtraVersion, fullPath))
         return subdirs
     
-    def getExtraVersions(self, app):
+    def getExtraVersions(self, app, extraApps):
         extraVersions = []
         length = len(app.versions)
-        for extraApp in app.extras:
+        for extraApp in extraApps:
             version = ".".join(extraApp.versions[length:])
             if not version in app.versions:
                 extraVersions.append(version)

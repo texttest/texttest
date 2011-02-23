@@ -310,7 +310,7 @@ class Test(plugins.Observable):
         return resultFiles, defFiles
 
     def listResultFiles(self, allVersions):
-        exclude = self.expandedDefFileStems() + self.app.getDataFileNames() + [ "file_edits" ]
+        exclude = self.expandedDefFileStems() + self.getDataFileNames() + [ "file_edits" ]
         self.diagnose("Excluding " + repr(exclude))
         predicate = lambda stem, vset: stem not in exclude and len(vset) > 0
         stems = self.dircache.findAllStems(predicate)
@@ -482,7 +482,7 @@ class Test(plugins.Observable):
         return False
 
     def getDataFileNames(self):
-        return self.app.getDataFileNames(self.environment)
+        return self.app.getDataFileNames(test=self)
             
     def getRelPath(self):
         if self.parent:
@@ -778,27 +778,28 @@ class TestSuiteFileHandler:
     def __init__(self):
         self.cache = {}
 
-    def read(self, fileName, warn=False, ignoreCache=False, filterMethod=None):
+    def readWithWarnings(self, fileName, ignoreCache=False, filterMethod=None):
         if not ignoreCache:
             cached = self.cache.get(fileName)
             if cached is not None:
-                return cached
+                return cached, OrderedDict()
 
-        tests = plugins.readListWithComments(fileName, plugins.Callable(self.getExclusionReason, filterMethod, warn))
-        self.cache[fileName] = tests
-        return tests
+        goodTests, badTests = plugins.readListWithComments(fileName, plugins.Callable(self.getExclusionReasons, filterMethod))
+        self.cache[fileName] = goodTests
+        return goodTests, badTests
 
-    def getExclusionReason(self, testName, existingTestNames, fileName, filterMethod, warn):
+    def read(self, *args, **kw):
+        return self.readWithWarnings(*args, **kw)[0]
+
+    def getExclusionReasons(self, testName, existingTestNames, fileName, filterMethod):
         if existingTestNames.has_key(testName):
-            if warn:
-                plugins.printWarning("The test " + testName + " was included several times in a test suite file.\n" + \
-                                     "Please check the file at " + fileName)
-            return "repeated inclusion of the same test name"
+            return "repeated inclusion of the same test name", "The test " + testName + \
+                   " was included several times in a test suite file.\n" + \
+                   "Please check the file at " + fileName
         if filterMethod and not filterMethod(testName):
-            if warn:
-                plugins.printWarning("The test " + testName + " could not be found.\nPlease check the file at " + fileName)
-            return "no test directory being found"
-        return ""
+            return "no test directory being found", \
+                   "The test " + testName + " could not be found.\nPlease check the file at " + fileName
+        return "", ""
 
     def write(self, fileName, content):
         testEntries = self.makeWriteEntries(content)
@@ -887,11 +888,19 @@ class TestSuite(Test):
         self.autoSortOrder = self.getConfigValue("auto_sort_test_suites")
     
     def readContents(self, filters=[], initial=True):
-        testNames = self.readTestNames(warn=True)
+        testNames, badTestNames = self.readTestNamesWithWarnings()
         self.createTestCases(filters, testNames, initial)
         if self.isEmpty() and len(testNames) > 0:
             # If the contents are filtered away, don't include the suite
             return False
+
+        # Only print warnings if the test would otherwise have been accepted
+        for testName, warningText in badTestNames.items():
+            dirCache = self.createTestCache(testName)
+            className = self.getSubtestClass(dirCache)
+            subTest = self.createSubtest(testName, "", dirCache, className)
+            if subTest.isAcceptedByAll(filters, checkContents=False):
+                plugins.printWarning(warningText)
 
         for filter in filters:
             if not filter.acceptsTestSuiteContents(self):
@@ -899,12 +908,15 @@ class TestSuite(Test):
                 return False
         return True
 
-    def readTestNames(self, warn=False, ignoreCache=False):
+    def readTestNamesWithWarnings(self, ignoreCache=False):
         fileName = self.getContentFileName()
         if fileName:
-            return self.testSuiteFileHandler.read(fileName, warn, ignoreCache, self.fileExists)
+            return self.testSuiteFileHandler.readWithWarnings(fileName, ignoreCache, self.fileExists)
         else:
-            return OrderedDict()
+            return OrderedDict(), OrderedDict()
+
+    def readTestNames(self, ignoreCache=False):
+        return self.readTestNamesWithWarnings(ignoreCache)[0]
 
     def findTestCases(self, version):
         versionFile = self.getFileName("testsuite", version)
@@ -1339,6 +1351,9 @@ class Application:
 
     def makeConfigObject(self):
         moduleName = self.getConfigValue("config_module")
+        if self.dircache.exists("texttest_config_modules"):
+            # Allow config modules to be stored under the test suite
+            sys.path.insert(0, self.dircache.pathName("texttest_config_modules"))
         try:
             return plugins.importAndCall(moduleName, "getConfig", self.inputOptions)
         except:
@@ -1449,11 +1464,12 @@ class Application:
             raise BadConfigError, "Cannot find file '" + fileName + "' to import config file settings from"
         return os.path.normpath(configPath)
 
-    def getDataFileNames(self, envMapping=os.environ):
-        allNames = self.getConfigValue("link_test_path", envMapping=envMapping) + \
-                   self.getConfigValue("copy_test_path", envMapping=envMapping) + \
-                   self.getConfigValue("copy_test_path_merge", envMapping=envMapping) + \
-                   self.getConfigValue("partial_copy_test_path", envMapping=envMapping)
+    def getDataFileNames(self, test=None):
+        confObj = test or self
+        allNames = confObj.getConfigValue("link_test_path") + \
+                   confObj.getConfigValue("copy_test_path") + \
+                   confObj.getConfigValue("copy_test_path_merge") + \
+                   confObj.getConfigValue("partial_copy_test_path")
         # Don't manage data that has an external path name, only accept absolute paths built by ourselves...
         return filter(self.isLocalDataFile, allNames)
 

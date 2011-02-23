@@ -224,20 +224,25 @@ class FileComparison:
                 self.tmpFile = self.tmpFile.replace(oldPath, newPath)
                 
     def versionise(self, fileName, versionString):
-        if len(versionString):
+        if versionString:
             return fileName + "." + versionString
         else:
             return fileName
+
     def getStdRootVersionFile(self):
         # drop version identifiers
         dirname, local = os.path.split(self.stdFile)
         localRoot = ".".join(local.split(".")[:2])
         return os.path.join(dirname, localRoot)
+
     def versionMatchesStd(self, versionString):
+        if versionString is None:
+            return True
         versions = set(versionString.split("."))
         local = os.path.basename(self.stdFile)
         localVersions = set(local.split(".")[2:])
         return versions == localVersions
+
     def getStdFileForSave(self, versionString):
         if self.versionMatchesStd(versionString):
             return self.stdFile

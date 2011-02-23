@@ -91,3 +91,7 @@ CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
 Previously TextTest has always sent batch emails to $USER unless this was explicitly disabled.
 As more and more people rely on the HTML reports alone and don't read the emails this was becoming
 a pain. So no "batch_receipients" entry now means no email.
+
+(2) CaptureMock no longer produces trailing spaces
+==================================================
+This should be easy to just save, really a bugfix.

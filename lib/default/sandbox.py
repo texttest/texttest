@@ -423,7 +423,7 @@ class TestEnvironmentCreator:
 
     def getPathVars(self):
         pathVars = [ "PATH" ]
-        for dataFile in self.test.app.getDataFileNames():
+        for dataFile in self.test.getDataFileNames():
             if dataFile.endswith(".py") and "PYTHONPATH" not in pathVars:
                 pathVars.append("PYTHONPATH")
             elif (dataFile.endswith(".jar") or dataFile.endswith(".class")) and "CLASSPATH" not in pathVars:

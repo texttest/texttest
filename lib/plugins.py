@@ -949,6 +949,7 @@ emptyLineSymbol = "__EMPTYLINE__"
 
 def readListWithComments(filename, filterMethod=None):
     items = OrderedDict()
+    badItems = OrderedDict()
     currComment = ""
     for longline in open(filename).readlines():
         line = longline.strip()
@@ -960,16 +961,17 @@ def readListWithComments(filename, filterMethod=None):
             currComment += longline[1:].lstrip()
         else:
             if filterMethod:
-                failReason = filterMethod(line, items, filename)
+                failReason, warningText = filterMethod(line, items, filename)
                 if failReason:
                     currComment += line + " (automatically commented due to " + failReason + ")\n" + emptyLineSymbol + "\n"
+                    badItems[line] = warningText
                     continue
             items[line] = currComment.strip()
             currComment = ""
     # Rescue dangling comments in the end (but put them before last test ...)
     if currComment and len(items) > 0:
         items[items.keys()[-1]] = currComment + items[items.keys()[-1]]
-    return items
+    return items, badItems
 
 # comment can contain lines with __EMPTYLINE__ (see above) as a separator
 # from free comments, or commented out tests. This method extracts the comment
@@ -1401,6 +1403,9 @@ class Option:
             self.updateMethod(self.defaultValue)
         else:
             self.valueMethod = None
+
+    def addPossibleValue(self, value):
+        pass
         
 
 class TextOption(Option):

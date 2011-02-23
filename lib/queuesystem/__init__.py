@@ -216,7 +216,7 @@ class QueueSystemConfig(default.Config):
                len(app.getCompositeConfigValue("performance_test_resource", "cputime")) > 0
 
     def getSubmissionRules(self, test):
-        return masterprocess.SubmissionRules(self.optionMap, test)
+        return masterprocess.TestSubmissionRules(self.optionMap, test)
 
     def getMachineInfoFinder(self):
         if self.slaveRun():
@@ -236,7 +236,10 @@ class QueueSystemConfig(default.Config):
         app.setConfigDefault("queue_system_resource", [], "Grid engine resources required to locate test execution machines")
         app.setConfigDefault("queue_system_processes", 1, "Number of processes the grid engine should reserve for tests")
         app.setConfigDefault("queue_system_submit_args", "", "Additional arguments to provide to grid engine submission command")
-
+        app.setConfigDefault("queue_system_proxy_executable", "", "Executable to run as a proxy for the real test program")
+        app.setConfigDefault("queue_system_proxy_resource", [], "Grid engine resources required to locate machine to run proxy process")
+        app.addConfigEntry("builtin", "proxy_options", "definition_file_stems")
+        
         
 class DocumentEnvironment(default.DocumentEnvironment):
     def setUpApplication(self, app):

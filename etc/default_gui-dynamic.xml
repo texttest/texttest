@@ -64,6 +64,7 @@
     <menuitem action="Follow File Progress"/>
     <separator/>
     <menuitem action="File Properties"/>
+    <menuitem action="Copy Path To Clipboard"/>
     <separator/>
     <menuitem action="Select Tests With Same Diff"/>
     <separator/>

@@ -664,6 +664,7 @@ class InteractiveActionHandler:
                 modules.add(module)
                 config = self._getIntvActionConfig(module)
                 if config:
+                    self.diag.info("Loading GUI configuration from module " + repr(module) + " succeeded.")
                     configs.append(config)
         if len(configs) == 0:
             defaultModule = self.getExplicitConfigModule()
@@ -709,6 +710,7 @@ class InteractiveActionHandler:
             exec "from " + module + " import InteractiveActionConfig"
             return InteractiveActionConfig()
         except ImportError:
+            self.diag.info("Rejected GUI configuration from module " + repr(module) + "\n" + plugins.getExceptionString())
             self.rejectedModules.append(module) # Make sure we don't try and import it again
             if module == "default_gui": # pragma: no cover - only to aid debugging default_gui
                 raise

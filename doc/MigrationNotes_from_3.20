@@ -92,6 +92,17 @@ Previously TextTest has always sent batch emails to $USER unless this was explic
 As more and more people rely on the HTML reports alone and don't read the emails this was becoming
 a pain. So no "batch_receipients" entry now means no email.
 
-(2) CaptureMock no longer produces trailing spaces
+(2) Default behaviour of "Save" and "Save As" in the dynamic GUI with versions
+==============================================================================
+Previously, the default operation of "Save" has been to save the results with the version specified when running.
+This has proved to be a bit unexpected in some cases, and hence the default behaviour is changed.
+
+"Save" will always overwrite the file it has compared with, no matter what. If it is a new file, it will be saved
+ without version identifiers.
+
+"Save As" allows you to specify a version. The default version value is however "<existing version>" which will behave
+like "Save". Selecting a version explicitly should behave as it does today.
+
+(3) CaptureMock no longer produces trailing spaces
 ==================================================
 This should be easy to just save, really a bugfix.

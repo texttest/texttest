@@ -1995,6 +1995,8 @@ Static GUI Enhancements:
 Dynamic GUI Enhancements:
     - Test-specific configuration files also re-read when recomputing (changeteststate.py)
 	Previously only reread application config files.
+    - Behaviour of "Save" with versions changed (changeteststate.py)
+	Always save the version compared with unless specified. See migration notes.
     - Text info times handle execution times > 1 day now (textinfo.py)
 CaptureMock Enhancements (over old TextTest traffic mechanism):
     - Now handles Python base classes correctly

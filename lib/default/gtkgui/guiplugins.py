@@ -948,7 +948,12 @@ class ActionDialogGUI(OptionGroupGUI):
             # Don't pass set_filename directly, will interfere with PyUseCase's attempts to intercept it
             fileChooserOption.setMethods(fileChooser.get_filename, lambda f: fileChooser.set_filename(f))
         
-        dialog.connect("response", self.respond)
+        dialog.connect("response", self.resetAndRespond, fileChooserOption)
+
+    def resetAndRespond(self, dialog, response, fileChooserOption):
+        if fileChooserOption:
+            fileChooserOption.resetDefault() # Must do this, because we can't rely on reading from invisible FileChoosers
+        self.respond(dialog, response)
 
     def simulateResponse(self, dummy, dialog):
         dialog.response(gtk.RESPONSE_ACCEPT)

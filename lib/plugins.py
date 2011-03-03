@@ -1386,6 +1386,13 @@ class Option:
         else:
             return self.defaultValue
 
+    def resetDefault(self):
+        if self.valueMethod:
+            value = self.valueMethod()
+            if value is not None:
+                self.defaultValue = value
+                self.valueMethod = None
+            
     def getCmdLineValue(self):
         return self.getValue()
 

@@ -82,6 +82,18 @@ and then run
 
 texttest.py -s "traffic.ModifyTraffic types=RET script=migrate_traffic_from_3.20.py"
 
+(3) Python interception and command line/client-server interception cannot write to the same file
+=================================================================================================
+This is only an issue if you are using both these functionalities.
+
+TextTest will in future write python interception from CaptureMock to "pythonmocks.<app>" and other 
+interception to "externalmocks.<app>". There is no need to rename if you are only using one of these,
+as it will still find the "traffic.<app>" files for backwards compatibility. Files recorded in future
+will have the new names, however, so you may wish to rename for consistency.
+
+If you are using both, however, it will be necessary to separate this out via a simple script into 
+the two new files as appropriate.
+
 =========================================================
 CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
 =========================================================

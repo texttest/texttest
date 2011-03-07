@@ -2006,6 +2006,9 @@ CaptureMock Enhancements (over old TextTest traffic mechanism):
     - Replay matcher improvements
 	No longer has TextTest paths hardcoded into it
 	Instead counts items in matching sequences, followed by the number of non-matching sequences.
+    - Python interception no longer uses a server process
+	Basic effect is that it has to use a separate file from the command line/client-server interception
+	See migration notes.
     - No longer works to intercept command line programs in the Windows system directory (e.g. Java)
 	Windows doesn't want you to do this and it's hard to get right.
     - Windows paths no longer magically converted to UNIX ones
@@ -2063,6 +2066,7 @@ Bug Fixes:
     - Don't regenerate batch HTML report index files if nothing the refer to has been regenerated (summarypages.py)
     - GUI now shows data files which are defined in test-specific config files (testmodel.py)
     - "historical_report_page_name" is now respected if provided in an "extra_version" (batch/__init__.py)
+    - Fixed stacktrace on providing "-v" with no arguments (testmodel.py)
 CaptureMock BugFixes:
     - __getitem__ now intercepted correctly for new-style classes (traffic_pymodule.py)
     - fixed infinite recursion bug if something used by inspect.getstack is intercepted (traffic_pymodule.py)

@@ -455,8 +455,8 @@ class RecordTest(BasicRunningAction,guiplugins.ActionDialogGUI):
         self.addOption("c", "Checkout to use for recording", defaultCheckout)
 
     def addSwitches(self):
-        if self.currentApp and self.currentApp.usesTrafficMechanism():
-            self.currentApp.addTrafficSwitch(self.optionGroup, value=1) # record new by default
+        if self.currentApp and self.currentApp.usesCaptureMock():
+            self.currentApp.addCaptureMockSwitch(self.optionGroup, value=1) # record new by default
         self.addSwitch("rep", "Automatically replay test after recording it", 1,
                        options = [ "Disabled", "In background", "Using dynamic GUI" ])
 

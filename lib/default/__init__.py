@@ -34,7 +34,7 @@ class Config:
     def addToOptionGroups(self, apps, groups):
         recordsUseCases = len(apps) == 0 or self.anyAppHas(apps, lambda app: app.getConfigValue("use_case_record_mode") != "disabled")
         useCatalogues = self.anyAppHas(apps, self.isolatesDataUsingCatalogues)
-        useTraffic = self.anyAppHas(apps, self.usesTrafficMechanism)
+        useCaptureMock = self.anyAppHas(apps, self.usesCaptureMock)
         for group in groups:
             if group.name.startswith("Select"):
                 group.addOption("t", "Test names containing", description="Select tests for which the name contains the entered text. The text can be a regular expression.")
@@ -62,8 +62,8 @@ class Config:
                     group.addSwitch("actrep", "Run with slow motion replay")
                 if useCatalogues:
                     group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
-                if useTraffic:
-                    self.addTrafficSwitch(group)
+                if useCaptureMock:
+                    self.addCaptureMockSwitch(group)
             elif group.name.startswith("Advanced"):
                 group.addOption("b", "Run batch mode session")
                 group.addOption("name", "Name this run", self.optionValue("name"))
@@ -108,16 +108,16 @@ class Config:
                     group.addSwitch("actrep", "Run with slow motion replay")
                 if not useCatalogues:
                     group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
-                if not useTraffic:
-                    self.addTrafficSwitch(group)
+                if not useCaptureMock:
+                    self.addCaptureMockSwitch(group)
 
-    def addTrafficSwitch(self, group, value=0):
+    def addCaptureMockSwitch(self, group, value=0):
         options = [ "Replay All", "Record All", "Record New Only"  ]
-        descriptions = [ "Replay all existing interactions from the information in the traffic files. Do not record anything new.",
-                         "Ignore any existing traffic files and record all the interactions afresh.",
-                         "Replay all existing interactions from the information in the traffic files. " + \
+        descriptions = [ "Replay all existing interactions from the information in CaptureMock's mock files. Do not record anything new.",
+                         "Ignore any existing CaptureMock files and record all the interactions afresh.",
+                         "Replay all existing interactions from the information in the CaptureMock mock files. " + \
                          "Record any other interactions that occur." ]
-        group.addSwitch("rectraffic", "Traffic Files", value=value, options=options, description=descriptions)
+        group.addSwitch("rectraffic", "CaptureMock", value=value, options=options, description=descriptions)
 
     def getReconnFullOptions(self):
         return ["Display results exactly as they were in the original run",
@@ -411,7 +411,7 @@ class Config:
         return app.getConfigValue("create_catalogues") == "true" and \
                len(app.getConfigValue("partial_copy_test_path")) > 0
 
-    def usesTrafficMechanism(self, app):
+    def usesCaptureMock(self, app):
         return "traffic" in app.defFileStems()
     
     def hasWritePermission(self, path):
@@ -506,9 +506,9 @@ class Config:
         catalogueCreator = self.getCatalogueCreator()
         ignoreCatalogues = self.shouldIgnoreCatalogues()
         collator = self.getTestCollator()
-        from traffic import SetUpTrafficHandlers, TerminateTrafficHandlers
-        trafficSetup = SetUpTrafficHandlers(self.optionIntValue("rectraffic"))
-        trafficTerminator = TerminateTrafficHandlers()
+        from traffic import SetUpCaptureMockHandlers, TerminateCaptureMockHandlers
+        trafficSetup = SetUpCaptureMockHandlers(self.optionIntValue("rectraffic"))
+        trafficTerminator = TerminateCaptureMockHandlers()
         return [ self.getExecHostFinder(), self.getWriteDirectoryMaker(), \
                  self.getWriteDirectoryPreparer(ignoreCatalogues), \
                  trafficSetup, catalogueCreator, collator, self.getOriginalFilterer(), self.getTestRunner(), \

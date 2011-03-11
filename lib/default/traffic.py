@@ -1,7 +1,7 @@
 
 import os, plugins, shutil, subprocess
 
-class SetUpTrafficHandlers(plugins.Action):
+class SetUpCaptureMockHandlers(plugins.Action):
     def __init__(self, recordSetting):
         self.recordSetting = recordSetting
         libexecDir = plugins.installationDir("libexec")
@@ -10,7 +10,7 @@ class SetUpTrafficHandlers(plugins.Action):
     def __call__(self, test):
         pythonCustomizeFiles = test.getAllPathNames("testcustomize.py") 
         pythonCoverage = test.hasEnvironment("COVERAGE_PROCESS_START")
-        if test.app.usesTrafficMechanism() or pythonCoverage or pythonCustomizeFiles:
+        if test.app.usesCaptureMock() or pythonCoverage or pythonCustomizeFiles:
             rcFiles = test.getAllPathNames("capturemockrc")
             if rcFiles or pythonCoverage or pythonCustomizeFiles:
                 self.setUpIntercepts(test, rcFiles, pythonCoverage, pythonCustomizeFiles)
@@ -66,7 +66,7 @@ class SetUpTrafficHandlers(plugins.Action):
             shutil.copy(src, dst)
 
 
-class TerminateTrafficHandlers(plugins.Action):
+class TerminateCaptureMockHandlers(plugins.Action):
     def __call__(self, test):
         try:
             from capturemock import terminate
@@ -76,35 +76,35 @@ class TerminateTrafficHandlers(plugins.Action):
                 
 
 class ModifyTraffic(plugins.ScriptWithArgs):
-    # For now, only bother with the client server traffic which is mostly what needs tweaking...
     scriptDoc = "Apply a script to all the client server data"
     def __init__(self, args):
-        argDict = self.parseArguments(args, [ "script", "types" ])
+        argDict = self.parseArguments(args, [ "script", "types", "file" ])
         self.script = argDict.get("script")
+        self.fileName = argDict.get("file", "traffic")
         self.trafficTypes = plugins.commasplit(argDict.get("types", "CLI,SRV"))
     def __repr__(self):
-        return "Updating traffic in"
+        return "Updating CaptureMock files in"
     def __call__(self, test):
-        fileName = test.getFileName("traffic")
+        fileName = test.getFileName(self.fileName)
         if not fileName:
             return
 
         self.describe(test)
         try:
-            newTrafficTexts = [ self.getModified(t, test.getDirectory()) for t in self.readIntoList(fileName) ]
+            newTexts = [ self.getModified(t, test.getDirectory()) for t in self.readIntoList(fileName) ]
         except plugins.TextTestError, e:
             print str(e).strip()
             return
 
         newFileName = fileName + "tmpedit"
         newFile = open(newFileName, "w")
-        for trafficText in newTrafficTexts:
-            self.write(newFile, trafficText) 
+        for text in newTexts:
+            self.write(newFile, text) 
         newFile.close()
         shutil.move(newFileName, fileName)
         
     def readIntoList(self, fileName):
-        # Copied from traffic server ReplayInfo, easier than trying to reuse it
+        # Copied from CaptureMock ReplayInfo, easier than trying to reuse it
         trafficList = []
         currTraffic = ""
         for line in open(fileName, "rU").xreadlines():

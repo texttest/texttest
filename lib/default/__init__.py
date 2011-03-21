@@ -1328,7 +1328,6 @@ class Config:
         app.setConfigDefault("remote_copy_program", "", "(UNIX) Program to use for copying files remotely, in case of non-shared file systems")
         app.setConfigDefault("default_filter_file", [], "Filter file to use by default, generally only useful for versions")
         app.setConfigDefault("test_data_environment", {}, "Environment variables to be redirected for linked/copied test data")
-        app.setConfigDefault("test_data_properties", { "default" : "" }, "Write the contents of test_data_environment to the given Java properties file")
         app.setConfigDefault("filter_file_directory", [ "filter_files" ], "Default directories for test filter files, relative to an application directory.")
         app.setConfigDefault("extra_version", [], "Versions to be run in addition to the one specified")
         app.setConfigDefault("batch_extra_version", { "default" : [] }, "Versions to be run in addition to the one specified, for particular batch sessions")

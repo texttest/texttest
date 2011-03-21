@@ -252,11 +252,10 @@ class Test(plugins.Observable):
         if newName != self.uniqueName:
             self.notify("UniqueNameChange", newName)
             self.uniqueName = newName
-    def setEnvironment(self, var, value, propFile=None):
-        if propFile:
-            self.addProperty(var, value, propFile)
-        else:
-            self.environment[var] = value
+            
+    def setEnvironment(self, var, value):
+        self.environment[var] = value
+
     def addProperty(self, var, value, propFile):
         if not self.properties.has_key(propFile):
             self.properties.addEntry(propFile, {})
@@ -385,7 +384,7 @@ class Test(plugins.Observable):
         return False
     
     def findAllStdFiles(self, stem):
-        if stem in [ "environment", "properties", "testcustomize.py" ]:
+        if stem in [ "environment", "testcustomize.py" ]:
             otherApps = self.app.findOtherAppNames()
             self.diagnose("Finding environment files, excluding " + repr(otherApps))
             otherAppExcludor = lambda vset: len(vset.intersection(otherApps)) == 0
@@ -1426,11 +1425,7 @@ class Application:
     def setEnvironment(self, test):
         test.environment.diag.info("Reading environment for " + repr(test))
         envFiles = test.getAllPathNames("environment")
-        envVars = map(self.readEnvironment, envFiles)
-        allVars = reduce(operator.add, envVars, [])
-        propFiles = test.getAllPathNames("properties")
-        test.properties.readValues(propFiles, insert=True, errorOnUnknown=False)
-        
+        allVars = sum((self.readEnvironment(f) for f in envFiles), [])
         allProps = []
         for suite in test.getAllTestsToRoot():
             vars, props = self.configObject.getConfigEnvironment(suite)
@@ -1554,7 +1549,7 @@ class Application:
         self.setConfigDefault("link_test_path", [], "Paths to be linked from the temp. directory when running tests")
         self.setConfigDefault("test_data_ignore", { "default" : [] }, \
                               "Elements under test data structures which should not be viewed or change-monitored")
-        self.setConfigDefault("definition_file_stems", { "default": [], "builtin": [ "config", "environment", "properties", "testsuite" ]}, \
+        self.setConfigDefault("definition_file_stems", { "default": [], "builtin": [ "config", "environment", "testsuite" ]}, \
                               "files to be shown as definition files by the static GUI")
         self.setConfigDefault("unsaveable_version", [], "Versions which should not have results saved for them")
         self.setConfigDefault("version_priority", { "default": 99 }, \

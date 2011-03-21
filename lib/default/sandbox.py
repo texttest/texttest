@@ -87,10 +87,10 @@ class PrepareWriteDirectory(plugins.Action):
         if remoteCopy and targetPath:
             remoteCopy(targetPath)
             
-        envVarToSet, propFileName = self.findDataEnvironment(test, configName)
+        envVarToSet = self.findDataEnvironment(test, configName)
         if envVarToSet and targetPath:
             self.diag.info("Setting env. variable " + envVarToSet + " to " + targetPath)
-            test.setEnvironment(envVarToSet, targetPath, propFileName)
+            test.setEnvironment(envVarToSet, targetPath)
 
     def copyDataRemotely(self, sourcePath, test, machine, remoteTmpDir):
         if os.path.exists(sourcePath):
@@ -131,10 +131,10 @@ class PrepareWriteDirectory(plugins.Action):
     def findDataEnvironment(self, test, configName):
         self.diag.info("Finding env. var name from " + configName)
         if configName.startswith("$"):
-            return configName[1:], None
+            return configName[1:]
+        
         envVarDict = test.getConfigValue("test_data_environment")
-        propFile = test.getCompositeConfigValue("test_data_properties", configName)
-        return envVarDict.get(configName), propFile
+        return envVarDict.get(configName)
     
     def copyTestPath(self, dummy, fullPath, target):
         if os.path.isfile(fullPath):

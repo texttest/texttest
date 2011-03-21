@@ -31,7 +31,10 @@ class FileViewAction(guiplugins.ActionGUI):
         return False
 
     def getLargestFileSize(self, f, *args):
-        return os.path.getsize(f)            
+        try:
+            return os.path.getsize(f)
+        except EnvironmentError:
+            return 0
 
     def getConfirmationMessage(self):
         self.performArgs = []

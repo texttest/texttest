@@ -1993,6 +1993,7 @@ Static GUI Enhancements:
     - Creating an application for testing PyGTK will now generate a repoint of XDG_CONFIG_HOME
 	This is basically always needed in theory and quite a gotcha if you aren't familiar with it.
 Dynamic GUI Enhancements:
+    - Rerun is now enabled and working from reconnect runs (runningactions.py)
     - Test-specific configuration files also re-read when recomputing (changeteststate.py)
 	Previously only reread application config files.
     - Behaviour of "Save" with versions changed (changeteststate.py)
@@ -2017,6 +2018,8 @@ CaptureMock Enhancements (over old TextTest traffic mechanism):
 	Only thing that remains is double-quoting when arguments contain spaces.
     - Works under Jython (as does pycoverage support)
 Framework Enhancements:
+    - New Trac plugin for known bugs functionality (trac.py)
+	Alongside Bugzilla and Jira ones. Thanks Michael Behrisch.
     - Jira plugin now highlights 'resolution' field if it is set, instead of 'status' (jira.py)
 	This information is usually more interesting.
     - Filter files can now list selected test suites as well as tests (default/__init__.py)
@@ -2024,6 +2027,8 @@ Framework Enhancements:
     - New standard location to store local config modules (testmodel.py)
 	Place in a directory under the root of the test suite, called "texttest_config_modules"
     - Now enable Java features if "java" appears anywhere in "interpreter" setting (default/__init__.py)
+    - "Properties files" support removed (sandbox.py)
+	Handle Java system properties via "interpreter_options" files, others via normal data file mechanism.
 Batch Report Enhancements:
     - Can now get green/red colourings from the batch console output (colorer.py)
 	Use the new -zen option. Thanks to Matt Baker for this.
@@ -2067,6 +2072,8 @@ Bug Fixes:
     - GUI now shows data files which are defined in test-specific config files (testmodel.py)
     - "historical_report_page_name" is now respected if provided in an "extra_version" (batch/__init__.py)
     - Fixed stacktrace on providing "-v" with no arguments (testmodel.py)
+    - "collate_file" now works if test names have glob metacharacter like '*' or '[' in them (sandbox.py)
+    - Fixed stacktrace when "max_file_size" set and files are viewed remotely which can't be accessed locally (fileviewers.py)
 CaptureMock BugFixes:
     - __getitem__ now intercepted correctly for new-style classes (traffic_pymodule.py)
     - fixed infinite recursion bug if something used by inspect.getstack is intercepted (traffic_pymodule.py)

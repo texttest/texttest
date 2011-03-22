@@ -94,6 +94,16 @@ will have the new names, however, so you may wish to rename for consistency.
 If you are using both, however, it will be necessary to separate this out via a simple script into 
 the two new files as appropriate.
 
+(4) Java Properties files and test_data_properties
+==================================================
+The ability to create and amalgamate specific properties files for Java programs seems to have been little used.
+In practice people seem to use system properties most of the time, and ordinary properties files can of course use
+the ordinary data file mechanism which is simpler than learning another format.
+
+For simplicity this functionality is therefore gone. Usage can be replaced by either "interpreter_options" files to
+provide properties via -D arguments to Java, or by simply adding the files via link_test_path. If you *really* miss
+this functionality, drop me a line and I'll think about restoring it.
+
 =========================================================
 CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
 =========================================================

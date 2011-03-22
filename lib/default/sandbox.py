@@ -562,10 +562,19 @@ class CollateFiles(plugins.Action):
                 return True # Don't collate generated files
         return False
 
+    def glob(self, test, sourcePattern):
+        # Test name may contain glob meta-characters, and there is no way to quote them (see comment in fnmatch.py)
+        # So we can't just form an absolute path and glob that
+        testDir = test.getDirectory(temporary=1)
+        origCwd = os.getcwd()
+        os.chdir(testDir)
+        result = glob.glob(sourcePattern)
+        os.chdir(origCwd)
+        return [ os.path.join(testDir, f) for f in result ]
+
     def findPaths(self, test, sourcePattern):
         self.diag.info("Looking for pattern " + sourcePattern + " for " + repr(test))
-        pattern = test.makeTmpFileName(sourcePattern, forComparison=0)
-        paths = glob.glob(pattern)
+        paths = self.glob(test, sourcePattern)
         paths.sort()
         existingPaths = filter(os.path.isfile, paths)
         if sourcePattern == "*": # interpret this specially to mean 'all files which are not collated already'

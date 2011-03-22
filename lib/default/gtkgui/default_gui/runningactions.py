@@ -384,7 +384,6 @@ class RunTests(RunningAction,guiplugins.ActionTabGUI):
 
 class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
     def __init__(self, allApps, dummy, inputOptions):
-        self.reconnecting = inputOptions.has_key("reconnect")
         guiplugins.ActionDialogGUI.__init__(self, allApps)
         RunningAction.__init__(self, allApps, inputOptions)
 
@@ -402,9 +401,6 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
 
     def getTmpFilterDir(self, app):
         return "" # don't want selections returned here, send them to the static GUI
-
-    def isValidForApp(self, *args):
-        return not self.reconnecting
     
     def getLogRootDirectory(self, app):
         if self.inputOptions.has_key("f"):

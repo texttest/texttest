@@ -1975,8 +1975,8 @@ Bug Fixes:
     - Fixed stack trace importing and copying a file to make a new directory (adminactions.py)
     - Various error messages tidied up (e.g. filetrees.py)
 
-Version trunk
-=============
+Version 3.21
+============
 System requirements (see Migration Notes):
     - "Traffic mechanism" is now a separate library called "capturemock" and should be managed separately
 	Suites with the old settings will not start any more. You will need to migrate as described in the migration notes.
@@ -1990,6 +1990,8 @@ General GUI Enhancements:
 Static GUI Enhancements:
     - Local "wrapper" scripts now appear in static GUI config tab (filetrees.py)
 	Any "executable" or "interpreter" that depends on "TEXTTEST_ROOT" will be shown.
+    - Application creation dialog now includes GUI test options for Eclipse RCP and SWT
+	Which are supported in PyUseCase 3.5
     - Creating an application for testing PyGTK will now generate a repoint of XDG_CONFIG_HOME
 	This is basically always needed in theory and quite a gotcha if you aren't familiar with it.
 Dynamic GUI Enhancements:
@@ -2080,3 +2082,13 @@ CaptureMock BugFixes:
     - No longer stacktraces if called on Python earlier than 2.4 (sitecustomize.py)
     - No longer writes a trailing space if the program is called with no arguments (capturepython.py)
 
+Version trunk
+=============
+System requirements (see Migration Notes):
+General GUI Enhancements:
+Static GUI Enhancements:
+Dynamic GUI Enhancements:
+Framework Enhancements:
+Batch Report Enhancements:
+Grid Engine (LSF/SGE) enhancements/bug fixes:
+Bug Fixes:

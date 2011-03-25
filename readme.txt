@@ -22,7 +22,7 @@ Documentation Summary:
 
 Installation and System Requirements:
 
-    Read the online installation guide at http://www.texttest.org. Click on the "Documentation" button
+    Read the online installation guide at http://www.texttest.org. Click on the "TextTest/docs" button
     and then the "Installation Guide" at the top-left of the table.
     The lightning summary is that you need Python, PyGTK, tkdiff which are probably already
     installed if you're on UNIX. On Windows you'll probably need to download them. 
@@ -39,18 +39,8 @@ TEXTTEST_HOME and the Self-Tests:
     and also a large number of tests for itself (using itself, naturally!) under the texttest subdirectory. 
     Your tests should be placed in product-specific subdirectories alongside the "texttest" directory.
 
-    The self-tests have been made much more independent of environment since TextTest 3.11 and shouldn't depend
-    on any particular software being present any more. It should be possible to just run them "out of the box".
-
-    If you plan to change the code you are strongly recommended to run the self-tests and test your changes. 
-    They also function as working examples as described above, read source/doc/quickstart.txt for more 
+    The self-tests also function as working examples as described above, read source/doc/quickstart.txt for more 
     details.
-
-Known bugs:
-
-    (1) When testing GUIs on Windows, TextTest hides the window as it does via the virtual DISPLAY on UNIX. However,
-    this isn't recursive so any dialogs, other windows, other apps etc. started by the test will still pop up. This
-    is very obvious if you run the self-tests on Windows...
 
 Bugs and Support:
     
@@ -60,14 +50,13 @@ Bugs and Support:
 
     Geoff Bache
 
-    <Geoff.Bache@jeppesen.com>
-
+    <geoff.bache@pobox.com>
 
 Other (non-standard) Open Source python modules used by TextTest and packaged with it:
 
-    ndict.py                    : sequential dictionaries. (Wolfgang Grafen, v0.3.2)
-    usecase.py,gtkusecase.py    : "PyUseCase", record/replay tool for PyGTK GUIs, of the kind you may well 
-                                  need if you test GUIs (Geoff Bache, v3.4)
+    ordereddict.py              : sequential dictionaries. (Raymond Hettinger, v1.1)
+    source/pyusecase            : "PyUseCase", record/replay tool for PyGTK GUIs, of the kind you may well 
+                                  need if you test GUIs (Geoff Bache, v3.5)
     HTMLgen.py,HTMLcolors.py,   : "HTMLGen", tool for generating HTML in Python, used for the historical report
     ImageH.py,ImagePaletteH.py,   webpages generated for batch runs (Robin Friedrich, v2.2.2)
     imgsize.py
@@ -81,6 +70,7 @@ Plugins included:
     lsf.py            :   integration with LSF for distributing tests - note LSF is not free! (see www.platform.com)
     bugzilla.py       :   integration with Bugzilla version 3.x, using its native webservice API (see www.bugzilla.org)
     bugzillav2.py     :   integration with Bugzilla version 2.x, using the command-line interface program bugcli (Dennis Cox, v0.6)
+    trac.py           :   integration with Trac for bug tracking
     jira.py           :   integration with Atlassian Jira for bug tracking - which isn't free either
     virtualdisplay.py :   integration with Xvfb, UNIX virtual display tool, useful for stopping tested GUIs popping up all the time.
 
@@ -111,10 +101,10 @@ There is a text-based console interface and two related GUI interfaces, the 'sta
 and management, and the 'dynamic GUI' for running tests and examining failures. It is recommended
 that you install this as the text interface is not actively developed any more. The GUIs use the
 Python library PyGTK, which is directly available in most Linux distributions. If you aren't using Linux, 
-it is freely available for download, see below.
+it is freely available for download, see online installation instructions.
 
 To test GUIs, you need some simulation tool. We have also developed "PyUseCase", which is such a tool
-for Python GUIs, which relies on a record/replay layer between the application and the GUI library. There also 
-exist "JUseCase", for Java GUIs and "NUseCase" for .net GUIs. TextTest integrates with these, and includes 
+for Python GUIs and SWT/Eclipse RCP, which relies on a record/replay layer between the application and the GUI library. 
+There also exist "JUseCase", for Java Swing GUIs and "NUseCase" for .net GUIs. TextTest integrates with these, and includes 
 PyUseCase as it uses it for its own testing. If you want to use it for your own GUIs you are however recommended 
 to download it separately from its own page.

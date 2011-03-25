@@ -426,7 +426,9 @@ class ImportApplication(guiplugins.ActionDialogGUI):
                                    "PyGTK GUI with PyUseCase 3.x",
                                    "Tkinter GUI with PyUseCase 3.2+",
                                    "wxPython GUI with PyUseCase 3.4+",
-                                   "Java GUI with JUseCase",
+                                   "SWT GUI with PyUseCase 3.5+",
+                                   "Eclipse RCP GUI with PyUseCase 3.5+",
+                                   "Java Swing GUI with JUseCase",
                                    "Other embedded Use-case Recorder (e.g. PyUseCase 2.x, NUseCase)",
                                    "Other GUI-test tool (enable virtual display only)" ],
                        hideOptions=True)
@@ -525,14 +527,18 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         useGui = self.optionGroup.getSwitchValue("gui")
         if useGui > 0:
             configEntries["use_case_record_mode"] = "GUI"
-            if useGui != 6:
+            if useGui != 8:
                 configEntries["slow_motion_replay_speed"] = "3.0"
-        if useGui in [ 1, 2, 3 ]:
+        if useGui in range(1, 6):
             interpreter = "pyusecase"
             if useGui == 2:
                 interpreter += " -i tkinter"
             elif useGui == 3:
                 interpreter += " -i wx"
+            elif useGui == 4:
+                interpreter += " -i javaswt"
+            elif useGui == 5:
+                interpreter += " -i javarcp"
             configEntries["use_case_recorder"] = "pyusecase"
             configEntries["interpreter"] = interpreter
             if useGui == 1: # PyGTK
@@ -561,13 +567,14 @@ class ImportApplication(guiplugins.ActionDialogGUI):
                           "So we disable it by default here: multiple desktops may be useful."
                 configEntries["section_comment"] = comment
                 configEntries["virtual_display_hide_windows"] = "false"
+            
             pyusecaseDir = os.path.join(directory, "pyusecase_files")
             plugins.ensureDirectoryExists(pyusecaseDir) 
             # Create an empty UI map file so it shows up in the Config tab...
             open(os.path.join(pyusecaseDir, "ui_map.conf"), "w")
-        elif useGui == 4:
-            configEntries["use_case_recorder"] = "jusecase"
         elif useGui == 6:
+            configEntries["use_case_recorder"] = "jusecase"
+        elif useGui == 8:
             configEntries["use_case_recorder"] = "none"            
 
         self.notify("NewApplication", ext, directory, configEntries)

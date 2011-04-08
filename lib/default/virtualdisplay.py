@@ -123,9 +123,19 @@ class VirtualDisplayResponder(plugins.Responder):
     def getVirtualServerArgs(self, machine, app):
         binDir = plugins.installationDir("libexec")
         fullPath = os.path.join(binDir, "startXvfb.py")
-        logDir = os.path.join(app.writeDirectory, "Xvfb") 
-        plugins.ensureDirectoryExists(logDir)
-        pythonArgs = self.findPythonArgs(machine)
+        appTmpDir = app.getRemoteTmpDirectory()[1]
+        if appTmpDir:
+            logDir = os.path.join(appTmpDir, "Xvfb")
+            app.ensureRemoteDirExists(machine, logDir)
+            remoteXvfb = os.path.join(appTmpDir, "startXvfb.py")
+            app.copyFileRemotely(fullPath, "localhost", remoteXvfb, machine)
+            fullPath = remoteXvfb
+            pythonArgs = [ "python", "-u" ]
+        else:
+            logDir = os.path.join(app.writeDirectory, "Xvfb") 
+            plugins.ensureDirectoryExists(logDir)
+            pythonArgs = self.findPythonArgs(machine)
+            
         xvfbExtraArgs = plugins.splitcmd(app.getConfigValue("virtual_display_extra_args"))
         cmdArgs = pythonArgs + [ fullPath, logDir ] + xvfbExtraArgs
         return app.getCommandArgsOn(machine, cmdArgs)

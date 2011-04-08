@@ -328,12 +328,15 @@ class PrepareWriteDirectory(plugins.Action):
 
 # Class for automatically adding things to test environment files...
 class TestEnvironmentCreator:
+    usecaseDirsCopied = set()
     def __init__(self, test, optionMap):
         self.test = test
         self.optionMap = optionMap
         self.diag = logging.getLogger("Environment Creator")
+
     def getVariables(self):
         vars, props = [], []
+        self.diag.info("Creating environment for " + repr(self.test))
         if self.topLevel():
             vars.append(("TEXTTEST_ROOT", self.test.app.getDirectory())) # Full path to the root directory for each test application
             vars.append(("TEXTTEST_CHECKOUT", self.test.app.checkout))
@@ -346,7 +349,9 @@ class TestEnvironmentCreator:
                 if usecaseRecorder != "none" and "USECASE_HOME" not in envSetInTests:
                     if not usecaseRecorder:
                         usecaseRecorder = "ui_simulation"
-                    vars.append(("USECASE_HOME", os.path.join(self.test.app.getDirectory(), usecaseRecorder + "_files")))
+                    usecaseDir = os.path.join(self.test.app.getDirectory(), usecaseRecorder + "_files")
+                    vars.append(("USECASE_HOME", self.copyRemoteUsecaseDirIfNeeded(usecaseDir)))
+                    
                 if os.name == "posix":
                     from virtualdisplay import VirtualDisplayResponder
                     if VirtualDisplayResponder.instance:
@@ -385,15 +390,44 @@ class TestEnvironmentCreator:
 
     def isRecording(self):
         return self.optionMap.has_key("record")
+    
     def findReplayUseCase(self, usecaseFile):
         if not self.isRecording():
             if usecaseFile:
-                return usecaseFile
+                return self.copyRemoteReplayFileIfNeeded(usecaseFile)
             elif os.environ.has_key("USECASE_REPLAY_SCRIPT") and not self.useJavaRecorder():
                 return "" # Clear our own script, if any, for further apps wanting to use PyUseCase
 
+    def copyRemoteReplayFileIfNeeded(self, path):
+        machine, remoteTmpDir = self.test.app.getRemoteTestTmpDir(self.test)
+        if remoteTmpDir:
+            newbasename = "replay_usecase"
+            remoteName = os.path.join(remoteTmpDir, newbasename)
+            self.test.app.copyFileRemotely(path, "localhost", remoteName, machine)
+            # Don't return remoteName, we pretend it's a local temporary file
+            # so that the $HOME reference gets preserved (no guarantee $HOME is the same remotely)
+            return os.path.join(self.test.getDirectory(temporary=1), newbasename)
+        else:
+            return path
+        
+    def copyRemoteUsecaseDirIfNeeded(self, path):
+        machine, remoteTmpDir = self.test.app.getRemoteTmpDirectory()
+        if remoteTmpDir:
+            newbasename = os.path.basename(path)
+            if os.path.isdir(path) and path not in self.usecaseDirsCopied:
+                self.usecaseDirsCopied.add(path)
+                self.test.app.ensureRemoteDirExists(machine, remoteTmpDir)
+                remoteName = os.path.join(remoteTmpDir, newbasename)
+                self.test.app.copyFileRemotely(path, "localhost", remoteName, machine)
+            # Don't return remoteName, we pretend it's a local temporary file
+            # so that the $HOME reference gets preserved (no guarantee $HOME is the same remotely)
+            return os.path.join(self.test.app.writeDirectory, newbasename)
+        else:
+            return path
+
     def useJavaRecorder(self):
         return self.test.getConfigValue("use_case_recorder") == "jusecase"
+
     def getReplayScriptVariable(self, replayScript):
         if self.useJavaRecorder():
             return "replay", replayScript, "jusecase"

@@ -136,11 +136,15 @@ class PrepareWriteDirectory(plugins.Action):
         envVarDict = test.getConfigValue("test_data_environment")
         return envVarDict.get(configName)
     
-    def copyTestPath(self, dummy, fullPath, target):
-        if os.path.isfile(fullPath):
-            self.copyfile(fullPath, target)
-        if os.path.isdir(fullPath):
-            self.copytree(fullPath, target)
+    def copyTestPath(self, test, fullPath, target):
+        copyScript = test.getCompositeConfigValue("copy_test_path_script", os.path.basename(target))
+        if copyScript:
+            subprocess.call(copyScript.split() + [ fullPath, target ])
+        else:
+            if os.path.isfile(fullPath):
+                self.copyfile(fullPath, target)
+            if os.path.isdir(fullPath):
+                self.copytree(fullPath, target)
 
     def copytimes(self, src, dst):
         if os.path.isdir(src) and os.name == "nt":

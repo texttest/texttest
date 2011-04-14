@@ -2089,6 +2089,10 @@ General GUI Enhancements:
 Static GUI Enhancements:
 Dynamic GUI Enhancements:
 Framework Enhancements:
+    - Added possibility to configure copying procedure for test data files
+	See docs for "copy_test_path_script".
+    - Now support GUI testing on separate networks
+	Both virtual display and accessibility of usecase and UI map files fixed
 Batch Report Enhancements:
 Grid Engine (LSF/SGE) enhancements/bug fixes:
 Bug Fixes:

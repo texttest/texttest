@@ -13,6 +13,8 @@ class QueueSystem:
                     "R" : ("RESTART", "Restarted"),
                     "S" : ("SSUSP", "Suspended by SGE due to other higher priority jobs"),
                     "T" : ("THRESH", "Suspended by SGE as it exceeded allowed thresholds") }
+    def __init__(self):
+        self.qdelOutput = ""
 
     def getSubmitCmdArgs(self, submissionRules):
         qsubArgs = [ "qsub", "-N", submissionRules.getJobName() ]
@@ -77,11 +79,15 @@ class QueueSystem:
 
     def getJobFailureInfo(self, jobId):
         methods = [ self.getAccountInfo, self.getAccountInfoOldFiles, self.retryAccountInfo ]
+        acctError = ""
         for method in methods:
-            acctOutput = method(jobId)
+            acctOutput, acctError = method(jobId)
             if acctOutput is not None:
                 return acctOutput
-        return "SGE lost job:" + jobId + "\n qdel output was as follows:\n" + self.qdelOutput
+        if self.qdelOutput:
+            return "SGE lost job: " + jobId + "\nqdel output was as follows:\n" + self.qdelOutput
+        else:
+            return "Could not find info about job: " + jobId + "\nqacct error was as follows:\n" + acctError
     
     def getAccountInfo(self, jobId, extraArgs=[]):
         cmdArgs = [ "qacct", "-j", jobId ] + extraArgs
@@ -89,30 +95,36 @@ class QueueSystem:
         outMsg, errMsg = proc.communicate()
         notFoundMsg = "error: job id " + jobId + " not found"
         if len(errMsg) == 0 or notFoundMsg not in errMsg:
-            return outMsg
+            return outMsg, errMsg
+        else:
+            return None, errMsg
 
     def retryAccountInfo(self, jobId):
         sleepTime = 0.5
+        acctError = ""
         for i in range(9): # would be 10 but we had one already
             # assume failure is because the job hasn't propagated yet, wait a bit
             sleep(sleepTime)
             if sleepTime < 5:
                 sleepTime *= 2
-            acctOutput = self.getAccountInfo(jobId)
+            acctOutput, acctError = self.getAccountInfo(jobId)
             if acctOutput is not None:
-                return acctOutput
+                return acctOutput, acctError
             else:
                 log.info("Waiting " + str(sleepTime) + " seconds before retrying account info for job " + jobId)
+        return None, acctError
 
     def getAccountInfoOldFiles(self, jobId):
+        acctError = ""
         for logNum in range(5):
             # try at most 5 accounting files for now - assume jobs don't run longer than 5 days!
             fileName = self.findAccountingFile(logNum)
             if not fileName:
-                return
-            acctInfo = self.getAccountInfo(jobId, [ "-f", fileName ])
+                return None, acctError
+            acctInfo, acctError = self.getAccountInfo(jobId, [ "-f", fileName ])
             if acctInfo:
-                return acctInfo
+                return acctInfo, acctError
+        return None, acctError
 
     def findAccountingFile(self, logNum):
         if os.environ.has_key("SGE_ROOT") and os.environ.has_key("SGE_CELL"):

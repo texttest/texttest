@@ -1,7 +1,7 @@
 
 """ Code related to building the summary page and the graphs etc. """
 
-import testoverview, plugins, logging, os, shutil, time, operator
+import testoverview, plugins, logging, os, shutil, time, operator, sys
 from ordereddict import OrderedDict
 from glob import glob
 from batchutils import BatchVersionFilter
@@ -132,6 +132,18 @@ class SummaryDataFinder:
             for versionData in appInfo.values():
                 allDates.append(max(versionData.keys()))
         return max(allDates)
+
+    def usePieChart(self, appName):
+        if self.appUsePie.get(appName) == "true":
+            try:
+                from resultgraphs import PieGraph
+                return True
+            except Exception, e:
+                sys.stderr.write("Not producing pie charts for index pages: " + str(e) + "\n")
+                self.appUsePie = {}
+                return False # if matplotlib isn't installed or is too old
+        else:
+            return False
 
     def getLatestSummary(self, appName, version):
         versionData = self.appVersionInfo[appName][version]
@@ -314,7 +326,7 @@ class SummaryGenerator:
                     resultSummary, lastDate = dataFinder.getLatestSummary(appName, version)
                     oldResults = lastDate != mostRecentDate
                     fileToLink = dataFinder.getOverviewPage(appName, version)
-                    if dataFinder.appUsePie[appName] == "true":
+                    if dataFinder.usePieChart(appName):
                         summaryGraphName = "summary_pie_" + version + ".png"
                         self.createPieChart(dataFinder, resultSummary, summaryGraphName, version, lastDate, oldResults)
                         file.write('    <td><a href="' + fileToLink + '"><img border=\"0\" src=\"' + summaryGraphName + '\"></a></td>\n')

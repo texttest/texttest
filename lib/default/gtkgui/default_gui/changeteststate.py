@@ -8,6 +8,7 @@ from .. import guiplugins
 
 class SaveTests(guiplugins.ActionDialogGUI):
     defaultVersionStr = "<existing version>"
+    fullVersionStr = "<full version>"
     def __init__(self, allApps, *args):
         guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
         self.directAccel = None
@@ -80,7 +81,7 @@ class SaveTests(guiplugins.ActionDialogGUI):
         return True
     
     def getPossibleVersions(self):
-        extensions = [ self.defaultVersionStr ]
+        extensions = [ self.defaultVersionStr, self.fullVersionStr ]
         for app in self.currAppSelection:
             for ext in app.getSaveableVersions():
                 if not ext in extensions:
@@ -110,9 +111,11 @@ class SaveTests(guiplugins.ActionDialogGUI):
         else:
             return []
 
-    def getVersion(self):
+    def getVersion(self, test):
         versionString = self.optionGroup.getOptionValue("v")
-        if versionString != self.defaultVersionStr:
+        if versionString == self.fullVersionStr:
+            return test.app.getFullVersion(forSave=1)
+        elif versionString != self.defaultVersionStr:
             return versionString
 
     def performOnCurrent(self):
@@ -123,11 +126,13 @@ class SaveTests(guiplugins.ActionDialogGUI):
         stemsToSave = self.getStemsToSave()
         overwriteSuccess = self.optionGroup.getSwitchValue("over")
         tests = self.getSaveableTests()
+        # Calculate the versions beforehand, as saving tests can change the selection,
+        # which can affect the default version calculation...
+        testsWithVersions = [ (test, self.getVersion(test)) for test in tests ]
         testDesc = str(len(tests)) + " tests"
-        versionString = self.getVersion()
         self.notify("Status", "Saving " + testDesc + " ...")
         try:
-            for test in tests:
+            for test, versionString in testsWithVersions:
                 testComparison = test.stateInGui
                 testComparison.setObservers(self.observers)
                 testComparison.save(test, self.getExactness(), versionString, overwriteSuccess, stemsToSave, backupVersions)

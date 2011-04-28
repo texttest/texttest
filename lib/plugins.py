@@ -663,6 +663,8 @@ class TestState(Observable):
         return False
     def updateAfterLoad(self, app, **kwargs):
         pass
+    def makeModifiedState(self, newRunStatus, newDetails):
+        pass
     
             
 addCategory("unrunnable", "unrunnable", "could not be run")

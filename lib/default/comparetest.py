@@ -396,7 +396,19 @@ class ProgressTestComparison(BaseTestComparison):
             tmpSize += self.getSize(comparison.tmpFile)
 
         if stdSize > 0:
-            return (tmpSize * 100) / stdSize 
+            return (tmpSize * 100) / stdSize
+    def makeModifiedState(self, *args):
+        newRunningState = self.runningState.makeModifiedState(*args)
+        if newRunningState:
+            newState = self.__class__(newRunningState)
+            newState.lifecycleChange = newRunningState.lifecycleChange
+            newState.changedResults = self.changedResults
+            newState.correctResults = self.correctResults
+            newState.allResults = self.allResults
+            newState.newResults = self.newResults
+            newState.missingResults = self.missingResults
+            newState.categorise()
+            return newState
 
 class MakeComparisons(plugins.Action):
     def __init__(self, testComparisonClass=None, progressComparisonClass=None, ignoreMissing=False, enableColor=False):

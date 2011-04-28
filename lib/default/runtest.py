@@ -13,6 +13,14 @@ class Running(plugins.TestState):
         plugins.TestState.__init__(self, "running", freeText, briefText, started=1,
                                    executionHosts = execMachines, lifecycleChange=lifecycleChange)
 
+    def makeModifiedState(self, newRunStatus, newDetails, lifecycleChange):
+        currRunStatus = self.briefText.split()[0]
+        if newRunStatus != currRunStatus:
+            currFreeTextStatus = self.freeText.splitlines()[0].rsplit(" ", 2)[0]
+            newFreeText = self.freeText.replace(currFreeTextStatus, newDetails)
+            newBriefText = self.briefText.replace(currRunStatus, newRunStatus)
+            return self.__class__(self.executionHosts, newFreeText, newBriefText, lifecycleChange)
+
 
 class Killed(plugins.TestState):
     def __init__(self, briefText, freeText, prevState):

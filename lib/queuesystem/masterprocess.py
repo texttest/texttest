@@ -13,7 +13,6 @@ from default.console import TextDisplayResponder, InteractiveResponder
 from default.knownbugs import CheckForBugs
 from default.actionrunner import BaseActionRunner
 from default.performance import getTestPerformance
-from default.runtest import Running
 from types import StringType
 from glob import glob
 
@@ -130,14 +129,9 @@ class QueueSystemServer(BaseActionRunner):
                         self.setSlaveFailed(test, False, True)
         
     def updateRunStatus(self, test, status):
-        oldState = test.state
-        currRunStatus = oldState.briefText.split()[0]
         newRunStatus, newExplanation = status
-        if newRunStatus != currRunStatus:
-            currFreeTextStatus = oldState.freeText.splitlines()[0].rsplit(" ", 2)[0]
-            newState = Running(oldState.executionHosts, oldState.freeText.replace(currFreeTextStatus, newExplanation),
-                               oldState.briefText.replace(currRunStatus, newRunStatus), 
-                               lifecycleChange="grid status update")
+        newState = test.state.makeModifiedState(newRunStatus, newExplanation, "grid status update")
+        if newState:
             test.changeState(newState)
 
     def findQueueForTest(self, test):

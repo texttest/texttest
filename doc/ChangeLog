@@ -2088,6 +2088,9 @@ System requirements (see Migration Notes):
 General GUI Enhancements:
 Static GUI Enhancements:
 Dynamic GUI Enhancements:
+    - New option "<full version>" in "version to save" in Save As dialog
+	Basically save with the full version you ran with, as was default behaviour in TextTest 3.20
+	Particularly helpful when running multiple versions
 Framework Enhancements:
     - Added possibility to configure copying procedure for test data files
 	See docs for "copy_test_path_script".
@@ -2095,4 +2098,7 @@ Framework Enhancements:
 	Both virtual display and accessibility of usecase and UI map files fixed
 Batch Report Enhancements:
 Grid Engine (LSF/SGE) enhancements/bug fixes:
+    - Fixed stacktrace when normal polling cannot find a job, e.g. if SGE master goes down
+    - Recomputing after a status update in SGE no longer duplicates progress information
 Bug Fixes:
+    - Fixed stacktrace trying to build piecharts when matplotlib not installed

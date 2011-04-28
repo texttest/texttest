@@ -75,7 +75,7 @@ class SaveTests(guiplugins.ActionDialogGUI):
         currVersions = versionOption.possibleValues
         if self.defaultVersionStr == currOption and newVersions == currVersions:
             return False
-        self.optionGroup.setOptionValue("v", self.defaultVersionStr)
+        self.optionGroup.setOptionValue("v", versionOption.defaultValue)
         self.diag.info("Setting default save version to " + self.defaultVersionStr)
         self.optionGroup.setPossibleValues("v", newVersions)
         return True

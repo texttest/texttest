@@ -180,7 +180,7 @@ class TestEnvironment(OrderedDict):
         
 # Base class for TestCase and TestSuite
 class Test(plugins.Observable):
-    def __init__(self, name, description, dircache, app, parent=None, configDir=None):
+    def __init__(self, name, description, dircache, app, parent=None):
         # Should notify which test it is
         plugins.Observable.__init__(self, passSelf=True)
         self.name = name
@@ -190,8 +190,8 @@ class Test(plugins.Observable):
         self.app = app
         self.parent = parent
         self.dircache = dircache
-        self.configDir = configDir
-        if configDir is None:
+        self.configDir = None
+        if parent is not None:
             self.setUpConfiguration()
         populateFunction = plugins.Callable(app.setEnvironment, self)
         self.environment = TestEnvironment(populateFunction)
@@ -203,14 +203,16 @@ class Test(plugins.Observable):
 
     def setUpConfiguration(self):
         if self.dircache.hasStem("config"):
-            self.configDir = self.copyParentConfigDir()
+            parentConfigDir = self.getParentConfigDir()
+            self.configDir = deepcopy(parentConfigDir)
             self.app.readValues(self.configDir, "config", [ self.dircache ], insert=False, errorOnUnknown=True)
 
-    def copyParentConfigDir(self):
+    def getParentConfigDir(self):
         # Take the immediate parent first, upwards to the root suite
         for suite in reversed(self.getAllTestsToRoot()):
             if suite.configDir:
-                return deepcopy(suite.configDir)
+                return suite.configDir
+        return self.app.configDir
         
     def __repr__(self):
         return repr(self.app) + " " + self.classId() + " " + self.name
@@ -464,7 +466,8 @@ class Test(plugins.Observable):
         if self.configDir:
             return self.configDir.getSingle(key, expandVars, envMapping)
         else:
-            return self.parent.getConfigValue(key, expandVars, envMapping)
+            confObj = self.parent or self.app
+            return confObj.getConfigValue(key, expandVars, envMapping)
 
     def getCompositeConfigValue(self, key, subKey, expandVars=True, envMapping=None):
         if envMapping is None:
@@ -472,7 +475,8 @@ class Test(plugins.Observable):
         if self.configDir:
             return self.configDir.getComposite(key, subKey, expandVars, envMapping)
         else:
-            return self.parent.getCompositeConfigValue(key, subKey, expandVars, envMapping)
+            confObj = self.parent or self.app
+            return confObj.getCompositeConfigValue(key, subKey, expandVars, envMapping)
 
     def configValueMatches(self, key, filePattern):
         for currPattern in self.getConfigValue(key):
@@ -878,8 +882,8 @@ class TestSuiteFileHandler:
 
 class TestSuite(Test):
     testSuiteFileHandler = TestSuiteFileHandler()
-    def __init__(self, name, description, dircache, app, parent=None, configDir=None):
-        Test.__init__(self, name, description, dircache, app, parent, configDir)
+    def __init__(self, name, description, dircache, app, parent=None):
+        Test.__init__(self, name, description, dircache, app, parent)
         self.testcases = []
         contentFile = self.getContentFileName()
         if not contentFile:
@@ -1594,7 +1598,7 @@ class Application:
             dircache = DirectoryCache(otherDir)
         else:
             dircache = self.dircache
-        suite = TestSuite(os.path.basename(dircache.dir), "Root test suite", dircache, self, configDir=self.configDir)
+        suite = TestSuite(os.path.basename(dircache.dir), "Root test suite", dircache, self)
         suite.setObservers(responders)
         return suite
 

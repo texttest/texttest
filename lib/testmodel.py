@@ -697,6 +697,7 @@ class TestCase(Test):
                 optionInsertPos += 1
             else:
                 optionArgs.append(newArg)
+                optionInsertPos = len(optionArgs)
             prevOption = newArg.startswith("-")
 
     def findLastOptionIndex(self, optionArgs):

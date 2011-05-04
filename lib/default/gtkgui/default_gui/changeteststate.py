@@ -154,10 +154,6 @@ class RecomputeTests(guiplugins.ActionGUI):
     def __init__(self, *args):
         guiplugins.ActionGUI.__init__(self, *args)
         self.latestNumberOfRecomputations = 0
-        self.allComplete = False
-
-    def notifyAllComplete(self):
-        self.allComplete = True
 
     def isActiveOnCurrent(self, test=None, state=None):
         for currTest in self.currTestSelection:
@@ -188,12 +184,11 @@ class RecomputeTests(guiplugins.ActionGUI):
         
     def performOnCurrent(self):
         self.latestNumberOfRecomputations = 0
-        if self.allComplete:
-            # not a good idea to reread configuration while tests are still running, can lead to race conditions
+        if any((test.stateInGui.isComplete() for test in self.currTestSelection)):
             for appOrTest in self.currAppSelection + self.currTestSelection:
                 self.notify("Status", "Rereading configuration for " + repr(appOrTest) + " ...")
                 self.notify("ActionProgress")
-                appOrTest.setUpConfiguration()
+                appOrTest.reloadConfiguration()
 
         for test in self.currTestSelection:
             self.latestNumberOfRecomputations += 1

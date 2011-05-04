@@ -192,7 +192,7 @@ class Test(plugins.Observable):
         self.dircache = dircache
         self.configDir = None
         if parent is not None:
-            self.setUpConfiguration()
+            self.reloadConfiguration()
         populateFunction = plugins.Callable(app.setEnvironment, self)
         self.environment = TestEnvironment(populateFunction)
         # Java equivalent of the environment mechanism...
@@ -201,11 +201,12 @@ class Test(plugins.Observable):
         # Test suites never change state, but it's convenient that they have one
         self.state = plugins.TestState("not_started")
 
-    def setUpConfiguration(self):
+    def reloadConfiguration(self):
         if self.dircache.hasStem("config"):
             parentConfigDir = self.getParentConfigDir()
-            self.configDir = deepcopy(parentConfigDir)
-            self.app.readValues(self.configDir, "config", [ self.dircache ], insert=False, errorOnUnknown=True)
+            newConfigDir = deepcopy(parentConfigDir)
+            self.app.readValues(newConfigDir, "config", [ self.dircache ], insert=False, errorOnUnknown=True)
+            self.configDir = newConfigDir
 
     def getParentConfigDir(self):
         # Take the immediate parent first, upwards to the root suite
@@ -1293,6 +1294,16 @@ class Application:
         if not plugins.TestState.showExecHosts:
             plugins.TestState.showExecHosts = self.configObject.showExecHostsInFailures(self)
 
+    def reloadConfiguration(self):
+        # Try to make this as atomic as possible, to avoid problems when other threads
+        # are reading from these objects while this is going on
+        tmpApp = Application(self.name, self.dircache, self.versions, self.inputOptions)
+        self.configDir = tmpApp.configDir
+        self.configObject = tmpApp.configObject
+        self.extraDirCaches = tmpApp.extraDirCaches
+        self.defaultDirCaches = tmpApp.defaultDirCaches
+        self.configDocs = tmpApp.configDocs
+        
     def importAndWriteEntries(self, configEntries):
         configFileName = self.dircache.pathName("config." + self.name)
         configFile = open(configFileName, "w")

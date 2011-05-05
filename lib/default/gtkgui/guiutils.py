@@ -3,9 +3,8 @@
 Generic module broken out from guiplugins. Contains utility code that can be
 called from anywhere in the gtkgui package
 """
-import plugins, os, sys, operator, types, subprocess
+import plugins, os, sys, operator, types, subprocess, locale
 from copy import copy
-from locale import getdefaultlocale
 
 # gtk.accelerator_valid appears utterly broken on Windows
 def windowsAcceleratorValid(key, mod):
@@ -23,38 +22,55 @@ except ImportError:
 guiConfig = None
 
 class Utf8Converter:
+    langVars = ('LC_ALL', 'LC_CTYPE', 'LANG', 'LANGUAGE')
     def __init__(self):
         self.encodings = self.getEncodings()
 
     def getEncodings(self):
         encodings = [ 'utf-8' ]
-        localeEncoding = getdefaultlocale()[1]
+        localeEncoding = locale.getdefaultlocale()[1]
         if localeEncoding and not localeEncoding in encodings:
             encodings.insert(0, localeEncoding)
         return encodings
     
-    def convert(self, text):
-        unicodeInfo = self.decodeText(text)
+    def convert(self, text, extraEncodingLookup=None):
+        unicodeInfo = self.decodeText(text, extraEncodingLookup)
         return unicodeInfo.encode('utf-8', 'replace')
 
-    def decodeText(self, text):
-        for encoding in self.encodings:
+    def getExtraEncodings(self, extraEncodingLookup):
+        # Calling undocumented method to save copying it, best not to crash if it has been renamed.
+        # Don't do this on Windows, the variables concerned don't apply there anyway
+        if extraEncodingLookup and os.name != "nt" and hasattr(locale, "_parse_localename"):
+            # Copied from locale.getdefaultlocale, would be nice if we could actually call this code
+            for variable in self.langVars:
+                localename = extraEncodingLookup(variable)
+                if localename:
+                    if variable == 'LANGUAGE':
+                        localename = localename.split(':')[0]
+                    extraEncoding = locale._parse_localename(localename)[1]
+                    if extraEncoding and extraEncoding not in self.encodings and extraEncoding.lower() not in self.encodings:
+                        return [ extraEncoding ]
+        return []
+
+    def decodeText(self, text, extraEncodingLookup):
+        encodingsToTry = self.encodings + self.getExtraEncodings(extraEncodingLookup)
+        for encoding in encodingsToTry:
             try:
                 return unicode(text, encoding, errors="strict")
             except Exception:
                 pass
 
         sys.stderr.write("WARNING: TextTest's textual display had some trouble with character encodings.\n" + \
-                         "It tried the encoding(s) " + " and ".join(self.encodings) + \
+                         "It tried the encoding(s) " + " and ".join(encodingsToTry) + \
                          ",\nbut the Unicode replacement character still had to be used.\n" + \
                          "Please ensure your locale is compatible with the encodings in your test files.\n" + \
                          "The problematic text follows:\n\n" + text.strip() + "\n")
-        return unicode(text, self.encodings[0], errors="replace")
+        return unicode(text, encodingsToTry[0], errors="replace")
 
 utf8Converter = Utf8Converter()
 
-def convertToUtf8(text): # gtk.TextViews insist we do the conversion ourselves
-    return utf8Converter.convert(text)
+def convertToUtf8(*args): # gtk.TextViews insist we do the conversion ourselves
+    return utf8Converter.convert(*args)
 
 
 def openLinkInBrowser(target):

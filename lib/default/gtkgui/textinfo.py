@@ -81,7 +81,7 @@ class TextViewGUI(guiutils.SubGUI):
     def updateViewFromText(self, text):
         textbuffer = self.view.get_buffer()
         # Encode to UTF-8, necessary for gtk.TextView
-        textToUse = guiutils.convertToUtf8(text)
+        textToUse = guiutils.convertToUtf8(text, self.getEnvironmentLookup())
         if self.linkMarker in textToUse:
             self.view.connect("event-after", self.event_after)
             self.view.connect("motion-notify-event", self.motion_notify_event)
@@ -89,6 +89,9 @@ class TextViewGUI(guiutils.SubGUI):
         else:
             textbuffer.set_text(textToUse)
 
+    def getEnvironmentLookup(self):
+        pass
+            
     # Links can be activated by clicking. Low-level code lifted from Maik Hertha's
     # GTK hypertext demo
     def event_after(self, text_view, event): # pragma : no cover - external code and untested browser code
@@ -389,4 +392,6 @@ class TextInfoGUI(TextViewGUI):
                 self.showingSubText = False
                 self.updateViewFromText(self.text)
 
-    
+    def getEnvironmentLookup(self):
+        if self.currentTest:
+            return self.currentTest.environment.get

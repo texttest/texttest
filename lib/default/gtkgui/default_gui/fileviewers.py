@@ -139,8 +139,11 @@ class FileViewAction(guiplugins.ActionGUI):
         return os.path.basename(fileName).split(".")[0]
 
     def testRunning(self):
-        return self.currTestSelection[0].stateInGui.hasStarted() and \
-               not self.currTestSelection[0].stateInGui.isComplete()
+        if len(self.currTestSelection) > 0:
+            return self.currTestSelection[0].stateInGui.hasStarted() and \
+                   not self.currTestSelection[0].stateInGui.isComplete()
+        else:
+            return False
 
     def getViewToolName(self, fileName):
         stem = self.getStem(fileName)

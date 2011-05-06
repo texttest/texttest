@@ -779,6 +779,8 @@ def commandLineString(cmdArgs):
             return '"'
 
     def quoteArg(arg):
+        if len(arg) == 0:
+            return '""'
         quoteChars = "'\"|* "
         for char in quoteChars:
             if char in arg:

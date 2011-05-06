@@ -987,7 +987,19 @@ class ActionDialogGUI(OptionGroupGUI):
             else:
                 self.createOptWidget(vbox, option)
 
+        if fileChooser:
+            # File choosers seize the focus, mostly we want to get it back and put it on the first text entry
+            self.set_focus(vbox)
+
         return fileChooser, fileChooserOption
+
+    def set_focus(self, vbox):
+        for child in vbox.get_children():
+            if isinstance(child, gtk.Container):
+                for gchild in child.get_children():
+                    if isinstance(gchild, gtk.Entry):
+                        gchild.get_toplevel().connect("map", lambda x: gchild.grab_focus())
+                        return
 
     def createOptWidget(self, vbox, option):
         labelEventBox = self.createLabelEventBox(option, separator=":")

@@ -448,7 +448,11 @@ class RecordTest(BasicRunningAction,guiplugins.ActionDialogGUI):
             defaultCheckout = self.currentApp.checkout
 
         self.addOption("v", "Version to record", defaultVersion)
-        self.addOption("c", "Checkout to use for recording", defaultCheckout)
+        self.addOption("c", self.getCheckoutLabel(), defaultCheckout)
+
+    def getCheckoutLabel(self):
+        # Sometimes configurations might want to use their own term in place of "checkout"
+        return "Checkout to use for recording"
 
     def addSwitches(self):
         if self.currentApp and self.currentApp.usesCaptureMock():
@@ -546,6 +550,10 @@ class RecordTest(BasicRunningAction,guiplugins.ActionDialogGUI):
 
     def _getTitle(self):
         return "Record _Use-Case"
+
+    def getSizeAsWindowFraction(self):
+        return 0.5, 0.5
+
 
 
 class RunScriptAction(BasicRunningAction,guiplugins.ActionDialogGUI):

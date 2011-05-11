@@ -2105,3 +2105,9 @@ Grid Engine (LSF/SGE) enhancements/bug fixes:
 Bug Fixes:
     - Fixed stacktrace trying to build piecharts when matplotlib not installed
     - Make sure options after positional arguments get treated as arguments to the new program
+    - Allow linking of executable, which is done in the new rpm (thanks Michael Behrisch)
+    - Record dialog size improved
+    - Focus in dialogs with file choosers (like the application creation one) now starts at the top
+    - Command lines with empty string arguments now shown correctly in Run Info
+    - On POSIX platforms, tests that set LANG and change encoding will no longer cause errors from TextTest previews
+    - Fixed occasional stacktraces when viewing files in tests exactly as the test in question completes

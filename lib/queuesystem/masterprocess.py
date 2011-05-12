@@ -204,7 +204,7 @@ class QueueSystemServer(BaseActionRunner):
     def getProxySubmissionRules(self, test):
         proxyResources = test.getConfigValue("queue_system_proxy_resource")
         if proxyResources:
-            return ProxySubmissionRules(test, proxyResources)
+            return test.app.getProxySubmissionRulesClass()(test, proxyResources)
 
     def getSubmissionRules(self, test):
         if self.submissionRules.has_key(test):

@@ -153,6 +153,9 @@ class QueueSystemConfig(default.Config):
         return [ "c", "b", "trace", "ignorecat", "ignorefilters", "actrep",
                  "rectraffic", "keeptmp", "keepslave", "x", "reconnect", "reconnfull" ]
 
+    def getProxySubmissionRulesClass(self):
+        return masterprocess.ProxySubmissionRules
+
     def getExecHostFinder(self):
         if self.slaveRun():
             return slavejobs.FindExecutionHostsInSlave()

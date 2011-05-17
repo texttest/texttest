@@ -359,8 +359,9 @@ class TestFileGUI(FileViewGUI):
             self.currentTest = tests[0]
             self.currentTest.refreshFiles()
             self.setName(tests, rowCount)
-            # New test selected, don't keep file selection
-            self.recreateModel(self.getState(), preserveSelection=False)
+            # New test selected, keep file selection!
+            # See TTT-2273. Previously we didn't keep the file selection, unclear why...
+            self.recreateModel(self.getState(), preserveSelection=True)
 
     def setName(self, tests, rowCount):
         newTitle = self.getName(tests, rowCount)

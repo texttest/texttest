@@ -241,10 +241,9 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         self.notInRepository = False
         self.needsAttention = False
         extraArgs = self.getExtraArgs()
-        for test in self.currTestSelection:
-            for fileArg in self.getFilesForCmd(test):
-                vcs.callProgramOnFiles(self.cmdName, fileArg, self.recursive, extraArgs,
-                                            outputHandler=self.handleVcsOutput, outputHandlerArgs=(test,))
+        for test, fileArg in self.getFilesForCmd():
+            vcs.callProgramOnFiles(self.cmdName, fileArg, self.recursive, extraArgs,
+                                   outputHandler=self.handleVcsOutput, outputHandlerArgs=(test,))
                     
     def handleVcsOutput(self, retcode, stdout, stderr, fileName, test):
         if self.commandHadError(retcode, stderr):
@@ -339,15 +338,22 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         appPath = self.currTestSelection[0].app.getDirectory()
         return os.path.split(appPath.rstrip(os.sep))[0]
     
-    def getFilesForCmd(self, test):
-        testPath = test.getDirectory()
-        if len(self.currFileSelection) == 0:
-            if self.dynamic:
-                return sorted([ fileComp.stdFile for fileComp in self.getComparisons(test) ])
-            else:
-                return [ testPath ]
+    def getFilesForCmd(self):
+        if len(self.currTestSelection) == 0:
+            return []
+        elif len(self.currFileSelection) > 0:
+            return [ (self.currTestSelection[0], f) for (f, comp) in self.currFileSelection ]
         else:
-            return [ f for (f, comp) in self.currFileSelection ]
+            testLists = [ self.getFilesForCmdForTest(test) for test in self.currTestSelection ]
+            return sum(testLists, [])
+
+    def getFilesForCmdForTest(self, test):
+        testPath = test.getDirectory()
+        if self.dynamic:
+            files = sorted([ fileComp.stdFile for fileComp in self.getComparisons(test) ])
+            return [ (test, f) for f in files ]
+        else:
+            return [ (test, testPath) ]
 
     def getComparisons(self, test):
         try:

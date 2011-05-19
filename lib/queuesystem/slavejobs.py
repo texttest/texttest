@@ -105,7 +105,7 @@ class SocketResponder(plugins.Responder,plugins.Observable):
 
     def interpretResponse(self, state, response):
         if len(response) > 0:
-            appDesc, testPath = response.strip().split(":")
+            appDesc, testPath = socketParse(response)
             appParts = appDesc.split(".")
             self.notify("ExtraTest", testPath, appParts[0], appParts[1:])
         elif state.isComplete():

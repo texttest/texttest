@@ -937,7 +937,7 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
     def getTest(self, testString):
         self.diag.info("Received request for '" + testString + "'")
         try:
-            appName, testPath = testString.split(":", 1)
+            appName, testPath = socketParse(testString)
             return self.testMap[appName][testPath]
         except ValueError:
             return

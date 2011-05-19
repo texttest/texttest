@@ -8,3 +8,7 @@ def queueSystemName(app):
 
 def socketSerialise(test):
     return test.app.name + test.app.versionSuffix() + ":" + test.getRelPath()        
+
+def socketParse(testString):
+    # Test name might contain ":"
+    return testString.strip().split(":", 1)

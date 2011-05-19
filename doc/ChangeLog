@@ -2086,6 +2086,8 @@ Version trunk
 =============
 System requirements (see Migration Notes):
 General GUI Enhancements:
+    - File selection is now preserved when a new test is selected
+	Makes it easier to compare previews of different test results
 Static GUI Enhancements:
 Dynamic GUI Enhancements:
     - New option "<full version>" in "version to save" in Save As dialog
@@ -2101,6 +2103,7 @@ Framework Enhancements:
 Batch Report Enhancements:
 Grid Engine (LSF/SGE) enhancements/bug fixes:
     - Fixed stacktrace when normal polling cannot find a job, e.g. if SGE master goes down
+    - Fixed stacktrace in slave when test names contain colons
     - Recomputing after a status update in SGE no longer duplicates progress information
 Bug Fixes:
     - Fixed stacktrace trying to build piecharts when matplotlib not installed
@@ -2111,3 +2114,4 @@ Bug Fixes:
     - Command lines with empty string arguments now shown correctly in Run Info
     - On POSIX platforms, tests that set LANG and change encoding will no longer cause errors from TextTest previews
     - Fixed occasional stacktraces when viewing files in tests exactly as the test in question completes
+    - Tried to improve handling of errors from "ps" on POSIX systems

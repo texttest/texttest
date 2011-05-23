@@ -5,14 +5,15 @@ from time import sleep
 
 # Used by master process for submitting, deleting and monitoring slave jobs
 class QueueSystem:
-    allStatuses = { "qw" : ("PEND", "Pending"),
-                    "t" : ("TRANS", "Transferring"),
-                    "r" : ("RUN", "Running"),
-                    "s" : ("USUSP", "Suspended by the user"),
-                    "dr" : ("DEL", "In the process of being killed"),
-                    "R" : ("RESTART", "Restarted"),
-                    "S" : ("SSUSP", "Suspended by SGE due to other higher priority jobs"),
-                    "T" : ("THRESH", "Suspended by SGE as it exceeded allowed thresholds") }
+    allStatuses = { "qw"  : ("PEND", "Pending"),
+                    "hqw" : ("HOLD", "On hold"),
+                    "t"   : ("TRANS", "Transferring"),
+                    "r"   : ("RUN", "Running"),
+                    "s"   : ("USUSP", "Suspended by the user"),
+                    "dr"  : ("DEL", "In the process of being killed"),
+                    "R"   : ("RESTART", "Restarted"),
+                    "S"   : ("SSUSP", "Suspended by SGE due to other higher priority jobs"),
+                    "T"   : ("THRESH", "Suspended by SGE as it exceeded allowed thresholds") }
     def __init__(self):
         self.qdelOutput = ""
 

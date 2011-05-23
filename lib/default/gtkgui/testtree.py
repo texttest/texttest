@@ -153,8 +153,8 @@ class TestColumnGUI(guiutils.SubGUI):
         else:
             return testCount, False
 
-    def getVersionString(self, tests):
-        if not self.dynamic and self.nofDistinctSelectedTests == 1 and self.totalNofTests != self.totalNofDistinctTests:
+    def getVersionString(self, tests, distinctTestCount):
+        if not self.dynamic and distinctTestCount == 1 and self.totalNofTests != self.totalNofDistinctTests:
             versions = [ test.app.getFullVersion() or "<default>" for test in tests ]
             return "version" + ("s" if len(versions) > 1 else "") + " " + ",".join(versions)
         else:
@@ -164,13 +164,14 @@ class TestColumnGUI(guiutils.SubGUI):
         newCount, suitesOnly = self.countTests(tests)
         if distinctTestCount > newCount:
             distinctTestCount = newCount
-        if self.nofSelectedTests != newCount or \
+        newVersionStr = self.getVersionString(tests, distinctTestCount)
+        if self.nofSelectedTests != newCount or newVersionStr != self.versionString or \
                self.nofDistinctSelectedTests != distinctTestCount or suitesOnly != self.testSuiteSelection:
             self.diag.info("New selection " + repr(tests) + " distinct " + str(distinctTestCount))
             self.nofSelectedTests = newCount
             self.nofDistinctSelectedTests = distinctTestCount
             self.testSuiteSelection = suitesOnly
-            self.versionString = self.getVersionString(tests)                
+            self.versionString = newVersionStr
             self.updateTitle()
             
     def notifyVisibility(self, tests, newValue):

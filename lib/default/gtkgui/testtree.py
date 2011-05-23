@@ -15,6 +15,7 @@ class TestColumnGUI(guiutils.SubGUI):
         self.nofSelectedTests = 0
         self.nofDistinctSelectedTests = 0
         self.totalNofTestsShown = 0
+        self.versionString = ""
         self.column = None
         self.dynamic = dynamic
         self.testSuiteSelection = False
@@ -90,7 +91,9 @@ class TestColumnGUI(guiutils.SubGUI):
         if self.testSuiteSelection:
             # We don't care about totals with test suites
             title += plugins.pluralise(self.nofSelectedTests, "suite") + " selected"
-            if self.nofDistinctSelectedTests != self.nofSelectedTests:
+            if self.versionString:
+                title += ", " + self.versionString
+            elif self.nofDistinctSelectedTests != self.nofSelectedTests:
                 title += ", " + str(self.nofDistinctSelectedTests) + " distinct"
             return title
         
@@ -100,7 +103,9 @@ class TestColumnGUI(guiutils.SubGUI):
             title += str(self.nofSelectedTests) + "/" + str(self.totalNofTests) + " selected"
 
         if not self.dynamic:
-            if self.totalNofDistinctTests != self.totalNofTests:
+            if self.versionString:
+                title += ", " + self.versionString
+            elif self.totalNofDistinctTests != self.totalNofTests:
                 if self.nofDistinctSelectedTests == self.totalNofDistinctTests:
                     title += ", all " + str(self.totalNofDistinctTests) + " distinct"
                 else:
@@ -148,6 +153,13 @@ class TestColumnGUI(guiutils.SubGUI):
         else:
             return testCount, False
 
+    def getVersionString(self, tests):
+        if not self.dynamic and self.nofDistinctSelectedTests == 1 and self.totalNofTests != self.totalNofDistinctTests:
+            versions = [ test.app.getFullVersion() or "<default>" for test in tests ]
+            return "version" + ("s" if len(versions) > 1 else "") + " " + ",".join(versions)
+        else:
+            return ""
+                            
     def notifyNewTestSelection(self, tests, dummyApps, distinctTestCount, *args, **kw):
         newCount, suitesOnly = self.countTests(tests)
         if distinctTestCount > newCount:
@@ -158,6 +170,7 @@ class TestColumnGUI(guiutils.SubGUI):
             self.nofSelectedTests = newCount
             self.nofDistinctSelectedTests = distinctTestCount
             self.testSuiteSelection = suitesOnly
+            self.versionString = self.getVersionString(tests)                
             self.updateTitle()
             
     def notifyVisibility(self, tests, newValue):

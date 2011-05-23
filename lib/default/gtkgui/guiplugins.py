@@ -228,7 +228,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         dialog = self.createAlarmDialog(self.getParentWindow(), message, stockIcon, alarmLevel)
         dialog.add_button(gtk.STOCK_OK, gtk.RESPONSE_ACCEPT)
         dialog.set_default_response(gtk.RESPONSE_ACCEPT)
-        dialog.connect("response", self._cleanDialog)
+        dialog.connect("response", lambda d, r: self._cleanDialog(d))
         dialog.show_all()
         
     def createAlarmDialog(self, parent, message, stockIcon, alarmLevel):
@@ -240,32 +240,32 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         dialog.vbox.pack_start(contents, expand=True, fill=True)
         return dialog
     
-    def showQueryDialog(self, parent, message, stockIcon, alarmLevel, respondMethod):
+    def showQueryDialog(self, parent, message, stockIcon, alarmLevel, respondMethod, respondData=None):
         dialog = self.createAlarmDialog(parent, message, stockIcon, alarmLevel)
         dialog.set_default_response(gtk.RESPONSE_NO)
         dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
         dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
-        dialog.connect("response", respondMethod)
+        dialog.connect("response", respondMethod, respondData)
         dialog.show_all()
         
     def _cleanDialog(self, dialog, *args):
         entrycompletion.manager.collectCompletions()
         dialog.hide() # Can't destroy it, we might still want to read stuff from it
         
-    def respond(self, dialog, responseId):
+    def respond(self, dialog, responseId, *args):
         saidOK = responseId in [ gtk.RESPONSE_ACCEPT, gtk.RESPONSE_YES, gtk.RESPONSE_OK ]
         try:
-            self._respond(saidOK, dialog)
+            self._respond(saidOK, dialog, *args)
         except plugins.TextTestError, e:
             self.showErrorDialog(str(e))
             
-    def _respond(self, saidOK, dialog):
+    def _respond(self, saidOK, dialog, *args):
         if saidOK:
             self._runInteractive()
         else:
             self.cancel()
         if dialog:
-            self._cleanDialog(dialog)
+            self._cleanDialog(dialog, *args)
         
     def getConfirmationMessage(self):
         return ""
@@ -879,19 +879,20 @@ class ActionDialogGUI(OptionGroupGUI):
     def getConfirmationDialogSettings(self):
         return gtk.STOCK_DIALOG_WARNING, "Confirmation"
     
-    def _respond(self, saidOK=True, dialog=None):
+    def _respond(self, saidOK=True, dialog=None, fileChooserOption=None):
         if saidOK:
             try:
                 message = self.getConfirmationMessage()
                 if message:
                     stockId, level = self.getConfirmationDialogSettings()
-                    self.showQueryDialog(self.getQueryParentWindow(dialog), message, stockId, level, self.confirmationRespond)
+                    self.showQueryDialog(self.getQueryParentWindow(dialog), message, stockId, level,
+                                         self.confirmationRespond, fileChooserOption)
                 else:
-                    self.defaultRespond(saidOK, dialog)
+                    self.defaultRespond(saidOK, dialog, fileChooserOption)
             except plugins.TextTestError, e:
                 self.showErrorDialog(str(e))
         else:
-            self.defaultRespond(saidOK, dialog)
+            self.defaultRespond(saidOK, dialog, fileChooserOption)
 
     def getQueryParentWindow(self, dialog):
         if dialog:
@@ -899,14 +900,19 @@ class ActionDialogGUI(OptionGroupGUI):
         else:
             return self.getParentWindow()
 
-    def confirmationRespond(self, dialog, responseId):
+    def confirmationRespond(self, dialog, responseId, fileChooserOption):
         saidOK = responseId == gtk.RESPONSE_YES
         self.defaultRespond(saidOK, dialog)
         if saidOK:
             parent = dialog.get_transient_for()
             if isinstance(parent, gtk.Dialog):
-                self._cleanDialog(parent)
+                self._cleanDialog(parent, fileChooserOption)
 
+    def _cleanDialog(self, dialog, fileChooserOption=None):
+        if fileChooserOption:
+            fileChooserOption.resetDefault() # Must do this, because we can't rely on reading from invisible FileChoosers
+        OptionGroupGUI._cleanDialog(self, dialog)
+        
     def defaultRespond(self, *args):
         OptionGroupGUI._respond(self, *args)
 
@@ -948,12 +954,7 @@ class ActionDialogGUI(OptionGroupGUI):
             # Don't pass set_filename directly, will interfere with PyUseCase's attempts to intercept it
             fileChooserOption.setMethods(fileChooser.get_filename, lambda f: fileChooser.set_filename(f))
         
-        dialog.connect("response", self.resetAndRespond, fileChooserOption)
-
-    def resetAndRespond(self, dialog, response, fileChooserOption):
-        if fileChooserOption:
-            fileChooserOption.resetDefault() # Must do this, because we can't rely on reading from invisible FileChoosers
-        self.respond(dialog, response)
+        dialog.connect("response", self.respond, fileChooserOption)
 
     def simulateResponse(self, dummy, dialog):
         dialog.response(gtk.RESPONSE_ACCEPT)

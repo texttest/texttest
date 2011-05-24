@@ -255,7 +255,7 @@ class ImportTest(guiplugins.ActionDialogGUI):
     
     def getSizeAsWindowFraction(self):
         # size of the dialog
-        return 0.5, 0.36
+        return 0.5, 0.45
 
     def testFilesExist(self, dir, app):
         for fileName in os.listdir(dir):

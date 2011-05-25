@@ -2089,6 +2089,8 @@ General GUI Enhancements:
     - File selection is now preserved when a new test is selected
 	Makes it easier to compare previews of different test results
 Static GUI Enhancements:
+    - Version information now shown when a single test/suite with extra versions selected
+	Previously hard to tell which was selected
 Dynamic GUI Enhancements:
     - New option "<full version>" in "version to save" in Save As dialog
 	Basically save with the full version you ran with, as was default behaviour in TextTest 3.20
@@ -2105,13 +2107,15 @@ Grid Engine (LSF/SGE) enhancements/bug fixes:
     - Fixed stacktrace when normal polling cannot find a job, e.g. if SGE master goes down
     - Fixed stacktrace in slave when test names contain colons
     - Recomputing after a status update in SGE no longer duplicates progress information
+    - Now handles hold state (hqw) correctly
 Bug Fixes:
     - Fixed stacktrace trying to build piecharts when matplotlib not installed
     - Make sure options after positional arguments get treated as arguments to the new program
     - Allow linking of executable, which is done in the new rpm (thanks Michael Behrisch)
-    - Record dialog size improved
+    - Record/Add dialog sizes improved
     - Focus in dialogs with file choosers (like the application creation one) now starts at the top
     - Command lines with empty string arguments now shown correctly in Run Info
     - On POSIX platforms, tests that set LANG and change encoding will no longer cause errors from TextTest previews
     - Fixed occasional stacktraces when viewing files in tests exactly as the test in question completes
     - Tried to improve handling of errors from "ps" on POSIX systems
+    - Fixed bug where invalid names of saved selections persist even after being changed

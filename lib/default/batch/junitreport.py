@@ -4,6 +4,7 @@ import plugins
 from ordereddict import OrderedDict
 from batchutils import calculateBatchDate
 from string import Template
+from locale import getdefaultlocale
 
 class JUnitResponder(plugins.Responder):
     """Respond to test results and write out results in format suitable for JUnit
@@ -51,6 +52,7 @@ class JUnitApplicationData:
         result = dict(full_test_name=self._fullTestName(test), 
                       test_name=test.name,
                       suite_name=self._suiteName(test),
+                      encoding=getdefaultlocale()[1],
                       time="1") # fake the time
         if not test.state.hasResults():
             self._error(test, result)
@@ -100,7 +102,7 @@ class JUnitApplicationData:
 
 
 failure_template = """\
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="$encoding"?>
 <testsuite name="$full_test_name" failures="1" tests="1" time="$time" errors="0">
   <properties/>
   <testcase name="$test_name" time="$time" classname="$suite_name">
@@ -114,7 +116,7 @@ $long_message
 """
 
 error_template = """\
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="$encoding"?>
 <testsuite name="$full_test_name" failures="0" tests="1" time="$time" errors="1">
   <properties/>
   <testcase name="$test_name" time="$time" classname="$suite_name">
@@ -128,7 +130,7 @@ $long_message
 """
 
 success_template = """\
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="$encoding"?>
 <testsuite name="$full_test_name" failures="0" tests="1" time="$time" errors="0">
   <properties/>
   <testcase name="$test_name" time="$time" classname="$suite_name"/>

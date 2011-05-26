@@ -150,7 +150,7 @@ class GUIController(plugins.Responder, plugins.Observable):
             manager.start(matching, inline, completions)
 
     def getTestTreeObservers(self):
-        return [ self.testColumnGUI, self.testFileGUI, self.textInfoGUI, self.testRunInfoGUI ] + \
+        return [ self.testColumnGUI, self.textInfoGUI, self.testFileGUI, self.testRunInfoGUI ] + \
                self.allActionGUIs() + [ self.rightWindowGUI ]
     def allActionGUIs(self):
         return self.defaultActionGUIs + self.actionTabGUIs

@@ -139,13 +139,19 @@ class ProgressBarGUI(guiutils.SubGUI):
 
 class ClassificationTree(OrderedDict):
     def addClassification(self, path):
-        prevElement = None
+        prevElementName = None
         for element in path:
-            if not self.has_key(element):
-                self[element] = []
-            if prevElement and element not in self[prevElement]:
-                self[prevElement].append(element)
-            prevElement = element
+            if isinstance(element, tuple):
+                elementName = element[0]
+                elementTuple = element
+            else:
+                elementName = element
+                elementTuple = element, None
+            if not self.has_key(elementName):
+                self[elementName] = []
+            if prevElementName and elementTuple not in self[prevElementName]:
+                self[prevElementName].append(elementTuple)
+            prevElementName = elementName
 
 # Class that keeps track of (and possibly shows) the progress of
 # pending/running/completed tests
@@ -155,8 +161,9 @@ class TestProgressMonitor(guiutils.SubGUI):
         self.classifications = {} # map from test to list of iterators where it exists
 
         # Each row has 'type', 'number', 'show', 'tests'
-        self.treeModel = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_INT, gobject.TYPE_BOOLEAN, \
-                                       gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
+        self.treeModel = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_INT, gobject.TYPE_BOOLEAN, 
+                                       gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,
+                                       gobject.TYPE_STRING)
         self.diag = logging.getLogger("Progress Monitor")
         self.progressReport = None
         self.treeView = None
@@ -231,14 +238,20 @@ class TestProgressMonitor(guiutils.SubGUI):
 
     def selectionChanged(self, selection):
         # For each selected row, select the corresponding rows in the test treeview
-        tests = []
-        selection.selected_foreach(self.selectCorrespondingTests, tests)
-        self.notify("SetTestSelection", tests)
+        # and the corresponding files in the test fileview
+        tests, fileStems = [], []
+        def addSelected(treemodel, dummyPath, iter, *args):
+            for test in treemodel.get_value(iter, 5):
+                if test not in tests:
+                    tests.append(test)
+            fileStem = treemodel.get_value(iter, 6)
+            if fileStem:
+                fileStems.append(fileStem)
 
-    def selectCorrespondingTests(self, treemodel, dummyPath, iter, tests , *args):
-        for test in treemodel.get_value(iter, 5):
-            if test not in tests:
-                tests.append(test)
+        selection.selected_foreach(addSelected)
+        self.notify("SetTestSelection", tests)
+        if len(fileStems) > 0:
+            self.notify("SetFileSelection", fileStems)
 
     def findTestIterators(self, test):
         return self.classifications.get(test, [])
@@ -295,7 +308,7 @@ class TestProgressMonitor(guiutils.SubGUI):
         comparisons = state.getComparisons()
         for fileComp in filter(lambda c: c.getType() == "failure", comparisons):
             summary = self.getFileSummary(fileComp)
-            fileClass = [ "Failed", self.getDifferenceType(fileComp), summary ]
+            fileClass = [ "Failed", self.getDifferenceType(fileComp), (summary, fileComp.stem) ]
 
             filteredDiff = self.getFilteredDiff(fileComp)
             if filteredDiff is not None:
@@ -308,14 +321,14 @@ class TestProgressMonitor(guiutils.SubGUI):
                     summaryDiffs[filteredDiff] = (testList, hasGroup)
                 if hasGroup:
                     group = summaryDiffs.keys().index(filteredDiff) + 1
-                    fileClass.append("Group " + str(group))
+                    fileClass.append(("Group " + str(group), fileComp.stem))
 
             self.diag.info("Adding file classification for " + repr(fileComp) + " = " + repr(fileClass))
             classifiers.addClassification(fileClass)
 
         for fileComp in filter(lambda c: c.getType() != "failure", comparisons):
             summary = fileComp.getSummary(includeNumbers=False)
-            fileClass = [ "Failed", "Performance differences", self.getCategoryDescription(state, summary) ]
+            fileClass = [ "Failed", "Performance differences", (self.getCategoryDescription(state, summary), fileComp.stem) ]
             self.diag.info("Adding file classification for " + repr(fileComp) + " = " + repr(fileClass))
             classifiers.addClassification(fileClass)
 
@@ -390,7 +403,8 @@ class TestProgressMonitor(guiutils.SubGUI):
             pass
         return [ test ]
 
-    def addTestForNode(self, test, defaultColour, defaultVisibility, nodeClassifier, classifiers, incrementCount, parentIter=None):
+    def addTestForNode(self, test, defaultColour, defaultVisibility, nodeClassifier,
+                       classifiers, incrementCount, parentIter=None, fileStem=None):
         nodeIter = self.findIter(nodeClassifier, parentIter)
         colour = guiutils.guiConfig.getTestColour(nodeClassifier, defaultColour)
         if nodeIter:
@@ -401,14 +415,15 @@ class TestProgressMonitor(guiutils.SubGUI):
         else:
             visibility = guiutils.guiConfig.showCategoryByDefault(nodeClassifier, parentHidden=not defaultVisibility)
             initialTests = self.getInitialTestsForNode(test, parentIter, nodeClassifier)
-            nodeIter = self.addNewIter(nodeClassifier, parentIter, colour, visibility, len(initialTests), initialTests)
+            nodeIter = self.addNewIter(nodeClassifier, parentIter, colour, visibility, len(initialTests), initialTests, fileStem)
             for initTest in initialTests:
                 self.diag.info("New node " + nodeClassifier + ", colour = " + repr(colour) + ", visible = " + repr(visibility) + " : add " + repr(initTest))
                 self.classifications[initTest].append(nodeIter)
 
         subColours = []
-        for subNodeClassifier in classifiers[nodeClassifier]:
-            subColour = self.addTestForNode(test, colour, visibility, subNodeClassifier, classifiers, incrementCount, nodeIter)
+        for subNodeClassifier, fileStem in classifiers[nodeClassifier]:
+            subColour = self.addTestForNode(test, colour, visibility, subNodeClassifier,
+                                            classifiers, incrementCount, nodeIter, fileStem)
             subColours.append(subColour)
 
         if len(subColours) > 0:
@@ -428,8 +443,8 @@ class TestProgressMonitor(guiutils.SubGUI):
         allTests.append(test)
         self.diag.info("Tests for node " + self.treeModel.get_value(iter, 0) + " " + repr(allTests))
         
-    def addNewIter(self, classifier, parentIter, colour, visibility, testCount, tests=[]):
-        modelAttributes = [classifier, testCount, visibility, colour, "bold", tests]
+    def addNewIter(self, classifier, parentIter, colour, visibility, testCount, tests=[], fileStem=None):
+        modelAttributes = [classifier, testCount, visibility, colour, "bold", tests, fileStem]
         newIter = self.insertIntoModel(parentIter, modelAttributes)
         if parentIter:
             self.treeView.expand_row(self.treeModel.get_path(parentIter), open_all=0)

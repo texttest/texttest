@@ -313,15 +313,17 @@ class TestFileGUI(FileViewGUI):
         return "ViewFile"
 
     def notifyNameChange(self, test, origRelPath):
-        if test is self.currentTest:
-            self.model.foreach(self.updatePath, (origRelPath, test.getRelPath()))
-            self.setName( [ test ], 1)
+        if test is not self.currentTest:
+            return
+            
+        def updatePath(model, dummyPath, iter):
+            origFile = model.get_value(iter, 2)
+            if origFile:
+                newFile = origFile.replace(origRelPath, test.getRelPath())
+                model.set_value(iter, 2, newFile)
 
-    def updatePath(self, model, dummyPath, iter, data):
-        origPath, newPath = data
-        origFile = model.get_value(iter, 2)
-        if origFile:
-            model.set_value(iter, 2, origFile.replace(origPath, newPath))
+        self.model.foreach(updatePath)
+        self.setName( [ test ], 1)
 
     def notifyFileChange(self, test):
         if test is self.currentTest:
@@ -332,17 +334,18 @@ class TestFileGUI(FileViewGUI):
             self.recreateModel(state, preserveSelection=changeDesc.find("save") == -1)
 
     def notifyRecalculation(self, test, comparisons, newIcon):
-        if test is self.currentTest:
-            self.model.foreach(self.setRecalculateIcon, [ comparisons, newIcon ])
-            
-    def setRecalculateIcon(self, model, dummyPath, iter, data):
-        comparisons, newIcon = data
-        comparison = model.get_value(iter, 3)
-        if comparison in comparisons:
-            oldVal = model.get_value(iter, 5)
-            if oldVal != newIcon:
-                self.model.set_value(iter, 5, newIcon)
-            
+        if test is not self.currentTest:
+            return
+
+        def setRecalculateIcon(model, dummyPath, iter):
+            comparison = model.get_value(iter, 3)
+            if comparison in comparisons:
+                oldVal = model.get_value(iter, 5)
+                if oldVal != newIcon:
+                    self.model.set_value(iter, 5, newIcon)
+
+        self.model.foreach(setRecalculateIcon)
+                        
     def forceVisible(self, rowCount):
         return rowCount == 1
 
@@ -362,6 +365,14 @@ class TestFileGUI(FileViewGUI):
             # New test selected, keep file selection!
             # See TTT-2273. Previously we didn't keep the file selection, unclear why...
             self.recreateModel(self.getState(), preserveSelection=True)
+
+    def notifySetFileSelection(self, fileStems):
+        def trySelect(model, dummyPath, iter):
+            comparison = model.get_value(iter, 3)
+            if comparison is not None and comparison.stem in fileStems:
+                self.selection.select_iter(iter)
+                
+        self.model.foreach(trySelect)
 
     def setName(self, tests, rowCount):
         newTitle = self.getName(tests, rowCount)

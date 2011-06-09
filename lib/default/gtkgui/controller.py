@@ -168,23 +168,31 @@ class GUIController(plugins.Responder, plugins.Observable):
 
     def getFileViewObservers(self):
         return self.defaultActionGUIs + self.actionTabGUIs + [ self.textInfoGUI ]
+
+    def getProgressMonitorObservers(self):
+        return [ self.testTreeGUI, self.testFileGUI ]
     
     def isFrameworkExitObserver(self, obs):
         return hasattr(obs, "notifyExit") or hasattr(obs, "notifyKillProcesses")
+
     def getExitObservers(self, frameworkObservers):
         # Don't put ourselves in the observers twice or lots of weird stuff happens.
         # Important that closing the GUI is the last thing to be done, so make sure we go at the end...
         frameworkExitObservers = filter(self.isFrameworkExitObserver, frameworkObservers)
         return self.defaultActionGUIs + [ guiplugins.processMonitor, self.statusMonitor, self.testTreeGUI, self.menuBarGUI ] + \
                frameworkExitObservers + [ self.idleManager, self ]
+
     def getTestColumnObservers(self):
         return [ self.testTreeGUI, self.statusMonitor, self.idleManager ]
+
     def getHideableGUIs(self):
         return [ self.toolBarGUI, self.shortcutBarGUI, self.statusMonitor ]
+
     def getAddSuitesObservers(self):
         actionObservers = filter(lambda obs: hasattr(obs, "addSuites"), self.allActionGUIs())
         return [ guiutils.guiConfig, self.testColumnGUI, self.appFileGUI ] + actionObservers + \
                [ self.rightWindowGUI, self.topWindowGUI, self.idleManager ]
+    
     def setObservers(self, frameworkObservers):
         # We don't actually have the framework observe changes here, this causes duplication. Just forward
         # them as appropriate to where they belong. This is a bit of a hack really.
@@ -199,8 +207,9 @@ class GUIController(plugins.Responder, plugins.Observable):
             self.testFileGUI.addObserver(observer)
             self.appFileGUI.addObserver(observer)
 
-        # watch for category selections
-        self.progressMonitor.addObserver(self.testTreeGUI)
+        for observer in self.getProgressMonitorObservers():
+            self.progressMonitor.addObserver(observer)
+
         guiplugins.processMonitor.addObserver(self.statusMonitor)
         self.textInfoGUI.addObserver(self.statusMonitor)
         for observer in self.getLifecycleObservers():

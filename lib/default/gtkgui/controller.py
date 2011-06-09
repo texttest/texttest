@@ -382,20 +382,23 @@ class TopWindowGUI(guiutils.ContainerGUI):
 
     def setWindowTitle(self):
         if self.dynamic:
-            title = "TextTest dynamic GUI : "
+            trailer = " - TextTest dynamic GUI"
             if self.name:
-                title += self.name
+                title = self.name + trailer
             else:
                 appNameDesc = self.dynamicAppNameTitle()
                 checkoutTitle = self.getCheckoutTitle()
-                title += "testing " + appNameDesc + checkoutTitle + \
-                         " (started at " + plugins.startTimeString() + ")"
-            self.topWindow.set_title(title)
+                title = appNameDesc + " tests" + checkoutTitle + \
+                         " (started at " + plugins.startTimeString() + ")" + trailer
         else:
             appNameDesc = self.staticAppNameTitle()
+            basicTitle = "test management "
+            trailer = "- TextTest static GUI"
             if len(appNameDesc) > 0:
-                appNameDesc = " for " + appNameDesc
-            self.topWindow.set_title("TextTest static GUI : management of tests" + appNameDesc)
+                title = appNameDesc + " " + basicTitle + trailer
+            else:
+                title = basicTitle.capitalize() + trailer
+        self.topWindow.set_title(title)
 
     def staticAppNameTitle(self):
         allAppNames = [ repr(app) for app in self.allApps ]

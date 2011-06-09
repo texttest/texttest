@@ -113,9 +113,12 @@ class SocketResponder(plugins.Responder,plugins.Observable):
 
 
 class SlaveActionRunner(ActionRunner):
-    def notifyAllRead(self, *args):
-        pass # don't add a terminator, we might get given more tests via the socket (code above)
-
+    def notifyAllRead(self, goodSuites):
+        # don't ordinarily add a terminator, we might get given more tests via the socket (code above)
+        # Need to add one if we haven't found any tests though
+        if len(goodSuites) == 0:
+            ActionRunner.notifyAllRead(self, goodSuites)
+        
     def notifyRerun(self, *args):
         pass # don't rerun directly in the slave, tell the master and give it a chance to send the job elsewhere
 

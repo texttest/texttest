@@ -234,15 +234,18 @@ class ReplaceText(plugins.ScriptWithArgs):
     def __call__(self, test):
         for stem in self.stems:
             for stdFile in test.getFileNamesMatching(stem):
-                fileName = os.path.basename(stdFile)
-                self.describe(test, " - file " + fileName)
-                sys.stdout.flush()
-                unversionedFileName = ".".join(fileName.split(".")[:2])
-                tmpFile = os.path.join(test.getDirectory(temporary=1), unversionedFileName)
-                writeFile = open(tmpFile, "w")
-                for line in open(stdFile).xreadlines():
-                    writeFile.write(self.oldTextTrigger.replace(line, self.newText))
-                writeFile.close()
+                if os.path.isfile(stdFile):
+                    self.replaceInFile(test, stdFile)
+
+    def replaceInFile(self, test, stdFile):
+        fileName = os.path.basename(stdFile)
+        self.describe(test, " - file " + fileName)
+        sys.stdout.flush()
+        unversionedFileName = ".".join(fileName.split(".")[:2])
+        tmpFile = os.path.join(test.getDirectory(temporary=1), unversionedFileName)
+        with open(tmpFile, "w") as writeFile:
+            for line in open(stdFile).xreadlines():
+                writeFile.write(self.oldTextTrigger.replace(line, self.newText))
 
     def usesComparator(self):
         return True

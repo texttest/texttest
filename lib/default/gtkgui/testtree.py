@@ -155,7 +155,7 @@ class TestColumnGUI(guiutils.SubGUI):
 
     def getVersionString(self, tests, distinctTestCount):
         if not self.dynamic and distinctTestCount == 1 and self.totalNofTests != self.totalNofDistinctTests:
-            versions = [ test.app.getFullVersion() or "<default>" for test in tests ]
+            versions = [ test.app.getFullVersion().replace("_", "__") or "<default>" for test in tests ]
             return "version" + ("s" if len(versions) > 1 else "") + " " + ",".join(versions)
         else:
             return ""

@@ -128,9 +128,11 @@ class SummaryDataFinder:
 
     def getMostRecentDate(self):
         allDates = []
-        for appInfo in self.appVersionInfo.values():
+        for appName, appInfo in self.appVersionInfo.items():
             for versionData in appInfo.values():
-                allDates.append(max(versionData.keys()))
+                mostRecentDate = max(versionData.keys())
+                allDates.append(mostRecentDate)
+                self.diag.info("Most recent date for " + appName + " = " + repr(mostRecentDate))
         return max(allDates)
 
     def usePieChart(self, appName):
@@ -310,6 +312,7 @@ class SummaryGenerator:
         self.diag.info("Minimum column indices are " + repr(minColumnIndices))
         columnVersions = {}
         mostRecentDate = dataFinder.getMostRecentDate()
+        self.diag.info("Most recent results are from " + repr(mostRecentDate))
         for appName in self.getOrderedVersions(appOrder, pageInfo):
             file.write("<tr>\n")
             file.write("  <td><h3>" + appName + "</h3></td>\n")

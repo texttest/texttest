@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, plugins, sys, time, shutil, datetime, testoverview, logging
+import os, plugins, sys, time, shutil, datetime, testoverview, logging, re
 from summarypages import GenerateSummaryPage, GenerateGraphs # only so they become package level entities
 from ordereddict import OrderedDict
 from batchutils import calculateBatchDate, BatchVersionFilter
@@ -374,10 +374,15 @@ class SaveState(plugins.Responder):
         self.allApps = allApps
         self.diag = logging.getLogger("Save Repository")
 
+    def isBatchDate(self, dateStr):
+        return re.match("[0-9]{2}[A-Za-z]{3}[0-9]{4}", dateStr)
+
     def createFileName(self, nameGiven):
         # include the date and the name, if any. Date is used for archiving, name for display
-        parts = [ "teststate", calculateBatchDate() ]
-        if nameGiven and nameGiven not in parts:
+        parts = [ "teststate" ]
+        if not nameGiven or not self.isBatchDate(nameGiven):
+            parts.append(calculateBatchDate())
+        if nameGiven:
             parts.append(nameGiven)
         return "_".join(parts)
     

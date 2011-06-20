@@ -2088,6 +2088,8 @@ System requirements (see Migration Notes):
 General GUI Enhancements:
     - File selection is now preserved when a new test is selected
 	Makes it easier to compare previews of different test results
+    - Window naming changed
+	Main aim is to put differentiating info at the start to aid finding in window managers
 Static GUI Enhancements:
     - Version information now shown when a single test/suite with extra versions selected
 	Previously hard to tell which was selected
@@ -2097,17 +2099,22 @@ Dynamic GUI Enhancements:
 	Particularly helpful when running multiple versions
     - Recomputed completed tests always reloads config file, even if other tests still running
 	Threading-related issues fixed.
+    - When a file-related row is selected in the status view, select equivalent files in the test file view
+	Note changes behaviour of "Save" in this situation
 Framework Enhancements:
     - Added possibility to configure copying procedure for test data files
 	See docs for "copy_test_path_script".
     - Now support GUI testing on separate networks
 	Both virtual display and accessibility of usecase and UI map files fixed
 Batch Report Enhancements:
+    - If a date is used as the name, use that throughout instead of the actual date to identify the run
+    - Junit format report now assumes locale encoding instead of hardcoding UTF-8
 Grid Engine (LSF/SGE) enhancements/bug fixes:
     - Fixed stacktrace when normal polling cannot find a job, e.g. if SGE master goes down
     - Fixed stacktrace in slave when test names contain colons
     - Recomputing after a status update in SGE no longer duplicates progress information
     - Now handles hold state (hqw) correctly
+    - Fixed hang if slave gets an invalid test for any reason
 Bug Fixes:
     - Fixed stacktrace trying to build piecharts when matplotlib not installed
     - Make sure options after positional arguments get treated as arguments to the new program
@@ -2119,3 +2126,4 @@ Bug Fixes:
     - Fixed occasional stacktraces when viewing files in tests exactly as the test in question completes
     - Tried to improve handling of errors from "ps" on POSIX systems
     - Fixed bug where invalid names of saved selections persist even after being changed
+    - Fixed stacktrace replacing text in files if the pattern matches a directory

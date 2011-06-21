@@ -21,6 +21,9 @@ class SaveTests(guiplugins.ActionDialogGUI):
         self.addSwitch("over", "Replace successfully compared files also", 0)
         if self.hasPerformance(allApps):
             self.addSwitch("ex", "Save", 1, ["Average performance", "Exact performance"])
+        # Must do this in the constructor, so that "Save" also takes account of them
+        for option in self.optionGroup.options.values():
+            self.addValuesFromConfig(option)
 
     def createDialog(self):
         dialog = guiplugins.ActionDialogGUI.createDialog(self)

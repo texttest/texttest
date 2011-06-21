@@ -402,6 +402,8 @@ class TestTreeGUI(guiutils.ContainerGUI):
         iter = self.itermap.getIterator(test)
         # If we've recomputed, clear the recalculation icons
         self.setNewRecalculationStatus(iter, test, [])
+        if test.stateInGui.hasFailed():
+            self.removeFromSuiteSuccess(test)            
 
     def getSortedSelectedTests(self, suite):
         appTests = filter(lambda test: test.app is suite.app, self.selectedTests)
@@ -590,6 +592,13 @@ class TestTreeGUI(guiutils.ContainerGUI):
             self.setAllSucceeded(suite, colour)
             self.updateSuiteSuccess(suite, colour)
 
+    def removeFromSuiteSuccess(self, test):
+        suite = test.parent
+        if suite and suite in self.successPerSuite and test in self.successPerSuite[suite]:
+            self.successPerSuite[suite].remove(test)
+            self.clearAllSucceeded(suite)
+            self.removeFromSuiteSuccess(suite)
+
     def setAllSucceeded(self, suite, colour):
         # Print how many tests succeeded, color details column in success color,
         # collapse row, and try to collapse parent suite.
@@ -600,6 +609,18 @@ class TestTreeGUI(guiutils.ContainerGUI):
 
         if guiutils.guiConfig.getValue("auto_collapse_successful") == 1:
             self.collapseRow(iter)
+
+    def clearAllSucceeded(self, suite):
+        iter = self.itermap.getIterator(suite)
+        self.model.set_value(iter, 3, "")
+        self.model.set_value(iter, 4, "white")
+
+        if guiutils.guiConfig.getValue("auto_collapse_successful") == 1:
+            path = self.model.get_path(iter)
+            if self.collapsedRows.has_key(path):
+                del self.collapsedRows[path]
+            filteredPath = self.filteredModel.convert_child_path_to_path(path)
+            self.treeView.expand_row(filteredPath, open_all=False)
 
     def isVisible(self, test):
         filteredIter = self.findIter(test)

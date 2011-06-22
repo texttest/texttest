@@ -252,7 +252,7 @@ class RunTest(plugins.Action):
         args = []
         localTmpDir = test.app.writeDirectory
         remoteTmp = test.app.getRemoteTmpDirectory()[1]
-        builtinVars = [ "TEXTTEST_CHECKOUT", "TEXTTEST_ROOT", "TEXTTEST_SANDBOX", "TEXTTEST_SANDBOX_ROOT" ]
+        builtinVars = [ "TEXTTEST_CHECKOUT", "TEXTTEST_CHECKOUT_NAME", "TEXTTEST_ROOT", "TEXTTEST_SANDBOX", "TEXTTEST_SANDBOX_ROOT" ]
         for var, value in vars:
             if var in builtinVars:
                 continue

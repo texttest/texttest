@@ -4,6 +4,7 @@
 import os, plugins, sandbox, console, rundependent, comparetest, batch, performance, subprocess, operator, logging
 
 from copy import copy
+from string import Template
 from fnmatch import fnmatch
 # For back-compatibility
 from runtest import RunTest, Running, Killed
@@ -928,8 +929,6 @@ class Config:
         if os.path.isabs(checkout):
             return os.path.normpath(checkout)
         checkoutLocations = app.getCompositeConfigValue("checkout_location", checkout, expandVars=False)
-        # do this afterwards, so it doesn't get expanded (yet)
-        os.environ["TEXTTEST_CHECKOUT_NAME"] = checkout # Local name of the checkout directory
         if len(checkoutLocations) > 0:
             return self.makeAbsoluteCheckout(checkoutLocations, checkout, app)
         else:
@@ -956,7 +955,8 @@ class Config:
         return self.absCheckout(locations[0], checkout, isSpecific)
 
     def absCheckout(self, location, checkout, isSpecific):
-        fullLocation = os.path.normpath(os.path.expanduser(os.path.expandvars(location)))
+        locationWithName = Template(location).safe_substitute(TEXTTEST_CHECKOUT_NAME=checkout)
+        fullLocation = os.path.normpath(os.path.expanduser(os.path.expandvars(locationWithName)))
         if isSpecific or "TEXTTEST_CHECKOUT_NAME" in location:
             return fullLocation
         else:

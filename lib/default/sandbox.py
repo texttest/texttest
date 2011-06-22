@@ -344,6 +344,9 @@ class TestEnvironmentCreator:
         if self.topLevel():
             vars.append(("TEXTTEST_ROOT", self.test.app.getDirectory())) # Full path to the root directory for each test application
             vars.append(("TEXTTEST_CHECKOUT", self.test.app.checkout)) # Full path to the checkout directory
+            localCheckout = self.test.app.getCheckout()
+            if localCheckout and localCheckout != self.test.app.checkout:
+                vars.append(("TEXTTEST_CHECKOUT_NAME", localCheckout)) # Local name of the checkout directory
             vars.append(("TEXTTEST_SANDBOX_ROOT", self.test.app.writeDirectory)) # Full path to the sandbox root directory
             if self.test.getConfigValue("use_case_record_mode") == "GUI":
                 usecaseRecorder = self.test.getConfigValue("use_case_recorder")

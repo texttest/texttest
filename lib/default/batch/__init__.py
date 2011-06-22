@@ -408,7 +408,7 @@ class SaveState(plugins.Responder):
             except IOError:
                 plugins.printWarning("Could not write file at " + targetFile)
     def addSuite(self, suite):
-        testStateRepository = os.path.expanduser(suite.app.getCompositeConfigValue("batch_result_repository", self.batchSession))
+        testStateRepository = os.path.expanduser(suite.getCompositeConfigValue("batch_result_repository", self.batchSession))
         self.diag.info("Test state repository is " + repr(testStateRepository))
         if testStateRepository:
             self.repositories[suite.app] = os.path.abspath(testStateRepository)
@@ -424,20 +424,25 @@ class ArchiveRepository(plugins.ScriptWithArgs):
         self.repository = None
         if not self.beforeDate and not self.afterDate:
             raise plugins.TextTestError, "Cannot archive the entire repository - give cutoff dates!"
+
     def parseDate(self, dict, key):
         if not dict.has_key(key):
             return
         val = dict[key]
         self.descriptor += key + " " + val
         return self.dateInSeconds(val)
+
     def dateInSeconds(self, val):
         return time.mktime(time.strptime(val, "%d%b%Y"))
-    def setUpApplication(self, app):
-        repository = os.path.expanduser(app.getCompositeConfigValue("batch_result_repository", self.batchSession))
-        self.repository = os.path.join(repository, app.name)
-        if not os.path.isdir(self.repository):
-            raise plugins.TextTestError, "Batch result repository " + self.repository + " does not exist"
-        self.archiveFilesUnder(self.repository, app)
+    
+    def setUpSuite(self, suite):
+        if suite.parent is None:
+            repository = os.path.expanduser(suite.getCompositeConfigValue("batch_result_repository", self.batchSession))
+            self.repository = os.path.join(repository, suite.app.name)
+            if not os.path.isdir(self.repository):
+                raise plugins.TextTestError, "Batch result repository " + self.repository + " does not exist"
+            self.archiveFilesUnder(self.repository, suite.app)
+
     def archiveFilesUnder(self, repository, app):
         count = 0
         dirList = os.listdir(repository)
@@ -451,6 +456,7 @@ class ArchiveRepository(plugins.ScriptWithArgs):
                 self.archiveFilesUnder(fullPath, app)
         if count > 0:
             plugins.log.info("Archived " + str(count) + " files dated " + self.descriptor + " under " + repository.replace(self.repository + os.sep, ""))
+
     def archiveFile(self, fullPath, app):
         targetPath = self.getTargetPath(fullPath, app.name)
         plugins.ensureDirExistsForFile(targetPath)
@@ -484,7 +490,7 @@ class WebPageResponder(plugins.Responder):
         self.batchSession = optionMap.get("b", "default")
         self.cmdLineResourcePage = self.findResourcePage(optionMap.get("coll"))
         self.diag = logging.getLogger("GenerateWebPages")
-        self.appsToGenerate = self.findAppsToGenerate(allApps)
+        self.suitesToGenerate = []
         self.descriptionInfo = {}
 
     def findResourcePage(self, collArg):
@@ -494,23 +500,20 @@ class WebPageResponder(plugins.Responder):
     def notifyAdd(self, test, *args, **kw):
         self.descriptionInfo.setdefault(test.app, {}).setdefault(test.getRelPath().replace(os.sep, " "), test.description)
 
-    def findAppsToGenerate(self, apps):
+    def addSuites(self, suites):
         # Don't blanket remove rejected apps automatically when collecting
         batchFilter = BatchVersionFilter(self.batchSession)
-        toGenerate = []
-        for app in apps:
+        self.extraApps = []
+        for suite in suites:
+            if suite.app in self.extraApps:
+                continue
             try:
-                batchFilter.verifyVersions(app)
-                toGenerate.append(app)
+                batchFilter.verifyVersions(suite.app)
+                self.suitesToGenerate.append(suite)
+                self.extraApps += suite.app.extras
             except plugins.TextTestError, e:
-                plugins.log.info("Not generating web page for " + app.description() + " : " + str(e))
-                # If the app is rejected, some of its extra versions may still not be...
-                for extra in app.extras:
-                    if not batchFilter.findUnacceptableVersion(extra):
-                        toGenerate.append(extra)
-                
-        return toGenerate
-            
+                plugins.log.info("Not generating web page for " + suite.app.description() + " : " + str(e))
+                            
     def notifyAllComplete(self):
         appInfo = self.getAppRepositoryInfo()
         plugins.log.info("Generating web pages...")
@@ -535,7 +538,7 @@ class WebPageResponder(plugins.Responder):
             extraVersions = self.getExtraVersions(app, extraApps)
             self.diag.info("Found extra versions " + repr(extraVersions))
             relevantSubDirs = self.findRelevantSubdirectories(repository, app, extraVersions)
-            version = getVersionName(app, self.appsToGenerate)
+            version = getVersionName(app, self.getAppsToGenerate())
             pageSubTitle = self.makeCommandLine([ app ])
             self.makeAndGenerate(relevantSubDirs, app.getCompositeConfigValue, pageDir, pageTitle, pageSubTitle,
                                  version, extraVersions, self.descriptionInfo.get(app, {}))
@@ -558,10 +561,11 @@ class WebPageResponder(plugins.Responder):
 
     def getAppRepositoryInfo(self):
         appInfo = OrderedDict()
-        for app in self.appsToGenerate:
-            repository = os.path.expanduser(app.getCompositeConfigValue("batch_result_repository", self.batchSession))
+        for suite in self.suitesToGenerate:
+            repository = os.path.expanduser(suite.getCompositeConfigValue("batch_result_repository", self.batchSession))
             if not repository:
                 continue
+            app = suite.app
             repository = os.path.join(repository, app.name)
             if not os.path.isdir(repository):
                 plugins.printWarning("Batch result repository " + repository + " does not exist - not creating pages for " + repr(app))
@@ -578,9 +582,12 @@ class WebPageResponder(plugins.Responder):
             appInfo.setdefault(pageTitle, []).append((app, repository, extraApps))
         return appInfo
 
+    def getAppsToGenerate(self):
+        return [ suite.app for suite in self.suitesToGenerate ]
+
     def transformToCommon(self, pageInfo):
         allApps = [ app for app, _, _ in pageInfo ]
-        version = getVersionName(allApps[0], self.appsToGenerate)
+        version = getVersionName(allApps[0], self.getAppsToGenerate())
         extraVersions, relevantSubDirs = [], OrderedDict()
         for app, repository, extraApps in pageInfo:
             extraVersions += self.getExtraVersions(app, extraApps)

@@ -541,42 +541,48 @@ class Config:
         #
         dirs = []
         for app in apps:
-            appDirs = app.getConfigValue("filter_file_directory")
-            tmpDir = self.getTmpFilterDir(app, useOwnTmpDir)
-            if tmpDir and tmpDir not in dirs:
-                dirs.append(tmpDir)
+            writeDir = app.writeDirectory if useOwnTmpDir else None
+            dirs += self._getFilterFileDirs(app, writeDir)
+        return  dirs
 
-            for dir in appDirs:
-                if os.path.isabs(dir) and os.path.isdir(dir):
-                    if dir not in dirs:
-                        dirs.append(dir)
-                else:
-                    newDir = os.path.join(app.getDirectory(), dir)
-                    if not newDir in dirs:
-                        dirs.append(newDir)
+    def _getFilterFileDirs(self, suiteOrApp, writeDir=None):
+        dirs = []
+        appDirs = suiteOrApp.getConfigValue("filter_file_directory")
+        tmpDir = self.getTmpFilterDir(writeDir)
+        if tmpDir and tmpDir not in dirs:
+            dirs.append(tmpDir)
+
+        for dir in appDirs:
+            if os.path.isabs(dir) and os.path.isdir(dir):
+                if dir not in dirs:
+                    dirs.append(dir)
+            else:
+                newDir = os.path.join(suiteOrApp.getDirectory(), dir)
+                if not newDir in dirs:
+                    dirs.append(newDir)
         return dirs
 
-    def getTmpFilterDir(self, app, useOwnTmpDir):
+    def getTmpFilterDir(self, writeDir):
         cmdLineDir = self.optionValue("fd")
         if cmdLineDir:
             return os.path.normpath(cmdLineDir)
-        elif useOwnTmpDir:
-            return os.path.join(app.writeDirectory, "temporary_filter_files")
+        elif writeDir:
+            return os.path.join(writeDir, "temporary_filter_files")
         
     def getFilterClasses(self):
         return [ TestNameFilter, plugins.TestSelectionFilter, TestRelPathFilter,
                  performance.TimeFilter, performance.FastestFilter, performance.SlowestFilter,
                  plugins.ApplicationFilter, TestDescriptionFilter ]
             
-    def getAbsoluteFilterFileName(self, filterFileName, app):
+    def getAbsoluteFilterFileName(self, suite, filterFileName):
         if os.path.isabs(filterFileName):
             if os.path.isfile(filterFileName):
                 return filterFileName
             else:
                 raise plugins.TextTestError, "Could not find filter file at '" + filterFileName + "'"
         else:
-            dirsToSearchIn = self.getFilterFileDirectories([app], useOwnTmpDir=False)
-            absName = app.getFileName(dirsToSearchIn, filterFileName)
+            dirsToSearchIn = self._getFilterFileDirs(suite)
+            absName = suite.app.getFileName(dirsToSearchIn, filterFileName)
             if absName:
                 return absName
             else:
@@ -612,12 +618,12 @@ class Config:
         # This will check all the files for existence from the input, and throw if it can't.
         # This is basically because we don't want to throw in a thread when we actually need the filters
         # if they aren't sensible for some reason
-        self._checkFilterFileSanity(suite.app, self.optionMap, includeConfig=True)
+        self._checkFilterFileSanity(suite, self.optionMap, includeConfig=True)
 
-    def _checkFilterFileSanity(self, app, options, includeConfig=False):
-        for filterFileName in self.findAllFilterFileNames(app, options, includeConfig):
-            optionFinder = self.makeOptionFinder(app, filterFileName)
-            self._checkFilterFileSanity(app, optionFinder)
+    def _checkFilterFileSanity(self, suite, options, includeConfig=False):
+        for filterFileName in self.findAllFilterFileNames(suite.app, options, includeConfig):
+            optionFinder = self.makeOptionFinder(suite, filterFileName)
+            self._checkFilterFileSanity(suite, optionFinder)
     
     def _getFilterList(self, app, options, suites, includeConfig, **kw):
         filters = self.getFiltersFromMap(options, app, suites, **kw)
@@ -635,14 +641,16 @@ class Config:
 
         return filters
 
-    def makeOptionFinder(self, app, filename):
-        absName = self.getAbsoluteFilterFileName(filename, app)
+    def makeOptionFinder(self, *args):
+        absName = self.getAbsoluteFilterFileName(*args)
         fileData = ",".join(plugins.readList(absName))
         return plugins.OptionFinder(fileData.split(), defaultKey="t")
         
     def getFiltersFromFile(self, app, filename, suites):
-        optionFinder = self.makeOptionFinder(app, filename)
-        return self._getFilterList(app, optionFinder, suites, includeConfig=False)
+        for suite in suites:
+            if suite.app is app:
+                optionFinder = self.makeOptionFinder(suite, filename)
+                return self._getFilterList(app, optionFinder, suites, includeConfig=False)
     
     def getFiltersFromMap(self, optionMap, app, suites, **kw):
         filters = []
@@ -775,12 +783,7 @@ class Config:
         return self.isReconnecting() # No use of checkouts has yet been thought up when reconnecting :)
 
     def setUpCheckout(self, app):
-        if self.ignoreCheckout():
-            return ""
-        else:
-            checkoutPath = self.getGivenCheckoutPath(app)
-            os.environ["TEXTTEST_CHECKOUT"] = checkoutPath # Full path to the checkout directory
-            return checkoutPath
+        return self.getGivenCheckoutPath(app) if not self.ignoreCheckout() else ""
     
     def verifyCheckoutValid(self, app):
         if not os.path.isabs(app.checkout):
@@ -954,7 +957,7 @@ class Config:
 
     def absCheckout(self, location, checkout, isSpecific):
         fullLocation = os.path.normpath(os.path.expanduser(os.path.expandvars(location)))
-        if isSpecific or location.find("TEXTTEST_CHECKOUT_NAME") != -1:
+        if isSpecific or "TEXTTEST_CHECKOUT_NAME" in location:
             return fullLocation
         else:
             # old-style: infer expansion in default checkout

@@ -889,6 +889,9 @@ class Config:
             return machine, os.path.join(appTmpDir, test.app.name + test.app.versionSuffix(), test.getRelPath())
         else:
             return machine, appTmpDir
+
+    def hasChanged(self, var, value):
+        return os.getenv(var) != value
                 
     def executableShouldBeFile(self, app, executable):
         if os.path.isabs(executable):

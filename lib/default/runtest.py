@@ -172,7 +172,7 @@ class RunTest(plugins.Action):
 
     def getEnvironmentChanges(self, test):
         testEnv = test.getRunEnvironment()
-        return sorted(filter(lambda (var, value): value != os.getenv(var), testEnv.items()))
+        return sorted(filter(lambda (var, value): test.app.hasChanged(var, value), testEnv.items()))
         
     def getTestProcess(self, test, machine):
         commandArgs = self.getExecuteCmdArgs(test, machine)

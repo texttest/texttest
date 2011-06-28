@@ -428,7 +428,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
                                    "wxPython GUI with PyUseCase 3.4+",
                                    "SWT GUI with PyUseCase 3.5+",
                                    "Eclipse RCP GUI with PyUseCase 3.5+",
-                                   "Java Swing GUI with JUseCase",
+                                   "Java Swing GUI with PyUseCase 3.5+",
                                    "Other embedded Use-case Recorder (e.g. PyUseCase 2.x, NUseCase)",
                                    "Other GUI-test tool (enable virtual display only)" ],
                        hideOptions=True)
@@ -529,7 +529,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
             configEntries["use_case_record_mode"] = "GUI"
             if useGui != 8:
                 configEntries["slow_motion_replay_speed"] = "3.0"
-        if useGui in range(1, 6):
+        if useGui in range(1, 7):
             interpreter = "pyusecase"
             if useGui == 2:
                 interpreter += " -i tkinter"
@@ -539,6 +539,8 @@ class ImportApplication(guiplugins.ActionDialogGUI):
                 interpreter += " -i javaswt"
             elif useGui == 5:
                 interpreter += " -i javarcp"
+            elif useGui == 6:
+                interpreter += " -i javaswing"
             configEntries["use_case_recorder"] = "pyusecase"
             configEntries["interpreter"] = interpreter
             if useGui == 1: # PyGTK
@@ -572,8 +574,6 @@ class ImportApplication(guiplugins.ActionDialogGUI):
             plugins.ensureDirectoryExists(pyusecaseDir) 
             # Create an empty UI map file so it shows up in the Config tab...
             open(os.path.join(pyusecaseDir, "ui_map.conf"), "w")
-        elif useGui == 6:
-            configEntries["use_case_recorder"] = "jusecase"
         elif useGui == 8:
             configEntries["use_case_recorder"] = "none"            
 

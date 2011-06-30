@@ -428,7 +428,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
                                    "wxPython GUI with PyUseCase 3.4+",
                                    "SWT GUI with PyUseCase 3.5+",
                                    "Eclipse RCP GUI with PyUseCase 3.5+",
-                                   "Java Swing GUI with PyUseCase 3.5+",
+                                   "Java Swing GUI with PyUseCase 3.6+",
                                    "Other embedded Use-case Recorder (e.g. PyUseCase 2.x, NUseCase)",
                                    "Other GUI-test tool (enable virtual display only)" ],
                        hideOptions=True)

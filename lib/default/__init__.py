@@ -262,12 +262,15 @@ class Config:
         else:
             return [], []
 
-    def getBatchSessionForSelect(self):
-        return self.optionMap.get("b") or self.optionMap.get("bx")
+    def getBatchSession(self, app):
+        return self.optionValue("b")
+
+    def getBatchSessionForSelect(self, app):
+        return self.getBatchSession(app) or self.optionMap.get("bx")
         
     def getExtraVersionsFromConfig(self, app):
         basic = app.getConfigValue("extra_version")
-        batchSession = self.getBatchSessionForSelect()
+        batchSession = self.getBatchSessionForSelect(app)
         if batchSession is not None:
             for batchExtra in app.getCompositeConfigValue("batch_extra_version", batchSession):
                 if batchExtra not in basic:
@@ -362,10 +365,9 @@ class Config:
                 if self.optionValue("b") is None:
                     plugins.log.info("No batch session identifier provided, using 'default'")
                     self.optionMap["b"] = "default"
-                batchSession = self.optionValue("b")
-                if self.anyAppHas(allApps, lambda app: self.emailEnabled(app, batchSession)):
+                if self.anyAppHas(allApps, lambda app: self.emailEnabled(app)):
                     classes.append(batch.EmailResponder)
-                if self.anyAppHas(allApps, lambda app: app.getCompositeConfigValue("batch_junit_format", batchSession) == "true"):
+                if self.anyAppHas(allApps, lambda app: self.getBatchConfigValue(app, "batch_junit_format") == "true"):
                     from batch.junitreport import JUnitResponder
                     classes.append(JUnitResponder)
                 
@@ -381,9 +383,12 @@ class Config:
         classes.append(ApplicationEventResponder)
         return classes
 
-    def emailEnabled(self, app, sessionName):
-        return app.getCompositeConfigValue("batch_recipients", sessionName) or \
-               app.getCompositeConfigValue("batch_use_collection", sessionName) == "true"
+    def emailEnabled(self, app):
+        return self.getBatchConfigValue(app, "batch_recipients") or \
+               self.getBatchConfigValue(app, "batch_use_collection") == "true"
+
+    def getBatchConfigValue(self, app, configName, **kw):
+        return app.getCompositeConfigValue(configName, self.getBatchSession(app), **kw)
 
     def isActionReplay(self):
         for option, _ in self.getInteractiveReplayOptions():
@@ -439,8 +444,8 @@ class Config:
             return [ "static_gui" ] + appDescriptors
         elif appDescriptors:
             return appDescriptors
-        elif self.optionValue("b"):
-            return [ self.optionValue("b") ]
+        elif self.getBatchSession(app):
+            return [ self.getBatchSession(app) ]
         elif self.optionMap.has_key("g"):
             return [ "dynamic_gui" ]
         else:
@@ -600,7 +605,7 @@ class Config:
         names = self.optionListValue(options, "f") + self.optionListValue(options, "fintersect")
         if includeConfig:
             names += app.getConfigValue("default_filter_file")
-            batchSession = self.getBatchSessionForSelect()
+            batchSession = self.getBatchSessionForSelect(app)
             if batchSession:
                 names += app.getCompositeConfigValue("batch_filter_file", batchSession)
         return names
@@ -659,7 +664,7 @@ class Config:
             argument = optionMap.get(filterClass.option)
             if argument:
                 filters.append(filterClass(argument, app, suites))
-        batchSession = self.getBatchSessionForSelect()
+        batchSession = self.getBatchSessionForSelect(app)
         if batchSession:
             timeLimit = app.getCompositeConfigValue("batch_timelimit", batchSession)
             if timeLimit:
@@ -671,10 +676,13 @@ class Config:
     
     def batchMode(self):
         return self.optionMap.has_key("b")
+    
     def keepTemporaryDirectories(self):
         return self.optionMap.has_key("keeptmp") or (self.batchMode() and not self.isReconnecting())
+
     def cleanPreviousTempDirs(self):
         return self.batchMode() and not self.isReconnecting() and not self.optionMap.has_key("keeptmp")
+
     def cleanWriteDirectory(self, suite):
         if not self.keepTemporaryDirectories():
             self._cleanWriteDirectory(suite)
@@ -814,7 +822,7 @@ class Config:
         self.checkFilterFileSanity(suite)
         self.checkCaptureMockMigration(suite)
         self.checkConfigSanity(suite.app)
-        batchSession = self.getBatchSessionForSelect()
+        batchSession = self.getBatchSessionForSelect(suite.app)
         if batchSession is not None and not self.optionMap.has_key("coll"):
             batchFilter = batch.BatchVersionFilter(batchSession)
             batchFilter.verifyVersions(suite.app)
@@ -942,7 +950,7 @@ class Config:
             return plugins.commasplit(self.optionMap["c"])[0]
 
         # Under some circumstances infer checkout from batch session
-        batchSession = self.optionValue("b")
+        batchSession = self.getBatchSession(app)
         if batchSession and  batchSession != "default" and \
                app.getConfigValue("checkout_location").has_key(batchSession):
             return batchSession

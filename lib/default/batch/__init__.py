@@ -136,13 +136,12 @@ class BatchApplicationData:
 class EmailResponder(plugins.Responder):
     def __init__(self, optionMap, *args):
         plugins.Responder.__init__(self)
-        self.sessionName = optionMap["b"]
         self.runId = optionMap.get("name", calculateBatchDate()) # use the command-line name if given, else the date
         self.batchAppData = OrderedDict()
         self.allApps = OrderedDict()
 
     def notifyComplete(self, test):
-        if test.app.emailEnabled(self.sessionName):
+        if test.app.emailEnabled():
             if not self.batchAppData.has_key(test.app):
                 self.addApplication(test)
             self.batchAppData[test.app].storeCategory(test)
@@ -160,7 +159,7 @@ class EmailResponder(plugins.Responder):
         self.allApps.setdefault(app.name, []).append(app)
         
     def notifyAllComplete(self):
-        mailSender = MailSender(self.sessionName, self.runId)
+        mailSender = MailSender(self.runId)
         for appList in self.allApps.values():
             batchDataList = map(self.batchAppData.get, appList)
             mailSender.send(batchDataList)
@@ -170,10 +169,10 @@ class EmailResponder(plugins.Responder):
 sectionHeaders = [ "Summary of all Unsuccessful tests", "Details of all Unsuccessful tests", "Summary of all Successful tests" ]
 
 class MailSender:
-    def __init__(self, sessionName, runId=""):
-        self.sessionName = sessionName
+    def __init__(self, runId=""):
         self.runId = runId
         self.diag = logging.getLogger("Mail Sender")
+
     def send(self, batchDataList):
         app = batchDataList[0].suite.app
         mailTitle = self.getMailTitle(app, batchDataList)
@@ -188,6 +187,7 @@ class MailSender:
         if not self.isAllFailure(batchDataList):
             mailContents += self.performForAll(app, batchDataList, BatchApplicationData.getSuccessBrief, sectionHeaders[2])
         self.sendOrStoreMail(app, mailContents, self.useCollection(app), self.isAllSuccess(batchDataList))
+
     def performForAll(self, app, batchDataList, method, headline):
         contents = headline + " follows...\n" + \
                    "---------------------------------------------------------------------------------" + "\n"
@@ -198,6 +198,7 @@ class MailSender:
                 contents += self.getMailTitle(app, [ resp ]) + "\n\n"
             contents += method(resp) + "\n"
         return contents
+
     def storeMail(self, app, mailContents):
         localFileName = "batchreport." + app.name + app.versionSuffix()
         collFile = os.path.join(app.writeDirectory, localFileName)
@@ -205,13 +206,14 @@ class MailSender:
         file = plugins.openForWrite(collFile)
         file.write(mailContents)
         file.close()
+
     def sendOrStoreMail(self, app, mailContents, useCollection=False, isAllSuccess=False):
         plugins.log.info("Creating batch report for application " + app.fullName() + " ...")
         if useCollection:
             self.storeMail(app, mailContents)
             plugins.log.info("File written.")
         else:
-            if not isAllSuccess or app.getCompositeConfigValue("batch_mail_on_failure_only", self.sessionName) != "true":
+            if not isAllSuccess or app.getBatchConfigValue("batch_mail_on_failure_only") != "true":
                 errorMessage = self.sendMail(app, mailContents)
                 if errorMessage:
                     plugins.log.info("FAILED. Details follow:\n" + errorMessage.strip())
@@ -229,8 +231,8 @@ class MailSender:
         smtpServer = app.getConfigValue("smtp_server")
         smtpUsername = app.getConfigValue("smtp_server_username")
         smtpPassword = app.getConfigValue("smtp_server_password")
-        fromAddress = app.getCompositeConfigValue("batch_sender", self.sessionName)
-        toAddresses = plugins.commasplit(app.getCompositeConfigValue("batch_recipients", self.sessionName))
+        fromAddress = app.getBatchConfigValue("batch_sender")
+        toAddresses = plugins.commasplit(app.getBatchConfigValue("batch_recipients"))
         import smtplib
         smtp = smtplib.SMTP()    
         try:
@@ -255,16 +257,20 @@ class MailSender:
                    title + "\n\n" # blank line separating headers from body
         else:
             return self.createMailHeaderForSend(self.runId, title, app)
+        
     def createMailHeaderForSend(self, runId, title, app):
-        fromAddress = app.getCompositeConfigValue("batch_sender", self.sessionName)
-        toAddress = app.getCompositeConfigValue("batch_recipients", self.sessionName)
+        fromAddress = app.getBatchConfigValue("batch_sender")
+        toAddress = app.getBatchConfigValue("batch_recipients")
         return "From: " + fromAddress + "\nTo: " + toAddress + "\n" + \
                "Subject: " + runId + " " + title + "\n\n"
+
     def useCollection(self, app):
-        return app.getCompositeConfigValue("batch_use_collection", self.sessionName) == "true"
+        return app.getBatchConfigValue("batch_use_collection") == "true"
+
     def getMailHeader(self, app, batchDataList):
         versions = self.findCommonVersions(app, batchDataList)
         return app.fullName() + self.getVersionString(versions) + " : "
+
     def getCategoryNames(self, batchDataList):
         names = []
         for resp in batchDataList:
@@ -280,10 +286,13 @@ class MailSender:
                 if not cat.name in names:
                     names.append(cat.name)
         return names
+
     def isAllSuccess(self, batchDataList):
         return self.getTotalString(batchDataList, BatchApplicationData.failureCount) == "0"
+
     def isAllFailure(self, batchDataList):
         return self.getTotalString(batchDataList, BatchApplicationData.successCount) == "0"
+
     def getMailTitle(self, app, batchDataList):
         title = self.getMailHeader(app, batchDataList)
         title += self.getTotalString(batchDataList, BatchApplicationData.testCount) + " tests"
@@ -362,13 +371,15 @@ def getVersionName(app, allApps):
         return "default." + fullVersion
     else:
         return "default"
-    
+
+def getBatchRepository(suite):
+    repo = suite.app.getBatchConfigValue("batch_result_repository", envMapping=suite.environment)
+    return os.path.expanduser(repo)
 
 # Allow saving results to a historical repository
 class SaveState(plugins.Responder):
     def __init__(self, optionMap, allApps):
         plugins.Responder.__init__(self)
-        self.batchSession = optionMap["b"]
         self.fileName = self.createFileName(optionMap.get("name"))
         self.repositories = {}
         self.allApps = allApps
@@ -407,20 +418,21 @@ class SaveState(plugins.Responder):
                 shutil.copyfile(test.getStateFile(), targetFile)
             except IOError:
                 plugins.printWarning("Could not write file at " + targetFile)
+
     def addSuite(self, suite):
-        testStateRepository = os.path.expanduser(suite.getCompositeConfigValue("batch_result_repository", self.batchSession))
+        testStateRepository = getBatchRepository(suite)
         self.diag.info("Test state repository is " + repr(testStateRepository))
         if testStateRepository:
             self.repositories[suite.app] = os.path.abspath(testStateRepository)
 
+
 class ArchiveRepository(plugins.ScriptWithArgs):
     scriptDoc = "Archive parts of the batch result repository to a history directory"
     def __init__(self, args):
-        argDict = self.parseArguments(args, [ "before", "after", "session" ])
+        argDict = self.parseArguments(args, [ "before", "after" ])
         self.descriptor = ""
         self.beforeDate = self.parseDate(argDict, "before")
         self.afterDate = self.parseDate(argDict, "after")
-        self.batchSession = argDict.get("session", "default")
         self.repository = None
         if not self.beforeDate and not self.afterDate:
             raise plugins.TextTestError, "Cannot archive the entire repository - give cutoff dates!"
@@ -437,7 +449,7 @@ class ArchiveRepository(plugins.ScriptWithArgs):
     
     def setUpSuite(self, suite):
         if suite.parent is None:
-            repository = os.path.expanduser(suite.getCompositeConfigValue("batch_result_repository", self.batchSession))
+            repository = getBatchRepository(suite)
             self.repository = os.path.join(repository, suite.app.name)
             if not os.path.isdir(self.repository):
                 raise plugins.TextTestError, "Batch result repository " + self.repository + " does not exist"
@@ -487,7 +499,6 @@ class ArchiveRepository(plugins.ScriptWithArgs):
 class WebPageResponder(plugins.Responder):
     def __init__(self, optionMap, allApps):
         plugins.Responder.__init__(self)
-        self.batchSession = optionMap.get("b", "default")
         self.cmdLineResourcePage = self.findResourcePage(optionMap.get("coll"))
         self.diag = logging.getLogger("GenerateWebPages")
         self.suitesToGenerate = []
@@ -502,12 +513,12 @@ class WebPageResponder(plugins.Responder):
 
     def addSuites(self, suites):
         # Don't blanket remove rejected apps automatically when collecting
-        batchFilter = BatchVersionFilter(self.batchSession)
         self.extraApps = []
         for suite in suites:
             if suite.app in self.extraApps:
                 continue
             try:
+                batchFilter = BatchVersionFilter(suite.app.getBatchSession())
                 batchFilter.verifyVersions(suite.app)
                 self.suitesToGenerate.append(suite)
                 self.extraApps += suite.app.extras
@@ -529,19 +540,24 @@ class WebPageResponder(plugins.Responder):
         if self.cmdLineResourcePage is not None:
             return [ self.cmdLineResourcePage ]
         else:
-            return getConfigValue("historical_report_resource_pages", self.batchSession)
+            return getConfigValue("historical_report_resource_pages")
 
     def generatePagePerApp(self, pageTitle, pageInfo):
         for app, repository, extraApps in pageInfo:
-            pageTopDir = os.path.expanduser(app.getCompositeConfigValue("historical_report_location", self.batchSession))
+            pageTopDir = os.path.expanduser(app.getBatchConfigValue("historical_report_location"))
             pageDir = os.path.join(pageTopDir, app.name)
             extraVersions = self.getExtraVersions(app, extraApps)
             self.diag.info("Found extra versions " + repr(extraVersions))
             relevantSubDirs = self.findRelevantSubdirectories(repository, app, extraVersions)
             version = getVersionName(app, self.getAppsToGenerate())
             pageSubTitle = self.makeCommandLine([ app ])
-            self.makeAndGenerate(relevantSubDirs, app.getCompositeConfigValue, pageDir, pageTitle, pageSubTitle,
+            self.makeAndGenerate(relevantSubDirs, self.getConfigValueMethod(app), pageDir, pageTitle, pageSubTitle,
                                  version, extraVersions, self.descriptionInfo.get(app, {}))
+
+    def getConfigValueMethod(self, app):
+        def getConfigValue(key, subKey=app.getBatchSession()):
+            return app.getCompositeConfigValue(key, subKey)
+        return getConfigValue
 
     def makeCommandLine(self, apps):
         appStr = ",".join((app.name for app in apps))
@@ -562,7 +578,7 @@ class WebPageResponder(plugins.Responder):
     def getAppRepositoryInfo(self):
         appInfo = OrderedDict()
         for suite in self.suitesToGenerate:
-            repository = os.path.expanduser(suite.getCompositeConfigValue("batch_result_repository", self.batchSession))
+            repository = getBatchRepository(suite)
             if not repository:
                 continue
             app = suite.app
@@ -571,10 +587,10 @@ class WebPageResponder(plugins.Responder):
                 plugins.printWarning("Batch result repository " + repository + " does not exist - not creating pages for " + repr(app))
                 continue
 
-            pageTitle = app.getCompositeConfigValue("historical_report_page_name", self.batchSession)
+            pageTitle = app.getBatchConfigValue("historical_report_page_name")
             extraApps = []
             for extraApp in app.extras:
-                extraPageTitle = extraApp.getCompositeConfigValue("historical_report_page_name", self.batchSession)
+                extraPageTitle = extraApp.getBatchConfigValue("historical_report_page_name")
                 if extraPageTitle != pageTitle and extraPageTitle != extraApp.getDefaultPageName():
                     appInfo.setdefault(extraPageTitle, []).append((extraApp, repository, []))
                 else:
@@ -592,7 +608,7 @@ class WebPageResponder(plugins.Responder):
         for app, repository, extraApps in pageInfo:
             extraVersions += self.getExtraVersions(app, extraApps)
             relevantSubDirs.update(self.findRelevantSubdirectories(repository, app, extraVersions, self.getVersionTitle))
-        getConfigValue = plugins.ResponseAggregator([ app.getCompositeConfigValue for app in allApps ])
+        getConfigValue = plugins.ResponseAggregator([ self.getConfigValueMethod(app) for app in allApps ])
         pageSubTitle = self.makeCommandLine(allApps)
         descriptionInfo = {}
         for app in allApps:
@@ -607,7 +623,7 @@ class WebPageResponder(plugins.Responder):
     
     def generateCommonPage(self, pageTitle, pageInfo):
         relevantSubDirs, getConfigValue, version, extraVersions, pageSubTitle, descriptionInfo = self.transformToCommon(pageInfo)
-        pageDir = os.path.expanduser(getConfigValue("historical_report_location", self.batchSession))
+        pageDir = os.path.expanduser(getConfigValue("historical_report_location"))
         self.makeAndGenerate(relevantSubDirs, getConfigValue, pageDir, pageTitle,
                              pageSubTitle, version, extraVersions, descriptionInfo)
         
@@ -626,7 +642,7 @@ class WebPageResponder(plugins.Responder):
     
     def generateWebPages(self, subDirs, getConfigValue, *args):
         generator = self.getWebPageGenerator(getConfigValue, *args)
-        subPageNames = getConfigValue("historical_report_subpages", self.batchSession)
+        subPageNames = getConfigValue("historical_report_subpages")
         generator.generate(subDirs, subPageNames)
 
     def findMatchingExtraVersion(self, dirVersions, extraVersions):
@@ -674,8 +690,7 @@ class CollectFiles(plugins.ScriptWithArgs):
     scriptDoc = "Collect and send all batch reports that have been written to intermediate files"
     def __init__(self, args=[""]):
         argDict = self.parseArguments(args, [ "batch", "tmp" ])
-        self.batchSession = argDict.get("batch", "default")
-        self.mailSender = MailSender(self.batchSession)
+        self.mailSender = MailSender()
         self.runId = "" # depends on what we pick up from collected files
         self.diag = logging.getLogger("batch collect")
         self.tmpInfo = argDict.get("tmp", "")
@@ -693,7 +708,7 @@ class CollectFiles(plugins.ScriptWithArgs):
             return
         dirlist = os.listdir(rootDir)
         dirlist.sort()
-        compulsoryVersions = set(app.getCompositeConfigValue("batch_collect_compulsory_version", self.batchSession))
+        compulsoryVersions = set(app.getBatchConfigValue("batch_collect_compulsory_version"))
         versionsFound = set()
         for dir in dirlist:
             fullDir = os.path.join(rootDir, dir)
@@ -715,7 +730,7 @@ class CollectFiles(plugins.ScriptWithArgs):
 
     def matchesApp(self, dir, app):
         suffix = app.versionSuffix()
-        return dir.startswith(app.name + suffix) or dir.startswith(self.batchSession + suffix)
+        return dir.startswith(app.name + suffix) or dir.startswith(app.getBatchSession() + suffix)
 
     def parseDirectory(self, fullDir, app, totalValues):
         basicPrefix = "batchreport." + app.name
@@ -754,7 +769,7 @@ class CollectFiles(plugins.ScriptWithArgs):
         file = open(fullname)
         valuesLine = file.readline()
         runId = file.readline().strip()
-        maxDays = app.getCompositeConfigValue("batch_collect_max_age_days", self.batchSession)
+        maxDays = app.getBatchConfigValue("batch_collect_max_age_days")
         if self.runIsRelevant(runId, maxDays):
             self.runId = runId
             self.addValuesToTotal(localName, valuesLine, totalValues)

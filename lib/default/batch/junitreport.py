@@ -12,13 +12,12 @@ class JUnitResponder(plugins.Responder):
     
     def __init__(self, optionMap, *args):
         plugins.Responder.__init__(self)
-        self.sessionName = optionMap["b"]
         self.runId = optionMap.get("name", calculateBatchDate()) # use the command-line name if given, else the date
         self.allApps = OrderedDict()
         self.appData = OrderedDict()
 
     def useJUnitFormat(self, app):
-        return app.getCompositeConfigValue("batch_junit_format", self.sessionName) == "true"
+        return app.getBatchConfigValue("batch_junit_format") == "true"
     
     def notifyComplete(self, test):
         if not self.useJUnitFormat(test.app):
@@ -34,7 +33,7 @@ class JUnitResponder(plugins.Responder):
             for app in appList:
                 if self.useJUnitFormat(app):
                     data = self.appData[app]
-                    ReportWriter(self.sessionName, self.runId).writeResults(app, data)
+                    ReportWriter(self.runId).writeResults(app, data)
       
     def _addApplication(self, test):
         app = test.app
@@ -138,8 +137,7 @@ success_template = """\
 """
 
 class ReportWriter:
-    def __init__(self, sessionName, runId):
-        self.sessionName = sessionName
+    def __init__(self, runId):
         self.runId = runId
         self.diag = logging.getLogger("JUnit Report Writer")
         
@@ -174,6 +172,6 @@ class ReportWriter:
         return appResultsDir
             
     def userDefinedFolder(self, app):
-        return app.getCompositeConfigValue("batch_junit_folder", self.sessionName)
+        return app.getBatchConfigValue("batch_junit_folder")
          
         

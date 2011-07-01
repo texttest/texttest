@@ -2093,6 +2093,7 @@ General GUI Enhancements:
 Static GUI Enhancements:
     - Version information now shown when a single test/suite with extra versions selected
 	Previously hard to tell which was selected
+    - GUI testing for Swing - PyUseCase 3.6 replaces defunct JUseCase in application creation dialog
 Dynamic GUI Enhancements:
     - New option "<full version>" in "version to save" in Save As dialog
 	Basically save with the full version you ran with, as was default behaviour in TextTest 3.20
@@ -2101,6 +2102,8 @@ Dynamic GUI Enhancements:
 	Threading-related issues fixed.
     - When a file-related row is selected in the status view, select equivalent files in the test file view
 	Note changes behaviour of "Save" in this situation
+    - Settings of $TEXTTEST_CHECKOUT and $TEXTTEST_CHECKOUT_NAME now listed in Run Info tab
+	Also made it easier for configurations to configure what appears there
 Framework Enhancements:
     - Added possibility to configure copying procedure for test data files
 	See docs for "copy_test_path_script".
@@ -2109,6 +2112,10 @@ Framework Enhancements:
 Batch Report Enhancements:
     - If a date is used as the name, use that throughout instead of the actual date to identify the run
     - Junit format report now assumes locale encoding instead of hardcoding UTF-8
+    - Junit format includes times when performance enabled
+    - HTML pages link all graphs at the top so they can be seen at once, if there is more than one graph on the page
+    - Made it easier for configurations to override how batch sessions are defined - single API function for it
+	Caused some backwards compatibility changes for scripts - see migration notes
 Grid Engine (LSF/SGE) enhancements/bug fixes:
     - Fixed stacktrace when normal polling cannot find a job, e.g. if SGE master goes down
     - Fixed stacktrace in slave when test names contain colons
@@ -2116,6 +2123,7 @@ Grid Engine (LSF/SGE) enhancements/bug fixes:
     - Now handles hold state (hqw) correctly
     - Fixed hang if slave gets an invalid test for any reason
 Bug Fixes:
+    - Fixed inconsistencies in dynamic GUI with test suite "all succeeded" status when tests are recomputed and then fail.
     - Fixed stacktrace trying to build piecharts when matplotlib not installed
     - Make sure options after positional arguments get treated as arguments to the new program
     - Allow linking of executable, which is done in the new rpm (thanks Michael Behrisch)

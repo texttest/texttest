@@ -1,0 +1,22 @@
+
+
+=========================================================
+CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
+=========================================================
+
+(1) Scripts that use batch session parameters
+=============================================
+There are several scripts which apply to batch mode data. These are
+
+batch.ArchiveRepository
+batch.CollectFiles (deprecated)
+batch.GenerateGraphs
+batch.GenerateSummaryPage
+
+All of these have had some way of referring to the batch session, usually as a script parameter (with different names for each). These are now removed. To supply the batch session for all of these, do it in the normal way, i.e. with the -b parameter. So for example
+
+texttest -s "batch.CollectFiles session=nightjob"
+
+will no longer work, and should now be done via
+
+texttest -s batch.CollectFiles -b nightjob

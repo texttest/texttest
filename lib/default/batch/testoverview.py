@@ -98,7 +98,6 @@ class GenerateWebPages(object):
                 for resourceName in self.resourceNames:
                     hasData = False
                     for sel in selectors:
-                        graph = []
                         filePath = self.getPageFilePath(sel, resourceName)
                         if self.pagesOverview.has_key(filePath):
                             page = self.pagesOverview[filePath][-1]
@@ -109,10 +108,11 @@ class GenerateWebPages(object):
                         for cellInfo in self.getCellInfoForResource(resourceName):
                             tableHeader = self.getTableHeader(resourceName, cellInfo, version, repositoryDirs)
                             heading = self.getHeading(resourceName, versionToShow)
-                            hasData |= self.addTable(page, cellInfo, categoryHandlers, version,
-                                                     loggedTests, sel, tableHeader, filePath, heading, graph)
-                            if len(graph) > 0:
-                                pageToGraphs.setdefault(page,  []).append(graph[0])
+                            hasNewData, graphLink = self.addTable(page, cellInfo, categoryHandlers, version,
+                                                                  loggedTests, sel, tableHeader, filePath, heading)
+                            hasData |= hasNewData
+                            if graphLink:
+                                pageToGraphs.setdefault(page, []).append(graphLink)
                     if hasData and versionToShow:
                         link = HTMLgen.Href("#" + version, versionToShow)
                         foundMinorVersions.setdefault(resourceName, HTMLgen.Container()).append(link)
@@ -137,12 +137,12 @@ class GenerateWebPages(object):
         for resourceName, page in self.pagesOverview.values():
             if len(monthContainer.contents) > 0:
                 page.prepend(HTMLgen.Heading(2, monthContainer, align = 'center'))
-            graph = pageToGraphs.get(page)
+            graphs = pageToGraphs.get(page)
             page.prepend(HTMLgen.Heading(2, selContainer, align = 'center'))
             minorVersionHeader = foundMinorVersions.get(resourceName)
             if minorVersionHeader:
-                if not graph is None and len(graph) > 1:
-                    page.prepend(HTMLgen.Heading(1, *graph, align = 'center'))
+                if not graphs is None and len(graphs) > 1:
+                    page.prepend(HTMLgen.Heading(1, *graphs, align = 'center'))
                 page.prepend(HTMLgen.Heading(1, minorVersionHeader, align = 'center'))
             page.prepend(HTMLgen.Heading(1, self.getHeading(resourceName), align = 'center'))
 
@@ -285,7 +285,7 @@ class GenerateWebPages(object):
     def getTestTable(self, *args):
         return TestTable(*args)
         
-    def addTable(self, page, cellInfo, categoryHandlers, version, loggedTests, selector, tableHeader, filePath, graphHeading, graphLink):
+    def addTable(self, page, cellInfo, categoryHandlers, version, loggedTests, selector, tableHeader, filePath, graphHeading):
         graphDirname, graphFileRef = self.getGraphFileParts(filePath, version)
         testTable = self.getTestTable(self.getConfigValue, cellInfo, self.descriptionInfo,
                                       selector.selectedTags, categoryHandlers, self.pageVersion, version, os.path.join(graphDirname, graphFileRef))
@@ -296,12 +296,13 @@ class GenerateWebPages(object):
                 page.append(HTMLgen.HR())
                 cells.append(self.makeTableHeaderCell(tableHeader))
 
+            graphLink = None
             if not cellInfo: 
                 fullPath = os.path.abspath(os.path.join(graphDirname, graphFileRef))
                 if testTable.generateGraph(fullPath, graphHeading):
-                    cells.append(HTMLgen.TD(self.makeImageLink(graphFileRef)))
-                    graphLink.append(self.makeImageLink(graphFileRef))
-
+                    graphLink = self.makeImageLink(graphFileRef)
+                    cells.append(HTMLgen.TD(graphLink))
+                    
             if len(cells):
                 row = HTMLgen.TR(*cells)
                 initialTable = HTMLgen.TableLite(align="center")
@@ -314,9 +315,9 @@ class GenerateWebPages(object):
 
 
             page.append(table)
-            return True
+            return True, graphLink
         else:
-            return False
+            return False, None
 
     def getGraphFileParts(self, filePath, version):
         dirname, local = os.path.split(filePath)

@@ -689,7 +689,7 @@ class WebPageResponder(plugins.Responder):
 class CollectFiles(plugins.ScriptWithArgs):
     scriptDoc = "Collect and send all batch reports that have been written to intermediate files"
     def __init__(self, args=[""]):
-        argDict = self.parseArguments(args, [ "batch", "tmp" ])
+        argDict = self.parseArguments(args, [ "tmp" ])
         self.mailSender = MailSender()
         self.runId = "" # depends on what we pick up from collected files
         self.diag = logging.getLogger("batch collect")

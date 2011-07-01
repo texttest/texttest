@@ -11,18 +11,17 @@ class GenerateFromSummaryData(plugins.ScriptWithArgs):
     summaryFileName = "index.html"
     basePath = ""
     def __init__(self, args=[""]):
-        argDict = self.parseArguments(args, [ "batch", "basepath", "file" ])
-        self.batchSession = argDict.get("batch", "default")
-        self.versionFilter = BatchVersionFilter(self.batchSession)
+        argDict = self.parseArguments(args, [ "basepath", "file" ])
         if argDict.has_key("basepath"):
             GenerateFromSummaryData.basePath = argDict["basepath"]
         if argDict.has_key("file"):
             GenerateFromSummaryData.summaryFileName = argDict["file"]
 
     def setUpApplication(self, app):
-        location = os.path.realpath(app.getCompositeConfigValue("historical_report_location", self.batchSession))
-        usePie = app.getCompositeConfigValue("historical_report_piechart_summary", self.batchSession)
-        rejected = bool(self.versionFilter.findUnacceptableVersion(app))
+        location = os.path.realpath(app.getBatchConfigValue("historical_report_location"))
+        usePie = app.getBatchConfigValue("historical_report_piechart_summary")
+        versionFilter = BatchVersionFilter(app.getBatchSession())
+        rejected = bool(versionFilter.findUnacceptableVersion(app))
         self.locationApps.setdefault(location, []).append((app, usePie, rejected))
 
     @classmethod

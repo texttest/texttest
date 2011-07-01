@@ -167,12 +167,11 @@ class Config:
     def getCollectSequence(self):
         arg = self.optionMap.get("coll")
         sequence = []
-        batchArgs = [ "batch=" + self.optionValue("b") ]
         if not arg or "web" not in arg:
-            emailHandler = batch.CollectFiles(batchArgs)
+            emailHandler = batch.CollectFiles()
             sequence.append(emailHandler)
         if not arg or arg == "web":
-            summaryGenerator = batch.GenerateSummaryPage(batchArgs)
+            summaryGenerator = batch.GenerateSummaryPage()
             sequence.append(summaryGenerator)
         return sequence
 

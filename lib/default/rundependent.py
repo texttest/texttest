@@ -5,7 +5,8 @@ import os
 
 if __name__ == "__main__":
     import sys
-    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.realpath(sys.argv[0]))))
+    libDir = os.path.dirname(os.path.dirname(os.path.realpath(sys.argv[0])))
+    sys.path.insert(0, libDir)
 
 import plugins, fpdiff, logging, shutil
 from optparse import OptionParser
@@ -409,7 +410,6 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
     if options.module:
         sys.modules["default.rundependent"] = sys.modules["__main__"]
-        libDir = os.path.dirname(os.path.dirname(os.path.abspath(sys.argv[0])))
         sys.path.insert(0, os.path.join(libDir, "../site/lib"))
         exec "import " + options.module
     allPaths = plugins.findDataPaths([ "logging.console" ], dataDirName="log", includePersonal=True)

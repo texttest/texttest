@@ -5,7 +5,7 @@ import os
 
 if __name__ == "__main__":
     import sys
-    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(sys.argv[0]))))
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.realpath(sys.argv[0]))))
 
 import plugins, fpdiff, logging, shutil
 from optparse import OptionParser

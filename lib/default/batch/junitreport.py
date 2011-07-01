@@ -5,6 +5,7 @@ from ordereddict import OrderedDict
 from batchutils import calculateBatchDate
 from string import Template
 from locale import getdefaultlocale
+from default.performance import getTestPerformance
 
 class JUnitResponder(plugins.Responder):
     """Respond to test results and write out results in format suitable for JUnit
@@ -48,11 +49,14 @@ class JUnitApplicationData:
         self.testResults = {}
         
     def storeResult(self, test):
+        t = getTestPerformance(test)
+        if t == -1:
+            t = 0
         result = dict(full_test_name=self._fullTestName(test), 
                       test_name=test.name,
                       suite_name=self._suiteName(test),
                       encoding=getdefaultlocale()[1],
-                      time="1") # fake the time
+                      time=str(t))
         if not test.state.hasResults():
             self._error(test, result)
         elif test.state.hasSucceeded():

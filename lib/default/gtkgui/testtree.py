@@ -88,11 +88,17 @@ class TestColumnGUI(guiutils.SubGUI):
 
     def getTitle(self):
         title = "Tests: "
-        if self.testSuiteSelection:
+        reducedVersionString = None
+        if self.versionString and len(self.versionString) > 40:
+                reducedVersionString = self.versionString[:40] + "..."
+        else:
+            reducedVersionString = self.versionString  
+
+        if self.testSuiteSelection:              
             # We don't care about totals with test suites
             title += plugins.pluralise(self.nofSelectedTests, "suite") + " selected"
             if self.versionString:
-                title += ", " + self.versionString
+                title += ", " + reducedVersionString
             elif self.nofDistinctSelectedTests != self.nofSelectedTests:
                 title += ", " + str(self.nofDistinctSelectedTests) + " distinct"
             return title
@@ -104,7 +110,7 @@ class TestColumnGUI(guiutils.SubGUI):
 
         if not self.dynamic:
             if self.versionString:
-                title += ", " + self.versionString
+                title += ", " + reducedVersionString
             elif self.totalNofDistinctTests != self.totalNofTests:
                 if self.nofDistinctSelectedTests == self.totalNofDistinctTests:
                     title += ", all " + str(self.totalNofDistinctTests) + " distinct"

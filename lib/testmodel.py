@@ -1556,7 +1556,7 @@ class Application:
         self.setConfigDefault("home_operating_system", "any", "Which OS the test results were originally collected on")
         self.setConfigDefault("base_version", { "default" : [] }, "Versions to inherit settings from")
         self.setConfigDefault("default_machine", "localhost", "Default machine to run tests on")
-        self.setConfigDefault("kill_timeout", 0, "Number of (wall clock) seconds to wait before killing the test")
+        self.setConfigDefault("kill_timeout", 0.0, "Number of (wall clock) seconds to wait before killing the test")
         self.setConfigDefault("kill_command", "taskkill /F /T /PID", "Kill command to use on non-posix machines")
         # various varieties of test data
         self.setConfigDefault("partial_copy_test_path", [], "Paths to be part-copied, part-linked to the sandbox")

@@ -88,9 +88,8 @@ class TestColumnGUI(guiutils.SubGUI):
 
     def getTitle(self):
         title = "Tests: "
-        reducedVersionString = None
         if self.versionString and len(self.versionString) > 40:
-                reducedVersionString = self.versionString[:40] + "..."
+            reducedVersionString = self.versionString[:40] + "..."
         else:
             reducedVersionString = self.versionString  
 

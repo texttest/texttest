@@ -987,7 +987,10 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
     def getFileToWrite(self, test, stem):
         return test.makeTmpFileName(stem)
     def findLogFiles(self, test, stem):
-        return glob.glob(test.makeTmpFileName(stem))
+        collatedfiles = glob.glob(test.makeTmpFileName(stem))
+        if len(collatedfiles) == 0:
+            return glob.glob(test.makeTmpFileName(stem, forComparison=0))
+        return collatedfiles
     def findLogFileStems(self, fileStem):
         if self.entryFiles.has_key(fileStem):
             return self.entryFiles[fileStem]

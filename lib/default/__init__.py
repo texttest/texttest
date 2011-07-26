@@ -547,10 +547,10 @@ class Config:
         dirs = []
         for app in apps:
             writeDir = app.writeDirectory if useOwnTmpDir else None
-            dirs += self._getFilterFileDirs(app, writeDir)
+            dirs += self._getFilterFileDirs(app, app.getDirectory(), writeDir)
         return  dirs
 
-    def _getFilterFileDirs(self, suiteOrApp, writeDir=None):
+    def _getFilterFileDirs(self, suiteOrApp, rootDir, writeDir=None):
         dirs = []
         appDirs = suiteOrApp.getConfigValue("filter_file_directory")
         tmpDir = self.getTmpFilterDir(writeDir)
@@ -562,7 +562,7 @@ class Config:
                 if dir not in dirs:
                     dirs.append(dir)
             else:
-                newDir = os.path.join(suiteOrApp.getDirectory(), dir)
+                newDir = os.path.join(rootDir, dir)
                 if not newDir in dirs:
                     dirs.append(newDir)
         return dirs
@@ -586,7 +586,7 @@ class Config:
             else:
                 raise plugins.TextTestError, "Could not find filter file at '" + filterFileName + "'"
         else:
-            dirsToSearchIn = self._getFilterFileDirs(suite)
+            dirsToSearchIn = self._getFilterFileDirs(suite, suite.app.getDirectory())
             absName = suite.app.getFileName(dirsToSearchIn, filterFileName)
             if absName:
                 return absName

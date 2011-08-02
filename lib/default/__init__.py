@@ -93,6 +93,7 @@ class Config:
                 group.addOption("fintersect", "Tests in all files")
                 group.addOption("funion", "Tests in any of files")
                 group.addOption("fd", "Private: Directory to search for filter files in")
+                group.addOption("td", "Private: Directory to search for temporary settings in")
                 group.addOption("count", "Private: How many tests we believe there will be")
                 group.addOption("o", "Overwrite failures, optionally using version")
                 group.addOption("reconnect", "Reconnect to previous run")

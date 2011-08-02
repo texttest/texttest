@@ -34,7 +34,7 @@ class BasicRunningAction:
         app = self.currAppSelection[0]
         writeDir = os.path.join(self.getLogRootDirectory(app), "dynamic_run" + str(self.runNumber))
         plugins.ensureDirectoryExists(writeDir)
-        filterFile = self.getFilterFile(writeDir, filterFileOverride)
+        filterFile = filterFileOverride or self.getFilterFile(writeDir)
         ttOptions = runModeOptions + self.getTextTestOptions(filterFile, app, usecase)
         self.diag.info("Starting " + usecase + " run of TextTest with arguments " + repr(ttOptions))
         logFile = os.path.join(writeDir, "output.log")
@@ -74,15 +74,12 @@ class BasicRunningAction:
     def getSignalsSent(self):
         return [ "SaveSelection" ]
 
-    def getFilterFile(self, writeDir, filterFileOverride):
+    def getFilterFile(self, writeDir):
         # Because the description of the selection can be extremely long, we write it in a file and refer to it
         # This avoids too-long command lines which are a problem at least on Windows XP
-        if filterFileOverride:
-            return filterFileOverride
-        else:
-            filterFileName = os.path.join(writeDir, "gui_select")
-            self.notify("SaveSelection", filterFileName)
-            return filterFileName
+        filterFileName = os.path.join(writeDir, "gui_select")
+        self.notify("SaveSelection", filterFileName)
+        return filterFileName
     
     def getInterpreterArgs(self):
         interpreterArg = os.getenv("TEXTTEST_DYNAMIC_GUI_INTERPRETER", "") # Alternative interpreter for the dynamic GUI : mostly useful for coverage / testing
@@ -214,9 +211,40 @@ class RunningAction(BasicRunningAction):
             self.optionGroups.append(group)
             if disablingOption:
                 self.disablingInfo[self.getOption(disablingOption)] = disablingOptionValue, group
-            
+
+        self.temporaryGroup = plugins.OptionGroup("Temporary Settings")
+        self.temporaryGroup.addOption("filetype", "File Type", "environment", possibleValues=self.getFileTypes(allApps))
+        self.temporaryGroup.addOption("contents", "Contents", multilineEntry=True)
+
         RunningAction.originalVersion = self.getVersionString()
 
+    def getFileTypes(self, allApps):
+        ignoreTypes = [ "testsuite", "knownbugs", "stdin", "input", "testcustomize.py" ]
+        fileTypes = []
+        for app in allApps:
+            for ft in app.defFileStems("builtin") + app.defFileStems("default"):
+                if ft not in fileTypes and ft not in ignoreTypes:
+                    fileTypes.append(ft)
+        return fileTypes
+
+    def getTextTestOptions(self, filterFile, app, *args):
+        ret = BasicRunningAction.getTextTestOptions(self, filterFile, app, *args)
+        contents = self.temporaryGroup.getValue("contents")
+        if contents:
+            fileType = self.temporaryGroup.getValue("filetype")
+            writeDir = os.path.dirname(filterFile)
+            tmpDir = self.makeTemporarySettingsDir(writeDir, app, fileType, contents)
+            ret += [ "-td", tmpDir ]
+        return ret
+
+    def makeTemporarySettingsDir(self, writeDir, app, fileType, contents):
+        tmpDir = os.path.join(writeDir, "temporary_settings")
+        plugins.ensureDirectoryExists(tmpDir)
+        fileName = os.path.join(tmpDir, fileType + "." + app.name + app.versionSuffix())
+        with open(fileName, "w") as f:
+            f.write(contents)
+        return tmpDir
+    
     def getGroupNames(self, allApps):
         if len(allApps) > 0:
             return allApps[0].getAllRunningGroupNames(allApps)
@@ -333,6 +361,7 @@ class RunningAction(BasicRunningAction):
         tabBox = gtk.VBox()
         if frames:
             frames.append(self.createFrame(group, "Miscellaneous"))
+            frames.append(self.createFrame(self.temporaryGroup,  self.temporaryGroup.name))
             for frame in frames:
                 tabBox.pack_start(frame, fill=False, expand=False, padding=8)
         else:

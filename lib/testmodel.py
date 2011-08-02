@@ -452,7 +452,10 @@ class Test(plugins.Observable):
 
     def getDirCachesToRoot(self, configName):
         fromTests = [ test.dircache for test in self.getAllTestsToRoot() ]
-        return self.app.getExtraDirCaches(configName, envMapping=self.environment) + fromTests
+        dirCaches = self.app.getExtraDirCaches(configName, envMapping=self.environment) + fromTests
+        if self.app.tmpSettingsDirCache:
+            dirCaches.append(self.app.tmpSettingsDirCache)
+        return dirCaches
 
     def getAllFileNames(self, stem, refVersion = None):
         self.diagnose("Getting file from " + stem)
@@ -1252,6 +1255,7 @@ class Application:
         self.diag.info("Write directory at " + self.writeDirectory)
         self.checkout = self.configObject.setUpCheckout(self)
         self.diag.info("Checkout set to " + self.checkout)
+        self.tmpSettingsDirCache = DirectoryCache(inputOptions.get("td")) if "td" in inputOptions else None
         
     def __repr__(self):
         return self.fullName() + self.versionSuffix()

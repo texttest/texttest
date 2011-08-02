@@ -970,3 +970,6 @@ changed = set test paths to contain
 [Name=Copy Path To Clipboard]
 activate = copy path to clipboard
 
+[Name=Contents]
+changed = set temporary settings contents to
+

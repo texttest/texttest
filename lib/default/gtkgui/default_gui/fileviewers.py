@@ -381,12 +381,44 @@ class ViewFileDifferences(FileViewAction):
 
     def _performOnFile(self, diffProgram, tmpFile, comparison):
         stdFile = comparison.getStdFile(self.useFiltered(), self.extraPostfix())
+        self.runDiff(diffProgram, stdFile, tmpFile)
+
+    def runDiff(self, diffProgram, stdFile, tmpFile):
         description = diffProgram + " " + os.path.basename(stdFile) + " " + os.path.basename(tmpFile)
         cmdArgs = plugins.splitcmd(diffProgram) + [ stdFile, tmpFile ]
         self.startViewer(cmdArgs, description=description, exitHandler=self.diffingComplete)
 
     def diffingComplete(self, *args):
         self.applicationEvent("the " + self.getToolDescription() + " to terminate")
+
+class PairwiseFileViewer:
+    def singleTestOnly(self):
+        return False
+
+    def isActiveOnCurrent(self, *args):
+        if not guiplugins.ActionGUI.isActiveOnCurrent(self) or len(self.currTestSelection) != 2 or len(self.currFileSelection) != 1:
+            return False
+        for fileName, comparison in self.currFileSelection:
+            if bool(comparison) and not comparison.missingResult():
+                otherComp = self.findOtherComparison(comparison)
+                if otherComp and not otherComp.missingResult():
+                    return True
+        return False
+
+    def findOtherComparison(self, comparison):
+        state = self.currTestSelection[-1].stateInGui
+        return state.findComparison(comparison.stem, includeSuccess=True)[0] if hasattr(state, "findComparison") else None
+
+    def _performOnFile(self, diffProgram, tmpFile, comparison):
+        otherComp = self.findOtherComparison(comparison)
+        file1 = comparison.getTmpFile(self.useFiltered(), self.extraPostfix())
+        file2 = otherComp.getTmpFile(self.useFiltered(), self.extraPostfix())
+        self.runDiff(diffProgram, file1, file2)
+
+
+class ViewPairwiseDifferences(PairwiseFileViewer, ViewFileDifferences):
+    def _getTitle(self):
+        return "View Raw Differences (between tests)"
 
 
 class ViewFilteredFileDifferences(ViewFileDifferences):
@@ -402,6 +434,17 @@ class ViewFilteredFileDifferences(ViewFileDifferences):
     def isDefaultViewer(self, comparison):
         return self.differencesActive(comparison)
 
+class ViewFilteredPairwiseDifferences(PairwiseFileViewer, ViewFilteredFileDifferences):
+    def _getTitle(self):
+        return "View Differences (between tests)"
+
+    def useFiltered(self):
+        return True
+
+    def isDefaultViewer(self, comparison):
+        return False
+
+
 class ViewContentFilteredFileDifferences(ContentFilterViewer, ViewFilteredFileDifferences):
     def _getTitle(self):
         return "View Content-Filtered Differences"
@@ -411,6 +454,10 @@ class ViewContentFilteredFileDifferences(ContentFilterViewer, ViewFilteredFileDi
 
     def isDefaultViewer(self, comparison):
         return False
+
+class ViewContentFilteredPairwiseDifferences(PairwiseFileViewer, ViewContentFilteredFileDifferences):
+    def _getTitle(self):
+        return "View Content-Filtered Differences (between tests)"
 
 
 class FollowFile(FileViewAction):
@@ -462,6 +509,7 @@ def getInteractiveActionClasses(dynamic):
         classes += [ ViewFilteredTestFileInEditor, ViewContentFilteredTestFileInEditor,
                      ViewOrigFileInEditor, ViewContentFilteredOrigFileInEditor, ViewFilteredOrigFileInEditor,
                      ViewFileDifferences, ViewContentFilteredFileDifferences, ViewFilteredFileDifferences,
+                     ViewPairwiseDifferences, ViewContentFilteredPairwiseDifferences, ViewFilteredPairwiseDifferences,
                      FollowFile ]
     else:
         classes.append(ViewConfigFileInEditor)

@@ -61,6 +61,10 @@
     <placeholder name="ExtraDiffViewers" />
     <menuitem action="View Raw Differences"/>
     <separator/>
+    <menuitem action="View Differences (between tests)"/>
+    <placeholder name="ExtraBetweenViewers" />
+    <menuitem action="View Raw Differences (between tests)"/>
+    <separator/>
     <menuitem action="Follow File Progress"/>
     <separator/>
     <menuitem action="File Properties"/>

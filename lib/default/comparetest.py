@@ -22,7 +22,23 @@ class BaseTestComparison(plugins.TestState):
 
     def isAllNew(self):
         return len(self.newResults) == len(self.allResults)
-    
+
+    def findComparison(self, stem, includeSuccess=False):
+        lists = [ self.changedResults, self.newResults, self.missingResults ]
+        if includeSuccess:
+            lists.append(self.correctResults)
+        self.diag.info("Finding comparison for stem " + stem)
+        for list in lists:
+            for comparison in list:
+                if comparison.stem == stem:
+                    return comparison, list
+        return None, None
+
+    def removeComparison(self, stem):
+        comparison, newList = self.findComparison(stem)
+        newList.remove(comparison)
+        self.allResults.remove(comparison)
+
     def computeFor(self, test, ignoreMissing=False):
         self.makeComparisons(test, ignoreMissing)
         self.categorise()
@@ -255,6 +271,7 @@ class TestComparison(BaseTestComparison):
 
     def getPerformanceStems(self, test):
         return [ "performance" ] + test.getConfigValue("performance_logfile_extractor").keys()
+
     def createFileComparison(self, test, stem, standardFile, tmpFile):
         if stem in self.getPerformanceStems(test):
             if tmpFile:
@@ -264,6 +281,7 @@ class TestComparison(BaseTestComparison):
                 return None
         else:
             return FileComparison(test, stem, standardFile, tmpFile, testInProgress=0)
+
     def categorise(self):
         if self.failedPrediction:
             # Keep the category we had before
@@ -277,23 +295,11 @@ class TestComparison(BaseTestComparison):
         else:
             self.category = worstResult.getType()
             self.freeText = self.getFreeTextInfo()
+
     def getFreeTextInfo(self):
         texts = [ fileComp.getFreeText() for fileComp in self.getSortedComparisons() ] 
         return "".join(texts)
-    def findComparison(self, stem, includeSuccess=False):
-        lists = [ self.changedResults, self.newResults, self.missingResults ]
-        if includeSuccess:
-            lists.append(self.correctResults)
-        self.diag.info("Finding comparison for stem " + stem)
-        for list in lists:
-            for comparison in list:
-                if comparison.stem == stem:
-                    return comparison, list
-        return None, None
-    def removeComparison(self,stem):
-        comparison, newList = self.findComparison(stem)
-        newList.remove(comparison)
-        self.allResults.remove(comparison)
+
     def save(self, test, exact=True, versionString=None, overwriteSuccessFiles=False, onlyStems=[], backupVersions=[]):
         self.diag.info("Saving " + repr(test) + " stems " + repr(onlyStems))
         for comparison in self.filterComparisons(self.changedResults, onlyStems):

@@ -416,7 +416,14 @@ class TestFileGUI(FileViewGUI):
 
     def selectionChanged(self, selection):
         filelist = []
-        selection.selected_foreach(self.fileSelected, filelist)
+        def fileSelected(dummyModel, dummyPath, iter):
+            # Do not include the top level which are just headers that don't currently correspond to files
+            if self.model.iter_parent(iter) is not None:
+                filePath = self.model.get_value(iter, 2)
+                if filePath:
+                    filelist.append((filePath, self.model.get_value(iter, 3)))
+
+        selection.selected_foreach(fileSelected)
         self.notify("NewFileSelection", filelist)
         if not self.dynamic:
             if selection.count_selected_rows() == 1:
@@ -443,13 +450,6 @@ class TestFileGUI(FileViewGUI):
         else:
             name = self.model.get_value(iter, 0)
             return name.split()[0].lower()
-
-    def fileSelected(self, dummyModel, dummyPath, iter, filelist):
-        # Do not include the top level which are just headers that don't currently correspond to files
-        if self.model.iter_parent(iter) is not None:
-            filePath = self.model.get_value(iter, 2)
-            if filePath:
-                filelist.append((filePath, self.model.get_value(iter, 3)))
 
     def getState(self):
         if self.currentTest:

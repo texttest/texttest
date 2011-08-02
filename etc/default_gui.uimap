@@ -973,3 +973,12 @@ activate = copy path to clipboard
 [Name=Contents]
 changed = set temporary settings contents to
 
+[Name=View Differences (between tests)]
+activate = view differences between tests
+
+[Name=View Raw Differences (between tests)]
+activate = view raw differences between tests
+
+[Name=View Content-Filtered Differences (between tests)]
+activate = view content-filtered differences between tests
+

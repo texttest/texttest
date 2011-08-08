@@ -396,13 +396,14 @@ class PairwiseFileViewer:
         return False
 
     def isActiveOnCurrent(self, *args):
-        if not guiplugins.ActionGUI.isActiveOnCurrent(self) or len(self.currTestSelection) != 2 or len(self.currFileSelection) != 1:
-            return False
-        for fileName, comparison in self.currFileSelection:
-            if bool(comparison) and not comparison.missingResult():
-                otherComp = self.findOtherComparison(comparison)
-                if otherComp and not otherComp.missingResult():
-                    return True
+        return len(self.currTestSelection) == 2 and len(self.currFileSelection) == 1 and \
+               FileViewAction.isActiveOnCurrent(self, *args)
+
+    def isActiveForFile(self, fileName, comparison):
+        if bool(comparison) and not comparison.missingResult():
+            otherComp = self.findOtherComparison(comparison)
+            if otherComp and not otherComp.missingResult():
+                return True
         return False
 
     def findOtherComparison(self, comparison):

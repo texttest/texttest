@@ -825,13 +825,7 @@ class RemoveTests(guiplugins.ActionGUI):
         guiplugins.ActionGUI.__init__(self, *args, **kw)
     
     def isActiveOnCurrent(self, *args):
-        if len(self.currFileSelection) > 0:
-            return False
-        
-        for test in self.currTestSelection:
-            if test.parent:
-                return True
-        return False
+        return any((test.parent for test in self.currTestSelection))
 
     def getActionName(self):
         return "Remove Tests"

@@ -50,7 +50,6 @@ class InteractiveActionConfig(BaseInteractiveActionConfig):
         dict["save_as"] = "<control><alt>s"
         dict["copy"] = "<control>c"
         dict["kill"] = "<control>Delete"
-        dict["remove_files"] = "<control>Delete"
         dict["remove_tests"] = "<control>Delete"
         dict["cut"] = "<control>x"
         dict["paste"] = "<control>v"

@@ -20,3 +20,9 @@ texttest -s "batch.CollectFiles session=nightjob"
 will no longer work, and should now be done via
 
 texttest -s batch.CollectFiles -b nightjob
+
+(2) Default accelerator for "Remove Files" removed
+==================================================
+Up to 3.21, Ctrl+Delete has removed files, if any were selected, and tests if they were not. This was deemed confusing and had the side effect of preventing removal of tests if any files were selected.
+
+Ctrl+Delete will therefore now always try to remove the tests. This can be done also when files are selected. There is no longer any default accelerator for removing files, it has to be done with the popup menu.

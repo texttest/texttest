@@ -2093,6 +2093,10 @@ General GUI Enhancements:
 Static GUI Enhancements:
     - Version information now shown when a single test/suite with extra versions selected
 	Previously hard to tell which was selected
+    - Removing tests is now possible when files are selected
+	Ctrl+Delete now always deletes tests. There is no default accelerator for deleting files.
+    - Can now specify additional settings that only affect the current run
+	For example set an environment variable, add a command line option. See Advanced tab under Running.
     - GUI testing for Swing - PyUseCase 3.6 replaces defunct JUseCase in application creation dialog
 Dynamic GUI Enhancements:
     - New option "<full version>" in "version to save" in Save As dialog
@@ -2102,6 +2106,9 @@ Dynamic GUI Enhancements:
 	Threading-related issues fixed.
     - When a file-related row is selected in the status view, select equivalent files in the test file view
 	Note changes behaviour of "Save" in this situation
+    - New "pairwise viewer" for test files - View Differences (between tests)
+	If you select exactly two tests and one file, you can compare the behaviour of two test runs with each other.
+	This is aimed at multiple versions/instances of the same test being run.
     - Settings of $TEXTTEST_CHECKOUT and $TEXTTEST_CHECKOUT_NAME now listed in Run Info tab
 	Also made it easier for configurations to configure what appears there
 Framework Enhancements:
@@ -2109,6 +2116,8 @@ Framework Enhancements:
 	See docs for "copy_test_path_script".
     - Now support GUI testing on separate networks
 	Both virtual display and accessibility of usecase and UI map files fixed
+    - "performance_logfile" now works on any file, not just those that are being compared
+	Unix file expansions can also be used
 Batch Report Enhancements:
     - If a date is used as the name, use that throughout instead of the actual date to identify the run
     - Junit format report now assumes locale encoding instead of hardcoding UTF-8
@@ -2135,3 +2144,5 @@ Bug Fixes:
     - Tried to improve handling of errors from "ps" on POSIX systems
     - Fixed bug where invalid names of saved selections persist even after being changed
     - Fixed stacktrace replacing text in files if the pattern matches a directory
+    - "Java detection" also works if "jython" provided in the interpreter now
+    - Timeouts no longer applied when recording tests

@@ -25,13 +25,22 @@ class Bug:
         return cmp(self.getPriority(), other.getPriority())
                    
     def findCategory(self, internalError):
-        if internalError:
+        if internalError or self.rerunCount:
             return "badPredict"
         else:
             return "bug"
 
     def isCancellation(self):
         return False
+
+    def getRerunText(self):
+        if self.rerunCount:
+            return "\n(NOTE: Test was run " + str(self.rerunCount + 1) + " times in total and each time encountered this issue.\n" + \
+                   "Results of previous runs can be found in framework_tmp/backup.previous.* under the sandbox directory.)\n\n"
+        else:
+            return ""
+        
+    
 
 class BugSystemBug(Bug):
     def __init__(self, bugSystem, bugId, *args):
@@ -50,7 +59,7 @@ class BugSystemBug(Bug):
         status, bugText, isResolved = _findBugInfo(self.bugId, location, username, password)
         category = self.findCategory(isResolved)
         briefText = "bug " + self.bugId + " (" + status + ")"
-        return category, briefText, bugText
+        return category, briefText, self.getRerunText() + bugText
 
     
 class UnreportedBug(Bug):
@@ -70,7 +79,7 @@ class UnreportedBug(Bug):
             return 3
         
     def findInfo(self, *args):
-        return self.findCategory(self.internalError), self.briefText, self.fullText
+        return self.findCategory(self.internalError), self.briefText, self.getRerunText() + self.fullText
 
 
 class BugTrigger:

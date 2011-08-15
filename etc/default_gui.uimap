@@ -533,6 +533,7 @@ toggled.false = uncheck report as 'internal error' rather than 'known bug'
 [Title=Enter information for automatic interpretation of test failures]
 response.cancel = press cancel
 response.accept = press ok
+delete-event = close failure information dialog
 
 [Label=Run with slow motion replay]
 toggled.true = check run with slow motion replay

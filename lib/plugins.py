@@ -1386,9 +1386,12 @@ class Option:
         
     def getValue(self):
         if self.valueMethod:
-            return self.valueMethod()
-        else:
-            return self.defaultValue
+            try:
+                return self.valueMethod()
+            except ValueError:
+                self.valueMethod = None
+
+        return self.defaultValue
 
     def resetDefault(self):
         if self.valueMethod:

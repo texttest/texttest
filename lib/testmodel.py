@@ -1073,12 +1073,9 @@ class TestSuite(Test):
 
     def createTestCache(self, testName):
         return DirectoryCache(os.path.join(self.getDirectory(), testName))
+
     def getSubtestClass(self, cache):
-        allFiles = self.app.getAllFileNames([ cache ], "testsuite", allVersions=True)
-        if len(allFiles) > 0:
-            return TestSuite
-        else:
-            return TestCase
+        return TestSuite if cache.hasStem("testsuite." + self.app.name) else TestCase
 
     def createSubtest(self, testName, description, cache, className):
         test = className(testName, description, cache, self.app, self)

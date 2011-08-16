@@ -481,6 +481,8 @@ class TestTable:
         success = state.category == "success"
         if success:
             cellContent = "ok"
+            if state.briefText:
+                cellContent += " " + state.briefText
         else:
             cellContent = state.getTypeBreakdown()[1]
         cellContent += " " + ", ".join(state.executionHosts)

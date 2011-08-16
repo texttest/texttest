@@ -130,6 +130,7 @@ class ActionRunner(BaseActionRunner):
 
     def notifyRerun(self, test):
         if self.currentTestRunner and self.currentTestRunner.test is test:
+            self.diag.info("Got rerun notification for " + repr(test) + ", resetting actions")
             self.currentTestRunner.resetActionSequence()
 
     def runTest(self, test):

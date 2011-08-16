@@ -290,7 +290,8 @@ class CheckForBugs(plugins.Action):
             if rerunCount and not os.path.exists(test.makeBackupFileName(rerunCount)):
                 self.describe(test, " - found an issue that triggered a rerun")
                 test.saveState()
-                test.notify("Rerun")        
+                # Current thread, must be done immediately or we might exit...
+                test.performNotify("Rerun")        
 
     def checkTest(self, test, state):
         activeBugs = self.readBugs(test)

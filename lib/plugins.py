@@ -1256,6 +1256,13 @@ class MultiEntryDictionary(OrderedDict):
             self.warn("Config entry name '" + entryName + "' in section '" + currSection +
                       "' given an invalid value '" + entry + "', ignoring.")
 
+    def removeEntry(self, entryName, entry, sectionName=""):
+        currDict, currSection = self.getSectionInfo(sectionName)
+        if entryName in currDict:
+            dictElem = currDict[entryName]
+            if entry in dictElem:
+                dictElem.remove(entry)
+            
     def _addEntry(self, entryName, entry, currDict, currSection, insert=True, errorOnUnknown=False):
         if currDict is not self and self.has_key(entryName):
             self.warn("Config entry name '" + entryName + "' found in section '" + currSection +

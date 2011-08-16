@@ -10,10 +10,18 @@ class SetUpCaptureMockHandlers(plugins.Action):
     def __call__(self, test):
         pythonCustomizeFiles = test.getAllPathNames("testcustomize.py") 
         pythonCoverage = test.hasEnvironment("COVERAGE_PROCESS_START")
-        if test.app.usesCaptureMock() or pythonCoverage or pythonCustomizeFiles:
+        captureMock = test.app.usesCaptureMock() and self.recordSetting != 3
+        if captureMock or pythonCoverage or pythonCustomizeFiles:
             rcFiles = test.getAllPathNames("capturemockrc")
             if rcFiles or pythonCoverage or pythonCustomizeFiles:
                 self.setUpIntercepts(test, rcFiles, pythonCoverage, pythonCustomizeFiles)
+        elif self.recordSetting == 3:
+            self.disableCaptureMockComparison(test.app)
+
+    def disableCaptureMockComparison(self, app):
+        for name in [ "traffic", "externalmocks", "pythonmocks" ]:
+            app.removeConfigEntry("regenerate", name, "definition_file_stems")
+            app.addConfigEntry("builtin", name, "definition_file_stems")
 
     def setUpIntercepts(self, test, rcFiles, pythonCoverage, pythonCustomizeFiles):
         interceptDir = test.makeTmpFileName("traffic_intercepts", forComparison=0)

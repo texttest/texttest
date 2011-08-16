@@ -114,11 +114,12 @@ class Config:
                     self.addCaptureMockSwitch(group)
 
     def addCaptureMockSwitch(self, group, value=0):
-        options = [ "Replay All", "Record All", "Record New Only"  ]
+        options = [ "Replay", "Record", "Mixed Mode", "Disabled"  ]
         descriptions = [ "Replay all existing interactions from the information in CaptureMock's mock files. Do not record anything new.",
                          "Ignore any existing CaptureMock files and record all the interactions afresh.",
                          "Replay all existing interactions from the information in the CaptureMock mock files. " + \
-                         "Record any other interactions that occur." ]
+                         "Record any other interactions that occur.",
+                         "Disable CaptureMock" ]
         group.addSwitch("rectraffic", "CaptureMock", value=value, options=options, description=descriptions)
 
     def getReconnFullOptions(self):

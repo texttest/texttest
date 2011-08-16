@@ -1750,6 +1750,10 @@ class Application:
        
     def addConfigEntry(self, key, value, sectionName = ""):
         self.configDir.addEntry(key, value, sectionName, insert=False, errorOnUnknown=True)
+
+    def removeConfigEntry(self, key, value, sectionName = ""):
+        self.configDir.removeEntry(key, value, sectionName)
+
     def setConfigDefault(self, key, value, docString = ""):
         self.configDir[key] = value
         if len(docString) > 0:

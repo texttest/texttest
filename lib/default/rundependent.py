@@ -183,24 +183,30 @@ class RunDependentTextFilter(plugins.Observable):
 
     def filterFile(self, file, newFile, filteredAway=None):
         lineNumber = 0
+        lengths = []
         for line in file:
             # We don't want to stack up ActionProgreess calls in ThreaderNotificationHandler ...
             self.notifyIfMainThread("ActionProgress")
             lineNumber += 1
-            lineFilter, filteredLine = self.getFilteredLine(line, lineNumber)
+            lineFilter, filteredLine, removeCount = self.getFilteredLine(line, lineNumber)
+            if removeCount:
+                offset = sum(lengths[-removeCount:])
+                newFile.seek(-offset, os.SEEK_CUR)
+                lengths = []
             if filteredLine:
                 newFile.write(filteredLine)
+                lengths.append(len(filteredLine))
             elif filteredAway is not None and lineFilter is not None:
                 filteredAway.setdefault(lineFilter, []).append(line)
 
     def getFilteredLine(self, line, lineNumber):
         for lineFilter in self.lineFilters:
-            changed, filteredLine = lineFilter.applyTo(line, lineNumber)
+            changed, filteredLine, removeCount = lineFilter.applyTo(line, lineNumber)
             if changed:
                 if not filteredLine:
-                    return lineFilter, filteredLine
+                    return lineFilter, filteredLine, removeCount
                 line = filteredLine
-        return None, line
+        return None, line, 0
 
 
 class UnorderedTextFilter(RunDependentTextFilter):
@@ -242,7 +248,7 @@ class LineFilter:
     # All syntax that affects how a match is found
     matcherStrings = [ "{LINE ", "{INTERNAL " ]
     # All syntax that affects what is done when a match is found
-    matchModifierStrings = [ "{WORD ", "{REPLACE ", "{LINES " ]
+    matchModifierStrings = [ "{WORD ", "{REPLACE ", "{LINES ", "{PREVLINES " ]
     internalExpressions = { "writedir" : getWriteDirRegexp }
     def __init__(self, text, testId, diag):
         self.originalText = text
@@ -251,6 +257,7 @@ class LineFilter:
         self.trigger = None
         self.untrigger = None
         self.linesToRemove = 1
+        self.prevLinesToRemove = 0
         self.autoRemove = 0
         self.wordNumber = None
         self.replaceText = None
@@ -318,6 +325,8 @@ class LineFilter:
                 self.wordNumber -= 1
         elif matchModifierString == "{LINES ":
             self.linesToRemove = int(parameter)
+        elif matchModifierString == "{PREVLINES ":
+            self.prevLinesToRemove = int(parameter)
 
     def createTrigger(self, matcherString, parameter):
         if matcherString == "{LINE ":
@@ -335,7 +344,7 @@ class LineFilter:
             self.diag.info(repr(self.trigger) + " matched " + line.strip())
             return self.applyMatchingTrigger(line)
         else:
-            return False, line
+            return False, line, 0
         
     def applyAutoRemove(self, line):
         if self.untrigger:
@@ -343,20 +352,20 @@ class LineFilter:
                 self.diag.info(repr(self.untrigger) + " (end) matched " + line.strip()) 
                 self.autoRemove = 0
                 if self.divider.endswith("]}"):
-                    return True, None
+                    return True, None, 0
                 else:
-                    return False, line
+                    return False, line, 0
         else:
             self.autoRemove -= 1
-        return True, self.filterWords(line)
+        return True, self.filterWords(line), 0
 
     def applyMatchingTrigger(self, line):
         if self.untrigger:
             self.autoRemove = 1
-            return self.divider.startswith("{["), self.filterWords(line)
+            return self.divider.startswith("{["), self.filterWords(line), 0
         if self.linesToRemove:
             self.autoRemove = self.linesToRemove - 1
-        return True, self.filterWords(line, self.trigger)
+        return True, self.filterWords(line, self.trigger), self.prevLinesToRemove
             
     def filterWords(self, line, trigger=None):
         if self.wordNumber != None:

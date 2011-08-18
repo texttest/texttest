@@ -79,9 +79,9 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
     def changeState(self, test, state):
         test.changeState(state) # for overriding in case we need other notifiers
         
-    def runQueue(self, getMethod, runMethod, desc):
+    def runQueue(self, getMethod, runMethod, desc, block=True):
         while True:
-            test = getMethod()
+            test = getMethod(block)
             if not test: # completed normally
                 break
 
@@ -104,8 +104,8 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
         except Empty:
             return
 
-    def getTestForRun(self):
-        return self.getItemFromQueue(self.testQueue, block=True)
+    def getTestForRun(self, block=True):
+        return self.getItemFromQueue(self.testQueue, block=block)
 
     def canBeMainThread(self):
         return False # We block, so we shouldn't be the main thread...

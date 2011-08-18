@@ -107,6 +107,8 @@ class QueueSystemServer(BaseActionRunner):
                         return
                 self.updateJobStatus()
                 attempts = 30
+                # In case any tests have had reruns triggered since we stopped submitting
+                self.runQueue(self.getTestForRun, self.runTest, "rerunning", block=False)
 
     def canPoll(self):
         queueSystem = self.getQueueSystem(self.jobs.keys()[0])
@@ -173,6 +175,8 @@ class QueueSystemServer(BaseActionRunner):
                 else:
                     self.diag.info("Adding to reuse failure queue : " + newTest.uniqueName)
                     self.reuseFailureQueue.put(newTest)
+            else:
+                self.diag.info("No tests available for reuse : " + test.uniqueName)
                 
         # Allowed a submitted job to terminate
         self.testsSubmitted -= 1
@@ -235,7 +239,7 @@ class QueueSystemServer(BaseActionRunner):
             sock.sendall("SUT_SERVER:" + state + "\n")
             sock.close()
             
-    def getTestForRunNormalMode(self):
+    def getTestForRunNormalMode(self, block):
         self.reuseOnly = False
         reuseFailure = self.getItemFromQueue(self.reuseFailureQueue, block=False)
         if reuseFailure:
@@ -243,7 +247,7 @@ class QueueSystemServer(BaseActionRunner):
             return reuseFailure
         else:
             self.diag.info("Waiting for new tests...")
-            newTest = self.getTest(block=True)
+            newTest = self.getTest(block=block)
             if newTest:
                 return newTest
             else:
@@ -251,21 +255,21 @@ class QueueSystemServer(BaseActionRunner):
                 self.diag.info("No normal test found, checking reuse failures...")
                 return self.getItemFromQueue(self.reuseFailureQueue, block=False)
             
-    def getTestForRunReuseOnlyMode(self):
+    def getTestForRunReuseOnlyMode(self, block):
         self.reuseOnly = True
         self.diag.info("Waiting for reuse failures...")
-        reuseFailure = self.getItemFromQueue(self.reuseFailureQueue, block=True)
+        reuseFailure = self.getItemFromQueue(self.reuseFailureQueue, block=block)
         if reuseFailure:
             return reuseFailure
         elif self.testCount > 0 and self.testsSubmitted < self.maxCapacity:
             # Try again, the capacity situation has changed...
-            return self.getTestForRunNormalMode()
+            return self.getTestForRunNormalMode(block)
 
-    def getTestForRun(self):
+    def getTestForRun(self, block=True):
         if self.testCount == 0 or (self.testsSubmitted < self.maxCapacity):
-            return self.getTestForRunNormalMode()
+            return self.getTestForRunNormalMode(block)
         else:
-            return self.getTestForRunReuseOnlyMode()
+            return self.getTestForRunReuseOnlyMode(block)
 
     def notifyAllComplete(self):
         BaseActionRunner.notifyAllComplete(self)

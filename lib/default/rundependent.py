@@ -192,6 +192,7 @@ class RunDependentTextFilter(plugins.Observable):
             if removeCount:
                 offset = sum(lengths[-removeCount:])
                 newFile.seek(-offset, os.SEEK_CUR)
+                newFile.truncate()
                 lengths = []
             if filteredLine:
                 newFile.write(filteredLine)

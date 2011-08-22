@@ -2112,12 +2112,17 @@ Dynamic GUI Enhancements:
     - Settings of $TEXTTEST_CHECKOUT and $TEXTTEST_CHECKOUT_NAME now listed in Run Info tab
 	Also made it easier for configurations to configure what appears there
 Framework Enhancements:
+    - Added "{PREVLINES }" construct to run_dependent_text
+	See website for details
     - Added possibility to configure copying procedure for test data files
 	See docs for "copy_test_path_script".
+    - Improved reporting when tests are rerun due to known bug failures
+	Now see how many times something has been run before failing.
     - Now support GUI testing on separate networks
 	Both virtual display and accessibility of usecase and UI map files fixed
     - "performance_logfile" now works on any file, not just those that are being compared
 	Unix file expansions can also be used
+    - Allow disabling of CaptureMock from TextTest (-rectraffic 3, or an extra radio button in the static GUI)
 Batch Report Enhancements:
     - If a date is used as the name, use that throughout instead of the actual date to identify the run
     - Junit format report now assumes locale encoding instead of hardcoding UTF-8
@@ -2127,6 +2132,7 @@ Batch Report Enhancements:
 	Caused some backwards compatibility changes for scripts - see migration notes
 Grid Engine (LSF/SGE) enhancements/bug fixes:
     - Fixed stacktrace when normal polling cannot find a job, e.g. if SGE master goes down
+    - Fixed problem where knownbugs cause tests to be rerun but there is no available job to run with
     - Fixed stacktrace in slave when test names contain colons
     - Recomputing after a status update in SGE no longer duplicates progress information
     - Now handles hold state (hqw) correctly
@@ -2146,3 +2152,5 @@ Bug Fixes:
     - Fixed stacktrace replacing text in files if the pattern matches a directory
     - "Java detection" also works if "jython" provided in the interpreter now
     - Timeouts no longer applied when recording tests
+    - No longer stacktrace if the "Enter Failure Information" dialog is destroyed
+    - Refactoring to speed up reading of tests, especially when reconnecting

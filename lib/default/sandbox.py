@@ -300,7 +300,7 @@ class PrepareWriteDirectory(plugins.Action):
             self.copySUTRemotely(machine, tmpDir, suite)
 
     def tryCopyPathRemotely(self, path, fullTmpDir, machine, app):
-        if os.path.isabs(path) and os.path.exists(path):
+        if os.path.isabs(path) and os.path.exists(path) and not app.pathExistsRemotely(path, machine):
             # If not absolute, assume it's an installed program
             # If it doesn't exist locally, it must already exist remotely or we'd have raised an error by now
             remotePath = os.path.join(fullTmpDir, os.path.basename(path))

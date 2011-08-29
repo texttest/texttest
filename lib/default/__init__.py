@@ -865,7 +865,7 @@ class Config:
             if os.path.isabs(interpreter) and not os.path.exists(interpreter):
                 self.handleNonExistent(interpreter, "interpreter program", suite.app)
 
-    def pathExistsRemotely(self, path, machine, app):
+    def pathExistsRemotely(self, app, path, machine):
         exitCode = self.runCommandOn(app, machine, [ "test", "-e", path ], collectExitCode=True)
         return exitCode == 0
 
@@ -878,7 +878,7 @@ class Config:
         if remoteCopy:
             runMachine = app.getRunMachine()
             if runMachine != "localhost":
-                if not self.pathExistsRemotely(path, runMachine, app):
+                if not self.pathExistsRemotely(app, path, runMachine):
                     self.checkConnection(app, runMachine) # throws if we can't get to it
                     raise plugins.TextTestError, message + ", either locally or on machine '" + runMachine + "'."
         else:

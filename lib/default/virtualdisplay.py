@@ -158,7 +158,8 @@ class VirtualDisplayResponder(plugins.Responder):
         if machine == "localhost":
             return displayStr
         else:
-            return machine + displayStr
+            # Don't include user name, if any
+            return machine.split("@")[-1] + displayStr
 
     def canRunVirtualServer(self, machine, app):
         retcode = app.runCommandOn(machine, [ "which", "Xvfb" ], collectExitCode=True)

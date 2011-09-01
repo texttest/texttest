@@ -38,12 +38,14 @@ class QueueSystemConfig(default.Config):
                     options.append("If enough tests")
                     descriptions.append("Submit the tests to " + qsName + " only if " + str(minTestCount) + " or more are selected.")
                     defaultValue = 2
+                if "l" in self.optionMap:
+                    defaultValue = self.optionIntValue("l")
                 group.addSwitch("l", "Use grid", value=defaultValue, options=options, description=descriptions)
             elif group.name.startswith("Grid"):
-                group.addOption("R", "Request grid resource", possibleValues = self.getPossibleResources())
-                group.addOption("q", "Request grid queue", possibleValues = self.getPossibleQueues())
-                group.addSwitch("keepslave", "Keep data files and successful tests until termination")
-                group.addSwitch("perf", "Run on performance machines only")
+                self.addDefaultOption(group, "R", "Request grid resource", possibleValues = self.getPossibleResources())
+                self.addDefaultOption(group, "q", "Request grid queue", possibleValues = self.getPossibleQueues())
+                self.addDefaultSwitch(group, "keepslave", "Keep data files and successful tests until termination")
+                self.addDefaultSwitch(group, "perf", "Run on performance machines only")
             elif group.name.startswith("Invisible"):
                 group.addOption("slave", "Private: used to submit slave runs remotely")
                 group.addOption("servaddr", "Private: used to submit slave runs remotely")

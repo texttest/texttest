@@ -58,22 +58,22 @@ class Config:
                 group.addOption("c", self.getCheckoutLabel(), checkout)
                 group.addOption("m", self.getMachineLabel(), self.getMachineNameForDisplay(machine))
                 group.addOption("cp", "Times to run", 1, description="Set this to some number larger than 1 to run the same test multiple times, for example to try to catch indeterminism in the system under test")
-                group.addSwitch("stop", "Stop after first failure")
+                self.addDefaultSwitch(group, "stop", "Stop after first failure")
                 if recordsUseCases:
-                    group.addSwitch("actrep", "Run with slow motion replay")
+                    self.addDefaultSwitch(group, "actrep", "Run with slow motion replay")
                 if useCatalogues:
-                    group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")
+                    self.addDefaultSwitch(group, "ignorecat", "Ignore catalogue file when isolating data")
                 if useCaptureMock:
                     self.addCaptureMockSwitch(group)
             elif group.name.startswith("Advanced"):
-                group.addOption("b", "Run batch mode session")
-                group.addOption("name", "Name this run", self.optionValue("name"))
+                self.addDefaultOption(group, "b", "Run batch mode session")
+                self.addDefaultOption(group, "name", "Name this run")
                 group.addOption("vanilla", "Ignore configuration files", self.defaultVanillaValue(),
                                 possibleValues = [ "", "site", "personal", "all" ])
-                group.addSwitch("keeptmp", "Keep temporary write-directories")
+                self.addDefaultSwitch(group, "keeptmp", "Keep temporary write-directories")
                 group.addSwitch("ignorefilters", "Ignore all run-dependent text filtering")
             elif group.name.startswith("Self-diagnostics"):
-                group.addSwitch("x", "Enable self-diagnostics")
+                self.addDefaultSwitch(group, "x", "Enable self-diagnostics")
                 defaultDiagDir = plugins.getPersonalDir("log")
                 group.addOption("xr", "Configure self-diagnostics from", os.path.join(defaultDiagDir, "logging.debug"),
                                 possibleValues=[ os.path.join(plugins.installationDir("log"), "logging.debug") ])
@@ -113,6 +113,12 @@ class Config:
                 if not useCaptureMock:
                     self.addCaptureMockSwitch(group)
 
+    def addDefaultSwitch(self, group, key, name, *args, **kw):
+        group.addSwitch(key, name, self.optionIntValue(key), *args, **kw)
+
+    def addDefaultOption(self, group, key, name, *args, **kw):
+        group.addOption(key, name, self.optionValue(key), *args, **kw)
+
     def addCaptureMockSwitch(self, group, value=0):
         options = [ "Replay", "Record", "Mixed Mode", "Disabled"  ]
         descriptions = [ "Replay all existing interactions from the information in CaptureMock's mock files. Do not record anything new.",
@@ -137,10 +143,7 @@ class Config:
         if not self.optionMap.has_key("vanilla"):
             return ""
         given = self.optionValue("vanilla")
-        if given:
-            return given
-        else:
-            return "all"
+        return given or "all"
 
     def getRunningGroupNames(self):
         return [ ("Basic", None, None), ("Self-diagnostics (internal logging)", "x", 0), ("Advanced", None, None) ]

@@ -210,7 +210,8 @@ class Test(plugins.Observable):
 
     def getParentConfigDir(self):
         # Take the immediate parent first, upwards to the root suite
-        for suite in reversed(self.getAllTestsToRoot()):
+        # Don't include self!
+        for suite in reversed(self.getAllTestsToRoot()[:-1]):
             if suite.configDir:
                 return suite.configDir
         return self.app.configDir

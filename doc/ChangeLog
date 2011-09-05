@@ -2122,6 +2122,7 @@ Framework Enhancements:
 	Both virtual display and accessibility of usecase and UI map files fixed
     - "performance_logfile" now works on any file, not just those that are being compared
 	Unix file expansions can also be used
+    - performance percentage numbers are now rounded to the nearest integer rather than truncated 
     - Allow disabling of CaptureMock from TextTest (-rectraffic 3, or an extra radio button in the static GUI)
 Batch Report Enhancements:
     - If a date is used as the name, use that throughout instead of the actual date to identify the run
@@ -2154,3 +2155,6 @@ Bug Fixes:
     - Timeouts no longer applied when recording tests
     - No longer stacktrace if the "Enter Failure Information" dialog is destroyed
     - Refactoring to speed up reading of tests, especially when reconnecting
+    - Fixed bug where Rerun functionality lost settings from the original run
+    - Fixed bug with running remotely where files existed both locally and remotely - don't copy in this case.
+

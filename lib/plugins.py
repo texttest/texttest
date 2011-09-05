@@ -1073,7 +1073,7 @@ def calculatePercentageStandard(oldVal, newVal):
         return zeroDivisorPercentage(newVal)
 
 def roundPercentage(val):
-    perc = int(val)
+    perc = int(round(val))
     if perc == 0:
         return float("%.0e" % val) # Print one significant figure
     else:

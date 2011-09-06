@@ -202,7 +202,7 @@ class Test(plugins.Observable):
         self.state = plugins.TestState("not_started")
 
     def reloadConfiguration(self):
-        if self.dircache.hasStem("config"):
+        if self.dircache.hasStem("config." + self.app.name):
             parentConfigDir = self.getParentConfigDir()
             newConfigDir = deepcopy(parentConfigDir)
             self.app.readValues(newConfigDir, "config", [ self.dircache ], insert=False, errorOnUnknown=True)

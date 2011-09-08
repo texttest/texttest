@@ -229,14 +229,18 @@ class RunTest(plugins.Action):
         scriptFile.write("cd " + plugins.quote(tmpDir) + "\n")
 
         # Must set the environment remotely
-        for arg, value in self.getEnvironmentArgs(test):
+        remoteTmp = test.app.getRemoteTmpDirectory()[1]
+        for arg, value in self.getEnvironmentArgs(test, remoteTmp):
             # Two step export process for compatibility with CYGWIN and older versions of 'sh'
             scriptFile.write(arg + "=" + value + "\n")
             scriptFile.write("export " + arg + "\n")
         if test.app.getConfigValue("remote_shell_program") == "ssh":
             # SSH doesn't kill remote processes, create a kill script
             scriptFile.write('echo "kill $$" > kill_test.sh\n')
-        scriptFile.write("exec " + " ".join(localArgs) + "\n")
+        cmdString = " ".join(localArgs)
+        if remoteTmp:
+            cmdString = cmdString.replace(test.app.writeDirectory, remoteTmp)
+        scriptFile.write("exec " + cmdString + "\n")
         scriptFile.close()
         os.chmod(scriptFileName, 0775) # make executable
         remoteTmp = test.app.getRemoteTestTmpDir(test)[1]
@@ -247,11 +251,10 @@ class RunTest(plugins.Action):
         else:
             return test.app.getCommandArgsOn(runMachine, [ plugins.quote(scriptFileName) ])
 
-    def getEnvironmentArgs(self, test):
+    def getEnvironmentArgs(self, test, remoteTmp):
         vars = self.getEnvironmentChanges(test)
         args = []
         localTmpDir = test.app.writeDirectory
-        remoteTmp = test.app.getRemoteTmpDirectory()[1]
         builtinVars = [ "TEXTTEST_CHECKOUT", "TEXTTEST_CHECKOUT_NAME", "TEXTTEST_ROOT", "TEXTTEST_SANDBOX", "TEXTTEST_SANDBOX_ROOT" ]
         for var, value in vars:
             if var in builtinVars:

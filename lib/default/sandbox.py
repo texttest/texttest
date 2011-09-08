@@ -94,7 +94,14 @@ class PrepareWriteDirectory(plugins.Action):
 
     def copyDataRemotely(self, sourcePath, test, machine, remoteTmpDir):
         if os.path.exists(sourcePath):
-            test.app.copyFileRemotely(sourcePath, "localhost", remoteTmpDir, machine)
+            copyScript = test.getCompositeConfigValue("copy_test_path_script", os.path.basename(sourcePath), expandVars=False)
+            if copyScript:
+                scriptSource = os.path.join(remoteTmpDir, "scriptSource")
+                test.app.copyFileRemotely(sourcePath, "localhost", scriptSource, machine)
+                cmdArgs = copyScript.split() + [ scriptSource, os.path.join(remoteTmpDir, os.path.basename(sourcePath)) ]
+                test.app.runCommandOn(machine, cmdArgs)
+            else:
+                test.app.copyFileRemotely(sourcePath, "localhost", remoteTmpDir, machine)
             
     def getEnvironmentSourcePath(self, configName, test):
         pathName = self.getPathFromEnvironment(configName, test)
@@ -139,12 +146,16 @@ class PrepareWriteDirectory(plugins.Action):
     def copyTestPath(self, test, fullPath, target):
         copyScript = test.getCompositeConfigValue("copy_test_path_script", os.path.basename(target))
         if copyScript:
-            subprocess.call(copyScript.split() + [ fullPath, target ])
-        else:
-            if os.path.isfile(fullPath):
-                self.copyfile(fullPath, target)
-            if os.path.isdir(fullPath):
-                self.copytree(fullPath, target)
+            try:
+                subprocess.call(copyScript.split() + [ fullPath, target ])
+                return
+            except OSError:
+                pass # If this doesn't work, assume it's on the remote machine and we'll handle it later
+
+        if os.path.isfile(fullPath):
+            self.copyfile(fullPath, target)
+        if os.path.isdir(fullPath):
+            self.copytree(fullPath, target)
 
     def copytimes(self, src, dst):
         if os.path.isdir(src) and os.name == "nt":
@@ -327,6 +338,16 @@ class PrepareWriteDirectory(plugins.Action):
                 self.diag.info("Setting " + repr(setting) + " to " + repr(remoteFile))
                 # For convenience, so we don't have to set it everywhere...
                 suite.app.setConfigDefault(setting, remoteFile)
+
+        scripts = suite.getConfigValue("copy_test_path_script")
+        newScripts = {}
+        for fileName, script in scripts.items():
+            remoteScript = self.tryCopyPathRemotely(script, fullTmpDir, machine, suite.app)
+            if remoteScript:
+                self.diag.info("Setting copy_test_path_script for " + repr(fileName) + " to " + repr(remoteFile))
+                newScripts[fileName] = remoteScript
+        if newScripts:
+            suite.app.setConfigDefault("copy_test_path_script", newScripts)
         
         
 

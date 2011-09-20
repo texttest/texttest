@@ -424,16 +424,19 @@ class TestEnvironmentCreator:
     def findReplayUseCase(self, usecaseFile):
         if not self.isRecording():
             if usecaseFile:
-                return self.copyRemoteReplayFileIfNeeded(usecaseFile)
+                return self.copyRemoteReplayFilesIfNeeded(usecaseFile)
             elif os.environ.has_key("USECASE_REPLAY_SCRIPT") and not self.useJavaRecorder():
                 return "" # Clear our own script, if any, for further apps wanting to use PyUseCase
 
-    def copyRemoteReplayFileIfNeeded(self, path):
+    def copyRemoteReplayFilesIfNeeded(self, path):
         machine, remoteTmpDir = self.test.app.getRemoteTestTmpDir(self.test)
         if remoteTmpDir:
             newbasename = "replay_usecase"
-            remoteName = os.path.join(remoteTmpDir, newbasename)
-            self.test.app.copyFileRemotely(path, "localhost", remoteName, machine)
+            # Sometimes more than one UI is run, copy all files with 'usecase' in the name
+            for currPath in glob.glob(os.path.join(os.path.dirname(path), "*usecase*." + self.test.app.name)):
+                currStem = os.path.basename(currPath).split(".")[0]
+                remoteName = os.path.join(remoteTmpDir, currStem.replace("usecase", newbasename))
+                self.test.app.copyFileRemotely(currPath, "localhost", remoteName, machine)
             # Don't return remoteName, we pretend it's a local temporary file
             # so that the $HOME reference gets preserved (no guarantee $HOME is the same remotely)
             return os.path.join(self.test.getDirectory(temporary=1), newbasename)

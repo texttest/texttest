@@ -2132,6 +2132,8 @@ Batch Report Enhancements:
     - Made it easier for configurations to override how batch sessions are defined - single API function for it
 	Caused some backwards compatibility changes for scripts - see migration notes
 Grid Engine (LSF/SGE) enhancements/bug fixes:
+    - New Dynamic GUI actions to suspend and unsuspend a test in SGE
+	See popup menu in test tree
     - Fixed stacktrace when normal polling cannot find a job, e.g. if SGE master goes down
     - Fixed problem where knownbugs cause tests to be rerun but there is no available job to run with
     - Fixed stacktrace in slave when test names contain colons
@@ -2157,4 +2159,7 @@ Bug Fixes:
     - Refactoring to speed up reading of tests, especially when reconnecting
     - Fixed bug where Rerun functionality lost settings from the original run
     - Fixed bug with running remotely where files existed both locally and remotely - don't copy in this case.
-
+    - Fixed/worked around GTK issue so that clearing the visibility check boxes in the status view unselects the row also
+    - Now works to refer to TEXTTEST_SANDBOX in options file when running tests remotely
+    - Don't get confused by test/suite names 'config' or 'performance'
+    - Recomputation now works when the app config file is changed, and there is also a test config file

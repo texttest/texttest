@@ -708,7 +708,9 @@ class Config:
             if tmpDir:
                 # Ignore the datetime and the pid at the end
                 searchParts = tmpDir.split(".")[:-2] + [ "*" ]
-                self.runCommandOn(app, machine, [ "rm", "-rf", ".".join(searchParts) ])
+                fileArg = ".".join(searchParts)
+                plugins.log.info("Removing previous remote write directories matching " + fileArg)
+                self.runCommandOn(app, machine, [ "rm", "-rf", fileArg ])
 
         dirToMake = app.writeDirectory
         if subdir:
@@ -1329,7 +1331,7 @@ class Config:
         srcPath = self.getRemotePath(srcFile, srcMachine)
         dstPath = self.getRemotePath(dstFile, dstMachine)
         args = self.getRemoteProgramArgs(app, "remote_copy_program") + [ srcPath, dstPath ]
-        return subprocess.call(args, stdin=open(os.devnull)) #, stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
+        return subprocess.call(args, stdin=open(os.devnull), stdout=open(os.devnull, "w")) #, stderr=subprocess.STDOUT)
 
     def getRemoteProgramArgs(self, app, setting):
         progStr = app.getConfigValue(setting)

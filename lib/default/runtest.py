@@ -255,7 +255,8 @@ class RunTest(plugins.Action):
         vars = self.getEnvironmentChanges(test)
         args = []
         localTmpDir = test.app.writeDirectory
-        builtinVars = [ "TEXTTEST_CHECKOUT", "TEXTTEST_CHECKOUT_NAME", "TEXTTEST_ROOT", "TEXTTEST_SANDBOX", "TEXTTEST_SANDBOX_ROOT" ]
+        builtinVars = [ "TEXTTEST_CHECKOUT", "TEXTTEST_CHECKOUT_NAME", "TEXTTEST_ROOT",
+                        "TEXTTEST_SANDBOX", "TEXTTEST_SANDBOX_ROOT", "USECASE_HOME_LOCAL" ]
         for var, value in vars:
             if var in builtinVars:
                 continue

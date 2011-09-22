@@ -13,6 +13,7 @@ class MakeWriteDirectory(plugins.Action):
         app.makeWriteDirectory()
 
 class PrepareWriteDirectory(plugins.Action):
+    usecaseDirsCopied = set()
     def __init__(self, ignoreCatalogues):
         self.diag = logging.getLogger("Prepare Writedir")
         self.ignoreCatalogues = ignoreCatalogues
@@ -309,6 +310,7 @@ class PrepareWriteDirectory(plugins.Action):
         machine, tmpDir = suite.app.getRemoteTmpDirectory()
         if tmpDir:
             self.copySUTRemotely(machine, tmpDir, suite)
+            self.copyUsecaseDirRemotely(machine, tmpDir, suite)
 
     def tryCopyPathRemotely(self, path, fullTmpDir, machine, app):
         if os.path.isabs(path) and os.path.exists(path) and not app.pathExistsRemotely(path, machine):
@@ -348,12 +350,19 @@ class PrepareWriteDirectory(plugins.Action):
                 newScripts[fileName] = remoteScript
         if newScripts:
             suite.app.setConfigDefault("copy_test_path_script", newScripts)
-        
+
+    def copyUsecaseDirRemotely(self, machine, tmpDir, suite):
+        usecaseDir = suite.getEnvironment("USECASE_HOME_LOCAL")
+        if usecaseDir:
+            newbasename = os.path.basename(usecaseDir)
+            if os.path.isdir(usecaseDir) and usecaseDir not in self.usecaseDirsCopied:
+                self.usecaseDirsCopied.add(usecaseDir)
+                remoteName = os.path.join(tmpDir, newbasename)
+                suite.app.copyFileRemotely(usecaseDir, "localhost", remoteName, machine)        
         
 
 # Class for automatically adding things to test environment files...
 class TestEnvironmentCreator:
-    usecaseDirsCopied = set()
     def __init__(self, test, optionMap):
         self.test = test
         self.optionMap = optionMap
@@ -380,7 +389,16 @@ class TestEnvironmentCreator:
                     if not usecaseRecorder:
                         usecaseRecorder = "ui_simulation"
                     usecaseDir = os.path.join(self.test.app.getDirectory(), usecaseRecorder + "_files")
-                    vars.append(("USECASE_HOME", self.copyRemoteUsecaseDirIfNeeded(usecaseDir)))
+                    remoteTmpDir = self.test.app.getRemoteTmpDirectory()[1]
+                    if remoteTmpDir:
+                        # We pretend it's a local temporary file
+                        # so that the $HOME reference gets preserved in runtest.py
+                        # (no guarantee $HOME is the same remotely)
+                        fakeRemotePath = os.path.join(self.test.app.writeDirectory, os.path.basename(usecaseDir))
+                        vars.append(("USECASE_HOME", fakeRemotePath))
+                        vars.append(("USECASE_HOME_LOCAL", usecaseDir))
+                    else:
+                        vars.append(("USECASE_HOME", usecaseDir))
                     
                 if os.name == "posix":
                     from virtualdisplay import VirtualDisplayResponder
@@ -443,21 +461,6 @@ class TestEnvironmentCreator:
         else:
             return path
         
-    def copyRemoteUsecaseDirIfNeeded(self, path):
-        machine, remoteTmpDir = self.test.app.getRemoteTmpDirectory()
-        if remoteTmpDir:
-            newbasename = os.path.basename(path)
-            if os.path.isdir(path) and path not in self.usecaseDirsCopied:
-                self.usecaseDirsCopied.add(path)
-                self.test.app.ensureRemoteDirExists(machine, remoteTmpDir)
-                remoteName = os.path.join(remoteTmpDir, newbasename)
-                self.test.app.copyFileRemotely(path, "localhost", remoteName, machine)
-            # Don't return remoteName, we pretend it's a local temporary file
-            # so that the $HOME reference gets preserved (no guarantee $HOME is the same remotely)
-            return os.path.join(self.test.app.writeDirectory, newbasename)
-        else:
-            return path
-
     def useJavaRecorder(self):
         return self.test.getConfigValue("use_case_recorder") == "jusecase"
 

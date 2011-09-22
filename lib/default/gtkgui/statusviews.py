@@ -516,7 +516,6 @@ class TestProgressMonitor(guiutils.SubGUI):
         # Toggle the toggle button
         newValue = not self.treeModel[path][2]
         self.treeModel[path][2] = newValue
-
         iter = self.treeModel.get_iter_from_string(path)
         categoryName = self.treeModel.get_value(iter, 0)
         for childIter in self.getAllChildIters(iter):
@@ -530,6 +529,13 @@ class TestProgressMonitor(guiutils.SubGUI):
             if self.shouldBeVisible(test) == newValue:
                 changedTests.append(test)
         self.notify("Visibility", changedTests, newValue)
+        if newValue is False:
+            selection = self.treeView.get_selection()
+            
+            if selection.path_is_selected(path):
+                #WORKAROUND: selection.unselect_path(path) Doesn't seem to work here
+                selection.set_mode(gtk.SELECTION_SINGLE)
+                selection.set_mode(gtk.SELECTION_MULTIPLE)
 
     def notifyResetVisibility(self):
         self.diag.info("Resetting visibility from current status")

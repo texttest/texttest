@@ -50,6 +50,10 @@ class QueueSystem:
         self.qdelOutput = proc.communicate()[0]
         return self.qdelOutput.find("has registered the job") != -1 or self.qdelOutput.find("has deleted job") != -1
 
+    def setSuspendState(self, jobId, newState):
+        arg = "-sj" if newState else "-usj"
+        subprocess.call([ "qmod", arg, jobId ], stdout=open(os.devnull, "w"))
+
     def getJobId(self, line):
         return line.split()[2]
 

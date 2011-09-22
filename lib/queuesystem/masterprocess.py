@@ -51,6 +51,7 @@ class QueueSystemServer(BaseActionRunner):
         capacityPerSuite = self.maxCapacity / len(allApps)
         for app in allApps:
             self.remainingForApp[app.name] = capacityPerSuite
+            self.getQueueSystem(app) # populate cache
         QueueSystemServer.instance = self
         
     def addSuites(self, suites):
@@ -58,7 +59,7 @@ class QueueSystemServer(BaseActionRunner):
             self.slaveLogDirs.add(suite.app.makeWriteDirectory("slavelogs"))
             plugins.log.info("Using " + queueSystemName(suite.app) + " queues for " +
                              suite.app.description(includeCheckout=True))
-        
+           
     def setSlaveServerAddress(self, address):
         self.submitAddress = os.getenv("CAPTUREMOCK_SERVER", address)
         self.testQueue.put("TextTest slave server started on " + address)
@@ -513,7 +514,10 @@ class QueueSystemServer(BaseActionRunner):
         self.killedJobs[jobId] = test, jobExisted
         return jobExisted
     def getQueueSystem(self, test):
-        queueModule = queueSystemName(test).lower()
+        queueModuleText = queueSystemName(test)
+        if queueModuleText is None:
+            return None
+        queueModule = queueModuleText.lower()
         if self.queueSystems.has_key(queueModule):
             return self.queueSystems[queueModule]
         
@@ -559,7 +563,7 @@ class QueueSystemServer(BaseActionRunner):
         # Explicitly chose test to kill (from the GUI)
         jobInfo = self.getJobInfo(test)
         if len(jobInfo) > 0:
-            for jobId, jobName in self.getJobInfo(test):
+            for jobId, jobName in jobInfo:
                 self.killTest(test, jobId, jobName, wantStatus=True)
         else:
             self.diag.info("No job info found from queue system server, changing state to cancelled")
@@ -583,8 +587,16 @@ class QueueSystemServer(BaseActionRunner):
             if not test.state.isComplete():
                 self.setSlaveFailed(test, startNotified, wantStatus)
         return False
+
+    def setSuspendStateForTests(self, tests, newState):
+        for test in tests:
+            queueSystem = self.getQueueSystem(test)
+            for jobId, jobName in self.getJobInfo(test):
+                queueSystem.setSuspendState(jobId, newState)
+    
     def jobStarted(self, test):
         return test.state.hasStarted()
+    
     def setKilledPending(self, test, jobId):
         timeStr =  plugins.localtime("%H:%M")
         briefText = "cancelled pending job at " + timeStr

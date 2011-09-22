@@ -40,6 +40,7 @@
     <menuitem action="Save As..."/>
     <separator/>
     <menuitem action="Kill"/>
+    <placeholder name="ExtraTestActions" />
     <menuitem action="Mark"/>
     <menuitem action="Unmark"/>
     <separator/>

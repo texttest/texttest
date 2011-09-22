@@ -245,6 +245,29 @@ class UnmarkTest(guiplugins.ActionGUI):
                 return True
         return False
 
+class SuspendTests(guiplugins.ActionGUI):
+    def _getTitle(self):
+        return "Suspend"
+    def getTooltip(self):
+        return "Suspend the selected tests"
+    def performOnCurrent(self):
+        from queuesystem.masterprocess import QueueSystemServer
+        QueueSystemServer.instance.setSuspendStateForTests(self.currTestSelection, True)
+    def isActiveOnCurrent(self, *args):
+        return any((not test.stateInGui.isComplete() for test in self.currTestSelection))
+
+class UnsuspendTests(guiplugins.ActionGUI):
+    def _getTitle(self):
+        return "Unsuspend"
+    def getTooltip(self):
+        return "Unsuspend the selected tests"
+    def performOnCurrent(self):
+        from queuesystem.masterprocess import QueueSystemServer
+        QueueSystemServer.instance.setSuspendStateForTests(self.currTestSelection, False)
+    def isActiveOnCurrent(self, *args):
+        return any((not test.stateInGui.isComplete() for test in self.currTestSelection))
+
+
 
 class KillTests(guiplugins.ActionGUI):
     def _getStockId(self):
@@ -277,5 +300,5 @@ class KillTests(guiplugins.ActionGUI):
 
 
 def getInteractiveActionClasses():
-    return [ SaveTests, KillTests, MarkTest, UnmarkTest, RecomputeTests ]
+    return [ SaveTests, KillTests, MarkTest, UnmarkTest, RecomputeTests, SuspendTests, UnsuspendTests ]
  

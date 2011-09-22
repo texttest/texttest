@@ -983,3 +983,9 @@ activate = view raw differences between tests
 [Name=View Content-Filtered Differences (between tests)]
 activate = view content-filtered differences between tests
 
+[Name=Suspend]
+activate = suspend selected test
+
+[Name=Unsuspend]
+activate = unsuspend selected test
+

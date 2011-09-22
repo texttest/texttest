@@ -1,0 +1,10 @@
+<ui>
+  <popup name="TestPopupMenu">
+    <placeholder name="ExtraTestActions">
+      <menuitem action="Suspend"/>
+      <menuitem action="Unsuspend"/>
+      <separator/>
+    </placeholder>
+  </popup>
+</ui>
+

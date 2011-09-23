@@ -1,6 +1,6 @@
 
 import os, string, subprocess
-from plugins import gethostname, log
+from plugins import gethostname, log, TextTestError
 from time import sleep
 
 # Used by master process for submitting, deleting and monitoring slave jobs
@@ -52,8 +52,14 @@ class QueueSystem:
 
     def setSuspendState(self, jobId, newState):
         arg = "-sj" if newState else "-usj"
-        subprocess.call([ "qmod", arg, jobId ], stdout=open(os.devnull, "w"))
-
+        cmdArgs = [ "qmod", arg, jobId ]
+        proc = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = proc.communicate()[0]
+        # unsuspend always provides return code 1, even when it works (bug in SGE)
+        if newState and proc.returncode > 0:
+            raise TextTestError, "Failed to suspend job using command '" + " ".join(cmdArgs) + \
+                  "'\nError message from SGE follows:\n" + output
+            
     def getJobId(self, line):
         return line.split()[2]
 

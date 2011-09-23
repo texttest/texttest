@@ -451,7 +451,8 @@ class TestEnvironmentCreator:
         if remoteTmpDir:
             newbasename = "replay_usecase"
             # Sometimes more than one UI is run, copy all files with 'usecase' in the name
-            for currPath in glob.glob(os.path.join(os.path.dirname(path), "*usecase*." + self.test.app.name)):
+            usecasePattern = os.path.join(os.path.dirname(path), "*usecase*." + self.test.app.name)
+            for currPath in sorted(glob.glob(usecasePattern)):
                 currStem = os.path.basename(currPath).split(".")[0]
                 remoteName = os.path.join(remoteTmpDir, currStem.replace("usecase", newbasename))
                 self.test.app.copyFileRemotely(currPath, "localhost", remoteName, machine)

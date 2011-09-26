@@ -354,12 +354,13 @@ class Config:
             elif len(allApps) == 0:
                 raise plugins.TextTestError, "Could not find any matching applications (files of the form config.<app>) under " + " or ".join(self.optionMap.rootDirectories)
             
-        if not self.optionMap.has_key("gx"):
-            classes += self.getThreadActionClasses()
         if self.useGUI():
             self.addGuiResponder(classes)
         else:
             classes.append(self.getTextDisplayResponderClass())
+
+        if not self.optionMap.has_key("gx"):
+            classes += self.getThreadActionClasses()
         
         if self.batchMode() and not self.optionMap.has_key("s"):
             if self.optionMap.has_key("coll"):

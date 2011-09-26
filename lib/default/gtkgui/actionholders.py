@@ -18,13 +18,15 @@ class MenuBarGUI(guiutils.SubGUI):
         self.actionGUIs = actionGUIs
         self.actionGroup = self.uiManager.get_action_groups()[0]
         self.toggleActions = []
-        self.loadedModules = self.getLoadedModules()
+        self.loadedModules = set()
         self.diag = logging.getLogger("Menu Bar")
         self.diag.info("All description files : " + repr(self.allFiles))
 
     def getLoadedModules(self):
-        return set((module.split(".")[-1] for module in sys.modules.keys()))
-
+        if not self.loadedModules:
+            self.loadedModules = set((module.split(".")[-1] for module in sys.modules.keys()))
+        return self.loadedModules
+    
     def shouldHide(self, name):
         return guiutils.guiConfig.getCompositeValue("hide_gui_element", name, modeDependent=True)
 
@@ -114,7 +116,7 @@ class MenuBarGUI(guiutils.SubGUI):
                 allParts = allParts[:-1]
 
         self.diag.info("Checking if we loaded module " + moduleName)
-        if moduleName not in self.loadedModules:
+        if moduleName not in self.getLoadedModules():
             return False
 
         for configSetting in allParts[1:]:

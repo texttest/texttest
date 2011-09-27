@@ -58,6 +58,11 @@ class FilterAction(plugins.Action):
         stem = self.getStem(fileName)
         filters = self.makeAllFilters(test, stem, app)
         inFile = open(fileName)
+        if len(filters) == 0:
+            try:
+                return inFile.read()
+            finally:
+                inFile.close()
         for fileFilter, _ in filters:
             self.diag.info("Applying " + fileFilter.__class__.__name__ + " to " + fileName) 
             outFile = StringIO()

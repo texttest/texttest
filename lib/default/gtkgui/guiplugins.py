@@ -528,10 +528,11 @@ class OptionGroupGUI(ActionGUI):
                 return widget.get_text(widget.get_start_iter(), widget.get_end_iter())
             return get_text
 
-    def addValuesFromConfig(self, option):
-        newValue = self.updateForConfig(option)
-        if newValue:
-            option.addPossibleValue(newValue)
+    def addValuesFromConfig(self, option, includeOverrides=True):
+        if includeOverrides:
+            newValue = self.updateForConfig(option)
+            if newValue:
+                option.addPossibleValue(newValue)
         for extraOption in self.getConfigOptions(option):
             option.addPossibleValue(extraOption)
 
@@ -959,11 +960,11 @@ class ActionDialogGUI(OptionGroupGUI):
     def simulateResponse(self, dummy, dialog):
         dialog.response(gtk.RESPONSE_ACCEPT)
         
-    def fillVBox(self, vbox, optionGroup):
+    def fillVBox(self, vbox, optionGroup, includeOverrides=True):
         fileChooser, fileChooserOption = None, None
         allOptions = optionGroup.options.values()
         for option in allOptions:
-            self.addValuesFromConfig(option)
+            self.addValuesFromConfig(option, includeOverrides)
             
             if isinstance(option, plugins.Switch):
                 widget = self.createSwitchWidget(option, optionGroup)

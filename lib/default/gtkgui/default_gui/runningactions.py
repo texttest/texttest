@@ -453,7 +453,7 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
             vbox.pack_start(notebook)
             return None, None # no file chooser info
         else:
-            return guiplugins.ActionDialogGUI.fillVBox(self, vbox, optionGroup)
+            return guiplugins.ActionDialogGUI.fillVBox(self, vbox, optionGroup, includeOverrides=False)
 
     def getSizeAsWindowFraction(self):
         return 0.8, 0.9

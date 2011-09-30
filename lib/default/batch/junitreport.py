@@ -5,7 +5,7 @@ from ordereddict import OrderedDict
 from batchutils import calculateBatchDate
 from string import Template
 from locale import getpreferredencoding
-from default.performance import getTestPerformance
+from default.performance import getPerformance
 
 class JUnitResponder(plugins.Responder):
     """Respond to test results and write out results in format suitable for JUnit
@@ -49,9 +49,8 @@ class JUnitApplicationData:
         self.testResults = {}
         
     def storeResult(self, test):
-        t = getTestPerformance(test)
-        if t == -1:
-            t = 0
+        perfFile = test.makeTmpFileName("performance")
+        t = getPerformance(perfFile) if os.path.isfile(perfFile) else 0
         result = dict(full_test_name=self._fullTestName(test), 
                       test_name=test.name,
                       suite_name=self._suiteName(test),

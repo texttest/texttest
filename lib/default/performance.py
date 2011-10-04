@@ -75,7 +75,6 @@ class PerformanceConfigSettings:
     def __init__(self, test, stem):
         self.configName = self.getConfigName(stem)
         self.configMethod = test.getCompositeConfigValue
-        self.processCount = max(len(test.state.executionHosts), 1)
         
     def getConfigName(self, stem):
         if stem == "performance":
@@ -87,7 +86,7 @@ class PerformanceConfigSettings:
         return self.configMethod(configEntry, self.configName) == "true"
     
     def aboveMinimum(self, value, configEntry):
-        minimum = self.processCount * self.configMethod(configEntry, self.configName)
+        minimum = self.configMethod(configEntry, self.configName)
         return value < 0 or value > minimum
 
     def getDescriptor(self, configEntry):

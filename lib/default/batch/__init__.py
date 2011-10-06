@@ -545,6 +545,7 @@ class WebPageResponder(plugins.Responder):
     def generatePagePerApp(self, pageTitle, pageInfo):
         for app, repository, extraApps in pageInfo:
             pageTopDir = os.path.expanduser(app.getBatchConfigValue("historical_report_location"))
+            self.copyJavaScript(pageTopDir)
             pageDir = os.path.join(pageTopDir, app.name)
             extraVersions = self.getExtraVersions(app, extraApps)
             self.diag.info("Found extra versions " + repr(extraVersions))
@@ -624,8 +625,16 @@ class WebPageResponder(plugins.Responder):
     def generateCommonPage(self, pageTitle, pageInfo):
         relevantSubDirs, getConfigValue, version, extraVersions, pageSubTitle, descriptionInfo = self.transformToCommon(pageInfo)
         pageDir = os.path.expanduser(getConfigValue("historical_report_location"))
+        self.copyJavaScript(pageDir)
         self.makeAndGenerate(relevantSubDirs, getConfigValue, pageDir, pageTitle,
                              pageSubTitle, version, extraVersions, descriptionInfo)
+
+    def copyJavaScript(self, pageDir):
+        jsDir = os.path.join(pageDir, "javascript")
+        srcDir = os.path.join(os.path.dirname(__file__), "testoverview_javascript")
+        if os.path.isdir(jsDir):
+            shutil.rmtree(jsDir)
+        shutil.copytree(srcDir, jsDir)            
         
     def makeAndGenerate(self, subDirs, getConfigValue, pageDir, *args):
         resourcePages = self.getResourcePages(getConfigValue)

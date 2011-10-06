@@ -270,7 +270,8 @@ class GenerateWebPages(object):
     def createPage(self, resourceName):
         style = "body,td {color: #000000;font-size: 11px;font-family: Helvetica;} th {color: #000000;font-size: 13px;font-family: Helvetica;}"
         title = TitleWithDateStamp(self.getResultType(resourceName) + " results for " + self.pageTitle)
-        return HTMLgen.SimpleDocument(title=title, style=style)
+        scripts = [ HTMLgen.Script(src="../javascript/jquery.js"), HTMLgen.Script(src="../javascript/filter.js")  ]
+        return HTMLgen.SimpleDocument(title=title, style=style, script=scripts)
 
     def makeTableHeaderCell(self, tableHeader):
         container = HTMLgen.Container()

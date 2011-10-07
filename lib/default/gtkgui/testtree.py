@@ -822,6 +822,9 @@ class TestTreeGUI(guiutils.ContainerGUI):
 
     def updateVisibilityInModel(self, test, newValue):
         testIter = self.itermap.getIterator(test)
+        if testIter is None:
+            # Tests are not necessarily loaded yet in the GUI (for example if we do show only selected), don't stacktrace
+            return False
         visibleTests = self.model.get_value(testIter, 2)
         isVisible = test in visibleTests
         changed = False

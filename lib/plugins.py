@@ -856,7 +856,10 @@ def getPaths(d):
     paths = [ d ]
     for root, dirs, files in os.walk(d):
         for path in dirs + files:
-            paths.append(os.path.join(root, path))
+            fullPath = os.path.join(root, path)
+            if not os.path.islink(fullPath):
+                # Don't want to / can't change permissions of links anyway
+                paths.append(fullPath)
     return paths
     
 # Version of rmtree not prone to crashing if directory in use or externally removed

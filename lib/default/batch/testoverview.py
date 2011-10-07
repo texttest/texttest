@@ -100,19 +100,22 @@ class GenerateWebPages(object):
                     for sel in selectors:
                         filePath = self.getPageFilePath(sel, resourceName)
                         if self.pagesOverview.has_key(filePath):
-                            page = self.pagesOverview[filePath][-1]
+                            _, page, pageColours = self.pagesOverview[filePath]
                         else:
                             page = self.createPage(resourceName)
-                            self.pagesOverview[filePath] = resourceName, page
-                            
+                            pageColours = set()
+                            self.pagesOverview[filePath] = resourceName, page, pageColours
+
                         for cellInfo in self.getCellInfoForResource(resourceName):
                             tableHeader = self.getTableHeader(resourceName, cellInfo, version, repositoryDirs)
                             heading = self.getHeading(resourceName, versionToShow)
-                            hasNewData, graphLink = self.addTable(page, cellInfo, categoryHandlers, version,
-                                                                  loggedTests, sel, tableHeader, filePath, heading)
+                            hasNewData, graphLink, tableColours = self.addTable(page, cellInfo, categoryHandlers, version,
+                                                                                loggedTests, sel, tableHeader, filePath, heading)
                             hasData |= hasNewData
+                            pageColours.update(tableColours)
                             if graphLink:
                                 pageToGraphs.setdefault(page, []).append(graphLink)
+                                
                     if hasData and versionToShow:
                         link = HTMLgen.Href("#" + version, versionToShow)
                         foundMinorVersions.setdefault(resourceName, HTMLgen.Container()).append(link)
@@ -134,7 +137,8 @@ class GenerateWebPages(object):
             target, linkName = sel.getLinkInfo(self.pageVersion)
             monthContainer.append(HTMLgen.Href(target, linkName))
         
-        for resourceName, page in self.pagesOverview.values():
+        rowHeaderColour = ColourFinder(self.getConfigValue).find("row_header_bg")
+        for resourceName, page, pageColours in self.pagesOverview.values():
             if len(monthContainer.contents) > 0:
                 page.prepend(HTMLgen.Heading(2, monthContainer, align = 'center'))
             graphs = pageToGraphs.get(page)
@@ -145,8 +149,17 @@ class GenerateWebPages(object):
                     page.prepend(HTMLgen.Heading(1, *graphs, align = 'center'))
                 page.prepend(HTMLgen.Heading(1, minorVersionHeader, align = 'center'))
             page.prepend(HTMLgen.Heading(1, self.getHeading(resourceName), align = 'center'))
+            if len(pageColours) > 1:
+                page.script = self.getColourFilterScripts(pageColours, rowHeaderColour)
 
         self.writePages()
+
+    def getColourFilterScripts(self, pageColours, rowHeaderColour):
+        scriptCode = "var TEST_ROW_HEADER_COLOR = " + repr(rowHeaderColour) + ";\n" + \
+                     "var Colors = " + repr(sorted(pageColours)) + ";"  
+        return [ HTMLgen.Script(code=scriptCode),
+                 HTMLgen.Script(src="../javascript/jquery.js"),
+                 HTMLgen.Script(src="../javascript/filter.js")  ]
 
     def getHeading(self, resourceName, versionToShow=""):
         heading = self.getResultType(resourceName) + " results for " + self.pageTitle
@@ -270,8 +283,7 @@ class GenerateWebPages(object):
     def createPage(self, resourceName):
         style = "body,td {color: #000000;font-size: 11px;font-family: Helvetica;} th {color: #000000;font-size: 13px;font-family: Helvetica;}"
         title = TitleWithDateStamp(self.getResultType(resourceName) + " results for " + self.pageTitle)
-        scripts = [ HTMLgen.Script(src="../javascript/jquery.js"), HTMLgen.Script(src="../javascript/filter.js")  ]
-        return HTMLgen.SimpleDocument(title=title, style=style, script=scripts)
+        return HTMLgen.SimpleDocument(title=title, style=style)
 
     def makeTableHeaderCell(self, tableHeader):
         container = HTMLgen.Container()
@@ -316,9 +328,9 @@ class GenerateWebPages(object):
 
 
             page.append(table)
-            return True, graphLink
+            return True, graphLink, testTable.usedColours
         else:
-            return False, None
+            return False, None, []
 
     def getGraphFileParts(self, filePath, version):
         dirname, local = os.path.split(filePath)
@@ -329,7 +341,7 @@ class GenerateWebPages(object):
         
     def writePages(self):
         plugins.log.info("Writing overview pages...")
-        for pageFile, (resourceName, page) in self.pagesOverview.items():
+        for pageFile, (resourceName, page, pageColours) in self.pagesOverview.items():
             page.write(pageFile)
             plugins.log.info("wrote: '" + plugins.relpath(pageFile, self.pageDir) + "'")
         plugins.log.info("Writing detail pages...")
@@ -360,6 +372,7 @@ class TestTable:
         self.pageVersion = pageVersion
         self.version = version
         self.graphFilePath = graphFilePath # For convenience in performance analyzer.
+        self.usedColours = set()
 
     def generateGraph(self, fileName, heading):
         if len(self.tags) > 1: # Don't bother with graphs when tests have only run once
@@ -453,12 +466,15 @@ class TestTable:
         row = [ HTMLgen.TD(container, bgcolor=bgColour, title=self.descriptionInfo.get(testName, "")) ]
         # Don't add empty rows to the table
         foundData = False
+        bgcol = None
         for tag in self.tags:
             cellContent, bgcol, hasData = self.generateTestCell(tag, testName, testId, results)
             row.append(HTMLgen.TD(cellContent, bgcolor = bgcol))
             foundData |= hasData
             
         if foundData:
+            # We only filter based on the final column
+            self.usedColours.add(bgcol)
             return [ HTMLgen.TR(*row) ]
 
     def getCellData(self, state):

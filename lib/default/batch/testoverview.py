@@ -137,7 +137,6 @@ class GenerateWebPages(object):
             target, linkName = sel.getLinkInfo(self.pageVersion)
             monthContainer.append(HTMLgen.Href(target, linkName))
         
-        rowHeaderColour = ColourFinder(self.getConfigValue).find("row_header_bg")
         for resourceName, page, pageColours in self.pagesOverview.values():
             if len(monthContainer.contents) > 0:
                 page.prepend(HTMLgen.Heading(2, monthContainer, align = 'center'))
@@ -150,13 +149,18 @@ class GenerateWebPages(object):
                 page.prepend(HTMLgen.Heading(1, minorVersionHeader, align = 'center'))
             page.prepend(HTMLgen.Heading(1, self.getHeading(resourceName), align = 'center'))
             if len(pageColours) > 1:
-                page.script = self.getColourFilterScripts(pageColours, rowHeaderColour)
+                page.script = self.getColourFilterScripts(pageColours)
 
         self.writePages()
 
-    def getColourFilterScripts(self, pageColours, rowHeaderColour):
+    def getColourFilterScripts(self, pageColours):
+        finder = ColourFinder(self.getConfigValue)
+        rowHeaderColour = finder.find("row_header_bg")
+        successColour = finder.find("success_bg")
+        # Always put green at the start, we often want to filter that
+        sortedColours = sorted(pageColours, key=lambda c: (c != successColour, c))
         scriptCode = "var TEST_ROW_HEADER_COLOR = " + repr(rowHeaderColour) + ";\n" + \
-                     "var Colors = " + repr(sorted(pageColours)) + ";"  
+                     "var Colors = " + repr(sortedColours) + ";"  
         return [ HTMLgen.Script(code=scriptCode),
                  HTMLgen.Script(src="../javascript/jquery.js"),
                  HTMLgen.Script(src="../javascript/filter.js")  ]

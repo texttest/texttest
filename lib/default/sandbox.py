@@ -355,11 +355,12 @@ class PrepareWriteDirectory(plugins.Action):
         scripts = suite.getConfigValue("copy_test_path_script")
         newScripts = {}
         for fileName, script in scripts.items():
-            localScript = getScriptArgs(script)[0]
-            remoteScript = self.tryCopyPathRemotely(localScript, fullTmpDir, machine, suite.app)
-            if remoteScript:
-                self.diag.info("Setting copy_test_path_script for " + repr(fileName) + " to " + repr(remoteFile))
-                newScripts[fileName] = remoteScript
+            if script:
+                localScript = getScriptArgs(script)[0]
+                remoteScript = self.tryCopyPathRemotely(localScript, fullTmpDir, machine, suite.app)
+                if remoteScript:
+                    self.diag.info("Setting copy_test_path_script for " + repr(fileName) + " to " + repr(remoteFile))
+                    newScripts[fileName] = remoteScript
         if newScripts:
             suite.app.setConfigDefault("copy_test_path_script", newScripts)
 

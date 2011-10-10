@@ -6,6 +6,16 @@ from ordereddict import OrderedDict
 from string import Template
 
 
+def getScriptArgs(script):
+    args = script.split()
+    scriptName = args[0]
+    instScript = plugins.installationPath(os.path.join("libexec", scriptName))
+    if instScript:
+        args = [ instScript ] + args[1:]
+        
+    return args
+
+
 class MakeWriteDirectory(plugins.Action):
     def __call__(self, test):
         test.makeWriteDirectory()
@@ -148,7 +158,8 @@ class PrepareWriteDirectory(plugins.Action):
         copyScript = test.getCompositeConfigValue("copy_test_path_script", os.path.basename(target))
         if copyScript:
             try:
-                subprocess.call(copyScript.split() + [ fullPath, target ])
+                args = getScriptArgs(copyScript)
+                subprocess.call(args + [ fullPath, target ])
                 return
             except OSError:
                 pass # If this doesn't work, assume it's on the remote machine and we'll handle it later
@@ -670,15 +681,6 @@ class CollateFiles(plugins.Action):
                 stdout.close()
                 stderr.close()
 
-    def getScriptArgs(self, script):
-        args = script.split()
-        scriptName = args[0]
-        instScript = plugins.installationPath(os.path.join("libexec", scriptName))
-        if instScript:
-            args = [ instScript ] + args[1:]
-            
-        return args
-
     def kill(self, test, sig):
         if self.collationProc:
             proc = self.collationProc
@@ -694,7 +696,7 @@ class CollateFiles(plugins.Action):
         self.collationProc = None
         stdin = None
         for script in scripts:
-            args = self.getScriptArgs(script)
+            args = getScriptArgs(script)
             if self.collationProc:
                 stdin = self.collationProc.stdout
             else:

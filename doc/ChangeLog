@@ -2125,6 +2125,8 @@ Framework Enhancements:
     - performance percentage numbers are now rounded to the nearest integer rather than truncated 
     - Allow disabling of CaptureMock from TextTest (-rectraffic 3, or an extra radio button in the static GUI)
 Batch Report Enhancements:
+    - New filtering toolbar in the HTML pages
+	Allows for showing only tests in a certain category. See website.
     - If a date is used as the name, use that throughout instead of the actual date to identify the run
     - Junit format report now assumes locale encoding instead of hardcoding UTF-8
     - Junit format includes times when performance enabled
@@ -2140,6 +2142,7 @@ Grid Engine (LSF/SGE) enhancements/bug fixes:
     - Recomputing after a status update in SGE no longer duplicates progress information
     - Now handles hold state (hqw) correctly
     - Fixed hang if slave gets an invalid test for any reason
+    - disabled confusing multiplication of performance limits by number of processes run
 Bug Fixes:
     - Fixed inconsistencies in dynamic GUI with test suite "all succeeded" status when tests are recomputed and then fail.
     - Fixed stacktrace trying to build piecharts when matplotlib not installed
@@ -2153,6 +2156,7 @@ Bug Fixes:
     - Tried to improve handling of errors from "ps" on POSIX systems
     - Fixed bug where invalid names of saved selections persist even after being changed
     - Fixed stacktrace replacing text in files if the pattern matches a directory
+    - Fixed stacktrace and inconsistency pressing "show only selected" before all tests have loaded
     - "Java detection" also works if "jython" provided in the interpreter now
     - Timeouts no longer applied when recording tests
     - No longer stacktrace if the "Enter Failure Information" dialog is destroyed
@@ -2163,3 +2167,5 @@ Bug Fixes:
     - Now works to refer to TEXTTEST_SANDBOX in options file when running tests remotely
     - Don't get confused by test/suite names 'config' or 'performance'
     - Recomputation now works when the app config file is changed, and there is also a test config file
+    - No longer fail to remove tmp directories if there are readonly broken links in them
+    - Fixed crash doing "Test Filtering" when no filters were defined

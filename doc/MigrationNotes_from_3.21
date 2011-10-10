@@ -26,3 +26,7 @@ texttest -s batch.CollectFiles -b nightjob
 Up to 3.21, Ctrl+Delete has removed files, if any were selected, and tests if they were not. This was deemed confusing and had the side effect of preventing removal of tests if any files were selected.
 
 Ctrl+Delete will therefore now always try to remove the tests. This can be done also when files are selected. There is no longer any default accelerator for removing files, it has to be done with the popup menu.
+
+(3) performance_variation_% and performance_test_minimum when using SGE parallel environments
+=============================================================================================
+In the distant past it was decided that when a test ran in several processes (using SGE) performance measurement was less reliable and hence it was a good idea to multiply the limits by the number of processes run before comparing. This now seems arbitrary and confusing, so it is removed. It's obviously easy to recreate this for a specific test suite if desired.

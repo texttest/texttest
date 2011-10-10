@@ -109,7 +109,7 @@ class PrepareWriteDirectory(plugins.Action):
             if copyScript:
                 scriptSource = os.path.join(remoteTmpDir, "scriptSource")
                 test.app.copyFileRemotely(sourcePath, "localhost", scriptSource, machine)
-                cmdArgs = copyScript.split() + [ scriptSource, os.path.join(remoteTmpDir, os.path.basename(sourcePath)) ]
+                cmdArgs = getScriptArgs(copyScript) + [ scriptSource, os.path.join(remoteTmpDir, os.path.basename(sourcePath)) ]
                 test.app.runCommandOn(machine, cmdArgs)
             else:
                 test.app.copyFileRemotely(sourcePath, "localhost", remoteTmpDir, machine)
@@ -355,7 +355,8 @@ class PrepareWriteDirectory(plugins.Action):
         scripts = suite.getConfigValue("copy_test_path_script")
         newScripts = {}
         for fileName, script in scripts.items():
-            remoteScript = self.tryCopyPathRemotely(script, fullTmpDir, machine, suite.app)
+            localScript = getScriptArgs(script)[0]
+            remoteScript = self.tryCopyPathRemotely(localScript, fullTmpDir, machine, suite.app)
             if remoteScript:
                 self.diag.info("Setting copy_test_path_script for " + repr(fileName) + " to " + repr(remoteFile))
                 newScripts[fileName] = remoteScript

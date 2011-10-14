@@ -56,7 +56,7 @@ ListType   = type([1])
 TupleType  = type((1,2))
 InstanceType = type(UserList.UserList())
 CONTYPE = 'Content-Type: text/html\n\n'
-DOCTYPE = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">\n<HTML>\n'
+DOCTYPE = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">\n<HTML>\n'
 PRINTECHO = 1
 
 

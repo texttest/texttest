@@ -57,6 +57,7 @@ TupleType  = type((1,2))
 InstanceType = type(UserList.UserList())
 CONTYPE = 'Content-Type: text/html\n\n'
 DOCTYPE = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">\n<HTML>\n'
+XHTML_DOCTYPE = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">\n<HTML>\n'
 PRINTECHO = 1
 
 
@@ -82,6 +83,7 @@ class BasicDocument:
         title -- HTML TITLE attribute for document
         bgcolor -- background color expressed in hex-triplet or names from HTMLcolors.
         background -- background image filename
+        xhtml -- flag to indicate if this is XHTML (1 if it is)
         cgi -- flag to indicate if this is used in CGI context (1 if it is)
         textcolor -- color to use for normal text
         linkcolor -- color to use for hyperlinks
@@ -90,6 +92,7 @@ class BasicDocument:
     """
     title = ''
     cgi = None
+    xhtml = None
     bgcolor = None
     background = None
     textcolor = None
@@ -103,11 +106,7 @@ class BasicDocument:
             setattr(self, name, value)
 
     def __str__(self):
-        s = []
-        if self.cgi:
-            s.append('Content-Type: text/html\n\n' + DOCTYPE)
-        else:
-            s.append(DOCTYPE)
+        s = [ self.get_doc_type() ]
         s.append('\n<!-- This file generated using Python HTMLgen module. -->\n')
 
         # build the HEAD and BODY tags
@@ -121,6 +120,15 @@ class BasicDocument:
         # CLOSE the document
         s.append('\n</BODY> </HTML>\n')
         return string.join(s, '')
+
+    def get_doc_type(self):
+        if self.xhtml:
+            doctype = XHTML_DOCTYPE
+        else:
+            doctype = DOCTYPE
+        if self.cgi:
+            doctype = CONTYPE + doctype
+        return doctype
 
     def html_head(self):
         """Generate the HEAD, TITLE and BODY tags.
@@ -214,11 +222,7 @@ class FramesetDocument(BasicDocument):
     script = None
 
     def __str__(self):
-        s = []
-        if self.cgi:
-            s.append('Content-Type: text/html\n\n' + DOCTYPE)
-        else:
-            s.append(DOCTYPE)
+        s = [ self.get_doc_type() ]
         s.append('\n<!-- This file generated using Python HTMLgen module. -->\n')
 
         # build the HEAD tag
@@ -258,11 +262,7 @@ class SimpleDocument(BasicDocument):
             setattr(self, name, value)
 
     def __str__(self):
-        s = []
-        if self.cgi:
-            s.append('Content-Type: text/html\n\n' + DOCTYPE)
-        else:
-            s.append(DOCTYPE)
+        s = [ self.get_doc_type() ]
         s.append('\n<!-- This file generated using Python HTMLgen module. -->\n')
 
         # build the HEAD and BODY tags
@@ -389,11 +389,7 @@ class SeriesDocument(SimpleDocument):
     gohome = None
 
     def __str__(self):
-        s = []
-        if self.cgi:
-            s.append(CONTYPE + DOCTYPE)
-        else:
-            s.append(DOCTYPE)
+        s = [ self.get_doc_type() ]
         s.append('\n<!-- This file generated using Python HTMLgen module. -->\n')
         # build the HEAD and BODY tags
         s.append(self.html_head())

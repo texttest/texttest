@@ -149,11 +149,13 @@ class GenerateWebPages(object):
                 page.prepend(HTMLgen.Heading(1, minorVersionHeader, align = 'center'))
             page.prepend(HTMLgen.Heading(1, self.getHeading(resourceName), align = 'center'))
             if len(pageColours) > 1:
-                page.script = self.getColourFilterScripts(pageColours)
+                page.prepend(HTMLgen.BR());
+                page.prepend(HTMLgen.BR());
+                page.script = self.getFilterScripts(pageColours)
 
         self.writePages()
 
-    def getColourFilterScripts(self, pageColours):
+    def getFilterScripts(self, pageColours):
         finder = ColourFinder(self.getConfigValue)
         rowHeaderColour = finder.find("row_header_bg")
         successColour = finder.find("success_bg")
@@ -287,7 +289,7 @@ class GenerateWebPages(object):
     def createPage(self, resourceName):
         style = "body,td {color: #000000;font-size: 11px;font-family: Helvetica;} th {color: #000000;font-size: 13px;font-family: Helvetica;}"
         title = TitleWithDateStamp(self.getResultType(resourceName) + " results for " + self.pageTitle)
-        return HTMLgen.SimpleDocument(title=title, style=style)
+        return HTMLgen.SimpleDocument(title=title, style=style, xhtml=True)
 
     def makeTableHeaderCell(self, tableHeader):
         container = HTMLgen.Container()

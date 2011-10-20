@@ -2126,7 +2126,7 @@ Framework Enhancements:
     - Allow disabling of CaptureMock from TextTest (-rectraffic 3, or an extra radio button in the static GUI)
 Batch Report Enhancements:
     - New filtering toolbar in the HTML pages
-	Allows for showing only tests in a certain category. See website.
+	Various operations for filtering the tests. See website for details.
     - If a date is used as the name, use that throughout instead of the actual date to identify the run
     - Junit format report now assumes locale encoding instead of hardcoding UTF-8
     - Junit format includes times when performance enabled
@@ -2137,6 +2137,7 @@ Grid Engine (LSF/SGE) enhancements/bug fixes:
     - New Dynamic GUI actions to suspend and unsuspend a test in SGE
 	See popup menu in test tree
     - Fixed stacktrace when normal polling cannot find a job, e.g. if SGE master goes down
+    - Fixed related issue where submitted but unstarted jobs get marked "SGE job exited" if SGE master goes down
     - Fixed problem where knownbugs cause tests to be rerun but there is no available job to run with
     - Fixed stacktrace in slave when test names contain colons
     - Recomputing after a status update in SGE no longer duplicates progress information

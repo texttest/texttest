@@ -79,6 +79,10 @@ class QueueSystem:
         statusDict = {}
         proc = subprocess.Popen([ "qstat" ], stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         outMsg = proc.communicate()[0]
+        if proc.returncode > 0:
+            # SGE unavailable for the moment, don't update the job status
+            return
+        
         for line in outMsg.splitlines():
             words = line.split()
             if len(words) >= 5:

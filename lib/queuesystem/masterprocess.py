@@ -119,17 +119,18 @@ class QueueSystemServer(BaseActionRunner):
         queueSystem = self.getQueueSystem(self.jobs.keys()[0])
         statusInfo = queueSystem.getStatusForAllJobs()
         self.diag.info("Got status for all jobs : " + repr(statusInfo))
-        for test, jobs in self.jobs.items():
-            if not test.state.isComplete():
-                for jobId, _ in jobs:
-                    status = statusInfo.get(jobId)
-                    if status and test.state.hasStarted() and test.state.briefText:
-                        # Only do this to test jobs (might make a difference for derived configurations)
-                        # Ignore filtering states for now, which have empty 'briefText'.
-                        self.updateRunStatus(test, status)
-                    elif not status and not self.jobStarted(test):
-                        # Do this to any jobs
-                        self.setSlaveFailed(test, False, True)
+        if statusInfo is not None: # queue system not available for some reason
+            for test, jobs in self.jobs.items():
+                if not test.state.isComplete():
+                    for jobId, _ in jobs:
+                        status = statusInfo.get(jobId)
+                        if status and test.state.hasStarted() and test.state.briefText:
+                            # Only do this to test jobs (might make a difference for derived configurations)
+                            # Ignore filtering states for now, which have empty 'briefText'.
+                            self.updateRunStatus(test, status)
+                        elif not status and not self.jobStarted(test):
+                            # Do this to any jobs
+                            self.setSlaveFailed(test, False, True)
         
     def updateRunStatus(self, test, status):
         newRunStatus, newExplanation = status

@@ -869,6 +869,7 @@ class Href:
         self.onClick = None
         self.onMouseOver = None
         self.onMouseOut = None
+        self.style = None
         self.url = url
         self.text = text
         for item in kw.keys():
@@ -884,6 +885,7 @@ class Href:
         if self.onClick: s.append(' onClick="%s"' % self.onClick)
         if self.onMouseOver: s.append(' onMouseOver="%s"' % self.onMouseOver)
         if self.onMouseOut: s.append(' onMouseOut="%s"' % self.onMouseOut)
+        if self.style: s.append(' style="%s"' % self.style)
         s.append('>%s</A>' % self.text)
         return string.join(s, '')
 

@@ -530,7 +530,7 @@ class TestTable:
         else:
             linkTarget = getDetailPageName(self.pageVersion, tag) + "#" + testId
             tooltip = "'" + testName + "' failure for " + getDisplayText(tag)
-            return HTMLgen.Href(linkTarget, cellContent, title=tooltip), bgcol, True
+            return HTMLgen.Href(linkTarget, cellContent, title=tooltip, style="color:black"), bgcol, True
             
     def getBackgroundColourKey(self, category):
         if category == "success":

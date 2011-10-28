@@ -23,7 +23,8 @@ Var PYTHON_PATH
 Var JYTHON_PATH
 Var VIRTUALENV_PATH
 Var TKDIFF_PATH
-Var WINMERGE_PATH
+Var JAVA_EXE
+;Var WINMERGE_PATH
 
 !define env_hkcu 'HKCU "Environment"'
 !define env_hklm 'HKLM "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"'
@@ -39,11 +40,11 @@ Var WINMERGE_PATH
   !define CENTRAL_PYUSECASE_LOCATION "T:\texttest\release\current.win\pyusecase"
   !define CENTRAL_TEXTTEST_LOCATION "T:\texttest\release\current.win"
 !else
-  !ifndef TEXTTEST_DIST
-    !define TEXTTEST_DIST "texttest-3.21.zip"
-  !endif
   !ifndef TEXTTEST_ROOT
     !define TEXTTEST_ROOT "texttest-3.21"
+  !endif
+  !ifndef TEXTTEST_DIST
+    !define TEXTTEST_DIST "${TEXTTEST_ROOT}.zip"
   !endif
 !endif
 
@@ -77,16 +78,22 @@ Var WINMERGE_PATH
 !ifndef TKDIFF_INSTALLER
   !define TKDIFF_INSTALLER "tkdiffInstall.exe"
 !endif
-
+/*
 !ifndef WINMERGE_INSTALLER
   !define WINMERGE_INSTALLER "WinMerge-2.12.4-exe.zip"
 !endif
+*/
 
 ; MUI Settings
 !define MUI_ABORTWARNING
 !define MUI_ICON "${NSISDIR}\Contrib\Graphics\Icons\modern-install.ico"
 
 ; Welcome page
+;!define MUI_WELCOMEPAGE_TITLE "Please Note:"
+LangString WELCOME_TEXT ${LANG_ENGLSH} "This wizard will guide you through the installation of TextTest.$\r$\n$\r$\n \
+Click Next to continue.$\r$\n"
+!define MUI_WELCOMEPAGE_TEXT "$(WELCOME_TEXT)"
+;!define MUI_WELCOMEPAGE_TITLE_3LINES
 !insertmacro MUI_PAGE_WELCOME
 
 ; Components page
@@ -95,7 +102,7 @@ Var WINMERGE_PATH
 ; Directory page
 !ifndef JEPPESEN
 LangString TEXT_TOP ${LANG_ENGLSH} "Setup will install \
-Texttest in the following folder..."
+TextTest in the following folder..."
 !define MUI_DIRECTORYPAGE_TEXT_TOP "$(TEXT_TOP)"
 ;!DEFINE MUI_DIRECTORYPAGE_VARIABLE $INSTDIR
 !insertmacro MUI_PAGE_DIRECTORY
@@ -110,6 +117,10 @@ PageEx directory
   DirVar $TT_HOME
 PageExEnd
 ; Finish page
+!define MUI_FINISHPAGE_SHOWREADME ""
+!define MUI_FINISHPAGE_SHOWREADME_CHECKED
+!define MUI_FINISHPAGE_SHOWREADME_TEXT "Create start menu and desktop shortcuts"
+!define MUI_FINISHPAGE_SHOWREADME_FUNCTION makeShortcuts
 !insertmacro MUI_PAGE_FINISH
 
 ; Language files
@@ -120,7 +131,7 @@ PageExEnd
 ; MUI end ------
 
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
-BrandingText ""
+BrandingText " "
 RequestExecutionLevel user
 Caption "${PRODUCT_NAME}"
 !ifdef JEPPESEN
@@ -128,10 +139,24 @@ Caption "${PRODUCT_NAME}"
 !else
   OutFile "texttext-all-in-one${PRODUCT_VERSION}.${ARCH}.exe"
 !endif
-InstallDir "C:\Texttest"
+InstallDir "C:\TextTest"
 InstallDirRegKey HKLM "${PRODUCT_DIR_REGKEY}" ""
-ShowInstDetails show
+ShowInstDetails hide
 
+!macro SETUP_MACRO un
+  Function ${un}setup
+    ${GetRoot} "$PROGRAMFILES" $ROOT_DRIVE
+    StrCpy $INSTDIR "$ROOT_DRIVE\${PRODUCT_NAME}"
+    StrCpy $JYTHON_PATH "$ROOT_DRIVE\jython${JYTHON_VERSION}"
+    StrCpy $VIRTUALENV_PATH "$ROOT_DRIVE\virtualenv"
+    StrCpy $TKDIFF_PATH "$PROGRAMFILES\TkDiff"
+    ;StrCpy $WINMERGE_PATH "$ROOT_DRIVE\WinMerge-2.12.4-exe"
+    StrCpy $TT_HOME "$ROOT_DRIVE\Tests"
+  FunctionEnd
+!macroend
+
+!insertmacro SETUP_MACRO ""
+!insertmacro SETUP_MACRO "un."
 
 Section -SETTINGS
   SetOutPath $TEMP\texttest
@@ -165,7 +190,7 @@ SectionEnd
 SectionGroup /e "Diff tool" G1
   Section "Tkdiff" g1o1
     File "${TKDIFF_INSTALLER}"
-    ExecWait "$OUTDIR\tkdiffInstall.exe"
+    ExecWait '"cmd.exe" /K CD $OUTDIR & tkdiffInstall.exe && EXIT'
     IfErrors onError
     Call updateTkDiffPath
     IfErrors onError done
@@ -173,6 +198,7 @@ SectionGroup /e "Diff tool" G1
     Abort
     done:
   SectionEnd
+/*
   Section /o "WinMerge" g1o2
     File "${WINMERGE_INSTALLER}"
     ZipDLL::extractall "$OUTDIR\${WINMERGE_INSTALLER}" "$ROOT_DRIVE\"
@@ -183,11 +209,16 @@ SectionGroup /e "Diff tool" G1
     Abort
     done:
   SectionEnd
+*/
 SectionGroupEnd
 
 !ifdef JEPPESEN
 Section "TextTest and PyUseCase configuration" SEC06
-  Call configurePyusecase
+  Call configurePyusecasePython
+  IfErrors onError
+  Call installJython
+  IfErrors onError
+  Call configurePyusecaseJava
   IfErrors onError
   Call updateTexttestPath
   IfErrors onError done
@@ -231,21 +262,17 @@ Section "Uninstall"
 SectionEnd
 
 Function initialize
-  ${GetRoot} "$PROGRAMFILES" $ROOT_DRIVE
-  StrCpy $INSTDIR "$ROOT_DRIVE\Texttest"
-  StrCpy $JYTHON_PATH "$ROOT_DRIVE\jython${JYTHON_VERSION}"
-  StrCpy $VIRTUALENV_PATH "$ROOT_DRIVE\virtualenv"
-  StrCpy $TKDIFF_PATH "$PROGRAMFILES\TkDiff"
-  StrCpy $WINMERGE_PATH "$ROOT_DRIVE\WinMerge-2.12.4-exe"
+  Call setup
   File "${VIRTUALENV_DIST}"
+  File "texttest-icon-dynamic.ico"
   !ifndef JEPPESEN
     File "open_source\${TEXTTEST_DIST}"
   !endif
   !ifdef JEPPESEN
-    writeUninstaller "$OUTDIR\uninstall.exe"
+    writeUninstaller "$OUTDIR\Uninstall.exe"
   !else
     CreateDirectory "$INSTDIR"
-    writeUninstaller "$INSTDIR\uninstall.exe"
+    writeUninstaller "$INSTDIR\Uninstall.exe"
   !endif
   Call copyVirtualEnvFiles
 FunctionEnd
@@ -262,7 +289,8 @@ FunctionEnd
 
 Function installJython
   File "${JYTHON_INSTALLER}"
-  ExecWait 'java -jar $OUTDIR\${JYTHON_INSTALLER} -s -d "$JYTHON_PATH"'
+  Call checkJava
+  ExecWait '$JAVA_EXE -jar $OUTDIR\${JYTHON_INSTALLER} -s -d "$JYTHON_PATH"'
   IfErrors onError
   Call installVirtualEnvOnJython
   IfErrors onError
@@ -278,8 +306,10 @@ Function .onInstSuccess
 FunctionEnd
 
 Function setTexttestHome
-  WriteRegStr ${env_hkcu} "TEXTTEST_HOME" $TT_HOME
-  DetailPrint $TT_HOME
+  IfFileExists "$TT_HOME\*.*" done
+    CreateDirectory "$TT_HOME"
+  done:
+    WriteRegStr ${env_hkcu} "TEXTTEST_HOME" $TT_HOME
 FunctionEnd
 
 Function updateTexttestPath
@@ -304,11 +334,19 @@ Function updateTkDiffPath
   ${EnvVarUpdate} $0 "PATH" "P" "HKCU" "$TKDIFF_PATH"
 FunctionEnd
 
+/*
 Function updateWinMergePath
   ${EnvVarUpdate} $0 "PATH" "P" "HKCU" "$WINMERGE_PATH"
 FunctionEnd
+*/
 
 Function configurePyusecasePython
+  IfFileExists "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\*.*" install
+  Call installVirtualEnvOnPython
+  IfErrors 0 install
+  MessageBox MB_OK|MB_ICONSTOP "Failed to install virtual environment on Python."
+  Quit
+  install:
   !ifdef JEPPESEN
     ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring pyusecase on python & ${VIRTUAL_PYTHON}\Scripts\pip install -e ${CENTRAL_PYUSECASE_LOCATION} & EXIT'
     IfErrors onError done
@@ -317,7 +355,7 @@ Function configurePyusecasePython
     IfErrors onError done
   !endif
   onError:
-    MessageBox MB_OK|MB_ICONSTOP "Python is not installed. Run the installer again and choose Python"
+    MessageBox MB_OK|MB_ICONSTOP "Failed to install PyUseCase on Python."
     Quit
   done:
 FunctionEnd
@@ -336,19 +374,46 @@ Function configurePyusecaseJava
   done:
 FunctionEnd
 
-Function getPythonPath
+Function checkPythonPath
   ReadRegStr $PYTHON_PATH HKCU "SOFTWARE\Python\PythonCore\${PYTHON_VERSION}\InstallPath" ""
   IfErrors 0 done
+  ClearErrors
   ReadRegStr $PYTHON_PATH HKLM "SOFTWARE\Python\PythonCore\${PYTHON_VERSION}\InstallPath" ""
   IfErrors onError done
   onError:
-    MessageBox MB_OK|MB_ICONSTOP "Python is not installed"
-    Abort
+    MessageBox MB_OK|MB_ICONSTOP "Python is not installed. Run the installer again and choose Python"
+    Quit
+  done:
+FunctionEnd
+
+Function checkJava
+  ; Check if it's already in path
+  StrCpy $JAVA_EXE "java"
+  ExecWait '"cmd.exe" /K java -version & EXIT'
+  IfErrors checkJavaHome done
+  ; Check for JAVA_HOME
+  checkJavaHome:
+    ClearErrors
+    ReadEnvStr $R0 "JAVA_HOME"
+    StrCpy $JAVA_EXE "$R0\bin\java.exe"
+    IfErrors checkRegistry
+    IfFileExists $JAVA_EXE done checkRegistry
+
+  ; Check for registry
+  checkRegistry:
+    ClearErrors
+    ReadRegStr $R1 HKLM "SOFTWARE\JavaSoft\Java Runtime Environment" "CurrentVersion"
+    ReadRegStr $R0 HKLM "SOFTWARE\JavaSoft\Java Runtime Environment\$R1" "JavaHome"
+    StrCpy $JAVA_EXE "$R0\bin\java.exe"
+    IfErrors onError done
+  onError:
+    MessageBox MB_OK|MB_ICONSTOP "Java is not installed. It must be present in order to install PyUseCase for java."
+    Quit
   done:
 FunctionEnd
 
 Function installVirtualEnvOnPython
-  Call getPythonPath
+  Call checkPythonPath
   ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO installing virtualenv on python & "$PYTHON_PATH"python virtualenv.py ${VIRTUAL_PYTHON} && EXIT'
 Functionend
 
@@ -357,12 +422,33 @@ Function installVirtualEnvOnJython
   ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO installing virtualenv on jython & $JYTHON_PATH\bin\jython virtualenv.py ${VIRTUAL_JYTHON} && EXIT'
 Functionend
 
+Function makeShortcuts
+  CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
+  !ifdef JEPPESEN
+    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "${CENTRAL_TEXTTEST_LOCATION}\bin\texttest.py" \
+    "" "$OUTDIR\texttest-icon-dynamic.ico" ""
+    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall.lnk" "$OUTDIR\Uninstall.exe"
+    CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "${CENTRAL_TEXTTEST_LOCATION}\bin\texttest.py" "" "$OUTDIR\texttest-icon-dynamic.ico" ""
+  !else
+    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\${TEXTTEST_ROOT}\${TT_BIN}\texttest.py" "" "$OUTDIR\texttest-icon-dynamic.ico" ""
+    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
+    CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\${TEXTTEST_ROOT}\${TT_BIN}\texttest.py" "" "$OUTDIR\texttest-icon-dynamic.ico" ""
+  !endif
+FunctionEnd
+
+Function .onInit
+  StrCpy $1 ${g1o1}
+FunctionEnd
+; ============== Uninstall fuctions ========================
 Function un.install
-  RMDir /r $JYTHON_PATH
+  Call un.setup
+  RMDir /r "$JYTHON_PATH"
   RMDir /r "$OUTDIR"
   RMDir /r $VIRTUALENV_PATH
+  RMDir /r $SMPROGRAMS\${PRODUCT_NAME}
+  Delete "$DESKTOP\${PRODUCT_NAME}.lnk"
   Call un.setEnv
-  Delete "$INSTDIR\Uninstaller.exe"
+  Delete "$INSTDIR\Uninstall.exe"
 FunctionEnd
 
 Function un.setEnv
@@ -371,18 +457,16 @@ Function un.setEnv
     ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "${CENTRAL_PYUSECASE_LOCATION}\bin"
     ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "${CENTRAL_TEXTTEST_LOCATION}\bin"
   !else
-    ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "$INSTDIR\texttest-3.21\${TT_BIN}"
+    ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "$INSTDIR\${TEXTTEST_ROOT}\${TT_BIN}"
   !endif
   ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\bin"
   ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\Scripts"
   ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "$VIRTUALENV_PATH\${VIRTUAL_JYTHON}\bin"
   ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "$TKDIFF_PATH"
-  ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "$WINMERGE_PATH"
+  ;${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "$WINMERGE_PATH"
 FunctionEnd
 
-Function .onInit
-  StrCpy $1 ${g1o1}
-FunctionEnd
+
 /*
 Function .onSelChange
   !insertmacro StartRadioButtons $1

@@ -165,7 +165,8 @@ class GenerateWebPages(object):
                      "var Colors = " + repr(sortedColours) + ";"  
         return [ HTMLgen.Script(code=scriptCode),
                  HTMLgen.Script(src="../javascript/jquery.js"),
-                 HTMLgen.Script(src="../javascript/filter.js")  ]
+                 HTMLgen.Script(src="../javascript/filter.js"),
+                 HTMLgen.Script(src="../javascript/plugin.js")  ]
 
     def getHeading(self, resourceName, versionToShow=""):
         heading = self.getResultType(resourceName) + " results for " + self.pageTitle

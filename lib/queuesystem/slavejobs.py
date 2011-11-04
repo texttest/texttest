@@ -85,9 +85,10 @@ class SocketResponder(plugins.Responder,plugins.Observable):
             try:
                 response = self.sendData(sendSocket, fullData)
                 return self.interpretResponse(state, response)
-            except socket.error:
+            except socket.error, e:
                 plugins.log.info("Failed to communicate with master process - waiting " +
                                  str(sleepTime) + " seconds and then trying again.")
+                plugins.log.info("Error received was " + str(e))
                 time.sleep(sleepTime)
                 sleepTime *= 2
 

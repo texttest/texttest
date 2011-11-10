@@ -874,6 +874,9 @@ class SlaveRequestHandler(StreamRequestHandler):
             
 
 class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
+    # Python's default value of 5 isn't very much...
+    # There doesn't seem to be any disadvantage of allowing a longer queue, so we will use the system's maximum size
+    request_queue_size = socket.SOMAXCONN    
     def __init__(self, *args):
         plugins.Responder.__init__(self, *args)
         ThreadingTCPServer.__init__(self, (socket.gethostname(), 0), self.handlerClass())
@@ -890,9 +893,6 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
         # We give up after 5 minutes
         if hasattr(socket, "TCP_KEEPIDLE"):
             self.socket.setsockopt(socket.SOL_TCP, socket.TCP_KEEPIDLE, 300)
-        # Default value of 5 isn't very much...
-        # There doesn't seem to be any disadvantage of allowing a longer queue, so we will increase it by a lot...
-        self.request_queue_size = 500
         
     def addSuites(self, *args):
         # use this as an opportunity to broadcast our address

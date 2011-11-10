@@ -91,7 +91,7 @@ class RefreshTips:
         self.refreshColumn = refreshColumn
         self.refreshCell = refreshCell
 
-    def hasRefreshIcon(self, view, path): # pragma: no cover - PyUseCase cannot test tooltips (future?)
+    def hasRefreshIcon(self, view, path): # pragma: no cover - StoryText cannot test tooltips (future?)
         model = view.get_model()
         if isinstance(model, gtk.TreeModelFilter):
             childPath = model.convert_path_to_child_path(path)
@@ -99,7 +99,7 @@ class RefreshTips:
         else:
             return model[path][self.refreshIndex]
 
-    def getTooltip(self, view, widget_x, widget_y, dummy, tooltip): # pragma: no cover - PyUseCase cannot test tooltips (future?)
+    def getTooltip(self, view, widget_x, widget_y, dummy, tooltip): # pragma: no cover - StoryText cannot test tooltips (future?)
         x, y = view.convert_widget_to_tree_coords(widget_x, widget_y)
         pathInfo = view.get_path_at_pos(x, y)
         if pathInfo is None:
@@ -333,7 +333,7 @@ class SubGUI(plugins.Observable):
 
     def applicationEvent(self, name, **kw):
         try:
-            from usecase import applicationEvent
+            from storytext import applicationEvent
             # Everything that comes from here is to do with editing files in external programs
             applicationEvent(name, "files", **kw)
         except ImportError:

@@ -99,8 +99,8 @@ class DocumentConfig(plugins.Action):
 class DocumentEnvironment(plugins.Action):
     def __init__(self, args=[]):
         self.onlyEntries = args
-        self.prefixes = [ "TEXTTEST_", "USECASE_" ]
-        self.exceptions = [ "TEXTTEST_PERSONAL_", "USECASE_HOME_LOCAL" ]
+        self.prefixes = [ "TEXTTEST_", "USECASE_", "STORYTEXT_" ]
+        self.exceptions = [ "TEXTTEST_PERSONAL_", "STORYTEXT_HOME_LOCAL" ]
         
     def getEntriesToUse(self, app):
         rootDir = plugins.installationRoots[0]
@@ -112,8 +112,8 @@ class DocumentEnvironment(plugins.Action):
         for root, dirs, files in os.walk(rootDir):
             if "log" in dirs:
                 dirs.remove("log")
-            if "pyusecase" in dirs:
-                dirs.remove("pyusecase")
+            if "storytext" in dirs:
+                dirs.remove("storytext")
             if not includeSite and "site" in dirs:
                 dirs.remove("site")
             if root.endswith("lib"):

@@ -23,7 +23,7 @@ class MakeWriteDirectory(plugins.Action):
         app.makeWriteDirectory()
 
 class PrepareWriteDirectory(plugins.Action):
-    usecaseDirsCopied = set()
+    storytextDirsCopied = set()
     def __init__(self, ignoreCatalogues):
         self.diag = logging.getLogger("Prepare Writedir")
         self.ignoreCatalogues = ignoreCatalogues
@@ -321,7 +321,7 @@ class PrepareWriteDirectory(plugins.Action):
         machine, tmpDir = suite.app.getRemoteTmpDirectory()
         if tmpDir:
             self.copySUTRemotely(machine, tmpDir, suite)
-            self.copyUsecaseDirRemotely(machine, tmpDir, suite)
+            self.copyStorytextDirRemotely(machine, tmpDir, suite)
 
     def tryCopyPathRemotely(self, path, fullTmpDir, machine, app):
         if os.path.isabs(path) and os.path.exists(path) and not app.pathExistsRemotely(path, machine):
@@ -364,14 +364,14 @@ class PrepareWriteDirectory(plugins.Action):
         if newScripts:
             suite.app.setConfigDefault("copy_test_path_script", newScripts)
 
-    def copyUsecaseDirRemotely(self, machine, tmpDir, suite):
-        usecaseDir = suite.getEnvironment("USECASE_HOME_LOCAL")
-        if usecaseDir:
-            newbasename = os.path.basename(usecaseDir)
-            if os.path.isdir(usecaseDir) and usecaseDir not in self.usecaseDirsCopied:
-                self.usecaseDirsCopied.add(usecaseDir)
+    def copyStorytextDirRemotely(self, machine, tmpDir, suite):
+        storytextDir = suite.getEnvironment("STORYTEXT_HOME_LOCAL")
+        if storytextDir:
+            newbasename = os.path.basename(storytextDir)
+            if os.path.isdir(storytextDir) and storytextDir not in self.storytextDirsCopied:
+                self.storytextDirsCopied.add(storytextDir)
                 remoteName = os.path.join(tmpDir, newbasename)
-                suite.app.copyFileRemotely(usecaseDir, "localhost", remoteName, machine)        
+                suite.app.copyFileRemotely(storytextDir, "localhost", remoteName, machine)        
         
 
 # Class for automatically adding things to test environment files...
@@ -395,10 +395,10 @@ class TestEnvironmentCreator:
             vars.append(("TEXTTEST_SANDBOX_ROOT", self.test.app.writeDirectory)) # Full path to the sandbox root directory
             if self.test.getConfigValue("use_case_record_mode") == "GUI":
                 usecaseRecorder = self.test.getConfigValue("use_case_recorder")
-                # Mostly to make sure PyUseCase's own tests have a chance of working
+                # Mostly to make sure StoryText's own tests have a chance of working
                 # Almost any other test suite shouldn't be doing this...
                 envSetInTests = self.test.getConfigValue("test_data_environment").values()
-                if usecaseRecorder != "none" and "USECASE_HOME" not in envSetInTests:
+                if usecaseRecorder != "none" and "STORYTEXT_HOME" not in envSetInTests:
                     if not usecaseRecorder:
                         usecaseRecorder = "ui_simulation"
                     usecaseDir = os.path.join(self.test.app.getDirectory(), usecaseRecorder + "_files")
@@ -408,10 +408,10 @@ class TestEnvironmentCreator:
                         # so that the $HOME reference gets preserved in runtest.py
                         # (no guarantee $HOME is the same remotely)
                         fakeRemotePath = os.path.join(self.test.app.writeDirectory, os.path.basename(usecaseDir))
-                        vars.append(("USECASE_HOME", fakeRemotePath))
-                        vars.append(("USECASE_HOME_LOCAL", usecaseDir))
+                        vars.append(("STORYTEXT_HOME", fakeRemotePath))
+                        vars.append(("STORYTEXT_HOME_LOCAL", usecaseDir))
                     else:
-                        vars.append(("USECASE_HOME", usecaseDir))
+                        vars.append(("STORYTEXT_HOME", usecaseDir))
                     
                 if os.name == "posix":
                     from virtualdisplay import VirtualDisplayResponder
@@ -433,8 +433,8 @@ class TestEnvironmentCreator:
         return self.test.classId() == "test-case"
 
     def getUseCaseVariables(self):
-        # Here we assume the application uses either PyUseCase or JUseCase
-        # PyUseCase reads environment variables, but you can't do that from java,
+        # Here we assume the application uses either StoryText or JUseCase
+        # StoryText reads environment variables, but you can't do that from java,
         # so we have a "properties file" set up as well. Do both always, to save forcing
         # apps to tell us which to do...
         usecaseFile = self.test.getFileName("usecase")
@@ -457,7 +457,7 @@ class TestEnvironmentCreator:
             if usecaseFile:
                 return self.copyRemoteReplayFilesIfNeeded(usecaseFile)
             elif os.environ.has_key("USECASE_REPLAY_SCRIPT") and not self.useJavaRecorder():
-                return "" # Clear our own script, if any, for further apps wanting to use PyUseCase
+                return "" # Clear our own script, if any, for further apps wanting to use StoryText
 
     def copyRemoteReplayFilesIfNeeded(self, path):
         machine, remoteTmpDir = self.test.app.getRemoteTestTmpDir(self.test)

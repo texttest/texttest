@@ -37,7 +37,7 @@ Var JAVA_EXE
 !endif
 
 !ifdef JEPPESEN
-  !define CENTRAL_PYUSECASE_LOCATION "T:\texttest\release\current.win\pyusecase"
+  !define CENTRAL_STORYTEXT_LOCATION "T:\texttest\release\current.win\storytext"
   !define CENTRAL_TEXTTEST_LOCATION "T:\texttest\release\current.win"
 !else
   !ifndef TEXTTEST_ROOT
@@ -213,12 +213,12 @@ SectionGroup /e "Diff tool" G1
 SectionGroupEnd
 
 !ifdef JEPPESEN
-Section "TextTest and PyUseCase configuration" SEC06
-  Call configurePyusecasePython
+Section "TextTest and StoryText configuration" SEC06
+  Call configureStorytextPython
   IfErrors onError
   Call installJython
   IfErrors onError
-  Call configurePyusecaseJava
+  Call configureStorytextJava
   IfErrors onError
   Call updateTexttestPath
   IfErrors onError done
@@ -227,18 +227,18 @@ Section "TextTest and PyUseCase configuration" SEC06
   done:
 SectionEnd
 !else
-Section "PyUseCase for Python GUI testing" SEC07
-  Call configurePyusecasePython
+Section "StoryText for Python GUI testing" SEC07
+  Call configureStorytextPython
   IfErrors onError done
   onError:
     Abort
   done:
 SectionEnd
 
-Section "PyUseCase for Java GUI testing" SEC08
+Section "StoryText for Java GUI testing" SEC08
   Call installJython
   IfErrors onError
-  Call configurePyusecaseJava
+  Call configureStorytextJava
   IfErrors onError done
   onError:
     Abort
@@ -314,7 +314,7 @@ FunctionEnd
 
 Function updateTexttestPath
   !ifdef JEPPESEN
-    ${EnvVarUpdate} $0 "PATH" "P" "HKCU" "${CENTRAL_PYUSECASE_LOCATION}\bin"
+    ${EnvVarUpdate} $0 "PATH" "P" "HKCU" "${CENTRAL_STORYTEXT_LOCATION}\bin"
     ${EnvVarUpdate} $0 "PATH" "P" "HKCU" "${CENTRAL_TEXTTEST_LOCATION}\bin"
   !else
     ${EnvVarUpdate} $0 "PATH" "P" "HKCU" "$INSTDIR\${TEXTTEST_ROOT}\${TT_BIN}"
@@ -340,7 +340,7 @@ Function updateWinMergePath
 FunctionEnd
 */
 
-Function configurePyusecasePython
+Function configureStorytextPython
   IfFileExists "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\*.*" install
   Call installVirtualEnvOnPython
   IfErrors 0 install
@@ -348,25 +348,25 @@ Function configurePyusecasePython
   Quit
   install:
   !ifdef JEPPESEN
-    ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring pyusecase on python & ${VIRTUAL_PYTHON}\Scripts\pip install -e ${CENTRAL_PYUSECASE_LOCATION} & EXIT'
+    ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring storytext on python & ${VIRTUAL_PYTHON}\Scripts\pip install -e ${CENTRAL_STORYTEXT_LOCATION} & EXIT'
     IfErrors onError done
   !else
-    ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring pyusecase on python & ${VIRTUAL_PYTHON}\Scripts\pip install pyusecase & EXIT'
+    ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring storytext on python & ${VIRTUAL_PYTHON}\Scripts\pip install storytext & EXIT'
     IfErrors onError done
   !endif
   onError:
-    MessageBox MB_OK|MB_ICONSTOP "Failed to install PyUseCase on Python."
+    MessageBox MB_OK|MB_ICONSTOP "Failed to install StoryText on Python."
     Quit
   done:
 FunctionEnd
 
-Function configurePyusecaseJava
+Function configureStorytextJava
   !ifdef JEPPESEN
-    ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring pyusecase on jython & ${VIRTUAL_JYTHON}\bin\jython ${VIRTUAL_JYTHON}\bin\pip install -e ${CENTRAL_PYUSECASE_LOCATION} && EXIT'
+    ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring storytext on jython & ${VIRTUAL_JYTHON}\bin\jython ${VIRTUAL_JYTHON}\bin\pip install -e ${CENTRAL_STORYTEXT_LOCATION} && EXIT'
     IfErrors onError done
   !else
-    ;ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring pyusecase on jython & ${VIRTUAL_JYTHON}\bin\jython ${VIRTUAL_JYTHON}\bin\pip install pyusecase && EXIT'
-    ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring pyusecase on jython & ${VIRTUAL_JYTHON}\bin\jython ${VIRTUAL_JYTHON}\bin\easy_install pyusecase && EXIT'
+    ;ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring storytext on jython & ${VIRTUAL_JYTHON}\bin\jython ${VIRTUAL_JYTHON}\bin\pip install storytext && EXIT'
+    ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring storytext on jython & ${VIRTUAL_JYTHON}\bin\jython ${VIRTUAL_JYTHON}\bin\easy_install storytext && EXIT'
     IfErrors onError done
   !endif
   onError:
@@ -407,7 +407,7 @@ Function checkJava
     StrCpy $JAVA_EXE "$R0\bin\java.exe"
     IfErrors onError done
   onError:
-    MessageBox MB_OK|MB_ICONSTOP "Java is not installed. It must be present in order to install PyUseCase for java."
+    MessageBox MB_OK|MB_ICONSTOP "Java is not installed. It must be present in order to install StoryText for java."
     Quit
   done:
 FunctionEnd
@@ -454,7 +454,7 @@ FunctionEnd
 Function un.setEnv
   DeleteRegKey "HKCU" "Environment\TEXTTEST_HOME"
   !ifdef JEPPESEN
-    ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "${CENTRAL_PYUSECASE_LOCATION}\bin"
+    ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "${CENTRAL_STORYTEXT_LOCATION}\bin"
     ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "${CENTRAL_TEXTTEST_LOCATION}\bin"
   !else
     ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "$INSTDIR\${TEXTTEST_ROOT}\${TT_BIN}"

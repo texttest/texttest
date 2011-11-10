@@ -1,9 +1,9 @@
 
-# Support for our custom widgets for PyUseCase, which needs to know how to handle them
+# Support for our custom widgets for StoryText, which needs to know how to handle them
 
 import gtk
-from usecase.gtktoolkit.simulator.treeviewevents import TreeColumnHelper
-from usecase.gtktoolkit.simulator.baseevents import RightClickEvent
+from storytext.gtktoolkit.simulator.treeviewevents import TreeColumnHelper
+from storytext.gtktoolkit.simulator.baseevents import RightClickEvent
 
 class TreeColumnRightClickEvent(RightClickEvent):
     def __init__(self, name, widget, argumentParseData):

@@ -509,7 +509,7 @@ class OptionGroupGUI(ActionGUI):
 
     def connectEntry(self, option, entryOrBuffer):
         entryOrBuffer.set_text(str(option.getValue()))
-        # Don't pass entry.set_text directly, it will mess up PyUseCase's programmatic method interception
+        # Don't pass entry.set_text directly, it will mess up StoryText's programmatic method interception
         option.setMethods(self.getGetTextMethod(entryOrBuffer), lambda t: entryOrBuffer.set_text(str(t)))
         if option.changeMethod:
             entryOrBuffer.connect("changed", option.changeMethod)
@@ -642,7 +642,7 @@ class OptionGroupGUI(ActionGUI):
         
         if int(switch.getValue()):
             checkButton.set_active(True)
-        # Don't pass checkButton.set_active as that will screw up PyUseCase's interception of it
+        # Don't pass checkButton.set_active as that will screw up StoryText's interception of it
         switch.setMethods(checkButton.get_active, lambda x: checkButton.set_active(x))
         checkButton.show()
         return checkButton
@@ -952,7 +952,7 @@ class ActionDialogGUI(OptionGroupGUI):
         dialog.set_default_response(gtk.RESPONSE_ACCEPT)
         if fileChooser:
             fileChooser.connect("file-activated", self.simulateResponse, dialog)
-            # Don't pass set_filename directly, will interfere with PyUseCase's attempts to intercept it
+            # Don't pass set_filename directly, will interfere with StoryText's attempts to intercept it
             fileChooserOption.setMethods(fileChooser.get_filename, lambda f: fileChooser.set_filename(f))
         
         dialog.connect("response", self.respond, fileChooserOption)

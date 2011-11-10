@@ -55,7 +55,7 @@ Bugs and Support:
 Other (non-standard) Open Source python modules used by TextTest and packaged with it:
 
     ordereddict.py              : sequential dictionaries. (Raymond Hettinger, v1.1)
-    source/pyusecase            : "PyUseCase", record/replay tool for PyGTK GUIs, of the kind you may well 
+    source/storytext            : "StoryText", record/replay tool for PyGTK GUIs, of the kind you may well 
                                   need if you test GUIs (Geoff Bache, v3.5)
     HTMLgen.py,HTMLcolors.py,   : "HTMLGen", tool for generating HTML in Python, used for the historical report
     ImageH.py,ImagePaletteH.py,   webpages generated for batch runs (Robin Friedrich, v2.2.2)
@@ -103,8 +103,8 @@ that you install this as the text interface is not actively developed any more. 
 Python library PyGTK, which is directly available in most Linux distributions. If you aren't using Linux, 
 it is freely available for download, see online installation instructions.
 
-To test GUIs, you need some simulation tool. We have also developed "PyUseCase", which is such a tool
+To test GUIs, you need some simulation tool. We have also developed "StoryText", which is such a tool
 for Python GUIs and SWT/Eclipse RCP, which relies on a record/replay layer between the application and the GUI library. 
 There also exist "JUseCase", for Java Swing GUIs and "NUseCase" for .net GUIs. TextTest integrates with these, and includes 
-PyUseCase as it uses it for its own testing. If you want to use it for your own GUIs you are however recommended 
+StoryText as it uses it for its own testing. If you want to use it for your own GUIs you are however recommended 
 to download it separately from its own page.

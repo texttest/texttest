@@ -64,7 +64,7 @@ TestSelf/ExtraVersions/TargetApp           : shows how to automatically run othe
                                                when running normally.
 
 TestSelf/UITesting/GUI/TargetApp           : useful for understanding TextTest's integration with Use Case
-                                               Recorders such as PyUseCase and JUseCase for GUI testing.
+                                               Recorders such as StoryText and JUseCase for GUI testing.
 
 GUI/DynamicGUI/Filtering/TargetApp         : useful for exploring the status tab from the dynamic GUI and what
                                              it can do.

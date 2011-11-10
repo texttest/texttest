@@ -2097,7 +2097,8 @@ Static GUI Enhancements:
 	Ctrl+Delete now always deletes tests. There is no default accelerator for deleting files.
     - Can now specify additional settings that only affect the current run
 	For example set an environment variable, add a command line option. See Advanced tab under Running.
-    - GUI testing for Swing - PyUseCase 3.6 replaces defunct JUseCase in application creation dialog
+    - GUI testing for Swing - StoryText (formerly PyUseCase, now supporting Java also)
+	replaces defunct JUseCase in application creation dialog
 Dynamic GUI Enhancements:
     - New option "<full version>" in "version to save" in Save As dialog
 	Basically save with the full version you ran with, as was default behaviour in TextTest 3.20

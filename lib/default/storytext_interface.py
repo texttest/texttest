@@ -1,9 +1,9 @@
 
 import plugins, os
 try:
-    import usecase
-    applicationEvent = usecase.applicationEvent
-    applicationEventRename = usecase.applicationEventRename
+    import storytext
+    applicationEvent = storytext.applicationEvent
+    applicationEventRename = storytext.applicationEventRename
 except ImportError:
     def applicationEventRename(*args, **kw):
         pass

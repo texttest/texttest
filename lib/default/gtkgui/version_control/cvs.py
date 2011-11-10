@@ -6,7 +6,7 @@ from ordereddict import OrderedDict
 #
 # Todo/improvements:
 #
-# + Multiple dialogs confuses PyUseCase - close doesn't work correctly, for example ..
+# + Multiple dialogs confuses StoryText - close doesn't work correctly, for example ..
 # + There is a lot of string stripping/replacing going on - perhaps this
 #   could be unified and collected in a more centralized place?
 # + Update on non-cvs controlled tests give no hint that tests are not in cvs.

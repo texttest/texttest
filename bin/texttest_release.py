@@ -11,7 +11,7 @@
 # <release_name> defaults to "current" and should be overridden when making external releases
 
 # <tag> indicates a version control tag to use. This should be a pre-existing one that is set
-# in both the TextTest source and the self-tests (but not PyUseCase, currently)
+# in both the TextTest source and the self-tests (but not StoryText, currently)
 
 # The -x flag should be provided if the temporary files are to be left. Mostly useful for testing.
 
@@ -42,7 +42,7 @@ def exportFromBzr(dest, tagName):
     exportDir("TextTest", "source", "source", dest, tagName)
     os.mkdir(os.path.join(dest, "tests"))
     exportDir("TextTest", "tests", "tests/texttest", dest, tagName)
-    exportDir("PyUseCase", "source", "source/pyusecase", dest)
+    exportDir("StoryText", "source", "source/storytext", dest)
         
 def createSource(reldir):
     versionFile = os.path.join(reldir, "source", "lib", "texttest_version.py")

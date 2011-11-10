@@ -620,36 +620,36 @@ formatter=debug
 args=(os.devnull, 'a')
 #args=('%(TEXTTEST_PERSONAL_LOG)s/guimap.diag', 'a')
 
-# ======= Section for usecase record ======
-[logger_usecase record]
-handlers=usecase record
-qualname=usecase record
+# ======= Section for storytext record ======
+[logger_storytext record]
+handlers=storytext record
+qualname=storytext record
 #level=DEBUG
 
-[handler_usecase record]
+[handler_storytext record]
 class=FileHandler
 formatter=debug
 args=(os.devnull, 'a')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/usecaserecord.diag', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/storytextrecord.diag', 'a')
 
-# ======= Section for usecase replay log ======
-[logger_usecase replay log]
-handlers=usecase replay log
-qualname=usecase replay log
+# ======= Section for storytext replay log ======
+[logger_storytext replay log]
+handlers=storytext replay log
+qualname=storytext replay log
 #level=DEBUG
 
-[handler_usecase replay log]
+[handler_storytext replay log]
 class=FileHandler
 formatter=debug
 args=(os.devnull, 'a')
-#args=('%(TEXTTEST_PERSONAL_LOG)s/usecasereplaylog.diag', 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/storytextreplaylog.diag', 'a')
 
 # ====== Cruft that python logging module needs ======
 [loggers]
-keys=root,Action Runner,Activator,Check For Bugs,Collate Files,Environment Creator,File View GUI,FileComparison,Filter Actions,Find Applications,GUI notebook,GenerateWebPages,Idle Handlers,Interactive Actions,JUnit Report Writer,Mail Sender,Menu Bar,MultiEntryDictionary,Observable,Prepare Writedir,Progress Monitor,Queue System Submit,Reconnection,Run Dependent Text,Save Repository,Select Tests,Slave Server,Test Column GUI,Test Tree,TestComparison,TestSelectionFilter,Top Window,Unique Names,application,batch collect,catalogues,check for crashes,kill processes,locks,makeperformance,option finder,read environment,remote commands,run test,standard log,test objects,virtual display,TreeModelIndexer,TreeViewDescriber,gui log,gui map,usecase record,usecase replay log
+keys=root,Action Runner,Activator,Check For Bugs,Collate Files,Environment Creator,File View GUI,FileComparison,Filter Actions,Find Applications,GUI notebook,GenerateWebPages,Idle Handlers,Interactive Actions,JUnit Report Writer,Mail Sender,Menu Bar,MultiEntryDictionary,Observable,Prepare Writedir,Progress Monitor,Queue System Submit,Reconnection,Run Dependent Text,Save Repository,Select Tests,Slave Server,Test Column GUI,Test Tree,TestComparison,TestSelectionFilter,Top Window,Unique Names,application,batch collect,catalogues,check for crashes,kill processes,locks,makeperformance,option finder,read environment,remote commands,run test,standard log,test objects,virtual display,TreeModelIndexer,TreeViewDescriber,gui log,gui map,storytext record,storytext replay log
 
 [handlers]
-keys=root,Action Runner,Activator,Check For Bugs,Collate Files,Environment Creator,File View GUI,FileComparison,Filter Actions,Find Applications,GUI notebook,GenerateWebPages,Idle Handlers,Interactive Actions,JUnit Report Writer,Mail Sender,Menu Bar,MultiEntryDictionary,Observable,Prepare Writedir,Progress Monitor,Queue System Submit,Reconnection,Run Dependent Text,Save Repository,Select Tests,Slave Server,Test Column GUI,Test Tree,TestComparison,TestSelectionFilter,Top Window,TreeModelIndexer,TreeViewDescriber,Unique Names,application,batch collect,catalogues,check for crashes,gui log,gui map,kill processes,locks,makeperformance,option finder,read environment,remote commands,run test,standard log,stdout,test objects,usecase record,usecase replay log,virtual display
+keys=root,Action Runner,Activator,Check For Bugs,Collate Files,Environment Creator,File View GUI,FileComparison,Filter Actions,Find Applications,GUI notebook,GenerateWebPages,Idle Handlers,Interactive Actions,JUnit Report Writer,Mail Sender,Menu Bar,MultiEntryDictionary,Observable,Prepare Writedir,Progress Monitor,Queue System Submit,Reconnection,Run Dependent Text,Save Repository,Select Tests,Slave Server,Test Column GUI,Test Tree,TestComparison,TestSelectionFilter,Top Window,TreeModelIndexer,TreeViewDescriber,Unique Names,application,batch collect,catalogues,check for crashes,gui log,gui map,kill processes,locks,makeperformance,option finder,read environment,remote commands,run test,standard log,stdout,test objects,storytext record,storytext replay log,virtual display
 
 [formatters]
 keys=timed,debug

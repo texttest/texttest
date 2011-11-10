@@ -384,7 +384,7 @@ class Config:
         if not self.useGUI() and not self.batchMode():
             classes.append(self.getTextResponder())
         # At the end, so we've done the processing before we proceed
-        from pyusecase_interface import ApplicationEventResponder
+        from storytext_interface import ApplicationEventResponder
         classes.append(ApplicationEventResponder)
         return classes
 
@@ -1377,7 +1377,7 @@ class Config:
         # For setting up configuration where the config file needs to have been read first
         # Should return True if it does anything that could cause new config files to be found
         interpreter = app.getConfigValue("interpreter")
-        if "python" in interpreter or "pyusecase" in interpreter:
+        if "python" in interpreter or "storytext" in interpreter:
             app.addConfigEntry("default", "testcustomize.py", "definition_file_stems")
         return False
 

@@ -177,7 +177,7 @@ class ApplicationFileGUI(FileViewGUI):
         FileViewGUI.__init__(self, dynamic, "Configuration Files")
         self.allApps = copy(allApps)
         self.extras = reduce(operator.add, (app.extras for app in allApps), [])
-        self.usecaseDirs = {}
+        self.storytextDirs = {}
         self.testScripts = {}
     
     def shouldShow(self):
@@ -197,9 +197,9 @@ class ApplicationFileGUI(FileViewGUI):
 
     def addSuites(self, suites):
         for suite in suites:
-            currUsecaseHome = suite.getEnvironment("USECASE_HOME")
-            if currUsecaseHome != os.getenv("USECASE_HOME") and os.path.isdir(currUsecaseHome):
-                self.usecaseDirs[suite.app] = currUsecaseHome
+            currUsecaseHome = suite.getEnvironment("STORYTEXT_HOME")
+            if currUsecaseHome != os.getenv("STORYTEXT_HOME") and os.path.isdir(currUsecaseHome):
+                self.storytextDirs[suite.app] = currUsecaseHome
             for configVar in [ "executable" , "interpreter" ]:
                 rawScript = suite.getConfigValue(configVar, expandVars=False)
                 if "TEXTTEST_ROOT" in rawScript:
@@ -219,9 +219,9 @@ class ApplicationFileGUI(FileViewGUI):
                 self.addFileToModel(confiter, file, colour, [ app ])
                 for importedFile in self.getImportedFiles(file, app):
                     importedFiles[importedFile] = importedFile
-            usecaseDir = self.usecaseDirs.get(app)
-            if usecaseDir:
-                files = [ usecaseDir ] + [ os.path.join(usecaseDir, f) for f in os.listdir(usecaseDir) ]
+            storytextDir = self.storytextDirs.get(app)
+            if storytextDir:
+                files = [ storytextDir ] + [ os.path.join(storytextDir, f) for f in os.listdir(storytextDir) ]
                 self.addDataFilesUnderIter(confiter, files, colour, 
                                            app.getDirectory(), associatedObject=self.allApps)
             testScripts = self.testScripts.get(app.name)

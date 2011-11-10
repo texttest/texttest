@@ -5,7 +5,7 @@ Module for the queuesystem configuration, i.e. using grid engines to run tests i
 
 import masterprocess, slavejobs, utils, os, default, plugins
 from default.virtualdisplay import VirtualDisplayResponder
-from default.pyusecase_interface import ApplicationEventResponder
+from default.storytext_interface import ApplicationEventResponder
 
 def getConfig(optionMap):
     return QueueSystemConfig(optionMap)

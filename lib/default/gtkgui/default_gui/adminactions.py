@@ -423,13 +423,13 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         self.addOption("javaclass", "\nJava Class name (instead of executable program)")
         self.addSwitch("gui", "GUI testing option chooser",
                        options = [ "Disable GUI testing options",
-                                   "PyGTK GUI with PyUseCase 3.x",
-                                   "Tkinter GUI with PyUseCase 3.2+",
-                                   "wxPython GUI with PyUseCase 3.4+",
-                                   "SWT GUI with PyUseCase 3.5+",
-                                   "Eclipse RCP GUI with PyUseCase 3.5+",
-                                   "Java Swing GUI with PyUseCase 3.6+",
-                                   "Other embedded Use-case Recorder (e.g. PyUseCase 2.x, NUseCase)",
+                                   "PyGTK GUI with StoryText",
+                                   "Tkinter GUI with StoryText",
+                                   "wxPython GUI with StoryText",
+                                   "SWT GUI with StoryText",
+                                   "Eclipse RCP GUI with StoryText",
+                                   "Java Swing GUI with StoryText",
+                                   "Other embedded Use-case Recorder (e.g. NUseCase)",
                                    "Other GUI-test tool (enable virtual display only)" ],
                        hideOptions=True)
 
@@ -530,7 +530,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
             if useGui != 8:
                 configEntries["slow_motion_replay_speed"] = "3.0"
         if useGui in range(1, 7):
-            interpreter = "pyusecase"
+            interpreter = "storytext"
             if useGui == 2:
                 interpreter += " -i tkinter"
             elif useGui == 3:
@@ -541,7 +541,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
                 interpreter += " -i javarcp"
             elif useGui == 6:
                 interpreter += " -i javaswing"
-            configEntries["use_case_recorder"] = "pyusecase"
+            configEntries["use_case_recorder"] = "storytext"
             configEntries["interpreter"] = interpreter
             if useGui == 1: # PyGTK
                 comment = "XDG_CONFIG_HOME points to user's ~/.config directory.\n" + \
@@ -552,9 +552,9 @@ class ImportApplication(guiplugins.ActionDialogGUI):
                 configEntries["test_data_ignore"] = "xdg_config_home"
                 configEntries["test_data_environment"] = ("xdg_config_home", "XDG_CONFIG_HOME")
             elif useGui == 2:
-                # PyUseCase doesn't handle tkMessageBox, deal with it via interception by default
+                # StoryText doesn't handle tkMessageBox, deal with it via interception by default
                 comment = "Tkinter doesn't provide any means to simulate interaction with tkMessageBox.\n" + \
-                          "Therefore PyUseCase cannot handle it. So we capture interaction with it instead.\n" + \
+                          "Therefore StoryText cannot handle it. So we capture interaction with it instead.\n" + \
                           "Cannot have multiple threads interacting with tkinter so we disable the threading also."
                 configEntries["section_comment"] = comment
                 configEntries["import_config_file"] = "capturemock_config"
@@ -570,10 +570,10 @@ class ImportApplication(guiplugins.ActionDialogGUI):
                 configEntries["section_comment"] = comment
                 configEntries["virtual_display_hide_windows"] = "false"
             
-            pyusecaseDir = os.path.join(directory, "pyusecase_files")
-            plugins.ensureDirectoryExists(pyusecaseDir) 
+            storytextDir = os.path.join(directory, "storytext_files")
+            plugins.ensureDirectoryExists(storytextDir) 
             # Create an empty UI map file so it shows up in the Config tab...
-            open(os.path.join(pyusecaseDir, "ui_map.conf"), "w")
+            open(os.path.join(storytextDir, "ui_map.conf"), "w")
         elif useGui == 8:
             configEntries["use_case_recorder"] = "none"            
 

@@ -62,12 +62,12 @@ class IdleHandlerManager:
 
     def getIdlePriority(self):
         try:
-            # Same priority as PyUseCase replay, so they get called interchangeably
+            # Same priority as StoryText replay, so they get called interchangeably
             # Non-default as a workaround for bugs in filechooser handling in GTK
-            from usecase.gtktoolkit import PRIORITY_PYUSECASE_IDLE
-            return PRIORITY_PYUSECASE_IDLE
+            from storytext.gtktoolkit import PRIORITY_STORYTEXT_IDLE
+            return PRIORITY_STORYTEXT_IDLE
         except ImportError:
-            # It should still work if we can't find PyUseCase
+            # It should still work if we can't find StoryText
             # so we hardcode the right answer...
             return gobject.PRIORITY_DEFAULT_IDLE + 20
 
@@ -488,8 +488,8 @@ class ShortcutBarGUI(guiutils.SubGUI):
         guiutils.SubGUI.__init__(self)
         # Do this first, so we set up interceptors and so on early on
         try:
-            from usecase import createShortcutBar
-            from version_control.custom_widgets_pyusecase import customEventTypes
+            from storytext import createShortcutBar
+            from version_control.custom_widgets_storytext import customEventTypes
             uiMapFiles = plugins.findDataPaths([ "*.uimap" ], *args)
             self.widget = createShortcutBar(uiMapFiles=uiMapFiles, customEventTypes=customEventTypes)
             self.widget.show()

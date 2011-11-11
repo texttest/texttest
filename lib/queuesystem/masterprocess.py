@@ -910,8 +910,13 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
     def run(self):
         while not self.terminate:
             self.diag.info("Waiting for a new request...")
-            self.handle_request()
-        
+            try:
+                self.handle_request()
+            except:
+                # e.g. can get interrupted system call here in 'select' if we get a signal
+                sys.stderr.write("WARNING: slave server caught exception while processing request!\n")
+                plugins.printException()
+            
         self.diag.info("Terminating slave server")
         
     def notifyAllRead(self, *args):

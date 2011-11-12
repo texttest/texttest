@@ -634,7 +634,7 @@ class WebPageResponder(plugins.Responder):
         srcDir = os.path.join(os.path.dirname(__file__), "testoverview_javascript")
         if os.path.isdir(jsDir):
             for fn in os.listdir(srcDir):
-                shutil.copy(os.path.join(srcDir, fn), jsDir)
+                shutil.copyfile(os.path.join(srcDir, fn), jsDir)
         else:
             shutil.copytree(srcDir, jsDir)            
         

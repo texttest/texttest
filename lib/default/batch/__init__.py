@@ -634,9 +634,9 @@ class WebPageResponder(plugins.Responder):
         srcDir = os.path.join(os.path.dirname(__file__), "testoverview_javascript")
         if os.path.isdir(jsDir):
             for fn in os.listdir(srcDir):
-                shutil.copyfile(os.path.join(srcDir, fn), jsDir)
+                shutil.copyfile(os.path.join(srcDir, fn), os.path.join(jsDir, fn))
         else:
-            shutil.copytree(srcDir, jsDir)            
+            shutil.copytree(srcDir, jsDir)
         
     def makeAndGenerate(self, subDirs, getConfigValue, pageDir, *args):
         resourcePages = self.getResourcePages(getConfigValue)

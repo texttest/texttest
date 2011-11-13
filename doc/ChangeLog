@@ -2082,9 +2082,10 @@ CaptureMock BugFixes:
     - No longer stacktraces if called on Python earlier than 2.4 (sitecustomize.py)
     - No longer writes a trailing space if the program is called with no arguments (capturepython.py)
 
-Version trunk
-=============
-System requirements (see Migration Notes):
+Version 3.22
+============
+Installation:
+    - There is now a Windows installer (which also includes StoryText, ex PyUseCase)
 General GUI Enhancements:
     - File selection is now preserved when a new test is selected
 	Makes it easier to compare previews of different test results
@@ -2145,6 +2146,8 @@ Grid Engine (LSF/SGE) enhancements/bug fixes:
     - Now handles hold state (hqw) correctly
     - Fixed hang if slave gets an invalid test for any reason
     - disabled confusing multiplication of performance limits by number of processes run
+    - Various network problem-related robustness fixes
+    - Don't allow SGE job reuse if virtual display args differ between tests
 Bug Fixes:
     - Fixed inconsistencies in dynamic GUI with test suite "all succeeded" status when tests are recomputed and then fail.
     - Fixed stacktrace trying to build piecharts when matplotlib not installed

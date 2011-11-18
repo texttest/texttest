@@ -2174,3 +2174,15 @@ Bug Fixes:
     - Recomputation now works when the app config file is changed, and there is also a test config file
     - No longer fail to remove tmp directories if there are readonly broken links in them
     - Fixed crash doing "Test Filtering" when no filters were defined
+
+
+Version trunk
+=============
+Installation:
+General GUI Enhancements:
+Static GUI Enhancements:
+Dynamic GUI Enhancements:
+Framework Enhancements:
+Batch Report Enhancements:
+Grid Engine (LSF/SGE) enhancements/bug fixes:
+Bug Fixes:

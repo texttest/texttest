@@ -148,7 +148,7 @@ class GenerateWebPages(object):
                     page.prepend(HTMLgen.Heading(1, *graphs, align = 'center'))
                 page.prepend(HTMLgen.Heading(1, minorVersionHeader, align = 'center'))
             page.prepend(HTMLgen.Heading(1, self.getHeading(resourceName), align = 'center'))
-            if len(pageColours) > 1:
+            if len(pageColours) > 0:
                 page.prepend(HTMLgen.BR());
                 page.prepend(HTMLgen.BR());
                 page.script = self.getFilterScripts(pageColours)

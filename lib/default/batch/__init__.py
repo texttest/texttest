@@ -386,7 +386,7 @@ class SaveState(plugins.Responder):
         self.diag = logging.getLogger("Save Repository")
 
     def isBatchDate(self, dateStr):
-        return re.match("[0-9]{2}[A-Za-z]{3}[0-9]{4}", dateStr)
+        return re.match("^[0-9]{2}[A-Za-z]{3}[0-9]{4}$", dateStr)
 
     def createFileName(self, nameGiven):
         # include the date and the name, if any. Date is used for archiving, name for display

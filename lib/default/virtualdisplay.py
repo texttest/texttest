@@ -98,7 +98,7 @@ class VirtualDisplayResponder(plugins.Responder):
         return self.startXvfb(startArgs, machine)
 
     def startXvfb(self, startArgs, machine):
-        for i in range(5):
+        for _ in range(5):
             self.diag.info("Starting Xvfb using args " + repr(startArgs))
             self.displayProc = subprocess.Popen(startArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             line = plugins.retryOnInterrupt(self.displayProc.stdout.readline)

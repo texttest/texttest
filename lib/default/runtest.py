@@ -98,7 +98,7 @@ class RunTest(plugins.Action):
         self.lock.release()
 
     def waitForKill(self):
-        for i in range(10):
+        for _ in range(10):
             sleep(0.2)
             if self.killSignal is not None:
                 return
@@ -198,7 +198,7 @@ class RunTest(plugins.Action):
             info = subprocess.STARTUPINFO()
             # Python doesn't make this easy for us: in 2.6.6 and later these flags became inaccessible
             # Alternative is to use win32api which seems excessive just for this purpose.
-            winFlagModule = subprocess if hasattr(subprocess, "STARTF_USESHOWWINDOW") else subprocess._subprocess
+            winFlagModule = subprocess if hasattr(subprocess, "STARTF_USESHOWWINDOW") else subprocess._subprocess #@UndefinedVariable
             info.dwFlags |= winFlagModule.STARTF_USESHOWWINDOW
             info.wShowWindow = winFlagModule.SW_HIDE
             return info

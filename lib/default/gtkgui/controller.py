@@ -720,7 +720,7 @@ class InteractiveActionHandler:
     def _getIntvActionConfig(self, module):
         try:
             exec "from " + module + " import InteractiveActionConfig"
-            return InteractiveActionConfig()
+            return InteractiveActionConfig() #@UndefinedVariable
         except ImportError:
             self.diag.info("Rejected GUI configuration from module " + repr(module) + "\n" + plugins.getExceptionString())
             self.rejectedModules.append(module) # Make sure we don't try and import it again

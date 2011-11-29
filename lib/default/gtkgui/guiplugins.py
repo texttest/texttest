@@ -497,7 +497,10 @@ class OptionGroupGUI(ActionGUI):
         fromConfig = guiConfig.getCompositeValue("gui_entry_overrides", option.name)
         # only do this if it hasn't previously been manually overwritten
         if fromConfig is not None and fromConfig != "<not set>" and option.getValue() == option.defaultValue:
-            option.setValue(fromConfig)
+            newValue = fromConfig
+            if isinstance(option.getValue(), int):
+                newValue = int(fromConfig)
+            option.setValue(newValue)
             return fromConfig
 
     def createLabelEventBox(self, option, separator):
@@ -672,21 +675,20 @@ class OptionGroupGUI(ActionGUI):
             return frame, view.get_buffer()
         else:
             box = gtk.HBox()
-            if option.usePossibleValues():
+            value = option.getValue()
+            if isinstance(value, int):
+                adjustment = gtk.Adjustment(value=value, lower=self.getLowerBoundForSpinButtons(),
+                                            upper=1000, step_incr=1)
+                widget = gtk.SpinButton(adjustment)
+                widget.set_numeric(True)
+                entry = widget
+            elif option.usePossibleValues():
                 widget, entry = self.createComboBoxEntry(option)
                 widget.set_name(optionName + " (Combo Box)")
-                box.pack_start(widget, expand=True, fill=True)
             else:
-                value = option.getValue()
-                if isinstance(value, int):
-                    adjustment = gtk.Adjustment(value=value, lower=self.getLowerBoundForSpinButtons(),
-                                                upper=1000, step_incr=1)
-                    entry = gtk.SpinButton(adjustment)
-                    entry.set_numeric(True)
-                else:
-                    entry = gtk.Entry()
-                box.pack_start(entry, expand=True, fill=True)
-
+                widget = gtk.Entry()
+                entry = widget
+            box.pack_start(widget, expand=True, fill=True)
             entry.set_name(optionName)
             entrycompletion.manager.register(entry)
             # Options in drop-down lists don't change, so we just add them once and for all.

@@ -245,8 +245,10 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         dialog.set_default_response(gtk.RESPONSE_NO)
         dialog.add_button(gtk.STOCK_NO, gtk.RESPONSE_NO)
         dialog.add_button(gtk.STOCK_YES, gtk.RESPONSE_YES)
-        dialog.connect("response", respondMethod, respondData)
+        if respondMethod:
+            dialog.connect("response", respondMethod, respondData)
         dialog.show_all()
+        return dialog
         
     def _cleanDialog(self, dialog, *args):
         entrycompletion.manager.collectCompletions()

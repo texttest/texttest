@@ -11,7 +11,7 @@ SetCompressor lzma
 ; ------------ TextTest settings ---------
 !define PRODUCT_NAME "TextTest"
 !ifndef PRODUCT_VERSION
-  !define PRODUCT_VERSION ""
+  !define PRODUCT_VERSION "3.22"
 !endif
 !define PRODUCT_PUBLISHER "TextTest"
 !define PRODUCT_WEB_SITE "http://www.texttest.org"
@@ -41,7 +41,7 @@ Var JAVA_EXE
   !define CENTRAL_TEXTTEST_LOCATION "T:\texttest\release\current.win"
 !else
   !ifndef TEXTTEST_ROOT
-    !define TEXTTEST_ROOT "texttest-3.21"
+    !define TEXTTEST_ROOT "texttest-3.22"
   !endif
   !ifndef TEXTTEST_DIST
     !define TEXTTEST_DIST "${TEXTTEST_ROOT}.zip"
@@ -55,7 +55,7 @@ Var JAVA_EXE
   !DEFINE PYTHON_VERSION "2.6"
 !endif
 !ifndef JYTHON_VERSION
-  !DEFINE JYTHON_VERSION "2.5.2"
+  !DEFINE JYTHON_VERSION "2.5.1"
 !endif
 
 !ifndef VIRTUAL_PYTHON
@@ -69,7 +69,7 @@ Var JAVA_EXE
   !define PYTHON_INSTALLER "python-2.6.6.msi"
 !endif
 !ifndef JYTHON_INSTALLER
-  !define JYTHON_INSTALLER "jython_installer-2.5.2.jar"
+  !define JYTHON_INSTALLER "jython_installer-2.5.1.jar"
 !endif
 !ifndef PYGTK_INSTALLER
   !define PYGTK_INSTALLER "pygtk-all-in-one-2.22.6.win32-py2.6.msi"

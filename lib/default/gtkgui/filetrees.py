@@ -201,9 +201,10 @@ class ApplicationFileGUI(FileViewGUI):
             if currUsecaseHome != os.getenv("STORYTEXT_HOME") and os.path.isdir(currUsecaseHome):
                 self.storytextDirs[suite.app] = currUsecaseHome
             for configVar in [ "executable" , "interpreter" ]:
-                rawScript = suite.getConfigValue(configVar, expandVars=False)
-                if "TEXTTEST_ROOT" in rawScript:
-                    self.testScripts.setdefault(suite.app.name, set()).add(suite.getConfigValue(configVar))
+                for i, rawScriptArg in enumerate(suite.getConfigValue(configVar, expandVars=False).split()):
+                    if "TEXTTEST_ROOT" in rawScriptArg:
+                        scriptArg = suite.getConfigValue(configVar).split()[i]
+                        self.testScripts.setdefault(suite.app.name, set()).add(scriptArg)
             if suite.app not in self.allApps and suite.app not in self.extras:
                 self.allApps.append(suite.app)
                 self.recreateModel(self.getState(), preserveSelection=False)

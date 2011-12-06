@@ -2184,5 +2184,9 @@ Static GUI Enhancements:
 Dynamic GUI Enhancements:
 Framework Enhancements:
 Batch Report Enhancements:
+    - Now allow different colours for performance and memory changes in HTML report
+	Use e.g. larger_bg, faster_bg in [historical_report_colours]
 Grid Engine (LSF/SGE) enhancements/bug fixes:
 Bug Fixes:
+    - "gui_entry_override" now works with spin buttons (e.g. "times_to_run", for the Running tab)
+    - Fixed infinite recursion in static GUI if "interpreter" or "executable" took a script as an argument

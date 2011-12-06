@@ -72,7 +72,7 @@ class SummaryDataFinder:
         if len(apps) > 0:
             self.colourFinder = testoverview.ColourFinder(apps[0][0].getCompositeConfigValue)
             self.inputOptions = apps[0][0].inputOptions
-        for app, usePie, rejected in apps:
+        for app, usePie, _ in apps:
             self.appUsePie[app.fullName()] = usePie
             appDir = os.path.join(location, app.name)
             self.diag.info("Searching under " + repr(appDir))
@@ -137,7 +137,7 @@ class SummaryDataFinder:
     def usePieChart(self, appName):
         if self.appUsePie.get(appName) == "true":
             try:
-                from resultgraphs import PieGraph
+                from resultgraphs import PieGraph #@UnusedImport
                 return True
             except Exception, e:
                 sys.stderr.write("Not producing pie charts for index pages: " + str(e) + "\n")

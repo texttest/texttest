@@ -13,13 +13,17 @@ def getWeekDay(tag):
 class ColourFinder:
     def __init__(self, getConfigValue):
         self.getConfigValue = getConfigValue
+        
     def find(self, title):
         colourName = self.getConfigValue("historical_report_colours", title)
         return self.htmlColour(colourName)
+    
     def htmlColour(self, colourName):
-        if not colourName.startswith("#"):
-            colourName = getattr(HTMLcolors, colourName.upper())
-        return colourName
+        if colourName and not colourName.startswith("#"):
+            return getattr(HTMLcolors, colourName.upper())
+        else:
+            return colourName
+
 
 def getDisplayText(tag):
     displayText = "_".join(tag.split("_")[1:])
@@ -237,14 +241,14 @@ class GenerateWebPages(object):
     def findGlobal(self, modName, className):
         try:
             exec "from " + modName + " import " + className + " as _class"
-            return _class
+            return _class #@UndefinedVariable
         except ImportError:
             for loadedMod in sys.modules.keys():
                 if "." in loadedMod:
                     packageName = ".".join(loadedMod.split(".")[:-1] + [ modName ])
                     try:
                         exec "from " + packageName + " import " + className + " as _class" 
-                        return _class
+                        return _class #@UndefinedVariable
                     except ImportError:
                         pass
             raise
@@ -348,7 +352,7 @@ class GenerateWebPages(object):
         
     def writePages(self):
         plugins.log.info("Writing overview pages...")
-        for pageFile, (resourceName, page, pageColours) in self.pagesOverview.items():
+        for pageFile, (resourceName, page, _) in self.pagesOverview.items():
             page.write(pageFile)
             plugins.log.info("wrote: '" + plugins.relpath(pageFile, self.pageDir) + "'")
         plugins.log.info("Writing detail pages...")
@@ -443,7 +447,8 @@ class TestTable:
         fullData = []
         for tag in self.tags:
             colourCount = OrderedDict()
-            for colourKey in [ "success", "knownbug", "performance", "memory", "failure", "incomplete" ]:
+            for colourKey in [ "success", "knownbug", "slower", "faster" , "performance", 
+                                "larger", "smaller" , "memory", "failure", "incomplete" ]:
                 colourCount[colourKey] = 0
             categoryHandler = self.categoryHandlers[tag]
             basicData = categoryHandler.getSummaryData()[-1]
@@ -538,14 +543,21 @@ class TestTable:
             return "success"
         elif category == "bug":
             return "knownbug"
-        elif category.startswith("faster") or category.startswith("slower"):
-            return "performance"
+        elif category.startswith("faster"): 
+            return self.getExistingColourKey([ "faster", "performance" ])
+        elif category.startswith("slower"):
+            return self.getExistingColourKey([ "slower", "performance" ])
         elif category == "smaller" or category == "larger":
-            return "memory"
+            return self.getExistingColourKey([ category, "memory" ])
         elif category in [ "killed", "unrunnable", "cancelled", "abandoned" ]:
             return "incomplete"
         else:
             return "failure"
+        
+    def getExistingColourKey(self, keys):
+        for key in keys:
+            if self.colourFinder.find(key + "_bg"):
+                return key
 
     def getForegroundColourKey(self, bgcolKey, fileComp):
         if (bgcolKey == "performance" and self.getPercent(fileComp) >= \
@@ -675,7 +687,7 @@ class TestDetails:
             return HTMLgen.Heading(4, headerText) 
     def getTestLines(self, tests, version, linkFromDetailsToOverview):
         lines = []
-        for testName, state, extraVersion in tests:
+        for testName, _, extraVersion in tests:
             linksToOverview = self.getLinksToOverview(version, testName, extraVersion, linkFromDetailsToOverview)
             headerText = testName + " ("
             container = HTMLgen.Container(headerText, linksToOverview, ")<br>")

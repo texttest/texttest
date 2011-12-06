@@ -119,7 +119,11 @@ class GraphGenerator:
     labels = OrderedDict()
     labels["success"] = "Succeeded tests"
     labels["performance"] = "Performance difference"
+    labels["faster"] = "Performance faster"
+    labels["slower"] = "Performance slower"
     labels["memory"] = "Memory difference"
+    labels["smaller"] = "Less Memory"
+    labels["larger"] = "More Memory"
     labels["knownbug"] = "Known Issues"
     labels["failure"] = "Failed tests"
     labels["incomplete"] = "Not completed"

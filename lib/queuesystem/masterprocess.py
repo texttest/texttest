@@ -411,17 +411,18 @@ class QueueSystemServer(BaseActionRunner):
         else:
             return []
         
-    def createSubmitProcess(self, test, cmdArgs, slaveEnv):
+    def createSubmitProcess(self, test, cmdArgs, slaveEnv, withProxy):
         logDir = self.getSlaveLogDir(test)
-        proxyArgs = self.getProxyCmdArgs(test)
-        if proxyArgs:
-            cmdArgs[1:1] = [ "-sync", "y" ] # must synchronise in the proxy
-            slaveEnv["TEXTTEST_SUBMIT_COMMAND_ARGS"] = repr(cmdArgs) # Exact command arguments to run TextTest slave, for use by proxy
-            cmdArgs = proxyArgs
-        return subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                cwd=logDir, env=slaveEnv)
+        if withProxy:
+            proxyArgs = self.getProxyCmdArgs(test)
+            if proxyArgs:
+                cmdArgs[1:1] = [ "-sync", "y" ] # must synchronise in the proxy
+                slaveEnv["TEXTTEST_SUBMIT_COMMAND_ARGS"] = repr(cmdArgs) # Exact command arguments to run TextTest slave, for use by proxy
+                cmdArgs = proxyArgs
+        return cmdArgs, subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                         cwd=logDir, env=slaveEnv)
 
-    def submitJob(self, test, submissionRules, command, slaveEnv):
+    def submitJob(self, test, submissionRules, command, slaveEnv, withProxy=True):
         self.diag.info("Submitting job at " + plugins.localtime() + ":" + command)
         self.diag.info("Creating job at " + plugins.localtime())
         cmdArgs = self.getSubmitCmdArgs(test, submissionRules)
@@ -439,7 +440,7 @@ class QueueSystemServer(BaseActionRunner):
         self.lockDiag.info("Got lock for submission")
         queueSystem = self.getQueueSystem(test)
         try:
-            process = self.createSubmitProcess(test, cmdArgs, slaveEnv)
+            cmdArgs, process = self.createSubmitProcess(test, cmdArgs, slaveEnv, withProxy)
             stdout, stderr = process.communicate()
             errorMessage = self.findErrorMessage(stderr, queueSystem)
         except OSError:

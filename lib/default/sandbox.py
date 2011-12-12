@@ -1051,6 +1051,7 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
             sum += value
         roundedSum = float(int(10*sum))/10
         return "Total " + fileStem.capitalize() + "  :      " + str(roundedSum)
+    
     def findValues(self, logFile, entryFinder):
         values = []
         for line in open(logFile).xreadlines():
@@ -1059,32 +1060,33 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
                 self.diag.info(" found value: " + str(value))
                 values.append(value)
         return values
+    
     def getValue(self, line, entryFinder):
-        # locates the first whitespace after an occurrence of entryFinder in line,
-        # and scans the rest of the string after that whitespace
-        pattern = '.*' + entryFinder + r'\S*\s(?P<restofline>.*)'
-        regExp = re.compile(pattern)
-        match = regExp.match(line)
-        if not match:
-            return
-        restOfLine = match.group('restofline')
-        self.diag.info(" entry found, extracting value from: " + restOfLine)
-        words = restOfLine.split()
-        if len(words) == 0:
-            return
+        match = re.search(entryFinder, line)
+        if match is not None:
+            # If there are groups in the string, go through them till we find one we can parse
+            for group in match.groups():
+                groupValue = self.parseString(group)
+                if groupValue is not None:
+                    return groupValue
+            # locates the first whitespace after an occurrence of entryFinder in line,
+            # and scans the rest of the string after that whitespace
+            return self.getValue(line, entryFinder + r'\S*\s+(\S+)')
+    
+    def parseString(self, stringValue):
         try:
-            number = float(words[0])
-            if restOfLine.lower().find("kb") != -1:
-                number = float(number / 1024.0)
-            return number
+            return float(stringValue)
         except ValueError:
-            # try parsing the memString as a h*:mm:ss time string
-            # * - any number of figures are allowed for the hour part
-            timeRegExp = re.compile(r'(?P<hours>\d+)\:(?P<minutes>\d\d)\:(?P<seconds>\d\d)')
-            match = timeRegExp.match(words[0])
-            if match:
-                hours = float(match.group('hours'))
-                minutes = float(match.group('minutes'))
-                seconds = float(match.group('seconds'))
-                return hours*60*60 + minutes*60 + seconds
+            return self.parseAsTimeString(stringValue)
+        
+    def parseAsTimeString(self, stringValue):
+        # try parsing the memString as a h*:mm:ss time string
+        # * - any number of figures are allowed for the hour part
+        timeRegExp = re.compile(r'(?P<hours>\d+)\:(?P<minutes>\d\d)\:(?P<seconds>\d\d)')
+        match = timeRegExp.match(stringValue)
+        if match:
+            hours = float(match.group('hours'))
+            minutes = float(match.group('minutes'))
+            seconds = float(match.group('seconds'))
+            return hours*60*60 + minutes*60 + seconds
 

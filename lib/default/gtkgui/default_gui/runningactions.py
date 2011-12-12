@@ -478,6 +478,7 @@ class RecordTest(BasicRunningAction,guiplugins.ActionDialogGUI):
 
         self.addOption("v", "Version to record", defaultVersion)
         self.addOption("c", self.getCheckoutLabel(), defaultCheckout)
+        self.addOption("m", "Record on machine")
 
     def getCheckoutLabel(self):
         # Sometimes configurations might want to use their own term in place of "checkout"
@@ -566,7 +567,7 @@ class RecordTest(BasicRunningAction,guiplugins.ActionDialogGUI):
             self.notify("Status", "Recording and auto-replay completed for " + repr(test))
 
     def getCommandLineKeys(self, usecase):
-        keys = [ "v", "c" ]
+        keys = [ "v", "c", "m" ]
         if usecase == "record":
             keys.append("rectraffic")
         return keys

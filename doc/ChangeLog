@@ -2181,8 +2181,13 @@ Version trunk
 Installation:
 General GUI Enhancements:
 Static GUI Enhancements:
+    - Record dialog now allows recording on a different machine via SSH
 Dynamic GUI Enhancements:
 Framework Enhancements:
+    - "Known bugs" no longer cause TextTest to exit with exit code 1
+	It's reckoned they are under control and hence not a reason to fail anything, e.g. a Jenkins build.
+    - "performance_logfile_extractor" format is more general
+	Can now use regular expression groups to specify any format at all
 Batch Report Enhancements:
     - Now allow different colours for performance and memory changes in HTML report
 	Use e.g. larger_bg, faster_bg in [historical_report_colours]
@@ -2190,3 +2195,4 @@ Grid Engine (LSF/SGE) enhancements/bug fixes:
 Bug Fixes:
     - "gui_entry_override" now works with spin buttons (e.g. "times_to_run", for the Running tab)
     - Fixed infinite recursion in static GUI if "interpreter" or "executable" took a script as an argument
+    - Now display correct error message if a proxy job cannot be submitted to SGE

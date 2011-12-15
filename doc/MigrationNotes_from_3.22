@@ -1,0 +1,10 @@
+
+
+=========================================================
+CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
+=========================================================
+
+(1) Known bugs no longer "fail the whole run"
+=============================================
+TextTest returns an exit code of 1 if any tests fail. It no longer does this for "known bugs": it reckons they
+are under control and not a reason to fail things.

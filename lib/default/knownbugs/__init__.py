@@ -11,11 +11,12 @@ plugins.addCategory("crash", "CRASHED")
 
 # For backwards compatibility...
 class FailedPrediction(plugins.TestState):
+    def setsFailureCode(self):
+        return self.category != "bug"
+    
     def getTypeBreakdown(self):
-        if self.category == "bug":
-            return "success", self.briefText
-        else:
-            return "failure", self.briefText
+        status = "failure" if self.setsFailureCode() else "success"
+        return status, self.briefText
 
 class Bug:
     def __init__(self, rerunCount):
@@ -56,7 +57,7 @@ class BugSystemBug(Bug):
         username = test.getCompositeConfigValue("bug_system_username", self.bugSystem)
         password = test.getCompositeConfigValue("bug_system_password", self.bugSystem)
         exec "from " + self.bugSystem + " import findBugInfo as _findBugInfo"
-        status, bugText, isResolved = _findBugInfo(self.bugId, location, username, password)
+        status, bugText, isResolved = _findBugInfo(self.bugId, location, username, password) #@UndefinedVariable
         category = self.findCategory(isResolved)
         briefText = "bug " + self.bugId + " (" + status + ")"
         return category, briefText, self.getRerunText() + bugText

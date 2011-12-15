@@ -310,7 +310,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             self.appSuites = []
 
     def notifyComplete(self, test):
-        if test.state.hasFailed():
+        if test.state.setsFailureCode():
             self.exitCode = 1
         
     def run(self):

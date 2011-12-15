@@ -200,6 +200,9 @@ class TestComparison(BaseTestComparison):
 
     def hasSucceeded(self):
         return self.category == "success"
+    
+    def setsFailureCode(self):
+        return self.hasFailed() and (self.failedPrediction is None or self.failedPrediction.setsFailureCode())
 
     def warnOnSave(self):
         return bool(self.failedPrediction)

@@ -20,7 +20,7 @@ def trySetupCaptureMock():
     try:
         import capturemock
         capturemock.process_startup() # doesn't do anything unless CAPTUREMOCK_PROCESS_START is set
-    except Exception, e:
+    except Exception:
         pass
 
 def loadRealSiteCustomize(fileName): # pragma: no cover - coverage not set up yet

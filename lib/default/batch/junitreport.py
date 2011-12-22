@@ -63,7 +63,7 @@ class JUnitApplicationData:
         else:
             self._failure(test, result)
         
-        self.testResults[test.name] = result
+        self.testResults[test.getRelPath().replace("/", ".")] = result
         
     def getResults(self):
         return self.testResults

@@ -8,3 +8,9 @@ CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
 =============================================
 TextTest returns an exit code of 1 if any tests fail. It no longer does this for "known bugs": it reckons they
 are under control and not a reason to fail things.
+
+(2) "interpreter" can no longer be set in personal configuration files
+======================================================================
+It was never intended that it be used in this way but it worked up until 3.22. This is not supported any longer. Move it 
+to the application configuration where it belongs.
+

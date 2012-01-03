@@ -1380,7 +1380,7 @@ class MultiEntryDictionary(OrderedDict):
         elif isinstance(value, list):
             return [ string.Template(element).safe_substitute(envMapping) for element in value ]
         elif isinstance(value, dict):
-            newDict = {}
+            newDict = value.__class__()
             for key, val in value.items():
                 newDict[key] = cls.expandEnvironment(val, envMapping)
             return newDict

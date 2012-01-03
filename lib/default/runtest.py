@@ -211,8 +211,8 @@ class RunTest(plugins.Action):
         for signum in [ signal.SIGQUIT, signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU ]:
             signal.signal(signum, signal.SIG_IGN)
 
-    def getInterpreterArgs(self, test, expandVars):
-        args = plugins.splitcmd(test.getConfigValue("interpreter", expandVars=expandVars))
+    def getInterpreterArgs(self, test, interpreter):
+        args = plugins.splitcmd(interpreter)
         if len(args) > 0 and args[0] == "ttpython": # interpreted to mean "whatever python TextTest runs with"
             return [ sys.executable, "-u" ] + args[1:]
         else:
@@ -300,8 +300,9 @@ class RunTest(plugins.Action):
 
         # Don't expand environment if we're running on a different file system
         expandVars = test.app.getRunMachine() == "localhost" or not test.getConfigValue("remote_copy_program")
-        args += self.getInterpreterArgs(test, expandVars)
-        args += test.getInterpreterOptions()
+        for interpreterName, interpreter in test.getConfigValue("interpreters", expandVars=expandVars).items():
+            args += self.getInterpreterArgs(test, interpreter)
+            args += test.getCommandLineOptions(stem=interpreterName + "_options")
         args += plugins.splitcmd(test.getConfigValue("executable", expandVars=expandVars))
         args += test.getCommandLineOptions()
         return args

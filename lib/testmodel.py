@@ -425,10 +425,12 @@ class Test(plugins.Observable):
         return self.getAppForVersion(refVersion).getFileNameFromCaches([ self.dircache ], stem)
 
     def getPathName(self, stem, configName=None, refVersion=None):
+        self.diagnose("Getting path name from " + stem)
         app = self.getAppForVersion(refVersion)
         return self.pathNameMethod(stem, configName, app.getFileNameFromCaches)
 
     def getAllPathNames(self, stem, configName=None, refVersion=None):
+        self.diagnose("Getting all path names from " + stem)
         app = self.getAppForVersion(refVersion)
         return self.pathNameMethod(stem, configName, app.getAllFileNames)
 
@@ -665,9 +667,6 @@ class TestCase(Test):
             if itemToClear == optionArgs[pos]:
                 del optionArgs[pos]
                 # which should leave the new pos as the next item
-
-    def getInterpreterOptions(self):
-        return self.getCommandLineOptions(stem="interpreter_options")
         
     def getCommandLineOptions(self, stem="options"):
         optionArgs = []
@@ -1552,6 +1551,8 @@ class Application:
     def setConfigDefaults(self):
         self.setConfigDefault("executable", "", "Full path to the System Under Test")
         self.setConfigAlias("binary", "executable")
+        self.setConfigDefault("interpreters", OrderedDict(), "Programs to use, in order, as interpreters for the SUT")
+        self.setConfigDefault("interpreter", "", "Single program to use as interpreter for the SUT")
         self.setConfigDefault("config_module", "default", "Configuration module to use")
         self.setConfigDefault("import_config_file", [], "Extra config files to use")
         self.setConfigDefault("full_name", self.name.upper(), "Expanded name to use for application")
@@ -1583,7 +1584,11 @@ class Application:
         # Set values which default to other values
         self.setConfigDefault("interactive_action_module", self.getConfigValue("config_module") + "_gui",
                               "Module to search for InteractiveActions for the GUI")
-        self.setConfigDefault("interpreter", plugins.getInterpreter(executable), "Program to use as interpreter for the SUT")
+        interpreter = self.getConfigValue("interpreter", expandVars=False) or plugins.getInterpreter(executable)
+        interpreterDict = self.getConfigValue("interpreters")
+        if interpreter and len(interpreterDict) == 0:
+            # Must stop this printing a warning
+            self.addConfigEntry("interpreter", interpreter, "interpreters", errorOnClashWithGlobal=False)
 
     def getFullVersion(self, forSave = 0):
         versionsToUse = self.versions
@@ -1749,8 +1754,8 @@ class Application:
     def getCompositeConfigValue(self, *args, **kw):
         return self.configDir.getComposite(*args, **kw)
        
-    def addConfigEntry(self, key, value, sectionName = ""):
-        self.configDir.addEntry(key, value, sectionName, insert=False, errorOnUnknown=True)
+    def addConfigEntry(self, key, value, sectionName = "", **kw):
+        self.configDir.addEntry(key, value, sectionName, insert=False, errorOnUnknown=True, **kw)
 
     def removeConfigEntry(self, key, value, sectionName = ""):
         self.configDir.removeEntry(key, value, sectionName)

@@ -865,8 +865,7 @@ class Config:
         if self.executableShouldBeFile(suite.app, executable) and not os.path.isfile(executable):
             self.handleNonExistent(executable, "executable program", suite.app)
 
-        interpreterStr = suite.getConfigValue("interpreter")
-        if interpreterStr:
+        for interpreterStr in suite.getConfigValue("interpreters").values():
             interpreter = plugins.splitcmd(interpreterStr)[0]
             if os.path.isabs(interpreter) and not os.path.exists(interpreter):
                 self.handleNonExistent(interpreter, "interpreter program", suite.app)
@@ -917,8 +916,10 @@ class Config:
             return False
         
         # For finding java classes, don't warn if they don't exist as files...
-        interpreter = app.getConfigValue("interpreter")
-        return ("java" not in interpreter and "jython" not in interpreter) or executable.endswith(".jar")
+        if executable.endswith(".jar"):
+            return False
+        interpreters = app.getConfigValue("interpreters").values()
+        return all(("java" not in i and "jython" not in i for i in interpreters)) 
     
     def checkConfigSanity(self, app):
         for key in app.getConfigValue("collate_file"):
@@ -1356,7 +1357,6 @@ class Config:
         # Applies to any interface...
         app.setConfigDefault("auto_sort_test_suites", 0, "Automatically sort test suites in alphabetical order. 1 means sort in ascending order, -1 means sort in descending order.")
         app.addConfigEntry("builtin", "options", "definition_file_stems")
-        app.addConfigEntry("builtin", "interpreter_options", "definition_file_stems")
         app.addConfigEntry("regenerate", "usecase", "definition_file_stems")
         app.addConfigEntry("builtin", self.getStdinName(namingScheme), "definition_file_stems")
         app.addConfigEntry("builtin", "knownbugs", "definition_file_stems")
@@ -1376,9 +1376,11 @@ class Config:
     def setDependentConfigDefaults(self, app):
         # For setting up configuration where the config file needs to have been read first
         # Should return True if it does anything that could cause new config files to be found
-        interpreter = app.getConfigValue("interpreter")
-        if "python" in interpreter or "storytext" in interpreter:
+        interpreters = app.getConfigValue("interpreters").values()
+        if any(("python" in i or "storytext" in i for i in interpreters)):
             app.addConfigEntry("default", "testcustomize.py", "definition_file_stems")
+        for interpreterName in app.getConfigValue("interpreters").keys():
+            app.addConfigEntry("builtin", interpreterName + "_options", "definition_file_stems")
         return False
 
 

@@ -1262,14 +1262,15 @@ class MultiEntryDictionary(OrderedDict):
                       "' given an invalid value '" + entry + "', ignoring.")
 
     def removeEntry(self, entryName, entry, sectionName=""):
-        currDict, currSection = self.getSectionInfo(sectionName)
+        currDict, _ = self.getSectionInfo(sectionName)
         if entryName in currDict:
             dictElem = currDict[entryName]
             if entry in dictElem:
                 dictElem.remove(entry)
             
-    def _addEntry(self, entryName, entry, currDict, currSection, insert=True, errorOnUnknown=False):
-        if currDict is not self and self.has_key(entryName):
+    def _addEntry(self, entryName, entry, currDict, currSection, 
+                  insert=True, errorOnUnknown=False, errorOnClashWithGlobal=True):
+        if currDict is not self and self.has_key(entryName) and errorOnClashWithGlobal:
             self.warn("Config entry name '" + entryName + "' found in section '" + currSection +
                       "', but defined at global scope. Did you forget an [end] marker?")
 

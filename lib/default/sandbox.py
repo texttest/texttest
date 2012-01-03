@@ -332,6 +332,13 @@ class PrepareWriteDirectory(plugins.Action):
             self.diag.info("Copied " + path + " to " + remotePath)
             return remotePath
                     
+
+    def copySUTFileIfNeeded(self, machine, suite, fullTmpDir, checkout, remoteCheckout, localFile):
+        if remoteCheckout and localFile.startswith(checkout):
+            return localFile.replace(checkout, remoteCheckout) # We've copied it already, don't do it again...
+        else:
+            return self.tryCopyPathRemotely(localFile, fullTmpDir, machine, suite.app)
+
     def copySUTRemotely(self, machine, tmpDir, suite):
         self.diag.info("Copying SUT for " + repr(suite.app) + " to machine " + machine + " at " + tmpDir)
         fullTmpDir = os.path.join(tmpDir, "system_under_test")
@@ -341,16 +348,19 @@ class PrepareWriteDirectory(plugins.Action):
         if remoteCheckout:
             suite.app.checkout = remoteCheckout
             
-        for setting in [ "interpreter", "executable" ]:
-            localFile = suite.getConfigValue(setting)
-            if remoteCheckout and localFile.startswith(checkout):
-                remoteFile = localFile.replace(checkout, remoteCheckout) # We've copied it already, don't do it again...
-            else:
-                remoteFile = self.tryCopyPathRemotely(localFile, fullTmpDir, machine, suite.app)
+        for interpreterName, localFile in suite.getConfigValue("interpreters").items():
+            remoteFile = self.copySUTFileIfNeeded(machine, suite, fullTmpDir, checkout, remoteCheckout, localFile)
             if remoteFile:
-                self.diag.info("Setting " + repr(setting) + " to " + repr(remoteFile))
+                self.diag.info("Setting interpreter " + repr(interpreterName) + " to " + repr(remoteFile))
                 # For convenience, so we don't have to set it everywhere...
-                suite.app.setConfigDefault(setting, remoteFile)
+                suite.app.addConfigEntry(interpreterName, remoteFile, "interpreters", errorOnClashWithGlobal=False)
+
+        localFile = suite.getConfigValue("executable")
+        remoteFile = self.copySUTFileIfNeeded(machine, suite, fullTmpDir, checkout, remoteCheckout, localFile)
+        if remoteFile:
+            self.diag.info("Setting executable to " + repr(remoteFile))
+            # For convenience, so we don't have to set it everywhere...
+            suite.app.setConfigDefault("executable", remoteFile)
 
         scripts = suite.getConfigValue("copy_test_path_script")
         newScripts = {}

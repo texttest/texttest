@@ -3,7 +3,7 @@
 Module to handle the various file-trees in the GUI
 """
 
-import gtk, gobject, guiutils, plugins, os, sys, operator, logging
+import gtk, gobject, guiutils, plugins, os, sys, operator, logging, string
 from ordereddict import OrderedDict
 from copy import copy
 
@@ -195,16 +195,25 @@ class ApplicationFileGUI(FileViewGUI):
     def monitorEvents(self):
         pass
 
+
+    def getScriptArgs(self, suite):
+        scriptArgs = set()
+        scriptCmds = [ suite.getConfigValue("executable", expandVars=False) ] + \
+            suite.getConfigValue("interpreters", expandVars=False).values()
+            
+        for scriptCmd in scriptCmds:
+            for rawScriptArg in scriptCmd.split():
+                if "TEXTTEST_ROOT" in rawScriptArg:
+                    scriptArgs.add(string.Template(rawScriptArg).safe_substitute(suite.environment))
+        return scriptArgs
+
     def addSuites(self, suites):
         for suite in suites:
             currUsecaseHome = suite.getEnvironment("STORYTEXT_HOME")
             if currUsecaseHome != os.getenv("STORYTEXT_HOME") and os.path.isdir(currUsecaseHome):
                 self.storytextDirs[suite.app] = currUsecaseHome
-            for configVar in [ "executable" , "interpreter" ]:
-                for i, rawScriptArg in enumerate(suite.getConfigValue(configVar, expandVars=False).split()):
-                    if "TEXTTEST_ROOT" in rawScriptArg:
-                        scriptArg = suite.getConfigValue(configVar).split()[i]
-                        self.testScripts.setdefault(suite.app.name, set()).add(scriptArg)
+                
+            self.testScripts.setdefault(suite.app.name, set()).update(self.getScriptArgs(suite))
             if suite.app not in self.allApps and suite.app not in self.extras:
                 self.allApps.append(suite.app)
                 self.recreateModel(self.getState(), preserveSelection=False)

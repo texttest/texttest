@@ -1292,6 +1292,7 @@ class Application:
             self.importAndWriteEntries(configEntries)
 
         self.configDir.readValues(self.getPersonalConfigFiles(), insert=False, errorOnUnknown=False)
+        self.setInterpreters()
         self.diag.info("Config file settings are: " + "\n" + repr(self.configDir))
         if not plugins.TestState.showExecHosts:
             plugins.TestState.showExecHosts = self.configObject.showExecHostsInFailures(self)
@@ -1375,9 +1376,9 @@ class Application:
         except:
             if sys.exc_type == exceptions.ImportError:
                 errorString = "No module named " + moduleName
-                if str(sys.exc_value) == errorString:
+                if str(sys.exc_value) == errorString: #@UndefinedVariable
                     raise BadConfigError, "could not find config_module " + repr(moduleName)
-                elif str(sys.exc_value) == "cannot import name getConfig":
+                elif str(sys.exc_value) == "cannot import name getConfig": #@UndefinedVariable
                     raise BadConfigError, "module " + repr(moduleName) + " is not intended for use as a config_module"
             plugins.printException()
             raise BadConfigError, "config_module " + repr(moduleName) + " contained errors and could not be imported"
@@ -1580,15 +1581,19 @@ class Application:
         self.setConfigAlias("extra_config_directory", "extra_search_directory")
 
     def setDependentConfigDefaults(self):
-        executable = self.getConfigValue("executable")
         # Set values which default to other values
         self.setConfigDefault("interactive_action_module", self.getConfigValue("config_module") + "_gui",
                               "Module to search for InteractiveActions for the GUI")
-        interpreter = self.getConfigValue("interpreter", expandVars=False) or plugins.getInterpreter(executable)
+        self.setInterpreters()
+        
+    def setInterpreters(self):
         interpreterDict = self.getConfigValue("interpreters")
-        if interpreter and len(interpreterDict) == 0:
-            # Must stop this printing a warning
-            self.addConfigEntry("interpreter", interpreter, "interpreters", errorOnClashWithGlobal=False)
+        if len(interpreterDict) == 0 or (len(interpreterDict) == 1 and "interpreter" in interpreterDict):
+            executable = self.getConfigValue("executable")
+            interpreter = self.getConfigValue("interpreter", expandVars=False) or plugins.getInterpreter(executable)
+            if interpreter:
+                # Must stop this printing a warning
+                self.addConfigEntry("interpreter", interpreter, "interpreters", errorOnClashWithGlobal=False)
 
     def getFullVersion(self, forSave = 0):
         versionsToUse = self.versions
@@ -1902,9 +1907,9 @@ class OptionFinder(plugins.OptionFinder):
         
         try:
             if len(actionArgs) > 0:
-                return _class(actionArgs)
+                return _class(actionArgs) #@UndefinedVariable
             else:
-                return _class()
+                return _class() #@UndefinedVariable
         except:
             raise plugins.TextTestError, "Could not instantiate script action " + repr(actionCmd) +\
                   " with arguments " + repr(actionArgs) + "\n" + plugins.getExceptionString()

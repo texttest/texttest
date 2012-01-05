@@ -1,11 +1,10 @@
 
-import sys, os, logging.config, string, shutil, socket, time, re, stat, subprocess, shlex, types, fnmatch
+import sys, os, logging.config, string, shutil, socket, time, re, stat, shlex, types, fnmatch
 from ordereddict import OrderedDict
 from traceback import format_exception
 from threading import currentThread
 from Queue import Queue, Empty
 from glob import glob
-from copy import deepcopy
 from datetime import datetime
 
 # We standardise around UNIX paths, it's all much easier that way. They work fine,
@@ -30,10 +29,10 @@ if os.name == "nt":
     os.path.sep = posixpath.sep
     os.path.normpath = posixpath.normpath
     orig_abspath = os.path.abspath
-    def abspath(f):
+    def new_abspath(f):
         return orig_abspath(f).replace("\\", "/")
-    os.path.abspath = abspath
-    os.path.realpath = abspath
+    os.path.abspath = new_abspath
+    os.path.realpath = new_abspath
         
     
 class Callable:
@@ -81,7 +80,7 @@ def startTimeString():
 def importAndCall(moduleName, callableName, *args):
     command = "from " + moduleName + " import " + callableName + " as _callable"
     exec command
-    return _callable(*args)
+    return _callable(*args) #@UndefinedVariable
 
 def installationDir(name):
     # Generic modules only, we're confident we know where they are

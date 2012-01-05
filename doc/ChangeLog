@@ -2186,7 +2186,6 @@ Dynamic GUI Enhancements:
 Framework Enhancements:
     - Can now chain several "interpreter" programs together, instead of having only one
 	New config file section "interpreters". See website.
-	"interpreter" no longer works from personal config files as a result. See migration notes.
     - "Known bugs" no longer cause TextTest to exit with exit code 1
 	It's reckoned they are under control and hence not a reason to fail anything, e.g. a Jenkins build.
     - "performance_logfile_extractor" format is more general
@@ -2201,3 +2200,5 @@ Bug Fixes:
     - Fixed infinite recursion in static GUI if "interpreter" or "executable" took a script as an argument
     - Now display correct error message if a proxy job cannot be submitted to SGE
     - Now works to use coverage, capturemock and testcustomize.py under Python 3 when using TextTest
+    - Importing a non-existent config file from a config file in a test no longer causes complete failure
+	Just an error message for the test concerned

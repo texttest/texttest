@@ -1067,7 +1067,7 @@ class TestSuite(Test):
     def createTestOrSuite(self, testName, description, dirCache, filters, initial=True):
         className = self.getSubtestClass(dirCache)
         subTest = self.createSubtest(testName, description, dirCache, className)
-        if subTest.isAcceptedByAll(filters, checkContents=False) and subTest.readContents(filters, initial):
+        if subTest and subTest.isAcceptedByAll(filters, checkContents=False) and subTest.readContents(filters, initial):
             self.testcases.append(subTest)
             subTest.notify("Add", initial)
 
@@ -1078,9 +1078,12 @@ class TestSuite(Test):
         return TestSuite if cache.hasStem("testsuite." + self.app.name) else TestCase
 
     def createSubtest(self, testName, description, cache, className):
-        test = className(testName, description, cache, self.app, self)
-        test.setObservers(self.observers)
-        return test
+        try:
+            test = className(testName, description, cache, self.app, self)
+            test.setObservers(self.observers)
+            return test
+        except BadConfigError, e:
+            sys.stderr.write("ERROR: Could not create test '" + testName + "', problems with configuration:\n" + str(e) + "\n")
 
     def addTestCase(self, *args, **kwargs):
         return self.addTest(TestCase, *args, **kwargs)

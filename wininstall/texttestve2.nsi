@@ -28,7 +28,6 @@ Var JAVA_EXE
 
 !define env_hkcu 'HKCU "Environment"'
 !define env_hklm 'HKLM "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"'
-!define TT_BIN "source\bin"
 
 !ifdef WIN64
   !define ARCH "win64"
@@ -37,8 +36,12 @@ Var JAVA_EXE
 !endif
 
 !ifdef JEPPESEN
-  !define CENTRAL_STORYTEXT_LOCATION "T:\texttest\release\current.win\storytext"
-  !define CENTRAL_TEXTTEST_LOCATION "T:\texttest\release\current.win"
+  !define CENTRAL_STORYTEXT_LOCATION "T:\texttest\release\storytext"
+  !define CENTRAL_TEXTTEST_LOCATION "T:\texttest\release\current"
+  !define TT_BIN "bin"
+  !ifndef STORYTEXT_UPDATER
+    !define STORYTEXT_UPDATER "storytext_updater.bat"
+  !endif
 !else
   !ifndef TEXTTEST_ROOT
     !define TEXTTEST_ROOT "texttest-3.22"
@@ -46,6 +49,7 @@ Var JAVA_EXE
   !ifndef TEXTTEST_DIST
     !define TEXTTEST_DIST "${TEXTTEST_ROOT}.zip"
   !endif
+  !define TT_BIN "${TEXTTEST_ROOT}\source\bin"
 !endif
 
 !ifndef VIRTUALENV_DIST
@@ -214,11 +218,15 @@ SectionGroupEnd
 
 !ifdef JEPPESEN
 Section "TextTest and StoryText configuration" SEC06
-  Call configureStorytextPython
-  IfErrors onError
+  IfFileExists "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\*.*" ok
+  Call installVirtualEnvOnPython
+  IfErrors 0 ok
+  MessageBox MB_OK|MB_ICONSTOP "Failed to install virtual environment on Python."
+  Quit
+  ok:
   Call installJython
   IfErrors onError
-  Call configureStorytextJava
+  Call configureStoryTextJepp
   IfErrors onError
   Call updateTexttestPath
   IfErrors onError done
@@ -268,12 +276,8 @@ Function initialize
   !ifndef JEPPESEN
     File "open_source\${TEXTTEST_DIST}"
   !endif
-  !ifdef JEPPESEN
-    writeUninstaller "$OUTDIR\Uninstall.exe"
-  !else
-    CreateDirectory "$INSTDIR"
-    writeUninstaller "$INSTDIR\Uninstall.exe"
-  !endif
+  CreateDirectory "$INSTDIR"
+  writeUninstaller "$INSTDIR\Uninstall.exe"
   Call copyVirtualEnvFiles
 FunctionEnd
 
@@ -313,12 +317,7 @@ Function setTexttestHome
 FunctionEnd
 
 Function updateTexttestPath
-  !ifdef JEPPESEN
-    ${EnvVarUpdate} $0 "PATH" "P" "HKCU" "${CENTRAL_STORYTEXT_LOCATION}\bin"
-    ${EnvVarUpdate} $0 "PATH" "P" "HKCU" "${CENTRAL_TEXTTEST_LOCATION}\bin"
-  !else
-    ${EnvVarUpdate} $0 "PATH" "P" "HKCU" "$INSTDIR\${TEXTTEST_ROOT}\${TT_BIN}"
-  !endif
+  ${EnvVarUpdate} $0 "PATH" "P" "HKCU" "$INSTDIR\${TT_BIN}"
 FunctionEnd
 
 Function updatePythonPath
@@ -347,13 +346,8 @@ Function configureStorytextPython
   MessageBox MB_OK|MB_ICONSTOP "Failed to install virtual environment on Python."
   Quit
   install:
-  !ifdef JEPPESEN
-    ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring storytext on python & ${VIRTUAL_PYTHON}\Scripts\pip install -e ${CENTRAL_STORYTEXT_LOCATION} & EXIT'
-    IfErrors onError done
-  !else
-    ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring storytext on python & ${VIRTUAL_PYTHON}\Scripts\pip install storytext & EXIT'
-    IfErrors onError done
-  !endif
+  ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring storytext on python & ${VIRTUAL_PYTHON}\Scripts\pip install storytext & EXIT'
+  IfErrors onError done
   onError:
     MessageBox MB_OK|MB_ICONSTOP "Failed to install StoryText on Python."
     Quit
@@ -361,18 +355,26 @@ Function configureStorytextPython
 FunctionEnd
 
 Function configureStorytextJava
-  !ifdef JEPPESEN
-    ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring storytext on jython & ${VIRTUAL_JYTHON}\bin\jython ${VIRTUAL_JYTHON}\bin\pip install -e ${CENTRAL_STORYTEXT_LOCATION} && EXIT'
-    IfErrors onError done
-  !else
-    ;ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring storytext on jython & ${VIRTUAL_JYTHON}\bin\jython ${VIRTUAL_JYTHON}\bin\pip install storytext && EXIT'
-    ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring storytext on jython & ${VIRTUAL_JYTHON}\bin\jython ${VIRTUAL_JYTHON}\bin\easy_install storytext && EXIT'
-    IfErrors onError done
-  !endif
+  ;ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring storytext on jython & ${VIRTUAL_JYTHON}\bin\jython ${VIRTUAL_JYTHON}\bin\pip install storytext && EXIT'
+  ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring storytext on jython & ${VIRTUAL_JYTHON}\bin\jython ${VIRTUAL_JYTHON}\bin\easy_install storytext && EXIT'
+  IfErrors onError done
   onError:
     Abort
   done:
 FunctionEnd
+
+Function configureStoryTextJepp
+  FILE "${STORYTEXT_UPDATER}"
+  CopyFiles /SILENT "$OUTDIR\${STORYTEXT_UPDATER}" $INSTDIR
+  IfErrors onError
+  ExecWait '"cmd.exe" /K CD $INSTDIR & ${STORYTEXT_UPDATER} & exit'
+  IfErrors onError
+  ExecWait '"cmd.exe" /K schtasks /create /tn "StoryText Updater" /tr "$INSTDIR\${STORYTEXT_UPDATER}" /sc daily /st 23:00'
+  IfErrors onError done
+  onError:
+    Abort
+  done:
+FuntionEnd
 
 Function checkPythonPath
   ReadRegStr $PYTHON_PATH HKCU "SOFTWARE\Python\PythonCore\${PYTHON_VERSION}\InstallPath" ""
@@ -424,16 +426,9 @@ Functionend
 
 Function makeShortcuts
   CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
-  !ifdef JEPPESEN
-    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "${CENTRAL_TEXTTEST_LOCATION}\bin\texttest.py" \
-    "" "$OUTDIR\texttest-icon-dynamic.ico" ""
-    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall.lnk" "$OUTDIR\Uninstall.exe"
-    CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "${CENTRAL_TEXTTEST_LOCATION}\bin\texttest.py" "" "$OUTDIR\texttest-icon-dynamic.ico" ""
-  !else
-    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\${TEXTTEST_ROOT}\${TT_BIN}\texttest.py" "" "$OUTDIR\texttest-icon-dynamic.ico" ""
+    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\${TT_BIN}\texttest.py" "" "$OUTDIR\texttest-icon-dynamic.ico" ""
     CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
-    CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\${TEXTTEST_ROOT}\${TT_BIN}\texttest.py" "" "$OUTDIR\texttest-icon-dynamic.ico" ""
-  !endif
+    CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\${TT_BIN}\texttest.py" "" "$OUTDIR\texttest-icon-dynamic.ico" ""
 FunctionEnd
 
 Function .onInit
@@ -453,12 +448,7 @@ FunctionEnd
 
 Function un.setEnv
   DeleteRegKey "HKCU" "Environment\TEXTTEST_HOME"
-  !ifdef JEPPESEN
-    ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "${CENTRAL_STORYTEXT_LOCATION}\bin"
-    ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "${CENTRAL_TEXTTEST_LOCATION}\bin"
-  !else
-    ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "$INSTDIR\${TEXTTEST_ROOT}\${TT_BIN}"
-  !endif
+  ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "$INSTDIR\${TT_BIN}"
   ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\bin"
   ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\Scripts"
   ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "$VIRTUALENV_PATH\${VIRTUAL_JYTHON}\bin"

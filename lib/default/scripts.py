@@ -131,7 +131,7 @@ class DocumentEnvironment(plugins.Action):
         parts = line[pos:].strip().split("#")
         endPos = parts[0].find(")")
         argStr = parts[0][:endPos + 1]
-        for i in range(argStr.count("(", 1)):
+        for _ in range(argStr.count("(", 1)):
             endPos = parts[0].find(")", endPos + 1)
             argStr = parts[0][:endPos + 1]
         allArgs = self.getActualArguments(argStr)
@@ -149,7 +149,7 @@ class DocumentEnvironment(plugins.Action):
         class FakeApp:
             def getConfigValue(self, name):
                 return "Config value '" + name + "'"
-        app = FakeApp()
+        app = FakeApp() #@UnusedVariable
         try:
             argTuple = eval(argStr)
             from types import TupleType
@@ -206,13 +206,12 @@ class DocumentScripts(plugins.Action):
         for modName in modNames:
             importCommand = "import " + modName
             exec importCommand
-            command = "names = dir(" + modName + ")"
-            exec command
+            module = eval(modName)
+            names = dir(module)
             for name in names:
                 scriptName = modName + "." + name
-                docFinder = "docString = " + scriptName + ".scriptDoc"
                 try:
-                    exec docFinder
+                    docString = getattr(eval(scriptName), "scriptDoc")
                     print scriptName + "|" + docString
                 except AttributeError:
                     pass

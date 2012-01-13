@@ -365,8 +365,10 @@ FunctionEnd
 
 Function configureStoryTextJepp
   FILE "${STORYTEXT_UPDATER}"
+  FILE "exclude.txt"
   CreateDirectory "$INSTDIR\storytext"
   CopyFiles /SILENT "$OUTDIR\${STORYTEXT_UPDATER}" $INSTDIR
+  CopyFiles /SILENT "$OUTDIR\exclude.txt" $INSTDIR
   IfErrors onError
   ExecWait '"cmd.exe" /K CD $INSTDIR & ${STORYTEXT_UPDATER} & exit'
   IfErrors onError

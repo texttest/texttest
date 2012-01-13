@@ -374,7 +374,7 @@ Function configureStoryTextJepp
   onError:
     Abort
   done:
-FuntionEnd
+FunctionEnd
 
 Function checkPythonPath
   ReadRegStr $PYTHON_PATH HKCU "SOFTWARE\Python\PythonCore\${PYTHON_VERSION}\InstallPath" ""
@@ -426,9 +426,9 @@ Functionend
 
 Function makeShortcuts
   CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
-    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\${TT_BIN}\texttest.py" "" "$OUTDIR\texttest-icon-dynamic.ico" ""
-    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
-    CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\${TT_BIN}\texttest.py" "" "$OUTDIR\texttest-icon-dynamic.ico" ""
+  CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\${TT_BIN}\texttest.py" "" "$OUTDIR\texttest-icon-dynamic.ico" ""
+  CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
+  CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\${TT_BIN}\texttest.py" "" "$OUTDIR\texttest-icon-dynamic.ico" ""
 FunctionEnd
 
 Function .onInit

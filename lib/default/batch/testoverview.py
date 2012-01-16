@@ -5,6 +5,7 @@ import os, plugins, time, HTMLgen, HTMLcolors, sys, logging
 from cPickle import Unpickler, UnpicklingError
 from ordereddict import OrderedDict
 from glob import glob
+import re
 HTMLgen.PRINTECHO = 0
 
 def getWeekDay(tag):
@@ -207,8 +208,16 @@ class GenerateWebPages(object):
         if timeCmp:
             return timeCmp
         else:
-            return cmp(x, y) # If the timing is the same, sort alphabetically
+            # If the timing is the same, sort alphabetically
+            # Any number should be sorted numerically, do this by padding them with leading zeroes
+            return cmp(self.padNumbersWithZeroes(x), self.padNumbersWithZeroes(y)) 
+    
+    def padNumbersWithZeroes(self, x):
+        return re.sub("[0-9]+", self.padWithZeroes, x)
 
+    def padWithZeroes(self, match):
+        return match.group(0).rjust(4, "0")
+    
     def getTagFromFile(self, fileName):
         return os.path.basename(fileName).replace("teststate_", "")
         

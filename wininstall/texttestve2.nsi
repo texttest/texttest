@@ -372,7 +372,7 @@ Function configureStoryTextJepp
   IfErrors onError
   ExecWait '"cmd.exe" /K CD $INSTDIR & ${STORYTEXT_UPDATER} & exit'
   IfErrors onError
-  ExecWait '"cmd.exe" /K schtasks /create /tn "StoryText Updater" /tr "$INSTDIR\${STORYTEXT_UPDATER}" /sc daily /st 23:00'
+  ExecWait '"cmd.exe" /K schtasks /create /tn "StoryText Updater" /tr "$INSTDIR\${STORYTEXT_UPDATER}" /sc daily /st 23:00 & exit'
   IfErrors onError done
   onError:
     Abort

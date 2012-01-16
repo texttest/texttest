@@ -207,10 +207,12 @@ class GenerateWebPages(object):
         timeCmp = cmp(self.getTagTimeInSeconds(x), self.getTagTimeInSeconds(y))
         if timeCmp:
             return timeCmp
-        else:
+        elif len(x) != len(y):
             # If the timing is the same, sort alphabetically
             # Any number should be sorted numerically, do this by padding them with leading zeroes
-            return cmp(self.padNumbersWithZeroes(x), self.padNumbersWithZeroes(y)) 
+            return cmp(self.padNumbersWithZeroes(x), self.padNumbersWithZeroes(y))
+        else:
+            return cmp(x, y)
     
     def padNumbersWithZeroes(self, x):
         return re.sub("[0-9]+", self.padWithZeroes, x)

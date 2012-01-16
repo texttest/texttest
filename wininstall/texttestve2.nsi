@@ -432,6 +432,10 @@ Function makeShortcuts
   CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\${TT_BIN}\texttest.py" "" "$OUTDIR\texttest-icon-dynamic.ico" ""
   CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
   CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\${TT_BIN}\texttest.py" "" "$OUTDIR\texttest-icon-dynamic.ico" ""
+  !ifdef JEPPESEN
+    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\StoryTextUpdater.lnk" "cmd.exe" "/K $INSTDIR\storytext_updater.bat"
+    CreateShortcut "$DESKTOP\StoryTextUpdater.lnk" "cmd.exe" "/K $INSTDIR\storytext_updater.bat"
+  !endif
 FunctionEnd
 
 Function .onInit
@@ -446,6 +450,10 @@ Function un.install
   RMDir /r $SMPROGRAMS\${PRODUCT_NAME}
   Delete "$DESKTOP\${PRODUCT_NAME}.lnk"
   Call un.setEnv
+  !ifdef JEPPESEN
+    Delete "$DESKTOP\StoryTextUpdater.lnk"
+  	ExecWait '"cmd.exe" /K schtasks /delete /tn "StoryText Updater" & exit'
+  !endif
   Delete "$INSTDIR\Uninstall.exe"
 FunctionEnd
 

@@ -286,7 +286,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
                 # Actions showing dialogs will handle this in the dialog code.
                 entrycompletion.manager.collectCompletions()
                 self._runInteractive()
-        except plugins.TextTestError, e:
+        except Exception, e:
             self.showErrorDialog(str(e))
             
     def _runInteractive(self):
@@ -894,7 +894,7 @@ class ActionDialogGUI(OptionGroupGUI):
                                          self.confirmationRespond, fileChooserOption)
                 else:
                     self.defaultRespond(saidOK, dialog, fileChooserOption)
-            except plugins.TextTestError, e:
+            except Exception, e:
                 self.showErrorDialog(str(e))
         else:
             self.defaultRespond(saidOK, dialog, fileChooserOption)

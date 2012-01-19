@@ -3,7 +3,7 @@
 Generic module broken out from guiplugins. Contains utility code that can be
 called from anywhere in the gtkgui package
 """
-import plugins, os, sys, operator, types, subprocess, locale
+import plugins, os, sys, operator, subprocess, locale
 from copy import copy
 
 # gtk.accelerator_valid appears utterly broken on Windows
@@ -75,7 +75,7 @@ def convertToUtf8(*args): # gtk.TextViews insist we do the conversion ourselves
 
 def openLinkInBrowser(target):
     if os.name == "nt" and not os.environ.has_key("BROWSER"):
-        os.startfile(target)
+        os.startfile(target) #@UndefinedVariable
         return 'Started "<default browser> ' + target + '" in background.'
     else:
         browser = os.getenv("BROWSER", "firefox")

@@ -136,7 +136,7 @@ class MenuBarGUI(guiutils.SubGUI):
             else:
                 return True
         else:
-            return bool(value)
+            return bool(val)
 
         
     

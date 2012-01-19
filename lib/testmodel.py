@@ -201,6 +201,10 @@ class Test(plugins.Observable):
         # Test suites never change state, but it's convenient that they have one
         self.state = plugins.TestState("not_started")
 
+    def reloadTestConfigurations(self):
+        if self.parent is not None:
+            self.reloadConfiguration()
+
     def reloadConfiguration(self):
         if self.dircache.hasStem("config." + self.app.name):
             parentConfigDir = self.getParentConfigDir()
@@ -1039,6 +1043,11 @@ class TestSuite(Test):
                 dirCache = self.createTestCache(testName)
                 self.createTestOrSuite(testName, desc, dirCache, filters, initial=False)
         self.updateOrder()
+    
+    def reloadTestConfigurations(self):
+        Test.reloadTestConfigurations(self)
+        for testcase in self.testcases:
+            testcase.reloadTestConfigurations()
 
 # private:
     def getOrderedTestNames(self, testNames, testCaseNames):

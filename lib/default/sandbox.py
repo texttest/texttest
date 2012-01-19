@@ -373,6 +373,8 @@ class PrepareWriteDirectory(plugins.Action):
                     newScripts[fileName] = remoteScript
         if newScripts:
             suite.app.setConfigDefault("copy_test_path_script", newScripts)
+            
+        suite.reloadTestConfigurations()            
 
     def copyStorytextDirRemotely(self, machine, tmpDir, suite):
         storytextDir = suite.getEnvironment("STORYTEXT_HOME_LOCAL")
@@ -426,7 +428,7 @@ class TestEnvironmentCreator:
                 if os.name == "posix":
                     from virtualdisplay import VirtualDisplayResponder
                     if VirtualDisplayResponder.instance:
-                        virtualDisplay = VirtualDisplayResponder.instance.displayName
+                        virtualDisplay = VirtualDisplayResponder.instance.displayName #@UndefinedVariable
                         if virtualDisplay:
                             vars.append(("DISPLAY", virtualDisplay))
         elif self.testCase():

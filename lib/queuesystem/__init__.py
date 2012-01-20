@@ -152,7 +152,7 @@ class QueueSystemConfig(default.Config):
             return default.Config.getTextResponder(self)
     
     def getSlaveSwitches(self):
-        return [ "c", "b", "trace", "ignorecat", "ignorefilters", "actrep",
+        return [ "c", "b", "trace", "ignorecat", "ignorefilters", "actrep", "td",
                  "rectraffic", "keeptmp", "keepslave", "x", "reconnect", "reconnfull" ]
 
     def getProxySubmissionRulesClass(self):

@@ -60,7 +60,7 @@ class RunTest(plugins.Action):
         self.changeToRunningState(test)
         
         self.registerProcess(test, process)
-        if test.getConfigValue("kill_timeout") and not test.app.isRecording():
+        if test.getConfigValue("kill_timeout") and not test.app.isRecording() and not test.app.isActionReplay():
             timer = Timer(test.getConfigValue("kill_timeout"), self.kill, (test, "timeout"))
             timer.start()
             self.wait(process)

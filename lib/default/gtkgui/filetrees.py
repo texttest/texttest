@@ -218,6 +218,13 @@ class ApplicationFileGUI(FileViewGUI):
                 self.allApps.append(suite.app)
                 self.recreateModel(self.getState(), preserveSelection=False)
 
+    def getAllFiles(self, storytextDir):
+        paths = [ storytextDir ]
+        for root, dirs, files in os.walk(storytextDir):
+            for name in dirs + files:
+                paths.append(os.path.join(root, name))
+        return paths
+
     def addFilesToModel(self, *args):
         colour = guiutils.guiConfig.getCompositeValue("file_colours", "static")
         importedFiles = {}
@@ -231,7 +238,7 @@ class ApplicationFileGUI(FileViewGUI):
                     importedFiles[importedFile] = importedFile
             storytextDir = self.storytextDirs.get(app)
             if storytextDir:
-                files = [ storytextDir ] + [ os.path.join(storytextDir, f) for f in os.listdir(storytextDir) ]
+                files = self.getAllFiles(storytextDir)
                 self.addDataFilesUnderIter(confiter, files, colour, 
                                            app.getDirectory(), associatedObject=self.allApps)
             testScripts = self.testScripts.get(app.name)

@@ -2193,7 +2193,10 @@ Framework Enhancements:
 Batch Report Enhancements:
     - Now allow different colours for performance and memory changes in HTML report
 	Use e.g. larger_bg, faster_bg in [historical_report_colours]
+    - If named runs are numeric, they will now be sorted numerically
+	Previously sorting has been string-sorting, causing "10" to come before "9".
 Grid Engine (LSF/SGE) enhancements/bug fixes:
+    - Setting temporary environment variables now works with grid engines
 Bug Fixes:
     - Junit report now handles tests with the same name in different suites properly.
     - "gui_entry_override" now works with spin buttons (e.g. "times_to_run", for the Running tab)
@@ -2202,3 +2205,6 @@ Bug Fixes:
     - Now works to use coverage, capturemock and testcustomize.py under Python 3 when using TextTest
     - Importing a non-existent config file from a config file in a test no longer causes complete failure
 	Just an error message for the test concerned
+    - kill_timeout now disabled when using slow motion replay on GUI tests
+    - Running tests on different networks (e.g. via SSH) now works also if individual tests have their own config files
+    - All exceptions in the GUI are now shown in dialogs rather than the console, instead of only "expected" ones

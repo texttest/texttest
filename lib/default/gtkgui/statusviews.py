@@ -170,6 +170,7 @@ class TestProgressMonitor(guiutils.SubGUI):
         self.dynamic = dynamic
         self.testCount = testCount
         self.diffStore = {}
+        self.groupNames = {}
         if self.shouldShow():
             # It isn't really a gui configuration, and this could cause bugs when several apps
             # using differnt diff tools are run together. However, this isn't very likely and we prefer not
@@ -267,7 +268,7 @@ class TestProgressMonitor(guiutils.SubGUI):
         for line in diff.split("\n"):
             if self.diffFilterGroup.stringContainsText(line):
                 filteredDiff += line + "\n"
-        return filteredDiff
+        return filteredDiff[:-1]
 
     def getDifferenceType(self, fileComp):
         if fileComp.missingResult():
@@ -312,16 +313,14 @@ class TestProgressMonitor(guiutils.SubGUI):
 
             filteredDiff = self.getFilteredDiff(fileComp)
             if filteredDiff is not None:
-                summaryDiffs = self.diffStore.setdefault(summary, OrderedDict())
-                testList, hasGroup = summaryDiffs.setdefault(filteredDiff, ([], False))
+                groupNames, summaryDiffs = self.diffStore.setdefault(summary, ({}, OrderedDict()))
+                testList, groupName = summaryDiffs.setdefault(filteredDiff, ([], None))
                 if test not in testList:
                     testList.append(test)
-                if len(testList) > 1 and not hasGroup:
-                    hasGroup = True
-                    summaryDiffs[filteredDiff] = (testList, hasGroup)
-                if hasGroup:
-                    group = summaryDiffs.keys().index(filteredDiff) + 1
-                    fileClass.append(("Group " + str(group), fileComp.stem))
+                if len(testList) > 1 and groupName is None:
+                    groupName = self.setGroupName(groupNames, summaryDiffs, filteredDiff)
+                if groupName:
+                    fileClass.append(("Group " + groupName, fileComp.stem))
 
             self.diag.info("Adding file classification for " + repr(fileComp) + " = " + repr(fileClass))
             classifiers.addClassification(fileClass)
@@ -334,12 +333,44 @@ class TestProgressMonitor(guiutils.SubGUI):
 
         return classifiers
 
+    def extractRepeats(self, filteredDiff):
+        size = len(filteredDiff)
+        smallPrimes = [ 2, 3, 5, 7, 11, 13, 17, 19 ] # Surely we won't repeat stuff more than 20 times :)
+        for prime in smallPrimes:
+            if size > prime and size % prime == 0:
+                chunkSize = size / prime
+                firstPart = filteredDiff[:chunkSize]
+                if filteredDiff == firstPart * prime:
+                    return firstPart, prime
+        return None, None
+
+    def setGroupName(self, groupNames, summaryDiffs, filteredDiff):
+        groupName = self.getGroupName(groupNames, summaryDiffs, filteredDiff)
+        groupNames[groupName] = filteredDiff
+        summaryDiffs[filteredDiff] = (summaryDiffs[filteredDiff][0], groupName)
+        return groupName
+                    
+    def getGroupName(self, groupNames, summaryDiffs, filteredDiff):
+        singleVersion, timesRepeated = self.extractRepeats(filteredDiff)
+        if singleVersion:
+            _, group = summaryDiffs.get(singleVersion, (None, None))
+            if group is None:
+                group = self.setGroupName(groupNames, summaryDiffs, singleVersion)
+            if "*" in group:
+                core, timeStr = group.split("*")
+                return core + "*" + str(timesRepeated * int(timeStr))
+            else:
+                return str(group) + "*" + str(timesRepeated)
+        else:
+            group = len(groupNames) + 1
+            return str(group)
+    
     def notifySelectInGroup(self, fileComp):
         summary = self.getFileSummary(fileComp)
-        summaryDiffs = self.diffStore.get(summary, {})
+        _, summaryDiffs = self.diffStore.get(summary, {})
         filteredDiff = self.getFilteredDiff(fileComp)
-        testList, hasGroup = summaryDiffs.get(filteredDiff, ([], False))
-        if hasGroup:
+        testList, groupName = summaryDiffs.get(filteredDiff, ([], False))
+        if groupName:
             self.notify("SetTestSelection", testList)
         
     def getFileSummary(self, fileComp):
@@ -363,7 +394,7 @@ class TestProgressMonitor(guiutils.SubGUI):
             self.treeModel.set_value(iter, 5, allTests)
 
     def removeFromDiffStore(self, test):
-        for fileInfo in self.diffStore.values():
+        for _, fileInfo in self.diffStore.values():
             for testList, _ in fileInfo.values():
                 if test in testList:
                     testList.remove(test)
@@ -392,15 +423,14 @@ class TestProgressMonitor(guiutils.SubGUI):
         self.notify("Visibility", [ test ], self.shouldBeVisible(test))
 
     def getInitialTestsForNode(self, test, parentIter, nodeClassifier):
-        try:
-            if nodeClassifier.startswith("Group "):
-                diffNumber = int(nodeClassifier[6:]) - 1
-                parentName = self.treeModel.get_value(parentIter, 0)
-                testLists = self.diffStore.get(parentName)
-                testList = testLists.values()[diffNumber][0]
+        if nodeClassifier.startswith("Group "):
+            groupName = nodeClassifier[6:]
+            parentName = self.treeModel.get_value(parentIter, 0)
+            groupNames, summaryDiffs = self.diffStore.get(parentName)
+            filteredDiff = groupNames.get(groupName)
+            if filteredDiff is not None:
+                testList = summaryDiffs[filteredDiff][0]
                 return copy(testList)
-        except ValueError:
-            pass
         return [ test ]
 
     def addTestForNode(self, test, defaultColour, defaultVisibility, nodeClassifier,

@@ -489,6 +489,8 @@ class RecordTest(BasicRunningAction,guiplugins.ActionDialogGUI):
             self.currentApp.addCaptureMockSwitch(self.optionGroup, value=1) # record new by default
         self.addSwitch("rep", "Automatically replay test after recording it", 1,
                        options = [ "Disabled", "In background", "Using dynamic GUI" ])
+        if self.currentApp and self.currentApp.getConfigValue("extra_test_process_postfix"):
+            self.addSwitch("mult", "Record multiple runs of system")
 
     def correctTestClass(self):
         return "test-case"
@@ -499,8 +501,18 @@ class RecordTest(BasicRunningAction,guiplugins.ActionDialogGUI):
     def messageAfterPerform(self):
         return "Started record session for " + self.describeTests()
 
+    def touchFiles(self, test):
+        for postfix in test.getConfigValue("extra_test_process_postfix"):
+            if not test.getFileName("usecase" + postfix):
+                fileName = os.path.join(test.getDirectory(), "usecase" + postfix + "." + test.app.name)
+                with open(fileName, "w") as f:
+                    f.write("Dummy file to indicate we should record multiple runs\n")
+
     def performOnCurrent(self):
-        self.updateRecordTime(self.currTestSelection[0])
+        test = self.currTestSelection[0]
+        if self.optionGroup.getSwitchValue("mult"):
+            self.touchFiles(test)
+        self.updateRecordTime(test)
         self.startTextTestProcess("record", [ "-g", "-record" ] + self.getVanillaOption())
 
     def shouldShowCurrent(self, *args):

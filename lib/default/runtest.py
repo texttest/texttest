@@ -56,18 +56,26 @@ class RunTest(plugins.Action):
     def runTest(self, test):
         self.describe(test)
         machine = test.app.getRunMachine()
-        process = self.getTestProcess(test, machine)
         self.changeToRunningState(test)
-        
-        self.registerProcess(test, process)
-        if test.getConfigValue("kill_timeout") and not test.app.isRecording() and not test.app.isActionReplay():
-            timer = Timer(test.getConfigValue("kill_timeout"), self.kill, (test, "timeout"))
-            timer.start()
-            self.wait(process)
-            timer.cancel()
-        else:
-            self.wait(process)
-        self.checkAndClear(test)
+        for postfix in self.getTestRunPostfixes(test):
+            process = self.getTestProcess(test, machine, postfix)    
+            self.registerProcess(test, process)
+            if test.getConfigValue("kill_timeout") and not test.app.isRecording() and not test.app.isActionReplay():
+                timer = Timer(test.getConfigValue("kill_timeout"), self.kill, (test, "timeout"))
+                timer.start()
+                self.wait(process)
+                timer.cancel()
+            else:
+                self.wait(process)
+            self.checkAndClear(test, postfix)
+            test.notify("TestProcessComplete") # Checks for support processes like virtual displays, restarts if needed
+            
+    def getTestRunPostfixes(self, test):
+        postfixes = [ "" ]
+        for postfix in test.getConfigValue("extra_test_process_postfix"):
+            if any((test.getFileName(stem + postfix) for stem in test.defFileStems())):
+                postfixes.append(postfix)
+        return postfixes
     
     def registerProcess(self, test, process):
         self.lock.acquire()
@@ -76,12 +84,12 @@ class RunTest(plugins.Action):
             self.killProcess(test)
         self.lock.release()
 
-    def storeReturnCode(self, test, code):
-        file = open(test.makeTmpFileName("exitcode"), "w")
+    def storeReturnCode(self, test, code, postfix):
+        file = open(test.makeTmpFileName("exitcode" + postfix), "w")
         file.write(str(code) + "\n")
         file.close()
 
-    def checkAndClear(self, test):        
+    def checkAndClear(self, test, postfix):        
         returncode = self.currentProcess.returncode
         self.diag.info("Process terminated with return code " + repr(returncode))
         if os.name == "posix" and test not in self.killedTests and returncode < 0:
@@ -93,7 +101,7 @@ class RunTest(plugins.Action):
         if test in self.killedTests:
             self.changeToKilledState(test)
         elif returncode: # Don't bother to store return code when tests are killed, it isn't interesting
-            self.storeReturnCode(test, returncode)
+            self.storeReturnCode(test, returncode, postfix)
         
         self.lock.release()
 
@@ -174,14 +182,22 @@ class RunTest(plugins.Action):
         testEnv = test.getRunEnvironment()
         return sorted(filter(lambda (var, value): test.app.hasChanged(var, value), testEnv.items()))
         
-    def getTestProcess(self, test, machine):
-        commandArgs = self.getExecuteCmdArgs(test, machine)
+    def fixUseCaseVariables(self, testEnv, postfix):
+        for varName in [ "USECASE_RECORD_SCRIPT", "USECASE_REPLAY_SCRIPT" ]:
+            if varName in testEnv:
+                testEnv[varName] = testEnv.get(varName).replace("usecase", "usecase" + postfix)
+        
+    def getTestProcess(self, test, machine, postfix=""):
+        commandArgs = self.getExecuteCmdArgs(test, machine, postfix)
         testEnv = test.getRunEnvironment()
+        if postfix and "USECASE_RECORD_SCRIPT" in testEnv:
+            # Redirect usecase variables if needed
+            self.fixUseCaseVariables(testEnv, postfix)
         self.diag.info("Running test with args : " + repr(commandArgs))
         namingScheme = test.app.getConfigValue("filename_convention_scheme")
-        stdoutStem = test.app.getStdoutName(namingScheme)
-        stderrStem = test.app.getStderrName(namingScheme)
-        inputStem = test.app.getStdinName(namingScheme)
+        stdoutStem = test.app.getStdoutName(namingScheme) + postfix
+        stderrStem = test.app.getStderrName(namingScheme) + postfix
+        inputStem = test.app.getStdinName(namingScheme) + postfix
         try:
             return subprocess.Popen(commandArgs, preexec_fn=self.getPreExecFunction(), \
                                     stdin=open(self.getInputFile(test, inputStem)), cwd=test.getDirectory(temporary=1), \
@@ -293,7 +309,7 @@ class RunTest(plugins.Action):
             perfFile = test.makeTmpFileName("unixperf", forFramework=1)
         return [ "time", "-p", "-o", perfFile ]
 
-    def getLocalExecuteCmdArgs(self, test, makeDirs=True):
+    def getLocalExecuteCmdArgs(self, test, postfix="", makeDirs=True):
         args = []
         if test.app.hasAutomaticCputimeChecking():
             args += self.getTimingArgs(test, makeDirs)
@@ -303,12 +319,16 @@ class RunTest(plugins.Action):
         for interpreterName, interpreter in test.getConfigValue("interpreters", expandVars=expandVars).items():
             args += self.getInterpreterArgs(test, interpreter)
             args += test.getCommandLineOptions(stem=interpreterName + "_options")
+            if postfix:
+                args += test.getCommandLineOptions(stem=interpreterName + "_options" + postfix)
         args += plugins.splitcmd(test.getConfigValue("executable", expandVars=expandVars))
-        args += test.getCommandLineOptions()
+        args += test.getCommandLineOptions(stem="options")
+        if postfix:
+            args += test.getCommandLineOptions(stem="options" + postfix)
         return args
         
-    def getExecuteCmdArgs(self, test, runMachine):
-        args = self.getLocalExecuteCmdArgs(test)
+    def getExecuteCmdArgs(self, test, runMachine, postfix):
+        args = self.getLocalExecuteCmdArgs(test, postfix)
         if runMachine == "localhost":
             return args
         else:

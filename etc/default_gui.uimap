@@ -989,3 +989,6 @@ activate = suspend selected test
 [Name=Unsuspend]
 activate = unsuspend selected test
 
+[Label=Record multiple runs of system]
+toggled.true = choose to record multiple runs
+

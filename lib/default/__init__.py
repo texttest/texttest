@@ -1356,6 +1356,7 @@ class Config:
         app.setConfigDefault("save_filtered_file_stems", [], "Files where the filtered version should be saved rather than the SUT output")
         # Applies to any interface...
         app.setConfigDefault("auto_sort_test_suites", 0, "Automatically sort test suites in alphabetical order. 1 means sort in ascending order, -1 means sort in descending order.")
+        app.setConfigDefault("extra_test_process_postfix", [], "Postfixes to use on ordinary files to denote an additional run of the SUT to be triggered")
         app.addConfigEntry("builtin", "options", "definition_file_stems")
         app.addConfigEntry("regenerate", "usecase", "definition_file_stems")
         app.addConfigEntry("builtin", self.getStdinName(namingScheme), "definition_file_stems")
@@ -1379,8 +1380,18 @@ class Config:
         interpreters = app.getConfigValue("interpreters").values()
         if any(("python" in i or "storytext" in i for i in interpreters)):
             app.addConfigEntry("default", "testcustomize.py", "definition_file_stems")
+        extraPostfixes = app.getConfigValue("extra_test_process_postfix")
         for interpreterName in app.getConfigValue("interpreters").keys():
-            app.addConfigEntry("builtin", interpreterName + "_options", "definition_file_stems")
+            stem = interpreterName + "_options"
+            app.addConfigEntry("builtin", stem, "definition_file_stems")
+            for postfix in extraPostfixes:
+                app.addConfigEntry("builtin", stem + postfix, "definition_file_stems")
+        
+        namingScheme = app.getConfigValue("filename_convention_scheme")
+        for postfix in extraPostfixes:
+            app.addConfigEntry("builtin", "options" + postfix, "definition_file_stems")
+            app.addConfigEntry("regenerate", "usecase" + postfix, "definition_file_stems")
+            app.addConfigEntry("builtin", self.getStdinName(namingScheme) + postfix, "definition_file_stems")
         return False
 
 

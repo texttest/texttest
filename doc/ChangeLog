@@ -2183,9 +2183,13 @@ General GUI Enhancements:
 Static GUI Enhancements:
     - Record dialog now allows recording on a different machine via SSH
 Dynamic GUI Enhancements:
+    - Grouping now notices if some diffs are repeats of other diffs
+	You may now get something like "Group 3*2", which means this is "Group 3"'s diffs, repeated twice
 Framework Enhancements:
     - Can now chain several "interpreter" programs together, instead of having only one
 	New config file section "interpreters". See website.
+    - Can now run the SUT more than once using different settings for the same test
+	New setting "extra_test_process_postfix". For example to verify database writes. See website.
     - "Known bugs" no longer cause TextTest to exit with exit code 1
 	It's reckoned they are under control and hence not a reason to fail anything, e.g. a Jenkins build.
     - "performance_logfile_extractor" format is more general

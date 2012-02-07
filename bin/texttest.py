@@ -2,7 +2,13 @@
 
 import sys, os
 
-install_root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+if __file__.endswith(".py"):
+    # If there is a separate script "texttest", want to use the local tree
+    fileName = os.path.normpath(os.path.abspath(__file__))
+else:
+    # For RPMs etc, want to be able to have a link "texttest" somewhere totally different, i.e. /usr/bin
+    fileName = os.path.realpath(__file__)
+install_root = os.path.dirname(os.path.dirname(fileName))
 # We pick up the basic libraries.
 # Also accept a setup with a "site" subdirectory containing local modules,
 # or a "generic" directory containing the TextTest core with local modules in the root

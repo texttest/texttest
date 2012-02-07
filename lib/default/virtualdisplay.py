@@ -56,6 +56,12 @@ class VirtualDisplayResponder(plugins.Responder):
         return allMachines
 
     def notifyTestProcessComplete(self, *args):
+        self.tryRestartXvfb()
+        
+    def notifyComplete(self, *args):
+        self.tryRestartXvfb()
+        
+    def tryRestartXvfb(self, *args):
         # Whenever a test completes, we check to see if the virtual server is still going
         if self.displayProc is not None and self.displayProc.poll() is not None:
             self.displayProc.wait() # Don't leave zombie processes around

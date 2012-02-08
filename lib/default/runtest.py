@@ -58,6 +58,9 @@ class RunTest(plugins.Action):
         machine = test.app.getRunMachine()
         self.changeToRunningState(test)
         for postfix in self.getTestRunPostfixes(test):
+            if postfix:
+                test.notify("TestProcessComplete") # Checks for support processes like virtual displays, restarts if needed
+
             process = self.getTestProcess(test, machine, postfix)    
             self.registerProcess(test, process)
             if test.getConfigValue("kill_timeout") and not test.app.isRecording() and not test.app.isActionReplay():
@@ -68,7 +71,6 @@ class RunTest(plugins.Action):
             else:
                 self.wait(process)
             self.checkAndClear(test, postfix)
-            test.notify("TestProcessComplete") # Checks for support processes like virtual displays, restarts if needed
             
     def getTestRunPostfixes(self, test):
         postfixes = [ "" ]

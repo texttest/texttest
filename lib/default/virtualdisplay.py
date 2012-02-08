@@ -21,6 +21,8 @@ class VirtualDisplayResponder(plugins.Responder):
         guiSuites = filter(lambda suite : suite.getConfigValue("use_case_record_mode") == "GUI", suites)
         if not self.displayName:
             self.setUpVirtualDisplay(guiSuites)
+            if self.displayName:
+                plugins.log.info("Tests will run with DISPLAY variable set to " + self.displayName)
                               
     def setUpVirtualDisplay(self, guiSuites):
         if len(guiSuites) == 0:
@@ -32,7 +34,6 @@ class VirtualDisplayResponder(plugins.Responder):
             self.displayMachine = machine
             self.displayPid = pid
             self.guiSuites = guiSuites
-            plugins.log.info("Tests will run with DISPLAY variable set to " + display)
         elif len(machines) > 0:
             plugins.printWarning("Failed to start virtual display on " + ",".join(machines) + " - using real display.")
 
@@ -55,18 +56,25 @@ class VirtualDisplayResponder(plugins.Responder):
                     allMachines.append(machine)
         return allMachines
 
-    def notifyTestProcessComplete(self, *args):
-        self.tryRestartXvfb()
+    def notifyTestProcessComplete(self, test):
+        if self.restartXvfb():
+            plugins.log.info("Virtual display had terminated unexpectedly with some test processes still to run.")
+            plugins.log.info("Reset DISPLAY variable to " + self.displayName + " for test " + repr(test))
+            test.setEnvironment("DISPLAY", self.displayName)
         
     def notifyComplete(self, *args):
-        self.tryRestartXvfb()
+        if self.restartXvfb():
+            plugins.log.info("Virtual display had terminated unexpectedly, restarted as DISPLAY " + self.displayName + ".")
         
-    def tryRestartXvfb(self, *args):
+    def restartXvfb(self):
         # Whenever a test completes, we check to see if the virtual server is still going
         if self.displayProc is not None and self.displayProc.poll() is not None:
             self.displayProc.wait() # Don't leave zombie processes around
             # If Xvfb has terminated, we need to restart it
             self.setUpVirtualDisplay(self.guiSuites)
+            return bool(self.displayName)
+        else:
+            return False
             
     def notifyAllComplete(self):
         self.cleanXvfb()

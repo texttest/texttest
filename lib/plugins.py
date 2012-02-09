@@ -1180,19 +1180,21 @@ class TextTrigger:
 # Used for application and personal configuration files
 class MultiEntryDictionary(OrderedDict):
     warnings = []
-    def __init__(self, importKey="", importFileFinder=None, aliases={}, *args, **kw):
+    def __init__(self, importKey="", importFileFinder=None, aliases={}, allowSectionHeaders=True, *args, **kw):
         OrderedDict.__init__(self, *args, **kw)
         self.diag = logging.getLogger("MultiEntryDictionary")
         self.aliases = aliases
         self.importKey = importKey
         self.importFileFinder= importFileFinder
+        self.allowSectionHeaders = allowSectionHeaders
 
     def __reduce__(self):
         # Need this because of __reduce__ in OrderedDict
         # which merrily reduces all the attributes of the subclass without asking
         # Used when doing deepcopy()
         items = [[k, self[k]] for k in self]
-        return self.__class__, (self.importKey, Callable(self.importFileFinder), self.aliases, items)
+        return self.__class__, (self.importKey, Callable(self.importFileFinder), 
+                                self.aliases, self.allowSectionHeaders, items)
         
     def getSectionInfo(self, sectionName=""):
         if sectionName and sectionName != "end":
@@ -1214,7 +1216,7 @@ class MultiEntryDictionary(OrderedDict):
         self.diag.info("Reading file " + filename)
         currSectionName = ""
         for line in readList(filename):
-            if self.isSectionHeader(line):
+            if self.allowSectionHeaders and self.isSectionHeader(line):
                 currSectionName = self.getNewSectionInfo(line, *args, **kwargs)
             elif ":" in line:
                 self.parseConfigLine(line, currSectionName, *args, **kwargs)

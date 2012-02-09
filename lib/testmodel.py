@@ -1470,7 +1470,7 @@ class Application:
         if self.envFiles.has_key(envFile):
             return self.envFiles[envFile]
 
-        envDir = plugins.MultiEntryDictionary()
+        envDir = plugins.MultiEntryDictionary(allowSectionHeaders=False)
         envDir.readValues([ envFile ])
         envVars = envDir.items()
         self.envFiles[envFile] = envVars

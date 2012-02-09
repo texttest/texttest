@@ -180,10 +180,17 @@ class RunTest(plugins.Action):
             text += var + "=" + value + "\n"
         return text
 
-    def getEnvironmentChanges(self, test):
-        testEnv = test.getRunEnvironment()
+    def getEnvironmentChanges(self, test, postfix=""):
+        testEnv = self.getTestRunEnvironment(test, postfix)
         return sorted(filter(lambda (var, value): test.app.hasChanged(var, value), testEnv.items()))
         
+    def getTestRunEnvironment(self, test, postfix):
+        testEnv = test.getRunEnvironment()
+        if postfix and "USECASE_RECORD_SCRIPT" in testEnv:
+            # Redirect usecase variables if needed
+            self.fixUseCaseVariables(testEnv, postfix)
+        return testEnv
+    
     def fixUseCaseVariables(self, testEnv, postfix):
         for varName in [ "USECASE_RECORD_SCRIPT", "USECASE_REPLAY_SCRIPT" ]:
             if varName in testEnv:
@@ -191,15 +198,12 @@ class RunTest(plugins.Action):
         
     def getTestProcess(self, test, machine, postfix=""):
         commandArgs = self.getExecuteCmdArgs(test, machine, postfix)
-        testEnv = test.getRunEnvironment()
-        if postfix and "USECASE_RECORD_SCRIPT" in testEnv:
-            # Redirect usecase variables if needed
-            self.fixUseCaseVariables(testEnv, postfix)
         self.diag.info("Running test with args : " + repr(commandArgs))
         namingScheme = test.app.getConfigValue("filename_convention_scheme")
         stdoutStem = test.app.getStdoutName(namingScheme) + postfix
         stderrStem = test.app.getStderrName(namingScheme) + postfix
         inputStem = test.app.getStdinName(namingScheme) + postfix
+        testEnv = self.getTestRunEnvironment(test, postfix)
         try:
             return subprocess.Popen(commandArgs, preexec_fn=self.getPreExecFunction(), \
                                     stdin=open(self.getInputFile(test, inputStem)), cwd=test.getDirectory(temporary=1), \
@@ -236,8 +240,8 @@ class RunTest(plugins.Action):
         else:
             return args
 
-    def getRemoteExecuteCmdArgs(self, test, runMachine, localArgs):
-        scriptFileName = test.makeTmpFileName("run_test.sh", forComparison=0)
+    def getRemoteExecuteCmdArgs(self, test, runMachine, localArgs, postfix):
+        scriptFileName = test.makeTmpFileName("run_test" + postfix + ".sh", forComparison=0)
         openType = "w" if os.name == "posix" else "wb" # the 'b' is necessary so we don't get \r\n written when we just want \n
         scriptFile = open(scriptFileName, openType)
         scriptFile.write("#!/bin/sh\n\n")
@@ -248,7 +252,7 @@ class RunTest(plugins.Action):
 
         # Must set the environment remotely
         remoteTmp = test.app.getRemoteTmpDirectory()[1]
-        for arg, value in self.getEnvironmentArgs(test, remoteTmp):
+        for arg, value in self.getEnvironmentArgs(test, remoteTmp, postfix):
             # Two step export process for compatibility with CYGWIN and older versions of 'sh'
             scriptFile.write(arg + "=" + value + "\n")
             scriptFile.write("export " + arg + "\n")
@@ -269,8 +273,8 @@ class RunTest(plugins.Action):
         else:
             return test.app.getCommandArgsOn(runMachine, [ plugins.quote(scriptFileName) ])
 
-    def getEnvironmentArgs(self, test, remoteTmp):
-        vars = self.getEnvironmentChanges(test)
+    def getEnvironmentArgs(self, test, remoteTmp, postfix):
+        vars = self.getEnvironmentChanges(test, postfix)
         args = []
         localTmpDir = test.app.writeDirectory
         builtinVars = [ "TEXTTEST_CHECKOUT", "TEXTTEST_CHECKOUT_NAME", "TEXTTEST_ROOT",
@@ -334,7 +338,7 @@ class RunTest(plugins.Action):
         if runMachine == "localhost":
             return args
         else:
-            return self.getRemoteExecuteCmdArgs(test, runMachine, args)
+            return self.getRemoteExecuteCmdArgs(test, runMachine, args, postfix)
 
     def makeFile(self, test, name):
         fileName = test.makeTmpFileName(name)

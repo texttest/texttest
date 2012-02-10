@@ -219,8 +219,9 @@ class DocumentScripts(plugins.Action):
 class ReplaceText(plugins.ScriptWithArgs):
     scriptDoc = "Perform a search and replace on all files with the given stem"
     def __init__(self, args):
-        argDict = self.parseArguments(args, [ "old", "new", "file" ])
-        self.oldTextTrigger = plugins.TextTrigger(argDict["old"])
+        argDict = self.parseArguments(args, [ "old", "new", "file", "regexp" ])
+        tryAsRegexp = "regexp" not in argDict or argDict["regexp"] == "1"
+        self.oldTextTrigger = plugins.TextTrigger(argDict["old"], tryAsRegexp)
         self.newText = argDict["new"].replace("\\n", "\n")
         self.stems = []
         fileStr = argDict.get("file")

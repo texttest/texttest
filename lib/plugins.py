@@ -1156,10 +1156,10 @@ class OptionFinder(OrderedDict):
             return item[1:].strip()
 
 class TextTrigger:
-    def __init__(self, text):
+    def __init__(self, text, tryAsRegexp=True):
         self.text = text
         self.regex = None
-        if isRegularExpression(text):
+        if tryAsRegexp and isRegularExpression(text):
             try:
                 self.regex = re.compile(text)
             except re.error:

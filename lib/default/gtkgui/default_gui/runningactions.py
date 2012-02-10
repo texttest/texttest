@@ -612,7 +612,7 @@ class RunScriptAction(BasicRunningAction,guiplugins.ActionDialogGUI):
     def getCommandLineArgs(self, optionGroup, *args):
         args = [ self.scriptName() ]
         for key, option in optionGroup.options.items():
-            args.append(key + "=" + option.getValue())
+            args.append(key + "=" + str(option.getValue()))
             
         return [ "-s", " ".join(args) ]
 
@@ -620,6 +620,7 @@ class RunScriptAction(BasicRunningAction,guiplugins.ActionDialogGUI):
 class ReplaceText(RunScriptAction):
     def __init__(self, *args):
         RunScriptAction.__init__(self, *args)
+        self.addSwitch("regexp", "Enable regular expressions", 1)
         self.addOption("old", "Text or regular expression to search for")
         self.addOption("new", "Text to replace it with (may contain regexp back references)")
         self.addOption("file", "File stem(s) to perform replacement in", allocateNofValues=2)

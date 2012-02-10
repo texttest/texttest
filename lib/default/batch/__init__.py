@@ -4,6 +4,7 @@ import os, plugins, sys, time, shutil, datetime, testoverview, logging, re
 from summarypages import GenerateSummaryPage, GenerateGraphs # only so they become package level entities
 from ordereddict import OrderedDict
 from batchutils import calculateBatchDate, BatchVersionFilter
+import subprocess
                 
 class BatchCategory(plugins.Filter):
     def __init__(self, state):
@@ -454,6 +455,11 @@ class ArchiveRepository(plugins.ScriptWithArgs):
             if not os.path.isdir(self.repository):
                 raise plugins.TextTestError, "Batch result repository " + self.repository + " does not exist"
             self.archiveFilesUnder(self.repository, suite.app)
+            if os.name == "posix":
+                historyDir = suite.app.name + "_history"
+                tarFileName = historyDir + "_" + plugins.localtime("%d%b%H%M%S") + ".tar.gz"
+                subprocess.call([ "tar", "cfz", tarFileName, historyDir ], cwd=repository)
+                shutil.rmtree(os.path.join(repository, historyDir))
 
     def archiveFilesUnder(self, repository, app):
         count = 0
@@ -474,8 +480,9 @@ class ArchiveRepository(plugins.ScriptWithArgs):
         plugins.ensureDirExistsForFile(targetPath)
         try:
             os.rename(fullPath, targetPath)
-        except EnvironmentError:
+        except EnvironmentError, e:
             plugins.log.info("Rename failed: " + fullPath + " " + targetPath)
+            plugins.log.info("Error was " + str(e))
 
     def getTargetPath(self, fullPath, appName):
         parts = fullPath.split(os.sep)
@@ -484,6 +491,7 @@ class ArchiveRepository(plugins.ScriptWithArgs):
         parts[appIndex] = appName + "_history"
         parts.reverse()
         return os.sep.join(parts)
+    
     def shouldArchive(self, file):
         if not file.startswith("teststate"):
             return False

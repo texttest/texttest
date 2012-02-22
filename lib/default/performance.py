@@ -125,7 +125,7 @@ class PerformanceFileComparison(FileComparison):
         if self.stdFile and self.tmpFile:
             oldPerf = getPerformance(self.stdFile)
             # If we didn't understand the old performance, overwrite it and behave like it didn't exist
-            if (oldPerf < 0):
+            if (oldPerf == float(-1)):
                 os.remove(self.stdFile)
                 test.refreshFiles()
                 self.stdFile = test.getFileName(self.stem)

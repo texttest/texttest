@@ -175,9 +175,6 @@ class Config:
         if not arg or "web" not in arg:
             emailHandler = batch.CollectFiles()
             sequence.append(emailHandler)
-        if not arg or arg == "web":
-            summaryGenerator = batch.GenerateSummaryPage()
-            sequence.append(summaryGenerator)
         return sequence
 
     def getActionSequence(self):

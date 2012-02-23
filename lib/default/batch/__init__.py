@@ -513,6 +513,7 @@ class WebPageResponder(plugins.Responder):
         self.diag = logging.getLogger("GenerateWebPages")
         self.suitesToGenerate = []
         self.descriptionInfo = {}
+        self.summaryGenerator = GenerateSummaryPage() if self.cmdLineResourcePage is None else None
 
     def findResourcePage(self, collArg):
         if collArg and collArg.startswith("web."):
@@ -527,6 +528,8 @@ class WebPageResponder(plugins.Responder):
         for suite in suites:
             if suite.app in self.extraApps:
                 continue
+            if self.summaryGenerator:
+                self.summaryGenerator.setUpApplication(suite.app)
             try:
                 batchFilter = BatchVersionFilter(suite.app.getBatchSession())
                 batchFilter.verifyVersions(suite.app)
@@ -544,6 +547,12 @@ class WebPageResponder(plugins.Responder):
                 self.generatePagePerApp(pageTitle, pageInfo)
             else:
                 self.generateCommonPage(pageTitle, pageInfo)
+            
+            if self.summaryGenerator:
+                self.summaryGenerator.finalise()
+        if len(appInfo) == 0 and self.summaryGenerator:
+            # Describe errors, if any
+            self.summaryGenerator.finalise()
         plugins.log.info("Completed web page generation.")
 
     def getResourcePages(self, getConfigValue):

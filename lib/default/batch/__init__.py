@@ -457,9 +457,11 @@ class ArchiveRepository(plugins.ScriptWithArgs):
             self.archiveFilesUnder(self.repository, suite.app)
             if os.name == "posix":
                 historyDir = suite.app.name + "_history"
-                tarFileName = historyDir + "_" + plugins.localtime("%d%b%H%M%S") + ".tar.gz"
-                subprocess.call([ "tar", "cfz", tarFileName, historyDir ], cwd=repository)
-                shutil.rmtree(os.path.join(repository, historyDir))
+                fullHistoryDir = os.path.join(repository, historyDir)
+                if os.path.isdir(fullHistoryDir):
+                    tarFileName = historyDir + "_" + plugins.localtime("%d%b%H%M%S") + ".tar.gz"
+                    subprocess.call([ "tar", "cfz", tarFileName, historyDir ], cwd=repository)
+                    shutil.rmtree(fullHistoryDir)
 
     def archiveFilesUnder(self, repository, app):
         count = 0

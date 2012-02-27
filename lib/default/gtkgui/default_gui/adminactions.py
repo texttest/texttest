@@ -797,6 +797,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
                 plugins.ensureDirExistsForFile(targetPath)
                 file = open(targetPath, "w")
                 file.close()
+                test.refreshFiles()
                 self.newFileInfo = targetPath, False
             elif action == 2:
                 plugins.ensureDirectoryExists(targetPath)

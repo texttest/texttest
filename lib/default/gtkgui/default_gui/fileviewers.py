@@ -92,7 +92,7 @@ class FileViewAction(guiplugins.ActionGUI):
             allArgs = (fileName,) + args
             self.currFileSelection = [ allArgs ]
             self.runInteractive()
-
+        
     def getFileToView(self, fileName, associatedObject):
         try:
             # associatedObject might be a comparison object, but it might not
@@ -269,15 +269,12 @@ class ViewTestFileInEditor(ViewInEditor):
 
         # options file can change appearance of test (environment refs etc.)
         baseName = os.path.basename(fileName)
-        if baseName.startswith("options"):
-            tests = self.getTestsForFile("options", fileName)
-            if len(tests) > 0:
-                return self.handleOptionsEdit, (tests,)
-        elif baseName.startswith("testsuite"):
-            tests = self.getTestsForFile("testsuite", fileName)
-            if len(tests) > 0:
-                # refresh tests if this edited
-                return self.handleTestSuiteEdit, (tests,)
+        for stem in [ "options", "testsuite", "config" ]:
+            if baseName.startswith(stem):
+                tests = self.getTestsForFile(stem, fileName)
+                if len(tests) > 0:
+                    methodName = "handle" + stem.capitalize() + "Edit"
+                    return getattr(self, methodName), (tests,)
         return self.staticGUIEditingComplete, (copy(self.currTestSelection), fileName)
 
     def getTestsForFile(self, stem, fileName):
@@ -288,7 +285,7 @@ class ViewTestFileInEditor(ViewInEditor):
                 tests.append(test)
         return tests
 
-    def handleTestSuiteEdit(self, suites):
+    def handleTestsuiteEdit(self, suites):
         for suite in suites:
             suite.refresh(suite.app.getFilterList(suites))
         self.editingComplete()
@@ -296,6 +293,11 @@ class ViewTestFileInEditor(ViewInEditor):
     def handleOptionsEdit(self, tests):
         for test in tests:
             test.filesChanged()
+        self.editingComplete()
+
+    def handleConfigEdit(self, tests):
+        for test in tests:
+            test.reloadTestConfigurations()
         self.editingComplete()
 
     def getSignalsSent(self):

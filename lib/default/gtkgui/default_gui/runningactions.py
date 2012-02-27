@@ -653,7 +653,7 @@ class TestFileFiltering(guiplugins.ActionResultDialogGUI):
         return guiplugins.ActionResultDialogGUI.isActiveOnCurrent(self) and len(self.currFileSelection) == 1
 
     def getVersion(self, test, fileName):
-        fileVersions = set(fileName.split(".")[1:])
+        fileVersions = set(os.path.basename(fileName).split(".")[1:])
         testVersions = set(test.app.versions + [ test.app.name ])
         additionalVersions = fileVersions.difference(testVersions)
         return ".".join(additionalVersions)

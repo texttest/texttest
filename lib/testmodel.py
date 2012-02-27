@@ -191,13 +191,13 @@ class Test(plugins.Observable):
         self.parent = parent
         self.dircache = dircache
         self.configDir = None
+        self.diag = logging.getLogger("test objects")
         if parent is not None:
             self.reloadConfiguration()
         populateFunction = plugins.Callable(app.setEnvironment, self)
         self.environment = TestEnvironment(populateFunction)
         # Java equivalent of the environment mechanism...
         self.properties = plugins.MultiEntryDictionary()
-        self.diag = logging.getLogger("test objects")
         # Test suites never change state, but it's convenient that they have one
         self.state = plugins.TestState("not_started")
 
@@ -211,6 +211,7 @@ class Test(plugins.Observable):
             newConfigDir = deepcopy(parentConfigDir)
             self.app.readValues(newConfigDir, "config", [ self.dircache ], insert=False, errorOnUnknown=True)
             self.configDir = newConfigDir
+            self.diagnose("config file settings are: " + "\n" + repr(self.configDir))
 
     def getParentConfigDir(self):
         # Take the immediate parent first, upwards to the root suite

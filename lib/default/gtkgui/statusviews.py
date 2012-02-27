@@ -347,8 +347,8 @@ class TestProgressMonitor(guiutils.SubGUI):
     def setGroupName(self, groupNames, summaryDiffs, filteredDiff):
         groupName = self.getGroupName(groupNames, summaryDiffs, filteredDiff)
         groupNames[groupName] = filteredDiff
-        if filteredDiff in summaryDiffs:
-            summaryDiffs[filteredDiff] = (summaryDiffs[filteredDiff][0], groupName)
+        tests = summaryDiffs[filteredDiff][0] if filteredDiff in summaryDiffs else []
+        summaryDiffs[filteredDiff] = (tests, groupName)
         return groupName
                     
     def getGroupName(self, groupNames, summaryDiffs, filteredDiff):

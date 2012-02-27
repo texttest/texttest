@@ -2194,11 +2194,15 @@ Framework Enhancements:
 	It's reckoned they are under control and hence not a reason to fail anything, e.g. a Jenkins build.
     - "performance_logfile_extractor" format is more general
 	Can now use regular expression groups to specify any format at all
+    - Can now disable regular expression matching when replacing text in files
 Batch Report Enhancements:
     - Now allow different colours for performance and memory changes in HTML report
 	Use e.g. larger_bg, faster_bg in [historical_report_colours]
     - If named runs are numeric, they will now be sorted numerically
 	Previously sorting has been string-sorting, causing "10" to come before "9".
+    - Summary page is now regenerated after each application
+	Reduces the probability that these two can be out of synch for any significant time
+    - Archiving the repository now results in it being compressed also
 Grid Engine (LSF/SGE) enhancements/bug fixes:
     - Setting temporary environment variables now works with grid engines
 Bug Fixes:
@@ -2212,3 +2216,8 @@ Bug Fixes:
     - kill_timeout now disabled when using slow motion replay on GUI tests
     - Running tests on different networks (e.g. via SSH) now works also if individual tests have their own config files
     - All exceptions in the GUI are now shown in dialogs rather than the console, instead of only "expected" ones
+    - Test-specific config file updates in the static GUI are now reflected better in operations like "Test Filtering".
+    - Extracting performance-like numbers from log files ("performance_logfile_extractor") can now handle negative numbers
+    - Section headers in environment files no longer cause a stacktrace
+    - HTML report filtering now handle lower-case HTML colours as well as upper-case ones
+

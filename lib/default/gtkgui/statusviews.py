@@ -265,10 +265,10 @@ class TestProgressMonitor(guiutils.SubGUI):
 
     def filterDiff(self, diff):
         filteredDiff = ""
-        for line in diff.split("\n"):
+        for line in diff.splitlines():
             if self.diffFilterGroup.stringContainsText(line):
                 filteredDiff += line + "\n"
-        return filteredDiff[:-1]
+        return filteredDiff or diff # If we filter it all away, should assume it was a new file and return it unchanged
 
     def getDifferenceType(self, fileComp):
         if fileComp.missingResult():
@@ -347,10 +347,12 @@ class TestProgressMonitor(guiutils.SubGUI):
     def setGroupName(self, groupNames, summaryDiffs, filteredDiff):
         groupName = self.getGroupName(groupNames, summaryDiffs, filteredDiff)
         groupNames[groupName] = filteredDiff
-        summaryDiffs[filteredDiff] = (summaryDiffs[filteredDiff][0], groupName)
+        if filteredDiff in summaryDiffs:
+            summaryDiffs[filteredDiff] = (summaryDiffs[filteredDiff][0], groupName)
         return groupName
                     
     def getGroupName(self, groupNames, summaryDiffs, filteredDiff):
+        self.diag.info("Getting group name for " + repr(filteredDiff))
         singleVersion, timesRepeated = self.extractRepeats(filteredDiff)
         if singleVersion:
             _, group = summaryDiffs.get(singleVersion, (None, None))

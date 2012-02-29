@@ -529,7 +529,7 @@ class QueueSystemServer(BaseActionRunner):
         
         command = "from " + queueModule + " import QueueSystem as _QueueSystem"
         exec command
-        system = _QueueSystem()
+        system = _QueueSystem() #@UndefinedVariable
         self.queueSystems[queueModule] = system
         return system
     def changeState(self, test, newState, previouslySubmitted=True):

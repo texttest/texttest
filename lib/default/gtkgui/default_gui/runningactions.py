@@ -196,6 +196,52 @@ class ReconnectToTests(BasicRunningAction,guiplugins.ActionDialogGUI):
         return app.name
     def getSizeAsWindowFraction(self):
         return 0.8, 0.7
+    
+    
+class ReloadTests(BasicRunningAction,guiplugins.ActionDialogGUI):
+    def __init__(self, allApps, dynamic, inputOptions):
+        guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic)
+        BasicRunningAction.__init__(self, inputOptions)
+        self.appGroup = plugins.OptionGroup("Invisible")
+        # We don't think reconnect can handle multiple roots currently
+        # Can be a limitation of this for the moment.
+        self.addApplicationOptions(allApps, self.appGroup, inputOptions)
+        self.addSwitch("reconnfull", "Recomputation", options=self.appGroup.getOption("reconnfull").options)
+    
+    def getTmpDirectory(self):
+        return self.currAppSelection[0].writeDirectory
+    
+    def _getStockId(self):
+        return "connect"
+    
+    def _getTitle(self):
+        return "Re_load tests..."
+    
+    def getTooltip(self):
+        return "Reload current results into new dynamic GUI"
+    
+    def performedDescription(self):
+        return "Reloaded"
+    
+    def getUseCaseName(self):
+        return "reload"
+    
+    def performOnCurrent(self):
+        if self.appGroup.getOptionValue("reconnfull") == 0:
+            # We want to reload the results exactly as they are currently
+            # This will only be possible if we make sure to save the teststate files first
+            self.saveTestStates()
+        self.startTextTestProcess(self.getUseCaseName(), [ "-g", "-reconnect", self.getTmpDirectory() ] + self.getVanillaOption())
+    
+    def saveTestStates(self):
+        for test in self.currTestSelection:
+            if test.state.isComplete(): # might look weird but this notification also comes in scripts etc.
+                test.saveState()
+            
+    def getAppIdentifier(self, app):
+        # Don't send version data, we have our own field with that info and it has a slightly different meaning
+        return app.name
+    
 
 # base class for RunTests and RerunTests, i.e. all the options are available
 class RunningAction(BasicRunningAction):
@@ -686,6 +732,6 @@ class TestFileFiltering(guiplugins.ActionResultDialogGUI):
     
 def getInteractiveActionClasses(dynamic):
     if dynamic:
-        return [ RerunTests ]
+        return [ RerunTests, ReloadTests ]
     else:
         return [ RunTests, RecordTest, ReconnectToTests, ReplaceText, TestFileFiltering ]

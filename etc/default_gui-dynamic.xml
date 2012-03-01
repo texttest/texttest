@@ -24,6 +24,7 @@
       <separator/>
       <menuitem action="Rerun"/>
       <menuitem action="Recompute Status"/>
+      <menuitem action="Reload tests..."/>
       <separator/>
     </menu>
   </menubar>
@@ -46,6 +47,7 @@
     <separator/>
     <menuitem action="Rerun"/>
     <menuitem action="Recompute Status"/>
+    <menuitem action="Reload tests..."/>
     <separator/>
   </popup>
 

@@ -992,3 +992,9 @@ activate = unsuspend selected test
 [Label=Record multiple runs of system]
 toggled.true = choose to record multiple runs
 
+[Name=Reload tests...]
+activate = reload tests
+
+[Title=Reload current results into new dynamic GUI]
+response.accept = accept test reload options
+

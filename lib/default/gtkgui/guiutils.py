@@ -60,11 +60,6 @@ class Utf8Converter:
             except Exception:
                 pass
 
-        sys.stderr.write("WARNING: TextTest's textual display had some trouble with character encodings.\n" + \
-                         "It tried the encoding(s) " + " and ".join(encodingsToTry) + \
-                         ",\nbut the Unicode replacement character still had to be used.\n" + \
-                         "Please ensure your locale is compatible with the encodings in your test files.\n" + \
-                         "The problematic text follows:\n\n" + text.strip() + "\n")
         return unicode(text, encodingsToTry[0], errors="replace")
 
 utf8Converter = Utf8Converter()

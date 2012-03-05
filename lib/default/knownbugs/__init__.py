@@ -209,6 +209,13 @@ class ParserSectionDict(OrderedDict):
             plugins.printWarning(msg)
         return OrderedDict.__getitem__(self, key)
 
+    def values(self):
+        # Fix for python 2.7... which calls __getitem__ internally
+        origFile = self.readingFile
+        self.readingFile = None
+        ret = OrderedDict.values(self)
+        self.readingFile = origFile
+        return ret
 
 class BugMap(OrderedDict):
     def checkUnchanged(self):

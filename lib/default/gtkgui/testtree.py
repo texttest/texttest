@@ -671,6 +671,9 @@ class TestTreeGUI(guiutils.ContainerGUI):
 
         self.diag.info("Adding test " + repr(test))
         self.tryAddTest(test, initial)
+        if test.parent is None and not initial:
+            # We've added a new suite, we should also select it as it's likely the user wants to add stuff under it
+            self.notifySetTestSelection([test])
 
     def notifyClipboard(self, tests, cut=False):        
         if cut:

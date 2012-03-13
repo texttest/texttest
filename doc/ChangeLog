@@ -2185,6 +2185,9 @@ Static GUI Enhancements:
 Dynamic GUI Enhancements:
     - Grouping now notices if some diffs are repeats of other diffs
 	You may now get something like "Group 3*2", which means this is "Group 3"'s diffs, repeated twice
+    - New "reload tests" action
+	This is essentially like reconnecting to the current run. Main point being to make it possible to reload results 
+	using the grid, and/or without interfering with the currently shown results.
 Framework Enhancements:
     - Can now chain several "interpreter" programs together, instead of having only one
 	New config file section "interpreters". See website.
@@ -2202,6 +2205,8 @@ Batch Report Enhancements:
 	Previously sorting has been string-sorting, causing "10" to come before "9".
     - Summary page is now regenerated after each application
 	Reduces the probability that these two can be out of synch for any significant time
+    - For junit-format reports, can now choose which performance setting is used for the "time" field.
+	New config file setting "batch_junit_performance"
     - Archiving the repository now results in it being compressed also
 Grid Engine (LSF/SGE) enhancements/bug fixes:
     - Setting temporary environment variables now works with grid engines
@@ -2220,4 +2225,5 @@ Bug Fixes:
     - Extracting performance-like numbers from log files ("performance_logfile_extractor") can now handle negative numbers
     - Section headers in environment files no longer cause a stacktrace
     - HTML report filtering now handle lower-case HTML colours as well as upper-case ones
-
+    - Spurious error messages about duplicated sections in knownbugs files no longer produced under Python 2.7
+    - Removed unicode-related error message that caused more trouble than it was worth

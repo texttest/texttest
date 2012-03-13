@@ -504,10 +504,10 @@ class TestTreeGUI(guiutils.ContainerGUI):
         except RuntimeError:
             pass # convert_child_iter_to_iter throws RunTimeError if the row is hidden in the TreeModelFilter
 
-    def notifySetTestSelection(self, selTests, criteria="", selectCollapsed=True):
+    def notifySetTestSelection(self, selTests, criteria="", selectCollapsed=True, direct=False):
         actualSelection = self.selectTestRows(selTests, selectCollapsed)
         # Here it's been set via some indirect mechanism, might want to behave differently
-        self.sendSelectionNotification(actualSelection, direct=False)
+        self.sendSelectionNotification(actualSelection, direct=direct)
 
     def selectTestRows(self, selTests, selectCollapsed=True):
         self.selecting = True # don't respond to each individual programmatic change here
@@ -671,6 +671,10 @@ class TestTreeGUI(guiutils.ContainerGUI):
 
         self.diag.info("Adding test " + repr(test))
         self.tryAddTest(test, initial)
+        if test.parent is None and not initial:
+            # We've added a new suite, we should also select it as it's likely the user wants to add stuff under it
+            # Also include the knock-on effects, i.e. selecting the test tab etc
+            self.notifySetTestSelection([test], direct=True)
 
     def notifyClipboard(self, tests, cut=False):        
         if cut:

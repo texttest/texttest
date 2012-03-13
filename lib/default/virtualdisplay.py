@@ -127,7 +127,8 @@ class VirtualDisplayResponder(plugins.Responder):
                 self.displayProc.stdout.close()
                 return self.getDisplayName(machine, displayNum), pid
             except ValueError: #pragma : no cover - should never happen, just a fail-safe
-                plugins.log.info("Failed to parse line :\n " + line + self.displayProc.stdout.read())
+                sys.stderr.write("ERROR: Failed to parse startXvfb.py line :\n " + line + "\n")
+                self.displayProc.stdout.close()
                 return None, None
 
         messages = "Failed to start Xvfb in 5 attempts, giving up"

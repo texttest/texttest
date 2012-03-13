@@ -429,7 +429,7 @@ class QueueSystemServer(BaseActionRunner):
         cmdArgs.append(self.shellWrap(command))
         jobName = submissionRules.getJobName()
         self.fixDisplay(slaveEnv)
-        self.diag.info("Creating job " + jobName + " with command arguments : " + repr(cmdArgs))
+        self.diag.info("Creating job " + jobName + " with command arguments : " + " ".join(cmdArgs))
         self.lock.acquire()
         if self.exited:
             self.cancel(test)

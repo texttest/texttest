@@ -2182,6 +2182,8 @@ Installation:
 General GUI Enhancements:
 Static GUI Enhancements:
     - Record dialog now allows recording on a different machine via SSH
+    - Root test suite is automatically selected when adding a new application
+	Idea is to make it easier for newbies to understand what to do at the start.
 Dynamic GUI Enhancements:
     - Grouping now notices if some diffs are repeats of other diffs
 	You may now get something like "Group 3*2", which means this is "Group 3"'s diffs, repeated twice

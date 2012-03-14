@@ -223,7 +223,7 @@ class PasteTests(FocusDependentAction):
 
     @staticmethod
     def copyPath(oldDirName, newDirName):
-        shutil.copytree(oldDirName, newDirName)
+        shutil.copytree(oldDirName, newDirName, ignore=shutil.ignore_patterns(*plugins.controlDirNames))
     
 
 

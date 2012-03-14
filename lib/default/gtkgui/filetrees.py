@@ -288,8 +288,9 @@ class ApplicationFileGUI(FileViewGUI):
             return []
         allFiles = []
         for root, dirs, files in os.walk(personalDir):
-            if "tmp" in dirs:
-                dirs.remove("tmp")
+            for pruneDir in [ "tmp" ] + plugins.controlDirNames:
+                if pruneDir in dirs:
+                    dirs.remove(pruneDir)
             for file in files + dirs:
                 allFiles.append(os.path.join(root, file))
         return sorted(allFiles)

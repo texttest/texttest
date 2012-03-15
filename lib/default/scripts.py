@@ -221,15 +221,18 @@ class ReplaceText(plugins.ScriptWithArgs):
     def __init__(self, args):
         argDict = self.parseArguments(args, [ "old", "new", "file", "regexp" ])
         tryAsRegexp = "regexp" not in argDict or argDict["regexp"] == "1"
-        self.oldTextTrigger = plugins.TextTrigger(argDict["old"], tryAsRegexp)
+        self.oldText = argDict["old"].replace("\\n", "\n")
+        self.multiLineTriggers = self.getTextTriggers(self.oldText, tryAsRegexp)
         self.newText = argDict["new"].replace("\\n", "\n")
+        self.newMultiLineText = self.newText.splitlines()
+        self.checkInputTexts(tryAsRegexp)
         self.stems = []
         fileStr = argDict.get("file")
         if fileStr:
             self.stems = plugins.commasplit(fileStr)
 
     def __repr__(self):
-        return "Replacing " + self.oldTextTrigger.text + " with " + self.newText + " for"
+        return "Replacing " + self.oldText + " with " + self.newText + " for"
 
     def __call__(self, test):
         for stem in self.stems:
@@ -244,9 +247,41 @@ class ReplaceText(plugins.ScriptWithArgs):
         unversionedFileName = ".".join(fileName.split(".")[:2])
         tmpFile = os.path.join(test.getDirectory(temporary=1), unversionedFileName)
         with open(tmpFile, "w") as writeFile:
-            for line in open(stdFile).xreadlines():
-                writeFile.write(self.oldTextTrigger.replace(line, self.newText))
+            with open(stdFile) as readFile:
+                matchedLines = []
+                index = 0
+                lineCounter = 0
+                for line in readFile:
+                    lineCounter += 1
+                    # fully matched
+                    if index == -1:
+                        self.writeMatched(writeFile, matchedLines)
+                        index = 0
+                        matchedLines = []
+                       
+                    if self.multiLineTriggers[index].matches(line):
+                        matchedLines.append(line)
+                        index = self.getNextTriggerIndex(index)
+                    else:
+                        # write all unsaved lines
+                        self.writeMatched(writeFile, matchedLines, matched=False)
+                        # write current line
+                        writeFile.write(line)
+                        index = 0
+                        matchedLines = []
+                # Be sure to write the lines left
+                if index == -1:
+                    self.writeMatched(writeFile, matchedLines)
+                else:
+                    self.writeMatched(writeFile, matchedLines, matched=False)
 
+    def writeMatched(self, writeFile, lines, matched=True):
+        for i in range(0,len(lines)):
+            if matched:
+                writeFile.write(self.multiLineTriggers[i].replace(lines[i], self.newMultiLineText[i]))
+            else:
+                writeFile.write(lines[i])
+            
     def usesComparator(self):
         return True
 
@@ -258,7 +293,23 @@ class ReplaceText(plugins.ScriptWithArgs):
             logFile = app.getConfigValue("log_file")
             if not logFile in self.stems:
                 self.stems.append(logFile)                
-            
+
+    def getTextTriggers(self, text, tryAsRegexp):
+        triggers = []
+        lines = text.splitlines()
+        for line in lines:
+            triggers.append(plugins.TextTrigger(line, tryAsRegexp))
+        return triggers
+
+    def getNextTriggerIndex(self, currentIndex):
+        nextIdx = currentIndex + 1
+        return nextIdx if nextIdx < len(self.multiLineTriggers) else -1
+    
+    def checkInputTexts(self, tryAsRegexp):
+        while len(self.multiLineTriggers) < len(self.newMultiLineText):
+            self.multiLineTriggers.append(plugins.TextTrigger("", tryAsRegexp))
+        while len(self.multiLineTriggers) > len(self.newMultiLineText):
+            self.newMultiLineText.append("")
 
 class ExportTests(plugins.ScriptWithArgs):
     scriptDoc = "Export the selected tests to a different test suite"

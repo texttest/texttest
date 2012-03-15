@@ -667,8 +667,8 @@ class ReplaceText(RunScriptAction):
     def __init__(self, *args):
         RunScriptAction.__init__(self, *args)
         self.addSwitch("regexp", "Enable regular expressions", 1)
-        self.addOption("old", "Text or regular expression to search for")
-        self.addOption("new", "Text to replace it with (may contain regexp back references)")
+        self.addOption("old", "Text or regular expression to search for", multilineEntry=True)
+        self.addOption("new", "Text to replace it with (may contain regexp back references)", multilineEntry=True)
         self.addOption("file", "File stem(s) to perform replacement in", allocateNofValues=2)
 
     def notifyAllStems(self, allStems, defaultTestFile):
@@ -686,6 +686,10 @@ class ReplaceText(RunScriptAction):
 
     def performedDescription(self):
         return "Replaced text in files for"
+    
+    def getSizeAsWindowFraction(self):
+        # size of the dialog
+        return 0.5, 0.5
 
 
 class TestFileFiltering(guiplugins.ActionResultDialogGUI):

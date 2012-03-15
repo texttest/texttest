@@ -139,9 +139,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         from traceback import print_stack
         print_stack()
 
-    def findSearchDirs(self):
-        roots = filter(os.path.isdir, self.inputOptions.rootDirectories)
-        self.diag.info("Using test suite at " + repr(roots))
+    def findSearchDirs(self, roots):
         subDirs = []
         for root in roots:
             for f in sorted(os.listdir(root)):
@@ -151,12 +149,16 @@ class TextTest(plugins.Responder, plugins.Observable):
         return roots + subDirs
 
     def findApps(self):
-        searchDirs = self.findSearchDirs()
-        if len(searchDirs) == 0:
+        roots = filter(os.path.isdir, self.inputOptions.rootDirectories)
+        if len(roots) == 0:
             for root in self.inputOptions.rootDirectories:
                 sys.stderr.write("Test suite root directory does not exist: " + root + "\n")
             return True, []
-
+        
+        # Just ignore any roots that don't exist
+        self.inputOptions.rootDirectories = roots
+        self.diag.info("Using test suite at " + repr(roots))
+        searchDirs = self.findSearchDirs(roots)
         if self.inputOptions.has_key("new"):
             return False, []
         

@@ -370,7 +370,8 @@ class QueueSystemServer(BaseActionRunner):
                 if value:
                     runOptions.append(value)
 
-        if self.optionMap.has_key("x"):
+        if self.optionMap.has_key("xs"):
+            runOptions.append("-x")
             runOptions.append("-xr")
             runOptions.append(self.optionMap.get("xr", os.path.expandvars("$TEXTTEST_PERSONAL_LOG/logging.debug")))
             runOptions.append("-xw")

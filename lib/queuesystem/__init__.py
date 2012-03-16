@@ -46,6 +46,8 @@ class QueueSystemConfig(default.Config):
                 self.addDefaultOption(group, "q", "Request grid queue", possibleValues = self.getPossibleQueues())
                 self.addDefaultSwitch(group, "keepslave", "Keep data files and successful tests until termination")
                 self.addDefaultSwitch(group, "perf", "Run on performance machines only")
+            elif group.name.startswith("Self-diagnostics"):
+                self.addDefaultSwitch(group, "xs", "Enable self-diagnostics in slave processes")
             elif group.name.startswith("Invisible"):
                 group.addOption("slave", "Private: used to submit slave runs remotely")
                 group.addOption("servaddr", "Private: used to submit slave runs remotely")
@@ -153,7 +155,7 @@ class QueueSystemConfig(default.Config):
     
     def getSlaveSwitches(self):
         return [ "c", "b", "trace", "ignorecat", "ignorefilters", "actrep", "td",
-                 "rectraffic", "keeptmp", "keepslave", "x", "reconnect", "reconnfull" ]
+                 "rectraffic", "keeptmp", "keepslave", "reconnect", "reconnfull" ]
 
     def getProxySubmissionRulesClass(self):
         return masterprocess.ProxySubmissionRules

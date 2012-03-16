@@ -9,3 +9,8 @@ CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
 TextTest returns an exit code of 1 if any tests fail. It no longer does this for "known bugs": it reckons they
 are under control and not a reason to fail things.
 
+(2) Requesting self-diagnostics in grid engine slave processes requires a separate flag
+=======================================================================================
+When running tests via a grid engine, in the past "-x" has enabled self-diagnostics in both master and slave processes. This was 
+reckoned unwieldy in some cases, as enabling diagnostics in the slaves can create a very large number of directories. So there is
+now a separate flag "-xs" if you want slave diagnostics - "-x" will only request diagnostics from the master process.

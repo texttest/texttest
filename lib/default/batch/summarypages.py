@@ -29,8 +29,9 @@ class GenerateFromSummaryData(plugins.ScriptWithArgs):
         for location, apps in cls.locationApps.items():
             if not all((rejected for app, usePie, rejected in apps)):
                 dataFinder = SummaryDataFinder(location, apps, cls.summaryFileName, cls.basePath)
-                if dataFinder.hasInfo():
-                    cls.generate(dataFinder)
+                appsWithVersions = dataFinder.getAppsWithVersions()
+                if appsWithVersions:
+                    cls.generate(dataFinder, appsWithVersions)
             else:
                 plugins.log.info("No applications generated for index page at " +
                                  repr(os.path.join(location, cls.summaryFileName)) + ".")
@@ -39,17 +40,17 @@ class GenerateFromSummaryData(plugins.ScriptWithArgs):
 class GenerateSummaryPage(GenerateFromSummaryData):
     scriptDoc = "Generate a summary page which links all the other generated pages"
     @classmethod
-    def generate(cls, dataFinder):
+    def generate(cls, *args):
         generator = SummaryGenerator()
-        generator.generatePage(dataFinder)
+        generator.generatePage(*args)
 
 
 class GenerateGraphs(GenerateFromSummaryData):
     scriptDoc = "Generate standalone graphs along the lines of the ones that appear in the HTML report"
     @classmethod
-    def generate(cls, dataFinder):
+    def generate(cls, dataFinder, appsWithVersions):
         from resultgraphs import GraphGenerator
-        for appName, versions in dataFinder.getAppsWithVersions().items():
+        for appName, versions in appsWithVersions.items():
             for version in versions:
                 results = dataFinder.getAllSummaries(appName, version)
                 if len(results) > 1:
@@ -79,9 +80,6 @@ class SummaryDataFinder:
             if os.path.isdir(appDir):
                 self.appDirs[app.fullName()] = appDir
                 
-    def hasInfo(self):
-        return len(self.appDirs) > 0
-
     def getTemplateFile(self):
         templateFile = os.path.join(self.location, "summary_template.html")
         if not os.path.isfile(templateFile):
@@ -98,8 +96,9 @@ class SummaryDataFinder:
         appsWithVersions = OrderedDict()
         for appName, appDir in self.appDirs.items():
             versionInfo = self.getVersionInfoFor(appDir)
-            self.appVersionInfo[appName] = versionInfo
-            appsWithVersions[appName] = versionInfo.keys()
+            if versionInfo:
+                self.appVersionInfo[appName] = versionInfo
+                appsWithVersions[appName] = versionInfo.keys()
         return appsWithVersions
 
     def getShortAppName(self, fullName):
@@ -226,7 +225,7 @@ class SummaryGenerator:
         pos = line.find("</title>")
         return str(testoverview.TitleWithDateStamp(line[:pos])) + "</title>\n"
             
-    def generatePage(self, dataFinder):
+    def generatePage(self, dataFinder, appsWithVersions):
         file = open(dataFinder.summaryPageName, "w")
         versionOrder = [ "default" ]
         appOrder = []
@@ -240,7 +239,7 @@ class SummaryGenerator:
             if "Version order=" in line:
                 versionOrder += self.extractOrder(line)
             if "Insert table here" in line:
-                self.insertSummaryTable(file, dataFinder, appOrder, versionOrder)
+                self.insertSummaryTable(file, dataFinder, appsWithVersions, appOrder, versionOrder)
         file.close()
         plugins.log.info("wrote: '" + dataFinder.summaryPageName + "'") 
         
@@ -303,8 +302,7 @@ class SummaryGenerator:
         else:
             pg.save(summaryGraphFile)
 
-    def insertSummaryTable(self, file, dataFinder, appOrder, versionOrder):
-        pageInfo = dataFinder.getAppsWithVersions()
+    def insertSummaryTable(self, file, dataFinder, pageInfo, appOrder, versionOrder):
         versionWithColumns = self.getVersionsWithColumns(pageInfo)
         self.diag.info("Following versions will be placed in columns " + repr(versionWithColumns))
         minColumnIndices = self.getMinColumnIndices(pageInfo, versionOrder)

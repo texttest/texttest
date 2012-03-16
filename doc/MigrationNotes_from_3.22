@@ -14,3 +14,11 @@ are under control and not a reason to fail things.
 When running tests via a grid engine, in the past "-x" has enabled self-diagnostics in both master and slave processes. This was 
 reckoned unwieldy in some cases, as enabling diagnostics in the slaves can create a very large number of directories. So there is
 now a separate flag "-xs" if you want slave diagnostics - "-x" will only request diagnostics from the master process.
+
+(3) Replace Text In Files now handles multiline input and output.
+=================================================================
+For those of you who like to migrate your saved results in predictable ways, its now possible to do so 
+with multiple line chunks of text. Simple use the updated dialog where you'll notice the text fields 
+have got bigger, or provide a string including "\n" to the "old" argument to "default.ReplaceText" 
+if doing it from the command line. Note that regular expressions are supported in this case, for example two lines
+with regular expressions imply searching for a line matching the first expression followed by a line matching the second.

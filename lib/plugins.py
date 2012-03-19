@@ -442,9 +442,12 @@ class ScriptWithArgs(Action):
         dict = {}
         for arg in args:
             if "=" in arg:
-                currKey, val = arg.split("=", 1)
-                if currKey in allowedArgs:
+                newKey, val = arg.split("=", 1)
+                if newKey in allowedArgs:
+                    currKey = newKey
                     dict[currKey] = val
+                elif dict.has_key(currKey):
+                    dict[currKey] += " " + arg
                 else:
                     print "Unrecognised option '" + currKey + "'"
             elif dict.has_key(currKey):

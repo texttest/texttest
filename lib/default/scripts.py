@@ -223,8 +223,8 @@ class ReplaceText(plugins.ScriptWithArgs):
         tryAsRegexp = "regexp" not in argDict or argDict["regexp"] == "1"
         self.oldText = argDict["old"].replace("\\n", "\n")
         self.multiLineTriggers = self.getTextTriggers(self.oldText, tryAsRegexp)
-        self.newText = argDict["new"].replace("\\n", "\n")
-        self.newMultiLineText = self.newText.splitlines()
+        self.newText = argDict["new"].replace("\\n", "\n").rstrip()
+        self.newMultiLineText = self.newText.split("\n")
         self.stems = []
         fileStr = argDict.get("file")
         if fileStr:

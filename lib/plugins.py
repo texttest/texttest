@@ -449,7 +449,7 @@ class ScriptWithArgs(Action):
                 elif dict.has_key(currKey):
                     dict[currKey] += " " + arg
                 else:
-                    print "Unrecognised option '" + currKey + "'"
+                    print "Unrecognised option '" + newKey + "'"
             elif dict.has_key(currKey):
                 dict[currKey] += " " + arg
         return dict

@@ -8,7 +8,7 @@
 # We try to make the JobProcess class look as much like subprocess.Popen objects as possible
 # so we can if necessary treat them interchangeably.
 
-import signal, os, time, subprocess, select
+import signal, os, time, subprocess, select, shlex
 
 class WrongOSException(RuntimeError):
     pass
@@ -113,8 +113,9 @@ class JobProcess:
             else:
                 raise
 
-def runCmd(cmdArgs):
+def runCmd(cmd):
     try:
+        cmdArgs = shlex.split(cmd)
         return subprocess.call(cmdArgs, stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT) == 0
     except OSError:
         return False
@@ -136,9 +137,10 @@ def killArbitaryProcess(pid, sig=None):
             return False
 
 def killSubProcessAndChildren(process, sig=None, cmd=None):
-    if os.name == "posix":
-        killArbitaryProcess(process.pid, sig)
-    elif not cmd or not runCmd(cmd+" "+str(process.pid)):
-        import ctypes
-        ctypes.windll.kernel32.TerminateProcess(int(process._handle), -1)
+    if not cmd or not runCmd(cmd + " " + str(process.pid)):
+        if os.name == "posix":
+            killArbitaryProcess(process.pid, sig)
+        else:
+            import ctypes
+            ctypes.windll.kernel32.TerminateProcess(int(process._handle), -1)
 

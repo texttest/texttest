@@ -78,8 +78,6 @@ class VirtualDisplayResponder(plugins.Responder):
             
     def notifyAllComplete(self):
         self.cleanXvfb()
-    def notifyKillProcesses(self, *args):
-        self.cleanXvfb()
 
     def terminateIfRunning(self, pid):
         try:

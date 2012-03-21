@@ -319,6 +319,10 @@ class GUIController(plugins.Responder, plugins.Observable):
         self.notify("Remove", test)
 
     def notifyAllComplete(self):
+        return self.LAST_OBSERVER # Make sure all the framework classes get to respond before we take down the GUI...
+    
+    def notifyLastObserver(self, *args):
+        # Called via the above, when all other observers have been notified
         self.notify("AllComplete")
 
     def notifyQuit(self, *args):

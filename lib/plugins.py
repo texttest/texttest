@@ -492,6 +492,7 @@ class ThreadedNotificationHandler:
 class Observable:
     threadedNotificationHandler = ThreadedNotificationHandler()
     obsDiag = None
+    LAST_OBSERVER = "last observer"
     @classmethod
     def diagnoseObs(klass, message, *args, **kwargs):
         if not klass.obsDiag:
@@ -537,9 +538,17 @@ class Observable:
 
     def performNotify(self, name, *args, **kwargs):
         methodName = "notify" + name
+        lastObserver = None
         for observer in self.observers:
             if hasattr(observer, methodName):
-                self.notifyObserver(observer, methodName, *args, **kwargs)
+                self.diagnoseObs("Notify observer " + str(observer.__class__))
+                answer = self.notifyObserver(observer, methodName, *args, **kwargs)
+                if answer == self.LAST_OBSERVER:
+                    self.diagnoseObs("Setting as last observer", *args, **kwargs)
+                    lastObserver = observer
+        if lastObserver:
+            self.diagnoseObs("Notify last observer", *args, **kwargs)
+            lastObserver.notifyLastObserver(methodName)
                 
     def notifyObserver(self, observer, methodName, *args, **kwargs):
         # doesn't matter if only some of the observers have the method
@@ -548,9 +557,9 @@ class Observable:
         # hence do not have self.passSelf ...
         try:
             if hasattr(self, "passSelf") and self.passSelf:
-                method(self, *args, **kwargs)
+                return method(self, *args, **kwargs)
             else:
-                method(*args, **kwargs)
+                return method(*args, **kwargs)
         except Exception:
             sys.stderr.write("Observer raised exception while calling " + methodName + " :\n")
             printException()

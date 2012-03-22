@@ -113,9 +113,8 @@ class JobProcess:
             else:
                 raise
 
-def runCmd(cmd):
+def runCmd(cmdArgs):
     try:
-        cmdArgs = shlex.split(cmd)
         return subprocess.call(cmdArgs, stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT) == 0
     except OSError:
         return False
@@ -137,7 +136,7 @@ def killArbitaryProcess(pid, sig=None):
             return False
 
 def killSubProcessAndChildren(process, sig=None, cmd=None):
-    if not cmd or not runCmd(cmd + " " + str(process.pid)):
+    if not cmd or not runCmd(shlex.split(cmd) + [ str(process.pid) ]):
         if os.name == "posix":
             killArbitaryProcess(process.pid, sig)
         else:

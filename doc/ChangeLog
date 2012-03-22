@@ -2203,6 +2203,8 @@ Framework Enhancements:
     - Replace Text In Files functionality (in static GUI and default.ReplaceText script) now handle multiline input
 	Able to replace several lines with several other lines at once
 Batch Report Enhancements:
+    - Now possible to specify a specific command to kill test processes also on Linux
+	"kill_command" is now portable. See docs.
     - Now allow different colours for performance and memory changes in HTML report
 	Use e.g. larger_bg, faster_bg in [historical_report_colours]
     - If named runs are numeric, they will now be sorted numerically
@@ -2216,6 +2218,7 @@ Grid Engine (LSF/SGE) enhancements/bug fixes:
     - Setting temporary environment variables now works with grid engines
     - Self-diagnostics in slave processes now requested separately
 	New "-xs" flag for this. Not automatically inferred from "-x" any more.
+    - Error messages from slave processes now shown also when running GUI
 Bug Fixes:
     - Junit report now handles tests with the same name in different suites properly.
     - "gui_entry_override" now works with spin buttons (e.g. "times_to_run", for the Running tab)
@@ -2236,5 +2239,9 @@ Bug Fixes:
     - Don't copy version control systems control dirs when copying tests, even if they don't have a plugin (svn)
     - Removed VCS control dirs from display for application config tree
     - Removed possible hang if unexpected input received from startXvfb.py (virtual display handling)
+    - Fix race condition when killing tests, don't terminate virtual display before process completes
+    - "Replace Text In Files" works correctly when "=" characters are present
+    - Fixed stacktrace trying to collect HTML report from an empty application directory
     - Discard directories in TEXTTEST_PATH that don't exist
 	Previous stored them, forwarded them, kept looking in them etc
+

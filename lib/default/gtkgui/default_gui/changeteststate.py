@@ -105,7 +105,7 @@ class SaveTests(guiplugins.ActionDialogGUI):
         return False
 
     def getStemsToSave(self):
-        return [ os.path.basename(fileName).split(".")[0] for fileName, _ in self.currFileSelection ]
+        return [ cmp.stem for _, cmp in self.currFileSelection ]
 
     def getBackupVersions(self):
         versionString = self.optionGroup.getOptionValue("old")
@@ -153,10 +153,61 @@ class SaveTests(guiplugins.ActionDialogGUI):
                 raise plugins.TextTestError, errorStr
 
 
+class SplitResultFiles(guiplugins.ActionGUI):
+    def __init__(self, *args):
+        guiplugins.ActionGUI.__init__(self, *args)
+        self.latestTestCount = 0
+        
+    def isActiveOnCurrent(self, test=None, state=None):
+        for currTest in self.currTestSelection:
+            separators = currTest.getConfigValue("file_split_pattern")
+            if separators:
+                if currTest is test:
+                    if state.isComplete():
+                        return True
+                elif currTest.stateInGui.isComplete():
+                    return True
+        return False
+
+    def _getTitle(self):
+        return "Split result files"
+
+    def _getStockId(self):
+        return "convert"
+
+    def getTooltip(self):
+        return "Split result files to be able to handle different changes separately"
+
+    def messageAfterPerform(self):
+        if self.latestTestCount == 0:
+            return "No test was split."
+        else:
+            return "Split result files for " + plugins.pluralise(self.latestTestCount, "test") + "."
+     
+    def performOnCurrent(self):
+        self.latestTestCount = 0
+        for test in self.currTestSelection:
+            separators = test.getConfigValue("file_split_pattern")
+            if separators:
+                self.latestTestCount += 1
+                self.notify("Status", "Splitting result files for " + repr(test) + " ...")
+                self.notify("ActionProgress")
+                if test.stateInGui.hasResults():
+                    self.splitResultFiles(test, test.stateInGui, separators)
+                
+    def splitResultFiles(self, test, state, separators):
+        newComparisons = state.splitResultFiles(test, separators)
+        if newComparisons:
+            newState = state.makeNewState(test, "recalculated")
+            for comp in newComparisons:
+                newState.addComparison(comp)
+            test.changeState(newState)
+
+
 class RecomputeTests(guiplugins.ActionGUI):
     def __init__(self, *args):
         guiplugins.ActionGUI.__init__(self, *args)
-        self.latestNumberOfRecomputations = 0
+        self.latestTestCount = 0
 
     def isActiveOnCurrent(self, test=None, state=None):
         for currTest in self.currTestSelection:
@@ -180,13 +231,13 @@ class RecomputeTests(guiplugins.ActionGUI):
         return [ "Recomputed" ]
 
     def messageAfterPerform(self):
-        if self.latestNumberOfRecomputations == 0:
+        if self.latestTestCount == 0:
             return "No test needed recomputation."
         else:
-            return "Recomputed status of " + plugins.pluralise(self.latestNumberOfRecomputations, "test") + "."
+            return "Recomputed status of " + plugins.pluralise(self.latestTestCount, "test") + "."
         
     def performOnCurrent(self):
-        self.latestNumberOfRecomputations = 0
+        self.latestTestCount = 0
         if any((test.stateInGui.isComplete() for test in self.currTestSelection)):
             for appOrTest in self.currAppSelection + self.currTestSelection:
                 self.notify("Status", "Rereading configuration for " + repr(appOrTest) + " ...")
@@ -194,7 +245,7 @@ class RecomputeTests(guiplugins.ActionGUI):
                 appOrTest.reloadConfiguration()
 
         for test in self.currTestSelection:
-            self.latestNumberOfRecomputations += 1
+            self.latestTestCount += 1
             self.notify("Status", "Recomputing status of " + repr(test) + " ...")
             self.notify("ActionProgress")
             test.app.recomputeProgress(test, test.stateInGui, self.observers)
@@ -300,5 +351,5 @@ class KillTests(guiplugins.ActionGUI):
 
 
 def getInteractiveActionClasses():
-    return [ SaveTests, KillTests, MarkTest, UnmarkTest, RecomputeTests, SuspendTests, UnsuspendTests ]
+    return [ SaveTests, KillTests, MarkTest, UnmarkTest, RecomputeTests, SuspendTests, UnsuspendTests, SplitResultFiles ]
  

@@ -317,7 +317,8 @@ class TestFileGUI(FileViewGUI):
 
     def canSelect(self, path):
         if self.dynamic:
-            return FileViewGUI.canSelect(self, path)
+            pathIter = self.model.get_iter(path)
+            return self.model.iter_parent(pathIter) is not None
         else:
             return True
 
@@ -484,22 +485,30 @@ class TestFileGUI(FileViewGUI):
         iter = self.model.insert_before(None, None)
         self.model.set_value(iter, 0, title)
         filelist = []
+        splitlist = {}
         fileCompMap = {}
         for comp in compList:
             file = comp.getDisplayFileName()
             fileCompMap[file] = comp
-            filelist.append(file)
-        filelist.sort()
-        self.addStandardFilesUnderIter(state, iter, filelist, fileCompMap)
+            if comp.getParent():
+                splitlist.setdefault(comp.getParent().getDisplayFileName(), []).append(comp)
+            else:
+                filelist.append(file)
+            
+        for file in sorted(filelist):
+            newiter = self.addStandardFileUnderIter(state, iter, file, fileCompMap)
+            splitcomps = splitlist.get(file, [])
+            # Preserve the original order of these split files
+            for splitcomp in sorted(splitcomps, key=state.allResults.index):
+                self.addStandardFileUnderIter(state, newiter, splitcomp.getDisplayFileName(), fileCompMap)
 
-    def addStandardFilesUnderIter(self, state, iter, files, compMap = {}):
-        for file in files:
-            comparison = compMap.get(file)
-            colour = self.getComparisonColour(state, comparison)
-            details = ""
-            if comparison:
-                details = comparison.getDetails()
-            self.addFileToModel(iter, file, colour, comparison, details)
+    def addStandardFileUnderIter(self, state, iter, file, compMap = {}):
+        comparison = compMap.get(file)
+        colour = self.getComparisonColour(state, comparison)
+        details = ""
+        if comparison:
+            details = comparison.getDetails()
+        return self.addFileToModel(iter, file, colour, comparison, details)
 
     def getComparisonColour(self, state, fileComp):
         if not state.isComplete():
@@ -513,7 +522,8 @@ class TestFileGUI(FileViewGUI):
         tmpFiles = self.currentTest.listTmpFiles()
         tmpIter = self.model.insert_before(None, None)
         self.model.set_value(tmpIter, 0, "Temporary Files")
-        self.addStandardFilesUnderIter(state, tmpIter, tmpFiles)
+        for file in tmpFiles:
+            self.addStandardFileUnderIter(state, tmpIter, file)
 
     def getRootIterAndColour(self, heading, rootDir=None):
         if not rootDir:

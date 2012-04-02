@@ -1,8 +1,7 @@
-#!/usr/local/bin/python
 
-
-import os, filecmp, plugins, time, subprocess, logging
+import os, filecmp, plugins, time, subprocess, logging, re
 from shutil import copyfile
+from itertools import izip
 
 class FileComparison:
     SAME = 0
@@ -17,14 +16,15 @@ class FileComparison:
         self.differenceCache = self.SAME
         self.recalculationTime = None
         self.diag = logging.getLogger("FileComparison")
-        self.severity = test.getCompositeConfigValue("failure_severity", self.stem)
-        self.displayPriority = test.getCompositeConfigValue("failure_display_priority", self.stem)
+        stemForConfig = self.stemForConfig()
+        self.severity = test.getCompositeConfigValue("failure_severity", stemForConfig)
+        self.displayPriority = test.getCompositeConfigValue("failure_display_priority", stemForConfig)
         maxLength = test.getConfigValue("lines_of_text_difference")
         maxWidth = test.getConfigValue("max_width_text_difference")
         # It would be nice if this could be replaced by some automagic file type detection
         # mechanism, such as the *nix 'file' command, but as the first implementation I've
         # chosen to use a manually created list instead.
-        self.binaryFile = test.configValueMatches("binary_file", self.stem)
+        self.binaryFile = test.configValueMatches("binary_file", stemForConfig)
         self.previewGenerator = plugins.PreviewGenerator(maxWidth, maxLength)
         self.textDiffTool = test.getConfigValue("text_diff_program")
         self.textDiffToolMaxSize = plugins.parseBytes(test.getCompositeConfigValue("max_file_size", self.textDiffTool))
@@ -33,6 +33,9 @@ class FileComparison:
         self.cacheDifferences(test, testInProgress)
         self.diag.info("Created file comparison std: " + repr(self.stdFile) + " tmp: " +
                        repr(self.tmpFile) + " diff: " + repr(self.differenceCache))
+        
+    def stemForConfig(self):
+        return self.stem
 
     def setStandardFile(self, standardFile):
         self.stdFile = standardFile
@@ -44,7 +47,41 @@ class FileComparison:
         if self.needsRecalculation():
             self.recalculationTime = time.time()
         if self.tmpFile and os.path.isfile(self.tmpFile):
-            self.cacheDifferences(test, False)
+            self.cacheDifferences(test, False)        
+            
+    def split(self, test, separators):
+        separator = separators.get(self.stem)
+        if separator:
+            sepRegex = re.compile(separator)
+            tmpParts = self.splitFile(self.tmpCmpFile, sepRegex)
+            origParts = self.splitFile(self.stdCmpFile, sepRegex)
+            return [ SplitFileComparison(self, test, self.stem, origPart, tmpPart) \
+                     for origPart, tmpPart in izip(origParts, tmpParts) ]
+        else:
+            return []
+    
+    def getSplitFileName(self, match, partsDir):
+        localname = match.group(1).replace(" ", "_").lower()
+        return os.path.join(partsDir, localname)
+    
+    def splitFile(self, filename, sepRegex):
+        parts = []
+        partsDir = filename + "_split"
+        plugins.ensureDirectoryExists(partsDir)
+        initialFileName = os.path.join(partsDir, "initial")
+        parts.append(initialFileName)
+        currWriteFile = open(initialFileName, "w")
+        with open(filename) as f:
+            for line in f:
+                match = sepRegex.search(line)
+                if match:
+                    currWriteFile.close()
+                    newFileName = self.getSplitFileName(match, partsDir)
+                    parts.append(newFileName)
+                    currWriteFile = open(newFileName, "w")
+                currWriteFile.write(line)
+        currWriteFile.close()
+        return parts
 
     def __getstate__(self):
         # don't pickle the diagnostics
@@ -141,7 +178,7 @@ class FileComparison:
         else:
             return self.getTmpFile(*args)
         
-    def cacheDifferences(self, test, testInProgress):
+    def setCmpFiles(self, test, testInProgress):
         filterFileBase = test.makeTmpFileName(self.stem + "." + test.app.name, forFramework=1)
         origCmp = filterFileBase + "origcmp"
         if os.path.isfile(origCmp):
@@ -152,23 +189,28 @@ class FileComparison:
         if os.path.isfile(tmpCmpFileName):
             self.tmpCmpFile = tmpCmpFileName
 
+    def updateDifferenceCache(self, valueForEqual):
         if self.stdCmpFile and self.tmpCmpFile:
             if filecmp.cmp(self.stdCmpFile, self.tmpCmpFile, 0):
                 if self.differenceCache != self.SAVED:
-                    self.differenceCache = self.SAME
+                    self.differenceCache = valueForEqual
             else:
                 self.differenceCache = self.DIFFERENT
             self.diag.info("Caching differences " + repr(self.stdCmpFile) + " " + repr(self.tmpCmpFile) + " = " + repr(self.differenceCache))
 
+    def cacheDifferences(self, test, testInProgress):
+        self.setCmpFiles(test, testInProgress)
+        self.updateDifferenceCache(self.SAME)
+
     def getSummary(self, includeNumbers=True):
         if self.newResult():
-            return self.stem + " new"
+            return repr(self) + " new"
         elif self.missingResult():
-            return self.stem + " missing"
+            return repr(self) + " missing"
         else:
             return self.getDifferencesSummary(includeNumbers)
     def getDifferencesSummary(self, includeNumbers=True):
-        return self.stem + " different"
+        return repr(self) + " different"
     def getFreeText(self):
         return self.getFreeTextTitle() + "\n" + self.getFreeTextBody()
     def getFreeTextTitle(self):
@@ -264,12 +306,22 @@ class FileComparison:
         self.backupOrRemove(self.stdFile, backupVersionStrings)
         self.saveTmpFile(test, exact)
         
+    def overwriteFromSplit(self, splitComps, test, exact, versionString, backupVersionStrings):
+        self.stdFile = self.getStdFileForSave(versionString)
+        self.diag.info("writing split files back to " + self.stdFile)
+        self.backupOrRemove(self.stdFile, backupVersionStrings)
+        with open(self.stdFile, "w") as f:
+            for splitComp in splitComps:
+                f.write(open(splitComp.stdFile).read())
+        copyfile(self.stdFile, self.stdCmpFile)
+        self.updateDifferenceCache(self.SAVED)
+        
     def saveNew(self, test, versionString):
         self.stdFile = os.path.join(test.getDirectory(), self.versionise(self.stem + "." + test.app.name, versionString))
         self.saveTmpFile(test)
 
     def getTmpFileForSave(self, test):
-        if not test.configValueMatches("save_filtered_file_stems", self.stem):
+        if not test.configValueMatches("save_filtered_file_stems", self.stemForConfig()):
             return self.tmpFile
 
         # Don't include the sorting when saving filtered files...
@@ -312,3 +364,18 @@ class FileComparison:
     def saveResults(self, tmpFile, destFile):
         copyfile(tmpFile, destFile)
         
+    def getParent(self):
+        pass
+
+class SplitFileComparison(FileComparison):
+    def __init__(self, parent, test, stem, stdFile, *args):
+        self.parent = parent
+        stemToUse = stem + "/" + os.path.basename(stdFile)
+        FileComparison.__init__(self, test, stemToUse, stdFile, *args)
+        
+    def getParent(self):
+        return self.parent
+    
+    def setCmpFiles(self, *args):
+        pass # Don't want to look for comparison files
+    

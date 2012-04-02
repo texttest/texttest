@@ -998,3 +998,6 @@ activate = reload tests
 [Title=Reload current results into new dynamic GUI]
 response.accept = accept test reload options
 
+[Name=Split result files]
+activate = split result files
+

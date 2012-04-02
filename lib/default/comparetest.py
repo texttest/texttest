@@ -314,6 +314,30 @@ class TestComparison(BaseTestComparison):
     def getFreeTextInfo(self):
         texts = [ fileComp.getFreeText() for fileComp in self.getSortedComparisons() ] 
         return "".join(texts)
+    
+    def findParentStems(self, onlyStems):
+        parents = set()
+        for stem in onlyStems:
+            if "/" in stem:
+                parent = stem.split("/")[0]
+                if parent not in onlyStems:
+                    parents.add(parent)
+        return parents
+    
+    def rebuildFromSplit(self, onlyStems, *args):
+        parentStems = self.findParentStems(onlyStems)
+        for stem in parentStems:
+            parentComp, splitComps = self.findComparisonsForSplit(stem)
+            parentComp.overwriteFromSplit(splitComps, *args)
+            
+    def findComparisonsForSplit(self, stem):
+        parentComp, splitComps = None, []
+        for comp in self.allResults:
+            if comp.stem == stem:
+                parentComp = comp
+            elif parentComp and comp.getParent() == parentComp:
+                splitComps.append(comp)
+        return parentComp, splitComps
 
     def save(self, test, exact=True, versionString=None, overwriteSuccessFiles=False, onlyStems=[], backupVersions=[]):
         self.diag.info("Saving " + repr(test) + " stems " + repr(onlyStems))
@@ -328,6 +352,8 @@ class TestComparison(BaseTestComparison):
             comparison.saveMissing(versionString, self.fakeMissingFileText(), backupVersions)
         if len(onlyStems) == 0:  # Save any external file edits we may have made. Don't do this on partial saves.
             self.saveFileEdits(test, versionString)
+        elif any(("/" in stem for stem in onlyStems)): # We've explicitly selected split files
+            self.rebuildFromSplit(onlyStems, test, exact, versionString, backupVersions)
         if overwriteSuccessFiles:
             for comparison in self.filterComparisons(self.correctResults, onlyStems):
                 self.updateStatus(test, str(comparison), versionString)
@@ -360,12 +386,18 @@ class TestComparison(BaseTestComparison):
     def recalculateComparisons(self, test):
         for fileComp in self.allResults:
             fileComp.recompute(test)
-            
+    
+    def splitResultFiles(self, *args):
+        return sum((fileComp.split(*args) for fileComp in self.allResults), [])
+    
+    def stemMatches(self, stem, onlyStems):
+        return stem in onlyStems or ("/" in stem and stem.split("/")[0] in onlyStems)
+    
     def filterComparisons(self, resultList, onlyStems):
         if len(onlyStems) == 0:
             return resultList
         else:
-            return filter(lambda comp: comp.stem in onlyStems, resultList)
+            return [ comp for comp in resultList if self.stemMatches(comp.stem, onlyStems) ]
 
     def updateStatus(self, test, compStr, versionString):
         testRepr = "Saving " + repr(test) + " : "

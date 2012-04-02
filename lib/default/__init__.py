@@ -995,7 +995,7 @@ class Config:
             fileFilter(test)
             comparator = self.getTestComparator()
             comparator.recomputeProgress(test, state, observers)
-
+            
     def getRunDescription(self, test):
         return RunTest().getRunDescription(test)
 
@@ -1190,6 +1190,7 @@ class Config:
         app.setConfigDefault("collect_traffic_client_server", "false", trafficText)
         app.setConfigDefault("run_dependent_text", { "default" : [] }, "Mapping of patterns to remove from result files")
         app.setConfigDefault("unordered_text", { "default" : [] }, "Mapping of patterns to extract and sort from result files")
+        app.setConfigDefault("file_split_pattern", {}, "Pattern to use for splitting result files")
         app.setConfigDefault("create_catalogues", "false", "Do we create a listing of files created/removed by tests")
         app.setConfigDefault("catalogue_process_string", "", "String for catalogue functionality to identify processes created")
         app.setConfigDefault("binary_file", [], "Which output files are known to be binary, and hence should not be shown/diffed?")

@@ -309,6 +309,7 @@ class FileComparison:
     def overwriteFromSplit(self, splitComps, test, exact, versionString, backupVersionStrings):
         self.stdFile = self.getStdFileForSave(versionString)
         self.diag.info("writing split files back to " + self.stdFile)
+        self.freeTextBody = None # clear the cache which may well be wrong now...
         self.backupOrRemove(self.stdFile, backupVersionStrings)
         with open(self.stdFile, "w") as f:
             for splitComp in splitComps:

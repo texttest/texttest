@@ -238,6 +238,9 @@ class TestProgressMonitor(guiutils.SubGUI):
                 self.treeModel.set_value(iter, 1, actualTestCount)
 
     def selectionChanged(self, selection):
+        if hasattr(selection, "unseen_changes"):
+            return # hack in StoryText so we can reproduce manual behaviour
+
         # For each selected row, select the corresponding rows in the test treeview
         # and the corresponding files in the test fileview
         tests, fileStems = [], []

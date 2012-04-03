@@ -390,6 +390,8 @@ class TestFileGUI(FileViewGUI):
             comparison = model.get_value(iter, 3)
             if comparison is not None and comparison.stem in fileStems:
                 self.selection.select_iter(iter)
+            else:
+                self.selection.unselect_iter(iter)
                 
         self.model.foreach(trySelect)
 

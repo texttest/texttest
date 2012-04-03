@@ -380,3 +380,5 @@ class SplitFileComparison(FileComparison):
     def setCmpFiles(self, *args):
         pass # Don't want to look for comparison files
     
+    def needsRecalculation(self):
+        return False # These cannot be recalculated in any sensible way, and are created nearly simultaneously

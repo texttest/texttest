@@ -53,8 +53,8 @@ class FileComparison:
         separator = separators.get(self.stem)
         if separator:
             sepRegex = re.compile(separator)
-            tmpParts = self.splitFile(self.tmpCmpFile, sepRegex)
-            origParts = self.splitFile(self.stdCmpFile, sepRegex)
+            tmpParts = self.splitFile(test, self.tmpCmpFile, sepRegex)
+            origParts = self.splitFile(test, self.stdCmpFile, sepRegex)
             return [ SplitFileComparison(self, test, self.stem, origPart, tmpPart) \
                      for origPart, tmpPart in izip(origParts, tmpParts) ]
         else:
@@ -64,9 +64,10 @@ class FileComparison:
         localname = match.group(1).replace(" ", "_").lower()
         return os.path.join(partsDir, localname)
     
-    def splitFile(self, filename, sepRegex):
+    def splitFile(self, test, filename, sepRegex):
         parts = []
-        partsDir = filename + "_split"
+        localPartsDir = os.path.basename(filename + "_split")
+        partsDir = test.makeTmpFileName(localPartsDir, forFramework=1)
         plugins.ensureDirectoryExists(partsDir)
         initialFileName = os.path.join(partsDir, "initial")
         parts.append(initialFileName)

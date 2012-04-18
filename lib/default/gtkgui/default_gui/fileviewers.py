@@ -498,13 +498,22 @@ class FollowFile(FileViewAction):
     def _performOnFile(self, followProgram, fileName, comparison):
         useFile = self.fileToFollow(fileName, comparison)
         useProgram = self.getFollowProgram(followProgram, fileName)
+        program = useProgram.split()[0]
         description = useProgram + " " + os.path.basename(useFile)
         cmdArgs = self.getFollowCommand(useProgram, useFile)
-        self.startViewer(cmdArgs, description=description, exitHandler=self.followComplete)
+        if self.canRunCommand(program):
+            self.startViewer(cmdArgs, description=description, exitHandler=self.followComplete)
+        else:
+            self.showErrorDialog("Couldn't find " + program + " to run the " + self.getToolDescription())
 
     def followComplete(self, *args):
         self.applicationEvent("the " + self.getToolDescription() + " to terminate")
 
+    def canRunCommand(self, cmd):
+        if len(self.currTestSelection) > 0:
+            app = self.currTestSelection[0].app
+        retcode = app.runCommandOn(self.getRemoteHost(), [ "which", cmd ], collectExitCode=True)
+        return retcode == 0
 
 def getInteractiveActionClasses(dynamic):
     classes = [ ViewTestFileInEditor ]

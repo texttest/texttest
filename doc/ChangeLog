@@ -2187,6 +2187,10 @@ Static GUI Enhancements:
 Dynamic GUI Enhancements:
     - Grouping now notices if some diffs are repeats of other diffs
 	You may now get something like "Group 3*2", which means this is "Group 3"'s diffs, repeated twice
+    - New "split result files" action
+	This allows viewing, grouping and saving the differences of parts of your files separately, for example in case many 
+	things have changed at once. There is a new config value "file_split_pattern", see the documentation of that in
+	the config file documenation for more details of how to use it.
     - New "reload tests" action
 	This is essentially like reconnecting to the current run. Main point being to make it possible to reload results 
 	using the grid, and/or without interfering with the currently shown results.
@@ -2197,6 +2201,9 @@ Framework Enhancements:
 	New setting "extra_test_process_postfix". For example to verify database writes. See website.
     - "Known bugs" no longer cause TextTest to exit with exit code 1
 	It's reckoned they are under control and hence not a reason to fail anything, e.g. a Jenkins build.
+    - "copy_test_path_merge" can also be used on files now
+	This has the meaning of appending the various files to each other and is intended for "settings"-type files to avoid having to
+	copy general settings to test-specific settings-files. See the migration notes and the config file documentation.
     - "performance_logfile_extractor" format is more general
 	Can now use regular expression groups to specify any format at all
     - Can now disable regular expression matching when replacing text in files
@@ -2244,4 +2251,7 @@ Bug Fixes:
     - Fixed stacktrace trying to collect HTML report from an empty application directory
     - Discard directories in TEXTTEST_PATH that don't exist
 	Previous stored them, forwarded them, kept looking in them etc
-
+    - Error messages are now shown when doing "Follow File" remotely in the dynamic GUI file view.
+	e.g. if the viewer requested doesn't exist or the remote shell configuration does not work.
+    - Fixed bug in dynamic GUI where file view selections from actions in the status view 
+	Did not clear previous selections but added to them.

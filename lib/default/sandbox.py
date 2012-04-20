@@ -74,7 +74,7 @@ class PrepareWriteDirectory(plugins.Action):
 
     def collateAllPaths(self, test, remoteCopy):
         self.collatePaths(test, "copy_test_path", self.copyTestPath, remoteCopy)
-        self.collatePaths(test, "copy_test_path_merge", self.copyTestPath, remoteCopy, mergeDirectories=True)
+        self.collatePaths(test, "copy_test_path_merge", self.copyTestPath, remoteCopy, mergeData=True)
         self.collatePaths(test, "partial_copy_test_path", self.partialCopyTestPath, remoteCopy)
         self.collatePaths(test, "link_test_path", self.linkTestPath, remoteCopy)
 
@@ -82,7 +82,7 @@ class PrepareWriteDirectory(plugins.Action):
         for configName in test.getConfigValue(configListName, expandVars=False):
             self.collatePath(test, configName, *args, **kwargs)
 
-    def collatePath(self, test, configName, collateMethod, remoteCopy, mergeDirectories=False):
+    def collatePath(self, test, configName, collateMethod, remoteCopy, mergeData=False):
         targetPath = self.getTargetPath(test, configName)
         sourceFileName = self.getSourceFileName(configName, test)
         if not targetPath or not sourceFileName: # Can happen with e.g. empty environment
@@ -92,7 +92,7 @@ class PrepareWriteDirectory(plugins.Action):
             self.diag.info("Collating " + configName + " from " + repr(sourcePath) +
                            "\nto " + repr(targetPath))
             collateMethod(test, sourcePath, targetPath)
-            if not mergeDirectories or not os.path.isdir(sourcePath):
+            if not mergeData:
                 break
 
         if remoteCopy and targetPath:
@@ -165,7 +165,11 @@ class PrepareWriteDirectory(plugins.Action):
                 pass # If this doesn't work, assume it's on the remote machine and we'll handle it later
 
         if os.path.isfile(fullPath):
-            self.copyfile(fullPath, target)
+            if os.path.isfile(target):
+                with open(target, "a") as f:
+                    f.write(open(fullPath).read())
+            else:
+                self.copyfile(fullPath, target)
         if os.path.isdir(fullPath):
             self.copytree(fullPath, target)
 

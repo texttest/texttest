@@ -205,16 +205,11 @@ class QueueSystemServer(BaseActionRunner):
         return oldRules.allowsReuse(newRules)
 
     def getJobSubmissionRules(self, test):
-        proxyRules = self.getProxySubmissionRules(test)
+        proxyRules = test.app.getProxySubmissionRules(test)
         if proxyRules:
             return proxyRules
         else:
             return self.getSubmissionRules(test)
-
-    def getProxySubmissionRules(self, test):
-        proxyResources = test.getConfigValue("queue_system_proxy_resource")
-        if proxyResources:
-            return test.app.getProxySubmissionRulesClass()(test, proxyResources)
 
     def getSubmissionRules(self, test):
         if self.submissionRules.has_key(test):
@@ -656,9 +651,10 @@ class QueueSystemServer(BaseActionRunner):
         plugins.log.info("T: Cancelling " + repr(test) + " " + postText)
 
 class SubmissionRules:
-    def __init__(self, test, configResources):
+    def __init__(self, optionMap, test):
         self.test = test
-        self.configResources = configResources
+        self.optionMap = optionMap
+        self.configResources = self.getConfigResources(test)
         self.processesNeeded = self.getProcessesNeeded()
         
     def getProcessesNeeded(self):
@@ -684,7 +680,7 @@ class SubmissionRules:
         return name.replace(":", "_")
 
     def findQueue(self):
-        return ""
+        return self.optionMap.get("q", "")
 
     def findMachineList(self):
         return []
@@ -703,13 +699,11 @@ class SubmissionRules:
 
 class ProxySubmissionRules(SubmissionRules):
     classPrefix = "Proxy"
+    def getConfigResources(self, test):
+        return test.getConfigValue("queue_system_proxy_resource")
 
 class TestSubmissionRules(SubmissionRules):
     classPrefix = "Test"
-    def __init__(self, optionMap, test):
-        self.optionMap = optionMap
-        SubmissionRules.__init__(self, test, self.getConfigResources(test))
-        
     def getConfigResources(self, test):
         if not self.optionMap.has_key("reconnect"):
             envSetting = os.path.expandvars(test.getEnvironment("QUEUE_SYSTEM_RESOURCE", "")) # Deprecated. See "queue_system_resource" in config file docs
@@ -767,8 +761,9 @@ class TestSubmissionRules(SubmissionRules):
         return []
 
     def findQueue(self):
-        if self.optionMap.has_key("q"):
-            return self.optionMap["q"]
+        cmdQueue = SubmissionRules.findQueue(self)
+        if cmdQueue:
+            return cmdQueue
         configQueue = self.test.app.getConfigValue("default_queue")
         if configQueue != "texttest_default":
             return configQueue

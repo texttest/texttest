@@ -157,9 +157,6 @@ class QueueSystemConfig(default.Config):
         return [ "c", "b", "trace", "ignorecat", "ignorefilters", "actrep", "td",
                  "rectraffic", "keeptmp", "keepslave", "reconnect", "reconnfull" ]
 
-    def getProxySubmissionRulesClass(self):
-        return masterprocess.ProxySubmissionRules
-
     def getExecHostFinder(self):
         if self.slaveRun():
             return slavejobs.FindExecutionHostsInSlave()
@@ -224,6 +221,14 @@ class QueueSystemConfig(default.Config):
 
     def getSubmissionRules(self, test):
         return masterprocess.TestSubmissionRules(self.optionMap, test)
+
+    def getProxySubmissionRulesClass(self):
+        return masterprocess.ProxySubmissionRules
+
+    def getProxySubmissionRules(self, test):
+        proxyResources = test.getConfigValue("queue_system_proxy_resource")
+        if proxyResources:
+            return self.getProxySubmissionRulesClass()(self.optionMap, test)
 
     def getMachineInfoFinder(self):
         if self.slaveRun():

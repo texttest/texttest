@@ -476,10 +476,12 @@ class QueueSystemServer(BaseActionRunner):
         self.setUpSuites(bugchecker, test)
         bugchecker(test)
         test.actionsCompleted()        
+    
     def setUpSuites(self, bugchecker, test):
         if test.parent:
             bugchecker.setUpSuite(test.parent)
             self.setUpSuites(bugchecker, test.parent)
+    
     def _getJobFailureInfo(self, test):
         jobInfo = self.getJobInfo(test)
         if len(jobInfo) == 0:
@@ -488,22 +490,31 @@ class QueueSystemServer(BaseActionRunner):
         # Take the most recent job, it's hopefully the most interesting
         jobId = jobInfo[-1][0]
         return queueSystem.getJobFailureInfo(jobId)
-    def getSlaveErrors(self, test, name):
-        slaveErrFile = self.getSlaveErrFile(test)
-        if slaveErrFile:
-            errors = open(slaveErrFile).read()
-            if errors:
-                return "-" * 10 + " Error messages written by " + name + " job " + "-" * 10 + \
-                       "\n" + errors
- 
-    def getSlaveErrFile(self, test):
-        for _, jobName in self.getJobInfo(test):
-            errFile = os.path.join(self.getSlaveLogDir(test), jobName + ".errors")
-            if os.path.isfile(errFile):
-                return errFile
     
+    def getSlaveErrors(self, test, name):
+        errorTexts = [ self.getSlaveErrorText(test, jobName, desc) for jobName, desc in self.getErrorJobNames(test, name) ]
+        return "\n".join([text for text in errorTexts if text])
+    
+    def getErrorJobNames(self, test, name):
+        jobNames = []
+        for _, jobName in self.getJobInfo(test):
+            jobNames.append((jobName, name))
+            if jobName.startswith("Test-"):
+                jobNames.append(("Proxy-" + jobName[5:], name + " Proxy"))
+        return jobNames
+    
+    def getSlaveErrorText(self, test, jobName, desc):
+        errFile = os.path.join(self.getSlaveLogDir(test), jobName + ".errors")
+        if os.path.isfile(errFile):
+            errors = open(errFile).read()
+            if errors:
+                return "-" * 10 + " Error messages written by " + desc + " job " + "-" * 10 + \
+                              "\n" + errors
+        return ""
+     
     def getJobInfo(self, test):
         return self.jobs.get(test, [])
+ 
     def killJob(self, test, jobId, jobName):
         prevTest, prevJobExisted = self.killedJobs.get(jobId, (None, False))
         # Killing the same job for other tests should result in the cached result being returned

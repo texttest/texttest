@@ -512,11 +512,11 @@ class FollowFile(FileViewAction):
     def canRunCommand(self, cmd):
         if len(self.currTestSelection) > 0:
             app = self.currTestSelection[0].app
-        if os.name == "posix":
+        if self.getRemoteHost():
             retcode = app.runCommandOn(self.getRemoteHost(), [ "which", cmd ], collectExitCode=True)
             return retcode == 0
         else:
-            return True # What to do on Windows? "which" doesn't exist. As running tests remotely on Windows is dodgy anyway we won't worry for now
+            return True 
 
 def getInteractiveActionClasses(dynamic):
     classes = [ ViewTestFileInEditor ]

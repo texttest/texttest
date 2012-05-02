@@ -512,7 +512,7 @@ class FollowFile(FileViewAction):
     def canRunCommand(self, cmd):
         if len(self.currTestSelection) > 0:
             app = self.currTestSelection[0].app
-        if self.getRemoteHost():
+        if self.getRemoteHost() != "localhost":
             retcode = app.runCommandOn(self.getRemoteHost(), [ "which", cmd ], collectExitCode=True)
             return retcode == 0
         else:

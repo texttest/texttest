@@ -2226,6 +2226,8 @@ Grid Engine (LSF/SGE) enhancements/bug fixes:
     - Self-diagnostics in slave processes now requested separately
 	New "-xs" flag for this. Not automatically inferred from "-x" any more.
     - Error messages from slave processes now shown also when running GUI
+    - Error messages from proxy slave jobs are now shown
+    - Proxy slave jobs now also use queues specified on the command line 
 Bug Fixes:
     - Junit report now handles tests with the same name in different suites properly.
     - "gui_entry_override" now works with spin buttons (e.g. "times_to_run", for the Running tab)
@@ -2255,3 +2257,4 @@ Bug Fixes:
 	e.g. if the viewer requested doesn't exist or the remote shell configuration does not work.
     - Fixed bug in dynamic GUI where file view selections from actions in the status view 
 	Did not clear previous selections but added to them.
+    - Now works when recomputing or saving causes a known bug to become irrelevant, state correctly updated

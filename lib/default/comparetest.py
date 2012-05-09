@@ -141,10 +141,10 @@ class BaseTestComparison(plugins.TestState):
 
         
 class TestComparison(BaseTestComparison):
-    def __init__(self, previousInfo, app, lifecycleChange=""):
+    def __init__(self, previousInfo, app, lifecycleChange="", copyFailedPrediction=True):
         BaseTestComparison.__init__(self, "failure", previousInfo, completed=1, lifecycleChange=lifecycleChange)
         self.failedPrediction = None
-        if hasattr(previousInfo, "failedPrediction") and previousInfo.failedPrediction:
+        if copyFailedPrediction and hasattr(previousInfo, "failedPrediction") and previousInfo.failedPrediction:
             self.setFailedPrediction(previousInfo.failedPrediction)
         # Cache these only so it gets output when we pickle, so we can re-interpret if needed... data may be moved
         self.appAbsPath = app.getDirectory()
@@ -409,7 +409,8 @@ class TestComparison(BaseTestComparison):
         self.notifyIfMainThread("ActionProgress")
 
     def makeNewState(self, test, lifeCycleDest):
-        newState = TestComparison(self, test.app, "be " + lifeCycleDest)
+        crashed = hasattr(self, "failedPrediction") and self.failedPrediction is not None and self.failedPrediction.category == "crash"
+        newState = TestComparison(self, test.app, "be " + lifeCycleDest, copyFailedPrediction=crashed)
         for comparison in self.allResults:
             newState.addComparison(comparison)
         newState.categorise()

@@ -59,9 +59,21 @@ class FileComparison:
                      for origPart, tmpPart in izip(origParts, tmpParts) ]
         else:
             return []
+        
+    def makeDeltaName(self, name):
+        parts = name.rsplit("_", 1)
+        lastpart = parts[-1]
+        if len(parts) == 2 and lastpart.isdigit():
+            newdigit = str(int(lastpart) + 1)
+            return parts[0] + "_" + newdigit
+        else:
+            return name + "_2"
     
-    def getSplitFileName(self, match, partsDir):
+    def getSplitFileName(self, match, partsDir, splitFileNames):
         localname = match.group(1).replace(" ", "_").lower()
+        while localname in splitFileNames:
+            localname = self.makeDeltaName(localname)
+        splitFileNames.append(localname)
         return os.path.join(partsDir, localname)
     
     def splitFile(self, test, filename, sepRegex):
@@ -72,12 +84,13 @@ class FileComparison:
         initialFileName = os.path.join(partsDir, "initial")
         parts.append(initialFileName)
         currWriteFile = open(initialFileName, "w")
+        splitFileNames = []
         with open(filename) as f:
             for line in f:
                 match = sepRegex.search(line)
                 if match:
                     currWriteFile.close()
-                    newFileName = self.getSplitFileName(match, partsDir)
+                    newFileName = self.getSplitFileName(match, partsDir, splitFileNames)
                     parts.append(newFileName)
                     currWriteFile = open(newFileName, "w")
                 currWriteFile.write(line)

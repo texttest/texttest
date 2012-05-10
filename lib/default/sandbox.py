@@ -88,12 +88,11 @@ class PrepareWriteDirectory(plugins.Action):
         if not targetPath or not sourceFileName: # Can happen with e.g. empty environment
             return
         plugins.ensureDirExistsForFile(targetPath)
-        for sourcePath in self.getSourcePaths(test, configName, sourceFileName):
+        sourcePaths = self.getSourcePaths(test, configName, sourceFileName)
+        for sourcePath in self.getSortedSourcePaths(sourcePaths, mergeData):
             self.diag.info("Collating " + configName + " from " + repr(sourcePath) +
                            "\nto " + repr(targetPath))
             collateMethod(test, sourcePath, targetPath)
-            if not mergeData:
-                break
 
         if remoteCopy and targetPath:
             remoteCopy(targetPath)
@@ -102,6 +101,18 @@ class PrepareWriteDirectory(plugins.Action):
         if envVarToSet and targetPath:
             self.diag.info("Setting env. variable " + envVarToSet + " to " + targetPath)
             test.setEnvironment(envVarToSet, targetPath)
+
+    def getSortedSourcePaths(self, sourcePaths, mergeData):
+        if mergeData:
+            if os.path.isdir(sourcePaths[-1]):
+                # Merging directories copies specific information first and refuses to overwrite it, must switch the order
+                return reversed(sourcePaths)
+            else:
+                # Merging files starts with most general and appends specific ones, keep the order
+                return sourcePaths
+        else:
+            # Don't merge, just use the most specific data
+            return sourcePaths[-1:]
 
     def copyDataRemotely(self, sourcePath, test, machine, remoteTmpDir):
         if os.path.exists(sourcePath):
@@ -137,7 +148,7 @@ class PrepareWriteDirectory(plugins.Action):
         if os.path.isabs(fileName):
             return [ fileName ]
         else:
-            return reversed(test.getAllPathNames(fileName, configName)) # most specific first
+            return test.getAllPathNames(fileName, configName) # most general first
 
     def getSourceFileName(self, configName, test):
         # These can refer to environment variables or to paths within the test structure

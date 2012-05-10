@@ -104,7 +104,7 @@ class PrepareWriteDirectory(plugins.Action):
 
     def getSortedSourcePaths(self, sourcePaths, mergeData):
         if mergeData:
-            if os.path.isdir(sourcePaths[-1]):
+            if sourcePaths and os.path.isdir(sourcePaths[-1]):
                 # Merging directories copies specific information first and refuses to overwrite it, must switch the order
                 return reversed(sourcePaths)
             else:

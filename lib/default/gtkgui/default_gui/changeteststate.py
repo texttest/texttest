@@ -5,6 +5,7 @@ The actions in the dynamic GUI that affect the state of a test
 
 import gtk, plugins, os
 from .. import guiplugins
+from adminactions import ReportBugs
 
 class SaveTests(guiplugins.ActionDialogGUI):
     defaultVersionStr = "<existing version>"
@@ -348,8 +349,41 @@ class KillTests(guiplugins.ActionGUI):
             test.notify("Kill")
 
         self.notify("Status", "Killed " + testDesc + ".")
-
-
+        
+class ReportBugsAndRecompute(ReportBugs):
+    def getFile(self):
+        from cStringIO import StringIO
+        return StringIO()
+    
+    def updateOptions(self):
+        ReportBugs.updateOptions(self)
+        multifile = int(len(self.getPossibleFileStems()) > 1)
+        self.searchGroup.setOptionValue("ignore_other_errors", multifile)
+        if not self.currTestSelection[0].stateInGui.hasResults():
+            self.searchGroup.setSwitchValue("data_source", 2)
+            # Perhaps we should get the box to be greyed out as it usually is when this is done?
+            
+    def getPossibleFileStems(self):
+        state = self.currTestSelection[0].stateInGui
+        if state.hasResults():
+            return [ comp.stem for comp in state.allResults if not comp.hasSucceeded() ]
+        else:
+            return []
+    
+    def updateWithBugFile(self, bugFile):
+        bugFile.seek(0)
+        from default.knownbugs import CheckForBugs
+        test = self.currTestSelection[0]
+        newState, _ = CheckForBugs().checkTestWithBugFile(test, test.stateInGui, bugFile)
+        if newState:
+            newState.lifecycleChange = "recalculated"
+            test.changeState(newState)
+            with ReportBugs.getFile(self) as realFile:
+                realFile.write(bugFile.getvalue())
+        else:
+            raise plugins.TextTestError, "Information entered did not trigger on the selected test, please try again"
+        
 def getInteractiveActionClasses():
-    return [ SaveTests, KillTests, MarkTest, UnmarkTest, RecomputeTests, SuspendTests, UnsuspendTests, SplitResultFiles ]
+    return [ SaveTests, KillTests, MarkTest, UnmarkTest, RecomputeTests, ReportBugsAndRecompute,
+             SuspendTests, UnsuspendTests, SplitResultFiles ]
  

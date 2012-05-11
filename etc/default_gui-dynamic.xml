@@ -42,6 +42,8 @@
     <menuitem action="Save"/>
     <menuitem action="Save As..."/>
     <separator/>
+    <menuitem action="Enter Failure Information"/>
+    <separator/>
     <menuitem action="Kill"/>
     <placeholder name="ExtraTestActions" />
     <menuitem action="Mark"/>

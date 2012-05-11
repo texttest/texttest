@@ -8,6 +8,8 @@
       <separator/>
       <menuitem name="Save Selection..." action="Save Selection..."/>
       <separator/>
+      <menuitem action="Enter Failure Information"/>
+      <separator/>
       <menuitem name="Quit" action="Quit"/>
     </menu> 
     <menu action="editmenu" />

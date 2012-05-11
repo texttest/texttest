@@ -223,11 +223,24 @@ class BugMap(OrderedDict):
             if bugData.checkUnchanged:
                 return True
         return False
+    
     def readFromFile(self, fileName):
         parser = self.makeParser(fileName)
         if parser:
             self.readFromParser(parser)
-    
+            
+    def readFromFileObject(self, f):
+        parser = self.makeParserFromFileObject(f)
+        if parser:
+            self.readFromParser(parser)
+            
+    def makeParserFromFileObject(self, f):
+        parser = ConfigParser()
+        # Default behaviour transforms to lower case: we want case-sensitive
+        parser.optionxform = str
+        parser.readfp(f)
+        return parser
+        
     def makeParser(self, fileName):
         parser = ConfigParser()
         # Default behaviour transforms to lower case: we want case-sensitive
@@ -241,6 +254,7 @@ class BugMap(OrderedDict):
             return parser
         except Exception:
             plugins.printWarning("Bug file at " + fileName + " not understood, ignoring")
+    
     def readFromParser(self, parser):
         for section in reversed(sorted(parser.sections())):
             getOption = ParseMethod(parser, section)
@@ -303,6 +317,14 @@ class CheckForBugs(plugins.Action):
 
     def checkTest(self, test, state):
         activeBugs = self.readBugs(test)
+        return self.checkTestWithBugs(test, state, activeBugs)
+    
+    def checkTestWithBugFile(self, test, state, bugFile):
+        bugMap = BugMap()
+        bugMap.readFromFileObject(bugFile)
+        return self.checkTestWithBugs(test, state, bugMap)
+    
+    def checkTestWithBugs(self, test, state, activeBugs):
         if not activeBugs.checkUnchanged() and not state.hasFailed():
             self.diag.info(repr(test) + " succeeded, not looking for bugs")
             return None, 0

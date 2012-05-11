@@ -1378,10 +1378,14 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         return "Enter information for automatic interpretation of test failures"
 
     def updateOptions(self):
-        if not self.searchGroup.getOptionValue("search_file"):
-            self.searchGroup.setOptionValue("search_file", self.currTestSelection[0].getConfigValue("log_file"))
+        possibleValues = self.getPossibleFileStems()
+        logFileStem = self.currTestSelection[0].getConfigValue("log_file")
+        if logFileStem in possibleValues:
+            self.searchGroup.setOptionValue("search_file", logFileStem)
+        elif possibleValues:
+            self.searchGroup.setOptionValue("search_file", possibleValues[0])
 
-        self.searchGroup.setPossibleValues("search_file", self.getPossibleFileStems())
+        self.searchGroup.setPossibleValues("search_file", possibleValues)
         return False
 
     def getPossibleFileStems(self):
@@ -1411,9 +1415,10 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         else:
             return "." + version
 
-    def getFileName(self):
+    def getFile(self):
         name = "knownbugs." + self.currTestSelection[0].app.name + self.versionSuffix()
-        return os.path.join(self.currTestSelection[0].getDirectory(), name)
+        fileName = os.path.join(self.currTestSelection[0].getDirectory(), name)
+        return open(fileName, "a")
 
     def getSizeAsWindowFraction(self):
         # size of the dialog
@@ -1423,11 +1428,10 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         self.checkSanity()
         dataSourceText = { 1 : "brief_text", 2 : "free_text" }
         namesToIgnore = [ "version" ]
-        fileName = self.getFileName()
-        writeFile = open(fileName, "a")
+        writeFile = self.getFile()
         writeFile.write("\n[Reported by " + os.getenv("USER", "Windows") + " at " + plugins.localtime() + "]\n")
         for group in [ self.textGroup, self.searchGroup, self.applyGroup,
-                       self.bugSystemGroup, self.textDescGroup, self.optionGroup ]:
+                      self.bugSystemGroup, self.textDescGroup, self.optionGroup ]:
             for name, option in group.options.items():
                 value = option.getValue()
                 if name in namesToIgnore or not value or value in [ "0", "<none>" ]:
@@ -1437,7 +1441,10 @@ class ReportBugs(guiplugins.ActionDialogGUI):
                     namesToIgnore += [ "search_file", "trigger_on_success", "ignore_other_errors" ]
                 else:
                     writeFile.write(name + ":" + str(value) + "\n")
+        self.updateWithBugFile(writeFile)
         writeFile.close()
+    
+    def updateWithBugFile(self, *args):
         self.currTestSelection[0].filesChanged()
 
 

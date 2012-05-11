@@ -13,8 +13,6 @@
       <menuitem action="Remove Tests"/>
       <menuitem action="Rename Test"/>
       <separator/>
-      <menuitem action="Enter Failure Information"/>
-      <separator/>
       <menuitem name="Move to first" action="Move to first"/>
       <menuitem name="Move up" action="Move up"/>
       <menuitem name="Move down" action="Move down"/>

@@ -328,7 +328,7 @@ class FileComparison:
         with open(self.stdFile, "w") as f:
             for splitComp in splitComps:
                 f.write(open(splitComp.stdFile).read())
-        copyfile(self.stdFile, self.stdCmpFile)
+        self.stdCmpFile = self.stdFile
         self.updateDifferenceCache(self.SAVED)
         
     def saveNew(self, test, versionString):

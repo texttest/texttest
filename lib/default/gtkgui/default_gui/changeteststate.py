@@ -361,7 +361,11 @@ class ReportBugsAndRecompute(ReportBugs):
         self.searchGroup.setOptionValue("ignore_other_errors", multifile)
         if not self.currTestSelection[0].stateInGui.hasResults():
             self.searchGroup.setSwitchValue("data_source", 2)
-            # Perhaps we should get the box to be greyed out as it usually is when this is done?
+            
+    def fillVBox(self, *args):
+        ret = ReportBugs.fillVBox(self, *args)
+        self.dataSourceChanged()
+        return ret
             
     def getPossibleFileStems(self):
         state = self.currTestSelection[0].stateInGui

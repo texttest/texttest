@@ -43,6 +43,7 @@
     <menuitem action="Save As..."/>
     <separator/>
     <menuitem action="Enter Failure Information"/>
+    <menuitem action="Find Failure Information"/>
     <separator/>
     <menuitem action="Kill"/>
     <placeholder name="ExtraTestActions" />

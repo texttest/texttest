@@ -49,6 +49,9 @@ class BugSystemBug(Bug):
         self.bugSystem = bugSystem
         Bug.__init__(self, *args)
 
+    def __repr__(self):
+        return self.bugId
+
     def getPriority(self):
         return 2
         
@@ -69,6 +72,9 @@ class UnreportedBug(Bug):
         self.briefText = briefText
         self.internalError = internalError
         Bug.__init__(self, *args)
+        
+    def __repr__(self):
+        return self.briefText
 
     def isCancellation(self):
         return not self.briefText and not self.fullText
@@ -241,7 +247,8 @@ class BugMap(OrderedDict):
         parser.readfp(f)
         return parser
         
-    def makeParser(self, fileName):
+    @staticmethod
+    def makeParser(fileName):
         parser = ConfigParser()
         # Default behaviour transforms to lower case: we want case-sensitive
         parser.optionxform = str
@@ -333,12 +340,17 @@ class CheckForBugs(plugins.Action):
         else:
             return None, 0
             
-    def findBug(self, test, state, activeBugs):
+
+    def findAllBugs(self, test, state, activeBugs):
         multipleDiffs = self.hasMultipleDifferences(test, state)
         bugs = []
         for stem, fileBugData in activeBugs.items():
             bugs += self.findBugsInFile(test, state, stem, fileBugData, multipleDiffs)
+        
+        return bugs
 
+    def findBug(self, test, state, activeBugs):
+        bugs = self.findAllBugs(test, state, activeBugs)
         unblockedBugs = self.findUnblockedBugs(bugs)
         if len(unblockedBugs) > 0:
             unblockedBugs.sort()

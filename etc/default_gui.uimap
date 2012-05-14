@@ -1001,3 +1001,16 @@ response.accept = accept test reload options
 [Name=Split result files]
 activate = split result files
 
+[Name=Find Failure Information]
+activate = find failure information
+
+[Title=Find, copy and move information for automatic interpretation of test failures]
+response.accept = apply failure information to selected tests
+response.cancel = cancel failure information search
+
+[Name=Bug or Brief Text]
+changed = choose predefined bug
+
+[Label=Copy info into test(s)]
+toggled.true = choose to copy info into tests
+

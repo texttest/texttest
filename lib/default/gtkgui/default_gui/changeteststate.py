@@ -6,6 +6,8 @@ The actions in the dynamic GUI that affect the state of a test
 import gtk, plugins, os
 from .. import guiplugins
 from adminactions import ReportBugs
+from default.knownbugs import CheckForBugs, BugMap
+from ConfigParser import ConfigParser
 
 class SaveTests(guiplugins.ActionDialogGUI):
     defaultVersionStr = "<existing version>"
@@ -349,6 +351,18 @@ class KillTests(guiplugins.ActionGUI):
             test.notify("Kill")
 
         self.notify("Status", "Killed " + testDesc + ".")
+    
+def applyBugsToTests(tests, bugMap):
+    foundMatch = False
+    for test in tests:
+        newState, _ = CheckForBugs().checkTestWithBugs(test, test.stateInGui, bugMap)
+        if newState:
+            newState.lifecycleChange = "recalculated"
+            test.changeState(newState)
+            foundMatch = True
+    
+    return foundMatch
+
         
 class ReportBugsAndRecompute(ReportBugs):
     def getFiles(self, *args):
@@ -376,18 +390,9 @@ class ReportBugsAndRecompute(ReportBugs):
     
     def updateWithBugFile(self, bugFile, ancestors):
         bugFile.seek(0)
-        from default.knownbugs import CheckForBugs, BugMap
         bugMap = BugMap()
         bugMap.readFromFileObject(bugFile)
-        foundMatch = False
-        for test in self.currTestSelection:
-            newState, _ = CheckForBugs().checkTestWithBugs(test, test.stateInGui, bugMap)
-            if newState:
-                newState.lifecycleChange = "recalculated"
-                test.changeState(newState)
-                foundMatch = True
-        
-        if foundMatch:    
+        if applyBugsToTests(self.currTestSelection, bugMap):
             for realFile in ReportBugs.getFiles(self, ancestors):
                 realFile.write(bugFile.getvalue())
                 realFile.close()
@@ -396,9 +401,106 @@ class ReportBugsAndRecompute(ReportBugs):
         
     def setFilesChanged(self, *args):
         pass # No point, we don't show the knownbugs files anyway
+    
+class FindKnownBugs(guiplugins.ActionDialogGUI):
+    def __init__(self, allApps, *args):
+        guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
+        self.optionGroup.addOption("bug", "Bug or Brief Text", allocateNofValues=2)
+        self.optionGroup.addSwitch("copy", 
+                                   options = [ "Apply to whole suite", "Copy info into test(s)" ], 
+                                   description = [ "Move the reported failure information to the root suite where it will apply to all tests", 
+                                                   "Copy the reported failure information to the selected tests" ]
+                                   )
+        self.allKnownBugFiles = []
+        self.rootSuites = []
             
+    def _getStockId(self):
+        return "find"
+
+    def _getTitle(self):
+        return "Find Failure Information"
+
+    def getDialogTitle(self):
+        return "Find, copy and move information for automatic interpretation of test failures"
+    
+    def updateOptions(self):
+        # Only do this on completed tests
+        if not all((test.stateInGui.isComplete() for test in self.currTestSelection)):
+            return False
+        
+        bugMap = BugMap()
+        self.allKnownBugFiles = self.findAllKnownBugsFiles()
+        for bugFile in self.allKnownBugFiles:
+            bugMap.readFromFile(bugFile)
+            
+        # We assume the first test is representative and only check all the bugs on that one
+        test = self.currTestSelection[0]
+        bugs = CheckForBugs().findAllBugs(test, test.stateInGui, bugMap)
+        if bugs:
+            self.optionGroup.setPossibleValues("bug", map(str, bugs))
+            self.optionGroup.setValue("bug", str(bugs[0]))
+        return False
+    
+    def findAllKnownBugsFiles(self):
+        files = []
+        self.rootSuites = self.findSelectedRootSuites()
+        for rootSuite in self.rootSuites:
+            for test in rootSuite.testCaseList():
+                for file in test.getAllPathNames("knownbugs"):
+                    if file not in files:
+                        files.append(file)
+        return files
+        
+    def findSelectedRootSuites(self):
+        roots = []
+        for test in self.currTestSelection:
+            root = test.getAllTestsToRoot()[0]
+            if root not in roots:
+                roots.append(root)
+        return roots
+
+    def getFileNames(self, copyChoice):
+        fileNames = []
+        suitesOrTests = self.currTestSelection if copyChoice else self.rootSuites
+        for suiteOrTest in suitesOrTests:
+            name = "knownbugs." + suiteOrTest.app.name + suiteOrTest.app.versionSuffix()
+            fileName = os.path.join(suiteOrTest.getDirectory(), name)
+            if not any((fileName.startswith(f) for f in fileNames)):
+                fileNames.append(fileName)
+        
+        return fileNames
+    
+    def findBugInfo(self, bugStr):
+        for bugFile in self.allKnownBugFiles:
+            parser = BugMap.makeParser(bugFile)
+            for section in parser.sections():
+                if (parser.has_option(section, "bug_id") and parser.get(section, "bug_id") == bugStr) or \
+                   (parser.has_option(section, "brief_description") and parser.get(section, "brief_description") == bugStr):
+                    return bugFile, parser, section
+
+    def performOnCurrent(self):
+        bugFile, parser, section = self.findBugInfo(self.optionGroup.getValue("bug"))
+        
+        newParser = ConfigParser()
+        newParser.add_section(section)
+        for key, value in parser.items(section):
+            newParser.set(section, key, value)
+        
+        copyChoice = self.optionGroup.getValue("copy")
+        if copyChoice == 0:
+            parser.remove_section(section)
+            parser.write(open(bugFile, "w"))
+            
+        for fileName in self.getFileNames(copyChoice):
+            with open(fileName, "a") as f:
+                newParser.write(f)
+                
+        bugMap = BugMap()
+        bugMap.readFromParser(newParser)
+        applyBugsToTests(self.currTestSelection, bugMap)
+
         
 def getInteractiveActionClasses():
     return [ SaveTests, KillTests, MarkTest, UnmarkTest, RecomputeTests, ReportBugsAndRecompute,
-             SuspendTests, UnsuspendTests, SplitResultFiles ]
+             SuspendTests, UnsuspendTests, SplitResultFiles, FindKnownBugs ]
  

@@ -894,8 +894,10 @@ class ActionDialogGUI(OptionGroupGUI):
                                          self.confirmationRespond, fileChooserOption)
                 else:
                     self.defaultRespond(saidOK, dialog, fileChooserOption)
-            except Exception, e:
+            except plugins.TextTestError, e:
                 self.showErrorDialog(str(e))
+            except Exception:
+                self.showErrorDialog(plugins.getExceptionString())
         else:
             self.defaultRespond(saidOK, dialog, fileChooserOption)
 

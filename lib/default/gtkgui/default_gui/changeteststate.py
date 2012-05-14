@@ -351,9 +351,9 @@ class KillTests(guiplugins.ActionGUI):
         self.notify("Status", "Killed " + testDesc + ".")
         
 class ReportBugsAndRecompute(ReportBugs):
-    def getFile(self):
+    def getFiles(self, *args):
         from cStringIO import StringIO
-        return StringIO()
+        return [ StringIO() ]
     
     def updateOptions(self):
         ReportBugs.updateOptions(self)
@@ -374,18 +374,29 @@ class ReportBugsAndRecompute(ReportBugs):
         else:
             return []
     
-    def updateWithBugFile(self, bugFile):
+    def updateWithBugFile(self, bugFile, ancestors):
         bugFile.seek(0)
-        from default.knownbugs import CheckForBugs
-        test = self.currTestSelection[0]
-        newState, _ = CheckForBugs().checkTestWithBugFile(test, test.stateInGui, bugFile)
-        if newState:
-            newState.lifecycleChange = "recalculated"
-            test.changeState(newState)
-            with ReportBugs.getFile(self) as realFile:
+        from default.knownbugs import CheckForBugs, BugMap
+        bugMap = BugMap()
+        bugMap.readFromFileObject(bugFile)
+        foundMatch = False
+        for test in self.currTestSelection:
+            newState, _ = CheckForBugs().checkTestWithBugs(test, test.stateInGui, bugMap)
+            if newState:
+                newState.lifecycleChange = "recalculated"
+                test.changeState(newState)
+                foundMatch = True
+        
+        if foundMatch:    
+            for realFile in ReportBugs.getFiles(self, ancestors):
                 realFile.write(bugFile.getvalue())
+                realFile.close()
         else:
             raise plugins.TextTestError, "Information entered did not trigger on the selected test, please try again"
+        
+    def setFilesChanged(self, *args):
+        pass # No point, we don't show the knownbugs files anyway
+            
         
 def getInteractiveActionClasses():
     return [ SaveTests, KillTests, MarkTest, UnmarkTest, RecomputeTests, ReportBugsAndRecompute,

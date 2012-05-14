@@ -1368,33 +1368,35 @@ class ReportBugs(guiplugins.ActionDialogGUI):
     def _getStockId(self):
         return "info"
 
-    def singleTestOnly(self):
-        return True
-
     def _getTitle(self):
         return "Enter Failure Information"
 
     def getDialogTitle(self):
         return "Enter information for automatic interpretation of test failures"
 
+    def getDefaultSearchFile(self, possibleValues):
+        logFileStems = set([ test.getConfigValue("log_file") for test in self.currTestSelection ])
+        for logFileStem in logFileStems:
+            if logFileStem in possibleValues:
+                return logFileStem
+        return possibleValues[0]
+
     def updateOptions(self):
         possibleValues = self.getPossibleFileStems()
-        logFileStem = self.currTestSelection[0].getConfigValue("log_file")
-        if logFileStem in possibleValues:
-            self.searchGroup.setOptionValue("search_file", logFileStem)
-        elif possibleValues:
-            self.searchGroup.setOptionValue("search_file", possibleValues[0])
+        if possibleValues:
+            self.searchGroup.setOptionValue("search_file", self.getDefaultSearchFile(possibleValues))
 
         self.searchGroup.setPossibleValues("search_file", possibleValues)
         return False
 
     def getPossibleFileStems(self):
         stems = []
-        excludeStems = self.currTestSelection[0].expandedDefFileStems()
-        for test in self.currTestSelection[0].testCaseList():
-            for stem in test.dircache.findAllStems():
-                if stem not in stems and stem not in excludeStems:
-                    stems.append(stem)
+        for testOrSuite in self.currTestSelection:
+            excludeStems = testOrSuite.expandedDefFileStems()
+            for test in testOrSuite.testCaseList():
+                for stem in test.dircache.findAllStems():
+                    if stem not in stems and stem not in excludeStems:
+                        stems.append(stem)
         return stems
 
     def checkSanity(self):
@@ -1415,37 +1417,63 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         else:
             return "." + version
 
-    def getFile(self):
-        name = "knownbugs." + self.currTestSelection[0].app.name + self.versionSuffix()
-        fileName = os.path.join(self.currTestSelection[0].getDirectory(), name)
-        return open(fileName, "a")
+    def getFiles(self, ancestors):
+        fileNames = []
+        for ancestor in ancestors:
+            name = "knownbugs." + ancestor.app.name + self.versionSuffix()
+            fileName = os.path.join(ancestor.getDirectory(), name)
+            if not any((fileName.startswith(f) for f in fileNames)):
+                fileNames.append(fileName)
+        return [ open(fileName, "a") for fileName in fileNames ]
 
     def getSizeAsWindowFraction(self):
         # size of the dialog
         return 0.6, 0.6
+
+    def updateAncestors(self, ancestors, test):
+        for i, ancestor in enumerate(ancestors):
+            newAncestor = ancestor.findCommonAncestor(test)
+            if newAncestor:
+                ancestors[i] = newAncestor
+                return True
+        
+        return False
+
+    def findCommonSelectedAncestors(self):
+        ancestors = [ self.currTestSelection[0] ]
+        for test in self.currTestSelection[1:]:
+            if not self.updateAncestors(ancestors, test):
+                ancestors.append(test)
+        return ancestors              
     
     def performOnCurrent(self):
         self.checkSanity()
         dataSourceText = { 1 : "brief_text", 2 : "free_text" }
         namesToIgnore = [ "version" ]
-        writeFile = self.getFile()
-        writeFile.write("\n[Reported by " + os.getenv("USER", "Windows") + " at " + plugins.localtime() + "]\n")
-        for group in [ self.textGroup, self.searchGroup, self.applyGroup,
-                      self.bugSystemGroup, self.textDescGroup, self.optionGroup ]:
-            for name, option in group.options.items():
-                value = option.getValue()
-                if name in namesToIgnore or not value or value in [ "0", "<none>" ]:
-                    continue
-                if name == "data_source":
-                    writeFile.write("search_file:" + dataSourceText[value] + "\n")
-                    namesToIgnore += [ "search_file", "trigger_on_success", "ignore_other_errors" ]
-                else:
-                    writeFile.write(name + ":" + str(value) + "\n")
-        self.updateWithBugFile(writeFile)
-        writeFile.close()
-    
+        ancestors = self.findCommonSelectedAncestors()
+        for writeFile in self.getFiles(ancestors):
+            writeFile.write("\n[Reported by " + os.getenv("USER", "Windows") + " at " + plugins.localtime() + "]\n")
+            for group in [ self.textGroup, self.searchGroup, self.applyGroup,
+                          self.bugSystemGroup, self.textDescGroup, self.optionGroup ]:
+                for name, option in group.options.items():
+                    value = option.getValue()
+                    if name in namesToIgnore or not value or value in [ "0", "<none>" ]:
+                        continue
+                    if name == "data_source":
+                        writeFile.write("search_file:" + dataSourceText[value] + "\n")
+                        namesToIgnore += [ "search_file", "trigger_on_success", "ignore_other_errors" ]
+                    else:
+                        writeFile.write(name + ":" + str(value) + "\n")
+            self.updateWithBugFile(writeFile, ancestors)
+            writeFile.close()
+        self.setFilesChanged(ancestors)
+        
     def updateWithBugFile(self, *args):
-        self.currTestSelection[0].filesChanged()
+        pass # only used in dynamic GUI
+    
+    def setFilesChanged(self, ancestors):
+        for ancestor in ancestors:
+            ancestor.filesChanged()
 
 
 def getInteractiveActionClasses():

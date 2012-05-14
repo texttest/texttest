@@ -324,7 +324,7 @@ class TestRunner:
         tearDownSuites = []
         commonAncestor = None
         if previousTestRunner:
-            commonAncestor = self.findCommonAncestor(self.test, previousTestRunner.test)
+            commonAncestor = self.test.findCommonAncestor(previousTestRunner.test)
             self.diag.info("Common ancestor : " + repr(commonAncestor))
             tearDownSuites = previousTestRunner.findSuitesUpTo(commonAncestor)
         setUpSuites = self.findSuitesUpTo(commonAncestor)
@@ -332,24 +332,6 @@ class TestRunner:
         setUpSuites.reverse()
         return tearDownSuites, setUpSuites
     
-    def findCommonAncestor(self, test1, test2):
-        if self.hasAncestor(test2, test1):
-            self.diag.info(test2.uniqueName + " has ancestor " + test1.uniqueName)
-            return test1
-        elif test1.parent:
-            return self.findCommonAncestor(test1.parent, test2)
-        else:
-            self.diag.info(test1.uniqueName + " unrelated to " + test2.uniqueName)
-            return None
-
-    def hasAncestor(self, test1, test2):
-        if test1 == test2:
-            return 1
-        if test1.parent:
-            return self.hasAncestor(test1.parent, test2)
-        else:
-            return 0
-
     def findSuitesUpTo(self, ancestor):
         suites = []
         currCheck = self.test.parent

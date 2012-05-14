@@ -594,6 +594,24 @@ class Test(plugins.Observable):
     def refresh(self, *args):
         self.refreshFiles()
         self.notify("FileChange")
+        
+    def findCommonAncestor(self, other):
+        if self.hasAncestor(other):
+            self.diagnose("Have ancestor " + other.uniqueName)
+            return other
+        elif other.parent:
+            return self.findCommonAncestor(other.parent)
+        else:
+            self.diagnose("Unrelated to " + other.uniqueName)
+
+    def hasAncestor(self, other):
+        if self is other:
+            return True
+        if self.parent:
+            return self.parent.hasAncestor(other)
+        else:
+            return False
+
 
 
 class TestCase(Test):

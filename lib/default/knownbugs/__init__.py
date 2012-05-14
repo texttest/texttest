@@ -319,11 +319,6 @@ class CheckForBugs(plugins.Action):
         activeBugs = self.readBugs(test)
         return self.checkTestWithBugs(test, state, activeBugs)
     
-    def checkTestWithBugFile(self, test, state, bugFile):
-        bugMap = BugMap()
-        bugMap.readFromFileObject(bugFile)
-        return self.checkTestWithBugs(test, state, bugMap)
-    
     def checkTestWithBugs(self, test, state, activeBugs):
         if not activeBugs.checkUnchanged() and not state.hasFailed():
             self.diag.info(repr(test) + " succeeded, not looking for bugs")

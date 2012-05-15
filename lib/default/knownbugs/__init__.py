@@ -21,9 +21,6 @@ class FailedPrediction(plugins.TestState):
 class Bug:
     def __init__(self, rerunCount):
         self.rerunCount = rerunCount
-    
-    def __cmp__(self, other):
-        return cmp(self.getPriority(), other.getPriority())
                    
     def findCategory(self, internalError):
         if internalError or self.rerunCount:
@@ -177,7 +174,7 @@ class FileBugData:
             for bugTrigger in self.presentList:
                 self.diag.info("Checking for existence of " + repr(bugTrigger))
                 bug = bugTrigger.findBug(execHosts, isChanged, multipleDiffs, line)
-                if bug:
+                if bug and bug not in bugs:
                     bugs.append(bug)
             for bugTrigger in currAbsent:
                 if bugTrigger.matchesText(line):
@@ -189,7 +186,7 @@ class FileBugData:
         bugs = []
         for bugTrigger in absentList:
             bug = bugTrigger.findBug(execHosts, isChanged, multipleDiffs)
-            if bug:
+            if bug and bug not in bugs:
                 bugs.append(bug)
         return bugs
 
@@ -353,7 +350,7 @@ class CheckForBugs(plugins.Action):
         bugs = self.findAllBugs(test, state, activeBugs)
         unblockedBugs = self.findUnblockedBugs(bugs)
         if len(unblockedBugs) > 0:
-            unblockedBugs.sort()
+            unblockedBugs.sort(key=lambda bug: bug.getPriority())
             return unblockedBugs[0]
 
     def findUnblockedBugs(self, bugs):

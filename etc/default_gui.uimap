@@ -1014,3 +1014,6 @@ changed = choose predefined bug
 [Label=Copy info into test(s)]
 toggled.true = choose to copy info into tests
 
+[Label=Apply to common parent suite]
+toggled.true = choose to apply to parent suite
+

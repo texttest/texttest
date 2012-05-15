@@ -1430,7 +1430,8 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         # size of the dialog
         return 0.6, 0.6
 
-    def updateAncestors(self, ancestors, test):
+    @classmethod
+    def updateAncestors(cls, ancestors, test):
         for i, ancestor in enumerate(ancestors):
             newAncestor = ancestor.findCommonAncestor(test)
             if newAncestor:
@@ -1439,10 +1440,11 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         
         return False
 
-    def findCommonSelectedAncestors(self):
-        ancestors = [ self.currTestSelection[0] ]
-        for test in self.currTestSelection[1:]:
-            if not self.updateAncestors(ancestors, test):
+    @classmethod
+    def findCommonSelectedAncestors(cls, tests):
+        ancestors = [ tests[0] ]
+        for test in tests[1:]:
+            if not cls.updateAncestors(ancestors, test):
                 ancestors.append(test)
         return ancestors              
     
@@ -1450,7 +1452,7 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         self.checkSanity()
         dataSourceText = { 1 : "brief_text", 2 : "free_text" }
         namesToIgnore = [ "version" ]
-        ancestors = self.findCommonSelectedAncestors()
+        ancestors = self.findCommonSelectedAncestors(self.currTestSelection)
         for writeFile in self.getFiles(ancestors):
             writeFile.write("\n[Reported by " + os.getenv("USER", "Windows") + " at " + plugins.localtime() + "]\n")
             for group in [ self.textGroup, self.searchGroup, self.applyGroup,

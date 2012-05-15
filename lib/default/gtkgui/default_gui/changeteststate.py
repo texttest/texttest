@@ -405,8 +405,9 @@ class FindKnownBugs(guiplugins.ActionDialogGUI):
         guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
         self.optionGroup.addOption("bug", "Bug or Brief Text", allocateNofValues=2)
         self.optionGroup.addSwitch("copy", 
-                                   options = [ "Apply to whole suite", "Copy info into test(s)" ], 
+                                   options = [ "Apply to whole suite", "Apply to common parent suite", "Copy info into test(s)" ], 
                                    description = [ "Move the reported failure information to the root suite where it will apply to all tests", 
+                                                   "Move the reported failure information to the suite where it will apply to all selected tests", 
                                                    "Copy the reported failure information to the selected tests" ]
                                    )
         self.allKnownBugFiles = []
@@ -456,10 +457,25 @@ class FindKnownBugs(guiplugins.ActionDialogGUI):
             if root not in roots:
                 roots.append(root)
         return roots
+    
+    def findBugFileTest(self, filePath):
+        testDir = os.path.dirname(filePath)
+        for suite in self.rootSuites:
+            if testDir.startswith(suite.getDirectory()):
+                relPath = plugins.relpath(testDir, suite.getDirectory())
+                return suite.findSubtestWithPath(relPath)
+    
+    def getTestsToApplyTo(self, copyChoice, bugFile):
+        if copyChoice == 0:
+            return self.rootSuites
+        elif copyChoice == 1:
+            bugFileTest = self.findBugFileTest(bugFile)
+            return ReportBugs.findCommonSelectedAncestors(self.currTestSelection + [ bugFileTest ])
+        else:
+            return self.currTestSelection
 
-    def getFileNames(self, copyChoice):
+    def getFileNames(self, suitesOrTests):
         fileNames = []
-        suitesOrTests = self.currTestSelection if copyChoice else self.rootSuites
         for suiteOrTest in suitesOrTests:
             name = "knownbugs." + suiteOrTest.app.name + suiteOrTest.app.versionSuffix()
             fileName = os.path.join(suiteOrTest.getDirectory(), name)
@@ -485,11 +501,12 @@ class FindKnownBugs(guiplugins.ActionDialogGUI):
             newParser.set(section, key, value)
         
         copyChoice = self.optionGroup.getValue("copy")
-        if copyChoice == 0:
+        if copyChoice != 2:
             parser.remove_section(section)
             parser.write(open(bugFile, "w"))
             
-        for fileName in self.getFileNames(copyChoice):
+        suitesOrTests = self.getTestsToApplyTo(copyChoice, bugFile)
+        for fileName in self.getFileNames(suitesOrTests):
             with open(fileName, "a") as f:
                 newParser.write(f)
                 

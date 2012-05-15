@@ -399,8 +399,6 @@ class ReportBugsAndRecompute(ReportBugs):
         else:
             raise plugins.TextTestError, "Information entered did not trigger on the selected test, please try again"
         
-    def setFilesChanged(self, *args):
-        pass # No point, we don't show the knownbugs files anyway
     
 class FindKnownBugs(guiplugins.ActionDialogGUI):
     def __init__(self, allApps, *args):

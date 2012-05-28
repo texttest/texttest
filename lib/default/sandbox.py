@@ -1083,7 +1083,7 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
         values = []
         for line in open(logFile).xreadlines():
             value = self.getValue(line, entryFinder)
-            if value:
+            if value is not None:
                 self.diag.info(" found value: " + str(value))
                 values.append(value)
         return values

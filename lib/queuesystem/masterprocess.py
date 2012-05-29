@@ -324,8 +324,12 @@ class QueueSystemServer(BaseActionRunner):
         If we're being run via SSH, don't pass this on to the slave jobs
         This has been known to trip up shell starter scripts, e.g. on SuSE 10
         making them believe that the SGE job is an SSH login and setting things wrongly
-        as a result."""
-        return [ "USECASE_REPLAY_SCRIPT", "USECASE_RECORD_SCRIPT", "SSH_TTY" ]
+        as a result.
+
+        LS_COLORS has also been shown to be problematic as older version of tcsh fail hard
+        if given newer instructions they don't understand there.
+        """
+        return [ "USECASE_REPLAY_SCRIPT", "USECASE_RECORD_SCRIPT", "SSH_TTY", "LS_COLORS" ]
 
     def getSlaveEnvironment(self):
         return plugins.copyEnvironment(ignoreVars=self.getSlaveVarsToBlock())

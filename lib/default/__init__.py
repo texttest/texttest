@@ -376,8 +376,9 @@ class Config:
         if os.name == "posix" and self.useVirtualDisplay():
             from virtualdisplay import VirtualDisplayResponder
             classes.append(VirtualDisplayResponder)
-        if self.keepTemporaryDirectories():
-            classes.append(self.getStateSaver())
+        stateSaver = self.getStateSaver()
+        if stateSaver is not None:
+            classes.append(stateSaver)
         if not self.useGUI() and not self.batchMode():
             classes.append(self.getTextResponder())
         # At the end, so we've done the processing before we proceed
@@ -680,10 +681,16 @@ class Config:
         return self.optionMap.has_key("b")
     
     def keepTemporaryDirectories(self):
-        return self.optionMap.has_key("keeptmp") or (self.batchMode() and not self.isReconnecting())
+        if "keeptmp" in self.optionMap:
+            return self.optionMap.get("keeptmp") != "0"
+        else:
+            return self.batchMode() and not self.isReconnecting()
+
+    def hasKeeptmpFlag(self):
+        return "keeptmp" in self.optionMap and self.optionMap.get("keeptmp") != "0"
 
     def cleanPreviousTempDirs(self):
-        return self.batchMode() and not self.isReconnecting() and not self.optionMap.has_key("keeptmp")
+        return self.batchMode() and not self.isReconnecting() and "keeptmp" not in self.optionMap
 
     def cleanWriteDirectory(self, suite):
         if not self.keepTemporaryDirectories():
@@ -752,29 +759,39 @@ class Config:
         return sandbox.ExtractPerformanceFiles(self.getMachineInfoFinder())
     def getPerformanceFileMaker(self):
         return sandbox.MakePerformanceFile(self.getMachineInfoFinder())
+    
     def getMachineInfoFinder(self):
         return sandbox.MachineInfoFinder()
+    
     def getFailureExplainer(self):
         from knownbugs import CheckForBugs, CheckForCrashes
         return [ CheckForCrashes(), CheckForBugs() ]
+    
     def showExecHostsInFailures(self, app):
         return self.batchMode() or app.getRunMachine() != "localhost"
+    
     def getTestComparator(self):
         return comparetest.MakeComparisons(enableColor=self.optionMap.has_key("zen"))
+    
     def getStateSaver(self):
-        if self.batchMode():
+        if self.batchMode() and not self.isReconnecting():
             return batch.SaveState
-        else:
+        elif self.keepTemporaryDirectories():
             return SaveState
+        
     def getConfigEnvironment(self, test):
         testEnvironmentCreator = self.getEnvironmentCreator(test)
         return testEnvironmentCreator.getVariables()
+    
     def getEnvironmentCreator(self, test):
         return sandbox.TestEnvironmentCreator(test, self.optionMap)
+    
     def getInteractiveReplayOptions(self):
         return [ ("actrep", "slow motion") ]
+    
     def getTextResponder(self):
         return console.InteractiveResponder
+    
     def getWebPageResponder(self):
         return batch.WebPageResponder
 

@@ -302,11 +302,11 @@ class QueueSystemServer(BaseActionRunner):
 
     def runTest(self, test):   
         submissionRules = self.getSubmissionRules(test)
-        command = self.getSlaveCommand(test, submissionRules)
+        commandArgs = self.getSlaveCommandArgs(test, submissionRules)
         plugins.log.info("Q: Submitting " + repr(test) + submissionRules.getSubmitSuffix())
         sys.stdout.flush()
         self.jobs[test] = [] # Preliminary jobs aren't interesting any more
-        if not self.submitJob(test, submissionRules, command, self.getSlaveEnvironment()):
+        if not self.submitJob(test, submissionRules, commandArgs, self.getSlaveEnvironment()):
             return
         
         self.testCount -= 1
@@ -344,17 +344,11 @@ class QueueSystemServer(BaseActionRunner):
         freeText = "Job pending in " + queueSystemName(test.app)
         return plugins.TestState("pending", freeText=freeText, briefText="PEND", lifecycleChange="become pending")
 
-    def shellWrap(self, command):
-        # Must use exec so as not to create extra processes: SGE's qdel isn't very clever when
-        # it comes to noticing extra shells
-        return "exec $SHELL -c \"exec " + command + "\""
-
-    def getSlaveCommand(self, test, submissionRules):
-        cmdArgs = [ plugins.getTextTestProgram(), "-d", ":".join(self.optionMap.rootDirectories),
-                    "-a", test.app.name + test.app.versionSuffix(),
-                    "-l", "-tp", plugins.quote(test.getRelPath()) ] + \
-                    self.getSlaveArgs(test) + self.getRunOptions(test.app, submissionRules)
-        return " ".join(cmdArgs)
+    def getSlaveCommandArgs(self, test, submissionRules):
+        return [ plugins.getTextTestProgram(), "-d", ":".join(self.optionMap.rootDirectories),
+                 "-a", test.app.name + test.app.versionSuffix(),
+                 "-l", "-tp", test.getRelPath() ] + \
+                 self.getSlaveArgs(test) + self.getRunOptions(test.app, submissionRules)
 
     def getSlaveArgs(self, test):
         return [ "-slave", test.app.writeDirectory, "-servaddr", self.submitAddress ]
@@ -380,10 +374,10 @@ class QueueSystemServer(BaseActionRunner):
     def getSlaveLogDir(self, test):
         return os.path.join(test.app.writeDirectory, "slavelogs")
 
-    def getSubmitCmdArgs(self, test, submissionRules):
+    def getSubmitCmdArgs(self, test, submissionRules, *args):
         queueSystem = self.getQueueSystem(test)
         extraArgs = submissionRules.getExtraSubmitArgs()
-        cmdArgs = queueSystem.getSubmitCmdArgs(submissionRules)
+        cmdArgs = queueSystem.getSubmitCmdArgs(submissionRules, *args)
         if extraArgs:
             cmdArgs += plugins.splitcmd(extraArgs)
         return cmdArgs
@@ -392,7 +386,7 @@ class QueueSystemServer(BaseActionRunner):
         submissionRules = self.getSubmissionRules(test)
         cmdArgs = self.getSubmitCmdArgs(test, submissionRules)
         text = queueSystemName(test) + " Command   : " + plugins.commandLineString(cmdArgs) + " ...\n" + \
-               "Slave Command : " + self.getSlaveCommand(test, submissionRules) + "\n"
+               "Slave Command : " + " ".join(self.getSlaveCommandArgs(test, submissionRules)) + "\n"
         proxyArgs = self.getProxyCmdArgs(test)
         if proxyArgs:
             return queueSystemName(test) + " Proxy Command   : " + plugins.commandLineString(proxyArgs) + "\n" + text
@@ -405,28 +399,26 @@ class QueueSystemServer(BaseActionRunner):
             proxyOptions = test.getCommandLineOptions("proxy_options")
             fullProxyCmd = proxyCmd + " " + " ".join(proxyOptions)
             proxyRules = self.getJobSubmissionRules(test)
-            proxyArgs = self.getSubmitCmdArgs(test, proxyRules)
-            proxyArgs.append(self.shellWrap(fullProxyCmd))
-            return proxyArgs
+            return self.getSubmitCmdArgs(test, proxyRules, fullProxyCmd)
         else:
             return []
-        
-    def createSubmitProcess(self, test, cmdArgs, slaveEnv, withProxy):
-        logDir = self.getSlaveLogDir(test)
-        if withProxy:
-            proxyArgs = self.getProxyCmdArgs(test)
-            if proxyArgs:
-                cmdArgs[1:1] = [ "-sync", "y" ] # must synchronise in the proxy
-                slaveEnv["TEXTTEST_SUBMIT_COMMAND_ARGS"] = repr(cmdArgs) # Exact command arguments to run TextTest slave, for use by proxy
-                cmdArgs = proxyArgs
-        return cmdArgs, subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                         cwd=logDir, env=slaveEnv)
 
-    def submitJob(self, test, submissionRules, command, slaveEnv, withProxy=True):
-        self.diag.info("Submitting job at " + plugins.localtime() + ":" + command)
+    def modifyCommandForProxy(self, test, cmdArgs):
+        proxyArgs = self.getProxyCmdArgs(test)
+        if proxyArgs:
+            cmdArgs[1:1] = [ "-sync", "y" ] # must synchronise in the proxy
+            slaveEnv["TEXTTEST_SUBMIT_COMMAND_ARGS"] = repr(cmdArgs) # Exact command arguments to run TextTest slave, for use by proxy
+            return proxyArgs
+        else:
+            return cmdArgs
+        
+    def submitJob(self, test, submissionRules, commandArgs, slaveEnv, withProxy=True):
+        self.diag.info("Submitting job at " + plugins.localtime() + ":" + repr(commandArgs))
         self.diag.info("Creating job at " + plugins.localtime())
-        cmdArgs = self.getSubmitCmdArgs(test, submissionRules)
-        cmdArgs.append(self.shellWrap(command))
+        cmdArgs = self.getSubmitCmdArgs(test, submissionRules, commandArgs)
+        if withProxy:
+            cmdArgs = self.modifyCommandForProxy(test, cmdArgs)
+
         jobName = submissionRules.getJobName()
         self.fixDisplay(slaveEnv)
         self.diag.info("Creating job " + jobName + " with command arguments : " + " ".join(cmdArgs))
@@ -439,14 +431,9 @@ class QueueSystemServer(BaseActionRunner):
         
         self.lockDiag.info("Got lock for submission")
         queueSystem = self.getQueueSystem(test)
-        try:
-            cmdArgs, process = self.createSubmitProcess(test, cmdArgs, slaveEnv, withProxy)
-            stdout, stderr = process.communicate()
-            errorMessage = self.findErrorMessage(stderr, queueSystem)
-        except OSError:
-            errorMessage = "local machine is not a submit host: running '" + cmdArgs[0] + "' failed."
-        if not errorMessage:
-            jobId = queueSystem.findJobId(stdout)
+        logDir = self.getSlaveLogDir(test)
+        jobId, errorMessage = queueSystem.submitSlaveJob(cmdArgs, slaveEnv, logDir, submissionRules)
+        if jobId is not None:
             self.diag.info("Job created with id " + jobId)
 
             self.jobs.setdefault(test, []).append((jobId, jobName))
@@ -456,20 +443,10 @@ class QueueSystemServer(BaseActionRunner):
         else:
             self.lock.release()
             self.diag.info("Job not created : " + errorMessage)
-            fullError = self.getFullSubmitError(test, errorMessage, cmdArgs)
-            test.changeState(plugins.Unrunnable(fullError, "NOT SUBMITTED"))
+            test.changeState(plugins.Unrunnable(errorMessage, "NOT SUBMITTED"))
             self.handleErrorState(test)
             return False
         
-    def findErrorMessage(self, stderr, queueSystem):
-        if len(stderr) > 0:
-            return queueSystem.findSubmitError(stderr)
-
-    def getFullSubmitError(self, test, errorMessage, cmdArgs):
-        qname = queueSystemName(test.app)
-        return "Failed to submit to " + qname + " (" + errorMessage.strip() + ")\n" + \
-               "Submission command was '" + " ".join(cmdArgs[:-1]) + " ... '\n"
-
     def handleErrorState(self, test, previouslySubmitted=False):
         if previouslySubmitted:
             self.testsSubmitted -= 1

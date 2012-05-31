@@ -1,9 +1,10 @@
 
 import os
+import abstractqueuesystem
 
 # Used by the master to submit, monitor and delete jobs...
-class QueueSystem:
-    def getSubmitCmdArgs(self, submissionRules):
+class QueueSystem(abstractqueuesystem.QueueSystem):
+    def getSubmitCmdArgs(self, submissionRules, commandArgs=[]):
         bsubArgs = [ "bsub", "-J", submissionRules.getJobName() ]
         if submissionRules.processesNeeded != 1:
             bsubArgs += [ "-n", str(submissionRules.processesNeeded) ]
@@ -17,7 +18,7 @@ class QueueSystem:
         if len(machines):
             bsubArgs += [ "-m", " ".join(machines) ]
         outputFile, errorsFile = submissionRules.getJobFiles()
-        bsubArgs += [ "-u", "nobody", "-o", outputFile, "-e", errorsFile ]
+        bsubArgs += [ "-u", "nobody", "-o", outputFile, "-e", errorsFile, self.shellWrap(commandArgs) ]
         return bsubArgs
     def findSubmitError(self, stderr):
         for errorMessage in stderr.splitlines():

@@ -6,6 +6,7 @@ Module for the queuesystem configuration, i.e. using grid engines to run tests i
 import masterprocess, slavejobs, utils, os, default, plugins
 from default.virtualdisplay import VirtualDisplayResponder
 from default.storytext_interface import ApplicationEventResponder
+from multiprocessing import cpu_count
 
 def getConfig(optionMap):
     return QueueSystemConfig(optionMap)
@@ -252,7 +253,15 @@ class QueueSystemConfig(default.Config):
         app.setConfigDefault("queue_system_proxy_resource", [], "Grid engine resources required to locate machine to run proxy process")
         app.addConfigEntry("builtin", "proxy_options", "definition_file_stems")
         
-        
+    def setDependentConfigDefaults(self, app):
+        # For setting up configuration where the config file needs to have been read first
+        # Should return True if it does anything that could cause new config files to be found
+        ret = default.Config.setDependentConfigDefaults(self, app)
+        if app.getConfigValue("queue_system_module") == "localqueuesystem":
+            app.setConfigDefault("queue_system_max_capacity", cpu_count())
+        return ret
+
+
 class DocumentEnvironment(default.DocumentEnvironment):
     def setUpApplication(self, app):
         default.DocumentEnvironment.setUpApplication(self, app)

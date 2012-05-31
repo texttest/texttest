@@ -1,10 +1,11 @@
 
 import os, string, subprocess
+import abstractqueuesystem
 from plugins import gethostname, log, TextTestError
 from time import sleep
 
 # Used by master process for submitting, deleting and monitoring slave jobs
-class QueueSystem:
+class QueueSystem(abstractqueuesystem.QueueSystem):
     allStatuses = { "qw"  : ("PEND", "Pending"),
                     "hqw" : ("HOLD", "On hold"),
                     "t"   : ("TRANS", "Transferring"),
@@ -17,7 +18,7 @@ class QueueSystem:
     def __init__(self):
         self.qdelOutput = ""
 
-    def getSubmitCmdArgs(self, submissionRules):
+    def getSubmitCmdArgs(self, submissionRules, commandArgs=[]):
         qsubArgs = [ "qsub", "-N", submissionRules.getJobName() ]
         if submissionRules.processesNeeded != 1:
             qsubArgs += [ "-pe", submissionRules.getParallelEnvironment(), \
@@ -32,7 +33,7 @@ class QueueSystem:
         if len(resource):
             qsubArgs += [ "-l", resource ]
         outputFile, errorsFile = submissionRules.getJobFiles()
-        qsubArgs += [ "-w", "e", "-notify", "-m", "n", "-cwd", "-b", "y", "-V", "-o", outputFile, "-e", errorsFile ]
+        qsubArgs += [ "-w", "e", "-notify", "-m", "n", "-cwd", "-b", "y", "-V", "-o", outputFile, "-e", errorsFile, self.shellWrap(commandArgs) ]
         return qsubArgs
 
     def getResourceArg(self, submissionRules):
@@ -71,9 +72,6 @@ class QueueSystem:
             else:
                 log.info("Unexpected output from qsub : " + line.strip())
         return jobId
-
-    def supportsPolling(self):
-        return True
 
     def getStatusForAllJobs(self):
         statusDict = {}

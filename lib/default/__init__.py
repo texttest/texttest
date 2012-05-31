@@ -1344,7 +1344,7 @@ class Config:
         app.setConfigDefault("default_texttest_tmp", "$TEXTTEST_PERSONAL_CONFIG/tmp", "Default value for $TEXTTEST_TMP, if it is not set")
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
         app.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")
-        app.setConfigDefault("remote_shell_program", "rsh", "Program to use for running commands remotely")
+        app.setConfigDefault("remote_shell_program", "ssh", "Program to use for running commands remotely")
         app.setConfigDefault("remote_program_options", self.getDefaultRemoteProgramOptions(), "Default options to use for particular remote shell programs")
         app.setConfigDefault("remote_copy_program", "", "(UNIX) Program to use for copying files remotely, in case of non-shared file systems")
         app.setConfigDefault("default_filter_file", [], "Filter file to use by default, generally only useful for versions")

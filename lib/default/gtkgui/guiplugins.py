@@ -286,8 +286,10 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
                 # Actions showing dialogs will handle this in the dialog code.
                 entrycompletion.manager.collectCompletions()
                 self._runInteractive()
-        except Exception, e:
+        except plugins.TextTestError, e:
             self.showErrorDialog(str(e))
+        except Exception, e:
+            self.showErrorDialog(plugins.getExceptionString())
             
     def _runInteractive(self):
         try:
@@ -865,6 +867,7 @@ class ActionDialogGUI(OptionGroupGUI):
         if self.busy: # If we're busy with some other action, ignore this one ...
             return
                 
+        self.updateOptions()
         try:
             self.showConfigurationDialog()
         except plugins.TextTestError, e:
@@ -931,11 +934,6 @@ class ActionDialogGUI(OptionGroupGUI):
         
     def getSizeAsWindowFraction(self):
         return None, None
-    
-    def setSensitivity(self, newValue):
-        ActionGUI.setSensitivity(self, newValue)
-        if newValue:
-            self.updateOptions()
             
     def createAlignment(self):
         alignment = gtk.Alignment()

@@ -295,7 +295,7 @@ class ImportTest(guiplugins.ActionDialogGUI):
         # Add suite and its children
         placements = [ "first in suite" ]
         for test in suite.testcases:
-            placements += [ "after " + test.name ]
+            placements.append("after " + test.name)
         placements.append("last in suite")
 
         self.optionGroup.setPossibleValues("testpos", placements)
@@ -1380,6 +1380,10 @@ class ReportBugs(guiplugins.ActionDialogGUI):
             if logFileStem in possibleValues:
                 return logFileStem
         return possibleValues[0]
+    
+    def _cleanDialog(self, *args):
+        self.searchGroup.getOption("search_file").resetDefault()
+        guiplugins.ActionDialogGUI._cleanDialog(self, *args)
 
     def updateOptions(self):
         possibleValues = self.getPossibleFileStems()

@@ -1419,12 +1419,16 @@ class Option:
 
         return self.defaultValue
 
+    def resetMethods(self):
+        self.valueMethod = None
+        self.updateMethod = None
+
     def resetDefault(self):
         if self.valueMethod:
             value = self.valueMethod()
             if value is not None:
                 self.defaultValue = value
-                self.valueMethod = None
+            self.resetMethods()
             
     def getCmdLineValue(self):
         return self.getValue()
@@ -1464,6 +1468,12 @@ class TextOption(Option):
         self.clearMethod = None
         self.multilineEntry = multilineEntry
         self.setPossibleValues(possibleValues)
+        
+    def resetMethods(self):
+        Option.resetMethods(self)
+        self.possValAppendMethod = None
+        self.possValListMethod = None
+        self.clearMethod = None
         
     def setPossibleValuesMethods(self, appendMethod, getMethod):
         self.possValListMethod = getMethod

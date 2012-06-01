@@ -326,11 +326,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         return "filter tests to show only those indicated"
 
     def createFilterButton(self):
-        button = gtk.Button()
-        self.filterAction.connect_proxy(button)
-        button.set_image(gtk.image_new_from_stock(self.getStockId(), gtk.ICON_SIZE_BUTTON))
-        button.set_tooltip_text(self.getFilterTooltip())
-        return button
+        return self._createButton(self.filterAction, self.getFilterTooltip())
 
     def createFrame(self, name, group, button):
         frame = gtk.Frame(name)

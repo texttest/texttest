@@ -27,7 +27,7 @@ def getLocalName(corefile):
     data = os.popen("file " + corefile).readline()
     parts = data.split("'")
     if len(parts) == 3:
-        return parts[1]
+        return parts[1].split()[0] # don't pass arguments along, only want program name
     else:
         newParts = data.split()
         if len(newParts) > 2 and newParts[-2].endswith(","):

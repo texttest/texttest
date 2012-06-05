@@ -40,6 +40,9 @@ def getLastFileName(corefile):
     # Yes, we know this is horrible. Does anyone know a better way of getting the binary out of a core file???
     # Unfortunately running gdb is not the answer, because it truncates the data...
     localName = getLocalName(corefile)
+    if os.path.isfile(localName):
+        return localName
+
     possibleNames = os.popen("strings " + corefile + " | grep '^/.*/" + localName + "'").readlines()
     possibleNames.reverse()
     for name in possibleNames:

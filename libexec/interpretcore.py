@@ -27,7 +27,7 @@ def getLocalName(corefile):
     data = os.popen("file " + corefile).readline()
     parts = data.split("'")
     if len(parts) == 3:
-        return parts[1]
+        return parts[1].split()[0] # don't pass arguments along, only want program name
     else:
         newParts = data.split()
         if len(newParts) > 2 and newParts[-2].endswith(","):
@@ -40,6 +40,9 @@ def getLastFileName(corefile):
     # Yes, we know this is horrible. Does anyone know a better way of getting the binary out of a core file???
     # Unfortunately running gdb is not the answer, because it truncates the data...
     localName = getLocalName(corefile)
+    if os.path.isfile(localName):
+        return localName
+
     possibleNames = os.popen("strings " + corefile + " | grep '^/.*/" + localName + "'").readlines()
     possibleNames.reverse()
     for name in possibleNames:

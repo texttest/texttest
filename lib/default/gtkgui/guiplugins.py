@@ -423,12 +423,18 @@ class ActionGUI(BasicActionGUI):
         return "Performed '" + self.getTooltip() + "' on " + self.describeTests() + "."
 
     def createButton(self):
+        return self._createButton(self.gtkAction, self.getTooltip())
+    
+    def _createButton(self, action, tooltip):
         button = gtk.Button()
-        self.gtkAction.connect_proxy(button)
+        action.connect_proxy(button)
         # In theory all this should be automatic, but it appears not to work
         if self.getStockId():
-            button.set_image(gtk.image_new_from_stock(self.getStockId(), gtk.ICON_SIZE_BUTTON))
-        button.set_tooltip_text(self.getTooltip())
+            image = gtk.image_new_from_stock(self.getStockId(), gtk.ICON_SIZE_BUTTON)
+            button.set_image(image)
+            image.show()
+
+        button.set_tooltip_text(tooltip)
         button.show()
         return button
     

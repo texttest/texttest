@@ -2187,6 +2187,10 @@ Static GUI Enhancements:
 Dynamic GUI Enhancements:
     - Grouping now notices if some diffs are repeats of other diffs
 	You may now get something like "Group 3*2", which means this is "Group 3"'s diffs, repeated twice
+    - "Enter Failure Information" can now be done in the dynamic GUI
+	Makes it easier to instantly verify if a knownbug is applied or not
+    - New "Find failure information" action
+	Allows finding other reported bugs in the test suite that might match a given failure, and applying them
     - New "split result files" action
 	This allows viewing, grouping and saving the differences of parts of your files separately, for example in case many 
 	things have changed at once. There is a new config value "file_split_pattern", see the documentation of that in
@@ -2209,6 +2213,8 @@ Framework Enhancements:
     - Can now disable regular expression matching when replacing text in files
     - Replace Text In Files functionality (in static GUI and default.ReplaceText script) now handle multiline input
 	Able to replace several lines with several other lines at once
+    - "ssh" is now default program to use to run remotely
+	Replaces "rsh", which is dying out
 Batch Report Enhancements:
     - Now possible to specify a specific command to kill test processes also on Linux
 	"kill_command" is now portable. See docs.
@@ -2220,6 +2226,8 @@ Batch Report Enhancements:
 	Reduces the probability that these two can be out of synch for any significant time
     - For junit-format reports, can now choose which performance setting is used for the "time" field.
 	New config file setting "batch_junit_performance"
+    - Can now run in batch mode without keeping the temporary files
+	Use "-keeptmp 0". "Reconnect" functionality becomse unusable of course.
     - Archiving the repository now results in it being compressed also
 Grid Engine (LSF/SGE) enhancements/bug fixes:
     - Setting temporary environment variables now works with grid engines
@@ -2228,6 +2236,7 @@ Grid Engine (LSF/SGE) enhancements/bug fixes:
     - Error messages from slave processes now shown also when running GUI
     - Error messages from proxy slave jobs are now shown
     - Proxy slave jobs now also use queues specified on the command line 
+    - Workaround for LS_COLORS bug in ancient version of tcsh
 Bug Fixes:
     - Junit report now handles tests with the same name in different suites properly.
     - "gui_entry_override" now works with spin buttons (e.g. "times_to_run", for the Running tab)
@@ -2258,3 +2267,6 @@ Bug Fixes:
     - Fixed bug in dynamic GUI where file view selections from actions in the status view 
 	Did not clear previous selections but added to them.
     - Now works when recomputing or saving causes a known bug to become irrelevant, state correctly updated
+    - Core file interpretation now handles 'file' version 5 (previously only handled up to version 4)
+    - Button images now no longer lost on some platforms
+    - Can now register 0 time as performance, if compatible with other settings

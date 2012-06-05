@@ -33,8 +33,8 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
         if len(resource):
             qsubArgs += [ "-l", resource ]
         outputFile, errorsFile = submissionRules.getJobFiles()
-        qsubArgs += [ "-w", "e", "-notify", "-m", "n", "-cwd", "-b", "y", "-V", "-o", outputFile, "-e", errorsFile, self.shellWrap(commandArgs) ]
-        return qsubArgs
+        qsubArgs += [ "-w", "e", "-notify", "-m", "n", "-cwd", "-b", "y", "-V", "-o", outputFile, "-e", errorsFile ]
+        return self.addExtraAndCommand(qsubArgs, submissionRules, commandArgs)
 
     def getResourceArg(self, submissionRules):
         resourceList = submissionRules.findResourceList()

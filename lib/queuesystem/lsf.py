@@ -18,8 +18,9 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
         if len(machines):
             bsubArgs += [ "-m", " ".join(machines) ]
         outputFile, errorsFile = submissionRules.getJobFiles()
-        bsubArgs += [ "-u", "nobody", "-o", outputFile, "-e", errorsFile, self.shellWrap(commandArgs) ]
-        return bsubArgs
+        bsubArgs += [ "-u", "nobody", "-o", outputFile, "-e", errorsFile ]
+        return self.addExtraAndCommand(bsubArgs, submissionRules, commandArgs)
+
     def findSubmitError(self, stderr):
         for errorMessage in stderr.splitlines():
             if self.isRealError(errorMessage):

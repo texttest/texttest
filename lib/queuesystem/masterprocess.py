@@ -376,11 +376,7 @@ class QueueSystemServer(BaseActionRunner):
 
     def getSubmitCmdArgs(self, test, submissionRules, *args):
         queueSystem = self.getQueueSystem(test)
-        extraArgs = submissionRules.getExtraSubmitArgs()
-        cmdArgs = queueSystem.getSubmitCmdArgs(submissionRules, *args)
-        if extraArgs:
-            cmdArgs += plugins.splitcmd(extraArgs)
-        return cmdArgs
+        return queueSystem.getSubmitCmdArgs(submissionRules, *args)
 
     def getQueueSystemCommand(self, test):
         submissionRules = self.getSubmissionRules(test)
@@ -397,13 +393,13 @@ class QueueSystemServer(BaseActionRunner):
         proxyCmd = test.getConfigValue("queue_system_proxy_executable")
         if proxyCmd:
             proxyOptions = test.getCommandLineOptions("proxy_options")
-            fullProxyCmd = proxyCmd + " " + " ".join(proxyOptions)
+            fullProxyCmdArgs = [ proxyCmd ] + proxyOptions
             proxyRules = self.getJobSubmissionRules(test)
-            return self.getSubmitCmdArgs(test, proxyRules, fullProxyCmd)
+            return self.getSubmitCmdArgs(test, proxyRules, fullProxyCmdArgs)
         else:
             return []
 
-    def modifyCommandForProxy(self, test, cmdArgs):
+    def modifyCommandForProxy(self, test, cmdArgs, slaveEnv):
         proxyArgs = self.getProxyCmdArgs(test)
         if proxyArgs:
             cmdArgs[1:1] = [ "-sync", "y" ] # must synchronise in the proxy
@@ -417,7 +413,7 @@ class QueueSystemServer(BaseActionRunner):
         self.diag.info("Creating job at " + plugins.localtime())
         cmdArgs = self.getSubmitCmdArgs(test, submissionRules, commandArgs)
         if withProxy:
-            cmdArgs = self.modifyCommandForProxy(test, cmdArgs)
+            cmdArgs = self.modifyCommandForProxy(test, cmdArgs, slaveEnv)
 
         jobName = submissionRules.getJobName()
         self.fixDisplay(slaveEnv)
@@ -713,9 +709,10 @@ class TestSubmissionRules(SubmissionRules):
     def getExtraSubmitArgs(self):
         if not self.optionMap.has_key("reconnect"):
             envSetting = os.path.expandvars(self.test.getEnvironment("QUEUE_SYSTEM_SUBMIT_ARGS", "")) #  Deprecated. See "queue_system_submit_args" in config file docs
-            return envSetting or self.test.getConfigValue("queue_system_submit_args")
+            argStr = envSetting or self.test.getConfigValue("queue_system_submit_args")
+            return plugins.splitcmd(argStr)
         else:
-            return ""
+            return []
 
     def getSubmitSuffix(self):
         name = queueSystemName(self.test)

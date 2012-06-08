@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import os, sys, types, string, plugins, exceptions, shutil, operator, logging, glob, fnmatch
+from multiprocessing import cpu_count
 from ordereddict import OrderedDict
 from cPickle import Pickler, loads, UnpicklingError
 from threading import Lock
@@ -1580,12 +1581,15 @@ class Application:
                 names.add(appName)
         return names
 
+    def getDefaultConfigModule(self):
+        return "queuesystem" if cpu_count() > 1 else "default"
+
     def setConfigDefaults(self):
         self.setConfigDefault("executable", "", "Full path to the System Under Test")
         self.setConfigAlias("binary", "executable")
         self.setConfigDefault("interpreters", OrderedDict(), "Programs to use, in order, as interpreters for the SUT")
         self.setConfigDefault("interpreter", "", "Single program to use as interpreter for the SUT")
-        self.setConfigDefault("config_module", "default", "Configuration module to use")
+        self.setConfigDefault("config_module", self.getDefaultConfigModule(), "Configuration module to use")
         self.setConfigDefault("import_config_file", [], "Extra config files to use")
         self.setConfigDefault("full_name", self.name.upper(), "Expanded name to use for application")
         self.setConfigDefault("home_operating_system", "any", "Which OS the test results were originally collected on")

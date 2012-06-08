@@ -408,7 +408,7 @@ class QueueSystemServer(BaseActionRunner):
         else:
             return cmdArgs
         
-    def submitJob(self, test, submissionRules, commandArgs, slaveEnv, withProxy=True):
+    def submitJob(self, test, submissionRules, commandArgs, slaveEnv, withProxy=True, jobType=""):
         self.diag.info("Submitting job at " + plugins.localtime() + ":" + repr(commandArgs))
         self.diag.info("Creating job at " + plugins.localtime())
         cmdArgs = self.getSubmitCmdArgs(test, submissionRules, commandArgs)
@@ -428,7 +428,7 @@ class QueueSystemServer(BaseActionRunner):
         self.lockDiag.info("Got lock for submission")
         queueSystem = self.getQueueSystem(test)
         logDir = self.getSlaveLogDir(test)
-        jobId, errorMessage = queueSystem.submitSlaveJob(cmdArgs, slaveEnv, logDir, submissionRules)
+        jobId, errorMessage = queueSystem.submitSlaveJob(cmdArgs, slaveEnv, logDir, submissionRules, jobType)
         if jobId is not None:
             self.diag.info("Job created with id " + jobId)
 
@@ -461,11 +461,9 @@ class QueueSystemServer(BaseActionRunner):
     
     def _getJobFailureInfo(self, test):
         jobInfo = self.getJobInfo(test)
-        if len(jobInfo) == 0:
-            return "No job has been submitted to " + queueSystemName(test)
-        queueSystem = self.getQueueSystem(test)
         # Take the most recent job, it's hopefully the most interesting
-        jobId = jobInfo[-1][0]
+        jobId = jobInfo[-1][0] if len(jobInfo) > 0 else None
+        queueSystem = self.getQueueSystem(test)
         return queueSystem.getJobFailureInfo(jobId)
     
     def getSlaveErrors(self, test, name):
@@ -594,10 +592,9 @@ class QueueSystemServer(BaseActionRunner):
                    ") at " + timeStr
         self.cancel(test, briefText, freeText)
 
-    def getJobFailureInfo(self, test, name, wantStatus):
+    def getJobFailureInfo(self, test, wantStatus):
         if wantStatus:
-            return "-" * 10 + " Full accounting info from " + name + " " + "-" * 10 + "\n" + \
-                   self._getJobFailureInfo(test)
+            return self._getJobFailureInfo(test)
         else:
             # Job accounting info can take ages to find, don't do it from GUI quit
             return "No accounting info found as quitting..."
@@ -614,7 +611,7 @@ class QueueSystemServer(BaseActionRunner):
         if slaveErrors:
             fullText += slaveErrors
 
-        fullText += self.getJobFailureInfo(test, name, wantStatus)
+        fullText += self.getJobFailureInfo(test, wantStatus)
         return self.getSlaveFailureBriefText(name, startNotified), fullText
 
     def getSlaveFailureBriefText(self, name, startNotified):

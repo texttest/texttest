@@ -33,7 +33,8 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
             if errorMessage.find(okStr) != -1:
                 return 0
         return 1
-    def getJobFailureInfo(self, jobId):
+    
+    def _getJobFailureInfo(self, jobId):
         resultOutput = os.popen("bjobs -a -l " + jobId + " 2>&1").read()
         if resultOutput.find("is not found") != -1:
             return "LSF lost job:" + jobId

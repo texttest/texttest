@@ -241,7 +241,7 @@ class QueueSystemConfig(default.Config):
         default.Config.setApplicationDefaults(self, app)
         app.setConfigDefault("default_queue", "texttest_default", "Which queue to submit tests to by default")
         app.setConfigDefault("min_time_for_performance_force", -1, "Minimum CPU time for test to always run on performance machines")
-        app.setConfigDefault("queue_system_module", "SGE", "Which queue system (grid engine) software to use. (\"SGE\" or \"LSF\")")
+        app.setConfigDefault("queue_system_module", "local", "Which queue system (grid engine) software to use. (\"local\", \"SGE\" or \"LSF\")")
         app.setConfigDefault("performance_test_resource", { "default" : [] }, "Resources to request from queue system for performance testing")
         app.setConfigDefault("parallel_environment_name", "*", "(SGE) Which SGE parallel environment to use when SUT is parallel")
         app.setConfigDefault("queue_system_max_capacity", 100000, "Maximum possible number of parallel similar jobs in the available grid")
@@ -257,7 +257,7 @@ class QueueSystemConfig(default.Config):
         # For setting up configuration where the config file needs to have been read first
         # Should return True if it does anything that could cause new config files to be found
         ret = default.Config.setDependentConfigDefaults(self, app)
-        if app.getConfigValue("queue_system_module") == "localqueuesystem":
+        if app.getConfigValue("queue_system_module") == "local":
             app.setConfigDefault("queue_system_max_capacity", cpu_count())
         return ret
 

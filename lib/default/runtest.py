@@ -150,7 +150,7 @@ class RunTest(plugins.Action):
         self.lock.acquire()
         self.killedTests.append(test)
         self.killSignal = sig
-        if self.currentProcess:
+        if self.currentProcess is not None:
             self.killProcess(test)
         self.lock.release()
         

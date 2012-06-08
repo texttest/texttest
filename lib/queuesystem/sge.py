@@ -90,7 +90,7 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
                     statusDict[words[0]] = status
         return statusDict
 
-    def getJobFailureInfo(self, jobId):
+    def _getJobFailureInfo(self, jobId):
         methods = [ self.getAccountInfo, self.getAccountInfoOldFiles, self.retryAccountInfo ]
         acctError = ""
         for method in methods:

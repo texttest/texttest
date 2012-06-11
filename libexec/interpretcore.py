@@ -43,7 +43,11 @@ def getLastFileName(corefile):
     if os.path.isfile(localName):
         return localName
 
-    possibleNames = os.popen("strings " + corefile + " | grep '^/.*/" + localName + "'").readlines()
+    localRegexp = localName 
+    if not os.path.isabs(localName):
+        localRegexp = "/.*/" + localName
+
+    possibleNames = os.popen("strings " + corefile + " | grep '^" + localRegexp + "'").readlines()
     possibleNames.reverse()
     for name in possibleNames:
         name = name.strip()

@@ -2199,6 +2199,8 @@ Dynamic GUI Enhancements:
 	This is essentially like reconnecting to the current run. Main point being to make it possible to reload results 
 	using the grid, and/or without interfering with the currently shown results.
 Framework Enhancements:
+    - Now take advantage of multiple cores when running tests locally with no grid available
+	Somewhat overdue feature but it should speed up TextTest usage considerably now.
     - Can now chain several "interpreter" programs together, instead of having only one
 	New config file section "interpreters". See website.
     - Can now run the SUT more than once using different settings for the same test
@@ -2237,6 +2239,8 @@ Grid Engine (LSF/SGE) enhancements/bug fixes:
     - Error messages from proxy slave jobs are now shown
     - Proxy slave jobs now also use queues specified on the command line 
     - Workaround for LS_COLORS bug in ancient version of tcsh
+    - Fixed issue with "kill_timeout" if test gets suspended by grid engine
+	Timeout only worked on wallclock time so test could time out prematurely.
 Bug Fixes:
     - Junit report now handles tests with the same name in different suites properly.
     - "gui_entry_override" now works with spin buttons (e.g. "times_to_run", for the Running tab)

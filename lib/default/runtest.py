@@ -36,13 +36,17 @@ class RunTest(plugins.Action):
         self.diag = logging.getLogger("run test")
         self.killDiag = logging.getLogger("kill processes")
         self.currentProcess = None
+        self.currentTimer = None
         self.killedTests = []
         self.killSignal = None
         self.lock = Lock()
+        
     def __repr__(self):
         return "Running"
+    
     def __call__(self, test):
         return self.runTest(test)
+    
     def changeToRunningState(self, test):
         execMachines = test.state.executionHosts
         self.diag.info("Changing " + repr(test) + " to state Running on " + repr(execMachines))
@@ -50,9 +54,25 @@ class RunTest(plugins.Action):
         freeText = "Running on " + ",".join(execMachines)
         newState = Running(execMachines, briefText=briefText, freeText=freeText)
         test.changeState(newState)
+    
     def getBriefText(self, execMachinesArg):
         # Default to not bothering to print the machine name: all is local anyway
         return ""
+    
+    def startTimer(self, timer):
+        self.currentTimer = timer
+        self.currentTimer.start()
+
+    def runMultiTimer(self, timeout, method, args):
+        # Break the timer up into 5 sub-timers
+        # The point is to prevent timing out too early if the process gets suspended
+        subTimerCount = 5 # whatever
+        subTimerTimeout = float(timeout) / subTimerCount
+        timer = Timer(subTimerTimeout, method, args)
+        for _ in range(subTimerCount - 1):
+            timer = Timer(subTimerTimeout, self.startTimer, [ timer ])
+        self.startTimer(timer)
+    
     def runTest(self, test):
         self.describe(test)
         machine = test.app.getRunMachine()
@@ -64,10 +84,10 @@ class RunTest(plugins.Action):
             process = self.getTestProcess(test, machine, postfix)    
             self.registerProcess(test, process)
             if test.getConfigValue("kill_timeout") and not test.app.isRecording() and not test.app.isActionReplay():
-                timer = Timer(test.getConfigValue("kill_timeout"), self.kill, (test, "timeout"))
-                timer.start()
+                self.runMultiTimer(test.getConfigValue("kill_timeout"), self.kill, (test, "timeout"))
                 self.wait(process)
-                timer.cancel()
+                self.currentTimer.cancel()
+                self.currentTimer = None
             else:
                 self.wait(process)
             self.checkAndClear(test, postfix)

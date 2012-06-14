@@ -9,23 +9,31 @@ CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
 If you want to run one at a time, set config_module:default explicitly in your config file. If you want to change the
 number of jobs to run at once, set e.g. queue_system_max_capacity:4.
 
-(2) Known bugs no longer "fail the whole run"
+(2) "queue_system_module" now defaults to "local"
+=================================================
+If you use SGE you will now have to set it explicitly to "SGE", which used to be the default.
+
+(3) "remote_shell_program" now defaults to "ssh"
+================================================
+"rsh", the old default, is dying.
+
+(4) Known bugs no longer "fail the whole run"
 =============================================
 TextTest returns an exit code of 1 if any tests fail. It no longer does this for "known bugs": it reckons they
 are under control and not a reason to fail things.
 
-(3) copy_test_path_merge on files now appends them to each other
+(5) copy_test_path_merge on files now appends them to each other
 ================================================================
 Previously it was just an alias for copy_test_path, only behaving differently with directories. See documentation for
 more details.
 
-(4) Requesting self-diagnostics in grid engine slave processes requires a separate flag
+(6) Requesting self-diagnostics in grid engine slave processes requires a separate flag
 =======================================================================================
 When running tests via a grid engine, in the past "-x" has enabled self-diagnostics in both master and slave processes. This was 
 reckoned unwieldy in some cases, as enabling diagnostics in the slaves can create a very large number of directories. So there is
 now a separate flag "-xs" if you want slave diagnostics - "-x" will only request diagnostics from the master process.
 
-(5) Replace Text In Files now handles multiline input and output.
+(7) Replace Text In Files now handles multiline input and output.
 =================================================================
 For those of you who like to migrate your saved results in predictable ways, its now possible to do so 
 with multiple line chunks of text. Simple use the updated dialog where you'll notice the text fields 

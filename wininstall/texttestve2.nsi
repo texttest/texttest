@@ -217,7 +217,7 @@ SectionGroup /e "Diff tool" G1
 SectionGroupEnd
 
 !ifdef JEPPESEN
-Section "TextTest and StoryText configuration" SEC06
+Section /o "TextTest and StoryText configuration" SEC06
   IfFileExists "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\*.*" ok
   Call installVirtualEnvOnPython
   IfErrors 0 ok
@@ -235,7 +235,7 @@ Section "TextTest and StoryText configuration" SEC06
   done:
 SectionEnd
 !else
-Section "StoryText for Python GUI testing" SEC07
+Section /o "StoryText for Python GUI testing" SEC07
   Call configureStorytextPython
   IfErrors onError done
   onError:
@@ -243,7 +243,7 @@ Section "StoryText for Python GUI testing" SEC07
   done:
 SectionEnd
 
-Section "StoryText for Java GUI testing" SEC08
+Section /o "StoryText for Java GUI testing" SEC08
   Call installJython
   IfErrors onError
   Call configureStorytextJava
@@ -269,6 +269,14 @@ Section "Uninstall"
   Call un.install
 SectionEnd
 
+; ============== Section macros ========================
+!insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
+  !insertmacro MUI_DESCRIPTION_TEXT ${SEC07} "Installing StoryText will require an internet connection."
+  !insertmacro MUI_DESCRIPTION_TEXT ${SEC08} "Installing StoryText will require an internet connection.$\r$\n$\r$\n \
+Installing StoryText for Java GUIs requires Java Runtime Environment (JRE) to be pre-installed.$\r$\n"
+!insertmacro MUI_FUNCTION_DESCRIPTION_END
+
+; ============== Fuctions ========================
 Function initialize
   Call setup
   File "${VIRTUALENV_DIST}"
@@ -363,6 +371,7 @@ Function configureStorytextJava
   done:
 FunctionEnd
 
+!ifdef JEPPESEN
 Function configureStoryTextJepp
   FILE "${STORYTEXT_UPDATER}"
   FILE "exclude.txt"
@@ -378,6 +387,7 @@ Function configureStoryTextJepp
     Abort
   done:
 FunctionEnd
+!endif
 
 Function checkPythonPath
   ReadRegStr $PYTHON_PATH HKCU "SOFTWARE\Python\PythonCore\${PYTHON_VERSION}\InstallPath" ""

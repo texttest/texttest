@@ -2274,3 +2274,5 @@ Bug Fixes:
     - Core file interpretation now handles 'file' version 5 (previously only handled up to version 4)
     - Button images now no longer lost on some platforms
     - Can now register 0 time as performance, if compatible with other settings
+    - StoryText files, particularly shortcuts, are now sorted in the Config tab
+    - Windows installer no longer default-installs StoryText, and documents preconditions better

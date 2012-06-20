@@ -311,7 +311,8 @@ class RunningAction(BasicRunningAction):
     def storeSwitch(self, switch, widgets):
         if self.disablingInfo.has_key(switch):
             disablingOptionValue, group = self.disablingInfo[switch]
-            self.disableWidgets[widgets[disablingOptionValue]] = switch, disablingOptionValue, group
+            if disablingOptionValue < len(widgets):
+                self.disableWidgets[widgets[disablingOptionValue]] = switch, disablingOptionValue, group
             
     def getOption(self, optName):
         for group in self.optionGroups:
@@ -396,7 +397,7 @@ class RunningAction(BasicRunningAction):
                 label = gtk.Label(group.name)
                 tab = self.createTab(group, frames)
                 notebook.append_page(tab, label)
-            else:
+            elif len(group.keys()) > 0:
                 frames.append(self.createFrame(group, group.name))
         self.connectDisablingSwitches()
         notebook.show_all()

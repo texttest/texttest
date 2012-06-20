@@ -25,6 +25,7 @@ class QueueSystemConfig(default.Config):
     def addToOptionGroups(self, apps, groups):
         default.Config.addToOptionGroups(self, apps, groups)
         minTestCount = min((app.getConfigValue("queue_system_min_test_count") for app in apps))
+        localQueueSystem = all((app.getConfigValue("queue_system_module") == "local" for app in apps))
         for group in groups:
             if group.name.startswith("Basic"):
                 options = [ "Always", "Never" ]
@@ -42,12 +43,17 @@ class QueueSystemConfig(default.Config):
                     defaultValue = 2
                 if "l" in self.optionMap:
                     defaultValue = self.optionIntValue("l")
-                group.addSwitch("l", "Use grid", value=defaultValue, options=options, description=descriptions)
-            elif group.name.startswith("Grid"):
+                if localQueueSystem:
+                    group.addSwitch("l", "Run tests sequentially", value=defaultValue)
+                else:
+                    group.addSwitch("l", "Use grid", value=defaultValue, options=options, description=descriptions)
+            elif group.name.startswith("Grid") and not localQueueSystem:
                 self.addDefaultOption(group, "R", "Request grid resource", possibleValues = self.getPossibleResources())
                 self.addDefaultOption(group, "q", "Request grid queue", possibleValues = self.getPossibleQueues())
                 self.addDefaultSwitch(group, "keepslave", "Keep data files and successful tests until termination")
                 self.addDefaultSwitch(group, "perf", "Run on performance machines only")
+            elif group.name.startswith("Advanced") and localQueueSystem:
+                self.addDefaultSwitch(group, "keepslave", "Keep data files and successful tests until termination")
             elif group.name.startswith("Self-diagnostics"):
                 self.addDefaultSwitch(group, "xs", "Enable self-diagnostics in slave processes")
             elif group.name.startswith("Invisible"):

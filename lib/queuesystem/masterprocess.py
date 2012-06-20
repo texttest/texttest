@@ -345,7 +345,8 @@ class QueueSystemServer(BaseActionRunner):
         return plugins.TestState("pending", freeText=freeText, briefText="PEND", lifecycleChange="become pending")
 
     def getSlaveCommandArgs(self, test, submissionRules):
-        return [ plugins.getTextTestProgram(), "-d", ":".join(self.optionMap.rootDirectories),
+        interpreterArgs = [ sys.executable ] if os.name == "nt" else []
+        return interpreterArgs + [ plugins.getTextTestProgram(), "-d", ":".join(self.optionMap.rootDirectories),
                  "-a", test.app.name + test.app.versionSuffix(),
                  "-l", "-tp", test.getRelPath() ] + \
                  self.getSlaveArgs(test) + self.getRunOptions(test.app, submissionRules)

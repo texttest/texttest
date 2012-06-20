@@ -221,7 +221,7 @@ class ApplicationFileGUI(FileViewGUI):
     def getAllFiles(self, storytextDir):
         paths = [ storytextDir ]
         for root, dirs, files in os.walk(storytextDir):
-            for name in dirs + files:
+            for name in sorted(files) + sorted(dirs):
                 paths.append(os.path.join(root, name))
         return paths
 

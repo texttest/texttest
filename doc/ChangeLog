@@ -2176,31 +2176,11 @@ Bug Fixes:
     - Fixed crash doing "Test Filtering" when no filters were defined
 
 
-Version trunk
+Version 3.23
 =============
-Installation:
-General GUI Enhancements:
-Static GUI Enhancements:
-    - Record dialog now allows recording on a different machine via SSH
-    - Root test suite is automatically selected when adding a new application
-	Idea is to make it easier for newbies to understand what to do at the start.
-Dynamic GUI Enhancements:
-    - Grouping now notices if some diffs are repeats of other diffs
-	You may now get something like "Group 3*2", which means this is "Group 3"'s diffs, repeated twice
-    - "Enter Failure Information" can now be done in the dynamic GUI
-	Makes it easier to instantly verify if a knownbug is applied or not
-    - New "Find failure information" action
-	Allows finding other reported bugs in the test suite that might match a given failure, and applying them
-    - New "split result files" action
-	This allows viewing, grouping and saving the differences of parts of your files separately, for example in case many 
-	things have changed at once. There is a new config value "file_split_pattern", see the documentation of that in
-	the config file documenation for more details of how to use it.
-    - New "reload tests" action
-	This is essentially like reconnecting to the current run. Main point being to make it possible to reload results 
-	using the grid, and/or without interfering with the currently shown results.
 Framework Enhancements:
     - Now take advantage of multiple cores when running tests locally with no grid available
-	Somewhat overdue feature but it should speed up TextTest usage considerably now.
+	Somewhat overdue feature but it should speed up TextTest usage on single machines considerably now.
     - Can now chain several "interpreter" programs together, instead of having only one
 	New config file section "interpreters". See website.
     - Can now run the SUT more than once using different settings for the same test
@@ -2217,6 +2197,24 @@ Framework Enhancements:
 	Able to replace several lines with several other lines at once
     - "ssh" is now default program to use to run remotely
 	Replaces "rsh", which is dying out
+Dynamic GUI Enhancements:
+    - Grouping now notices if some diffs are repeats of other diffs
+	You may now get something like "Group 3*2", which means this is "Group 3"'s diffs, repeated twice
+    - "Enter Failure Information" can now be done in the dynamic GUI
+	Makes it easier to instantly verify if a knownbug is applied or not
+    - New "Find failure information" action
+	Allows finding other reported bugs in the test suite that might match a given failure, and applying them
+    - New "split result files" action
+	This allows viewing, grouping and saving the differences of parts of your files separately, for example in case many 
+	things have changed at once. There is a new config value "file_split_pattern", see the documentation of that in
+	the config file documenation for more details of how to use it.
+    - New "reload tests" action
+	This is essentially like reconnecting to the current run. Main point being to make it possible to reload results 
+	using the grid, and/or without interfering with the currently shown results.
+Static GUI Enhancements:
+    - Record dialog now allows recording on a different machine via SSH
+    - Root test suite is automatically selected when adding a new application
+	Idea is to make it easier for newbies to understand what to do at the start.
 Batch Report Enhancements:
     - Now possible to specify a specific command to kill test processes also on Linux
 	"kill_command" is now portable. See docs.
@@ -2276,3 +2274,14 @@ Bug Fixes:
     - Can now register 0 time as performance, if compatible with other settings
     - StoryText files, particularly shortcuts, are now sorted in the Config tab
     - Windows installer no longer default-installs StoryText, and documents preconditions better
+
+Version trunk
+=============
+Installation:
+General GUI Enhancements:
+Static GUI Enhancements:
+Dynamic GUI Enhancements:
+Framework Enhancements:
+Batch Report Enhancements:
+Grid Engine (LSF/SGE) enhancements/bug fixes:
+Bug Fixes:

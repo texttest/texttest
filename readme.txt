@@ -25,7 +25,7 @@ Installation and System Requirements:
     Read the online installation guide at http://www.texttest.org. Click on the "TextTest/docs" button
     and then the "Installation Guide" at the top-left of the table.
     The lightning summary is that you need Python, PyGTK, tkdiff which are probably already
-    installed if you're on UNIX. On Windows you'll probably need to download them. 
+    installed if you're on UNIX. On Windows there is a Windows installer available on the sourceforge page.
 
     You now don't need to do anything to install TextTest itself as such. You can copy the contents
     of the source directory to anywhere at all or leave it where it is. Running TextTest is a matter
@@ -56,7 +56,7 @@ Other (non-standard) Open Source python modules used by TextTest and packaged wi
 
     ordereddict.py              : sequential dictionaries. (Raymond Hettinger, v1.1)
     source/storytext            : "StoryText", record/replay tool for PyGTK GUIs, of the kind you may well 
-                                  need if you test GUIs (Geoff Bache, v3.5)
+                                  need if you test GUIs (Geoff Bache, v3.7)
     HTMLgen.py,HTMLcolors.py,   : "HTMLGen", tool for generating HTML in Python, used for the historical report
     ImageH.py,ImagePaletteH.py,   webpages generated for batch runs (Robin Friedrich, v2.2.2)
     imgsize.py
@@ -64,9 +64,9 @@ Other (non-standard) Open Source python modules used by TextTest and packaged wi
 Plugins included:
 
     cvs.py            :   integration with CVS for version control
-    hg.py             :   integration with Bazaar for version control
-    bzr.py            :   integration with Mercurial for version control
-    sge.py            :   integration with Sun Grid Engine for distributing tests
+    bzr.py            :   integration with Bazaar for version control
+    hg.py             :   integration with Mercurial for version control
+    sge.py            :   integration with Grid Engine for distributing tests
     lsf.py            :   integration with LSF for distributing tests - note LSF is not free! (see www.platform.com)
     bugzilla.py       :   integration with Bugzilla version 3.x, using its native webservice API (see www.bugzilla.org)
     bugzillav2.py     :   integration with Bugzilla version 2.x, using the command-line interface program bugcli (Dennis Cox, v0.6)
@@ -93,9 +93,9 @@ behaviour changes in the target binary can be controlled.
 
 It is currently supported on all flavours of UNIX and Windows XP. Development is funded by Jeppesen AB.
 
-A configuration for the load balancing software Sun Grid Engine (which is free and open source) and LSF, 
-available for a fee from Platform Computing, is also available. This will enable the tests to be run in 
-parallel over a network. Unfortunately only LSF is supported on Windows.
+A configuration for the load balancing software Grid Engine (formerly the open source Sun Grid Engine, which now comes in several
+descendant versions, some of which are open source) and LSF, available for a fee from Platform Computing, is also available. 
+This will enable the tests to be run in parallel over a network. Unfortunately only LSF is supported on Windows.
 
 There is a text-based console interface and two related GUI interfaces, the 'static GUI' for test creation
 and management, and the 'dynamic GUI' for running tests and examining failures. It is recommended
@@ -104,7 +104,7 @@ Python library PyGTK, which is directly available in most Linux distributions. I
 it is freely available for download, see online installation instructions.
 
 To test GUIs, you need some simulation tool. We have also developed "StoryText", which is such a tool
-for Python GUIs and SWT/Eclipse RCP, which relies on a record/replay layer between the application and the GUI library. 
-There also exist "JUseCase", for Java Swing GUIs and "NUseCase" for .net GUIs. TextTest integrates with these, and includes 
+for Python and Java GUIs, which relies on a record/replay layer between the application and the GUI library. 
+There is also "NUseCase" for .net GUIs. TextTest integrates with these, and includes 
 StoryText as it uses it for its own testing. If you want to use it for your own GUIs you are however recommended 
 to download it separately from its own page.

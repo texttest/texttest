@@ -186,14 +186,40 @@ class RunDependentTextFilter(plugins.Observable):
         self.diag = logging.getLogger("Run Dependent Text")
         self.lineFilters = [ LineFilter(text, testId, self.diag) for text in filterTexts ]
 
+    def findRelevantFilters(self, file):
+        relevantFilters, sectionFilters = [], []
+        for filter in self.lineFilters:
+            if filter.untrigger is not None:
+                sectionFilters.append(filter)
+            else:
+                relevantFilters.append(filter)
+        if sectionFilters:
+            relevantFilters += self.findRelevantSectionFilters(sectionFilters, file)
+        return relevantFilters
+
+    def findRelevantSectionFilters(self, sectionFilters, file):
+        lineNumber = 0
+        matchedFirst, relevantFilters = [], []
+        for line in file:
+            lineNumber += 1
+            for sectionFilter in matchedFirst:
+                if sectionFilter not in relevantFilters and sectionFilter.untrigger.matches(line, lineNumber):
+                    relevantFilters.append(sectionFilter)
+            for sectionFilter in sectionFilters:
+                if sectionFilter not in matchedFirst and sectionFilter.trigger.matches(line, lineNumber):
+                    matchedFirst.append(sectionFilter)
+        file.seek(0)
+        return relevantFilters
+
     def filterFile(self, file, newFile, filteredAway=None):
         lineNumber = 0
         lengths = []
+        lineFilters = self.findRelevantFilters(file)
         for line in file:
             # We don't want to stack up ActionProgreess calls in ThreaderNotificationHandler ...
             self.notifyIfMainThread("ActionProgress")
             lineNumber += 1
-            lineFilter, filteredLine, removeCount = self.getFilteredLine(line, lineNumber)
+            lineFilter, filteredLine, removeCount = self.getFilteredLine(line, lineNumber, lineFilters)
             if removeCount:
                 offset = sum(lengths[-removeCount:])
                 newFile.seek(-offset, os.SEEK_CUR)
@@ -205,8 +231,8 @@ class RunDependentTextFilter(plugins.Observable):
             elif filteredAway is not None and lineFilter is not None:
                 filteredAway.setdefault(lineFilter, []).append(line)
 
-    def getFilteredLine(self, line, lineNumber):
-        for lineFilter in self.lineFilters:
+    def getFilteredLine(self, line, lineNumber, lineFilters):
+        for lineFilter in lineFilters:
             changed, filteredLine, removeCount = lineFilter.applyTo(line, lineNumber)
             if changed:
                 if not filteredLine:

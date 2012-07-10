@@ -1,0 +1,16 @@
+
+
+=========================================================
+CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
+=========================================================
+
+(1) run_dependent_text with sections will not filter anything if the end marker is never found
+==============================================================================================
+If you have a run_dependent_text filter of the form
+
+[run_dependent_text]
+stdout:text1{->}text2
+[end]
+
+and the file you are filtering contains text1 but not text2, nothing will be filtered any more.
+In TextTest 3.23 and earlier, the whole file from the text1 marker onwards would be removed.

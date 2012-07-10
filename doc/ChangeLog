@@ -2282,6 +2282,8 @@ General GUI Enhancements:
 Static GUI Enhancements:
 Dynamic GUI Enhancements:
 Framework Enhancements:
+    - run_dependent_text now does not apply the filter in the case where the end marker is never found for a section filtering
+	See migration notes for details
 Batch Report Enhancements:
 Grid Engine (LSF/SGE) enhancements/bug fixes:
 Bug Fixes:

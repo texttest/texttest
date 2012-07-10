@@ -188,14 +188,17 @@ class RunDependentTextFilter(plugins.Observable):
 
     def findRelevantFilters(self, file):
         relevantFilters, sectionFilters = [], []
-        for filter in self.lineFilters:
-            if filter.untrigger is not None:
-                sectionFilters.append(filter)
+        for lineFilter in self.lineFilters:
+            if lineFilter.untrigger is not None:
+                sectionFilters.append(lineFilter)
             else:
-                relevantFilters.append(filter)
+                relevantFilters.append(lineFilter)
         if sectionFilters:
+            # Must preserve the original order
             relevantFilters += self.findRelevantSectionFilters(sectionFilters, file)
-        return relevantFilters
+            return filter(lambda f: f in relevantFilters, self.lineFilters)
+        else:
+            return relevantFilters
 
     def findRelevantSectionFilters(self, sectionFilters, file):
         lineNumber = 0

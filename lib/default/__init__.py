@@ -1116,6 +1116,8 @@ class Config:
         app.setConfigDefault("slow_motion_replay_speed", 3.0, "How long in seconds to wait between each GUI action")
         app.setConfigDefault("virtual_display_machine", [ "localhost" ], \
                              "(UNIX) List of machines to run virtual display server (Xvfb) on")
+        app.setConfigDefault("virtual_display_count", 1, \
+                             "(UNIX) Number of virtual display server (Xvfb) instances to run, if enabled")
         app.setConfigDefault("virtual_display_extra_args", "", \
                              "(UNIX) Extra arguments (e.g. bitdepth) to supply to virtual display server (Xvfb)")
         app.setConfigDefault("virtual_display_hide_windows", "true", "(Windows) Whether to emulate the virtual display handling on Windows by hiding the SUT's windows")

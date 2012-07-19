@@ -197,7 +197,8 @@ class QueueSystemServer(BaseActionRunner):
             return False
 
         # Jobs maintain the same virtual display instance where possible, if they require different settings they can't be reused
-        if oldTest.getConfigValue("virtual_display_extra_args") != newTest.getConfigValue("virtual_display_extra_args"):
+        if oldTest.getConfigValue("virtual_display_extra_args") != newTest.getConfigValue("virtual_display_extra_args") or \
+            oldTest.getConfigValue("virtual_display_count") != newTest.getConfigValue("virtual_display_count"):
             return False
         
         oldRules = self.getSubmissionRules(oldTest)

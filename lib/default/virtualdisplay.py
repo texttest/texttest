@@ -8,10 +8,7 @@ class VirtualDisplayResponder(plugins.Responder):
     instance = None
     def __init__(self, *args):
         plugins.Responder.__init__(self, *args)
-        self.displayName = None
-        self.displayMachine = None
-        self.displayPid = None
-        self.displayProc = None
+        self.displayInfo = []
         self.guiSuites = []
         self.diag = logging.getLogger("virtual display")
         self.killDiag = logging.getLogger("kill processes")
@@ -19,32 +16,38 @@ class VirtualDisplayResponder(plugins.Responder):
         
     def addSuites(self, suites):
         guiSuites = filter(lambda suite : suite.getConfigValue("use_case_record_mode") == "GUI", suites)
-        if not self.displayName:
+        if len(self.displayInfo) == 0:
             self.setUpVirtualDisplay(guiSuites)
-            if self.displayName:
-                plugins.log.info("Tests will run with DISPLAY variable set to " + self.displayName)
-                              
+            for var, value in self.getVariablesToSet():
+                plugins.log.info("Tests will run with " + var + " variable set to " + value)
+                
+    def getVariablesToSet(self):
+        vars = []
+        for i, (_, displayName, _, _) in enumerate(self.displayInfo):
+            suffix = "" if i == 0 else str(i + 1)
+            vars.append(("DISPLAY" + suffix, displayName))
+        return vars
+                 
     def setUpVirtualDisplay(self, guiSuites):
         if len(guiSuites) == 0:
             return
         machines = self.findMachines(guiSuites)
-        machine, display, pid = self.getDisplay(machines, guiSuites[0].app)
-        if display:
-            self.displayName = display
-            self.displayMachine = machine
-            self.displayPid = pid
-            self.guiSuites = guiSuites
-        elif len(machines) > 0:
-            plugins.printWarning("Failed to start virtual display on " + ",".join(machines) + " - using real display.")
+        displayCount = max((suite.getConfigValue("virtual_display_count") for suite in guiSuites))
+        for _ in range(displayCount):
+            displayInfo = self.getDisplayInfo(machines, guiSuites[0].app)
+            if displayInfo:
+                self.displayInfo.append(displayInfo)
+                self.guiSuites = guiSuites
+            elif len(machines) > 0:
+                plugins.printWarning("Failed to start virtual display on " + ",".join(machines) + " - using real display.")
 
-    def getDisplay(self, machines, app):
+    def getDisplayInfo(self, machines, app):
         for machine in machines:
-            displayName, pid = self.createDisplay(machine, app)
+            displayName, pid, proc = self.createDisplay(machine, app)
             if displayName:
-                return machine, displayName, pid
+                return machine, displayName, pid, proc
             else:
                 plugins.printWarning("Virtual display program Xvfb not available on " + machine, stdout=True)
-        return None, None, None
     
     def findMachines(self, suites):
         allMachines = []
@@ -59,22 +62,29 @@ class VirtualDisplayResponder(plugins.Responder):
     def notifyTestProcessComplete(self, test):
         if self.restartXvfb():
             plugins.log.info("Virtual display had terminated unexpectedly with some test processes still to run.")
-            plugins.log.info("Reset DISPLAY variable to " + self.displayName + " for test " + repr(test))
-            test.setEnvironment("DISPLAY", self.displayName)
+            for var, value in self.getVariablesToSet():
+                plugins.log.info("Reset " + var + " variable to " + value + " for test " + repr(test))
+                test.setEnvironment(var, value)
         
     def notifyComplete(self, *args):
         if self.restartXvfb():
-            plugins.log.info("Virtual display had terminated unexpectedly, restarted as DISPLAY " + self.displayName + ".")
+            plugins.log.info("Virtual display had terminated unexpectedly.")
+            for var, value in self.getVariablesToSet():
+                plugins.log.info("Reset " + var + " variable to " + value + ".")
         
     def restartXvfb(self):
         # Whenever a test completes, we check to see if the virtual server is still going
-        if self.displayProc is not None and self.displayProc.poll() is not None:
-            self.displayProc.wait() # Don't leave zombie processes around
-            # If Xvfb has terminated, we need to restart it
-            self.setUpVirtualDisplay(self.guiSuites)
-            return bool(self.displayName)
-        else:
-            return False
+        changed = False
+        for i, displayInfo in enumerate(self.displayInfo):
+            displayProc = displayInfo[-1]
+            if displayProc is not None and displayProc.poll() is not None:
+                displayProc.wait() # Don't leave zombie processes around
+                # If Xvfb has terminated, we need to restart it
+                newDisplayInfo = self.getDisplayInfo(self.findMachines(self.guiSuites), self.guiSuites[0].app)
+                if newDisplayInfo:
+                    self.displayInfo[i] = newDisplayInfo
+                    changed = True
+        return changed
             
     def notifyAllComplete(self):
         self.cleanXvfb()
@@ -86,25 +96,26 @@ class VirtualDisplayResponder(plugins.Responder):
             pass
     
     def cleanXvfb(self):
-        if self.displayName and os.name == "posix":
-            if self.displayMachine == "localhost":
-                self.killDiag.info("Killing Xvfb process " + str(self.displayPid))
-                self.terminateIfRunning(self.displayPid)
-            else:
-                self.killRemoteServer()
-            self.displayName = None
-            self.displayProc.wait() # don't leave zombies around
-            self.displayProc = None
+        if len(self.displayInfo) and os.name == "posix":
+            for displayInfo in self.displayInfo:
+                machine, _, pid, proc = displayInfo
+                if machine == "localhost":
+                    self.killDiag.info("Killing Xvfb process " + str(pid))
+                    self.terminateIfRunning(pid)
+                else:
+                    self.killRemoteServer(machine, pid, proc)
+                proc.wait() # don't leave zombies around
+            self.displayInfo = []
 
-    def killRemoteServer(self):
-        self.diag.info("Getting ps output from " + self.displayMachine)
-        self.killDiag.info("Killing remote Xvfb process on " + self.displayMachine + " with pid " + str(self.displayPid))
-        self.guiSuites[0].app.runCommandOn(self.displayMachine, [ "kill", str(self.displayPid) ])
-        self.terminateIfRunning(self.displayProc.pid) # only for self-tests really : traffic mechanism doesn't fake remote process
+    def killRemoteServer(self, machine, pid, proc):
+        self.diag.info("Getting ps output from " + machine)
+        self.killDiag.info("Killing remote Xvfb process on " + machine + " with pid " + str(pid))
+        self.guiSuites[0].app.runCommandOn(machine, [ "kill", str(pid) ])
+        self.terminateIfRunning(proc.pid) # only for self-tests really : traffic mechanism doesn't fake remote process
 
     def createDisplay(self, machine, app):
         if not self.canRunVirtualServer(machine, app):
-            return None, None
+            return None, None, None
 
         startArgs = self.getVirtualServerArgs(machine, app)
         return self.startXvfb(startArgs, machine)
@@ -112,26 +123,26 @@ class VirtualDisplayResponder(plugins.Responder):
     def startXvfb(self, startArgs, machine):
         for _ in range(5):
             self.diag.info("Starting Xvfb using args " + repr(startArgs))
-            self.displayProc = subprocess.Popen(startArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            line = plugins.retryOnInterrupt(self.displayProc.stdout.readline)
+            displayProc = subprocess.Popen(startArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            line = plugins.retryOnInterrupt(displayProc.stdout.readline)
             if "Time Out!" in line:
-                self.displayProc.wait()
-                self.displayProc.stdout.close()
+                displayProc.wait()
+                displayProc.stdout.close()
                 self.diag.info("Timed out waiting for Xvfb to come up")
                 # We try again and hope for a better process ID!
                 continue
             try:
                 displayNum, pid = map(int, line.strip().split(","))
-                self.displayProc.stdout.close()
-                return self.getDisplayName(machine, displayNum), pid
+                displayProc.stdout.close()
+                return self.getDisplayName(machine, displayNum), pid, displayProc
             except ValueError: #pragma : no cover - should never happen, just a fail-safe
                 sys.stderr.write("ERROR: Failed to parse startXvfb.py line :\n " + line + "\n")
-                self.displayProc.stdout.close()
-                return None, None
+                displayProc.stdout.close()
+                return None, None, None
 
         messages = "Failed to start Xvfb in 5 attempts, giving up"
         plugins.printWarning(messages)
-        return None, None
+        return None, None, None
     
     def getVirtualServerArgs(self, machine, app):
         binDir = plugins.installationDir("libexec")

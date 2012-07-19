@@ -443,9 +443,8 @@ class TestEnvironmentCreator:
                 if os.name == "posix":
                     from virtualdisplay import VirtualDisplayResponder
                     if VirtualDisplayResponder.instance:
-                        virtualDisplay = VirtualDisplayResponder.instance.displayName #@UndefinedVariable
-                        if virtualDisplay:
-                            vars.append(("DISPLAY", virtualDisplay))
+                        for var, value in VirtualDisplayResponder.instance.getVariablesToSet():
+                            vars.append((var, value))
         elif self.testCase():
             useCaseVars = self.getUseCaseVariables()
             if self.useJavaRecorder():

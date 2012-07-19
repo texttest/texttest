@@ -2284,6 +2284,8 @@ Dynamic GUI Enhancements:
 Framework Enhancements:
     - run_dependent_text now does not apply the filter in the case where the end marker is never found for a section filtering
 	See migration notes for details
+    - New config file entry "virtual_display_count"
+	Allows running multiple virtual servers in the case where for example several GUIs need to run simultaneously
 Batch Report Enhancements:
 Grid Engine (LSF/SGE) enhancements/bug fixes:
 Bug Fixes:

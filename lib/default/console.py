@@ -2,30 +2,78 @@
 import sys, os, plugins, subprocess, colorer
 from jobprocess import killSubProcessAndChildren
 from time import sleep
+from ordereddict import OrderedDict
 
 
 class TextDisplayResponder(plugins.Responder):
     def __init__(self, optionMap, *args):
         plugins.Responder.__init__(self)
         self.enableColor = optionMap.has_key("zen")
+        self.enableSummary = optionMap.has_key("b") and not optionMap.has_key("s") and not optionMap.has_key("coll")
+        self.failedTests = []
+        self.resultSummary = OrderedDict()
+        self.resultSummary["Tests Run"] = 0
+
+    def getSummaryKey(self, category):
+        if category == "success":
+            return ""
+        elif category == "bug":
+            return "Known Bugs"
+        elif category.startswith("faster") or category.startswith("slower") or category == "smaller" or category == "larger":
+            return "Performance Differences"
+        elif category in [ "killed", "unrunnable", "cancelled", "abandoned" ]:
+            return "Incomplete"
+        else:
+            return "Failures"
         
+    def shouldDescribe(self, test):
+        return test.state.hasFailed()
+
+    def writeDescription(self, test, summary):
+        if self.enableColor and test.state.hasFailed():
+            self.printTestWithColorEnabled(test, colorer.RED, summary)
+        else:
+            self.describe(test, summary)
+
     def notifyComplete(self, test):
-        if test.state.hasFailed():
-            if self.enableColor:
-                self.printTestWithColorEnabled(test, colorer.RED)
-            else:
-                self.describe(test)  
+        if self.enableSummary:
+            self.resultSummary["Tests Run"] += 1
+            summaryKey = self.getSummaryKey(test.state.category)
+            if summaryKey:
+                self.failedTests.append(test)
+                if summaryKey not in self.resultSummary:
+                    self.resultSummary[summaryKey] = 0
+                self.resultSummary[summaryKey] += 1
+            
+        if self.shouldDescribe(test):
+            self.writeDescription(test, summary=False)  
+                
+    def notifyAllComplete(self):
+        if self.enableSummary:
+            plugins.log.info("Results:")
+            plugins.log.info("")
+            if len(self.failedTests):
+                plugins.log.info("Tests that did not succeed:")
+                for test in self.failedTests:
+                    self.writeDescription(test, summary=True)
+                plugins.log.info("")
+            parts = [ summaryKey + ": " + str(count) for summaryKey, count in self.resultSummary.items() ]
+            plugins.log.info(", ".join(parts))
      
-    def printTestWithColorEnabled(self, test, color):
+    def printTestWithColorEnabled(self, test, color, summary):
         colorer.enableOutputColor(color)
-        self.describe(test)
+        self.describe(test, summary)
         colorer.disableOutputColor()
 
     def getPrefix(self, test):
         return test.getIndent()
     
-    def describe(self, test):
-        plugins.log.info(self.getPrefix(test) + repr(test) + " " + test.state.description())
+    def describe(self, test, summary):
+        prefix = "  " if summary else self.getPrefix(test)
+        desc = test.state.description()
+        if summary and "\n" in desc:
+            desc = " ".join(desc.splitlines()[:2])
+        plugins.log.info(prefix + repr(test) + " " + desc)
             
             
 class InteractiveResponder(plugins.Responder):

@@ -971,8 +971,8 @@ class MasterTextResponder(TextDisplayResponder):
     def getPrefix(self, test):
         return "S: " # don't get things in order, so indenting is pointless
     
-    def notifyComplete(self, test):
-        self.describe(test) # Write the successful tests also
+    def shouldDescribe(self, test):
+        return True # Write the successful tests also
 
 class MasterInteractiveResponder(InteractiveResponder):
     def getPrefix(self, test):

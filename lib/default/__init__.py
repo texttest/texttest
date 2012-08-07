@@ -6,6 +6,7 @@ import os, plugins, sandbox, console, rundependent, comparetest, batch, performa
 from copy import copy
 from string import Template
 from fnmatch import fnmatch
+from threading import Thread
 # For back-compatibility
 from runtest import RunTest, Running, Killed
 from scripts import *
@@ -18,6 +19,7 @@ class Config:
     def __init__(self, optionMap):
         self.optionMap = optionMap
         self.filterFileMap = {}
+        self.removePreviousThread = None
         if self.hasExplicitInterface():
             self.trySetUpLogging()
         from reconnect import ReconnectConfig
@@ -693,6 +695,9 @@ class Config:
         return self.batchMode() and not self.isReconnecting() and "keeptmp" not in self.optionMap
 
     def cleanWriteDirectory(self, suite):
+        if self.removePreviousThread and self.removePreviousThread.isAlive():
+            plugins.log.info("Waiting for removal of previous write directories to complete...")
+            self.removePreviousThread.join()
         if not self.keepTemporaryDirectories():
             self._cleanWriteDirectory(suite)
             machine, tmpDir = self.getRemoteTmpDirectory(suite.app)
@@ -706,16 +711,33 @@ class Config:
         if os.path.isdir(suite.app.writeDirectory):
             plugins.rmtree(suite.app.writeDirectory)
 
+
+    def findRemotePreviousDirInfo(self, app):
+        machine, tmpDir = self.getRemoteTmpDirectory(app)
+        if tmpDir: # Ignore the datetime and the pid at the end
+            searchParts = tmpDir.split(".")[:-2] + ["*"]
+            fileArg = ".".join(searchParts)
+            return machine, fileArg
+        else:
+            return None, None
+
+    def cleanPreviousWriteDirs(self, previousWriteDirs, app, machine, fileArg):
+        for previousWriteDir in previousWriteDirs:              
+            plugins.rmtree(previousWriteDir, attempts=3)
+        if fileArg:
+            self.runCommandOn(app, machine, [ "rm", "-rf", fileArg ])
+
+
     def makeWriteDirectory(self, app, subdir=None):
         if self.cleanPreviousTempDirs():
-            self.cleanPreviousWriteDirs(app.writeDirectory)
-            machine, tmpDir = self.getRemoteTmpDirectory(app)
-            if tmpDir:
-                # Ignore the datetime and the pid at the end
-                searchParts = tmpDir.split(".")[:-2] + [ "*" ]
-                fileArg = ".".join(searchParts)
-                plugins.log.info("Removing previous remote write directories matching " + fileArg)
-                self.runCommandOn(app, machine, [ "rm", "-rf", fileArg ])
+            previousWriteDirs = self.findPreviousWriteDirs(app.writeDirectory)
+            machine, fileArg = self.findRemotePreviousDirInfo(app)
+            for previousWriteDir in previousWriteDirs:
+                plugins.log.info("Removing previous write directory " + previousWriteDir + " in background")
+            if fileArg:
+                plugins.log.info("Removing previous remote write directories on " + machine + " matching " + fileArg + " in background")
+            self.removePreviousThread = Thread(target=self.cleanPreviousWriteDirs, args=(previousWriteDirs, app, machine, fileArg))
+            self.removePreviousThread.start()
 
         dirToMake = app.writeDirectory
         if subdir:
@@ -724,7 +746,8 @@ class Config:
         app.diag.info("Made root directory at " + dirToMake)
         return dirToMake
 
-    def cleanPreviousWriteDirs(self, writeDir):
+    def findPreviousWriteDirs(self, writeDir):
+        previousWriteDirs = []
         rootDir, basename = os.path.split(writeDir)
         if os.path.isdir(rootDir):
             # Ignore the datetime and the pid at the end
@@ -734,8 +757,8 @@ class Config:
                 if fileParts[:-2] == searchParts:
                     previousWriteDir = os.path.join(rootDir, file)
                     if os.path.isdir(previousWriteDir) and not plugins.samefile(previousWriteDir, writeDir):
-                        plugins.log.info("Removing previous write directory " + previousWriteDir)
-                        plugins.rmtree(previousWriteDir, attempts=3)
+                        previousWriteDirs.append(previousWriteDir)
+        return previousWriteDirs
     
     def isReconnecting(self):
         return self.optionMap.has_key("reconnect")

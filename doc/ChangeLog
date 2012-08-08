@@ -2287,5 +2287,9 @@ Framework Enhancements:
     - New config file entry "virtual_display_count"
 	Allows running multiple virtual servers in the case where for example several GUIs need to run simultaneously
 Batch Report Enhancements:
+    - Removing previous results is now done in the background
+	Avoids it slowing down the start of batch mode runs
+    - A small textual report summarising the results is now produced in the log
+	Similar to surefire plugin for Maven's description
 Grid Engine (LSF/SGE) enhancements/bug fixes:
 Bug Fixes:

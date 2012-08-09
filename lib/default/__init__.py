@@ -16,10 +16,10 @@ def getConfig(optionMap):
 
 class Config:
     loggingSetup = False
+    removePreviousThread = None
     def __init__(self, optionMap):
         self.optionMap = optionMap
         self.filterFileMap = {}
-        self.removePreviousThread = None
         if self.hasExplicitInterface():
             self.trySetUpLogging()
         from reconnect import ReconnectConfig
@@ -698,6 +698,7 @@ class Config:
         if self.removePreviousThread and self.removePreviousThread.isAlive():
             plugins.log.info("Waiting for removal of previous write directories to complete...")
             self.removePreviousThread.join()
+            Config.removePreviousThread = None
         if not self.keepTemporaryDirectories():
             self._cleanWriteDirectory(suite)
             machine, tmpDir = self.getRemoteTmpDirectory(suite.app)
@@ -737,8 +738,9 @@ class Config:
             if fileArg:
                 plugins.log.info("Removing previous remote write directories on " + machine + " matching " + fileArg + " in background")
             if previousWriteDirs or fileArg:
-                self.removePreviousThread = Thread(target=self.cleanPreviousWriteDirs, args=(previousWriteDirs, app, machine, fileArg))
-                self.removePreviousThread.start()
+                thread = Thread(target=self.cleanPreviousWriteDirs, args=(previousWriteDirs, app, machine, fileArg))
+                thread.start()
+                Config.removePreviousThread = thread
 
         dirToMake = app.writeDirectory
         if subdir:

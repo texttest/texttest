@@ -729,15 +729,16 @@ class Config:
 
 
     def makeWriteDirectory(self, app, subdir=None):
-        if self.cleanPreviousTempDirs():
+        if not self.removePreviousThread and self.cleanPreviousTempDirs():
             previousWriteDirs = self.findPreviousWriteDirs(app.writeDirectory)
             machine, fileArg = self.findRemotePreviousDirInfo(app)
             for previousWriteDir in previousWriteDirs:
                 plugins.log.info("Removing previous write directory " + previousWriteDir + " in background")
             if fileArg:
                 plugins.log.info("Removing previous remote write directories on " + machine + " matching " + fileArg + " in background")
-            self.removePreviousThread = Thread(target=self.cleanPreviousWriteDirs, args=(previousWriteDirs, app, machine, fileArg))
-            self.removePreviousThread.start()
+            if previousWriteDirs or fileArg:
+                self.removePreviousThread = Thread(target=self.cleanPreviousWriteDirs, args=(previousWriteDirs, app, machine, fileArg))
+                self.removePreviousThread.start()
 
         dirToMake = app.writeDirectory
         if subdir:

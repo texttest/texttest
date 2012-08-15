@@ -722,23 +722,21 @@ class Config:
         else:
             return None, None
 
-    def cleanPreviousWriteDirs(self, previousWriteDirs, app, machine, fileArg):
+    def cleanPreviousWriteDirs(self, previousWriteDirs):
         for previousWriteDir in previousWriteDirs:              
             plugins.rmtree(previousWriteDir, attempts=3)
-        if fileArg:
-            self.runCommandOn(app, machine, [ "rm", "-rf", fileArg ])
-
 
     def makeWriteDirectory(self, app, subdir=None):
         if not self.removePreviousThread and self.cleanPreviousTempDirs():
             previousWriteDirs = self.findPreviousWriteDirs(app.writeDirectory)
             machine, fileArg = self.findRemotePreviousDirInfo(app)
+            if fileArg:
+                plugins.log.info("Removing previous remote write directories on " + machine + " matching " + fileArg)
+                self.runCommandOn(app, machine, [ "rm", "-rf", fileArg ])
             for previousWriteDir in previousWriteDirs:
                 plugins.log.info("Removing previous write directory " + previousWriteDir + " in background")
-            if fileArg:
-                plugins.log.info("Removing previous remote write directories on " + machine + " matching " + fileArg + " in background")
             if previousWriteDirs or fileArg:
-                thread = Thread(target=self.cleanPreviousWriteDirs, args=(previousWriteDirs, app, machine, fileArg))
+                thread = Thread(target=self.cleanPreviousWriteDirs, args=(previousWriteDirs,))
                 thread.start()
                 Config.removePreviousThread = thread
 

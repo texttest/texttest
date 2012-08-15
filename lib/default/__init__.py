@@ -735,7 +735,7 @@ class Config:
                 self.runCommandOn(app, machine, [ "rm", "-rf", fileArg ])
             for previousWriteDir in previousWriteDirs:
                 plugins.log.info("Removing previous write directory " + previousWriteDir + " in background")
-            if previousWriteDirs or fileArg:
+            if previousWriteDirs:
                 thread = Thread(target=self.cleanPreviousWriteDirs, args=(previousWriteDirs,))
                 thread.start()
                 Config.removePreviousThread = thread

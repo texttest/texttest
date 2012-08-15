@@ -172,18 +172,18 @@ class TestComparison(BaseTestComparison):
     def updateAfterLoad(self, app=None, updatePaths=False, newTmpPath=None):
         pathsToChange = []
         if updatePaths:
-            newAbsPath = app.getDirectory()
-            if newAbsPath != self.appAbsPath:
-                self.diag.info("Updating abspath " + self.appAbsPath + " to " + newAbsPath)
-                pathsToChange.append((self.appAbsPath, newAbsPath))
-                self.appAbsPath = newAbsPath
-
             if newTmpPath is None:
                 newTmpPath = app.writeDirectory
             if self.appWriteDir != newTmpPath:
                 self.diag.info("Updating tmppath " + self.appWriteDir + " to " + newTmpPath)
                 pathsToChange.append((self.appWriteDir, newTmpPath))
                 self.appWriteDir = newTmpPath
+
+            newAbsPath = app.getDirectory()
+            if newAbsPath != self.appAbsPath:
+                self.diag.info("Updating abspath " + self.appAbsPath + " to " + newAbsPath)
+                pathsToChange.append((self.appAbsPath, newAbsPath))
+                self.appAbsPath = newAbsPath
 
         for comparison in self.allResults:
             comparison.updateAfterLoad(pathsToChange)

@@ -1189,6 +1189,9 @@ class TextTrigger:
         else:
             return line.replace(self.text, newText)
 
+    def reset(self):
+        pass
+
 # Used for application and personal configuration files
 class MultiEntryDictionary(OrderedDict):
     warnings = []

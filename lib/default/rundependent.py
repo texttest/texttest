@@ -211,6 +211,9 @@ class RunDependentTextFilter(plugins.Observable):
             for sectionFilter in sectionFilters:
                 if sectionFilter not in matchedFirst and sectionFilter.trigger.matches(line, lineNumber):
                     matchedFirst.append(sectionFilter)
+        for sectionFilter in sectionFilters:
+            sectionFilter.trigger.reset()
+            sectionFilter.untrigger.reset()
         file.seek(0)
         return relevantFilters
 
@@ -271,6 +274,26 @@ class LineNumberTrigger:
         return lineNumber == self.lineNumber
     def replace(self, lineArg, newText):
         return newText + "\n"
+    def reset(self):
+        pass
+
+class MatchNumberTrigger(plugins.TextTrigger):
+    def __init__(self, text, matchNumber):
+        self.matchNumber = matchNumber
+        self.matchCounter = 0
+        plugins.TextTrigger.__init__(self, text)
+        
+    def __repr__(self):
+        return "Match number trigger for the " + str(self.matchNumber) + ":th match"
+        
+    def matches(self, line, *args):
+        if plugins.TextTrigger.matches(self, line):
+            self.matchCounter += 1
+            return self.matchNumber == self.matchCounter
+        return False
+    
+    def reset(self):
+        self.matchCounter = 0
 
 def getWriteDirRegexp(testId):
     # Some stuff, a date, and the testId (ignore the appId as we don't know when or where)
@@ -281,7 +304,7 @@ def getWriteDirRegexp(testId):
 class LineFilter:
     dividers = [ "{->}", "{[->]}", "{[->}", "{->]}" ]
     # All syntax that affects how a match is found
-    matcherStrings = [ "{LINE ", "{INTERNAL " ]
+    matcherStrings = [ "{LINE ", "{INTERNAL ", "{MATCH " ]
     # All syntax that affects what is done when a match is found
     matchModifierStrings = [ "{WORD ", "{REPLACE ", "{LINES ", "{PREVLINES " ]
     internalExpressions = { "writedir" : getWriteDirRegexp }
@@ -313,7 +336,7 @@ class LineFilter:
         for divider in self.dividers:
             dividerPoint = self.originalText.find(divider)
             if dividerPoint != -1:
-                beforeText, afterText, _ = self.extractParameter(self.originalText, dividerPoint, divider)
+                beforeText, afterText = self.originalText.split(divider)
                 self.divider = divider
                 self.trigger = self.parseText(beforeText)
                 self.untrigger = self.parseText(afterText)
@@ -327,16 +350,16 @@ class LineFilter:
                 beforeText, afterText, parameter = self.extractParameter(text, linePoint, matchModifierString)
                 self.readMatchModifier(matchModifierString, parameter)
                 text = beforeText + afterText
-        matcherString, parameter = self.findMatcherInfo(text)
-        return self.createTrigger(matcherString, parameter)
+        matcherString, text, parameter = self.findMatcherInfo(text)
+        return self.createTrigger(matcherString, text, parameter)
 
     def findMatcherInfo(self, text):
         for matcherString in self.matcherStrings:
             linePoint = text.find(matcherString)
             if linePoint != -1:
-                parameter = self.extractParameter(text, linePoint, matcherString)[-1]
-                return matcherString, parameter
-        return "", text
+                beforeText, afterText, parameter = self.extractParameter(text, linePoint, matcherString)
+                return matcherString, beforeText + afterText, parameter
+        return "", text, None
 
     def extractParameter(self, textToParse, linePoint, syntaxString):
         beforeText = textToParse[:linePoint]
@@ -363,13 +386,15 @@ class LineFilter:
         elif matchModifierString == "{PREVLINES ":
             self.prevLinesToRemove = int(parameter)
 
-    def createTrigger(self, matcherString, parameter):
+    def createTrigger(self, matcherString, text, parameter):
         if matcherString == "{LINE ":
             return LineNumberTrigger(int(parameter))
         elif matcherString == "{INTERNAL " and self.internalExpressions.has_key(parameter):
             return self.makeRegexTrigger(parameter)
+        elif matcherString ==  "{MATCH ":
+            return MatchNumberTrigger(text, int(parameter))
         else:
-            return plugins.TextTrigger(parameter)
+            return plugins.TextTrigger(text)
 
     def applyTo(self, line, lineNumber=0):
         if self.autoRemove:

@@ -507,19 +507,33 @@ class FindKnownBugs(guiplugins.ActionDialogGUI):
     def performOnCurrent(self):
         bugFile, section, parser, newParser, bugMap = self.findBugInfo(self.optionGroup.getValue("bug"))
         copyChoice = self.optionGroup.getValue("copy")
+        suitesOrTests = self.getTestsToApplyTo(copyChoice, bugFile)
+        newFileNames = self.getFileNames(suitesOrTests, bugFile)
         if copyChoice != 2:
             parser.remove_section(section)
-            if len(parser.sections()) > 0:
+            if len(parser.sections()) == 0:
+                if len(newFileNames) == 1 and not os.path.isfile(newFileNames[0]):
+                    self.movePath(bugFile, newFileNames[0])
+                    newFileNames = [] # Don't need to write parser also
+                else:
+                    self.removePath(bugFile)
+            else:                
                 parser.write(open(bugFile, "w"))
-            else:
-                os.remove(bugFile)
             
-        suitesOrTests = self.getTestsToApplyTo(copyChoice, bugFile)
-        for fileName in self.getFileNames(suitesOrTests, bugFile):
+        for fileName in newFileNames:
             with open(fileName, "a") as f:
                 newParser.write(f)
                 
         applyBugsToTests(self.currTestSelection, bugMap)
+        
+    @staticmethod
+    def removePath(dir):
+        return plugins.removePath(dir)
+    
+    @staticmethod
+    def movePath(oldPath, newPath):
+        # overridden by version control modules
+        os.rename(oldPath, newPath)
 
         
 def getInteractiveActionClasses():

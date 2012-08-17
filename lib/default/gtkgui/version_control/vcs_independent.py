@@ -3,7 +3,7 @@
 
 import gtk, gobject, plugins, custom_widgets, os, datetime, subprocess, shutil
 from .. import guiplugins, guiutils, entrycompletion
-from ..default_gui import adminactions
+from ..default_gui import adminactions, changeteststate
 
 vcsClass, vcs, annotateClass = None, None, None
     
@@ -820,6 +820,8 @@ class RemoveFiles(VcsRemoveAction, adminactions.RemoveFiles):
 class RemoveTestsForPopup(VcsRemoveAction, adminactions.RemoveTestsForPopup):
     pass
     
+class FindKnownBugs(VcsAdminAction, changeteststate.FindKnownBugs):
+    pass
     
 class RenameTest(VcsAdminAction, adminactions.RenameTest):
     def getNameChangeMessage(self, newName):
@@ -879,9 +881,10 @@ class InteractiveActionConfig(guiplugins.InteractiveActionConfig):
         return RenameTest
 
     def getReplacements(self):
-        return { adminactions.RemoveTests : RemoveTests,
-                 adminactions.RemoveFiles : RemoveFiles,
+        return { adminactions.RemoveTests         : RemoveTests,
+                 adminactions.RemoveFiles         : RemoveFiles,
                  adminactions.RemoveTestsForPopup : RemoveTestsForPopup,
-                 adminactions.RenameTest  : self.getRenameTestClass(),
-                 adminactions.RenameFile  : RenameFile,
-                 adminactions.PasteTests  : PasteTests }
+                 adminactions.RenameTest          : self.getRenameTestClass(),
+                 adminactions.RenameFile          : RenameFile,
+                 adminactions.PasteTests          : PasteTests,
+                 changeteststate.FindKnownBugs    : FindKnownBugs }

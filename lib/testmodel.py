@@ -321,7 +321,7 @@ class Test(plugins.Observable):
     def listResultFiles(self, allVersions):
         exclude = self.expandedDefFileStems() + self.getDataFileNames() + [ "file_edits" ]
         self.diagnose("Excluding " + repr(exclude))
-        predicate = lambda stem, vset: stem not in exclude and len(vset) > 0
+        predicate = lambda stem, vset: stem not in exclude and self.app.name in vset
         stems = self.dircache.findAllStems(predicate)
         return self.getFilesFromStems(stems, allVersions)
 

@@ -422,6 +422,12 @@ class FindKnownBugs(guiplugins.ActionDialogGUI):
     def getDialogTitle(self):
         return "Find, copy and move information for automatic interpretation of test failures"
     
+
+    def findAllBugs(self, bugMap):
+        test = self.currTestSelection[0]
+        bugs = CheckForBugs().findAllBugs(test, test.stateInGui, bugMap)
+        return map(str, bugs)
+        
     def updateOptions(self):
         # Only do this on completed tests
         if not all((test.stateInGui.isComplete() for test in self.currTestSelection)):
@@ -433,11 +439,10 @@ class FindKnownBugs(guiplugins.ActionDialogGUI):
             bugMap.readFromFile(bugFile)
             
         # We assume the first test is representative and only check all the bugs on that one
-        test = self.currTestSelection[0]
-        bugs = CheckForBugs().findAllBugs(test, test.stateInGui, bugMap)
+        bugs = self.findAllBugs(bugMap)
         if bugs:
-            self.optionGroup.setPossibleValues("bug", map(str, bugs))
-            self.optionGroup.setValue("bug", str(bugs[0]))
+            self.optionGroup.setPossibleValues("bug", bugs)
+            self.optionGroup.setValue("bug", bugs[0])
         return False
     
     def findAllKnownBugsFiles(self):
@@ -474,10 +479,10 @@ class FindKnownBugs(guiplugins.ActionDialogGUI):
         else:
             return self.currTestSelection
 
-    def getFileNames(self, suitesOrTests):
+    def getFileNames(self, suitesOrTests, bugFile):
         fileNames = []
         for suiteOrTest in suitesOrTests:
-            name = "knownbugs." + suiteOrTest.app.name + suiteOrTest.app.versionSuffix()
+            name = os.path.basename(bugFile)
             fileName = os.path.join(suiteOrTest.getDirectory(), name)
             if not any((fileName.startswith(f) for f in fileNames)):
                 fileNames.append(fileName)
@@ -490,28 +495,30 @@ class FindKnownBugs(guiplugins.ActionDialogGUI):
             for section in parser.sections():
                 if (parser.has_option(section, "bug_id") and parser.get(section, "bug_id") == bugStr) or \
                    (parser.has_option(section, "brief_description") and parser.get(section, "brief_description") == bugStr):
-                    return bugFile, parser, section
+                    newParser = ConfigParser()
+                    newParser.add_section(section)
+                    for key, value in parser.items(section):
+                        newParser.set(section, key, value)
+                    bugMap = BugMap()
+                    bugMap.readFromParser(newParser)
+                    if bugStr in self.findAllBugs(bugMap):
+                        return bugFile, section, parser, newParser, bugMap
 
     def performOnCurrent(self):
-        bugFile, parser, section = self.findBugInfo(self.optionGroup.getValue("bug"))
-        
-        newParser = ConfigParser()
-        newParser.add_section(section)
-        for key, value in parser.items(section):
-            newParser.set(section, key, value)
-        
+        bugFile, section, parser, newParser, bugMap = self.findBugInfo(self.optionGroup.getValue("bug"))
         copyChoice = self.optionGroup.getValue("copy")
         if copyChoice != 2:
             parser.remove_section(section)
-            parser.write(open(bugFile, "w"))
+            if len(parser.sections()) > 0:
+                parser.write(open(bugFile, "w"))
+            else:
+                os.remove(bugFile)
             
         suitesOrTests = self.getTestsToApplyTo(copyChoice, bugFile)
-        for fileName in self.getFileNames(suitesOrTests):
+        for fileName in self.getFileNames(suitesOrTests, bugFile):
             with open(fileName, "a") as f:
                 newParser.write(f)
                 
-        bugMap = BugMap()
-        bugMap.readFromParser(newParser)
         applyBugsToTests(self.currTestSelection, bugMap)
 
         

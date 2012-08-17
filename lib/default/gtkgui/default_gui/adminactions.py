@@ -88,8 +88,13 @@ class PasteTests(FocusDependentAction):
         return guiplugins.ActionGUI.isActiveOnCurrent(self, test, state) and len(self.clipboardTests) > 0
 
     def getCurrentTestMatchingApp(self, test):
+        # Try the exact application first, if that fails, look for extra-version
         for currTest in self.currTestSelection:
             if currTest.app == test.app:
+                return currTest
+        
+        for currTest in self.currTestSelection:
+            if currTest.app.name == test.app.name:
                 return currTest
 
     def getDestinationInfo(self, test):

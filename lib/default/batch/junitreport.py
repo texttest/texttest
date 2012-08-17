@@ -6,6 +6,7 @@ from batchutils import calculateBatchDate
 from string import Template
 from locale import getpreferredencoding
 from default.performance import getPerformance
+from xml.sax.saxutils import escape
 
 class JUnitResponder(plugins.Responder):
     """Respond to test results and write out results in format suitable for JUnit
@@ -97,7 +98,7 @@ class JUnitApplicationData:
         result["long_message"] = self._longMessage(test)                    
     
     def _shortMessage(self, test):
-        return test.state.getTypeBreakdown()[1]
+        return escape(test.state.getTypeBreakdown()[1])
     
     def _longMessage(self, test):
         message = test.state.freeText.replace("]]>", "END_MARKER")

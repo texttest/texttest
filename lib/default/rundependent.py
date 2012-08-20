@@ -234,8 +234,10 @@ class RunDependentTextFilter(plugins.Observable):
             if filteredLine:
                 newFile.write(filteredLine)
                 lengths.append(len(filteredLine))
-            elif filteredAway is not None and lineFilter is not None:
-                filteredAway.setdefault(lineFilter, []).append(line)
+            else:
+                lengths.append(0)
+                if filteredAway is not None and lineFilter is not None:
+                    filteredAway.setdefault(lineFilter, []).append(line)
 
     def getFilteredLine(self, line, lineNumber, lineFilters):
         for lineFilter in lineFilters:

@@ -2284,8 +2284,12 @@ Dynamic GUI Enhancements:
 Framework Enhancements:
     - run_dependent_text now does not apply the filter in the case where the end marker is never found for a section filtering
 	See migration notes for details
+    - new run_dependent_text syntax {MATCH <number>}
+	For filtering against later instances of the same pattern. See website.
     - New config file entry "virtual_display_count"
 	Allows running multiple virtual servers in the case where for example several GUIs need to run simultaneously
+    - Find Failure Information now integrates with version control plugins
+	when moving or removing knownbug files
 Batch Report Enhancements:
     - Removing previous results is now done in the background
 	Avoids it slowing down the start of batch mode runs
@@ -2293,3 +2297,11 @@ Batch Report Enhancements:
 	Similar to surefire plugin for Maven's description
 Grid Engine (LSF/SGE) enhancements/bug fixes:
 Bug Fixes:
+    - Find Failure Information picks the right file when the same bug has several triggers defined
+    - Find Failure Information doesn't add spurious version IDs to new knownbug files
+    - Find Failure Information removes any files left empty by its actions
+    - Junit report now escapes illegal XML characters in the message tag
+    - Copying or moving a test to an extra version suite in the GUI no longer produces errors
+    - Fixed bug when presence of file x and x.y in a test caused x to be compared, even if y was not the application name
+    - Fixed reconnect failure when $TEXTTTEST_TMP was a subdirectory of $TEXTTEST_HOME
+    

@@ -1330,6 +1330,9 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         self.textDescGroup.addOption("brief_description", "Few-word summary")
         self.textDescGroup.addSwitch("internal_error", "Report as 'internal error' rather than 'known bug'")
         self.optionGroup.addOption("rerun_count", "Number of times to try to rerun the test if the issue is triggered", 0)
+        
+    def isModal(self):
+        return False # Want to be able to select text from the main GUI while we're in the dialog
 
     def fillVBox(self, vbox, optionGroup):
         if optionGroup is self.optionGroup:

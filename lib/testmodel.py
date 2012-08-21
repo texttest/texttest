@@ -293,7 +293,7 @@ class Test(plugins.Observable):
         return True
 
     def isDefinitionFileStem(self, stem):
-        return self.fileMatches(stem, self.defFileStems())
+        return self.app.fileMatches(stem, self.defFileStems())
                 
     def defFileStems(self, *args, **kw):
         return self.app.defFileStems(*args, **kw)
@@ -376,7 +376,7 @@ class Test(plugins.Observable):
         dirs = []
         self.diag.info("Listing files from " + repr(files) + ", ignoring " + repr(filesToIgnore))
         for file in files:
-            if self.fileMatches(os.path.basename(file), filesToIgnore):
+            if self.app.fileMatches(os.path.basename(file), filesToIgnore):
                 continue
             if os.path.isdir(file) and (followLinks or not os.path.islink(file)):
                 dirs.append(file)
@@ -386,12 +386,6 @@ class Test(plugins.Observable):
             dataFiles.append(subdir)
             dataFiles += self.listFilesFrom(self.fullPathList(subdir), filesToIgnore, followLinks)
         return dataFiles
-
-    def fileMatches(self, file, filesToIgnore):
-        for ignFile in filesToIgnore:
-            if fnmatch.fnmatch(file, ignFile):
-                return True
-        return False
     
     def findAllStdFiles(self, stem):
         if stem in [ "environment", "testcustomize.py" ]:
@@ -1808,6 +1802,14 @@ class Application:
 
     def setConfigAlias(self, aliasName, realName):
         self.configDir.setAlias(aliasName, realName)
+    
+    @staticmethod    
+    def fileMatches(file, filesToIgnore):
+        for ignFile in filesToIgnore:
+            if fnmatch.fnmatch(file, ignFile):
+                return True
+        return False
+
 
 
 class OptionFinder(plugins.OptionFinder):

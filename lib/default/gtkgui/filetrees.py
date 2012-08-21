@@ -210,7 +210,7 @@ class ApplicationFileGUI(FileViewGUI):
     def addSuites(self, suites):
         for suite in suites:
             currUsecaseHome = suite.getEnvironment("STORYTEXT_HOME")
-            if currUsecaseHome != os.getenv("STORYTEXT_HOME") and os.path.isdir(currUsecaseHome):
+            if currUsecaseHome != os.getenv("STORYTEXT_HOME") and os.path.isdir(currUsecaseHome) and currUsecaseHome not in self.storytextDirs.values():
                 self.storytextDirs[suite.app] = currUsecaseHome
                 
             self.testScripts.setdefault(suite.app.name, set()).update(self.getScriptArgs(suite))
@@ -218,11 +218,16 @@ class ApplicationFileGUI(FileViewGUI):
                 self.allApps.append(suite.app)
                 self.recreateModel(self.getState(), preserveSelection=False)
 
-    def getAllFiles(self, storytextDir):
+    def getAllFiles(self, storytextDir, app):
         paths = [ storytextDir ]
+        filesToIgnore = app.getCompositeConfigValue("test_data_ignore", os.path.basename(storytextDir))
         for root, dirs, files in os.walk(storytextDir):
             for name in sorted(files) + sorted(dirs):
-                paths.append(os.path.join(root, name))
+                if app.fileMatches(name, filesToIgnore):
+                    if name in dirs:
+                        dirs.remove(name)
+                else:
+                    paths.append(os.path.join(root, name))
         return paths
 
     def addFilesToModel(self, *args):
@@ -238,7 +243,7 @@ class ApplicationFileGUI(FileViewGUI):
                     importedFiles[importedFile] = importedFile
             storytextDir = self.storytextDirs.get(app)
             if storytextDir:
-                files = self.getAllFiles(storytextDir)
+                files = self.getAllFiles(storytextDir, app)
                 self.addDataFilesUnderIter(confiter, files, colour, 
                                            app.getDirectory(), associatedObject=self.allApps)
             testScripts = self.testScripts.get(app.name)

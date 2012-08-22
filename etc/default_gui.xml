@@ -15,7 +15,8 @@
     <menu action="editmenu" />
     
     <menu action="viewmenu">
-      <placeholder name="FirstInViewMenu" />
+      <menuitem action="Set Run Name"/>
+      <separator/>
       <menuitem action="Show only selected"/>
       <menuitem action="Hide selected"/>
       <menuitem action="Show all"/>

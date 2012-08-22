@@ -217,7 +217,8 @@ class RunInfoGUI(TextViewGUI):
 
     def notifySetRunName(self, name):
         self.runName = name
-        self.updateView()
+        if self.view:
+            self.updateView()
 
     def updateView(self):
         if self.runName:

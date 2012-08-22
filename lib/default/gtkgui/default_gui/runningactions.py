@@ -457,6 +457,20 @@ class RunTests(RunningAction,guiplugins.ActionTabGUI):
     def createView(self):
         return self.createNotebook()
 
+    def updateName(self, nameOption, name):
+        if name:
+            nameOption.setValue("Tests started from " + repr(name) + " at <time>")
+
+    def notifySetRunName(self, name):
+        nameOption = self.getOption("name")
+        self.updateName(nameOption, name)
+        
+    def addApplicationOptions(self, allApps, group, inputOptions):
+        guiplugins.ActionTabGUI.addApplicationOptions(self, allApps, group, inputOptions)
+        nameOption = group.getOption("name")
+        if nameOption:
+            self.updateName(nameOption, nameOption.getValue())
+
 
 class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
     def __init__(self, allApps, dummy, inputOptions):

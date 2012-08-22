@@ -8,7 +8,7 @@ from .. import guiplugins
 class Quit(guiplugins.BasicActionGUI):
     def __init__(self, allApps, dynamic, inputOptions):
         guiplugins.BasicActionGUI.__init__(self, allApps, dynamic, inputOptions)
-        self.runName = inputOptions.get("name", "")
+        self.runName = inputOptions.get("name", "") if dynamic else None
     def _getStockId(self):
         return "quit"
     def _getTitle(self):
@@ -20,12 +20,13 @@ class Quit(guiplugins.BasicActionGUI):
     def performOnCurrent(self):
         self.notify("Quit")
     def notifySetRunName(self, runName):
-        self.runName = runName
+        if self.runName is not None:
+            self.runName = runName
     def messageAfterPerform(self):
         pass # GUI isn't there to show it
     def getConfirmationMessage(self):
         message = ""
-        if self.runName:
+        if self.runName and not self.runName.startswith("Tests started from"):
             message = "You named this run as follows : \n" + self.runName + "\n"
         runningProcesses = guiplugins.processMonitor.listRunningProcesses()
         if len(runningProcesses) > 0:
@@ -106,9 +107,7 @@ class RefreshAll(guiplugins.BasicActionGUI):
 
 
 def getInteractiveActionClasses(dynamic):
-    classes = [ Quit ]
-    if dynamic:
-        classes.append(SetRunName)
-    else:
+    classes = [ Quit, SetRunName ]
+    if not dynamic:
         classes += [ RefreshAll, ResetGroups ]
     return classes

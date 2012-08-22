@@ -105,7 +105,7 @@ class GUIController(plugins.Responder, plugins.Observable):
 
         self.appFileGUI = filetrees.ApplicationFileGUI(self.dynamic, allApps)
         self.textInfoGUI = textinfo.TextInfoGUI(self.dynamic)
-        runName = optionMap.get("name", "")
+        runName = optionMap.get("name", "").replace("<time>", plugins.startTimeString())
         reconnect = optionMap.has_key("reconnect")
         self.runInfoGUI = textinfo.RunInfoGUI(self.dynamic, runName, reconnect)
         self.testRunInfoGUI = textinfo.TestRunInfoGUI(self.dynamic, reconnect)
@@ -394,19 +394,18 @@ class TopWindowGUI(guiutils.ContainerGUI):
         return self.topWindow
 
     def setWindowTitle(self):
-        if self.dynamic:
-            trailer = " - TextTest dynamic GUI"
-            if self.name:
-                title = self.name + trailer
-            else:
-                appNameDesc = self.dynamicAppNameTitle()
-                checkoutTitle = self.getCheckoutTitle()
-                title = appNameDesc + " tests" + checkoutTitle + \
-                         " (started at " + plugins.startTimeString() + ")" + trailer
+        guiText = "dynamic" if self.dynamic else "static"
+        trailer = " - TextTest " + guiText + " GUI"
+        if self.name:
+            title = self.name + trailer
+        elif self.dynamic:
+            appNameDesc = self.dynamicAppNameTitle()
+            checkoutTitle = self.getCheckoutTitle()
+            title = appNameDesc + " tests" + checkoutTitle + \
+                     " (started at " + plugins.startTimeString() + ")" + trailer
         else:
             appNameDesc = self.staticAppNameTitle()
-            basicTitle = "test management "
-            trailer = "- TextTest static GUI"
+            basicTitle = "test management"
             if len(appNameDesc) > 0:
                 title = appNameDesc + " " + basicTitle + trailer
             else:

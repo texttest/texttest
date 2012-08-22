@@ -10,13 +10,6 @@
       </placeholder>
     </menu>
    
-    <menu action="viewmenu">
-      <placeholder name="FirstInViewMenu">
-        <menuitem action="Set Run Name"/>
-        <separator/>
-      </placeholder>
-    </menu>
-
     <menu action="actionsmenu">
       <menuitem action="Kill"/>
       <menuitem action="Mark"/>

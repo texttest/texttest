@@ -459,7 +459,7 @@ class ArchiveRepository(plugins.ScriptWithArgs):
                 historyDir = suite.app.name + "_history"
                 fullHistoryDir = os.path.join(repository, historyDir)
                 if os.path.isdir(fullHistoryDir):
-                    tarFileName = historyDir + "_" + plugins.localtime("%d%b%H%M%S") + ".tar.gz"
+                    tarFileName = historyDir + "_" + self.descriptor.replace(" ", "_") + ".tar.gz"
                     subprocess.call([ "tar", "cfz", tarFileName, historyDir ], cwd=repository)
                     shutil.rmtree(fullHistoryDir)
 

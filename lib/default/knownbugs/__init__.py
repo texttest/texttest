@@ -117,20 +117,35 @@ class BugTrigger:
     def matchesText(self, line):
         return self.textTrigger.matches(line)
 
-    def findBug(self, execHosts, isChanged, multipleDiffs, line=None):
+    def hasBug(self, execHosts, isChanged, multipleDiffs, line=None):
         if not self.checkUnchanged and not isChanged:
             self.diag.info("File not changed, ignoring")
-            return
+            return False
         if multipleDiffs and not self.ignoreOtherErrors:
             self.diag.info("Multiple differences present, allowing others through")
-            return
+            return False
         if line is not None and not self.textTrigger.matches(line):
-            return
+            return False
         if self.hostsMatch(execHosts):
-            return self.bugInfo
+            return True
         else:
             self.diag.info("No match " + repr(execHosts) + " with " + repr(self.triggerHosts))
-
+            return False
+        
+    def findBugInfo(self, test, fileStem, absenceBug):
+        category, briefText, fullText = self.bugInfo.findInfo(test)
+        whatText = "FAILING to find text" if absenceBug else "text found"
+        fullText += "\n(This bug was triggered by " + whatText + " in " + self.getFileText(fileStem) + " matching '" + repr(self) + "')"
+        return category, briefText, fullText
+    
+    def getFileText(self, fileStem):
+        if fileStem == "free_text":
+            return "the full difference report"
+        elif fileStem == "brief_text":
+            return "the brief text/details"
+        else:
+            return "file " + repr(fileStem)
+    
     def hostsMatch(self, execHosts):
         if len(self.triggerHosts) == 0:
             return True
@@ -173,9 +188,8 @@ class FileBugData:
         for line in lines:
             for bugTrigger in self.presentList:
                 self.diag.info("Checking for existence of " + repr(bugTrigger))
-                bug = bugTrigger.findBug(execHosts, isChanged, multipleDiffs, line)
-                if bug and bug not in bugs:
-                    bugs.append(bug)
+                if bugTrigger not in bugs and bugTrigger.hasBug(execHosts, isChanged, multipleDiffs, line):
+                    bugs.append(bugTrigger)
             for bugTrigger in currAbsent:
                 if bugTrigger.matchesText(line):
                     currAbsent.remove(bugTrigger)
@@ -185,9 +199,8 @@ class FileBugData:
     def findAbsenceBugs(self, absentList, execHosts, isChanged, multipleDiffs):
         bugs = []
         for bugTrigger in absentList:
-            bug = bugTrigger.findBug(execHosts, isChanged, multipleDiffs)
-            if bug and bug not in bugs:
-                bugs.append(bug)
+            if bugTrigger not in bugs and bugTrigger.hasBug(execHosts, isChanged, multipleDiffs):
+                bugs.append(bugTrigger)
         return bugs
 
 
@@ -328,35 +341,41 @@ class CheckForBugs(plugins.Action):
             self.diag.info(repr(test) + " succeeded, not looking for bugs")
             return None, 0
 
-        bug = self.findBug(test, state, activeBugs)
-        if bug:
-            category, briefText, fullText = bug.findInfo(test)
+        bugTrigger, bugStem = self.findBug(test, state, activeBugs)
+        if bugTrigger:
+            absenceBug = bugTrigger in activeBugs[bugStem].absentList
+            category, briefText, fullText = bugTrigger.findBugInfo(test, bugStem, absenceBug)
             self.diag.info("Changing to " + category + " with text " + briefText)
             bugState = FailedPrediction(category, fullText, briefText, completed=1)
-            return self.getNewState(state, bugState), bug.rerunCount
+            return self.getNewState(state, bugState), bugTrigger.bugInfo.rerunCount
         else:
             return None, 0
             
-
     def findAllBugs(self, test, state, activeBugs):
         multipleDiffs = self.hasMultipleDifferences(test, state)
-        bugs = []
+        bugs, bugStems = [], []
         for stem, fileBugData in activeBugs.items():
-            bugs += self.findBugsInFile(test, state, stem, fileBugData, multipleDiffs)
+            newBugs = self.findBugsInFile(test, state, stem, fileBugData, multipleDiffs)
+            if newBugs:
+                bugs += newBugs
+                bugStems += [ stem ] * len(newBugs)
         
-        return bugs
+        return bugs, bugStems
 
     def findBug(self, test, state, activeBugs):
-        bugs = self.findAllBugs(test, state, activeBugs)
+        bugs, bugStems = self.findAllBugs(test, state, activeBugs)
         unblockedBugs = self.findUnblockedBugs(bugs)
         if len(unblockedBugs) > 0:
-            unblockedBugs.sort(key=lambda bug: bug.getPriority())
-            return unblockedBugs[0]
+            unblockedBugs.sort(key=lambda bug: bug.bugInfo.getPriority())
+            bug = unblockedBugs[0]
+            return bug, bugStems[bugs.index(bug)]
+        else:
+            return None, None
 
     def findUnblockedBugs(self, bugs):
         unblockedBugs = []
         for bug in bugs:
-            if bug.isCancellation():
+            if bug.bugInfo.isCancellation():
                 return unblockedBugs
             else:
                 unblockedBugs.append(bug)

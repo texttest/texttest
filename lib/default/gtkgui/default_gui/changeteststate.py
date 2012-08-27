@@ -425,8 +425,8 @@ class FindKnownBugs(guiplugins.ActionDialogGUI):
 
     def findAllBugs(self, bugMap):
         test = self.currTestSelection[0]
-        bugs = CheckForBugs().findAllBugs(test, test.stateInGui, bugMap)
-        return map(str, bugs)
+        bugs = CheckForBugs().findAllBugs(test, test.stateInGui, bugMap)[0]
+        return [ str(b.bugInfo) for b in bugs ]
         
     def updateOptions(self):
         # Only do this on completed tests

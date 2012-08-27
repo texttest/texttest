@@ -2279,7 +2279,11 @@ Version trunk
 =============
 Installation:
 General GUI Enhancements:
+    - Can now set names also in the static GUI
+	via the -name argument or the "Set Run Name" entry in the view menu, as it used to be in the dynamic GUI
 Static GUI Enhancements:
+    - "test_data_ignore" is now also used when displaying the storytext_files tree in the config tab
+	Make it easier to ignore backup files, plugin sources etc.
 Dynamic GUI Enhancements:
 Framework Enhancements:
     - run_dependent_text now does not apply the filter in the case where the end marker is never found for a section filtering
@@ -2295,6 +2299,7 @@ Batch Report Enhancements:
 	Avoids it slowing down the start of batch mode runs
     - A small textual report summarising the results is now produced in the log
 	Similar to surefire plugin for Maven's description
+    - Archived results are now named after the date of the results archived to, not the date when the archiving was done
 Grid Engine (LSF/SGE) enhancements/bug fixes:
 Bug Fixes:
     - Find Failure Information picks the right file when the same bug has several triggers defined
@@ -2304,4 +2309,5 @@ Bug Fixes:
     - Copying or moving a test to an extra version suite in the GUI no longer produces errors
     - Fixed bug when presence of file x and x.y in a test caused x to be compared, even if y was not the application name
     - Fixed reconnect failure when $TEXTTTEST_TMP was a subdirectory of $TEXTTEST_HOME
-    
+    - "Enter Failure Information" is no longer a modal dialog
+    - Fixed run_dependent_text with {PREVLINES ...} filter where one of the lines would be taken by a different filter

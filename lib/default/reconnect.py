@@ -85,6 +85,9 @@ class ReconnectConfig:
         correctNames = sorted(os.listdir(fetchDir))
         fullPaths = [ os.path.join(fetchDir, d) for d in correctNames ]
         return filter(lambda d: self.isRunDirectoryFor(app, d), fullPaths)
+    
+    def getFilter(self):
+        return ReconnectFilter(self.reconnDir)
 
     @classmethod
     def all_perms(cls, items):
@@ -228,7 +231,16 @@ class ReconnectConfig:
                   " for the run directory found at " + runDir
         for datedVersion in self.datedVersions:
             app.addConfigEntry("unsaveable_version", datedVersion)
+            
+class ReconnectFilter(plugins.TextFilter):
+    def __init__(self, rootDir):
+        self.rootDir = rootDir
         
+    def acceptsTestCase(self, test):
+        return os.path.exists(os.path.join(self.rootDir, test.getRelPath()))
+
+    def acceptsTestSuite(self, suite):
+        return os.path.exists(os.path.join(self.rootDir, suite.getRelPath()))
 
 class ReconnectTest(plugins.Action):
     def __init__(self, rootDirToCopy, fullRecalculate):

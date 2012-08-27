@@ -640,6 +640,8 @@ class Config:
         filters = self.getFiltersFromMap(options, app, suites, **kw)
         for filterFileName in self.findFilterFileNames(app, options, includeConfig):
             filters += self.getFiltersFromFile(app, filterFileName, suites)
+        if self.isReconnecting():
+            filters.append(self.reconnectConfig.getFilter())
 
         orFilterFiles = self.optionListValue(options, "funion")
         if len(orFilterFiles) > 0:

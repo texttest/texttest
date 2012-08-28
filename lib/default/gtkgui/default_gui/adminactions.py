@@ -1315,7 +1315,8 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         self.applyGroup = plugins.OptionGroup("Additional options to only apply to certain runs")
         self.bugSystemGroup = plugins.OptionGroup("Link failure to a reported bug")
         self.textDescGroup = plugins.OptionGroup("Link failure to a textual description")
-        self.textGroup.addOption("search_string", "Text or regexp to match")
+        self.textGroup.addOption("search_string", "Text or regexp to match", multilineEntry=True)
+        self.textGroup.addSwitch("use_regexp", "Enable regular expressions", 1)
         self.textGroup.addSwitch("trigger_on_absence", "Trigger if given text is NOT present")
         self.searchGroup.addSwitch("data_source", options = [ "Specific file", "Brief text/details", "Full difference report" ], description = [ "Search in a newly generated file (not its diff)", "Search in the brief text describing the test result as it appears in the Details column in the dynamic GUI test view", "Search in the whole difference report as it appears in the lower right window in the dynamic GUI" ])
         self.searchGroup.addOption("search_file", "File to search in")
@@ -1471,16 +1472,22 @@ class ReportBugs(guiplugins.ActionDialogGUI):
                           self.bugSystemGroup, self.textDescGroup, self.optionGroup ]:
                 for name, option in group.options.items():
                     value = option.getValue()
-                    if name in namesToIgnore or not value or value in [ "0", "<none>" ]:
+                    if name in namesToIgnore or self.hasDefaultValue(name, value):
                         continue
                     if name == "data_source":
                         writeFile.write("search_file:" + dataSourceText[value] + "\n")
                         namesToIgnore += [ "search_file", "trigger_on_success", "ignore_other_errors" ]
                     else:
-                        writeFile.write(name + ":" + str(value) + "\n")
+                        writeFile.write(name + ":" + str(value).replace("\n", "\\n") + "\n")
             self.updateWithBugFile(writeFile, ancestors)
             writeFile.close()
         self.setFilesChanged(ancestors)
+
+    def hasDefaultValue(self, name, value):
+        if name == "use_regexp":
+            return value == 1
+        else:
+            return not value or value in [ "0", "<none>" ]
         
     def updateWithBugFile(self, *args):
         pass # only used in dynamic GUI

@@ -1017,3 +1017,6 @@ toggled.true = choose to copy info into tests
 [Label=Apply to common parent suite]
 toggled.true = choose to apply to parent suite
 
+[Label=Enable regular expressions]
+toggled.false = disable regular expressions
+

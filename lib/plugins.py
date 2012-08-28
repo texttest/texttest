@@ -1192,6 +1192,57 @@ class TextTrigger:
     def reset(self):
         pass
 
+class MultilineTextTrigger(TextTrigger):
+    def __init__(self, text, tryAsRegexp):
+        TextTrigger.__init__(self, text, False)
+        self.triggers = []
+        self.currentIndex = 0
+        self.matchedLines = []
+        lines = text.splitlines()
+        for line in lines:
+            self.triggers.append(TextTrigger(line, tryAsRegexp))
+
+    def matches(self, line):
+        return self._matches(line)[0]
+    
+    def _matches(self, line):
+        if self.triggers[self.currentIndex].matches(line):
+            self.currentIndex += 1
+            if self.currentIndex == len(self.triggers):
+                self.currentIndex = 0
+                return True, True
+            else:
+                return False, True
+        return False, False
+    
+    def replace(self, line, newTextLines):
+        matchComplete, matchThisLine = self._matches(line)
+        if matchThisLine:
+            self.matchedLines.append(line)
+            text = ""
+            if matchComplete:
+                for i in range(len(newTextLines)):
+                    if i < len(self.matchedLines):
+                        text += self.triggers[i].replace(self.matchedLines[i], newTextLines[i])
+                    else:
+                        text += newTextLines[i] + "\n"
+                self.matchedLines = []
+            return text
+        else:
+            text = "".join(self.matchedLines) + line
+            self.reset()
+            return text
+        
+    def getLeftoverText(self):
+        text = "".join(self.matchedLines)
+        self.reset()
+        return text
+    
+    def reset(self):
+        self.currentIndex = 0
+        self.matchedLines = []
+
+
 # Used for application and personal configuration files
 class MultiEntryDictionary(OrderedDict):
     warnings = []

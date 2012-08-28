@@ -88,7 +88,9 @@ class UnreportedBug(Bug):
 
 class BugTrigger:
     def __init__(self, getOption):
-        self.textTrigger = plugins.TextTrigger(getOption("search_string"))
+        useRegexp = int(getOption("use_regexp", "1"))
+        searchStr = getOption("search_string").replace("\\n", "\n")
+        self.textTrigger = plugins.MultilineTextTrigger(searchStr, useRegexp)
         self.triggerHosts = self.getTriggerHosts(getOption)
         self.checkUnchanged = int(getOption("trigger_on_success", "0"))
         self.reportInternalError = int(getOption("internal_error", "0"))
@@ -135,7 +137,12 @@ class BugTrigger:
     def findBugInfo(self, test, fileStem, absenceBug):
         category, briefText, fullText = self.bugInfo.findInfo(test)
         whatText = "FAILING to find text" if absenceBug else "text found"
-        fullText += "\n(This bug was triggered by " + whatText + " in " + self.getFileText(fileStem) + " matching '" + repr(self) + "')"
+        matchText = repr(self)
+        if "\n" in matchText:
+            matchText = "'''\n" + matchText + "\n'''"
+        else:
+            matchText = "'" + matchText + "'"
+        fullText += "\n(This bug was triggered by " + whatText + " in " + self.getFileText(fileStem) + " matching " + matchText + ")"
         return category, briefText, fullText
     
     def getFileText(self, fileStem):

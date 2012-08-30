@@ -29,15 +29,16 @@ def _getChanges(buildName, workspace, jenkinsUrl):
     changes = []
     for project, build in getCauses(jobRoot, jobName, buildName):
         xmlFile = os.path.join(jobRoot, project, "builds", build, "changelog.xml")
-        document = parse(xmlFile)
-        authors = []
-        for changeset in document.getElementsByTagName("changeset"):
-            author = parseAuthor(changeset.getAttribute("author"))
-            if author not in authors:
-                authors.append(author)
-        if authors:
-            fullUrl = os.path.join(jenkinsUrl, "job", project, build, "changes")
-            changes.append((",".join(authors), fullUrl))
+        if os.path.isfile(xmlFile):
+            document = parse(xmlFile)
+            authors = []
+            for changeset in document.getElementsByTagName("changeset"):
+                author = parseAuthor(changeset.getAttribute("author"))
+                if author not in authors:
+                    authors.append(author)
+            if authors:
+                fullUrl = os.path.join(jenkinsUrl, "job", project, build, "changes")
+                changes.append((",".join(authors), fullUrl))
     return changes
 
 def getChanges(buildName):

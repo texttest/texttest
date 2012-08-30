@@ -25,7 +25,8 @@ def getPerformanceFromLine(line):
     
 def getTestPerformance(test, version = None):
     try:
-        return getPerformance(test.getFileName("performance", version))
+        perfStem = test.getConfigValue("default_performance_stem")
+        return getPerformance(test.getFileName(perfStem, version))
     except IOError: # assume something disappeared externally
         test.refreshFiles()
         return getTestPerformance(test, version)

@@ -50,7 +50,7 @@ class JUnitApplicationData:
         self.testResults = {}
         
     def storeResult(self, test):
-        perfStem = test.app.getBatchConfigValue("batch_junit_performance")
+        perfStem = test.getConfigValue("default_performance_stem")
         perfFile = test.makeTmpFileName(perfStem)
         t = getPerformance(perfFile) if os.path.isfile(perfFile) else 0
         result = dict(full_test_name=self._fullTestName(test), 

@@ -1110,7 +1110,6 @@ class Config:
         app.setConfigDefault("batch_use_collection", { "default" : "false" }, "Do we collect multiple mails into one in batch mode")
         app.setConfigDefault("batch_junit_format", { "default" : "false" }, "Do we write out results in junit format in batch mode")
         app.setConfigDefault("batch_junit_folder", { "default" : "" }, "Which folder to write test results in junit format in batch mode. Only useful together with batch_junit_format")
-        app.setConfigDefault("batch_junit_performance", { "default" : "performance" }, "Which performance statistic to use in the Junit XML report. Only useful together with batch_junit_format")
         app.setConfigDefault("batch_collect_max_age_days", { "default" : 100000 }, "When collecting multiple messages, what is the maximum age of run that we should accept?")
         app.setConfigDefault("batch_collect_compulsory_version", self.getDefaultCollectCompulsoryVersions(), "When collecting multiple messages, which versions should be expected and give an error if not present?")
         app.setConfigDefault("batch_mail_on_failure_only", { "default" : "false" }, "Send mails only if at least one test fails")
@@ -1121,6 +1120,7 @@ class Config:
     def setPerformanceDefaults(self, app):
         # Performance values
         app.setConfigDefault("cputime_include_system_time", 0, "Include system time when measuring CPU time?")
+        app.setConfigDefault("default_performance_stem", "performance", "Which performance statistic to use when selecting tests by performance, placing performance in Junit XML reports etc")
         app.setConfigDefault("performance_logfile", { "default" : [] }, "Which result file to collect performance data from")
         app.setConfigDefault("performance_logfile_extractor", {}, "What string to look for when collecting performance data")
         app.setConfigDefault("performance_test_machine", { "default" : [], "*mem*" : [ "any" ] }, \
@@ -1136,6 +1136,7 @@ class Config:
         app.setConfigDefault("performance_unit", self.defaultPerfUnits(), "Name to be used to identify the units in a performance file")
         app.setConfigDefault("performance_ignore_improvements", { "default" : "false" }, "Should we ignore all improvements in performance?")
         app.setConfigAlias("performance_use_normalised_%", "use_normalised_percentage_change")
+        app.setConfigAlias("batch_junit_performance", "default_performance_stem")
         
     def setUsecaseDefaults(self, app):
         app.setConfigDefault("use_case_record_mode", "disabled", "Mode for Use-case recording (GUI, console or disabled)")

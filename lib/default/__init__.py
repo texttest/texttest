@@ -1067,6 +1067,7 @@ class Config:
         for wkday in plugins.weekdays:
             colours["run_" + wkday + "_fg"] = "black"
         colours["column_header_bg"] = "gray1"
+        colours["changes_header_bg"] = "#E2E2FF"
         colours["row_header_bg"] = "#FFFFCC"
         colours["performance_fg"] = "red6"
         colours["memory_bg"] = "pink"

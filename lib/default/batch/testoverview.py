@@ -1,7 +1,7 @@
 # Code to generate HTML report of historical information. This report generated
 # either via the -coll flag, or via -s 'batch.GenerateHistoricalReport <batchid>'
 
-import os, plugins, time, HTMLgen, HTMLcolors, sys, logging
+import os, plugins, time, HTMLgen, HTMLcolors, sys, logging, jenkinschanges
 from cPickle import Unpickler, UnpicklingError
 from ordereddict import OrderedDict
 from glob import glob
@@ -415,6 +415,10 @@ class TestTable:
         table = HTMLgen.TableLite(border=0, cellpadding=4, cellspacing=2,width="100%")
         table.append(self.generateTableHead())
         table.append(self.generateSummaries())
+        if os.getenv("JENKINS_URL"):
+            changeRow = self.generateJenkinsChanges()
+            if changeRow:
+                table.append(changeRow)
         hasRows = False
         for extraVersion, testInfo in loggedTests.items():
             currRows = []
@@ -443,7 +447,33 @@ class TestTable:
         if hasRows:
             table.append(HTMLgen.BR())
             return table
-
+        
+    def generateJenkinsChanges(self):
+        bgColour = self.colourFinder.find("changes_header_bg")
+        row = [ HTMLgen.TD("Changes", bgcolor = bgColour) ]
+        hasData = False
+        prevBuildNum = None
+        for tag in self.tags:
+            buildNumber = tag.split(".")[-1]
+            cont = HTMLgen.Container()
+            allChanges = []
+            if prevBuildNum is not None and buildNumber.isdigit():
+                allBuildNumbers = map(str, range(prevBuildNum + 1, int(buildNumber) + 1))
+            else:
+                allBuildNumbers = [ buildNumber ]
+            for buildNum in allBuildNumbers:
+                allChanges += jenkinschanges.getChanges(buildNum)
+            for i, (author, target) in enumerate(allChanges):
+                if i:
+                    cont.append(HTMLgen.BR())
+                cont.append(HTMLgen.Href(target, author))
+                hasData = True
+            row.append(HTMLgen.TD(cont, bgcolor = bgColour))
+            if buildNumber.isdigit():
+                prevBuildNum = int(buildNumber)
+        if hasData:
+            return HTMLgen.TR(*row)
+            
     def generateSummaries(self, extraVersion=None):
         bgColour = self.colourFinder.find("column_header_bg")
         row = [ HTMLgen.TD("Summary", bgcolor = bgColour) ]

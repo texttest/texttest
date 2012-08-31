@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, plugins, sys, time, shutil, datetime, testoverview, logging, re
+import os, plugins, sys, time, shutil, datetime, testoverview, logging, re, tarfile
 from summarypages import GenerateSummaryPage, GenerateGraphs # only so they become package level entities
 from ordereddict import OrderedDict
 from batchutils import calculateBatchDate, BatchVersionFilter
@@ -377,6 +377,9 @@ def getBatchRepository(suite):
     repo = suite.app.getBatchConfigValue("batch_result_repository", envMapping=suite.environment)
     return os.path.expanduser(repo)
 
+def dateInSeconds(val):
+    return time.mktime(time.strptime(val, "%d%b%Y"))
+
 # Allow saving results to a historical repository
 class SaveState(plugins.Responder):
     def __init__(self, optionMap, allApps):
@@ -505,11 +508,53 @@ class ArchiveRepository(plugins.ScriptWithArgs):
             return False
         return True
 
+class ArchiveExtractor:
+    def __init__(self, dateStr):
+        self.dateStr = dateStr
+        self.repositories = []
+    
+    def extract(self, suite):
+        repository = getBatchRepository(suite)
+        archives = self.getArchives(suite)
+        for archive in archives:
+            self.extractUnder(archive, repository)
+        self.repositories.append(os.path.join(repository, suite.app.name + "_history"))
+        
+    def getArchives(self, suite):
+        repository = getBatchRepository(suite)
+        dirList = os.listdir(repository)
+        return [os.path.join(repository,f) for f in dirList if f.endswith(".tar.gz") and self.shouldOpen(f)]
+
+    def shouldOpen(self, tarFileName):
+        dateStr = tarFileName[tarFileName.find("before_") + len("before_") : tarFileName.find(".tar.gz")]
+        return dateInSeconds(self.dateStr) <= dateInSeconds(dateStr)
+    
+    def extractUnder(self, archivedFile, targetPath):
+        tar = tarfile.open(archivedFile)
+        tar.extractall(targetPath, members=self.findFiles(tar))
+        tar.close()
+
+    def findFiles(self, members):
+        for tarinfo in members:
+            if self.shouldExtract(os.path.split(tarinfo.name)[1]):
+                yield tarinfo
+
+    def shouldExtract(self, fileName):
+        if not fileName.startswith("teststate"):
+            return False
+        dateStr = fileName.split("_")[1]
+        return dateInSeconds(self.dateStr) <= dateInSeconds(dateStr)
+    
+    def cleanAllExtracted(self):
+        for repository in self.repositories:
+            if os.path.isdir(repository):
+                plugins.rmtree(repository)
 
 class WebPageResponder(plugins.Responder):
     def __init__(self, optionMap, allApps):
         plugins.Responder.__init__(self)
         self.cmdLineResourcePage = self.findResourcePage(optionMap.get("coll"))
+        self.archiveExtractor = ArchiveExtractor(optionMap.get("collarchive")) if optionMap.get("collarchive") is not None else None
         self.diag = logging.getLogger("GenerateWebPages")
         self.suitesToGenerate = []
         self.descriptionInfo = {}
@@ -535,6 +580,8 @@ class WebPageResponder(plugins.Responder):
                 batchFilter.verifyVersions(suite.app)
                 self.suitesToGenerate.append(suite)
                 self.extraApps += suite.app.extras
+                if self.archiveExtractor is not None:
+                    self.extractFromArchive()
             except plugins.TextTestError, e:
                 plugins.log.info("Not generating web page for " + suite.app.description() + " : " + str(e))
                             
@@ -554,6 +601,12 @@ class WebPageResponder(plugins.Responder):
             # Describe errors, if any
             self.summaryGenerator.finalise()
         plugins.log.info("Completed web page generation.")
+        if self.archiveExtractor is not None:
+            self.archiveExtractor.cleanAllExtracted()
+
+    def extractFromArchive(self):
+        for suite in self.suitesToGenerate:
+            self.archiveExtractor.extract(suite)
 
     def getResourcePages(self, getConfigValue):
         if self.cmdLineResourcePage is not None:
@@ -562,13 +615,13 @@ class WebPageResponder(plugins.Responder):
             return getConfigValue("historical_report_resource_pages")
 
     def generatePagePerApp(self, pageTitle, pageInfo):
-        for app, repository, extraApps in pageInfo:
+        for app, repositories, extraApps in pageInfo:
             pageTopDir = os.path.expanduser(app.getBatchConfigValue("historical_report_location"))
             self.copyJavaScript(pageTopDir)
             pageDir = os.path.join(pageTopDir, app.name)
             extraVersions = self.getExtraVersions(app, extraApps)
             self.diag.info("Found extra versions " + repr(extraVersions))
-            relevantSubDirs = self.findRelevantSubdirectories(repository, app, extraVersions)
+            relevantSubDirs = self.findRelevantSubdirectories(repositories, app, extraVersions)
             version = getVersionName(app, self.getAppsToGenerate())
             pageSubTitle = self.makeCommandLine([ app ])
             self.makeAndGenerate(relevantSubDirs, self.getConfigValueMethod(app), pageDir, pageTitle, pageSubTitle,
@@ -598,25 +651,36 @@ class WebPageResponder(plugins.Responder):
     def getAppRepositoryInfo(self):
         appInfo = OrderedDict()
         for suite in self.suitesToGenerate:
-            repository = getBatchRepository(suite)
-            if not repository:
-                continue
             app = suite.app
-            repository = os.path.join(repository, app.name)
-            if not os.path.isdir(repository):
-                plugins.printWarning("Batch result repository " + repository + " does not exist - not creating pages for " + repr(app))
+            repositories = self.getRepositories(suite)
+            if len(repositories) == 0:
                 continue
-
             pageTitle = app.getBatchConfigValue("historical_report_page_name")
             extraApps = []
             for extraApp in app.extras:
                 extraPageTitle = extraApp.getBatchConfigValue("historical_report_page_name")
                 if extraPageTitle != pageTitle and extraPageTitle != extraApp.getDefaultPageName():
-                    appInfo.setdefault(extraPageTitle, []).append((extraApp, repository, []))
+                    appInfo.setdefault(extraPageTitle, []).append((extraApp, repositories, []))
                 else:
                     extraApps.append(extraApp)
-            appInfo.setdefault(pageTitle, []).append((app, repository, extraApps))
+            appInfo.setdefault(pageTitle, []).append((app, repositories, extraApps))
         return appInfo
+
+    def getRepositories(self, suite):
+        repositories = []
+        repositoryRoot = getBatchRepository(suite)
+        if repositoryRoot:
+            repos = [os.path.join(repositoryRoot, suite.app.name)]
+            if self.archiveExtractor is not None:
+                repos.append(os.path.join(repositoryRoot, suite.app.name + "_history"))
+            repositories = [repository for repository in repos if self.checkRepository(repository, suite.app)]
+        return repositories
+    
+    def checkRepository(self, repository, app):
+        if not os.path.isdir(repository):
+            plugins.printWarning("Batch result repository " + repository + " does not exist - not creating pages for " + repr(app))
+            return False
+        return True
 
     def getAppsToGenerate(self):
         return [ suite.app for suite in self.suitesToGenerate ]
@@ -625,9 +689,9 @@ class WebPageResponder(plugins.Responder):
         allApps = [ app for app, _, _ in pageInfo ]
         version = getVersionName(allApps[0], self.getAppsToGenerate())
         extraVersions, relevantSubDirs = [], OrderedDict()
-        for app, repository, extraApps in pageInfo:
+        for app, repositories, extraApps in pageInfo:
             extraVersions += self.getExtraVersions(app, extraApps)
-            relevantSubDirs.update(self.findRelevantSubdirectories(repository, app, extraVersions, self.getVersionTitle))
+            relevantSubDirs.update(self.findRelevantSubdirectories(repositories, app, extraVersions, self.getVersionTitle))
         getConfigValue = plugins.ResponseAggregator([ self.getConfigValueMethod(app) for app in allApps ])
         pageSubTitle = self.makeCommandLine(allApps)
         descriptionInfo = {}
@@ -683,27 +747,28 @@ class WebPageResponder(plugins.Responder):
                 return versionToCheck
         return ""
         
-    def findRelevantSubdirectories(self, repository, app, extraVersions, versionTitleMethod=None):
+    def findRelevantSubdirectories(self, repositories, app, extraVersions, versionTitleMethod=None):
         subdirs = OrderedDict()
-        dirlist = os.listdir(repository)
-        dirlist.sort()
-        appVersions = set(app.versions)
-        for dir in dirlist:
-            dirVersions = dir.split(".")
-            if set(dirVersions).issuperset(appVersions):
-                currExtraVersion = self.findMatchingExtraVersion(dirVersions, extraVersions)
-                if currExtraVersion:
-                    version = dir.replace("." + currExtraVersion, "")
-                else:
-                    version = dir
-                if versionTitleMethod:
-                    versionTitle = versionTitleMethod(app, version)
-                else:
-                    versionTitle = version
-                fullPath = os.path.join(repository, dir)
-                self.diag.info("Found subdirectory " + dir + " with version " + versionTitle
-                               + " and extra version '" + currExtraVersion + "'")
-                subdirs.setdefault(versionTitle, []).append((currExtraVersion, fullPath))
+        for repository in repositories:
+            dirlist = os.listdir(repository)
+            dirlist.sort()
+            appVersions = set(app.versions)
+            for dir in dirlist:
+                dirVersions = dir.split(".")
+                if set(dirVersions).issuperset(appVersions):
+                    currExtraVersion = self.findMatchingExtraVersion(dirVersions, extraVersions)
+                    if currExtraVersion:
+                        version = dir.replace("." + currExtraVersion, "")
+                    else:
+                        version = dir
+                    if versionTitleMethod:
+                        versionTitle = versionTitleMethod(app, version)
+                    else:
+                        versionTitle = version
+                    fullPath = os.path.join(repository, dir)
+                    self.diag.info("Found subdirectory " + dir + " with version " + versionTitle
+                                   + " and extra version '" + currExtraVersion + "'")
+                    subdirs.setdefault(versionTitle, []).append((currExtraVersion, fullPath))
         return subdirs
     
     def getExtraVersions(self, app, extraApps):
@@ -715,7 +780,6 @@ class WebPageResponder(plugins.Responder):
                 extraVersions.append(version)
         return extraVersions
 
-    
 class CollectFiles(plugins.ScriptWithArgs):
     scriptDoc = "Collect and send all batch reports that have been written to intermediate files"
     def __init__(self, args=[""]):

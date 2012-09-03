@@ -463,8 +463,9 @@ class ArchiveRepository(plugins.ScriptWithArgs):
                 fullHistoryDir = os.path.join(repository, historyDir)
                 if os.path.isdir(fullHistoryDir):
                     tarFileName = historyDir + "_" + self.descriptor.replace(" ", "_") + ".tar.gz"
+                    plugins.log.info("Archiving completed for " + self.repository + ", created tarfile at " + tarFileName)
                     subprocess.call([ "tar", "cfz", tarFileName, historyDir ], cwd=repository)
-                    shutil.rmtree(fullHistoryDir)
+                    plugins.rmtree(fullHistoryDir)
 
     def archiveFilesUnder(self, repository, app):
         count = 0

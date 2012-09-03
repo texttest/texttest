@@ -2292,15 +2292,29 @@ Framework Enhancements:
 	For filtering against later instances of the same pattern. See website.
     - New config file entry "virtual_display_count"
 	Allows running multiple virtual servers in the case where for example several GUIs need to run simultaneously
+    - When reconnecting, no longer show tests with no results
+	Simply show less tests
     - Find Failure Information now integrates with version control plugins
 	when moving or removing knownbug files
+    - New config entry "default_performance_stem"
+	Allows usage of selecting tests based on some other performance measure than "performance"
+	batch_junit_performance is now an alias, but can no longer be configured per batch stem.
+    - Knownbugs functionality now allows mulitline triggers and disabling regular expression matching.
+	Hence a wider range of possible triggers
+    - Knownbugs now add a brief description of why they were triggered to the report
 Batch Report Enhancements:
+    - Integration with Jenkins added
+	If the job is triggered by changes in Jenkins, now link the authors and the changes from the test page.
     - Removing previous results is now done in the background
 	Avoids it slowing down the start of batch mode runs
     - A small textual report summarising the results is now produced in the log
 	Similar to surefire plugin for Maven's description
     - Archived results are now named after the date of the results archived to, not the date when the archiving was done
-Grid Engine (LSF/SGE) enhancements/bug fixes:
+    - Added possibility to generate web pages from archived data
+	New option -collarchive. See website.
+Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
+    - Basic support for Condor added
+	Set queue_system_module:condor. Thanks to Tomas Lidén for this.
 Bug Fixes:
     - Find Failure Information picks the right file when the same bug has several triggers defined
     - Find Failure Information doesn't add spurious version IDs to new knownbug files

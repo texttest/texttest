@@ -1,4 +1,23 @@
 
+=========================================================
+COMPULSORY MIGRATION
+=========================================================
+
+(1) "batch_junit_performance" replaced by "default_performance_stem"
+====================================================================
+The ability to identify the "main performance measure being used" has been generalised so it can apply to more situations.
+
+The basic difference is that it will no longer work to configure it differently per batch session. If you have set "batch_junit_performance", you will need to replace it as follows
+
+from
+
+[batch_junit_performance]
+my_session:my_performance
+
+to
+
+default_performance_stem:my_performance
+
 
 =========================================================
 CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)

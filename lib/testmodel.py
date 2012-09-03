@@ -1530,6 +1530,17 @@ class Application:
         allFiles = self.getAllFileNames(dircaches, stem)
         if len(allFiles):
             return allFiles[-1]
+        
+    def getFileNamesFromFileStructure(self, *args, **kw):
+        # Ignore what tests we have loaded, just look in the file structure
+        dircaches = []
+        for root, dirs, _ in os.walk(self.getDirectory()):
+            for dir in dirs:
+                if dir.startswith("."):
+                    dirs.remove(dir)
+                else:
+                    dircaches.append(DirectoryCache(os.path.join(root, dir)))
+        return self.getAllFileNames(dircaches, *args, **kw)
 
     def getAllFileNames(self, dircaches, stem, allVersions=False):
         versionPred = self.getExtensionPredicate(allVersions)

@@ -434,6 +434,7 @@ class FindKnownBugs(guiplugins.ActionDialogGUI):
             return False
         
         bugMap = BugMap()
+        self.rootSuites = self.findSelectedRootSuites()
         self.allKnownBugFiles = self.findAllKnownBugsFiles()
         for bugFile in self.allKnownBugFiles:
             bugMap.readFromFile(bugFile)
@@ -447,14 +448,12 @@ class FindKnownBugs(guiplugins.ActionDialogGUI):
     
     def findAllKnownBugsFiles(self):
         files = []
-        self.rootSuites = self.findSelectedRootSuites()
-        for rootSuite in self.rootSuites:
-            for test in rootSuite.testCaseList():
-                for file in test.getAllPathNames("knownbugs"):
-                    if file not in files:
-                        files.append(file)
+        for app in self.currAppSelection:
+            for fileName in app.getFileNamesFromFileStructure("knownbugs"):
+                if fileName not in files:
+                    files.append(fileName)
         return files
-        
+    
     def findSelectedRootSuites(self):
         roots = []
         for test in self.currTestSelection:
@@ -462,7 +461,7 @@ class FindKnownBugs(guiplugins.ActionDialogGUI):
             if root not in roots:
                 roots.append(root)
         return roots
-    
+
     def findBugFileTest(self, filePath):
         testDir = os.path.dirname(filePath)
         for suite in self.rootSuites:

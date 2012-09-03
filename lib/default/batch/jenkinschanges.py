@@ -19,13 +19,19 @@ def getCauses(jobRoot, jobName, buildName):
     xmlFile = os.path.join(dirName, "build.xml")
     if not os.path.isfile(xmlFile):
         return []
-    causes = _getCauses(xmlFile)
-    badBuildFile = os.path.join(dirName, "badbuilds.txt")
-    if os.path.isfile(badBuildFile):
-        with open(badBuildFile) as f:
-            for line in f:
-                currJobName, currBuildName = line.strip().split()
-                causes += getCauses(jobRoot, currJobName, currBuildName)
+    causes = []
+    for project, build in _getCauses(xmlFile):
+        causes.append((project, build))
+        # IF one of our causes follows on from a failed build, check out what caused all the failed builds also, it
+        # will have propagated up to us just now.
+        continueSearching = True
+        while continueSearching:
+            prevBuild = str(int(build) - 1)
+            prevBuildFile = os.path.join(jobRoot, project, "builds", prevBuild, "build.xml")
+            continueSearching = os.path.isfile(prevBuildFile) and "<result>FAILURE" in open(prevBuildFile).read()
+            if continueSearching:
+                causes += getCauses(jobRoot, project, prevBuild)
+                build = prevBuild
     return causes
     
 def parseAuthor(author):

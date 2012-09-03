@@ -2,10 +2,7 @@
 import os, sys
 from xml.dom.minidom import parse
 
-def getCauses(jobRoot, jobName, buildName):
-    xmlFile = os.path.join(jobRoot, jobName, "builds", buildName, "build.xml")
-    if not os.path.isfile(xmlFile):
-        return []
+def _getCauses(xmlFile):
     document = parse(xmlFile)
     causes = []
     for obj in document.getElementsByTagName("upstreamProject"):
@@ -14,6 +11,21 @@ def getCauses(jobRoot, jobName, buildName):
             obj = obj.nextSibling
         build = obj.childNodes[0].nodeValue
         causes.append((project, build))
+    return causes
+
+
+def getCauses(jobRoot, jobName, buildName):
+    dirName = os.path.join(jobRoot, jobName, "builds", buildName)
+    xmlFile = os.path.join(dirName, "build.xml")
+    if not os.path.isfile(xmlFile):
+        return []
+    causes = _getCauses(xmlFile)
+    badBuildFile = os.path.join(dirName, "badbuilds.txt")
+    if os.path.isfile(badBuildFile):
+        with open(badBuildFile) as f:
+            for line in f:
+                currJobName, currBuildName = line.strip().split()
+                causes += getCauses(jobRoot, currJobName, currBuildName)
     return causes
     
 def parseAuthor(author):

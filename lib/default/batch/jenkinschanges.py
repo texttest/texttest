@@ -63,7 +63,6 @@ def _getChanges(buildName, workspace, jenkinsUrl, bugSystemData={}):
     jobRoot = os.path.join(os.path.dirname(rootDir), "jobs")
     changes = []
     for project, build in getCauses(jobRoot, jobName, buildName):
-        print project, build
         xmlFile = os.path.join(jobRoot, project, "builds", build, "changelog.xml")
         if os.path.isfile(xmlFile):
             document = parse(xmlFile)

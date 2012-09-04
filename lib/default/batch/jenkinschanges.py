@@ -32,6 +32,12 @@ def getCauses(jobRoot, jobName, buildName):
             if continueSearching:
                 causes += getCauses(jobRoot, project, prevBuild)
                 build = prevBuild
+    extraFile = os.path.join(dirName, "extracauses.txt")
+    if os.path.isfile(extraFile):
+        with open(extraFile) as f:
+            for line in f:
+                project, build = line.strip().split()
+                causes.append((project, build))
     return causes
     
 def parseAuthor(author):

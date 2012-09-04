@@ -461,12 +461,15 @@ class TestTable:
                 allBuildNumbers = map(str, range(prevBuildNum + 1, int(buildNumber) + 1))
             else:
                 allBuildNumbers = [ buildNumber ]
+            bugSystemData = self.getConfigValue("bug_system_location", allSubKeys=True)
             for buildNum in allBuildNumbers:
-                allChanges += jenkinschanges.getChanges(buildNum)
-            for i, (author, target) in enumerate(allChanges):
+                allChanges += jenkinschanges.getChanges(buildNum, bugSystemData)
+            for i, (author, target, bugText, bugTarget) in enumerate(allChanges):
                 if i:
                     cont.append(HTMLgen.BR())
                 cont.append(HTMLgen.Href(target, author))
+                if bugText:
+                    cont.append(HTMLgen.Href(bugTarget, bugText))
                 hasData = True
             row.append(HTMLgen.TD(cont, bgcolor = bgColour))
             if buildNumber.isdigit():

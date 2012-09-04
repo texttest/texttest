@@ -24,7 +24,7 @@
  'votes': '0'}
 """
 
-import xmlrpclib
+import xmlrpclib, re
 from ordereddict import OrderedDict
 
 def convertToString(value):
@@ -76,6 +76,9 @@ def filterReply(bugInfo, statuses, resolutions):
         transfer(bugInfo, newBugInfo, key)
     return newBugInfo
     
+def makeURL(location, bugText):
+    return location + "/browse/" + bugText
+    
 def parseReply(bugInfo, statuses, resolutions, location):
     try:
         newBugInfo = filterReply(bugInfo, statuses, resolutions)
@@ -85,7 +88,7 @@ def parseReply(bugInfo, statuses, resolutions, location):
             message += fieldName.capitalize() + ": " + str(value) + "\n"
         message += ruler + "\n"
         bugId = newBugInfo['key']
-        message += "View bug " + bugId + " using Jira URL=" + location + "/browse/" + str(bugId) + "\n\n"
+        message += "View bug " + bugId + " using Jira URL=" + makeURL(location, str(bugId)) + "\n\n"
         message += convertToString(bugInfo["description"])
         isResolved = newBugInfo.has_key("resolution")
         statusText = newBugInfo["resolution"].strip() if isResolved else newBugInfo['status']
@@ -115,4 +118,12 @@ def findBugInfo(bugId, location, username, password):
         return parseReply(bugInfo, statuses, resolutions, location)
     except xmlrpclib.Fault, e:
         return "NONEXISTENT", e.faultString, False
+    
+# Used by Jenkins plugin
+def getBugFromText(text, location):
+    bugRegex = re.compile("[A-Z]{2,}-[0-9]+")
+    match = bugRegex.search(text)
+    if match is not None:
+        bugText = match.group(0)
+        return bugText, makeURL(location, bugText)
     

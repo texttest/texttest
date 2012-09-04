@@ -629,8 +629,11 @@ class WebPageResponder(plugins.Responder):
                                  version, extraVersions, self.descriptionInfo.get(app, {}))
 
     def getConfigValueMethod(self, app):
-        def getConfigValue(key, subKey=app.getBatchSession()):
-            return app.getCompositeConfigValue(key, subKey)
+        def getConfigValue(key, subKey=app.getBatchSession(), allSubKeys=False):
+            if allSubKeys:
+                return app.getConfigValue(key)
+            else:
+                return app.getCompositeConfigValue(key, subKey)
         return getConfigValue
 
     def makeCommandLine(self, apps):

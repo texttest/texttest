@@ -2314,7 +2314,7 @@ Batch Report Enhancements:
 	New option -collarchive. See website.
 Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
     - Basic support for Condor added
-	Set queue_system_module:condor. Thanks to Tomas Lidén for this.
+	Set queue_system_module:condor. Thanks to Tomas Liden for this.
 Bug Fixes:
     - Find Failure Information picks the right file when the same bug has several triggers defined
     - Find Failure Information doesn't add spurious version IDs to new knownbug files

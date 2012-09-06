@@ -52,7 +52,6 @@
   </popup>
 
   <popup name="TestFilePopupMenu">
-    <menuitem action="View File"/>
     <placeholder name="ExtraTmpViewers" />
     <menuitem action="View Filtered File"/>
     <separator/>

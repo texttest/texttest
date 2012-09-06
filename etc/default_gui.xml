@@ -52,6 +52,7 @@
   </popup>
 
   <popup name="TestFilePopupMenu">
+    <menuitem action="View File"/>
   </popup>
 
 </ui>

@@ -1,0 +1,7 @@
+<ui>
+
+  <popup name="TestFilePopupMenu">
+    <menuitem action="Edit File"/>
+  </popup>
+
+</ui>

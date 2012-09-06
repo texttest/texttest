@@ -181,15 +181,18 @@ class ViewInEditor(FileViewAction):
     def viewFile(self, fileName, viewTool, exitHandler, exitHandlerArgs):
         cmdArgs, descriptor, env = self.getViewCommand(fileName, viewTool)
         description = descriptor + " " + os.path.basename(fileName)
-        refresh = str(exitHandler != self.editingComplete)
         self.startViewer(cmdArgs, description=description, env=env,
                          exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
         
     def getViewerEnvironment(self, cmdArgs):
         # An absolute path to the viewer may indicate a custom tool, send the test environment along too
         # Doing this is unlikely to cause harm in any case
-        if len(self.currTestSelection) > 0 and os.path.isabs(cmdArgs[0]):
-            return self.currTestSelection[0].getRunEnvironment()
+        if len(self.currTestSelection) > 0:
+            if cmdArgs[0] == "storytext_editor":
+                storytextHome = self.currTestSelection[0].getEnvironment("STORYTEXT_HOME")
+                return plugins.copyEnvironment({ "STORYTEXT_HOME" : storytextHome }, ignoreVars=[ "USECASE_RECORD_SCRIPT", "USECASE_REPLAY_SCRIPT" ]) 
+            elif os.path.isabs(cmdArgs[0]):
+                return self.currTestSelection[0].getRunEnvironment()
 
     def getViewCommand(self, fileName, viewProgram):
         # viewProgram might have arguments baked into it...
@@ -308,6 +311,18 @@ class ViewTestFileInEditor(ViewInEditor):
             self.notify("RefreshFilePreviews", test, fileName)
         self.editingComplete()
 
+class EditTestFileInEditor(ViewTestFileInEditor):
+    def _getTitle(self):
+        return "Edit File"
+    
+    def getViewToolName(self, *args):
+        return self.getConfigValue(self.getToolConfigEntry(), "default")
+    
+    def isDefaultViewer(self, *args):
+        return False
+    
+    def _getStockId(self):
+        pass # don't use same stock for both
 
 class ViewFilteredTestFileInEditor(ViewTestFileInEditor):
     def _getStockId(self):
@@ -519,7 +534,7 @@ class FollowFile(FileViewAction):
             return True 
 
 def getInteractiveActionClasses(dynamic):
-    classes = [ ViewTestFileInEditor ]
+    classes = [ ViewTestFileInEditor, EditTestFileInEditor ]
     if dynamic:
         classes += [ ViewFilteredTestFileInEditor, ViewContentFilteredTestFileInEditor,
                      ViewOrigFileInEditor, ViewContentFilteredOrigFileInEditor, ViewFilteredOrigFileInEditor,

@@ -1264,6 +1264,7 @@ class Config:
                 return "wordpad"
             else:
                 return "notepad"
+            
     def defaultFollowProgram(self):
         if os.name == "posix":
             return "xterm -bg white -T $TEXTTEST_FOLLOW_FILE_TITLE -e tail -f"
@@ -1439,6 +1440,10 @@ class Config:
             app.addConfigEntry("builtin", "options" + postfix, "definition_file_stems")
             app.addConfigEntry("regenerate", "usecase" + postfix, "definition_file_stems")
             app.addConfigEntry("builtin", self.getStdinName(namingScheme) + postfix, "definition_file_stems")
+        if app.getConfigValue("use_case_record_mode") == "GUI" and \
+            app.getConfigValue("use_case_recorder") in [ "", "storytext" ] and \
+            not any(("usecase" in k for k in app.getConfigValue("view_program"))):
+            app.addConfigEntry("*usecase*", "storytext_editor", "view_program")
         return False
 
 

@@ -1020,3 +1020,6 @@ toggled.true = choose to apply to parent suite
 [Label=Enable regular expressions]
 toggled.false = disable regular expressions
 
+[Name=Edit File]
+activate = edit selected file
+

@@ -132,7 +132,7 @@ class MenuBarGUI(guiutils.SubGUI):
                 if val.has_key(""):
                     return val[""]
                 elif val.has_key("default"):
-                    return val["default"]
+                    return False # Not set if we only have a default key...
             else:
                 return True
         else:

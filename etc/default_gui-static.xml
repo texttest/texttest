@@ -77,7 +77,6 @@
   </popup>
 
   <popup name="TestFilePopupMenu">
-    <menuitem action="View File"/>
     <menuitem action="Test Filtering"/>
     <menuitem action="File Properties"/>
     <menuitem action="Copy Path To Clipboard"/>

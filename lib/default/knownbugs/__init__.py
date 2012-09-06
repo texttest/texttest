@@ -322,6 +322,7 @@ class CheckForCrashes(plugins.Action):
 class CheckForBugs(plugins.Action):
     def __init__(self):
         self.diag = logging.getLogger("Check For Bugs")
+        
     def callDuringAbandon(self, test):
         # want to be able to mark UNRUNNABLE tests as known bugs too...
         return test.state.lifecycleChange != "complete"
@@ -333,7 +334,7 @@ class CheckForBugs(plugins.Action):
         newState, rerunCount = self.checkTest(test, test.state)
         if newState:
             test.changeState(newState)
-            if rerunCount and not os.path.exists(test.makeBackupFileName(rerunCount)):
+            if rerunCount and not test.app.isReconnecting() and not os.path.exists(test.makeBackupFileName(rerunCount)):
                 self.describe(test, " - found an issue that triggered a rerun")
                 test.saveState()
                 # Current thread, must be done immediately or we might exit...

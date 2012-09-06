@@ -864,7 +864,7 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
     request_queue_size = socket.SOMAXCONN    
     def __init__(self, *args):
         plugins.Responder.__init__(self, *args)
-        ThreadingTCPServer.__init__(self, (socket.gethostname(), 0), self.handlerClass())
+        ThreadingTCPServer.__init__(self, (self.getIPAddress(), 0), self.handlerClass())
         self.testMap = {}
         self.testLocks = {}
         self.testClientInfo = {}
@@ -878,6 +878,9 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
         # We give up after 5 minutes
         if hasattr(socket, "TCP_KEEPIDLE"):
             self.socket.setsockopt(socket.SOL_TCP, socket.TCP_KEEPIDLE, 300)
+
+    def getIPAddress(self):
+        return socket.gethostbyname(socket.gethostname())
         
     def addSuites(self, *args):
         # use this as an opportunity to broadcast our address

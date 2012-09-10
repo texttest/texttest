@@ -2281,6 +2281,9 @@ Installation:
 General GUI Enhancements:
     - Can now set names also in the static GUI
 	via the -name argument or the "Set Run Name" entry in the view menu, as it used to be in the dynamic GUI
+    - New "Edit File" action in file drop-down menu when additional viewers are configured
+	If you for example set a browser for viewing HTML files this allows you to open them conveniently with the default text editor also
+    - Added StoryText's editor as default viewer for usecase files
 Static GUI Enhancements:
     - "test_data_ignore" is now also used when displaying the storytext_files tree in the config tab
 	Make it easier to ignore backup files, plugin sources etc.
@@ -2305,6 +2308,7 @@ Framework Enhancements:
 Batch Report Enhancements:
     - Integration with Jenkins added
 	If the job is triggered by changes in Jenkins, now link the authors and the changes from the test page.
+	Also parse any bug IDs from checkin messages
     - Removing previous results is now done in the background
 	Avoids it slowing down the start of batch mode runs
     - A small textual report summarising the results is now produced in the log
@@ -2315,13 +2319,17 @@ Batch Report Enhancements:
 Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
     - Basic support for Condor added
 	Set queue_system_module:condor. Thanks to Tomas Liden for this.
+    - Grid engine server now uses IP address instead of machine name
+	Should make it more resilient to DNS trouble etc, also easier to override the behaviour
 Bug Fixes:
     - Find Failure Information picks the right file when the same bug has several triggers defined
     - Find Failure Information doesn't add spurious version IDs to new knownbug files
     - Find Failure Information removes any files left empty by its actions
+    - Find Failure Information now looks in the whole suite instead of just the tests that are loaded
     - Junit report now escapes illegal XML characters in the message tag
     - Copying or moving a test to an extra version suite in the GUI no longer produces errors
     - Fixed bug when presence of file x and x.y in a test caused x to be compared, even if y was not the application name
     - Fixed reconnect failure when $TEXTTTEST_TMP was a subdirectory of $TEXTTEST_HOME
     - "Enter Failure Information" is no longer a modal dialog
     - Fixed run_dependent_text with {PREVLINES ...} filter where one of the lines would be taken by a different filter
+    - Fix bug where reconnecting with recomputation to a test with a knownbug + rerun would rerun it indefinitely

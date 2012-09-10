@@ -67,24 +67,26 @@ def _getChanges(buildName, workspace, jenkinsUrl, bugSystemData={}):
         if os.path.isfile(xmlFile):
             document = parse(xmlFile)
             authors = []
-            bugText, bugURL = "", "" 
+            bugs = []
             for changeset in document.getElementsByTagName("changeset"):
                 author = parseAuthor(changeset.getAttribute("author"))
                 if author not in authors:
                     authors.append(author)
                 for msgNode in changeset.getElementsByTagName("msg"):
                     msg = msgNode.childNodes[0].nodeValue
-                    if not bugText:
-                        bugText, bugURL = getBug(msg, bugSystemData)
+                    bugText, bugURL = getBug(msg, bugSystemData)
+                    if bugText:
+                        bugs.append((bugText, bugURL))
             if authors:
                 fullUrl = os.path.join(jenkinsUrl, "job", project, build, "changes")
-                changes.append((",".join(authors), fullUrl, bugText, bugURL))
+                changes.append((",".join(authors), fullUrl, bugs))
     return changes
 
 def getChanges(buildName, bugSystemData):
     return _getChanges(buildName, os.getenv("WORKSPACE"), os.getenv("JENKINS_URL"), bugSystemData)
     
 if __name__ == "__main__":
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     print _getChanges(sys.argv[1], "/nfs/vm/c14n/build/PWS-x86_64_linux-6.optimize/.jenkins/workspace/cms-product-car-test",  
-                     "http://gotburh03p.got.jeppesensystems.com:8080/")
+                     "http://gotburh03p.got.jeppesensystems.com:8080/", {"jira": "https://jira.jeppesensystems.com"})
     

@@ -464,11 +464,11 @@ class TestTable:
             bugSystemData = self.getConfigValue("bug_system_location", allSubKeys=True)
             for buildNum in allBuildNumbers:
                 allChanges += jenkinschanges.getChanges(buildNum, bugSystemData)
-            for i, (author, target, bugText, bugTarget) in enumerate(allChanges):
+            for i, (author, target, bugs) in enumerate(allChanges):
                 if i:
                     cont.append(HTMLgen.BR())
                 cont.append(HTMLgen.Href(target, author))
-                if bugText:
+                for bugText, bugTarget in bugs:
                     cont.append(HTMLgen.Href(bugTarget, bugText))
                 hasData = True
             row.append(HTMLgen.TD(cont, bgcolor = bgColour))

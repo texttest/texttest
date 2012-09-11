@@ -75,7 +75,7 @@ def _getChanges(buildName, workspace, jenkinsUrl, bugSystemData={}):
                 for msgNode in changeset.getElementsByTagName("msg"):
                     msg = msgNode.childNodes[0].nodeValue
                     bugText, bugURL = getBug(msg, bugSystemData)
-                    if bugText:
+                    if bugText and (bugText, bugURL) not in bugs:
                         bugs.append((bugText, bugURL))
             if authors:
                 fullUrl = os.path.join(jenkinsUrl, "job", project, build, "changes")

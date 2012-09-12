@@ -28,8 +28,9 @@ def getCauses(jobRoot, jobName, buildName):
         while continueSearching:
             prevBuild = str(int(build) - 1)
             prevBuildFile = os.path.join(jobRoot, project, "builds", prevBuild, "build.xml")
-            continueSearching = os.path.isfile(prevBuildFile) and "<result>FAILURE" in open(prevBuildFile).read()
+            continueSearching = os.path.isfile(prevBuildFile) and "<result>SUCCESS" not in open(prevBuildFile).read()
             if continueSearching:
+                causes.append((project, prevBuild))
                 causes += getCauses(jobRoot, project, prevBuild)
                 build = prevBuild
     extraFile = os.path.join(dirName, "extracauses.txt")

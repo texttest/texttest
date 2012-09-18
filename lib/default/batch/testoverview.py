@@ -5,6 +5,7 @@ import os, plugins, time, HTMLgen, HTMLcolors, sys, logging, jenkinschanges
 from cPickle import Unpickler, UnpicklingError
 from ordereddict import OrderedDict
 from glob import glob
+from pprint import pformat
 import re
 HTMLgen.PRINTECHO = 0
 
@@ -324,7 +325,7 @@ class GenerateWebPages(object):
         graphDirname, graphFileRef = self.getGraphFileParts(filePath, version)
         testTable = self.getTestTable(self.getConfigValue, cellInfo, self.descriptionInfo,
                                       selector.selectedTags, categoryHandlers, self.pageVersion, version, os.path.join(graphDirname, graphFileRef))
-        table = testTable.generate(loggedTests)
+        table = testTable.generate(loggedTests, self.pageDir)
         if table:
             cells = []
             if tableHeader:
@@ -411,12 +412,12 @@ class TestTable:
         else:
             return False
 
-    def generate(self, loggedTests):
+    def generate(self, loggedTests, pageDir):
         table = HTMLgen.TableLite(border=0, cellpadding=4, cellspacing=2,width="100%")
         table.append(self.generateTableHead())
         table.append(self.generateSummaries())
         if os.getenv("JENKINS_URL"):
-            changeRow = self.generateJenkinsChanges()
+            changeRow = self.generateJenkinsChanges(pageDir)
             if changeRow:
                 table.append(changeRow)
         hasRows = False
@@ -448,22 +449,31 @@ class TestTable:
             table.append(HTMLgen.BR())
             return table
         
-    def generateJenkinsChanges(self):
+    def findJenkinsChanges(self, prevBuildNumber, buildNumber, cacheDir):
+        cacheFile = os.path.join(cacheDir, buildNumber)
+        if os.path.isfile(cacheFile):
+            return eval(open(cacheFile).read().strip())
+        else:
+            bugSystemData = self.getConfigValue("bug_system_location", allSubKeys=True)
+            if buildNumber.isdigit() and prevBuildNumber is not None:
+                allChanges = jenkinschanges.getChanges(prevBuildNumber, buildNumber, bugSystemData)
+                plugins.ensureDirectoryExists(cacheDir)
+                with open(cacheFile, "w") as f:
+                    f.write(pformat(allChanges) + "\n")
+                return allChanges
+            else:
+                return []
+            
+    def generateJenkinsChanges(self, pageDir):
+        cacheDir = os.path.join(os.path.dirname(pageDir), "jenkins_changes")
         bgColour = self.colourFinder.find("changes_header_bg")
         row = [ HTMLgen.TD("Changes", bgcolor = bgColour) ]
         hasData = False
-        prevBuildNum = None
+        prevBuildNumber = None
         for tag in self.tags:
             buildNumber = tag.split(".")[-1]
+            allChanges = self.findJenkinsChanges(prevBuildNumber, buildNumber, cacheDir)
             cont = HTMLgen.Container()
-            allChanges = []
-            if prevBuildNum is not None and buildNumber.isdigit():
-                allBuildNumbers = map(str, range(prevBuildNum + 1, int(buildNumber) + 1))
-            else:
-                allBuildNumbers = [ buildNumber ]
-            bugSystemData = self.getConfigValue("bug_system_location", allSubKeys=True)
-            for buildNum in allBuildNumbers:
-                allChanges += jenkinschanges.getChanges(buildNum, bugSystemData)
             for i, (author, target, bugs) in enumerate(allChanges):
                 if i:
                     cont.append(HTMLgen.BR())
@@ -472,8 +482,7 @@ class TestTable:
                     cont.append(HTMLgen.Href(bugTarget, bugText))
                 hasData = True
             row.append(HTMLgen.TD(cont, bgcolor = bgColour))
-            if buildNumber.isdigit():
-                prevBuildNum = int(buildNumber)
+            prevBuildNumber = buildNumber
         if hasData:
             return HTMLgen.TR(*row)
             

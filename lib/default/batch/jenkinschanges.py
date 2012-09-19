@@ -2,6 +2,7 @@
 import os, sys
 from xml.dom.minidom import parse
 from ordereddict import OrderedDict
+from difflib import SequenceMatcher
 
 def fingerprintStrings(document):
     for obj in document.getElementsByTagName("hudson.tasks.Fingerprinter_-FingerprintAction"):
@@ -45,13 +46,24 @@ def getBug(msg, bugSystemData):
     return "", ""
     
 def getProject(artefact, allProjects):
+    # Find the project with the longest name whose name is a substring of the artefact name
     currProject = None
     for project in allProjects:
         if project in artefact and (currProject is None or len(project) > len(currProject)):
             currProject = project
     
-    return currProject
+    if currProject:
+        return currProject
 
+    # Find the project with the longest common substring
+    currProjectScore = 0
+    for project in allProjects:
+        matcher = SequenceMatcher(None, project, artefact)
+        projectScore = max((block.size for block in matcher.get_matching_blocks()))
+        if projectScore > currProjectScore:
+            currProject = project
+            currProjectScore = projectScore
+    return currProject
 
 def getHash(document, artefact):
     found = False
@@ -83,6 +95,8 @@ def organiseByProject(jobRoot, differences):
         project = getProject(artefact, allProjects)
         if project:
             projectData.setdefault(project, []).append((artefact, oldHash, hash))
+        else:
+            print "ERROR: Could not find project for artefact", artefact
     
     return projectData
 

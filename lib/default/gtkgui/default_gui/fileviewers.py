@@ -252,6 +252,7 @@ class ViewConfigFileInEditor(ViewInEditor):
                 return suite
 
     def refreshFilesRecursively(self, suite):
+        suite.reloadTestConfigurations()
         suite.filesChanged()
         if suite.classId() == "test-suite":
             for subTest in suite.testcases:

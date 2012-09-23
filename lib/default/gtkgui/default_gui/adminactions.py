@@ -592,6 +592,10 @@ class ImportApplication(guiplugins.ActionDialogGUI):
                 return candidate
         return os.path.normpath(os.path.join(self.rootDirectories[0], subdir))
         
+    def getSizeAsWindowFraction(self):
+        # size of the dialog
+        return 0.7, 0.9
+    
 
 class ImportFiles(guiplugins.ActionDialogGUI):
     def __init__(self, allApps, dynamic, inputOptions):

@@ -2333,3 +2333,5 @@ Bug Fixes:
     - "Enter Failure Information" is no longer a modal dialog
     - Fixed run_dependent_text with {PREVLINES ...} filter where one of the lines would be taken by a different filter
     - Fix bug where reconnecting with recomputation to a test with a knownbug + rerun would rerun it indefinitely
+    - Application creation dialog size in some environments fixed
+    - Fixed problem where editing the main config file did not refresh properly if there were test-specific config files.

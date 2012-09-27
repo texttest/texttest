@@ -483,7 +483,7 @@ class TextTest(plugins.Responder, plugins.Observable):
     def getSignals(self):
         if hasattr(signal, "SIGUSR1"):
             # Signals used on UNIX to signify running out of CPU time, wallclock time etc.
-            return [ signal.SIGINT, signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU ]
+            return [ signal.SIGINT, signal.SIGTERM, signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU ]
         else:
             # Windows, which doesn't do signals
             return []

@@ -148,6 +148,8 @@ class RunTest(plugins.Action):
             return "CPULIMIT", "exceeded maximum cpu time allowed"
         elif self.killSignal == signal.SIGINT:
             return "INTERRUPT", "terminated via a keyboard interrupt (Ctrl-C)"
+        elif self.killSignal == signal.SIGTERM:
+            return "TERMINATED", "terminated via SIGTERM signal"
         else:
             return self.getKillInfoOtherSignal(test)
 

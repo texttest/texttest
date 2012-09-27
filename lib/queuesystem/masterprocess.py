@@ -523,7 +523,7 @@ class QueueSystemServer(BaseActionRunner):
     def killTests(self):
         # If we've been killed with some sort of limit signal, wait here until we know
         # all tests terminate. Otherwise we rely on them terminating naturally, and if they don't
-        wantStatus = self.killSignal and self.killSignal != signal.SIGINT
+        wantStatus = self.killSignal and self.killSignal not in [ signal.SIGINT, signal.SIGTERM ]
         killedTests = []
         for test, jobList in self.jobs.items():
             if not test.state.isComplete():

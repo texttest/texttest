@@ -173,7 +173,10 @@ def getChanges(build1, build2, bugSystemData):
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     buildName = sys.argv[1]
-    prevBuildName = str(int(buildName) - 1)
+    if len(sys.argv) > 2:
+        prevBuildName = sys.argv[2]
+    else:
+        prevBuildName = str(int(buildName) - 1)
     from pprint import pprint
     pprint(_getChanges(prevBuildName, buildName, "/nfs/vm/c14n/build/PWS-x86_64_linux-6.optimize/.jenkins/workspace/cms-product-car-test",  
                      "http://gotburh03p.got.jeppesensystems.com:8080/", {"jira": "https://jira.jeppesensystems.com"}))

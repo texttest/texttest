@@ -1306,16 +1306,18 @@ class Application:
 
         # Read our pre-existing config files
         self.readConfigFiles(configModuleInitialised=False)
+
         self.diag.info("Basic Config file settings are: " + "\n" + repr(self.configDir))
         self.diag.info("Found application '" + self.name + "'")
         self.configObject = self.makeConfigObject()
         # Fill in the values we expect from the configurations, and read the file a second time
         self.configObject.setApplicationDefaults(self)
+        if len(configEntries) > 0:
+            self.writeConfigEntries(configEntries)
+            self.dircache.refresh()
+
         self.setDependentConfigDefaults()
         self.readConfigFiles(configModuleInitialised=True)
-        if len(configEntries):
-            # We've been given some entries, read them in and write them out to file
-            self.importAndWriteEntries(configEntries)
 
         self.configDir.readValues(self.getPersonalConfigFiles(), insert=False, errorOnUnknown=False)
         self.setInterpreters()
@@ -1332,8 +1334,8 @@ class Application:
         self.extraDirCaches = tmpApp.extraDirCaches
         self.defaultDirCaches = tmpApp.defaultDirCaches
         self.configDocs = tmpApp.configDocs
-        
-    def importAndWriteEntries(self, configEntries):
+
+    def writeConfigEntries(self, configEntries):
         configFileName = self.dircache.pathName("config." + self.name)
         configFile = open(configFileName, "w")
         for key, value in configEntries.items():
@@ -1341,20 +1343,16 @@ class Application:
                 configFile.write("## " + value.replace("\n", "\n## ") + "\n\n")
             else:
                 configFile.write("# " + self.configDocs.get(key) + "\n")
-                if isinstance(value, tuple):
-                    subKey, subValue = value
-                    self.importAndWriteSection(key, subKey, subValue, configFile)
+                if isinstance(value, list):
+                    self.writeSection(key, value, configFile)
                 else:
-                    self.importAndWriteEntry(key, value, configFile)
-
-    def importAndWriteEntry(self, key, value, configFile):
-        self.configDir.addEntry(key, value, insert=False, errorOnUnknown=True)
-        configFile.write(key + ":" + value + "\n\n")
-
-    def importAndWriteSection(self, sectionName, key, value, configFile):
-        self.configDir.addEntry(key, value, sectionName, insert=False, errorOnUnknown=True)
+                    configFile.write(key + ":" + value + "\n\n")
+                    
+    def writeSection(self, sectionName, entries, configFile):
         configFile.write("[" + sectionName + "]\n")
-        configFile.write(key + ":" + value + "\n[end]\n")
+        for key, value in entries:
+            configFile.write(key + ":" + value + "\n")
+        configFile.write("[end]\n")
         
     def makeExtraDirCache(self, envDir):
         if envDir == "":

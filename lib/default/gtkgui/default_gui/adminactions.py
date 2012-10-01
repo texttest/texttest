@@ -7,6 +7,7 @@ import gtk, plugins, os, shutil, subprocess
 from .. import guiplugins, guiutils
 from ordereddict import OrderedDict
 from tempfile import mkdtemp
+from fnmatch import fnmatch
 
 # Cut, copy and paste
 class FocusDependentAction(guiplugins.ActionGUI):
@@ -434,6 +435,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
                                    "wxPython GUI with StoryText",
                                    "SWT GUI with StoryText",
                                    "Eclipse RCP GUI with StoryText",
+                                   "Eclipse GEF GUI with StoryText",
                                    "Java Swing GUI with StoryText",
                                    "Other embedded Use-case Recorder (e.g. NUseCase)",
                                    "Other GUI-test tool (enable virtual display only)" ],
@@ -540,7 +542,6 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         if javaClass:
             executable = javaClass
         configEntries = OrderedDict({ "executable" : executable })
-        environmentEntries = OrderedDict()
         configEntries["filename_convention_scheme"] = "standard"
         if javaClass:
             configEntries["interpreter"] = "java"
@@ -550,65 +551,112 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         useGui = self.optionGroup.getSwitchValue("gui")
         if useGui > 0:
             configEntries["use_case_record_mode"] = "GUI"
-            if useGui != 8:
+            if useGui != 9:
                 configEntries["slow_motion_replay_speed"] = "3.0"
-        if useGui in range(1, 7):
-            interpreter = "storytext"
-            if useGui == 2:
-                interpreter += " -i tkinter"
-            elif useGui == 3:
-                interpreter += " -i wx"
-            elif useGui == 4:
-                interpreter += " -i javaswt"
-            elif useGui == 5:
-                interpreter += " -i javarcp"
-            elif useGui == 6:
-                interpreter += " -i javaswing"
+        if useGui in range(1, 8):
             configEntries["use_case_recorder"] = "storytext"
-            configEntries["interpreter"] = interpreter
-            if useGui == 1: # PyGTK
-                comment = "XDG_CONFIG_HOME points to user's ~/.config directory.\n" + \
-                          "Behaviour of e.g. FileChoosers can vary wildly depending on settings there.\n" + \
-                          "The following settings makes sure it uses an empty test-dependent directory instead."
-                configEntries["section_comment"] = comment
-                configEntries["copy_test_path"] = "xdg_config_home"
-                configEntries["test_data_ignore"] = "xdg_config_home"
-                configEntries["test_data_environment"] = ("xdg_config_home", "XDG_CONFIG_HOME")
-            elif useGui == 2:
-                # StoryText doesn't handle tkMessageBox, deal with it via interception by default
-                comment = "Tkinter doesn't provide any means to simulate interaction with tkMessageBox.\n" + \
-                          "Therefore StoryText cannot handle it. So we capture interaction with it instead.\n" + \
-                          "Cannot have multiple threads interacting with tkinter so we disable the threading also."
-                configEntries["section_comment"] = comment
-                configEntries["import_config_file"] = "capturemock_config"
-                cpMockFileName = os.path.join(directory, "capturemockrc." + ext)
-                with open(cpMockFileName, "w") as f:
-                    f.write("[python]\n" +
-                            "intercepts = tkMessageBox\n\n" + 
-                            "[general]\n" +
-                            "server_multithreaded = False\n")
-            elif useGui == 3:
-                comment = "wxPython GUIs don't seem to work very well when the hide flag is set on Windows.\n" + \
-                          "So we disable it by default here: multiple desktops may be useful."
-                configEntries["section_comment"] = comment
-                configEntries["virtual_display_hide_windows"] = "false"
-            elif executable.endswith(".jar"):
-                # Java Guis of one sort or another
-                # We don't know how to load jar files directly, store the main class name and add the jar file to the environment.
-                mainClass = self.getMainClass(executable)
-                environmentEntries["CLASSPATH"] = executable
-                configEntries["executable"] = mainClass
-                
             storytextDir = os.path.join(directory, "storytext_files")
             plugins.ensureDirectoryExists(storytextDir) 
             # Create an empty UI map file so it shows up in the Config tab...
             open(os.path.join(storytextDir, "ui_map.conf"), "w")
-        elif useGui == 8:
+            
+            toolkits = [ "gtk", "tkinter", "wx", "javaswt", "javarcp", "javagef", "javaswing" ]
+            toolkit = toolkits[useGui - 1]
+            if "java" in toolkit:
+                self.setJavaGuiTestingEntries(toolkit, directory, ext, configEntries)
+            else:
+                self.setPythonGuiTestingEntries(toolkit, directory, ext, configEntries)                
+        elif useGui == 9:
             configEntries["use_case_recorder"] = "none"            
 
-        self.notify("NewApplication", ext, directory, configEntries, environmentEntries)
+        self.notify("NewApplication", ext, directory, configEntries)
         self.notify("Status", "Created new application with extension '" + ext + "'.")
 
+    def setPythonGuiTestingEntries(self, toolkit, directory, ext, configEntries):
+        configEntries["interpreter"] = "storytext -i " + toolkit
+        if toolkit == "gtk": 
+            comment = "XDG_CONFIG_HOME points to user's ~/.config directory.\n" + \
+                      "Behaviour of e.g. FileChoosers can vary wildly depending on settings there.\n" + \
+                      "The following settings makes sure it uses an empty test-dependent directory instead."
+            configEntries["section_comment"] = comment
+            configEntries["copy_test_path"] = "xdg_config_home"
+            configEntries["test_data_ignore"] = "xdg_config_home"
+            configEntries["test_data_environment"] = [("xdg_config_home", "XDG_CONFIG_HOME")]
+        elif toolkit == "tkinter":
+            # StoryText doesn't handle tkMessageBox, deal with it via interception by default
+            comment = "Tkinter doesn't provide any means to simulate interaction with tkMessageBox.\n" + \
+                      "Therefore StoryText cannot handle it. So we capture interaction with it instead.\n" + \
+                      "Cannot have multiple threads interacting with tkinter so we disable the threading also."
+            configEntries["section_comment"] = comment
+            configEntries["import_config_file"] = "capturemock_config"
+            cpMockFileName = os.path.join(directory, "capturemockrc." + ext)
+            with open(cpMockFileName, "w") as f:
+                f.write("[python]\n" +
+                        "intercepts = tkMessageBox\n\n" + 
+                        "[general]\n" +
+                        "server_multithreaded = False\n")
+        elif toolkit == "wx":
+            comment = "wxPython GUIs don't seem to work very well when the hide flag is set on Windows.\n" + \
+                      "So we disable it by default here: multiple desktops may be useful."
+            configEntries["section_comment"] = comment
+            configEntries["virtual_display_hide_windows"] = "false"
+        
+    def findStoryTextInPath(self):
+        suffix = ".bat" if os.name == "nt" else ""
+        for pathElem in os.getenv("PATH").split(os.pathsep):
+            storytextPath = os.path.join(pathElem, "storytext")
+            jythonPath = os.path.join(pathElem, "jython" + suffix)
+            if os.path.isfile(storytextPath) and os.path.isfile(jythonPath):
+                return storytextPath, jythonPath
+        return None, None
+    
+    def findSwingLibraryPath(self, storytextPath):
+        rootDir = os.path.dirname(os.path.dirname(storytextPath))
+        pattern = "swinglibrary-*.jar"
+        for root, _, files in os.walk(rootDir):
+            for file in files:
+                if fnmatch(file, pattern):
+                    return os.path.join(rootDir, root, "*")
+                    
+    def setJavaGuiTestingEntries(self, toolkit, directory, ext, configEntries):
+        storytextPath, jythonPath = self.findStoryTextInPath()
+        if not storytextPath:
+            raise plugins.TextTestError, "Could not set up Java-GUI testing with StoryText, could not find StoryText/Jython installation on PATH"
+        interpreters = [("jython", jythonPath), ("storytext", storytextPath)]
+        configEntries["interpreters"] = interpreters
+        executable = configEntries["executable"]
+        classpath = []
+        if executable.endswith(".jar"):
+            # Java Guis of one sort or another
+            # We don't know how to load jar files directly, store the main class name and add the jar file to the environment.
+            mainClass = self.getMainClass(executable)
+            if not mainClass:
+                raise plugins.TextTestError, "Jar file provided has no main class specified, cannot use it as an executable"
+            classpath.append(executable)
+            configEntries["executable"] = mainClass
+        if "swing" in toolkit:
+            swingLibraryPath = self.findSwingLibraryPath(storytextPath)
+            if swingLibraryPath:
+                classpath.append(swingLibraryPath)
+
+        if classpath:
+            fileName = os.path.join(directory, "environment." + ext)
+            with open(fileName, "a") as f:
+                f.write("CLASSPATH:" + os.pathsep.join(classpath) + "\n")
+                
+        storytextOptionsFile = os.path.join(directory, "storytext_options." + ext)
+        with open(storytextOptionsFile, "w") as f:
+            f.write("# StoryText options. Run storytext --help for more information on what can be added here\n")
+            f.write("-i " + toolkit + "\n")
+        with open(storytextOptionsFile + ".debug", "w") as f:
+            f.write("-l debug\n")
+        jythonOptionsFile = os.path.join(directory, "jython_options." + ext)
+        with open(jythonOptionsFile, "w") as f:
+            f.write("# Add Java properties as required, for example:\n")
+            f.write("#-Djava.util.prefs.userRoot=preferences\n")
+            f.write("# Can also supply JVM arguments by prefixing them with -J, for example:\n")
+            f.write("#-J-XX:MaxPermSize=128M")
+                
     def findFullDirectoryPath(self, subdir):
         for rootDir in self.rootDirectories:
             candidate = os.path.normpath(os.path.join(rootDir, subdir))

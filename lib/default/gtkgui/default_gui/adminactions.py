@@ -3,9 +3,10 @@
 All the actions for administering the files and directories in a test suite
 """
 
-import gtk, plugins, os, shutil
+import gtk, plugins, os, shutil, subprocess
 from .. import guiplugins, guiutils
 from ordereddict import OrderedDict
+from tempfile import mkdtemp
 
 # Cut, copy and paste
 class FocusDependentAction(guiplugins.ActionGUI):
@@ -512,6 +513,22 @@ class ImportApplication(guiplugins.ActionDialogGUI):
     def getSignalsSent(self):
         return [ "NewApplication" ]
 
+    def getMainClassFromManifest(self, manifestFile):
+        with open(manifestFile) as f:
+            for line in f:
+                parts = [ part.strip() for part in line.split(":") ]
+                if len(parts) == 2 and parts[0] == "Main-Class":
+                    return parts[1]
+
+    def getMainClass(self, jarFile):
+        tmpDir = mkdtemp()
+        manifestPath = "META-INF/MANIFEST.MF"
+        subprocess.call(["jar", "fx", jarFile, manifestPath], cwd=tmpDir)
+        manifestFile = os.path.join(tmpDir, manifestPath)
+        mainClass = self.getMainClassFromManifest(manifestFile)
+        shutil.rmtree(tmpDir)
+        return mainClass
+
     def performOnCurrent(self):
         executable = self.optionGroup.getOptionValue("exec")
         ext = self.optionGroup.getOptionValue("ext")
@@ -523,6 +540,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         if javaClass:
             executable = javaClass
         configEntries = OrderedDict({ "executable" : executable })
+        environmentEntries = OrderedDict()
         configEntries["filename_convention_scheme"] = "standard"
         if javaClass:
             configEntries["interpreter"] = "java"
@@ -574,7 +592,13 @@ class ImportApplication(guiplugins.ActionDialogGUI):
                           "So we disable it by default here: multiple desktops may be useful."
                 configEntries["section_comment"] = comment
                 configEntries["virtual_display_hide_windows"] = "false"
-            
+            elif executable.endswith(".jar"):
+                # Java Guis of one sort or another
+                # We don't know how to load jar files directly, store the main class name and add the jar file to the environment.
+                mainClass = self.getMainClass(executable)
+                environmentEntries["CLASSPATH"] = executable
+                configEntries["executable"] = mainClass
+                
             storytextDir = os.path.join(directory, "storytext_files")
             plugins.ensureDirectoryExists(storytextDir) 
             # Create an empty UI map file so it shows up in the Config tab...
@@ -582,7 +606,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         elif useGui == 8:
             configEntries["use_case_recorder"] = "none"            
 
-        self.notify("NewApplication", ext, directory, configEntries)
+        self.notify("NewApplication", ext, directory, configEntries, environmentEntries)
         self.notify("Status", "Created new application with extension '" + ext + "'.")
 
     def findFullDirectoryPath(self, subdir):

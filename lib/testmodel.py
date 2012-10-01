@@ -1590,7 +1590,7 @@ class Application:
         return "queuesystem" if cpu_count() > 1 else "default"
 
     def setConfigDefaults(self):
-        self.setConfigDefault("executable", "", "Full path to the System Under Test")
+        self.setConfigDefault("executable", "", "Full path to the System Under Test (or Java Main Class name)")
         self.setConfigAlias("binary", "executable")
         self.setConfigDefault("interpreters", OrderedDict(), "Programs to use, in order, as interpreters for the SUT")
         self.setConfigDefault("interpreter", "", "Single program to use as interpreter for the SUT")

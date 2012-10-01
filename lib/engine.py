@@ -431,10 +431,18 @@ class TextTest(plugins.Responder, plugins.Observable):
     def notifyExtraTest(self, testPath, appName, versions):
         rootSuite = self.getRootSuite(appName, versions)
         rootSuite.addTestCaseWithPath(testPath)
+        
+    def makeEnvironmentFile(self, appName, directory, environmentEntries):
+        fileName = os.path.join(directory, "environment." + appName)
+        with open(fileName, "a") as f:
+            for var, value in environmentEntries.items():
+                f.write(var + ":" + value + "\n")
 
-    def notifyNewApplication(self, appName, directory, configEntries):
+    def notifyNewApplication(self, appName, directory, configEntries, environmentEntries):
         dircache = testmodel.DirectoryCache(directory)
         newApp = testmodel.Application(appName, dircache, [], self.inputOptions, configEntries)
+        if environmentEntries:
+            self.makeEnvironmentFile(appName, directory, environmentEntries)
         dircache.refresh() # we created a config file...
         suite = self.createEmptySuite(newApp)
         suite.notify("Add", initial=False)

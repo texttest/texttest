@@ -626,7 +626,7 @@ class WebPageResponder(plugins.Responder):
             version = getVersionName(app, self.getAppsToGenerate())
             pageSubTitle = self.makeCommandLine([ app ])
             self.makeAndGenerate(relevantSubDirs, self.getConfigValueMethod(app), pageDir, pageTitle, pageSubTitle,
-                                 version, extraVersions, self.descriptionInfo.get(app, {}))
+                                 version, extraVersions, self.getDescriptionInfo([ app ]))
 
     def getConfigValueMethod(self, app):
         def getConfigValue(key, subKey=app.getBatchSession(), allSubKeys=False):
@@ -689,6 +689,14 @@ class WebPageResponder(plugins.Responder):
     def getAppsToGenerate(self):
         return [ suite.app for suite in self.suitesToGenerate ]
 
+    def getDescriptionInfo(self, apps):
+        descriptionInfo = {}
+        for app in apps:
+            for appToUse in [ app ] + app.extras:
+                descriptionInfo.update(self.descriptionInfo.get(appToUse))
+        
+        return descriptionInfo
+
     def transformToCommon(self, pageInfo):
         allApps = [ app for app, _, _ in pageInfo ]
         version = getVersionName(allApps[0], self.getAppsToGenerate())
@@ -698,9 +706,7 @@ class WebPageResponder(plugins.Responder):
             relevantSubDirs.update(self.findRelevantSubdirectories(repositories, app, extraVersions, self.getVersionTitle))
         getConfigValue = plugins.ResponseAggregator([ self.getConfigValueMethod(app) for app in allApps ])
         pageSubTitle = self.makeCommandLine(allApps)
-        descriptionInfo = {}
-        for app in allApps:
-            descriptionInfo.update(self.descriptionInfo.get(app))
+        descriptionInfo = self.getDescriptionInfo(allApps)
         return relevantSubDirs, getConfigValue, version, extraVersions, pageSubTitle, descriptionInfo
 
     def getVersionTitle(self, app, version):

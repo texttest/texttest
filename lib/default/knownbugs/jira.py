@@ -120,10 +120,11 @@ def findBugInfo(bugId, location, username, password):
         return "NONEXISTENT", e.faultString, False
     
 # Used by Jenkins plugin
-def getBugFromText(text, location):
+def getBugsFromText(text, location):
     bugRegex = re.compile("[A-Z]{2,}-[0-9]+")
-    match = bugRegex.search(text)
-    if match is not None:
+    bugs = []
+    for match in bugRegex.finditer(text):
         bugText = match.group(0)
-        return bugText, makeURL(location, bugText)
+        bugs.append((bugText, makeURL(location, bugText)))
+    return bugs
     

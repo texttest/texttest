@@ -3,6 +3,7 @@ import os, sys
 from xml.dom.minidom import parse
 from ordereddict import OrderedDict
 from difflib import SequenceMatcher
+import re
 
 def fingerprintStrings(document):
     for obj in document.getElementsByTagName("hudson.tasks.Fingerprinter_-FingerprintAction"):
@@ -18,9 +19,13 @@ def getFingerprint(jobRoot, jobName, buildName):
     
     document = parse(xmlFile)
     prevString = None
+    versionRegex = re.compile("[0-9]+\\.[0-9\\.]*")
     for currString in fingerprintStrings(document):
         if prevString:
             if jobName not in prevString:
+                match = versionRegex.search(prevString)
+                if match:
+                    prevString = prevString.replace(match.group(0), versionRegex.pattern)
                 fingerprint[prevString] = currString
             prevString = None
         else:
@@ -34,16 +39,20 @@ def parseAuthor(author):
     else:
         return withoutEmail.encode("ascii", "xmlcharrefreplace")
     
-def getBug(msg, bugSystemData):
+def addUnique(items, newItems):
+    for newItem in newItems:
+        if newItem not in items:
+            items.append(newItem)
+    
+def getBugs(msg, bugSystemData):
+    bugs = []
     for systemName, location in bugSystemData.items():
         try:
-            exec "from default.knownbugs." + systemName + " import getBugFromText"
-            ret = getBugFromText(msg, location) #@UndefinedVariable
-            if ret:
-                return ret
+            exec "from default.knownbugs." + systemName + " import getBugsFromText"
+            addUnique(bugs, getBugsFromText(msg, location)) #@UndefinedVariable
         except ImportError:
             pass
-    return "", ""
+    return bugs
     
 def getProject(artefact, allProjects):
     # Find the project with the longest name whose name is a substring of the artefact name
@@ -67,10 +76,11 @@ def getProject(artefact, allProjects):
 
 def getHash(document, artefact):
     found = False
+    regex = re.compile(artefact)
     for currString in fingerprintStrings(document):
         if found:
             return currString
-        elif currString == artefact:
+        elif regex.match(currString):
             found = True
 
 def getFingerprintDifferences(build1, build2, jobName, jobRoot):
@@ -146,9 +156,7 @@ def getChangeData(jobRoot, projectChanges, jenkinsUrl, bugSystemData):
                     authors.append(author)
                 for msgNode in changeset.getElementsByTagName("msg"):
                     msg = msgNode.childNodes[0].nodeValue
-                    bugText, bugURL = getBug(msg, bugSystemData)
-                    if bugText and (bugText, bugURL) not in bugs:
-                        bugs.append((bugText, bugURL))
+                    addUnique(bugs, getBugs(msg, bugSystemData))
             if authors:
                 fullUrl = os.path.join(jenkinsUrl, "job", project, build, "changes")
                 changes.append((",".join(authors), fullUrl, bugs))

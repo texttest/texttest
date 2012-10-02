@@ -6,7 +6,7 @@ All the actions for administering the files and directories in a test suite
 import gtk, plugins, os, shutil, subprocess
 from .. import guiplugins, guiutils
 from ordereddict import OrderedDict
-from tempfile import mkdtemp
+from zipfile import ZipFile
 from fnmatch import fnmatch
 
 # Cut, copy and paste
@@ -515,21 +515,12 @@ class ImportApplication(guiplugins.ActionDialogGUI):
     def getSignalsSent(self):
         return [ "NewApplication" ]
 
-    def getMainClassFromManifest(self, manifestFile):
-        with open(manifestFile) as f:
-            for line in f:
-                parts = [ part.strip() for part in line.split(":") ]
-                if len(parts) == 2 and parts[0] == "Main-Class":
-                    return parts[1]
-
     def getMainClass(self, jarFile):
-        tmpDir = mkdtemp()
-        manifestPath = "META-INF/MANIFEST.MF"
-        subprocess.call(["jar", "fx", jarFile, manifestPath], cwd=tmpDir)
-        manifestFile = os.path.join(tmpDir, manifestPath)
-        mainClass = self.getMainClassFromManifest(manifestFile)
-        shutil.rmtree(tmpDir)
-        return mainClass
+        f = ZipFile(jarFile).open("META-INF/MANIFEST.MF")
+        for line in f:
+            parts = [ part.strip() for part in line.split(":") ]
+            if len(parts) == 2 and parts[0] == "Main-Class":
+                return parts[1]
 
     def performOnCurrent(self):
         executable = self.optionGroup.getOptionValue("exec")
@@ -624,6 +615,8 @@ class ImportApplication(guiplugins.ActionDialogGUI):
             raise plugins.TextTestError, "Could not set up Java-GUI testing with StoryText, could not find StoryText/Jython installation on PATH"
         interpreters = [("jython", jythonPath), ("storytext", storytextPath)]
         configEntries["interpreters"] = interpreters
+        # Jython messages, probably don't want to compare them
+        configEntries["run_dependent_text"] = [("stderr*", "\\*sys-package-mgr\\*")]
         executable = configEntries["executable"]
         classpath = []
         if executable.endswith(".jar"):

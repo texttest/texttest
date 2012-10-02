@@ -1352,7 +1352,7 @@ class Application:
         configFile.write("[" + sectionName + "]\n")
         for key, value in entries:
             configFile.write(key + ":" + value + "\n")
-        configFile.write("[end]\n")
+        configFile.write("[end]\n\n")
         
     def makeExtraDirCache(self, envDir):
         if envDir == "":

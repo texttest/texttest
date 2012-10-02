@@ -98,17 +98,22 @@ def getFingerprintDifferences(build1, build2, jobName, jobRoot):
     return differences
 
 
-def organiseByProject(jobRoot, differences):
+def organiseByProject(jobRoot, differences, markedArtefacts):
     allProjects = sorted(os.listdir(jobRoot))
     projectData = OrderedDict()
+    changes = []
     for artefact, oldHash, hash in differences:
+        for name, regexp in markedArtefacts.items():
+            if re.match(regexp, artefact):
+                changes.append((name + " was updated", "", []))
+                
         project = getProject(artefact, allProjects)
         if project:
             projectData.setdefault(project, []).append((artefact, oldHash, hash))
         else:
             print "ERROR: Could not find project for artefact", artefact
     
-    return projectData
+    return changes, projectData
 
 def buildFailed(document):
     for entry in document.getElementsByTagName("result"):
@@ -163,20 +168,21 @@ def getChangeData(jobRoot, projectChanges, jenkinsUrl, bugSystemData):
     return changes
 
 
-def _getChanges(build1, build2, workspace, jenkinsUrl, bugSystemData={}):
+def _getChanges(build1, build2, workspace, jenkinsUrl, bugSystemData={}, markedArtefacts={}):
     rootDir, jobName = os.path.split(workspace)
     jobRoot = os.path.join(os.path.dirname(rootDir), "jobs")
     # Find what artefacts have changed between times build
     differences = getFingerprintDifferences(build1, build2, jobName, jobRoot)
     # Organise them by project
-    projectData = organiseByProject(jobRoot, differences)
+    changes, projectData = organiseByProject(jobRoot, differences, markedArtefacts)
     # For each project, find out which builds were affected
     projectChanges = getProjectChanges(jobRoot, projectData)
     # Extract the changeset information from them
-    return getChangeData(jobRoot, projectChanges, jenkinsUrl, bugSystemData)
+    changes += getChangeData(jobRoot, projectChanges, jenkinsUrl, bugSystemData)
+    return changes
 
-def getChanges(build1, build2, bugSystemData):
-    return _getChanges(build1, build2, os.getenv("WORKSPACE"), os.getenv("JENKINS_URL"), bugSystemData)
+def getChanges(build1, build2, bugSystemData, markedArtefacts):
+    return _getChanges(build1, build2, os.getenv("WORKSPACE"), os.getenv("JENKINS_URL"), bugSystemData, markedArtefacts)
     
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -187,5 +193,5 @@ if __name__ == "__main__":
         prevBuildName = str(int(buildName) - 1)
     from pprint import pprint
     pprint(_getChanges(prevBuildName, buildName, "/nfs/vm/c14n/build/PWS-x86_64_linux-6.optimize/.jenkins/workspace/cms-product-car-test",  
-                     "http://gotburh03p.got.jeppesensystems.com:8080/", {"jira": "https://jira.jeppesensystems.com"}))
+                     "http://gotburh03p.got.jeppesensystems.com:8080/", {"jira": "https://jira.jeppesensystems.com"}, {"MAVE" : ".*mave-.*"}))
     

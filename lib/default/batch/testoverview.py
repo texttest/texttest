@@ -455,8 +455,9 @@ class TestTable:
             return eval(open(cacheFile).read().strip())
         else:
             bugSystemData = self.getConfigValue("bug_system_location", allSubKeys=True)
+            markedArtefacts = self.getConfigValue("batch_jenkins_marked_artefacts", allSubKeys=True)
             if buildNumber.isdigit() and prevBuildNumber is not None:
-                allChanges = jenkinschanges.getChanges(prevBuildNumber, buildNumber, bugSystemData)
+                allChanges = jenkinschanges.getChanges(prevBuildNumber, buildNumber, bugSystemData, markedArtefacts)
                 plugins.ensureDirectoryExists(cacheDir)
                 with open(cacheFile, "w") as f:
                     f.write(pformat(allChanges) + "\n")
@@ -477,7 +478,10 @@ class TestTable:
             for i, (author, target, bugs) in enumerate(allChanges):
                 if i:
                     cont.append(HTMLgen.BR())
-                cont.append(HTMLgen.Href(target, author))
+                if target:
+                    cont.append(HTMLgen.Href(target, author))
+                else:
+                    cont.append(HTMLgen.Font(author, color="red")) 
                 for bugText, bugTarget in bugs:
                     cont.append(HTMLgen.Href(bugTarget, bugText))
                 hasData = True

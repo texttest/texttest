@@ -806,7 +806,10 @@ class SlaveRequestHandler(StreamRequestHandler):
         self.handleRequestFromHost(self.getHostName(clientHost), identifier)
 
     def getHostName(self, ipAddress):
-        return socket.gethostbyaddr(ipAddress)[0].split(".")[0]
+        try:
+            return socket.gethostbyaddr(ipAddress)[0].split(".")[0]
+        except socket.error:
+            return "<UNKNOWN HOST> (check IP configuration)"
 
     def parseIdentifier(self, identifier):
         rerun = identifier.endswith(self.rerunPostfix)

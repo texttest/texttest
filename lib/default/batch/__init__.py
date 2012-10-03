@@ -693,7 +693,7 @@ class WebPageResponder(plugins.Responder):
         descriptionInfo = {}
         for app in apps:
             for appToUse in [ app ] + app.extras:
-                descriptionInfo.update(self.descriptionInfo.get(appToUse))
+                descriptionInfo.update(self.descriptionInfo.get(appToUse, {}))
         
         return descriptionInfo
 

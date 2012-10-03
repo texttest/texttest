@@ -784,12 +784,12 @@ def getInterpreter(executable):
               "jar" : "java -jar" }
     return cache.get(extension, "")
 
-def commandLineString(cmdArgs):
+def commandLineString(cmdArgs, defaultQuoteChar='"'):
     def getQuoteChar(char):
         if char == "\"" and os.name == "posix":
             return "'"
         else:
-            return '"'
+            return defaultQuoteChar
 
     def quoteArg(arg):
         if len(arg) == 0:

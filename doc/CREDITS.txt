@@ -1,10 +1,12 @@
-Code Maintainer:                                        
+Code Maintainers:                                        
 
     Geoff Bache
+    Daniel Galdames
 
 Developers:
 
     Geoff Bache
+    Daniel Galdames
     Mattias Grönkvist
     Johan Ivarsson
     Johan Andersson

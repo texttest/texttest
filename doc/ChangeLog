@@ -2341,3 +2341,12 @@ Bug Fixes:
     - Application creation dialog size in some environments fixed
     - Fixed problem where editing the main config file did not refresh properly if there were test-specific config files.
     - Fixed HTML report bug which didn't include descriptions for extra_version tests
+
+Version trunk
+=============
+General GUI Enhancements:
+Static GUI Enhancements:
+Framework Enhancements:
+Batch Report Enhancements:
+Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
+Bug Fixes:

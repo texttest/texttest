@@ -2275,8 +2275,8 @@ Bug Fixes:
     - StoryText files, particularly shortcuts, are now sorted in the Config tab
     - Windows installer no longer default-installs StoryText, and documents preconditions better
 
-Version trunk
-=============
+Version 3.24
+============
 General GUI Enhancements:
     - Can now set names also in the static GUI
 	via the -name argument or the "Set Run Name" entry in the view menu, as it used to be in the dynamic GUI

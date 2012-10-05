@@ -11,7 +11,7 @@ SetCompressor lzma
 ; ------------ TextTest settings ---------
 !define PRODUCT_NAME "TextTest"
 !ifndef PRODUCT_VERSION
-  !define PRODUCT_VERSION "3.23"
+  !define PRODUCT_VERSION "3.24"
 !endif
 !define PRODUCT_PUBLISHER "TextTest"
 !define PRODUCT_WEB_SITE "http://www.texttest.org"
@@ -44,7 +44,7 @@ Var JAVA_EXE
   !endif
 !else
   !ifndef TEXTTEST_ROOT
-    !define TEXTTEST_ROOT "texttest-3.23"
+    !define TEXTTEST_ROOT "texttest-3.24"
   !endif
   !ifndef TEXTTEST_DIST
     !define TEXTTEST_DIST "${TEXTTEST_ROOT}.zip"

@@ -2277,7 +2277,6 @@ Bug Fixes:
 
 Version trunk
 =============
-Installation:
 General GUI Enhancements:
     - Can now set names also in the static GUI
 	via the -name argument or the "Set Run Name" entry in the view menu, as it used to be in the dynamic GUI
@@ -2287,7 +2286,10 @@ General GUI Enhancements:
 Static GUI Enhancements:
     - "test_data_ignore" is now also used when displaying the storytext_files tree in the config tab
 	Make it easier to ignore backup files, plugin sources etc.
-Dynamic GUI Enhancements:
+    - Application creation dialog now allows pointing out jar files for Java programs
+	Sets the class path and main class name internally
+    - GEF added as an option for GUI testing
+    - Swing option for GUI testing now finds SwingLibrary packaged with latest StoryText automatically
 Framework Enhancements:
     - run_dependent_text now does not apply the filter in the case where the end marker is never found for a section filtering
 	See migration notes for details
@@ -2305,10 +2307,11 @@ Framework Enhancements:
     - Knownbugs functionality now allows mulitline triggers and disabling regular expression matching.
 	Hence a wider range of possible triggers
     - Knownbugs now add a brief description of why they were triggered to the report
+    - Now cleans up properly on receiving SIGTERM (handled the same way as SIGINT)
 Batch Report Enhancements:
     - Integration with Jenkins added
 	If the job is triggered by changes in Jenkins, now link the authors and the changes from the test page.
-	Also parse any bug IDs from checkin messages
+	Also parse any bug IDs from checkin messages. See website for more details.
     - Removing previous results is now done in the background
 	Avoids it slowing down the start of batch mode runs
     - A small textual report summarising the results is now produced in the log
@@ -2317,10 +2320,12 @@ Batch Report Enhancements:
     - Added possibility to generate web pages from archived data
 	New option -collarchive. See website.
 Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
-    - Basic support for Condor added
+    - Basic (alpha) support for Condor added
 	Set queue_system_module:condor. Thanks to Tomas Liden for this.
     - Grid engine server now uses IP address instead of machine name
 	Should make it more resilient to DNS trouble etc, also easier to override the behaviour
+    - Fixed stacktrace when IP address is incorrectly configured
+    - Fixed quoting problems when run arguments have spaces etc in them
 Bug Fixes:
     - Find Failure Information picks the right file when the same bug has several triggers defined
     - Find Failure Information doesn't add spurious version IDs to new knownbug files
@@ -2335,3 +2340,4 @@ Bug Fixes:
     - Fix bug where reconnecting with recomputation to a test with a knownbug + rerun would rerun it indefinitely
     - Application creation dialog size in some environments fixed
     - Fixed problem where editing the main config file did not refresh properly if there were test-specific config files.
+    - Fixed HTML report bug which didn't include descriptions for extra_version tests

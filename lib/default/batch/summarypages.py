@@ -108,10 +108,10 @@ class SummaryDataFinder:
     @staticmethod
     def findFullName(dirName):
         # All files have the application in the title attribute
-        allFiles = os.listdir(dirName)
-        if len(allFiles) == 0:
+        htmlFiles = glob(os.path.join(dirName, "test_*.html"))
+        if len(htmlFiles) == 0:
             return
-        anyFile = os.path.join(dirName, os.listdir(dirName)[0])
+        anyFile = os.path.join(dirName, htmlFiles[0])
         finder = TitleFinder()
         finder.feed(open(anyFile).read())
         title = finder.title

@@ -2,6 +2,7 @@
 """ Code related to building the summary page and the graphs etc. """
 
 import testoverview, plugins, logging, os, shutil, time, operator, sys
+from HTMLParser import HTMLParser
 from ordereddict import OrderedDict
 from glob import glob
 from batchutils import BatchVersionFilter
@@ -28,7 +29,8 @@ class GenerateFromSummaryData(plugins.ScriptWithArgs):
     def finalise(cls):
         for location, apps in cls.locationApps.items():
             if not all((rejected for app, usePie, rejected in apps)):
-                dataFinder = SummaryDataFinder(location, apps, cls.summaryFileName, cls.basePath)
+                defaultUsePie = all((usePie for app, usePie, rejected in apps))
+                dataFinder = SummaryDataFinder(location, apps, cls.summaryFileName, cls.basePath, defaultUsePie)
                 appsWithVersions = dataFinder.getAppsWithVersions()
                 if appsWithVersions:
                     cls.generate(dataFinder, appsWithVersions)
@@ -58,10 +60,23 @@ class GenerateGraphs(GenerateFromSummaryData):
                     graphTitle = "Test results for Application: '" + appName + "'  Version: '" + version + "'"
                     graphGenerator = GraphGenerator()
                     graphGenerator.generateGraph(fileName, graphTitle, results, dataFinder.colourFinder)
+ 
+class TitleFinder(HTMLParser):
+    def __init__(self):
+        HTMLParser.__init__(self)
+        self.active = False
+        self.title = None
+        
+    def handle_starttag(self, rawname, attrs):
+        self.active = rawname.lower() == "title"
 
+    def handle_data(self, content):
+        if self.active:
+            self.title = content
+            self.active = False
 
 class SummaryDataFinder:
-    def __init__(self, location, apps, summaryFileName, basePath):
+    def __init__(self, location, apps, summaryFileName, basePath, defaultUsePie):
         self.diag = logging.getLogger("GenerateWebPages")
         self.location = location
         self.basePath = basePath
@@ -73,12 +88,40 @@ class SummaryDataFinder:
         if len(apps) > 0:
             self.colourFinder = testoverview.ColourFinder(apps[0][0].getCompositeConfigValue)
             self.inputOptions = apps[0][0].inputOptions
+        appnames = set()
         for app, usePie, _ in apps:
+            appnames.add(app.name)
             self.appUsePie[app.fullName()] = usePie
             appDir = os.path.join(location, app.name)
             self.diag.info("Searching under " + repr(appDir))
             if os.path.isdir(appDir):
                 self.appDirs[app.fullName()] = appDir
+        for dirName in os.listdir(location):
+            if dirName not in appnames and not dirName.endswith("_history") and dirName not in [ "images", "javascript", "jenkins_changes" ]:
+                fullDir = os.path.join(location, dirName)
+                if os.path.isdir(fullDir):
+                    appFullName = self.findFullName(fullDir)
+                    if appFullName:
+                        self.appUsePie[appFullName] = defaultUsePie
+                        self.appDirs[appFullName] = fullDir
+                        
+    @staticmethod
+    def findFullName(dirName):
+        # All files have the application in the title attribute
+        allFiles = os.listdir(dirName)
+        if len(allFiles) == 0:
+            return
+        anyFile = os.path.join(dirName, os.listdir(dirName)[0])
+        finder = TitleFinder()
+        finder.feed(open(anyFile).read())
+        title = finder.title
+        if title is not None:
+            prefix = "est results for"
+            pos = title.find(prefix) + len(prefix) + 1
+            if pos != -1:
+                endPos = title.find(" - ", pos)
+                if endPos != -1:
+                    return title[pos:endPos]
                 
     def getTemplateFile(self):
         templateFile = os.path.join(self.location, "summary_template.html")

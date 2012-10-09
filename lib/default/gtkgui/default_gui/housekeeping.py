@@ -104,7 +104,8 @@ class RefreshAll(guiplugins.BasicActionGUI):
             self.notify("ActionProgress")
             filters = suite.app.getFilterList(self.rootTestSuites)
             suite.refresh(filters)
-
+            suite.refreshFilesRecursively()
+            
 
 def getInteractiveActionClasses(dynamic):
     classes = [ Quit, SetRunName ]

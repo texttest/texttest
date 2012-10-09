@@ -202,6 +202,10 @@ class Test(plugins.Observable):
         # Test suites never change state, but it's convenient that they have one
         self.state = plugins.TestState("not_started")
 
+    def refreshFilesRecursively(self):
+        self.reloadTestConfigurations()
+        self.filesChanged()
+
     def reloadTestConfigurations(self):
         if self.parent is not None:
             self.reloadConfiguration()
@@ -1062,6 +1066,11 @@ class TestSuite(Test):
         Test.reloadTestConfigurations(self)
         for testcase in self.testcases:
             testcase.reloadTestConfigurations()
+
+    def refreshFilesRecursively(self):
+        Test.refreshFilesRecursively(self)
+        for subTest in self.testcases:
+            subTest.refreshFilesRecursively()
 
 # private:
     def getOrderedTestNames(self, testNames, testCaseNames):

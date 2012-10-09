@@ -83,11 +83,14 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
         
         for line in outMsg.splitlines():
             words = line.split()
-            if len(words) >= 5:
+            if len(words) >= 5 and words[0].isdigit():
                 statusLetter = words[4]
                 status = self.allStatuses.get(statusLetter)
                 if status:
                     statusDict[words[0]] = status
+                else:
+                    log.info("WARNING: unexpected job status " + repr(statusLetter) + " received from SGE!")
+                    statusDict[words[0]] = statusLetter
         return statusDict
 
     def _getJobFailureInfo(self, jobId):

@@ -7,6 +7,7 @@ from time import sleep
 # Used by master process for submitting, deleting and monitoring slave jobs
 class QueueSystem(abstractqueuesystem.QueueSystem):
     allStatuses = { "qw"  : ("PEND", "Pending"),
+                    "Eqw" : ("ERROR", "In error state"),
                     "hqw" : ("HOLD", "On hold"),
                     "t"   : ("TRANS", "Transferring"),
                     "r"   : ("RUN", "Running"),

@@ -170,7 +170,10 @@ def getChangeData(jobRoot, projectChanges, jenkinsUrl, bugSystemData):
 
 def _getChanges(build1, build2, workspace, jenkinsUrl, bugSystemData={}, markedArtefacts={}):
     rootDir, jobName = os.path.split(workspace)
-    jobRoot = os.path.join(os.path.dirname(rootDir), "jobs")
+    if jobName == "workspace": # new structure
+        jobRoot, jobName = os.path.split(rootDir)
+    else:
+        jobRoot = os.path.join(os.path.dirname(rootDir), "jobs")
     # Find what artefacts have changed between times build
     differences = getFingerprintDifferences(build1, build2, jobName, jobRoot)
     # Organise them by project

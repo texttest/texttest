@@ -89,7 +89,9 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
                 status = self.allStatuses.get(statusLetter)
                 if status:
                     statusDict[words[0]] = status
-                else:
+                elif statusLetter != os.getenv("USER"):
+                    # Job names can contain spaces, in which case the username (our own) will be the 5th word
+                    # These jobs are not test jobs and can safely be ignored.
                     log.info("WARNING: unexpected job status " + repr(statusLetter) + " received from SGE!")
                     statusDict[words[0]] = statusLetter
         return statusDict

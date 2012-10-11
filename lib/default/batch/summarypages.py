@@ -101,7 +101,7 @@ class SummaryDataFinder:
                 fullDir = os.path.join(location, dirName)
                 if os.path.isdir(fullDir):
                     appFullName = self.findFullName(fullDir)
-                    if appFullName:
+                    if appFullName and appFullName not in self.appDirs:
                         self.appUsePie[appFullName] = defaultUsePie
                         self.appDirs[appFullName] = fullDir
                         

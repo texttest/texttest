@@ -585,6 +585,12 @@ class WebPageResponder(plugins.Responder):
                     self.extractFromArchive()
             except plugins.TextTestError, e:
                 plugins.log.info("Not generating web page for " + suite.app.description() + " : " + str(e))
+        
+    def notifyAllRead(self, *args):
+        # Sort the suites to generate by the number of tests they contain
+        # This should ensure we get small test suites' results first and anything that is slow to generate
+        # won't slow down other stuff
+        self.suitesToGenerate.sort(key=lambda s: s.size())
                             
     def notifyAllComplete(self):
         appInfo = self.getAppRepositoryInfo()
@@ -698,6 +704,9 @@ class WebPageResponder(plugins.Responder):
         return descriptionInfo
 
     def transformToCommon(self, pageInfo):
+        # We've sorted by number of tests already, but on the same page we want applications in a more predictable order
+        # Sort by name again.
+        pageInfo.sort(key=lambda info: info[0].name)
         allApps = [ app for app, _, _ in pageInfo ]
         version = getVersionName(allApps[0], self.getAppsToGenerate())
         extraVersions, relevantSubDirs = [], OrderedDict()

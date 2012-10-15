@@ -2346,7 +2346,15 @@ Version trunk
 =============
 General GUI Enhancements:
 Static GUI Enhancements:
+    - Refresh now reloads all test-specific config files
+	Previously only reloaded the main application config files
 Framework Enhancements:
 Batch Report Enhancements:
+    - Now sort the applications in order of number of tests before generating HTML report
+	If there are many large slow-to-generate test suites it's best they don't hold up small fast ones.
+    - Applications whose test suite is removed but where old results still exist are still linked from the main index page
+	Can be important, especially when live versions exist of older versions of the same apps.
+    - Jenkins change handling deals with the new directory structure in Jenkins as well as the "legacy" one.
 Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
+    - SGE errors handled in a better way, warn when we get a job status we don't expect
 Bug Fixes:

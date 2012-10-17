@@ -1182,7 +1182,8 @@ class TextTrigger:
         if self.regex:
             return self.regex.search(line)
         else:
-            return line.find(self.text) != -1
+            # We just want to match the empty string when both are empty.
+            return (line.find(self.text) != -1 and self.text != "") or line == self.text
     def replace(self, line, newText):
         if self.regex:
             return re.sub(self.text, newText, line)
@@ -1198,7 +1199,7 @@ class MultilineTextTrigger(TextTrigger):
         self.triggers = []
         self.currentIndex = 0
         self.matchedLines = []
-        lines = text.splitlines()
+        lines = text.split("\n") if text else []
         for line in lines:
             self.triggers.append(TextTrigger(line, tryAsRegexp))
 
@@ -1229,7 +1230,8 @@ class MultilineTextTrigger(TextTrigger):
                 self.matchedLines = []
             return text
         else:
-            text = "".join(self.matchedLines) + line
+            # We want to remove matched lines if the current trigger text is the empty string.
+            text = "".join(self.matchedLines) + line if self.text[-1] !="\n" else line
             self.reset()
             return text
         

@@ -249,7 +249,8 @@ class ReplaceText(plugins.ScriptWithArgs):
             with open(stdFile) as readFile:
                 for line in readFile:
                     writeFile.write(self.multiLineTrigger.replace(line, self.newMultiLineText))
-                writeFile.write(self.multiLineTrigger.getLeftoverText())
+                if self.oldText[-1] != "\n":
+                    writeFile.write(self.multiLineTrigger.getLeftoverText())
             
     def usesComparator(self):
         return True

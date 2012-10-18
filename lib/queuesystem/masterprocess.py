@@ -128,7 +128,7 @@ class QueueSystemServer(BaseActionRunner):
                             # Only do this to test jobs (might make a difference for derived configurations)
                             # Ignore filtering states for now, which have empty 'briefText'.
                             self.updateRunStatus(test, status)
-                        elif not status and not self.jobStarted(test):
+                        elif not status and not self.jobCompleted(test):
                             # Do this to any jobs
                             self.setSlaveFailed(test, False, True)
         
@@ -586,6 +586,9 @@ class QueueSystemServer(BaseActionRunner):
     
     def jobStarted(self, test):
         return test.state.hasStarted()
+    
+    def jobCompleted(self, test):
+        return test.state.isComplete()
     
     def setKilledPending(self, test, jobId):
         timeStr =  plugins.localtime("%H:%M")

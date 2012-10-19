@@ -96,14 +96,16 @@ class SummaryDataFinder:
             self.diag.info("Searching under " + repr(appDir))
             if os.path.isdir(appDir):
                 self.appDirs[app.fullName()] = appDir
-        for dirName in os.listdir(location):
-            if dirName not in appnames and not dirName.endswith("_history") and dirName not in [ "images", "javascript", "jenkins_changes" ]:
-                fullDir = os.path.join(location, dirName)
-                if os.path.isdir(fullDir):
-                    appFullName = self.findFullName(fullDir)
-                    if appFullName and appFullName not in self.appDirs:
-                        self.appUsePie[appFullName] = defaultUsePie
-                        self.appDirs[appFullName] = fullDir
+                
+        if os.path.isdir(location):
+            for dirName in os.listdir(location):
+                if dirName not in appnames and not dirName.endswith("_history") and dirName not in [ "images", "javascript", "jenkins_changes" ]:
+                    fullDir = os.path.join(location, dirName)
+                    if os.path.isdir(fullDir):
+                        appFullName = self.findFullName(fullDir)
+                        if appFullName and appFullName not in self.appDirs:
+                            self.appUsePie[appFullName] = defaultUsePie
+                            self.appDirs[appFullName] = fullDir
                         
     @staticmethod
     def findFullName(dirName):

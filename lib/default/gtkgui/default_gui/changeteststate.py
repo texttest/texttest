@@ -8,6 +8,8 @@ from .. import guiplugins
 from adminactions import ReportBugs
 from default.knownbugs import CheckForBugs, BugMap
 from ConfigParser import ConfigParser
+from copy import copy
+from threading import Thread
 
 class SaveTests(guiplugins.ActionDialogGUI):
     defaultVersionStr = "<existing version>"
@@ -208,10 +210,6 @@ class SplitResultFiles(guiplugins.ActionGUI):
 
 
 class RecomputeTests(guiplugins.ActionGUI):
-    def __init__(self, *args):
-        guiplugins.ActionGUI.__init__(self, *args)
-        self.latestTestCount = 0
-
     def isActiveOnCurrent(self, test=None, state=None):
         for currTest in self.currTestSelection:
             if currTest is test:
@@ -231,28 +229,39 @@ class RecomputeTests(guiplugins.ActionGUI):
         return "Recompute test status, including progress information if appropriate"
 
     def getSignalsSent(self):
-        return [ "Recomputed" ]
+        return [ "Recomputed", "RecomputationCompleted" ]
 
     def messageAfterPerform(self):
-        if self.latestTestCount == 0:
-            return "No test needed recomputation."
-        else:
-            return "Recomputed status of " + plugins.pluralise(self.latestTestCount, "test") + "."
+        pass
         
     def performOnCurrent(self):
-        self.latestTestCount = 0
         if any((test.stateInGui.isComplete() for test in self.currTestSelection)):
             for appOrTest in self.currAppSelection + self.currTestSelection:
                 self.notify("Status", "Rereading configuration for " + repr(appOrTest) + " ...")
                 self.notify("ActionProgress")
                 appOrTest.reloadConfiguration()
 
-        for test in self.currTestSelection:
-            self.latestTestCount += 1
+        selection = copy(self.currTestSelection)
+        recomputeThread = Thread(target=self.recomputeTests, args=(selection,))
+        recomputeThread.start()
+        
+    def recomputeTests(self, selection):
+        latestTestCount = 0
+        for test in selection:
+            latestTestCount += 1
             self.notify("Status", "Recomputing status of " + repr(test) + " ...")
-            self.notify("ActionProgress")
             test.app.recomputeProgress(test, test.stateInGui, self.observers)
             self.notify("Recomputed", test)
+            
+        self.notify("Status", self.getFinalMessage(latestTestCount))
+        self.notify("RecomputationCompleted")
+            
+    def getFinalMessage(self, latestTestCount):
+        if latestTestCount == 0:
+            return "No test needed recomputation."
+        else:
+            return "Recomputed status of " + plugins.pluralise(latestTestCount, "test") + "."
+
 
 
 class MarkTest(guiplugins.ActionDialogGUI):

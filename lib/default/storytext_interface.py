@@ -41,6 +41,9 @@ class ApplicationEventResponder(plugins.Responder):
             return int(os.getenv("TEXTTEST_FILEWAIT_SLEEP", 1))
         except ValueError: # pragma: no cover - pathological case
             return 1
+        
+    def notifyRecomputationCompleted(self, *args):
+        applicationEvent("completion of recomputation", "recompute")
 
     def notifyAllRead(self, *args):
         applicationEvent("all tests to be read", "read", [ "lifecycle" ])

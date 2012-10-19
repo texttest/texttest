@@ -39,13 +39,17 @@ class BaseTestComparison(plugins.TestState):
         newList.remove(comparison)
         self.allResults.remove(comparison)
 
-    def computeFor(self, test, ignoreMissing=False):
-        self.makeComparisons(test, ignoreMissing)
-        self.categorise()
+    def addAdditionalText(self, test):
         rerunCount = self.getRerunCount(test)
         if rerunCount and self.hasSucceeded():
             self.briefText = "after " + plugins.pluralise(rerunCount, "rerun")
-        test.changeState(self)
+
+    def computeFor(self, test, ignoreMissing=False, incompleteOnly=False):
+        self.makeComparisons(test, ignoreMissing)
+        self.categorise()
+        self.addAdditionalText(test)
+        if not incompleteOnly or not test.state.isComplete():
+            test.changeState(self)
 
     def getRerunCount(self, test):
         number = 1
@@ -494,7 +498,8 @@ class MakeComparisons(plugins.Action):
     def recomputeProgress(self, test, state, observers):
         newState = self.progressComparisonClass(state)
         newState.setObservers(observers)
-        newState.computeFor(test, ignoreMissing=True)        
+        if not test.state.isComplete():
+            newState.computeFor(test, ignoreMissing=True, incompleteOnly=True)        
 
     def setUpSuite(self, suite):
         self.describe(suite)

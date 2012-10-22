@@ -74,6 +74,11 @@ class QueueSystemServer(BaseActionRunner):
                 self.addTestToQueues(test) # For the last app (which may be the only one) there is no point in delaying
             else:
                 self.delayedTestsForAdd.append(test)
+                
+    def queueTestForRerun(self, test):
+        # Clear out the previous job reference, otherwise our grid polling will kill it off
+        self.jobs[test] = []
+        self.addTestToQueues(test)
 
     def addTestToQueues(self, test):
         self.testCount += 1
@@ -843,7 +848,7 @@ class SlaveRequestHandler(StreamRequestHandler):
                 if rerun:
                     self.server.diag.info("Instructed to rerun test " + test.uniqueName)
                     self.server.clearClient(test) # it might come back from a different process
-                    QueueSystemServer.instance.addTestToQueues(test)
+                    QueueSystemServer.instance.queueTestForRerun(test)
                 else:
                     self.server.changeState(test, state)
                 self.connection.shutdown(socket.SHUT_RD)

@@ -2348,6 +2348,8 @@ General GUI Enhancements:
 Static GUI Enhancements:
     - Refresh now reloads all test-specific config files
 	Previously only reloaded the main application config files
+Dynamic GUI Enhancements:
+    - "Recompute Status" now runs in the background and doesn't lock the GUI
 Framework Enhancements:
 Batch Report Enhancements:
     - Now sort the applications in order of number of tests before generating HTML report
@@ -2357,4 +2359,9 @@ Batch Report Enhancements:
     - Jenkins change handling deals with the new directory structure in Jenkins as well as the "legacy" one.
 Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
     - SGE errors handled in a better way, warn when we get a job status we don't expect
+    - Don't lose track of SGE jobs that end up in "St" state
+    - If SGE jobs start but then terminate without reporting in (e.g. by getting SIGKILL) react and report this.
 Bug Fixes:
+    - Fixed stacktrace for HTML report generation when the location doesn't exist yet
+    - "Replace Text in Files" handles removing lines in a more consistent way
+

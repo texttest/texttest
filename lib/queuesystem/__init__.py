@@ -108,6 +108,9 @@ class QueueSystemConfig(default.Config):
     def getWriteDirectoryName(self, app):
         return self.optionMap.get("slave") or default.Config.getWriteDirectoryName(self, app)
     
+    def getLocalWriteDirectoryName(self, app):
+        return default.Config.getWriteDirectoryName(self, app)
+    
     def noFileAdvice(self):
         if self.useQueueSystem:
             return "Try re-running the test, and either use local mode, or check the box for keeping\n" + \

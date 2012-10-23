@@ -617,15 +617,19 @@ class TestCase(Test):
     def __init__(self, name, description, abspath, app, parent):
         Test.__init__(self, name, description, abspath, app, parent)
         # Directory where test executes from and hopefully where all its files end up
-        self.writeDirectory = os.path.join(app.writeDirectory, app.name + app.versionSuffix(), self.getRelPath())
-
+        relPath = os.path.join(app.name + app.versionSuffix(), self.getRelPath())
+        self.writeDirectory = os.path.join(app.writeDirectory, relPath)
+        self.localWriteDirectory = os.path.join(app.localWriteDirectory, relPath)
+        
     def classId(self):
         return "test-case"
     
-    def getDirectory(self, temporary=False, forFramework=False):
+    def getDirectory(self, temporary=False, forFramework=False, local=False):
         if temporary:
             if forFramework:
                 return os.path.join(self.writeDirectory, "framework_tmp")
+            elif local:
+                return self.localWriteDirectory
             else:
                 return self.writeDirectory
         else:
@@ -669,6 +673,9 @@ class TestCase(Test):
         plugins.ensureDirectoryExists(self.writeDirectory)
         frameworkTmp = self.getDirectory(temporary=1, forFramework=True)
         plugins.ensureDirectoryExists(frameworkTmp)
+        if self.localWriteDirectory != self.writeDirectory:
+            self.diagnose("Created local writedir at " + self.localWriteDirectory)
+            plugins.ensureDirectoryExists(self.localWriteDirectory)
 
     def getOptionsFromFile(self, optionsFile):
         lines = plugins.readList(optionsFile)
@@ -751,18 +758,19 @@ class TestCase(Test):
 
     def listUnownedTmpPaths(self):
         paths = []
-        filelist = os.listdir(self.writeDirectory)
+        filelist = os.listdir(self.localWriteDirectory)
         filelist.sort()
         for file in filelist:
             if file in [ "framework_tmp", "file_edits", "traffic_intercepts" ] or file.endswith("." + self.app.name):
                 continue
-            fullPath = os.path.join(self.writeDirectory, file)
+            fullPath = os.path.join(self.localWriteDirectory, file)
             paths += self.listFiles(fullPath, file, followLinks=False)
         return paths
 
-    def makeTmpFileName(self, stem, forComparison=1, forFramework=0):
-        dir = self.getDirectory(temporary=1, forFramework=forFramework)
-        if forComparison and not forFramework and stem.find(os.sep) == -1:
+    def makeTmpFileName(self, stem, forComparison=True, forFramework=False):
+        local = not forComparison and not forFramework
+        dir = self.getDirectory(temporary=True, forFramework=forFramework, local=local)
+        if forComparison and not forFramework and os.sep not in stem:
             return os.path.join(dir, stem + "." + self.app.name)
         else:
             return os.path.join(dir, stem)
@@ -1282,9 +1290,11 @@ class Application:
         self.configDir = plugins.MultiEntryDictionary(importKey="import_config_file", importFileFinder=self.configPath)
         self.setUpConfiguration(configEntries)
         self.checkSanity()
-        self.writeDirectory = self.getWriteDirectory()
+        self.writeDirectory, self.localWriteDirectory = self.getWriteDirectories()
         self.rootTmpDir = os.path.dirname(self.writeDirectory)
         self.diag.info("Write directory at " + self.writeDirectory)
+        if self.writeDirectory != self.localWriteDirectory:
+            self.diag.info("Local write directory at " + self.localWriteDirectory)
         self.checkout = self.configObject.setUpCheckout(self)
         self.diag.info("Checkout set to " + self.checkout)
         self.tmpSettingsDirCache = DirectoryCache(inputOptions.get("td")) if "td" in inputOptions else None

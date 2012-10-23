@@ -228,7 +228,7 @@ class RunTest(plugins.Action):
         testEnv = self.getTestRunEnvironment(test, postfix)
         try:
             return subprocess.Popen(commandArgs, preexec_fn=self.getPreExecFunction(), \
-                                    stdin=open(self.getInputFile(test, inputStem)), cwd=test.getDirectory(temporary=1), \
+                                    stdin=open(self.getInputFile(test, inputStem)), cwd=test.getDirectory(temporary=1, local=1), \
                                     stdout=self.makeFile(test, stdoutStem), stderr=self.makeFile(test, stderrStem), \
                                     env=testEnv, startupinfo=self.getProcessStartUpInfo(test))
         except OSError:

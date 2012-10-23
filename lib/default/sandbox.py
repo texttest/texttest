@@ -420,6 +420,8 @@ class TestEnvironmentCreator:
             if localCheckout and localCheckout != checkout:
                 vars.append(("TEXTTEST_CHECKOUT_NAME", localCheckout)) # Local name of the checkout directory
             vars.append(("TEXTTEST_SANDBOX_ROOT", self.test.app.writeDirectory)) # Full path to the sandbox root directory
+            if self.test.app.localWriteDirectory != self.test.app.writeDirectory:
+                vars.append(("TEXTTEST_LOCAL_SANDBOX_ROOT", self.test.app.localWriteDirectory)) # Full path to the local sandbox root directory, if different from the ordinary sandbox
             if self.test.getConfigValue("use_case_record_mode") == "GUI":
                 usecaseRecorder = self.test.getConfigValue("use_case_recorder")
                 # Mostly to make sure StoryText's own tests have a chance of working
@@ -524,10 +526,13 @@ class TestEnvironmentCreator:
     def getPathVariables(self):
         testDir = self.test.getDirectory(temporary=1)
         vars = [("TEXTTEST_SANDBOX", testDir)] # Full path to the sandbox directory
+        localTestDir = self.test.getDirectory(temporary=1, local=1)
+        if localTestDir != testDir:
+            vars.append(("TEXTTEST_LOCAL_SANDBOX", localTestDir)) # Full path to the local sandbox directory, if different
         # Always include the working directory of the test in PATH, to pick up fake
         # executables provided as test data. Allow for later expansion...
         for pathVar in self.getPathVars():
-            newPathVal = testDir + os.pathsep + "$" + pathVar
+            newPathVal = localTestDir + os.pathsep + "$" + pathVar
             vars.append((pathVar, newPathVal))
         return vars
 
@@ -561,7 +566,7 @@ class CollateFiles(plugins.Action):
             for sourcePattern in sourcePatterns:
                 for sourcePath in self.findPaths(test, sourcePattern):
                     # Use relative paths: easier to debug and SequenceMatcher breaks down if strings are longer than 200 chars
-                    relativeSourcePath = plugins.relpath(sourcePath, test.getDirectory(temporary=1))
+                    relativeSourcePath = plugins.relpath(sourcePath, test.getDirectory(temporary=1, local=1))
                     newTargetStem = self.makeTargetStem(targetPattern, sourcePattern, relativeSourcePath)
                     self.diag.info("New collation to " + newTargetStem + " : from " + relativeSourcePath)
                     newColl.setdefault(newTargetStem, []).append(sourcePath)
@@ -675,7 +680,7 @@ class CollateFiles(plugins.Action):
     def glob(self, test, sourcePattern):
         # Test name may contain glob meta-characters, and there is no way to quote them (see comment in fnmatch.py)
         # So we can't just form an absolute path and glob that
-        testDir = test.getDirectory(temporary=1)
+        testDir = test.getDirectory(temporary=1, local=1)
         origCwd = os.getcwd()
         os.chdir(testDir)
         result = glob.glob(sourcePattern)
@@ -802,7 +807,8 @@ class CreateCatalogue(plugins.Action):
     def createCatalogueChangeFile(self, test):
         oldPaths = self.catalogues[test]
         newPaths = self.findAllPaths(test)
-        pathsLost, pathsEdited, pathsGained = self.findDifferences(oldPaths, newPaths, test.getDirectory(temporary=1))
+        tmpDir = test.getDirectory(temporary=1, local=1)
+        pathsLost, pathsEdited, pathsGained = self.findDifferences(oldPaths, newPaths, tmpDir)
         processesGained = self.findProcessesGained(test)
         fileName = test.makeTmpFileName("catalogue")
         file = open(fileName, "w")

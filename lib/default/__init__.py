@@ -432,17 +432,25 @@ class Config:
         else:
             return self.hasWritePermission(os.path.dirname(path))
 
-    def getWriteDirectory(self, app):
+    def getWriteDirectories(self, app):
         rootDir = self.optionMap.setPathFromOptionsOrEnv("TEXTTEST_TMP", app.getConfigValue("default_texttest_tmp")) # Location of temporary files from test runs
         if not os.path.isdir(rootDir) and not self.hasWritePermission(os.path.dirname(rootDir)):
             rootDir = self.optionMap.setPathFromOptionsOrEnv("", "$TEXTTEST_PERSONAL_CONFIG/tmp")
-        return os.path.join(rootDir, self.getWriteDirectoryName(app))
+        writeDir = os.path.join(rootDir, self.getWriteDirectoryName(app))
+        localRootDir = self.optionMap.getPathFromOptionsOrEnv("TEXTTEST_LOCAL_TMP", app.getConfigValue("default_texttest_local_tmp")) # Location of temporary files on local disk from test runs. Defaults to value of TEXTTEST_TMP
+        if localRootDir:
+            return writeDir, os.path.join(localRootDir, self.getLocalWriteDirectoryName(app))
+        else:   
+            return writeDir, writeDir
 
     def getWriteDirectoryName(self, app):
         appDescriptor = self.getAppDescriptor()
         parts = self.getBasicRunDescriptors(app, appDescriptor) + self.getVersionDescriptors(appDescriptor) + \
                 [ self.getTimeDescriptor(), str(os.getpid()) ]
         return ".".join(parts)
+    
+    def getLocalWriteDirectoryName(self, app):
+        return self.getWriteDirectoryName(app)
 
     def getBasicRunDescriptors(self, app, appDescriptor):
         appDescriptors = [ appDescriptor ] if appDescriptor else []
@@ -702,6 +710,8 @@ class Config:
             plugins.log.info("Waiting for removal of previous write directories to complete...")
             self.removePreviousThread.join()
             Config.removePreviousThread = None
+        if not self.hasKeeptmpFlag():
+            self._cleanLocalWriteDirectory(suite)
         if not self.keepTemporaryDirectories():
             self._cleanWriteDirectory(suite)
             machine, tmpDir = self.getRemoteTmpDirectory(suite.app)
@@ -715,6 +725,9 @@ class Config:
         if os.path.isdir(suite.app.writeDirectory):
             plugins.rmtree(suite.app.writeDirectory)
 
+    def _cleanLocalWriteDirectory(self, suite):
+        if suite.app.localWriteDirectory != suite.app.writeDirectory and os.path.isdir(suite.app.localWriteDirectory):
+            plugins.rmtree(suite.app.localWriteDirectory)
 
     def findRemotePreviousDirInfo(self, app):
         machine, tmpDir = self.getRemoteTmpDirectory(app)
@@ -1392,6 +1405,7 @@ class Config:
 
     def setMiscDefaults(self, app, namingScheme):
         app.setConfigDefault("default_texttest_tmp", "$TEXTTEST_PERSONAL_CONFIG/tmp", "Default value for $TEXTTEST_TMP, if it is not set")
+        app.setConfigDefault("default_texttest_local_tmp", "", "Default value for $TEXTTEST_LOCAL_TMP, if it is not set")
         app.setConfigDefault("checkout_location", { "default" : []}, "Absolute paths to look for checkouts under")
         app.setConfigDefault("default_checkout", "", "Default checkout, relative to the checkout location")
         app.setConfigDefault("remote_shell_program", "ssh", "Program to use for running commands remotely")

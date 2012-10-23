@@ -31,6 +31,7 @@
       <menuitem action="Reconnect..."/>
       <menuitem action="Record Use-Case"/>
       <menuitem action="Replace Text in Files"/>
+      <menuitem action="Insert Shortcuts into Usecases"/>
       <separator/>
       <menuitem action="Refresh"/>
       <menuitem action="Reset"/>

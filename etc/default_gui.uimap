@@ -1023,3 +1023,6 @@ toggled.false = disable regular expressions
 [Name=Edit File]
 activate = edit selected file
 
+[Name=Insert Shortcuts into Usecases]
+activate = insert shortcuts into usecases
+

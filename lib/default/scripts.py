@@ -346,3 +346,36 @@ class ExtractStandardPerformance(sandbox.ExtractPerformanceFiles):
         self.describe(suite)
     def getMachineContents(self, test):
         return " on unknown machine (extracted)\n"
+    
+class InsertShortcuts(plugins.ScriptWithArgs):
+    def __repr__(self):
+        return "Inserting shortcuts into usecases for"
+
+    def __call__(self, test):
+        stdFiles = test.getFileNamesMatching("*usecase*")
+        for stdFile in stdFiles:
+            fileName = os.path.basename(stdFile)
+            self.describe(test, " - file " + fileName)
+            unversionedFileName = ".".join(fileName.split(".")[:2])
+            tmpFile = os.path.join(test.getDirectory(temporary=1), unversionedFileName)
+            storytextHome = test.getEnvironment("STORYTEXT_HOME")
+            shortcutManager, recordScript = self.getShortcutManager(tmpFile, storytextHome)
+            for _, shortcut in shortcutManager.shortcuts:
+                recordScript.registerShortcut(shortcut)
+            
+            with open(stdFile, "r") as readFile:
+                for line in readFile:
+                    recordScript.record(line)
+
+    def getShortcutManager(self, stdFile, storytextHome):
+        from storytext.replayer import ShortcutManager
+        from storytext import scriptEngine
+        from storytext.recorder import RecordScript
+        recordScript = RecordScript(stdFile)
+        shortcutManager = ShortcutManager()
+        for shortcut in scriptEngine.getShortcuts(storytextHome):
+            shortcutManager.add(shortcut)
+        return shortcutManager, recordScript
+
+    def usesComparator(self):
+        return True

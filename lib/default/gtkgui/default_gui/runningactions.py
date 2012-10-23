@@ -658,12 +658,7 @@ class RecordTest(BasicRunningAction,guiplugins.ActionDialogGUI):
         return 0.5, 0.5
 
 
-
-class RunScriptAction(BasicRunningAction,guiplugins.ActionDialogGUI):
-    def __init__(self, allApps, dynamic, inputOptions):
-        guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic)
-        BasicRunningAction.__init__(self, inputOptions)
-        
+class RunScriptAction(BasicRunningAction):
     def getUseCaseName(self):
         return "script"
 
@@ -678,9 +673,10 @@ class RunScriptAction(BasicRunningAction,guiplugins.ActionDialogGUI):
         return [ "-s", " ".join(args) ]
 
 
-class ReplaceText(RunScriptAction):
-    def __init__(self, *args):
-        RunScriptAction.__init__(self, *args)
+class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
+    def __init__(self, allApps, dynamic, inputOptions):
+        RunScriptAction.__init__(self, inputOptions)
+        guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic)
         self.addSwitch("regexp", "Enable regular expressions", 1)
         self.addOption("old", "Text or regular expression to search for", multilineEntry=True)
         self.addOption("new", "Text to replace it with (may contain regexp back references)", multilineEntry=True)
@@ -748,9 +744,29 @@ class TestFileFiltering(guiplugins.ActionResultDialogGUI):
         self.dialog.vbox.pack_start(window, expand=True, fill=True)
 
 
+class InsertShortcuts(RunScriptAction, guiplugins.OptionGroupGUI):
+    def __init__(self, allApps, dynamic, inputOptions):
+        guiplugins.OptionGroupGUI.__init__(self, allApps, dynamic)
+        RunScriptAction.__init__(self, inputOptions)
+
+    def scriptName(self):
+        return "default.InsertShortcuts"
     
+    def _getTitle(self):
+        return "Insert Shortcuts into Usecases"
+    
+    def getTootip(self):
+        return self._getTitle()
+    
+    def performedDescription(self):
+        return "Inserted shortcuts into usecases for"
+    
+    def isValidForApp(self, app):
+        return app.getConfigValue("use_case_record_mode") != "disabled" and \
+               app.getConfigValue("use_case_recorder") != "none"
+
 def getInteractiveActionClasses(dynamic):
     if dynamic:
         return [ RerunTests, ReloadTests ]
     else:
-        return [ RunTests, RecordTest, ReconnectToTests, ReplaceText, TestFileFiltering ]
+        return [ RunTests, RecordTest, ReconnectToTests, ReplaceText, TestFileFiltering, InsertShortcuts ]

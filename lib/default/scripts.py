@@ -365,7 +365,7 @@ class InsertShortcuts(plugins.ScriptWithArgs):
             
             with open(stdFile, "r") as readFile:
                 for line in readFile:
-                    recordScript.record(line.strip())
+                    recordScript.record(line.strip("\n"))
 
     def getShortcutManager(self, stdFile, storytextHome):
         from storytext.replayer import ShortcutManager

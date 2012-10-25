@@ -89,7 +89,7 @@ def parseReply(bugInfo, statuses, resolutions, location):
         message += ruler + "\n"
         bugId = newBugInfo['key']
         message += "View bug " + bugId + " using Jira URL=" + makeURL(location, str(bugId)) + "\n\n"
-        message += convertToString(bugInfo["description"])
+        message += convertToString(bugInfo.get("description", ""))
         isResolved = newBugInfo.has_key("resolution")
         statusText = newBugInfo["resolution"].strip() if isResolved else newBugInfo['status']
         return statusText, message, isResolved

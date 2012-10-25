@@ -419,9 +419,7 @@ class TestEnvironmentCreator:
             localCheckout = self.test.app.getCheckout()
             if localCheckout and localCheckout != checkout:
                 vars.append(("TEXTTEST_CHECKOUT_NAME", localCheckout)) # Local name of the checkout directory
-            vars.append(("TEXTTEST_SANDBOX_ROOT", self.test.app.writeDirectory)) # Full path to the sandbox root directory
-            if self.test.app.localWriteDirectory != self.test.app.writeDirectory:
-                vars.append(("TEXTTEST_LOCAL_SANDBOX_ROOT", self.test.app.localWriteDirectory)) # Full path to the local sandbox root directory, if different from the ordinary sandbox
+            vars.append(("TEXTTEST_SANDBOX_ROOT", self.test.app.localWriteDirectory)) # Full path to the sandbox root directory
             if self.test.getConfigValue("use_case_record_mode") == "GUI":
                 usecaseRecorder = self.test.getConfigValue("use_case_recorder")
                 # Mostly to make sure StoryText's own tests have a chance of working
@@ -525,10 +523,9 @@ class TestEnvironmentCreator:
             return "USECASE_RECORD_SCRIPT", recordScript # Full path to the script to record in GUI tests
     def getPathVariables(self):
         testDir = self.test.getDirectory(temporary=1)
-        vars = [("TEXTTEST_SANDBOX", testDir)] # Full path to the sandbox directory
         localTestDir = self.test.getDirectory(temporary=1, local=1)
-        if localTestDir != testDir:
-            vars.append(("TEXTTEST_LOCAL_SANDBOX", localTestDir)) # Full path to the local sandbox directory, if different
+        vars = [("TEXTTEST_SANDBOX", localTestDir),  # Full path to the sandbox directory
+                ("TEXTTEST_LOG_DIR", testDir) ] # Full path to where TextTest will write the SUT's log files
         # Always include the working directory of the test in PATH, to pick up fake
         # executables provided as test data. Allow for later expansion...
         for pathVar in self.getPathVars():

@@ -732,7 +732,10 @@ def configureLogging(configFile=None):
     global log
     if not log:
         if configFile:
-            defaults = { "TEXTTEST_PERSONAL_LOG": getPersonalDir("log") }
+            # First is for TextTest troubleshooting
+            # Second is for self-tests
+            defaults = { "TEXTTEST_PERSONAL_LOG": getPersonalDir("log"),
+                         "TEXTTEST_LOG_DIR": os.getenv("TEXTTEST_LOG_DIR", "") }
             logging.config.fileConfig(configFile, defaults)
         log = logging.getLogger("standard log")
 

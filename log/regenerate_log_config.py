@@ -5,15 +5,15 @@ from copy import copy
 
 def generateForSelfTests(selftestDir, trafficLoggers, *args):
     if selftestDir:
-        consoleGen = logconfiggen.PythonLoggingGenerator(os.path.join(selftestDir, "logging.console"), postfix="texttest")
+        consoleGen = logconfiggen.PythonLoggingGenerator(os.path.join(selftestDir, "logging.console"), prefix="%(TEXTTEST_LOG_DIR)s/", postfix="texttest")
         enabledLoggerNames = stdInfo + [ ("storytext replay log", "stdout"), ("kill processes", "stdout") ]
         consoleGen.generate(enabledLoggerNames, *args)
         
-        staticGen = logconfiggen.PythonLoggingGenerator(os.path.join(selftestDir, "logging.static_gui"), postfix="texttest")
+        staticGen = logconfiggen.PythonLoggingGenerator(os.path.join(selftestDir, "logging.static_gui"), prefix="%(TEXTTEST_LOG_DIR)s/", postfix="texttest")
         enabledLoggerNames = stdInfo + [ ("gui log", "gui_log"), ("storytext replay log", "gui_log") ]
         staticGen.generate(enabledLoggerNames, *args)
 
-        dynamicGen = logconfiggen.PythonLoggingGenerator(os.path.join(selftestDir, "logging.dynamic_gui"), postfix="texttest")
+        dynamicGen = logconfiggen.PythonLoggingGenerator(os.path.join(selftestDir, "logging.dynamic_gui"), prefix="%(TEXTTEST_LOG_DIR)s/", postfix="texttest")
         enabledLoggerNames = stdInfo + [ ("gui log", "dynamic_gui_log"), ("storytext replay log", "dynamic_gui_log"),
                                          ("kill processes", "dynamic_gui_log") ]
         dynamicGen.generate(enabledLoggerNames, *args)

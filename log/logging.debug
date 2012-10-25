@@ -572,6 +572,54 @@ formatter=debug
 args=(os.devnull, 'a')
 #args=('%(TEXTTEST_PERSONAL_LOG)s/virtualdisplay.diag', 'a')
 
+# ======= Section for Centre finding ======
+[logger_Centre finding]
+handlers=Centre finding
+qualname=Centre finding
+#level=DEBUG
+
+[handler_Centre finding]
+class=FileHandler
+formatter=debug
+args=(os.devnull, 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/centrefinding.diag', 'a')
+
+# ======= Section for Eclipse RCP jobs ======
+[logger_Eclipse RCP jobs]
+handlers=Eclipse RCP jobs
+qualname=Eclipse RCP jobs
+#level=DEBUG
+
+[handler_Eclipse RCP jobs]
+class=FileHandler
+formatter=debug
+args=(os.devnull, 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/eclipsercpjobs.diag', 'a')
+
+# ======= Section for Shortcut Tracker ======
+[logger_Shortcut Tracker]
+handlers=Shortcut Tracker
+qualname=Shortcut Tracker
+#level=DEBUG
+
+[handler_Shortcut Tracker]
+class=FileHandler
+formatter=debug
+args=(os.devnull, 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/shortcuttracker.diag', 'a')
+
+# ======= Section for TableIndexer ======
+[logger_TableIndexer]
+handlers=TableIndexer
+qualname=TableIndexer
+#level=DEBUG
+
+[handler_TableIndexer]
+class=FileHandler
+formatter=debug
+args=(os.devnull, 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/tableindexer.diag', 'a')
+
 # ======= Section for TreeModelIndexer ======
 [logger_TreeModelIndexer]
 handlers=TreeModelIndexer
@@ -644,12 +692,24 @@ formatter=debug
 args=(os.devnull, 'a')
 #args=('%(TEXTTEST_PERSONAL_LOG)s/storytextreplaylog.diag', 'a')
 
+# ======= Section for widget structure ======
+[logger_widget structure]
+handlers=widget structure
+qualname=widget structure
+#level=DEBUG
+
+[handler_widget structure]
+class=FileHandler
+formatter=debug
+args=(os.devnull, 'a')
+#args=('%(TEXTTEST_PERSONAL_LOG)s/widgetstructure.diag', 'a')
+
 # ====== Cruft that python logging module needs ======
 [loggers]
-keys=root,Action Runner,Activator,Check For Bugs,Collate Files,Environment Creator,File View GUI,FileComparison,Filter Actions,Find Applications,GUI notebook,GenerateWebPages,Idle Handlers,Interactive Actions,JUnit Report Writer,Mail Sender,Menu Bar,MultiEntryDictionary,Observable,Prepare Writedir,Progress Monitor,Queue System Submit,Reconnection,Run Dependent Text,Save Repository,Select Tests,Slave Server,Test Column GUI,Test Tree,TestComparison,TestSelectionFilter,Top Window,Unique Names,application,batch collect,catalogues,check for crashes,kill processes,locks,makeperformance,option finder,read environment,remote commands,run test,standard log,test objects,virtual display,TreeModelIndexer,TreeViewDescriber,gui log,gui map,storytext record,storytext replay log
+keys=root,Action Runner,Activator,Check For Bugs,Collate Files,Environment Creator,File View GUI,FileComparison,Filter Actions,Find Applications,GUI notebook,GenerateWebPages,Idle Handlers,Interactive Actions,JUnit Report Writer,Mail Sender,Menu Bar,MultiEntryDictionary,Observable,Prepare Writedir,Progress Monitor,Queue System Submit,Reconnection,Run Dependent Text,Save Repository,Select Tests,Slave Server,Test Column GUI,Test Tree,TestComparison,TestSelectionFilter,Top Window,Unique Names,application,batch collect,catalogues,check for crashes,kill processes,locks,makeperformance,option finder,read environment,remote commands,run test,standard log,test objects,virtual display,Centre finding,Eclipse RCP jobs,Shortcut Tracker,TableIndexer,TreeModelIndexer,TreeViewDescriber,gui log,gui map,storytext record,storytext replay log,widget structure
 
 [handlers]
-keys=root,Action Runner,Activator,Check For Bugs,Collate Files,Environment Creator,File View GUI,FileComparison,Filter Actions,Find Applications,GUI notebook,GenerateWebPages,Idle Handlers,Interactive Actions,JUnit Report Writer,Mail Sender,Menu Bar,MultiEntryDictionary,Observable,Prepare Writedir,Progress Monitor,Queue System Submit,Reconnection,Run Dependent Text,Save Repository,Select Tests,Slave Server,Test Column GUI,Test Tree,TestComparison,TestSelectionFilter,Top Window,TreeModelIndexer,TreeViewDescriber,Unique Names,application,batch collect,catalogues,check for crashes,gui log,gui map,kill processes,locks,makeperformance,option finder,read environment,remote commands,run test,standard log,stdout,test objects,storytext record,storytext replay log,virtual display
+keys=root,Action Runner,Activator,Centre finding,Check For Bugs,Collate Files,Eclipse RCP jobs,Environment Creator,File View GUI,FileComparison,Filter Actions,Find Applications,GUI notebook,GenerateWebPages,Idle Handlers,Interactive Actions,JUnit Report Writer,Mail Sender,Menu Bar,MultiEntryDictionary,Observable,Prepare Writedir,Progress Monitor,Queue System Submit,Reconnection,Run Dependent Text,Save Repository,Select Tests,Shortcut Tracker,Slave Server,TableIndexer,Test Column GUI,Test Tree,TestComparison,TestSelectionFilter,Top Window,TreeModelIndexer,TreeViewDescriber,Unique Names,application,batch collect,catalogues,check for crashes,gui log,gui map,kill processes,locks,makeperformance,option finder,read environment,remote commands,run test,standard log,stdout,storytext record,storytext replay log,test objects,virtual display,widget structure
 
 [formatters]
 keys=timed,debug

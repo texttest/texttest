@@ -222,7 +222,7 @@ class ReplaceText(plugins.ScriptWithArgs):
         argDict = self.parseArguments(args, [ "old", "new", "file", "regexp" ])
         tryAsRegexp = "regexp" not in argDict or argDict["regexp"] == "1"
         self.oldText = argDict["old"].replace("\\n", "\n")
-        self.multiLineTrigger = plugins.MultilineTextTrigger(self.oldText, tryAsRegexp)
+        self.multiLineTrigger = plugins.MultilineTextTrigger(self.oldText, tryAsRegexp, False)
         self.newText = argDict["new"].replace("\\n", "\n").rstrip()
         self.newMultiLineText = self.newText.split("\n")
         self.stems = []

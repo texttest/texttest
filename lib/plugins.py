@@ -1171,22 +1171,28 @@ class OptionFinder(OrderedDict):
             return item[1:].strip()
 
 class TextTrigger:
-    def __init__(self, text, tryAsRegexp=True):
+    def __init__(self, text, tryAsRegexp=True, matchEmptyString=True):
         self.text = text
         self.regex = None
+        self.matchEmptyString = matchEmptyString
         if tryAsRegexp and isRegularExpression(text):
             try:
                 self.regex = re.compile(text)
             except re.error:
                 pass
+
     def __repr__(self):
         return self.text
+
     def matches(self, line, *args):
         if self.regex:
             return self.regex.search(line)
         else:
-            # We just want to match the empty string when both are empty.
-            return (line.find(self.text) != -1 and self.text != "") or line == self.text
+            found = line.find(self.text) != -1
+            if not self.matchEmptyString:
+                found = (found and self.text != "") or line == self.text
+            return found
+
     def replace(self, line, newText):
         if self.regex:
             return re.sub(self.text, newText, line)
@@ -1197,14 +1203,14 @@ class TextTrigger:
         pass
 
 class MultilineTextTrigger(TextTrigger):
-    def __init__(self, text, tryAsRegexp):
-        TextTrigger.__init__(self, text, False)
+    def __init__(self, text, tryAsRegexp, matchEmptyString=True):
+        TextTrigger.__init__(self, text, False, matchEmptyString)
         self.triggers = []
         self.currentIndex = 0
         self.matchedLines = []
         lines = text.split("\n") if text else []
         for line in lines:
-            self.triggers.append(TextTrigger(line, tryAsRegexp))
+            self.triggers.append(TextTrigger(line, tryAsRegexp, matchEmptyString))
 
     def matches(self, line):
         return self._matches(line)[0]
@@ -1233,8 +1239,9 @@ class MultilineTextTrigger(TextTrigger):
                 self.matchedLines = []
             return text
         else:
-            # We want to remove matched lines if the current trigger text is the empty string.
-            text = "".join(self.matchedLines) + line if self.text[-1] !="\n" else line
+            if not self.matchEmptyString:
+                # We want to remove matched lines if the current trigger text is the empty string.
+                text = "".join(self.matchedLines) + line if self.text[-1] !="\n" else line
             self.reset()
             return text
         

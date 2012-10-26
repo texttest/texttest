@@ -442,10 +442,12 @@ class FindKnownBugs(guiplugins.ActionDialogGUI):
         if not all((test.stateInGui.isComplete() for test in self.currTestSelection)):
             return False
         
+        self.notify("ActionStart")
         bugMap = BugMap()
         self.rootSuites = self.findSelectedRootSuites()
         self.allKnownBugFiles = self.findAllKnownBugsFiles()
         for bugFile in self.allKnownBugFiles:
+            self.notify("ActionProgress")
             bugMap.readFromFile(bugFile)
             
         # We assume the first test is representative and only check all the bugs on that one
@@ -453,12 +455,15 @@ class FindKnownBugs(guiplugins.ActionDialogGUI):
         if bugs:
             self.optionGroup.setPossibleValues("bug", bugs)
             self.optionGroup.setValue("bug", bugs[0])
+        self.notify("ActionStop")
         return False
     
     def findAllKnownBugsFiles(self):
         files = []
+        def progress():
+            self.notify("ActionProgress")
         for app in self.currAppSelection:
-            for fileName in app.getFileNamesFromFileStructure("knownbugs"):
+            for fileName in app.getFileNamesFromFileStructure("knownbugs", progress):
                 if fileName not in files:
                     files.append(fileName)
         return files

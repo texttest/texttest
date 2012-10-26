@@ -1548,16 +1548,19 @@ class Application:
         if len(allFiles):
             return allFiles[-1]
         
-    def getFileNamesFromFileStructure(self, *args, **kw):
+    def getFileNamesFromFileStructure(self, stem, progressMethod=None):
         # Ignore what tests we have loaded, just look in the file structure
         dircaches = []
         for root, dirs, _ in os.walk(self.getDirectory()):
+            # Slow operation, we might need to tell e.g. the GUI that we've made progress
+            if progressMethod:
+                progressMethod()
             for dir in dirs:
                 if dir.startswith("."):
                     dirs.remove(dir)
                 else:
                     dircaches.append(DirectoryCache(os.path.join(root, dir)))
-        return self.getAllFileNames(dircaches, *args, **kw)
+        return self.getAllFileNames(dircaches, stem)
 
     def getAllFileNames(self, dircaches, stem, allVersions=False):
         versionPred = self.getExtensionPredicate(allVersions)

@@ -46,8 +46,14 @@ class FileComparison:
         self.freeTextBody = None
         if self.needsRecalculation():
             self.recalculationTime = time.time()
-        if self.tmpFile and os.path.isfile(self.tmpFile):
-            self.cacheDifferences(test, False)        
+        if self.tmpFile:
+            if os.path.isfile(self.tmpFile):
+                self.cacheDifferences(test, False)
+            elif self.differenceCache == self.DIFFERENT:
+                # File has been removed
+                self.tmpFile = None
+                self.tmpCmpFile = None
+                self.differenceCache = self.SAME     
             
     def split(self, test, separators):
         separator = separators.get(self.stem)

@@ -133,7 +133,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         self.diag = logging.getLogger("Find Applications")
         self.appSuites = OrderedDict()
         self.exitCode = 0
-        
+
     def printStackTrace(self, *args):
         sys.stderr.write("Received SIGQUIT: showing current stack trace below:\n")
         from traceback import print_stack
@@ -493,8 +493,9 @@ class TextTest(plugins.Responder, plugins.Observable):
             signal.signal(sig, handler)
 
     def handleSignal(self, sig, *args):
-        # Don't respond to the same signal more than once!
-        signal.signal(sig, signal.SIG_IGN)
+        # Respond to the same signal only once and ignore all others!
+        for ignoreSignal in self.getSignals():
+            signal.signal(ignoreSignal, signal.SIG_IGN)
         signalText = self.getSignalText(sig)
         self.writeTermMessage(signalText)
         self.notify("Quit", sig)

@@ -363,7 +363,7 @@ class InsertShortcuts(plugins.ScriptWithArgs):
             for _, shortcut in shortcutManager.shortcuts:
                 recordScript.registerShortcut(shortcut)
             
-            with open(stdFile, "r") as readFile:
+            with open(stdFile, "rU") as readFile:
                 for line in readFile:
                     recordScript.record(line.strip("\n"))
 

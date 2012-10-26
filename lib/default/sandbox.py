@@ -60,6 +60,10 @@ class PrepareWriteDirectory(plugins.Action):
             currLocation = os.path.join(localTmpDir, plugins.relpath(oldBackupPath, writeDir))
             os.rename(currLocation, oldBackupPath)
         os.rename(localTmpDir, newBackupPath)
+        localWriteDir = test.getDirectory(temporary=1, local=1)
+        if localWriteDir != writeDir:
+            plugins.rmtree(localWriteDir)
+            plugins.ensureDirectoryExists(localWriteDir)
 
     def findBackupPaths(self, test):
         number = 1

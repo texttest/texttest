@@ -174,7 +174,7 @@ class PrepareWriteDirectory(plugins.Action):
         if copyScript:
             try:
                 args = getScriptArgs(copyScript)
-                subprocess.call(args + [ fullPath, target ])
+                subprocess.call(args + [ fullPath, target ], env=test.getRunEnvironment())
                 return
             except OSError:
                 pass # If this doesn't work, assume it's on the remote machine and we'll handle it later

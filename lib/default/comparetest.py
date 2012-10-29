@@ -354,7 +354,8 @@ class TestComparison(BaseTestComparison):
         for comparison in self.filterComparisons(self.missingResults, onlyStems):
             self.updateStatus(test, str(comparison), versionString)
             comparison.saveMissing(versionString, self.fakeMissingFileText(), backupVersions)
-        if len(onlyStems) == 0:  # Save any external file edits we may have made. Don't do this on partial saves.
+        # Save any external file edits we may have made. Only do this on partial saves for CaptureMock related files
+        if len(onlyStems) == 0 or "externalmocks" in onlyStems or "traffic" in onlyStems:  
             self.saveFileEdits(test, versionString)
         elif any(("/" in stem for stem in onlyStems)): # We've explicitly selected split files
             self.rebuildFromSplit(onlyStems, test, exact, versionString, backupVersions)

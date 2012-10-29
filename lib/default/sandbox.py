@@ -4,6 +4,7 @@ from runtest import Killed
 from jobprocess import killArbitaryProcess, killSubProcessAndChildren
 from ordereddict import OrderedDict
 from string import Template
+from tempfile import mkdtemp
 
 
 def getScriptArgs(script):
@@ -53,7 +54,7 @@ class PrepareWriteDirectory(plugins.Action):
     def backupPreviousData(self, test):
         writeDir = test.getDirectory(temporary=1)
         newBackupPath, oldBackupPaths = self.findBackupPaths(test)
-        localTmpDir = os.path.join(os.path.dirname(writeDir), os.path.basename(newBackupPath))
+        localTmpDir = mkdtemp(dir=os.path.dirname(writeDir), prefix=os.path.basename(newBackupPath) + ".")
         os.rename(writeDir, localTmpDir)
         test.makeWriteDirectory()
         for oldBackupPath in oldBackupPaths:

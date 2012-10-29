@@ -2348,9 +2348,14 @@ General GUI Enhancements:
 Static GUI Enhancements:
     - Refresh now reloads all test-specific config files
 	Previously only reloaded the main application config files
+    - (GUI testing) Can now automatically insert StoryText shortcuts into all tests without running them
+	New script "default.InsertShortcuts" and item in Actions menu.
 Dynamic GUI Enhancements:
     - "Recompute Status" now runs in the background and doesn't lock the GUI
 Framework Enhancements:
+    - Can now make use of separate sandbox locations for running the test itself and for collecting logfiles / results
+	Set default_texttest_local_tmp in your config file, or TEXTTEST_LOCAL_TMP in your environment. See website.
+	(Usual setup is to run the test on a local disk and write its logfiles to a shared disk.)
 Batch Report Enhancements:
     - Now sort the applications in order of number of tests before generating HTML report
 	If there are many large slow-to-generate test suites it's best they don't hold up small fast ones.
@@ -2364,4 +2369,8 @@ Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
 Bug Fixes:
     - Fixed stacktrace for HTML report generation when the location doesn't exist yet
     - "Replace Text in Files" handles removing lines in a more consistent way
+    - Fixed stacktrace when pressing recompute and temporary files have been externally removed
+    - "Find Failure Information" now shows a progress indicator instead of just leaving the menu item present
+    - Ignore kill signals after the first one has arrived, so we show the correct reason for being killed
+    - Fixed Jira plugin problem: stacktrace when Jira bug has no description
 

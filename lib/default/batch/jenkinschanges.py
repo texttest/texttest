@@ -25,7 +25,7 @@ def getFingerprint(jobRoot, jobName, buildName):
             if jobName not in prevString:
                 match = versionRegex.search(prevString)
                 if match:
-                    prevString = prevString.replace(match.group(0), versionRegex.pattern)
+                    prevString = prevString.replace(match.group(0), versionRegex.pattern) + "$"
                 fingerprint[prevString] = currString
             prevString = None
         else:

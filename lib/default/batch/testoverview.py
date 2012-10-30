@@ -475,18 +475,21 @@ class TestTable:
             buildNumber = tag.split(".")[-1]
             allChanges = self.findJenkinsChanges(prevBuildNumber, buildNumber, cacheDir)
             cont = HTMLgen.Container()
-            for i, (author, target, bugs) in enumerate(allChanges):
+            aborted = False
+            for i, (authorOrMessage, target, bugs) in enumerate(allChanges):
                 if i:
                     cont.append(HTMLgen.BR())
                 if target:
-                    cont.append(HTMLgen.Href(target, author))
+                    cont.append(HTMLgen.Href(target, authorOrMessage))
                 else:
-                    cont.append(HTMLgen.Font(author, color="red")) 
+                    cont.append(HTMLgen.Font(authorOrMessage, color="red"))
+                    aborted = "Aborted" in authorOrMessage
                 for bugText, bugTarget in bugs:
                     cont.append(HTMLgen.Href(bugTarget, bugText))
                 hasData = True
             row.append(HTMLgen.TD(cont, bgcolor = bgColour))
-            prevBuildNumber = buildNumber
+            if not aborted:
+                prevBuildNumber = buildNumber
         if hasData:
             return HTMLgen.TR(*row)
             

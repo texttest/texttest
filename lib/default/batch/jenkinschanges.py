@@ -5,6 +5,9 @@ from ordereddict import OrderedDict
 from difflib import SequenceMatcher
 import re
 
+class AbortedException(RuntimeError):
+    pass
+
 def fingerprintStrings(document):
     for obj in document.getElementsByTagName("hudson.tasks.Fingerprinter_-FingerprintAction"):
         for entry in obj.getElementsByTagName("string"):
@@ -30,6 +33,8 @@ def getFingerprint(jobRoot, jobName, buildName):
             prevString = None
         else:
             prevString = currString
+    if not fingerprint and getResult(document) == "ABORTED":
+        raise AbortedException, "Aborted in Jenkins"
     return fingerprint
     
 def parseAuthor(author):
@@ -115,10 +120,9 @@ def organiseByProject(jobRoot, differences, markedArtefacts):
     
     return changes, projectData
 
-def buildFailed(document):
+def getResult(document):
     for entry in document.getElementsByTagName("result"):
-        result = entry.childNodes[0].nodeValue
-        return result == "FAILURE"
+        return entry.childNodes[0].nodeValue
 
 def hashesEquivalent(hashes, otherHashes):
     return any((hashes[i] == otherHashes[i] for i in range(len(hashes))))
@@ -138,7 +142,7 @@ def getProjectChanges(jobRoot, projectData):
     
             document = parse(xmlFile)
             hashes = [ getHash(document, artefact) for artefact, oldHash, hash in diffs ]
-            if not buildFailed(document):
+            if getResult(document) != "FAILURE":
                 if hashesEquivalent(hashes, newHashes):
                     active = True
                 elif hashesEquivalent(hashes, oldHashes):
@@ -175,7 +179,11 @@ def _getChanges(build1, build2, workspace, jenkinsUrl, bugSystemData={}, markedA
     else:
         jobRoot = os.path.join(os.path.dirname(rootDir), "jobs")
     # Find what artefacts have changed between times build
-    differences = getFingerprintDifferences(build1, build2, jobName, jobRoot)
+    try:
+        differences = getFingerprintDifferences(build1, build2, jobName, jobRoot)
+    except AbortedException, e:
+        # If it was aborted, say this
+        return [(str(e), "", [])]
     # Organise them by project
     changes, projectData = organiseByProject(jobRoot, differences, markedArtefacts)
     # For each project, find out which builds were affected

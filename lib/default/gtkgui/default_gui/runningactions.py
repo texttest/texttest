@@ -95,7 +95,7 @@ class BasicRunningAction:
         return [ self.optionGroup ]
 
     def getTextTestOptions(self, filterFile, app, usecase):
-        ttOptions = self.getCmdlineOptionForApps()
+        ttOptions = self.getCmdlineOptionForApps() if filterFile else []
         for group in self.getOptionGroups():
             ttOptions += self.getCommandLineArgs(group, self.getCommandLineKeys(usecase))
         # May be slow to calculate for large test suites, cache it

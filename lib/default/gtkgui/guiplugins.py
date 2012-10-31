@@ -46,14 +46,21 @@ class ProcessTerminationMonitor(plugins.Observable):
         gobject.child_watch_add(pidOrHandle, self.processExited)
 
     def processExited(self, pid, *args):
+        output = ""
         if self.processesForKill.has_key(pid):
+            process = self.processesForKill[pid][0]
+            if process.stdout is not None:
+                output = process.stdout.read().strip()
             del self.processesForKill[pid]
             
         if self.exitHandlers.has_key(pid):
             exitHandler, exitHandlerArgs = self.exitHandlers.pop(pid)
             if exitHandler:
                 exitHandler(*exitHandlerArgs)
-    
+                if output:
+                    command, arg = output.split(" ", 1)
+                    self.notify(command, arg)
+                    
     def notifyKillProcesses(self, sig=None):
         # Don't leak processes
         if len(self.processesForKill) == 0:

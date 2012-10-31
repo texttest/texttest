@@ -7,6 +7,7 @@ import plugins, os
 from .. import guiplugins
 from string import Template
 from copy import copy
+import subprocess
 
 class FileViewAction(guiplugins.ActionGUI):
     def __init__(self, *args, **kw):
@@ -127,12 +128,13 @@ class FileViewAction(guiplugins.ActionGUI):
     def getSignalsSent(self):
         return [ "ViewerStarted" ]
 
-    def startViewer(self, cmdArgs, description, *args, **kwargs):
+    def startViewer(self, cmdArgs, description, checkOutput=False, **kwargs):
         testDesc = self.testDescription()
         fullDesc = description + testDesc
         nullFile = open(os.devnull, "w")
+        stdout = subprocess.PIPE if checkOutput else nullFile
         self.notify("Status", 'Started "' + description + '" in background' + testDesc + '.')
-        guiplugins.processMonitor.startProcess(cmdArgs, fullDesc, stdout=nullFile, stderr=nullFile, *args, **kwargs)
+        guiplugins.processMonitor.startProcess(cmdArgs, fullDesc, stdout=stdout, stderr=nullFile, **kwargs)
         self.notifyThreaded("ViewerStarted") # Don't call application events directly in the GUI thread
 
     def getStem(self, fileName):
@@ -181,7 +183,8 @@ class ViewInEditor(FileViewAction):
     def viewFile(self, fileName, viewTool, exitHandler, exitHandlerArgs):
         cmdArgs, descriptor, env = self.getViewCommand(fileName, viewTool)
         description = descriptor + " " + os.path.basename(fileName)
-        self.startViewer(cmdArgs, description=description, env=env,
+        checkOutput = cmdArgs[0] == "storytext_editor"
+        self.startViewer(cmdArgs, description=description, checkOutput=checkOutput, env=env,
                          exitHandler=exitHandler, exitHandlerArgs=exitHandlerArgs)
         
     def getViewerEnvironment(self, cmdArgs):
@@ -317,6 +320,7 @@ class EditTestFileInEditor(ViewTestFileInEditor):
     
     def _getStockId(self):
         pass # don't use same stock for both
+    
 
 class ViewFilteredTestFileInEditor(ViewTestFileInEditor):
     def _getStockId(self):

@@ -34,7 +34,7 @@ class BasicRunningAction:
         app = self.currAppSelection[0]
         writeDir = os.path.join(self.getLogRootDirectory(app), "dynamic_run" + str(self.runNumber))
         plugins.ensureDirectoryExists(writeDir)
-        filterFile = filterFileOverride or self.getFilterFile(writeDir)
+        filterFile = self.getFilterFile(writeDir, filterFileOverride)
         ttOptions = runModeOptions + self.getTextTestOptions(filterFile, app, usecase)
         self.diag.info("Starting " + usecase + " run of TextTest with arguments " + repr(ttOptions))
         logFile = os.path.join(writeDir, "output.log")
@@ -74,12 +74,15 @@ class BasicRunningAction:
     def getSignalsSent(self):
         return [ "SaveSelection" ]
 
-    def getFilterFile(self, writeDir):
+    def getFilterFile(self, writeDir, filterFileOverride):
         # Because the description of the selection can be extremely long, we write it in a file and refer to it
         # This avoids too-long command lines which are a problem at least on Windows XP
-        filterFileName = os.path.join(writeDir, "gui_select")
-        self.notify("SaveSelection", filterFileName)
-        return filterFileName
+        if filterFileOverride is None:
+            filterFileName = os.path.join(writeDir, "gui_select")
+            self.notify("SaveSelection", filterFileName)
+            return filterFileName
+        elif filterFileOverride is not NotImplemented: 
+            return filterFileOverride
     
     def getInterpreterArgs(self):
         interpreterArg = os.getenv("TEXTTEST_DYNAMIC_GUI_INTERPRETER", "") # Alternative interpreter for the dynamic GUI : mostly useful for coverage / testing
@@ -98,7 +101,8 @@ class BasicRunningAction:
         # May be slow to calculate for large test suites, cache it
         self.testCount = len(self.getTestCaseSelection())
         ttOptions += [ "-count", str(self.testCount * self.getCountMultiplier()) ]
-        ttOptions += [ "-f", filterFile ]
+        if filterFile:
+            ttOptions += [ "-f", filterFile ]
         tmpFilterDir = self.getTmpFilterDir(app)
         if tmpFilterDir:
             ttOptions += [ "-fd", tmpFilterDir ]
@@ -662,8 +666,8 @@ class RunScriptAction(BasicRunningAction):
     def getUseCaseName(self):
         return "script"
 
-    def performOnCurrent(self):
-        self.startTextTestProcess(self.getUseCaseName(), [ "-g" ] + self.getVanillaOption())
+    def performOnCurrent(self, **kw):
+        self.startTextTestProcess(self.getUseCaseName(), [ "-g" ] + self.getVanillaOption(), **kw)
 
     def getCommandLineArgs(self, optionGroup, *args):
         args = [ self.scriptName() ]
@@ -758,6 +762,15 @@ class InsertShortcuts(RunScriptAction, guiplugins.OptionGroupGUI):
     def getTootip(self):
         return self._getTitle()
     
+    def notifyShortcut(self, *args):
+        self.showQueryDialog(self.getParentWindow(), "New shortcuts were created. Would you like to insert them into all usecases now?",
+                             gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respondShortcut)
+        
+    def respondShortcut(self, dialog, ans, *args):
+        if ans == gtk.RESPONSE_YES:
+            self.performOnCurrent(filterFileOverride=NotImplemented)
+        dialog.hide()
+        
     def performedDescription(self):
         return "Inserted shortcuts into usecases for"
     

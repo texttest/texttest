@@ -55,6 +55,9 @@ class PrepareWriteDirectory(plugins.Action):
         writeDir = test.getDirectory(temporary=1)
         newBackupPath, oldBackupPaths = self.findBackupPaths(test)
         localTmpDir = mkdtemp(dir=os.path.dirname(writeDir), prefix=os.path.basename(newBackupPath) + ".")
+        if os.name == "nt":
+            # Windows doesn't manage to overwrite empty directories. Linux does.
+            os.rmdir(localTmpDir)
         os.rename(writeDir, localTmpDir)
         test.makeWriteDirectory()
         for oldBackupPath in oldBackupPaths:

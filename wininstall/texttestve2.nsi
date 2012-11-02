@@ -243,15 +243,23 @@ Section /o "StoryText for Python GUI testing" SEC07
   done:
 SectionEnd
 
-Section /o "StoryText for Java GUI testing" SEC08
+SectionGroup /e "StoryText for Java" G2
+Section /o "Jython" g2o1
   Call installJython
-  IfErrors onError
+  IfErrors onError done
+  onError:
+    Abort
+  done:
+SectionEnd
+
+Section /o "StoryText for Java GUI testing" g2o2
   Call configureStorytextJava
   IfErrors onError done
   onError:
     Abort
   done:
 SectionEnd
+SectionGroupEnd
 
 Section "Texttest" SEC09
   ;SectionIn RO
@@ -272,7 +280,7 @@ SectionEnd
 ; ============== Section macros ========================
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
   !insertmacro MUI_DESCRIPTION_TEXT ${SEC07} "Installing StoryText will require an internet connection."
-  !insertmacro MUI_DESCRIPTION_TEXT ${SEC08} "Installing StoryText will require an internet connection.$\r$\n$\r$\n \
+  !insertmacro MUI_DESCRIPTION_TEXT ${G2} "Installing StoryText will require an internet connection.$\r$\n$\r$\n \
 Installing StoryText for Java GUIs requires Java Runtime Environment (JRE) to be pre-installed.$\r$\n"
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
@@ -302,12 +310,19 @@ FunctionEnd
 Function installJython
   File "${JYTHON_INSTALLER}"
   Call checkJava
-  ExecWait '$JAVA_EXE -jar $OUTDIR\${JYTHON_INSTALLER} -s -d "$JYTHON_PATH"'
-  IfErrors onError
-  Call installVirtualEnvOnJython
-  IfErrors onError
-  Call updateJythonPath
-  IfErrors onError done
+  IfFileExists "$JYTHON_PATH" removeOld install
+  removeOld:
+    RMDir /r "$JYTHON_PATH"
+  checkEmpty:
+    sleep 500
+    IfFileExists "$JYTHON_PATH" checkEmpty install
+  install:
+    ExecWait '$JAVA_EXE -jar $OUTDIR\${JYTHON_INSTALLER} -s -d "$JYTHON_PATH"'
+    IfErrors onError
+    Call installVirtualEnvOnJython
+    IfErrors onError
+    Call updateJythonPath
+    IfErrors onError done
   onError:
     Abort
   done:
@@ -363,11 +378,18 @@ Function configureStorytextPython
 FunctionEnd
 
 Function configureStorytextJava
+  IfFileExists "$VIRTUALENV_PATH\${VIRTUAL_JYTHON}\*.*" install
+  Call installVirtualEnvOnPython
+  IfErrors 0 install
+  MessageBox MB_OK|MB_ICONSTOP "Failed to install virtual environment on Jython."
+  Quit
+  install:
   ;ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring storytext on jython & ${VIRTUAL_JYTHON}\bin\jython ${VIRTUAL_JYTHON}\bin\pip install storytext && EXIT'
   ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring storytext on jython & ${VIRTUAL_JYTHON}\bin\jython ${VIRTUAL_JYTHON}\bin\easy_install storytext && EXIT'
   IfErrors onError done
   onError:
-    Abort
+    MessageBox MB_OK|MB_ICONSTOP "Failed to install StoryText on Jython."
+    Quit
   done:
 FunctionEnd
 
@@ -433,15 +455,30 @@ Function installVirtualEnvOnPython
 Functionend
 
 Function installVirtualEnvOnJython
-  ;ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO installing virtualenv on jython & "$PYTHON_PATH"python virtualenv.py -p $JYTHON_PATH\bin\jython.bat ${VIRTUAL_JYTHON} && EXIT'
-  ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO installing virtualenv on jython & $JYTHON_PATH\bin\jython virtualenv.py ${VIRTUAL_JYTHON} && EXIT'
+  IfFileExists "$VIRTUALENV_PATH\${VIRTUAL_JYTHON}" removeOld install
+  removeOld:
+    RMDir /r "$VIRTUALENV_PATH\${VIRTUAL_JYTHON}"
+  checkEmpty:
+    sleep 500
+    IfFileExists "$VIRTUALENV_PATH\${VIRTUAL_JYTHON}" checkEmpty install
+  install:
+    ;ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO installing virtualenv on jython & "$PYTHON_PATH"python virtualenv.py -p $JYTHON_PATH\bin\jython.bat ${VIRTUAL_JYTHON} && EXIT'
+    ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO installing virtualenv on jython & $JYTHON_PATH\bin\jython virtualenv.py ${VIRTUAL_JYTHON} && EXIT'
 Functionend
 
+Function copyTexttestBin
+  CopyFiles /SILENT "$INSTDIR\${TT_BIN}\texttest.py" $INSTDIR
+  Rename "$INSTDIR\texttest.py" "$INSTDIR\texttest.pyw"
+  CopyFiles /SILENT "$INSTDIR\texttest.pyw" $INSTDIR\${TT_BIN}
+  Delete "$INSTDIR\texttest.pyw"
+FunctionEnd
+
 Function makeShortcuts
+  Call copyTexttestBin
   CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
-  CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\${TT_BIN}\texttest.py" "" "$OUTDIR\texttest-icon-dynamic.ico" ""
+  CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\${TT_BIN}\texttest.pyw" "" "$OUTDIR\texttest-icon-dynamic.ico" ""
   CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
-  CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\${TT_BIN}\texttest.py" "" "$OUTDIR\texttest-icon-dynamic.ico" ""
+  CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\${TT_BIN}\texttest.pyw" "" "$OUTDIR\texttest-icon-dynamic.ico" ""
   !ifdef JEPPESEN
     CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\StoryTextUpdater.lnk" "cmd.exe" "/K $INSTDIR\storytext_updater.bat"
     CreateShortcut "$DESKTOP\StoryTextUpdater.lnk" "cmd.exe" "/K $INSTDIR\storytext_updater.bat"

@@ -70,10 +70,15 @@ def filterReply(bugInfo, statuses, resolutions):
     else:
         transfer(bugInfo, newBugInfo, "assignee", "\n")
     newBugInfo["components"] = convertToString(bugInfo["components"])
-    remainder = filter(lambda k: k not in ignoreFields and k not in newBugInfo and isInteresting(bugInfo[k]), bugInfo.keys())
+    priorityStr = convertToString(bugInfo["priority"])
+    priorityStr = str(int(priorityStr) -1) if priorityStr.isdigit() else priorityStr
+    remainder = filter(lambda k: k not in ignoreFields and (k not in newBugInfo or k == "priority") and isInteresting(bugInfo[k]), bugInfo.keys())
     remainder.sort()
     for key in remainder:
-        transfer(bugInfo, newBugInfo, key)
+        if key == "priority":
+            newBugInfo["priority"] = str(priorityStr)
+        else:
+            transfer(bugInfo, newBugInfo, key)
     return newBugInfo
     
 def makeURL(location, bugText):

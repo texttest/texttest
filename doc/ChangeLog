@@ -2349,7 +2349,7 @@ Static GUI Enhancements:
     - Refresh now reloads all test-specific config files
 	Previously only reloaded the main application config files
     - (GUI testing) Can now automatically insert StoryText shortcuts into all tests without running them
-	New script "default.InsertShortcuts" and item in Actions menu.
+	New script "default.InsertShortcuts" and item in Actions menu. Auto-detected when shortcuts are added via StoryText Editor.
 Dynamic GUI Enhancements:
     - "Recompute Status" now runs in the background and doesn't lock the GUI
     - Showing now previews of succeeded files
@@ -2357,12 +2357,15 @@ Framework Enhancements:
     - Can now make use of separate sandbox locations for running the test itself and for collecting logfiles / results
 	Set default_texttest_local_tmp in your config file, or TEXTTEST_LOCAL_TMP in your environment. See website.
 	(Usual setup is to run the test on a local disk and write its logfiles to a shared disk.)
+    - Scripts used 'copy_test_path_script' can now use the environment variables set for the test run.
+	Particularly useful if they need to refer to the logging location in a setup using the above default_texttest_local_tmp.
 Batch Report Enhancements:
     - Now sort the applications in order of number of tests before generating HTML report
 	If there are many large slow-to-generate test suites it's best they don't hold up small fast ones.
     - Applications whose test suite is removed but where old results still exist are still linked from the main index page
 	Can be important, especially when live versions exist of older versions of the same apps.
     - Jenkins change handling deals with the new directory structure in Jenkins as well as the "legacy" one.
+    - Jenkins change handling deals with aborted runs in a better way
 Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
     - SGE errors handled in a better way, warn when we get a job status we don't expect
     - Don't lose track of SGE jobs that end up in "St" state
@@ -2377,4 +2380,6 @@ Bug Fixes:
     - Fixed Jira plugin problem: wrong prio in jira info
     - Fixed Windows installer: failed when only TextTest and StoryText selected
     - Fixed Windows installer: get rid of the command window
-    - Fixed "TEXTTEST EXCEPTION" when rerunning test after knownbug
+    - Fixed occasional "TEXTTEST EXCEPTION" due to temporary file collisions when rerunning test after knownbug
+    - Fixed bug where Jenkins change handling was fooled by artefacts whose names extend each other
+    - Fixed problem with CaptureMock tests that capture files: save them when the files that refer to them are saved.

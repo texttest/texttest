@@ -2352,6 +2352,7 @@ Static GUI Enhancements:
 	New script "default.InsertShortcuts" and item in Actions menu.
 Dynamic GUI Enhancements:
     - "Recompute Status" now runs in the background and doesn't lock the GUI
+    - Showing now previews of succeeded files
 Framework Enhancements:
     - Can now make use of separate sandbox locations for running the test itself and for collecting logfiles / results
 	Set default_texttest_local_tmp in your config file, or TEXTTEST_LOCAL_TMP in your environment. See website.
@@ -2373,4 +2374,7 @@ Bug Fixes:
     - "Find Failure Information" now shows a progress indicator instead of just leaving the menu item present
     - Ignore kill signals after the first one has arrived, so we show the correct reason for being killed
     - Fixed Jira plugin problem: stacktrace when Jira bug has no description
-
+    - Fixed Jira plugin problem: wrong prio in jira info
+    - Fixed Windows installer: failed when only TextTest and StoryText selected
+    - Fixed Windows installer: get rid of the command window
+    - Fixed "TEXTTEST EXCEPTION" when rerunning test after knownbug

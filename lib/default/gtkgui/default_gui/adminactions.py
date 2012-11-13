@@ -1482,8 +1482,12 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         return stems
 
     def checkSanity(self):
-        if len(self.textGroup.getOptionValue("search_string")) == 0:
+        searchStr = self.textGroup.getOptionValue("search_string")
+        if len(searchStr) == 0:
             raise plugins.TextTestError, "Must fill in the field 'text or regexp to match'"
+        elif searchStr.startswith(" "):
+            raise plugins.TextTestError, "'Knownbugs' file format cannot handle leading spaces in search string.\n" + \
+                                         "If the line starts with spaces, suggest to add a ^ at the start, to match the beginning of the line"
         if self.bugSystemGroup.getOptionValue("bug_system") == "<none>":
             if len(self.textDescGroup.getOptionValue("full_description")) == 0 or \
                    len(self.textDescGroup.getOptionValue("brief_description")) == 0:

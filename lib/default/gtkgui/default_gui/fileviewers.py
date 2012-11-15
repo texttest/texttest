@@ -364,6 +364,13 @@ class ViewOrigFileInEditor(ViewFilteredOrigFileInEditor):
         return "View Original File"
     def useFiltered(self):
         return False
+        
+class EditOrigFileInEditor(ViewOrigFileInEditor):
+    def _getTitle(self):
+        return "Edit Original File"
+    def getViewToolName(self, *args):
+        return self.getConfigValue(self.getToolConfigEntry(), "default")
+
 
 class ViewContentFilteredOrigFileInEditor(ContentFilterViewer, ViewFilteredOrigFileInEditor):
     def _getTitle(self):
@@ -535,7 +542,7 @@ def getInteractiveActionClasses(dynamic):
     classes = [ ViewTestFileInEditor, EditTestFileInEditor ]
     if dynamic:
         classes += [ ViewFilteredTestFileInEditor, ViewContentFilteredTestFileInEditor,
-                     ViewOrigFileInEditor, ViewContentFilteredOrigFileInEditor, ViewFilteredOrigFileInEditor,
+                     ViewOrigFileInEditor, EditOrigFileInEditor, ViewContentFilteredOrigFileInEditor, ViewFilteredOrigFileInEditor,
                      ViewFileDifferences, ViewContentFilteredFileDifferences, ViewFilteredFileDifferences,
                      ViewPairwiseDifferences, ViewContentFilteredPairwiseDifferences, ViewFilteredPairwiseDifferences,
                      FollowFile ]

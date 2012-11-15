@@ -1,0 +1,9 @@
+<ui>
+
+  <popup name="TestFilePopupMenu">
+    <placeholder name="ExtraOrigViewers">
+      <menuitem action="Edit Original File"/>
+    </placeholder>
+  </popup>
+
+</ui>

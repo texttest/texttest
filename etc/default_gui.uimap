@@ -1026,3 +1026,6 @@ activate = edit selected file
 [Name=Insert Shortcuts into Usecases]
 activate = insert shortcuts into usecases
 
+[Name=Edit Original File]
+activate = edit original file
+

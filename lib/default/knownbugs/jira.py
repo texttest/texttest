@@ -110,7 +110,7 @@ def findBugInfo(bugId, location, username, password):
     except xmlrpclib.Fault, e:
         return "LOGIN FAILED", e.faultString, False
     except Exception, e:
-        message = "Failed to communicate with '" + scriptLocation + "': " + str(e) + ".\n\nPlease make sure that the configuration entry 'bug_system_location' points to a correct location of a Jira version 3.x installation. The current value is '" + location + "'."
+        message = "Failed to log in to '" + scriptLocation + "': " + str(e) + ".\n\nPlease make sure that the configuration entry 'bug_system_location' points to a correct location of a Jira version 3.x installation. The current value is '" + location + "'."
         return "BAD SCRIPT", message, False
 
     try:
@@ -123,7 +123,10 @@ def findBugInfo(bugId, location, username, password):
         return parseReply(bugInfo, statuses, resolutions, location)
     except xmlrpclib.Fault, e:
         return "NONEXISTENT", e.faultString, False
-    
+    except Exception, e:
+        message = "Failed to fetch data from '" + scriptLocation + "': " + str(e)
+        return "BAD SCRIPT", message, False
+
 # Used by Jenkins plugin
 def getBugsFromText(text, location):
     bugRegex = re.compile("[A-Z]{2,}-[0-9]+")

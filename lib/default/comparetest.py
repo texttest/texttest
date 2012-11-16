@@ -1,7 +1,7 @@
 import os, performance, knownbugs, filecmp, string, plugins, shutil, logging
 from ordereddict import OrderedDict
 from tempfile import mktemp
-from comparefile import FileComparison
+from comparefile import FileComparison, SplitFileComparison
 
 plugins.addCategory("success", "succeeded")
 plugins.addCategory("failure", "FAILED")
@@ -389,7 +389,8 @@ class TestComparison(BaseTestComparison):
             fileComp.setStandardFile(stdFile)
         
     def recalculateComparisons(self, test):
-        for fileComp in self.allResults:
+        self.removeSplitComparisons(test)
+        for fileComp in self.allResults:      
             fileComp.recompute(test)
     
     def splitResultFiles(self, *args):
@@ -421,6 +422,14 @@ class TestComparison(BaseTestComparison):
         newState.categorise()
         return knownbugs.CheckForBugs().checkTest(test, newState)[0] or newState
     
+    def removeSplitComparisons(self, test):
+        toRemove = []
+        for fileComp in self.allResults:
+            if isinstance(fileComp, SplitFileComparison):
+                toRemove.append(fileComp)
+                fileComp.unsplit(test)
+        for comp in toRemove:
+            self.allResults.remove(comp)
 
 # for back-compatibility, preserve old names
 performance.PerformanceTestComparison = TestComparison

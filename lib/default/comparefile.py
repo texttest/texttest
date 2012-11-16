@@ -65,7 +65,7 @@ class FileComparison:
                      for origPart, tmpPart in izip(origParts, tmpParts) ]
         else:
             return []
-        
+    
     def makeDeltaName(self, name):
         parts = name.rsplit("_", 1)
         lastpart = parts[-1]
@@ -103,6 +103,18 @@ class FileComparison:
         currWriteFile.close()
         return parts
 
+    def unsplit(self, test):
+        path = test.getDirectory(temporary=True, forFramework=True)
+        for dir in self.getSplitDirs(path):
+            plugins.rmtree(os.path.join(path, dir))
+
+    def getSplitDirs(self, path):
+        dirs = []
+        for f in os.listdir(path):
+            if os.path.isdir(os.path.join(path, f)) and f.endswith("_split"):
+                dirs.append(f)
+        return dirs
+        
     def __getstate__(self):
         # don't pickle the diagnostics
         state = {}

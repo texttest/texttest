@@ -3,7 +3,7 @@
 Code to do with the grid engine master process, i.e. submitting slave jobs and waiting for them to report back
 """
 
-import plugins, os, sys, socket, subprocess, signal, logging, time
+import plugins, os, sys, socket, signal, logging, time
 from utils import *
 from Queue import Queue
 from SocketServer import ThreadingTCPServer, StreamRequestHandler
@@ -107,7 +107,7 @@ class QueueSystemServer(BaseActionRunner):
         attempts = int(os.getenv("TEXTTEST_QS_POLL_WAIT", "5")) * 2 # Amount of time to wait before initiating polling of SGE
         if attempts >= 0: 
             while True:
-                for i in range(attempts):
+                for _ in range(attempts):
                     time.sleep(0.5)
                     if self.allComplete or self.exited:
                         return
@@ -586,7 +586,7 @@ class QueueSystemServer(BaseActionRunner):
     def setSuspendStateForTests(self, tests, newState):
         for test in tests:
             queueSystem = self.getQueueSystem(test)
-            for jobId, jobName in self.getJobInfo(test):
+            for jobId, _ in self.getJobInfo(test):
                 queueSystem.setSuspendState(jobId, newState)
     
     def jobStarted(self, test):

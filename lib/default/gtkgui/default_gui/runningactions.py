@@ -496,6 +496,9 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
     def getTmpFilterDir(self, app):
         return "" # don't want selections returned here, send them to the static GUI
     
+    def getConfirmationMessage(self):
+        return BasicRunningAction.getConfirmationMessage(self)
+    
     def getLogRootDirectory(self, app):
         if self.inputOptions.has_key("f"):
             logRootDir = os.path.dirname(self.inputOptions["f"])
@@ -504,7 +507,7 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
         return BasicRunningAction.getLogRootDirectory(self, app)
 
     def getAppIdentifier(self, app):
-        parts = filter(lambda part: not part.startswith("copy_"), [ app.name ] + app.versions)
+        parts = filter(lambda part: not part.startswith("copy_"), [ app.name ])
         return ".".join(parts)
 
     def checkTestRun(self, errFile, testSel, filterFile, usecase):

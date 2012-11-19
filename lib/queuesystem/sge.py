@@ -7,7 +7,6 @@ from time import sleep
 # Used by master process for submitting, deleting and monitoring slave jobs
 class QueueSystem(abstractqueuesystem.QueueSystem):
     allStatuses = { "qw"  : ("PEND", "Pending"),
-                    "Eqw" : ("ERROR", "In error state"),
                     "hqw" : ("HOLD", "On hold"),
                     "t"   : ("TRANS", "Transferring"),
                     "r"   : ("RUN", "Running"),
@@ -17,8 +16,10 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
                     "S"   : ("SSUSP", "Suspended by SGE due to other higher priority jobs"),
                     "St"  : ("SSUSP", "Suspended by SGE due to other higher priority jobs"),
                     "T"   : ("THRESH", "Suspended by SGE as it exceeded allowed thresholds") }
+    errorStatus = "Eqw"
     def __init__(self):
         self.qdelOutput = ""
+        self.errorReasons = {}
 
     def getSubmitCmdArgs(self, submissionRules, commandArgs=[]):
         qsubArgs = [ "qsub", "-N", submissionRules.getJobName() ]
@@ -86,18 +87,34 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
         for line in outMsg.splitlines():
             words = line.split()
             if len(words) >= 5 and words[0].isdigit():
+                jobId = words[0]
                 statusLetter = words[4]
+                if statusLetter == self.errorStatus:
+                    self.errorReasons[jobId] = self.getErrorReason(jobId)
+                    self.killJob(jobId)
+                    continue
+                
                 status = self.allStatuses.get(statusLetter)
                 if status:
-                    statusDict[words[0]] = status
+                    statusDict[jobId] = status
                 elif statusLetter != os.getenv("USER"):
                     # Job names can contain spaces, in which case the username (our own) will be the 5th word
                     # These jobs are not test jobs and can safely be ignored.
                     log.info("WARNING: unexpected job status " + repr(statusLetter) + " received from SGE!")
-                    statusDict[words[0]] = statusLetter
+                    statusDict[jobId] = statusLetter
         return statusDict
 
+    def getErrorReason(self, jobId):
+        proc = subprocess.Popen([ "qstat", "-j", jobId ], stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        outMsg = proc.communicate()[0]
+        for line in outMsg.splitlines():
+            if line.startswith("error reason"):
+                return line.strip()
+        return ""
+    
     def _getJobFailureInfo(self, jobId):
+        if jobId in self.errorReasons: 
+            return "SGE job entered error state: " + jobId + "\nTextTest terminated this job as a result. SGE's error reason follows:\n" + self.errorReasons.get(jobId)
         methods = [ self.getAccountInfo, self.getAccountInfoOldFiles, self.retryAccountInfo ]
         acctError = ""
         for method in methods:

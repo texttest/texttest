@@ -2353,6 +2353,7 @@ Static GUI Enhancements:
 Dynamic GUI Enhancements:
     - "Recompute Status" now runs in the background and doesn't lock the GUI
     - Showing now previews of succeeded files
+    - Adding ability to edit the original file also, when we have a different viewer added.
 Framework Enhancements:
     - Can now make use of separate sandbox locations for running the test itself and for collecting logfiles / results
 	Set default_texttest_local_tmp in your config file, or TEXTTEST_LOCAL_TMP in your environment. See website.
@@ -2370,6 +2371,7 @@ Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
     - SGE errors handled in a better way, warn when we get a job status we don't expect
     - Don't lose track of SGE jobs that end up in "St" state
     - If SGE jobs start but then terminate without reporting in (e.g. by getting SIGKILL) react and report this.
+    - Better handling of Eqw jobs in UGE. We grab now the error reason and kill them.
 Bug Fixes:
     - Fixed stacktrace for HTML report generation when the location doesn't exist yet
     - "Replace Text in Files" handles removing lines in a more consistent way
@@ -2383,3 +2385,7 @@ Bug Fixes:
     - Fixed occasional "TEXTTEST EXCEPTION" due to temporary file collisions when rerunning test after knownbug
     - Fixed bug where Jenkins change handling was fooled by artefacts whose names extend each other
     - Fixed problem with CaptureMock tests that capture files: save them when the files that refer to them are saved.
+    - Fixed stacktrace when getting non-xmlrcp errors from Jira
+    - Fixed "Split Files" followed by "Recompute" does not work properly. "Recompute" removes now all split information if it's present.
+    - Fixed knownbugs mechanism drops leading spaces from regular expressions. We don't accept leading spaces and show now an error message
+

@@ -1,10 +1,10 @@
 
 import os
-import abstractqueuesystem
+import abstractqueuesystem, plugins
 
 # Used by the master to submit, monitor and delete jobs...
 class QueueSystem(abstractqueuesystem.QueueSystem):
-    def getSubmitCmdArgs(self, submissionRules, commandArgs=[]):
+    def getSubmitCmdArgs(self, submissionRules, commandArgs=[], slaveEnv={}):
         bsubArgs = [ "bsub", "-J", submissionRules.getJobName() ]
         if submissionRules.processesNeeded != 1:
             bsubArgs += [ "-n", str(submissionRules.processesNeeded) ]
@@ -20,7 +20,21 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
         outputFile, errorsFile = submissionRules.getJobFiles()
         bsubArgs += [ "-u", "nobody", "-o", outputFile, "-e", errorsFile ]
         return self.addExtraAndCommand(bsubArgs, submissionRules, commandArgs)
+    
+    def getSlaveVarsToBlock(self):
+        """Make sure we clear out the master scripts so the slave doesn't use them too,
+        otherwise just use the environment as is.
+        
+        If we're being run via SSH, don't pass this on to the slave jobs
+        This has been known to trip up shell starter scripts, e.g. on SuSE 10
+        making them believe that the SGE job is an SSH login and setting things wrongly
+        as a result.
 
+        LS_COLORS has also been shown to be problematic as older version of tcsh fail hard
+        if given newer instructions they don't understand there.
+        """
+        return [ "USECASE_REPLAY_SCRIPT", "USECASE_RECORD_SCRIPT", "SSH_TTY", "LS_COLORS" ]
+    
     def findSubmitError(self, stderr):
         for errorMessage in stderr.splitlines():
             if self.isRealError(errorMessage):

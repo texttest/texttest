@@ -13,21 +13,20 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
                     "5" : ("HELD", "Being held"),
                     "6" : ("TRANS", "Transfering output") }
 
-    def getSubmitCmdArgs(self, submissionRules, commandArgs=[]):
+    def getSubmitCmdArgs(self, submissionRules, commandArgs=[], slaveEnv={}):
         return commandArgs # These really aren't very interesting, as all the stuff is in the command file
 
     def submitSlaveJob(self, cmdArgs, slaveEnv, logDir, submissionRules, jobType):
-        submitScript = self.writeSubmitScript(submissionRules, logDir, cmdArgs)
+        submitScript = self.writeSubmitScript(submissionRules, logDir, cmdArgs, slaveEnv)
         realArgs = [ "condor_submit", submitScript ]
         return abstractqueuesystem.QueueSystem.submitSlaveJob(self, realArgs, slaveEnv, logDir, submissionRules, jobType)
 
-    def writeSubmitScript(self, submissionRules, directory, cmdArgs):
+    def writeSubmitScript(self, submissionRules, directory, cmdArgs, slaveEnv):
         jobName = submissionRules.getJobName()
         submitFileName = jobName + ".sub"
         resources = " && ".join(submissionRules.findResourceList())
         with open(os.path.join(directory, submitFileName), "w") as submitFile:
             submitFile.writelines(['universe = vanilla\n',
-                                   'getenv = true\n',
                                    'executable = ' + cmdArgs[0] + '\n',
                                    'arguments = ' + " ".join(cmdArgs[1:]) + '\n',
                                    'requirements = ' + resources + '\n',
@@ -35,6 +34,10 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
                                    'error = ' + jobName + '.errors\n',
                                    'log = ' + jobName + '.log\n',
                                    'queue' + '\n'])
+            if slaveEnv:
+                envStr = [ var + "=" + value for var, value in slaveEnv.items()]
+                submitFile.write("environment = " + "|".join(envStr) + "\n")
+                
         return submitFileName
 
     def findSubmitError(self, stderr):

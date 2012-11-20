@@ -21,7 +21,7 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
         self.qdelOutput = ""
         self.errorReasons = {}
 
-    def getSubmitCmdArgs(self, submissionRules, commandArgs=[]):
+    def getSubmitCmdArgs(self, submissionRules, commandArgs=[], slaveEnv={}):
         qsubArgs = [ "qsub", "-N", submissionRules.getJobName() ]
         if submissionRules.processesNeeded != 1:
             qsubArgs += [ "-pe", submissionRules.getParallelEnvironment(), \
@@ -36,7 +36,15 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
         if len(resource):
             qsubArgs += [ "-l", resource ]
         outputFile, errorsFile = submissionRules.getJobFiles()
-        qsubArgs += [ "-w", "e", "-notify", "-m", "n", "-cwd", "-b", "y", "-V", "-o", outputFile, "-e", errorsFile ]
+        qsubArgs += [ "-w", "e", "-notify", "-m", "n", "-cwd", "-b", "y"]
+        if slaveEnv:
+            if len(slaveEnv) >= len(os.environ): # We've clearly copied the environment, just forward the whole thing
+                qsubArgs.append("-V")
+            else:
+                qsubArgs.append("-v")
+                qsubArgs.append(",".join(slaveEnv))
+            
+        qsubArgs += [ "-o", outputFile, "-e", errorsFile ]
         return self.addExtraAndCommand(qsubArgs, submissionRules, commandArgs)
 
     def getResourceArg(self, submissionRules):

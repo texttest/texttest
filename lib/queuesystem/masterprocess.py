@@ -312,7 +312,8 @@ class QueueSystemServer(BaseActionRunner):
         plugins.log.info("Q: Submitting " + repr(test) + submissionRules.getSubmitSuffix())
         sys.stdout.flush()
         self.jobs[test] = [] # Preliminary jobs aren't interesting any more
-        if not self.submitJob(test, submissionRules, commandArgs, self.getSlaveEnvironment()):
+        slaveEnv = OrderedDict()
+        if not self.submitJob(test, submissionRules, commandArgs, slaveEnv):
             return
         
         self.testCount -= 1
@@ -323,29 +324,16 @@ class QueueSystemServer(BaseActionRunner):
         if self.testsSubmitted == self.maxCapacity:
             self.sendServerState("Completed submission of tests up to capacity")
 
-    def getSlaveVarsToBlock(self):
-        """Make sure we clear out the master scripts so the slave doesn't use them too,
-        otherwise just use the environment as is.
-        
-        If we're being run via SSH, don't pass this on to the slave jobs
-        This has been known to trip up shell starter scripts, e.g. on SuSE 10
-        making them believe that the SGE job is an SSH login and setting things wrongly
-        as a result.
-
-        LS_COLORS has also been shown to be problematic as older version of tcsh fail hard
-        if given newer instructions they don't understand there.
-        """
-        return [ "USECASE_REPLAY_SCRIPT", "USECASE_RECORD_SCRIPT", "SSH_TTY", "LS_COLORS" ]
-
-    def getSlaveEnvironment(self):
-        return plugins.copyEnvironment(ignoreVars=self.getSlaveVarsToBlock())
+    def fixProxyVar(self, env, test, withProxy):
+        if withProxy and test.getConfigValue("queue_system_proxy_executable"):
+            env["TEXTTEST_SUBMIT_COMMAND_ARGS"] = "?"
  
     def fixDisplay(self, env):
         # Must make sure SGE jobs don't get a locally referencing DISPLAY
-        display = env.get("DISPLAY")
+        display = os.environ.get("DISPLAY")
         if display and display.startswith(":"):
             env["DISPLAY"] = plugins.gethostname() + display
-
+        
     def getPendingState(self, test):
         freeText = "Job pending in " + queueSystemName(test.app)
         return plugins.TestState("pending", freeText=freeText, briefText="PEND", lifecycleChange="become pending")
@@ -381,9 +369,9 @@ class QueueSystemServer(BaseActionRunner):
     def getSlaveLogDir(self, test):
         return os.path.join(test.app.writeDirectory, "slavelogs")
 
-    def getSubmitCmdArgs(self, test, submissionRules, *args):
+    def getSubmitCmdArgs(self, test, *args):
         queueSystem = self.getQueueSystem(test)
-        return queueSystem.getSubmitCmdArgs(submissionRules, *args)
+        return queueSystem.getSubmitCmdArgs(*args)
 
     def getQueueSystemCommand(self, test):
         submissionRules = self.getSubmissionRules(test)
@@ -396,18 +384,18 @@ class QueueSystemServer(BaseActionRunner):
         else:
             return text
 
-    def getProxyCmdArgs(self, test):
+    def getProxyCmdArgs(self, test, slaveEnv={}):
         proxyCmd = test.getConfigValue("queue_system_proxy_executable")
         if proxyCmd:
             proxyOptions = test.getCommandLineOptions("proxy_options")
             fullProxyCmdArgs = [ proxyCmd ] + proxyOptions
             proxyRules = self.getJobSubmissionRules(test)
-            return self.getSubmitCmdArgs(test, proxyRules, fullProxyCmdArgs)
+            return self.getSubmitCmdArgs(test, proxyRules, fullProxyCmdArgs, slaveEnv)
         else:
             return []
 
     def modifyCommandForProxy(self, test, cmdArgs, slaveEnv):
-        proxyArgs = self.getProxyCmdArgs(test)
+        proxyArgs = self.getProxyCmdArgs(test, slaveEnv)
         if proxyArgs:
             cmdArgs[1:1] = [ "-sync", "y" ] # must synchronise in the proxy
             slaveEnv["TEXTTEST_SUBMIT_COMMAND_ARGS"] = repr(cmdArgs) # Exact command arguments to run TextTest slave, for use by proxy
@@ -418,12 +406,13 @@ class QueueSystemServer(BaseActionRunner):
     def submitJob(self, test, submissionRules, commandArgs, slaveEnv, withProxy=True, jobType=""):
         self.diag.info("Submitting job at " + plugins.localtime() + ":" + repr(commandArgs))
         self.diag.info("Creating job at " + plugins.localtime())
-        cmdArgs = self.getSubmitCmdArgs(test, submissionRules, commandArgs)
+        self.fixDisplay(slaveEnv)
+        self.fixProxyVar(slaveEnv, test, withProxy)
+        cmdArgs = self.getSubmitCmdArgs(test, submissionRules, commandArgs, slaveEnv)
         if withProxy:
             cmdArgs = self.modifyCommandForProxy(test, cmdArgs, slaveEnv)
-
+        
         jobName = submissionRules.getJobName()
-        self.fixDisplay(slaveEnv)
         self.diag.info("Creating job " + jobName + " with command arguments : " + " ".join(cmdArgs))
         self.lock.acquire()
         if self.exited:

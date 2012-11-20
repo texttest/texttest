@@ -1,14 +1,14 @@
 
 """ Base class for all the queue system implementations """
 
-import subprocess
+import subprocess, os
 import plugins
 
 class QueueSystem:
     def submitSlaveJob(self, cmdArgs, slaveEnv, logDir, submissionRules, jobType):
         try:
             process = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                       cwd=logDir, env=slaveEnv)
+                                       cwd=logDir, env=self.getSlaveEnvironment(slaveEnv))
             stdout, stderr = process.communicate()
             errorMessage = self.findErrorMessage(stderr, cmdArgs, jobType)
         except OSError:
@@ -35,7 +35,22 @@ class QueueSystem:
         err += "to " + qname + " (" + errorMessage.strip() + ")\n" + \
                "Submission command was '" + self.formatCommand(cmdArgs) + "'\n"
         return err
+    
+    def getSlaveEnvironment(self, env):
+        if len(env) >= len(os.environ): # full environment sent
+            return env
+        else:
+            return self.makeSlaveEnvironment(env)
+        
+    def getSlaveVarsToBlock(self):
+        return []
 
+    def makeSlaveEnvironment(self, env):
+        newEnv = plugins.copyEnvironment(ignoreVars=self.getSlaveVarsToBlock())
+        for var, value in env.items():
+            newEnv[var] = value
+        return newEnv
+    
     def getQueueSystemName(self):
         modname = self.__class__.__module__
         return modname.split(".")[-1].upper()
@@ -49,7 +64,7 @@ class QueueSystem:
     def formatCommand(self, cmdArgs):
         return " ".join(cmdArgs[:-1]) + " ... "
         
-    def getSubmitCmdArgs(self, submissionRules, commandArgs=[]):
+    def getSubmitCmdArgs(self, submissionRules, commandArgs=[], slaveEnv={}):
         return commandArgs
 
     def getJobFailureInfo(self, jobId):

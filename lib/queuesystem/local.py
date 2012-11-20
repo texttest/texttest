@@ -14,7 +14,7 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
             process = subprocess.Popen(cmdArgs, 
                                        stdout=open(os.path.join(logDir, outputFile), "w"), 
                                        stderr=open(os.path.join(logDir, errorsFile), "w"),
-                                       cwd=logDir, env=slaveEnv)
+                                       cwd=logDir, env=self.getSlaveEnvironment(slaveEnv))
             errorMessage = None
         except OSError, e:
             errorMessage = "Failed to start slave process : " + str(e)
@@ -24,7 +24,7 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
             jobId = str(process.pid)
             self.processes[jobId] = process
             return jobId, None
-
+        
     def formatCommand(self, cmdArgs):
         return " ".join(cmdArgs)
 

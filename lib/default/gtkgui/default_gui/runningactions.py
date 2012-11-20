@@ -505,9 +505,23 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
             if os.path.basename(logRootDir).startswith("dynamic_run"):
                 return logRootDir
         return BasicRunningAction.getLogRootDirectory(self, app)
+    
+    def getExtraParent(self, app):
+        for other in self.validApps:
+            if app in other.extras:
+                return other
+    
+    def getExtraVersions(self, app):
+        if app.extras or any((v.startswith("copy_") for v in app.versions)):
+            return []
+        extraParent = self.getExtraParent(app)
+        if extraParent:
+            return filter(lambda v: v not in extraParent.versions, app.versions)
+        else:
+            return []
 
     def getAppIdentifier(self, app):
-        parts = filter(lambda part: not part.startswith("copy_"), [ app.name ])
+        parts = [ app.name ] + self.getExtraVersions(app)
         return ".".join(parts)
 
     def checkTestRun(self, errFile, testSel, filterFile, usecase):

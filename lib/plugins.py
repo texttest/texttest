@@ -1208,7 +1208,8 @@ class MultilineTextTrigger(TextTrigger):
         self.triggers = []
         self.currentIndex = 0
         self.matchedLines = []
-        lines = text.split("\n") if text else []
+        self.trailingNewline = text.endswith("\n")
+        lines = text.rstrip("\n").split("\n") if text else []
         for line in lines:
             self.triggers.append(TextTrigger(line, tryAsRegexp, matchEmptyString))
 
@@ -1233,7 +1234,10 @@ class MultilineTextTrigger(TextTrigger):
             if matchComplete:
                 for i in range(len(newTextLines)):
                     if i < len(self.matchedLines):
-                        text += self.triggers[i].replace(self.matchedLines[i], newTextLines[i])
+                        newLine = self.triggers[i].replace(self.matchedLines[i], newTextLines[i])
+                        if self.trailingNewline and i == len(newTextLines) - 1:
+                            newLine = newLine.rstrip("\n")
+                        text += newLine
                     else:
                         text += newTextLines[i] + "\n"
                 self.matchedLines = []

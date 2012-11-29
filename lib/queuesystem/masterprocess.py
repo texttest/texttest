@@ -397,7 +397,8 @@ class QueueSystemServer(BaseActionRunner):
     def modifyCommandForProxy(self, test, cmdArgs, slaveEnv):
         proxyArgs = self.getProxyCmdArgs(test, slaveEnv)
         if proxyArgs:
-            cmdArgs[1:1] = [ "-sync", "y" ] # must synchronise in the proxy
+            cmdArgs[1:1] = [ "-sync", "y", "-V" ] # must sychronise in the proxy
+            # Proxy likes to set environment variables, make sure they get forwarded
             slaveEnv["TEXTTEST_SUBMIT_COMMAND_ARGS"] = repr(cmdArgs) # Exact command arguments to run TextTest slave, for use by proxy
             return proxyArgs
         else:

@@ -403,15 +403,15 @@ class LineFilter:
             return self.applyAutoRemove(line)
 
         if self.trigger.matches(line, lineNumber):
-            self.diag.info(repr(self.trigger) + " matched " + line.strip())
+            self.diag.info(repr(self.trigger) + " matched " + line.rstrip())
             return self.applyMatchingTrigger(line)
         else:
             return False, line, 0
         
     def applyAutoRemove(self, line):
         if self.untrigger:
-            if self.untrigger.matches(line.strip()):
-                self.diag.info(repr(self.untrigger) + " (end) matched " + line.strip()) 
+            if self.untrigger.matches(line.rstrip()):
+                self.diag.info(repr(self.untrigger) + " (end) matched " + line.rstrip()) 
                 self.autoRemove = 0
                 if self.divider.endswith("]}"):
                     return True, None, 0

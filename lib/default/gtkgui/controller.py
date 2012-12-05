@@ -173,8 +173,7 @@ class GUIController(plugins.Responder, plugins.Observable):
         return [ self.testTreeGUI, self.testFileGUI ]
     
     def getProcessMonitorObservers(self):
-        return [ self.statusMonitor ] + \
-                 filter(lambda obs: hasattr(obs, "notifyShortcut"), self.defaultActionGUIs)
+        return [ self.statusMonitor ] + self.defaultActionGUIs
     
     def isFrameworkExitObserver(self, obs):
         return hasattr(obs, "notifyExit") or hasattr(obs, "notifyKillProcesses")

@@ -288,10 +288,12 @@ class ReconnectTest(plugins.Action):
     
     def copyFiles(self, test, reconnLocation):
         test.makeWriteDirectory()
+        tmpDir = test.getDirectory(temporary=1)
+        self.diag.info("Copying files from " + reconnLocation + " to " + tmpDir)
         for file in os.listdir(reconnLocation):
             fullPath = os.path.join(reconnLocation, file)
             if os.path.isfile(fullPath):
-                targetPath = test.makeTmpFileName(file, forComparison=0)
+                targetPath = os.path.join(tmpDir, os.path.basename(fullPath))
                 try:
                     shutil.copyfile(fullPath, targetPath)
                 except EnvironmentError, e:

@@ -518,7 +518,8 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
         if extraParent:
             return filter(lambda v: v not in extraParent.versions, app.versions)
         else:
-            return []
+            extrasGiven = app.getConfigValue("extra_version")
+            return filter(lambda v: v in extrasGiven, app.versions)
 
     def getAppIdentifier(self, app):
         parts = [ app.name ] + self.getExtraVersions(app)

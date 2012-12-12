@@ -1,9 +1,11 @@
 
-import os, sys
+import os, sys, re, hashlib
 from xml.dom.minidom import parse
 from ordereddict import OrderedDict
 from difflib import SequenceMatcher
-import re
+from glob import glob
+from pprint import pprint
+    
 
 class AbortedException(RuntimeError):
     pass
@@ -13,7 +15,13 @@ def fingerprintStrings(document):
         for entry in obj.getElementsByTagName("string"):
             yield entry.childNodes[0].nodeValue
             
-def getFingerprint(jobRoot, jobName, buildName):
+def getCacheFileName(buildName, cacheDir):
+    return os.path.join(cacheDir, "correct_hashes_" + buildName)
+            
+def getFingerprint(jobRoot, jobName, buildName, cacheDir):
+    cacheFileName = getCacheFileName(buildName, cacheDir) 
+    if os.path.isfile(cacheFileName):
+        return eval(open(cacheFileName).read())
     dirName = os.path.join(jobRoot, jobName, "builds", buildName)
     xmlFile = os.path.join(dirName, "build.xml")
     fingerprint = {}
@@ -27,9 +35,10 @@ def getFingerprint(jobRoot, jobName, buildName):
         if prevString:
             if jobName not in prevString:
                 match = versionRegex.search(prevString)
+                regex = prevString
                 if match:
-                    prevString = prevString.replace(match.group(0), versionRegex.pattern) + "$"
-                fingerprint[prevString] = currString
+                    regex = prevString.replace(match.group(0), versionRegex.pattern) + "$"
+                fingerprint[regex] = currString, prevString
             prevString = None
         else:
             prevString = currString
@@ -87,17 +96,57 @@ def getHash(document, artefact):
             return currString
         elif regex.match(currString):
             found = True
+            
+def md5sum(filename):
+    md5 = hashlib.md5()
+    with open(filename,'rb') as f: 
+        for chunk in iter(lambda: f.read(128*md5.block_size), b''): 
+            md5.update(chunk)
+    return md5.hexdigest()
 
-def getFingerprintDifferences(build1, build2, jobName, jobRoot):
-    fingerprint1 = getFingerprint(jobRoot, jobName, build1)
-    fingerprint2 = getFingerprint(jobRoot, jobName, build2)
+def getCorrectedHash(f, hash, fileFinder):
+    filePattern = f.split(":")[-1].replace("-", "?")
+    paths = glob(os.path.join(fileFinder, filePattern))
+    if len(paths):
+        path = paths[0]
+        correctHash = md5sum(path)
+        if correctHash != hash:
+            return correctHash
+
+def getFingerprintDifferences(build1, build2, jobName, jobRoot, fileFinder, cacheDir):
+    fingerprint1 = getFingerprint(jobRoot, jobName, build1, cacheDir)
+    fingerprint2 = getFingerprint(jobRoot, jobName, build2, cacheDir)
     if not fingerprint1 or not fingerprint2:
         return []
     differences = []
-    for artefact, hash2 in fingerprint2.items():
+    updatedHashes = {}
+    for artefact, (hash2, file2) in fingerprint2.items():
         hash1 = fingerprint1.get(artefact)
+        if isinstance(hash1, tuple):
+            hash1 = hash1[0]
         if hash1 != hash2:
+            if fileFinder:
+                fullFileFinder = os.path.join(jobRoot, jobName, "builds", build2, fileFinder)
+                correctedHash = getCorrectedHash(file2, hash2, fullFileFinder)
+                if correctedHash:
+                    hash2 = correctedHash
+                    updatedHashes[artefact] = hash2
+                if hash1 == hash2:
+                    continue
             differences.append((artefact, hash1, hash2))
+    
+    if updatedHashes:
+        print "WARNING: incorrect hashes found!"
+        print "This is probably due to fingerprint data being wrongly updated from artefacts produced during the build"
+        print "Storing a cached file of corrected versions. The following were changed:"
+        for artefact, hash in updatedHashes.items():
+            print artefact, fingerprint2.get(artefact)[0], hash
+            
+        for artefact, (hash2, file2) in fingerprint2.items():
+            if artefact not in updatedHashes:
+                updatedHashes[artefact] = hash2
+        with open(getCacheFileName(build2, cacheDir), "w") as f:
+            pprint(updatedHashes, f) 
     
     differences.sort()
     return differences
@@ -172,7 +221,7 @@ def getChangeData(jobRoot, projectChanges, jenkinsUrl, bugSystemData):
     return changes
 
 
-def _getChanges(build1, build2, workspace, jenkinsUrl, bugSystemData={}, markedArtefacts={}):
+def _getChanges(build1, build2, workspace, jenkinsUrl, bugSystemData={}, markedArtefacts={}, fileFinder="", cacheDir=None):
     rootDir, jobName = os.path.split(workspace)
     if jobName == "workspace": # new structure
         jobRoot, jobName = os.path.split(rootDir)
@@ -180,7 +229,7 @@ def _getChanges(build1, build2, workspace, jenkinsUrl, bugSystemData={}, markedA
         jobRoot = os.path.join(os.path.dirname(rootDir), "jobs")
     # Find what artefacts have changed between times build
     try:
-        differences = getFingerprintDifferences(build1, build2, jobName, jobRoot)
+        differences = getFingerprintDifferences(build1, build2, jobName, jobRoot, fileFinder, cacheDir)
     except AbortedException, e:
         # If it was aborted, say this
         return [(str(e), "", [])]
@@ -192,8 +241,18 @@ def _getChanges(build1, build2, workspace, jenkinsUrl, bugSystemData={}, markedA
     changes += getChangeData(jobRoot, projectChanges, jenkinsUrl, bugSystemData)
     return changes
 
-def getChanges(build1, build2, bugSystemData, markedArtefacts):
-    return _getChanges(build1, build2, os.getenv("WORKSPACE"), os.getenv("JENKINS_URL"), bugSystemData, markedArtefacts)
+def getChanges(build1, build2, *args):
+    return _getChanges(build1, build2, os.getenv("WORKSPACE"), os.getenv("JENKINS_URL"), *args)
+    
+def parseEnvAsDict(varName):
+    if varName not in os.environ:
+        return {}
+    
+    ret = {}
+    for pairText in os.getenv(varName).split(","):
+        var, value = pairText.split("=")
+        ret[var] = value
+    return ret
     
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -202,7 +261,6 @@ if __name__ == "__main__":
         prevBuildName = sys.argv[2]
     else:
         prevBuildName = str(int(buildName) - 1)
-    from pprint import pprint
-    pprint(_getChanges(prevBuildName, buildName, "/nfs/vm/c14n/build/PWS-x86_64_linux-6.optimize/.jenkins/workspace/cms-product-car-test",  
-                     "http://gotburh03p.got.jeppesensystems.com:8080/", {"jira": "https://jira.jeppesensystems.com"}, {"MAVE" : ".*mave-.*"}))
+    pprint(getChanges(prevBuildName, buildName, parseEnvAsDict("BUG_SYSTEM_DATA"), parseEnvAsDict("MARKED_ARTEFACTS"), 
+                      os.getenv("FILE_FINDER", ""), os.getcwd()))
     

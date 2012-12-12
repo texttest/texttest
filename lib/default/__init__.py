@@ -1301,6 +1301,7 @@ class Config:
         app.setConfigDefault("bug_system_username", {}, "Username to use when logging in to bug systems defined in bug_system_location")
         app.setConfigDefault("bug_system_password", {}, "Password to use when logging in to bug systems defined in bug_system_location")
         app.setConfigDefault("batch_jenkins_marked_artefacts", {}, "Artefacts to highlight in the report when they are updated")
+        app.setConfigDefault("batch_jenkins_archive_file_pattern", { "default": "" }, "Path to the built files in the archive, in case Jenkins fingerprints need double-checking")
         app.setConfigAlias("text_diff_program_max_file_size", "max_file_size")
         
     def setInterfaceDefaults(self, app):

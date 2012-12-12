@@ -708,6 +708,19 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
         self.optionGroup.setValue("file", defaultTestFile)
         self.optionGroup.setPossibleValues("file", allStems)
 
+    def notifyUsecaseRename(self, argstr, *args):
+        self.showQueryDialog(self.getParentWindow(), "Usecase names were renamed. Would you like to update them into all usecases now?",
+                             gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respondUsecaseRename, respondData=argstr)
+
+    def respondUsecaseRename(self, dialog, ans, argstr):
+        if ans == gtk.RESPONSE_YES:
+            oldName, newName =  argstr.split(" renamed to ")
+            self.optionGroup.setValue("file", "*usecase*,stdout")
+            self.optionGroup.setValue("old", oldName.strip("'"))
+            self.optionGroup.setValue("new", newName.strip("'"))
+            self.performOnCurrent(filterFileOverride=NotImplemented)
+        dialog.hide()
+
     def scriptName(self):
         return "default.ReplaceText"
 

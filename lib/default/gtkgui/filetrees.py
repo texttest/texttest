@@ -30,7 +30,9 @@ class FileViewGUI(guiutils.SubGUI):
 
         self.model.clear()
         self.addFilesToModel(state)
-        self.selection.get_tree_view().expand_all()
+        view = self.selection.get_tree_view()
+        if view: # Might already be taking down the GUI
+            view.expand_all()
         if preserveSelection:
             self.reselect(selectionStore)
         

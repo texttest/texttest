@@ -137,7 +137,7 @@ class FileViewGUI(guiutils.SubGUI):
             # Don't crash on double clicking the header lines...
             return
         comparison = self.model.get_value(iter, 3)
-        self.notify(self.getViewFileSignal(), fileName, comparison)
+        self.notify(self.getViewFileSignal(), fileName, comparison, False)
 
     def notifyViewerStarted(self):
         if self.dynamic:
@@ -146,7 +146,7 @@ class FileViewGUI(guiutils.SubGUI):
 
     def notifyNewFile(self, fileName, overwrittenExisting):
         if os.path.isfile(fileName):
-            self.notify(self.getViewFileSignal(), fileName, None)
+            self.notify(self.getViewFileSignal(), fileName, None, True)
         if not overwrittenExisting or os.path.isdir(fileName):
             self.currentTest.refreshFiles()
             self.recreateModel(self.getState(), preserveSelection=True)

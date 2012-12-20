@@ -2350,9 +2350,10 @@ Static GUI Enhancements:
 	Previously only reloaded the main application config files
     - (GUI testing) Can now automatically insert StoryText shortcuts into all tests without running them
 	New script "default.InsertShortcuts" and item in Actions menu. Auto-detected when shortcuts are added via StoryText Editor.
+    - (GUI testing) Auto-detect renaming from StoryText editor and trigger "Replace Text In Files" run
 Dynamic GUI Enhancements:
     - "Recompute Status" now runs in the background and doesn't lock the GUI
-    - Showing now previews of succeeded files
+    - Now showing previews of succeeded files when they are selected
     - Adding ability to edit the original file also, when we have a different viewer added.
 Framework Enhancements:
     - Can now make use of separate sandbox locations for running the test itself and for collecting logfiles / results
@@ -2360,6 +2361,8 @@ Framework Enhancements:
 	(Usual setup is to run the test on a local disk and write its logfiles to a shared disk.)
     - Scripts used 'copy_test_path_script' can now use the environment variables set for the test run.
 	Particularly useful if they need to refer to the logging location in a setup using the above default_texttest_local_tmp.
+    - Memory/Performance settings can now be configured per test/test suite
+	For example performance_logfile_extractor, performance_logfile etc
 Batch Report Enhancements:
     - Now sort the applications in order of number of tests before generating HTML report
 	If there are many large slow-to-generate test suites it's best they don't hold up small fast ones.
@@ -2374,6 +2377,7 @@ Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
     - Don't lose track of SGE jobs that end up in "St" state
     - If SGE jobs start but then terminate without reporting in (e.g. by getting SIGKILL) react and report this.
     - Better handling of Eqw jobs in UGE. We grab now the error reason and kill them.
+    - Added workaround for SGE issue with long command line, which are rejected as if they were long path names
 Bug Fixes:
     - Fixed stacktrace for HTML report generation when the location doesn't exist yet
     - "Replace Text in Files" handles removing and inserting lines in a more consistent way
@@ -2386,9 +2390,13 @@ Bug Fixes:
     - Fixed Windows installer: get rid of the command window
     - Fixed occasional "TEXTTEST EXCEPTION" due to temporary file collisions when rerunning test after knownbug
     - Fixed bug where Jenkins change handling was fooled by artefacts whose names extend each other
+    - Double-check Jenkins change information as it's prone to being corrupted by builds running concurrently
     - Fixed problem with CaptureMock tests that capture files: save them when the files that refer to them are saved.
     - Fixed stacktrace when getting non-xmlrpc errors from Jira
     - Fixed "Split Files" followed by "Recompute" does not work properly. "Recompute" removes now all split information if it's present.
     - Fixed knownbugs mechanism drops leading spaces from regular expressions. We don't accept leading spaces and show now an error message
     - Fixed problem where leading spaces got removing when matching run_dependent_text
     - Removed restrictions around rerunning tests with a version not included in the original run
+    - Fixed stacktrace if test completes at the same instant it is killed
+    - Creating new files via "Import File" always opens the default viewer (normally a text editor), even if they have a specific viewer configured.
+	Specific viewers often do not allow editing

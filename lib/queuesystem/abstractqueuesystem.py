@@ -58,11 +58,11 @@ class QueueSystem:
     def addExtraAndCommand(self, args, submissionRules, commandArgs):
         args += submissionRules.getExtraSubmitArgs()
         if commandArgs:
-            args.append(self.shellWrap(commandArgs))
+            args += self.shellWrapArgs(commandArgs)
         return args
 
     def formatCommand(self, cmdArgs):
-        return " ".join(cmdArgs[:-1]) + " ... "
+        return " ".join(cmdArgs[:-2]) + " ... "
         
     def getSubmitCmdArgs(self, submissionRules, commandArgs=[], slaveEnv={}):
         return commandArgs
@@ -75,8 +75,8 @@ class QueueSystem:
         else:
             return header + self._getJobFailureInfo(jobId)
                    
-    def shellWrap(self, commandArgs):
+    def shellWrapArgs(self, commandArgs):
         # Must use exec so as not to create extra processes: SGE's qdel isn't very clever when
         # it comes to noticing extra shells
-        return "exec $SHELL -c \"exec " + plugins.commandLineString(commandArgs, defaultQuoteChar="'") + "\"" if commandArgs else ""
+        return [ "exec", "$SHELL -c \"exec " + plugins.commandLineString(commandArgs, defaultQuoteChar="'") + "\"" ]
 

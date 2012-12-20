@@ -1024,26 +1024,23 @@ class MakePerformanceFile(PerformanceFileCreator):
 class ExtractPerformanceFiles(PerformanceFileCreator):
     def __init__(self, machineInfoFinder):
         PerformanceFileCreator.__init__(self, machineInfoFinder)
-        self.entryFinders = None
         self.entryFiles = None
         self.logFileStem = None
         
-    def setUpApplication(self, app):
-        PerformanceFileCreator.setUpApplication(self, app)
-        self.entryFinders = app.getConfigValue("performance_logfile_extractor")
-        self.entryFiles = app.getConfigValue("performance_logfile")
-        self.logFileStem = app.getConfigValue("log_file")
-        self.diag.info("Found the following entry finders:" + str(self.entryFinders))
-
     def makePerformanceFiles(self, test):
-        for fileStem, entryFinder in self.entryFinders.items():
+        entryFinders = test.getConfigValue("performance_logfile_extractor")
+        entryFiles = test.getConfigValue("performance_logfile")
+        defaultLogFileStem = test.getConfigValue("log_file")
+        self.diag.info("Found the following entry finders:" + str(entryFinders))
+        for fileStem, entryFinder in entryFinders.items():
             if len(entryFinder) == 0:
                 continue # don't allow empty entry finders
             if not self.allMachinesTestPerformance(test, fileStem):
                 self.diag.info("Not extracting performance file for " + fileStem + ": not on performance machines")
                 continue
             values = []
-            for logFileStem in self.findLogFileStems(fileStem):
+            logFileStems = entryFiles.get(fileStem, [ defaultLogFileStem ])
+            for logFileStem in logFileStems:
                 self.diag.info("Looking for log files matching " + logFileStem)
                 for fileName in self.findLogFiles(test, logFileStem):
                     self.diag.info("Scanning log file for entry: " + entryFinder)
@@ -1053,22 +1050,21 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
                 self.diag.info("Writing performance to file " + fileName)
                 contents = self.makeFileContents(test, values, fileStem)
                 self.saveFile(fileName, contents)
+                
     def getFileToWrite(self, test, stem):
         return test.makeTmpFileName(stem)
+    
     def findLogFiles(self, test, stem):
         collatedfiles = glob.glob(test.makeTmpFileName(stem))
         if len(collatedfiles) == 0:
             return glob.glob(test.makeTmpFileName(stem, forComparison=0))
         return collatedfiles
-    def findLogFileStems(self, fileStem):
-        if self.entryFiles.has_key(fileStem):
-            return self.entryFiles[fileStem]
-        else:
-            return [ self.logFileStem ]
+    
     def saveFile(self, fileName, contents):
         file = open(fileName, "w")
         file.write(contents)
         file.close()
+    
     def makeFileContents(self, test, values, fileStem):
         # Round to accuracy 0.01
         unit = test.getCompositeConfigValue("performance_unit", fileStem)

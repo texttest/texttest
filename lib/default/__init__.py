@@ -64,7 +64,8 @@ class Config:
                 if recordsUseCases:
                     self.addDefaultSwitch(group, "actrep", "Run with slow motion replay")
                 if useCatalogues:
-                    self.addDefaultSwitch(group, "ignorecat", "Ignore catalogue file when isolating data")
+                    self.addDefaultSwitch(group, "ignorecat", "Ignore catalogue file when isolating data", description="Treat test data identified by 'partial_copy_test_path' as if it were in 'copy_test_path', " + 
+                                          "i.e. copy everything without taking notice of the catalogue file. Useful when many things have changed with the files written by the test")
                 if useCaptureMock:
                     self.addCaptureMockSwitch(group)
             elif group.name.startswith("Advanced"):

@@ -42,8 +42,10 @@ def getFingerprint(jobRoot, jobName, buildName, cacheDir):
             prevString = None
         else:
             prevString = currString
-    if not fingerprint and getResult(document) == "ABORTED":
-        raise AbortedException, "Aborted in Jenkins"
+    if not fingerprint:
+        result = getResult(document)
+        if result == "ABORTED" or result is None:
+            raise AbortedException, "Aborted in Jenkins"
     return fingerprint
     
 def parseAuthor(author):

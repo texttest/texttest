@@ -2351,6 +2351,7 @@ Static GUI Enhancements:
     - (GUI testing) Can now automatically insert StoryText shortcuts into all tests without running them
 	New script "default.InsertShortcuts" and item in Actions menu. Auto-detected when shortcuts are added via StoryText Editor.
     - (GUI testing) Auto-detect renaming from StoryText editor and trigger "Replace Text In Files" run
+    - Added some new tooltips
 Dynamic GUI Enhancements:
     - "Recompute Status" now runs in the background and doesn't lock the GUI
     - Now showing previews of succeeded files when they are selected
@@ -2369,7 +2370,7 @@ Batch Report Enhancements:
     - Applications whose test suite is removed but where old results still exist are still linked from the main index page
 	Can be important, especially when live versions exist of older versions of the same apps.
     - Jenkins change handling deals with the new directory structure in Jenkins as well as the "legacy" one.
-    - Jenkins change handling deals with aborted runs in a better way
+    - Jenkins change handling deals with aborted and incomplete runs in a better way
 Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
     - Grid Engine submission no longer forwards the entire environment by default
 	See migration notes

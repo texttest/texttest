@@ -1359,7 +1359,7 @@ class MultiEntryDictionary(OrderedDict):
 
         entryExists = currDict.has_key(entryName)
         if entryExists:
-            self.diag.info("Entry existed, setting " + entryName + "=" + entry)
+            self.diag.info("Entry existed, setting " + entryName + "=" + str(entry))
             self.insertEntry(entryName, entry, currDict)
         else:
             if insert or not currDict is self:

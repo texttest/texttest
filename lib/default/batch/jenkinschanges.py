@@ -223,12 +223,8 @@ def getChangeData(jobRoot, projectChanges, jenkinsUrl, bugSystemData):
     return changes
 
 
-def _getChanges(build1, build2, workspace, jenkinsUrl, bugSystemData={}, markedArtefacts={}, fileFinder="", cacheDir=None):
-    rootDir, jobName = os.path.split(workspace)
-    if jobName == "workspace": # new structure
-        jobRoot, jobName = os.path.split(rootDir)
-    else:
-        jobRoot = os.path.join(os.path.dirname(rootDir), "jobs")
+def _getChanges(build1, build2, jobName, jenkinsUrl, bugSystemData={}, markedArtefacts={}, fileFinder="", cacheDir=None):
+    jobRoot = os.path.join(os.getenv("JENKINS_HOME"), "jobs")
     # Find what artefacts have changed between times build
     try:
         differences = getFingerprintDifferences(build1, build2, jobName, jobRoot, fileFinder, cacheDir)
@@ -244,7 +240,7 @@ def _getChanges(build1, build2, workspace, jenkinsUrl, bugSystemData={}, markedA
     return changes
 
 def getChanges(build1, build2, *args):
-    return _getChanges(build1, build2, os.getenv("WORKSPACE"), os.getenv("JENKINS_URL"), *args)
+    return _getChanges(build1, build2, os.getenv("JOB_NAME"), os.getenv("JENKINS_URL"), *args)
     
 def parseEnvAsDict(varName):
     if varName not in os.environ:

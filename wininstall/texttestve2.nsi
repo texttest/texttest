@@ -7,7 +7,7 @@ SetCompressor lzma
 
 !include "ZipDLL.nsh"
 !include "EnvVarUpdate.nsh"
-
+!include "WinVer.nsh"
 ; ------------ TextTest settings ---------
 !define PRODUCT_NAME "TextTest"
 !ifndef PRODUCT_VERSION
@@ -235,7 +235,8 @@ Section /o "TextTest and StoryText configuration" SEC06
   done:
 SectionEnd
 !else
-Section /o "StoryText for Python GUI testing" SEC07
+SectionGroup /e "StoryText" G2
+Section "-StoryText for Python GUI testing" SEC07
   Call configureStorytextPython
   IfErrors onError done
   onError:
@@ -243,8 +244,8 @@ Section /o "StoryText for Python GUI testing" SEC07
   done:
 SectionEnd
 
-SectionGroup /e "StoryText for Java" G2
-Section /o "Jython" g2o1
+SectionGroup /e "StoryText for Java" G3
+Section /o "Jython" g3o1
   Call installJython
   IfErrors onError done
   onError:
@@ -252,13 +253,14 @@ Section /o "Jython" g2o1
   done:
 SectionEnd
 
-Section /o "StoryText for Java GUI testing" g2o2
+Section /o "StoryText for Java GUI testing" g3o2
   Call configureStorytextJava
   IfErrors onError done
   onError:
     Abort
   done:
 SectionEnd
+SectionGroupEnd
 SectionGroupEnd
 
 Section "Texttest" SEC09
@@ -279,8 +281,9 @@ SectionEnd
 
 ; ============== Section macros ========================
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
+  !insertmacro MUI_DESCRIPTION_TEXT ${G2} "Installing StoryText will add support for Python GUI testing by default."
   !insertmacro MUI_DESCRIPTION_TEXT ${SEC07} "Installing StoryText will require an internet connection."
-  !insertmacro MUI_DESCRIPTION_TEXT ${G2} "Installing StoryText will require an internet connection.$\r$\n$\r$\n \
+  !insertmacro MUI_DESCRIPTION_TEXT ${G3} "Installing StoryText will require an internet connection.$\r$\n$\r$\n \
 Installing StoryText for Java GUIs requires Java Runtime Environment (JRE) to be pre-installed.$\r$\n"
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
@@ -336,7 +339,11 @@ Function setTexttestHome
   IfFileExists "$TT_HOME\*.*" done
     CreateDirectory "$TT_HOME"
   done:
-    WriteRegStr ${env_hkcu} "TEXTTEST_HOME" $TT_HOME
+    ${If} ${IsWin7}
+      ExecWait '"cmd.exe" /K SETX TEXTTEST_HOME $TT_HOME & EXIT'
+    ${else}
+      WriteRegStr ${env_hkcu} "TEXTTEST_HOME" $TT_HOME
+    ${EndIf}
 FunctionEnd
 
 Function updateTexttestPath

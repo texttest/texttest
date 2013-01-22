@@ -2344,7 +2344,6 @@ Bug Fixes:
 
 Version trunk
 =============
-General GUI Enhancements:
 Static GUI Enhancements:
     - Refresh now reloads all test-specific config files
 	Previously only reloaded the main application config files
@@ -2369,7 +2368,8 @@ Batch Report Enhancements:
 	If there are many large slow-to-generate test suites it's best they don't hold up small fast ones.
     - Applications whose test suite is removed but where old results still exist are still linked from the main index page
 	Can be important, especially when live versions exist of older versions of the same apps.
-    - Jenkins change handling deals with the new directory structure in Jenkins as well as the "legacy" one.
+    - Jenkins change handling now uses JENKINS_HOME and JOB_NAME instead of WORKSPACE variables
+	Makes it independent of Jenkins workspace file layout, which seems to vary a lot
     - Jenkins change handling deals with aborted and incomplete runs in a better way
 Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
     - Grid Engine submission no longer forwards the entire environment by default
@@ -2401,3 +2401,7 @@ Bug Fixes:
     - Fixed stacktrace if test completes at the same instant it is killed
     - Creating new files via "Import File" always opens the default viewer (normally a text editor), even if they have a specific viewer configured.
 	Specific viewers often do not allow editing
+    - Windows installer doesn't allow incorrect install with Java GUI testing enabled but not Python GUI testing
+    - Windows installer no longer requires logging in and out if using Windows 7
+    - Don't stacktrace when parallel GUI testing locally on Windows
+    - Fixed possible stacktrace in log statement in plugins.py (only relevant from custom configuration modules)

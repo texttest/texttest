@@ -183,7 +183,7 @@ class QueueSystemConfig(default.Config):
         
     def getSlaveResponderClasses(self):
         classes = [ slavejobs.SocketResponder, slavejobs.SlaveActionRunner ]
-        if not self.isActionReplay():
+        if os.name == "posix" and not self.isActionReplay():
             classes.append(VirtualDisplayResponder)
         classes.append(ApplicationEventResponder)
         return classes

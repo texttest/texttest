@@ -2377,7 +2377,7 @@ Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
     - SGE errors handled in a better way, warn when we get a job status we don't expect
     - Don't lose track of SGE jobs that end up in "St" state
     - If SGE jobs start but then terminate without reporting in (e.g. by getting SIGKILL) react and report this.
-    - Better handling of Eqw jobs in UGE. We grab now the error reason and kill them.
+    - Better handling of Eqw jobs in SGE. We grab now the error reason and kill them.
     - Added workaround for SGE issue with long command line, which are rejected as if they were long path names
 Bug Fixes:
     - Fixed stacktrace for HTML report generation when the location doesn't exist yet
@@ -2385,23 +2385,23 @@ Bug Fixes:
     - Fixed stacktrace when pressing recompute and temporary files have been externally removed
     - "Find Failure Information" now shows a progress indicator instead of just leaving the menu item present
     - Ignore kill signals after the first one has arrived, so we show the correct reason for being killed
-    - Fixed Jira plugin problem: stacktrace when Jira bug has no description
-    - Fixed Jira plugin problem: wrong prio in jira info
-    - Fixed Windows installer: failed when only TextTest and StoryText selected
-    - Fixed Windows installer: get rid of the command window
-    - Fixed occasional "TEXTTEST EXCEPTION" due to temporary file collisions when rerunning test after knownbug
-    - Fixed bug where Jenkins change handling was fooled by artefacts whose names extend each other
-    - Double-check Jenkins change information as it's prone to being corrupted by builds running concurrently
-    - Fixed problem with CaptureMock tests that capture files: save them when the files that refer to them are saved.
-    - Fixed stacktrace when getting non-xmlrpc errors from Jira
-    - Fixed "Split Files" followed by "Recompute" does not work properly. "Recompute" removes now all split information if it's present.
     - Fixed knownbugs mechanism drops leading spaces from regular expressions. We don't accept leading spaces and show now an error message
+    - Fixed occasional "TEXTTEST EXCEPTION" due to temporary file collisions when rerunning test after knownbug
+    - Fixed problem with CaptureMock tests that capture files: save them when the files that refer to them are saved.
+    - Fixed "Split Files" followed by "Recompute" does not work properly. "Recompute" removes now all split information if it's present.
     - Fixed problem where leading spaces got removing when matching run_dependent_text
     - Removed restrictions around rerunning tests with a version not included in the original run
     - Fixed stacktrace if test completes at the same instant it is killed
-    - Creating new files via "Import File" always opens the default viewer (normally a text editor), even if they have a specific viewer configured.
+    - Creating new files via "Import File" always opens the default viewer (normally a text editor), even when a specific viewer is configured.
 	Specific viewers often do not allow editing
-    - Windows installer doesn't allow incorrect install with Java GUI testing enabled but not Python GUI testing
-    - Windows installer no longer requires logging in and out if using Windows 7
     - Don't stacktrace when parallel GUI testing locally on Windows
     - Fixed possible stacktrace in log statement in plugins.py (only relevant from custom configuration modules)
+    - Fixed Jenkins plugin: Don't be fooled by artefacts whose names extend each other
+    - Fixed Jenkins plugin: Double-check change information as it's prone to being corrupted by builds running concurrently
+    - Fixed Jira plugin: stacktrace when Jira bug has no description
+    - Fixed Jira plugin: wrong priority in jira info
+    - Fixed Jira plugin: stacktrace when getting non-xmlrpc errors from Jira
+    - Fixed Windows installer: failed when only TextTest and StoryText selected
+    - Fixed Windows installer: get rid of the command window
+    - Fixed Windows installer: doesn't allow incorrect install with Java GUI testing enabled but not Python GUI testing
+    - Fixed Windows installer: no longer requires logging in and out after install if using Windows 7

@@ -2342,8 +2342,8 @@ Bug Fixes:
     - Fixed problem where editing the main config file did not refresh properly if there were test-specific config files.
     - Fixed HTML report bug which didn't include descriptions for extra_version tests
 
-Version trunk
-=============
+Version 3.25
+============
 Static GUI Enhancements:
     - Refresh now reloads all test-specific config files
 	Previously only reloaded the main application config files
@@ -2395,6 +2395,7 @@ Bug Fixes:
     - Creating new files via "Import File" always opens the default viewer (normally a text editor), even when a specific viewer is configured.
 	Specific viewers often do not allow editing
     - Don't stacktrace when parallel GUI testing locally on Windows
+    - When setting up for Java GUI testing, don't put Windows path names in the CLASSPATH, it can't handle them. Convert to DOS format first.
     - Fixed possible stacktrace in log statement in plugins.py (only relevant from custom configuration modules)
     - Fixed Jenkins plugin: Don't be fooled by artefacts whose names extend each other
     - Fixed Jenkins plugin: Double-check change information as it's prone to being corrupted by builds running concurrently
@@ -2405,3 +2406,12 @@ Bug Fixes:
     - Fixed Windows installer: get rid of the command window
     - Fixed Windows installer: doesn't allow incorrect install with Java GUI testing enabled but not Python GUI testing
     - Fixed Windows installer: no longer requires logging in and out after install if using Windows 7
+
+Version trunk
+=============
+Static GUI Enhancements:
+Dynamic GUI Enhancements:
+Framework Enhancements:
+Batch Report Enhancements:
+Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
+Bug Fixes:

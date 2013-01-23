@@ -236,7 +236,9 @@ Section /o "TextTest and StoryText configuration" SEC06
 SectionEnd
 !else
 SectionGroup /e "StoryText" G2
-Section "-StoryText for Python GUI testing" SEC07
+Section /o "" TOGGLE ;hidden section to keep track of section group's state
+SectionEnd
+Section /o "StoryText for Python GUI testing" SEC07
   Call configureStorytextPython
   IfErrors onError done
   onError:
@@ -494,6 +496,26 @@ FunctionEnd
 
 Function .onInit
   StrCpy $1 ${g1o1}
+FunctionEnd
+
+Function .onSelChange
+  !define /math SECFLAGS_SELRO ${SF_SELECTED} | ${SF_RO}
+  ${IfNot} ${SectionIsSelected} ${TOGGLE}
+  ${AndIf} ${SectionIsReadOnly} ${SEC07}
+    !insertmacro ClearSectionFlag ${SEC07} ${SECFLAGS_SELRO}
+  ${EndIf}
+  ${If} ${SectionIsSelected} ${g3o1}
+  ${OrIf} ${SectionIsSelected} ${g3o2}
+    !insertmacro SetSectionFlag ${SEC07} ${SECFLAGS_SELRO}
+  ${Else}
+    !insertmacro ClearSectionFlag ${SEC07} ${SF_RO}
+  ${EndIf}
+  ${If} ${SectionIsSelected} ${SEC07}
+    !insertmacro SelectSection ${TOGGLE}
+  ${Else}
+    !insertmacro UnselectSection ${TOGGLE}
+  ${EndIf}
+  !undef SECFLAGS_SELRO
 FunctionEnd
 ; ============== Uninstall fuctions ========================
 Function un.install

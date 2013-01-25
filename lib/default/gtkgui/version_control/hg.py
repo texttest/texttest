@@ -40,13 +40,10 @@ class HgInterface(vcs_independent.VersionControlInterface):
             return os.path.realpath(file)
         
     def callProgramOnFiles(self, cmdName, fileArg, recursive=False, extraArgs=[], **kwargs):
-        if cmdName == "status":
-            basicArgs = self.getCmdArgs(cmdName, extraArgs)
-            for fileName in self.getFileNamesForCmd(cmdName, fileArg, recursive):
-                self.callProgramWithHandler(fileName, basicArgs + [ self.correctForLinks(fileName) ], **kwargs)
-        else:
-            vcs_independent.VersionControlInterface.callProgramOnFiles(self, cmdName, fileArg, recursive, extraArgs, **kwargs)
-    
+        basicArgs = self.getCmdArgs(cmdName, extraArgs)
+        for fileName in self.getFileNamesForCmd(cmdName, fileArg, recursive):
+            self.callProgramWithHandler(fileName, basicArgs + [ self.correctForLinks(fileName) ], **kwargs)
+        
     def getStateFromStatus(self, output):
         words = output.split()
         if len(words) > 0:

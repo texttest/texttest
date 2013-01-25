@@ -4,7 +4,9 @@ import os, plugins
 def getVersionControlConfig(apps, inputOptions):
     allDirs = [ app.getDirectory() for app in apps ] + inputOptions.rootDirectories
     for dir in allDirs:
-        config = getConfigFromDirectory(os.path.realpath(dir))
+        # Hack for self-testing...
+        dirToCheck = dir if os.path.basename(dir) == "TargetApp" else os.path.realpath(dir)
+        config = getConfigFromDirectory(dirToCheck)
         if config:
             return config
 

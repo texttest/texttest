@@ -154,13 +154,13 @@ class SummaryDataFinder:
         versionDates = {}
         for path in glob(os.path.join(appDir, "test_*.html")):
             fileName = os.path.basename(path)
-            version, date = self.parseFileName(fileName)
+            version, date, tag = self.parseFileName(fileName)
             if version:
                 overviewPage = os.path.join(appDir, self.getOverviewPageName(version))
                 if os.path.isfile(overviewPage):
                     self.diag.info("Found file with version " + version)
                     versionDates.setdefault(version, {})
-                    versionDates[version][date] = path
+                    versionDates[version][(date, tag)] = path
         return versionDates
 
     def getOverviewPageName(self, version):
@@ -169,15 +169,18 @@ class SummaryDataFinder:
     def getOverviewPage(self, appName, version):
         return os.path.join(self.basePath, self.getShortAppName(appName), self.getOverviewPageName(version))
 
-    def getMostRecentDate(self):
+    def getMostRecentDateAndTag(self):
         allDates = []
         for appName, appInfo in self.appVersionInfo.items():
             for versionData in appInfo.values():
-                mostRecentDate = max(versionData.keys())
-                allDates.append(mostRecentDate)
-                self.diag.info("Most recent date for " + appName + " = " + repr(mostRecentDate))
+                mostRecentInfo = max(versionData.keys(), key=self.getDateTagKey)
+                allDates.append(mostRecentInfo)
+                self.diag.info("Most recent date for " + appName + " = " + repr(mostRecentInfo))
         return max(allDates)
-
+    
+    def getDateTagKey(self, info):
+        return info[0], testoverview.GenerateWebPages.padNumbersWithZeroes(info[1])
+        
     def usePieChart(self, appName):
         if self.appUsePie.get(appName) == "true":
             try:
@@ -192,17 +195,17 @@ class SummaryDataFinder:
 
     def getLatestSummary(self, appName, version):
         versionData = self.appVersionInfo[appName][version]
-        lastDate = max(versionData.keys())
-        path = versionData[lastDate]
+        lastInfo = max(versionData.keys(), key=self.getDateTagKey)
+        path = versionData[lastInfo]
         summary = self.extractSummary(path)
         self.diag.info("For version " + version + ", found summary info " + repr(summary))
-        return summary, lastDate
+        return summary, lastInfo
 
     def getAllSummaries(self, appName, version):
         versionData = self.appVersionInfo[appName][version]
         allDates = versionData.keys()
-        allDates.sort()
-        return [ (time.strftime("%d%b%Y", currDate), self.extractSummary(versionData[currDate])) for currDate in allDates ]
+        allDates.sort(key=self.getDateTagKey)
+        return [ (time.strftime("%d%b%Y", currInfo[0]), self.extractSummary(versionData[currInfo])) for currInfo in allDates ]
 
     def extractSummary(self, datedFile):
         for line in open(datedFile):
@@ -251,14 +254,17 @@ class SummaryDataFinder:
     def parseFileName(self, fileName):
         versionStr = fileName[5:-5]
         components = versionStr.split("_")
+        self.diag.info("Parsing file with components " + repr(components))
         for index, component in enumerate(components[1:]):
             try:
-                self.diag.info("Trying to parse " + component + " as date.")
+                self.diag.info("Trying to parse " + component + " as date")
                 date = time.strptime(component, "%d%b%Y")
-                return "_".join(components[:index + 1]), date
+                version = "_".join(components[:index + 1])
+                tag = "_".join(components[index + 2:]) or component
+                return version, date, tag
             except ValueError:
                 pass
-        return None, None
+        return None, None, None
 
 
 class SummaryGenerator:
@@ -274,6 +280,9 @@ class SummaryGenerator:
         file = open(dataFinder.summaryPageName, "w")
         versionOrder = [ "default" ]
         appOrder = []
+        mostRecentInfo = dataFinder.getMostRecentDateAndTag()
+        mostRecentTag = mostRecentInfo[1]
+        self.diag.info("Most recent results are from " + repr(mostRecentTag))
         for line in open(dataFinder.getTemplateFile()):
             if "<title>" in line:
                 file.write(self.adjustLineForTitle(line))
@@ -283,8 +292,10 @@ class SummaryGenerator:
                 appOrder += self.extractOrder(line)
             if "Version order=" in line:
                 versionOrder += self.extractOrder(line)
+            if "<h1" in line:
+                file.write("<h3 align=\"center\">(from test run " + mostRecentTag + ")</h3>\n")
             if "Insert table here" in line:
-                self.insertSummaryTable(file, dataFinder, appsWithVersions, appOrder, versionOrder)
+                self.insertSummaryTable(file, dataFinder, mostRecentInfo, appsWithVersions, appOrder, versionOrder)
         file.close()
         plugins.log.info("wrote: '" + dataFinder.summaryPageName + "'") 
         
@@ -327,7 +338,7 @@ class SummaryGenerator:
         allVersions = reduce(operator.add, pageInfo.values(), [])
         return set(filter(lambda v: allVersions.count(v) > 1, allVersions))
 
-    def createPieChart(self, dataFinder, resultSummary, summaryGraphName, version, lastDate, oldResults):
+    def createPieChart(self, dataFinder, resultSummary, summaryGraphName, version, lastInfo, oldResults):
         from resultgraphs import PieGraph
         fracs = []
         colours = []
@@ -338,7 +349,7 @@ class SummaryGenerator:
                 fracs.append(count)
                 colours.append(colour)
                 tests += count
-        title = time.strftime("%d%b%Y",lastDate) + " - " + str(tests) + " tests"
+        title = lastInfo[1] + " - " + str(tests) + " tests"
         pg = PieGraph(version, title, size=5)
         pg.pie(fracs, colours)
         summaryGraphFile = os.path.join(dataFinder.location, summaryGraphName)
@@ -347,14 +358,12 @@ class SummaryGenerator:
         else:
             pg.save(summaryGraphFile)
 
-    def insertSummaryTable(self, file, dataFinder, pageInfo, appOrder, versionOrder):
+    def insertSummaryTable(self, file, dataFinder, mostRecentInfo, pageInfo, appOrder, versionOrder):
         versionWithColumns = self.getVersionsWithColumns(pageInfo)
         self.diag.info("Following versions will be placed in columns " + repr(versionWithColumns))
         minColumnIndices = self.getMinColumnIndices(pageInfo, versionOrder)
         self.diag.info("Minimum column indices are " + repr(minColumnIndices))
         columnVersions = {}
-        mostRecentDate = dataFinder.getMostRecentDate()
-        self.diag.info("Most recent results are from " + repr(mostRecentDate))
         for appName in self.getOrderedVersions(appOrder, pageInfo):
             file.write("<tr>\n")
             file.write("  <td><h3>" + appName + "</h3></td>\n")
@@ -368,12 +377,12 @@ class SummaryGenerator:
                     if version in versionWithColumns:
                         columnVersions[columnIndex] = version
 
-                    resultSummary, lastDate = dataFinder.getLatestSummary(appName, version)
-                    oldResults = lastDate != mostRecentDate
+                    resultSummary, lastInfo = dataFinder.getLatestSummary(appName, version)
+                    oldResults = lastInfo != mostRecentInfo
                     fileToLink = dataFinder.getOverviewPage(appName, version)
                     if dataFinder.usePieChart(appName):
                         summaryGraphName = "summary_pie_" + version + ".png"
-                        self.createPieChart(dataFinder, resultSummary, summaryGraphName, version, lastDate, oldResults)
+                        self.createPieChart(dataFinder, resultSummary, summaryGraphName, version, lastInfo, oldResults)
                         file.write('    <td><a href="' + fileToLink + '"><img border=\"0\" src=\"' + summaryGraphName + '\"></a></td>\n')
                     else:
                         file.write('    <td><h3><a href="' + fileToLink + '">' + version + '</a></h3></td>\n')

@@ -215,10 +215,12 @@ class GenerateWebPages(object):
         else:
             return cmp(x, y)
     
-    def padNumbersWithZeroes(self, x):
-        return re.sub("[0-9]+", self.padWithZeroes, x)
+    @classmethod
+    def padNumbersWithZeroes(cls, x):
+        return re.sub("[0-9]+", cls.padWithZeroes, x)
 
-    def padWithZeroes(self, match):
+    @staticmethod
+    def padWithZeroes(match):
         return match.group(0).rjust(4, "0")
     
     def getTagFromFile(self, fileName):

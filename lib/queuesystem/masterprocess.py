@@ -943,6 +943,8 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
         allow = self.allowChange(test.state, state)
         if allow:
             test.changeState(state)
+        else:
+            self.diag.info("Rejecting state change, old state " + test.state.category + " is complete, new state " + state.category + " is not.")
         lock.release()
         return allow
 

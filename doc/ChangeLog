@@ -2413,5 +2413,10 @@ Static GUI Enhancements:
 Dynamic GUI Enhancements:
 Framework Enhancements:
 Batch Report Enhancements:
+    - Index page now notes which run the information there is based on
 Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
 Bug Fixes:
+    - Correctly find version control when TextTest files are only some part of the substructure
+    - Workaround Mercurial bug for symbolically linked repository when removing or moving
+    - Don't bail out if a testsuite file is missing and we don't have permission to create a new one
+

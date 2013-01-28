@@ -139,9 +139,9 @@ BrandingText " "
 RequestExecutionLevel user
 Caption "${PRODUCT_NAME}"
 !ifdef JEPPESEN
-  OutFile "texttext-all-in-one${PRODUCT_VERSION}.${ARCH}.jeppesen.exe"
+  OutFile "texttest-all-in-one${PRODUCT_VERSION}.${ARCH}.jeppesen.exe"
 !else
-  OutFile "texttext-all-in-one${PRODUCT_VERSION}.${ARCH}.exe"
+  OutFile "texttest-all-in-one${PRODUCT_VERSION}.${ARCH}.exe"
 !endif
 InstallDir "C:\TextTest"
 InstallDirRegKey HKLM "${PRODUCT_DIR_REGKEY}" ""

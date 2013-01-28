@@ -64,7 +64,7 @@ class HgInterface(vcs_independent.VersionControlInterface):
     def removePath(self, path):
         # Mercurial doesn't remove unknown files, nor does it return non-zero exit codes when it fails
         retValue = os.path.exists(path)
-        self.callProgram("rm", [ path ]) # returns 0 whatever happens
+        self.callProgram("rm", [ self.correctForLinks(path) ]) # returns 0 whatever happens
         plugins.removePath(path)
         return retValue
 

@@ -665,7 +665,17 @@ class SubmissionRules:
         return name.replace(":", "_")
 
     def findQueue(self):
-        return self.optionMap.get("q", "")
+        cmdQueue = self.optionMap.get("q", "")
+        if cmdQueue:
+            return cmdQueue
+        configQueue = self.test.app.getConfigValue("default_queue")
+        if configQueue != "texttest_default":
+            return configQueue
+
+        return self.findDefaultQueue()
+
+    def findDefaultQueue(self):
+        return ""
 
     def findMachineList(self):
         return []
@@ -745,19 +755,6 @@ class TestSubmissionRules(SubmissionRules):
             if len(val) > 0 and val[0] != "any" and val[0] != "none":
                 return val
         return []
-
-    def findQueue(self):
-        cmdQueue = SubmissionRules.findQueue(self)
-        if cmdQueue:
-            return cmdQueue
-        configQueue = self.test.app.getConfigValue("default_queue")
-        if configQueue != "texttest_default":
-            return configQueue
-
-        return self.findDefaultQueue()
-
-    def findDefaultQueue(self):
-        return ""
 
     def findMachineList(self):
         if not self.forceOnPerformanceMachines():

@@ -476,8 +476,9 @@ class TestEnvironmentCreator:
         vars = []
         if replayUseCase is not None:
             vars.append(self.getReplayScriptVariable(replayUseCase))
-            if self.optionMap.has_key("actrep"):
-                vars.append(self.getReplayDelayVariable())
+            delay = self.optionMap.get("delay", 0)
+            if delay > 0:
+                vars.append(self.getReplayDelayVariable(delay))
         if usecaseFile or self.isRecording():
             # Re-record if recorded files are already present or recording explicitly requested
             vars.append(self.getRecordScriptVariable(self.test.makeTmpFileName("usecase")))
@@ -517,18 +518,20 @@ class TestEnvironmentCreator:
             return "replay", replayScript, "jusecase"
         else:
             return "USECASE_REPLAY_SCRIPT", replayScript # Full path to the script to replay in GUI tests
-    def getReplayDelayVariable(self):
-        replaySpeed = str(self.test.getConfigValue("slow_motion_replay_speed"))
+    
+    def getReplayDelayVariable(self, delay):
         if self.useJavaRecorder():
-            return "delay", replaySpeed, "jusecase"
+            return "delay", delay, "jusecase"
         else:
-            return "USECASE_REPLAY_DELAY", replaySpeed # Time to wait between each action in GUI tests
+            return "USECASE_REPLAY_DELAY", delay # Time to wait between each action in GUI tests
+    
     def getRecordScriptVariable(self, recordScript):
         self.diag.info("Enabling recording")
         if self.useJavaRecorder():
             return "record", recordScript, "jusecase"
         else:
             return "USECASE_RECORD_SCRIPT", recordScript # Full path to the script to record in GUI tests
+    
     def getPathVariables(self):
         testDir = self.test.getDirectory(temporary=1)
         localTestDir = self.test.getDirectory(temporary=1, local=1)

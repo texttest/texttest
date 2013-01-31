@@ -1525,7 +1525,7 @@ class Option:
 class TextOption(Option):
     def __init__(self, name, value="", possibleValues=[], allocateNofValues=-1,
                  selectDir=False, selectFile=False, saveFile=False, possibleDirs=[],
-                 description="", changeMethod=None, multilineEntry=False):
+                 description="", changeMethod=None, multilineEntry=False, minimum=0):
         Option.__init__(self, name, value, description, changeMethod)
         self.possValAppendMethod = None
         self.possValListMethod = None
@@ -1537,6 +1537,7 @@ class TextOption(Option):
         self.possibleDirs = possibleDirs
         self.clearMethod = None
         self.multilineEntry = multilineEntry
+        self.minimum = minimum
         self.setPossibleValues(possibleValues)
         
     def resetMethods(self):
@@ -1722,6 +1723,7 @@ class OptionGroup:
         for key, option in self.options.items():
             if self.accept(key, option, onlyKeys):
                 commandLines.append((key, option.getCmdLineValue()))
+            
         return commandLines
     
     def moveToEnd(self, keys):

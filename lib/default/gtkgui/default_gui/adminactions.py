@@ -542,8 +542,6 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         useGui = self.optionGroup.getSwitchValue("gui")
         if useGui > 0:
             configEntries["use_case_record_mode"] = "GUI"
-            if useGui != 9:
-                configEntries["slow_motion_replay_speed"] = "3.0"
         if useGui in range(1, 8):
             configEntries["use_case_recorder"] = "storytext"
             storytextDir = os.path.join(directory, "storytext_files")

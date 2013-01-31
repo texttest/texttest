@@ -374,18 +374,16 @@ class RunningAction(BasicRunningAction):
         else:
             return BasicRunningAction.getConfirmationMessage(self)
 
-    def getLowerBoundForSpinButtons(self):
-        return 1
-
     def checkValid(self, app):
         if app.getConfigValue("use_case_record_mode") == "disabled" and app not in self.validApps:
-            switch = self.getOption("actrep")
-            if switch:
-                self.hideChildWithLabel(self.widget, switch.name)
+            for guiOptName in [ "delay", "gui" ]:
+                guiOpt = self.getOption(guiOptName)
+                if guiOpt:
+                    self.hideChildWithLabel(self.widget, guiOpt.name)
         return guiplugins.ActionTabGUI.checkValid(self, app)
 
     def hideChildWithLabel(self, widget, label):
-        if hasattr(widget, "get_label") and widget.get_label() == label:
+        if (hasattr(widget, "get_label") and widget.get_label() and widget.get_label().strip() == label) or widget.get_name() == label:
             widget.hide()
         elif hasattr(widget, "get_children"):
             for child in widget.get_children():

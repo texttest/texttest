@@ -165,7 +165,7 @@ class QueueSystemConfig(default.Config):
             return default.Config.getTextResponder(self)
     
     def getSlaveSwitches(self):
-        return [ "c", "b", "trace", "ignorecat", "ignorefilters", "actrep", "td",
+        return [ "c", "b", "trace", "ignorecat", "ignorefilters", "delay", "gui", "td",
                  "rectraffic", "keeptmp", "keepslave", "reconnect", "reconnfull" ]
 
     def getExecHostFinder(self):

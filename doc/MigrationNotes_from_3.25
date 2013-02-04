@@ -1,0 +1,7 @@
+=========================================================
+CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
+=========================================================
+
+(1) "slow_motion_replay_speed" config file setting is not longer used
+=====================================================================
+It can be configured now on the running tab of the static GUI. You should just remove it.

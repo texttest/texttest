@@ -168,7 +168,7 @@ class DocumentEnvironment(plugins.Action):
             return arg
 
     def isRelevant(self, var, vars, prefixes):
-        if var in self.exceptions or var in prefixes or "SLEEP" in var or \
+        if var in self.exceptions or var in prefixes or "SLEEP" in var or "SELFTEST" in var or \
                (len(self.onlyEntries) > 0 and var not in self.onlyEntries):
             return False
         prevVal = vars.get(var, [])

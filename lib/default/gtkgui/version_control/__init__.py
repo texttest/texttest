@@ -5,7 +5,7 @@ def getVersionControlConfig(apps, inputOptions):
     allDirs = [ app.getDirectory() for app in apps ] + inputOptions.rootDirectories
     for dir in allDirs:
         # Hack for self-testing...
-        dirToCheck = dir if os.path.basename(dir) == "TargetApp" else os.path.realpath(dir)
+        dirToCheck = dir if os.path.basename(dir) in os.getenv("TEXTTEST_SELFTEST_DIR_NAMES", "").split(",") else os.path.realpath(dir)
         config = getConfigFromDirectory(dirToCheck)
         if config:
             return config

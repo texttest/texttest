@@ -101,6 +101,7 @@ class QueueSystemServer(BaseActionRunner):
             self.diag.info("All jobs submitted, polling the queue system now.")
             if self.canPoll():
                 self.pollQueueSystem()
+        self.diag.info("No jobs left to poll, exiting thread")
 
     def pollQueueSystem(self):
         # Start by polling after 5 seconds, ever after try every 15

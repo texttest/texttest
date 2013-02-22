@@ -362,23 +362,16 @@ class InsertShortcuts(plugins.ScriptWithArgs):
             unversionedFileName = ".".join(fileName.split(".")[:2])
             tmpFile = os.path.join(test.getDirectory(temporary=1), unversionedFileName)
             storytextHome = test.getEnvironment("STORYTEXT_HOME")
-            shortcutManager, recordScript = self.getShortcutManager(tmpFile, storytextHome)
-            for _, shortcut in shortcutManager.shortcuts:
-                recordScript.registerShortcut(shortcut)
-            
+            recordScript = self.getRecordScript(tmpFile, storytextHome)
             with open(stdFile, "rU") as readFile:
                 for line in readFile:
                     recordScript.record(line.strip("\n"))
 
-    def getShortcutManager(self, stdFile, storytextHome):
+    def getRecordScript(self, stdFile, storytextHome):
         from storytext.replayer import ShortcutManager
         from storytext import scriptEngine
         from storytext.recorder import RecordScript
-        recordScript = RecordScript(stdFile)
-        shortcutManager = ShortcutManager()
-        for shortcut in scriptEngine.getShortcuts(storytextHome):
-            shortcutManager.add(shortcut)
-        return shortcutManager, recordScript
+        return RecordScript(stdFile, scriptEngine.getShortcuts(storytextHome))
 
     def usesComparator(self):
         return True

@@ -11,12 +11,13 @@ def getVersionControlConfig(apps, inputOptions):
             return config
 
 def getConfigFromDirectory(directory):
+    allEntries = os.listdir(directory)
     for controlDirName in plugins.controlDirNames:
-        controlDir = os.path.join(directory, controlDirName)
-        if os.path.isdir(controlDir):
+        if controlDirName in allEntries:
             module = controlDirName.lower().replace(".", "")
             try:
                 exec "from " + module + " import InteractiveActionConfig"
+                controlDir = os.path.join(directory, controlDirName)
                 return InteractiveActionConfig(controlDir) #@UndefinedVariable
             except ImportError: # There may well be more VCSs than we have support for...
                 pass

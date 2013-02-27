@@ -339,8 +339,12 @@ class QueueSystemServer(BaseActionRunner):
         freeText = "Job pending in " + queueSystemName(test.app)
         return plugins.TestState("pending", freeText=freeText, briefText="PEND", lifecycleChange="become pending")
 
+    def getWindowsExecutable(self):
+        # sys.executable could be something other than Python... like storytext. Don't involve that here
+        return os.path.join(sys.exec_prefix, "python.exe")
+
     def getSlaveCommandArgs(self, test, submissionRules):
-        interpreterArgs = [ sys.executable ] if os.name == "nt" else []
+        interpreterArgs = [ self.getWindowsExecutable() ] if os.name == "nt" else []
         return interpreterArgs + [ plugins.getTextTestProgram(), "-d", ":".join(self.optionMap.rootDirectories),
                  "-a", test.app.name + test.app.versionSuffix(),
                  "-l", "-tp", test.getRelPath() ] + \

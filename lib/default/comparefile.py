@@ -57,6 +57,12 @@ class FileComparison:
             
     def split(self, test, separators):
         separator = separators.get(self.stem)
+        if not separator: # try wildcards
+            for key, value in separators.items():
+                if key.endswith("*"):
+                    if self.stem.startswith(key[:-1]):
+                        separator = value
+                        break
         if separator:
             sepRegex = re.compile(separator)
             tmpParts = self.splitFile(test, self.tmpCmpFile, sepRegex)
@@ -65,7 +71,7 @@ class FileComparison:
                      for origPart, tmpPart in izip(origParts, tmpParts) ]
         else:
             return []
-    
+
     def makeDeltaName(self, name):
         parts = name.rsplit("_", 1)
         lastpart = parts[-1]

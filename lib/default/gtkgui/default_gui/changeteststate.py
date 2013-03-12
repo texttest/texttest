@@ -210,6 +210,10 @@ class SplitResultFiles(guiplugins.ActionGUI):
 
 
 class RecomputeTests(guiplugins.ActionGUI):
+    def __init__(self, *args, **kw):
+        guiplugins.ActionGUI.__init__(self, *args, **kw)
+        self.recomputeThread = None
+        
     def isActiveOnCurrent(self, test=None, state=None):
         for currTest in self.currTestSelection:
             if currTest is test:
@@ -242,8 +246,11 @@ class RecomputeTests(guiplugins.ActionGUI):
                 appOrTest.reloadConfiguration()
 
         selection = copy(self.currTestSelection)
-        recomputeThread = Thread(target=self.recomputeTests, args=(selection,))
-        recomputeThread.start()
+        if self.recomputeThread and self.recomputeThread.isAlive():
+            self.notify("Status", "Waiting for previous recomputation to finish ...")
+            self.recomputeThread.join()
+        self.recomputeThread = Thread(target=self.recomputeTests, args=(selection,))
+        self.recomputeThread.start()
         
     def recomputeTests(self, selection):
         latestTestCount = 0

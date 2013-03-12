@@ -2342,17 +2342,18 @@ Bug Fixes:
     - Fixed problem where editing the main config file did not refresh properly if there were test-specific config files.
     - Fixed HTML report bug which didn't include descriptions for extra_version tests
 
-Version trunk
-=============
-General GUI Enhancements:
+Version 3.25
+============
 Static GUI Enhancements:
     - Refresh now reloads all test-specific config files
 	Previously only reloaded the main application config files
     - (GUI testing) Can now automatically insert StoryText shortcuts into all tests without running them
 	New script "default.InsertShortcuts" and item in Actions menu. Auto-detected when shortcuts are added via StoryText Editor.
+    - (GUI testing) Auto-detect renaming from StoryText editor and trigger "Replace Text In Files" run
+    - Added some new tooltips
 Dynamic GUI Enhancements:
     - "Recompute Status" now runs in the background and doesn't lock the GUI
-    - Showing now previews of succeeded files
+    - Now showing previews of succeeded files when they are selected
     - Adding ability to edit the original file also, when we have a different viewer added.
 Framework Enhancements:
     - Can now make use of separate sandbox locations for running the test itself and for collecting logfiles / results
@@ -2360,32 +2361,67 @@ Framework Enhancements:
 	(Usual setup is to run the test on a local disk and write its logfiles to a shared disk.)
     - Scripts used 'copy_test_path_script' can now use the environment variables set for the test run.
 	Particularly useful if they need to refer to the logging location in a setup using the above default_texttest_local_tmp.
+    - Memory/Performance settings can now be configured per test/test suite
+	For example performance_logfile_extractor, performance_logfile etc
 Batch Report Enhancements:
     - Now sort the applications in order of number of tests before generating HTML report
 	If there are many large slow-to-generate test suites it's best they don't hold up small fast ones.
     - Applications whose test suite is removed but where old results still exist are still linked from the main index page
 	Can be important, especially when live versions exist of older versions of the same apps.
-    - Jenkins change handling deals with the new directory structure in Jenkins as well as the "legacy" one.
-    - Jenkins change handling deals with aborted runs in a better way
+    - Jenkins change handling now uses JENKINS_HOME and JOB_NAME instead of WORKSPACE variables
+	Makes it independent of Jenkins workspace file layout, which seems to vary a lot
+    - Jenkins change handling deals with aborted and incomplete runs in a better way
 Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
+    - Grid Engine submission no longer forwards the entire environment by default
+	See migration notes
     - SGE errors handled in a better way, warn when we get a job status we don't expect
     - Don't lose track of SGE jobs that end up in "St" state
     - If SGE jobs start but then terminate without reporting in (e.g. by getting SIGKILL) react and report this.
-    - Better handling of Eqw jobs in UGE. We grab now the error reason and kill them.
+    - Better handling of Eqw jobs in SGE. We grab now the error reason and kill them.
+    - Added workaround for SGE issue with long command line, which are rejected as if they were long path names
 Bug Fixes:
     - Fixed stacktrace for HTML report generation when the location doesn't exist yet
-    - "Replace Text in Files" handles removing lines in a more consistent way
+    - "Replace Text in Files" handles removing and inserting lines in a more consistent way
     - Fixed stacktrace when pressing recompute and temporary files have been externally removed
     - "Find Failure Information" now shows a progress indicator instead of just leaving the menu item present
     - Ignore kill signals after the first one has arrived, so we show the correct reason for being killed
-    - Fixed Jira plugin problem: stacktrace when Jira bug has no description
-    - Fixed Jira plugin problem: wrong prio in jira info
+    - Fixed knownbugs mechanism drops leading spaces from regular expressions. We don't accept leading spaces and show now an error message
+    - Fixed occasional "TEXTTEST EXCEPTION" due to temporary file collisions when rerunning test after knownbug
+    - Fixed problem with CaptureMock tests that capture files: save them when the files that refer to them are saved.
+    - Fixed "Split Files" followed by "Recompute" does not work properly. "Recompute" removes now all split information if it's present.
+    - Fixed problem where leading spaces got removing when matching run_dependent_text
+    - Removed restrictions around rerunning tests with a version not included in the original run
+    - Fixed stacktrace if test completes at the same instant it is killed
+    - Creating new files via "Import File" always opens the default viewer (normally a text editor), even when a specific viewer is configured.
+	Specific viewers often do not allow editing
+    - Don't stacktrace when parallel GUI testing locally on Windows
+    - When setting up for Java GUI testing, don't put Windows path names in the CLASSPATH, it can't handle them. Convert to DOS format first.
+    - Fixed possible stacktrace in log statement in plugins.py (only relevant from custom configuration modules)
+    - Fixed Jenkins plugin: Don't be fooled by artefacts whose names extend each other
+    - Fixed Jenkins plugin: Double-check change information as it's prone to being corrupted by builds running concurrently
+    - Fixed Jira plugin: stacktrace when Jira bug has no description
+    - Fixed Jira plugin: wrong priority in jira info
+    - Fixed Jira plugin: stacktrace when getting non-xmlrpc errors from Jira
     - Fixed Windows installer: failed when only TextTest and StoryText selected
     - Fixed Windows installer: get rid of the command window
-    - Fixed occasional "TEXTTEST EXCEPTION" due to temporary file collisions when rerunning test after knownbug
-    - Fixed bug where Jenkins change handling was fooled by artefacts whose names extend each other
-    - Fixed problem with CaptureMock tests that capture files: save them when the files that refer to them are saved.
-    - Fixed stacktrace when getting non-xmlrcp errors from Jira
-    - Fixed "Split Files" followed by "Recompute" does not work properly. "Recompute" removes now all split information if it's present.
-    - Fixed knownbugs mechanism drops leading spaces from regular expressions. We don't accept leading spaces and show now an error message
+    - Fixed Windows installer: doesn't allow incorrect install with Java GUI testing enabled but not Python GUI testing
+    - Fixed Windows installer: no longer requires logging in and out after install if using Windows 7
+
+Version trunk
+=============
+Static GUI Enhancements:
+    - (GUI testing) "run in slow motion replay" checkbox removed. It has been replaced with a spinner for adding a pause after each event and
+	a new check box "Show GUI and record any extra actions".
+Dynamic GUI Enhancements:
+Framework Enhancements:
+Batch Report Enhancements:
+    - Index page now notes which run the information there is based on
+Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
+    - Default_queue setting should also apply to the proxy job
+Bug Fixes:
+    - Correctly find version control when TextTest files are only some part of the substructure
+    - Workaround Mercurial bug for symbolically linked repository when removing or moving
+    - Don't bail out if a testsuite file is missing and we don't have permission to create a new one
+    - Allways disable storytext editor when using a virtual display
+
 

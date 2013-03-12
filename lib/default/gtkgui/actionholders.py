@@ -253,6 +253,8 @@ class NotebookGUI(guiutils.SubGUI):
         changed = False
         for pageNum, tabGUI in enumerate(self.tabInfo):
             page = self.notebook.get_nth_page(pageNum)
+            if page is None:
+                continue # Can happen if tests terminate when the GUI is being taken down
             name = tabGUI.getTabTitle()
             if tabGUI.shouldShowCurrent(*args):
                 if not page.get_property("visible"):

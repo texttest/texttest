@@ -542,8 +542,6 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         useGui = self.optionGroup.getSwitchValue("gui")
         if useGui > 0:
             configEntries["use_case_record_mode"] = "GUI"
-            if useGui != 9:
-                configEntries["slow_motion_replay_speed"] = "3.0"
         if useGui in range(1, 8):
             configEntries["use_case_recorder"] = "storytext"
             storytextDir = os.path.join(directory, "storytext_files")
@@ -608,6 +606,25 @@ class ImportApplication(guiplugins.ActionDialogGUI):
             for file in files:
                 if fnmatch(file, pattern):
                     return os.path.join(rootDir, root, "*")
+    
+    def has_special_chars(self, path):
+        return " " in path or "(" in path
+
+    def get_dos_corrected_path(self, path):
+        if os.name == "posix" or not self.has_special_chars(path):
+            return path
+        
+        # Windows paths with spaces don't work in classpaths, figure out the correct DOS path
+        dirname, local = os.path.split(path)
+        if self.has_special_chars(local):
+            p = subprocess.Popen([ "dir", "/x" ], cwd=dirname, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            out = p.communicate()[0]
+            for line in out.splitlines():
+                if line.endswith(local):
+                    parts = line.split()
+                    local = parts[3]
+                    break
+        return os.path.join(self.get_dos_corrected_path(dirname), local)
                     
     def setJavaGuiTestingEntries(self, toolkit, directory, ext, configEntries):
         storytextPath, jythonPath = self.findStoryTextInPath()
@@ -625,7 +642,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
             mainClass = self.getMainClass(executable)
             if not mainClass:
                 raise plugins.TextTestError, "Jar file provided has no main class specified, cannot use it as an executable"
-            classpath.append(executable)
+            classpath.append(self.get_dos_corrected_path(executable))
             configEntries["executable"] = mainClass
         if "swing" in toolkit:
             swingLibraryPath = self.findSwingLibraryPath(storytextPath)

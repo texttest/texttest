@@ -451,7 +451,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         mainThreadRunner, subThreadRunners = self.findThreadRunners()
         allThreads = []
         for subThreadRunner in subThreadRunners:
-            thread = Thread(target=subThreadRunner.run)
+            thread = Thread(target=subThreadRunner.run, name=subThreadRunner.__class__.__name__)
             allThreads.append(thread)
             self.diag.info("Running " + str(subThreadRunner.__class__) + " in a subthread")
             thread.start()
@@ -473,10 +473,14 @@ class TextTest(plugins.Responder, plugins.Observable):
         
         # See http://groups.google.com/group/comp.lang.python/browse_thread/thread/a244905b86f06e48/7e969a0c7932fa91#
         currThreads = self.aliveThreads(allThreads)
-        while len(currThreads) > 0:
+        threadCount = len(currThreads)
+        while threadCount > 0:
             sleep(0.5)
             currThreads = self.aliveThreads(currThreads)
-
+            if len(currThreads) < threadCount:
+                self.diag.info("Thread(s) terminated, remaining are " + repr([ t.name for t in currThreads ]))
+            threadCount = len(currThreads)
+        
     def aliveThreads(self, threads):
         return filter(lambda thread: thread.isAlive(), threads)
 

@@ -1,0 +1,24 @@
+
+=========================================================
+COMPULSORY MIGRATION
+=========================================================
+
+(1) Grid Engine submission no longer forwards the entire environment
+====================================================================
+Anyone using Grid Engine (UGE/SGE) should note that the setup no longer tells UGE to copy the 
+entire environment when submitting jobs. (In detail, it does not send the -V flag to the qsub program)
+
+The previous behaviour could lead to some very strange errors, such as when display/shell related 
+variables were forwarded to machines with a different OS where they didn't make sense.
+
+It has previously worked to set environment variables outside of TextTest, e.g. via a starter 
+script, and then just start TextTest. This will not work any more with UGE/SGE, you will need 
+to set them via TextTest's own environment file mechanism.
+
+Alternatively, to restore the previous behaviour, you can add
+
+queue_system_submit_args:-V 
+
+to your config file, which will once again forward your entire environment to the remote job.
+
+

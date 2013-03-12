@@ -4,18 +4,23 @@ import os, plugins
 def getVersionControlConfig(apps, inputOptions):
     allDirs = [ app.getDirectory() for app in apps ] + inputOptions.rootDirectories
     for dir in allDirs:
-        config = getConfigFromDirectory(dir)
+        # Hack for self-testing...
+        dirToCheck = dir if os.path.basename(dir) in os.getenv("TEXTTEST_SELFTEST_DIR_NAMES", "").split(",") else os.path.realpath(dir)
+        config = getConfigFromDirectory(dirToCheck)
         if config:
             return config
 
 def getConfigFromDirectory(directory):
-    for dir in [ directory, os.path.dirname(directory) ]:
-        for controlDirName in plugins.controlDirNames:
-            controlDir = os.path.join(dir, controlDirName)
-            if os.path.isdir(controlDir):
-                module = controlDirName.lower().replace(".", "")
-                try:
-                    exec "from " + module + " import InteractiveActionConfig"
-                    return InteractiveActionConfig(controlDir)
-                except ImportError: # There may well be more VCSs than we have support for...
-                    pass
+    allEntries = os.listdir(directory)
+    for controlDirName in plugins.controlDirNames:
+        if controlDirName in allEntries:
+            module = controlDirName.lower().replace(".", "")
+            try:
+                exec "from " + module + " import InteractiveActionConfig"
+                controlDir = os.path.join(directory, controlDirName)
+                return InteractiveActionConfig(controlDir) #@UndefinedVariable
+            except ImportError: # There may well be more VCSs than we have support for...
+                pass
+    dirname = os.path.dirname(directory)
+    if dirname != directory:
+        return getConfigFromDirectory(dirname)

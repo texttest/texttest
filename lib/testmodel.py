@@ -1008,11 +1008,14 @@ class TestSuite(Test):
     
     def createContentFile(self):
         contentFile = self.dircache.pathName("testsuite." + self.app.name)
-        file = open(contentFile, "a")
-        file.write("# Ordered list of tests in test suite. Add as appropriate\n\n")
-        file.close()
-        self.dircache.refresh()
-        
+        try:
+            file = open(contentFile, "a")
+            file.write("# Ordered list of tests in test suite. Add as appropriate\n\n")
+            file.close()
+            self.dircache.refresh()
+        except OSError, e:
+            sys.stderr.write("ERROR: Could not create testsuite file at '" + contentFile + "'\n" + str(e) + "\n")
+
     def contentChanged(self):
         # Here we assume that only order can change...
         self.refreshFiles()

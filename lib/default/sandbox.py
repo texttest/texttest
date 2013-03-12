@@ -476,8 +476,9 @@ class TestEnvironmentCreator:
         vars = []
         if replayUseCase is not None:
             vars.append(self.getReplayScriptVariable(replayUseCase))
-            if self.optionMap.has_key("actrep"):
-                vars.append(self.getReplayDelayVariable())
+            delay = self.optionMap.get("delay", 0)
+            if delay > 0:
+                vars.append(self.getReplayDelayVariable(delay))
         if usecaseFile or self.isRecording():
             # Re-record if recorded files are already present or recording explicitly requested
             vars.append(self.getRecordScriptVariable(self.test.makeTmpFileName("usecase")))
@@ -517,18 +518,20 @@ class TestEnvironmentCreator:
             return "replay", replayScript, "jusecase"
         else:
             return "USECASE_REPLAY_SCRIPT", replayScript # Full path to the script to replay in GUI tests
-    def getReplayDelayVariable(self):
-        replaySpeed = str(self.test.getConfigValue("slow_motion_replay_speed"))
+    
+    def getReplayDelayVariable(self, delay):
         if self.useJavaRecorder():
-            return "delay", replaySpeed, "jusecase"
+            return "delay", delay, "jusecase"
         else:
-            return "USECASE_REPLAY_DELAY", replaySpeed # Time to wait between each action in GUI tests
+            return "USECASE_REPLAY_DELAY", delay # Time to wait between each action in GUI tests
+    
     def getRecordScriptVariable(self, recordScript):
         self.diag.info("Enabling recording")
         if self.useJavaRecorder():
             return "record", recordScript, "jusecase"
         else:
             return "USECASE_RECORD_SCRIPT", recordScript # Full path to the script to record in GUI tests
+    
     def getPathVariables(self):
         testDir = self.test.getDirectory(temporary=1)
         localTestDir = self.test.getDirectory(temporary=1, local=1)
@@ -1024,26 +1027,23 @@ class MakePerformanceFile(PerformanceFileCreator):
 class ExtractPerformanceFiles(PerformanceFileCreator):
     def __init__(self, machineInfoFinder):
         PerformanceFileCreator.__init__(self, machineInfoFinder)
-        self.entryFinders = None
         self.entryFiles = None
         self.logFileStem = None
         
-    def setUpApplication(self, app):
-        PerformanceFileCreator.setUpApplication(self, app)
-        self.entryFinders = app.getConfigValue("performance_logfile_extractor")
-        self.entryFiles = app.getConfigValue("performance_logfile")
-        self.logFileStem = app.getConfigValue("log_file")
-        self.diag.info("Found the following entry finders:" + str(self.entryFinders))
-
     def makePerformanceFiles(self, test):
-        for fileStem, entryFinder in self.entryFinders.items():
+        entryFinders = test.getConfigValue("performance_logfile_extractor")
+        entryFiles = test.getConfigValue("performance_logfile")
+        defaultLogFileStem = test.getConfigValue("log_file")
+        self.diag.info("Found the following entry finders:" + str(entryFinders))
+        for fileStem, entryFinder in entryFinders.items():
             if len(entryFinder) == 0:
                 continue # don't allow empty entry finders
             if not self.allMachinesTestPerformance(test, fileStem):
                 self.diag.info("Not extracting performance file for " + fileStem + ": not on performance machines")
                 continue
             values = []
-            for logFileStem in self.findLogFileStems(fileStem):
+            logFileStems = entryFiles.get(fileStem, [ defaultLogFileStem ])
+            for logFileStem in logFileStems:
                 self.diag.info("Looking for log files matching " + logFileStem)
                 for fileName in self.findLogFiles(test, logFileStem):
                     self.diag.info("Scanning log file for entry: " + entryFinder)
@@ -1053,22 +1053,21 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
                 self.diag.info("Writing performance to file " + fileName)
                 contents = self.makeFileContents(test, values, fileStem)
                 self.saveFile(fileName, contents)
+                
     def getFileToWrite(self, test, stem):
         return test.makeTmpFileName(stem)
+    
     def findLogFiles(self, test, stem):
         collatedfiles = glob.glob(test.makeTmpFileName(stem))
         if len(collatedfiles) == 0:
             return glob.glob(test.makeTmpFileName(stem, forComparison=0))
         return collatedfiles
-    def findLogFileStems(self, fileStem):
-        if self.entryFiles.has_key(fileStem):
-            return self.entryFiles[fileStem]
-        else:
-            return [ self.logFileStem ]
+    
     def saveFile(self, fileName, contents):
         file = open(fileName, "w")
         file.write(contents)
         file.close()
+    
     def makeFileContents(self, test, values, fileStem):
         # Round to accuracy 0.01
         unit = test.getCompositeConfigValue("performance_unit", fileStem)

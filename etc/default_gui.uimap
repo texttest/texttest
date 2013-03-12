@@ -1029,3 +1029,9 @@ activate = insert shortcuts into usecases
 [Name=Edit Original File]
 activate = edit original file
 
+[Name=Replay pause (sec)]
+changed = set replay pause to
+
+[Label=Show GUI and record any extra actions]
+toggled.true = enable gui visibility
+

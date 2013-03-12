@@ -168,7 +168,7 @@ class DocumentEnvironment(plugins.Action):
             return arg
 
     def isRelevant(self, var, vars, prefixes):
-        if var in self.exceptions or var in prefixes or "SLEEP" in var or \
+        if var in self.exceptions or var in prefixes or "SLEEP" in var or "SELFTEST" in var or \
                (len(self.onlyEntries) > 0 and var not in self.onlyEntries):
             return False
         prevVal = vars.get(var, [])
@@ -219,14 +219,15 @@ class DocumentScripts(plugins.Action):
 class ReplaceText(plugins.ScriptWithArgs):
     scriptDoc = "Perform a search and replace on all files with the given stem"
     def __init__(self, args):
-        argDict = self.parseArguments(args, [ "old", "new", "file", "regexp" ])
+        argDict = self.parseArguments(args, [ "old", "new", "file", "regexp", "argsReplacement" ])
         tryAsRegexp = "regexp" not in argDict or argDict["regexp"] == "1"
+        self.argsReplacement = "argsReplacement" in argDict and argDict["argsReplacement"] == "1"
         self.oldText = argDict["old"].replace("\\n", "\n")
         self.newText = argDict["new"].replace("\\n", "\n")
         if self.newText.endswith("\n") and self.oldText.endswith("\n"):
             self.oldText = self.oldText.rstrip()
         self.newText = self.newText.rstrip()
-        self.multiLineTrigger = plugins.MultilineTextTrigger(self.oldText, tryAsRegexp, False)
+        self.trigger = plugins.MultilineTextTrigger(self.oldText, tryAsRegexp, False) if not self.argsReplacement else plugins.TextTrigger(self.oldText, tryAsRegexp, False)
         self.newMultiLineText = self.newText.split("\n")
         self.stems = []
         fileStr = argDict.get("file")
@@ -251,10 +252,14 @@ class ReplaceText(plugins.ScriptWithArgs):
         with open(tmpFile, "w") as writeFile:
             with open(stdFile) as readFile:
                 for line in readFile:
-                    writeFile.write(self.multiLineTrigger.replace(line, self.newMultiLineText))
-                if self.oldText[-1] != "\n":
-                    writeFile.write(self.multiLineTrigger.getLeftoverText())
-            
+                    writeFile.write(self.trigger.replace(line, self.newMultiLineText if not self.argsReplacement else self.replaceArgs))
+                if self.oldText[-1] != "\n" and not self.argsReplacement:
+                    writeFile.write(self.trigger.getLeftoverText())
+                    
+    def replaceArgs(self, matchobj):
+        from storytext.replayer import ReplayScript
+        return ReplayScript.getTextWithArgs(self.newText, [arg for arg in matchobj.groups()])
+
     def usesComparator(self):
         return True
 
@@ -362,23 +367,16 @@ class InsertShortcuts(plugins.ScriptWithArgs):
             unversionedFileName = ".".join(fileName.split(".")[:2])
             tmpFile = os.path.join(test.getDirectory(temporary=1), unversionedFileName)
             storytextHome = test.getEnvironment("STORYTEXT_HOME")
-            shortcutManager, recordScript = self.getShortcutManager(tmpFile, storytextHome)
-            for _, shortcut in shortcutManager.shortcuts:
-                recordScript.registerShortcut(shortcut)
-            
+            recordScript = self.getRecordScript(tmpFile, storytextHome)
             with open(stdFile, "rU") as readFile:
                 for line in readFile:
                     recordScript.record(line.strip("\n"))
 
-    def getShortcutManager(self, stdFile, storytextHome):
+    def getRecordScript(self, stdFile, storytextHome):
         from storytext.replayer import ShortcutManager
         from storytext import scriptEngine
         from storytext.recorder import RecordScript
-        recordScript = RecordScript(stdFile)
-        shortcutManager = ShortcutManager()
-        for shortcut in scriptEngine.getShortcuts(storytextHome):
-            shortcutManager.add(shortcut)
-        return shortcutManager, recordScript
+        return RecordScript(stdFile, scriptEngine.getShortcuts(storytextHome))
 
     def usesComparator(self):
         return True

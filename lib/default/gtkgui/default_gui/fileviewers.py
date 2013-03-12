@@ -88,12 +88,12 @@ class FileViewAction(guiplugins.ActionGUI):
     def extraPostfix(self):
         return ""
 
-    def notifyViewFile(self, fileName, *args):
-        if self.isDefaultViewer(*args):
-            allArgs = (fileName,) + args
+    def notifyViewFile(self, fileName, comp, newFile):
+        if self.isDefaultViewer(comp, newFile):
+            allArgs = (fileName, comp)
             self.currFileSelection = [ allArgs ]
             self.runInteractive()
-        
+
     def getFileToView(self, fileName, associatedObject):
         try:
             # associatedObject might be a comparison object, but it might not
@@ -219,7 +219,6 @@ class ViewInEditor(FileViewAction):
     def editingComplete(self):
         self.applicationEvent("file editing operations to complete")
 
-
 class ViewConfigFileInEditor(ViewInEditor):
     def __init__(self, *args):
         ViewInEditor.__init__(self, *args)
@@ -234,7 +233,7 @@ class ViewConfigFileInEditor(ViewInEditor):
     def isActiveOnCurrent(self, *args):
         return False # only way to get at it is via the activation below...
 
-    def notifyViewApplicationFile(self, fileName, apps):
+    def notifyViewApplicationFile(self, fileName, apps, *args):
         self.currFileSelection = [ (fileName, apps) ]
         self.runInteractive()
 
@@ -259,8 +258,8 @@ class ViewTestFileInEditor(ViewInEditor):
     def _getTitle(self):
         return "View File"
 
-    def isDefaultViewer(self, comparison):
-        return not self.differencesActive(comparison) and \
+    def isDefaultViewer(self, comparison, isNewFile):
+        return not isNewFile and not self.differencesActive(comparison) and \
                (not self.testRunning() or not guiplugins.guiConfig.getValue("follow_file_by_default"))
 
     def findExitHandlerInfo(self, fileName, *args):
@@ -315,8 +314,8 @@ class EditTestFileInEditor(ViewTestFileInEditor):
     def getViewToolName(self, *args):
         return self.getConfigValue(self.getToolConfigEntry(), "default")
     
-    def isDefaultViewer(self, *args):
-        return False
+    def isDefaultViewer(self, comp, isNewFile):
+        return isNewFile
     
     def _getStockId(self):
         pass # don't use same stock for both
@@ -454,7 +453,7 @@ class ViewFilteredFileDifferences(ViewFileDifferences):
     def isActiveForFile(self, fileName, comparison):
         return self.differencesActive(comparison)
 
-    def isDefaultViewer(self, comparison):
+    def isDefaultViewer(self, comparison, *args):
         return self.differencesActive(comparison)
 
 class ViewFilteredPairwiseDifferences(PairwiseFileViewer, ViewFilteredFileDifferences):
@@ -464,7 +463,7 @@ class ViewFilteredPairwiseDifferences(PairwiseFileViewer, ViewFilteredFileDiffer
     def useFiltered(self):
         return True
 
-    def isDefaultViewer(self, comparison):
+    def isDefaultViewer(self, comparison, *args):
         return False
 
 
@@ -475,7 +474,7 @@ class ViewContentFilteredFileDifferences(ContentFilterViewer, ViewFilteredFileDi
     def isActiveForFile(self, fileName, comparison):
         return ViewFileDifferences.isActiveForFile(self, fileName, comparison) and self.unorderedFiltersActive(comparison)
 
-    def isDefaultViewer(self, comparison):
+    def isDefaultViewer(self, comparison, *args):
         return False
 
 class ViewContentFilteredPairwiseDifferences(PairwiseFileViewer, ViewContentFilteredFileDifferences):
@@ -502,7 +501,7 @@ class FollowFile(FileViewAction):
         else:
             return fileName
 
-    def isDefaultViewer(self, comparison):
+    def isDefaultViewer(self, comparison, *args):
         return not self.differencesActive(comparison) and self.testRunning() and \
                guiplugins.guiConfig.getValue("follow_file_by_default")
 

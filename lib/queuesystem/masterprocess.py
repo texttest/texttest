@@ -101,6 +101,7 @@ class QueueSystemServer(BaseActionRunner):
             self.diag.info("All jobs submitted, polling the queue system now.")
             if self.canPoll():
                 self.pollQueueSystem()
+        self.diag.info("No jobs left to poll, exiting thread")
 
     def pollQueueSystem(self):
         # Start by polling after 5 seconds, ever after try every 15
@@ -338,8 +339,12 @@ class QueueSystemServer(BaseActionRunner):
         freeText = "Job pending in " + queueSystemName(test.app)
         return plugins.TestState("pending", freeText=freeText, briefText="PEND", lifecycleChange="become pending")
 
+    def getWindowsExecutable(self):
+        # sys.executable could be something other than Python... like storytext. Don't involve that here
+        return os.path.join(sys.exec_prefix, "python.exe")
+
     def getSlaveCommandArgs(self, test, submissionRules):
-        interpreterArgs = [ sys.executable ] if os.name == "nt" else []
+        interpreterArgs = [ self.getWindowsExecutable() ] if os.name == "nt" else []
         return interpreterArgs + [ plugins.getTextTestProgram(), "-d", ":".join(self.optionMap.rootDirectories),
                  "-a", test.app.name + test.app.versionSuffix(),
                  "-l", "-tp", test.getRelPath() ] + \
@@ -665,7 +670,17 @@ class SubmissionRules:
         return name.replace(":", "_")
 
     def findQueue(self):
-        return self.optionMap.get("q", "")
+        cmdQueue = self.optionMap.get("q", "")
+        if cmdQueue:
+            return cmdQueue
+        configQueue = self.test.app.getConfigValue("default_queue")
+        if configQueue != "texttest_default":
+            return configQueue
+
+        return self.findDefaultQueue()
+
+    def findDefaultQueue(self):
+        return ""
 
     def findMachineList(self):
         return []
@@ -745,19 +760,6 @@ class TestSubmissionRules(SubmissionRules):
             if len(val) > 0 and val[0] != "any" and val[0] != "none":
                 return val
         return []
-
-    def findQueue(self):
-        cmdQueue = SubmissionRules.findQueue(self)
-        if cmdQueue:
-            return cmdQueue
-        configQueue = self.test.app.getConfigValue("default_queue")
-        if configQueue != "texttest_default":
-            return configQueue
-
-        return self.findDefaultQueue()
-
-    def findDefaultQueue(self):
-        return ""
 
     def findMachineList(self):
         if not self.forceOnPerformanceMachines():
@@ -943,6 +945,8 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
         allow = self.allowChange(test.state, state)
         if allow:
             test.changeState(state)
+        else:
+            self.diag.info("Rejecting state change, old state " + test.state.category + " is complete, new state " + state.category + " is not.")
         lock.release()
         return allow
 

@@ -349,6 +349,9 @@ class RunTest(plugins.Action):
             args += test.getCommandLineOptions(stem=interpreterName + "_options")
             if postfix:
                 args += test.getCommandLineOptions(stem=interpreterName + "_options" + postfix)
+            if "storytext" in interpreter and test.app.useVirtualDisplay():
+                # Don't display storytext editor under a virtual display!
+                args.append("-x")
         args += plugins.splitcmd(test.getConfigValue("executable", expandVars=expandVars))
         args += test.getCommandLineOptions(stem="options")
         if postfix:

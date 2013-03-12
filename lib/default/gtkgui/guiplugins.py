@@ -539,7 +539,8 @@ class OptionGroupGUI(ActionGUI):
             # Would be nice to return widget.get_value_as_int but that returns the wrong answer from
             # dialogs that have been closed
             def get_text():
-                return int(widget.get_text())
+                text = widget.get_text()
+                return float(text) if widget.get_digits() else int(text)
             return get_text
         elif isinstance(widget, gtk.Entry):
             return widget.get_text
@@ -693,10 +694,11 @@ class OptionGroupGUI(ActionGUI):
         else:
             box = gtk.HBox()
             value = option.getValue()
-            if isinstance(value, int):
-                adjustment = gtk.Adjustment(value=value, lower=self.getLowerBoundForSpinButtons(),
+            if isinstance(value, int) or isinstance(value, float):
+                adjustment = gtk.Adjustment(value=value, lower=option.minimum,
                                             upper=1000, step_incr=1)
-                widget = gtk.SpinButton(adjustment)
+                digits = int(isinstance(value, float))
+                widget = gtk.SpinButton(adjustment, digits=digits)
                 widget.set_numeric(True)
                 entry = widget
             elif option.usePossibleValues():
@@ -707,15 +709,13 @@ class OptionGroupGUI(ActionGUI):
                 entry = widget
             box.pack_start(widget, expand=True, fill=True)
             entry.set_name(optionName)
-            entrycompletion.manager.register(entry)
+            if not isinstance(widget, gtk.SpinButton):
+                entrycompletion.manager.register(entry)
             # Options in drop-down lists don't change, so we just add them once and for all.
             for text in option.listPossibleValues():
                 entrycompletion.manager.addTextCompletion(text)
 
             return box, entry
-
-    def getLowerBoundForSpinButtons(self):
-        return 0
 
     def createFileChooserDialog(self, box, entry, option):
         button = gtk.Button("...")

@@ -351,7 +351,7 @@ class TextInfoGUI(TextViewGUI):
 
     def makeSubText(self, files):
         newText = self.preambleText
-        showComparisonPreviews = self.dynamic and not all((comp.hasSucceeded() for _, comp in files))
+        showComparisonPreviews = self.dynamic and not all((comp and comp.hasSucceeded() for _, comp in files))
         for fileName, comp in files:
             if showComparisonPreviews:
                 if comp and not comp.hasSucceeded():

@@ -12,6 +12,8 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
                     "r"   : ("RUN", "Running"),
                     "s"   : ("USUSP", "Suspended by the user"),
                     "dr"  : ("DEL", "In the process of being killed"),
+                    "dt"  : ("DEL", "In the process of being killed"),
+                    "ds"  : ("DEL", "In the process of being killed"),
                     "R"   : ("RESTART", "Restarted"),
                     "S"   : ("SSUSP", "Suspended by SGE due to other higher priority jobs"),
                     "St"  : ("SSUSP", "Suspended by SGE due to other higher priority jobs"),

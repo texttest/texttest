@@ -49,6 +49,8 @@
     <separator/>
     <menuitem action="Split result files"/>
     <separator/>
+    <menuitem action="View screenshots"/>
+    <separator/>
   </popup>
 
   <popup name="TestFilePopupMenu">

@@ -3,7 +3,8 @@
 Miscellaneous actions for generally housekeeping the state of the GUI
 """
 
-from .. import guiplugins
+from .. import guiplugins, guiutils
+import os
 
 class Quit(guiplugins.BasicActionGUI):
     def __init__(self, allApps, dynamic, inputOptions):
@@ -105,10 +106,37 @@ class RefreshAll(guiplugins.BasicActionGUI):
             filters = suite.app.getFilterList(self.rootTestSuites)
             suite.refresh(filters)
             suite.refreshFilesRecursively()
+    
+class ViewScreenshots(guiplugins.ActionGUI):
+    def _getTitle(self):
+        return "View screenshots"
+    
+    def isActiveOnCurrent(self, *args):
+        if len(self.currTestSelection) != 1:
+            return False
+        
+        screenshotDir = self.getScreenshotDir()
+        return os.path.isdir(screenshotDir)
+    
+    def getScreenshotDir(self):
+        return os.path.join(self.currTestSelection[0].getDirectory(temporary=True), "screenshots")
+    
+    def performOnCurrent(self):
+        screenshotDir = self.getScreenshotDir()
+        allFiles = os.listdir(screenshotDir)
+        allFiles.sort(key=self.getSortKey)
+        allPaths = [ os.path.join(screenshotDir, f) for f in allFiles ]
+        guiutils.openLinkInBrowser(*allPaths)
+            
+    def getSortKey(self, fileName):
+        number = fileName[10:-4]
+        return int(number) if number.isdigit() else 0
             
 
 def getInteractiveActionClasses(dynamic):
     classes = [ Quit, SetRunName ]
-    if not dynamic:
+    if dynamic:
+        classes.append(ViewScreenshots)
+    else:
         classes += [ RefreshAll, ResetGroups ]
     return classes

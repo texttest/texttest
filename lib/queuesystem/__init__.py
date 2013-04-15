@@ -141,7 +141,13 @@ class QueueSystemConfig(default.Config):
     def cleanSlaveFiles(self, test):
         if test.state.hasSucceeded():
             writeDir = test.getDirectory(temporary=1)
-            plugins.rmtree(writeDir)
+            # If we've made screenshots, keep them, we might want to look at them...
+            if os.path.isdir(os.path.join(writeDir, "screenshots")):
+                for f in os.listdir(writeDir):
+                    if f != "screenshots":
+                        plugins.removePath(os.path.join(writeDir, f))
+            else:
+                plugins.rmtree(writeDir)
         else:
             for dataFile in self.getDataFiles(test):
                 fullPath = test.makeTmpFileName(dataFile, forComparison=0)

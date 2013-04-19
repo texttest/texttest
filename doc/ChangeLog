@@ -2413,7 +2413,10 @@ Static GUI Enhancements:
     - (GUI testing) "run in slow motion replay" checkbox removed. It has been replaced with a spinner for adding a pause after each event and
 	a new check box "Show GUI and record any extra actions".
 Dynamic GUI Enhancements:
+    - New action "View screenshots"
+	Intended for displaying screenshots created by new StoryText feature.
 Framework Enhancements:
+    - GUI shortcut renaming is now detected and a "Replace Text in Files" run triggered if desired, to update them.
 Batch Report Enhancements:
     - Index page now notes which run the information there is based on
 Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
@@ -2422,6 +2425,8 @@ Bug Fixes:
     - Correctly find version control when TextTest files are only some part of the substructure
     - Workaround Mercurial bug for symbolically linked repository when removing or moving
     - Don't bail out if a testsuite file is missing and we don't have permission to create a new one
-    - Allways disable storytext editor when using a virtual display
-
+    - Always disable storytext editor when using a virtual display
+    - Filled in some missing possible states from SGE
+    - Fixed stacktrace on closing dynamic GUI after pressing F5.
+    - Fixed wildcards doesn't work for stems in file_split_pattern list
 

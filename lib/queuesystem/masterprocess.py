@@ -843,7 +843,11 @@ class SlaveRequestHandler(StreamRequestHandler):
                     QueueSystemServer.instance.queueTestForRerun(test)
                 else:
                     self.server.changeState(test, state)
-                self.connection.shutdown(socket.SHUT_RD)
+                try:
+                    self.connection.shutdown(socket.SHUT_RD)
+                except socket.error, e:
+                    # This only occurs on a mac, and doesn't affect functionality.
+                    pass
                 if state.isComplete():
                     newTest = QueueSystemServer.instance.getTestForReuse(test, state, tryReuse)
                     if newTest:

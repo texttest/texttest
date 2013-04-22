@@ -2,23 +2,25 @@
 
 import sys, os
 
-if __file__.endswith(".py"):
-    # If there is a separate script "texttest", want to use the local tree
-    fileName = os.path.normpath(os.path.abspath(__file__))
-else:
-    # For RPMs etc, want to be able to have a link "texttest" somewhere totally different, i.e. /usr/bin
-    fileName = os.path.realpath(__file__)
-install_root = os.path.dirname(os.path.dirname(fileName))
-# We pick up the basic libraries.
-# Also accept a setup with a "site" subdirectory containing local modules,
-# or a "generic" directory containing the TextTest core with local modules in the root
-# Also allow tying a TextTest installation to a StoryText one
-for subdir in [ "lib", "site/lib", "generic/lib", "storytext/lib", "generic/storytext/lib" ]:
-    libDir = os.path.abspath(os.path.join(install_root, subdir))
-    if os.path.isdir(libDir):
-        sys.path.insert(0, libDir)
+def fixSysPath(fileName):
+    install_root = os.path.dirname(os.path.dirname(fileName))
+    # We pick up the basic libraries.
+    # Also accept a setup with a "site" subdirectory containing local modules,
+    # or a "generic" directory containing the TextTest core with local modules in the root
+    # Also allow tying a TextTest installation to a StoryText one
+    for subdir in [ "lib", "site/lib", "generic/lib", "storytext/lib", "generic/storytext/lib" ]:
+        libDir = os.path.abspath(os.path.join(install_root, subdir))
+        if os.path.isdir(libDir):
+            sys.path.insert(0, libDir)
 
-import texttest_version
+try:
+    # If there is a separate script "texttest", want to use the local tree
+    fixSysPath(os.path.abspath(__file__))
+    import texttest_version
+except ImportError:
+    # For RPMs etc, want to be able to have a link "texttest" somewhere totally different, i.e. /usr/bin
+    fixSysPath(os.path.realpath(__file__))
+    import texttest_version
 
 major, minor, micro = sys.version_info[:3]
 reqMajor, reqMinor, reqMicro = texttest_version.required_python_version

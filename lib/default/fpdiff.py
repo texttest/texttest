@@ -3,10 +3,28 @@ import sys, difflib, StringIO, optparse
 
 def _getNumberAt(l, pos):
     start = pos
+    eSeen = False
+    dotSeen = False
     while start > 0 and l[start-1] in "1234567890.eE-":
+        if l[start-1] in "eE":
+            if eSeen:
+                break
+            eSeen = True
+        if l[start-1] == ".":
+            if dotSeen:
+                break
+            dotSeen = True
         start -= 1
     end = pos
     while end < len(l) and l[end] in "1234567890.eE-":
+        if l[end] in "eE":
+            if eSeen:
+                break
+            eSeen = True
+        if l[end] == ".":
+            if dotSeen:
+                break
+            dotSeen = True
         end += 1
     return l[start:end], l[end:]
 

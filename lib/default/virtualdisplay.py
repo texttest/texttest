@@ -123,7 +123,7 @@ class VirtualDisplayResponder(plugins.Responder):
     def startXvfb(self, startArgs, machine):
         for _ in range(5):
             self.diag.info("Starting Xvfb using args " + repr(startArgs))
-            displayProc = subprocess.Popen(startArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            displayProc = subprocess.Popen(startArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=open(os.devnull, "w"))
             line = plugins.retryOnInterrupt(displayProc.stdout.readline)
             if "Time Out!" in line:
                 displayProc.wait()

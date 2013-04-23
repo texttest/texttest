@@ -120,10 +120,17 @@ class VirtualDisplayResponder(plugins.Responder):
         startArgs = self.getVirtualServerArgs(machine, app)
         return self.startXvfb(startArgs, machine)
 
+    def ignoreSignals(self):
+        for signum in [ signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU ]:
+            signal.signal(signum, signal.SIG_IGN)
+
     def startXvfb(self, startArgs, machine):
         for _ in range(5):
             self.diag.info("Starting Xvfb using args " + repr(startArgs))
-            displayProc = subprocess.Popen(startArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=open(os.devnull, "w"))
+            # Ignore job control signals for remote processes
+            # Otherwise the ssh process gets killed, but the stuff it's started remotely doesn't, and we leak Xvfb processes
+            preexec_fn = None if machine == "localhost" else self.ignoreSignals
+            displayProc = subprocess.Popen(startArgs, preexec_fn=preexec_fn, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=open(os.devnull, "w"))
             line = plugins.retryOnInterrupt(displayProc.stdout.readline)
             if "Time Out!" in line:
                 displayProc.wait()

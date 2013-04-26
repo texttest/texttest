@@ -1291,6 +1291,7 @@ class Application:
         self.diag = logging.getLogger("application")
         self.inputOptions = inputOptions
         self.configDir = plugins.MultiEntryDictionary(importKey="import_config_file", importFileFinder=self.configPath)
+        self.overrideConfigDir = {}
         self.setUpConfiguration(configEntries)
         self.checkSanity()
         self.writeDirectory, self.localWriteDirectory = self.getWriteDirectories()
@@ -1356,6 +1357,15 @@ class Application:
         self.extraDirCaches = tmpApp.extraDirCaches
         self.defaultDirCaches = tmpApp.defaultDirCaches
         self.configDocs = tmpApp.configDocs
+        self.reapplyOverrides()
+        
+    def reapplyOverrides(self):
+        for key, value in self.overrideConfigDir.items():
+            if isinstance(key, dict):
+                for subKey, subValue in key.items():
+                    self.configDir.addEntry(subKey, subValue, key, insert=False, errorOnUnknown=True, errorOnClashWithGlobal=False)
+            else:
+                self.configDir[key] = value
 
     def writeConfigEntries(self, configEntries):
         configFileName = self.dircache.pathName("config." + self.name)
@@ -1826,6 +1836,10 @@ class Application:
     def addConfigEntry(self, key, value, sectionName = "", **kw):
         self.configDir.addEntry(key, value, sectionName, insert=False, errorOnUnknown=True, **kw)
 
+    def addConfigEntryOverride(self, key, value, sectionName):
+        self.configDir.addEntry(key, value, sectionName, insert=False, errorOnUnknown=True, errorOnClashWithGlobal=False)
+        self.overrideConfigDir.setdefault(sectionName, {})[key] = value
+
     def removeConfigEntry(self, key, value, sectionName = ""):
         self.configDir.removeEntry(key, value, sectionName)
 
@@ -1833,7 +1847,11 @@ class Application:
         self.configDir[key] = value
         if len(docString) > 0:
             self.configDocs[key] = docString
-
+            
+    def setConfigOverride(self, key, value):
+        self.configDir[key] = value
+        self.overrideConfigDir[key] = value
+        
     def setConfigAlias(self, aliasName, realName):
         self.configDir.setAlias(aliasName, realName)
     

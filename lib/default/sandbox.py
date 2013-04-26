@@ -376,14 +376,14 @@ class PrepareWriteDirectory(plugins.Action):
             if remoteFile:
                 self.diag.info("Setting interpreter " + repr(interpreterName) + " to " + repr(remoteFile))
                 # For convenience, so we don't have to set it everywhere...
-                suite.app.addConfigEntry(interpreterName, remoteFile, "interpreters", errorOnClashWithGlobal=False)
+                suite.app.addConfigEntryOverride(interpreterName, remoteFile, "interpreters")
 
         localFile = suite.getConfigValue("executable")
         remoteFile = self.copySUTFileIfNeeded(machine, suite, fullTmpDir, checkout, remoteCheckout, localFile)
         if remoteFile:
             self.diag.info("Setting executable to " + repr(remoteFile))
             # For convenience, so we don't have to set it everywhere...
-            suite.app.setConfigDefault("executable", remoteFile)
+            suite.app.setConfigOverride("executable", remoteFile)
 
         scripts = suite.getConfigValue("copy_test_path_script")
         newScripts = {}
@@ -395,7 +395,7 @@ class PrepareWriteDirectory(plugins.Action):
                     self.diag.info("Setting copy_test_path_script for " + repr(fileName) + " to " + repr(remoteFile))
                     newScripts[fileName] = remoteScript
         if newScripts:
-            suite.app.setConfigDefault("copy_test_path_script", newScripts)
+            suite.app.setConfigOverride("copy_test_path_script", newScripts)
             
         suite.reloadTestConfigurations()            
 

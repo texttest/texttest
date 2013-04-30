@@ -2429,4 +2429,9 @@ Bug Fixes:
     - Filled in some missing possible states from SGE
     - Fixed stacktrace on closing dynamic GUI after pressing F5.
     - Fixed wildcards doesn't work for stems in file_split_pattern list
-
+    - Fixed problem when running tests on remote networks, and refreshing before they were done (F5)
+    - Fixed leak of remote Xvfb processes on receiving job control signals (SIGXCPU etc)
+    - Remote virtual display handling now tolerates warnings etc from ssh
+    - Fixed Mac-specific exception when running in parallel
+    - Fixed bug with trailing "E" and "." when doing floating point rounding (thanks Michael Behrisch)
+    - Made RPM work again for "texttest.py", not just "texttest" (thanks Michael Behrisch)

@@ -240,13 +240,19 @@ class RunDependentTextFilter(plugins.Observable):
                     filteredAway.setdefault(lineFilter, []).append(line)
 
     def getFilteredLine(self, line, lineNumber, lineFilters):
+        appliedLineFilter = None
+        filteredLine = line
+        linesToRemove = 0
         for lineFilter in lineFilters:
-            changed, filteredLine, removeCount = lineFilter.applyTo(line, lineNumber)
+            changed, currFilteredLine, removeCount = lineFilter.applyTo(line, lineNumber)
             if changed:
-                if not filteredLine:
-                    return lineFilter, filteredLine, removeCount
-                line = filteredLine
-        return None, line, 0
+                appliedLineFilter = lineFilter
+                linesToRemove = max(removeCount, linesToRemove)
+                if currFilteredLine and filteredLine:
+                    line = currFilteredLine
+                if filteredLine:
+                    filteredLine = currFilteredLine
+        return appliedLineFilter, filteredLine, linesToRemove
 
 
 class UnorderedTextFilter(RunDependentTextFilter):

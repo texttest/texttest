@@ -2435,3 +2435,4 @@ Bug Fixes:
     - Fixed Mac-specific exception when running in parallel
     - Fixed bug with trailing "E" and "." when doing floating point rounding (thanks Michael Behrisch)
     - Made RPM work again for "texttest.py", not just "texttest" (thanks Michael Behrisch)
+    - Overlapping section filters in run_dependent_text now behave as expected. See migration notes as it may cause changes.

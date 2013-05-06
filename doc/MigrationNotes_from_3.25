@@ -2,6 +2,28 @@
 CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
 =========================================================
 
-(1) "slow_motion_replay_speed" config file setting is not longer used
-=====================================================================
+(1) "slow_motion_replay_speed" config file setting is no longer used
+====================================================================
 It can be configured now on the running tab of the static GUI. You should just remove it.
+
+(2) "run_dependent_text": overlapping filters now behave as expected
+====================================================================
+
+If you have a file
+
+A
+B
+C
+D
+E
+F
+G
+
+and you filter it with two filters
+
+[run_dependent_text]
+stdout:C{->}F
+stdout:B{->}E
+
+this will now as expected remove all the lines between B and F. Previously it would remove the entire file
+after B. This was a bug, but is included here as it may change the behaviour of long-established filters.

@@ -57,7 +57,7 @@ class FileViewAction(guiplugins.ActionGUI):
             self.showErrorDialog("Cannot find " + self.getToolDescription() + " '" + viewTool + \
                                  "'.\nPlease install it somewhere on your PATH or\n"
                                  "change the configuration entry '" + self.getToolConfigEntry() + "'.")
-
+            
     def getConfMessageForFile(self, fileName, associatedObject):
         fileToView = self.getFileToView(fileName, associatedObject)
         if os.path.isfile(fileToView) or os.path.islink(fileToView):
@@ -236,6 +236,10 @@ class ViewConfigFileInEditor(ViewInEditor):
     def notifyViewApplicationFile(self, fileName, apps, *args):
         self.currFileSelection = [ (fileName, apps) ]
         self.runInteractive()
+        
+    def notifyViewReadonlyFile(self, fileName):
+        viewTool = self.getConfigValue("view_program", "default")
+        return self.viewFile(fileName, viewTool, self.applicationEvent, ("the readonly file viewer to be closed",))
 
     def findExitHandlerInfo(self, dummy, apps):
         return self.configFileChanged, (apps,)

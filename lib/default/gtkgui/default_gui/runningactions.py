@@ -3,7 +3,7 @@
 The various ways to launch the dynamic GUI from the static GUI
 """
 
-import gtk, plugins, os, sys
+import gtk, plugins, os, sys, stat
 from .. import guiplugins
 from copy import copy, deepcopy
 
@@ -743,15 +743,12 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
         return 0.5, 0.5
 
 
-class TestFileFiltering(guiplugins.ActionResultDialogGUI):
+class TestFileFiltering(guiplugins.ActionGUI):
     def _getTitle(self):
         return "Test Filtering"
 
-    def getDialogTitle(self):
-        return "Filtered contents of " + os.path.basename(self.currFileSelection[0][0])
-
     def isActiveOnCurrent(self, *args):
-        return guiplugins.ActionResultDialogGUI.isActiveOnCurrent(self) and len(self.currFileSelection) == 1
+        return guiplugins.ActionGUI.isActiveOnCurrent(self) and len(self.currFileSelection) == 1
 
     def getVersion(self, test, fileName):
         fileVersions = set(os.path.basename(fileName).split(".")[1:])
@@ -759,29 +756,32 @@ class TestFileFiltering(guiplugins.ActionResultDialogGUI):
         additionalVersions = fileVersions.difference(testVersions)
         return ".".join(additionalVersions)
 
-    def getTextToShow(self):
-        fileName = self.currFileSelection[0][0]
-        test = self.currTestSelection[0]
+    def getTextToShow(self, test, fileName):
         version = self.getVersion(test, fileName)
         return test.app.applyFiltering(test, fileName, version)
     
-    def addContents(self):
-        self.dialog.set_name("Test Filtering Window")
-        text = self.getTextToShow()
-        buffer = gtk.TextBuffer()
-        buffer.set_text(text)
+    def performOnCurrent(self):
+        test = self.currTestSelection[0]
+        fileName = self.currFileSelection[0][0]
+        text = self.getTextToShow(test, fileName)
+        root = test.getEnvironment("TEXTTEST_SANDBOX_ROOT")
+        plugins.ensureDirectoryExists(root)
+        tmpFileNameLocal = os.path.basename(fileName) + " (FILTERED)"
+        tmpFileName = os.path.join(root, tmpFileNameLocal)
+        bakFileName = tmpFileName + ".bak"
+        if os.path.isfile(bakFileName):
+            os.remove(bakFileName)
+        if os.path.isfile(tmpFileName):
+            os.rename(tmpFileName, bakFileName)
+        with open(tmpFileName, "w") as tmpFile:
+            tmpFile.write(text)
+            
+        # Don't want people editing by mistake, remove write permissions
+        os.chmod(tmpFileName, stat.S_IREAD)
+        self.notify("ViewReadonlyFile", tmpFileName)
         
-        textView = gtk.TextView(buffer)
-        textView.set_editable(False)
-        textView.set_cursor_visible(False)
-        textView.set_left_margin(5)
-        textView.set_right_margin(5)
-        window = gtk.ScrolledWindow()
-        window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        window.add(textView)
-        parentSize = self.topWindow.get_size()
-        self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[1] * 0.7))
-        self.dialog.vbox.pack_start(window, expand=True, fill=True)
+    def getSignalsSent(self):
+        return [ "ViewReadonlyFile" ]
 
 
 class InsertShortcuts(RunScriptAction, guiplugins.OptionGroupGUI):

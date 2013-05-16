@@ -49,7 +49,7 @@ def getFingerprint(jobRoot, jobName, buildName, cacheDir):
     return fingerprint
     
 def parseAuthor(author):
-    withoutEmail = author.split("<")[0].strip()
+    withoutEmail = author.split("<")[0].strip().split("@")[0]
     if "." in withoutEmail:
         return " ".join([ part.capitalize() for part in withoutEmail.split(".") ])
     else:
@@ -70,25 +70,15 @@ def getBugs(msg, bugSystemData):
             pass
     return bugs
     
-def getProject(artefact, allProjects):
-    # Find the project with the longest name whose name is a substring of the artefact name
-    currProject = None
-    for project in allProjects:
-        if project in artefact and (currProject is None or len(project) > len(currProject)):
-            currProject = project
+def getProjects(artefact, allProjects):
+    currProjArtefact = None
+    currProjects = []
+    for projArtefact, projects in allProjects.items():
+        if artefact.startswith(projArtefact) and (currProjArtefact is None or len(projArtefact) > len(currProjArtefact)):
+            currProjArtefact = projArtefact
+            currProjects = projects
     
-    if currProject:
-        return currProject
-
-    # Find the project with the longest common substring
-    currProjectScore = 0
-    for project in allProjects:
-        matcher = SequenceMatcher(None, project, artefact)
-        projectScore = max((block.size for block in matcher.get_matching_blocks()))
-        if projectScore > currProjectScore:
-            currProject = project
-            currProjectScore = projectScore
-    return currProject
+    return currProjects
 
 def getHash(document, artefact):
     found = False
@@ -154,8 +144,7 @@ def getFingerprintDifferences(build1, build2, jobName, jobRoot, fileFinder, cach
     return differences
 
 
-def organiseByProject(jobRoot, differences, markedArtefacts):
-    allProjects = sorted(os.listdir(jobRoot))
+def organiseByProject(differences, markedArtefacts, artefactProjectData):
     projectData = OrderedDict()
     changes = []
     for artefact, oldHash, hash in differences:
@@ -163,11 +152,10 @@ def organiseByProject(jobRoot, differences, markedArtefacts):
             if re.match(regexp, artefact):
                 changes.append((name + " was updated", "", []))
                 
-        project = getProject(artefact, allProjects)
-        if project:
-            projectData.setdefault(project, []).append((artefact, oldHash, hash))
-        else:
-            print "ERROR: Could not find project for artefact", artefact
+        projects = getProjects(artefact, artefactProjectData)
+        if projects:
+            for project, scopeProvided in projects:
+                projectData.setdefault(project, []).append((artefact, oldHash, hash, scopeProvided))
     
     return changes, projectData
 
@@ -180,27 +168,31 @@ def hashesEquivalent(hashes, otherHashes):
 
 def getProjectChanges(jobRoot, projectData):
     projectChanges = []
+    recursiveChanges = []
     for project, diffs in projectData.items():
         projectDir = os.path.join(jobRoot, project, "builds")
         allBuilds = sorted([ build for build in os.listdir(projectDir) if build.isdigit()], key=lambda b: -int(b))
-        oldHashes = [ oldHash for artefact, oldHash, hash in diffs ]
-        newHashes = [ hash for artefact, oldHash, hash in diffs ]    
-        active = False
+        oldHashes = [ oldHash for artefact, oldHash, hash, _ in diffs ]
+        newHashes = [ hash for artefact, oldHash, hash, _ in diffs ]
+        scopeProvided = any((s for _, _, _, s in diffs))  
+        activeBuild = None
         for build in allBuilds:
             xmlFile = os.path.join(projectDir, build, "build.xml")
             if not os.path.isfile(xmlFile):
                 continue
     
             document = parse(xmlFile)
-            hashes = [ getHash(document, artefact) for artefact, oldHash, hash in diffs ]
+            hashes = [ getHash(document, artefact) for artefact, oldHash, hash, _ in diffs ]
             if getResult(document) != "FAILURE":
                 if hashesEquivalent(hashes, newHashes):
-                    active = True
+                    activeBuild = build
                 elif hashesEquivalent(hashes, oldHashes):
+                    if scopeProvided and activeBuild:
+                        recursiveChanges.append((project, build, activeBuild))
                     break       
-            if active and (project, build) not in projectChanges:
+            if activeBuild and (project, build) not in projectChanges:
                 projectChanges.append((project, build))
-    return projectChanges
+    return projectChanges, recursiveChanges
 
 def getChangeData(jobRoot, projectChanges, jenkinsUrl, bugSystemData):
     changes = []
@@ -222,22 +214,60 @@ def getChangeData(jobRoot, projectChanges, jenkinsUrl, bugSystemData):
                 changes.append((",".join(authors), fullUrl, bugs))
     return changes
 
+def getPomData(pomFile):
+    document = parse(pomFile)
+    artifactId, groupId = None, None
+    for node in document.documentElement.childNodes:
+        if node.nodeName == "artifactId":
+            artifactId = node.childNodes[0].nodeValue
+        elif node.nodeName == "groupId":
+            groupId = node.childNodes[0].nodeValue
+        if artifactId and groupId:
+            break
+    providedScope = any((node.childNodes[0].nodeValue == "provided" for node in document.getElementsByTagName("scope")))
+    groupPrefix = groupId + ":" if groupId else ""
+    return groupPrefix + artifactId, providedScope
+    
 
+def getProjectData(jobRoot):
+    projectData = {}
+    workspaceRoot = os.path.dirname(os.getenv("WORKSPACE"))
+    for jobName in os.listdir(workspaceRoot):
+        pomFile = os.path.join(workspaceRoot, jobName, "pom.xml")
+        if os.path.isfile(pomFile) and os.path.isdir(os.path.join(jobRoot, jobName)):
+            artefactName, providedScope = getPomData(pomFile)
+            projectData.setdefault(artefactName, []).append((jobName, providedScope))
+    return projectData
+
+def getChangesRecursively(build1, build2, jobName, jobRoot, projectData, markedArtefacts, fileFinder, cacheDir):
+    # Find what artefacts have changed between times build
+    differences = getFingerprintDifferences(build1, build2, jobName, jobRoot, fileFinder, cacheDir)
+    # Organise them by project
+    markedChanges, differencesByProject = organiseByProject(differences, markedArtefacts, projectData)
+    # For each project, find out which builds were affected
+    projectChanges, recursiveChanges = getProjectChanges(jobRoot, differencesByProject)
+    for subProj, subBuild1, subBuild2 in recursiveChanges:
+        if subProj != jobName:
+            subMarkedChanges, subProjectChanges = getChangesRecursively(subBuild1, subBuild2, subProj, jobRoot, 
+                                                                        projectData, markedArtefacts, fileFinder, cacheDir)
+            markedChanges += subMarkedChanges
+            for subProjectChange in subProjectChanges:
+                if subProjectChange not in projectChanges:
+                    projectChanges.append(subProjectChange)
+    return markedChanges, projectChanges
+    
 def _getChanges(build1, build2, jobName, jenkinsUrl, bugSystemData={}, markedArtefacts={}, fileFinder="", cacheDir=None):
     jobRoot = os.path.join(os.getenv("JENKINS_HOME"), "jobs")
-    # Find what artefacts have changed between times build
+    projectData = getProjectData(jobRoot)
     try:
-        differences = getFingerprintDifferences(build1, build2, jobName, jobRoot, fileFinder, cacheDir)
+        markedChanges, projectChanges = getChangesRecursively(build1, build2, jobName, jobRoot, projectData, markedArtefacts, fileFinder, cacheDir)
     except AbortedException, e:
         # If it was aborted, say this
         return [(str(e), "", [])]
-    # Organise them by project
-    changes, projectData = organiseByProject(jobRoot, differences, markedArtefacts)
-    # For each project, find out which builds were affected
-    projectChanges = getProjectChanges(jobRoot, projectData)
+    
     # Extract the changeset information from them
-    changes += getChangeData(jobRoot, projectChanges, jenkinsUrl, bugSystemData)
-    return changes
+    changesFromProjects = getChangeData(jobRoot, projectChanges, jenkinsUrl, bugSystemData)
+    return markedChanges + changesFromProjects
 
 def getChanges(build1, build2, *args):
     return _getChanges(build1, build2, os.getenv("JOB_NAME"), os.getenv("JENKINS_URL"), *args)

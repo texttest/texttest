@@ -2423,6 +2423,7 @@ Batch Report Enhancements:
     - Index page now notes which run the information there is based on
     - Jenkins changes feature now find indirect dependencies where appropriate
 	e.g. scope:provided in Maven
+    - Now find Jenkins timestamps for runs, show them as tooltips in the HTML report
 Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
     - Default_queue setting should also apply to the proxy job
 Bug Fixes:

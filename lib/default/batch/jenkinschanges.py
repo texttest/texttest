@@ -274,7 +274,8 @@ def getChanges(build1, build2, *args):
     
 def getTimestamp(build):
     buildLink = os.path.join(os.getenv("JENKINS_HOME"), "jobs", os.getenv("JOB_NAME"), "builds", build)
-    return os.readlink(buildLink)
+    if os.path.exists(buildLink):
+        return os.readlink(buildLink)
     
 def parseEnvAsDict(varName):
     if varName not in os.environ:

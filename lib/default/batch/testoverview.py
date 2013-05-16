@@ -466,8 +466,11 @@ class TestTable:
                     f.write(pformat(allChanges) + "\n")
                 return allChanges
             else:
-                return []
-            
+                return []     
+
+    def getJenkinsBuildNumber(self, tag):
+        return tag.split(".")[-1]
+
     def generateJenkinsChanges(self, pageDir):
         cacheDir = os.path.join(os.path.dirname(pageDir), "jenkins_changes")
         bgColour = self.colourFinder.find("changes_header_bg")
@@ -475,7 +478,7 @@ class TestTable:
         hasData = False
         prevBuildNumber = None
         for tag in self.tags:
-            buildNumber = tag.split(".")[-1]
+            buildNumber = self.getJenkinsBuildNumber(tag)
             allChanges = self.findJenkinsChanges(prevBuildNumber, buildNumber, cacheDir)
             cont = HTMLgen.Container()
             aborted = False
@@ -648,12 +651,15 @@ class TestTable:
             tagColour = self.findTagColour(tag)
             linkTarget = getDetailPageName(self.pageVersion, tag)
             linkText = HTMLgen.Font(getDisplayText(tag), color=tagColour)
-            link = HTMLgen.Href(linkTarget, linkText)
+            link = HTMLgen.Href(linkTarget, linkText, title=self.getTagTooltip(tag))
             head.append(HTMLgen.TH(link))
         heading = HTMLgen.TR()
         heading = heading + head
         return heading
-
+    
+    def getTagTooltip(self, tag):
+        if os.getenv("JENKINS_URL"):
+            return jenkinschanges.getTimestamp(self.getJenkinsBuildNumber(tag))
         
 class TestDetails:
     def __init__(self, tag, pageTitle, pageSubTitle):

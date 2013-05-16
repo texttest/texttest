@@ -2410,6 +2410,8 @@ Bug Fixes:
 Version trunk
 =============
 Static GUI Enhancements:
+    - "Test Filtering" action now displays results in the normal text editor (default entry in "view_program")
+	Allows searching, font configuration etc and is more consistent
     - (GUI testing) "run in slow motion replay" checkbox removed. It has been replaced with a spinner for adding a pause after each event and
 	a new check box "Show GUI and record any extra actions".
 Dynamic GUI Enhancements:
@@ -2419,6 +2421,8 @@ Framework Enhancements:
     - GUI shortcut renaming is now detected and a "Replace Text in Files" run triggered if desired, to update them.
 Batch Report Enhancements:
     - Index page now notes which run the information there is based on
+    - Jenkins changes feature now find indirect dependencies where appropriate
+	e.g. scope:provided in Maven
 Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
     - Default_queue setting should also apply to the proxy job
 Bug Fixes:

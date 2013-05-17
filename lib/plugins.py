@@ -87,10 +87,10 @@ def installationDir(name):
     return os.path.join(installationRoots[0], name)
 
 def getTextTestProgram():
-    slaveCmd = os.getenv("TEXTTEST_SLAVE_CMD", sys.argv[0]) # TextTest start-script for starting subsequent processes
+    slaveCmd = os.getenv("TEXTTEST_SLAVE_CMD", os.path.abspath(sys.argv[0])) # TextTest start-script for starting subsequent processes
     if not slaveCmd:
         # To allow it to be reset, the above form is for documentation...
-        slaveCmd = sys.argv[0]
+        slaveCmd = os.path.abspath(sys.argv[0])
     return slaveCmd
 
 def installationPath(*pathElems):

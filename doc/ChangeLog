@@ -2419,6 +2419,8 @@ Dynamic GUI Enhancements:
 	Intended for displaying screenshots created by new StoryText feature.
 Framework Enhancements:
     - GUI shortcut renaming is now detected and a "Replace Text in Files" run triggered if desired, to update them.
+    - Known bugs mechanism priorities
+	If two known bugs are triggered and one of them requests a rerun, we report the one that didn't request a rerun. 
 Batch Report Enhancements:
     - Index page now notes which run the information there is based on
     - Jenkins changes feature now find indirect dependencies where appropriate
@@ -2441,3 +2443,4 @@ Bug Fixes:
     - Fixed bug with trailing "E" and "." when doing floating point rounding (thanks Michael Behrisch)
     - Made RPM work again for "texttest.py", not just "texttest" (thanks Michael Behrisch)
     - Overlapping section filters in run_dependent_text now behave as expected. See migration notes as it may cause changes.
+    - Fixing stacktrace when starting with parallel runs using a relative path to TextTest

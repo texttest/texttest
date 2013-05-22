@@ -374,7 +374,7 @@ class CheckForBugs(plugins.Action):
         bugs, bugStems = self.findAllBugs(test, state, activeBugs)
         unblockedBugs = self.findUnblockedBugs(bugs)
         if len(unblockedBugs) > 0:
-            unblockedBugs.sort(key=lambda bug: bug.bugInfo.getPriority())
+            unblockedBugs.sort(key=lambda bug: (bug.bugInfo.getPriority(), bug.bugInfo.rerunCount))
             bug = unblockedBugs[0]
             return bug, bugStems[bugs.index(bug)]
         else:

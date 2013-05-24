@@ -99,10 +99,20 @@ class GUIController(plugins.Responder, plugins.Observable):
         self.initialApps = self.storeInitial(allApps)
         self.interactiveActionHandler = InteractiveActionHandler(self.dynamic, allApps, optionMap)
         self.setUpGlobals(allApps, includePersonal)
+        self.shortcutBarGUI = ShortcutBarGUI(includeSite, includePersonal)
         plugins.Responder.__init__(self)
         plugins.Observable.__init__(self)
         testCount = int(optionMap.get("count", 0))
+        initialStatus = "TextTest started at " + plugins.localtime() + "."
+        # This is perhaps not an ideal design, throwing up the application creation dialog from the middle of a constructor.
+        # Would possibly be better to move this, and all the code below, to a later call
+        # At the moment that would be setObservers, not fantastic as a side-effect there either
+        # Perhaps an entirely new call would be needed? [GB 20130524]
+        if len(allApps) == 0:
+            newApp, initialStatus = self.createNewApplication(optionMap)
+            allApps.append(newApp)
 
+        self.statusMonitor = statusviews.StatusMonitorGUI(initialStatus)
         self.appFileGUI = filetrees.ApplicationFileGUI(self.dynamic, allApps)
         self.textInfoGUI = textinfo.TextInfoGUI(self.dynamic)
         runName = optionMap.get("name", "").replace("<time>", plugins.startTimeString())
@@ -119,10 +129,12 @@ class GUIController(plugins.Responder, plugins.Observable):
         self.testTreeGUI = testtree.TestTreeGUI(self.dynamic, allApps, testPopupGUI, self.testColumnGUI)
         self.testFileGUI = filetrees.TestFileGUI(self.dynamic, testFilePopupGUI)
         self.rightWindowGUI = self.createRightWindowGUI()
-        self.shortcutBarGUI = ShortcutBarGUI(includeSite, includePersonal)
-        self.statusMonitor = statusviews.StatusMonitorGUI()
-
+        
         self.topWindowGUI = self.createTopWindowGUI(allApps, runName)
+    
+    def createNewApplication(self, optionMap):
+        from default_gui import ImportApplication
+        return ImportApplication([], False, optionMap).runDialog()
 
     def storeInitial(self, allApps):
         initial = set()
@@ -301,21 +313,26 @@ class GUIController(plugins.Responder, plugins.Observable):
         self.notify("NameChange", *args, **kwargs)
 
     def notifyStartRead(self):
-        if not self.dynamic:
+        if not self.dynamic and self.initialApps:
             self.notify("Status", "Reading tests ...")
             self.notify("ActionStart", False)
 
     def notifyAllRead(self, suites):
-        if not self.dynamic:
+        if not self.dynamic and self.initialApps:
             self.notify("Status", "Reading tests completed at " + plugins.localtime() + ".")
             self.notify("ActionStop")
         self.notify("AllRead", suites)
+        for suite in suites:
+            if suite.app not in self.initialApps:
+                # We've added a new suite, we should also select it as it's likely the user wants to add stuff under it
+                # Also include the knock-on effects, i.e. selecting the test tab etc
+                self.notify("SetTestSelection", [ suite ], direct=True)
         if self.dynamic and len(suites) == 0:
             self.topWindowGUI.forceQuit()
 
-    def notifyAdd(self, test, *args, **kwargs):
+    def notifyAdd(self, test, initial):
         test.stateInGui = test.state
-        self.notify("Add", test, *args, **kwargs)
+        self.notify("Add", test, initial)
 
     def notifyStatus(self, *args, **kwargs):
         self.notify("Status", *args, **kwargs)
@@ -475,20 +492,10 @@ class TopWindowGUI(guiutils.ContainerGUI):
         if guiConfig.getWindowOption("maximize"):
             self.topWindow.maximize()
         else:
-            width = self.getWindowDimension("width")
-            height = self.getWindowDimension("height")
+            width = guiConfig.getWindowDimension("width", self.diag)
+            height = guiConfig.getWindowDimension("height", self.diag)
             self.topWindow.set_default_size(width, height)
 
-    def getWindowDimension(self, dimensionName):
-        pixelDimension = guiConfig.getWindowOption(dimensionName + "_pixels")
-        if pixelDimension != "<not set>":
-            self.diag.info("Setting window " + dimensionName + " to " + pixelDimension + " pixels.")
-            return int(pixelDimension)
-        else:
-            fullSize = getattr(gtk.gdk, "screen_" + dimensionName)()
-            proportion = float(guiConfig.getWindowOption(dimensionName + "_screen"))
-            self.diag.info("Setting window " + dimensionName + " to " + repr(int(100.0 * proportion)) + "% of screen.")
-            return int(fullSize * proportion)
 
 
 class ShortcutBarGUI(guiutils.SubGUI):

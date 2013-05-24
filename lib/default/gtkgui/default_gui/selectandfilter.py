@@ -495,7 +495,7 @@ class LoadSelection(guiplugins.ActionDialogGUI):
     def addSuites(self, suites):
         self.rootTestSuites += suites
     def isActiveOnCurrent(self, *args):
-        return not self.noApps
+        return True
     def getSignalsSent(self):
         return [ "SetTestSelection" ]
     def _getStockId(self):

@@ -226,8 +226,21 @@ class GUIConfig:
             return self.getCompositeValue(sectionName, entryName)
         else:
             return value
+        
     def getWindowOption(self, name):
         return self.getCompositeValue("window_size", name, modeDependent=True)
+
+    def getWindowDimension(self, dimensionName, diag):
+        pixelDimension = self.getWindowOption(dimensionName + "_pixels")
+        if pixelDimension != "<not set>":
+            diag.info("Setting window " + dimensionName + " to " + pixelDimension + " pixels.")
+            return int(pixelDimension)
+        else:
+            fullSize = getattr(gtk.gdk, "screen_" + dimensionName)()
+            proportion = float(self.getWindowOption(dimensionName + "_screen"))
+            diag.info("Setting window " + dimensionName + " to " + repr(int(100.0 * proportion)) + "% of screen.")
+            return int(fullSize * proportion)
+    
     def showCategoryByDefault(self, category, parentHidden=False):
         if self.dynamic:
             if parentHidden:

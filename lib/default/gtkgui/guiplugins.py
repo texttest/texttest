@@ -338,21 +338,16 @@ class ActionGUI(BasicActionGUI):
         self.currFileSelection = []
         self.currAppSelection = []
         self.validApps = []
-        self.noApps = len(allApps) == 0
         BasicActionGUI.__init__(self)
         for app in allApps:
-            self._checkAllValid(app)
-    
-    def checkValid(self, app):
-        self._checkValid(app)
-        self.noApps = False
-
-    def _checkAllValid(self, app):
+            self.checkAllValid(app)
+            
+    def checkAllValid(self, app):
         for currApp in [ app ] + app.extras:
             if currApp not in self.validApps:
-                self._checkValid(currApp)
+                self.checkValid(currApp)
                         
-    def _checkValid(self, app):
+    def checkValid(self, app):
         if self.isValidForApp(app):
             self.validApps.append(app)
         else:
@@ -362,7 +357,7 @@ class ActionGUI(BasicActionGUI):
         return True
 
     def shouldShow(self):
-        return self.noApps or len(self.validApps) > 0
+        return len(self.validApps) > 0
     
     def notifyNewTestSelection(self, *args):
         newActive = self.updateSelection(*args)
@@ -896,6 +891,7 @@ class ActionDialogGUI(OptionGroupGUI):
         self.createButtons(dialog, fileChooser, fileChooserOption)
         self.tryResize(dialog)
         dialog.show_all()
+        return dialog
         
     def getConfirmationDialogSettings(self):
         return gtk.STOCK_DIALOG_WARNING, "Confirmation"
@@ -941,7 +937,7 @@ class ActionDialogGUI(OptionGroupGUI):
 
     def tryResize(self, dialog):
         horfrac, verfrac = self.getSizeAsWindowFraction()
-        if horfrac is not None:
+        if horfrac is not None and self.topWindow is not None:
             width, height = self.topWindow.get_size()
             dialog.resize(int(width * horfrac), int(height * verfrac))
         

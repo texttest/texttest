@@ -3,7 +3,7 @@
 All the actions for administering the files and directories in a test suite
 """
 
-import gtk, plugins, os, shutil, subprocess
+import gtk, plugins, os, shutil, subprocess, testmodel
 from .. import guiplugins, guiutils
 from ordereddict import OrderedDict
 from zipfile import ZipFile
@@ -422,6 +422,8 @@ class ImportApplication(guiplugins.ActionDialogGUI):
     def __init__(self, allApps, dynamic, inputOptions):
         guiplugins.ActionDialogGUI.__init__(self, allApps, dynamic, inputOptions)
         self.fileChooser = None
+        self.newApplication = None
+        self.inputOptions = inputOptions
         self.rootDirectories = inputOptions.rootDirectories
         self.addOption("name", "Full name of application", description="Name of application to use in reports etc.")
         self.addOption("ext", "\nFile extension to use for TextTest files associated with this application", description="Short space-free extension, to identify all TextTest's files associated with this application")
@@ -479,10 +481,6 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         allDirs.sort()
         return map(os.path.basename, allDirs)
 
-    def notifyAllRead(self):
-        if self.noApps:
-            self.runInteractive()
-
     def isActiveOnCurrent(self, *args):
         return True
     def _getStockId(self):
@@ -522,6 +520,9 @@ class ImportApplication(guiplugins.ActionDialogGUI):
             if len(parts) == 2 and parts[0] == "Main-Class":
                 return parts[1]
 
+    def getStatusMessage(self, app):
+        return "Created new application '" + app.fullName() + "'."
+
     def performOnCurrent(self):
         executable = self.optionGroup.getOptionValue("exec")
         ext = self.optionGroup.getOptionValue("ext")
@@ -558,9 +559,38 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         elif useGui == 9:
             configEntries["use_case_recorder"] = "none"            
 
-        self.notify("NewApplication", ext, directory, configEntries)
-        self.notify("Status", "Created new application with extension '" + ext + "'.")
+        self.newApplication = self.createApplication(ext, directory, configEntries)
+        self.notify("NewApplication", self.newApplication)
+        self.notify("Status", self.getStatusMessage(self.newApplication))
+        
+    def createApplication(self, ext, directory, configEntries):
+        dircache = testmodel.DirectoryCache(directory)
+        newApp = testmodel.Application(ext, dircache, [], self.inputOptions, configEntries)
+        dircache.refresh() # we created a config file...
+        return newApp
+    
+    def respond(self, *args):
+        if len(self.validApps) > 0:
+            return guiplugins.ActionDialogGUI.respond(self, *args)
+        
+    def runDialog(self):
+        dialog = self.showConfigurationDialog()
+        width = guiutils.guiConfig.getWindowDimension("width", self.diag)
+        height = guiutils.guiConfig.getWindowDimension("height", self.diag)
+        dialog.resize(width, height)
+        while True:
+            response = dialog.run()
+            if response != gtk.RESPONSE_ACCEPT:
+                raise plugins.TextTestError, "Application creation cancelled."
 
+            try:
+                self.performOnCurrent()
+                break
+            except plugins.TextTestError, e:
+                self.showErrorDialog(str(e))
+        dialog.destroy()
+        return self.newApplication, self.getStatusMessage(self.newApplication)
+        
     def setPythonGuiTestingEntries(self, toolkit, directory, ext, configEntries):
         configEntries["interpreter"] = "storytext -i " + toolkit
         if toolkit == "gtk": 

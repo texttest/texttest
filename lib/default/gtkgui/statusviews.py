@@ -14,16 +14,17 @@ from copy import copy
 # while actions are under way.
 #
 class StatusMonitorGUI(guiutils.SubGUI):
-    def __init__(self):
+    def __init__(self, initialMessage):
         guiutils.SubGUI.__init__(self)
         self.throbber = None
         self.animation = None
         self.pixbuf = None
         self.label = None
+        self.initialMessage = plugins.convertForMarkup(initialMessage)
 
     def getWidgetName(self):
         return "_Status bar"
-
+    
     def notifyActionStart(self, lock=True):
         if self.throbber:
             if self.pixbuf: # pragma: no cover : Only occurs if some code forgot to do ActionStop ...
@@ -60,7 +61,7 @@ class StatusMonitorGUI(guiutils.SubGUI):
         # the optimal number depends on the string to display) \ Mattias++
         self.label.set_max_width_chars(90)
         self.label.set_use_markup(True)
-        self.label.set_markup(plugins.convertForMarkup("TextTest started at " + plugins.localtime() + "."))
+        self.label.set_markup(self.initialMessage)
         hbox.pack_start(self.label, expand=False, fill=False)
         imageDir = plugins.installationDir("images")
         try:

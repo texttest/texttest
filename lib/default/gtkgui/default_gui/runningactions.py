@@ -374,21 +374,6 @@ class RunningAction(BasicRunningAction):
         else:
             return BasicRunningAction.getConfirmationMessage(self)
 
-    def checkValid(self, app):
-        if app.getConfigValue("use_case_record_mode") == "disabled" and app not in self.validApps:
-            for guiOptName in [ "delay", "gui" ]:
-                guiOpt = self.getOption(guiOptName)
-                if guiOpt:
-                    self.hideChildWithLabel(self.widget, guiOpt.name)
-        return guiplugins.ActionTabGUI.checkValid(self, app)
-
-    def hideChildWithLabel(self, widget, label):
-        if (hasattr(widget, "get_label") and widget.get_label() and widget.get_label().strip() == label) or widget.get_name() == label:
-            widget.hide()
-        elif hasattr(widget, "get_children"):
-            for child in widget.get_children():
-                self.hideChildWithLabel(child, label)
-
     def createNotebook(self):
         notebook = gtk.Notebook()
         notebook.set_name("sub-notebook for running")
@@ -603,11 +588,6 @@ class RecordTest(BasicRunningAction,guiplugins.ActionDialogGUI):
     def isValidForApp(self, app):
         return app.getConfigValue("use_case_record_mode") != "disabled" and \
                app.getConfigValue("use_case_recorder") != "none"
-
-    def checkValid(self, app):
-        guiplugins.ActionDialogGUI.checkValid(self, app)
-        if self.widget and len(self.validApps) == 0:
-            self.widget.hide()
 
     def updateOptions(self):
         if self.currentApp is not self.currAppSelection[0]:

@@ -261,6 +261,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         filteredClasses = self.removeBaseClasses(responderClasses)
         self.diag.info("Filtering away base classes, using " + repr(filteredClasses))
         self.observers = map(lambda x : x(self.inputOptions, allApps), filteredClasses)
+
     def getBuiltinResponderClasses(self):
         return [ UniqueNameFinder, Activator, testmodel.AllCompleteResponder ]
     def removeBaseClasses(self, classes):
@@ -432,10 +433,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         rootSuite = self.getRootSuite(appName, versions)
         rootSuite.addTestCaseWithPath(testPath)
         
-    def notifyNewApplication(self, appName, directory, configEntries):
-        dircache = testmodel.DirectoryCache(directory)
-        newApp = testmodel.Application(appName, dircache, [], self.inputOptions, configEntries)
-        dircache.refresh() # we created a config file...
+    def notifyNewApplication(self, newApp):
         suite = self.createEmptySuite(newApp)
         suite.notify("Add", initial=False)
         

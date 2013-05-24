@@ -588,6 +588,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
                 break
             except plugins.TextTestError, e:
                 self.showErrorDialog(str(e))
+        dialog.hide()
         dialog.destroy()
         return self.newApplication, self.getStatusMessage(self.newApplication)
         

@@ -29,9 +29,8 @@
       <separator/>
       <menuitem action="Run"/>
       <menuitem action="Reconnect..."/>
-      <menuitem action="Record Use-Case"/>
       <menuitem action="Replace Text in Files"/>
-      <menuitem action="Insert Shortcuts into Usecases"/>
+      <placeholder name="ExtraActions" />
       <separator/>
       <menuitem action="Refresh"/>
       <menuitem action="Reset"/>
@@ -63,7 +62,7 @@
     <menuitem action="Hide selected"/>
     <separator/>    
     <menuitem action="Run"/>
-    <menuitem action="Record Use-Case"/>
+    <placeholder name="ExtraTestActions" />
     <separator/>
     <menu action="reordermenu">
       <menuitem name="Move to first" action="Move to first"/>

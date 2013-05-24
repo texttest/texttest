@@ -1,0 +1,18 @@
+<ui>
+  <menubar name="MainMenuBar">
+    <menu action="actionsmenu">
+      <placeholder name="ExtraActions">
+        <menuitem action="Record Use-Case"/>
+        <menuitem action="Insert Shortcuts into Usecases"/>
+      </placeholder>
+    </menu>
+  </menubar>
+
+  <popup name="TestPopupMenu">
+    <placeholder name="ExtraTestActions">
+      <menuitem action="Record Use-Case"/>
+      <menuitem action="Insert Shortcuts into Usecases"/>
+    </placeholder>
+  </popup>
+
+</ui>

@@ -1,0 +1,18 @@
+<ui>
+  <menubar name="MainMenuBar">
+    <menu action="actionsmenu">
+      <placeholder name="ExtraActions">
+        <separator/>
+        <menuitem action="View screenshots"/>
+      </placeholder>
+    </menu>
+  </menubar>
+
+  <popup name="TestPopupMenu">
+    <placeholder name="ExtraTestActions">
+      <separator/>
+      <menuitem action="View screenshots"/>
+    </placeholder>
+  </popup>
+
+</ui>

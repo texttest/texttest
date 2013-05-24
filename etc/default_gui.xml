@@ -53,6 +53,7 @@
 
   <popup name="TestFilePopupMenu">
     <menuitem action="View File"/>
+    <placeholder name="ExtraViewers" />
   </popup>
 
 </ui>

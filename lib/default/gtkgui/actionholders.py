@@ -6,6 +6,7 @@ to store the simple actions and the dialogs, and a notebook to store the tabs in
 
 import gtk, guiutils, plugins, os, sys, logging, types
 from ordereddict import OrderedDict
+from pprint import pformat
 
 class MenuBarGUI(guiutils.SubGUI):
     def __init__(self, dynamic, uiManager, actionGUIs, menuNames, *args):
@@ -20,7 +21,7 @@ class MenuBarGUI(guiutils.SubGUI):
         self.toggleActions = []
         self.loadedModules = set()
         self.diag = logging.getLogger("Menu Bar")
-        self.diag.info("All description files : " + repr(self.allFiles))
+        self.diag.info("All description files : " + pformat(self.allFiles))
 
     def getLoadedModules(self):
         if not self.loadedModules:
@@ -86,12 +87,13 @@ class MenuBarGUI(guiutils.SubGUI):
         return loadFiles
 
     def cmpDescFiles(self, file1, file2):
+        basicFiles = [ "default_gui.xml", "default_gui-dynamic.xml", "default_gui-static.xml" ]
         base1 = os.path.basename(file1)
         base2 = os.path.basename(file2)
-        default1 = base1.startswith("default")
-        default2 = base2.startswith("default")
+        default1 = base1 in basicFiles
+        default2 = base2 in basicFiles
         if default1 != default2:
-            return cmp(default2, default1)
+            return cmp(default2, default1) # Hard code the three files above, they define the basic framework and should come first
         partCount1 = base1.count("-")
         partCount2 = base2.count("-")
         if partCount1 != partCount2:
@@ -121,8 +123,9 @@ class MenuBarGUI(guiutils.SubGUI):
 
         for configSetting in allParts[1:]:
             value = guiutils.guiConfig.getValue(configSetting)
-            self.diag.info("Checking if we have set " + configSetting + " = " + repr(value))
-            if not self.haveSet(value):
+            haveSet = self.haveSet(value)
+            self.diag.info("Checking if we have set " + configSetting + ": value = " + repr(value) + ", set = " + repr(haveSet))
+            if not haveSet:
                 return False
         return True
 
@@ -136,7 +139,7 @@ class MenuBarGUI(guiutils.SubGUI):
             else:
                 return True
         else:
-            return bool(val)
+            return val and val != "disabled"
 
         
     

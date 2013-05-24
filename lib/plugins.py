@@ -940,9 +940,16 @@ class ResponseAggregator:
             elif type(basicValue) == types.DictType:
                 basicValue.update(extraValue)
             elif extraValue != basicValue:
-                raise AggregationError(basicValue, extraValue, i + 1)
+                if self.isSet(extraValue):
+                    if self.isSet(basicValue):
+                        raise AggregationError(basicValue, extraValue, i + 1)
+                    else:
+                        basicValue = extraValue
                 
         return basicValue
+    
+    def isSet(self, value):
+        return value != "" and value != "disabled"
 
 def getAggregateString(items, method):
     values = []

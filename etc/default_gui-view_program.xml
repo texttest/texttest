@@ -1,7 +1,9 @@
 <ui>
 
   <popup name="TestFilePopupMenu">
-    <menuitem action="Edit File"/>
+    <placeholder name="ExtraViewers">
+      <menuitem action="Edit File"/>
+    </placeholder>
   </popup>
 
 </ui>

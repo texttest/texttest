@@ -1,7 +1,7 @@
 <ui>
 
   <popup name="TestFilePopupMenu">
-    <placeholder name="ExtraTmpViewers">
+    <placeholder name="ExtraViewers">
       <menuitem action="View Content-Filtered File"/>
     </placeholder>
     <placeholder name="ExtraOrigViewers">

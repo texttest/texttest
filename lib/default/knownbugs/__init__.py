@@ -120,11 +120,11 @@ class BugTrigger:
     def matchesText(self, line):
         return self.textTrigger.matches(line)
     
-    def customTriggerMatches(self, tmpDir):
+    def customTriggerMatches(self, *args):
         module, method = self.customTrigger.split(".", 1)
-        return plugins.importAndCall(module, method, tmpDir)
+        return plugins.importAndCall(module, method, *args)
 
-    def hasBug(self, line, execHosts=[], isChanged=True, multipleDiffs=False, **kw):
+    def hasBug(self, line, execHosts=[], isChanged=True, multipleDiffs=False, tmpDir=None):
         if not self.checkUnchanged and not isChanged:
             self.diag.info("File not changed, ignoring")
             return False
@@ -134,7 +134,7 @@ class BugTrigger:
         if line is not None and not self.textTrigger.matches(line):
             return False
         
-        if self.customTrigger and not self.customTriggerMatches(**kw):
+        if self.customTrigger and not self.customTriggerMatches(execHosts, tmpDir):
             return False
         
         if self.hostsMatch(execHosts):

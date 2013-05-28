@@ -120,11 +120,11 @@ class BugTrigger:
     def matchesText(self, line):
         return self.textTrigger.matches(line)
     
-    def customTriggerMatches(self):
+    def customTriggerMatches(self, tmpDir):
         module, method = self.customTrigger.split(".", 1)
-        return plugins.importAndCall(module, method)
+        return plugins.importAndCall(module, method, tmpDir)
 
-    def hasBug(self, execHosts, isChanged, multipleDiffs, line=None):
+    def hasBug(self, line, execHosts=[], isChanged=True, multipleDiffs=False, **kw):
         if not self.checkUnchanged and not isChanged:
             self.diag.info("File not changed, ignoring")
             return False
@@ -134,7 +134,7 @@ class BugTrigger:
         if line is not None and not self.textTrigger.matches(line):
             return False
         
-        if self.customTrigger and not self.customTriggerMatches():
+        if self.customTrigger and not self.customTriggerMatches(**kw):
             return False
         
         if self.hostsMatch(execHosts):
@@ -193,29 +193,30 @@ class FileBugData:
             return []
         if not fileName:
             self.diag.info("File doesn't exist, checking only for absence bugs")
-            return self.findAbsenceBugs(self.absentList, execHosts, isChanged, multipleDiffs)
+            return self.findAbsenceBugs(self.absentList, execHosts=execHosts, isChanged=isChanged, multipleDiffs=multipleDiffs, tmpDir=None)
         
         self.diag.info("Looking for bugs in " + fileName)
-        return self.findBugsInText(open(fileName).readlines(), execHosts, isChanged, multipleDiffs)
+        dirname = os.path.dirname(fileName)
+        return self.findBugsInText(open(fileName).readlines(), execHosts=execHosts, isChanged=isChanged, multipleDiffs=multipleDiffs, tmpDir=dirname)
 
-    def findBugsInText(self, lines, execHosts, isChanged=True, multipleDiffs=False):
+    def findBugsInText(self, lines, **kw):
         currAbsent = copy(self.absentList)
         bugs = []
         for line in lines:
             for bugTrigger in self.presentList:
                 self.diag.info("Checking for existence of " + repr(bugTrigger))
-                if bugTrigger not in bugs and bugTrigger.hasBug(execHosts, isChanged, multipleDiffs, line):
+                if bugTrigger not in bugs and bugTrigger.hasBug(line, **kw):
                     bugs.append(bugTrigger)
             for bugTrigger in currAbsent:
                 if bugTrigger.matchesText(line):
                     currAbsent.remove(bugTrigger)
 
-        return bugs + self.findAbsenceBugs(currAbsent, execHosts, isChanged, multipleDiffs)
+        return bugs + self.findAbsenceBugs(currAbsent, **kw)
 
-    def findAbsenceBugs(self, absentList, execHosts, isChanged, multipleDiffs):
+    def findAbsenceBugs(self, absentList, **kw):
         bugs = []
         for bugTrigger in absentList:
-            if bugTrigger not in bugs and bugTrigger.hasBug(execHosts, isChanged, multipleDiffs):
+            if bugTrigger not in bugs and bugTrigger.hasBug(None, **kw):
                 bugs.append(bugTrigger)
         return bugs
 
@@ -401,10 +402,10 @@ class CheckForBugs(plugins.Action):
     def findBugsInFile(self, test, state, stem, fileBugData, multipleDiffs):
         self.diag.info("Looking for bugs in file " + stem)
         if stem == "free_text":
-            return fileBugData.findBugsInText(state.freeText.split("\n"), state.executionHosts)
+            return fileBugData.findBugsInText(state.freeText.split("\n"), execHosts=state.executionHosts)
         elif stem == "brief_text":
             briefText = state.getTypeBreakdown()[1]
-            return fileBugData.findBugsInText(briefText.split("\n"), state.executionHosts)
+            return fileBugData.findBugsInText(briefText.split("\n"), execHosts=state.executionHosts)
         elif state.hasResults():
             # bugs are only relevant if the file itself is changed, unless marked to trigger on success also
             comp = state.findComparison(stem, includeSuccess=True)[0]

@@ -95,6 +95,7 @@ class BugTrigger:
         self.checkUnchanged = int(getOption("trigger_on_success", "0"))
         self.reportInternalError = int(getOption("internal_error", "0"))
         self.ignoreOtherErrors = int(getOption("ignore_other_errors", self.reportInternalError))
+        self.customTrigger = getOption("custom_trigger", "")
         self.bugInfo = self.createBugInfo(getOption)
         self.diag = logging.getLogger("Check For Bugs")
         
@@ -118,6 +119,10 @@ class BugTrigger:
 
     def matchesText(self, line):
         return self.textTrigger.matches(line)
+    
+    def customTriggerMatches(self):
+        module, method = self.customTrigger.split(".", 1)
+        return plugins.importAndCall(module, method)
 
     def hasBug(self, execHosts, isChanged, multipleDiffs, line=None):
         if not self.checkUnchanged and not isChanged:
@@ -128,6 +133,10 @@ class BugTrigger:
             return False
         if line is not None and not self.textTrigger.matches(line):
             return False
+        
+        if self.customTrigger and not self.customTriggerMatches():
+            return False
+        
         if self.hostsMatch(execHosts):
             return True
         else:

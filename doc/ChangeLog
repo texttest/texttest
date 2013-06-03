@@ -2421,6 +2421,7 @@ Framework Enhancements:
     - GUI shortcut renaming is now detected and a "Replace Text in Files" run triggered if desired, to update them.
     - Known bugs mechanism priorities
 	If two known bugs are triggered and one of them requests a rerun, we report the one that didn't request a rerun. 
+    - New setting "custom_trigger" for known bugs, to allow further configuration of when to trigger (essentially checking the environment)
 Batch Report Enhancements:
     - Index page now notes which run the information there is based on
     - Jenkins changes feature now find indirect dependencies where appropriate
@@ -2444,3 +2445,6 @@ Bug Fixes:
     - Made RPM work again for "texttest.py", not just "texttest" (thanks Michael Behrisch)
     - Overlapping section filters in run_dependent_text now behave as expected. See migration notes as it may cause changes.
     - Fixing stacktrace when starting with parallel runs using a relative path to TextTest
+    - Parallel GUI configuration and "Edit File" (when appropriate) now enabled on initial app creation without need for restart
+    - GUI testing-specific menu items are no longer present when not GUI testing
+

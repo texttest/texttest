@@ -19,7 +19,8 @@ class FailedPrediction(plugins.TestState):
         return status, self.briefText
 
 class Bug:
-    def __init__(self, rerunCount):
+    def __init__(self, priority, rerunCount):
+        self.priority = priority        
         self.rerunCount = rerunCount
                    
     def findCategory(self, internalError):
@@ -41,16 +42,14 @@ class Bug:
     
 
 class BugSystemBug(Bug):
-    def __init__(self, bugSystem, bugId, *args):
+    def __init__(self, bugSystem, bugId, priorityStr, *args):
         self.bugId = bugId
         self.bugSystem = bugSystem
-        Bug.__init__(self, *args)
+        prio = int(priorityStr) if priorityStr else 20
+        Bug.__init__(self, prio, *args)
 
     def __repr__(self):
         return self.bugId
-
-    def getPriority(self):
-        return 2
         
     def findInfo(self, test):
         location = test.getCompositeConfigValue("bug_system_location", self.bugSystem)
@@ -64,11 +63,12 @@ class BugSystemBug(Bug):
 
     
 class UnreportedBug(Bug):
-    def __init__(self, fullText, briefText, internalError, *args):
+    def __init__(self, fullText, briefText, internalError, priorityStr, *args):
         self.fullText = fullText
         self.briefText = briefText
         self.internalError = internalError
-        Bug.__init__(self, *args)
+        prio = self.getPriority(priorityStr)
+        Bug.__init__(self, prio, *args)
         
     def __repr__(self):
         return self.briefText
@@ -76,11 +76,13 @@ class UnreportedBug(Bug):
     def isCancellation(self):
         return not self.briefText and not self.fullText
 
-    def getPriority(self):
-        if self.internalError:
-            return 1
+    def getPriority(self, priorityStr):
+        if priorityStr:
+            return int(priorityStr)
+        elif self.internalError:
+            return 10
         else:
-            return 3
+            return 30
         
     def findInfo(self, *args):
         return self.findCategory(self.internalError), self.briefText, self.getRerunText() + self.fullText
@@ -111,11 +113,12 @@ class BugTrigger:
 
     def createBugInfo(self, getOption):
         bugSystem = getOption("bug_system")
+        prioStr = getOption("priority")
         rerunCount = int(getOption("rerun_count", "0"))
         if bugSystem:
-            return BugSystemBug(bugSystem, getOption("bug_id"), rerunCount)
+            return BugSystemBug(bugSystem, getOption("bug_id"), prioStr, rerunCount)
         else:
-            return UnreportedBug(getOption("full_description"), getOption("brief_description"), self.reportInternalError, rerunCount)
+            return UnreportedBug(getOption("full_description"), getOption("brief_description"), self.reportInternalError, prioStr, rerunCount)
 
     def matchesText(self, line):
         return self.textTrigger.matches(line)
@@ -384,7 +387,7 @@ class CheckForBugs(plugins.Action):
         bugs, bugStems = self.findAllBugs(test, state, activeBugs)
         unblockedBugs = self.findUnblockedBugs(bugs)
         if len(unblockedBugs) > 0:
-            unblockedBugs.sort(key=lambda bug: (bug.bugInfo.getPriority(), bug.bugInfo.rerunCount))
+            unblockedBugs.sort(key=lambda bug: (bug.bugInfo.priority, bug.bugInfo.rerunCount))
             bug = unblockedBugs[0]
             return bug, bugStems[bugs.index(bug)]
         else:

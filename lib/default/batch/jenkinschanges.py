@@ -143,19 +143,23 @@ def getFingerprintDifferences(build1, build2, jobName, jobRoot, fileFinder, cach
     differences.sort()
     return differences
 
+def getUpdateMarker(project):
+    return project + " was updated", "", []
 
 def organiseByProject(differences, markedArtefacts, artefactProjectData):
     projectData = OrderedDict()
     changes = []
     for artefact, oldHash, hash in differences:
-        for name, regexp in markedArtefacts.items():
-            if re.match(regexp, artefact):
-                changes.append((name + " was updated", "", []))
-                
         projects = getProjects(artefact, artefactProjectData)
         if projects:
             for project, scopeProvided in projects:
                 projectData.setdefault(project, []).append((artefact, oldHash, hash, scopeProvided))
+                if project in markedArtefacts:
+                    changes.append(getUpdateMarker(project))
+        else:
+            projectName = artefact.split(":")[-1].split("[")[0][:-1]
+            if projectName in markedArtefacts:
+                changes.append(getUpdateMarker(projectName))
     
     return changes, projectData
 
@@ -249,7 +253,7 @@ def getChangesRecursively(build1, build2, jobName, jobRoot, projectData, markedA
     for subProj, subBuild1, subBuild2 in recursiveChanges:
         if subProj != jobName:
             subMarkedChanges, subProjectChanges = getChangesRecursively(subBuild1, subBuild2, subProj, jobRoot, 
-                                                                        projectData, markedArtefacts, fileFinder, cacheDir)
+                                                                        projectData, [], fileFinder, cacheDir)
             markedChanges += subMarkedChanges
             for subProjectChange in subProjectChanges:
                 if subProjectChange not in projectChanges:
@@ -277,12 +281,15 @@ def getTimestamp(build):
     if os.path.exists(buildLink):
         return os.readlink(buildLink)
     
+def parseEnvAsList(varName):
+    if varName in os.environ:
+        return os.getenv(varName).split(",")
+    else:
+        return []
+        
 def parseEnvAsDict(varName):
-    if varName not in os.environ:
-        return {}
-    
     ret = {}
-    for pairText in os.getenv(varName).split(","):
+    for pairText in parseEnvAsList(varName):
         var, value = pairText.split("=")
         ret[var] = value
     return ret
@@ -294,6 +301,6 @@ if __name__ == "__main__":
         prevBuildName = sys.argv[2]
     else:
         prevBuildName = str(int(buildName) - 1)
-    pprint(getChanges(prevBuildName, buildName, parseEnvAsDict("BUG_SYSTEM_DATA"), parseEnvAsDict("MARKED_ARTEFACTS"), 
+    pprint(getChanges(prevBuildName, buildName, parseEnvAsDict("BUG_SYSTEM_DATA"), parseEnvAsList("MARKED_ARTEFACTS"), 
                       os.getenv("FILE_FINDER", ""), os.getcwd()))
     

@@ -19,9 +19,10 @@ def getCacheFileName(buildName, cacheDir):
     return os.path.join(cacheDir, "correct_hashes_" + buildName)
             
 def getFingerprint(jobRoot, jobName, buildName, cacheDir):
-    cacheFileName = getCacheFileName(buildName, cacheDir) 
-    if os.path.isfile(cacheFileName):
-        return eval(open(cacheFileName).read())
+    if cacheDir:
+        cacheFileName = getCacheFileName(buildName, cacheDir) 
+        if os.path.isfile(cacheFileName):
+            return eval(open(cacheFileName).read())
     dirName = os.path.join(jobRoot, jobName, "builds", buildName)
     xmlFile = os.path.join(dirName, "build.xml")
     fingerprint = {}
@@ -243,7 +244,7 @@ def getProjectData(jobRoot):
             projectData.setdefault(artefactName, []).append((jobName, providedScope))
     return projectData
 
-def getChangesRecursively(build1, build2, jobName, jobRoot, projectData, markedArtefacts, fileFinder, cacheDir):
+def getChangesRecursively(build1, build2, jobName, jobRoot, projectData, markedArtefacts=[], fileFinder="", cacheDir=None):
     # Find what artefacts have changed between times build
     differences = getFingerprintDifferences(build1, build2, jobName, jobRoot, fileFinder, cacheDir)
     # Organise them by project
@@ -252,8 +253,7 @@ def getChangesRecursively(build1, build2, jobName, jobRoot, projectData, markedA
     projectChanges, recursiveChanges = getProjectChanges(jobRoot, differencesByProject)
     for subProj, subBuild1, subBuild2 in recursiveChanges:
         if subProj != jobName:
-            subMarkedChanges, subProjectChanges = getChangesRecursively(subBuild1, subBuild2, subProj, jobRoot, 
-                                                                        projectData, [], fileFinder, cacheDir)
+            subMarkedChanges, subProjectChanges = getChangesRecursively(subBuild1, subBuild2, subProj, jobRoot, projectData)
             markedChanges += subMarkedChanges
             for subProjectChange in subProjectChanges:
                 if subProjectChange not in projectChanges:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import plugins, os, string, shutil, sys, logging
+import plugins, os, string, shutil, sys, logging, glob
 from ConfigParser import ConfigParser, NoOptionError
 from copy import copy
 from ordereddict import OrderedDict
@@ -260,10 +260,10 @@ class BugMap(OrderedDict):
                 return True
         return False
     
-    def readFromFile(self, fileName):
+    def readFromFile(self, fileName, getStemsMethod=None):
         parser = self.makeParser(fileName)
         if parser:
-            self.readFromParser(parser)
+            self.readFromParser(parser, getStemsMethod)
             
     def readFromFileObject(self, f):
         parser = self.makeParserFromFileObject(f)
@@ -292,13 +292,16 @@ class BugMap(OrderedDict):
         except Exception:
             plugins.printWarning("Bug file at " + fileName + " not understood, ignoring")
     
-    def readFromParser(self, parser):
+    def readFromParser(self, parser, getStemsMethod=None):
         for section in reversed(sorted(parser.sections())):
             getOption = ParseMethod(parser, section)
             fileStem = getOption("search_file")
-            self.setdefault(fileStem, FileBugData()).addBugTrigger(getOption)
+            if getStemsMethod:
+                for stem in getStemsMethod(fileStem):
+                    self.setdefault(stem, FileBugData()).addBugTrigger(getOption)
+            else:
+                self.setdefault(fileStem, FileBugData()).addBugTrigger(getOption)
 
-    
 class CheckForCrashes(plugins.Action):
     def __init__(self):
         self.diag = logging.getLogger("check for crashes")
@@ -380,7 +383,6 @@ class CheckForBugs(plugins.Action):
             if newBugs:
                 bugs += newBugs
                 bugStems += [ stem ] * len(newBugs)
-        
         return bugs, bugStems
 
     def findBug(self, test, state, activeBugs):
@@ -441,15 +443,23 @@ class CheckForBugs(plugins.Action):
         return diffCount > 1
     
     def readBugs(self, test):
+        def findStems(pattern):
+            stems = []
+            if glob.has_magic(pattern):
+                for stem in test.dircache.findStemsMatching(pattern):
+                    if stem not in stems:
+                        stems.append(stem)
+            if len(stems) == 0:
+                stems.append(pattern)
+            return stems
         bugMap = BugMap()
         # Mostly for backwards compatibility, reverse the list so that more specific bugs
         # get checked first.
         for bugFile in reversed(test.getAllPathNames("knownbugs")):
             self.diag.info("Reading bugs from file " + bugFile)
-            bugMap.readFromFile(bugFile)
+            bugMap.readFromFile(bugFile, getStemsMethod=findStems)
         return bugMap
 
-            
 # For migrating from knownbugs files which are from TextTest 3.7 and older
 class MigrateFiles(plugins.Action):
     def setUpSuite(self, suite):

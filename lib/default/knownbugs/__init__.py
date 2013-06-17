@@ -407,10 +407,10 @@ class CheckForBugs(plugins.Action):
     def findBugsInFile(self, test, state, stem, fileBugData, multipleDiffs):
         self.diag.info("Looking for bugs in file " + stem)
         if stem == "free_text":
-            return fileBugData.findBugsInText(state.freeText.split("\n"), execHosts=state.executionHosts)
+            return fileBugData.findBugsInText(state.freeText.split("\n"), execHosts=state.executionHosts, tmpDir=test.writeDirectory)
         elif stem == "brief_text":
             briefText = state.getTypeBreakdown()[1]
-            return fileBugData.findBugsInText(briefText.split("\n"), execHosts=state.executionHosts)
+            return fileBugData.findBugsInText(briefText.split("\n"), execHosts=state.executionHosts, tmpDir=test.writeDirectory)
         elif state.hasResults():
             # bugs are only relevant if the file itself is changed, unless marked to trigger on success also
             comp = state.findComparison(stem, includeSuccess=True)[0]

@@ -791,6 +791,9 @@ class TestCase(Test):
     def saveState(self):
         stateFile = self.getStateFile()
         if os.path.isfile(stateFile):
+            # Debug info, trying to find out why it doesn't get saved sometimes
+            if os.path.exists(self.makeBackupFileName(1)):
+                plugins.printWarning("File already exists at " + stateFile + " - while saving state. Not overwriting!")
             # Don't overwrite previous saved state
             return
 

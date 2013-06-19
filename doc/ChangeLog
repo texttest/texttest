@@ -2421,11 +2421,16 @@ Framework Enhancements:
     - GUI shortcut renaming is now detected and a "Replace Text in Files" run triggered if desired, to update them.
     - Known bugs mechanism priorities
 	If two known bugs are triggered and one of them requests a rerun, we report the one that didn't request a rerun. 
+	Can add priorities explicitly via "priority" field (not available via GUI yet)
+    - Known bugs "search_file" field now supports wildcards
+	for example "stdout*"
     - New setting "custom_trigger" for known bugs, to allow further configuration of when to trigger (essentially checking the environment)
 Batch Report Enhancements:
     - Index page now notes which run the information there is based on
     - Jenkins changes feature now find indirect dependencies where appropriate
 	e.g. scope:provided in Maven
+    - Jenkins changes "marked artefacts" now variable per batch session
+	(Separate name from artefact name is also removed)
     - Now find Jenkins timestamps for runs, show them as tooltips in the HTML report
 Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
     - Default_queue setting should also apply to the proxy job

@@ -195,10 +195,23 @@ class RunDependentTextFilter(plugins.Observable):
                 relevantFilters.append(lineFilter)
         if sectionFilters:
             # Must preserve the original order
-            relevantFilters += self.findRelevantSectionFilters(sectionFilters, file)
-            return filter(lambda f: f in relevantFilters, self.lineFilters)
+            relevantSectionFilters = self.findRelevantSectionFilters(sectionFilters, file)
+            orderedRelevantFilters = []
+            for lineFilter in self.lineFilters:
+                if lineFilter in relevantFilters:
+                    orderedRelevantFilters.append((lineFilter, None))
+                else:
+                    lastLine = self.getLastLine(relevantSectionFilters, lineFilter)
+                    if lastLine:
+                        orderedRelevantFilters.append((lineFilter, lastLine))
+            return orderedRelevantFilters
         else:
-            return relevantFilters
+            return [ (f, None) for f in relevantFilters ]
+
+    def getLastLine(self, filters, lineFilter):
+        for f, lastLine in reversed(filters):
+            if f is lineFilter:
+                return lastLine
 
     def findRelevantSectionFilters(self, sectionFilters, file):
         lineNumber = 0
@@ -207,7 +220,7 @@ class RunDependentTextFilter(plugins.Observable):
             lineNumber += 1
             for sectionFilter in matchedFirst:
                 if sectionFilter not in relevantFilters and sectionFilter.untrigger.matches(line, lineNumber):
-                    relevantFilters.append(sectionFilter)
+                    relevantFilters.append((sectionFilter, lineNumber))
             for sectionFilter in sectionFilters:
                 if sectionFilter not in matchedFirst and sectionFilter.trigger.matches(line, lineNumber):
                     matchedFirst.append(sectionFilter)
@@ -243,8 +256,12 @@ class RunDependentTextFilter(plugins.Observable):
         appliedLineFilter = None
         filteredLine = line
         linesToRemove = 0
-        for lineFilter in lineFilters:
+        filtersToRemove = []
+        for lineFilter, lastRelevantLine in lineFilters:
             changed, currFilteredLine, removeCount = lineFilter.applyTo(line, lineNumber)
+            if lastRelevantLine is not None and lineNumber >= lastRelevantLine:
+                filtersToRemove.append((lineFilter, lastRelevantLine))
+
             if changed:
                 appliedLineFilter = lineFilter
                 linesToRemove = max(removeCount, linesToRemove)
@@ -252,6 +269,9 @@ class RunDependentTextFilter(plugins.Observable):
                     line = currFilteredLine
                 if filteredLine:
                     filteredLine = currFilteredLine
+        for lineFilter, lastRelevantLine in filtersToRemove:
+            lineFilters.remove((lineFilter, lastRelevantLine))
+                    
         return appliedLineFilter, filteredLine, linesToRemove
 
 

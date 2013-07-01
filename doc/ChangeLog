@@ -2452,4 +2452,6 @@ Bug Fixes:
     - Fixing stacktrace when starting with parallel runs using a relative path to TextTest
     - Parallel GUI configuration and "Edit File" (when appropriate) now enabled on initial app creation without need for restart
     - GUI testing-specific menu items are no longer present when not GUI testing
+    - Fixed Section Filtering filtered away half a section.
+    - Fixed curious GTK error when trying to save test selection
 

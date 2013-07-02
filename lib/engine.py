@@ -430,8 +430,13 @@ class TextTest(plugins.Responder, plugins.Observable):
                     return testmodel.DirectoryCache(os.path.dirname(allFiles[0]))
             
     def notifyExtraTest(self, testPath, appName, versions):
-        rootSuite = self.getRootSuite(appName, versions)
-        rootSuite.addTestCaseWithPath(testPath)
+        try:
+            rootSuite = self.getRootSuite(appName, versions)
+            rootSuite.addTestCaseWithPath(testPath)
+        except:
+            message = "Exception caught when trying to add an extra test for aplication: " + str(appName) + \
+            " and versions: "+ str(versions) + " and testpath: " + str(testPath)
+            plugins.printWarning(message)
         
     def notifyNewApplication(self, newApp):
         suite = self.createEmptySuite(newApp)

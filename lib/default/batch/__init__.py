@@ -849,7 +849,7 @@ class CollectFiles(plugins.ScriptWithArgs):
         basicPrefix = "batchreport." + app.name
         prefix = basicPrefix + app.versionSuffix()
         # Don't collect to more collections!
-        self.diag.info("Setting up application " + app.name + " looking for " + prefix) 
+        self.log.info("Setting up application " + app.name + " looking for " + prefix) 
         filelist = os.listdir(fullDir)
         filelist.sort()
         fileBodies = []

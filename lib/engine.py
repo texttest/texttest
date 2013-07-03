@@ -433,10 +433,11 @@ class TextTest(plugins.Responder, plugins.Observable):
         try:
             rootSuite = self.getRootSuite(appName, versions)
             rootSuite.addTestCaseWithPath(testPath)
-        except:
+        except Exception: #workaround due to nightjob problems(CM-7467)
             message = "Exception caught when trying to add an extra test for aplication: " + str(appName) + \
             " and versions: "+ str(versions) + " and testpath: " + str(testPath)
             plugins.printWarning(message)
+            plugins.printException()
         
     def notifyNewApplication(self, newApp):
         suite = self.createEmptySuite(newApp)

@@ -73,6 +73,7 @@ class Activator(plugins.Responder, plugins.Observable):
     def __init__(self, optionMap, allApps):
         plugins.Responder.__init__(self, optionMap, allApps)
         plugins.Observable.__init__(self)
+        self.optionMap = optionMap
         self.allowEmpty = optionMap.has_key("gx") or optionMap.runScript()
         self.suites = []
         self.diag = logging.getLogger("Activator")
@@ -83,9 +84,18 @@ class Activator(plugins.Responder, plugins.Observable):
         goodSuites = []
         rejectionInfo = OrderedDict()
         self.notify("StartRead")
+        storytextDirs = {}
         for suite in self.suites:
             try:
                 filters = suite.app.getFilterList(self.suites)
+                if self.includeShortcuts() and suite.parent is None:
+                    currUsecaseHome = suite.getEnvironment("STORYTEXT_HOME")
+                    testName = os.path.basename(currUsecaseHome)
+                    if currUsecaseHome != os.getenv("STORYTEXT_HOME") and os.path.isdir(currUsecaseHome) and currUsecaseHome not in storytextDirs.values():
+                        storytextDirs[suite.app] = currUsecaseHome
+                        self.diag.info("Creating stemless test " + testName )
+                        suite.addTestCaseWithPath(testName, stemless=True)
+
                 self.diag.info("Creating test suite with filters " + repr(filters))
         
                 suite.readContents(filters)
@@ -118,6 +128,13 @@ class Activator(plugins.Responder, plugins.Observable):
             if appGroup.issubset(rejectedApps):
                 sys.stderr.write(app.rejectionMessage(rejectionInfo.get(app)))
 
+    def includeShortcuts(self):
+        script = self.optionMap.runScript()
+        if not script:
+            return False        
+        words = script.split(" ")
+        actionCmd = words[1:]
+        return "includeShortcuts=1" in actionCmd
 
 class TextTest(plugins.Responder, plugins.Observable):
     def __init__(self):
@@ -438,7 +455,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             " and versions: "+ str(versions) + " and testpath: " + str(testPath)
             plugins.printWarning(message)
             plugins.printException()
-        
+
     def notifyNewApplication(self, newApp):
         suite = self.createEmptySuite(newApp)
         suite.notify("Add", initial=False)

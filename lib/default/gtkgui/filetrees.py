@@ -214,6 +214,8 @@ class ApplicationFileGUI(FileViewGUI):
             currUsecaseHome = suite.getEnvironment("STORYTEXT_HOME")
             if currUsecaseHome != os.getenv("STORYTEXT_HOME") and os.path.isdir(currUsecaseHome) and currUsecaseHome not in self.storytextDirs.values():
                 self.storytextDirs[suite.app] = currUsecaseHome
+                if not suite.parent:
+                    self.notify("UsecaseHome", suite, currUsecaseHome)
                 
             self.testScripts.setdefault(suite.app.name, set()).update(self.getScriptArgs(suite))
             if suite.app not in self.allApps and suite.app not in self.extras:

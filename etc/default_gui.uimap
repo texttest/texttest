@@ -1038,3 +1038,6 @@ toggled.true = enable gui visibility
 [Name=View screenshots]
 activate = view screenshots
 
+[Label=Replace text in shortcut files]
+toggled.true = include shortcut files
+

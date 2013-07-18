@@ -669,7 +669,7 @@ class RunScriptAction(BasicRunningAction):
         args = [ self.scriptName() ]
         for key, option in optionGroup.options.items():
             args.append(key + "=" + str(option.getValue()))
-            
+
         return [ "-s", " ".join(args) ]
 
 
@@ -681,10 +681,25 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
         self.addOption("old", "Text or regular expression to search for", multilineEntry=True)
         self.addOption("new", "Text to replace it with (may contain regexp back references)", multilineEntry=True)
         self.addOption("file", "File stem(s) to perform replacement in", allocateNofValues=2)
+        self.storytextDirs = {}
 
     def notifyAllStems(self, allStems, defaultTestFile):
         self.optionGroup.setValue("file", defaultTestFile)
         self.optionGroup.setPossibleValues("file", allStems)
+
+    def notifyNewTestSelection(self, *args):
+        guiplugins.ActionDialogGUI.notifyNewTestSelection(self, *args)
+        if self.shouldAddShortcut():
+            self.addSwitch("includeShortcuts", "Replace text in shortcut files", 0)
+        else:
+            if "includeShortcuts" in self.optionGroup.options.keys():
+                self.optionGroup.options.pop("includeShortcuts")
+
+    def shouldAddShortcut(self):
+        if self.currAppSelection:
+            app = self.currAppSelection[0]
+            return self.storytextDirs.has_key(app) and self.currTestSelection[0].name == os.path.basename(app.getDirectory())
+        return False
 
     def notifyUsecaseRename(self, argstr, *args):
         self.showQueryDialog(self.getParentWindow(), "Usecase names were renamed. Would you like to update them into all usecases now?",
@@ -722,6 +737,12 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
         # size of the dialog
         return 0.5, 0.5
 
+    def notifyUsecaseHome(self, suite, usecaseHome):
+        self.storytextDirs[suite.app] = usecaseHome
+
+    def notifyWriteTestsIfSelected(self, suite, file):
+        if self.shouldAddShortcut():
+            file.write(os.path.basename(self.storytextDirs[self.currAppSelection[0]]) + "\n")
 
 class TestFileFiltering(guiplugins.ActionGUI):
     def _getTitle(self):

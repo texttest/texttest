@@ -219,7 +219,7 @@ class DocumentScripts(plugins.Action):
 class ReplaceText(plugins.ScriptWithArgs):
     scriptDoc = "Perform a search and replace on all files with the given stem"
     def __init__(self, args):
-        argDict = self.parseArguments(args, [ "old", "new", "file", "regexp", "argsReplacement" ])
+        argDict = self.parseArguments(args, [ "old", "new", "file", "regexp", "argsReplacement", "includeShortcuts" ])
         tryAsRegexp = "regexp" not in argDict or argDict["regexp"] == "1"
         self.argsReplacement = "argsReplacement" in argDict and argDict["argsReplacement"] == "1"
         self.oldText = argDict["old"].replace("\\n", "\n")
@@ -233,21 +233,30 @@ class ReplaceText(plugins.ScriptWithArgs):
         fileStr = argDict.get("file")
         if fileStr:
             self.stems = plugins.commasplit(fileStr)
+        self.includeShortcuts = "includeShortcuts" in argDict and argDict["includeShortcuts"] == "1"
 
     def __repr__(self):
         return "Replacing " + self.oldText + " with " + self.newText + " for"
 
     def __call__(self, test):
-        for stem in self.stems:
-            for stdFile in test.getFileNamesMatching(stem):
-                if os.path.isfile(stdFile):
-                    self.replaceInFile(test, stdFile)
+        storytextDir = test.getEnvironment("STORYTEXT_HOME")
+        if self.includeShortcuts and test.name == os.path.basename(storytextDir):
+            for f in self.getShortcutFiles(storytextDir):
+                self.replaceInFile(test, f, True)
+        else:
+            for stem in self.stems:
+                for stdFile in test.getFileNamesMatching(stem):
+                    if os.path.isfile(stdFile):
+                        self.replaceInFile(test, stdFile)
 
-    def replaceInFile(self, test, stdFile):
+    def getShortcutFiles(self, shortcutDir):
+        return [os.path.join(shortcutDir, f) for f in os.listdir(shortcutDir) if f.endswith(".shortcut")]
+
+    def replaceInFile(self, test, stdFile, stemless=False):
         fileName = os.path.basename(stdFile)
         self.describe(test, " - file " + fileName)
         sys.stdout.flush()
-        unversionedFileName = ".".join(fileName.split(".")[:2])
+        unversionedFileName = ".".join(fileName.split(".")[:2]) if not stemless else fileName
         tmpFile = os.path.join(test.getDirectory(temporary=1), unversionedFileName)
         with open(tmpFile, "w") as writeFile:
             with open(stdFile) as readFile:
@@ -255,7 +264,7 @@ class ReplaceText(plugins.ScriptWithArgs):
                     writeFile.write(self.trigger.replace(line, self.newMultiLineText if not self.argsReplacement else self.replaceArgs))
                 if self.oldText[-1] != "\n" and not self.argsReplacement:
                     writeFile.write(self.trigger.getLeftoverText())
-                    
+
     def replaceArgs(self, matchobj):
         from storytext.replayer import ReplayScript
         return ReplayScript.getTextWithArgs(self.newText, [arg for arg in matchobj.groups()])
@@ -270,8 +279,7 @@ class ReplaceText(plugins.ScriptWithArgs):
         if len(self.stems) == 0:
             logFile = app.getConfigValue("log_file")
             if not logFile in self.stems:
-                self.stems.append(logFile)                
-
+                self.stems.append(logFile)
 
 class ExportTests(plugins.ScriptWithArgs):
     scriptDoc = "Export the selected tests to a different test suite"

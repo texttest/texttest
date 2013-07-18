@@ -744,6 +744,12 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
         if self.shouldAddShortcut():
             file.write(os.path.basename(self.storytextDirs[self.currAppSelection[0]]) + "\n")
 
+    def _respond(self, saidOK=True, dialog=None, fileChooserOption=None):
+        if saidOK and not self.optionGroup.getValue("old"):
+            self.showWarningDialog("Text or regular expression to search for cannot be empty")
+        else:
+            guiplugins.ActionDialogGUI._respond(self, saidOK, dialog, fileChooserOption)
+
 class TestFileFiltering(guiplugins.ActionGUI):
     def _getTitle(self):
         return "Test Filtering"

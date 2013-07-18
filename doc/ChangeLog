@@ -2414,6 +2414,8 @@ Static GUI Enhancements:
 	Allows searching, font configuration etc and is more consistent
     - (GUI testing) "run in slow motion replay" checkbox removed. It has been replaced with a spinner for adding a pause after each event and
 	a new check box "Show GUI and record any extra actions".
+    - "Replace Text in Files" action allows now text search/replace in shortcut files. It shows now a new check box, "Replace text in shortcut files"
+	when usecase home exists.
 Dynamic GUI Enhancements:
     - New action "View screenshots"
 	Intended for displaying screenshots created by new StoryText feature.
@@ -2454,4 +2456,5 @@ Bug Fixes:
     - GUI testing-specific menu items are no longer present when not GUI testing
     - Fixed Section Filtering filtered away half a section.
     - Fixed curious GTK error when trying to save test selection
+    - Fixed exception when "search for" text is empty in Replace Text dialog. We show now a warning dialog if empty.
 

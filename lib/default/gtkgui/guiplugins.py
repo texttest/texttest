@@ -1002,16 +1002,15 @@ class ActionDialogGUI(OptionGroupGUI):
             else:
                 self.createOptWidget(vbox, option)
 
-# Disabling this for the moment, see TTT-2485
-#        if fileChooser:
-#            # File choosers seize the focus, mostly we want to get it back and put it on the first text entry
-#            self.set_focus(vbox)
+        if fileChooser:
+            # File choosers seize the focus, mostly we want to get it back and put it on the first text entry
+            self.set_focus(vbox)
         return fileChooser, fileChooserOption
 
     def set_focus(self, vbox):
         for child in vbox.get_children():
-            if isinstance(child, gtk.Container):
-                for gchild in child.get_children():# This may cause indeterministic behavior, see TTT-2485
+            if isinstance(child, gtk.Container) and not isinstance(child, gtk.FileChooser):
+                for gchild in child.get_children():# This may cause indeterministic behavior if called on FileChoosers, see TTT-2485
                     if isinstance(gchild, gtk.Entry):
                         gchild.get_toplevel().connect("map", lambda x: gchild.grab_focus())
                         return

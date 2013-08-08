@@ -117,17 +117,18 @@ class Activator(plugins.Responder, plugins.Observable):
     
     def writeErrors(self, rejectionInfo):
         # Don't write errors if only some of a group are rejected
-        extras = []
+        appsByName = OrderedDict()
         rejectedApps = set(rejectionInfo.keys())
         for suite in self.suites:
             app = suite.app
-            if app in extras:
-                continue
-            extras += app.extras
-            appGroup = set([ app ] + app.extras)
-            if appGroup.issubset(rejectedApps):
-                sys.stderr.write(app.rejectionMessage(rejectionInfo.get(app)))
-
+            appsByName.setdefault(app.name, []).append(app)
+            
+        for _, appGroup in appsByName.items():
+            if set(appGroup).issubset(rejectedApps):
+                for app in appGroup:
+                    if app in rejectionInfo:
+                        sys.stderr.write(app.rejectionMessage(rejectionInfo.get(app)))
+                        
     def includeShortcuts(self):
         script = self.optionMap.runScript()
         if not script:

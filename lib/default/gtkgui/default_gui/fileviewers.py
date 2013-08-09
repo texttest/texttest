@@ -229,9 +229,9 @@ class ViewConfigFileInEditor(ViewInEditor):
 
     def addSuites(self, suites):
         self.rootTestSuites += suites
-
+        
     def isActiveOnCurrent(self, *args):
-        return False # only way to get at it is via the activation below...
+        return len(self.currFileSelection) > 0
 
     def notifyViewApplicationFile(self, fileName, apps, *args):
         self.currFileSelection = [ (fileName, apps) ]
@@ -243,6 +243,9 @@ class ViewConfigFileInEditor(ViewInEditor):
 
     def findExitHandlerInfo(self, dummy, apps):
         return self.configFileChanged, (apps,)
+    
+    def getSignalsSent(self):
+        return [ "ReloadConfig" ]
 
     def configFileChanged(self, apps):
         for app in apps:
@@ -250,6 +253,8 @@ class ViewConfigFileInEditor(ViewInEditor):
             suite = self.findSuite(app)
             suite.refreshFilesRecursively()
 
+        # May have affected e.g. imported files, script references etc
+        self.notify("ReloadConfig")
         self.editingComplete()
 
     def findSuite(self, app):

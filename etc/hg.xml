@@ -67,4 +67,13 @@
     </menu>
   </popup>
 
+  <popup name="ConfigFilePopupMenu">
+    <menu name="VCS File Popup Menu" action="Mercurialmenu">
+      <menuitem action="Mercurial Log"/>
+      <menuitem action="Mercurial Difference"/>
+      <menuitem action="Mercurial Status"/>
+      <menuitem action="Mercurial Annotate"/>
+      <menuitem action="Mercurial Add"/>
+    </menu>
+  </popup>
 </ui>

@@ -180,7 +180,7 @@ class ToolBarGUI(guiutils.ContainerGUI):
         return self.widget
 
 def createPopupGUIs(uiManager):
-    return PopupMenuGUI("TestPopupMenu", uiManager), PopupMenuGUI("TestFilePopupMenu", uiManager)
+    return PopupMenuGUI("TestPopupMenu", uiManager), PopupMenuGUI("TestFilePopupMenu", uiManager), PopupMenuGUI("ConfigFilePopupMenu", uiManager)
 
 class PopupMenuGUI(guiutils.SubGUI):
     def __init__(self, name, uiManager):

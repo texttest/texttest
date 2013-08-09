@@ -169,6 +169,8 @@ button-press-event = view actions for file
 
 [Name=Application File Tree]
 row-activated = select application file
+changed.selection = set config file selection to
+button-press-event = view actions for config file
 
 [Name=Tests for version]
 changed = enter tests for version =
@@ -1040,4 +1042,7 @@ activate = view screenshots
 
 [Label=Replace text in shortcut files]
 toggled.true = include shortcut files
+
+[Name=VCS File Popup Menu]
+activate = show vcs popup menu
 

@@ -175,7 +175,7 @@ class CopyPathToClipboard(guiplugins.ActionGUI):
 
     def performOnCurrent(self):
         fileName, comp = self.currFileSelection[0]
-        if comp:
+        if comp and hasattr(comp, "tmpFile"):
             fileName = comp.tmpFile
         # Copy to both, for good measure, avoid problems with e.g. Exceed configuration
         for clipboard in [ gtk.clipboard_get(), gtk.clipboard_get("PRIMARY") ]:

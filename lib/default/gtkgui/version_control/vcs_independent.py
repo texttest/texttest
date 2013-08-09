@@ -268,10 +268,10 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         if not self.dynamic: # See bugzilla 17653
             self.currFileSelection = []
         return newActive
-    def notifyNewFileSelection(self, files):
-        self.updateFileSelection(files)
+    
     def isActiveOnCurrent(self, *args):
-        return len(self.currTestSelection) > 0 
+        return len(self.currTestSelection) > 0 or len(self.currFileSelection) > 0
+    
     def messageAfterPerform(self):
         return "Performed " + self.getTooltip() + "."
     def getResultDialogTwoColumnsInTreeView(self):
@@ -284,35 +284,38 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         file = self.getSelectedFile()
         self.diag.info("Viewing status on file " + file)
         status = StatusGUI()
-        status.notifyTopWindow(self.topWindow)
-        status.currTestSelection = [ self.fileToTest[file] ]
-        status.currFileSelection = [ (file, None) ]
-        status.performOnCurrent()
+        self.runWithSelections(status, file)
+        
+    def getFileApps(self, file):
+        if len(self.currFileSelection) == 0:
+            return []
+        for f, apps in self.currFileSelection:
+            if f == file:
+                return apps
+        return self.currFileSelection[0][1]
+        
+    def runWithSelections(self, gui, file):
+        gui.notifyTopWindow(self.topWindow)
+        test = self.fileToTest[file]
+        gui.currTestSelection = [ test ] if test else []
+        gui.currFileSelection = [ (file, self.getFileApps(file)) ]
+        gui.performOnCurrent()
 
     def viewLog(self, button):
         file = self.getSelectedFile()
         logger = LogGUI(self.validApps, self.dynamic)
-        logger.topWindow = self.topWindow
-        logger.currTestSelection = [ self.fileToTest[file] ]
-        logger.currFileSelection = [ (file, None) ]
-        logger.performOnCurrent()
+        self.runWithSelections(logger, file)
 
     def viewAnnotations(self, button):
         file = self.getSelectedFile()
         annotater = annotateClass()
-        annotater.topWindow = self.topWindow
-        annotater.currTestSelection = [ self.fileToTest[file] ]
-        annotater.currFileSelection = [ (file, None) ]
-        annotater.performOnCurrent()
+        self.runWithSelections(annotater, file)
 
     def viewDiffs(self, button):
         file = self.getSelectedFile()
         differ = DiffGUI()
-        differ.topWindow = self.topWindow
         differ.setRevisions(self.revision1.get_text(), self.revision2.get_text())
-        differ.currTestSelection = [ self.fileToTest[file] ]
-        differ.currFileSelection = [ (file, None) ]
-        differ.performOnCurrent()
+        self.runWithSelections(differ, file)
 
     def viewGraphicalDiff(self, button):
         path = self.filteredTreeModel.get_value(self.treeView.get_selection().get_selected()[1], 3)
@@ -335,12 +338,16 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         self.applicationEvent("the version-control graphical diff program to terminate")
                                 
     def getRootPath(self):
-        appPath = self.currTestSelection[0].app.getDirectory()
+        if len(self.currTestSelection) > 0:
+            app = self.currTestSelection[0].app
+        else:
+            app = self.currFileSelection[0][1][0]
+        appPath = app.getDirectory()
         return os.path.split(appPath.rstrip(os.sep))[0]
     
     def getFilesForCmd(self):
         if len(self.currTestSelection) == 0:
-            return []
+            return [ (None, f) for (f, _) in self.currFileSelection ]
         elif len(self.currFileSelection) > 0:
             return [ (self.currTestSelection[0], f) for (f, comp) in self.currFileSelection ]
         else:
@@ -495,9 +502,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
                                        gobject.TYPE_BOOLEAN)
         self.filteredTreeModel = self.treeModel.filter_new()
         self.filteredTreeModel.set_visible_column(4)
-        if len(self.currTestSelection) > 0:
-            rootDir = self.getRootPath()
-        
+        rootDir = self.getRootPath()
         fileToIter = {}
         for fileName, content, info in self.pages:
             label = plugins.relpath(fileName, rootDir)

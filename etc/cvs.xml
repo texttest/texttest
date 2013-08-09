@@ -70,4 +70,15 @@
     </menu>
   </popup>
 
+  <popup name="ConfigFilePopupMenu">
+    <menu name="VCS File Popup Menu" action="CVSmenu">
+      <menuitem action="CVS Log"/>
+      <menuitem action="CVS Log Latest"/>
+      <menuitem action="CVS Difference"/>
+      <menuitem action="CVS Status"/>
+      <menuitem action="CVS Annotate"/>
+      <menuitem action="CVS Add"/>
+    </menu>
+  </popup>
+
 </ui>

@@ -113,7 +113,6 @@ class GUIController(plugins.Responder, plugins.Observable):
             allApps.append(newApp)
 
         self.statusMonitor = statusviews.StatusMonitorGUI(initialStatus)
-        self.appFileGUI = filetrees.ApplicationFileGUI(self.dynamic, allApps)
         self.textInfoGUI = textinfo.TextInfoGUI(self.dynamic)
         runName = optionMap.get("name", "").replace("<time>", plugins.startTimeString())
         reconnect = optionMap.has_key("reconnect")
@@ -124,10 +123,11 @@ class GUIController(plugins.Responder, plugins.Observable):
         self.idleManager = IdleHandlerManager()
         uiManager = gtk.UIManager()
         self.defaultActionGUIs, self.actionTabGUIs = self.interactiveActionHandler.getPluginGUIs(uiManager)
-        self.menuBarGUI, self.toolBarGUI, testPopupGUI, testFilePopupGUI = self.createMenuAndToolBarGUIs(uiManager, includeSite, includePersonal)
+        self.menuBarGUI, self.toolBarGUI, testPopupGUI, testFilePopupGUI, appFilePopupGUI = self.createMenuAndToolBarGUIs(uiManager, includeSite, includePersonal)
         self.testColumnGUI = testtree.TestColumnGUI(self.dynamic, testCount)
         self.testTreeGUI = testtree.TestTreeGUI(self.dynamic, allApps, testPopupGUI, self.testColumnGUI)
         self.testFileGUI = filetrees.TestFileGUI(self.dynamic, testFilePopupGUI)
+        self.appFileGUI = filetrees.ApplicationFileGUI(self.dynamic, allApps, appFilePopupGUI)
         self.rightWindowGUI = self.createRightWindowGUI()
         
         self.topWindowGUI = self.createTopWindowGUI(allApps, runName)
@@ -175,7 +175,7 @@ class GUIController(plugins.Responder, plugins.Observable):
                  filter(lambda obs: hasattr(obs, "notifyAllComplete"), self.defaultActionGUIs)
 
     def getActionObservers(self):
-        return [ self.progressMonitor, self.testTreeGUI, self.testFileGUI, self.statusMonitor,
+        return [ self.progressMonitor, self.testTreeGUI, self.testFileGUI, self.appFileGUI, self.statusMonitor,
                  self.runInfoGUI, self.idleManager, self.topWindowGUI ]
 
     def getFileViewObservers(self):
@@ -278,8 +278,8 @@ class GUIController(plugins.Responder, plugins.Observable):
         menuNames = self.interactiveActionHandler.getMenuNames()
         menu = actionholders.MenuBarGUI(self.dynamic, uiManager, self.allActionGUIs(), menuNames, *args)
         toolbar = actionholders.ToolBarGUI(uiManager, self.progressBarGUI)
-        testPopup, testFilePopup = actionholders.createPopupGUIs(uiManager)
-        return menu, toolbar, testPopup, testFilePopup
+        testPopup, testFilePopup, appFilePopup = actionholders.createPopupGUIs(uiManager)
+        return menu, toolbar, testPopup, testFilePopup, appFilePopup
 
     def createRightWindowGUI(self):
         testTab = PaneGUI(self.testFileGUI, self.textInfoGUI, horizontal=False)

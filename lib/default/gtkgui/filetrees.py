@@ -100,12 +100,16 @@ class FileViewGUI(guiutils.SubGUI):
         view.connect("row_activated", self.fileActivated)
         
         if self.popupGUI:
-            view.connect("button_press_event", self.popupGUI.showMenu)
+            view.connect("button_press_event", self.buttonPressed)
             self.popupGUI.createView()
 
         view.show()
         return self.addScrollBars(view, hpolicy=gtk.POLICY_NEVER)
         # only used in test view
+        
+    def buttonPressed(self, *args):
+        self.selectionChanged(self.selection)
+        self.popupGUI.showMenu(*args)
 
     def renderParentsBold(self, dummyColumn, cell, model, iter):
         if model.iter_has_child(iter):
@@ -141,18 +145,6 @@ class FileViewGUI(guiutils.SubGUI):
         comparison = self.model.get_value(iter, 3)
         self.notify(self.getViewFileSignal(), fileName, comparison, False)
 
-    def notifyViewerStarted(self):
-        if self.dynamic:
-            self.selection.unselect_all() # Mostly so viewing files doesn't cause only them to be saved
-        self.applicationEvent("the viewer process to start", timeDelay=1)
-
-    def notifyNewFile(self, fileName, overwrittenExisting):
-        if os.path.isfile(fileName):
-            self.notify(self.getViewFileSignal(), fileName, None, True)
-        if not overwrittenExisting or os.path.isdir(fileName):
-            self.currentTest.refreshFiles()
-            self.recreateModel(self.getState(), preserveSelection=True)
-
     def addFileToModel(self, iter, fileName, colour, associatedObject=None, details=""):
         baseName = os.path.basename(fileName)
         row = [ baseName, colour, fileName, associatedObject, details, "" ]
@@ -172,11 +164,51 @@ class FileViewGUI(guiutils.SubGUI):
                 dirIters[file] = newiter
         return dirIters
 
+    def monitorEvents(self):
+        self.selectionChanged(self.selection)
+        self.selection.connect("changed", self.selectionChanged)
+
+    def selectionChanged(self, selection):
+        filelist = []
+        def fileSelected(dummyModel, dummyPath, iter):
+            # Do not include the top level which are just headers that don't currently correspond to files
+            if self.model.iter_parent(iter) is not None:
+                filePath = self.model.get_value(iter, 2)
+                if filePath:
+                    filelist.append((filePath, self.model.get_value(iter, 3)))
+
+        selection.selected_foreach(fileSelected)
+        self.notify("NewFileSelection", filelist)
+        if not self.dynamic:
+            if selection.count_selected_rows() == 1:
+                paths = selection.get_selected_rows()[1]
+                selectedIter = self.model.get_iter(paths[0])
+                dirName = self.getDirectory(selectedIter)
+                fileType = self.getFileType(selectedIter)
+                self.notify("FileCreationInfo", dirName, fileType)
+            else:
+                self.notify("FileCreationInfo", None, None)
+
+    def getFileType(self, iter):
+        parent = self.model.iter_parent(iter)
+        if parent is not None:
+            return self.getFileType(parent)
+        else:
+            name = self.model.get_value(iter, 0)
+            return name.split()[0].lower()
+
+    def getDirectory(self, iter):
+        fileName = self.model.get_value(iter, 2)
+        if fileName:
+            if os.path.isdir(fileName):
+                return fileName
+            else:
+                return os.path.dirname(fileName)
 
 
 class ApplicationFileGUI(FileViewGUI):
-    def __init__(self, dynamic, allApps):
-        FileViewGUI.__init__(self, dynamic, "Configuration Files")
+    def __init__(self, dynamic, allApps, popupGUI):
+        FileViewGUI.__init__(self, dynamic, "Configuration Files", popupGUI)
         self.allApps = copy(allApps)
         self.extras = reduce(operator.add, (app.extras for app in allApps), [])
         self.storytextDirs = {}
@@ -193,10 +225,13 @@ class ApplicationFileGUI(FileViewGUI):
     
     def getWidgetName(self):
         return "Application File Tree"
-    
-    def monitorEvents(self):
-        pass
 
+    def notifyReloadConfig(self):
+        for appName, scriptArgs in self.testScripts.items():
+            nonexistent = filter(lambda s: not os.path.isfile(s), scriptArgs)
+            for scriptArg in nonexistent:
+                scriptArgs.remove(scriptArg)
+        self.recreateModel(None, preserveSelection=True)
 
     def getScriptArgs(self, suite):
         scriptArgs = set()
@@ -206,7 +241,9 @@ class ApplicationFileGUI(FileViewGUI):
         for scriptCmd in scriptCmds:
             for rawScriptArg in scriptCmd.split():
                 if "TEXTTEST_ROOT" in rawScriptArg:
-                    scriptArgs.add(string.Template(rawScriptArg).safe_substitute(suite.environment))
+                    scriptArg = string.Template(rawScriptArg).safe_substitute(suite.environment)
+                    if os.path.isfile(scriptArg):
+                        scriptArgs.add(scriptArg)
         return scriptArgs
 
     def addSuites(self, suites):
@@ -313,7 +350,8 @@ class ApplicationFileGUI(FileViewGUI):
                     file = line.split(":")[1].strip()
                     if app:
                         file = app.configPath(file)
-                    imports.append(file)
+                    if os.path.isfile(file):
+                        imports.append(file)
                 except Exception: # App. file not found ...
                     continue
         return imports
@@ -403,6 +441,18 @@ class TestFileGUI(FileViewGUI):
                 self.selection.unselect_iter(iter)
                 
         self.model.foreach(trySelect)
+        
+    def notifyViewerStarted(self):
+        if self.dynamic:
+            self.selection.unselect_all() # Mostly so viewing files doesn't cause only them to be saved
+        self.applicationEvent("the viewer process to start", timeDelay=1)
+
+    def notifyNewFile(self, fileName, overwrittenExisting):
+        if os.path.isfile(fileName):
+            self.notify(self.getViewFileSignal(), fileName, None, True)
+        if not overwrittenExisting or os.path.isdir(fileName):
+            self.currentTest.refreshFiles()
+            self.recreateModel(self.getState(), preserveSelection=True)
 
     def setName(self, tests, rowCount):
         newTitle = self.getName(tests, rowCount)
@@ -439,47 +489,6 @@ class TestFileGUI(FileViewGUI):
                 self.addTmpFilesToModel(realState)
         else:
             self.addStaticFilesToModel(realState)
-
-    def monitorEvents(self):
-        self.selectionChanged(self.selection)
-        self.selection.connect("changed", self.selectionChanged)
-
-    def selectionChanged(self, selection):
-        filelist = []
-        def fileSelected(dummyModel, dummyPath, iter):
-            # Do not include the top level which are just headers that don't currently correspond to files
-            if self.model.iter_parent(iter) is not None:
-                filePath = self.model.get_value(iter, 2)
-                if filePath:
-                    filelist.append((filePath, self.model.get_value(iter, 3)))
-
-        selection.selected_foreach(fileSelected)
-        self.notify("NewFileSelection", filelist)
-        if not self.dynamic:
-            if selection.count_selected_rows() == 1:
-                paths = selection.get_selected_rows()[1]
-                selectedIter = self.model.get_iter(paths[0])
-                dirName = self.getDirectory(selectedIter)
-                fileType = self.getFileType(selectedIter)
-                self.notify("FileCreationInfo", dirName, fileType)
-            else:
-                self.notify("FileCreationInfo", None, None)
-
-    def getDirectory(self, iter):
-        fileName = self.model.get_value(iter, 2)
-        if fileName:
-            if os.path.isdir(fileName):
-                return fileName
-            else:
-                return os.path.dirname(fileName)
-
-    def getFileType(self, iter):
-        parent = self.model.iter_parent(iter)
-        if parent is not None:
-            return self.getFileType(parent)
-        else:
-            name = self.model.get_value(iter, 0)
-            return name.split()[0].lower()
 
     def getState(self):
         if self.currentTest:

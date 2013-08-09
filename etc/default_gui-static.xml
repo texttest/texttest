@@ -88,4 +88,15 @@
     <separator/>
   </popup>
 
+  <popup name="ConfigFilePopupMenu">
+    <menuitem action="View In Editor"/>
+    <menuitem action="File Properties"/>
+    <menuitem action="Copy Path To Clipboard"/>
+    <separator/>
+    <menuitem action="Rename File"/>
+    <menuitem action="Remove Files"/>
+    <separator/>
+  </popup>
+
+
 </ui>

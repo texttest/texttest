@@ -1454,6 +1454,9 @@ class Application:
 
     def getDirectory(self):
         return self.dircache.dir
+    
+    def refreshFiles(self):
+        self.dircache.refresh()
 
     def getRootDirectory(self):
         for rootDir in self.inputOptions.rootDirectories:

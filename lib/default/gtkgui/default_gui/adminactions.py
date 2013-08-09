@@ -1064,9 +1064,15 @@ class RemoveFiles(guiplugins.ActionGUI):
         
     def getConfirmationMessage(self):
         extraLines = "\n\nNote: " + self.getFileRemoveWarning() + "\n\nAre you sure you wish to proceed?\n"""
-        currTest = self.currTestSelection[0]
+        test = self.getFirstTest()
         return "\nYou are about to remove " + plugins.pluralise(len(self.currFileSelection), self.getType(self.currFileSelection[0][0])) + \
-                   " from the " + currTest.classDescription() + " '" + currTest.name + "'." + extraLines
+                   self.getTestSuffix(test) + "." + extraLines
+
+    def inConfigTab(self):
+        return isinstance(self.currFileSelection[0][1], list)
+
+    def getTestSuffix(self, test):
+        return " from the " + test.classDescription() + " '" + test.name + "'" if test else ""
 
     @staticmethod
     def removePath(dir):
@@ -1078,8 +1084,11 @@ class RemoveFiles(guiplugins.ActionGUI):
         else:
             return "file"
 
+    def getFirstTest(self):
+        return self.currTestSelection[0] if not self.inConfigTab() else None
+
     def performOnCurrent(self):
-        test = self.currTestSelection[0]
+        test = self.getFirstTest()
         removed = 0
         for filePath, _ in self.currFileSelection:
             fileType = self.getType(filePath)
@@ -1089,9 +1098,24 @@ class RemoveFiles(guiplugins.ActionGUI):
             if plugins.tryFileChange(self.removePath, permMessage, filePath):
                 removed += 1
 
-        test.filesChanged()
-        self.notify("Status", "Removed " + plugins.pluralise(removed, fileType) + " from the " +
-                    test.classDescription() + " " + test.name + "")
+        if test:
+            test.filesChanged()
+        else:
+            self.appFilesChanged()
+        self.notify("Status", "Removed " + plugins.pluralise(removed, fileType) + self.getTestSuffix(test))
+        
+    def getSignalsSent(self):
+        return [ "ReloadConfig" ]
+
+    def appFilesChanged(self):
+        appsSeen = set()
+        for _, apps in self.currFileSelection:
+            for app in apps:
+                if app not in appsSeen:
+                    appsSeen.add(app)
+                    app.refreshFiles()
+                    
+        self.notify("ReloadConfig")
 
     def messageAfterPerform(self):
         pass # do it as part of the method, uses lots of local data
@@ -1306,6 +1330,7 @@ class RenameFile(RenameAction):
         RenameAction.__init__(self, *args)
         self.addOption("name", "\nNew name for file")
         self.oldName = ""
+        self.configAppList = []
 
     def notifyFileCreationInfo(self, creationDir, fileType):
         canRename = fileType != "external" and \
@@ -1321,8 +1346,13 @@ class RenameFile(RenameAction):
 
     def updateOptions(self):
         self.oldName = os.path.basename(self.currFileSelection[0][0])
+        associatedObj = self.currFileSelection[0][1]
+        self.configAppList = associatedObj if isinstance(associatedObj, list) else []
         self.optionGroup.setOptionValue("name", self.oldName)
         return True
+    
+    def getSignalsSent(self):
+        return [ "ReloadConfig" ]
 
     def _getStockId(self):
         return "italic"
@@ -1352,18 +1382,28 @@ class RenameFile(RenameAction):
         oldStem = self.oldName.split(".")[0]
         newName = self.optionGroup.getOptionValue("name")
         newStem = newName.split(".")[0]
-        if self.currTestSelection[0].isDefinitionFileStem(oldStem) and \
-               not self.currTestSelection[0].isDefinitionFileStem(newStem):
+        if self.isDefinitionFileStem(oldStem) and not self.isDefinitionFileStem(newStem):
             return "You are trying to rename a definition file in such a way that it will no longer fulfil its previous purpose.\nTextTest uses conventional names for files with certain purposes and '" + oldStem + "' is one such conventional name.\nAre you sure you want to continue?"
         else:
             return ""
+
+    def isDefinitionFileStem(self, stem):
+        if self.configAppList:
+            return stem == "config"
+        else:
+            return self.currTestSelection[0].isDefinitionFileStem(stem)
 
     def performRename(self, newName):
         oldPath = self.currFileSelection[0][0]
         newPath = os.path.join(os.path.dirname(oldPath), newName)
         self.checkNewName(newName, newPath)
         self.movePath(oldPath, newPath)
-        self.currTestSelection[0].filesChanged()
+        if self.configAppList:
+            for app in self.configAppList:
+                app.refreshFiles()
+            self.notify("ReloadConfig")
+        else:
+            self.currTestSelection[0].filesChanged()
         changeMessage = self.getNameChangeMessage(newName)
         self.oldName = newName
         self.notify("Status", changeMessage)

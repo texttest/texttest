@@ -67,4 +67,14 @@
     </menu>
   </popup>
 
+  <popup name="ConfigFilePopupMenu">
+    <menu name="VCS File Popup Menu" action="Bazaarmenu">
+      <menuitem action="Bazaar Log"/>
+      <menuitem action="Bazaar Difference"/>
+      <menuitem action="Bazaar Status"/>
+      <menuitem action="Bazaar Annotate"/>
+      <menuitem action="Bazaar Add"/>
+    </menu>
+  </popup>
+
 </ui>

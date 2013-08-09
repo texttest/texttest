@@ -11,8 +11,10 @@ class BzrInterface(vcs_independent.VersionControlInterface):
 
     def isVersionControlled(self, dirname):
         args = self.getCmdArgs("status") + [ dirname ]
-        output = self.getProcessResults(args)[1]
+        returncode, output, err = self.getProcessResults(args)
         # Unless the result is "unknown:" followed by the relpath of the dirname, it's version controlled, at least a bit...
+        if returncode and err:
+            return False
         lines = output.splitlines()
         if len(lines) != 2:
             return True

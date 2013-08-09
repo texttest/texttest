@@ -451,14 +451,19 @@ class TestTable:
             table.append(HTMLgen.BR())
             return table
         
-    def findJenkinsChanges(self, prevBuildNumber, buildNumber, cacheDir):
-        cacheFile = os.path.join(cacheDir, buildNumber)
+    def findJenkinsChanges(self, prevTag, tag, cacheDir):
+        buildNumber = self.getJenkinsBuildNumber(tag)
+        cacheFileOldName = os.path.join(cacheDir, buildNumber)
+        cacheFile = os.path.join(cacheDir, tag)
+        if os.path.isfile(cacheFileOldName):
+            os.rename(cacheFileOldName, cacheFile)
         if os.path.isfile(cacheFile):
             return eval(open(cacheFile).read().strip())
         else:
             bugSystemData = self.getConfigValue("bug_system_location", allSubKeys=True)
             markedArtefacts = self.getConfigValue("batch_jenkins_marked_artefacts")
             fileFinder = self.getConfigValue("batch_jenkins_archive_file_pattern")
+            prevBuildNumber = self.getJenkinsBuildNumber(prevTag)
             if buildNumber.isdigit() and prevBuildNumber is not None:
                 allChanges = jenkinschanges.getChanges(prevBuildNumber, buildNumber, bugSystemData, markedArtefacts, fileFinder, cacheDir)
                 plugins.ensureDirectoryExists(cacheDir)
@@ -476,10 +481,9 @@ class TestTable:
         bgColour = self.colourFinder.find("changes_header_bg")
         row = [ HTMLgen.TD("Changes", bgcolor = bgColour) ]
         hasData = False
-        prevBuildNumber = None
+        prevTag = None
         for tag in self.tags:
-            buildNumber = self.getJenkinsBuildNumber(tag)
-            allChanges = self.findJenkinsChanges(prevBuildNumber, buildNumber, cacheDir)
+            allChanges = self.findJenkinsChanges(prevTag, tag, cacheDir)
             cont = HTMLgen.Container()
             aborted = False
             for i, (authorOrMessage, target, bugs) in enumerate(allChanges):
@@ -495,7 +499,7 @@ class TestTable:
                 hasData = True
             row.append(HTMLgen.TD(cont, bgcolor = bgColour))
             if not aborted:
-                prevBuildNumber = buildNumber
+                prevTag = tag
         if hasData:
             return HTMLgen.TR(*row)
             

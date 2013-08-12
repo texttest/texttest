@@ -62,7 +62,10 @@ class Config:
                 group.addOption("cp", "Times to run", 1, minimum=1, description="Set this to some number larger than 1 to run the same test multiple times, for example to try to catch indeterminism in the system under test")
                 if recordsUseCases:
                     group.addOption("delay", "Replay pause (sec)", 0.0, description="How long to wait, in seconds, between replaying each GUI action in the usecase file")
-                    self.addDefaultSwitch(group, "gui", "Show GUI and record any extra actions", description="Disable virtual display usage if any. Replay whatever is in the usecase file and enabled recording when done")
+                    self.addDefaultSwitch(group, "gui", "Show GUI and record any extra actions", 
+                                          description="Disable virtual display usage if any. Replay whatever is in the usecase file and enabled recording when done")
+                    self.addDefaultSwitch(group, "screenshot", "Generate a screenshot after each replayed action", 
+                                          description="The screenshots can be viewed via the 'View Screenshots' action in the test (left panel) context menu")
                 self.addDefaultSwitch(group, "stop", "Stop after first failure")
                 if useCatalogues:
                     self.addDefaultSwitch(group, "ignorecat", "Ignore catalogue file when isolating data", description="Treat test data identified by 'partial_copy_test_path' as if it were in 'copy_test_path', " + 
@@ -114,6 +117,7 @@ class Config:
                     # We may have other apps that do this, don't reject these options
                     group.addOption("delay", "Replay pause (sec)", 0)
                     group.addSwitch("gui", "Show GUI and record any extra actions")
+                    group.addSwitch("screenshot", "Generate a screenshot after each replayed action")
 
                 if not useCatalogues:
                     group.addSwitch("ignorecat", "Ignore catalogue file when isolating data")

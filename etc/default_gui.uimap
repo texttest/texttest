@@ -1046,3 +1046,6 @@ toggled.true = include shortcut files
 [Name=VCS File Popup Menu]
 activate = show vcs popup menu
 
+[Label=Generate a screenshot after each replayed action]
+toggled.true = choose option to generate screenshots
+

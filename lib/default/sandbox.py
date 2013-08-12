@@ -479,6 +479,10 @@ class TestEnvironmentCreator:
             delay = self.optionMap.get("delay", 0)
             if delay > 0:
                 vars.append(self.getReplayDelayVariable(delay))
+                
+            screenshot = self.optionMap.has_key("screenshot")
+            if screenshot:
+                vars.append(("USECASE_REPLAY_SCREENSHOTS", "1")) # Whether to take screenshots between each action in GUI tests
         if usecaseFile or self.isRecording():
             # Re-record if recorded files are already present or recording explicitly requested
             vars.append(self.getRecordScriptVariable(self.test.makeTmpFileName("usecase")))

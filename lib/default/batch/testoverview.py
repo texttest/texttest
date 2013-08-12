@@ -828,11 +828,11 @@ class CategoryHandler:
         return numTests, summaryData
     
     def getTestsWithDescriptions(self):
-        return [ (getCategoryDescription(cat)[1], testInfo) for cat, testInfo in self.testsInCategory.items() ]
+        return sorted([ (getCategoryDescription(cat)[1], testInfo) for cat, testInfo in self.testsInCategory.items() ])
 
     def getSummarySortKey(self, data):
         # Put success at the start, it's neater like that
-        return data[0] != "success", -data[1]
+        return data[0] != "success", -data[1], data[0]
                           
 
 def getCategoryDescription(cat):

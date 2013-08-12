@@ -2412,12 +2412,14 @@ Version trunk
 Static GUI Enhancements:
     - "Test Filtering" action now displays results in the normal text editor (default entry in "view_program")
 	Allows searching, font configuration etc and is more consistent
+    - Config tab now has a context menu
+	Many viewing actions, including version control ones, can now be carried out there.
     - (GUI testing) "run in slow motion replay" checkbox removed. It has been replaced with a spinner for adding a pause after each event and
 	a new check box "Show GUI and record any extra actions".
     - "Replace Text in Files" action allows now text search/replace in shortcut files. It shows now a new check box, "Replace text in shortcut files"
 	when usecase home exists.
 Dynamic GUI Enhancements:
-    - New action "View screenshots"
+    - New action "View screenshots" and new checkbox enabling screenshot generation in Running tab
 	Intended for displaying screenshots created by new StoryText feature.
 Framework Enhancements:
     - GUI shortcut renaming is now detected and a "Replace Text in Files" run triggered if desired, to update them.
@@ -2434,6 +2436,8 @@ Batch Report Enhancements:
     - Jenkins changes "marked artefacts" now variable per batch session
 	(Separate name from artefact name is also removed)
     - Now find Jenkins timestamps for runs, show them as tooltips in the HTML report
+    - Jenkins cache files now include the date in their name as well as build number
+	Saves trouble if the job gets moved to a different Jenkins server for example
 Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
     - Default_queue setting should also apply to the proxy job
 Bug Fixes:
@@ -2457,4 +2461,4 @@ Bug Fixes:
     - Fixed Section Filtering filtered away half a section.
     - Fixed curious GTK error when trying to save test selection
     - Fixed exception when "search for" text is empty in Replace Text dialog. We show now a warning dialog if empty.
-
+    - Fixed spurious warning when one extra version has no tests and all tests are selected via the root suite and then run.

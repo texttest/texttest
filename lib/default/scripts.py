@@ -3,6 +3,7 @@
 
 import plugins, sandbox, operator, os, shutil, sys
 from ordereddict import OrderedDict
+from ConfigParser import RawConfigParser
                     
 class CountTest(plugins.Action):
     scriptDoc = "report on the number of tests selected, by application"
@@ -388,3 +389,77 @@ class InsertShortcuts(plugins.ScriptWithArgs):
 
     def usesComparator(self):
         return True
+
+class FilterUIMapFile(plugins.ScriptWithArgs):
+    scriptDoc = "Edit the UI map to remove all unused entries, list the unused shortcuts (GUI testing)"
+    instancesByFile = OrderedDict()
+    def __init__(self):
+        self.uiMapFileHandler = None
+        self.uiMapFileUsed = {}
+        from storytext.replayer import ShortcutManager
+        self.shortcutManager = ShortcutManager()
+        self.shortcutsUsed = set()
+        
+    def __repr__(self):
+        return "Filtering UI map file for"
+
+    def __call__(self, test):
+        storytextHome = test.getEnvironment("STORYTEXT_HOME")
+        uiMapFile = os.path.join(storytextHome, "ui_map.conf")
+        self.instancesByFile[uiMapFile].filterUseCaseCommands(test)
+        
+    def storeUsage(self, script):
+        for command in script.commands:
+            shortcut, _ = self.shortcutManager.findShortcut(command)
+            if shortcut:
+                self.shortcutsUsed.add(shortcut)
+            else:
+                for section, option in self.uiMapFileHandler.findSectionsAndOptions(command):
+                    self.uiMapFileUsed.setdefault(section, []).append(option)
+
+    def filterUseCaseCommands(self, test):
+        stdFiles = test.getFileNamesMatching("*usecase*")
+        from storytext.replayer import ReplayScript
+        for stdFile in sorted(stdFiles):
+            fileName = os.path.basename(stdFile)
+            self.describe(test, " - file " + fileName)
+            script = ReplayScript(stdFile, ignoreComments=True)
+            self.storeUsage(script)
+
+    def setUpSuite(self, suite):
+        if suite.parent is None:
+            storytextHome = suite.getEnvironment("STORYTEXT_HOME")
+            uiMapFile = os.path.join(storytextHome, "ui_map.conf")
+            if not uiMapFile in self.instancesByFile:
+                self.instancesByFile[uiMapFile] = self
+                from storytext.guishared import UIMapFileHandler
+                from storytext.scriptengine import ScriptEngine
+                self.uiMapFileHandler = UIMapFileHandler([ uiMapFile ])
+                for shortcut in ScriptEngine.getShortcuts(storytextHome):
+                    self.shortcutManager.add(shortcut)
+        else:
+            self.describe(suite)
+   
+    @classmethod     
+    def finalise(cls):
+        for uiMapFile, instance in cls.instancesByFile.items():
+            instance.writeResults(uiMapFile)
+
+    def writeResults(self, uiMapFile):
+        for name, shortcut in self.shortcutManager.getShortcuts():
+            if shortcut in self.shortcutsUsed:
+                self.storeUsage(shortcut)
+            else:
+                print "Shortcut not used", shortcut.name
+
+        writeParser = RawConfigParser(dict_type=OrderedDict)
+        writeParser.optionxform = str
+        for section in self.uiMapFileHandler.sections():
+            usedActions = self.uiMapFileUsed.get(section, [])
+            entriesToAdd = filter(lambda (action, event): action in usedActions or len(event.strip()) == 0, self.uiMapFileHandler.items(section))
+            if entriesToAdd:
+                writeParser.add_section(section)
+                for actionName, eventName in entriesToAdd:
+                    writeParser.set(section, actionName, eventName)
+        print "Updating UI map file..."
+        writeParser.write(open(uiMapFile, "w"))

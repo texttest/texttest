@@ -430,18 +430,18 @@ class SaveState(plugins.Responder):
             self.repositories[suite.app] = os.path.abspath(testStateRepository)
 
 
-class ArchiveRepository(plugins.ScriptWithArgs):
-    scriptDoc = "Archive parts of the batch result repository to a history directory"
-    def __init__(self, args):
-        argDict = self.parseArguments(args, [ "before", "after", "weekday_pages_before" ])
+class ArchiveScript(plugins.ScriptWithArgs):
+    def __init__(self, argDict):
         self.descriptors = []
-        self.weekdayBeforeDate = self.parseDate(argDict, "weekday_pages_before")
         self.beforeDate = self.parseDate(argDict, "before")
         self.afterDate = self.parseDate(argDict, "after")
         self.descriptors.sort()
         self.repository = None
         if not self.beforeDate and not self.afterDate:
             raise plugins.TextTestError, "Cannot archive the entire repository - give cutoff dates!"
+        
+    def getCutoffParameters(self):
+        return [ "before", "after" ]
 
     def parseDate(self, dict, key):
         if not dict.has_key(key):
@@ -450,41 +450,48 @@ class ArchiveRepository(plugins.ScriptWithArgs):
         self.descriptors.append(key + " " + val)
         return self.dateInSeconds(val)
 
-    def dateInSeconds(self, val):
-        return time.mktime(time.strptime(val, "%d%b%Y"))
-    
-    def setUpSuite(self, suite):
-        if suite.parent is None:
-            repository = getBatchRepository(suite)
-            self.repository = os.path.join(repository, suite.app.name)
-            if not os.path.isdir(self.repository):
-                raise plugins.TextTestError, "Batch result repository " + self.repository + " does not exist"
-            weekdayNameLists = suite.getConfigValue("historical_report_subpage_weekdays").values()
-            weekdayNames = sum(weekdayNameLists, [])
-            weekdays = map(plugins.weekdays.index, weekdayNames)
-            self.archiveFilesUnder(self.repository, suite.app, weekdays)
-            if os.name == "posix":
-                historyDir = suite.app.name + "_history"
-                fullHistoryDir = os.path.join(repository, historyDir)
-                if os.path.isdir(fullHistoryDir):
-                    tarFileName = historyDir + "_" + "_".join(self.descriptors).replace(" ", "_") + ".tar.gz"
-                    plugins.log.info("Archiving completed for " + self.repository + ", created tarfile at " + tarFileName)
-                    subprocess.call([ "tar", "cfz", tarFileName, historyDir ], cwd=repository)
-                    plugins.rmtree(fullHistoryDir)
+    def getDateFormat(self, val):
+        return "%b%Y" if len(val) == 7 else "%d%b%Y"
 
-    def archiveFilesUnder(self, repository, app, weekdays):
+    def dateInSeconds(self, val):
+        dateFormat = self.getDateFormat(val)
+        return time.mktime(time.strptime(val, dateFormat))
+
+    def makeTarArchive(self, suite, repository):
+        historyDir = suite.app.name + "_history"
+        fullHistoryDir = os.path.join(repository, historyDir)
+        if os.path.isdir(fullHistoryDir):
+            tarFileName = historyDir + "_" + "_".join(self.descriptors).replace(" ", "_") + ".tar.gz"
+            plugins.log.info("Archiving completed for " + self.repository + ", created tarfile at " + tarFileName)
+            subprocess.call(["tar", "cfz", tarFileName, historyDir], cwd=repository)
+            plugins.rmtree(fullHistoryDir)
+            
+    def archiveFiles(self, suite):
+        self.archiveFilesUnder(self.repository, suite.app)
+        
+    def archiveFilesUnder(self, repository, app, *args):
         count = 0
         dirList = os.listdir(repository)
         dirList.sort()
         for file in dirList:
             fullPath = os.path.join(repository, file)
-            if self.shouldArchive(file, weekdays):
+            if self.shouldArchive(file, *args):
                 self.archiveFile(fullPath, app)
                 count += 1
             elif os.path.isdir(fullPath):
-                self.archiveFilesUnder(fullPath, app, weekdays)
+                self.archiveFilesUnder(fullPath, app, *args)
         if count > 0:
             plugins.log.info("Archived " + str(count) + " files dated " + ", ".join(self.descriptors) + " under " + repository.replace(self.repository + os.sep, ""))
+
+    def setUpSuite(self, suite):
+        if suite.parent is None:
+            repository = self.getRepository(suite)
+            self.repository = os.path.join(repository, suite.app.name)
+            if not os.path.isdir(self.repository):
+                raise plugins.TextTestError, "Batch result repository " + self.repository + " does not exist"
+            self.archiveFiles(suite)
+            if os.name == "posix":
+                self.makeTarArchive(suite, repository)
 
     def archiveFile(self, fullPath, app):
         targetPath = self.getTargetPath(fullPath, app.name)
@@ -503,19 +510,66 @@ class ArchiveRepository(plugins.ScriptWithArgs):
         parts.reverse()
         return os.sep.join(parts)
     
-    def shouldArchive(self, file, weekdays):
-        if not file.startswith("teststate"):
-            return False
-        dateStr = file.split("_")[1]
-        timeStruct = time.strptime(dateStr, "%d%b%Y")
-        date = time.mktime(timeStruct)
+    def shouldArchiveWithDate(self, date):
         if self.beforeDate and date >= self.beforeDate:
             return False
         if self.afterDate and date <= self.afterDate:
             return False
-        if self.weekdayBeforeDate and date >= self.weekdayBeforeDate and timeStruct.tm_wday in weekdays:
-            return False
         return True
+
+
+
+class ArchiveRepository(ArchiveScript):
+    scriptDoc = "Archive parts of the batch result repository to a history directory"
+    def __init__(self, args):
+        argDict = self.parseArguments(args, [ "before", "after", "weekday_pages_before" ])
+        ArchiveScript.__init__(self, argDict)
+        self.weekdayBeforeDate = self.parseDate(argDict, "weekday_pages_before")
+        
+    def getRepository(self, suite):
+        return getBatchRepository(suite)
+
+    def getWeekDays(self, suite):
+        weekdayNameLists = suite.getConfigValue("historical_report_subpage_weekdays").values()
+        weekdayNames = sum(weekdayNameLists, [])
+        return map(plugins.weekdays.index, weekdayNames)
+        
+    def archiveFiles(self, suite):
+        weekdays = self.getWeekDays(suite)
+        self.archiveFilesUnder(self.repository, suite.app, weekdays)
+                
+    def shouldArchive(self, file, weekdays):
+        if not file.startswith("teststate"):
+            return False
+        dateStr = file.split("_")[1]
+        timeStruct = time.strptime(dateStr, self.getDateFormat(dateStr))
+        date = time.mktime(timeStruct)
+        return self.shouldArchiveWithDate(date) and (not self.weekdayBeforeDate or date < self.weekdayBeforeDate or timeStruct.tm_wday not in weekdays)
+    
+    
+class ArchiveHTML(ArchiveScript):
+    scriptDoc = "Archive parts of the historical report location to a history directory"
+    def __init__(self, args):
+        argDict = self.parseArguments(args, [ "before", "after" ])
+        ArchiveScript.__init__(self, argDict)
+
+    def getRepository(self, suite):
+        return os.path.expanduser(suite.app.getBatchConfigValue("historical_report_location"))
+    
+    def parseDateFromFile(self, file):
+        for part in reversed(file[:-5].split("_")):
+            if len(part) in [ 7, 9 ]:
+                try:
+                    return self.dateInSeconds(part)
+                except ValueError:
+                    pass
+
+    def shouldArchive(self, file):
+        if not file.endswith(".html"):
+            return False
+        date = self.parseDateFromFile(file)
+        return self.shouldArchiveWithDate(date) if date else False
+
 
 class ArchiveExtractor:
     def __init__(self, dateStr):

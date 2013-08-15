@@ -2429,6 +2429,8 @@ Framework Enhancements:
     - Known bugs "search_file" field now supports wildcards
 	for example "stdout*"
     - New setting "custom_trigger" for known bugs, to allow further configuration of when to trigger (essentially checking the environment)
+    - New script default.FilterUIMapFile
+	for identifying unused entries in UI map files and shortcuts when GUI testing. See website.
 Batch Report Enhancements:
     - Index page now notes which run the information there is based on
     - Jenkins changes feature now find indirect dependencies where appropriate
@@ -2438,6 +2440,10 @@ Batch Report Enhancements:
     - Now find Jenkins timestamps for runs, show them as tooltips in the HTML report
     - Jenkins cache files now include the date in their name as well as build number
 	Saves trouble if the job gets moved to a different Jenkins server for example
+    - batch.ArchiveRepository can give a different cutoff date for weekday-specific pages
+	New argument "weekday_pages_before". See website
+    - New script batch.ArchiveHTML
+	Works like ArchiveRepository, but on historical_report_location. See webpage.
 Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
     - Default_queue setting should also apply to the proxy job
 Bug Fixes:
@@ -2462,3 +2468,5 @@ Bug Fixes:
     - Fixed curious GTK error when trying to save test selection
     - Fixed exception when "search for" text is empty in Replace Text dialog. We show now a warning dialog if empty.
     - Fixed spurious warning when one extra version has no tests and all tests are selected via the root suite and then run.
+    - Only recreate relevant index pages after each app when generating the HTML report (speedup)
+    - Category ordering in column headers in HTML report should now be deterministic

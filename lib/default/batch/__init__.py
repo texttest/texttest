@@ -666,7 +666,8 @@ class WebPageResponder(plugins.Responder):
                 self.generateCommonPage(pageTitle, pageInfo)
             
             if self.summaryGenerator:
-                self.summaryGenerator.finalise()
+                appsUsed = [ app for app, _, _ in pageInfo ]
+                self.summaryGenerator.generateForApps(appsUsed)
         if len(appInfo) == 0 and self.summaryGenerator:
             # Describe errors, if any
             self.summaryGenerator.finalise()

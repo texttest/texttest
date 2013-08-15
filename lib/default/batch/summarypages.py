@@ -25,18 +25,28 @@ class GenerateFromSummaryData(plugins.ScriptWithArgs):
         rejected = bool(versionFilter.findUnacceptableVersion(app))
         self.locationApps.setdefault(location, []).append((app, usePie, rejected))
 
+    def generateForApps(self, apps):
+        def shouldGenerate(currApps):
+            for app in apps:
+                for currApp, _, _ in currApps:
+                    if app is currApp or app in currApp.extras:
+                        return True
+            return False
+        return self.finalise(shouldGenerate)
+
     @classmethod
-    def finalise(cls):
+    def finalise(cls, predicate=None):
         for location, apps in cls.locationApps.items():
-            if not all((rejected for app, usePie, rejected in apps)):
-                defaultUsePie = all((usePie for app, usePie, rejected in apps))
-                dataFinder = SummaryDataFinder(location, apps, cls.summaryFileName, cls.basePath, defaultUsePie)
-                appsWithVersions = dataFinder.getAppsWithVersions()
-                if appsWithVersions:
-                    cls.generate(dataFinder, appsWithVersions)
-            else:
-                plugins.log.info("No applications generated for index page at " +
-                                 repr(os.path.join(location, cls.summaryFileName)) + ".")
+            if predicate is None or predicate(apps):
+                if not all((rejected for app, usePie, rejected in apps)):
+                    defaultUsePie = all((usePie for app, usePie, rejected in apps))
+                    dataFinder = SummaryDataFinder(location, apps, cls.summaryFileName, cls.basePath, defaultUsePie)
+                    appsWithVersions = dataFinder.getAppsWithVersions()
+                    if appsWithVersions:
+                        cls.generate(dataFinder, appsWithVersions)
+                else:
+                    plugins.log.info("No applications generated for index page at " +
+                                     repr(os.path.join(location, cls.summaryFileName)) + ".")
 
 
 class GenerateSummaryPage(GenerateFromSummaryData):

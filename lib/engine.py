@@ -419,13 +419,20 @@ class TextTest(plugins.Responder, plugins.Observable):
                     suites.append(testSuite)
                     break
         return suites
+
     def getRootSuite(self, appName, versions):
         for app, testSuite in self.appSuites.items():
             if app.name == appName and app.versions == versions:
                 return testSuite
 
-        newApp = self.addApplication(appName, self.makeDirectoryCache(appName), versions)[0]
-        return self.createEmptySuite(newApp)
+        dirCache = self.makeDirectoryCache(appName)
+        if dirCache:
+            newApp = self.addApplication(appName, dirCache, versions)[0]
+            return self.createEmptySuite(newApp)
+        else:
+            message = "Couldn't create directory cache for application: " + str(appName)
+            plugins.printWarning(message)
+            return None
 
     def createEmptySuite(self, newApp):
         emptySuite = self.createInitialTestSuite(newApp)
@@ -448,14 +455,12 @@ class TextTest(plugins.Responder, plugins.Observable):
                     return testmodel.DirectoryCache(os.path.dirname(allFiles[0]))
             
     def notifyExtraTest(self, testPath, appName, versions):
-        try:
-            rootSuite = self.getRootSuite(appName, versions)
+        rootSuite = self.getRootSuite(appName, versions)
+        if rootSuite:
             rootSuite.addTestCaseWithPath(testPath)
-        except Exception: #workaround due to nightjob problems(CM-7467)
-            message = "Exception caught when trying to add an extra test for aplication: " + str(appName) + \
-            " and versions: "+ str(versions) + " and testpath: " + str(testPath)
+        else:
+            message = "Couldn't add extra test for application: " + str(appName)
             plugins.printWarning(message)
-            plugins.printException()
 
     def notifyNewApplication(self, newApp):
         suite = self.createEmptySuite(newApp)

@@ -463,7 +463,7 @@ class TestTable:
             bugSystemData = self.getConfigValue("bug_system_location", allSubKeys=True)
             markedArtefacts = self.getConfigValue("batch_jenkins_marked_artefacts")
             fileFinder = self.getConfigValue("batch_jenkins_archive_file_pattern")
-            prevBuildNumber = self.getJenkinsBuildNumber(prevTag)
+            prevBuildNumber = self.getJenkinsBuildNumber(prevTag) if prevTag else None
             if buildNumber.isdigit() and prevBuildNumber is not None:
                 allChanges = jenkinschanges.getChanges(prevBuildNumber, buildNumber, bugSystemData, markedArtefacts, fileFinder, cacheDir)
                 plugins.ensureDirectoryExists(cacheDir)

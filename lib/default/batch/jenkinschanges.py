@@ -1,8 +1,7 @@
 
-import os, sys, re, hashlib
+import os, sys, re, hashlib, time
 from xml.dom.minidom import parse
 from ordereddict import OrderedDict
-from difflib import SequenceMatcher
 from glob import glob
 from pprint import pprint
     
@@ -13,6 +12,8 @@ class AbortedException(RuntimeError):
 class JobStillRunningException(RuntimeError):
     pass
 
+class FingerprintNotReadyException(RuntimeError):
+    pass
 
 def fingerprintStrings(document):
     for obj in document.getElementsByTagName("hudson.tasks.Fingerprinter_-FingerprintAction"):
@@ -49,8 +50,13 @@ def getFingerprint(jobRoot, jobName, buildName, cacheDir):
             prevString = currString
     if not fingerprint:
         result = getResult(document)
-        if result is None and os.getenv("BUILD_NUMBER") == buildName:
-            raise JobStillRunningException()
+        if result is None and os.getenv("BUILD_NUMBER") == buildName and os.getenv("JOB_NAME") == jobName:
+            if os.getenv("BUILD_ID") == "none": 
+                # Needed to prevent Jenkins from killing background jobs running after the job has exited
+                # If we have this, we should wait a bit
+                raise FingerprintNotReadyException()
+            else:
+                raise JobStillRunningException()
         # No result means aborted (hard) if we're checking a previous run, otherwise it means we haven't finished yet
         elif result == "ABORTED" or result is None:
             raise AbortedException, "Aborted in Jenkins"
@@ -113,9 +119,21 @@ def getCorrectedHash(f, hash, fileFinder):
         if correctHash != hash:
             return correctHash
 
+def getAndWaitForFingerprint(*args):
+    for i in range(500):
+        try:
+            return getFingerprint(*args)
+        except FingerprintNotReadyException:
+            if i % 10 == 0:
+                print "No Jenkins fingerprints available yet, sleeping..."
+            time.sleep(1)
+                
+    print "Giving up waiting for fingerprints."
+    raise JobStillRunningException()
+
 def getFingerprintDifferences(build1, build2, jobName, jobRoot, fileFinder, cacheDir):
     fingerprint1 = getFingerprint(jobRoot, jobName, build1, cacheDir)
-    fingerprint2 = getFingerprint(jobRoot, jobName, build2, cacheDir)
+    fingerprint2 = getAndWaitForFingerprint(jobRoot, jobName, build2, cacheDir)
     if not fingerprint1 or not fingerprint2:
         return []
     differences = []

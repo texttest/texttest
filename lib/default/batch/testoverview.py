@@ -657,15 +657,22 @@ class TestTable:
             tagColour = self.findTagColour(tag)
             linkTarget = getDetailPageName(self.pageVersion, tag)
             linkText = HTMLgen.Font(getDisplayText(tag), color=tagColour)
-            link = HTMLgen.Href(linkTarget, linkText, title=self.getTagTooltip(tag))
-            head.append(HTMLgen.TH(link))
+            buildNumber = self.getJenkinsBuildNumber(tag)
+            if os.getenv("JENKINS_URL") and buildNumber.isdigit():
+                container = HTMLgen.Container()
+                tooltip = jenkinschanges.getTimestamp(buildNumber)
+                container.append(HTMLgen.Href(linkTarget, linkText, title=tooltip))
+                container.append(HTMLgen.BR())
+                jobTarget = os.path.join(os.getenv("JENKINS_URL"), "job", os.getenv("JOB_NAME"), buildNumber)
+                jobText = HTMLgen.Emphasis(HTMLgen.Font("(Jenkins " + buildNumber + ")", size=1))
+                container.append(HTMLgen.Href(jobTarget, jobText, title=tooltip))
+                head.append(HTMLgen.TH(container))
+            else:
+                head.append(HTMLgen.TH(HTMLgen.Href(linkTarget, linkText)))
         heading = HTMLgen.TR()
         heading = heading + head
         return heading
-    
-    def getTagTooltip(self, tag):
-        if os.getenv("JENKINS_URL"):
-            return jenkinschanges.getTimestamp(self.getJenkinsBuildNumber(tag))
+
         
 class TestDetails:
     def __init__(self, tag, pageTitle, pageSubTitle):

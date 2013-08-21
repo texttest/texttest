@@ -10,6 +10,10 @@ from pprint import pprint
 class AbortedException(RuntimeError):
     pass
 
+class JobStillRunningException(RuntimeError):
+    pass
+
+
 def fingerprintStrings(document):
     for obj in document.getElementsByTagName("hudson.tasks.Fingerprinter_-FingerprintAction"):
         for entry in obj.getElementsByTagName("string"):
@@ -45,7 +49,10 @@ def getFingerprint(jobRoot, jobName, buildName, cacheDir):
             prevString = currString
     if not fingerprint:
         result = getResult(document)
-        if result == "ABORTED" or result is None:
+        if result is None and os.getenv("BUILD_NUMBER") == buildName:
+            raise JobStillRunningException()
+        # No result means aborted (hard) if we're checking a previous run, otherwise it means we haven't finished yet
+        elif result == "ABORTED" or result is None:
             raise AbortedException, "Aborted in Jenkins"
     return fingerprint
     

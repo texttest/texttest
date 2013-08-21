@@ -465,13 +465,15 @@ class TestTable:
             fileFinder = self.getConfigValue("batch_jenkins_archive_file_pattern")
             prevBuildNumber = self.getJenkinsBuildNumber(prevTag) if prevTag else None
             if buildNumber.isdigit() and prevBuildNumber is not None:
-                allChanges = jenkinschanges.getChanges(prevBuildNumber, buildNumber, bugSystemData, markedArtefacts, fileFinder, cacheDir)
-                plugins.ensureDirectoryExists(cacheDir)
-                with open(cacheFile, "w") as f:
-                    f.write(pformat(allChanges) + "\n")
-                return allChanges
-            else:
-                return []     
+                try:
+                    allChanges = jenkinschanges.getChanges(prevBuildNumber, buildNumber, bugSystemData, markedArtefacts, fileFinder, cacheDir)
+                    plugins.ensureDirectoryExists(cacheDir)
+                    with open(cacheFile, "w") as f:
+                        f.write(pformat(allChanges) + "\n")
+                    return allChanges
+                except jenkinschanges.JobStillRunningException:
+                    pass # don't write to cache in this case
+            return []     
 
     def getJenkinsBuildNumber(self, tag):
         return tag.split(".")[-1]

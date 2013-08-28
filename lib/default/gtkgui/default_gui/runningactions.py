@@ -687,7 +687,7 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
     def performOnCurrent(self, **kw):
         if self.shouldAddShortcuts():
             self.createShortcutApps()
-        RunScriptAction.performOnCurrent(self)
+        RunScriptAction.performOnCurrent(self, **kw)
 
     def checkTestRun(self, *args, **kw):
         if self.shouldAddShortcuts():

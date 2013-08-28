@@ -806,6 +806,7 @@ class CreateCatalogue(plugins.Action):
     def __init__(self):
         self.catalogues = {}
         self.diag = logging.getLogger("catalogues")
+        
     def __call__(self, test):
         if test.app.getConfigValue("create_catalogues") != "true":
             return
@@ -815,33 +816,35 @@ class CreateCatalogue(plugins.Action):
             self.createCatalogueChangeFile(test)
         else:
             self.diag.info("Collecting original information...")
-            self.catalogues[test] = self.findAllPaths(test)
+            self.catalogues[test] = self.findAllPaths(test)[0]
+            
     def createCatalogueChangeFile(self, test):
         oldPaths = self.catalogues[test]
-        newPaths = self.findAllPaths(test)
+        newPaths, ignoredPaths = self.findAllPaths(test)
         tmpDir = test.getDirectory(temporary=1, local=1)
-        pathsLost, pathsEdited, pathsGained = self.findDifferences(oldPaths, newPaths, tmpDir)
+        pathsLost, pathsEdited, pathsGained = self.findDifferences(oldPaths, newPaths, ignoredPaths, tmpDir)
         processesGained = self.findProcessesGained(test)
         fileName = test.makeTmpFileName("catalogue")
-        file = open(fileName, "w")
-        if len(pathsLost) == 0 and len(pathsEdited) == 0 and len(pathsGained) == 0:
-            file.write("No files or directories were created, edited or deleted.\n")
-        if len(pathsGained) > 0:
-            file.write("The following new files/directories were created:\n")
-            self.writeFileStructure(file, pathsGained)
-        if len(pathsEdited) > 0:
-            file.write("\nThe following existing files/directories changed their contents:\n")
-            self.writeFileStructure(file, pathsEdited)
-        if len(pathsLost) > 0:
-            file.write("\nThe following existing files/directories were deleted:\n")
-            self.writeFileStructure(file, pathsLost)
-        if len(processesGained) > 0:
-            file.write("\nThe following processes were created:\n")
-            self.writeProcesses(file, processesGained)
-        file.close()
+        with open(fileName, "w") as file:
+            if len(pathsLost) == 0 and len(pathsEdited) == 0 and len(pathsGained) == 0:
+                file.write("No files or directories were created, edited or deleted.\n")
+            if len(pathsGained) > 0:
+                file.write("The following new files/directories were created:\n")
+                self.writeFileStructure(file, pathsGained)
+            if len(pathsEdited) > 0:
+                file.write("\nThe following existing files/directories changed their contents:\n")
+                self.writeFileStructure(file, pathsEdited)
+            if len(pathsLost) > 0:
+                file.write("\nThe following existing files/directories were deleted:\n")
+                self.writeFileStructure(file, pathsLost)
+            if len(processesGained) > 0:
+                file.write("\nThe following processes were created:\n")
+                self.writeProcesses(file, processesGained)
+        
     def writeProcesses(self, file, processesGained):
         for process in processesGained:
             file.write("- " + process + "\n")
+    
     def writeFileStructure(self, file, pathNames):
         prevParts = []
         tabSize = 4
@@ -859,6 +862,7 @@ class CreateCatalogue(plugins.Action):
                 else:
                     file.write("-" * tabSize)
             prevParts = parts
+    
     def findProcessesGained(self, test):
         searchString = test.getConfigValue("catalogue_process_string")
         if len(searchString) == 0:
@@ -879,13 +883,15 @@ class CreateCatalogue(plugins.Action):
                 if killArbitaryProcess(processId):
                     processes.append(parts[1])
         return processes
+    
     def findAllPaths(self, test):
         allPaths = OrderedDict()
-        for path in test.listUnownedTmpPaths():
+        paths, ignoredPaths = test.listUnownedTmpPaths()
+        for path in paths:
             editInfo = self.getEditInfo(path)
             self.diag.info("Path " + path + " edit info " + editInfo)
             allPaths[path] = editInfo
-        return allPaths
+        return allPaths, ignoredPaths
 
     def getEditInfo(self, fullPath):
         # Check modified times for files and directories, targets for links
@@ -894,7 +900,7 @@ class CreateCatalogue(plugins.Action):
         else:
             return time.strftime(plugins.datetimeFormat, time.localtime(plugins.modifiedTime(fullPath)))
     
-    def findDifferences(self, oldPaths, newPaths, writeDir):
+    def findDifferences(self, oldPaths, newPaths, ignoredPaths, writeDir):
         pathsGained, pathsEdited, pathsLost = [], [], []
         for path, modTime in newPaths.items():
             if not oldPaths.has_key(path):
@@ -905,12 +911,15 @@ class CreateCatalogue(plugins.Action):
             if not newPaths.has_key(path):
                 pathsLost.append(self.outputPathName(path, writeDir))
         # Clear out duplicates
+        ignoredOutputPaths = [ self.outputPathName(path, writeDir) for path in ignoredPaths ]
         self.removeParents(pathsEdited, pathsGained)
         self.removeParents(pathsEdited, pathsEdited)
         self.removeParents(pathsEdited, pathsLost)
+        self.removeParents(pathsEdited, ignoredOutputPaths)
         self.removeParents(pathsGained, pathsGained)
         self.removeParents(pathsLost, pathsLost)
         return pathsLost, pathsEdited, pathsGained
+    
     def removeParents(self, toRemove, toFind):
         removeList = []
         for path in toFind:
@@ -920,9 +929,11 @@ class CreateCatalogue(plugins.Action):
         for path in removeList:
             self.diag.info("Removing parent path " + path)
             toRemove.remove(path)
+
     def outputPathName(self, path, writeDir):
         self.diag.info("Output name for " + path)
         return path.replace(writeDir, "<Test Directory>")
+
 
 class MachineInfoFinder:
     def findPerformanceMachines(self, test, fileStem):

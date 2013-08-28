@@ -351,7 +351,8 @@ class Test(plugins.Observable):
         for dataFile in self.getDataFileNames():
             self.diagnose("Searching for data files called " + dataFile)
             for fileName in self.dircache.findAllFiles(dataFile):
-                for fullPath in self.listFiles(fileName, dataFile, followLinks=True):
+                dataFiles, _ = self.listFiles(fileName, dataFile, followLinks=True)
+                for fullPath in dataFiles:
                     if not fullPath in existingDataFiles:
                         existingDataFiles.append(fullPath)
 
@@ -370,17 +371,20 @@ class Test(plugins.Observable):
         if rootDir:
             fileList = self.fullPathList(rootDir)
             filesToIgnore = self.getCompositeConfigValue("test_data_ignore", "file_edits")
-            return rootDir, self.listFilesFrom(fileList, filesToIgnore, followLinks=True)
+            editedFiles, _ = self.listFilesFrom(fileList, filesToIgnore, followLinks=True)
+            return rootDir, editedFiles
         else:
             return None, []
 
     def listFilesFrom(self, files, filesToIgnore, followLinks):
         files.sort()
         dataFiles = []
+        ignoredFiles = []
         dirs = []
         self.diag.info("Listing files from " + repr(files) + ", ignoring " + repr(filesToIgnore))
         for file in files:
             if self.app.fileMatches(os.path.basename(file), filesToIgnore):
+                ignoredFiles.append(file)
                 continue
             if os.path.isdir(file) and (followLinks or not os.path.islink(file)):
                 dirs.append(file)
@@ -388,8 +392,10 @@ class Test(plugins.Observable):
                 dataFiles.append(file)
         for subdir in dirs:
             dataFiles.append(subdir)
-            dataFiles += self.listFilesFrom(self.fullPathList(subdir), filesToIgnore, followLinks)
-        return dataFiles
+            newDataFiles, newIgnoredFiles = self.listFilesFrom(self.fullPathList(subdir), filesToIgnore, followLinks)
+            dataFiles += newDataFiles
+            ignoredFiles += newIgnoredFiles
+        return dataFiles, ignoredFiles
     
     def findAllStdFiles(self, stem):
         if stem in [ "environment", "testcustomize.py" ]:
@@ -758,15 +764,17 @@ class TestCase(Test):
         return tmpFiles
 
     def listUnownedTmpPaths(self):
-        paths = []
+        paths, ignoredPaths = [], []
         filelist = os.listdir(self.localWriteDirectory)
         filelist.sort()
         for file in filelist:
             if file in [ "framework_tmp", "file_edits", "traffic_intercepts" ] or file.endswith("." + self.app.name):
                 continue
             fullPath = os.path.join(self.localWriteDirectory, file)
-            paths += self.listFiles(fullPath, file, followLinks=False)
-        return paths
+            newPaths, newIgnoredPaths = self.listFiles(fullPath, file, followLinks=False)
+            paths += newPaths
+            ignoredPaths += newIgnoredPaths
+        return paths, ignoredPaths
 
     def makeTmpFileName(self, stem, forComparison=True, forFramework=False):
         local = not forComparison and not forFramework

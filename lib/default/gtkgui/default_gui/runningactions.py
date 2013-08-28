@@ -682,6 +682,31 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
         self.addOption("new", "Text to replace it with (may contain regexp back references)", multilineEntry=True)
         self.addOption("file", "File stem(s) to perform replacement in", allocateNofValues=2)
         self.storytextDirs = {}
+        self.createdApps = {}
+        
+    def performOnCurrent(self, **kw):
+        if self.shouldAddShortcuts():
+            self.createShortcutApps()
+        RunScriptAction.performOnCurrent(self)
+
+    def checkTestRun(self, *args, **kw):
+        if self.shouldAddShortcuts():
+            self.removeShortcutApps()
+        RunScriptAction.checkTestRun(self, *args, **kw)
+    
+    def getCmdlineOptionForApps(self):
+        options = RunScriptAction.getCmdlineOptionForApps(self)
+        if self.shouldAddShortcuts():
+            options[1] = options[1] + ",shortcut"
+        return options
+
+    def getFilterFile(self, writeDir, filterFileOverride):
+        filterFileName = RunScriptAction.getFilterFile(self, writeDir, filterFileOverride)
+        if self.shouldAddShortcuts():
+            with open(filterFileName, "a") as filterFile:
+                filterFile.write("appdata=shortcut\n")
+                filterFile.write(os.path.basename(self.storytextDirs[self.currAppSelection[0]]) + "\n")
+        return filterFileName
 
     def notifyAllStems(self, allStems, defaultTestFile):
         self.optionGroup.setValue("file", defaultTestFile)
@@ -689,17 +714,11 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
 
     def notifyNewTestSelection(self, *args):
         guiplugins.ActionDialogGUI.notifyNewTestSelection(self, *args)
-        if self.shouldAddShortcut():
+        if len(self.storytextDirs) > 0:
             self.addSwitch("includeShortcuts", "Replace text in shortcut files", 0)
-        else:
-            if "includeShortcuts" in self.optionGroup.options.keys():
-                self.optionGroup.options.pop("includeShortcuts")
 
-    def shouldAddShortcut(self):
-        if self.currAppSelection:
-            app = self.currAppSelection[0]
-            return self.storytextDirs.has_key(app) and self.currTestSelection[0].name == os.path.basename(app.getDirectory())
-        return False
+    def shouldAddShortcuts(self):
+        return len(self.storytextDirs) > 0 and self.optionGroup.getOptionValue("includeShortcuts") > 0
 
     def notifyUsecaseRename(self, argstr, *args):
         self.showQueryDialog(self.getParentWindow(), "Usecase names were renamed. Would you like to update them into all usecases now?",
@@ -721,6 +740,36 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
             self.performOnCurrent(filterFileOverride=NotImplemented)
         dialog.hide()
 
+    def createShortcutApps(self):
+        for app, storyTextHome in self.storytextDirs.items():
+            self.createShortcutApp(app, os.path.basename(storyTextHome))
+            
+    def createShortcutApp(self, app, storyTextHome):
+        self.createdApps[app] = [self.createConfigFile(app), self.createTestSuiteFile(app, os.path.basename(storyTextHome))]
+    
+    def createConfigFile(self, app):
+        configFileName = os.path.join(app.getDirectory(), "config.shortcut")
+        with  open(configFileName, "w") as configFile:
+            configFile.write("executable:None\n")
+            configFile.write("filename_convention_scheme:standard\n")
+            configFile.write("use_case_record_mode:GUI\n")
+            configFile.write("use_case_recorder:storytext")
+        return configFileName
+    
+    def createTestSuiteFile(self, app, storyTextHome):
+        suiteFileName = os.path.join(app.getDirectory(), "testsuite.shortcut")
+        with open(suiteFileName, "w") as suiteFile:
+            suiteFile.write(storyTextHome + "\n")
+        return suiteFileName
+
+    def removeShortcutApps(self):
+        for _, (configFile, suiteFile) in self.createdApps.items():
+            if os.path.isfile(configFile):
+                os.remove(configFile)
+            if os.path.isfile(suiteFile):
+                os.remove(suiteFile)
+        self.createdApps = {}
+
     def scriptName(self):
         return "default.ReplaceText"
 
@@ -739,10 +788,6 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
 
     def notifyUsecaseHome(self, suite, usecaseHome):
         self.storytextDirs[suite.app] = usecaseHome
-
-    def notifyWriteTestsIfSelected(self, suite, file):
-        if self.shouldAddShortcut():
-            file.write(os.path.basename(self.storytextDirs[self.currAppSelection[0]]) + "\n")
 
     def _respond(self, saidOK=True, dialog=None, fileChooserOption=None):
         if saidOK and not self.optionGroup.getValue("old"):

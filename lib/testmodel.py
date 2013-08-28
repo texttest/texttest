@@ -626,7 +626,6 @@ class TestCase(Test):
         relPath = os.path.join(app.name + app.versionSuffix(), self.getRelPath())
         self.writeDirectory = os.path.join(app.writeDirectory, relPath)
         self.localWriteDirectory = os.path.join(app.localWriteDirectory, relPath)
-        self.stemless = False
         
     def classId(self):
         return "test-case"
@@ -759,7 +758,7 @@ class TestCase(Test):
         filelist = os.listdir(self.writeDirectory)
         filelist.sort()
         for file in filelist:
-            if file.endswith("." + self.app.name) or self.stemless:
+            if file.endswith("." + self.app.name):
                 tmpFiles.append(os.path.join(self.writeDirectory, file))
         return tmpFiles
 
@@ -1152,15 +1151,12 @@ class TestSuite(Test):
         self.testcases.insert(placement, test)
         test.notify("Add", initial=False)
         return test
-    def addTestCaseWithPath(self, testPath, stemless=False):
+    def addTestCaseWithPath(self, testPath):
         pathElements = testPath.split("/", 1)
         subSuite = self.findSubtest(pathElements[0])
         if len(pathElements) == 1:
             # add it even if it already exists, then we get two of them :)
-            test = self.addTestCase(testPath)
-            if test:
-                test.stemless = stemless
-            return test
+            return self.addTestCase(testPath)
         else:
             if not subSuite:
                 subSuite = self.addTestSuite(pathElements[0])

@@ -95,8 +95,6 @@ class BaseTestComparison(plugins.TestState):
     def makeComparisons(self, test, ignoreMissing=False):
         # Might have saved some new ones or removed some old ones in the meantime...
         test.refreshFiles()
-        if test.stemless:
-            return self.makeStemlessComparisons(test, ignoreMissing)
         tmpFiles = self.makeStemDict(test.listTmpFiles())
         stdFiles = self.makeStandardStemDict(test, tmpFiles, ignoreMissing)
         for tmpStem, tmpFile in tmpFiles.items():
@@ -144,32 +142,6 @@ class BaseTestComparison(plugins.TestState):
             stem = os.path.basename(file).split(".")[0]
             stemDict[stem] = file
         return stemDict
-    
-    def makeStemlessComparisons(self, test, ignoreMissing=False):
-        tmpFiles = self.makeFileNameDict(test.listTmpFiles())
-        stdFiles = self.makeFileNameDict(self.listSteemlessFiles(test))
-        for name, tmpFile in tmpFiles.items():
-            stdFile = stdFiles.get(name)
-            comparison = self.createFileComparison(test, name, stdFile, tmpFile) if stdFile else None
-            if comparison:
-                self.addComparison(comparison)
-    
-    def listSteemlessFiles(self, test):
-        tmpFiles = []
-        filelist = os.listdir(test.getDirectory())
-        filelist.sort()
-        for file in filelist:
-            if test.stemless:
-                tmpFiles.append(os.path.join(test.getDirectory(), file))
-        return tmpFiles
-
-    def makeFileNameDict(self, files):
-        fileDict = OrderedDict()
-        for file in files:
-            name = os.path.basename(file)
-            fileDict[name] = file
-        return fileDict
-
         
 class TestComparison(BaseTestComparison):
     def __init__(self, previousInfo, app, lifecycleChange="", copyFailedPrediction=True):

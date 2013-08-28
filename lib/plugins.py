@@ -955,7 +955,7 @@ def getAggregateString(items, method):
     values = []
     for item in items:
         value = method(item)
-        if value not in values:
+        if value is not None and value not in values:
             values.append(value)
     
     if len(values) > 1:

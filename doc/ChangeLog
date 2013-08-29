@@ -2444,6 +2444,8 @@ Batch Report Enhancements:
 	New argument "weekday_pages_before". See website
     - New script batch.ArchiveHTML
 	Works like ArchiveRepository, but on historical_report_location. See webpage.
+    - Now recognizing Jenkins jobs in the html report. We wait for fingerprints if BUILD_ID=none is set
+    - Adding links in html report to Jenkins jobs
 Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
     - Default_queue setting should also apply to the proxy job
 Bug Fixes:
@@ -2470,3 +2472,8 @@ Bug Fixes:
     - Fixed spurious warning when one extra version has no tests and all tests are selected via the root suite and then run.
     - Only recreate relevant index pages after each app when generating the HTML report (speedup)
     - Category ordering in column headers in HTML report should now be deterministic
+    - Don't crash if directory cache doesn't exist when adding an extra test
+    - Fixed stacktrace running from Jenkins without the expected naming
+    - Don't print spurious Aborted messages in jenkins or write to the cache if the job is still running
+    - Fixed problem with filtering out tmp directories with 'test_data_ignore'.
+

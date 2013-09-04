@@ -10,6 +10,7 @@ class BatchCategory(plugins.Filter):
     def __init__(self, state):
         self.name = state.category
         self.briefDescription, self.longDescription = state.categoryDescriptions.get(self.name, (self.name, self.name))
+        self.setsFailureCode = state.setsFailureCode()
         self.tests = {}
         self.testSuites = []
     def addTest(self, test):
@@ -108,6 +109,8 @@ class BatchApplicationData:
         return self.totalTests(self.successCategories)
     def failCategories(self):
         return self.errorCategories + self.failureCategories
+    def triggersExitCode(self):
+        return any((c.setsFailureCode and c.size() for c in self.failCategories()))
     def allCategories(self):
         return self.failCategories() + self.successCategories
     def testCount(self):
@@ -187,7 +190,7 @@ class MailSender:
             mailContents += self.performForAll(app, batchDataList, BatchApplicationData.getDetails, sectionHeaders[1])
         if not self.isAllFailure(batchDataList):
             mailContents += self.performForAll(app, batchDataList, BatchApplicationData.getSuccessBrief, sectionHeaders[2])
-        self.sendOrStoreMail(app, mailContents, self.useCollection(app), self.isAllSuccess(batchDataList))
+        self.sendOrStoreMail(app, mailContents, self.useCollection(app), not self.hasExitCodeErrors(batchDataList))
 
     def performForAll(self, app, batchDataList, method, headline):
         contents = headline + " follows...\n" + \
@@ -221,7 +224,7 @@ class MailSender:
                 else:
                     plugins.log.info("done.")
             else:
-                plugins.log.info("not sent: all tests succeeded.")
+                plugins.log.info("not sent: all tests succeeded or had known bugs.")
 
     def exceptionOutput(self):
         exctype, value = sys.exc_info()[:2]
@@ -287,6 +290,9 @@ class MailSender:
                 if not cat.name in names:
                     names.append(cat.name)
         return names
+ 
+    def hasExitCodeErrors(self, batchDataList):
+        return any((bd.triggersExitCode() for bd in batchDataList))
 
     def isAllSuccess(self, batchDataList):
         return self.getTotalString(batchDataList, BatchApplicationData.failureCount) == "0"
@@ -902,7 +908,9 @@ class CollectFiles(plugins.ScriptWithArgs):
         mailTitle = self.getTitle(app, totalValues)
         mailContents = self.mailSender.createMailHeaderForSend(self.runId, mailTitle, app)
         mailContents += self.getBody(fileBodies, missingVersions)
-        allSuccess = len(totalValues.keys()) == 1 and totalValues.keys()[0] == "succeeded"
+        allCats = set(totalValues.keys())
+        noMailCats = set([ "succeeded", "known bugs" ])
+        allSuccess = allCats.issubset(noMailCats)
         self.mailSender.sendOrStoreMail(app, mailContents, isAllSuccess=allSuccess)
 
     def matchesApp(self, dir, app):

@@ -1049,3 +1049,9 @@ activate = show vcs popup menu
 [Label=Generate a screenshot after each replayed action]
 toggled.true = choose option to generate screenshots
 
+[Label=NOT present]
+toggled.true = trigger if given text is not present
+
+[Label=Exactly as given]
+toggled.true = trigger if the text is exactly as given
+

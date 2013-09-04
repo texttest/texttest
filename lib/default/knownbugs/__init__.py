@@ -123,6 +123,19 @@ class BugTrigger:
     def matchesText(self, line):
         return self.textTrigger.matches(line)
     
+    def exactMatch(self, lines, **kw):
+        updatedLines = [line for i,line in enumerate(lines) if i < len(lines) -1] if lines[-1] == '' else lines
+        if len(updatedLines) == len(self.textTrigger.triggers):
+            for index, line in enumerate(updatedLines, start=1):
+                # We must check that every line match because MultilineTextTrigger.matches method
+                # returns True only when the match is complete
+                if index < len(updatedLines):
+                    if not self.textTrigger._matches(line)[1]:
+                        return False
+                else:
+                    return self.hasBug(line, **kw)
+        return False
+
     def customTriggerMatches(self, *args):
         module, method = self.customTrigger.split(".", 1)
         return plugins.importAndCall(module, method, *args)
@@ -178,6 +191,7 @@ class FileBugData:
     def __init__(self):
         self.presentList = []
         self.absentList = []
+        self.identicalList = []
         self.checkUnchanged = False
         self.diag = logging.getLogger("Check For Bugs")
 
@@ -187,6 +201,8 @@ class FileBugData:
             self.checkUnchanged = True
         if getOption("trigger_on_absence", False):
             self.absentList.append(bugTrigger)
+        elif getOption("trigger_on_identical", False):
+            self.identicalList.append(bugTrigger)
         else:
             self.presentList.append(bugTrigger)
 
@@ -205,6 +221,9 @@ class FileBugData:
     def findBugsInText(self, lines, **kw):
         currAbsent = copy(self.absentList)
         bugs = []
+        for bugTrigger in self.identicalList:
+            if bugTrigger not in bugs and bugTrigger.exactMatch(lines, **kw):
+                bugs.append(bugTrigger)
         for line in lines:
             for bugTrigger in self.presentList:
                 self.diag.info("Checking for existence of " + repr(bugTrigger))

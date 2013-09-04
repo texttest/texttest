@@ -977,7 +977,10 @@ class TestSuite(Test):
         return newTestList
 
     def fileExists(self, name):
-        return self.dircache.exists(name)
+        if os.path.isabs(name):
+            return os.path.isdir(name)
+        else:
+            return self.dircache.exists(name)
 
     def testCaseList(self, filters=[]):
         list = []
@@ -1113,9 +1116,10 @@ class TestSuite(Test):
                 if not dircache.hasStem("testsuite"):
                     testCaseNames.append(testName)
 
-        for testName in self.getOrderedTestNames(testNames.keys(), testCaseNames):
-            dirCache = testCaches.get(testName, self.createTestCache(testName))
-            desc = plugins.extractComment(testNames.get(testName))
+        for testNameOrPath in self.getOrderedTestNames(testNames.keys(), testCaseNames):
+            testName = os.path.basename(testNameOrPath)
+            dirCache = testCaches.get(testName, self.createTestCache(testNameOrPath))
+            desc = plugins.extractComment(testNames.get(testNameOrPath))
             self.createTestOrSuite(testName, desc, dirCache, filters, initial)
 
     def createTestOrSuite(self, testName, description, dirCache, filters, initial=True):

@@ -239,19 +239,17 @@ class ReplaceText(plugins.ScriptWithArgs):
     def __repr__(self):
         return "Replacing " + self.oldText + " with " + self.newText + " for"
 
-    def __call__(self, test):
-        storytextDir = test.getEnvironment("STORYTEXT_HOME")
-        if self.includeShortcuts and test.name == os.path.basename(storytextDir):
-            for f in self.getShortcutFiles(storytextDir):
-                self.replaceInFile(test, f, True)
+    def getFilesToChange(self, test, stem):
+        if self.includeShortcuts and test.app.name == "shortcut":
+            return [ test.dircache.pathName(f) for f in test.dircache.contents if f.endswith(".shortcut") ]
         else:
-            for stem in self.stems:
-                for stdFile in test.getFileNamesMatching(stem):
-                    if os.path.isfile(stdFile):
-                        self.replaceInFile(test, stdFile)
+            return test.getFileNamesMatching(stem)
 
-    def getShortcutFiles(self, shortcutDir):
-        return [os.path.join(shortcutDir, f) for f in os.listdir(shortcutDir) if f.endswith(".shortcut")]
+    def __call__(self, test):
+        for stem in self.stems:
+            for stdFile in self.getFilesToChange(test, stem):
+                if os.path.isfile(stdFile):
+                    self.replaceInFile(test, stdFile)
 
     def replaceInFile(self, test, stdFile, stemless=False):
         fileName = os.path.basename(stdFile)

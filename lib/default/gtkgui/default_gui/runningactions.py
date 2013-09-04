@@ -34,7 +34,7 @@ class BasicRunningAction:
         app = self.currAppSelection[0]
         writeDir = os.path.join(self.getLogRootDirectory(app), "dynamic_run" + str(self.runNumber))
         plugins.ensureDirectoryExists(writeDir)
-        filterFile = self.getFilterFile(writeDir, filterFileOverride)
+        filterFile = self.createFilterFile(writeDir, filterFileOverride)
         ttOptions = runModeOptions + self.getTextTestOptions(filterFile, app, usecase)
         self.diag.info("Starting " + usecase + " run of TextTest with arguments " + repr(ttOptions))
         logFile = os.path.join(writeDir, "output.log")
@@ -74,7 +74,7 @@ class BasicRunningAction:
     def getSignalsSent(self):
         return [ "SaveSelection" ]
 
-    def getFilterFile(self, writeDir, filterFileOverride):
+    def createFilterFile(self, writeDir, filterFileOverride):
         # Because the description of the selection can be extremely long, we write it in a file and refer to it
         # This avoids too-long command lines which are a problem at least on Windows XP
         if filterFileOverride is None:
@@ -95,7 +95,7 @@ class BasicRunningAction:
         return [ self.optionGroup ]
 
     def getTextTestOptions(self, filterFile, app, usecase):
-        ttOptions = self.getCmdlineOptionForApps() if filterFile else []
+        ttOptions = self.getCmdlineOptionForApps(filterFile)
         for group in self.getOptionGroups():
             ttOptions += self.getCommandLineArgs(group, self.getCommandLineKeys(usecase))
         # May be slow to calculate for large test suites, cache it
@@ -130,7 +130,10 @@ class BasicRunningAction:
     def getAppIdentifier(self, app):
         return app.name + app.versionSuffix()
         
-    def getCmdlineOptionForApps(self):
+    def getCmdlineOptionForApps(self, filterFile):
+        if not filterFile:
+            return []
+        
         apps = sorted(self.currAppSelection, key=self.validApps.index)
         appNames = map(self.getAppIdentifier, apps)
         return [ "-a", ",".join(appNames) ]
@@ -682,30 +685,23 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
         self.addOption("new", "Text to replace it with (may contain regexp back references)", multilineEntry=True)
         self.addOption("file", "File stem(s) to perform replacement in", allocateNofValues=2)
         self.storytextDirs = {}
-        self.createdApps = {}
-        
-    def performOnCurrent(self, **kw):
-        if self.shouldAddShortcuts():
-            self.createShortcutApps()
-        RunScriptAction.performOnCurrent(self, **kw)
-
-    def checkTestRun(self, *args, **kw):
-        if self.shouldAddShortcuts():
-            self.removeShortcutApps()
-        RunScriptAction.checkTestRun(self, *args, **kw)
-    
-    def getCmdlineOptionForApps(self):
-        options = RunScriptAction.getCmdlineOptionForApps(self)
+            
+    def getCmdlineOptionForApps(self, filterFile):
+        options = RunScriptAction.getCmdlineOptionForApps(self, filterFile)
         if self.shouldAddShortcuts():
             options[1] = options[1] + ",shortcut"
+            directoryStr = os.path.dirname(filterFile) + os.pathsep + os.pathsep.join(self.inputOptions.rootDirectories)
+            options += [ "-d", directoryStr ]
         return options
 
-    def getFilterFile(self, writeDir, filterFileOverride):
-        filterFileName = RunScriptAction.getFilterFile(self, writeDir, filterFileOverride)
+    def createFilterFile(self, writeDir, filterFileOverride):
+        filterFileName = RunScriptAction.createFilterFile(self, writeDir, filterFileOverride)
         if self.shouldAddShortcuts():
+            storytextDir = self.storytextDirs[self.currAppSelection[0]]
+            self.createShortcutApps(writeDir)
             with open(filterFileName, "a") as filterFile:
                 filterFile.write("appdata=shortcut\n")
-                filterFile.write(os.path.basename(self.storytextDirs[self.currAppSelection[0]]) + "\n")
+                filterFile.write(os.path.basename(storytextDir) + "\n")
         return filterFileName
 
     def notifyAllStems(self, allStems, defaultTestFile):
@@ -740,15 +736,13 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
             self.performOnCurrent(filterFileOverride=NotImplemented)
         dialog.hide()
 
-    def createShortcutApps(self):
+    def createShortcutApps(self, writeDir):
         for app, storyTextHome in self.storytextDirs.items():
-            self.createShortcutApp(app, os.path.basename(storyTextHome))
-            
-    def createShortcutApp(self, app, storyTextHome):
-        self.createdApps[app] = [self.createConfigFile(app), self.createTestSuiteFile(app, os.path.basename(storyTextHome))]
+            self.createConfigFile(app, writeDir)
+            self.createTestSuiteFile(app, storyTextHome, writeDir)
     
-    def createConfigFile(self, app):
-        configFileName = os.path.join(app.getDirectory(), "config.shortcut")
+    def createConfigFile(self, app, writeDir):
+        configFileName = os.path.join(writeDir, "config.shortcut")
         with  open(configFileName, "w") as configFile:
             configFile.write("executable:None\n")
             configFile.write("filename_convention_scheme:standard\n")
@@ -756,19 +750,11 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
             configFile.write("use_case_recorder:storytext")
         return configFileName
     
-    def createTestSuiteFile(self, app, storyTextHome):
-        suiteFileName = os.path.join(app.getDirectory(), "testsuite.shortcut")
+    def createTestSuiteFile(self, app, storyTextHome, writeDir):
+        suiteFileName = os.path.join(writeDir, "testsuite.shortcut")
         with open(suiteFileName, "w") as suiteFile:
             suiteFile.write(storyTextHome + "\n")
         return suiteFileName
-
-    def removeShortcutApps(self):
-        for _, (configFile, suiteFile) in self.createdApps.items():
-            if os.path.isfile(configFile):
-                os.remove(configFile)
-            if os.path.isfile(suiteFile):
-                os.remove(suiteFile)
-        self.createdApps = {}
 
     def scriptName(self):
         return "default.ReplaceText"

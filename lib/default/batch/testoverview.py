@@ -619,8 +619,10 @@ class TestTable:
             return self.getExistingColourKey([ "faster", "performance" ])
         elif category.startswith("slower"):
             return self.getExistingColourKey([ "slower", "performance" ])
-        elif category == "smaller" or category == "larger":
-            return self.getExistingColourKey([ category, "memory" ])
+        elif category.startswith("smaller"):
+            return self.getExistingColourKey([ "smaller", "memory" ])
+        elif category.startswith("larger"):
+            return self.getExistingColourKey([ "larger", "memory" ])
         elif category in [ "killed", "unrunnable", "cancelled", "abandoned" ]:
             return "incomplete"
         else:

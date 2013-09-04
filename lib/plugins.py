@@ -661,8 +661,8 @@ class TestState(Observable):
         return 0
     def hasFailed(self):
         return self.isComplete() and not self.hasSucceeded()
-    def setsFailureCode(self):
-        return self.hasFailed()
+    def getExitCode(self):
+        return int(self.hasFailed())
     def isMarked(self):
         return False
     def hasResults(self):

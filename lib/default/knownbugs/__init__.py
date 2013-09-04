@@ -11,11 +11,11 @@ plugins.addCategory("crash", "CRASHED")
 
 # For backwards compatibility...
 class FailedPrediction(plugins.TestState):
-    def setsFailureCode(self):
-        return self.category != "bug"
+    def getExitCode(self):
+        return int(self.category != "bug")
     
     def getTypeBreakdown(self):
-        status = "failure" if self.setsFailureCode() else "success"
+        status = "failure" if self.getExitCode() else "success"
         return status, self.briefText
 
 class Bug:

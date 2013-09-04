@@ -204,11 +204,19 @@ class TestComparison(BaseTestComparison):
     def hasSucceeded(self):
         return self.category == "success"
     
-    def setsFailureCode(self):
-        return self.hasFailed() and (self.failedPrediction is None or self.failedPrediction.setsFailureCode())
+    def getExitCode(self):
+        if self.hasFailed():
+            if self.failedPrediction is not None:
+                return self.failedPrediction.getExitCode()
+            fileComp = self.getMostSevereFileComparison()
+            # performance diffs return 2
+            return 1 if fileComp.getType() == "failure" else 2
+        else:
+            return 0
 
     def warnOnSave(self):
         return bool(self.failedPrediction)
+    
     def getComparisonsForRecalculation(self):
         comparisons = []
         for comparison in self.allResults:
@@ -218,6 +226,7 @@ class TestComparison(BaseTestComparison):
                 comparisons.append(comparison)
         self.diag.info("All file comparisons up to date")
         return comparisons
+    
     def getMostSevereFileComparison(self):
         worstSeverity = None
         worstResult = None
@@ -227,6 +236,7 @@ class TestComparison(BaseTestComparison):
                 worstSeverity = severity
                 worstResult = result
         return worstResult
+    
     def getTypeBreakdown(self):
         if self.hasSucceeded():
             return self.category, self.briefText

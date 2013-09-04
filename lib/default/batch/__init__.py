@@ -10,7 +10,7 @@ class BatchCategory(plugins.Filter):
     def __init__(self, state):
         self.name = state.category
         self.briefDescription, self.longDescription = state.categoryDescriptions.get(self.name, (self.name, self.name))
-        self.setsFailureCode = state.setsFailureCode()
+        self.setsFailureCode = state.getExitCode()
         self.tests = {}
         self.testSuites = []
     def addTest(self, test):

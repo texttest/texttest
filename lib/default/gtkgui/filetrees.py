@@ -225,6 +225,12 @@ class ApplicationFileGUI(FileViewGUI):
     
     def getWidgetName(self):
         return "Application File Tree"
+    
+    def notifyShortcut(self, *args):
+        self.notifyReloadConfig()
+
+    def notifyShortcutRename(self, *args):
+        self.notifyReloadConfig()
 
     def notifyReloadConfig(self):
         for appName, scriptArgs in self.testScripts.items():

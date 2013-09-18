@@ -32,11 +32,11 @@
   </toolbar>
 
   <popup name="TestPopupMenu">
-    <menuitem action="Save"/>
-    <menuitem action="Save As..."/>
-    <separator/>
     <menuitem action="Enter Failure Information"/>
     <menuitem action="Find Failure Information"/>
+    <separator/>
+    <menuitem action="Save"/>
+    <menuitem action="Save As..."/>
     <separator/>
     <menuitem action="Kill"/>
     <placeholder name="ExtraTestActions" />

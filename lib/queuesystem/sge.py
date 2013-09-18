@@ -99,7 +99,7 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
             words = line.split()
             if len(words) >= 5 and words[0].isdigit():
                 jobId = words[0]
-                statusLetter = words[4]
+                statusLetter = self.getStatusLetter(words, 4)
                 if statusLetter == self.errorStatus:
                     self.errorReasons[jobId] = self.getErrorReason(jobId)
                     self.killJob(jobId)
@@ -108,12 +108,19 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
                 status = self.allStatuses.get(statusLetter)
                 if status:
                     statusDict[jobId] = status
-                elif statusLetter != os.getenv("USER"):
-                    # Job names can contain spaces, in which case the username (our own) will be the 5th word
-                    # These jobs are not test jobs and can safely be ignored.
+                else:
                     log.info("WARNING: unexpected job status " + repr(statusLetter) + " received from SGE!")
                     statusDict[jobId] = statusLetter
         return statusDict
+
+    def isDate(self, text):
+        return len(text) == 10 and text.count("/") == 2
+    
+    def getStatusLetter(self, words, statusIndex):
+        if len(words) < statusIndex + 1 or self.isDate(words[statusIndex + 1]):
+            return words[statusIndex]
+        else:
+            return self.getStatusLetter(words, statusIndex + 1)
 
     def getErrorReason(self, jobId):
         proc = subprocess.Popen([ "qstat", "-j", jobId ], stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.PIPE)

@@ -892,6 +892,8 @@ class Config:
         self.checkCaptureMockMigration(suite)
         self.checkConfigSanity(suite.app)
         batchSession = self.getBatchSessionForSelect(suite.app)
+        if self.optionMap.has_key("coll") and batchSession is None:
+            raise plugins.TextTestError, "Must provide '-b' argument to identify the batch session when running with '-coll' to collect batch run data"
         if batchSession is not None and not self.optionMap.has_key("coll"):
             batchFilter = batch.BatchVersionFilter(batchSession)
             batchFilter.verifyVersions(suite.app)

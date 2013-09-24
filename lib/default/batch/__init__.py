@@ -869,23 +869,23 @@ class WebPageResponder(plugins.Responder):
                 extraVersions.append(version)
         return extraVersions
 
-class CollectFiles(plugins.ScriptWithArgs):
-    scriptDoc = "Collect and send all batch reports that have been written to intermediate files"
-    def __init__(self, args=[""]):
-        argDict = self.parseArguments(args, [ "tmp" ])
+class CollectFilesResponder(plugins.Responder):
+    def __init__(self, optionMap, allApps):
+        plugins.Responder.__init__(self)
         self.mailSender = MailSender()
         self.runId = "" # depends on what we pick up from collected files
         self.diag = logging.getLogger("batch collect")
-        self.tmpInfo = argDict.get("tmp", "")
-        if self.tmpInfo:
-            plugins.log.info("Collecting batch files from temp directory " + self.tmpInfo + "...")
-        else:
-            plugins.log.info("Collecting batch files locally...")
+        self.allApps = allApps
+                        
+    def notifyAllComplete(self):
+        plugins.log.info("Collecting batch files locally...")
+        for app in self.allApps:
+            self.collectFilesForApp(app)
             
-    def setUpApplication(self, app):
+    def collectFilesForApp(self, app):
         fileBodies = []
         totalValues = OrderedDict()
-        rootDir = app.getPreviousWriteDirInfo(self.tmpInfo)
+        rootDir = app.getPreviousWriteDirInfo()
         if not os.path.isdir(rootDir):
             sys.stderr.write("No temporary directory found at " + rootDir + " - not collecting batch reports.\n")
             return
@@ -907,11 +907,24 @@ class CollectFiles(plugins.ScriptWithArgs):
 
         mailTitle = self.getTitle(app, totalValues)
         mailContents = self.mailSender.createMailHeaderForSend(self.runId, mailTitle, app)
-        mailContents += self.getBody(fileBodies, missingVersions)
+        reportLocation = app.getBatchConfigValue("historical_report_location")
+        if reportLocation:
+            mailContents += "Please see detailed results at " + self.getHtmlReportLocation(app, reportLocation) + "\n"
+        else:
+            mailContents += self.getBody(fileBodies, missingVersions)
         allCats = set(totalValues.keys())
         noMailCats = set([ "succeeded", "known bugs" ])
         allSuccess = allCats.issubset(noMailCats)
         self.mailSender.sendOrStoreMail(app, mailContents, isAllSuccess=allSuccess)
+
+    def getHtmlReportLocation(self, app, reportLocation):
+        versionName = getVersionName(app, self.allApps)
+        fileMapping = app.getConfigValue("file_to_url")
+        appReport = os.path.join(reportLocation, app.name, "test_" + versionName + ".html")
+        for filePath, httpPath in fileMapping.items():
+            if appReport.startswith(filePath):
+                return appReport.replace(filePath, httpPath)
+        return "file://" + os.path.abspath(appReport)
 
     def matchesApp(self, dir, app):
         suffix = app.versionSuffix()

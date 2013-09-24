@@ -180,17 +180,9 @@ class Config:
         groups = self.createOptionGroups(allApps)
         return reduce(operator.add, (g.keys() for g in groups), [])
 
-    def getCollectSequence(self):
-        arg = self.optionMap.get("coll")
-        sequence = []
-        if not arg or "web" not in arg:
-            emailHandler = batch.CollectFiles()
-            sequence.append(emailHandler)
-        return sequence
-
     def getActionSequence(self):
         if self.optionMap.has_key("coll"):
-            return self.getCollectSequence()
+            return []
 
         if self.isReconnecting():
             return self.getReconnectSequence()
@@ -372,8 +364,11 @@ class Config:
         
         if self.batchMode() and not self.optionMap.has_key("s"):
             if self.optionMap.has_key("coll"):
-                if self.optionMap["coll"] != "mail": 
+                arg = self.optionMap["coll"]
+                if arg != "mail": 
                     classes.append(self.getWebPageResponder())
+                if not arg or "web" not in arg:
+                    classes.append(batch.CollectFilesResponder)
             else:
                 if self.optionValue("b") is None:
                     plugins.log.info("No batch session identifier provided, using 'default'")
@@ -1118,6 +1113,7 @@ class Config:
         app.setConfigDefault("smtp_server_username", "", "Username for SMTP authentication when sending mail in batch mode")
         app.setConfigDefault("smtp_server_password", "", "Password for SMTP authentication when sending mail in batch mode")
         app.setConfigDefault("batch_result_repository", { "default" : "" }, "Directory to store historical batch results under")
+        app.setConfigDefault("file_to_url", {}, "Mapping of file locations to URLS, for linking to HTML reports")
         app.setConfigDefault("historical_report_location", { "default" : "" }, "Directory to create reports on historical batch data under")
         app.setConfigDefault("historical_report_page_name", { "default" : self.getDefaultPageName(app) }, "Header for page on which this application should appear")
         app.setConfigDefault("historical_report_colours", self.getDefaultTestOverviewColours(), "Colours to use for historical batch HTML reports")

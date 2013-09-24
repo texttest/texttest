@@ -89,6 +89,13 @@ class PerformanceConfigSettings:
     def aboveMinimum(self, value, configEntry):
         minimum = self.configMethod(configEntry, self.configName)
         return value < 0 or value > minimum
+    
+    def getMinimumMultipleRange(self, value, configEntry):
+        minimum = self.configMethod(configEntry, self.configName)
+        if minimum == 0:
+            return None, None
+        multiple = int(value / minimum)
+        return int(multiple * minimum), int((multiple + 1) * minimum)
 
     def getDescriptor(self, configEntry):
         desc = self._getDescriptor(configEntry, self.configName)
@@ -154,6 +161,10 @@ class PerformanceFileComparison(FileComparison):
 
     def getDifferencesSummary(self, includeNumbers=True):
         return self.perfComparison.getSummary(includeNumbers)
+    
+    def getToleranceMultipleRange(self, test):
+        settings = PerformanceConfigSettings(test, self.stem)
+        return self.perfComparison.getToleranceMultipleRange(settings)
 
     def getDetails(self):
         if self.hasDifferences():
@@ -208,6 +219,16 @@ class PerformanceComparison:
             return str(perc) + "% " + self.descriptor
         else:
             return self.descriptor
+        
+    def getToleranceMultipleRange(self, settings):
+        perc = plugins.roundPercentage(self.percentageChange)
+        if perc <= 0:
+            return ""
+        lower, upper = settings.getMinimumMultipleRange(perc, "performance_variation_%")
+        if lower is not None:
+            return str(lower) + "%-" + str(upper) + "%"
+        else:
+            return ""
 
     def isSignificant(self, settings):
         if settings.ignoreImprovements() and self.newPerformance < self.oldPerformance:

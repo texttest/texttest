@@ -331,7 +331,12 @@ class TestProgressMonitor(guiutils.SubGUI):
 
         for fileComp in filter(lambda c: c.getType() != "failure", comparisons):
             summary = fileComp.getSummary(includeNumbers=False)
-            fileClass = [ "Failed", "Performance differences", (self.getCategoryDescription(state, summary), fileComp.stem) ]
+            desc = self.getCategoryDescription(state, summary)
+            stem = fileComp.stem
+            fileClass = [ "Failed", "Performance differences", (desc, stem) ]
+            toleranceRange = fileComp.getToleranceMultipleRange(test)
+            if toleranceRange:
+                fileClass.append((toleranceRange, stem))
             self.diag.info("Adding file classification for " + repr(fileComp) + " = " + repr(fileClass))
             classifiers.addClassification(fileClass)
 

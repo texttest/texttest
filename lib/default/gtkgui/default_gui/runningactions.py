@@ -31,7 +31,7 @@ class BasicRunningAction:
             return copy(self.currTestSelection)
         
     def startTextTestProcess(self, usecase, runModeOptions, testSelOverride=None, filterFileOverride=None):
-        app = self.currAppSelection[0]
+        app = self.getCurrentApplication()
         writeDir = os.path.join(self.getLogRootDirectory(app), "dynamic_run" + str(self.runNumber))
         plugins.ensureDirectoryExists(writeDir)
         filterFile = self.createFilterFile(writeDir, filterFileOverride)
@@ -48,6 +48,9 @@ class BasicRunningAction:
                                                stdout=open(logFile, "w"), stderr=open(errFile, "w"),
                                                exitHandler=self.checkTestRun,
                                                exitHandlerArgs=(errFile,testsAffected,filterFile,usecase))
+
+    def getCurrentApplication(self):
+        return self.currAppSelection[0] if self.currAppSelection else self.validApps[0]
 
     def getLogRootDirectory(self, app):
         return app.writeDirectory
@@ -139,6 +142,8 @@ class BasicRunningAction:
         return [ "-a", ",".join(appNames) ]
 
     def checkTestRun(self, errFile, testSel, filterFile, usecase):
+        if not testSel:
+            return
         if self.checkErrorFile(errFile, testSel, usecase):
             self.handleCompletion(testSel, filterFile, usecase)
             if len(self.currTestSelection) >= 1 and self.currTestSelection[0] in testSel:
@@ -722,6 +727,10 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
         
     def notifyShortcutRename(self, argstr, *args):
         self.showQueryDialog(self.getParentWindow(), "Shortcuts were renamed. Would you like to update them into all usecases now?",
+                             gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respondUsecaseRename, respondData=(argstr, True, "*usecase*"))
+
+    def notifyShortcutRemove(self, argstr, *args):
+        self.showQueryDialog(self.getParentWindow(), "Shortcuts were removed. Would you like to update them into all usecases now?",
                              gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respondUsecaseRename, respondData=(argstr, True, "*usecase*"))
 
     def respondUsecaseRename(self, dialog, ans, args):

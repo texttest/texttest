@@ -3,7 +3,7 @@
 All the actions for administering the files and directories in a test suite
 """
 
-import gtk, plugins, os, shutil, subprocess, testmodel
+import gtk, plugins, os, shutil, subprocess, testmodel,re
 from .. import guiplugins, guiutils
 from ordereddict import OrderedDict
 from zipfile import ZipFile
@@ -1097,6 +1097,9 @@ class RemoveFiles(guiplugins.ActionGUI):
             permMessage = "Insufficient permissions to remove " + fileType + " '" + filePath + "'"
             if plugins.tryFileChange(self.removePath, permMessage, filePath):
                 removed += 1
+            if filePath.endswith(".shortcut"):
+                from storytext.replayer import ReplayScript
+                self.notify("ShortcutRemove", ReplayScript.transformToRegexp(ReplayScript.tryToGetName(filePath)) + "\n renamed to ")
 
         if test:
             test.filesChanged()
@@ -1105,7 +1108,7 @@ class RemoveFiles(guiplugins.ActionGUI):
         self.notify("Status", "Removed " + plugins.pluralise(removed, fileType) + self.getTestSuffix(test))
         
     def getSignalsSent(self):
-        return [ "ReloadConfig" ]
+        return [ "ReloadConfig", "ShortcutRemove" ]
 
     def appFilesChanged(self):
         appsSeen = set()
@@ -1352,7 +1355,7 @@ class RenameFile(RenameAction):
         return True
     
     def getSignalsSent(self):
-        return [ "ReloadConfig" ]
+        return [ "ReloadConfig", "ShortcutRename" ]
 
     def _getStockId(self):
         return "italic"
@@ -1384,6 +1387,11 @@ class RenameFile(RenameAction):
         newStem = newName.split(".")[0]
         if self.isDefinitionFileStem(oldStem) and not self.isDefinitionFileStem(newStem):
             return "You are trying to rename a definition file in such a way that it will no longer fulfil its previous purpose.\nTextTest uses conventional names for files with certain purposes and '" + oldStem + "' is one such conventional name.\nAre you sure you want to continue?"
+        elif self.oldName.endswith(".shortcut"):
+            if not newName.endswith(".shortcut"):
+                return "A shortcut file name should end with '.shortcut'\nYou are trying to rename it with another extension\nAre you sure you want to continue?"
+            elif self.oldName.count("$") != newName.count("$"):
+                return "The number of shortcut arguments seems to be different.\nAre you sure you want to continue?"
         else:
             return ""
 
@@ -1404,10 +1412,13 @@ class RenameFile(RenameAction):
             self.notify("ReloadConfig")
         else:
             self.currTestSelection[0].filesChanged()
+        
         changeMessage = self.getNameChangeMessage(newName)
+        if self.oldName.endswith(".shortcut") and newName.endswith(".shortcut"):
+            from storytext.replayer import ReplayScript
+            self.notify("ShortcutRename", ReplayScript.transformToRegexp(ReplayScript.tryToGetName(self.oldName)) + " renamed to " + ReplayScript.tryToGetName(newName))
         self.oldName = newName
         self.notify("Status", changeMessage)
-                
 
 class SortTestSuiteFileAscending(guiplugins.ActionGUI):
     def singleTestOnly(self):

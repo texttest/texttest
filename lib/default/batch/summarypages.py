@@ -5,7 +5,7 @@ import testoverview, plugins, logging, os, shutil, time, operator, sys
 from HTMLParser import HTMLParser
 from ordereddict import OrderedDict
 from glob import glob
-from batchutils import BatchVersionFilter
+from batchutils import BatchVersionFilter, parseFileName
 
 class GenerateFromSummaryData(plugins.ScriptWithArgs):
     locationApps = OrderedDict()
@@ -164,7 +164,7 @@ class SummaryDataFinder:
         versionDates = {}
         for path in glob(os.path.join(appDir, "test_*.html")):
             fileName = os.path.basename(path)
-            version, date, tag = self.parseFileName(fileName)
+            version, date, tag = parseFileName(fileName, self.diag)
             if version:
                 overviewPage = os.path.join(appDir, self.getOverviewPageName(version))
                 if os.path.isfile(overviewPage):
@@ -189,7 +189,7 @@ class SummaryDataFinder:
         return max(allDates)
     
     def getDateTagKey(self, info):
-        return info[0], testoverview.GenerateWebPages.padNumbersWithZeroes(info[1])
+        return info[0], plugins.padNumbersWithZeroes(info[1])
         
     def usePieChart(self, appName):
         if self.appUsePie.get(appName) == "true":
@@ -260,21 +260,6 @@ class SummaryDataFinder:
                 return "incomplete"
             else:
                 return "failure"
-
-    def parseFileName(self, fileName):
-        versionStr = fileName[5:-5]
-        components = versionStr.split("_")
-        self.diag.info("Parsing file with components " + repr(components))
-        for index, component in enumerate(components[1:]):
-            try:
-                self.diag.info("Trying to parse " + component + " as date")
-                date = time.strptime(component, "%d%b%Y")
-                version = "_".join(components[:index + 1])
-                tag = "_".join(components[index + 2:]) or component
-                return version, date, tag
-            except ValueError:
-                pass
-        return None, None, None
 
 
 class SummaryGenerator:

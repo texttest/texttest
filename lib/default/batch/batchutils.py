@@ -1,4 +1,4 @@
-import plugins, datetime
+import plugins, datetime, time
 
 class BatchVersionFilter:
     def __init__(self, batchSession):
@@ -24,3 +24,18 @@ def calculateBatchDate():
     # Hence midnight is a bad cutover point. The day therefore starts and ends at 8am :)
     timeToUse = plugins.globalStartTime - datetime.timedelta(hours=8)
     return timeToUse.strftime("%d%b%Y")
+
+def parseFileName(fileName, diag):
+    versionStr = fileName[5:-5]
+    components = versionStr.split("_")
+    diag.info("Parsing file with components " + repr(components))
+    for index, component in enumerate(components[1:]):
+        try:
+            diag.info("Trying to parse " + component + " as date")
+            date = time.strptime(component, "%d%b%Y")
+            version = "_".join(components[:index + 1])
+            tag = "_".join(components[index + 2:]) or component
+            return version, date, tag
+        except ValueError:
+            pass
+    return None, None, None

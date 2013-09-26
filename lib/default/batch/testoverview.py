@@ -211,18 +211,10 @@ class GenerateWebPages(object):
         elif len(x) != len(y):
             # If the timing is the same, sort alphabetically
             # Any number should be sorted numerically, do this by padding them with leading zeroes
-            return cmp(self.padNumbersWithZeroes(x), self.padNumbersWithZeroes(y))
+            return cmp(plugins.padNumbersWithZeroes(x), plugins.padNumbersWithZeroes(y))
         else:
             return cmp(x, y)
-    
-    @classmethod
-    def padNumbersWithZeroes(cls, x):
-        return re.sub("[0-9]+", cls.padWithZeroes, x)
-
-    @staticmethod
-    def padWithZeroes(match):
-        return match.group(0).rjust(4, "0")
-    
+        
     def getTagFromFile(self, fileName):
         return os.path.basename(fileName).replace("teststate_", "")
         

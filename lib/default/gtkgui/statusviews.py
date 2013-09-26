@@ -493,7 +493,8 @@ class TestProgressMonitor(guiutils.SubGUI):
 
     def insertIntoModel(self, parentIter, modelAttributes):
         if parentIter:
-            follower = self.findChildIter(parentIter, lambda name: name > modelAttributes[0])
+            paddedClassifier = plugins.padNumbersWithZeroes(modelAttributes[0])
+            follower = self.findChildIter(parentIter, lambda name: plugins.padNumbersWithZeroes(name) > paddedClassifier)
             return self.treeModel.insert_before(parentIter, follower, modelAttributes)
         else:
             return self.treeModel.append(parentIter, modelAttributes)

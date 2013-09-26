@@ -3,8 +3,9 @@
 import os, plugins, sys, time, shutil, datetime, testoverview, logging, re, tarfile
 from summarypages import GenerateSummaryPage, GenerateGraphs # only so they become package level entities
 from ordereddict import OrderedDict
-from batchutils import calculateBatchDate, BatchVersionFilter
+from batchutils import calculateBatchDate, BatchVersionFilter, parseFileName
 import subprocess
+from glob import glob
                 
 class BatchCategory(plugins.Filter):
     def __init__(self, state):
@@ -882,6 +883,16 @@ class CollectFilesResponder(plugins.Responder):
         for app in self.allApps:
             self.collectFilesForApp(app)
             
+    def getMailBody(self, app, fileBodies, missingVersions):
+        reportLocation = app.getBatchConfigValue("historical_report_location")
+        if reportLocation:
+            htmlIndex, htmlBody = self.getHtmlReportLocation(app, reportLocation)
+            if htmlIndex is not None:
+                return "Please see detailed results at " + htmlBody + "\n\n" + \
+                        "The main index page can be found at " + htmlIndex + "\n"
+            
+        return self.getBody(fileBodies, missingVersions)
+        
     def collectFilesForApp(self, app):
         fileBodies = []
         totalValues = OrderedDict()
@@ -907,24 +918,39 @@ class CollectFilesResponder(plugins.Responder):
 
         mailTitle = self.getTitle(app, totalValues)
         mailContents = self.mailSender.createMailHeaderForSend(self.runId, mailTitle, app)
-        reportLocation = app.getBatchConfigValue("historical_report_location")
-        if reportLocation:
-            mailContents += "Please see detailed results at " + self.getHtmlReportLocation(app, reportLocation) + "\n"
-        else:
-            mailContents += self.getBody(fileBodies, missingVersions)
+        mailContents += self.getMailBody(app, fileBodies, missingVersions)
         allCats = set(totalValues.keys())
         noMailCats = set([ "succeeded", "known bugs" ])
         allSuccess = allCats.issubset(noMailCats)
         self.mailSender.sendOrStoreMail(app, mailContents, isAllSuccess=allSuccess)
 
     def getHtmlReportLocation(self, app, reportLocation):
+        latestFile = self.getMostRecentFile(app, reportLocation)
+        if latestFile is not None:
+            fileMapping = app.getConfigValue("file_to_url")
+            indexFile = os.path.join(reportLocation, "index.html")
+            return self.convertToUrl(indexFile, fileMapping), self.convertToUrl(latestFile, fileMapping)
+        else:
+            return None, None
+
+    def getMostRecentFile(self, app, reportLocation):
         versionName = getVersionName(app, self.allApps)
-        fileMapping = app.getConfigValue("file_to_url")
-        appReport = os.path.join(reportLocation, app.name, "test_" + versionName + ".html")
+        appDir = os.path.join(reportLocation, app.name)
+        bestPath, bestDate, bestTag = None, None, None
+        for path in glob(os.path.join(appDir, "test_" + versionName + "_*.html")):
+            fileName = os.path.basename(path)
+            _, date, tag = parseFileName(fileName, self.diag)
+            if date is not None:
+                paddedTag = plugins.padNumbersWithZeroes(tag)
+                if bestPath is None or date > bestDate or (date == bestDate and paddedTag > bestTag):
+                    bestPath, bestDate, bestTag = path, date, paddedTag
+        return bestPath
+            
+    def convertToUrl(self, path, fileMapping):
         for filePath, httpPath in fileMapping.items():
-            if appReport.startswith(filePath):
-                return appReport.replace(filePath, httpPath)
-        return "file://" + os.path.abspath(appReport)
+            if path.startswith(filePath):
+                return path.replace(filePath, httpPath)
+        return "file://" + os.path.abspath(path)
 
     def matchesApp(self, dir, app):
         suffix = app.versionSuffix()

@@ -175,6 +175,14 @@ regexChars = re.compile("[\^\$\[\]\{\}\\\*\?\|\+]")
 def isRegularExpression(text):
     return (regexChars.search(text) != None)
 
+# Useful for comparing strings with numbers in them
+# so that e.g. "Group 9" comes before "Group 10"
+def padNumbersWithZeroes(x):
+    def padWithZeroes(match):
+        return match.group(0).rjust(4, "0")
+    return re.sub("[0-9]+", padWithZeroes, x)
+
+
 # Parse the string as a byte expression.
 # Mb/mb/megabytes/mbytes
 def parseBytes(text): # pragma: no cover

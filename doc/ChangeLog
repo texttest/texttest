@@ -2419,6 +2419,9 @@ Static GUI Enhancements:
     - "Replace Text in Files" action allows now text search/replace in shortcut files. It shows now a new check box, "Replace text in shortcut files"
 	when usecase home exists.
 Dynamic GUI Enhancements:
+    - Status view now subdivides performance numbers
+	Instead of a single category "Faster" or "Slower" there are subdivisions based on multiples of the tolerance
+	e.g. 10-20%. Should make it easier to spot things that are Faster because they failed catastrophically.
     - New action "View screenshots" and new checkbox enabling screenshot generation in Running tab
 	Intended for displaying screenshots created by new StoryText feature.
 Framework Enhancements:
@@ -2437,6 +2440,8 @@ Framework Enhancements:
 	Allows wrapper scripts to treat this differently from if there are failures.
 Batch Report Enhancements:
     - Index page now notes which run the information there is based on
+    - If you enable both the email and the HTML report, the email now just links to the HTML report
+	New setting "file_to_url" to allow the links to be correct. See website
     - Jenkins changes feature now find indirect dependencies where appropriate
 	e.g. scope:provided in Maven
     - Jenkins changes "marked artefacts" now variable per batch session
@@ -2454,6 +2459,7 @@ Batch Report Enhancements:
 	So no mail will be sent when there are just known bugs now
 Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
     - Default_queue setting should also apply to the proxy job
+    - Don't produce warning spam if there are jobs with multiple spaces in their name
 Bug Fixes:
     - Correctly find version control when TextTest files are only some part of the substructure
     - Workaround Mercurial bug for symbolically linked repository when removing or moving
@@ -2483,3 +2489,8 @@ Bug Fixes:
     - Don't print spurious Aborted messages in jenkins or write to the cache if the job is still running
     - Fixed problem with filtering out tmp directories with 'test_data_ignore'.
     - Derived memory quantities (identified as other than "memory") are now coloured correctly in the HTML report
+    - Choosing "config" in "Temporary Settings" on the Running / Advanced tab now works
+    - Providing -coll without -b is now disallowed. Bad things happened before and this was not supposed to be possible.
+    - Save is no longer first item in any context menus (too easy to press by mistake, and hard to revert)
+    - Newly created shortcuts now appear directly in the Config tab, no restarting needed
+

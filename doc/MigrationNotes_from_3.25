@@ -1,12 +1,20 @@
 =========================================================
-CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
+COMPULSORY MIGRATION
 =========================================================
 
 (1) "slow_motion_replay_speed" config file setting is no longer used
 ====================================================================
 It can be configured now on the running tab of the static GUI. You should just remove it.
 
-(2) "run_dependent_text": overlapping filters now behave as expected
+(2) Deprecated script batch.CollectFiles is removed
+===================================================
+use "-coll mail" instead to send mails alone. "-coll" will send mails and build the HTML report.
+
+=========================================================
+CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
+=========================================================
+
+(1) "run_dependent_text": overlapping filters now behave as expected
 ====================================================================
 
 If you have a file
@@ -27,3 +35,9 @@ stdout:B{->}E
 
 this will now as expected remove all the lines between B and F. Previously it would remove the entire file
 after B. This was a bug, but is included here as it may change the behaviour of long-established filters.
+
+(2) Running "-coll", with both HTML report and email enabled
+============================================================
+The email will now just contain links to the HTML report instead of complete plain-text information.
+Also, it will be generated after the HTML report, in 3.25 it was generated first.
+ 

@@ -2441,7 +2441,7 @@ Framework Enhancements:
 Batch Report Enhancements:
     - Index page now notes which run the information there is based on
     - If you enable both the email and the HTML report, the email now just links to the HTML report
-	New setting "file_to_url" to allow the links to be correct. See website
+	New setting "file_to_url" to allow the links to be correct. See website and migration notes.
     - Jenkins changes feature now find indirect dependencies where appropriate
 	e.g. scope:provided in Maven
     - Jenkins changes "marked artefacts" now variable per batch session
@@ -2457,6 +2457,7 @@ Batch Report Enhancements:
     - Adding links in html report to Jenkins jobs
     - "batch_mail_on_failure_only" uses the same criteria as that which sets exit code 0
 	So no mail will be sent when there are just known bugs now
+    - batch.CollectFiles is removed. See migration notes.
 Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
     - Default_queue setting should also apply to the proxy job
     - Don't produce warning spam if there are jobs with multiple spaces in their name

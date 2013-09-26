@@ -1095,12 +1095,14 @@ class RemoveFiles(guiplugins.ActionGUI):
             self.notify("Status", "Removing " + fileType + " " + os.path.basename(filePath))
             self.notify("ActionProgress")
             permMessage = "Insufficient permissions to remove " + fileType + " '" + filePath + "'"
-            if plugins.tryFileChange(self.removePath, permMessage, filePath):
-                removed += 1
             if filePath.endswith(".shortcut"):
                 from storytext.replayer import ReplayScript
-                self.notify("ShortcutRemove", ReplayScript.transformToRegexp(ReplayScript.tryToGetName(filePath)) + "\n renamed to ")
+                script = ReplayScript(filePath, False)
+                commands = "\n".join(script.commands)
+                self.notify("ShortcutRemove", ReplayScript.transformToRegexp(ReplayScript.tryToGetName(filePath)) + "\n renamed to " + commands + "\n")
 
+            if plugins.tryFileChange(self.removePath, permMessage, filePath):
+                removed += 1
         if test:
             test.filesChanged()
         else:

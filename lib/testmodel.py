@@ -466,8 +466,6 @@ class Test(plugins.Observable):
     def getDirCachesToRoot(self, configName):
         fromTests = [ test.dircache for test in self.getAllTestsToRoot() ]
         dirCaches = self.app.getExtraDirCaches(configName, envMapping=self.environment) + fromTests
-        if self.app.tmpSettingsDirCache:
-            dirCaches.append(self.app.tmpSettingsDirCache)
         return dirCaches
 
     def getAllFileNames(self, stem, refVersion = None):
@@ -1316,7 +1314,6 @@ class Application:
             self.diag.info("Local write directory at " + self.localWriteDirectory)
         self.checkout = self.configObject.setUpCheckout(self)
         self.diag.info("Checkout set to " + self.checkout)
-        self.tmpSettingsDirCache = DirectoryCache(inputOptions.get("td")) if "td" in inputOptions else None
         
     def __repr__(self):
         return self.fullName() + self.versionSuffix()
@@ -1435,6 +1432,8 @@ class Application:
                     dirCaches.append(dirCache)
                 else:
                     self.extraDirCaches[dirName] = None # don't look for it again
+        if "td" in self.inputOptions:
+            dirCaches.append(DirectoryCache(self.inputOptions["td"]))
         return dirCaches
 
     def makeConfigObject(self):

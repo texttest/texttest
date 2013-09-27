@@ -258,24 +258,33 @@ class TextTest(plugins.Responder, plugins.Observable):
                 if not respClass in responderClasses:
                     self.diag.info("Adding responder " + repr(respClass))
                     responderClasses.insert(-2, respClass) # keep Activator and AllCompleteResponder at the end
-        filteredClasses = self.removeBaseClasses(responderClasses)
-        self.diag.info("Filtering away base classes, using " + repr(filteredClasses))
-        self.observers = map(lambda x : x(self.inputOptions, allApps), filteredClasses)
+        self.removeBaseClasses(responderClasses)
+        self.diag.info("Filtering away base classes, using " + repr(responderClasses))
+        self.observers = map(lambda x : x(self.inputOptions, allApps), responderClasses)
 
     def getBuiltinResponderClasses(self):
         return [ UniqueNameFinder, Activator, testmodel.AllCompleteResponder ]
     def removeBaseClasses(self, classes):
         # Different apps can produce different versions of the same responder/thread runner
-        # We should make sure we only include the most specific ones
+        # We should make sure we only include the most specific ones, in the furthest forward position their relatives achieved...
+        # (the order can be important)
         toRemove = []
+        newPositions = {}
         for i, class1 in enumerate(classes):
             for class2 in classes[i+1:]:
                 if issubclass(class1, class2):
                     toRemove.append(class2)
                 elif issubclass(class2, class1):
                     toRemove.append(class1)
-        return filter(lambda x: x not in toRemove, classes)
-
+                    if class2 not in newPositions:
+                        newPositions[class2] = i
+                        
+        for cls, i in newPositions.items():
+            classes.remove(cls)
+            classes.insert(i, cls)
+        for cls in toRemove:
+            classes.remove(cls)
+            
     def createTestSuites(self, allApps):
         appSuites = OrderedDict()
         raisedError = False

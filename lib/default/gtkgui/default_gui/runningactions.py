@@ -18,7 +18,13 @@ class BasicRunningAction:
         return "Running"
 
     def messageAfterPerform(self):
-        return self.performedDescription() + " " + self.describeTests() + " at " + plugins.localtime() + "."
+        return self.performedDescription() + " " + self.describeTestsWithCount() + " at " + plugins.localtime() + "."
+
+    def describeTestsWithCount(self):
+        if self.testCount == 1:
+            return "test " + self.getTestCaseSelection()[0].getRelPath()
+        else:
+            return str(self.testCount) + " tests"
 
     def performOnCurrent(self):
         self.startTextTestProcess(self.getUseCaseName(), [ "-g" ])

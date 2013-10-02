@@ -728,15 +728,15 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
         return len(self.storytextDirs) > 0 and self.optionGroup.getOptionValue("includeShortcuts") > 0
 
     def notifyUsecaseRename(self, argstr, *args):
-        self.showQueryDialog(self.getParentWindow(), "Usecase names were renamed. Would you like to update them into all usecases now?",
+        self.showQueryDialog(self.getParentWindow(), "Usecase names were renamed. Would you like to update them in all usecases now?",
                              gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respondUsecaseRename, respondData=(argstr, False, "*usecase*,stdout"))
         
     def notifyShortcutRename(self, argstr, *args):
-        self.showQueryDialog(self.getParentWindow(), "Shortcuts were renamed. Would you like to update them into all usecases now?",
+        self.showQueryDialog(self.getParentWindow(), "Shortcuts were renamed. Would you like to update all usecases now?",
                              gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respondUsecaseRename, respondData=(argstr, True, "*usecase*"))
 
     def notifyShortcutRemove(self, argstr, *args):
-        self.showQueryDialog(self.getParentWindow(), "Shortcuts were removed. Would you like to update them into all usecases now?",
+        self.showQueryDialog(self.getParentWindow(), "Shortcuts were removed. Would you like to update all usecases now?",
                              gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respondUsecaseRename, respondData=(argstr, True, "*usecase*"))
 
     def respondUsecaseRename(self, dialog, ans, args):

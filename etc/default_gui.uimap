@@ -1058,3 +1058,6 @@ toggled.true = trigger if the text is exactly as given
 [Name=File Type]
 changed = choose temporary setting file type =
 
+[Label=Enable CaptureMock for record/playback mocking]
+toggled.true = enable capturemock
+

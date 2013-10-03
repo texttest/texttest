@@ -442,6 +442,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
                                    "Other embedded Use-case Recorder (e.g. NUseCase)",
                                    "Other GUI-test tool (enable virtual display only)" ],
                        hideOptions=True)
+        self.addSwitch("cpmock", "Enable CaptureMock for record/playback mocking")
 
         possibleDirs = []
         for app in allApps:
@@ -540,6 +541,8 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         fullName = self.optionGroup.getOptionValue("name")
         if fullName:
             configEntries["full_name"] = fullName
+        if self.optionGroup.getSwitchValue("cpmock"):
+            configEntries["import_config_file"] = "capturemock_config"
         useGui = self.optionGroup.getSwitchValue("gui")
         if useGui > 0:
             configEntries["use_case_record_mode"] = "GUI"

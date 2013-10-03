@@ -2418,6 +2418,7 @@ Static GUI Enhancements:
 	a new check box "Show GUI and record any extra actions".
     - "Replace Text in Files" action allows now text search/replace in shortcut files. It shows now a new check box, "Replace text in shortcut files"
 	when usecase home exists.
+    - Can now enable CaptureMock directly from the initial application creation dialog
 Dynamic GUI Enhancements:
     - Status view now subdivides performance numbers
 	Instead of a single category "Faster" or "Slower" there are subdivisions based on multiples of the tolerance
@@ -2494,4 +2495,4 @@ Bug Fixes:
     - Providing -coll without -b is now disallowed. Bad things happened before and this was not supposed to be possible.
     - Save is no longer first item in any context menus (too easy to press by mistake, and hard to revert)
     - Newly created shortcuts now appear directly in the Config tab, no restarting needed
-
+    - Test count reported in static GUI status bar is correct when test suites are selected

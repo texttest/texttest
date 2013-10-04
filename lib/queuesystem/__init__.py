@@ -180,6 +180,9 @@ class QueueSystemConfig(default.Config):
         else:
             return default.Config.getExecHostFinder(self)
 
+    def expandExternalEnvironment(self):
+        return not self.useQueueSystem or self.slaveRun()
+
     def getRunDescription(self, test):
         basicDescription = default.Config.getRunDescription(self, test)
         if self.useQueueSystem:

@@ -1060,6 +1060,9 @@ class Config:
             
     def getRunDescription(self, test):
         return RunTest().getRunDescription(test)
+    
+    def expandExternalEnvironment(self):
+        return True
 
     # For display in the GUI
     def extraReadFiles(self, testArg):

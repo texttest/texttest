@@ -121,6 +121,8 @@ class TestEnvironment(OrderedDict):
             else:
                 varsToUnset.append(key)
         varsToUnset += ignoreVars
+        from pprint import pformat
+        self.diag.info("Got variables " + pformat(values))
         self.diag.info("Removing variables " + repr(varsToUnset))
         # copy in the external environment last
         return plugins.copyEnvironment(values, varsToUnset)
@@ -136,41 +138,45 @@ class TestEnvironment(OrderedDict):
         self.checkPopulated()
         return self._getSingleValue(var, defaultValue)
 
-    def _getSingleValue(self, var, defaultValue=None):
-        value = self.get(var, os.getenv(var, defaultValue))
+    def _getSingleValue(self, var, defaultValue=None, expandExternal=True):
+        if var in self:
+            value = self.get(var)
+        else:
+            # We create expansions of PATH externally, make sure we expand them if needed
+            value = os.getenv(var, defaultValue) if expandExternal or var == "PATH" else defaultValue
         self.diag.info("Single: got " + var + " = " + repr(value))
         return value
     
-    def getSelfReference(self, var, originalVar):
+    def getSelfReference(self, var, originalVar, expandExternal):
         if var == originalVar:
-            return self._getSingleValue(var)
+            return self._getSingleValue(var, expandExternal=expandExternal)
 
-    def getSingleValueNoSelfRef(self, var, originalVar):
+    def getSingleValueNoSelfRef(self, var, originalVar, expandExternal):
         if var != originalVar:
-            return self._getSingleValue(var)
+            return self._getSingleValue(var, expandExternal=expandExternal)
 
-    def storeVariables(self, vars):
+    def storeVariables(self, vars, expandExternal=True):
         for var, valueOrMethod in vars:
-            newValue = self.expandSelfReferences(var, valueOrMethod)
+            newValue = self.expandSelfReferences(var, valueOrMethod, expandExternal)
             if newValue is not None:
                 self.diag.info("Storing " + var + " = " + repr(newValue))
                 self[var] = newValue
                 
-        while self.expandVariables():
+        while self.expandVariables(expandExternal):
             pass
 
-    def expandSelfReferences(self, var, valueOrMethod):
+    def expandSelfReferences(self, var, valueOrMethod, expandExternal):
         if type(valueOrMethod) == types.StringType:
-            mapping = DynamicMapping(self.getSelfReference, var)
+            mapping = DynamicMapping(self.getSelfReference, var, expandExternal)
             self.diag.info("Expanding self references for " + repr(var) + " in " + repr(valueOrMethod))
             return string.Template(valueOrMethod).safe_substitute(mapping)
         else:
             return valueOrMethod(var, self._getSingleValue(var, ""))
 
-    def expandVariables(self):
+    def expandVariables(self, expandExternal):
         expanded = False
         for var, value in self.iteritems():
-            mapping = DynamicMapping(self.getSingleValueNoSelfRef, var)
+            mapping = DynamicMapping(self.getSingleValueNoSelfRef, var, expandExternal)
             newValue = string.Template(value).safe_substitute(mapping)
             if newValue != value:
                 expanded = True
@@ -1523,7 +1529,7 @@ class Application:
             allVars += vars
             allProps += props
 
-        test.environment.storeVariables(allVars)
+        test.environment.storeVariables(allVars, self.configObject.expandExternalEnvironment())
         for var, value, propFile in allProps:
             test.addProperty(var, value, propFile)
 

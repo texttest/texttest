@@ -245,6 +245,7 @@ class RecomputeTests(guiplugins.ActionGUI):
                 self.notify("ActionProgress")
                 appOrTest.reloadConfiguration()
 
+    def performInBackground(self):
         selection = copy(self.currTestSelection)
         if self.recomputeThread and self.recomputeThread.isAlive():
             self.notify("Status", "Waiting for previous recomputation to finish ...")
@@ -253,6 +254,7 @@ class RecomputeTests(guiplugins.ActionGUI):
         self.recomputeThread.start()
         
     def recomputeTests(self, selection):
+        self.notify("ActionStart", False)
         latestTestCount = 0
         for test in selection:
             latestTestCount += 1
@@ -261,6 +263,7 @@ class RecomputeTests(guiplugins.ActionGUI):
             self.notify("Recomputed", test)
             
         self.notify("Status", self.getFinalMessage(latestTestCount))
+        self.notify("ActionStop")
         self.notify("RecomputationCompleted")
             
     def getFinalMessage(self, latestTestCount):
@@ -269,6 +272,9 @@ class RecomputeTests(guiplugins.ActionGUI):
         else:
             return "Recomputed status of " + plugins.pluralise(latestTestCount, "test") + "."
 
+    def _runInteractive(self):
+        guiplugins.ActionGUI._runInteractive(self)
+        self.performInBackground()
 
 
 class MarkTest(guiplugins.ActionDialogGUI):

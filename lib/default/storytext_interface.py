@@ -42,8 +42,8 @@ class ApplicationEventResponder(plugins.Responder):
         except ValueError: # pragma: no cover - pathological case
             return 1
         
-    def notifyRecomputationCompleted(self, *args):
-        applicationEvent("completion of recomputation", "recompute")
+    def notifyBackgroundActionCompleted(self, *args):
+        applicationEvent("completion of background actions", "background")
 
     def notifyAllRead(self, *args):
         applicationEvent("all tests to be read", "read", [ "lifecycle" ])

@@ -420,7 +420,7 @@ class TestComparison(BaseTestComparison):
             versionRepr = ", version " + repr(versionString)
         else:
             versionRepr = ", existing version"
-        self.notifyIfMainThread("Status", testRepr + compStr + versionRepr)
+        self.notify("Status", testRepr + compStr + versionRepr)
         self.notifyIfMainThread("ActionProgress")
 
     def makeNewState(self, test, lifeCycleDest):

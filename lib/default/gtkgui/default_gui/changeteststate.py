@@ -11,7 +11,39 @@ from ConfigParser import ConfigParser
 from copy import copy
 from threading import Thread
 
-class SaveTests(guiplugins.ActionDialogGUI):
+class BackgroundThreadHelper:
+    backgroundThread = None
+    def getSignalsSent(self):
+        return [ "BackgroundActionCompleted" ]
+
+    def messageAfterPerform(self):
+        pass
+
+    def performInBackground(self):
+        selection = copy(self.currTestSelection)
+        if self.backgroundThread and self.backgroundThread.isAlive():
+            self.notify("Status", "Waiting for previous background action to finish ...")
+            self.backgroundThread.join()
+        BackgroundThreadHelper.backgroundThread = Thread(target=self.runBackgroundThread, args=(selection,))
+        self.backgroundThread.start()
+        
+    def runBackgroundThread(self, *args):
+        self.notify("ActionStart", False)
+        errorMsg = self.performBackgroundAction(*args)
+        self.notify("ActionStop")
+        self.notify("BackgroundActionCompleted", errorMsg, self)
+        
+    def _runInteractive(self):
+        guiplugins.ActionGUI._runInteractive(self)
+        self.performInBackground()
+
+    def notifyBackgroundActionCompleted(self, message, origAction):
+        if message and origAction is self:
+            self.showErrorDialog(message)
+        
+
+
+class SaveTests(BackgroundThreadHelper,guiplugins.ActionDialogGUI):
     defaultVersionStr = "<existing version>"
     fullVersionStr = "<full version>"
     def __init__(self, allApps, *args):
@@ -50,9 +82,7 @@ class SaveTests(guiplugins.ActionDialogGUI):
         return "Save results with non-default settings"
     def getDirectTooltip(self):
         return "Save results for selected tests"
-    def messageAfterPerform(self):
-        pass # do it in the method
-
+    
     def addToGroups(self, actionGroup, accelGroup):
         self.directAccel = self._addToGroups("Save", self.directAction, actionGroup, accelGroup)
         guiplugins.ActionDialogGUI.addToGroups(self, actionGroup, accelGroup)
@@ -73,8 +103,8 @@ class SaveTests(guiplugins.ActionDialogGUI):
         message += "Are you sure you want to do this?\n"
         return message
 
-    def getSaveableTests(self):
-        return filter(lambda test: test.stateInGui.isSaveable(), self.currTestSelection)
+    def getSaveableTests(self, selection):
+        return filter(lambda test: test.stateInGui.isSaveable(), selection)
 
     def updateOptions(self):
         versionOption = self.optionGroup.getOption("v")
@@ -131,9 +161,11 @@ class SaveTests(guiplugins.ActionDialogGUI):
         if self.optionGroup.getOptionValue("v") in backupVersions:
             raise plugins.TextTestError, "Cannot backup to the same version we're trying to save! Choose another name."
         
+    def performBackgroundAction(self, selection):
+        backupVersions = self.getBackupVersions()
         stemsToSave = self.getStemsToSave()
         overwriteSuccess = self.optionGroup.getSwitchValue("over")
-        tests = self.getSaveableTests()
+        tests = self.getSaveableTests(selection)
         # Calculate the versions beforehand, as saving tests can change the selection,
         # which can affect the default version calculation...
         testsWithVersions = [ (test, self.getVersion(test)) for test in tests ]
@@ -151,11 +183,10 @@ class SaveTests(guiplugins.ActionDialogGUI):
         except OSError, e:
             self.notify("Status", "Failed to save " + testDesc + ".")
             errorStr = str(e)
-            if errorStr.find("Permission") != -1:
-                raise plugins.TextTestError, "Failed to save " + testDesc + \
-                      " : didn't have sufficient write permission to the test files"
-            else:
-                raise plugins.TextTestError, errorStr
+            if "Permission" in errorStr:
+                errorStr = "Failed to save " + testDesc + \
+                        " : didn't have sufficient write permission to the test files"
+            return errorStr
 
 
 class SplitResultFiles(guiplugins.ActionGUI):
@@ -209,11 +240,7 @@ class SplitResultFiles(guiplugins.ActionGUI):
             test.changeState(newState)
 
 
-class RecomputeTests(guiplugins.ActionGUI):
-    def __init__(self, *args, **kw):
-        guiplugins.ActionGUI.__init__(self, *args, **kw)
-        self.recomputeThread = None
-        
+class RecomputeTests(BackgroundThreadHelper,guiplugins.ActionGUI):    
     def isActiveOnCurrent(self, test=None, state=None):
         for currTest in self.currTestSelection:
             if currTest is test:
@@ -233,10 +260,7 @@ class RecomputeTests(guiplugins.ActionGUI):
         return "Recompute test status, including progress information if appropriate"
 
     def getSignalsSent(self):
-        return [ "Recomputed", "RecomputationCompleted" ]
-
-    def messageAfterPerform(self):
-        pass
+        return [ "Recomputed" ] + BackgroundThreadHelper.getSignalsSent(self)
         
     def performOnCurrent(self):
         if any((test.stateInGui.isComplete() for test in self.currTestSelection)):
@@ -244,17 +268,8 @@ class RecomputeTests(guiplugins.ActionGUI):
                 self.notify("Status", "Rereading configuration for " + repr(appOrTest) + " ...")
                 self.notify("ActionProgress")
                 appOrTest.reloadConfiguration()
-
-    def performInBackground(self):
-        selection = copy(self.currTestSelection)
-        if self.recomputeThread and self.recomputeThread.isAlive():
-            self.notify("Status", "Waiting for previous recomputation to finish ...")
-            self.recomputeThread.join()
-        self.recomputeThread = Thread(target=self.recomputeTests, args=(selection,))
-        self.recomputeThread.start()
         
-    def recomputeTests(self, selection):
-        self.notify("ActionStart", False)
+    def performBackgroundAction(self, selection):
         latestTestCount = 0
         for test in selection:
             latestTestCount += 1
@@ -263,18 +278,12 @@ class RecomputeTests(guiplugins.ActionGUI):
             self.notify("Recomputed", test)
             
         self.notify("Status", self.getFinalMessage(latestTestCount))
-        self.notify("ActionStop")
-        self.notify("RecomputationCompleted")
             
     def getFinalMessage(self, latestTestCount):
         if latestTestCount == 0:
             return "No test needed recomputation."
         else:
             return "Recomputed status of " + plugins.pluralise(latestTestCount, "test") + "."
-
-    def _runInteractive(self):
-        guiplugins.ActionGUI._runInteractive(self)
-        self.performInBackground()
 
 
 class MarkTest(guiplugins.ActionDialogGUI):

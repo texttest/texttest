@@ -31,7 +31,7 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
     def killJob(self, jobId):
         proc = self.processes[jobId]
         jobExisted = proc.poll() is None
-        proc.send_signal(signal.SIGUSR2)
+        proc.send_signal(signal.SIGUSR2 if os.name == "posix" else signal.SIGTERM)
         return jobExisted
     
     def getStatusForAllJobs(self):

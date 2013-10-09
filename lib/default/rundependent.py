@@ -143,6 +143,11 @@ class FilterTemporary(FilterAction):
         test.changeState(newState)
 
 
+class FilterOriginalForScript(FilterOriginal):
+    def _makeAllFilters(self, *args):
+        return []
+
+
 class FilterErrorText(FilterAction):
     def _makeAllFilters(self, test, stem, app):
         texts = app.getConfigValue("suppress_stderr_text")

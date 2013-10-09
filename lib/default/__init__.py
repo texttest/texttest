@@ -190,7 +190,8 @@ class Config:
         scriptObject = self.optionMap.getScriptObject()
         if scriptObject:
             if self.usesComparator(scriptObject):
-                return [ self.getWriteDirectoryMaker(), scriptObject, comparetest.MakeComparisons(ignoreMissing=True,enableColor=self.optionMap.has_key("zen")) ]
+                return [ self.getWriteDirectoryMaker(), rundependent.FilterOriginalForScript(), scriptObject,  
+                        comparetest.MakeComparisons(ignoreMissing=True,enableColor=self.optionMap.has_key("zen")) ]
             else:
                 return [ scriptObject ]
         else:

@@ -517,6 +517,7 @@ class LoadSelection(guiplugins.ActionDialogGUI):
         tests = []
         for suite in self.rootTestSuites:
             filters = suite.app.getFiltersFromFile(fileName, self.rootTestSuites)
+            self.notify("ActionProgress")
             tests += suite.testCaseList(filters)
         return tests
     def getSizeAsWindowFraction(self):

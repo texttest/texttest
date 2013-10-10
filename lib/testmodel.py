@@ -582,6 +582,7 @@ class Test(plugins.Observable):
 
     def isAcceptedByAll(self, filters, checkContents=True):
         for filter in filters:
+            self.notifyIfMainThread("ActionProgress")
             if not self.isAcceptedBy(filter, checkContents):
                 self.diagnose("Rejected due to " + repr(filter))
                 return False

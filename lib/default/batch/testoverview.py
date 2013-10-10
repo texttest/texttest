@@ -1,7 +1,7 @@
 # Code to generate HTML report of historical information. This report generated
 # either via the -coll flag, or via -s 'batch.GenerateHistoricalReport <batchid>'
 
-import os, plugins, time, HTMLgen, HTMLcolors, sys, logging, jenkinschanges
+import os, plugins, time, HTMLgen, HTMLcolors, cgi, sys, logging, jenkinschanges
 from cPickle import Unpickler, UnpicklingError
 from ordereddict import OrderedDict
 from glob import glob
@@ -539,7 +539,8 @@ class TestTable:
         bgColour = self.colourFinder.find("row_header_bg")
         testId = self.version + testName + extraVersion
         container = HTMLgen.Container(HTMLgen.Name(testId), testName)
-        row = [ HTMLgen.TD(container, bgcolor=bgColour, title=self.descriptionInfo.get(testName, "")) ]
+        description = self.descriptionInfo.get(testName, "")
+        row = [ HTMLgen.TD(container, bgcolor=bgColour, title=cgi.escape(description, True)) ]
         # Don't add empty rows to the table
         foundData = False
         bgcol = None

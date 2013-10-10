@@ -1,12 +1,11 @@
 # Code to generate HTML report of historical information. This report generated
 # either via the -coll flag, or via -s 'batch.GenerateHistoricalReport <batchid>'
 
-import os, plugins, time, HTMLgen, HTMLcolors, cgi, sys, logging, jenkinschanges
+import os, plugins, time, HTMLgen, HTMLcolors, cgi, sys, logging, jenkinschanges, locale
 from cPickle import Unpickler, UnpicklingError
 from ordereddict import OrderedDict
 from glob import glob
 from pprint import pformat
-import re
 HTMLgen.PRINTECHO = 0
 
 def getWeekDay(tag):
@@ -535,12 +534,17 @@ class TestTable:
         columnHeader = HTMLgen.TH(extraVersionElement, colspan = len(self.tags) + 1, bgcolor=bgColour)
         return HTMLgen.TR(columnHeader)
     
+    def escapeForHtml(self, text):
+        localeEncoding = locale.getdefaultlocale()[1] or "utf-8"
+        text = cgi.escape(text, True)
+        return unicode(text, localeEncoding).encode("ascii", "xmlcharrefreplace")
+        
     def generateTestRows(self, testName, extraVersion, results):
         bgColour = self.colourFinder.find("row_header_bg")
         testId = self.version + testName + extraVersion
         container = HTMLgen.Container(HTMLgen.Name(testId), testName)
         description = self.descriptionInfo.get(testName, "")
-        row = [ HTMLgen.TD(container, bgcolor=bgColour, title=cgi.escape(description, True)) ]
+        row = [ HTMLgen.TD(container, bgcolor=bgColour, title=self.escapeForHtml(description)) ]
         # Don't add empty rows to the table
         foundData = False
         bgcol = None

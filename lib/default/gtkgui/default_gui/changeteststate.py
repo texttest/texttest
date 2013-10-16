@@ -30,7 +30,7 @@ class BackgroundThreadHelper:
     def runBackgroundThread(self, *args):
         self.notify("ActionStart", False)
         errorMsg = self.performBackgroundAction(*args)
-        self.notify("ActionStop")
+        self.notify("ActionStop", False)
         self.notify("BackgroundActionCompleted", errorMsg, self)
         
     def _runInteractive(self):

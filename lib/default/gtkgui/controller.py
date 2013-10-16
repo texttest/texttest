@@ -53,7 +53,7 @@ class IdleHandlerManager:
         if self.sourceId >= 0:
             raise plugins.TextTestError, "No Action currently exists to have progress on!"
 
-    def notifyActionStop(self):
+    def notifyActionStop(self, *args):
         # Activate idle function again, see comment in notifyActionStart
         self.enableHandler()
         
@@ -320,7 +320,7 @@ class GUIController(plugins.Responder, plugins.Observable):
     def notifyAllRead(self, suites):
         if not self.dynamic and self.initialApps:
             self.notify("Status", "Reading tests completed at " + plugins.localtime() + ".")
-            self.notify("ActionStop")
+            self.notify("ActionStop", False)
         self.notify("AllRead", suites)
         for suite in suites:
             if suite.app not in self.initialApps:

@@ -166,6 +166,9 @@ class TestColumnGUI(guiutils.SubGUI):
             return ""
                             
     def notifyNewTestSelection(self, tests, dummyApps, distinctTestCount, *args, **kw):
+        self.updateTestInfo(tests, distinctTestCount)
+        
+    def updateTestInfo(self, tests, distinctTestCount):
         newCount, suitesOnly = self.countTests(tests)
         if distinctTestCount > newCount:
             distinctTestCount = newCount
@@ -243,6 +246,8 @@ class TestTreeGUI(guiutils.ContainerGUI):
         self.treeView = None
         self.newTestsVisible = guiutils.guiConfig.showCategoryByDefault("not_started")
         self.diag = logging.getLogger("Test Tree")
+        self.longActionRunning = False
+        self.recreateOnActionStop = False
 
     def notifyDefaultVisibility(self, newValue):
         self.newTestsVisible = newValue
@@ -472,12 +477,30 @@ class TestTreeGUI(guiutils.ContainerGUI):
             if test.app not in apps:
                 apps.append(test.app)
         return apps
+    
+    def notifyActionStart(self, foreground=True):
+        if not foreground:
+            self.longActionRunning = True
+    
+    def notifyActionStop(self, foreground=True):
+        if not foreground:
+            if self.longActionRunning and self.recreateOnActionStop:
+                self.sendActualSelectionNotification(direct=False)
+            self.longActionRunning = False
+            self.recreateOnActionStop = False
+
+    def sendActualSelectionNotification(self, direct):
+        apps = self.getSelectedApps(self.selectedTests)
+        self.notify("NewTestSelection", self.selectedTests, apps, self.selection.count_selected_rows(), direct)
 
     def sendSelectionNotification(self, tests, direct=True):
         self.diag.info("Selection now changed to " + repr(tests))
-        apps = self.getSelectedApps(tests)
         self.selectedTests = tests
-        self.notify("NewTestSelection", tests, apps, self.selection.count_selected_rows(), direct)
+        if self.longActionRunning:
+            self.recreateOnActionStop = True
+            self.subguis[0].updateTestInfo(tests, self.selection.count_selected_rows())
+        else:
+            self.sendActualSelectionNotification(direct)
 
     def getSelected(self):
         allSelected = []

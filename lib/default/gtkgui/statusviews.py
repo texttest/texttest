@@ -28,7 +28,7 @@ class StatusMonitorGUI(guiutils.SubGUI):
     def notifyActionStart(self, lock=True):
         if self.throbber:
             if self.pixbuf: # pragma: no cover : Only occurs if some code forgot to do ActionStop ...
-                self.notifyActionStop()
+                self.notifyActionStop(lock)
             self.pixbuf = self.throbber.get_pixbuf()
             self.throbber.set_from_animation(self.animation)
             if lock:
@@ -38,11 +38,12 @@ class StatusMonitorGUI(guiutils.SubGUI):
         while gtk.events_pending():
             gtk.main_iteration(False)
 
-    def notifyActionStop(self):
+    def notifyActionStop(self, lock=True):
         if self.throbber:
             self.throbber.set_from_pixbuf(self.pixbuf)
             self.pixbuf = None
-            self.throbber.grab_remove()
+            if lock:
+                self.throbber.grab_remove()
 
     def notifyStatus(self, message):
         if self.label:
@@ -545,7 +546,7 @@ class TestProgressMonitor(guiutils.SubGUI):
         return False
     
     def getAllChildIters(self, iter):
-         # Toggle all children too
+        # Toggle all children too
         childIters = []
         childIter = self.treeModel.iter_children(iter)
         while childIter != None:

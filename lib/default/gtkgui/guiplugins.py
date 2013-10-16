@@ -190,7 +190,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         pass
                 
     def setObservers(self, observers):
-        signals = [ "Status", "ActionProgress" ] + self.getSignalsSent()
+        signals = [ "Status", "ActionStart" ] + self.getSignalsSent()
         self.diag.info("Observing " + str(self.__class__) + " :")
         for observer in observers:
             for signal in signals:

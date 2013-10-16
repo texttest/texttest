@@ -2420,6 +2420,8 @@ Static GUI Enhancements:
 	when usecase home exists.
     - Can now enable CaptureMock directly from the initial application creation dialog
 Dynamic GUI Enhancements:
+    - Save now runs in background
+	GUI doesn't freeze while tests are being saved
     - Status view now subdivides performance numbers
 	Instead of a single category "Faster" or "Slower" there are subdivisions based on multiples of the tolerance
 	e.g. 10-20%. Should make it easier to spot things that are Faster because they failed catastrophically.
@@ -2462,6 +2464,8 @@ Batch Report Enhancements:
 Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
     - Default_queue setting should also apply to the proxy job
     - Don't produce warning spam if there are jobs with multiple spaces in their name
+    - Run Info doesn't expand references to external environment variables any more when using grid
+	This is generally misleading as the variables won't be forwarded to the grid jobs anyway
 Bug Fixes:
     - Correctly find version control when TextTest files are only some part of the substructure
     - Workaround Mercurial bug for symbolically linked repository when removing or moving
@@ -2496,3 +2500,7 @@ Bug Fixes:
     - Save is no longer first item in any context menus (too easy to press by mistake, and hard to revert)
     - Newly created shortcuts now appear directly in the Config tab, no restarting needed
     - Test count reported in static GUI status bar is correct when test suites are selected
+    - Fixed various problems where throbber didn't run to show progress
+    - Unicode characters and quotes in test descriptions don't cause problems in HTML report any more
+    - Fixed bug with killing running tests in "parallel" on Windows
+    - Replace Text in files now works properly cross-platform, assuming home_operating_system is set correctly

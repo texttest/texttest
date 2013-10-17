@@ -494,7 +494,10 @@ class TestTreeGUI(guiutils.ContainerGUI):
         self.notify("NewTestSelection", self.selectedTests, apps, self.selection.count_selected_rows(), direct)
 
     def sendSelectionNotification(self, tests, direct=True):
-        self.diag.info("Selection now changed to " + repr(tests))
+        if len(tests) < 10:
+            self.diag.info("Selection now changed to " + repr(tests))
+        else:
+            self.diag.info("Selection now of size " + str(len(tests)))
         self.selectedTests = tests
         if self.longActionRunning:
             self.recreateOnActionStop = True
@@ -509,7 +512,6 @@ class TestTreeGUI(guiutils.ContainerGUI):
             selected += self.getNewSelected(model.get_value(iter, 2), prevSelected)
 
         self.selection.selected_foreach(addSelTest, allSelected)
-        self.diag.info("Selected tests are " + repr(allSelected))
         return allSelected
 
     def getNewSelected(self, tests, prevSelected):

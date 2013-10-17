@@ -549,7 +549,7 @@ class Observable:
         lastObserver = None
         for observer in self.observers:
             if hasattr(observer, methodName):
-                self.diagnoseObs("Notify observer " + str(observer.__class__))
+                self.diagnoseObs("Notify observer " + name + " " + str(observer.__class__))
                 answer = self.notifyObserver(observer, methodName, *args, **kwargs)
                 if answer == self.LAST_OBSERVER:
                     self.diagnoseObs("Setting as last observer", *args, **kwargs)

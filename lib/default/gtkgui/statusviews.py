@@ -481,9 +481,7 @@ class TestProgressMonitor(guiutils.SubGUI):
             self.treeModel.set_value(iter, 4, "bold")
         if incrementCount:
             self.treeModel.set_value(iter, 1, testCount + 1)
-        self.diag.info("Tests for node " + self.treeModel.get_value(iter, 0) + " " + repr(allTests))
         allTests.append(test)
-        self.diag.info("Tests for node " + self.treeModel.get_value(iter, 0) + " " + repr(allTests))
         
     def addNewIter(self, classifier, parentIter, colour, visibility, testCount, tests=[], fileStem=None):
         modelAttributes = [classifier, testCount, visibility, colour, "bold", tests, fileStem]

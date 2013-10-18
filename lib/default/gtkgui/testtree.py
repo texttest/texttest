@@ -175,7 +175,7 @@ class TestColumnGUI(guiutils.SubGUI):
         newVersionStr = self.getVersionString(tests, distinctTestCount)
         if self.nofSelectedTests != newCount or newVersionStr != self.versionString or \
                self.nofDistinctSelectedTests != distinctTestCount or suitesOnly != self.testSuiteSelection:
-            self.diag.info("New selection " + repr(tests) + " distinct " + str(distinctTestCount))
+            self.diag.info("New selection count = " + repr(newCount) + ", distinct = " + str(distinctTestCount) + ", test suites only = " + repr(suitesOnly))
             self.nofSelectedTests = newCount
             self.nofDistinctSelectedTests = distinctTestCount
             self.testSuiteSelection = suitesOnly

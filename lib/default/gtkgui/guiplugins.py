@@ -382,7 +382,7 @@ class ActionGUI(BasicActionGUI):
                 
         self.currAppSelection = apps
         newActive = self.allAppsValid() and self.isActiveOnCurrent()
-        self.diag.info("New test selection for " + self.getTitle() + "=" + repr(tests) + " : new active = " + repr(newActive))
+        self.diag.info("New test selection for " + self.getTitle() + "=" + self.describeTests() + " : new active = " + repr(newActive))
         return newActive
         
     def notifyLifecycleChange(self, test, state, *args):

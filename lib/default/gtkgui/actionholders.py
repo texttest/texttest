@@ -310,7 +310,7 @@ class NotebookGUI(guiutils.SubGUI):
         # This is mostly an attempt to work around the tree search problems.
         # Don't hide the tab for user-deselections of all tests because it trashes the search.
         if len(tests) > 0 or not direct:
-            self.diag.info("New selection with " + repr(tests) + ", adjusting notebook")
+            self.diag.info("New selection of size " + str(len(tests)) + ", adjusting notebook")
             # only change pages around if a test is directly selected and we haven't already selected another important tab
             changeCurrentPage = direct and not self.currentTabGUI.forceVisible(rowCount)
             self.diag.info("Current tab gui " + repr(self.currentTabGUI.__class__) + " will change = " + repr(changeCurrentPage))

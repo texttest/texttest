@@ -4,7 +4,9 @@ from xml.dom.minidom import parse
 from ordereddict import OrderedDict
 from glob import glob
 from pprint import pprint
-    
+
+versionRegex = re.compile("[0-9]+(\\.[0-9]+)+")
+        
 
 class AbortedException(RuntimeError):
     pass
@@ -22,21 +24,25 @@ def fingerprintStrings(document):
             
 def getCacheFileName(buildName, cacheDir):
     return os.path.join(cacheDir, "correct_hashes_" + buildName)
+         
+def getDocument(jobRoot, jobName, buildName):
+    dirName = os.path.join(jobRoot, jobName, "builds", buildName)
+    xmlFile = os.path.join(dirName, "build.xml")
+    if os.path.isfile(xmlFile):
+        return parse(xmlFile)
+    
             
 def getFingerprint(jobRoot, jobName, buildName, cacheDir):
     if cacheDir:
         cacheFileName = getCacheFileName(buildName, cacheDir) 
         if os.path.isfile(cacheFileName):
             return eval(open(cacheFileName).read())
-    dirName = os.path.join(jobRoot, jobName, "builds", buildName)
-    xmlFile = os.path.join(dirName, "build.xml")
+    document = getDocument(jobRoot, jobName, buildName)
     fingerprint = {}
-    if not os.path.isfile(xmlFile):
+    if document is None:
         return fingerprint
     
-    document = parse(xmlFile)
     prevString = None
-    versionRegex = re.compile("[0-9]+\\.[0-9\\.]*")
     for currString in fingerprintStrings(document):
         if prevString:
             if jobName not in prevString:
@@ -169,9 +175,6 @@ def getFingerprintDifferences(build1, build2, jobName, jobRoot, fileFinder, cach
     differences.sort()
     return differences
 
-def getUpdateMarker(project):
-    return project + " was updated", "", []
-
 def organiseByProject(differences, markedArtefacts, artefactProjectData):
     projectData = OrderedDict()
     changes = []
@@ -181,11 +184,11 @@ def organiseByProject(differences, markedArtefacts, artefactProjectData):
             for project, scopeProvided in projects:
                 projectData.setdefault(project, []).append((artefact, oldHash, hash, scopeProvided))
                 if project in markedArtefacts:
-                    changes.append(getUpdateMarker(project))
+                    changes.append((artefact, project))
         else:
             projectName = artefact.split(":")[-1].split("[")[0][:-1]
             if projectName in markedArtefacts:
-                changes.append(getUpdateMarker(projectName))
+                changes.append((artefact, projectName))
     
     return changes, projectData
 
@@ -269,6 +272,28 @@ def getProjectData(jobRoot):
             projectData.setdefault(artefactName, []).append((jobName, providedScope))
     return projectData
 
+
+def getArtefactVersion(artefactRegex, build, jobName, jobRoot):
+    document = getDocument(jobRoot, jobName, build)
+    if document is None:
+        return
+    
+    for currString in fingerprintStrings(document):
+        if artefactRegex.match(currString):
+            versionMatch = versionRegex.search(currString)
+            if versionMatch:
+                return versionMatch.group(0)
+
+
+def getMarkChangeText(artefact, projectName, build1, build2, jobName, jobRoot):
+    regex = re.compile(artefact)
+    version1 = getArtefactVersion(regex, build1, jobName, jobRoot)
+    version2 = getArtefactVersion(regex, build2, jobName, jobRoot)
+    if version1 == version2:
+        return projectName + " was updated", "", []
+    else:
+        return projectName + " " + version2, "", []
+
 def getChangesRecursively(build1, build2, jobName, jobRoot, projectData, markedArtefacts=[], fileFinder="", cacheDir=None):
     # Find what artefacts have changed between times build
     differences = getFingerprintDifferences(build1, build2, jobName, jobRoot, fileFinder, cacheDir)
@@ -296,7 +321,8 @@ def _getChanges(build1, build2, jobName, jenkinsUrl, bugSystemData={}, markedArt
     
     # Extract the changeset information from them
     changesFromProjects = getChangeData(jobRoot, projectChanges, jenkinsUrl, bugSystemData)
-    return markedChanges + changesFromProjects
+    changesFromMarking = [ getMarkChangeText(artefact, projectName, build1, build2, jobName, jobRoot) for artefact, projectName in markedChanges ]
+    return changesFromMarking + changesFromProjects
 
 def getChanges(build1, build2, *args):
     return _getChanges(build1, build2, os.getenv("JOB_NAME"), os.getenv("JENKINS_URL"), *args)

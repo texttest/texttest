@@ -1,7 +1,7 @@
 
 """ Action for running a test locally or on a remote machine """
 
-import plugins, os, logging, subprocess, sys, signal
+import plugins, os, logging, subprocess, sys, signal, pipes
 from time import sleep
 from threading import Lock, Timer
 from jobprocess import killSubProcessAndChildren
@@ -261,6 +261,9 @@ class RunTest(plugins.Action):
             return [ sys.executable, "-u" ] + args[1:]
         else:
             return args
+        
+    def quoteLocalArg(self, arg):
+        return arg if "$" in arg else pipes.quote(arg)
 
     def getRemoteExecuteCmdArgs(self, test, runMachine, localArgs, postfix):
         scriptFileName = test.makeTmpFileName("run_test" + postfix + ".sh", forComparison=0)
@@ -281,7 +284,7 @@ class RunTest(plugins.Action):
         if test.app.getConfigValue("remote_shell_program") == "ssh":
             # SSH doesn't kill remote processes, create a kill script
             scriptFile.write('echo "kill $$" > kill_test.sh\n')
-        cmdString = " ".join(localArgs)
+        cmdString = " ".join(map(self.quoteLocalArg, localArgs))
         if remoteTmp:
             cmdString = cmdString.replace(test.app.writeDirectory, remoteTmp)
         scriptFile.write("exec " + cmdString + "\n")

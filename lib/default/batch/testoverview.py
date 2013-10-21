@@ -244,19 +244,8 @@ class GenerateWebPages(object):
         return ""
 
     def findGlobal(self, modName, className):
-        try:
-            exec "from " + modName + " import " + className + " as _class"
-            return _class #@UndefinedVariable
-        except ImportError:
-            for loadedMod in sys.modules.keys():
-                if "." in loadedMod:
-                    packageName = ".".join(loadedMod.split(".")[:-1] + [ modName ])
-                    try:
-                        exec "from " + packageName + " import " + className + " as _class" 
-                        return _class #@UndefinedVariable
-                    except ImportError:
-                        pass
-            raise
+        exec "from " + modName + " import " + className + " as _class"
+        return _class #@UndefinedVariable
         
     def getNewState(self, file):
         # Would like to do load(file) here... but it doesn't work with universal line endings, see Python bug 1724366

@@ -1216,6 +1216,36 @@ class TextTrigger:
 
     def reset(self):
         pass
+    
+    
+class MatchAggregator:
+    def __init__(self):
+        self.match = None
+        self.groups = ()
+        
+    def reset(self):
+        self.match = None
+        self.groups = ()
+        
+    def group(self, i):
+        return self.groups[i - 1]
+        
+    def add(self, match):
+        if hasattr(match, "group"):
+            self.match = match
+            self.groups += match.groups()
+    
+    def expand(self, template):
+        if self.match is not None:
+            # ?? This is not documented, but has remained unchanged across many Python versions
+            # Better ideas welcome. The match objects are defined in C, the class name isn't public and hence they cannot be subclassed or monkey patched
+            return re._expand(self.match.re, self, template)
+        else:
+            return template
+    
+    def __getattr__(self, name):
+        return getattr(self.match, name)
+    
 
 class MultilineTextTrigger(TextTrigger):
     def __init__(self, text, tryAsRegexp, matchEmptyString=True):
@@ -1223,6 +1253,7 @@ class MultilineTextTrigger(TextTrigger):
         self.triggers = []
         self.currentIndex = 0
         self.matchedLines = []
+        self.aggregator = MatchAggregator()
         self.trailingNewline = text.endswith("\n")
         lines = text.rstrip("\n").split("\n") if text else []
         for line in lines:
@@ -1232,7 +1263,9 @@ class MultilineTextTrigger(TextTrigger):
         return self._matches(line)[0]
     
     def _matches(self, line):
-        if self.triggers[self.currentIndex].matches(line):
+        match = self.triggers[self.currentIndex].matches(line)
+        if match:
+            self.aggregator.add(match)
             self.currentIndex += 1
             if self.currentIndex == len(self.triggers):
                 self.currentIndex = 0
@@ -1249,13 +1282,14 @@ class MultilineTextTrigger(TextTrigger):
             if matchComplete:
                 for i in range(len(newTextLines)):
                     if i < len(self.matchedLines):
-                        newLine = self.triggers[i].replace(self.matchedLines[i], newTextLines[i])
+                        newText = self.aggregator.expand(newTextLines[i])
+                        newLine = self.triggers[i].replace(self.matchedLines[i], newText)
                         if self.trailingNewline and i == len(newTextLines) - 1:
                             newLine = newLine.rstrip("\n")
                         text += newLine
                     else:
                         text += newTextLines[i] + "\n"
-                self.matchedLines = []
+                self.reset()
             return text
         else:
             if not self.matchEmptyString:
@@ -1272,6 +1306,7 @@ class MultilineTextTrigger(TextTrigger):
     def reset(self):
         self.currentIndex = 0
         self.matchedLines = []
+        self.aggregator.reset()
 
 
 # Used for application and personal configuration files

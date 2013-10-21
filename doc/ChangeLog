@@ -2418,9 +2418,11 @@ Static GUI Enhancements:
 	a new check box "Show GUI and record any extra actions".
     - "Replace Text in Files" action allows now text search/replace in shortcut files. It shows now a new check box, "Replace text in shortcut files"
 	when usecase home exists.
+    - "Replace Text in Files" now applies back references as a whole, allowing e.g. swapping lines
+	See migration notes
     - Can now enable CaptureMock directly from the initial application creation dialog
 Dynamic GUI Enhancements:
-    - Save now runs in background
+    - Save now runs in background and is much faster for many tests
 	GUI doesn't freeze while tests are being saved
     - Status view now subdivides performance numbers
 	Instead of a single category "Faster" or "Slower" there are subdivisions based on multiples of the tolerance
@@ -2448,7 +2450,7 @@ Batch Report Enhancements:
     - Jenkins changes feature now find indirect dependencies where appropriate
 	e.g. scope:provided in Maven
     - Jenkins changes "marked artefacts" now variable per batch session
-	(Separate name from artefact name is also removed)
+	Separate name from artefact name is also removed. Versions displayed when they change.
     - Now find Jenkins timestamps for runs, show them as tooltips in the HTML report
     - Jenkins cache files now include the date in their name as well as build number
 	Saves trouble if the job gets moved to a different Jenkins server for example
@@ -2504,3 +2506,4 @@ Bug Fixes:
     - Unicode characters and quotes in test descriptions don't cause problems in HTML report any more
     - Fixed bug with killing running tests in "parallel" on Windows
     - Replace Text in files now works properly cross-platform, assuming home_operating_system is set correctly
+    - Fixed quoting problems when running tests remotely via SSH etc

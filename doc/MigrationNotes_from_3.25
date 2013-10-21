@@ -41,3 +41,29 @@ after B. This was a bug, but is included here as it may change the behaviour of 
 The email will now just contain links to the HTML report instead of complete plain-text information.
 Also, it will be generated after the HTML report, in 3.25 it was generated first.
  
+(3) "Replace Text in Files" now treats replacement string as a single whole instead of as separate parts
+========================================================================================================
+So if you have a file
+
+Apples
+Bananas
+
+and you replace using search expression
+
+(Apples)
+(Bananas)
+
+and replacement
+
+\2
+\1
+
+you will now as expected get
+
+Bananas
+Apples
+
+There was no way to do this before. Though of course this change can change the behaviour on some setups also: the
+back references have to be numbered correctly.
+
+

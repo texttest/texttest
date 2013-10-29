@@ -814,6 +814,7 @@ class TestFileFiltering(guiplugins.ActionGUI):
         return test.app.applyFiltering(test, fileName, version)
     
     def performOnCurrent(self):
+        self.reloadConfigForSelected() # Always make sure we're up to date here
         test = self.currTestSelection[0]
         fileName = self.currFileSelection[0][0]
         text = self.getTextToShow(test, fileName)

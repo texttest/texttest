@@ -440,6 +440,22 @@ class ActionGUI(BasicActionGUI):
         button.show()
         return button
     
+    def findTestsToReload(self):
+        tests = []
+        for test in self.currTestSelection:
+            for currTest in test.getAllTestsToRoot():
+                if currTest not in tests:
+                    currTest.refreshFiles()
+                    if currTest.hasLocalConfig():
+                        tests.append(currTest)
+        return tests
+    
+    def reloadConfigForSelected(self):
+        for appOrTest in self.currAppSelection + self.findTestsToReload():
+            self.notify("Status", "Rereading configuration for " + repr(appOrTest) + " ...")
+            self.notify("ActionProgress")
+            appOrTest.reloadConfiguration()
+
 
 # These actions consist of bringing up a dialog and only doing that
 # (i.e. the dialog is not a mechanism to steer how the action should be run)

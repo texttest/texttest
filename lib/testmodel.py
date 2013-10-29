@@ -199,8 +199,7 @@ class Test(plugins.Observable):
         self.dircache = dircache
         self.configDir = None
         self.diag = logging.getLogger("test objects")
-        if parent is not None:
-            self.reloadConfiguration()
+        self.reloadConfiguration()
         populateFunction = plugins.Callable(app.setEnvironment, self)
         self.environment = TestEnvironment(populateFunction)
         # Java equivalent of the environment mechanism...
@@ -213,11 +212,13 @@ class Test(plugins.Observable):
         self.filesChanged()
 
     def reloadTestConfigurations(self):
-        if self.parent is not None:
-            self.reloadConfiguration()
+        self.reloadConfiguration()
+
+    def hasLocalConfig(self):
+        return self.parent is not None and self.dircache.hasStem("config." + self.app.name)
 
     def reloadConfiguration(self):
-        if self.dircache.hasStem("config." + self.app.name):
+        if self.hasLocalConfig():
             parentConfigDir = self.getParentConfigDir()
             newConfigDir = deepcopy(parentConfigDir)
             self.app.readValues(newConfigDir, "config", [ self.dircache ], insert=False, errorOnUnknown=True)

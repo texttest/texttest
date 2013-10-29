@@ -264,10 +264,7 @@ class RecomputeTests(BackgroundThreadHelper,guiplugins.ActionGUI):
         
     def performOnCurrent(self):
         if any((test.stateInGui.isComplete() for test in self.currTestSelection)):
-            for appOrTest in self.currAppSelection + self.currTestSelection:
-                self.notify("Status", "Rereading configuration for " + repr(appOrTest) + " ...")
-                self.notify("ActionProgress")
-                appOrTest.reloadConfiguration()
+            self.reloadConfigForSelected()
         
     def performBackgroundAction(self, selection):
         latestTestCount = 0

@@ -250,25 +250,39 @@ def getChangeData(jobRoot, projectChanges, jenkinsUrl, bugSystemData):
 def getPomData(pomFile):
     document = parse(pomFile)
     artifactId, groupId = None, None
+    modules = []
     for node in document.documentElement.childNodes:
-        if node.nodeName == "artifactId":
+        if artifactId is None and node.nodeName == "artifactId":
             artifactId = node.childNodes[0].nodeValue
-        elif node.nodeName == "groupId":
+        elif groupId is None and node.nodeName == "groupId":
             groupId = node.childNodes[0].nodeValue
-        if artifactId and groupId:
-            break
+        elif node.nodeName == "modules":
+            for subNode in node.childNodes:
+                if subNode.childNodes:
+                    modules.append(subNode.childNodes[0].nodeValue)
     providedScope = any((node.childNodes[0].nodeValue == "provided" for node in document.getElementsByTagName("scope")))
     groupPrefix = groupId + ":" if groupId else ""
-    return groupPrefix + artifactId, providedScope
-    
+    return groupPrefix + artifactId, providedScope, modules
+
+def getArtefactsFromPomFiles(pomFile, jobName, jobRoot, workspaceRoot):
+    if not os.path.isfile(pomFile):
+        return []
+        
+    artefactName, providedScope, modules = getPomData(pomFile)
+    artefacts = []
+    if os.path.isdir(os.path.join(jobRoot, jobName)):
+        artefacts.append((artefactName, providedScope))
+        for module in modules:
+            newPomFile = os.path.join(workspaceRoot, jobName, module, "pom.xml")
+            artefacts += getArtefactsFromPomFiles(newPomFile, jobName, jobRoot, workspaceRoot)
+    return artefacts
 
 def getProjectData(jobRoot):
     projectData = {}
     workspaceRoot = os.path.dirname(os.getenv("WORKSPACE"))
     for jobName in os.listdir(workspaceRoot):
         pomFile = os.path.join(workspaceRoot, jobName, "pom.xml")
-        if os.path.isfile(pomFile) and os.path.isdir(os.path.join(jobRoot, jobName)):
-            artefactName, providedScope = getPomData(pomFile)
+        for artefactName, providedScope in getArtefactsFromPomFiles(pomFile, jobName, jobRoot, workspaceRoot):
             projectData.setdefault(artefactName, []).append((jobName, providedScope))
     return projectData
 

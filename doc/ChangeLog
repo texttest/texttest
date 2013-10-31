@@ -2412,12 +2412,14 @@ Version trunk
 Static GUI Enhancements:
     - "Test Filtering" action now displays results in the normal text editor (default entry in "view_program")
 	Allows searching, font configuration etc and is more consistent
+    - "Test Filtering" now always reloads all configuration before running
+	Previously triggered on an editor in a config file being closed, or on refresh being explicitly pressed
     - Config tab now has a context menu
 	Many viewing actions, including version control ones, can now be carried out there.
     - (GUI testing) "run in slow motion replay" checkbox removed. It has been replaced with a spinner for adding a pause after each event and
 	a new check box "Show GUI and record any extra actions".
-    - "Replace Text in Files" action allows now text search/replace in shortcut files. It shows now a new check box, "Replace text in shortcut files"
-	when usecase home exists.
+    - (GUI testing) "Replace Text in Files" action now allows text search/replace in shortcut files. 
+	It shows a new check box, "Replace text in shortcut files" when GUI testing is enabled.
     - "Replace Text in Files" now applies back references as a whole, allowing e.g. swapping lines
 	See migration notes
     - Can now enable CaptureMock directly from the initial application creation dialog
@@ -2427,10 +2429,12 @@ Dynamic GUI Enhancements:
     - Status view now subdivides performance numbers
 	Instead of a single category "Faster" or "Slower" there are subdivisions based on multiples of the tolerance
 	e.g. 10-20%. Should make it easier to spot things that are Faster because they failed catastrophically.
-    - New action "View screenshots" and new checkbox enabling screenshot generation in Running tab
+    - (GUI testing) New action "View screenshots" and new checkbox enabling screenshot generation in Running tab
 	Intended for displaying screenshots created by new StoryText feature.
+    - Wildcards now work in "file_split_pattern" list
+	for the Split Files feature
 Framework Enhancements:
-    - GUI shortcut renaming is now detected and a "Replace Text in Files" run triggered if desired, to update them.
+    - (GUI testing) GUI shortcut renaming is now detected and a "Replace Text in Files" run triggered if desired, to update them.
     - Known bugs mechanism priorities
 	If two known bugs are triggered and one of them requests a rerun, we report the one that didn't request a rerun. 
 	Can add priorities explicitly via "priority" field (not available via GUI yet)
@@ -2438,7 +2442,8 @@ Framework Enhancements:
 	for example "stdout*"
     - "Enter Failure Information" (known bugs) dialog has an extra option for providing exact matching
 	Mostly for when you need to match an exact small diff, and not also trigger when other things are present.
-    - New setting "custom_trigger" for known bugs, to allow further configuration of when to trigger (essentially checking the environment)
+    - New setting "custom_trigger" for known bugs, to allow further configuration of when to trigger 
+	(usually checking the environment)
     - New script default.FilterUIMapFile
 	for identifying unused entries in UI map files and shortcuts when GUI testing. See website.
     - TextTest now returns an exit code of 2 if there are only performanace differences
@@ -2447,8 +2452,10 @@ Batch Report Enhancements:
     - Index page now notes which run the information there is based on
     - If you enable both the email and the HTML report, the email now just links to the HTML report
 	New setting "file_to_url" to allow the links to be correct. See website and migration notes.
-    - Jenkins changes feature now find indirect dependencies where appropriate
+    - Jenkins changes feature now finds indirect dependencies where appropriate
 	e.g. scope:provided in Maven
+    - Jenkins changes feature now handles module structure in the jobs
+	e.g. where artefacts are inside modules rather than directly in the job
     - Jenkins changes "marked artefacts" now variable per batch session
 	Separate name from artefact name is also removed. Versions displayed when they change.
     - Now find Jenkins timestamps for runs, show them as tooltips in the HTML report
@@ -2475,7 +2482,6 @@ Bug Fixes:
     - Always disable storytext editor when using a virtual display
     - Filled in some missing possible states from SGE
     - Fixed stacktrace on closing dynamic GUI after pressing F5.
-    - Fixed wildcards doesn't work for stems in file_split_pattern list
     - Fixed problem when running tests on remote networks, and refreshing before they were done (F5)
     - Fixed leak of remote Xvfb processes on receiving job control signals (SIGXCPU etc)
     - Remote virtual display handling now tolerates warnings etc from ssh

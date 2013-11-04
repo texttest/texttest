@@ -2407,8 +2407,8 @@ Bug Fixes:
     - Fixed Windows installer: doesn't allow incorrect install with Java GUI testing enabled but not Python GUI testing
     - Fixed Windows installer: no longer requires logging in and out after install if using Windows 7
 
-Version trunk
-=============
+Version 3.26
+============
 Static GUI Enhancements:
     - "Test Filtering" action now displays results in the normal text editor (default entry in "view_program")
 	Allows searching, font configuration etc and is more consistent
@@ -2434,24 +2434,31 @@ Dynamic GUI Enhancements:
     - Wildcards now work in "file_split_pattern" list
 	for the Split Files feature
 Framework Enhancements:
-    - (GUI testing) GUI shortcut renaming is now detected and a "Replace Text in Files" run triggered if desired, to update them.
-    - Known bugs mechanism priorities
-	If two known bugs are triggered and one of them requests a rerun, we report the one that didn't request a rerun. 
-	Can add priorities explicitly via "priority" field (not available via GUI yet)
     - Known bugs "search_file" field now supports wildcards
 	for example "stdout*"
     - "Enter Failure Information" (known bugs) dialog has an extra option for providing exact matching
 	Mostly for when you need to match an exact small diff, and not also trigger when other things are present.
+    - Known bugs mechanism priorities
+	If two known bugs are triggered and one of them requests a rerun, we report the one that didn't request a rerun. 
+	Can add priorities explicitly via "priority" field (not available via GUI yet)
     - New setting "custom_trigger" for known bugs, to allow further configuration of when to trigger 
 	(usually checking the environment)
-    - New script default.FilterUIMapFile
-	for identifying unused entries in UI map files and shortcuts when GUI testing. See website.
     - TextTest now returns an exit code of 2 if there are only performanace differences
 	Allows wrapper scripts to treat this differently from if there are failures.
+    - (GUI testing) GUI shortcut renaming is now detected and a "Replace Text in Files" run triggered if desired, to update them.
+    - (GUI testing) New script default.FilterUIMapFile
+	for identifying unused entries in UI map files and shortcuts when GUI testing. See website.
 Batch Report Enhancements:
     - Index page now notes which run the information there is based on
     - If you enable both the email and the HTML report, the email now just links to the HTML report
 	New setting "file_to_url" to allow the links to be correct. See website and migration notes.
+    - "batch_mail_on_failure_only" uses the same criteria as that which sets exit code 0
+	So no mail will be sent when there are just known bugs now
+    - batch.CollectFiles is removed. See migration notes.
+    - batch.ArchiveRepository can give a different cutoff date for weekday-specific pages
+	New argument "weekday_pages_before". See website
+    - New script batch.ArchiveHTML
+	Works like ArchiveRepository, but on historical_report_location. See webpage.
     - Jenkins changes feature now finds indirect dependencies where appropriate
 	e.g. scope:provided in Maven
     - Jenkins changes feature now handles module structure in the jobs
@@ -2461,15 +2468,8 @@ Batch Report Enhancements:
     - Now find Jenkins timestamps for runs, show them as tooltips in the HTML report
     - Jenkins cache files now include the date in their name as well as build number
 	Saves trouble if the job gets moved to a different Jenkins server for example
-    - batch.ArchiveRepository can give a different cutoff date for weekday-specific pages
-	New argument "weekday_pages_before". See website
-    - New script batch.ArchiveHTML
-	Works like ArchiveRepository, but on historical_report_location. See webpage.
-    - Now recognizing Jenkins jobs in the html report. We wait for fingerprints if BUILD_ID=none is set
+    - We now wait for Jenkins fingerprints to be ready if BUILD_ID=none is set. See webpage
     - Adding links in html report to Jenkins jobs
-    - "batch_mail_on_failure_only" uses the same criteria as that which sets exit code 0
-	So no mail will be sent when there are just known bugs now
-    - batch.CollectFiles is removed. See migration notes.
 Grid Engine (LSF/SGE/Condor) enhancements/bug fixes:
     - Default_queue setting should also apply to the proxy job
     - Don't produce warning spam if there are jobs with multiple spaces in their name
@@ -2513,3 +2513,6 @@ Bug Fixes:
     - Fixed bug with killing running tests in "parallel" on Windows
     - Replace Text in files now works properly cross-platform, assuming home_operating_system is set correctly
     - Fixed quoting problems when running tests remotely via SSH etc
+
+Version trunk
+=============

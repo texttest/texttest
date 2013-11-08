@@ -2,6 +2,7 @@
 import os, filecmp, plugins, time, subprocess, logging, re
 from shutil import copyfile
 from itertools import izip
+from fnmatch import fnmatch
 
 class FileComparison:
     SAME = 0
@@ -59,10 +60,9 @@ class FileComparison:
         separator = separators.get(self.stem)
         if not separator: # try wildcards
             for key, value in separators.items():
-                if key.endswith("*"):
-                    if self.stem.startswith(key[:-1]):
-                        separator = value
-                        break
+                if fnmatch(self.stem, key):
+                    separator = value
+                    break
         if separator:
             sepRegex = re.compile(separator)
             tmpParts = self.splitFile(test, self.tmpCmpFile, sepRegex)

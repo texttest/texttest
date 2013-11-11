@@ -5,7 +5,7 @@ import gtk, gobject, plugins, custom_widgets, os, datetime, subprocess, shutil
 from .. import guiplugins, guiutils, entrycompletion
 from ..default_gui import adminactions, changeteststate
 
-vcsClass, vcs, annotateClass = None, None, None
+vcsClass, vcs, annotateClass, diffClass = None, None, None, None
     
 # All VCS specific stuff goes in this class. One global instance, "vcs" above
 class VersionControlInterface:
@@ -313,7 +313,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
 
     def viewDiffs(self, button):
         file = self.getSelectedFile()
-        differ = DiffGUI()
+        differ = diffClass()
         differ.setRevisions(self.revision1.get_text(), self.revision2.get_text())
         self.runWithSelections(differ, file)
 
@@ -775,7 +775,7 @@ class UpdateGUI(BasicVersionControlDialogGUI):
         return [ "Refresh" ]
 
     def addContents(self):
-        args = vcs.getCmdArgs("update")
+        args = vcs.getCmdArgs(self.getCommandName())
         retcode, stdout, stderr = vcs.getProcessResults(args, cwd=self.currTestSelection[0].app.getDirectory())
         buffer = gtk.TextBuffer()
         buffer.set_text(stdout + stderr)
@@ -783,6 +783,8 @@ class UpdateGUI(BasicVersionControlDialogGUI):
         self.dialog.vbox.pack_start(textView, expand=True, fill=True)
         self.notify("Refresh")
 
+    def getCommandName(self):
+        return "update"
 
 class AddGUI(VersionControlDialogGUI):
     def _getTitle(self):
@@ -868,22 +870,29 @@ class AddGUIRecursive(AddGUI):
 #
 class InteractiveActionConfig(guiplugins.InteractiveActionConfig):
     def __init__(self, controlDir):
-        global vcs, annotateClass
+        global vcs, annotateClass, diffClass
         vcs = vcsClass(controlDir)
         annotateClass = self.annotateClasses()[0]
+        diffClass = self.diffClasses()[0]
 
     def getMenuNames(self):
         return [ vcs.name ]
 
     def getInteractiveActionClasses(self, dynamic):
-        return [ LogGUI, LogGUIRecursive, DiffGUI, DiffGUIRecursive, StatusGUI, StatusGUIRecursive ] +\
-               self.annotateClasses() + [ AddGUI, AddGUIRecursive, UpdateGUI ]
+        return [ LogGUI, LogGUIRecursive] +  self.diffClasses() + [ StatusGUI, StatusGUIRecursive ] +\
+               self.annotateClasses() + [ AddGUI, AddGUIRecursive, self.getUpdateClass() ]
 
     def annotateClasses(self):
         return [ AnnotateGUI, AnnotateGUIRecursive ]
 
+    def diffClasses(self):
+        return [ DiffGUI, DiffGUIRecursive ]
+
     def getRenameTestClass(self):
         return RenameTest
+    
+    def getUpdateClass(self):
+        return UpdateGUI
 
     def getReplacements(self):
         return { adminactions.RemoveTests         : RemoveTests,

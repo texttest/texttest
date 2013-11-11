@@ -1,0 +1,79 @@
+<ui>
+
+  <menubar name="MainMenuBar">
+
+    <placeholder name="ExtraMenus">
+      <menu name="VCS Top Menu" action="Gitmenu">
+        <menuitem action="Git Log"/>
+        <menuitem action="Git Log Recursive"/>
+        <separator/>
+        <menuitem action="Git Difference"/>
+        <menuitem action="Git Difference Recursive"/>
+        <separator/>
+        <menuitem action="Git Status"/>
+        <menuitem action="Git Status Recursive"/>
+        <separator/>
+        <menuitem action="Git Annotate"/>
+        <menuitem action="Git Annotate Recursive"/>
+        <separator/>        
+        <menuitem action="Git Add"/>
+        <menuitem action="Git Add Recursive"/>
+        <separator/>
+        <menuitem action="Git Update"/>
+      </menu>
+    </placeholder>
+
+  </menubar>
+
+  <popup name="TestPopupMenu">
+    <menu name="VCS Popup Menu" action="Gitmenu">
+      <menuitem action="Git Log"/>
+      <menuitem action="Git Log Recursive"/>
+      <separator/>
+      <menuitem action="Git Difference"/>
+      <menuitem action="Git Difference Recursive"/>
+      <separator/>
+      <menuitem action="Git Status"/>
+      <menuitem action="Git Status Recursive"/>
+      <separator/>
+      <menuitem action="Git Annotate"/>
+      <menuitem action="Git Annotate Recursive"/>
+      <separator/>
+      <menuitem action="Git Add"/>
+      <menuitem action="Git Add Recursive"/>
+      <separator/>
+      <menuitem action="Git Update"/>
+    </menu>
+  </popup>
+
+  <popup name="TestFilePopupMenu">
+    <menu name="VCS File Popup Menu" action="Gitmenu">
+      <menuitem action="Git Log"/>
+      <menuitem action="Git Log Recursive"/>
+      <separator/>
+      <menuitem action="Git Difference"/>
+      <menuitem action="Git Difference Recursive"/>
+      <separator/>
+      <menuitem action="Git Status"/>
+      <menuitem action="Git Status Recursive"/>
+      <separator/>
+      <menuitem action="Git Annotate"/>
+      <menuitem action="Git Annotate Recursive"/>
+      <separator/>
+      <menuitem action="Git Add"/>
+      <menuitem action="Git Add Recursive"/>
+      <separator/>
+      <menuitem action="Git Update"/>
+    </menu>
+  </popup>
+
+  <popup name="ConfigFilePopupMenu">
+    <menu name="VCS File Popup Menu" action="Gitmenu">
+      <menuitem action="Git Log"/>
+      <menuitem action="Git Difference"/>
+      <menuitem action="Git Status"/>
+      <menuitem action="Git Annotate"/>
+      <menuitem action="Git Add"/>
+    </menu>
+  </popup>
+</ui>

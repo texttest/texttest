@@ -801,6 +801,36 @@ activate = version control add for the selected files
 [Name=Mercurial Add Recursive]
 activate = recursive version control add for the selected files
 
+[Name=Git Log]
+activate = version control log for the selected files
+
+[Name=Git Log Recursive]
+activate = recursive version control log for the selected files
+
+[Name=Git Difference]
+activate = version control difference for the selected files
+
+[Name=Git Difference Recursive]
+activate = recursive version control difference for the selected files
+
+[Name=Git Status]
+activate = version control status for the selected files
+
+[Name=Git Status Recursive]
+activate = recursive version control status for the selected files
+
+[Name=Git Annotate]
+activate = version control annotate for the selected files
+
+[Name=Git Annotate Recursive]
+activate = recursive version control annotate for the selected files
+
+[Name=Git Add]
+activate = version control add for the selected files
+
+[Name=Git Add Recursive]
+activate = recursive version control add for the selected files
+
 [Name=VCS Status Window]
 response.accept = close status window
 
@@ -913,6 +943,9 @@ activate = update from vcs
 activate = update from vcs
 
 [Name=CVS Update]
+activate = update from vcs
+
+[Name=Git Update]
 activate = update from vcs
 
 [Name=VCS Update Window]

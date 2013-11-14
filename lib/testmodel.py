@@ -5,7 +5,7 @@ from ordereddict import OrderedDict
 from cPickle import Pickler, loads, UnpicklingError
 from threading import Lock
 from tempfile import mkstemp
-from copy import deepcopy
+from copy import deepcopy, copy
 
 helpIntro = """
 Note: the purpose of this help is primarily to document derived configurations and how they differ from the
@@ -1300,7 +1300,7 @@ class ConfigurationCall:
             plugins.printException()
         raise BadConfigError, message
 
-class Application:
+class Application(object):
     def __init__(self, name, dircache, versions, inputOptions, configEntries={}):
         self.name = name
         self.dircache = dircache
@@ -1322,12 +1322,19 @@ class Application:
             self.diag.info("Local write directory at " + self.localWriteDirectory)
         self.checkout = self.configObject.setUpCheckout(self)
         self.diag.info("Checkout set to " + self.checkout)
-        
+
     def __repr__(self):
         return self.fullName() + self.versionSuffix()
 
     def __hash__(self):
         return id(self)
+
+    def __copy__(self):
+        # Using this to avoid a runtime error when copying applications
+        # (Exception RuntimeError: 'maximum recursion depth exceeded in __subclasscheck__')
+        obj_copy = object.__new__(type(self))
+        obj_copy.__dict__ = self.__dict__.copy()
+        return obj_copy
 
     def fullName(self):
         return self.getConfigValue("full_name")

@@ -2516,3 +2516,9 @@ Bug Fixes:
 
 Version trunk
 =============
+Version Control Browser Enhancements/bug fixes:
+    - Now supports Git
+
+Bug Fixes:
+    - Fixed wildcards for stems in "file_split_pattern" list. Using fnmatch module instead of a hacked pattern matching.
+    - Fixed taking long time to start a huge amount of test copies.

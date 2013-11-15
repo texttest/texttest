@@ -2,6 +2,7 @@ import os, performance, knownbugs, filecmp, string, plugins, shutil, logging
 from ordereddict import OrderedDict
 from tempfile import mktemp
 from comparefile import FileComparison, SplitFileComparison
+from fnmatch import fnmatch
 
 plugins.addCategory("success", "succeeded")
 plugins.addCategory("failure", "FAILED")
@@ -33,7 +34,17 @@ class BaseTestComparison(plugins.TestState):
                 if comparison.stem == stem:
                     return comparison, list
         return None, None
-
+    
+    def findComparisonsMatching(self, pattern):
+        lists = [ self.changedResults, self.newResults, self.missingResults, self.correctResults ]
+        self.diag.info("Finding comparison matching stem " + pattern)
+        comps = []
+        for list in lists:
+            for comparison in list:
+                if fnmatch(comparison.stem, pattern):
+                    comps.append(comparison)
+        return comps
+    
     def removeComparison(self, stem):
         comparison, newList = self.findComparison(stem)
         newList.remove(comparison)

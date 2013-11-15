@@ -279,10 +279,10 @@ class BugMap(OrderedDict):
                 return True
         return False
     
-    def readFromFile(self, fileName, getStemsMethod=None):
+    def readFromFile(self, fileName):
         parser = self.makeParser(fileName)
         if parser:
-            self.readFromParser(parser, getStemsMethod)
+            self.readFromParser(parser)
             
     def readFromFileObject(self, f):
         parser = self.makeParserFromFileObject(f)
@@ -311,15 +311,11 @@ class BugMap(OrderedDict):
         except Exception:
             plugins.printWarning("Bug file at " + fileName + " not understood, ignoring")
     
-    def readFromParser(self, parser, getStemsMethod=None):
+    def readFromParser(self, parser):
         for section in reversed(sorted(parser.sections())):
             getOption = ParseMethod(parser, section)
             fileStem = getOption("search_file")
-            if getStemsMethod:
-                for stem in getStemsMethod(fileStem):
-                    self.setdefault(stem, FileBugData()).addBugTrigger(getOption)
-            else:
-                self.setdefault(fileStem, FileBugData()).addBugTrigger(getOption)
+            self.setdefault(fileStem, FileBugData()).addBugTrigger(getOption)
 
 class CheckForCrashes(plugins.Action):
     def __init__(self):
@@ -432,10 +428,11 @@ class CheckForBugs(plugins.Action):
             return fileBugData.findBugsInText(briefText.split("\n"), execHosts=state.executionHosts, tmpDir=test.writeDirectory)
         elif state.hasResults():
             # bugs are only relevant if the file itself is changed, unless marked to trigger on success also
-            comp = state.findComparison(stem, includeSuccess=True)[0]
-            if comp:
+            bugs = []
+            for comp in state.findComparisonsMatching(stem):
                 isChanged = not comp.hasSucceeded()
-                return fileBugData.findBugs(comp.tmpFile, state.executionHosts, isChanged, multipleDiffs)
+                bugs += fileBugData.findBugs(comp.tmpFile, state.executionHosts, isChanged, multipleDiffs)
+            return bugs
         return []
 
     def getNewState(self, oldState, bugState):
@@ -462,21 +459,12 @@ class CheckForBugs(plugins.Action):
         return diffCount > 1
     
     def readBugs(self, test):
-        def findStems(pattern):
-            stems = []
-            if glob.has_magic(pattern):
-                for stem in test.dircache.findStemsMatching(pattern):
-                    if stem not in stems:
-                        stems.append(stem)
-            if len(stems) == 0:
-                stems.append(pattern)
-            return stems
         bugMap = BugMap()
         # Mostly for backwards compatibility, reverse the list so that more specific bugs
         # get checked first.
         for bugFile in reversed(test.getAllPathNames("knownbugs")):
             self.diag.info("Reading bugs from file " + bugFile)
-            bugMap.readFromFile(bugFile, getStemsMethod=findStems)
+            bugMap.readFromFile(bugFile)
         return bugMap
 
 # For migrating from knownbugs files which are from TextTest 3.7 and older

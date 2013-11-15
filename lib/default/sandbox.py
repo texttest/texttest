@@ -576,9 +576,10 @@ class CollateFiles(plugins.Action):
 
             # add each file to newColl by transferring wildcards across
             for sourcePattern in sourcePatterns:
-                for sourcePath in self.findPaths(test, sourcePattern):
+                testDir, sourcePaths = self.findPaths(test, sourcePattern)
+                for sourcePath in sourcePaths:
                     # Use relative paths: easier to debug and SequenceMatcher breaks down if strings are longer than 200 chars
-                    relativeSourcePath = plugins.relpath(sourcePath, test.getDirectory(temporary=1, local=1))
+                    relativeSourcePath = plugins.relpath(sourcePath, testDir)
                     newTargetStem = self.makeTargetStem(targetPattern, sourcePattern, relativeSourcePath)
                     self.diag.info("New collation to " + newTargetStem + " : from " + relativeSourcePath)
                     newColl.setdefault(newTargetStem, []).append(sourcePath)
@@ -643,7 +644,7 @@ class CollateFiles(plugins.Action):
 
     def findEditedFile(self, test, patterns):
         for pattern in patterns:
-            for fullpath in self.findPaths(test, pattern):
+            for fullpath in self.findPaths(test, pattern)[1]:
                 if self.testEdited(test, fullpath):
                     return fullpath
                 else:
@@ -671,7 +672,7 @@ class CollateFiles(plugins.Action):
         files = OrderedDict()
         for sourcePatterns in test.getConfigValue("collate_file").values():
             for sourcePattern in sourcePatterns:
-                for fullPath in self.findPaths(test, sourcePattern):
+                for fullPath in self.findPaths(test, sourcePattern)[1]:
                     self.diag.info("Pre-existing file found " + fullPath)
                     files[fullPath] = plugins.modifiedTime(fullPath)
         return files
@@ -692,7 +693,17 @@ class CollateFiles(plugins.Action):
     def glob(self, test, sourcePattern):
         # Test name may contain glob meta-characters, and there is no way to quote them (see comment in fnmatch.py)
         # So we can't just form an absolute path and glob that
-        testDir = test.getDirectory(temporary=1, local=1)
+        localTestDir = test.getDirectory(temporary=1, local=1)
+        localFiles = self.globDir(localTestDir, sourcePattern)
+        if not localFiles:
+            logDir = test.getDirectory(temporary=1)
+            if logDir != localTestDir:
+                logDirFiles = self.globDir(logDir, sourcePattern)
+                if logDirFiles:
+                    return logDir, logDirFiles
+        return localTestDir, localFiles
+        
+    def globDir(self, testDir, sourcePattern):
         origCwd = os.getcwd()
         os.chdir(testDir)
         result = glob.glob(sourcePattern)
@@ -701,13 +712,13 @@ class CollateFiles(plugins.Action):
 
     def findPaths(self, test, sourcePattern):
         self.diag.info("Looking for pattern " + sourcePattern + " for " + repr(test))
-        paths = self.glob(test, sourcePattern)
+        testDir, paths = self.glob(test, sourcePattern)
         paths.sort()
         existingPaths = filter(os.path.isfile, paths)
         if sourcePattern == "*": # interpret this specially to mean 'all files which are not collated already'
-            return filter(lambda f: not self.alreadyCollated(test, f, sourcePattern), existingPaths)
+            return testDir, filter(lambda f: not self.alreadyCollated(test, f, sourcePattern), existingPaths)
         else:
-            return existingPaths
+            return testDir, existingPaths
 
     def runCollationScript(self, args, test, stdin, stdout, stderr, useShell):
         # Windows isn't clever enough to know how to run Python/Java programs without some help...

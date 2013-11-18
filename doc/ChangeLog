@@ -2516,9 +2516,14 @@ Bug Fixes:
 
 Version trunk
 =============
-Version Control Browser Enhancements/bug fixes:
+Framework Enhancements:
+    - "collate_file" now also finds files in $TEXTTEST_LOG_DIR if local sandbox is used
+	i.e. if "default_texttest_local_tmp" is set
+
+Version Control Browser Enhancements:
     - Now supports Git
 
 Bug Fixes:
     - Fixed wildcards for stems in "file_split_pattern" list. Using fnmatch module instead of a hacked pattern matching.
+    - Fixed wildcards for stems in knownbugs "search_file", now works also with new files
     - Fixed taking long time to start a huge amount of test copies.

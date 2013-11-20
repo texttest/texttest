@@ -150,6 +150,9 @@ class VersionControlInterface:
 
     def getMoveCommand(self):
         return self.program + " mv"
+    
+    def hasLocalCommits(self, *args):
+        return False # Not possible in cvs or bzr
 
 class BasicVersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
     recursive = False
@@ -775,13 +778,20 @@ class UpdateGUI(BasicVersionControlDialogGUI):
         return [ "Refresh" ]
 
     def addContents(self):
-        args = vcs.getCmdArgs(self.getCommandName())
-        retcode, stdout, stderr = vcs.getProcessResults(args, cwd=self.currTestSelection[0].app.getDirectory())
+        vcsDirectory = self.currTestSelection[0].app.getDirectory()
+        canUpdate = not vcs.hasLocalCommits(vcsDirectory)
+        if canUpdate:
+            args = vcs.getCmdArgs(self.getCommandName())
+            _, stdout, stderr = vcs.getProcessResults(args, cwd=vcsDirectory)
+            text = stdout + stderr
+        else:
+            text = "You have local commits. Aborting updating via TextTest. You will need to merge by hand."
         buffer = gtk.TextBuffer()
-        buffer.set_text(stdout + stderr)
+        buffer.set_text(text)
         textView = gtk.TextView(buffer)
         self.dialog.vbox.pack_start(textView, expand=True, fill=True)
-        self.notify("Refresh")
+        if canUpdate:
+            self.notify("Refresh")
 
     def getCommandName(self):
         return "update"

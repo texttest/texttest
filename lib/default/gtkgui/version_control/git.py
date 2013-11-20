@@ -12,7 +12,6 @@ class GitInterface(vcs_independent.VersionControlInterface):
         self.defaultArgs["rm"] = [ "--force", "-r" ]
         self.defaultArgs["status"] = [ "--porcelain" ] # Would like to use --ignored but it is not available on git versions < 1.7.4
         self.defaultArgs["log"] = [ "-p", "--follow" ]
-        self.defaultArgs["merge"] = ["FETCH_HEAD"]
         
     def getDateFromLog(self, output):
         for line in output.splitlines():
@@ -42,6 +41,10 @@ class GitInterface(vcs_independent.VersionControlInterface):
         retCode = self.callProgram("rm", [ path ])
         plugins.removePath(path)
         return retCode == 0
+    
+    def hasLocalCommits(self, vcsDirectory):
+        retCode, _, stderr = self.getProcessResults(["git", "push", "-n"], cwd=vcsDirectory)
+        return retCode == 0 and stderr.strip() != "Everything up-to-date" 
 
 vcs_independent.vcsClass = GitInterface
 
@@ -61,8 +64,12 @@ class DiffGUIRecursive(DiffGUI):
 
 class UpdateGUI(vcs_independent.UpdateGUI):
     def getCommandName(self):
-        return "merge"
+        return "pull"
+    
+    def _getTitle(self):
+        return "Pull"
 
+    
 class InteractiveActionConfig(vcs_independent.InteractiveActionConfig):
     def diffClasses(self):
         return [ DiffGUI, DiffGUIRecursive ]

@@ -15,6 +15,7 @@ class HgInterface(vcs_independent.VersionControlInterface):
         self.defaultArgs["log"] = [ "-f" ] # "follow" renames, which isn't default
         self.defaultArgs["annotate"] = [ "-f", "-n" ] # annotate -f doesn't annotate anything...
         self.defaultArgs["diff"] = [ "-g" ] # "git format", which apparently is how to make it work with revisions :)
+        self.defaultArgs["pull"] = [ "-u" ] # Otherwise doesn't actually update the files. We "pretend to be centralised"
         
     def getDateFromLog(self, output):
         for line in output.splitlines():
@@ -68,6 +69,17 @@ class HgInterface(vcs_independent.VersionControlInterface):
         plugins.removePath(path)
         return retValue
 
+    def hasLocalCommits(self, vcsDirectory):
+        return self.callProgram("out", cwd=vcsDirectory) == 0
+
+    
+class UpdateGUI(vcs_independent.UpdateGUI):
+    def getCommandName(self):
+        return "pull"
+    
+    def _getTitle(self):
+        return "Pull/Update"
+
 
 vcs_independent.vcsClass = HgInterface
 
@@ -84,3 +96,7 @@ class AnnotateGUIRecursive(AnnotateGUI):
 class InteractiveActionConfig(vcs_independent.InteractiveActionConfig):
     def annotateClasses(self):
         return [ AnnotateGUI, AnnotateGUIRecursive ]
+    
+    def getUpdateClass(self):
+        return UpdateGUI
+

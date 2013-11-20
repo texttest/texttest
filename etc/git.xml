@@ -19,7 +19,7 @@
         <menuitem action="Git Add"/>
         <menuitem action="Git Add Recursive"/>
         <separator/>
-        <menuitem action="Git Update"/>
+        <menuitem action="Git Pull"/>
       </menu>
     </placeholder>
 
@@ -42,7 +42,7 @@
       <menuitem action="Git Add"/>
       <menuitem action="Git Add Recursive"/>
       <separator/>
-      <menuitem action="Git Update"/>
+      <menuitem action="Git Pull"/>
     </menu>
   </popup>
 
@@ -63,7 +63,7 @@
       <menuitem action="Git Add"/>
       <menuitem action="Git Add Recursive"/>
       <separator/>
-      <menuitem action="Git Update"/>
+      <menuitem action="Git Pull"/>
     </menu>
   </popup>
 

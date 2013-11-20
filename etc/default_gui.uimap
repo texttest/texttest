@@ -939,16 +939,22 @@ changed = set java class to
 [Name=Bazaar Update]
 activate = update from vcs
 
-[Name=Mercurial Update]
+[Name=Mercurial Pull/Update]
 activate = update from vcs
 
 [Name=CVS Update]
 activate = update from vcs
 
-[Name=Git Update]
+[Name=Git Pull]
 activate = update from vcs
 
 [Name=VCS Update Window]
+response.accept = close vcs update window
+
+[Name=VCS Pull/Update Window]
+response.accept = close vcs update window
+
+[Name=VCS Pull Window]
 response.accept = close vcs update window
 
 [Name=VCS Top Menu]
@@ -1076,9 +1082,6 @@ activate = view screenshots
 [Label=Replace text in shortcut files]
 toggled.true = include shortcut files
 
-[Name=VCS File Popup Menu]
-activate = show vcs popup menu
-
 [Label=Generate a screenshot after each replayed action]
 toggled.true = choose option to generate screenshots
 
@@ -1094,3 +1097,8 @@ changed = choose temporary setting file type =
 [Label=Enable CaptureMock for record/playback mocking]
 toggled.true = enable capturemock
 
+[Name=VCS Popup Menu]
+activate = show vcs file popup menu
+
+[Name=VCS File Popup Menu]
+activate = show vcs popup menu

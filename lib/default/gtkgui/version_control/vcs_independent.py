@@ -771,7 +771,8 @@ class AnnotateGUI(VersionControlDialogGUI):
 
 
 class UpdateGUI(BasicVersionControlDialogGUI):
-    def _getTitle(self):
+    @staticmethod
+    def _getTitle():
         return "Update"
 
     def getSignalsSent(self):
@@ -903,6 +904,12 @@ class InteractiveActionConfig(guiplugins.InteractiveActionConfig):
     
     def getUpdateClass(self):
         return UpdateGUI
+
+    def getDefaultAccelerators(self):
+        dict = {}
+        accelKey = vcs.name + "_" + self.getUpdateClass()._getTitle()
+        dict[accelKey.lower()] = "<control>u"
+        return dict
 
     def getReplacements(self):
         return { adminactions.RemoveTests         : RemoveTests,

@@ -66,7 +66,8 @@ class UpdateGUI(vcs_independent.UpdateGUI):
     def getCommandName(self):
         return "pull"
     
-    def _getTitle(self):
+    @staticmethod
+    def _getTitle():
         return "Pull"
 
     

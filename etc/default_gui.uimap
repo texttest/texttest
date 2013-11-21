@@ -1097,6 +1097,15 @@ changed = choose temporary setting file type =
 [Label=Enable CaptureMock for record/playback mocking]
 toggled.true = enable capturemock
 
+[Name=Generate test summary]
+activate = generate test summary
+
+[Name=File Chooser for 'Generate test summary']
+current-name-changed = set test summary name to
+
+[Title=Generate test summary]
+response.accept = confirm generate test summary
+
 [Name=VCS Popup Menu]
 activate = show vcs file popup menu
 

@@ -4,7 +4,9 @@ Miscellaneous actions for generally housekeeping the state of the GUI
 """
 
 from .. import guiplugins, guiutils
-import os
+from ordereddict import OrderedDict
+from default.batch import BatchApplicationData, MailSender
+import os, plugins
 
 class Quit(guiplugins.BasicActionGUI):
     def __init__(self, allApps, dynamic, inputOptions):
@@ -132,11 +134,59 @@ class ViewScreenshots(guiplugins.ActionGUI):
         number = fileName[10:-4]
         return int(number) if number.isdigit() else 0
             
+class GenerateTestSummary(guiplugins.ActionDialogGUI):
+    def __init__(self, *args):
+        guiplugins.ActionDialogGUI.__init__(self, *args)
+        self.addOption("generate", "",possibleDirs=[os.getenv("TEXTTEST_TMP", "")], saveFile=True)
+        self.batchAppData = OrderedDict()
+        self.allApps = OrderedDict()
+
+    def performOnCurrent(self):
+        fileName = self.getFileName()
+        for test in self.currTestSelection:
+            if test.state.isComplete():
+                if not self.batchAppData.has_key(test.app):
+                    self.addApplication(test)
+                self.batchAppData[test.app].storeCategory(test)
+        self.writeTextSummary(fileName)
+        
+    def writeTextSummary(self, fileName):
+        mailSender = MailSender()
+        with open(fileName, "w") as f:
+            for appList in self.allApps.values():
+                batchDataList = map(self.batchAppData.get, appList)
+                f.write(mailSender.makeContents(batchDataList, False))
+
+    def getFileName(self):
+        fileName = self.optionGroup.getOptionValue("generate")
+        if not fileName:
+            raise plugins.TextTestError, "Cannot save selection - no file name specified"
+        elif os.path.isdir(fileName):
+            raise plugins.TextTestError, "Cannot save selection - existing directory specified"
+        else:
+            return fileName
+
+
+    def _getTitle(self):
+        return "Generate test summary"
+
+    def getRootSuite(self, test):
+        if test.parent:
+            return self.getRootSuite(test.parent)
+        else:
+            return test
+       
+    def addApplication(self, test):
+        rootSuite = self.getRootSuite(test)
+        app = test.app
+        self.batchAppData[app] = BatchApplicationData(rootSuite)
+        self.allApps.setdefault(app.name, []).append(app)
 
 def getInteractiveActionClasses(dynamic):
     classes = [ Quit, SetRunName ]
     if dynamic:
         classes.append(ViewScreenshots)
+        classes.append(GenerateTestSummary)
     else:
         classes += [ RefreshAll, ResetGroups ]
     return classes

@@ -21,6 +21,10 @@
       <separator/>
       <menuitem action="Split result files"/>
       <separator/>
+      <placeholder name="ExtraTestActions">
+        <separator/>
+        <menuitem action="Generate test summary"/>
+      </placeholder>
     </menu>
   </menubar>
 
@@ -39,7 +43,10 @@
     <menuitem action="Save As..."/>
     <separator/>
     <menuitem action="Kill"/>
-    <placeholder name="ExtraTestActions" />
+    <placeholder name="ExtraTestActions" >
+        <separator/>
+        <menuitem action="Generate test summary"/>
+    </placeholder>
     <separator/>
     <menuitem action="Mark"/>
     <menuitem action="Unmark"/>

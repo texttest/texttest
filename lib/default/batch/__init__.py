@@ -180,8 +180,13 @@ class MailSender:
 
     def send(self, batchDataList):
         app = batchDataList[0].suite.app
+        mailContents = self.makeContents(batchDataList)
+        self.sendOrStoreMail(app, mailContents, self.useCollection(app), not self.hasExitCodeErrors(batchDataList))
+
+    def makeContents(self, batchDataList, headerSection=True):
+        app = batchDataList[0].suite.app
         mailTitle = self.getMailTitle(app, batchDataList)
-        mailContents = self.createMailHeaderSection(mailTitle, app, batchDataList)
+        mailContents = self.createMailHeaderSection(mailTitle, app, batchDataList) if headerSection else mailTitle + "\n"
         if len(batchDataList) > 1:
             for batchData in batchDataList:
                 mailContents += self.getMailTitle(app, [ batchData ]) + "\n"
@@ -191,7 +196,7 @@ class MailSender:
             mailContents += self.performForAll(app, batchDataList, BatchApplicationData.getDetails, sectionHeaders[1])
         if not self.isAllFailure(batchDataList):
             mailContents += self.performForAll(app, batchDataList, BatchApplicationData.getSuccessBrief, sectionHeaders[2])
-        self.sendOrStoreMail(app, mailContents, self.useCollection(app), not self.hasExitCodeErrors(batchDataList))
+        return mailContents
 
     def performForAll(self, app, batchDataList, method, headline):
         contents = headline + " follows...\n" + \

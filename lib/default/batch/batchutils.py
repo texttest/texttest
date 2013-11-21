@@ -1,4 +1,4 @@
-import plugins, datetime, time
+import plugins, datetime, time, os
 
 class BatchVersionFilter:
     def __init__(self, batchSession):
@@ -39,3 +39,9 @@ def parseFileName(fileName, diag):
         except ValueError:
             pass
     return None, None, None
+
+def convertToUrl(path, fileMapping):
+    for filePath, httpPath in fileMapping.items():
+        if path.startswith(filePath):
+            return path.replace(filePath, httpPath)
+    return "file://" + os.path.abspath(path)

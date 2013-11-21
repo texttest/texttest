@@ -6,6 +6,7 @@ from cPickle import Unpickler, UnpicklingError
 from ordereddict import OrderedDict
 from glob import glob
 from pprint import pformat
+from batchutils import convertToUrl
 HTMLgen.PRINTECHO = 0
 
 def getWeekDay(tag):
@@ -346,9 +347,13 @@ class GenerateWebPages(object):
         
     def writePages(self):
         plugins.log.info("Writing overview pages...")
+        fileToUrl = self.getConfigValue("file_to_url", allSubKeys=True)
         for pageFile, (resourceName, page, _) in self.pagesOverview.items():
             page.write(pageFile)
             plugins.log.info("wrote: '" + plugins.relpath(pageFile, self.pageDir) + "'")
+            if fileToUrl:
+                url = convertToUrl(pageFile, fileToUrl)
+                plugins.log.info("(URL is " + url + ")")
         plugins.log.info("Writing detail pages...")
         for resourceName in self.resourceNames:
             for tag, details in self.pagesDetails.items():

@@ -5,7 +5,7 @@ import testoverview, plugins, logging, os, shutil, time, operator, sys
 from HTMLParser import HTMLParser
 from ordereddict import OrderedDict
 from glob import glob
-from batchutils import BatchVersionFilter, parseFileName
+from batchutils import BatchVersionFilter, parseFileName, convertToUrl
 
 class GenerateFromSummaryData(plugins.ScriptWithArgs):
     locationApps = OrderedDict()
@@ -43,7 +43,7 @@ class GenerateFromSummaryData(plugins.ScriptWithArgs):
                     dataFinder = SummaryDataFinder(location, apps, cls.summaryFileName, cls.basePath, defaultUsePie)
                     appsWithVersions = dataFinder.getAppsWithVersions()
                     if appsWithVersions:
-                        cls.generate(dataFinder, appsWithVersions)
+                        cls.generate(dataFinder, appsWithVersions, apps[0][0].getConfigValue("file_to_url"))
                 else:
                     plugins.log.info("No applications generated for index page at " +
                                      repr(os.path.join(location, cls.summaryFileName)) + ".")
@@ -60,7 +60,7 @@ class GenerateSummaryPage(GenerateFromSummaryData):
 class GenerateGraphs(GenerateFromSummaryData):
     scriptDoc = "Generate standalone graphs along the lines of the ones that appear in the HTML report"
     @classmethod
-    def generate(cls, dataFinder, appsWithVersions):
+    def generate(cls, dataFinder, appsWithVersions, *args):
         from resultgraphs import GraphGenerator
         for appName, versions in appsWithVersions.items():
             for version in versions:
@@ -271,7 +271,7 @@ class SummaryGenerator:
         pos = line.find("</title>")
         return str(testoverview.TitleWithDateStamp(line[:pos])) + "</title>\n"
             
-    def generatePage(self, dataFinder, appsWithVersions):
+    def generatePage(self, dataFinder, appsWithVersions, fileToUrl):
         file = open(dataFinder.summaryPageName, "w")
         versionOrder = [ "default" ]
         appOrder = []
@@ -293,6 +293,9 @@ class SummaryGenerator:
                 self.insertSummaryTable(file, dataFinder, mostRecentInfo, appsWithVersions, appOrder, versionOrder)
         file.close()
         plugins.log.info("wrote: '" + dataFinder.summaryPageName + "'") 
+        if fileToUrl:
+            url = convertToUrl(dataFinder.summaryPageName, fileToUrl)
+            plugins.log.info("(URL is " + url + ")")
         
     def getOrderedVersions(self, predefined, info):
         fullList = sorted(info)

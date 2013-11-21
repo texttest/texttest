@@ -3,7 +3,7 @@
 import os, plugins, sys, time, shutil, datetime, testoverview, logging, re, tarfile
 from summarypages import GenerateSummaryPage, GenerateGraphs # only so they become package level entities
 from ordereddict import OrderedDict
-from batchutils import calculateBatchDate, BatchVersionFilter, parseFileName
+from batchutils import calculateBatchDate, BatchVersionFilter, parseFileName, convertToUrl
 import subprocess
 from glob import glob
                 
@@ -934,7 +934,7 @@ class CollectFilesResponder(plugins.Responder):
         if latestFile is not None:
             fileMapping = app.getConfigValue("file_to_url")
             indexFile = os.path.join(reportLocation, "index.html")
-            return self.convertToUrl(indexFile, fileMapping), self.convertToUrl(latestFile, fileMapping)
+            return convertToUrl(indexFile, fileMapping), convertToUrl(latestFile, fileMapping)
         else:
             return None, None
 
@@ -951,12 +951,6 @@ class CollectFilesResponder(plugins.Responder):
                     bestPath, bestDate, bestTag = path, date, paddedTag
         return bestPath
             
-    def convertToUrl(self, path, fileMapping):
-        for filePath, httpPath in fileMapping.items():
-            if path.startswith(filePath):
-                return path.replace(filePath, httpPath)
-        return "file://" + os.path.abspath(path)
-
     def matchesApp(self, dir, app):
         suffix = app.versionSuffix()
         return dir.startswith(app.name + suffix) or dir.startswith(app.getBatchSession() + suffix)

@@ -2516,14 +2516,23 @@ Bug Fixes:
 
 Version trunk
 =============
+Dynamic GUI Enhancements:
+    - New "Generate test summary" in Actions menu
+	Essentially generates the batch report for the selected tests, writing to a user-selected file
 Framework Enhancements:
     - "collate_file" now also finds files in $TEXTTEST_LOG_DIR if local sandbox is used
 	i.e. if "default_texttest_local_tmp" is set
-
 Version Control Browser Enhancements:
     - Now supports Git
-
+    - "Update" operation is now always a "centralised-style" update
+	i.e. Mercurial does "hg pull -u" instead of "hg update", Git does "git pull"
+    - Keyboard accelerator Ctrl+U added for "update"
+Batch Report Enhancements:
+    - If "file_to_url" is set, now list URLs in the log file, of table pages and index pages
+	For example Jenkins will turn these into links directly.
 Bug Fixes:
     - Fixed wildcards for stems in "file_split_pattern" list. Using fnmatch module instead of a hacked pattern matching.
     - Fixed wildcards for stems in knownbugs "search_file", now works also with new files
     - Fixed taking long time to start a huge amount of test copies.
+    - VCS update enabled when no tests are selected
+

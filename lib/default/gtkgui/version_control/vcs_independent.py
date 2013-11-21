@@ -779,7 +779,7 @@ class UpdateGUI(BasicVersionControlDialogGUI):
         return [ "Refresh" ]
 
     def addContents(self):
-        vcsDirectory = self.currTestSelection[0].app.getDirectory()
+        vcsDirectory = self.currTestSelection[0].app.getDirectory() if self.currTestSelection else self.validApps[0].getDirectory()
         canUpdate = not vcs.hasLocalCommits(vcsDirectory)
         if canUpdate:
             args = vcs.getCmdArgs(self.getCommandName())
@@ -796,6 +796,9 @@ class UpdateGUI(BasicVersionControlDialogGUI):
 
     def getCommandName(self):
         return "update"
+
+    def isActiveOnCurrent(self, *args):
+        return self.shouldShow()
 
 class AddGUI(VersionControlDialogGUI):
     def _getTitle(self):

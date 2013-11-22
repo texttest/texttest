@@ -352,6 +352,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             return
 
         if len(allApps) == 0 and appFindingWroteError:
+            self.exitCode = 1
             return
             
         if self.inputOptionsValid(allApps):

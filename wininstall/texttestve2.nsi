@@ -11,7 +11,7 @@ SetCompressor lzma
 ; ------------ TextTest settings ---------
 !define PRODUCT_NAME "TextTest"
 !ifndef PRODUCT_VERSION
-  !define PRODUCT_VERSION "3.24"
+  !define PRODUCT_VERSION "3.26"
 !endif
 !define PRODUCT_PUBLISHER "TextTest"
 !define PRODUCT_WEB_SITE "http://www.texttest.org"
@@ -44,7 +44,7 @@ Var JAVA_EXE
   !endif
 !else
   !ifndef TEXTTEST_ROOT
-    !define TEXTTEST_ROOT "texttest-3.24"
+    !define TEXTTEST_ROOT "texttest-3.26"
   !endif
   !ifndef TEXTTEST_DIST
     !define TEXTTEST_DIST "${TEXTTEST_ROOT}.zip"
@@ -151,8 +151,8 @@ ShowInstDetails hide
   Function ${un}setup
     ${GetRoot} "$PROGRAMFILES" $ROOT_DRIVE
     StrCpy $INSTDIR "$ROOT_DRIVE\${PRODUCT_NAME}"
-    StrCpy $JYTHON_PATH "$ROOT_DRIVE\jython${JYTHON_VERSION}"
-    StrCpy $VIRTUALENV_PATH "$ROOT_DRIVE\virtualenv"
+    StrCpy $JYTHON_PATH "$INSTDIR\jython${JYTHON_VERSION}"
+    StrCpy $VIRTUALENV_PATH "$INSTDIR\virtualenv"
     StrCpy $TKDIFF_PATH "$PROGRAMFILES\TkDiff"
     ;StrCpy $WINMERGE_PATH "$ROOT_DRIVE\WinMerge-2.12.4-exe"
     StrCpy $TT_HOME "$ROOT_DRIVE\Tests"
@@ -378,7 +378,11 @@ Function configureStorytextPython
   MessageBox MB_OK|MB_ICONSTOP "Failed to install virtual environment on Python."
   Quit
   install:
+  ifFileExists "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\Scripts\storytext*" upgrade
   ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring storytext on python & ${VIRTUAL_PYTHON}\Scripts\pip install storytext & EXIT'
+  IfErrors onError done
+  upgrade:
+  ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring storytext on python & ${VIRTUAL_PYTHON}\Scripts\pip install --upgrade storytext & EXIT'
   IfErrors onError done
   onError:
     MessageBox MB_OK|MB_ICONSTOP "Failed to install StoryText on Python."
@@ -393,8 +397,12 @@ Function configureStorytextJava
   MessageBox MB_OK|MB_ICONSTOP "Failed to install virtual environment on Jython."
   Quit
   install:
+  IfFileExists "$VIRTUALENV_PATH\${VIRTUAL_JYTHON}\bin\storytext*" upgrade
   ;ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring storytext on jython & ${VIRTUAL_JYTHON}\bin\jython ${VIRTUAL_JYTHON}\bin\pip install storytext && EXIT'
   ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring storytext on jython & ${VIRTUAL_JYTHON}\bin\jython ${VIRTUAL_JYTHON}\bin\easy_install storytext && EXIT'
+  IfErrors onError done
+  upgrade:
+  ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring storytext on jython & ${VIRTUAL_JYTHON}\bin\jython ${VIRTUAL_JYTHON}\bin\easy_install --upgrade storytext && EXIT'
   IfErrors onError done
   onError:
     MessageBox MB_OK|MB_ICONSTOP "Failed to install StoryText on Jython."

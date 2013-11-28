@@ -2530,9 +2530,12 @@ Version Control Browser Enhancements:
 Batch Report Enhancements:
     - If "file_to_url" is set, now list URLs in the log file, of table pages and index pages
 	For example Jenkins will turn these into links directly.
+Windows installer Enhancements:
+    - All files now end up under chosen location, removed hardcoded C:\virtualenv and C:\jython2.5.1
+    - StoryText is now upgraded properly when the installer is run for a second time after a new release
 Bug Fixes:
     - Fixed wildcards for stems in "file_split_pattern" list. Using fnmatch module instead of a hacked pattern matching.
     - Fixed wildcards for stems in knownbugs "search_file", now works also with new files
     - Fixed taking long time to start a huge amount of test copies.
     - VCS update enabled when no tests are selected
-
+    - Exit code of 1 now returned when initial test suite cannot be created

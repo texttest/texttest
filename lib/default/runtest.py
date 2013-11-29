@@ -216,8 +216,13 @@ class RunTest(plugins.Action):
     def fixUseCaseVariables(self, testEnv, postfix):
         for varName in [ "USECASE_RECORD_SCRIPT", "USECASE_REPLAY_SCRIPT" ]:
             if varName in testEnv:
-                testEnv[varName] = testEnv.get(varName).replace("usecase", "usecase" + postfix)
-        
+                testEnv[varName] = self.rreplace(testEnv.get(varName), "usecase", "usecase" + postfix)
+    
+    def rreplace(self, s, old, new):
+        # Swiped from http://stackoverflow.com/questions/2556108/how-to-replace-the-last-occurence-of-an-expression-in-a-string
+        parts = s.rsplit(old, 1)
+        return new.join(parts)
+    
     def getTestProcess(self, test, machine, postfix=""):
         commandArgs = self.getExecuteCmdArgs(test, machine, postfix)
         self.diag.info("Running test with args : " + repr(commandArgs))

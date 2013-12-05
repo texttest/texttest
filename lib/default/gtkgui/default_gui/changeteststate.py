@@ -29,7 +29,10 @@ class BackgroundThreadHelper:
         
     def runBackgroundThread(self, *args):
         self.notify("ActionStart", False)
-        errorMsg = self.performBackgroundAction(*args)
+        try:
+            errorMsg = self.performBackgroundAction(*args)
+        except plugins.TextTestError, e:
+            errorMsg = str(e)
         self.notify("ActionStop", False)
         self.notify("BackgroundActionCompleted", errorMsg, self)
         

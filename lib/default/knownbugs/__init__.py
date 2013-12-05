@@ -213,7 +213,9 @@ class FileBugData:
         if not fileName:
             self.diag.info("File doesn't exist, checking only for absence bugs")
             return self.findAbsenceBugs(self.absentList, execHosts=execHosts, isChanged=isChanged, multipleDiffs=multipleDiffs, tmpDir=None)
-        
+        if not os.path.exists(fileName):
+            raise plugins.TextTestError, "The file '"+ fileName + "' does not exist. Maybe it has been removed by an external process. "
+
         self.diag.info("Looking for bugs in " + fileName)
         dirname = os.path.dirname(fileName)
         return self.findBugsInText(open(fileName).readlines(), execHosts=execHosts, isChanged=isChanged, multipleDiffs=multipleDiffs, tmpDir=dirname)

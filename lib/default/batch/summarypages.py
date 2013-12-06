@@ -20,7 +20,7 @@ class GenerateFromSummaryData(plugins.ScriptWithArgs):
 
     def setUpApplication(self, app):
         location = os.path.realpath(app.getBatchConfigValue("historical_report_location"))
-        usePie = app.getBatchConfigValue("historical_report_piechart_summary")
+        usePie = app.getBatchConfigValue("historical_report_piechart_summary") == "true"
         versionFilter = BatchVersionFilter(app.getBatchSession())
         rejected = bool(versionFilter.findUnacceptableVersion(app))
         self.locationApps.setdefault(location, []).append((app, usePie, rejected))
@@ -40,6 +40,12 @@ class GenerateFromSummaryData(plugins.ScriptWithArgs):
             if predicate is None or predicate(apps):
                 if not all((rejected for app, usePie, rejected in apps)):
                     defaultUsePie = all((usePie for app, usePie, rejected in apps))
+                    plugins.log.info("Generating index page at " + os.path.join(location, cls.summaryFileName) + ", from following:")
+                    for app, _, rejected in apps:
+                        text = "- " + app.description()
+                        if rejected:
+                            text += " (rejected)"
+                        plugins.log.info(text)
                     dataFinder = SummaryDataFinder(location, apps, cls.summaryFileName, cls.basePath, defaultUsePie)
                     appsWithVersions = dataFinder.getAppsWithVersions()
                     if appsWithVersions:
@@ -192,7 +198,7 @@ class SummaryDataFinder:
         return info[0], plugins.padNumbersWithZeroes(info[1])
         
     def usePieChart(self, appName):
-        if self.appUsePie.get(appName) == "true":
+        if self.appUsePie.get(appName):
             try:
                 from resultgraphs import PieGraph #@UnusedImport
                 return True

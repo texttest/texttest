@@ -384,6 +384,8 @@ class PrepareWriteDirectory(plugins.Action):
             self.diag.info("Setting executable to " + repr(remoteFile))
             # For convenience, so we don't have to set it everywhere...
             suite.app.setConfigOverride("executable", remoteFile)
+        elif not remoteCheckout:
+            suite.app.setConfigOverride("executable", localFile) # Expand TEXTTEST_CHECKOUT, TEXTTEST_ROOT etc
 
         scripts = suite.getConfigValue("copy_test_path_script")
         newScripts = {}

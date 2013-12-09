@@ -1,6 +1,6 @@
 
 import gtk, gobject, plugins, texttest_version, os, sys, glob
-from .. import guiplugins, guiutils
+from .. import guiplugins
 from types import StringType
 
 # Show useful info about TextTest.
@@ -68,7 +68,7 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         self.dialog.set_resizable(False)
 
     def urlClicked(self, *args): 
-        status = guiutils.openLinkInBrowser(self.website)
+        status = guiplugins.openLinkInBrowser(self.website)
         self.notify("Status", status)
         
     def showCredits(self, *args):

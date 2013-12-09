@@ -18,6 +18,13 @@ try:
 except ImportError:
     pass # We might want to document the config entries, silly to fail on lack of GTK...
 
+def createApplicationEvent(name, category, **kw):
+    try:
+        from storytext import applicationEvent
+        # Everything that comes from here is to do with editing files in external programs
+        applicationEvent(name, category, **kw)
+    except ImportError:
+        pass
 
 guiConfig = None
 
@@ -66,18 +73,6 @@ utf8Converter = Utf8Converter()
 
 def convertToUtf8(*args): # gtk.TextViews insist we do the conversion ourselves
     return utf8Converter.convert(*args)
-
-
-def openLinkInBrowser(*files):
-    if os.name == "nt" and not os.environ.has_key("BROWSER") and len(files) == 1:
-        os.startfile(files[0]) #@UndefinedVariable
-        return 'Started "<default browser> ' + files[0] + '" in background.'
-    else:
-        browser = os.getenv("BROWSER", "firefox")
-        cmdArgs = [ browser ] + list(files)
-        subprocess.call(cmdArgs)
-        return 'Started "' + " ".join(cmdArgs) + '" in background.'
-
 
 class RefreshTips:
     def __init__(self, name, refreshCell, refreshColumn, refreshIndex):
@@ -340,13 +335,7 @@ class SubGUI(plugins.Observable):
             window.add(widget)
 
     def applicationEvent(self, name, **kw):
-        try:
-            from storytext import applicationEvent
-            # Everything that comes from here is to do with editing files in external programs
-            applicationEvent(name, "files", **kw)
-        except ImportError:
-            pass
-
+        createApplicationEvent(name, "files", **kw)
 
 # base class for managing containers
 class ContainerGUI(SubGUI):

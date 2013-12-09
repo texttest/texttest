@@ -1,7 +1,7 @@
 
 
 import gtk, gobject, entrycompletion, plugins, os, subprocess, types, logging
-from guiutils import guiConfig, SubGUI, GUIConfig
+from guiutils import guiConfig, SubGUI, GUIConfig, createApplicationEvent
 from jobprocess import killSubProcessAndChildren
 from ordereddict import OrderedDict
         
@@ -76,6 +76,15 @@ class ProcessTerminationMonitor(plugins.Observable):
         
 processMonitor = ProcessTerminationMonitor()
 
+def openLinkInBrowser(*files):
+    if os.name == "nt" and not os.environ.has_key("BROWSER") and len(files) == 1:
+        os.startfile(files[0]) #@UndefinedVariable
+        return 'Started "<default browser> ' + files[0] + '" in background.'
+    else:
+        browser = os.getenv("BROWSER", "firefox")
+        cmdArgs = [ browser ] + list(files)
+        processMonitor.startProcess(cmdArgs, exitHandler=createApplicationEvent, exitHandlerArgs=("the browser to be closed", "browser"))
+        return 'Started "' + " ".join(cmdArgs) + '" in background.'
 
 class GtkActionWrapper:
     def __init__(self):

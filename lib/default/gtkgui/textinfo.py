@@ -4,7 +4,7 @@ The various text info views, i.e. the bottom right-corner "Text Info" and
 the "Run Info" tab from the dynamic GUI
 """
 
-import gtk, pango, guiutils, plugins, os, sys, datetime
+import gtk, pango, guiutils, plugins, os, sys, datetime, guiplugins
 from default import performance
 
 class TimeMonitor:
@@ -115,7 +115,7 @@ class TextViewGUI(guiutils.SubGUI):
         iter = text_view.get_iter_at_location(x, y)
         target = self.findLinkTarget(iter)
         if target:
-            statusMessage = guiutils.openLinkInBrowser(target)
+            statusMessage = guiplugins.openLinkInBrowser(target)
             self.notify("Status", statusMessage)
 
         return False

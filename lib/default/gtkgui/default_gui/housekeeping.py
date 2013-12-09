@@ -128,7 +128,7 @@ class ViewScreenshots(guiplugins.ActionGUI):
         allFiles = os.listdir(screenshotDir)
         allFiles.sort(key=self.getSortKey)
         allPaths = [ os.path.join(screenshotDir, f) for f in allFiles ]
-        guiutils.openLinkInBrowser(*allPaths)
+        guiplugins.openLinkInBrowser(*allPaths)
             
     def getSortKey(self, fileName):
         number = fileName[10:-4]

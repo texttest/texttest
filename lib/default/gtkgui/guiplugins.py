@@ -79,6 +79,7 @@ processMonitor = ProcessTerminationMonitor()
 def openLinkInBrowser(*files):
     if os.name == "nt" and not os.environ.has_key("BROWSER") and len(files) == 1:
         os.startfile(files[0]) #@UndefinedVariable
+        createApplicationEvent("the browser to be closed", "browser")
         return 'Started "<default browser> ' + files[0] + '" in background.'
     else:
         browser = os.getenv("BROWSER", "firefox")

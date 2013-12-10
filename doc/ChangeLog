@@ -2539,3 +2539,7 @@ Bug Fixes:
     - Fixed taking long time to start a huge amount of test copies.
     - VCS update enabled when no tests are selected
     - Exit code of 1 now returned when initial test suite cannot be created
+    - Fixed problem when running multiple usecases if test has "usecase" in the name
+    - Fixed Exception when closing dynamic GUI after reconnecting.
+    - Handle now executables inside remote checkouts
+    - Fixed unresponsive dynamic GUI after viewing screenshots in a browser

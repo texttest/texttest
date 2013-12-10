@@ -34,11 +34,6 @@ class QueueSystemServer(BaseActionRunner):
         self.testsSubmitted = 0
         self.maxCapacity = 100000 # infinity, sort of
         self.allApps = allApps
-        for app in allApps:
-            currCap = app.getConfigValue("queue_system_max_capacity")
-            if currCap is not None and currCap < self.maxCapacity:
-                self.maxCapacity = currCap
-            
         self.jobs = OrderedDict()
         self.submissionRules = {}
         self.killedJobs = {}
@@ -48,10 +43,19 @@ class QueueSystemServer(BaseActionRunner):
         self.slaveLogDirs = set()
         self.delayedTestsForAdd = []
         self.remainingForApp = OrderedDict()
+        for app in allApps:
+            queueSystem = self.getQueueSystem(app) # populate cache
+            queueCapacity = queueSystem.getCapacity() if queueSystem else None
+            configCapacity = app.getConfigValue("queue_system_max_capacity")
+            for currCap in [queueCapacity, configCapacity]:
+                if currCap is not None and currCap < self.maxCapacity:
+                    self.maxCapacity = currCap
+        if self.maxCapacity == 0:
+            raise plugins.TextTestError, "The queue system module is reporting zero capacity.\nEither you have set 'queue_system_max_capacity' to 0 or something is uninstalled or unavailable. Exiting."
+        
         capacityPerSuite = self.maxCapacity / len(allApps)
         for app in allApps:
             self.remainingForApp[app.name] = capacityPerSuite
-            self.getQueueSystem(app) # populate cache
         QueueSystemServer.instance = self
         
     def addSuites(self, suites):
@@ -503,6 +507,7 @@ class QueueSystemServer(BaseActionRunner):
         jobExisted = queueSystem.killJob(jobId)
         self.killedJobs[jobId] = test, jobExisted
         return jobExisted
+    
     def getQueueSystem(self, test):
         queueModuleText = queueSystemName(test)
         if queueModuleText is None:
@@ -513,9 +518,10 @@ class QueueSystemServer(BaseActionRunner):
         
         command = "from " + queueModule + " import QueueSystem as _QueueSystem"
         exec command
-        system = _QueueSystem() #@UndefinedVariable
+        system = _QueueSystem(test) #@UndefinedVariable
         self.queueSystems[queueModule] = system
         return system
+    
     def changeState(self, test, newState, previouslySubmitted=True):
         test.changeState(newState)
         self.handleLocalError(test, previouslySubmitted)

@@ -3,9 +3,10 @@
 
 import subprocess, os, socket, signal
 import abstractqueuesystem
+from multiprocessing import cpu_count
 
 class QueueSystem(abstractqueuesystem.QueueSystem):
-    def __init__(self):
+    def __init__(self, *args):
         self.processes = {}
 
     def submitSlaveJob(self, cmdArgs, slaveEnv, logDir, submissionRules, jobType): 
@@ -24,6 +25,9 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
             jobId = str(process.pid)
             self.processes[jobId] = process
             return jobId, None
+        
+    def getCapacity(self):
+        return cpu_count()
         
     def formatCommand(self, cmdArgs):
         return " ".join(cmdArgs)

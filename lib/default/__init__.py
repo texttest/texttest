@@ -1328,8 +1328,9 @@ class Config:
         # Also disable hostkey checking, we assume we don't run tests on untrusted hosts.
         # Also don't run tests on machines which take a very long time to connect to...
         sshOptions = "-o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10"
+        rsyncExcludeFile = plugins.installationPath("etc", "rsync_exclude_patterns")
         return { "default": "", "ssh" : "-q " + sshOptions,
-                 "rsync" : "-azLp", "scp": "-Crp " + sshOptions }
+                 "rsync" : "-av --copy-unsafe-links --exclude-from=" + rsyncExcludeFile, "scp": "-Crp " + sshOptions }
 
     def getCommandArgsOn(self, app, machine, cmdArgs, graphical=False):
         if machine == "localhost":
@@ -1383,8 +1384,9 @@ class Config:
                   "'.\nMake sure you have passwordless access set up correctly. The failing command was:\n" + \
                   " ".join(allArgs) + "\n\nThe command produced the following output:\n" + output.strip()
 
-    def ensureRemoteDirExists(self, app, machine, dirname):
-        self.runCommandAndCheckMachine(app, machine, [ "mkdir", "-p", plugins.quote(dirname) ])
+    def ensureRemoteDirExists(self, app, machine, *dirnames):
+        quotedDirs = map(plugins.quote, dirnames)
+        self.runCommandAndCheckMachine(app, machine, [ "mkdir", "-p" ] + quotedDirs)
 
     @staticmethod
     def getRemotePath(fileName, machine):

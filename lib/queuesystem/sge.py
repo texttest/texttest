@@ -20,7 +20,7 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
                     "St"  : ("SSUSP", "Suspended by SGE due to other higher priority jobs"),
                     "T"   : ("THRESH", "Suspended by SGE as it exceeded allowed thresholds") }
     errorStatus = "Eqw"
-    def __init__(self):
+    def __init__(self, *args):
         self.qdelOutput = ""
         self.errorReasons = {}
 

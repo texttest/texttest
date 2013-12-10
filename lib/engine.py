@@ -381,6 +381,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         except plugins.TextTestError, e:
             # Responder class-level errors are basically fatal : there is no point running without them (cannot
             # do anything about them) and no way to get partial errors.
+            self.exitCode = 1
             return sys.stderr.write(str(e) + "\n")
         
         raisedError, self.appSuites = self.createTestSuites(allApps)

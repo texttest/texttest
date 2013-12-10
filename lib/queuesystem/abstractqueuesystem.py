@@ -5,6 +5,9 @@ import subprocess, os
 import plugins
 
 class QueueSystem:
+    def __init__(self, *args):
+        pass
+    
     def submitSlaveJob(self, cmdArgs, slaveEnv, logDir, submissionRules, jobType):
         try:
             process = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -44,6 +47,9 @@ class QueueSystem:
         
     def getSlaveVarsToBlock(self):
         return []
+    
+    def getCapacity(self):
+        pass # treated as no restriction
 
     def makeSlaveEnvironment(self, env):
         newEnv = plugins.copyEnvironment(ignoreVars=self.getSlaveVarsToBlock())

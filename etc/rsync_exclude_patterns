@@ -1,0 +1,9 @@
+.bzr/
+.hg/
+.git/
+.svn/
+CVS/
+*.pyc
+*py.class
+.nfs*
+core.[0-9]*

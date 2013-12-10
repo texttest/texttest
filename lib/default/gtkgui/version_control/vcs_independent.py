@@ -783,8 +783,11 @@ class UpdateGUI(BasicVersionControlDialogGUI):
         canUpdate = not vcs.hasLocalCommits(vcsDirectory)
         if canUpdate:
             args = vcs.getCmdArgs(self.getCommandName())
+            self.notify("Status", "Updating from " + vcs.name)
+            self.notify("ActionStart")
             _, stdout, stderr = vcs.getProcessResults(args, cwd=vcsDirectory)
             text = stdout + stderr
+            
         else:
             text = "You have local commits. Aborting updating via TextTest. You will need to merge by hand."
         buffer = gtk.TextBuffer()
@@ -793,6 +796,7 @@ class UpdateGUI(BasicVersionControlDialogGUI):
         self.dialog.vbox.pack_start(textView, expand=True, fill=True)
         if canUpdate:
             self.notify("Refresh")
+            self.notify("ActionStop")
 
     def getCommandName(self):
         return "update"

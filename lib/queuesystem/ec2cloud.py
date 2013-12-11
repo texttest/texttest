@@ -50,7 +50,11 @@ class QueueSystem(local.QueueSystem):
         for i, instRoot in enumerate(plugins.installationRoots):
             if i == 0 or not instRoot.startswith(plugins.installationRoots[0]):
                 dirs.append(instRoot)
-        dirs.append(self.app.getDirectory())
+        appDir = self.app.getDirectory()
+        dirs.append(appDir)
+        checkout = self.app.checkout
+        if checkout and not checkout.startswith(appDir):
+            dirs.append(checkout)
         return dirs
 
     def synchroniseMachine(self, machine):

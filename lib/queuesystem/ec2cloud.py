@@ -57,9 +57,17 @@ class QueueSystem(local.QueueSystem):
             dirs.append(checkout)
         return dirs
 
+    def getParents(self, dirs):
+        parents = []
+        for dir in dirs:
+            parent = os.path.dirname(dir)
+            if parent not in parents:
+                parents.append(parent)
+        return parents
+
     def synchroniseMachine(self, machine):
         dirs = self.getDirectoriesForSynch()
-        parents = map(os.path.dirname, dirs)
+        parents = self.getParents(dirs)
         self.app.ensureRemoteDirExists(machine, *parents)
         for dir in dirs:
             self.synchronisePath(dir, machine)
@@ -68,11 +76,13 @@ class QueueSystem(local.QueueSystem):
         ip = self.machines[self.nextMachineIndex]
         machine = "ec2-user@" + ip
         self.nextMachineIndex += 1
+        if self.nextMachineIndex == len(self.machines):
+            self.nextMachineIndex = 0
         try:
             self.synchroniseMachine(machine)
         except plugins.TextTestError, e:
-            sys.stderr.write("Failed to synchronise files with EC2 instance with private IP address '" + ip + "'\n" + str(e) + "\n")
-            return None, ""
+            errorMsg = "Failed to synchronise files with EC2 instance with private IP address '" + ip + "'\n" + str(e) + "\n"
+            return None, errorMsg
         
         remoteCmdArgs = self.app.getCommandArgsOn(machine, cmdArgs)
         return local.QueueSystem.submitSlaveJob(self, remoteCmdArgs, *args) 

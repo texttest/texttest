@@ -50,6 +50,9 @@ class QueueSystem:
     
     def getCapacity(self):
         pass # treated as no restriction
+    
+    def slavesOnRemoteSystem(self):
+        return False
 
     def makeSlaveEnvironment(self, env):
         newEnv = plugins.copyEnvironment(ignoreVars=self.getSlaveVarsToBlock())

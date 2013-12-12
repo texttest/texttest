@@ -27,7 +27,17 @@ class RunTestInSlave(RunTest):
         moduleName = queueSystemName(test.app).lower()
         command = "from " + moduleName + " import getUserSignalKillInfo as _getUserSignalKillInfo"
         exec command
-        return _getUserSignalKillInfo(userSignalNumber, self.getExplicitKillInfo)
+        return _getUserSignalKillInfo(userSignalNumber, self.getExplicitKillInfo) #@UndefinedVariable
+
+class FileTransferResponder(plugins.Responder):
+    def __init__(self, optionMap, *args):
+        plugins.Responder.__init__(self)
+        self.destination = optionMap.get("slavefilesynch")
+        self.transferAll = optionMap.get("keepslave") or optionMap.get("keeptmp")
+        
+    def notifyLifecycleChange(self, test, state, changeDesc):
+        if self.destination and changeDesc == "complete" and (self.transferAll or not test.state.hasSucceeded()):
+            test.app.copyFileRemotely(test.writeDirectory, "localhost", os.path.dirname(test.writeDirectory), self.destination)
 
 
 class SocketResponder(plugins.Responder,plugins.Observable):

@@ -59,6 +59,7 @@ class QueueSystemConfig(default.Config):
             elif group.name.startswith("Invisible"):
                 group.addOption("slave", "Private: used to submit slave runs remotely")
                 group.addOption("servaddr", "Private: used to submit slave runs remotely")
+                group.addOption("slavefilesynch", "Private: used to push files from remote slave machine to master")
 
     def getReconnFullOptions(self):
         return default.Config.getReconnFullOptions(self) + [
@@ -191,7 +192,7 @@ class QueueSystemConfig(default.Config):
             return basicDescription
         
     def getSlaveResponderClasses(self):
-        classes = [ slavejobs.SocketResponder, slavejobs.SlaveActionRunner ]
+        classes = [ slavejobs.FileTransferResponder, slavejobs.SocketResponder, slavejobs.SlaveActionRunner ]
         if os.name == "posix" and not self.isActionReplay():
             classes.append(VirtualDisplayResponder)
         classes.append(ApplicationEventResponder)

@@ -41,6 +41,9 @@ class QueueSystem(local.QueueSystem):
     def getCapacity(self):
         return len(self.machines)
     
+    def slavesOnRemoteSystem(self):
+        return True
+    
     def synchronisePath(self, path, machine):
         dirName = os.path.dirname(path)
         return self.app.copyFileRemotely(path, "localhost", dirName, machine)
@@ -71,6 +74,10 @@ class QueueSystem(local.QueueSystem):
         self.app.ensureRemoteDirExists(machine, *parents)
         for dir in dirs:
             self.synchronisePath(dir, machine)
+            
+    def getArg(self, args, flag):
+        index = args.index(flag)
+        return args[index + 1]
     
     def submitSlaveJob(self, cmdArgs, *args):
         ip = self.machines[self.nextMachineIndex]
@@ -84,7 +91,9 @@ class QueueSystem(local.QueueSystem):
             errorMsg = "Failed to synchronise files with EC2 instance with private IP address '" + ip + "'\n" + str(e) + "\n"
             return None, errorMsg
         
-        remoteCmdArgs = self.app.getCommandArgsOn(machine, cmdArgs)
+        ipAddress = self.getArg(cmdArgs, "-servaddr").split(":")[0]
+        fileArgs = [ "-slavefilesynch", os.getenv("USER") + "@" + ipAddress ]
+        remoteCmdArgs = self.app.getCommandArgsOn(machine, cmdArgs, agentForwarding=True) + fileArgs
         return local.QueueSystem.submitSlaveJob(self, remoteCmdArgs, *args) 
         
 from local import MachineInfo, getUserSignalKillInfo, getExecutionMachines

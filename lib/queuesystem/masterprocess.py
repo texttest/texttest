@@ -40,12 +40,16 @@ class QueueSystemServer(BaseActionRunner):
         self.queueSystems = {}
         self.reuseOnly = False
         self.submitAddress = None
+        self.createDirectories = False
         self.slaveLogDirs = set()
         self.delayedTestsForAdd = []
         self.remainingForApp = OrderedDict()
         for app in allApps:
             queueSystem = self.getQueueSystem(app) # populate cache
             queueCapacity = queueSystem.getCapacity() if queueSystem else None
+            # If the slaves run somewhere else, they won't create directories for us
+            if queueSystem:
+                self.createDirectories |= queueSystem.slavesOnRemoteSystem()
             configCapacity = app.getConfigValue("queue_system_max_capacity")
             for currCap in [queueCapacity, configCapacity]:
                 if currCap is not None and currCap < self.maxCapacity:
@@ -69,6 +73,8 @@ class QueueSystemServer(BaseActionRunner):
         self.testQueue.put("TextTest slave server started on " + address)
 
     def addTest(self, test):
+        if self.createDirectories:
+            test.makeWriteDirectory()
         capacityForApp = self.remainingForApp[test.app.name]
         if capacityForApp > 0:
             self.addTestToQueues(test)

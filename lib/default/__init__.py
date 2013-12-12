@@ -1332,13 +1332,16 @@ class Config:
         return { "default": "", "ssh" : "-q " + sshOptions,
                  "rsync" : "-av --copy-unsafe-links --exclude-from=" + rsyncExcludeFile, "scp": "-Crp " + sshOptions }
 
-    def getCommandArgsOn(self, app, machine, cmdArgs, graphical=False):
+    def getCommandArgsOn(self, app, machine, cmdArgs, graphical=False, agentForwarding=False):
         if machine == "localhost":
             return cmdArgs
         else:
             args = self.getRemoteProgramArgs(app, "remote_shell_program")
             if graphical and args[0] == "ssh":
                 args.append("-Y")
+            if agentForwarding and args[0] == "ssh":
+                args.append("-A") 
+
             args.append(machine)
             if graphical and args[0] == "rsh":
                 args += [ "env", "DISPLAY=" + self.getFullDisplay() ]

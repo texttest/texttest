@@ -139,8 +139,15 @@ class QueueSystemConfig(default.Config):
         # Reads the data via a socket, need to set up categories
         return default.Config.readsTestStateFiles(self) or (self.useQueueSystem and not self.slaveRun())
 
+    def slaveOnRemoteSystem(self):
+        return "slavefilesynch" in self.optionMap
+
     def cleanSlaveFiles(self, test):
-        if test.state.hasSucceeded():
+        if self.slaveOnRemoteSystem():
+            # Don't keep anything on a remote system, we've transferred it all back anyhow...
+            writeDir = test.getDirectory(temporary=1)
+            plugins.removePath(writeDir)
+        elif test.state.hasSucceeded():
             writeDir = test.getDirectory(temporary=1)
             # If we've made screenshots, keep them, we might want to look at them...
             if os.path.isdir(os.path.join(writeDir, "screenshots")):
@@ -153,6 +160,22 @@ class QueueSystemConfig(default.Config):
             for dataFile in self.getDataFiles(test):
                 fullPath = test.makeTmpFileName(dataFile, forComparison=0)
                 plugins.removePath(fullPath)
+                
+    def cleanEmptyDirectories(self, path):
+        # Swiped from http://dev.enekoalonso.com/2011/08/06/python-script-remove-empty-folders/ (first comment)
+        files = os.listdir(path)
+        foundFiles = False
+        if len(files):
+            for f in files:
+                fullpath = os.path.join(path, f)
+                if os.path.isdir(fullpath):
+                    foundFiles |= self.cleanEmptyDirectories(fullpath)
+                else:
+                    foundFiles = True
+            
+        if not foundFiles:
+            os.rmdir(path)
+        return foundFiles
 
     def getDataFiles(self, test):
         return test.getDataFileNames()
@@ -162,6 +185,8 @@ class QueueSystemConfig(default.Config):
             # Slaves leave their files for the master process to clean
             for test in suite.testCaseList():
                 self.cleanSlaveFiles(test)
+            if self.slaveOnRemoteSystem():
+                self.cleanEmptyDirectories(suite.app.writeDirectory)
         else:
             default.Config._cleanWriteDirectory(self, suite)
 

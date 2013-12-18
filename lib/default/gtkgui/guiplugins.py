@@ -1113,6 +1113,8 @@ class ActionDialogGUI(OptionGroupGUI):
         else:
             return []
         
+class CloseWindowCancelException(plugins.TextTestException):
+    pass
 
 class InteractiveActionConfig:
     def getColourDictionary(self):

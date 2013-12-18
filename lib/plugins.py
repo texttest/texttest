@@ -568,6 +568,8 @@ class Observable:
                 return method(self, *args, **kwargs)
             else:
                 return method(*args, **kwargs)
+        except TextTestException:
+            raise
         except Exception:
             sys.stderr.write("Observer raised exception while calling " + methodName + " :\n")
             printException()
@@ -1148,12 +1150,14 @@ class PreviewGenerator:
             result += remaining[:self.maxWidth] + "\n"
             remaining = remaining[self.maxWidth:]
 
-
-# Exception to throw. It's generally good to throw this internally
-class TextTestError(RuntimeError):
+class TextTestException(RuntimeError):
     pass
 
-class TextTestWarning(RuntimeError):
+# Exception to throw. It's generally good to throw this internally
+class TextTestError(TextTestException):
+    pass
+
+class TextTestWarning(TextTestException):
     pass
 
 # Sort of a workaround to get e.g. CVSLogInGUI to show a message in a simple info dialog

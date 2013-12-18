@@ -32,7 +32,7 @@ except Exception, e:
 import testtree, filetrees, statusviews, textinfo, actionholders, version_control, guiplugins, guiutils, plugins, os, sys, logging
 from copy import copy
 from ordereddict import OrderedDict
-
+from default.gtkgui.guiplugins import CloseWindowCancelException
 
 class IdleHandlerManager:
     def __init__(self):
@@ -194,7 +194,7 @@ class GUIController(plugins.Responder, plugins.Observable):
         # Don't put ourselves in the observers twice or lots of weird stuff happens.
         # Important that closing the GUI is the last thing to be done, so make sure we go at the end...
         frameworkExitObservers = filter(self.isFrameworkExitObserver, frameworkObservers)
-        return self.defaultActionGUIs + [ guiplugins.processMonitor, self.statusMonitor, self.testTreeGUI, self.menuBarGUI ] + \
+        return [ self.statusMonitor ] + self.defaultActionGUIs + [ guiplugins.processMonitor, self.testTreeGUI, self.menuBarGUI ] + \
                frameworkExitObservers + [ self.idleManager, self ]
 
     def getTestColumnObservers(self):
@@ -472,8 +472,10 @@ class TopWindowGUI(guiutils.ContainerGUI):
             self.notify("Exit")
 
     def windowClosed(self, *args):
-        self.notify("WindowClosed")
-        self.notifyQuit()
+        try:
+            self.notify("WindowClosed")
+        except CloseWindowCancelException:
+            return True
 
     def notifyQuit(self, *args):
         self.exitStatus |= self.EXIT_NOTIFIED

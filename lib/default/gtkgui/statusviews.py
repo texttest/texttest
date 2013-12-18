@@ -20,6 +20,7 @@ class StatusMonitorGUI(guiutils.SubGUI):
         self.animation = None
         self.pixbuf = None
         self.label = None
+        self.closing = False
         self.initialMessage = plugins.convertForMarkup(initialMessage)
 
     def getWidgetName(self):
@@ -33,10 +34,14 @@ class StatusMonitorGUI(guiutils.SubGUI):
             self.throbber.set_from_animation(self.animation)
             if lock:
                 self.throbber.grab_add()
+                
+    def notifyWindowClosed(self, *args):
+        self.closing = True
 
     def notifyActionProgress(self, *args):
-        while gtk.events_pending():
-            gtk.main_iteration(False)
+        if not self.closing:
+            while gtk.events_pending():
+                gtk.main_iteration(False)
 
     def notifyActionStop(self, lock=True):
         if self.throbber:

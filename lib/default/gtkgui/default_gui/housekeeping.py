@@ -6,27 +6,36 @@ Miscellaneous actions for generally housekeeping the state of the GUI
 from .. import guiplugins, guiutils
 from ordereddict import OrderedDict
 from default.batch import BatchApplicationData, MailSender
-import os, plugins
+import os, plugins, gtk
 
 class Quit(guiplugins.BasicActionGUI):
     def __init__(self, allApps, dynamic, inputOptions):
         guiplugins.BasicActionGUI.__init__(self, allApps, dynamic, inputOptions)
         self.runName = inputOptions.get("name", "") if dynamic else None
+        self.saidCancel = False
+        
     def _getStockId(self):
         return "quit"
+    
     def _getTitle(self):
         return "_Quit"
+    
     def isActiveOnCurrent(self, *args):
         return True
+    
     def getSignalsSent(self):
         return [ "Quit" ]
+    
     def performOnCurrent(self):
         self.notify("Quit")
+    
     def notifySetRunName(self, runName):
         if self.runName is not None:
             self.runName = runName
+    
     def messageAfterPerform(self):
         pass # GUI isn't there to show it
+    
     def getConfirmationMessage(self):
         message = ""
         if self.runName and not self.runName.startswith("Tests started from"):
@@ -38,6 +47,19 @@ class Quit(guiplugins.BasicActionGUI):
         if message:
             message += "\nQuit anyway?\n"
         return message
+
+    def notifyWindowClosed(self, *args):
+        confirmationMessage = self.getConfirmationMessage()
+        if confirmationMessage:
+            dialog = self.showQueryDialog(self.getParentWindow(), confirmationMessage,
+                                          gtk.STOCK_DIALOG_WARNING, "Confirmation", None)
+            responseId = dialog.run()
+            saidCancel = responseId not in [ gtk.RESPONSE_ACCEPT, gtk.RESPONSE_YES, gtk.RESPONSE_OK ]
+            dialog.hide()
+            dialog.destroy()
+            if saidCancel:
+                raise guiplugins.CloseWindowCancelException("Closing window")
+        self.notify("Quit")
 
 
 class ResetGroups(guiplugins.BasicActionGUI):

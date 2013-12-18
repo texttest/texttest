@@ -12,7 +12,6 @@ class Quit(guiplugins.BasicActionGUI):
     def __init__(self, allApps, dynamic, inputOptions):
         guiplugins.BasicActionGUI.__init__(self, allApps, dynamic, inputOptions)
         self.runName = inputOptions.get("name", "") if dynamic else None
-        self.saidCancel = False
         
     def _getStockId(self):
         return "quit"

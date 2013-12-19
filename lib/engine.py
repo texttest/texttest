@@ -136,6 +136,8 @@ class TextTest(plugins.Responder, plugins.Observable):
         self.exitCode = 0
 
     def printStackTrace(self, *args):
+        # Swiped from http://stackoverflow.com/questions/1032813/dump-stacktraces-of-all-active-threads
+        # print_stack() only shows the main thread which is often just waiting for the others.
         sys.stderr.write("Received SIGQUIT: showing current stack trace below:\n")
         code = []
         from traceback import extract_stack

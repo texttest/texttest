@@ -137,8 +137,17 @@ class TextTest(plugins.Responder, plugins.Observable):
 
     def printStackTrace(self, *args):
         sys.stderr.write("Received SIGQUIT: showing current stack trace below:\n")
-        from traceback import print_stack
-        print_stack()
+        code = []
+        from traceback import extract_stack
+        for threadId, stack in sys._current_frames().items():
+            code.append("# ThreadID: %s" % threadId)
+            for filename, lineno, name, line in extract_stack(stack):
+                code.append('  File "%s", line %d, in %s' % (filename, lineno, name))
+                if line:
+                    code.append("    " + line.strip())
+
+        for line in code:
+            sys.stderr.write(line + "\n")
 
     def findSearchDirs(self, roots):
         subDirs = []

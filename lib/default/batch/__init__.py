@@ -965,7 +965,7 @@ class CollectFilesResponder(plugins.Responder):
         fileBodies = []
         versionsFound = set()
         for filename in filelist:
-            if filename.startswith(prefix):
+            if filename == prefix or filename.startswith(prefix + "."):
                 fullname = os.path.join(fullDir, filename)
                 fileBody = self.parseFile(fullname, app, totalValues)
                 if fileBody:

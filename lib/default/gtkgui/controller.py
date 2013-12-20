@@ -475,8 +475,8 @@ class TopWindowGUI(guiutils.ContainerGUI):
         try:
             self.notify("WindowClosed")
         except CloseWindowCancelException:
-            return True
-
+            return not self.topWindow.stop_emission("delete_event")
+            
     def notifyQuit(self, *args):
         self.exitStatus |= self.EXIT_NOTIFIED
         self.notify("KillProcesses", *args)

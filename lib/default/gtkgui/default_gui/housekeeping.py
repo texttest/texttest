@@ -57,6 +57,7 @@ class Quit(guiplugins.BasicActionGUI):
             dialog.hide()
             dialog.destroy()
             if saidCancel:
+                self.cancel()
                 raise guiplugins.CloseWindowCancelException("Closing window")
         self.notify("Quit")
 

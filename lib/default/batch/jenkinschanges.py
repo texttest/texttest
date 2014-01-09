@@ -264,26 +264,27 @@ def getPomData(pomFile):
     groupPrefix = groupId + ":" if groupId else ""
     return groupPrefix + artifactId, providedScope, modules
 
-def getArtefactsFromPomFiles(pomFile, jobName, jobRoot, workspaceRoot):
+def getArtefactsFromPomFiles(workspaceDir):
+    pomFile = os.path.join(workspaceDir, "pom.xml")
     if not os.path.isfile(pomFile):
         return []
         
     artefactName, providedScope, modules = getPomData(pomFile)
-    artefacts = []
-    if os.path.isdir(os.path.join(jobRoot, jobName)):
-        artefacts.append((artefactName, providedScope))
-        for module in modules:
-            newPomFile = os.path.join(workspaceRoot, jobName, module, "pom.xml")
-            artefacts += getArtefactsFromPomFiles(newPomFile, jobName, jobRoot, workspaceRoot)
+    artefacts = [(artefactName, providedScope)]
+    for module in modules:
+        moduleDir = os.path.join(workspaceDir, module)
+        artefacts += getArtefactsFromPomFiles(moduleDir)
     return artefacts
 
 def getProjectData(jobRoot):
     projectData = {}
     workspaceRoot = os.path.dirname(os.getenv("WORKSPACE"))
     for jobName in os.listdir(workspaceRoot):
-        pomFile = os.path.join(workspaceRoot, jobName, "pom.xml")
-        for artefactName, providedScope in getArtefactsFromPomFiles(pomFile, jobName, jobRoot, workspaceRoot):
-            projectData.setdefault(artefactName, []).append((jobName, providedScope))
+        jobDir = os.path.join(jobRoot, jobName)
+        if os.path.isdir(jobDir):
+            workspaceDir = os.path.join(workspaceRoot, jobName)
+            for artefactName, providedScope in getArtefactsFromPomFiles(workspaceDir):
+                projectData.setdefault(artefactName, []).append((jobName, providedScope))
     return projectData
 
 

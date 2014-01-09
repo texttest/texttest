@@ -2522,6 +2522,8 @@ Dynamic GUI Enhancements:
 Framework Enhancements:
     - "collate_file" now also finds files in $TEXTTEST_LOG_DIR if local sandbox is used
 	i.e. if "default_texttest_local_tmp" is set
+    - When sending SIGQUIT to TextTest if it's hanging, now print a stacktrace of all threads instead of just the main one
+	(UNIX only, naturally)
 Version Control Browser Enhancements:
     - Now supports Git
     - "Update" operation is now always a "centralised-style" update
@@ -2530,6 +2532,9 @@ Version Control Browser Enhancements:
 Batch Report Enhancements:
     - If "file_to_url" is set, now list URLs in the log file, of table pages and index pages
 	For example Jenkins will turn these into links directly.
+Grid Engine enhancements/bug fixes:
+    - New experimental status support for EC2 Virtual Private Cloud added
+	Tests run parallel on any available cloud machines. Requires Python tool "boto". See website.
 Windows installer Enhancements:
     - All files now end up under chosen location, removed hardcoded C:\virtualenv and C:\jython2.5.1
     - StoryText is now upgraded properly when the installer is run for a second time after a new release
@@ -2543,3 +2548,6 @@ Bug Fixes:
     - Fixed Exception when closing dynamic GUI after reconnecting.
     - Handle now executables inside remote checkouts
     - Fixed unresponsive dynamic GUI after viewing screenshots in a browser
+    - Fixed stack trace generating batch report in Jenkins when Jenkins jobs have a nested module structure
+    - Fixed bug where batch reports were collected for e.g. version abc when version ab was requested
+    - Fixed inconsistency between pressing "Quit" and closing the window, in the last case warnings correctly produced now

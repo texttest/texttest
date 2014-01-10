@@ -7,7 +7,7 @@ import plugins, os, sys, socket, signal, logging, time
 from utils import *
 from Queue import Queue
 from SocketServer import ThreadingTCPServer, StreamRequestHandler
-from threading import RLock
+from threading import RLock, Lock
 from ordereddict import OrderedDict
 from default.console import TextDisplayResponder, InteractiveResponder
 from default.knownbugs import CheckForBugs
@@ -30,6 +30,7 @@ class QueueSystemServer(BaseActionRunner):
         BaseActionRunner.__init__(self, optionMap, logging.getLogger("Queue System Submit"))
         # queue for putting tests when we couldn't reuse the originals
         self.reuseFailureQueue = Queue()
+        self.counterLock = Lock()
         self.testCount = 0
         self.testsSubmitted = 0
         self.maxCapacity = 100000 # infinity, sort of
@@ -91,7 +92,8 @@ class QueueSystemServer(BaseActionRunner):
         self.addTestToQueues(test)
 
     def addTestToQueues(self, test):
-        self.testCount += 1
+        with self.counterLock:
+            self.testCount += 1
         queue = self.findQueueForTest(test)
         if queue:
             queue.put(test)
@@ -181,13 +183,14 @@ class QueueSystemServer(BaseActionRunner):
             if newTest:
                 if tryReuse and self.allowReuse(test, state, newTest):
                     self.jobs[newTest] = self.getJobInfo(test)
-                    if self.testCount > 1:
-                        self.testCount -= 1
-                        postText = self.remainStr()
-                    else:
-                        # Don't allow test count to drop to 0 here, can cause race conditions
-                        self.submitTerminators() 
-                        postText = ": submitting terminators as final test"
+                    with self.counterLock:
+                        if self.testCount > 1:
+                            self.testCount -= 1
+                            postText = self.remainStr()
+                        else:
+                            # Don't allow test count to drop to 0 here, can cause race conditions
+                            self.submitTerminators() 
+                            postText = ": submitting terminators as final test"
                     self.diag.info("Reusing slave from " + test.uniqueName + " for " + newTest.uniqueName + postText)
                     return newTest
                 else:
@@ -197,11 +200,12 @@ class QueueSystemServer(BaseActionRunner):
                 self.diag.info("No tests available for reuse : " + test.uniqueName)
                 
         # Allowed a submitted job to terminate
-        self.testsSubmitted -= 1
-        self.diag.info("No reuse for " + test.uniqueName + " : " + repr(self.testsSubmitted) + " tests still submitted")
-        if self.exited and self.testsSubmitted == 0:
-            self.diag.info("Forcing termination")
-            self.submitTerminators()
+        with self.counterLock:
+            self.testsSubmitted -= 1
+            self.diag.info("No reuse for " + test.uniqueName + " : " + repr(self.testsSubmitted) + " tests still submitted")
+            if self.exited and self.testsSubmitted == 0:
+                self.diag.info("Forcing termination")
+                self.submitTerminators()
             
     def allowReuse(self, oldTest, oldState, newTest):
         # Don't reuse jobs that have been killed
@@ -327,9 +331,10 @@ class QueueSystemServer(BaseActionRunner):
         if not self.submitJob(test, submissionRules, commandArgs, slaveEnv):
             return
         
-        self.testCount -= 1
-        self.testsSubmitted += 1
-        self.diag.info("Submission successful" + self.remainStr())
+        with self.counterLock:
+            self.testCount -= 1
+            self.testsSubmitted += 1
+            self.diag.info("Submission successful" + self.remainStr())
         if not test.state.hasStarted():
             test.changeState(self.getPendingState(test))
         if self.testsSubmitted == self.maxCapacity:
@@ -430,36 +435,34 @@ class QueueSystemServer(BaseActionRunner):
         
         jobName = submissionRules.getJobName()
         self.diag.info("Creating job " + jobName + " with command arguments : " + " ".join(cmdArgs))
-        self.lock.acquire()
-        if self.exited:
-            self.cancel(test)
-            self.lock.release()
-            plugins.log.info("Q: Submission cancelled for " + repr(test) + " - exit underway")
-            return False
+        with self.lock:
+            if self.exited:
+                self.cancel(test)
+                plugins.log.info("Q: Submission cancelled for " + repr(test) + " - exit underway")
+                return False
         
-        self.lockDiag.info("Got lock for submission")
-        queueSystem = self.getQueueSystem(test)
-        logDir = self.getSlaveLogDir(test)
-        jobId, errorMessage = queueSystem.submitSlaveJob(cmdArgs, slaveEnv, logDir, submissionRules, jobType)
-        if jobId is not None:
-            self.diag.info("Job created with id " + jobId)
+            self.lockDiag.info("Got lock for submission")
+            queueSystem = self.getQueueSystem(test)
+            logDir = self.getSlaveLogDir(test)
+            jobId, errorMessage = queueSystem.submitSlaveJob(cmdArgs, slaveEnv, logDir, submissionRules, jobType)
+            if jobId is not None:
+                self.diag.info("Job created with id " + jobId)
 
-            self.jobs.setdefault(test, []).append((jobId, jobName))
-            self.lockDiag.info("Releasing lock for submission...")
-            self.lock.release()
-            return True
-        else:
-            self.lock.release()
-            self.diag.info("Job not created : " + errorMessage)
-            test.changeState(plugins.Unrunnable(errorMessage, "NOT SUBMITTED"))
-            self.handleErrorState(test)
-            return False
+                self.jobs.setdefault(test, []).append((jobId, jobName))
+                self.lockDiag.info("Releasing lock for submission...")
+                return True
+            else:
+                self.diag.info("Job not created : " + errorMessage)
+                test.changeState(plugins.Unrunnable(errorMessage, "NOT SUBMITTED"))
+                self.handleErrorState(test)
+                return False
         
     def handleErrorState(self, test, previouslySubmitted=False):
-        if previouslySubmitted:
-            self.testsSubmitted -= 1
-        else:
-            self.testCount -= 1
+        with self.counterLock:
+            if previouslySubmitted:
+                self.testsSubmitted -= 1
+            else:
+                self.testCount -= 1
         self.diag.info(repr(test) + " in error state" + self.remainStr())
         bugchecker = CheckForBugs()
         self.setUpSuites(bugchecker, test)
@@ -957,13 +960,12 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
     def changeState(self, test, state):
         # Several threads could be trying to do this at once...
         lock = self.testLocks.get(test)
-        lock.acquire()
-        allow = self.allowChange(test.state, state)
-        if allow:
-            test.changeState(state)
-        else:
-            self.diag.info("Rejecting state change, old state " + test.state.category + " is complete, new state " + state.category + " is not.")
-        lock.release()
+        with lock:
+            allow = self.allowChange(test.state, state)
+            if allow:
+                test.changeState(state)
+            else:
+                self.diag.info("Rejecting state change, old state " + test.state.category + " is complete, new state " + state.category + " is not.")
         return allow
 
     def allowChange(self, oldState, newState):

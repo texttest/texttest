@@ -273,7 +273,10 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         return newActive
     
     def isActiveOnCurrent(self, *args):
-        return len(self.currTestSelection) > 0 or len(self.currFileSelection) > 0
+        return (len(self.currTestSelection) > 0 or len(self.currFileSelection) > 0) and not self.newFilesOnly()
+    
+    def newFilesOnly(self):
+        return len(self.currFileSelection) > 0 and all((comp and hasattr(comp, "newResult") and comp.newResult() for f, comp in self.currFileSelection))
     
     def messageAfterPerform(self):
         return "Performed " + self.getTooltip() + "."
@@ -509,8 +512,6 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         fileToIter = {}
         for fileName, content, info in self.pages:
             label = plugins.relpath(fileName, rootDir)
-            if label is None:
-                raise plugins.TextTestError, "Cannot show version control information for New Files"
             self.diag.info("Adding info for file " + label)
             utfContent = guiutils.convertToUtf8(content)
             path = label.split(os.sep)

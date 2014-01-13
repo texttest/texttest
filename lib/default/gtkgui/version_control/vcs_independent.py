@@ -509,6 +509,8 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         fileToIter = {}
         for fileName, content, info in self.pages:
             label = plugins.relpath(fileName, rootDir)
+            if label is None:
+                raise plugins.TextTestError, "Cannot show version control information for New Files"
             self.diag.info("Adding info for file " + label)
             utfContent = guiutils.convertToUtf8(content)
             path = label.split(os.sep)

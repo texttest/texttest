@@ -5,9 +5,6 @@ from ordereddict import OrderedDict
 from glob import glob
 from pprint import pprint
 
-versionRegex = re.compile("[0-9]+(\\.[0-9]+)+")
-        
-
 class AbortedException(RuntimeError):
     pass
 
@@ -16,337 +13,438 @@ class JobStillRunningException(RuntimeError):
 
 class FingerprintNotReadyException(RuntimeError):
     pass
+            
+def getBuildsDir(jobRoot, jobName):
+    projectDir = os.path.join(jobRoot, jobName)
+    local = os.path.join(projectDir, "builds")
+    if os.path.isdir(local):
+        return local
+        
+    if hasattr(os, "readlink"):
+        link = os.path.join(projectDir, "lastStable")
+        try:
+            target = os.readlink(link)
+            return os.path.dirname(target)
+        except OSError:
+            return
 
-def fingerprintStrings(document):
-    for obj in document.getElementsByTagName("hudson.tasks.Fingerprinter_-FingerprintAction"):
-        for entry in obj.getElementsByTagName("string"):
-            yield entry.childNodes[0].nodeValue
-            
-def getCacheFileName(buildName, cacheDir):
-    return os.path.join(cacheDir, "correct_hashes_" + buildName)
-         
-def getDocument(jobRoot, jobName, buildName):
-    dirName = os.path.join(jobRoot, jobName, "builds", buildName)
-    xmlFile = os.path.join(dirName, "build.xml")
-    if os.path.isfile(xmlFile):
-        return parse(xmlFile)
+class BuildDocument:
+    versionRegex = re.compile("[0-9]+(\\.[0-9]+)+")
+    versionRegexRpm = re.compile("[0-9]+(\\.[0-9]+)+.*.rpm")       
+    @classmethod
+    def create(cls, buildsDir, buildName):
+        xmlFile = os.path.join(buildsDir, buildName, "build.xml")
+        if os.path.isfile(xmlFile):
+            return cls(xmlFile)
+        
+    def __init__(self, xmlFile):
+        self.document = parse(xmlFile)
+
+    def fingerprintStrings(self):
+        for obj in self.document.getElementsByTagName("hudson.tasks.Fingerprinter_-FingerprintAction"):
+            for entry in obj.getElementsByTagName("string"):
+                yield entry.childNodes[0].nodeValue
+                
+    def getResult(self):
+        for entry in self.document.getElementsByTagName("result"):
+            return entry.childNodes[0].nodeValue
     
+    def checkHashes(self, oldHashes, newHashes):
+        for currString in self.fingerprintStrings():
+            if currString in oldHashes:
+                return True, False
+            elif currString in newHashes:
+                return True, True
+        return False, False
+
+    def getArtefactVersion(self, artefactRegex):
+        for currString in self.fingerprintStrings():
+            if artefactRegex.match(currString):
+                versionMatch = self.versionRegex.search(currString)
+                if versionMatch:
+                    return versionMatch.group(0)
+
+    def getFingerprint(self, ignoreArtefact):
+        prevString = None
+        fingerprint = {}
+        for currString in self.fingerprintStrings():
+            if prevString:
+                if ignoreArtefact not in prevString:
+                    vregex = self.versionRegexRpm if prevString.endswith(".rpm") else self.versionRegex
+                    match = vregex.search(prevString)
+                    regex = prevString
+                    if match:
+                        regex = prevString.replace(match.group(0), vregex.pattern) + "$"
+                    fingerprint[regex] = currString, prevString
+                prevString = None
+            else:
+                prevString = currString
+        return fingerprint
+
             
-def getFingerprint(jobRoot, jobName, buildName, cacheDir):
-    if cacheDir:
-        cacheFileName = getCacheFileName(buildName, cacheDir) 
+class FingerprintVerifier:
+    def __init__(self, fileFinder, cacheDir):
+        self.fileFinder = fileFinder
+        self.cacheDir = cacheDir
+        
+    def getCacheFileName(self, buildName):
+        return os.path.join(self.cacheDir, "correct_hashes_" + buildName)
+
+    def getCachedFingerprint(self, buildName):
+        cacheFileName = self.getCacheFileName(buildName) 
         if os.path.isfile(cacheFileName):
             return eval(open(cacheFileName).read())
-    document = getDocument(jobRoot, jobName, buildName)
-    fingerprint = {}
-    if document is None:
-        return fingerprint
-    
-    prevString = None
-    for currString in fingerprintStrings(document):
-        if prevString:
-            if jobName not in prevString:
-                match = versionRegex.search(prevString)
-                regex = prevString
-                if match:
-                    regex = prevString.replace(match.group(0), versionRegex.pattern) + "$"
-                fingerprint[regex] = currString, prevString
-            prevString = None
-        else:
-            prevString = currString
-    if not fingerprint:
-        result = getResult(document)
-        if result is None and os.getenv("BUILD_NUMBER") == buildName and os.getenv("JOB_NAME") == jobName:
-            if os.getenv("BUILD_ID") == "none": 
-                # Needed to prevent Jenkins from killing background jobs running after the job has exited
-                # If we have this, we should wait a bit
-                raise FingerprintNotReadyException()
-            else:
-                raise JobStillRunningException()
-        # No result means aborted (hard) if we're checking a previous run, otherwise it means we haven't finished yet
-        elif result == "ABORTED" or result is None:
-            raise AbortedException, "Aborted in Jenkins"
-    return fingerprint
-    
-def parseAuthor(author):
-    withoutEmail = author.split("<")[0].strip().split("@")[0]
-    if "." in withoutEmail:
-        return " ".join([ part.capitalize() for part in withoutEmail.split(".") ])
-    else:
-        return withoutEmail.encode("ascii", "xmlcharrefreplace")
-    
-def addUnique(items, newItems):
-    for newItem in newItems:
-        if newItem not in items:
-            items.append(newItem)
-    
-def getBugs(msg, bugSystemData):
-    bugs = []
-    for systemName, location in bugSystemData.items():
-        try:
-            exec "from default.knownbugs." + systemName + " import getBugsFromText"
-            addUnique(bugs, getBugsFromText(msg, location)) #@UndefinedVariable
-        except ImportError:
-            pass
-    return bugs
-    
-def getProjects(artefact, allProjects):
-    currProjArtefact = None
-    currProjects = []
-    for projArtefact, projects in allProjects.items():
-        if artefact.startswith(projArtefact) and (currProjArtefact is None or len(projArtefact) > len(currProjArtefact)):
-            currProjArtefact = projArtefact
-            currProjects = projects
-    
-    return currProjects
 
-def getHash(document, artefact):
-    found = False
-    regex = re.compile(artefact)
-    for currString in fingerprintStrings(document):
-        if found:
-            return currString
-        elif regex.match(currString):
-            found = True
-            
-def md5sum(filename):
-    md5 = hashlib.md5()
-    with open(filename,'rb') as f: 
-        for chunk in iter(lambda: f.read(128*md5.block_size), b''): 
-            md5.update(chunk)
-    return md5.hexdigest()
-
-def getCorrectedHash(f, hash, fileFinder):
-    filePattern = f.split(":")[-1].replace("-", "?")
-    paths = glob(os.path.join(fileFinder, filePattern))
-    if len(paths):
-        path = paths[0]
-        correctHash = md5sum(path)
-        if correctHash != hash:
-            return correctHash
-
-def getAndWaitForFingerprint(*args):
-    for i in range(500):
-        try:
-            return getFingerprint(*args)
-        except FingerprintNotReadyException:
-            if i % 10 == 0:
-                print "No Jenkins fingerprints available yet, sleeping..."
-            time.sleep(1)
-                
-    print "Giving up waiting for fingerprints."
-    raise JobStillRunningException()
-
-def getFingerprintDifferences(build1, build2, jobName, jobRoot, fileFinder, cacheDir):
-    fingerprint1 = getFingerprint(jobRoot, jobName, build1, cacheDir)
-    fingerprint2 = getAndWaitForFingerprint(jobRoot, jobName, build2, cacheDir)
-    if not fingerprint1 or not fingerprint2:
-        return []
-    differences = []
-    updatedHashes = {}
-    for artefact, (hash2, file2) in fingerprint2.items():
-        hash1 = fingerprint1.get(artefact)
-        if isinstance(hash1, tuple):
-            hash1 = hash1[0]
-        if hash1 != hash2:
-            if fileFinder:
-                fullFileFinder = os.path.join(jobRoot, jobName, "builds", build2, fileFinder)
-                correctedHash = getCorrectedHash(file2, hash2, fullFileFinder)
-                if correctedHash:
-                    hash2 = correctedHash
-                    updatedHashes[artefact] = hash2
-                if hash1 == hash2:
-                    continue
-            differences.append((artefact, hash1, hash2))
-    
-    if updatedHashes:
-        print "WARNING: incorrect hashes found!"
-        print "This is probably due to fingerprint data being wrongly updated from artefacts produced during the build"
-        print "Storing a cached file of corrected versions. The following were changed:"
-        for artefact, hash in updatedHashes.items():
-            print artefact, fingerprint2.get(artefact)[0], hash
-            
-        for artefact, (hash2, file2) in fingerprint2.items():
-            if artefact not in updatedHashes:
-                updatedHashes[artefact] = hash2
-        with open(getCacheFileName(build2, cacheDir), "w") as f:
+    def writeCache(self, buildName, updatedHashes):
+        cacheFileName = self.getCacheFileName(buildName)
+        with open(cacheFileName, "w") as f:
             pprint(updatedHashes, f) 
-    
-    differences.sort()
-    return differences
-
-def organiseByProject(differences, markedArtefacts, artefactProjectData):
-    projectData = OrderedDict()
-    changes = []
-    for artefact, oldHash, hash in differences:
-        projects = getProjects(artefact, artefactProjectData)
-        if projects:
-            for project, scopeProvided in projects:
-                projectData.setdefault(project, []).append((artefact, oldHash, hash, scopeProvided))
-                if project in markedArtefacts:
-                    changes.append((artefact, project))
-        else:
-            projectName = artefact.split(":")[-1].split("[")[0][:-1]
-            if projectName in markedArtefacts:
-                changes.append((artefact, projectName))
-    
-    return changes, projectData
-
-def getResult(document):
-    for entry in document.getElementsByTagName("result"):
-        return entry.childNodes[0].nodeValue
-
-def hashesEquivalent(hashes, otherHashes):
-    return any((hashes[i] == otherHashes[i] for i in range(len(hashes))))
-
-def getProjectChanges(jobRoot, projectData):
-    projectChanges = []
-    recursiveChanges = []
-    for project, diffs in projectData.items():
-        projectDir = os.path.join(jobRoot, project, "builds")
-        allBuilds = sorted([ build for build in os.listdir(projectDir) if build.isdigit()], key=lambda b: -int(b))
-        oldHashes = [ oldHash for artefact, oldHash, hash, _ in diffs ]
-        newHashes = [ hash for artefact, oldHash, hash, _ in diffs ]
-        scopeProvided = any((s for _, _, _, s in diffs))  
-        activeBuild = None
-        for build in allBuilds:
-            xmlFile = os.path.join(projectDir, build, "build.xml")
-            if not os.path.isfile(xmlFile):
-                continue
-    
-            document = parse(xmlFile)
-            hashes = [ getHash(document, artefact) for artefact, oldHash, hash, _ in diffs ]
-            if getResult(document) != "FAILURE":
-                if hashesEquivalent(hashes, newHashes):
-                    activeBuild = build
-                elif hashesEquivalent(hashes, oldHashes):
-                    if scopeProvided and activeBuild:
-                        recursiveChanges.append((project, build, activeBuild))
-                    break       
-            if activeBuild and (project, build) not in projectChanges:
-                projectChanges.append((project, build))
-    return projectChanges, recursiveChanges
-
-def getChangeData(jobRoot, projectChanges, jenkinsUrl, bugSystemData):
-    changes = []
-    for project, build in projectChanges:
-        xmlFile = os.path.join(jobRoot, project, "builds", build, "changelog.xml")
-        if os.path.isfile(xmlFile):
-            document = parse(xmlFile)
-            authors = []
-            bugs = []
-            for changeset in document.getElementsByTagName("changeset"):
-                author = parseAuthor(changeset.getAttribute("author"))
-                if author not in authors:
-                    authors.append(author)
-                for msgNode in changeset.getElementsByTagName("msg"):
-                    msg = msgNode.childNodes[0].nodeValue
-                    addUnique(bugs, getBugs(msg, bugSystemData))
-            if authors:
-                fullUrl = os.path.join(jenkinsUrl, "job", project, build, "changes")
-                changes.append((",".join(authors), fullUrl, bugs))
-    return changes
-
-def getPomData(pomFile):
-    document = parse(pomFile)
-    artifactId, groupId = None, None
-    modules = []
-    for node in document.documentElement.childNodes:
-        if artifactId is None and node.nodeName == "artifactId":
-            artifactId = node.childNodes[0].nodeValue
-        elif groupId is None and node.nodeName == "groupId":
-            groupId = node.childNodes[0].nodeValue
-        elif node.nodeName == "modules":
-            for subNode in node.childNodes:
-                if subNode.childNodes:
-                    modules.append(subNode.childNodes[0].nodeValue)
-    providedScope = any((node.childNodes[0].nodeValue == "provided" for node in document.getElementsByTagName("scope")))
-    groupPrefix = groupId + ":" if groupId else ""
-    return groupPrefix + artifactId, providedScope, modules
-
-def getArtefactsFromPomFiles(workspaceDir):
-    pomFile = os.path.join(workspaceDir, "pom.xml")
-    if not os.path.isfile(pomFile):
-        return []
         
-    artefactName, providedScope, modules = getPomData(pomFile)
-    artefacts = [(artefactName, providedScope)]
-    for module in modules:
-        moduleDir = os.path.join(workspaceDir, module)
-        artefacts += getArtefactsFromPomFiles(moduleDir)
-    return artefacts
-
-def getProjectData(jobRoot):
-    projectData = {}
-    workspaceRoot = os.path.dirname(os.getenv("WORKSPACE"))
-    for jobName in os.listdir(workspaceRoot):
-        jobDir = os.path.join(jobRoot, jobName)
-        if os.path.isdir(jobDir):
-            workspaceDir = os.path.join(workspaceRoot, jobName)
-            for artefactName, providedScope in getArtefactsFromPomFiles(workspaceDir):
-                projectData.setdefault(artefactName, []).append((jobName, providedScope))
-    return projectData
-
-
-def getArtefactVersion(artefactRegex, build, jobName, jobRoot):
-    document = getDocument(jobRoot, jobName, build)
-    if document is None:
-        return
+    def md5sum(self, filename):
+        md5 = hashlib.md5()
+        with open(filename,'rb') as f: 
+            for chunk in iter(lambda: f.read(128*md5.block_size), b''): 
+                md5.update(chunk)
+        return md5.hexdigest()
     
-    for currString in fingerprintStrings(document):
-        if artefactRegex.match(currString):
-            versionMatch = versionRegex.search(currString)
-            if versionMatch:
-                return versionMatch.group(0)
+    def getCorrectedHash(self, buildsDir, build, f, hash):
+        fullFileFinder = os.path.join(buildsDir, build, self.fileFinder)
+        filePattern = f.split(":")[-1].replace("-", "?")
+        paths = glob(os.path.join(fullFileFinder, filePattern))
+        if len(paths):
+            path = paths[0]
+            correctHash = self.md5sum(path)
+            if correctHash != hash:
+                return correctHash
+            
 
+class FingerprintDifferenceFinder:
+    def __init__(self, jobRoot, fileFinder, cacheDir):
+        self.jobRoot = jobRoot
+        self.verifier = FingerprintVerifier(fileFinder, cacheDir) if fileFinder else None
+                
+    def findDifferences(self, jobName, build1, build2):
+        buildsDir = getBuildsDir(self.jobRoot, jobName)
+        if not buildsDir:
+            return []
+        fingerprint1 = self.getFingerprint(buildsDir, jobName, build1)
+        fingerprint2 = self.getAndWaitForFingerprint(buildsDir, jobName, build2)
+        if not fingerprint1 or not fingerprint2:
+            return []
+        differences = []
+        updatedHashes = {}
+        for artefact, (hash2, file2) in fingerprint2.items():
+            hash1 = fingerprint1.get(artefact)
+            if isinstance(hash1, tuple):
+                hash1 = hash1[0]
+            if hash1 != hash2:
+                if self.verifier:
+                    correctedHash = self.verifier.getCorrectedHash(buildsDir, build2, file2, hash2)
+                    if correctedHash:
+                        hash2 = correctedHash
+                        updatedHashes[artefact] = hash2
+                    if hash1 == hash2:
+                        continue
+                differences.append((artefact, hash1, hash2))
+        
+        if updatedHashes:
+            print "WARNING: incorrect hashes found!"
+            print "This is probably due to fingerprint data being wrongly updated from artefacts produced during the build"
+            print "Storing a cached file of corrected versions. The following were changed:"
+            for artefact, hash in updatedHashes.items():
+                print artefact, fingerprint2.get(artefact)[0], hash
+                
+            for artefact, (hash2, file2) in fingerprint2.items():
+                if artefact not in updatedHashes:
+                    updatedHashes[artefact] = hash2
+            self.verifier.writeCache(build2, updatedHashes)
+        
+        differences.sort()
+        return differences
 
-def getMarkChangeText(artefact, projectName, build1, build2, jobName, jobRoot):
-    regex = re.compile(artefact)
-    version1 = getArtefactVersion(regex, build1, jobName, jobRoot)
-    version2 = getArtefactVersion(regex, build2, jobName, jobRoot)
-    if version1 == version2:
-        return projectName + " was updated", "", []
-    else:
-        return projectName + " " + version2, "", []
-
-def getChangesRecursively(build1, build2, jobName, jobRoot, projectData, markedArtefacts=[], fileFinder="", cacheDir=None):
-    # Find what artefacts have changed between times build
-    differences = getFingerprintDifferences(build1, build2, jobName, jobRoot, fileFinder, cacheDir)
-    # Organise them by project
-    markedChanges, differencesByProject = organiseByProject(differences, markedArtefacts, projectData)
-    # For each project, find out which builds were affected
-    projectChanges, recursiveChanges = getProjectChanges(jobRoot, differencesByProject)
-    for subProj, subBuild1, subBuild2 in recursiveChanges:
-        if subProj != jobName:
-            subMarkedChanges, subProjectChanges = getChangesRecursively(subBuild1, subBuild2, subProj, jobRoot, projectData)
-            markedChanges += subMarkedChanges
-            for subProjectChange in subProjectChanges:
-                if subProjectChange not in projectChanges:
-                    projectChanges.append(subProjectChange)
-    return markedChanges, projectChanges
+    def getAndWaitForFingerprint(self, *args):
+        for i in range(500):
+            try:
+                return self.getFingerprint(*args)
+            except FingerprintNotReadyException:
+                if i % 10 == 0:
+                    print "No Jenkins fingerprints available yet, sleeping..."
+                time.sleep(1)
+                    
+        print "Giving up waiting for fingerprints."
+        raise JobStillRunningException()
     
-def _getChanges(build1, build2, jobName, jenkinsUrl, bugSystemData={}, markedArtefacts={}, fileFinder="", cacheDir=None):
-    jobRoot = os.path.join(os.getenv("JENKINS_HOME"), "jobs")
-    projectData = getProjectData(jobRoot)
-    try:
-        markedChanges, projectChanges = getChangesRecursively(build1, build2, jobName, jobRoot, projectData, markedArtefacts, fileFinder, cacheDir)
-    except AbortedException, e:
-        # If it was aborted, say this
-        return [(str(e), "", [])]
+    def getFingerprint(self, buildsDir, jobName, buildName):
+        if self.verifier:
+            cached = self.verifier.getCachedFingerprint(buildName)
+            if cached:
+                return cached
     
-    # Extract the changeset information from them
-    changesFromProjects = getChangeData(jobRoot, projectChanges, jenkinsUrl, bugSystemData)
-    changesFromMarking = [ getMarkChangeText(artefact, projectName, build1, build2, jobName, jobRoot) for artefact, projectName in markedChanges ]
-    return changesFromMarking + changesFromProjects
+        document = BuildDocument.create(buildsDir, buildName)
+        fingerprint = {}
+        if document is None:
+            return fingerprint
+        
+        fingerprint = document.getFingerprint(jobName)
+        if not fingerprint:
+            result = document.getResult()
+            if result is None and os.getenv("BUILD_NUMBER") == buildName and os.getenv("JOB_NAME") == jobName:
+                if os.getenv("BUILD_ID") == "none": 
+                    # Needed to prevent Jenkins from killing background jobs running after the job has exited
+                    # If we have this, we should wait a bit
+                    raise FingerprintNotReadyException()
+                else:
+                    raise JobStillRunningException()
+            # No result means aborted (hard) if we're checking a previous run, otherwise it means we haven't finished yet
+            elif result == "ABORTED" or result is None:
+                raise AbortedException, "Aborted in Jenkins"
+        return fingerprint
+
+
+class ChangeSetFinder:
+    def __init__(self, jobRoot, jenkinsUrl, bugSystemData):
+        self.jobRoot = jobRoot
+        self.jenkinsUrl = jenkinsUrl
+        self.bugSystemData = bugSystemData
+        
+    def getChangeSetData(self, projectChanges):
+        changes = []
+        for project, build in projectChanges:
+            buildsDir = getBuildsDir(self.jobRoot, project)
+            if buildsDir is None:
+                continue
+            xmlFile = os.path.join(buildsDir, build, "changelog.xml")
+            if os.path.isfile(xmlFile):
+                document = parse(xmlFile)
+                authors = []
+                bugs = []
+                for changeset in document.getElementsByTagName("changeset"):
+                    author = self.parseAuthor(changeset.getAttribute("author"))
+                    if author not in authors:
+                        authors.append(author)
+                    for msgNode in changeset.getElementsByTagName("msg"):
+                        msg = msgNode.childNodes[0].nodeValue
+                        self.addUnique(bugs, self.getBugs(msg))
+                if authors:
+                    fullUrl = os.path.join(self.jenkinsUrl, "job", project, build, "changes")
+                    changes.append((",".join(authors), fullUrl, bugs))
+        return changes
+    
+    def parseAuthor(self, author):
+        withoutEmail = author.split("<")[0].strip().split("@")[0]
+        if "." in withoutEmail:
+            return " ".join([ part.capitalize() for part in withoutEmail.split(".") ])
+        else:
+            return withoutEmail.encode("ascii", "xmlcharrefreplace")
+        
+    def addUnique(self, items, newItems):
+        for newItem in newItems:
+            if newItem not in items:
+                items.append(newItem)
+        
+    def getBugs(self, msg):
+        bugs = []
+        for systemName, location in self.bugSystemData.items():
+            try:
+                exec "from default.knownbugs." + systemName + " import getBugsFromText"
+                self.addUnique(bugs, getBugsFromText(msg, location)) #@UndefinedVariable
+            except ImportError:
+                pass
+        return bugs
+
+    
+class ProjectData:
+    def __init__(self, jobRoot):
+        self.data = {}
+        workspaceRoot = os.path.dirname(os.getenv("WORKSPACE"))
+        for jobName in os.listdir(workspaceRoot):
+            jobDir = os.path.join(jobRoot, jobName)
+            if os.path.isdir(jobDir):
+                subdir = self.getSubdirectory(jobDir)
+                workspaceDir = os.path.join(workspaceRoot, jobName, subdir)
+                for artefactName, providedScope in self.getArtefactsFromPomFiles(workspaceDir):
+                    self.data.setdefault(artefactName, []).append((jobName, providedScope))
+                    
+    def isAttachedRpm(self, pluginNode):
+        return any((goalNode.childNodes[0].nodeValue == "rpm-maven-plugin" for goalNode in pluginNode.getElementsByTagName("artifactId")))
+    
+    def getRpmName(self, node):
+        for pluginNode in node.getElementsByTagName("plugin"):
+            if self.isAttachedRpm(pluginNode):
+                for confNode in pluginNode.childNodes:
+                    if confNode.nodeName == "configuration":
+                        for nameNode in confNode.childNodes:
+                            if nameNode.nodeName == "name":
+                                return nameNode.childNodes[0].nodeValue
+    
+    def getPomData(self, pomFile):
+        document = parse(pomFile)
+        artifactId, groupId = None, None
+        rpmName = None
+        artefacts, modules = [], []
+        for node in document.documentElement.childNodes:
+            if artifactId is None and node.nodeName == "artifactId":
+                artifactId = node.childNodes[0].nodeValue
+            elif groupId is None and node.nodeName == "groupId":
+                groupId = node.childNodes[0].nodeValue
+            elif node.nodeName == "modules":
+                for subNode in node.childNodes:
+                    if subNode.childNodes:
+                        modules.append(subNode.childNodes[0].nodeValue)
+            elif node.nodeName == "build":
+                rpmName = self.getRpmName(node)
+        providedScope = any((node.childNodes[0].nodeValue == "provided" for node in document.getElementsByTagName("scope")))
+        groupPrefix = groupId + ":" if groupId else ""
+        artefacts.append((groupPrefix + artifactId, providedScope))
+        if rpmName:
+            artefacts.append((groupPrefix + rpmName, True))
+        return artefacts, modules
+    
+    def getArtefactsFromPomFiles(self, workspaceDir):
+        pomFile = os.path.join(workspaceDir, "pom.xml")
+        if not os.path.isfile(pomFile):
+            return []
+            
+        artefacts, modules = self.getPomData(pomFile)
+        for module in modules:
+            moduleDir = os.path.join(workspaceDir, module)
+            artefacts += self.getArtefactsFromPomFiles(moduleDir)
+        return artefacts
+    
+    def getSubdirectory(self, jobDir):
+        configFile = os.path.join(jobDir, "config.xml")
+        if not os.path.isfile(configFile):
+            return ""
+        
+        document = parse(configFile)
+        for subDir in document.getElementsByTagName("subdir"):
+            return subDir.childNodes[0].nodeValue
+        return ""
+    
+    def getProjects(self, artefact):
+        currProjArtefact = None
+        currProjects = []
+        for projArtefact, projects in self.data.items():
+            if currProjArtefact is None or len(projArtefact) > len(currProjArtefact):
+                if artefact.startswith(projArtefact):
+                    currProjArtefact = artefact
+                    currProjects = projects
+                elif ":" in projArtefact:
+                    group, local = projArtefact.split(":", 1)
+                    if artefact.startswith(local):
+                        currProjArtefact = group + ":" + artefact
+                        currProjects = projects
+        
+        return currProjArtefact, currProjects
+    
+
+class ChangeFinder:
+    def __init__(self, bugSystemData, markedArtefacts, *args):
+        self.jobRoot = os.path.join(os.getenv("JENKINS_HOME"), "jobs")
+        self.jobName = os.getenv("JOB_NAME")
+        self.projectData = ProjectData(self.jobRoot)
+        self.markedArtefacts = markedArtefacts
+        self.changeSetFinder = ChangeSetFinder(self.jobRoot, os.getenv("JENKINS_URL"), bugSystemData)
+        self.diffFinder = FingerprintDifferenceFinder(self.jobRoot, *args)
+    
+    def findChanges(self, build1, build2):
+        try:
+            markedChanges, projectChanges = self.getChangesRecursively(self.jobName, build1, build2)
+        except AbortedException, e:
+            # If it was aborted, say this
+            return [(str(e), "", [])]
+        
+        # Extract the changeset information from them
+        changesFromProjects = self.changeSetFinder.getChangeSetData(projectChanges)
+        changesFromMarking = [ self.getMarkChangeText(artefact, projectName, build1, build2) for artefact, projectName in markedChanges ]
+        return changesFromMarking + changesFromProjects
+    
+    def getChangesRecursively(self, jobName, build1, build2):
+        # Find what artefacts have changed between times build
+        differences = self.diffFinder.findDifferences(jobName, build1, build2)
+        # Organise them by project
+        markedChanges, differencesByProject = self.organiseByProject(differences)
+        # For each project, find out which builds were affected
+        projectChanges, recursiveChanges = self.getProjectChanges(differencesByProject)
+        for subProj, subBuild1, subBuild2 in recursiveChanges:
+            if subProj != jobName:
+                subMarkedChanges, subProjectChanges = self.getChangesRecursively(subProj, subBuild1, subBuild2)
+                markedChanges += subMarkedChanges
+                for subProjectChange in subProjectChanges:
+                    if subProjectChange not in projectChanges:
+                        projectChanges.append(subProjectChange)
+        return markedChanges, projectChanges
+    
+    def organiseByProject(self, differences):
+        differencesByProject = OrderedDict()
+        changes = []
+        for artefact, oldHash, hash in differences:
+            actualArtefact, projects = self.projectData.getProjects(artefact)
+            if projects:
+                for project, scopeProvided in projects:
+                    differencesByProject.setdefault(project, []).append((actualArtefact, oldHash, hash, scopeProvided))
+                    if project in self.markedArtefacts:
+                        changes.append((actualArtefact, project))
+            else:
+                projectName = artefact.split(":")[-1].split("[")[0][:-1]
+                if projectName in self.markedArtefacts:
+                    changes.append((actualArtefact, projectName))
+        
+        return changes, differencesByProject
+    
+    def getProjectChanges(self, differencesByProject):
+        projectChanges = []
+        recursiveChanges = []
+        for project, diffs in differencesByProject.items():
+            buildsDir = getBuildsDir(self.jobRoot, project)
+            if buildsDir is None:
+                continue
+            allBuilds = sorted([ build for build in os.listdir(buildsDir) if build.isdigit()], key=lambda b: -int(b))
+            oldHashes = [ oldHash for _, oldHash, _, _ in diffs ]
+            newHashes = [ hash for _, _, hash, _ in diffs ]
+            scopeProvided = any((s for _, _, _, s in diffs))  
+            activeBuild = None
+            for build in allBuilds:
+                document = BuildDocument.create(buildsDir, build)
+                if not document:
+                    continue
+        
+                if document.getResult() != "FAILURE":
+                    matched, matchedNew = document.checkHashes(oldHashes, newHashes)
+                    if matched:
+                        if matchedNew:
+                            activeBuild = build
+                        else:
+                            if scopeProvided and activeBuild:
+                                recursiveChanges.append((project, build, activeBuild))
+                            break       
+                if activeBuild and (project, build) not in projectChanges:
+                    projectChanges.append((project, build))
+        return projectChanges, recursiveChanges
+    
+    def getMarkChangeText(self, artefact, projectName, build1, build2):
+        buildsDir = getBuildsDir(self.jobRoot, self.jobName)
+        regex = re.compile(artefact)
+        version1 = BuildDocument.create(buildsDir, build1).getArtefactVersion(regex)
+        version2 = BuildDocument.create(buildsDir, build2).getArtefactVersion(regex)
+        if version1 == version2:
+            return projectName + " was updated", "", []
+        else:
+            return projectName + " " + version2, "", []
+    
 
 def getChanges(build1, build2, *args):
-    return _getChanges(build1, build2, os.getenv("JOB_NAME"), os.getenv("JENKINS_URL"), *args)
+    finder = ChangeFinder(*args)
+    return finder.findChanges(build1, build2)
     
 def getTimestamp(build):
     if hasattr(os, "readlink"):
-        buildLink = os.path.join(os.getenv("JENKINS_HOME"), "jobs", os.getenv("JOB_NAME"), "builds", build)
-        if os.path.exists(buildLink):
-            return os.readlink(buildLink)
+        jobRoot = os.path.join(os.getenv("JENKINS_HOME"), "jobs")
+        buildsDir = getBuildsDir(jobRoot, os.getenv("JOB_NAME"))
+        if buildsDir:
+            buildLink = os.path.join(buildsDir, build)
+            if os.path.exists(buildLink):
+                return os.readlink(buildLink)
     
 def parseEnvAsList(varName):
     if varName in os.environ:

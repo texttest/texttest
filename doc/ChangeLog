@@ -2532,9 +2532,12 @@ Version Control Browser Enhancements:
 Batch Report Enhancements:
     - If "file_to_url" is set, now list URLs in the log file, of table pages and index pages
 	For example Jenkins will turn these into links directly.
+    - Many improvements to Jenkins Changes functionality
+	Handles attached RPMs via Maven, separate "build" structure from "jobs", workspace subdirectories amongst other things
 Grid Engine enhancements/bug fixes:
     - New experimental status support for EC2 Virtual Private Cloud added
 	Tests run parallel on any available cloud machines. Requires Python tool "boto". See website.
+    - Fixed race condition which could lead to hanging on shutdown
 Windows installer Enhancements:
     - All files now end up under chosen location, removed hardcoded C:\virtualenv and C:\jython2.5.1
     - StoryText is now upgraded properly when the installer is run for a second time after a new release
@@ -2551,3 +2554,4 @@ Bug Fixes:
     - Fixed stack trace generating batch report in Jenkins when Jenkins jobs have a nested module structure
     - Fixed bug where batch reports were collected for e.g. version abc when version ab was requested
     - Fixed inconsistency between pressing "Quit" and closing the window, in the last case warnings correctly produced now
+    - Disabled VCS actions on New Files in the dynamic GUI (stacktraced before)

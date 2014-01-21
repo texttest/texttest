@@ -335,7 +335,7 @@ class ProjectData:
                         currProjArtefact = group + ":" + artefact
                         currProjects = projects
         
-        return currProjArtefact, currProjects
+        return currProjArtefact or artefact, currProjects
     
 
 class ChangeFinder:

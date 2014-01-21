@@ -369,7 +369,9 @@ class ChangeFinder:
         for subProj, subBuild1, subBuild2 in recursiveChanges:
             if subProj != jobName:
                 subMarkedChanges, subProjectChanges = self.getChangesRecursively(subProj, subBuild1, subBuild2)
-                markedChanges += subMarkedChanges
+                for subMarkChange in subMarkedChanges:
+                    if subMarkChange not in markedChanges:
+                        markedChanges.append(subMarkChange)
                 for subProjectChange in subProjectChanges:
                     if subProjectChange not in projectChanges:
                         projectChanges.append(subProjectChange)

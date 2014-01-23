@@ -595,8 +595,24 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         dialog.destroy()
         return self.newApplication, self.getStatusMessage(self.newApplication)
         
+    def getFileOnPath(self, fileName):
+        for pathElem in os.getenv("PATH").split(os.pathsep):
+            fullPath = os.path.join(pathElem, fileName) 
+            if os.path.isfile(fullPath):
+                return fullPath
+        
+    def getStoryTextPythonInterpreter(self, toolkit):
+        if os.name == "posix":
+            return "storytext -i " + toolkit
+        else:
+            storytextPath = self.getFileOnPath("storytext.py")
+            if storytextPath:
+                return "python " + storytextPath + " -i " + toolkit
+            else:
+                raise plugins.TextTestError, "Could not set up Python-GUI testing with StoryText, could not find StoryText installation on PATH"
+
     def setPythonGuiTestingEntries(self, toolkit, directory, ext, configEntries):
-        configEntries["interpreter"] = "storytext -i " + toolkit
+        configEntries["interpreter"] = self.getStoryTextPythonInterpreter(toolkit)
         if toolkit == "gtk": 
             comment = "XDG_CONFIG_HOME points to user's ~/.config directory.\n" + \
                       "Behaviour of e.g. FileChoosers can vary wildly depending on settings there.\n" + \

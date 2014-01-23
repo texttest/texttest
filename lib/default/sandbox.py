@@ -339,14 +339,20 @@ class PrepareWriteDirectory(plugins.Action):
         if suite.parent is None:
             self.tryCopySUTRemotely(suite)
 
+    def isCopy(self, app):
+        return any(("copy_" in v for v in app.versions))
+
     def tryCopySUTRemotely(self, suite):
         # Copy the executables remotely, if necessary
         machine, tmpDir = suite.app.getRemoteTmpDirectory()
         if tmpDir:
-            self.copySUTRemotely(machine, tmpDir, suite)
-            self.copyStorytextDirRemotely(machine, tmpDir, suite)
+            if not self.isCopy(suite.app):
+                self.copySUTRemotely(machine, tmpDir, suite)
+                self.copyStorytextDirRemotely(machine, tmpDir, suite)
+            suite.reloadTestConfigurations()
 
     def tryCopyPathRemotely(self, path, fullTmpDir, machine, app):
+        self.diag.info("Trying to copy " + path + " to " + fullTmpDir)
         if os.path.isabs(path) and os.path.exists(path) and not app.pathExistsRemotely(path, machine):
             # If not absolute, assume it's an installed program
             # If it doesn't exist locally, it must already exist remotely or we'd have raised an error by now
@@ -361,6 +367,10 @@ class PrepareWriteDirectory(plugins.Action):
             return localFile.replace(checkout, remoteCheckout) # We've copied it already, don't do it again...
         else:
             return self.tryCopyPathRemotely(localFile, fullTmpDir, machine, suite.app)
+
+    def overrideExecutable(self, app, remoteFile):
+        self.diag.info("Setting executable to " + repr(remoteFile))
+        app.setConfigOverride("executable", remoteFile)
 
     def copySUTRemotely(self, machine, tmpDir, suite):
         self.diag.info("Copying SUT for " + repr(suite.app) + " to machine " + machine + " at " + tmpDir)
@@ -381,11 +391,10 @@ class PrepareWriteDirectory(plugins.Action):
         localFile = suite.getConfigValue("executable")
         remoteFile = self.copySUTFileIfNeeded(machine, suite, fullTmpDir, checkout, remoteCheckout, localFile)
         if remoteFile:
-            self.diag.info("Setting executable to " + repr(remoteFile))
             # For convenience, so we don't have to set it everywhere...
-            suite.app.setConfigOverride("executable", remoteFile)
+            self.overrideExecutable(suite.app, remoteFile)
         elif not remoteCheckout:
-            suite.app.setConfigOverride("executable", localFile) # Expand TEXTTEST_CHECKOUT, TEXTTEST_ROOT etc
+            self.overrideExecutable(suite.app, localFile) # Expand TEXTTEST_CHECKOUT, TEXTTEST_ROOT etc
 
         scripts = suite.getConfigValue("copy_test_path_script")
         newScripts = {}
@@ -399,8 +408,6 @@ class PrepareWriteDirectory(plugins.Action):
         if newScripts:
             suite.app.setConfigOverride("copy_test_path_script", newScripts)
             
-        suite.reloadTestConfigurations()            
-
     def copyStorytextDirRemotely(self, machine, tmpDir, suite):
         storytextDir = suite.getEnvironment("STORYTEXT_HOME_LOCAL")
         if storytextDir:

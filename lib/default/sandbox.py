@@ -956,6 +956,10 @@ class CreateCatalogue(plugins.Action):
 
 
 class MachineInfoFinder:
+    def allMachinesTestPerformance(self, test, fileStem):
+        perfMachines = self.findPerformanceMachines(test, fileStem)
+        return "any" in perfMachines or all((host in perfMachines for host in test.state.executionHosts))
+
     def findPerformanceMachines(self, test, fileStem):
         return test.getCompositeConfigValue("performance_test_machine", fileStem)
 
@@ -977,16 +981,7 @@ class PerformanceFileCreator(plugins.Action):
         self.machineInfoFinder.setUpApplication(app)
         
     def allMachinesTestPerformance(self, test, fileStem):
-        performanceMachines = self.machineInfoFinder.findPerformanceMachines(test, fileStem)
-        self.diag.info("Found performance machines as " + repr(performanceMachines))
-        if "any" in performanceMachines:
-            return True
-
-        for host in test.state.executionHosts:
-            if host not in performanceMachines:
-                self.diag.info("Real host rejected for performance " + host)
-                return False
-        return True
+        return self.machineInfoFinder.allMachinesTestPerformance(test, fileStem)
 
     def __call__(self, test):
         return self.makePerformanceFiles(test)
@@ -1035,13 +1030,9 @@ class MakePerformanceFile(PerformanceFileCreator):
         PerformanceFileCreator.setUpApplication(self, app)
         self.systemPerfInfoFinder.setUpApplication(app)
     def makePerformanceFiles(self, test):
-        # Check that all of the execution machines are also performance machines
-        if not self.allMachinesTestPerformance(test, "cputime"):
-            return
         cpuTime, realTime = self.systemPerfInfoFinder.findTimesUsedBy(test)
         # There was still an error (jobs killed in emergency), so don't write performance files
-        if cpuTime == None:
-            plugins.log.info("Not writing performance file for " + repr(test))
+        if cpuTime is None:
             return
 
         fileToWrite = test.makeTmpFileName("performance")

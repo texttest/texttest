@@ -10,6 +10,11 @@ from default.sandbox import FindExecutionHosts, MachineInfoFinder
 from default.actionrunner import ActionRunner
 from cPickle import dumps
 
+def importAndCallFromQueueSystem(app, *args):
+    moduleName = "queuesystem." + queueSystemName(app).lower()
+    return plugins.importAndCall(moduleName, *args)
+
+
 # Use a non-monitoring runTest, but the rest from unix
 class RunTestInSlave(RunTest):
     def getBriefText(self, execMachines):
@@ -24,10 +29,7 @@ class RunTestInSlave(RunTest):
             return RunTest.getKillInfoOtherSignal(self, test)
     
     def getUserSignalKillInfo(self, test, userSignalNumber):
-        moduleName = queueSystemName(test.app).lower()
-        command = "from " + moduleName + " import getUserSignalKillInfo as _getUserSignalKillInfo"
-        exec command
-        return _getUserSignalKillInfo(userSignalNumber, self.getExplicitKillInfo) #@UndefinedVariable
+        return importAndCallFromQueueSystem(test.app, "getUserSignalKillInfo", userSignalNumber, self.getExplicitKillInfo)
 
 class FileTransferResponder(plugins.Responder):
     def __init__(self, optionMap, *args):
@@ -140,10 +142,7 @@ class SlaveActionRunner(ActionRunner):
 
 class FindExecutionHostsInSlave(FindExecutionHosts):
     def getExecutionMachines(self, test):
-        moduleName = queueSystemName(test.app).lower()
-        command = "from " + moduleName + " import getExecutionMachines as _getExecutionMachines"
-        exec command
-        return _getExecutionMachines()
+        return importAndCallFromQueueSystem(test.app, "getExecutionMachines")
 
 
 class SlaveMachineInfoFinder(MachineInfoFinder):
@@ -167,10 +166,7 @@ class SlaveMachineInfoFinder(MachineInfoFinder):
 
     def setUpApplication(self, app):
         MachineInfoFinder.setUpApplication(self, app)
-        moduleName = queueSystemName(app).lower()
-        command = "from " + moduleName + " import MachineInfo as _MachineInfo"
-        exec command
-        self.queueMachineInfo = _MachineInfo()
+        self.queueMachineInfo = importAndCallFromQueueSystem(app, "MachineInfo")
 
     def getMachineInformation(self, test):
         # Try and write some information about what's happening on the machine

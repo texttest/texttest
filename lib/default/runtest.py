@@ -347,7 +347,7 @@ class RunTest(plugins.Action):
 
     def getLocalExecuteCmdArgs(self, test, postfix="", makeDirs=True):
         args = []
-        if test.app.hasAutomaticCputimeChecking():
+        if test.app.hasAutomaticCputimeChecking() and test.app.executingOnPerformanceMachine(test):
             args += self.getTimingArgs(test, makeDirs)
 
         # Don't expand environment if we're running on a different file system

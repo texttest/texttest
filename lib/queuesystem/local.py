@@ -35,8 +35,13 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
     def killJob(self, jobId):
         proc = self.processes[jobId]
         jobExisted = proc.poll() is None
-        proc.send_signal(signal.SIGUSR2 if os.name == "posix" else signal.SIGTERM)
+        if jobExisted:
+            sig = signal.SIGUSR2 if os.name == "posix" else signal.SIGTERM
+            self.sendSignal(proc, sig)
         return jobExisted
+
+    def sendSignal(self, proc, sig):
+        proc.send_signal(sig)
     
     def getStatusForAllJobs(self):
         statusDict = {}

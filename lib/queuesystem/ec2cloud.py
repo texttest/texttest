@@ -7,6 +7,7 @@ class QueueSystem(local.QueueSystem):
         self.nextMachineIndex = 0
         self.app = app
         self.machines = self.findMachines()
+        self.remoteProcessInfo = {}
         
     def findMachines(self):
         region = self.app.getConfigValue("queue_system_ec2_region")
@@ -79,6 +80,28 @@ class QueueSystem(local.QueueSystem):
         index = args.index(flag)
         return args[index + 1]
     
+    def setRemoteProcessId(self, localPid, remotePid):
+        if localPid in self.remoteProcessInfo:
+            machine = self.remoteProcessInfo[localPid][0]
+            self.remoteProcessInfo[localPid] = machine, remotePid
+            
+    def getRemoteTestMachine(self, localPid):
+        if localPid in self.remoteProcessInfo:
+            return self.remoteProcessInfo[localPid][0]
+            
+    def sendSignal(self, process, sig):
+        # ssh doesn't forward signals to remote processes.
+        # We need to find it ourselves and send it explicitly. Can assume python exists remotely, but not much else.
+        localPid = str(process.pid)
+        if localPid in self.remoteProcessInfo:
+            machine, remotePid = self.remoteProcessInfo[localPid]
+            if remotePid:
+                cmdArgs = [ "python", "-c", "\"import os; os.kill(" + remotePid + ", " + str(sig) + ")\"" ]
+                self.app.runCommandOn(machine, cmdArgs)
+        # Hack for self-tests. Shouldn't normally be needed. Need to kill the process locally as well when replaying CaptureMock.
+        if os.getenv("CAPTUREMOCK_MODE") == "0":
+            local.QueueSystem.sendSignal(self, process, sig)
+        
     def submitSlaveJob(self, cmdArgs, *args):
         ip = self.machines[self.nextMachineIndex]
         machine = "ec2-user@" + ip
@@ -94,6 +117,8 @@ class QueueSystem(local.QueueSystem):
         ipAddress = self.getArg(cmdArgs, "-servaddr").split(":")[0]
         fileArgs = [ "-slavefilesynch", os.getenv("USER") + "@" + ipAddress ]
         remoteCmdArgs = self.app.getCommandArgsOn(machine, cmdArgs, agentForwarding=True) + fileArgs
-        return local.QueueSystem.submitSlaveJob(self, remoteCmdArgs, *args) 
+        localPid, jobName = local.QueueSystem.submitSlaveJob(self, remoteCmdArgs, *args) 
+        self.remoteProcessInfo[localPid] = (machine, None)
+        return localPid, jobName
         
 from local import MachineInfo, getUserSignalKillInfo, getExecutionMachines

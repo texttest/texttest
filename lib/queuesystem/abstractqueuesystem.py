@@ -51,6 +51,12 @@ class QueueSystem:
     def getCapacity(self):
         pass # treated as no restriction
     
+    def setRemoteProcessId(self, *args):
+        pass # only cloud cares about this
+    
+    def getRemoteTestMachine(self, *args):
+        pass # only cloud cares about this
+    
     def slavesOnRemoteSystem(self):
         return False
 

@@ -1416,7 +1416,7 @@ class Config:
         srcPath = self.getRemotePath(srcFile, srcMachine)
         dstPath = self.getRemotePath(dstFile, dstMachine)
         args = self.getRemoteProgramArgs(app, "remote_copy_program") + [ srcPath, dstPath ]
-        return subprocess.call(args, stdin=open(os.devnull), stdout=open(os.devnull, "w")) #, stderr=subprocess.STDOUT)
+        return subprocess.call(args, stdin=open(os.devnull), stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
 
     def getRemoteProgramArgs(self, app, setting):
         progStr = app.getConfigValue(setting)

@@ -26,6 +26,7 @@ class QueueSystemConfig(default.Config):
         default.Config.addToOptionGroups(self, apps, groups)
         minTestCount = min((app.getConfigValue("queue_system_min_test_count") for app in apps))
         localQueueSystem = all((app.getConfigValue("queue_system_module") == "local" for app in apps))
+        useGrid = all((app.getConfigValue("queue_system_module") not in [ "local", "ec2cloud" ] for app in apps))
         for group in groups:
             if group.name.startswith("Basic"):
                 options = [ "Always", "Never" ]
@@ -46,13 +47,14 @@ class QueueSystemConfig(default.Config):
                 if localQueueSystem:
                     group.addSwitch("l", "Run tests sequentially", value=defaultValue)
                 else:
-                    group.addSwitch("l", "Use grid", value=defaultValue, options=options, description=descriptions)
-            elif group.name.startswith("Grid") and not localQueueSystem:
+                    title = "Use grid" if useGrid else "Use cloud"
+                    group.addSwitch("l", title, value=defaultValue, options=options, description=descriptions)
+            elif group.name.startswith("Grid") and useGrid:
                 self.addDefaultOption(group, "R", "Request grid resource", possibleValues = self.getPossibleResources())
                 self.addDefaultOption(group, "q", "Request grid queue", possibleValues = self.getPossibleQueues())
                 self.addDefaultSwitch(group, "keepslave", "Keep data files and successful tests until termination")
                 self.addDefaultSwitch(group, "perf", "Run on performance machines only")
-            elif group.name.startswith("Advanced") and localQueueSystem:
+            elif group.name.startswith("Advanced") and not useGrid:
                 self.addDefaultSwitch(group, "keepslave", "Keep data files and successful tests until termination")
             elif group.name.startswith("Self-diagnostics"):
                 self.addDefaultSwitch(group, "xs", "Enable self-diagnostics in slave processes")
@@ -99,6 +101,14 @@ class QueueSystemConfig(default.Config):
                 return self.optionValue("reconnfull") in [ "2", "grid" ]
             else:
                 return True
+            
+    def getRemoteTestTmpDir(self, test):
+        qs = masterprocess.QueueSystemServer.instance
+        if qs:
+            fromQs = qs.getRemoteTestTmpDir(test)
+            if fromQs:
+                return fromQs
+        return default.Config.getRemoteTestTmpDir(self, test)
     
     def hasExplicitInterface(self):
         return self.slaveRun() or default.Config.hasExplicitInterface(self)

@@ -389,6 +389,24 @@ class QueueSystemServer(BaseActionRunner):
     def getSlaveLogDir(self, test):
         return os.path.join(test.app.writeDirectory, "slavelogs")
 
+    def setRemoteProcessId(self, test, pid):
+        jobInfo = self.getJobInfo(test)
+        if len(jobInfo) > 0:
+            # Take the most recent job, it's hopefully the most interesting
+            jobId = jobInfo[-1][0] 
+            queueSystem = self.getQueueSystem(test)
+            queueSystem.setRemoteProcessId(jobId, pid)
+            
+    def getRemoteTestTmpDir(self, test):
+        jobInfo = self.getJobInfo(test)
+        if len(jobInfo) > 0:
+            # Take the most recent job, it's hopefully the most interesting
+            jobId = jobInfo[-1][0] 
+            queueSystem = self.getQueueSystem(test)
+            remoteMachine = queueSystem.getRemoteTestMachine(jobId)
+            if remoteMachine:
+                return remoteMachine, test.writeDirectory
+        
     def getSubmitCmdArgs(self, test, *args):
         queueSystem = self.getQueueSystem(test)
         return queueSystem.getSubmitCmdArgs(*args)
@@ -869,6 +887,7 @@ class SlaveRequestHandler(StreamRequestHandler):
                         self.wfile.write(socketSerialise(newTest))
                 else:
                     self.server.storeClient(test, (hostname, identifier))
+                    QueueSystemServer.instance.setRemoteProcessId(test, identifier)
                 self.connection.shutdown(socket.SHUT_WR)
         else:
             expectedHost, expectedPid = self.server.testClientInfo[test]
@@ -981,11 +1000,8 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
     
     def clientCorrect(self, test, clientInfo):
         # Only allow one client per test!
-        if self.testClientInfo.has_key(test):
-            return self.testClientInfo[test] == clientInfo
-        else:
-            return True
-
+        return test not in self.testClientInfo or self.testClientInfo[test] == clientInfo
+        
     def storeClient(self, test, clientInfo):
         self.testClientInfo[test] = clientInfo
 

@@ -14,14 +14,16 @@ def interpretCore(corefile):
         return "No binary found from core", details, None
 
     summary, details = writeGdbStackTrace(corefile, binary)
-    if summary.find("Parse failure") != -1:
-        dbxSummary, dbxDetails = writeDbxStackTrace(corefile, binary)
-        if dbxSummary.find("Parse failure") == -1:
-            return dbxSummary, dbxDetails, binary
-        else:
-            return "Parse failure from both GDB and DBX", details + dbxDetails, binary
-    else:
-        return summary, details, binary
+    if "Parse failure" in summary:
+        try:
+            dbxSummary, dbxDetails = writeDbxStackTrace(corefile, binary)
+            if "Parse failure" in dbxSummary:
+                return "Parse failure from both GDB and DBX", details + dbxDetails, binary
+            else:
+                return dbxSummary, dbxDetails, binary
+        except OSError:
+            pass # If DBX isn't installed, just return the GDB details anyway
+    return summary, details, binary
 
 def getLocalName(corefile):
     data = os.popen("file " + corefile).readline()

@@ -640,17 +640,37 @@ class CollateFiles(plugins.Action):
             self.tryFetchRemoteFiles(test)
             self.collate(test)
             self.removeUnwanted(test)
+            
+    def containsRegexps(self, filePath, regexps):
+        with open(filePath) as f:
+            for line in f:
+                if any((r.search(line) for r in regexps)):
+                    return True
+        return False
+    
+    def removeUnwantedFile(self, filePath):
+        self.diag.info("Trying to remove generated file " + os.path.basename(filePath))
+        try:
+            # Checking for existence too dependent on file server (?)
+            os.remove(filePath)
+        except EnvironmentError:
+            pass
 
     def removeUnwanted(self, test):
         for stem in test.getConfigValue("discard_file"):
-            self.diag.info("Trying to remove generated file with stem " + stem)
             filePath = test.makeTmpFileName(stem)
-            try:
-                # Checking for existence too dependent on file server (?)
-                os.remove(filePath)
-            except EnvironmentError:
-                pass
-
+            self.removeUnwantedFile(filePath)
+            
+        for stemPattern, texts in test.getConfigValue("discard_file_text").items():
+            if not texts:
+                continue
+            if stemPattern == "default":
+                stemPattern = "*"
+            regexps = map(re.compile, texts)
+            for filePath in glob.glob(test.makeTmpFileName(stemPattern)):
+                if self.containsRegexps(filePath, regexps):
+                    self.removeUnwantedFile(filePath)
+                
     def findEditedFile(self, test, patterns):
         for pattern in patterns:
             for fullpath in self.findPaths(test, pattern)[1]:

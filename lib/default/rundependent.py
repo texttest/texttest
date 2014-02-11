@@ -329,6 +329,8 @@ class MatchNumberTrigger(plugins.TextTrigger):
         self.matchCounter = 0
 
 def getWriteDirRegexp(testId):
+    for char in "+^":
+        testId = testId.replace(char, "\\" + char)
     # Some stuff, a date, and the testId (ignore the appId as we don't know when or where)
     # Doesn't handle paths with spaces, which seems hard, but does hardcode the default location of $HOME on Windows...
     posixVersion = '([A-Za-z]:/Documents and Settings)?[^ "=]*/[^ "=]*[0-3][0-9][A-Za-z][a-z][a-z][0-9]{6}[^ "=]*/' + testId

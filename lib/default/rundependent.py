@@ -227,7 +227,8 @@ class RunDependentTextFilter(plugins.Observable):
                 if sectionFilter not in relevantFilters and sectionFilter.untrigger.matches(line, lineNumber):
                     relevantFilters.append((sectionFilter, lineNumber))
             for sectionFilter in sectionFilters:
-                if sectionFilter not in matchedFirst and sectionFilter.trigger.matches(line, lineNumber):
+                if sectionFilter not in matchedFirst and \
+                    sectionFilter.trigger.matches(line, lineNumber) and not sectionFilter.untrigger.matches(line, lineNumber):
                     matchedFirst.append(sectionFilter)
         for sectionFilter in sectionFilters:
             sectionFilter.trigger.reset()

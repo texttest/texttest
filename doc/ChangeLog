@@ -2526,6 +2526,8 @@ Framework Enhancements:
 	Allows files to be discarded conditional on their contents. Useful e.g. for intermittent exceptions. See website.
     - When sending SIGQUIT to TextTest if it's hanging, now print a stacktrace of all threads instead of just the main one
 	(UNIX only, naturally)
+    - Section filters will not trigger on lines which match both the start and end lines now.
+	This is a backwards-incompatible change, see migration notes.
 Version Control Browser Enhancements:
     - Now supports Git
     - "Update" operation is now always a "centralised-style" update
@@ -2560,3 +2562,4 @@ Bug Fixes:
     - Disabled VCS actions on New Files in the dynamic GUI (stacktraced before)
     - Fixed stacktrace interpreting core files when GDB fails to handle them and DBX not installed
     - If performance_test_machine is set and test is not running there, don't attempt to use "time" program
+    - Fixed problems with {INTERNAL writedir} filtering when test names contain a '+'

@@ -1,0 +1,41 @@
+=========================================================
+CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
+=========================================================
+
+(1) "run_dependent_text": section filters now ignore lines which match both start and end marker
+================================================================================================
+
+If you have a file
+
+A
+B
+C
+A
+B
+C
+
+and you filter it with a filter
+
+[run_dependent_text]
+stdout:A{->}A
+
+or even a filter
+
+[run_dependent_text]
+stdout:{LINE 1}{->}A
+
+this would previously remove everything between the first two "A" lines. It will now simply be ignored.
+Probably any filter where the end marker also matches the start line has not been very well-defined, and will need fixing up.
+
+(What is meant by a filter where the start and end markers match the same line is open to interpretation, but this behaviour 
+seemed most practical in the situation where you have filters like 
+
+[run_dependent_text]
+stdout:{LINE 1}{->}something
+
+and have set
+
+save_filtered_file_stems:stdout
+
+If "something" appears more than once in the file, the filtering behaviour will behave differently on the stored file and the 
+new file, which is very confusing for users.

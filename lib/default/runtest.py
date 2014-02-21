@@ -91,6 +91,8 @@ class RunTest(plugins.Action):
             else:
                 self.wait(process)
             self.checkAndClear(test, postfix)
+            if self.killSignal is not None:
+                break # Don't start other processes
             
     def getTestRunPostfixes(self, test):
         postfixes = [ "" ]

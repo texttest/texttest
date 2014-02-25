@@ -828,9 +828,9 @@ class Config:
         elif self.keepTemporaryDirectories():
             return SaveState
         
-    def getConfigEnvironment(self, test):
+    def getConfigEnvironment(self, test, allVars):
         testEnvironmentCreator = self.getEnvironmentCreator(test)
-        return testEnvironmentCreator.getVariables()
+        return testEnvironmentCreator.getVariables(allVars)
     
     def getEnvironmentCreator(self, test):
         return sandbox.TestEnvironmentCreator(test, self.optionMap)

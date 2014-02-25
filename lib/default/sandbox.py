@@ -425,7 +425,7 @@ class TestEnvironmentCreator:
         self.optionMap = optionMap
         self.diag = logging.getLogger("Environment Creator")
 
-    def getVariables(self):
+    def getVariables(self, allVars):
         vars, props = [], []
         self.diag.info("Creating environment for " + repr(self.test))
         if self.topLevel():
@@ -442,20 +442,28 @@ class TestEnvironmentCreator:
                 # Mostly to make sure StoryText's own tests have a chance of working
                 # Almost any other test suite shouldn't be doing this...
                 envSetInTests = self.test.getConfigValue("test_data_environment").values()
-                if usecaseRecorder != "none" and "STORYTEXT_HOME" not in envSetInTests:
-                    if not usecaseRecorder:
-                        usecaseRecorder = "ui_simulation"
-                    usecaseDir = os.path.join(self.test.app.getDirectory(), usecaseRecorder + "_files")
-                    remoteTmpDir = self.test.app.getRemoteTmpDirectory()[1]
-                    if remoteTmpDir:
-                        # We pretend it's a local temporary file
-                        # so that the $HOME reference gets preserved in runtest.py
-                        # (no guarantee $HOME is the same remotely)
-                        fakeRemotePath = os.path.join(self.test.app.writeDirectory, os.path.basename(usecaseDir))
-                        vars.append(("STORYTEXT_HOME", fakeRemotePath))
-                        vars.append(("STORYTEXT_HOME_LOCAL", usecaseDir))
-                    else:
-                        vars.append(("STORYTEXT_HOME", usecaseDir))
+                if usecaseRecorder != "none":
+                    if "STORYTEXT_HOME" not in envSetInTests:
+                        if not usecaseRecorder:
+                            usecaseRecorder = "ui_simulation"
+                        usecaseDir = os.path.join(self.test.app.getDirectory(), usecaseRecorder + "_files")
+                        remoteTmpDir = self.test.app.getRemoteTmpDirectory()[1]
+                        if remoteTmpDir:
+                            # We pretend it's a local temporary file
+                            # so that the $HOME reference gets preserved in runtest.py
+                            # (no guarantee $HOME is the same remotely)
+                            fakeRemotePath = os.path.join(self.test.app.writeDirectory, os.path.basename(usecaseDir))
+                            vars.append(("STORYTEXT_HOME", fakeRemotePath))
+                            vars.append(("STORYTEXT_HOME_LOCAL", usecaseDir))
+                        else:
+                            vars.append(("STORYTEXT_HOME", usecaseDir))
+                    
+                    eclipseHome = self.findValueFromFiles(allVars, "ECLIPSE_HOME")
+                    if eclipseHome:
+                        # StoryText with RCP. We add the necessary to the classpath...
+                        expandedHome = self.getExpanded(allVars + vars, eclipseHome)
+                        jars = self.findJars(expandedHome)
+                        vars.append(("CLASSPATH", os.pathsep.join(jars)))
                     
                 if os.name == "posix":
                     from virtualdisplay import VirtualDisplayResponder
@@ -470,6 +478,33 @@ class TestEnvironmentCreator:
                 vars += useCaseVars
             vars += self.getPathVariables()
         return vars, props
+    
+    def getExpanded(self, allVars, path):
+        temp = Template(path)
+        d= {}
+        for var,value in allVars:
+            d[var]=value
+        return temp.safe_substitute(d)
+        
+    def findJars(self, eclipseHome):
+        names = [("org.eclipse.equinox.launcher_",""), ("org.eclipse.swtbot",".testscript")]
+        if not os.path.isdir(eclipseHome):
+            return []
+        home = os.path.join(eclipseHome, "plugins")
+        jars =[]
+        for name,suffix in names:
+            for fileName in sorted(os.listdir(home)):
+                if fileName.startswith(name) and suffix in fileName:
+                    jars.append(os.path.join(home, fileName))
+                    break
+
+        return jars
+    
+    def findValueFromFiles(self, allVars, varName):
+        for var, value in allVars:
+            if var == varName:
+                return value
+    
     def topLevel(self):
         return self.test.parent is None
     def testCase(self):

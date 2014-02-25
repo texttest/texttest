@@ -1534,7 +1534,7 @@ class Application(object):
         allVars = sum((self.readEnvironment(f) for f in envFiles), [])
         allProps = []
         for suite in test.getAllTestsToRoot():
-            vars, props = self.configObject.getConfigEnvironment(suite)
+            vars, props = self.configObject.getConfigEnvironment(suite, allVars)
             allVars += vars
             allProps += props
 

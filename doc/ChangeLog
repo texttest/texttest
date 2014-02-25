@@ -2564,3 +2564,4 @@ Bug Fixes:
     - If performance_test_machine is set and test is not running there, don't attempt to use "time" program
     - Fixed problems with {INTERNAL writedir} filtering when test names contain a '+'
     - Fixed java classpath for eclipse rcp applications
+    - Don't start subsequent processes if a test has been killed

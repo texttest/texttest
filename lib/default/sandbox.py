@@ -480,11 +480,15 @@ class TestEnvironmentCreator:
         return vars, props
     
     def getExpanded(self, allVars, path):
-        temp = Template(path)
-        d= {}
-        for var,value in allVars:
-            d[var]=value
-        return temp.safe_substitute(d)
+        # Expand variables recursively!
+        d = dict(allVars)
+        while True:
+            temp = Template(path)
+            newPath = temp.safe_substitute(d)
+            if newPath == path:
+                return newPath
+            else:
+                path = newPath
         
     def findJars(self, eclipseHome):
         names = [("org.eclipse.equinox.launcher_",""), ("org.eclipse.swtbot",".testscript")]

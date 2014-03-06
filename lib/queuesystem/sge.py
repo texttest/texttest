@@ -1,11 +1,11 @@
 
 import os, string, subprocess
-import abstractqueuesystem
+import gridqueuesystem
 from plugins import gethostname, log, TextTestError
 from time import sleep
 
 # Used by master process for submitting, deleting and monitoring slave jobs
-class QueueSystem(abstractqueuesystem.QueueSystem):
+class QueueSystem(gridqueuesystem.QueueSystem):
     allStatuses = { "qw"  : ("PEND", "Pending"),
                     "hqw" : ("HOLD", "On hold"),
                     "t"   : ("TRANS", "Transferring"),
@@ -23,7 +23,8 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
     def __init__(self, *args):
         self.qdelOutput = ""
         self.errorReasons = {}
-
+        gridqueuesystem.QueueSystem.__init__(self, *args)
+        
     def getSubmitCmdArgs(self, submissionRules, commandArgs=[], slaveEnv={}):
         qsubArgs = [ "qsub", "-N", submissionRules.getJobName() ]
         if submissionRules.processesNeeded != 1:
@@ -38,7 +39,6 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
         resource = self.getResourceArg(submissionRules)
         if len(resource):
             qsubArgs += [ "-l", resource ]
-        outputFile, errorsFile = submissionRules.getJobFiles()
         qsubArgs += [ "-w", "e", "-notify", "-m", "n", "-cwd", "-b", "y"]
         if slaveEnv:
             if len(slaveEnv) >= len(os.environ): # We've clearly copied the environment, just forward the whole thing
@@ -47,7 +47,7 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
                 qsubArgs.append("-v")
                 qsubArgs.append(",".join(slaveEnv))
             
-        qsubArgs += [ "-o", outputFile, "-e", errorsFile ]
+        qsubArgs += [ "-o", os.devnull, "-e", os.devnull ]
         return self.addExtraAndCommand(qsubArgs, submissionRules, commandArgs)
 
     def getResourceArg(self, submissionRules):

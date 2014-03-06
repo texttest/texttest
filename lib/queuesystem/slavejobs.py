@@ -3,7 +3,7 @@
 Module containing code that's only run in the slave jobs when running with a grid engine / queue system
 """
 
-import plugins, os, sys, time, socket, signal
+import plugins, os, sys, time, socket, signal, logging
 from utils import *
 from default.runtest import RunTest
 from default.sandbox import FindExecutionHosts, MachineInfoFinder
@@ -30,6 +30,28 @@ class RunTestInSlave(RunTest):
     
     def getUserSignalKillInfo(self, test, userSignalNumber):
         return importAndCallFromQueueSystem(test.app, "getUserSignalKillInfo", userSignalNumber, self.getExplicitKillInfo)
+
+# Redirect the log mechanism locally in the slave
+# Workaround for NFS slowness, essentially: we can't create these files in the master process in case they
+# don't propagate in time
+class RedirectLogResponder(plugins.Responder):
+    done = False
+    def notifyAdd(self, test, *args, **kw):
+        if not self.done:
+            RedirectLogResponder.done = True
+            logDir = os.path.join(test.app.writeDirectory, "slavelogs")
+            plugins.ensureDirectoryExists(logDir)
+            os.chdir(logDir)
+            logFile, errFile = test.app.getSubmissionRules(test).getJobFiles()
+            errPath = os.path.join(logDir, errFile)
+            logPath = os.path.join(logDir, logFile)
+            if not os.path.isfile(errPath) and not os.path.isfile(logPath):
+                sys.stderr = open(errPath, "w")
+                # This is more or less hardcoded to use a timed formatter and write to the file
+                handler = logging.FileHandler(logPath)
+                formatter = logging.Formatter("%(asctime)s - %(message)s")
+                handler.setFormatter(formatter)
+                plugins.log.addHandler(handler)
 
 class FileTransferResponder(plugins.Responder):
     def __init__(self, optionMap, *args):

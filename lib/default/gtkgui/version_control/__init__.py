@@ -16,9 +16,11 @@ def getConfigFromDirectory(directory):
         if controlDirName in allEntries:
             module = controlDirName.lower().replace(".", "")
             try:
-                exec "from " + module + " import InteractiveActionConfig"
                 controlDir = os.path.join(directory, controlDirName)
-                return InteractiveActionConfig(controlDir) #@UndefinedVariable
+                if module != "cvs" or not os.path.isdir(os.path.join(controlDir, "CVS")):
+                    # Avoid overarching directories "CVS" which are not control directories...
+                    exec "from " + module + " import InteractiveActionConfig"
+                    return InteractiveActionConfig(controlDir) #@UndefinedVariable
             except ImportError: # There may well be more VCSs than we have support for...
                 pass
     dirname = os.path.dirname(directory)

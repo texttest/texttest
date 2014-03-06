@@ -1,9 +1,9 @@
 
 import os
-import abstractqueuesystem, plugins
+import gridqueuesystem
 
 # Used by the master to submit, monitor and delete jobs...
-class QueueSystem(abstractqueuesystem.QueueSystem):
+class QueueSystem(gridqueuesystem.QueueSystem):
     def getSubmitCmdArgs(self, submissionRules, commandArgs=[], slaveEnv={}):
         bsubArgs = [ "bsub", "-J", submissionRules.getJobName() ]
         if submissionRules.processesNeeded != 1:
@@ -17,8 +17,7 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
         machines = submissionRules.findMachineList()
         if len(machines):
             bsubArgs += [ "-m", " ".join(machines) ]
-        outputFile, errorsFile = submissionRules.getJobFiles()
-        bsubArgs += [ "-u", "nobody", "-o", outputFile, "-e", errorsFile ]
+        bsubArgs += [ "-u", "nobody", "-o", os.devnull, "-e", os.devnull ]
         return self.addExtraAndCommand(bsubArgs, submissionRules, commandArgs)
     
     def getSlaveVarsToBlock(self):

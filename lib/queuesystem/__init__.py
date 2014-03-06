@@ -227,7 +227,7 @@ class QueueSystemConfig(default.Config):
             return basicDescription
         
     def getSlaveResponderClasses(self):
-        classes = [ slavejobs.FileTransferResponder, slavejobs.SocketResponder, slavejobs.SlaveActionRunner ]
+        classes = [ slavejobs.RedirectLogResponder, slavejobs.FileTransferResponder, slavejobs.SocketResponder, slavejobs.SlaveActionRunner ]
         if os.name == "posix" and not self.isActionReplay():
             classes.append(VirtualDisplayResponder)
         classes.append(ApplicationEventResponder)

@@ -176,6 +176,8 @@ class TestEnvironment(OrderedDict):
     def expandVariables(self, expandExternal):
         expanded = False
         for var, value in self.iteritems():
+            if "$" in value:
+                self.diag.info("Expanding " + var + "...")
             mapping = DynamicMapping(self.getSingleValueNoSelfRef, var, expandExternal)
             newValue = string.Template(value).safe_substitute(mapping)
             if newValue != value:

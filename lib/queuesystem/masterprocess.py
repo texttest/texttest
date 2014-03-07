@@ -672,10 +672,28 @@ class QueueSystemServer(BaseActionRunner):
     def describeJob(self, test, jobId, *args):
         postText = self.getPostText(test, jobId)
         plugins.log.info("T: Cancelling " + repr(test) + " " + postText)
-
-class SubmissionRules:
-    def __init__(self, optionMap, test):
+        
+# Used in slave
+class BasicSubmissionRules:
+    classPrefix = "Test"
+    def __init__(self, test):
         self.test = test
+
+    def getJobName(self):
+        path = self.test.getRelPath()
+        parts = path.split("/")
+        parts.reverse()
+        name = self.classPrefix + "-" + ".".join(parts) + "-" + repr(self.test.app).replace(" ", "_")
+        return name.replace(":", "_")
+
+    def getJobFiles(self):
+        jobName = self.getJobName()
+        return jobName + ".log", jobName + ".errors"
+ 
+
+class SubmissionRules(BasicSubmissionRules):
+    def __init__(self, optionMap, test):
+        BasicSubmissionRules.__init__(self, test)
         self.optionMap = optionMap
         self.configResources = self.getConfigResources(test)
         self.processesNeeded = self.getProcessesNeeded()
@@ -695,13 +713,6 @@ class SubmissionRules:
     def findResourceList(self):
         return self.configResources
 
-    def getJobName(self):
-        path = self.test.getRelPath()
-        parts = path.split("/")
-        parts.reverse()
-        name = self.classPrefix + "-" + ".".join(parts) + "-" + repr(self.test.app).replace(" ", "_")
-        return name.replace(":", "_")
-
     def findQueue(self):
         cmdQueue = self.optionMap.get("q", "")
         if cmdQueue:
@@ -717,10 +728,6 @@ class SubmissionRules:
 
     def findMachineList(self):
         return []
-
-    def getJobFiles(self):
-        jobName = self.getJobName()
-        return jobName + ".log", jobName + ".errors"
 
     def forceOnPerformanceMachines(self):
         return False

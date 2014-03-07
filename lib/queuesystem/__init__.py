@@ -276,7 +276,10 @@ class QueueSystemConfig(default.Config):
                len(app.getCompositeConfigValue("performance_test_resource", "cputime")) > 0
 
     def getSubmissionRules(self, test):
-        return masterprocess.TestSubmissionRules(self.optionMap, test)
+        if self.slaveRun():
+            return masterprocess.BasicSubmissionRules(test)
+        else:
+            return masterprocess.TestSubmissionRules(self.optionMap, test)
 
     def getProxySubmissionRulesClass(self):
         return masterprocess.ProxySubmissionRules

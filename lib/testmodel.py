@@ -699,17 +699,19 @@ class TestCase(Test):
         else:
             return ""
 
-    def removeOptions(self, optionArgs, toClear):
+    @staticmethod
+    def removeOptions(optionArgs, toClear):
         # Only want to remove them as a sequence
         try:
             pos = optionArgs.index(toClear[0])
         except ValueError:
-            return
+            return optionArgs
         
-        for itemToClear in toClear:
-            if itemToClear == optionArgs[pos]:
-                del optionArgs[pos]
-                # which should leave the new pos as the next item
+        endPos = pos + len(toClear)
+        if optionArgs[pos:endPos] == toClear:
+            return optionArgs[:pos] + optionArgs[endPos:]
+        else:
+            return optionArgs
         
     def getCommandLineOptions(self, stem="options"):
         optionArgs = []
@@ -724,7 +726,8 @@ class TestCase(Test):
                     endPos = optionString.find("}", startPos)
                     clearStr = optionString[startPos:endPos + 1]
                     optionString = optionString.replace(clearStr, "")
-                    self.removeOptions(optionArgs, plugins.splitcmd(clearStr[7:-1]))
+                    toClear = plugins.splitcmd(clearStr[7:-1])
+                    optionArgs = self.removeOptions(optionArgs, toClear)
             newArgs = plugins.splitcmd(optionString)
             if len(optionArgs) == 0:
                 optionArgs = newArgs

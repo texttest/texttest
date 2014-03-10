@@ -1634,7 +1634,10 @@ class ReportBugs(guiplugins.ActionDialogGUI):
 
     def getSizeAsWindowFraction(self):
         # size of the dialog
-        return 0.6, 0.6
+        return 0.6, 1.0
+    
+    def needsScrollBars(self):
+        return True
 
     @classmethod
     def updateAncestors(cls, ancestors, test):

@@ -912,12 +912,17 @@ class ActionDialogGUI(OptionGroupGUI):
         alignment = self.createAlignment()
         vbox = gtk.VBox()
         fileChooser, fileChooserOption = self.fillVBox(vbox, self.optionGroup)
+        if self.needsScrollBars():
+            vbox = self.addScrollBars(vbox, gtk.POLICY_AUTOMATIC)
         alignment.add(vbox)
         dialog.vbox.pack_start(alignment, expand=True, fill=True)
         self.createButtons(dialog, fileChooser, fileChooserOption)
         self.tryResize(dialog)
         dialog.show_all()
         return dialog
+        
+    def needsScrollBars(self):
+        return False
         
     def getConfirmationDialogSettings(self):
         return gtk.STOCK_DIALOG_WARNING, "Confirmation"

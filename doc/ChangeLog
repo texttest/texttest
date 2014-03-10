@@ -2528,6 +2528,8 @@ Framework Enhancements:
 	(UNIX only, naturally)
     - Section filters will not trigger on lines which match both the start and end lines now.
 	This is a backwards-incompatible change, see migration notes.
+    - Autogenerates CLASSPATH for StoryText/Eclipse applications
+	mirroring changes in latest StoryText
 Version Control Browser Enhancements:
     - Now supports Git
     - "Update" operation is now always a "centralised-style" update
@@ -2541,6 +2543,7 @@ Batch Report Enhancements:
 Grid Engine enhancements/bug fixes:
     - New experimental status support for EC2 Virtual Private Cloud added
 	Tests run parallel on any available cloud machines. Requires Python tool "boto". See website.
+    - Fixed race conditions on NFS-systems between grid engines and the file server
     - Fixed race condition which could lead to hanging on shutdown
 Windows installer Enhancements:
     - All files now end up under chosen location, removed hardcoded C:\virtualenv and C:\jython2.5.1
@@ -2565,3 +2568,5 @@ Bug Fixes:
     - Fixed problems with {INTERNAL writedir} filtering when test names contain a '+'
     - Fixed java classpath for eclipse rcp applications
     - Don't start subsequent processes if a test has been killed.
+    - Failure information dialog has scrollbars if needed
+    - Fixed bug with {CLEAR x} in options files clearing parts of what is matched

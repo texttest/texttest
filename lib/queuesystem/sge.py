@@ -17,6 +17,7 @@ class QueueSystem(gridqueuesystem.QueueSystem):
                     "dS"  : ("DEL", "In the process of being killed"),
                     "R"   : ("RESTART", "Restarted"),
                     "Rr"  : ("RESTART", "Restarted"),
+                    "Rt"  : ("RESTART", "Restarted"),
                     "Rq"  : ("REQUEUED", "Requested a restart"),
                     "S"   : ("SSUSP", "Suspended by SGE due to other higher priority jobs"),
                     "St"  : ("SSUSP", "Suspended by SGE due to other higher priority jobs"),

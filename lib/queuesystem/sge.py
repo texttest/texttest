@@ -21,6 +21,7 @@ class QueueSystem(gridqueuesystem.QueueSystem):
                     "Rq"  : ("REQUEUED", "Requested a restart"),
                     "S"   : ("SSUSP", "Suspended by SGE due to other higher priority jobs"),
                     "St"  : ("SSUSP", "Suspended by SGE due to other higher priority jobs"),
+                    "SRt" : ("SSUSP", "Suspended by SGE due to other higher priority jobs"),
                     "T"   : ("THRESH", "Suspended by SGE as it exceeded allowed thresholds") }
     errorStatus = "Eqw"
     def __init__(self, *args):

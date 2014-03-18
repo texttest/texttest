@@ -173,6 +173,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
             dialog = gtk.Dialog(self.getDialogTitle())
 
         dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+        dialog.set_has_separator(False)
         return dialog
     
     def getTitle(self, includeMnemonics=False):

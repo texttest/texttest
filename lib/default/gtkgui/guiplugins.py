@@ -1107,8 +1107,13 @@ class ActionDialogGUI(OptionGroupGUI):
                 fileChooser.add_shortcut_folder(folder)
             except gobject.GError:
                 pass # Get this if the folder is already added, e.g. if it's the home directory
-        if not option.saveFile and option.getValue():
-            fileChooser.set_filename(option.getValue())
+        if not option.saveFile:
+            if option.getValue():
+                fileChooser.set_filename(option.getValue())
+            else:
+                files = os.listdir(startFolder)
+                if len(files) == 1:
+                    fileChooser.set_filename(os.path.join(startFolder, files[0]))
             
         fileChooser.set_local_only(True)
         return fileChooser

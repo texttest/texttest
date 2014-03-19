@@ -316,8 +316,8 @@ class RunningAction(BasicRunningAction):
             configObject = self.makeDefaultConfigObject(self.inputOptions)
             return configObject.getAllRunningGroupNames(allApps)
 
-    def createCheckBox(self, switch):
-        widget = guiplugins.OptionGroupGUI.createCheckBox(self, switch)
+    def createCheckBox(self, switch, *args):
+        widget = guiplugins.OptionGroupGUI.createCheckBox(self, switch, *args)
         self.storeSwitch(switch, [ widget ])
         return widget
 

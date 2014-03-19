@@ -1111,3 +1111,7 @@ activate = show vcs file popup menu
 
 [Name=VCS File Popup Menu]
 activate = show vcs popup menu
+
+[Name=Reset Running Tab]
+clicked = reset running tab
+

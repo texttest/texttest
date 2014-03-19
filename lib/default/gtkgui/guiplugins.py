@@ -669,16 +669,20 @@ class OptionGroupGUI(ActionGUI):
         box.pack_start(combobox)
         return box
 
-    def createSwitchWidget(self, switch, optionGroup):
+    def transferEnable(self, enabler, switch):
+        if enabler.get_active():
+            switch.updateMethod(True)
+
+    def createSwitchWidget(self, switch, optionGroup, autoEnableInfo={}):
         if len(switch.options) >= 1:
             if switch.hideOptions:
                 return self.createComboBox(switch, optionGroup)
             else:
                 return self.createRadioButtonCollection(switch, optionGroup)
         else:
-            return self.createCheckBox(switch)
+            return self.createCheckBox(switch, autoEnableInfo)
 
-    def createCheckBox(self, switch):
+    def createCheckBox(self, switch, autoEnableInfo):
         self.updateForConfig(switch)
         checkButton = gtk.CheckButton(switch.name)
         if switch.description:
@@ -688,6 +692,10 @@ class OptionGroupGUI(ActionGUI):
             checkButton.set_active(True)
         # Don't pass checkButton.set_active as that will screw up StoryText's interception of it
         switch.setMethods(checkButton.get_active, lambda x: checkButton.set_active(x))
+        if switch in autoEnableInfo:
+            toEnable = autoEnableInfo.get(switch)
+            checkButton.connect("toggled", self.transferEnable, toEnable)
+
         checkButton.show()
         return checkButton
 
@@ -871,9 +879,19 @@ class ActionTabGUI(OptionGroupGUI):
                 table.show_all()
             vbox.pack_start(table, expand=False, fill=False)
 
+        autoEnableInfo = self.findAutoEnableInfo(switches)
         for switch in switches:
-            widget = self.createSwitchWidget(switch, optionGroup)
+            widget = self.createSwitchWidget(switch, optionGroup, autoEnableInfo)
             vbox.pack_start(widget, expand=False, fill=False)
+            
+    def findAutoEnableInfo(self, switches):
+        info = {}
+        for switch in switches:
+            if switch.autoEnable:
+                enabler = self.getOption(switch.autoEnable)
+                if enabler:
+                    info[enabler] = switch
+        return info
 
     def createResetButton(self):
         button = gtk.Button("Reset Tab")

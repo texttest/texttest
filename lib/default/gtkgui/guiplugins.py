@@ -253,6 +253,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         dialogTitle = "TextTest " + alarmLevel
         dialog = gtk.Dialog(dialogTitle, parent, flags=gtk.DIALOG_MODAL) 
         dialog.set_modal(True)
+        dialog.set_has_separator(False)
         
         contents = self.createDialogMessage(message, stockIcon)
         dialog.vbox.pack_start(contents, expand=True, fill=True)

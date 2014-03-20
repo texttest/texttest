@@ -74,17 +74,25 @@ class RunTest(plugins.Action):
         self.startTimer(timer)
     
     def runTest(self, test):
+        # If previous test (or test run) timed out, don't leave killSignal set, other tests can still run here
+        if self.killSignal == "timeout":
+            self.killSignal = None
+            if test in self.killedTests:
+                self.killedTests.remove(test)
+        
         self.describe(test)
-        machine = test.app.getRunMachine()
         self.changeToRunningState(test)
+
+        machine = test.app.getRunMachine()
+        killTimeout = test.getConfigValue("kill_timeout")
         for postfix in self.getTestRunPostfixes(test):
             if postfix:
                 test.notify("TestProcessComplete") # Checks for support processes like virtual displays, restarts if needed
 
             process = self.getTestProcess(test, machine, postfix)    
             self.registerProcess(test, process)
-            if test.getConfigValue("kill_timeout") and not test.app.isRecording() and not test.app.isActionReplay():
-                self.runMultiTimer(test.getConfigValue("kill_timeout"), self.kill, (test, "timeout"))
+            if killTimeout and not test.app.isRecording() and not test.app.isActionReplay():
+                self.runMultiTimer(killTimeout, self.kill, (test, "timeout"))
                 self.wait(process)
                 self.currentTimer.cancel()
                 self.currentTimer = None

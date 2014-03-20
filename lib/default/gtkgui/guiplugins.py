@@ -1130,12 +1130,22 @@ class ActionDialogGUI(OptionGroupGUI):
             if option.getValue():
                 fileChooser.set_filename(option.getValue())
             else:
-                files = os.listdir(startFolder)
-                if len(files) == 1:
-                    fileChooser.set_filename(os.path.join(startFolder, files[0]))
+                value = self.getDefaultFileChooserValue(startFolder)
+                if value:
+                    fileChooser.set_filename(value)
             
         fileChooser.set_local_only(True)
         return fileChooser
+        
+    def getDefaultFileChooserValue(self, startFolder):
+        appSuffices = [ "." + app.name for app in self.validApps ]
+        for f in sorted(os.listdir(startFolder)):
+            path = os.path.join(startFolder, f)
+            if not self.onlyDataFilesInFileChooser() or (os.path.isfile(path) and not any((suffix in f for suffix in appSuffices))):
+                return path
+            
+    def onlyDataFilesInFileChooser(self):
+        return False
 
     def getFilterFileDirs(self, allApps, **kw):
         if len(allApps) > 0:

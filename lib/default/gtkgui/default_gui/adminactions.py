@@ -456,6 +456,9 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         self.fileChooser = guiplugins.ActionDialogGUI.createFileChooser(self, *args)
         return self.fileChooser
 
+    def onlyDataFilesInFileChooser(self):
+        return True
+
     def createOptionWidget(self, option):
         box, entry = guiplugins.ActionDialogGUI.createOptionWidget(self, option)
         if option is self.optionGroup.getOption("javaclass"):

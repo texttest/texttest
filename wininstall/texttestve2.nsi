@@ -468,7 +468,7 @@ FunctionEnd
 
 Function installVirtualEnvOnPython
   Call checkPythonPath
-  ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO installing virtualenv on python & "$PYTHON_PATH"python virtualenv.py ${VIRTUAL_PYTHON} && EXIT'
+  ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO installing virtualenv on python & "$PYTHON_PATH"python virtualenv.py --distribute ${VIRTUAL_PYTHON} && EXIT'
 Functionend
 
 Function installVirtualEnvOnJython
@@ -480,7 +480,7 @@ Function installVirtualEnvOnJython
     IfFileExists "$VIRTUALENV_PATH\${VIRTUAL_JYTHON}" checkEmpty install
   install:
     ;ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO installing virtualenv on jython & "$PYTHON_PATH"python virtualenv.py -p $JYTHON_PATH\bin\jython.bat ${VIRTUAL_JYTHON} && EXIT'
-    ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO installing virtualenv on jython & $JYTHON_PATH\bin\jython virtualenv.py ${VIRTUAL_JYTHON} && EXIT'
+    ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO installing virtualenv on jython & $JYTHON_PATH\bin\jython virtualenv.py --distribute ${VIRTUAL_JYTHON} && EXIT'
 Functionend
 
 Function copyTexttestBin

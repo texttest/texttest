@@ -2519,6 +2519,8 @@ Version trunk
 Dynamic GUI Enhancements:
     - New "Generate test summary" in Actions menu
 	Essentially generates the batch report for the selected tests, writing to a user-selected file
+General GUI Enhancements:
+    - File choosers always pick a default choice, should be more sensible than the ones we had before
 Framework Enhancements:
     - "collate_file" now also finds files in $TEXTTEST_LOG_DIR if local sandbox is used
 	i.e. if "default_texttest_local_tmp" is set
@@ -2553,6 +2555,7 @@ Windows installer Enhancements:
     - All files now end up under chosen location, removed hardcoded C:\virtualenv and C:\jython2.5.1
     - StoryText is now upgraded properly when the installer is run for a second time after a new release
     - Should now work for wxPython applications without needing to hack by hand afterwards
+    - Now installing using --distribute as Jython and new versions of setuptools don't seem to get on
 Bug Fixes:
     - Fixed wildcards for stems in "file_split_pattern" list. Using fnmatch module instead of a hacked pattern matching.
     - Fixed wildcards for stems in knownbugs "search_file", now works also with new files
@@ -2574,3 +2577,5 @@ Bug Fixes:
     - Don't start subsequent processes if a test has been killed.
     - Failure information dialog has scrollbars if needed
     - Fixed bug with {CLEAR x} in options files clearing parts of what is matched
+    - Fixed Jenkins plugin bug where subprojects could try to use correct_hashes files from the main project under test
+

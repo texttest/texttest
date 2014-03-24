@@ -123,12 +123,12 @@ class FingerprintDifferenceFinder:
         self.jobRoot = jobRoot
         self.verifier = FingerprintVerifier(fileFinder, cacheDir) if fileFinder else None
                 
-    def findDifferences(self, jobName, build1, build2):
+    def findDifferences(self, jobName, build1, build2, verify):
         buildsDir = getBuildsDir(self.jobRoot, jobName)
         if not buildsDir:
             return []
-        fingerprint1 = self.getFingerprint(buildsDir, jobName, build1)
-        fingerprint2 = self.getAndWaitForFingerprint(buildsDir, jobName, build2)
+        fingerprint1 = self.getFingerprint(buildsDir, jobName, build1, verify)
+        fingerprint2 = self.getAndWaitForFingerprint(buildsDir, jobName, build2, verify)
         if not fingerprint1 or not fingerprint2:
             return []
         differences = []
@@ -138,7 +138,7 @@ class FingerprintDifferenceFinder:
             if isinstance(hash1, tuple):
                 hash1 = hash1[0]
             if hash1 != hash2:
-                if self.verifier:
+                if verify and self.verifier:
                     correctedHash = self.verifier.getCorrectedHash(buildsDir, build2, file2, hash2)
                     if correctedHash:
                         hash2 = correctedHash
@@ -174,8 +174,8 @@ class FingerprintDifferenceFinder:
         print "Giving up waiting for fingerprints."
         raise JobStillRunningException()
     
-    def getFingerprint(self, buildsDir, jobName, buildName):
-        if self.verifier:
+    def getFingerprint(self, buildsDir, jobName, buildName, verify):
+        if verify and self.verifier:
             cached = self.verifier.getCachedFingerprint(buildName)
             if cached:
                 return cached
@@ -349,7 +349,7 @@ class ChangeFinder:
     
     def findChanges(self, build1, build2):
         try:
-            markedChanges, projectChanges = self.getChangesRecursively(self.jobName, build1, build2)
+            markedChanges, projectChanges = self.getChangesRecursively(self.jobName, build1, build2, verify=True)
         except AbortedException, e:
             # If it was aborted, say this
             return [(str(e), "", [])]
@@ -359,16 +359,16 @@ class ChangeFinder:
         changesFromMarking = [ self.getMarkChangeText(artefact, projectName, build1, build2) for artefact, projectName in markedChanges ]
         return changesFromMarking + changesFromProjects
     
-    def getChangesRecursively(self, jobName, build1, build2):
+    def getChangesRecursively(self, jobName, build1, build2, verify):
         # Find what artefacts have changed between times build
-        differences = self.diffFinder.findDifferences(jobName, build1, build2)
+        differences = self.diffFinder.findDifferences(jobName, build1, build2, verify)
         # Organise them by project
         markedChanges, differencesByProject = self.organiseByProject(differences)
         # For each project, find out which builds were affected
         projectChanges, recursiveChanges = self.getProjectChanges(differencesByProject)
         for subProj, subBuild1, subBuild2 in recursiveChanges:
             if subProj != jobName:
-                subMarkedChanges, subProjectChanges = self.getChangesRecursively(subProj, subBuild1, subBuild2)
+                subMarkedChanges, subProjectChanges = self.getChangesRecursively(subProj, subBuild1, subBuild2, verify=False)
                 for subMarkChange in subMarkedChanges:
                     if subMarkChange not in markedChanges:
                         markedChanges.append(subMarkChange)
@@ -469,5 +469,5 @@ if __name__ == "__main__":
     else:
         prevBuildName = str(int(buildName) - 1)
     pprint(getChanges(prevBuildName, buildName, parseEnvAsDict("BUG_SYSTEM_DATA"), parseEnvAsList("MARKED_ARTEFACTS"), 
-                      os.getenv("FILE_FINDER", ""), os.getcwd()))
+                      os.getenv("FILE_FINDER", ""), os.getenv("CACHE_DIRECTORY", os.getcwd())))
     

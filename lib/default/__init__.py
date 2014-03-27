@@ -1285,7 +1285,7 @@ class Config:
         
     def defaultViewProgram(self, homeOS):
         if os.name == "posix":
-            return "emacs"
+            return os.getenv("EDITOR", "emacs")
         else:
             if homeOS == "posix":
                 # Notepad cannot handle UNIX line-endings: for cross platform suites use wordpad by default...

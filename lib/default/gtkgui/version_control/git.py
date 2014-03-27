@@ -7,12 +7,13 @@ class GitInterface(vcs_independent.VersionControlInterface):
         self.allStateInfo = { "C": "Copied", "U": "Unmerged" } # "!!" for ignored files is only available on git versions < 1.7.4
         self.allStateInfo.update(self.warningStateInfo)
         self.allStateInfo.update(self.errorStateInfo)
+        self.vcsDirectory = os.path.dirname(controlDir)
         vcs_independent.VersionControlInterface.__init__(self, controlDir, "Git",
                                                          self.warningStateInfo.values(), self.errorStateInfo.values(), "HEAD")
         self.defaultArgs["rm"] = [ "--force", "-r" ]
         self.defaultArgs["status"] = [ "--porcelain" ] # Would like to use --ignored but it is not available on git versions < 1.7.4
         self.defaultArgs["log"] = [ "-p", "--follow" ]
-        
+
     def getDateFromLog(self, output):
         for line in output.splitlines():
             if line.startswith("Date:"):
@@ -32,6 +33,26 @@ class GitInterface(vcs_independent.VersionControlInterface):
             return self.allStateInfo.get(statusLetter, statusLetter)
         else:
             return "Unchanged"
+
+    def getFileNames(self, fileArg, recursive, forStatus=False, **kwargs):
+        # Git handles ignored files different. We have to remove all ignored files to avoid doing status on them
+        fileNames = vcs_independent.VersionControlInterface.getFileNames(self, fileArg, recursive, **kwargs)
+        if not forStatus:
+            return fileNames
+        
+        ignored = self.getIgnoredFiles(fileArg)
+        return [f for f in fileNames if self.makeRelPath(f) not in ignored]
+
+    def getIgnoredFiles(self, path):
+        _, stdout,_ = self.getProcessResults(["git", "ls-files", "--other", "-i", "--exclude-standard",  path])
+        return stdout.split()
+
+    def makeRelPath(self, arg):
+        if os.path.isabs(arg):
+            relpath = plugins.relpath(arg, self.vcsDirectory)
+            if relpath:
+                return relpath
+        return arg
 
     def getCombinedRevisionOptions(self, r1, r2):
         return [ r1 + ".." + r2, "--" ]

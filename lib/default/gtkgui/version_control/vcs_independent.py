@@ -24,7 +24,7 @@ class VersionControlInterface:
 
     def isVersionControlled(self, path):
         basicArgs = self.getCmdArgs("status")
-        for file in self.getFileNames(path, recursive=True):
+        for file in self.getFileNames(path, recursive=True, forStatus=True):
             status = self.getFileStatus(basicArgs, file)
             if status != "Unknown" and status != "Ignored":
                 return True
@@ -61,9 +61,9 @@ class VersionControlInterface:
         if cmdName == "add" and recursive: # assume VCS adds recursively by default, override for CVS
             return [ fileArg ]
         else:
-            return self.getFileNames(fileArg, recursive)
+            return self.getFileNames(fileArg, recursive, forStatus=cmdName == "status")
 
-    def getFileNames(self, fileArg, recursive, includeDirs=False):
+    def getFileNames(self, fileArg, recursive, includeDirs=False, **kw):
         if os.path.isfile(fileArg):
             return [ fileArg ]
         elif os.path.isdir(fileArg):
@@ -75,6 +75,8 @@ class VersionControlInterface:
                 return baseFiles + self.getFilesFromDirRecursive(fileArg, includeDirs)
             else:
                 return baseFiles + self.getFilesFromDir(fileArg)
+        else:
+            return []
             
     def getFilesFromDir(self, dirName):
         files = []

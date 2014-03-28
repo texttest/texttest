@@ -44,6 +44,8 @@ class GitInterface(vcs_independent.VersionControlInterface):
         return [f for f in fileNames if self.makeRelPath(f) not in ignored]
 
     def getIgnoredFiles(self, path):
+        if not os.path.isdir(path):
+            return []
         _, stdout,_ = self.getProcessResults(["git", "ls-files", "--other", "-i", "--exclude-standard",  path])
         return stdout.split()
 
@@ -53,6 +55,13 @@ class GitInterface(vcs_independent.VersionControlInterface):
             if relpath:
                 return relpath
         return arg
+        
+    def getProcessResults(self, args, cwd=None, **kwargs):
+        workingDir = cwd if cwd else self.vcsDirectory
+        return vcs_independent.VersionControlInterface.getProcessResults(self, args, cwd=workingDir, **kwargs)
+    
+    def callProgram(self, cmdName, fileArgs=[], **kwargs):
+        return vcs_independent.VersionControlInterface.callProgram(self, cmdName, fileArgs, cwd=self.vcsDirectory, **kwargs)
 
     def getCombinedRevisionOptions(self, r1, r2):
         return [ r1 + ".." + r2, "--" ]

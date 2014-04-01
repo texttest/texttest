@@ -55,13 +55,16 @@ class BugSystemBug(Bug):
         location = test.getCompositeConfigValue("bug_system_location", self.bugSystem)
         username = test.getCompositeConfigValue("bug_system_username", self.bugSystem)
         password = test.getCompositeConfigValue("bug_system_password", self.bugSystem)
-        exec "from " + self.bugSystem + " import findBugInfo as _findBugInfo"
-        status, bugText, isResolved = _findBugInfo(self.bugId, location, username, password) #@UndefinedVariable
+        status, bugText, isResolved, bugId = self.findBugInfo(self.bugId, location, username, password)
+        self.bugId = bugId
         category = self.findCategory(isResolved)
         briefText = "bug " + self.bugId + " (" + status + ")"
         return category, briefText, self.getRerunText() + bugText
 
-    
+    def findBugInfo(self, bugId, location, username, password):
+        exec "from " + self.bugSystem + " import findBugInfo as _findBugInfo"
+        return _findBugInfo(self.bugId, location, username, password) #@UndefinedVariable
+
 class UnreportedBug(Bug):
     def __init__(self, fullText, briefText, internalError, priorityStr, *args):
         self.fullText = fullText

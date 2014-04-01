@@ -15,14 +15,14 @@ def findBugInfo(bugId, location, *args):
         message = "Failed to open URL '" + bugzillaRequest + "': " + str(e) + \
                   ".\n\nPlease make sure that the configuration entry 'bug_system_location' " + \
                   "points to the correct script to run to extract bugzilla information. The current value is '" + location + "'."
-        return "BAD SCRIPT", message, False
+        return "BAD SCRIPT", message, False, bugId
 
     if len(reply) == 1 and reply[0] == "":
         message = "Bug " + bugId + " could not be found in the Bugzilla version 2 instance at " + location + "."
-        return "NONEXISTENT", message, False
+        return "NONEXISTENT", message, False, bugId
     elif len(reply) < 8:
         message = "Could not parse reply from Bugzilla's cli.cgi script, maybe incompatible interface (this only works on version 2). Text of reply follows : \n" + reply[0]
-        return "BAD SCRIPT", message, False
+        return "BAD SCRIPT", message, False, bugId
 
     status = reply[4]
     bugText = "******************************************************\n" + \
@@ -33,4 +33,4 @@ def findBugInfo(bugId, location, *args):
            "Summary: " + reply[2] + "\n" + \
            "Description:\n" + reply[7] + "\n" + \
            "******************************************************"
-    return status, bugText, status == "RESOLVED" or status == "CLOSED"
+    return status, bugText, status == "RESOLVED" or status == "CLOSED", bugId

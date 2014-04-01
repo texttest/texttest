@@ -24,7 +24,7 @@
  'votes': '0'}
 """
 
-import xmlrpclib, re
+import xmlrpclib, re, urllib
 from ordereddict import OrderedDict
 
 def convertToString(value):
@@ -84,7 +84,7 @@ def filterReply(bugInfo, statuses, resolutions):
 def makeURL(location, bugText):
     return location + "/browse/" + bugText
     
-def parseReply(bugInfo, statuses, resolutions, location):
+def parseReply(bugInfo, statuses, resolutions, location, id):
     try:
         newBugInfo = filterReply(bugInfo, statuses, resolutions)
         ruler = "*" * 50 + "\n"
@@ -97,10 +97,10 @@ def parseReply(bugInfo, statuses, resolutions, location):
         message += convertToString(bugInfo.get("description", ""))
         isResolved = newBugInfo.has_key("resolution")
         statusText = newBugInfo["resolution"].strip() if isResolved else newBugInfo['status']
-        return statusText, message, isResolved
+        return statusText, message, isResolved, id
     except (IndexError, KeyError):
         message = "Could not parse reply from Jira's web service, maybe incompatible interface. Text of reply follows : \n" + str(bugInfo)
-        return "BAD SCRIPT", message, False
+        return "BAD SCRIPT", message, False, id
     
 def findBugInfo(bugId, location, username, password):
     scriptLocation = location + "/rpc/xmlrpc"
@@ -108,10 +108,10 @@ def findBugInfo(bugId, location, username, password):
     try:
         auth = proxy.jira1.login(username, password)
     except xmlrpclib.Fault, e:
-        return "LOGIN FAILED", e.faultString, False
+        return "LOGIN FAILED", e.faultString, False, bugId
     except Exception, e:
         message = "Failed to log in to '" + scriptLocation + "': " + str(e) + ".\n\nPlease make sure that the configuration entry 'bug_system_location' points to a correct location of a Jira version 3.x installation. The current value is '" + location + "'."
-        return "BAD SCRIPT", message, False
+        return "BAD SCRIPT", message, False, bugId
 
     try:
         bugInfo = proxy.jira1.getIssue(auth, bugId)
@@ -120,12 +120,27 @@ def findBugInfo(bugId, location, username, password):
             resolutions = proxy.jira1.getResolutions(auth)
         else:
             resolutions = []
-        return parseReply(bugInfo, statuses, resolutions, location)
+        return parseReply(bugInfo, statuses, resolutions, location, bugId)
     except xmlrpclib.Fault, e:
-        return "NONEXISTENT", e.faultString, False
+        renamedBug = getRenamedBug(bugId, location)
+        if renamedBug:
+            return findBugInfo(renamedBug, location, username, password)
+        else:
+            return "NONEXISTENT", e.faultString, True, bugId
     except Exception, e:
         message = "Failed to fetch data from '" + scriptLocation + "': " + str(e)
-        return "BAD SCRIPT", message, False
+        return "BAD SCRIPT", message, False, bugId
+
+def getRenamedBug(bugId, location):
+    try:
+        url = urllib.urlopen(makeURL(location, bugId))
+    except IOError:
+        return None
+    bugs = getBugsFromText(urllib.url2pathname(url.geturl()), "")
+    if len(bugs) == 1:
+        renamed, _ = bugs[0]
+        if renamed != bugId:
+            return renamed
 
 # Used by Jenkins plugin
 def getBugsFromText(text, location):

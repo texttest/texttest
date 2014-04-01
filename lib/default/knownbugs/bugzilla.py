@@ -26,7 +26,7 @@ def filterInternals(internals, alreadyMentioned):
 def isResolved(status):
     return status == "RESOLVED" or status == "CLOSED"
 
-def parseReply(reply, location):
+def parseReply(reply, location, id):
     try:
         bugInfo = reply["bugs"][0]
         internals = bugInfo["internals"] # This is marked unstable: we won't rely on its contents containing anything in particular
@@ -40,18 +40,18 @@ def parseReply(reply, location):
             message += fieldName + ": " + str(value) + "\n"
         message += ruler
         message += "\nView bug " + str(bugId) + " using bugzilla URL=" + location + "/show_bug.cgi?id=" + str(bugId) + "\n"
-        return status, message, isResolved(status)
+        return status, message, isResolved(status), id
     except (IndexError, KeyError):
         message = "Could not parse reply from bugzilla's web service, maybe incompatible interface. Text of reply follows : \n" + str(reply)
-        return "BAD SCRIPT", message, False
+        return "BAD SCRIPT", message, False, id
     
 def findBugInfo(bugId, location, *args):
     scriptLocation = location + "/xmlrpc.cgi"
     proxy = xmlrpclib.ServerProxy(scriptLocation)
     try:
-        return parseReply(proxy.Bug.get_bugs({ "ids" : [ bugId ]}), location)
+        return parseReply(proxy.Bug.get_bugs({ "ids" : [ bugId ]}), location, bugId)
     except xmlrpclib.Fault, e:
-        return "NONEXISTENT", e.faultString, False
+        return "NONEXISTENT", e.faultString, False, bugId
     except Exception, e:
         message = "Failed to communicate with '" + scriptLocation + "': " + str(e) + ".\n\nPlease make sure that the configuration entry 'bug_system_location' points to a correct location of a Bugzilla version 3.x installation. The current value is '" + location + "'."
-        return "BAD SCRIPT", message, False
+        return "BAD SCRIPT", message, False, bugId

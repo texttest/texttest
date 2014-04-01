@@ -15,12 +15,12 @@ def findBugInfo(bugId, location, *args):
                   ".\n\nPlease make sure that bug " + bugId + " exists\n" + \
                   "and that the configuration entry 'bug_system_location' " + \
                   "points to the correct trac instance.\nThe current value is '" + location + "'."
-        return "NONEXISTENT", message, False
+        return "NONEXISTENT", message, False, bugId
     keys = reply[0].split('\t')
     values = ("".join(reply[1:])).split('\t')
     if len(keys) == 1 or len(keys) > len(values):
         message = "Could not parse reply from trac, maybe incompatible interface."
-        return "BAD SCRIPT", message, False
+        return "BAD SCRIPT", message, False, bugId
     info = {'status': '', 'description': '', 'reporter': '', 'resolution': '', 'component': '', 'summary': '',
             'priority': '', 'version': '', 'milestone': '', 'owner': '', 'type': ''}
     for k, v in zip(keys, values):
@@ -33,7 +33,7 @@ def findBugInfo(bugId, location, *args):
            "Component: %s Version: %s\n" % (info['component'], info['version']) + \
            "Description:\n" + info['description'] + "\n" + \
            "******************************************************"
-    return info['status'], bugText, info['status'] == "closed"
+    return info['status'], bugText, info['status'] == "closed", bugId
 
 if __name__ == "__main__": # pragma: no cover - test code
     import sys

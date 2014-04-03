@@ -2532,6 +2532,7 @@ Framework Enhancements:
 	This is a backwards-incompatible change, see migration notes.
     - Autogenerates CLASSPATH for StoryText/Eclipse applications
 	mirroring changes in latest StoryText
+    - "Knownbugs" functionality in Jira can now handle bugs that have been moved or renamed.
 Version Control Browser Enhancements:
     - Now supports Git
     - "Update" operation is now always a "centralised-style" update
@@ -2578,4 +2579,7 @@ Bug Fixes:
     - Failure information dialog has scrollbars if needed
     - Fixed bug with {CLEAR x} in options files clearing parts of what is matched
     - Fixed Jenkins plugin bug where subprojects could try to use correct_hashes files from the main project under test
+    - Using now EDITOR environment variable to determine default editor
+    - Overriding environment variables through 'Temporary Settings' in Running.Advanced tab works now
+    - Non existing bugs in Jira are handled now as internal errors.
 

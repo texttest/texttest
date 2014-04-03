@@ -474,9 +474,8 @@ class Test(plugins.Observable):
 
     def getDirCachesToRoot(self, configName):
         fromTests = [ test.dircache for test in self.getAllTestsToRoot() ]
-        dirCaches = self.app.getExtraDirCaches(configName, envMapping=self.environment) + fromTests
-        return dirCaches
-
+        return self.app.getAllDirCaches(configName, fromTests, envMapping=self.environment)
+        
     def getAllFileNames(self, stem, refVersion = None):
         self.diagnose("Getting file from " + stem)
         appToUse = self.app
@@ -1434,7 +1433,7 @@ class Application(object):
         if os.path.isdir(appPath):
             return DirectoryCache(appPath)
 
-    def getExtraDirCaches(self, fileName, includeRoot=False, **kwargs):
+    def getAllDirCaches(self, fileName, caches, includeRoot=False, **kwargs):
         dirCacheNames = self.getCompositeConfigValue("extra_search_directory", fileName, **kwargs)
         dirCacheNames.reverse() # lowest-priority comes first, so it can be overridden
         if includeRoot:
@@ -1452,6 +1451,7 @@ class Application(object):
                     dirCaches.append(dirCache)
                 else:
                     self.extraDirCaches[dirName] = None # don't look for it again
+        dirCaches += caches
         if "td" in self.inputOptions:
             dirCaches.append(DirectoryCache(self.inputOptions["td"]))
         return dirCaches
@@ -1516,7 +1516,7 @@ class Application(object):
         prevFiles = []
         dependentsSetUp = False
         while True:
-            dircaches = self.getExtraDirCaches("config") + [ self.dircache ]
+            dircaches = self.getAllDirCaches("config", [ self.dircache ])
             allFiles = self.getAllFileNames(dircaches, "config")
             if len(allFiles) == len(prevFiles):
                 if configModuleInitialised and not dependentsSetUp and self.configObject.setDependentConfigDefaults(self):
@@ -1563,8 +1563,7 @@ class Application(object):
 
         dirCaches = []
         dirCaches += self.defaultDirCaches
-        dirCaches += self.getExtraDirCaches(fileName, includeRoot=True)
-        dirCaches.append(self.dircache)
+        dirCaches += self.getAllDirCaches(fileName, [ self.dircache ], includeRoot=True)
         configPath = self.getFileNameFromCaches(dirCaches, fileName)
         if not configPath:
             raise BadConfigError, "Cannot find file '" + fileName + "' to import config file settings from"

@@ -2,11 +2,14 @@
 import local, plugins, os, sys
 
 class QueueSystem(local.QueueSystem):
+    instanceTypeInfo = { "xlarge" : 4, "large" : 2, "medium" : 1 }
     def __init__(self, app):
         local.QueueSystem.__init__(self)
         self.nextMachineIndex = 0
+        self.nextCoreIndex = 0
         self.app = app
         self.machines = self.findMachines()
+        self.capacity = sum((c for m, c in self.machines))
         self.remoteProcessInfo = {}
         
     def findMachines(self):
@@ -29,18 +32,24 @@ class QueueSystem(local.QueueSystem):
         for inst in conn.get_only_instances():
             tag = inst.tags.get("Name", "")
             if "texttest" in tag:
-                idToIp[inst.id] = inst.private_ip_address
+                idToIp[inst.id] = inst.private_ip_address, inst.instance_type.split(".")[-1]
         return idToIp
+    
+    def getSortKey(self, info):
+        cores = self.instanceTypeInfo.get(info[1], 0)
+        return -cores, info[0]
     
     def filterOnStatus(self, conn, idToIp):
         machines = []
         for stat in conn.get_all_instance_status(idToIp.keys()):
             if stat.instance_status.status == "ok":
                 machines.append(idToIp.get(stat.id))
-        return sorted(machines)
+                
+        machines.sort(key=self.getSortKey)
+        return [ (m, self.instanceTypeInfo.get(instanceType, 1)) for m, instanceType in machines ]
                     
     def getCapacity(self):
-        return len(self.machines)
+        return self.capacity
     
     def slavesOnRemoteSystem(self):
         return True
@@ -103,16 +112,22 @@ class QueueSystem(local.QueueSystem):
             local.QueueSystem.sendSignal(self, process, sig)
         
     def submitSlaveJob(self, cmdArgs, *args):
-        ip = self.machines[self.nextMachineIndex]
-        machine = "ec2-user@" + ip
-        self.nextMachineIndex += 1
+        ip, cores = self.machines[self.nextMachineIndex]
+        firstSlaveOnMachine = self.nextCoreIndex == 0
+        self.nextCoreIndex += 1
+        if self.nextCoreIndex >= cores:
+            self.nextCoreIndex = 0
+            self.nextMachineIndex += 1
         if self.nextMachineIndex == len(self.machines):
             self.nextMachineIndex = 0
-        try:
-            self.synchroniseMachine(machine)
-        except plugins.TextTestError, e:
-            errorMsg = "Failed to synchronise files with EC2 instance with private IP address '" + ip + "'\n" + str(e) + "\n"
-            return None, errorMsg
+
+        machine = "ec2-user@" + ip
+        if firstSlaveOnMachine:
+            try:
+                self.synchroniseMachine(machine)
+            except plugins.TextTestError, e:
+                errorMsg = "Failed to synchronise files with EC2 instance with private IP address '" + ip + "'\n" + str(e) + "\n"
+                return None, errorMsg
         
         ipAddress = self.getArg(cmdArgs, "-servaddr").split(":")[0]
         fileArgs = [ "-slavefilesynch", os.getenv("USER") + "@" + ipAddress ]

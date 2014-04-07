@@ -58,6 +58,18 @@ class QueueSystem(local.QueueSystem):
         dirName = os.path.dirname(path)
         return self.app.copyFileRemotely(path, "localhost", dirName, machine)
     
+    @staticmethod
+    def findEggLinkedDirectories(checkout):
+        # "Egg-links" are something found in Python virtual environments
+        # They are a sort of portable symbolic link, but of course tools like rsync don't understand them
+        eggLinkDirs = []
+        for root, _, files in os.walk(checkout):
+            for f in files:
+                if f.endswith(".egg-link"):
+                    path = os.path.join(root, f)
+                    eggLinkDirs.append(open(path).read().splitlines()[0].strip())
+        return eggLinkDirs
+    
     def getDirectoriesForSynch(self):
         dirs = []
         for i, instRoot in enumerate(plugins.installationRoots):
@@ -68,6 +80,7 @@ class QueueSystem(local.QueueSystem):
         checkout = self.app.checkout
         if checkout and not checkout.startswith(appDir):
             dirs.append(checkout)
+            dirs += self.findEggLinkedDirectories(checkout)
         return dirs
 
     def getParents(self, dirs):

@@ -1343,10 +1343,13 @@ class Config:
             return cmdArgs
         else:
             args = self.getRemoteProgramArgs(app, "remote_shell_program")
-            if graphical and args[0] == "ssh":
-                args.append("-Y")
-            if agentForwarding and args[0] == "ssh":
-                args.append("-A") 
+            if args[0] == "ssh":
+                if graphical:
+                    args.append("-Y")
+                else:
+                    args.append("-x")
+                if agentForwarding:
+                    args.append("-A") 
 
             args.append(machine)
             if graphical and args[0] == "rsh":

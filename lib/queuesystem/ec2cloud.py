@@ -58,17 +58,40 @@ class QueueSystem(local.QueueSystem):
         dirName = os.path.dirname(path)
         return self.app.copyFileRemotely(path, "localhost", dirName, machine)
     
-    @staticmethod
-    def findEggLinkedDirectories(checkout):
+    @classmethod
+    def findSetUpDirectory(cls, dir):
+        # Egg-link points at the Python package code, which may not be all of the checkout
+        # Assume the setup.py is where it all starts
+        while not os.path.isfile(os.path.join(dir, "setup.py")):
+            newDir = os.path.dirname(dir)
+            if newDir == dir:
+                return
+            else:
+                dir = newDir
+        return dir 
+    
+    @classmethod
+    def findVirtualEnvLinkedDirectories(cls, checkout):
         # "Egg-links" are something found in Python virtual environments
         # They are a sort of portable symbolic link, but of course tools like rsync don't understand them
-        eggLinkDirs = []
+        # Virtual environments can also point out another environment they were created from, which we may also need to copy
+        linkedDirs = []
+        realPythonPrefix = sys.real_prefix if hasattr(sys, "real_prefix") else sys.prefix
         for root, _, files in os.walk(checkout):
             for f in files:
                 if f.endswith(".egg-link"):
                     path = os.path.join(root, f)
-                    eggLinkDirs.append(open(path).read().splitlines()[0].strip())
-        return eggLinkDirs
+                    newDir = open(path).read().splitlines()[0].strip()
+                    setupDir = cls.findSetUpDirectory(newDir)
+                    if setupDir and setupDir not in linkedDirs:
+                        linkedDirs.append(setupDir)
+                elif f == "orig-prefix.txt":
+                    path = os.path.join(root, f)
+                    newDir = open(path).read().strip()
+                    # Don't try to synch the system Python!
+                    if newDir != realPythonPrefix and newDir not in linkedDirs:
+                        linkedDirs.append(newDir)
+        return linkedDirs
     
     def getDirectoriesForSynch(self):
         dirs = []
@@ -80,7 +103,7 @@ class QueueSystem(local.QueueSystem):
         checkout = self.app.checkout
         if checkout and not checkout.startswith(appDir):
             dirs.append(checkout)
-            dirs += self.findEggLinkedDirectories(checkout)
+            dirs += self.findVirtualEnvLinkedDirectories(checkout)
         return dirs
 
     def getParents(self, dirs):

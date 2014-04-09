@@ -172,17 +172,17 @@ class QueueSystemConfig(default.Config):
                 plugins.removePath(fullPath)
                 
     def cleanEmptyDirectories(self, path):
-        # Swiped from http://dev.enekoalonso.com/2011/08/06/python-script-remove-empty-folders/ (first comment)
         files = os.listdir(path)
-        foundFiles = False
-        if len(files):
-            for f in files:
-                fullpath = os.path.join(path, f)
-                if os.path.isdir(fullpath):
-                    foundFiles |= self.cleanEmptyDirectories(fullpath)
-                else:
-                    foundFiles = True
-            
+        subdirs = []
+        for f in files:
+            fullpath = os.path.join(path, f)
+            if os.path.isdir(fullpath):
+                subdirs.append(fullpath)
+        foundFiles = len(subdirs) != len(files)
+        if not foundFiles:
+            for subdir in subdirs:
+                foundFiles |= self.cleanEmptyDirectories(subdir)
+                
         if not foundFiles:
             os.rmdir(path)
         return foundFiles

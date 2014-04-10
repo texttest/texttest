@@ -90,13 +90,20 @@ class PrepareWriteDirectory(plugins.Action):
         for configName in test.getConfigValue(configListName, expandVars=False):
             self.collatePath(test, configName, *args, **kwargs)
 
+    def handleNoTestData(self, test, configName):
+        if configName in test.getConfigValue("test_data_require"):
+            raise plugins.TextTestError, "No data source found for required test data '" + configName + "'"
+
     def collatePath(self, test, configName, collateMethod, remoteCopy, mergeData=False):
         targetPath = self.getTargetPath(test, configName)
         sourceFileName = self.getSourceFileName(configName, test)
         if not targetPath or not sourceFileName: # Can happen with e.g. empty environment
+            self.handleNoTestData(test, configName)
             return
         plugins.ensureDirExistsForFile(targetPath)
         sourcePaths = self.getSourcePaths(test, configName, sourceFileName)
+        if len(sourcePaths) == 0:
+            self.handleNoTestData(test, configName)
         for sourcePath in self.getSortedSourcePaths(sourcePaths, mergeData):
             self.diag.info("Collating " + configName + " from " + repr(sourcePath) +
                            "\nto " + repr(targetPath))

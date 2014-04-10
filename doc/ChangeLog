@@ -2522,6 +2522,8 @@ Dynamic GUI Enhancements:
 General GUI Enhancements:
     - File choosers always pick a default choice, should be more sensible than the ones we had before
 Framework Enhancements:
+    - "test_data_require" added
+	Allow specifying that certain types of test data must be present. See website
     - "collate_file" now also finds files in $TEXTTEST_LOG_DIR if local sandbox is used
 	i.e. if "default_texttest_local_tmp" is set
     - New option for discarding files, "discard_file_text"
@@ -2582,4 +2584,4 @@ Bug Fixes:
     - Using now EDITOR environment variable to determine default editor
     - Overriding environment variables through 'Temporary Settings' in Running.Advanced tab works now
     - Non existing bugs in Jira are handled now as internal errors.
-
+    - Forbidden "/" in -v arguments. Did not work, was not intended to be supported.

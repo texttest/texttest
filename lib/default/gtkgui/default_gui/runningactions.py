@@ -478,6 +478,21 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
         guiplugins.ActionDialogGUI.__init__(self, allApps)
         RunningAction.__init__(self, allApps, inputOptions)
 
+    def updateOptions(self):
+        checkout = []        
+        for app in self.currAppSelection:
+            path = app.getGivenCheckoutPath(app)
+            if path:
+                checkout.append(path)
+        if checkout:
+            self.fixCheckout(",".join(checkout))
+            
+    def fixCheckout(self, checkout):
+        for group in self.optionGroups:
+            if group.name == "Basic":
+                group.setValue("c", checkout)
+                return
+        
     def _getTitle(self):
         return "_Rerun"
 

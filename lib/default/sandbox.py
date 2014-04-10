@@ -90,25 +90,33 @@ class PrepareWriteDirectory(plugins.Action):
         for configName in test.getConfigValue(configListName, expandVars=False):
             self.collatePath(test, configName, *args, **kwargs)
 
-    def handleNoTestData(self, test, configName):
-        if configName in test.getConfigValue("test_data_require"):
-            raise plugins.TextTestError, "No data source found for required test data '" + configName + "'"
+    def handleNoTestData(self, test, configName, sourcePaths):
+        if configName in test.getConfigValue("test_data_require", expandVars=False):
+            msg = "No data source found for required test data '" + configName + "'"
+            if sourcePaths:
+                msg += "\nNo such file or directory : " + ", ".join(sourcePaths)
+            raise plugins.TextTestError, msg
 
     def collatePath(self, test, configName, collateMethod, remoteCopy, mergeData=False):
         targetPath = self.getTargetPath(test, configName)
         sourceFileName = self.getSourceFileName(configName, test)
         if not targetPath or not sourceFileName: # Can happen with e.g. empty environment
-            self.handleNoTestData(test, configName)
+            self.handleNoTestData(test, configName, [])
             return
         plugins.ensureDirExistsForFile(targetPath)
         sourcePaths = self.getSourcePaths(test, configName, sourceFileName)
-        if len(sourcePaths) == 0:
-            self.handleNoTestData(test, configName)
+        collated = False
         for sourcePath in self.getSortedSourcePaths(sourcePaths, mergeData):
-            self.diag.info("Collating " + configName + " from " + repr(sourcePath) +
-                           "\nto " + repr(targetPath))
-            collateMethod(test, sourcePath, targetPath)
+            if os.path.exists(sourcePath):
+                self.diag.info("Collating " + configName + " from " + repr(sourcePath) +
+                               "\nto " + repr(targetPath))
+                collateMethod(test, sourcePath, targetPath)
+                collated = True
 
+        if not collated:
+            self.diag.info("No test data present in " + repr(sourcePaths))
+            self.handleNoTestData(test, configName, sourcePaths)
+        
         if remoteCopy and targetPath:
             remoteCopy(targetPath)
             
@@ -239,15 +247,16 @@ class PrepareWriteDirectory(plugins.Action):
         # Basic aim is to keep the permission bits and times where possible, but ensure it is writeable
         shutil.copy2(srcname, dstname)
         plugins.makeWriteable(dstname)
+    
     def linkTestPath(self, test, fullPath, target):
         # Linking doesn't exist on windows!
         if os.name != "posix":
             return self.copyTestPath(test, fullPath, target)
-        if os.path.exists(fullPath):
-            if not os.path.exists(target):
-                os.symlink(fullPath, target)
-            else: #pragma : no cover
-                raise plugins.TextTestError, "File already existed at " + target + "\nTrying to link to " + fullPath
+        if not os.path.exists(target):
+            os.symlink(fullPath, target)
+        else: #pragma : no cover
+            raise plugins.TextTestError, "File already existed at " + target + "\nTrying to link to " + fullPath
+    
     def partialCopyTestPath(self, test, sourcePath, targetPath):
         # Linking doesn't exist on windows!
         if os.name != "posix":
@@ -258,7 +267,7 @@ class PrepareWriteDirectory(plugins.Action):
             self.copyTestPath(test, sourcePath, targetPath)
         elif not modifiedPaths.has_key(sourcePath):
             self.linkTestPath(test, sourcePath, targetPath)
-        elif os.path.exists(sourcePath):
+        else:
             os.mkdir(targetPath)
             self.diag.info("Copying/linking for Test " + repr(test))
             writeDirs = self.copyAndLink(sourcePath, targetPath, modifiedPaths)
@@ -270,6 +279,7 @@ class PrepareWriteDirectory(plugins.Action):
                     # Don't link locally - and it's possible to have the same name twice under different paths
                     os.symlink(writeDir, linkTarget)
             self.copytimes(sourcePath, targetPath)
+            
     def copyAndLink(self, sourcePath, targetPath, modifiedPaths):
         writeDirs = []
         self.diag.info("Copying/linking from " + sourcePath)

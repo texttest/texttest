@@ -1957,6 +1957,8 @@ class OptionFinder(plugins.OptionFinder):
     def findVersionList(self):
         versionList = []
         versionStr = self.get("v", "") or ""
+        if "/" in versionStr or "\\" in versionStr:
+            raise plugins.TextTestError, "Fatal Error: Version argument '" + versionStr + "' contains path separators, which is not allowed."
         for version in plugins.commasplit(versionStr):
             if version in versionList:
                 plugins.printWarning("Same version '" + version + "' requested more than once, ignoring.", stdout=True)

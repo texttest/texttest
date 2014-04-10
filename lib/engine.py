@@ -200,6 +200,7 @@ class TextTest(plugins.Responder, plugins.Observable):
 
     def compareApps(self, app1, app2):
         return cmp(app1.name, app2.name)
+    
     def findAppsUnder(self, dirName, selectedAppDict, ignoreNames):
         appList = []
         raisedError = False
@@ -347,6 +348,9 @@ class TextTest(plugins.Responder, plugins.Observable):
         try:
             self._run()
             sys.exit(self.exitCode)
+        except plugins.TextTestError, e:
+            sys.stderr.write(str(e) + "\n")
+            sys.exit(1)
         except KeyboardInterrupt:
             pass # already written about this
 
@@ -387,21 +391,10 @@ class TextTest(plugins.Responder, plugins.Observable):
         return validOptions
                                  
     def createAndRunSuites(self, allApps):
-        try:
-            self.createResponders(allApps)
-        except plugins.TextTestError, e:
-            # Responder class-level errors are basically fatal : there is no point running without them (cannot
-            # do anything about them) and no way to get partial errors.
-            self.exitCode = 1
-            return sys.stderr.write(str(e) + "\n")
-        
+        self.createResponders(allApps)
         raisedError, self.appSuites = self.createTestSuites(allApps)
         if not raisedError or len(self.appSuites) > 0:
-            try:
-                self.addSuites(self.appSuites.values())
-            except plugins.TextTestError, e:
-                # addSuites errors are fatal for the same reasons
-                return sys.stderr.write(str(e) + "\n")
+            self.addSuites(self.appSuites.values())
             
             # Set the signal handlers to use when running, if we actually plan to do any
             self.setSignalHandlers(self.handleSignal)

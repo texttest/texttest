@@ -58,10 +58,15 @@ class FileTransferResponder(plugins.Responder):
         plugins.Responder.__init__(self)
         self.destination = optionMap.get("slavefilesynch")
         self.transferAll = optionMap.get("keepslave") or optionMap.get("keeptmp")
-        
+
     def notifyLifecycleChange(self, test, state, changeDesc):
         if self.destination and changeDesc == "complete" and (self.transferAll or not test.state.hasSucceeded()):
-            test.app.copyFileRemotely(test.writeDirectory, "localhost", os.path.dirname(test.writeDirectory), self.destination)
+            test.app.copyFileRemotely(test.writeDirectory, "localhost", os.path.dirname(test.writeDirectory), self.destination, ignoreLinks=True)
+
+    def notifyMissingRequiredTestData(self, test, paths):
+        if self.destination:
+            for path in paths:
+                test.app.copyFileRemotely(path, self.destination, os.path.dirname(path), "localhost")
 
 
 class SocketResponder(plugins.Responder,plugins.Observable):

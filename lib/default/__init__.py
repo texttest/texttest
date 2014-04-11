@@ -1416,11 +1416,19 @@ class Config:
         else:
             return machine + ":" + plugins.quote(fileName)
                                                  
-    def copyFileRemotely(self, app, srcFile, srcMachine, dstFile, dstMachine):
+    def copyFileRemotely(self, app, srcFile, srcMachine, dstFile, dstMachine, ignoreLinks=False):
         srcPath = self.getRemotePath(srcFile, srcMachine)
         dstPath = self.getRemotePath(dstFile, dstMachine)
         args = self.getRemoteProgramArgs(app, "remote_copy_program") + [ srcPath, dstPath ]
+        if ignoreLinks:
+            args = self.removeLinkArgs(args)    
         return subprocess.call(args, stdin=open(os.devnull), stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
+
+    def removeLinkArgs(self, args):
+        for opt in [ "--copy-unsafe-links", "--delete" ]: # rsync args. Add others...
+            if opt in args:
+                args.remove(opt)
+        return args
 
     def getRemoteProgramArgs(self, app, setting):
         progStr = app.getConfigValue(setting)

@@ -94,8 +94,12 @@ class PrepareWriteDirectory(plugins.Action):
         if configName in test.getConfigValue("test_data_require", expandVars=False):
             msg = "No data source found for required test data '" + configName + "'"
             if sourcePaths:
+                test.notify("MissingRequiredTestData", sourcePaths) # a hook for custom code to try and find the data we can't find here
+                if any((os.path.exists(f) for f in sourcePaths)):
+                    return True
                 msg += "\nNo such file or directory : " + ", ".join(sourcePaths)
             raise plugins.TextTestError, msg
+        return False
 
     def collatePath(self, test, configName, collateMethod, remoteCopy, mergeData=False):
         targetPath = self.getTargetPath(test, configName)
@@ -115,7 +119,10 @@ class PrepareWriteDirectory(plugins.Action):
 
         if not collated:
             self.diag.info("No test data present in " + repr(sourcePaths))
-            self.handleNoTestData(test, configName, sourcePaths)
+            if self.handleNoTestData(test, configName, sourcePaths):
+                # We handled the problem, so we try again
+                self.collatePath(test, configName, collateMethod, remoteCopy, mergeData)
+                return
         
         if remoteCopy and targetPath:
             remoteCopy(targetPath)

@@ -38,7 +38,11 @@ class BasicRunningAction:
         
     def startTextTestProcess(self, usecase, runModeOptions, testSelOverride=None, filterFileOverride=None):
         app = self.getCurrentApplication()
-        writeDir = os.path.join(self.getLogRootDirectory(app), "dynamic_run" + str(self.runNumber))
+        if self.startedFromDynamicGui(app):
+            writeDir = os.path.join(os.getenv("TEXTTEST_TMP"), "dynamic_run" + str(self.runNumber) + "_" + plugins.startTimeString().replace(":", ""))
+        else:
+            writeDir = os.path.join(self.getLogRootDirectory(app), "dynamic_run" + str(self.runNumber))
+        
         plugins.ensureDirectoryExists(writeDir)
         filterFile = self.createFilterFile(writeDir, filterFileOverride)
         ttOptions = runModeOptions + self.getTextTestOptions(filterFile, app, usecase)
@@ -54,6 +58,10 @@ class BasicRunningAction:
                                                stdout=open(logFile, "w"), stderr=open(errFile, "w"),
                                                exitHandler=self.checkTestRun,
                                                exitHandlerArgs=(errFile,testsAffected,filterFile,usecase))
+
+    
+    def startedFromDynamicGui(self, app):
+        return app.inputOptions.has_key("g") and not "dynamic_run" in os.path.basename(self.getLogRootDirectory(app))
 
     def getCurrentApplication(self):
         return self.currAppSelection[0] if self.currAppSelection else self.validApps[0]

@@ -715,6 +715,8 @@ class ImportApplication(guiplugins.ActionDialogGUI):
             f.write("-l debug\n")
         jythonOptionsFile = os.path.join(directory, "jython_options." + ext)
         with open(jythonOptionsFile, "w") as f:
+            f.write("# Don't use jython's cache\n")
+            f.write("-Dpython.cachedir.skip=true\n")
             f.write("# Add Java properties as required, for example:\n")
             f.write("#-Djava.util.prefs.userRoot=preferences\n")
             f.write("# Can also supply JVM arguments by prefixing them with -J, for example:\n")

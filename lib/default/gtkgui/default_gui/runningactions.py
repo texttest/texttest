@@ -482,13 +482,13 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
         RunningAction.__init__(self, allApps, inputOptions)
 
     def updateOptions(self):
-        checkout = []        
+        checkouts = []        
         for app in self.currAppSelection:
             path = app.getGivenCheckoutPath(app)
-            if path:
-                checkout.append(path)
-        if checkout:
-            self.fixCheckout(",".join(checkout))
+            if path and path not in checkouts:
+                checkouts.append(path)
+        if checkouts:
+            self.fixCheckout(",".join(checkouts))
             
     def fixCheckout(self, checkout):
         for group in self.optionGroups:

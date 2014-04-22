@@ -36,13 +36,12 @@ class BasicRunningAction:
             # Take a copy so we aren't fooled by selection changes
             return copy(self.currTestSelection)
         
+    def getRunWriteDirectory(self, app):
+        return os.path.join(self.getLogRootDirectory(app), "dynamic_run" + str(self.runNumber))
+        
     def startTextTestProcess(self, usecase, runModeOptions, testSelOverride=None, filterFileOverride=None):
         app = self.getCurrentApplication()
-        if self.startedFromDynamicGui(app):
-            writeDir = os.path.join(os.getenv("TEXTTEST_TMP"), "dynamic_run" + str(self.runNumber) + "_" + plugins.startTimeString().replace(":", ""))
-        else:
-            writeDir = os.path.join(self.getLogRootDirectory(app), "dynamic_run" + str(self.runNumber))
-        
+        writeDir = self.getRunWriteDirectory(app)        
         plugins.ensureDirectoryExists(writeDir)
         filterFile = self.createFilterFile(writeDir, filterFileOverride)
         ttOptions = runModeOptions + self.getTextTestOptions(filterFile, app, usecase)
@@ -58,10 +57,6 @@ class BasicRunningAction:
                                                stdout=open(logFile, "w"), stderr=open(errFile, "w"),
                                                exitHandler=self.checkTestRun,
                                                exitHandlerArgs=(errFile,testsAffected,filterFile,usecase))
-
-    
-    def startedFromDynamicGui(self, app):
-        return app.inputOptions.has_key("g") and not "dynamic_run" in os.path.basename(self.getLogRootDirectory(app))
 
     def getCurrentApplication(self):
         return self.currAppSelection[0] if self.currAppSelection else self.validApps[0]
@@ -162,7 +157,7 @@ class BasicRunningAction:
             self.handleCompletion(testSel, filterFile, usecase)
             if len(self.currTestSelection) >= 1 and self.currTestSelection[0] in testSel:
                 self.currTestSelection[0].filesChanged()
-
+                
         testSel[0].notify("CloseDynamic", usecase)
     
     def checkErrorFile(self, errFile, testSel, usecase):
@@ -526,6 +521,16 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
                 return logRootDir
         return BasicRunningAction.getLogRootDirectory(self, app)
     
+    def getRunWriteDirectory(self, app):
+        fromDynamic = self.startedFromDynamicGui(app)
+        if fromDynamic:
+            return os.path.join(os.getenv("TEXTTEST_TMP"), "dynamic_run" + str(self.runNumber) + "_" + plugins.startTimeString().replace(":", ""))
+        else:
+            return RunningAction.getRunWriteDirectory(self, app)
+            
+    def startedFromDynamicGui(self, app):
+        return not app.useStaticGUI() and not "dynamic_run" in os.path.basename(self.getLogRootDirectory(app))
+    
     def getExtraParent(self, app):
         for other in self.validApps:
             if app in other.extras:
@@ -548,7 +553,12 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
     def checkTestRun(self, errFile, testSel, filterFile, usecase):
         # Don't do anything with the files, but do produce popups on failures and notify when complete
         self.checkErrorFile(errFile, testSel, usecase)
-        testSel[0].notify("CloseDynamic", usecase)
+        if len(testSel) > 0:
+            app = testSel[0].app
+            if not app.keepTemporaryDirectories() and self.startedFromDynamicGui(app):
+                writeDir = os.path.dirname(errFile)
+                plugins.rmtree(writeDir)
+            testSel[0].notify("CloseDynamic", usecase)
 
     def fillVBox(self, vbox, optionGroup):
         if optionGroup is self.optionGroup:

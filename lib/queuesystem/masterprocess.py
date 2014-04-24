@@ -746,8 +746,9 @@ class TestSubmissionRules(SubmissionRules):
     classPrefix = "Test"
     def getConfigResources(self, test):
         if not self.optionMap.has_key("reconnect"):
+            configSettings = test.getConfigValue("queue_system_resource")
             envSetting = os.path.expandvars(test.getEnvironment("QUEUE_SYSTEM_RESOURCE", "")) # Deprecated. See "queue_system_resource" in config file docs
-            return [ envSetting ] if envSetting else test.getConfigValue("queue_system_resource")
+            return configSettings + [ envSetting ] if envSetting else configSettings
         else:
             return ""
 

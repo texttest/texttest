@@ -1114,9 +1114,12 @@ class ActionDialogGUI(OptionGroupGUI):
         fileChooser.set_name("File Chooser for '" + self.getTooltip() + "'")
         fileChooser.set_show_hidden(True)
         folders, defaultFolder = option.getDirectories()
-        startFolder = os.getcwd() # Just to make sure we always have some dir ...
-        if defaultFolder and os.path.isdir(os.path.abspath(defaultFolder)):
+        if option.selectDir and option.getValue():
+            startFolder = option.getValue()
+        elif defaultFolder and os.path.isdir(os.path.abspath(defaultFolder)):
             startFolder = os.path.abspath(defaultFolder)
+        else:
+            startFolder = os.getcwd() # Just to make sure we always have some dir ...
             
         # We want a filechooser dialog to let the user choose where, and
         # with which name, to save the selection.
@@ -1126,7 +1129,7 @@ class ActionDialogGUI(OptionGroupGUI):
                 fileChooser.add_shortcut_folder(folder)
             except gobject.GError:
                 pass # Get this if the folder is already added, e.g. if it's the home directory
-        if not option.saveFile:
+        if option.selectFile:
             if option.getValue():
                 fileChooser.set_filename(option.getValue())
             else:

@@ -166,7 +166,7 @@ class QueueSystem(local.QueueSystem):
                 return None, errorMsg
         
         ipAddress = self.getArg(cmdArgs, "-servaddr").split(":")[0]
-        fileArgs = [ "-slavefilesynch", os.getenv("USER") + "@" + ipAddress ]
+        fileArgs = [ "-slavefilesynch", os.getenv("USER", os.getenv("USERNAME")) + "@" + ipAddress ]
         remoteCmdArgs = self.app.getCommandArgsOn(machine, cmdArgs, agentForwarding=True) + fileArgs
         localPid, jobName = local.QueueSystem.submitSlaveJob(self, remoteCmdArgs, *args) 
         self.remoteProcessInfo[localPid] = (machine, None)

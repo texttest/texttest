@@ -783,9 +783,10 @@ class TestSubmissionRules(SubmissionRules):
         if self.optionMap.has_key("R"):
             resourceList.append(self.optionMap["R"])
         resourceList += self.configResources
-        machine = self.test.app.getRunMachine()
-        if machine != "localhost":
-            resourceList.append("hostname=" + machine) # Won't work with LSF, but can't be bothered to figure it out there for now...
+        if self.optionMap.has_key("m"):
+            machine = self.optionMap["m"]
+            if machine != "localhost":
+                resourceList.append("hostname=" + machine) # Won't work with LSF, but can't be bothered to figure it out there for now...
         if self.forceOnPerformanceMachines():
             resources = self.getConfigValue("performance_test_resource")
             for resource in resources:
@@ -929,7 +930,7 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
             self.socket.setsockopt(socket.SOL_TCP, socket.TCP_KEEPIDLE, 300)
 
     def getIPAddress(self):
-        return socket.gethostbyname(socket.gethostname())
+        return socket.gethostbyname("localhost")
         
     def addSuites(self, *args):
         # use this as an opportunity to broadcast our address

@@ -930,8 +930,18 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
             self.socket.setsockopt(socket.SOL_TCP, socket.TCP_KEEPIDLE, 300)
 
     def getIPAddress(self):
-        return socket.gethostbyname("localhost")
-        
+        # Seems to be no good portable way to get the IP address in a portable way
+        # See e.g. http://stackoverflow.com/questions/166506/finding-local-ip-addresses-using-pythons-stdlib
+        # These two methods seem to be the only vaguely portable ones
+        try:
+            # Doesn't always work, sometimes not available
+            return socket.gethostbyname(socket.gethostname())
+        except socket.error:
+            # Relies on being online, but seems there is no other way...
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(('8.8.8.8', 0)) # Google's DNS server. Should always be there :)
+            return s.getsockname()[0]
+    
     def addSuites(self, *args):
         # use this as an opportunity to broadcast our address
         serverAddress = self.getAddress()

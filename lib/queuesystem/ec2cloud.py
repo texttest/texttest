@@ -20,15 +20,15 @@ class QueueSystem(local.QueueSystem):
             sys.stderr.write("Cannot run tests in EC2 cloud. You need to install Python's boto package for this to work.\n")
             return []
         conn = boto.ec2.connect_to_region(region)
-        idToIp = self.findTaggedInstances(conn)
+        instanceTag = self.app.getConfigValue("queue_system_ec2_instance_tag")
+        idToIp = self.findTaggedInstances(conn, instanceTag)
         if idToIp:
             return self.filterOnStatus(conn, idToIp)
         else:
-            sys.stderr.write("Cannot run tests in EC2 cloud. No machines were found with 'texttest' in their name tag.\n")
+            sys.stderr.write("Cannot run tests in EC2 cloud. No machines were found with '" + instanceTag + "' in their name tag.\n")
             return []
         
-    def findTaggedInstances(self, conn):
-        instanceTag = self.app.getConfigValue("queue_system_ec2_instance_tag")
+    def findTaggedInstances(self, conn, instanceTag):
         idToIp = {}
         for inst in conn.get_only_instances():
             tag = inst.tags.get("Name", "")

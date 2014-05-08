@@ -2555,6 +2555,8 @@ Grid Engine enhancements/bug fixes:
     - Fixed race condition which could lead to hanging on shutdown
     - Various status warnings fixed, mostly for restart statuses
     - Now use both "queue_system_resource" and the deprecated environment "QUEUE_SYSTEM_RESOURCE", if both are defined
+    - Made IP-address finding code more robust
+	Finding an IP address is complex and the old code didn't work in all environments
 Windows installer Enhancements:
     - All files now end up under chosen location, removed hardcoded C:\virtualenv and C:\jython2.5.1
     - StoryText is now upgraded properly when the installer is run for a second time after a new release
@@ -2588,4 +2590,4 @@ Bug Fixes:
     - Forbidden "/" in -v arguments. Did not work, was not intended to be supported.
     - Rerunning tests with different checkouts now works
     - Fixed hang when rerunning from dynamic GUI started from command line and closing the first one first
-
+    - Workaround for GTK2.20 bug in filechooser when choosing directories

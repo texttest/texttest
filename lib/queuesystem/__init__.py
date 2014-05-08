@@ -312,6 +312,7 @@ class QueueSystemConfig(default.Config):
         # In theory we could work this out, but checking all the regions takes more than 10 seconds
         # so it's better to get the user to tell us
         app.setConfigDefault("queue_system_ec2_region", "", "EC2 region to look for TextTest-instances to use")
+        app.setConfigDefault("queue_system_ec2_instance_tag", "texttest", "Tag on EC2 instances to identify those we can use")
         app.setConfigDefault("queue_system_core_file_location", "", "System-wide location for core files from grid jobs, in case TEXTTEST_TMP is generated")
         app.addConfigEntry("builtin", "proxy_options", "definition_file_stems")
         

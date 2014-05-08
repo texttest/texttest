@@ -28,10 +28,11 @@ class QueueSystem(local.QueueSystem):
             return []
         
     def findTaggedInstances(self, conn):
+        instanceTag = self.app.getConfigValue("queue_system_ec2_instance_tag")
         idToIp = {}
         for inst in conn.get_only_instances():
             tag = inst.tags.get("Name", "")
-            if "texttest" in tag:
+            if instanceTag in tag:
                 idToIp[inst.id] = inst.private_ip_address, inst.instance_type.split(".")[-1]
         return idToIp
     

@@ -79,7 +79,7 @@ class QueueSystem(local.QueueSystem):
         linkedDirs = []
         realPythonPrefix = sys.real_prefix if hasattr(sys, "real_prefix") else sys.prefix
         for root, _, files in os.walk(checkout):
-            for f in files:
+            for f in sorted(files):
                 if f.endswith(".egg-link"):
                     path = os.path.join(root, f)
                     newDir = open(path).read().splitlines()[0].strip()

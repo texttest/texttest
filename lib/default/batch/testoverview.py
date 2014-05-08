@@ -222,7 +222,7 @@ class GenerateWebPages(object):
         allFiles = []
         allTags = set()
         for _, dir in repositoryDirs:
-            for root, _, files in os.walk(dir):
+            for root, _, files in sorted(os.walk(dir)):
                 for file in files:
                     if file.startswith("teststate_"):
                         allFiles.append((os.path.join(root, file), dir))

@@ -43,7 +43,7 @@ class QueueSystem(local.QueueSystem):
     def filterOnStatus(self, conn, idToIp):
         machines = []
         for stat in conn.get_all_instance_status(idToIp.keys()):
-            if stat.instance_status.status == "ok":
+            if stat.instance_status.status in [ "ok", "initializing" ]:
                 machines.append(idToIp.get(stat.id))
                 
         machines.sort(key=self.getSortKey)

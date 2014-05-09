@@ -517,7 +517,10 @@ class TestEnvironmentCreator:
     def findJars(self, eclipseHome):
         names = [("org.eclipse.equinox.launcher_",""), ("org.eclipse.swtbot",".testscript")]
         if not os.path.isdir(eclipseHome):
-            return []
+            # Assume that eclipse home is required!
+            self.test.notify("MissingRequiredTestData", [ eclipseHome ])
+            if not os.path.isdir(eclipseHome):
+                return []
         home = os.path.join(eclipseHome, "plugins")
         jars =[]
         for name,suffix in names:
@@ -533,7 +536,7 @@ class TestEnvironmentCreator:
         # If the variable is overridden it will appear several times in the list,
         # so we start at the end
         for var, value in reversed(allVars):
-            if var == varName and value:
+            if var == varName:
                 return value
     
     def topLevel(self):

@@ -28,6 +28,7 @@ class PrepareWriteDirectory(plugins.Action):
     def __init__(self, ignoreCatalogues):
         self.diag = logging.getLogger("Prepare Writedir")
         self.ignoreCatalogues = ignoreCatalogues
+        self.handledRequiredPaths = set()
         if self.ignoreCatalogues:
             self.diag.info("Ignoring all information in catalogue files")
 
@@ -94,12 +95,14 @@ class PrepareWriteDirectory(plugins.Action):
         if configName in test.getConfigValue("test_data_require", expandVars=False):
             msg = "No data source found for required test data '" + configName + "'"
             if sourcePaths:
-                test.notify("MissingRequiredTestData", sourcePaths) # a hook for custom code to try and find the data we can't find here
-                if any((os.path.exists(f) for f in sourcePaths)):
-                    return True
                 msg += "\nNo such file or directory : " + ", ".join(sourcePaths)
             raise plugins.TextTestError, msg
-        return False
+    
+    def handleRequiredData(self, test, configName, sourcePaths):
+        unseenSource = filter(lambda p: p not in self.handledRequiredPaths, sourcePaths)
+        if unseenSource and configName in test.getConfigValue("test_data_require", expandVars=False):
+            test.notify("RequiredTestData", sourcePaths)
+            self.handledRequiredPaths.update(sourcePaths)
 
     def collatePath(self, test, configName, collateMethod, remoteCopy, mergeData=False):
         targetPath = self.getTargetPath(test, configName)
@@ -109,6 +112,8 @@ class PrepareWriteDirectory(plugins.Action):
             return
         plugins.ensureDirExistsForFile(targetPath)
         sourcePaths = self.getSourcePaths(test, configName, sourceFileName)
+        if sourcePaths:
+            self.handleRequiredData(test, configName, sourcePaths)
         collated = False
         for sourcePath in self.getSortedSourcePaths(sourcePaths, mergeData):
             if os.path.exists(sourcePath):
@@ -119,10 +124,7 @@ class PrepareWriteDirectory(plugins.Action):
 
         if not collated:
             self.diag.info("No test data present in " + repr(sourcePaths))
-            if self.handleNoTestData(test, configName, sourcePaths):
-                # We handled the problem, so we try again
-                self.collatePath(test, configName, collateMethod, remoteCopy, mergeData)
-                return
+            self.handleNoTestData(test, configName, sourcePaths)
         
         if remoteCopy and targetPath:
             remoteCopy(targetPath)

@@ -63,7 +63,7 @@ class FileTransferResponder(plugins.Responder):
         if self.destination and changeDesc == "complete" and (self.transferAll or not test.state.hasSucceeded()):
             test.app.copyFileRemotely(test.writeDirectory, "localhost", os.path.dirname(test.writeDirectory), self.destination, ignoreLinks=True)
 
-    def notifyMissingRequiredTestData(self, test, paths):
+    def notifyRequiredTestData(self, test, paths):
         if self.destination:
             for path in paths:
                 test.app.copyFileRemotely(path, self.destination, os.path.dirname(path), "localhost")

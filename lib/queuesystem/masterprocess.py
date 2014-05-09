@@ -851,7 +851,7 @@ class SlaveRequestHandler(StreamRequestHandler):
         try:
             return socket.gethostbyaddr(ipAddress)[0].split(".")[0]
         except socket.error:
-            return "<UNKNOWN HOST> (check IP configuration)"
+            return ipAddress
 
     def parseIdentifier(self, identifier):
         rerun = identifier.endswith(self.rerunPostfix)

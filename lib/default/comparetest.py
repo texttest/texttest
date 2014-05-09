@@ -231,7 +231,8 @@ class TestComparison(BaseTestComparison):
     def getComparisonsForRecalculation(self):
         comparisons = []
         for comparison in self.allResults:
-            self.diag.info(comparison.stem + " dates " + comparison.modifiedDates())
+            if self.diag.isEnabledFor(logging.INFO):
+                self.diag.info(comparison.stem + " dates " + comparison.modifiedDates())
             if comparison.needsRecalculation():
                 self.diag.info("Recalculation needed for file " + comparison.stem)
                 comparisons.append(comparison)

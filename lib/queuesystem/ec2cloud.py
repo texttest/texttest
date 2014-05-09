@@ -23,7 +23,11 @@ class QueueSystem(local.QueueSystem):
         instanceTag = self.app.getConfigValue("queue_system_ec2_instance_tag")
         idToIp = self.findTaggedInstances(conn, instanceTag)
         if idToIp:
-            return self.filterOnStatus(conn, idToIp)
+            machines = self.filterOnStatus(conn, idToIp)
+            if not machines:
+                sys.stderr.write("Cannot run tests in EC2 cloud. " + str(len(idToIp)) + " machines were found with '" + \
+                                 instanceTag + "' in their name tag, but none are currently up.\n")
+            return machines
         else:
             sys.stderr.write("Cannot run tests in EC2 cloud. No machines were found with '" + instanceTag + "' in their name tag.\n")
             return []

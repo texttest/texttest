@@ -533,7 +533,7 @@ class TestEnvironmentCreator:
         # If the variable is overridden it will appear several times in the list,
         # so we start at the end
         for var, value in reversed(allVars):
-            if var == varName:
+            if var == varName and value:
                 return value
     
     def topLevel(self):

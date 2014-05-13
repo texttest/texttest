@@ -1112,6 +1112,8 @@ class ActionDialogGUI(OptionGroupGUI):
     def createFileChooser(self, option):
         fileChooser = gtk.FileChooserWidget(self.getFileChooserFlag(option))
         fileChooser.set_name("File Chooser for '" + self.getTooltip() + "'")
+        # The following line has no effect until this GTK bug is fixed...
+        # https://bugzilla.gnome.org/show_bug.cgi?id=440667
         fileChooser.set_show_hidden(True)
         folders, defaultFolder = option.getDirectories()
         if option.selectDir and option.getValue():

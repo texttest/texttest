@@ -790,7 +790,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
 
     def stemChanged(self, *args):
         option = self.optionGroup.getOption("stem")
-        newStem = option.getValue()    
+        newStem = option.getValue()
         if newStem in option.possibleValues and newStem != self.currentStem:
             self.currentStem = newStem
             version = self.optionGroup.getOptionValue("v")
@@ -952,6 +952,8 @@ class ImportFiles(guiplugins.ActionDialogGUI):
             sourcePath = self.optionGroup.getOptionValue("src")
             appendAppName = os.path.basename(sourcePath).startswith(stem + "." + test.app.name)
             targetPath = self.getTargetPath(stem, version, appendAppName)
+            if targetPath.startswith(sourcePath) and os.path.isdir(sourcePath):
+                raise plugins.TextTestError, "Need to select a valid file or directory to copy, not a parent directory:\n" + sourcePath
             plugins.ensureDirExistsForFile(targetPath)
             fileExisted = os.path.exists(targetPath)
             plugins.copyPath(sourcePath, targetPath)

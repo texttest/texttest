@@ -413,7 +413,7 @@ class Config:
     def useVirtualDisplay(self):
         # Don't try to set it if we're using the static GUI or
         # we've requested a slow motion replay or we're trying to record a new usecase.
-        return not self.isRecording() and not self.optionMap.has_key("gx") and \
+        return not self.isRecording() and not self.optionMap.has_key("gx") and not self.isReconnecting() and \
                not self.isActionReplay() and not self.optionMap.has_key("coll") and not self.optionMap.runScript()
     
     def getThreadActionClasses(self):

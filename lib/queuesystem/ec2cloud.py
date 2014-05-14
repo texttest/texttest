@@ -1,5 +1,6 @@
 
-import local, plugins, os, sys
+import local, plugins
+import time, os, sys
 
 class QueueSystem(local.QueueSystem):
     instanceTypeInfo = { "2xlarge" : 8, "xlarge" : 4, "large" : 2, "medium" : 1 }
@@ -138,18 +139,28 @@ class QueueSystem(local.QueueSystem):
     def getRemoteTestMachine(self, localPid):
         if localPid in self.remoteProcessInfo:
             return self.remoteProcessInfo[localPid][0]
+        
+    def waitForRemoteProcessId(self, process):
+        localPid = str(process.pid)
+        for _ in range(10):
+            if localPid in self.remoteProcessInfo:
+                machine, remotePid = self.remoteProcessInfo[localPid]
+                if remotePid:
+                    return machine, remotePid
+            # Remote process exists but has not yet told us its process ID. Wait a bit and try again. 
+            time.sleep(1)
+        return None, None
             
     def sendSignal(self, process, sig):
         # ssh doesn't forward signals to remote processes.
         # We need to find it ourselves and send it explicitly. Can assume python exists remotely, but not much else.
-        localPid = str(process.pid)
-        if localPid in self.remoteProcessInfo:
-            machine, remotePid = self.remoteProcessInfo[localPid]
-            if remotePid:
-                cmdArgs = [ "python", "-c", "\"import os; os.kill(" + remotePid + ", " + str(sig) + ")\"" ]
-                self.app.runCommandOn(machine, cmdArgs)
+        machine, remotePid = self.waitForRemoteProcessId(process)
+        if remotePid:
+            cmdArgs = [ "python", "-c", "\"import os; os.kill(" + remotePid + ", " + str(sig) + ")\"" ]
+            self.app.runCommandOn(machine, cmdArgs)
         # Hack for self-tests. Shouldn't normally be needed. Need to kill the process locally as well when replaying CaptureMock.
-        if os.getenv("CAPTUREMOCK_MODE") == "0":
+        # Also kill the local process if we can't find the remote one for some reason...
+        if not remotePid or os.getenv("CAPTUREMOCK_MODE") == "0":
             local.QueueSystem.sendSignal(self, process, sig)
         
     def submitSlaveJob(self, cmdArgs, *args):

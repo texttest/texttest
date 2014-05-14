@@ -12,6 +12,7 @@ class QueueSystem(local.QueueSystem):
         self.machines = self.findMachines()
         self.capacity = sum((c for m, c in self.machines))
         self.remoteProcessInfo = {}
+        self.synchDirs = self.getDirectoriesForSynch()
         
     def findMachines(self):
         region = self.app.getConfigValue("queue_system_ec2_region")
@@ -121,10 +122,9 @@ class QueueSystem(local.QueueSystem):
         return parents
 
     def synchroniseMachine(self, machine):
-        dirs = self.getDirectoriesForSynch()
-        parents = self.getParents(dirs)
+        parents = self.getParents(self.synchDirs)
         self.app.ensureRemoteDirExists(machine, *parents)
-        for dir in dirs:
+        for dir in self.synchDirs:
             self.synchronisePath(dir, machine)
             
     def getArg(self, args, flag):

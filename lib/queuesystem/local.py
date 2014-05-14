@@ -32,16 +32,16 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
     def formatCommand(self, cmdArgs):
         return " ".join(cmdArgs)
 
+    def getSignal(self):
+        return signal.SIGUSR2 if os.name == "posix" else signal.SIGTERM
+
     def killJob(self, jobId):
         proc = self.processes[jobId]
         jobExisted = proc.poll() is None
         if jobExisted:
-            sig = signal.SIGUSR2 if os.name == "posix" else signal.SIGTERM
-            self.sendSignal(proc, sig)
-        return jobExisted
-
-    def sendSignal(self, proc, sig):
-        proc.send_signal(sig)
+            sig = self.getSignal()
+            proc.send_signal(sig)
+        return jobExisted        
     
     def getStatusForAllJobs(self):
         statusDict = {}

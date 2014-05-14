@@ -131,42 +131,48 @@ class QueueSystem(local.QueueSystem):
         index = args.index(flag)
         return args[index + 1]
     
-    def setRemoteProcessId(self, localPid, remotePid):
-        if localPid in self.remoteProcessInfo:
-            machine = self.remoteProcessInfo[localPid][0]
-            self.remoteProcessInfo[localPid] = machine, remotePid
+    def setRemoteProcessId(self, jobId, remotePid):
+        if jobId in self.remoteProcessInfo:
+            machine, localPid, _ = self.remoteProcessInfo[jobId]
+            self.remoteProcessInfo[jobId] = machine, localPid, remotePid
             
-    def getRemoteTestMachine(self, localPid):
-        if localPid in self.remoteProcessInfo:
-            return self.remoteProcessInfo[localPid][0]
+    def getRemoteTestMachine(self, jobId):
+        if jobId in self.remoteProcessInfo:
+            return self.remoteProcessInfo[jobId][0]
         
-    def waitForRemoteProcessId(self, process):
-        localPid = str(process.pid)
-        for _ in range(10):
-            if localPid in self.remoteProcessInfo:
-                machine, remotePid = self.remoteProcessInfo[localPid]
-                if remotePid:
-                    return machine, remotePid
-            # Remote process exists but has not yet told us its process ID. Wait a bit and try again. 
-            time.sleep(1)
-        return None, None
-            
-    def sendSignal(self, process, sig):
+    def killJob(self, jobId):
         # ssh doesn't forward signals to remote processes.
         # We need to find it ourselves and send it explicitly. Can assume python exists remotely, but not much else.
-        machine, remotePid = self.waitForRemoteProcessId(process)
+        machine, localPid, remotePid = self.waitForRemoteProcessId(jobId)
         if remotePid:
-            cmdArgs = [ "python", "-c", "\"import os; os.kill(" + remotePid + ", " + str(sig) + ")\"" ]
+            cmdArgs = [ "python", "-c", "\"import os; os.kill(" + remotePid + ", " + str(self.getSignal()) + ")\"" ]
             self.app.runCommandOn(machine, cmdArgs)
+            
         # Hack for self-tests. Shouldn't normally be needed. Need to kill the process locally as well when replaying CaptureMock.
         # Also kill the local process if we can't find the remote one for some reason...
         if not remotePid or os.getenv("CAPTUREMOCK_MODE") == "0":
-            local.QueueSystem.sendSignal(self, process, sig)
+            return local.QueueSystem.killJob(self, localPid)
+        else:
+            return True
+            
+    def waitForRemoteProcessId(self, jobId):
+        for _ in range(10):
+            if jobId in self.remoteProcessInfo:
+                machine, localPid, remotePid = self.remoteProcessInfo[jobId]
+                if remotePid:
+                    return machine, localPid, remotePid
+            # Remote process exists but has not yet told us its process ID. Wait a bit and try again. 
+            time.sleep(1)
+        return None, None, None
+            
+    def getJobId(self, ip, ix):
+        return "job" + str(ix) + "_" + ip
         
     def submitSlaveJob(self, cmdArgs, *args):
         ip, cores = self.machines[self.nextMachineIndex]
         firstSlaveOnMachine = self.nextCoreIndex == 0
         self.nextCoreIndex += 1
+        jobId = self.getJobId(ip, self.nextCoreIndex)
         if self.nextCoreIndex >= cores:
             self.nextCoreIndex = 0
             self.nextMachineIndex += 1
@@ -184,8 +190,8 @@ class QueueSystem(local.QueueSystem):
         ipAddress = self.getArg(cmdArgs, "-servaddr").split(":")[0]
         fileArgs = [ "-slavefilesynch", os.getenv("USER", os.getenv("USERNAME")) + "@" + ipAddress ]
         remoteCmdArgs = self.app.getCommandArgsOn(machine, cmdArgs, agentForwarding=True) + fileArgs
-        localPid, jobName = local.QueueSystem.submitSlaveJob(self, remoteCmdArgs, *args) 
-        self.remoteProcessInfo[localPid] = (machine, None)
-        return localPid, jobName
+        localPid, jobName = local.QueueSystem.submitSlaveJob(self, remoteCmdArgs, *args)
+        self.remoteProcessInfo[jobId] = (machine, localPid, None)
+        return jobId, jobName
         
 from local import MachineInfo, getUserSignalKillInfo, getExecutionMachines

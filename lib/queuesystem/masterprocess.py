@@ -22,6 +22,17 @@ class Abandoned(plugins.TestState):
     def __init__(self, freeText):
         plugins.TestState.__init__(self, "abandoned", briefText="job deletion failed", \
                                                       freeText=freeText, completed=1, lifecycleChange="complete")
+        
+class Pending(plugins.TestState):
+    defaultBriefText = "PEND"
+    def __init__(self, freeText, briefText=None, lifecycleChange="become pending"):
+        briefText = briefText or self.defaultBriefText
+        plugins.TestState.__init__(self, "pending", freeText=freeText, briefText=briefText, lifecycleChange=lifecycleChange)
+    
+    def makeModifiedState(self, newRunStatus, newDetails, lifecycleChange):
+        if newRunStatus != self.briefText:
+            newFreeText = self.freeText + "\n" + newDetails
+            return self.__class__(newFreeText, newRunStatus, lifecycleChange)
 
 
 class QueueSystemServer(BaseActionRunner):
@@ -40,6 +51,7 @@ class QueueSystemServer(BaseActionRunner):
         self.killedJobs = {}
         self.queueSystems = {}
         self.reuseOnly = False
+        self.allRead = False
         self.submitAddress = None
         self.createDirectories = False
         self.slaveLogDirs = set()
@@ -106,6 +118,7 @@ class QueueSystemServer(BaseActionRunner):
     def notifyAllRead(self, suites):
         self.addDelayedTests()
         BaseActionRunner.notifyAllRead(self, suites)
+        self.allRead = True
 
     def run(self): # picked up by core to indicate running in a thread
         self.runAllTests()
@@ -113,6 +126,7 @@ class QueueSystemServer(BaseActionRunner):
             self.diag.info("All jobs submitted, polling the queue system now.")
             if self.canPoll():
                 self.pollQueueSystem()
+                
         self.diag.info("No jobs left to poll, exiting thread")
 
     def pollQueueSystem(self):
@@ -132,7 +146,7 @@ class QueueSystemServer(BaseActionRunner):
     def canPoll(self):
         queueSystem = self.getQueueSystem(self.jobs.keys()[0])
         return queueSystem.supportsPolling()
-
+    
     def updateJobStatus(self):
         queueSystem = self.getQueueSystem(self.jobs.keys()[0])
         statusInfo = queueSystem.getStatusForAllJobs()
@@ -142,7 +156,7 @@ class QueueSystemServer(BaseActionRunner):
                 if not test.state.isComplete():
                     for jobId, _ in jobs:
                         status = statusInfo.get(jobId)
-                        if status and test.state.hasStarted() and test.state.briefText:
+                        if status:
                             # Only do this to test jobs (might make a difference for derived configurations)
                             # Ignore filtering states for now, which have empty 'briefText'.
                             self.updateRunStatus(test, status)
@@ -167,7 +181,7 @@ class QueueSystemServer(BaseActionRunner):
                 
     def handleLocalError(self, test, previouslySubmitted):
         self.handleErrorState(test, previouslySubmitted)
-        if self.testCount == 0 or (self.reuseOnly and self.testsSubmitted == 0):
+        if (self.testCount == 0 and self.allRead) or (self.reuseOnly and self.testsSubmitted == 0):
             self.diag.info("Submitting terminators after local error")
             self.submitTerminators()
             
@@ -288,7 +302,7 @@ class QueueSystemServer(BaseActionRunner):
             return self.getTestForRunNormalMode(block)
 
     def getTestForRun(self, block=True):
-        if self.testCount == 0 or (self.testsSubmitted < self.maxCapacity):
+        if (self.testCount == 0 and self.allRead) or (self.testsSubmitted < self.maxCapacity):
             return self.getTestForRunNormalMode(block)
         else:
             return self.getTestForRunReuseOnlyMode(block)
@@ -316,6 +330,9 @@ class QueueSystemServer(BaseActionRunner):
             sys.stderr.write("WARNING: error produced by slave job '" + jobName + "'\n" + msg)
     
     def cleanup(self):
+        if self.jobs:
+            queueSystem = self.getQueueSystem(self.jobs.keys()[0])
+            queueSystem.cleanup()
         self.sendServerState("Completed submission of all tests")
 
     def remainStr(self):
@@ -351,8 +368,7 @@ class QueueSystemServer(BaseActionRunner):
             env["DISPLAY"] = plugins.gethostname() + display
         
     def getPendingState(self, test):
-        freeText = "Job pending in " + queueSystemName(test.app)
-        return plugins.TestState("pending", freeText=freeText, briefText="PEND", lifecycleChange="become pending")
+        return Pending(freeText="Job pending in " + queueSystemName(test.app))
 
     def getWindowsExecutable(self):
         # sys.executable could be something other than Python... like storytext. Don't involve that here

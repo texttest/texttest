@@ -1,18 +1,130 @@
 
-import local, plugins
+import local, plugins, signal
 import time, os, sys
+from threading import Thread
+from Queue import Queue
+
+class Ec2Machine:
+    def __init__(self, ipAddress, cores, synchDirs, app):
+        self.ip = ipAddress
+        self.fullMachine = "ec2-user@" + self.ip
+        self.cores = cores 
+        self.synchDirs = synchDirs
+        self.app = app
+        self.remoteProcessInfo = {}
+        self.thread = Thread(target=self.runThread)
+        self.queue = Queue()
+        self.errorMessage = ""
+        
+    def getNextJobId(self):
+        return "job" + str(len(self.remoteProcessInfo)) + "_" + self.ip
+        
+    def getParents(self, dirs):
+        parents = []
+        for dir in dirs:
+            parent = os.path.dirname(dir)
+            if parent not in parents:
+                parents.append(parent)
+        return parents
+    
+    def isFull(self):
+        return len(self.remoteProcessInfo) >= self.cores
+    
+    def hasJob(self, jobId):
+        return jobId in self.remoteProcessInfo
+    
+    def setRemoteProcessId(self, jobId, remotePid):
+        localPid, _ = self.remoteProcessInfo[jobId]
+        self.remoteProcessInfo[jobId] = localPid, remotePid
+                
+    def synchronise(self):
+        parents = self.getParents(self.synchDirs)
+        self.app.ensureRemoteDirExists(self.fullMachine, *parents)
+        for dir in self.synchDirs:
+            if not self.errorMessage:
+                self.synchronisePath(dir)
+            
+    def synchronisePath(self, path):
+        dirName = os.path.dirname(path)
+        self.synchProc = self.app.getRemoteCopyFileProcess(path, "localhost", dirName, self.fullMachine)
+        self.synchProc.wait()
+        self.synchProc = None
+
+    def runThread(self):
+        try:
+            self.synchronise()
+        except plugins.TextTestError, e:
+            self.errorMessage = "Failed to synchronise files with EC2 instance with private IP address '" + self.ip + "'\n" + str(e) + "\n"
+            
+        if self.errorMessage:
+            return
+        
+        while True:
+            jobId, submitCallable = self.queue.get()
+            if jobId is None:
+                return
+            localPid, _ = submitCallable()
+            self.remoteProcessInfo[jobId] = localPid, None
+            
+    def cleanup(self):
+        if self.thread.isAlive():
+            self.queue.put((None, None))
+            self.thread.join()
+
+    def submitSlave(self, submitter, cmdArgs, fileArgs, *args):
+        jobId = self.getNextJobId()
+        self.remoteProcessInfo[jobId] = None, None
+        if not self.thread.isAlive():
+            self.thread.start()
+        remoteCmdArgs = self.app.getCommandArgsOn(self.fullMachine, cmdArgs, agentForwarding=True) + fileArgs
+        self.queue.put((jobId, plugins.Callable(submitter, remoteCmdArgs, *args)))
+        return jobId
+    
+    def killRemoteProcess(self, jobId, sig):
+        if self.synchProc:
+            self.errorMessage = "Terminated test during file synchronisation"
+            self.synchProc.send_signal(signal.SIGTERM)
+            return True, None
+        # ssh doesn't forward signals to remote processes.
+        # We need to find it ourselves and send it explicitly. Can assume python exists remotely, but not much else.
+        localPid, remotePid = self.waitForRemoteProcessId(jobId)
+        if remotePid:
+            cmdArgs = [ "python", "-c", "\"import os; os.kill(" + remotePid + ", " + str(sig) + ")\"" ]
+            self.app.runCommandOn(self.fullMachine, cmdArgs)
+            return True, localPid
+        else:
+            return False, localPid
+                        
+    def waitForRemoteProcessId(self, jobId):
+        for _ in range(10):
+            localPid, remotePid = self.remoteProcessInfo[jobId]
+            if remotePid:
+                return localPid, remotePid
+            # Remote process exists but has not yet told us its process ID. Wait a bit and try again. 
+            time.sleep(1)
+        return None, None
+    
+    def collectJobStatus(self, jobStatus, procStatus):
+        if not self.errorMessage:
+            for jobId, (localPid, _) in self.remoteProcessInfo.items():
+                if localPid:
+                    if localPid in procStatus:
+                        jobStatus[jobId] = procStatus[localPid]
+                else:
+                    jobStatus[jobId] = "SYNCH", "Synchronizing data with " + self.fullMachine
+
 
 class QueueSystem(local.QueueSystem):
     instanceTypeInfo = { "2xlarge" : 8, "xlarge" : 4, "large" : 2, "medium" : 1 }
     def __init__(self, app):
         local.QueueSystem.__init__(self)
         self.nextMachineIndex = 0
-        self.nextCoreIndex = 0
         self.app = app
-        self.machines = self.findMachines()
-        self.capacity = sum((c for m, c in self.machines))
-        self.remoteProcessInfo = {}
-        self.synchDirs = self.getDirectoriesForSynch()
+        self.fileArgs = []
+        machineData = self.findMachines()
+        synchDirs = self.getDirectoriesForSynch()
+        self.machines = [ Ec2Machine(m, self.instanceTypeInfo.get(instanceType, 1), synchDirs, app) for m, instanceType in machineData ]
+        self.capacity = sum((m.cores for m in self.machines))
         
     def findMachines(self):
         region = self.app.getConfigValue("queue_system_ec2_region")
@@ -34,6 +146,10 @@ class QueueSystem(local.QueueSystem):
             sys.stderr.write("Cannot run tests in EC2 cloud. No machines were found with '" + instanceTag + "' in their name tag.\n")
             return []
         
+    def cleanup(self):
+        for machine in self.machines:
+            machine.cleanup()
+        
     def findTaggedInstances(self, conn, instanceTag):
         idToIp = {}
         for inst in conn.get_only_instances():
@@ -53,18 +169,14 @@ class QueueSystem(local.QueueSystem):
                 machines.append(idToIp.get(stat.id))
                 
         machines.sort(key=self.getSortKey)
-        return [ (m, self.instanceTypeInfo.get(instanceType, 1)) for m, instanceType in machines ]
+        return machines
                     
     def getCapacity(self):
         return self.capacity
     
     def slavesOnRemoteSystem(self):
         return True
-    
-    def synchronisePath(self, path, machine):
-        dirName = os.path.dirname(path)
-        return self.app.copyFileRemotely(path, "localhost", dirName, machine)
-    
+        
     @classmethod
     def findSetUpDirectory(cls, dir):
         # Egg-link points at the Python package code, which may not be all of the checkout
@@ -112,86 +224,70 @@ class QueueSystem(local.QueueSystem):
             dirs.append(checkout)
             dirs += self.findVirtualEnvLinkedDirectories(checkout)
         return dirs
-
-    def getParents(self, dirs):
-        parents = []
-        for dir in dirs:
-            parent = os.path.dirname(dir)
-            if parent not in parents:
-                parents.append(parent)
-        return parents
-
-    def synchroniseMachine(self, machine):
-        parents = self.getParents(self.synchDirs)
-        self.app.ensureRemoteDirExists(machine, *parents)
-        for dir in self.synchDirs:
-            self.synchronisePath(dir, machine)
             
     def getArg(self, args, flag):
         index = args.index(flag)
         return args[index + 1]
     
+    def getMachine(self, jobId):
+        for machine in self.machines:
+            if machine.hasJob(jobId):
+                return machine
+    
     def setRemoteProcessId(self, jobId, remotePid):
-        if jobId in self.remoteProcessInfo:
-            machine, localPid, _ = self.remoteProcessInfo[jobId]
-            self.remoteProcessInfo[jobId] = machine, localPid, remotePid
+        machine = self.getMachine(jobId)
+        if machine:
+            machine.setRemoteProcessId(jobId, remotePid)
             
     def getRemoteTestMachine(self, jobId):
-        if jobId in self.remoteProcessInfo:
-            return self.remoteProcessInfo[jobId][0]
+        machine = self.getMachine(jobId)
+        if machine:
+            return machine.fullMachine
+
+    def killRemoteProcess(self, jobId):
+        machine = self.getMachine(jobId)
+        if machine:
+            return machine.killRemoteProcess(jobId, self.getSignal())
+        else:
+            return False, None
+    
+    def getJobFailureInfo(self, jobId):
+        machine = self.getMachine(jobId)
+        return machine.errorMessage if machine else ""
+    
+    def getStatusForAllJobs(self):
+        procStatus = super(QueueSystem, self).getStatusForAllJobs()
+        jobStatus = {}
+        for machine in self.machines:
+            machine.collectJobStatus(jobStatus, procStatus)
+        return jobStatus
         
     def killJob(self, jobId):
         # ssh doesn't forward signals to remote processes.
         # We need to find it ourselves and send it explicitly. Can assume python exists remotely, but not much else.
-        machine, localPid, remotePid = self.waitForRemoteProcessId(jobId)
-        if remotePid:
-            cmdArgs = [ "python", "-c", "\"import os; os.kill(" + remotePid + ", " + str(self.getSignal()) + ")\"" ]
-            self.app.runCommandOn(machine, cmdArgs)
-            
+        killed, localPid = self.killRemoteProcess(jobId)
         # Hack for self-tests. Shouldn't normally be needed. Need to kill the process locally as well when replaying CaptureMock.
         # Also kill the local process if we can't find the remote one for some reason...
-        if not remotePid or os.getenv("CAPTUREMOCK_MODE") == "0":
-            return local.QueueSystem.killJob(self, localPid)
+        if localPid and (not killed or os.getenv("CAPTUREMOCK_MODE") == "0"):
+            return super(QueueSystem, self).killJob(localPid)
         else:
             return True
-            
-    def waitForRemoteProcessId(self, jobId):
-        for _ in range(10):
-            if jobId in self.remoteProcessInfo:
-                machine, localPid, remotePid = self.remoteProcessInfo[jobId]
-                if remotePid:
-                    return machine, localPid, remotePid
-            # Remote process exists but has not yet told us its process ID. Wait a bit and try again. 
-            time.sleep(1)
-        return None, None, None
-            
-    def getJobId(self, ip, ix):
-        return "job" + str(ix) + "_" + ip
+                            
+    def getFileArgs(self, cmdArgs):
+        if not self.fileArgs:
+            ipAddress = self.getArg(cmdArgs, "-servaddr").split(":")[0]
+            self.fileArgs = [ "-slavefilesynch", os.getenv("USER", os.getenv("USERNAME")) + "@" + ipAddress ]
+        return self.fileArgs
         
     def submitSlaveJob(self, cmdArgs, *args):
-        ip, cores = self.machines[self.nextMachineIndex]
-        firstSlaveOnMachine = self.nextCoreIndex == 0
-        self.nextCoreIndex += 1
-        jobId = self.getJobId(ip, self.nextCoreIndex)
-        if self.nextCoreIndex >= cores:
-            self.nextCoreIndex = 0
+        machine = self.machines[self.nextMachineIndex]
+        submitter = super(QueueSystem, self).submitSlaveJob
+        jobId = machine.submitSlave(submitter, cmdArgs, self.getFileArgs(cmdArgs), *args)
+        if machine.isFull():
             self.nextMachineIndex += 1
         if self.nextMachineIndex == len(self.machines):
             self.nextMachineIndex = 0
+        return jobId, None
 
-        machine = "ec2-user@" + ip
-        if firstSlaveOnMachine:
-            try:
-                self.synchroniseMachine(machine)
-            except plugins.TextTestError, e:
-                errorMsg = "Failed to synchronise files with EC2 instance with private IP address '" + ip + "'\n" + str(e) + "\n"
-                return None, errorMsg
-        
-        ipAddress = self.getArg(cmdArgs, "-servaddr").split(":")[0]
-        fileArgs = [ "-slavefilesynch", os.getenv("USER", os.getenv("USERNAME")) + "@" + ipAddress ]
-        remoteCmdArgs = self.app.getCommandArgsOn(machine, cmdArgs, agentForwarding=True) + fileArgs
-        localPid, jobName = local.QueueSystem.submitSlaveJob(self, remoteCmdArgs, *args)
-        self.remoteProcessInfo[jobId] = (machine, localPid, None)
-        return jobId, jobName
         
 from local import MachineInfo, getUserSignalKillInfo, getExecutionMachines

@@ -114,7 +114,7 @@ class QueueSystem(gridqueuesystem.QueueSystem):
                     statusDict[jobId] = status
                 else:
                     log.info("WARNING: unexpected job status " + repr(statusLetter) + " received from SGE!")
-                    statusDict[jobId] = statusLetter
+                    statusDict[jobId] = statusLetter, statusLetter
         return statusDict
 
     def isDate(self, text):

@@ -303,9 +303,9 @@ class TestProgressMonitor(guiutils.SubGUI):
             classification = [ catDesc ]
             if "save" in changeDesc:
                 classification.append("Saved")
-            elif state.hasStarted() and not state.isComplete() and state.briefText:
+            elif not state.isComplete() and state.briefText:
                 subState = state.briefText.split()[0]
-                if subState != "RUN":
+                if subState != state.defaultBriefText:
                     classification.append(subState)
             classifiers.addClassification(classification)
             return classifiers

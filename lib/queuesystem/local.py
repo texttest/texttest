@@ -9,7 +9,7 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
     def __init__(self, *args):
         self.processes = {}
 
-    def submitSlaveJob(self, cmdArgs, slaveEnv, logDir, submissionRules, jobType): 
+    def submitSlaveJob(self, cmdArgs, slaveEnv, logDir, submissionRules, jobType):
         outputFile, errorsFile = submissionRules.getJobFiles()
         try:
             process = subprocess.Popen(cmdArgs, 

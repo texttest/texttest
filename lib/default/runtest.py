@@ -9,6 +9,7 @@ from jobprocess import killSubProcessAndChildren
 plugins.addCategory("killed", "killed", "were terminated before completion")
 
 class Running(plugins.TestState):
+    defaultBriefText = "RUN"
     def __init__(self, execMachines, freeText = "", briefText = "", lifecycleChange="start"):
         plugins.TestState.__init__(self, "running", freeText, briefText, started=1,
                                    executionHosts = execMachines, lifecycleChange=lifecycleChange)

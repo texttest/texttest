@@ -4,7 +4,7 @@
 import subprocess, os
 import plugins
 
-class QueueSystem:
+class QueueSystem(object):
     def __init__(self, *args):
         pass
     
@@ -55,6 +55,9 @@ class QueueSystem:
         pass # only cloud cares about this
     
     def getRemoteTestMachine(self, *args):
+        pass # only cloud cares about this
+    
+    def cleanup(self):
         pass # only cloud cares about this
     
     def slavesOnRemoteSystem(self):

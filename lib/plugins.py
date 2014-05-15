@@ -606,6 +606,7 @@ class Responder:
 class TestState(Observable):
     categoryDescriptions = OrderedDict()
     showExecHosts = 0
+    defaultBriefText = ""
     def __init__(self, category, freeText = "", briefText = "", started = 0, completed = 0,\
                  executionHosts = [], lifecycleChange = ""):
         Observable.__init__(self)
@@ -686,7 +687,7 @@ class TestState(Observable):
         return False
     def updateAfterLoad(self, app, **kwargs):
         pass
-    def makeModifiedState(self, newRunStatus, newDetails):
+    def makeModifiedState(self, *args):
         pass
     
             

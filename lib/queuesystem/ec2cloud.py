@@ -115,7 +115,7 @@ class Ec2Machine:
 
 
 class QueueSystem(local.QueueSystem):
-    instanceTypeInfo = { "2xlarge" : 8, "xlarge" : 4, "large" : 2, "medium" : 1 }
+    instanceTypeInfo = { "8xlarge" : 32, "4xlarge": 16, "2xlarge" : 8, "xlarge" : 4, "large" : 2, "medium" : 1 }
     def __init__(self, app):
         local.QueueSystem.__init__(self)
         self.nextMachineIndex = 0

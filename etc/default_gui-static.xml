@@ -24,9 +24,6 @@
     </menu>
     
     <menu action="actionsmenu">
-      <menuitem action="Select"/>
-      <menuitem action="Filter"/>
-      <separator/>
       <menuitem action="Run"/>
       <menuitem action="Reconnect..."/>
       <menuitem action="Replace Text in Files"/>

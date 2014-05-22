@@ -26,10 +26,14 @@
       <menuitem name="Status bar" action="Status bar"/>
     </menu>
     
-    <menu action="actionsmenu" />
-
+    <menu action="actionsmenu">
+      <menuitem action="Select"/>
+      <menuitem action="Filter"/>
+      <separator/>
+    </menu>
+ 
     <placeholder name="ExtraMenus" />
-
+    
     <menu action="helpmenu">
       <menuitem action="Quick Start"/>
       <menuitem action="Migration Notes"/>

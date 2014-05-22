@@ -629,16 +629,11 @@ class ArchiveExtractor:
 class WebPageResponder(plugins.Responder):
     def __init__(self, optionMap, allApps):
         plugins.Responder.__init__(self)
-        self.cmdLineResourcePage = self.findResourcePage(optionMap.get("coll"))
         self.archiveExtractor = ArchiveExtractor(optionMap.get("collarchive")) if optionMap.get("collarchive") is not None else None
         self.diag = logging.getLogger("GenerateWebPages")
         self.suitesToGenerate = []
         self.descriptionInfo = {}
-        self.summaryGenerator = GenerateSummaryPage() if self.cmdLineResourcePage is None else None
-
-    def findResourcePage(self, collArg):
-        if collArg and collArg.startswith("web."):
-            return collArg[4:]
+        self.summaryGenerator = GenerateSummaryPage()
 
     def notifyAdd(self, test, *args, **kw):
         self.descriptionInfo.setdefault(test.app, {}).setdefault(test.getRelPath().replace(os.sep, " "), test.description)
@@ -690,12 +685,6 @@ class WebPageResponder(plugins.Responder):
     def extractFromArchive(self):
         for suite in self.suitesToGenerate:
             self.archiveExtractor.extract(suite)
-
-    def getResourcePages(self, getConfigValue):
-        if self.cmdLineResourcePage is not None:
-            return [ self.cmdLineResourcePage ]
-        else:
-            return getConfigValue("historical_report_resource_pages")
 
     def generatePagePerApp(self, pageTitle, pageInfo):
         for app, repositories, extraApps in pageInfo:
@@ -817,11 +806,10 @@ class WebPageResponder(plugins.Responder):
             shutil.copytree(srcDir, jsDir)
         
     def makeAndGenerate(self, subDirs, getConfigValue, pageDir, *args):
-        resourcePages = self.getResourcePages(getConfigValue)
-        for resourcePage in resourcePages:
-            plugins.ensureDirectoryExists(os.path.join(pageDir, resourcePage))
+        resourceNames = getConfigValue("historical_report_resources")
+        plugins.ensureDirectoryExists(pageDir)
         try:
-            self.generateWebPages(subDirs, getConfigValue, pageDir, resourcePages, *args)
+            self.generateWebPages(subDirs, getConfigValue, pageDir, resourceNames, *args)
         except Exception: # pragma: no cover - robustness only, shouldn't be reachable
             sys.stderr.write("Caught exception while generating web pages :\n")
             plugins.printException()

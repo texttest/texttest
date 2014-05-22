@@ -399,8 +399,8 @@ class TestTreeGUI(guiutils.ContainerGUI):
         newSelection = self.getSelected()
         if newSelection != self.selectedTests:
             self.sendSelectionNotification(newSelection, direct)
-            if self.dynamic and direct:
-                self.selection.selected_foreach(self.updateRecalculationMarker)
+            if direct:
+                self.updateRecalculationMarkers()
 
     def notifyRefreshTestSelection(self):
         # The selection hasn't changed, but we want to e.g.
@@ -504,6 +504,10 @@ class TestTreeGUI(guiutils.ContainerGUI):
             self.subguis[0].updateTestInfo(tests, self.selection.count_selected_rows())
         else:
             self.sendActualSelectionNotification(direct)
+            
+    def updateRecalculationMarkers(self):
+        if self.dynamic:
+            self.selection.selected_foreach(self.updateRecalculationMarker)
 
     def getSelected(self):
         allSelected = []
@@ -534,6 +538,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         actualSelection = self.selectTestRows(selTests, selectCollapsed)
         # Here it's been set via some indirect mechanism, might want to behave differently
         self.sendSelectionNotification(actualSelection, direct=direct)
+        self.updateRecalculationMarkers()
 
     def selectTestRows(self, selTests, selectCollapsed=True):
         self.selecting = True # don't respond to each individual programmatic change here

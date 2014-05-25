@@ -101,7 +101,7 @@ class RefreshTips:
 
         cell_pos = column.cell_get_position(self.refreshCell)[0]
         if cell_x > cell_pos:
-            tooltip.set_text("Indicates that this " + self.name + "'s saved result has changed since the status was calculated. " + \
+            tooltip.set_text("Indicates that this " + self.name + "'s approved result has changed since the status was calculated. " + \
                              "It's therefore recommended to recompute the status.")
             return True
         else:

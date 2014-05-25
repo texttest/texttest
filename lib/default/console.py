@@ -108,9 +108,9 @@ class InteractiveResponder(plugins.Responder):
             saveDesc += "(exact) "
         if self.overwriteSuccess:
             saveDesc += "(overwriting succeeded files also)"
-        plugins.log.info(self.getPrefix(test) + "Saving " + repr(test) + saveDesc)
+        plugins.log.info(self.getPrefix(test) + "Approving " + repr(test) + saveDesc)
         test.state.save(test, exact, version, self.overwriteSuccess)
-        newState = test.state.makeNewState(test, "saved")
+        newState = test.state.makeNewState(test, "approved")
         test.changeState(newState)
 
     def useInteractiveResponse(self, test):
@@ -161,14 +161,14 @@ class InteractiveResponder(plugins.Responder):
         versions = test.app.getSaveableVersions()
         options = ""
         for i in range(len(versions)):
-            options += "Save Version " + versions[i] + "(" + str(i + 1) + "), "
-        options += "Save(s) or continue(any other key)?"
+            options += "Approve Version " + versions[i] + "(" + str(i + 1) + "), "
+        options += "Approve(a) or continue(any other key)?"
         if allowView:
             options = "View details(v), " + options
         plugins.log.info(self.getPrefix(test) + options)
         response = sys.stdin.readline()
         exactSave = response.find('+') != -1
-        if response.startswith('s'):
+        if response.startswith('a'):
             self.save(test, version="", exact=exactSave)
         elif allowView and response.startswith('v'):
             return 1

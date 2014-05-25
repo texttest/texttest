@@ -7,7 +7,7 @@ from fnmatch import fnmatch
 class FileComparison:
     SAME = 0
     DIFFERENT = 1
-    SAVED = 2
+    APPROVED = 2
     def __init__(self, test, stem, standardFile, tmpFile, testInProgress=False, **kw):
         self.stdFile = standardFile
         self.stdCmpFile = self.stdFile
@@ -155,9 +155,9 @@ class FileComparison:
             self.diag.info("No comparison, no recalculation")
             return False
 
-        # A test that has been saved doesn't need recalculating
-        if self.differenceCache == self.SAVED:
-            self.diag.info("Saved file, no recalculation")
+        # A test that has been approved doesn't need recalculating
+        if self.differenceCache == self.APPROVED:
+            self.diag.info("Approved file, no recalculation")
             return False
 
         stdModTime = plugins.modifiedTime(self.stdFile)
@@ -211,7 +211,7 @@ class FileComparison:
             return self.tmpFile + postfix
 
     def existingFile(self, *args):
-        if self.missingResult() or self.differenceCache == self.SAVED:
+        if self.missingResult() or self.differenceCache == self.APPROVED:
             return self.getStdFile(*args)
         else:
             return self.getTmpFile(*args)
@@ -230,7 +230,7 @@ class FileComparison:
     def updateDifferenceCache(self, valueForEqual):
         if self.stdCmpFile and self.tmpCmpFile:
             if filecmp.cmp(self.stdCmpFile, self.tmpCmpFile, 0):
-                if self.differenceCache != self.SAVED:
+                if self.differenceCache != self.APPROVED:
                     self.differenceCache = valueForEqual
             else:
                 self.differenceCache = self.DIFFERENT
@@ -353,7 +353,7 @@ class FileComparison:
             for splitComp in splitComps:
                 f.write(open(splitComp.stdFile).read())
         self.stdCmpFile = self.stdFile
-        self.updateDifferenceCache(self.SAVED)
+        self.updateDifferenceCache(self.APPROVED)
         
     def saveNew(self, test, versionString):
         self.stdFile = os.path.join(test.getDirectory(), self.versionise(self.stem + "." + test.app.name, versionString))
@@ -384,7 +384,7 @@ class FileComparison:
                 self.saveResults(tmpFile, self.stdFile)
         else:
             raise plugins.TextTestError, "The following file seems to have been removed since it was created:\n" + repr(tmpFile) 
-        self.differenceCache = self.SAVED
+        self.differenceCache = self.APPROVED
 
     def saveMissing(self, versionString, autoGenText, backupVersionStrings):
         stdRoot = self.getStdRootVersionFile()

@@ -867,7 +867,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
             self.setSensitivity(newActive)
             if newActive:
                 self.updateStems(fileType)
-                self.defaultAppendAppName = (fileType == "definition" or fileType == "standard")
+                self.defaultAppendAppName = (fileType == "definition" or fileType == "approved")
                 self.updateAppendAppName(self.defaultAppendAppName)
 
     def updateAppendAppName(self, setting):
@@ -879,8 +879,8 @@ class ImportFiles(guiplugins.ActionDialogGUI):
             return self.getDefinitionFiles()
         elif fileType == "data":
             return self.currTestSelection[0].getDataFileNames()
-        elif fileType == "standard":
-            return self.getStandardFiles()
+        elif fileType == "approved":
+            return self.getApprovedFiles()
         else:
             return []
 
@@ -904,7 +904,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         # That leaves the rest ("default")
         return defFiles + self.currTestSelection[0].expandedDefFileStems("default")
 
-    def getStandardFiles(self):
+    def getApprovedFiles(self):
         app = self.currTestSelection[0].app
         collateKeys = app.getConfigValue("collate_file").keys()
         # Don't pick up "dummy" indicators on Windows...

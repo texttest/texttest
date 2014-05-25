@@ -590,14 +590,14 @@ class TestTreeGUI(guiutils.ContainerGUI):
 
             iter = view.get_model().iter_next(iter)
 
-    def notifyTestAppearance(self, test, detailText, colour1, colour2, updateSuccess, saved):
+    def notifyTestAppearance(self, test, detailText, colour1, colour2, updateSuccess, approved):
         iter = self.itermap.getIterator(test)
         self.model.set_value(iter, 1, colour1)
         self.model.set_value(iter, 3, detailText)
         self.model.set_value(iter, 4, colour2)
         if updateSuccess:
             self.updateSuiteSuccess(test, colour1)
-        if saved:
+        if approved:
             self.checkRelatedForRecalculation(test)
 
     def notifyLifecycleChange(self, test, *args):

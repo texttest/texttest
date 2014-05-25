@@ -18,8 +18,8 @@ class ApplicationEventResponder(plugins.Responder):
         applicationEvent("test configuration to be read", "read")
 
     def notifyLifecycleChange(self, test, state, changeDesc):
-        if changeDesc.find("saved") != -1 or changeDesc.find("recalculated") != -1 or changeDesc.find("marked") != -1:
-            # don't generate application events when a test is saved or recalculated or marked...
+        if changeDesc.find("approved") != -1 or changeDesc.find("recalculated") != -1 or changeDesc.find("marked") != -1:
+            # don't generate application events when a test is approved or recalculated or marked...
             return
         eventName = "test " + test.uniqueName + " to " + changeDesc
         category = test.uniqueName

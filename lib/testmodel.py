@@ -323,7 +323,7 @@ class Test(plugins.Observable):
                 stems.append(pattern)
         return stems
 
-    def listStandardFiles(self, allVersions, defFileCategory="all"):
+    def listApprovedFiles(self, allVersions, defFileCategory="all"):
         self.diagnose("Looking for standard files, definition files in category " + repr(defFileCategory))
         defFileStems = self.expandedDefFileStems(defFileCategory)
         defFiles = self.getFilesFromStems(defFileStems, allVersions)
@@ -467,7 +467,7 @@ class Test(plugins.Observable):
         return tests
 
     def updateAllRelPaths(self, origRelPath):
-        stdFiles, defFiles = self.listStandardFiles(allVersions=True)
+        stdFiles, defFiles = self.listApprovedFiles(allVersions=True)
         newRelPath = self.getRelPath()
         for file in stdFiles + defFiles:
             self.updateRelPathReferences(file, origRelPath, newRelPath)

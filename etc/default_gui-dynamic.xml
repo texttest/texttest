@@ -4,8 +4,8 @@
 
     <menu name="filemenu" action="filemenu">
       <placeholder name="FirstInFileMenu">
-        <menuitem action="Save"/>
-        <menuitem action="Save As..."/>
+        <menuitem action="Approve"/>
+        <menuitem action="Approve As..."/>
         <separator/>
       </placeholder>
     </menu>
@@ -31,7 +31,7 @@
   <toolbar name="MainToolBar">
     <toolitem action="Quit"/>
     <toolitem action="Kill"/>
-    <toolitem action="Save"/>
+    <toolitem action="Approve"/>
     <separator/>
   </toolbar>
 
@@ -39,8 +39,8 @@
     <menuitem action="Enter Failure Information"/>
     <menuitem action="Find Failure Information"/>
     <separator/>
-    <menuitem action="Save"/>
-    <menuitem action="Save As..."/>
+    <menuitem action="Approve"/>
+    <menuitem action="Approve As..."/>
     <separator/>
     <menuitem action="Kill"/>
     <placeholder name="ExtraTestActions" >
@@ -81,8 +81,8 @@
     <separator/>
     <menuitem action="Select Tests With Same Diff"/>
     <separator/>
-    <menuitem action="Save"/>
-    <menuitem action="Save As..."/>
+    <menuitem action="Approve"/>
+    <menuitem action="Approve As..."/>
   </popup>
 
 </ui>

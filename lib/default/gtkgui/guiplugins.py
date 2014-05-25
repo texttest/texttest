@@ -1039,7 +1039,7 @@ class ActionDialogGUI(OptionGroupGUI):
                     fileChooser = self.createFileChooser(option)
                     if len(allOptions) > 1 and not option.saveFile:
                         # If there is other stuff, add a frame round the file chooser so we can see what it's for
-                        # Don't do this when saving as it shouldn't be necessary
+                        # Don't do this when approving as it shouldn't be necessary
                         labelEventBox = self.createLabelEventBox(option, separator=":")
                         frame = gtk.Frame()
                         frame.set_label_widget(labelEventBox)

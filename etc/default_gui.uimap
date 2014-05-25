@@ -292,12 +292,12 @@ delete-event = close window
 [Name=Set Run Name]
 activate = provide a name for this run and warn before closing it
 
-[Name=Save As...]
-activate = save results with non-default settings
+[Name=Approve As...]
+activate = approve results with non-default settings
 
-[Name=Save]
-activate = save results for selected tests
-clicked = save results for selected tests
+[Name=Approve]
+activate = approve results for selected tests
+clicked = approve results for selected tests
 
 [Name=Kill]
 activate = kill selected tests
@@ -385,17 +385,17 @@ response.cancel = cancel file selection
 response.no = answer no to texttest query
 response.yes = answer yes to texttest query
 
-[Name=Version to save]
-changed = enter version to save =
+[Name=Version to approve]
+changed = enter version to approve =
 
-[Name=Version(s) to save previous results as]
-changed = enter version(s) to save previous results as =
+[Name=Version(s) to store previous results as]
+changed = enter version(s) to store previous results as =
 
 [Label=Replace successfully compared files also]
 toggled.true = check replace successfully compared files also
 toggled.false = uncheck replace successfully compared files also
 
-[Name=Save As]
+[Name=Approve As]
 response.cancel = press cancel
 response.accept = press ok
 
@@ -488,10 +488,10 @@ response.no = answer no to texttest confirmation
 response.yes = answer yes to texttest confirmation
 
 [Label=Average performance]
-toggled.true = choose average performance for save
+toggled.true = choose average performance for store
 
 [Label=Exact performance]
-toggled.true = choose exact performance for save
+toggled.true = choose exact performance for store
 
 [Name=Text or regexp to match]
 changed = enter text or regexp to match =

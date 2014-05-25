@@ -105,7 +105,7 @@ class FilterAction(plugins.Action):
 
 class FilterOriginal(FilterAction):
     def filesToFilter(self, test):
-        resultFiles, defFiles = test.listStandardFiles(allVersions=False, defFileCategory="regenerate")
+        resultFiles, defFiles = test.listApprovedFiles(allVersions=False, defFileCategory="regenerate")
         return self.constantPostfix(resultFiles + defFiles, "origcmp")
 
     def changeToFilteringState(self, test):

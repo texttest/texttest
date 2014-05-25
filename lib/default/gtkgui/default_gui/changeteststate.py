@@ -46,48 +46,48 @@ class BackgroundThreadHelper:
         
 
 
-class SaveTests(BackgroundThreadHelper,guiplugins.ActionDialogGUI):
+class ApproveTests(BackgroundThreadHelper,guiplugins.ActionDialogGUI):
     defaultVersionStr = "<existing version>"
     fullVersionStr = "<full version>"
     def __init__(self, allApps, *args):
         guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
         self.directAccel = None
-        self.directAction = gtk.Action("Save", "_Save", \
+        self.directAction = gtk.Action("Approve", "_Approve", \
                                        self.getDirectTooltip(), self.getStockId())
         self.directAction.connect("activate", self._respond)
         self.directAction.set_property("sensitive", False)
-        self.addOption("v", "Version to save", self.defaultVersionStr)
-        self.addOption("old", "Version(s) to save previous results as")
+        self.addOption("v", "Version to approve", self.defaultVersionStr)
+        self.addOption("old", "Version(s) to store previous results as")
         self.addSwitch("over", "Replace successfully compared files also", 0)
         if self.hasPerformance(allApps):
-            self.addSwitch("ex", "Save", 1, ["Average performance", "Exact performance"])
-        # Must do this in the constructor, so that "Save" also takes account of them
+            self.addSwitch("ex", "Store", 1, ["Average performance", "Exact performance"])
+        # Must do this in the constructor, so that "Approve" also takes account of them
         for option in self.optionGroup.options.values():
             self.addValuesFromConfig(option)
 
     def createDialog(self):
         dialog = guiplugins.ActionDialogGUI.createDialog(self)
-        dialog.set_name("Save As")
+        dialog.set_name("Approve As")
         return dialog
 
     def getDialogTitle(self):
-        stemsToSave = self.getStemsToSave()
-        saveDesc = "Saving " + str(len(self.currTestSelection)) + " tests"
-        if len(stemsToSave) > 0:
-            saveDesc += ", only files " + ",".join(stemsToSave)
+        stemsToApprove = self.getStemsToApprove()
+        saveDesc = "Approving " + str(len(self.currTestSelection)) + " tests"
+        if len(stemsToApprove) > 0:
+            saveDesc += ", only files " + ",".join(stemsToApprove)
         return saveDesc
 
     def _getStockId(self):
-        return "save"
+        return "apply"
     def _getTitle(self):
-        return "Save _As..."
+        return "Approve _As..."
     def getTooltip(self):
-        return "Save results with non-default settings"
+        return "Approve results with non-default settings"
     def getDirectTooltip(self):
-        return "Save results for selected tests"
+        return "Approve results for selected tests"
     
     def addToGroups(self, actionGroup, accelGroup):
-        self.directAccel = self._addToGroups("Save", self.directAction, actionGroup, accelGroup)
+        self.directAccel = self._addToGroups("Approve", self.directAction, actionGroup, accelGroup)
         guiplugins.ActionDialogGUI.addToGroups(self, actionGroup, accelGroup)
 
     def setSensitivity(self, newValue):
@@ -142,7 +142,7 @@ class SaveTests(BackgroundThreadHelper,guiplugins.ActionDialogGUI):
                 return True
         return False
 
-    def getStemsToSave(self):
+    def getStemsToApprove(self):
         return [ cmp.stem for _, cmp in self.currFileSelection ]
 
     def getBackupVersions(self):
@@ -162,32 +162,32 @@ class SaveTests(BackgroundThreadHelper,guiplugins.ActionDialogGUI):
     def performOnCurrent(self):
         backupVersions = self.getBackupVersions()
         if self.optionGroup.getOptionValue("v") in backupVersions:
-            raise plugins.TextTestError, "Cannot backup to the same version we're trying to save! Choose another name."
+            raise plugins.TextTestError, "Cannot backup to the same version we're trying to approve! Choose another name."
         
     def performBackgroundAction(self, selection):
         backupVersions = self.getBackupVersions()
-        stemsToSave = self.getStemsToSave()
+        stemsToApprove = self.getStemsToApprove()
         overwriteSuccess = self.optionGroup.getSwitchValue("over")
         tests = self.getSaveableTests(selection)
-        # Calculate the versions beforehand, as saving tests can change the selection,
+        # Calculate the versions beforehand, as approving tests can change the selection,
         # which can affect the default version calculation...
         testsWithVersions = [ (test, self.getVersion(test)) for test in tests ]
         testDesc = str(len(tests)) + " tests"
-        self.notify("Status", "Saving " + testDesc + " ...")
+        self.notify("Status", "Approving " + testDesc + " ...")
         try:
             for test, versionString in testsWithVersions:
                 testComparison = test.stateInGui
                 testComparison.setObservers(self.observers)
-                testComparison.save(test, self.getExactness(), versionString, overwriteSuccess, stemsToSave, backupVersions)
-                newState = testComparison.makeNewState(test, "saved")
+                testComparison.save(test, self.getExactness(), versionString, overwriteSuccess, stemsToApprove, backupVersions)
+                newState = testComparison.makeNewState(test, "approved")
                 test.changeState(newState)
 
-            self.notify("Status", "Saved " + testDesc + ".")
+            self.notify("Status", "Approved " + testDesc + ".")
         except OSError, e:
-            self.notify("Status", "Failed to save " + testDesc + ".")
+            self.notify("Status", "Failed to approve " + testDesc + ".")
             errorStr = str(e)
             if "Permission" in errorStr:
-                errorStr = "Failed to save " + testDesc + \
+                errorStr = "Failed to approve " + testDesc + \
                         " : didn't have sufficient write permission to the test files"
             return errorStr
 
@@ -572,6 +572,6 @@ class FindKnownBugs(guiplugins.ActionDialogGUI):
 
         
 def getInteractiveActionClasses():
-    return [ SaveTests, KillTests, MarkTest, UnmarkTest, RecomputeTests, ReportBugsAndRecompute,
+    return [ ApproveTests, KillTests, MarkTest, UnmarkTest, RecomputeTests, ReportBugsAndRecompute,
              SuspendTests, UnsuspendTests, SplitResultFiles, FindKnownBugs ]
  

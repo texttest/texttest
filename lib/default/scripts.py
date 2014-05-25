@@ -320,7 +320,7 @@ class ExportTests(plugins.ScriptWithArgs):
         otherParent.addTest(test.__class__, test.name, test.description, placement)
 
     def copyTestContents(self, test, newDir):
-        stdFiles, defFiles = test.listStandardFiles(allVersions=True)
+        stdFiles, defFiles = test.listApprovedFiles(allVersions=True)
         for sourceFile in stdFiles + defFiles:
             dirname, local = os.path.split(sourceFile)
             if dirname == test.getDirectory():

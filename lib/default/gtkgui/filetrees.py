@@ -403,7 +403,7 @@ class TestFileGUI(FileViewGUI):
 
     def notifyLifecycleChange(self, test, state, changeDesc):
         if test is self.currentTest:
-            self.recreateModel(state, preserveSelection=changeDesc.find("save") == -1)
+            self.recreateModel(state, preserveSelection=changeDesc.find("approve") == -1)
 
     def notifyRecalculation(self, test, comparisons, newIcon):
         if test is not self.currentTest:
@@ -450,7 +450,7 @@ class TestFileGUI(FileViewGUI):
         
     def notifyViewerStarted(self):
         if self.dynamic:
-            self.selection.unselect_all() # Mostly so viewing files doesn't cause only them to be saved
+            self.selection.unselect_all() # Mostly so viewing files doesn't cause only them to be approved
         self.applicationEvent("the viewer process to start", timeDelay=1)
 
     def notifyNewFile(self, fileName, overwrittenExisting):
@@ -522,13 +522,13 @@ class TestFileGUI(FileViewGUI):
                 filelist.append(file)
             
         for file in sorted(filelist):
-            newiter = self.addStandardFileUnderIter(state, iter, file, fileCompMap)
+            newiter = self.addApprovedFileUnderIter(state, iter, file, fileCompMap)
             splitcomps = splitlist.get(file, [])
             # Preserve the original order of these split files
             for splitcomp in sorted(splitcomps, key=state.allResults.index):
-                self.addStandardFileUnderIter(state, newiter, splitcomp.getDisplayFileName(), fileCompMap)
+                self.addApprovedFileUnderIter(state, newiter, splitcomp.getDisplayFileName(), fileCompMap)
 
-    def addStandardFileUnderIter(self, state, iter, file, compMap = {}):
+    def addApprovedFileUnderIter(self, state, iter, file, compMap = {}):
         comparison = compMap.get(file)
         colour = self.getComparisonColour(state, comparison)
         details = ""
@@ -549,7 +549,7 @@ class TestFileGUI(FileViewGUI):
         tmpIter = self.model.insert_before(None, None)
         self.model.set_value(tmpIter, 0, "Temporary Files")
         for file in tmpFiles:
-            self.addStandardFileUnderIter(state, tmpIter, file)
+            self.addApprovedFileUnderIter(state, tmpIter, file)
 
     def getRootIterAndColour(self, heading, rootDir=None):
         if not rootDir:
@@ -565,9 +565,9 @@ class TestFileGUI(FileViewGUI):
             self.addFileToModel(stditer, file, colour)
 
     def addStaticFilesToModel(self, *args):
-        stdFiles, defFiles = self.currentTest.listStandardFiles(allVersions=True)
+        stdFiles, defFiles = self.currentTest.listApprovedFiles(allVersions=True)
         if self.currentTest.classId() == "test-case":
-            self.addStaticFilesWithHeading("Standard", stdFiles)
+            self.addStaticFilesWithHeading("Approved", stdFiles)
 
         self.addStaticFilesWithHeading("Definition", defFiles)
         self.addStaticDataFilesToModel()

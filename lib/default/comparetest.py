@@ -104,7 +104,7 @@ class BaseTestComparison(plugins.TestState):
         return self.makeStemDict(resultFilesToCompare)
 
     def makeComparisons(self, test, ignoreMissing=False):
-        # Might have saved some new ones or removed some old ones in the meantime...
+        # Might have approved some new ones or removed some old ones in the meantime...
         test.refreshFiles()
         tmpFiles = self.makeStemDict(test.listTmpFiles())
         stdFiles = self.makeStandardStemDict(test, tmpFiles, ignoreMissing)
@@ -129,7 +129,7 @@ class BaseTestComparison(plugins.TestState):
     def addComparison(self, comparison):
         info = "Making comparison for " + comparison.stem + " "
         if comparison.isDefunct():
-            # typically "missing file" that got "saved" and removed
+            # typically "missing file" that got "approved" and removed
             info += "(defunct)"
         else:
             self.allResults.append(comparison)
@@ -330,8 +330,8 @@ class TestComparison(BaseTestComparison):
         worstResult = self.getMostSevereFileComparison()
         if not worstResult:
             self.category = "success"
-            if "save" in self.lifecycleChange:
-                self.freeText = "(Saved at " + plugins.localtime("%H:%M") + ")"
+            if "approve" in self.lifecycleChange:
+                self.freeText = "(Approved at " + plugins.localtime("%H:%M") + ")"
         else:
             self.category = worstResult.getType()
             self.freeText = self.getFreeTextInfo()
@@ -365,7 +365,7 @@ class TestComparison(BaseTestComparison):
         return parentComp, splitComps
 
     def save(self, test, exact=True, versionString=None, overwriteSuccessFiles=False, onlyStems=[], backupVersions=[]):
-        self.diag.info("Saving " + repr(test) + " stems " + repr(onlyStems))
+        self.diag.info("Approving " + repr(test) + " stems " + repr(onlyStems))
         for comparison in self.filterComparisons(self.changedResults, onlyStems):
             self.updateStatus(test, str(comparison), versionString)
             comparison.overwrite(test, exact, versionString, backupVersions)
@@ -402,7 +402,7 @@ class TestComparison(BaseTestComparison):
     def recalculateStdFiles(self, test):
         self.diag.info("Recalculating standard files for " + repr(test))
         test.refreshFiles()
-        resultFiles, defFiles = test.listStandardFiles(allVersions=False)
+        resultFiles, defFiles = test.listApprovedFiles(allVersions=False)
         stdFiles = self.makeStemDict(resultFiles + defFiles)
         for fileComp in self.allResults:
             stdFile = stdFiles.get(fileComp.stem)
@@ -427,7 +427,7 @@ class TestComparison(BaseTestComparison):
             return [ comp for comp in resultList if self.stemMatches(comp.stem, onlyStems) ]
 
     def updateStatus(self, test, compStr, versionString):
-        testRepr = "Saving " + repr(test) + " : "
+        testRepr = "Approving " + repr(test) + " : "
         if versionString is not None:
             versionRepr = ", version " + repr(versionString)
         else:
@@ -551,7 +551,7 @@ class PrintObsoleteVersions(plugins.Action):
     def __call__(self, test):
         self.describe(test)
         compFiles = {}
-        resultFiles = test.listStandardFiles(allVersions=True)[0]
+        resultFiles = test.listApprovedFiles(allVersions=True)[0]
         for file in resultFiles:
             stem = file.split(".")[0]
             compFile = self.filterFile(test, file)

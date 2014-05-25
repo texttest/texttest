@@ -301,8 +301,8 @@ class TestProgressMonitor(guiutils.SubGUI):
 
         if not state.isComplete() or not state.hasFailed():
             classification = [ catDesc ]
-            if "save" in changeDesc:
-                classification.append("Saved")
+            if "approve" in changeDesc:
+                classification.append("Approved")
             elif not state.isComplete() and state.briefText:
                 subState = state.briefText.split()[0]
                 if subState != state.defaultBriefText:
@@ -436,7 +436,7 @@ class TestProgressMonitor(guiutils.SubGUI):
         mainColour = guiutils.guiConfig.getTestColour(catDesc, guiutils.guiConfig.getTestColour(resultType))
         # Don't change suite states when unmarking tests
         updateSuccess = state.hasSucceeded() and changeDesc != "unmarked"
-        self.notify("TestAppearance", test, summary, mainColour, colour, updateSuccess, "save" in changeDesc)
+        self.notify("TestAppearance", test, summary, mainColour, colour, updateSuccess, "approve" in changeDesc)
         self.notify("Visibility", [ test ], self.shouldBeVisible(test))
 
     def getInitialTestsForNode(self, test, parentIter, nodeClassifier):
@@ -517,7 +517,7 @@ class TestProgressMonitor(guiutils.SubGUI):
 
     def notifyLifecycleChange(self, test, state, changeDesc):
         self.removeFromModel(test)
-        if "save" in changeDesc or "marked" in changeDesc or "recalculated" in changeDesc:
+        if "approve" in changeDesc or "marked" in changeDesc or "recalculated" in changeDesc:
             self.removeFromDiffStore(test)
         colourInserted = self.insertTest(test, state, changeDesc, incrementCount=True)
         self.updateTestAppearance(test, state, changeDesc, colourInserted)

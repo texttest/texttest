@@ -2521,6 +2521,8 @@ Dynamic GUI Enhancements:
 	Essentially generates the batch report for the selected tests, writing to a user-selected file
 General GUI Enhancements:
     - File choosers always pick a default choice, should be more sensible than the ones we had before
+    - Change of terminology in GUIs:
+	"Save" renamed to "Approve". "Standard Files" are now "Approved Files".
 Framework Enhancements:
     - "test_data_require" added
 	Allow specifying that certain types of test data must be present. See website
@@ -2545,6 +2547,9 @@ Batch Report Enhancements:
 	For example Jenkins will turn these into links directly.
     - Many improvements to Jenkins Changes functionality
 	Handles attached RPMs via Maven, separate "build" structure from "jobs", workspace subdirectories amongst other things
+    - Overhaul of the additional performance data in HTML reports
+	Instead of separate pages it now appears as additional rows in the normal overview.
+	"historical_report_resource_pages" renamed to "historical_report_resources" to determine which ones to show
 Grid Engine enhancements/bug fixes:
     - New experimental status support for EC2 Virtual Private Cloud added
 	Tests run parallel on any available cloud machines. Requires Python tool "boto". See website.
@@ -2593,5 +2598,8 @@ Bug Fixes:
     - Rerunning tests with different checkouts now works
     - Fixed hang when rerunning from dynamic GUI started from command line and closing the first one first
     - Workaround for GTK2.20 bug in filechooser when choosing directories
+    - Warnings printed for same bug when it isn't possible to workaround
     - No longer start virtual display when reconnecting to GUI tests. Fixes hang when reconnecting to non-existent GUI tests.
     - No longer hang if parent directory chosen as source when importing files. Can occur with GTK2.20 bugs.
+    - Select and Filter now in dynamic GUI actions menu (got forgotten)
+    - File view recomputation icon in dynamic GUI no longer disappears when selecting via Selection tab

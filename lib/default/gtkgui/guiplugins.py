@@ -1,6 +1,6 @@
 
 
-import gtk, gobject, entrycompletion, plugins, os, subprocess, types, logging
+import gtk, gobject, entrycompletion, plugins, os, subprocess, types, logging, sys
 from guiutils import guiConfig, SubGUI, GUIConfig, createApplicationEvent
 from jobprocess import killSubProcessAndChildren
 from ordereddict import OrderedDict
@@ -1131,7 +1131,8 @@ class ActionDialogGUI(OptionGroupGUI):
                 fileChooser.add_shortcut_folder(folder)
             except gobject.GError:
                 pass # Get this if the folder is already added, e.g. if it's the home directory
-        if option.selectFile:
+
+        if option.selectFile and self.set_filename_is_working():
             if option.getValue():
                 fileChooser.set_filename(option.getValue())
             else:
@@ -1141,6 +1142,36 @@ class ActionDialogGUI(OptionGroupGUI):
             
         fileChooser.set_local_only(True)
         return fileChooser
+        
+    def set_filename_is_working(self):
+        # A particularly nasty bug was introduced in GTK 2.20, and fixed in GTK 2.24
+        # https://bugzilla.gnome.org/show_bug.cgi?id=643170
+        # It not only prevents set_filename from working but causes GTK events to be created and never executed
+        # making the GUI think it is constantly busy and sending our throbber into an infinite loop
+        # See bugs TTT-3469, TTT-3483
+        if gtk.gtk_version < (2, 20) or gtk.gtk_version >= (2, 24):
+            return True
+        
+        fileChooserConfigFile = self.getFileChooserConfigFile()
+        if not self.showHiddenFilesEnabled(fileChooserConfigFile):
+            return True
+        
+        sys.stderr.write("WARNING: unable to select files in File Chooser, due to a GTK+ bug.\n" + 
+                         "Either upgrade GTK+ to at least version 2.24, or set 'ShowHidden=false' in your configuration file at\n" +
+                         fileChooserConfigFile + "\n")
+        return False
+    
+    def getFileChooserConfigFile(self):
+        xdgConfigHome = os.getenv("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
+        return os.path.join(xdgConfigHome, "gtk-2.0", "gtkfilechooser.ini")
+        
+    def showHiddenFilesEnabled(self, configFile):
+        if os.path.isfile(configFile):
+            with open(configFile) as f:
+                for line in f:
+                    if "ShowHidden" in line and "true" in line:
+                        return True
+        return False
         
     def getDefaultFileChooserValue(self, startFolder):
         appSuffices = [ "." + app.name for app in self.validApps ]

@@ -52,7 +52,7 @@ class QueueSystem(gridqueuesystem.QueueSystem):
                 qsubArgs.append("-v")
                 qsubArgs.append(",".join(slaveEnv))
             
-        qsubArgs += [ "-o", os.devnull, "-e", os.devnull ]
+        qsubArgs += [ "-o", os.devnull, "-e", os.path.join(self.coreFileLocation, "slave_start_errors." + os.getenv("USER")) ]
         return self.addExtraAndCommand(qsubArgs, submissionRules, commandArgs)
 
     def getResourceArg(self, submissionRules):

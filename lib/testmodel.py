@@ -737,6 +737,7 @@ class TestCase(Test):
 
     def combineOptions(self, optionArgs, newArgs):
         prevOption = False
+        self.combineRepeatedOptions(optionArgs, newArgs)
         optionInsertPos = self.findOptionInsertPosition(optionArgs)
         self.diagnose("Inserting options into " + repr(optionArgs) + " in position " + repr(optionInsertPos))
         for newArg in newArgs:
@@ -747,6 +748,34 @@ class TestCase(Test):
                 optionArgs.append(newArg)
                 optionInsertPos = len(optionArgs)
             prevOption = newArg.startswith("-")
+
+    def combineRepeatedOptions(self, optionArgs, newArgs):
+        repeatedOptions = [newArg for newArg in newArgs if newArg.startswith("-") and newArg in optionArgs]
+        for option in repeatedOptions:
+            pos1 = optionArgs.index(option)
+            pos2 = newArgs.index(option)
+            oldValue = optionArgs[pos1 + 1] if pos1 + 1 < len(optionArgs) else ""
+            newValue = newArgs[pos2 + 1] if pos2 + 1 < len(newArgs) else ""
+            if oldValue and not oldValue.startswith("-") and newValue and not newValue.startswith("-"):
+                if not "," in oldValue and not "," in newValue:
+                    optionArgs[pos1 + 1] = newValue
+                else:
+                    topList = oldValue.split(",")
+                    newList = newValue.split(",")
+                    for value in newList:
+                        if value not in topList:
+                            topList.append(value)
+                    optionArgs[pos1 + 1] = ",".join(topList)
+                newArgs.pop(pos2)
+                newArgs.pop(pos2)
+            elif oldValue.startswith("-") or not oldValue:
+                if newValue and not newValue.startswith("-"):
+                    optionArgs.insert(pos1 + 1, newValue)
+                    newArgs.pop(pos2)
+                newArgs.pop(pos2)
+            elif newValue.startswith("-") or not newValue:
+                optionArgs.pop(pos1 + 1)
+                newArgs.pop(pos2)
 
     def findLastOptionIndex(self, optionArgs):
         for i, option in enumerate(reversed(optionArgs)):

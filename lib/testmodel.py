@@ -709,9 +709,25 @@ class TestCase(Test):
         endPos = pos + len(toClear)
         if optionArgs[pos:endPos] == toClear:
             return optionArgs[:pos] + optionArgs[endPos:]
+        elif len(toClear) == 2 and toClear[0].startswith("-") and not toClear[1].startswith("-") and toClear[0] in optionArgs and \
+            pos + 1 < len(optionArgs) and not optionArgs[pos + 1].startswith("-"):
+            return TestCase.removeOptionsFromList(optionArgs, toClear[0], toClear[1])
         else:
             return optionArgs
+    
+    @staticmethod
+    def removeOptionsFromList(optionArgs, option, argString):
+        optionPos = optionArgs.index(option)
+        oldArgList = optionArgs[optionPos + 1].split(",")
+        argList = argString.split(",")
+        for arg in argList:
+            if arg in oldArgList:
+                oldArgList.remove(arg)
+        optionArgsCopy = optionArgs[:]
+        optionArgsCopy[optionPos + 1] =   ",".join(oldArgList)
+        return optionArgsCopy
         
+            
     def getCommandLineOptions(self, stem="options"):
         optionArgs = []
         for optionsFile in self.getAllPathNames(stem):
@@ -732,7 +748,6 @@ class TestCase(Test):
                 optionArgs = newArgs
             else:
                 self.combineOptions(optionArgs, newArgs)
-
         return optionArgs
 
     def combineOptions(self, optionArgs, newArgs):

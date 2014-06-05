@@ -3,6 +3,7 @@ import local, plugins, signal
 import time, os, sys
 from threading import Thread
 from Queue import Queue
+from fnmatch import fnmatch
 
 class Ec2Machine:
     def __init__(self, ipAddress, cores, synchDirs, app):
@@ -134,27 +135,31 @@ class QueueSystem(local.QueueSystem):
             sys.stderr.write("Cannot run tests in EC2 cloud. You need to install Python's boto package for this to work.\n")
             return []
         conn = boto.ec2.connect_to_region(region)
-        instanceTag = self.app.getConfigValue("queue_system_ec2_instance_tag")
-        idToIp = self.findTaggedInstances(conn, instanceTag)
+        instanceTags = self.app.getConfigValue("queue_system_resource")
+        idToIp = self.findTaggedInstances(conn, instanceTags)
         if idToIp:
             machines = self.filterOnStatus(conn, idToIp)
             if not machines:
-                sys.stderr.write("Cannot run tests in EC2 cloud. " + str(len(idToIp)) + " machines were found with '" + \
-                                 instanceTag + "' in their name tag, but none are currently up.\n")
+                sys.stderr.write("Cannot run tests in EC2 cloud. " + str(len(idToIp)) + " instances were found matching '" + \
+                                 ",".join(instanceTags) + "' in their tags, but none are currently up.\n")
             return machines
         else:
-            sys.stderr.write("Cannot run tests in EC2 cloud. No machines were found with '" + instanceTag + "' in their name tag.\n")
+            sys.stderr.write("Cannot run tests in EC2 cloud. No instances were found matching '" + ",".join(instanceTags) + "' in their tags.\n")
             return []
         
     def cleanup(self):
         for machine in self.machines:
             machine.cleanup()
+            
+    def matchesTag(self, instanceTags, tagName, tagPattern):
+        tagValueForInstance = instanceTags.get(tagName, "")
+        return fnmatch(tagValueForInstance, tagPattern)
         
-    def findTaggedInstances(self, conn, instanceTag):
+    def findTaggedInstances(self, conn, instanceTags):
         idToIp = {}
+        parsedTags = [ tag.split("=", 1) for tag in instanceTags ]
         for inst in conn.get_only_instances():
-            tag = inst.tags.get("Name", "")
-            if instanceTag in tag:
+            if all((self.matchesTag(inst.tags, tagName, tagPattern) for tagName, tagPattern in parsedTags)):
                 idToIp[inst.id] = inst.private_ip_address, inst.instance_type.split(".")[-1]
         return idToIp
     

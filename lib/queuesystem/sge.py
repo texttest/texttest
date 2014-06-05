@@ -11,6 +11,7 @@ class QueueSystem(gridqueuesystem.QueueSystem):
                     "t"   : ("TRANS", "Transferring"),
                     "r"   : ("RUN", "Running"),
                     "s"   : ("USUSP", "Suspended by the user"),
+                    "dRr" : ("DEL", "In the process of being killed"),
                     "dr"  : ("DEL", "In the process of being killed"),
                     "dt"  : ("DEL", "In the process of being killed"),
                     "ds"  : ("DEL", "In the process of being killed"),
@@ -24,7 +25,7 @@ class QueueSystem(gridqueuesystem.QueueSystem):
                     "SR"  : ("SSUSP", "Suspended by SGE due to other higher priority jobs"),
                     "SRt" : ("SSUSP", "Suspended by SGE due to other higher priority jobs"),
                     "T"   : ("THRESH", "Suspended by SGE as it exceeded allowed thresholds") }
-    errorStatus = "Eqw"
+    errorStatuses = [ "Eqw", "ERq" ]
     def __init__(self, *args):
         self.qdelOutput = ""
         self.errorReasons = {}
@@ -105,7 +106,7 @@ class QueueSystem(gridqueuesystem.QueueSystem):
             if len(words) >= 5 and words[0].isdigit():
                 jobId = words[0]
                 statusLetter = self.getStatusLetter(words, 4)
-                if statusLetter == self.errorStatus:
+                if statusLetter in self.errorStatuses:
                     self.errorReasons[jobId] = self.getErrorReason(jobId)
                     self.killJob(jobId)
                     continue

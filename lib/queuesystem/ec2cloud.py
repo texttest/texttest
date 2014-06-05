@@ -155,9 +155,12 @@ class QueueSystem(local.QueueSystem):
         tagValueForInstance = instanceTags.get(tagName, "")
         return fnmatch(tagValueForInstance, tagPattern)
         
+    def parseTag(self, tag):
+        return tag.split("=", 1) if "=" in tag else [ tag, "1" ]
+
     def findTaggedInstances(self, conn, instanceTags):
         idToIp = {}
-        parsedTags = [ tag.split("=", 1) for tag in instanceTags ]
+        parsedTags = [ self.parseTag(tag) for tag in instanceTags ]
         for inst in conn.get_only_instances():
             if all((self.matchesTag(inst.tags, tagName, tagPattern) for tagName, tagPattern in parsedTags)):
                 idToIp[inst.id] = inst.private_ip_address, inst.instance_type.split(".")[-1]

@@ -39,3 +39,19 @@ save_filtered_file_stems:stdout
 
 If "something" appears more than once in the file, the filtering behaviour will behave differently on the stored file and the 
 new file, which is very confusing for users.
+
+(2)options files: We allow now combining of comma separated lists of arguments
+==============================================================================
+Some examples:
+Ex1)
+top-level options file: -X 1,4
+test-level option file: -X 3,5
+Previous behaviour: ["-X", "1,4","-X", "3,5"] 
+we get now the list ["-X", "1,4,3,5"]
+
+Ex2)
+top-level options file: -X 1
+test-level option file: -X 2
+Previous behaviour: ["-X", "1","-X", "2"] 
+New behaviour: ["-X", "2"]
+

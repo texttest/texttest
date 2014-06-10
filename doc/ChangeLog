@@ -2537,6 +2537,8 @@ Framework Enhancements:
     - Autogenerates CLASSPATH for StoryText/Eclipse applications
 	mirroring changes in latest StoryText
     - "Knownbugs" functionality in Jira can now handle bugs that have been moved or renamed.
+    - Now allow combining of comma-separated lists in options files.
+    - Allow removing one or more elements of comma-separated lists in options files
 Version Control Browser Enhancements:
     - Now supports Git
     - "Update" operation is now always a "centralised-style" update
@@ -2564,6 +2566,7 @@ Grid Engine enhancements/bug fixes:
     - Now use both "queue_system_resource" and the deprecated environment "QUEUE_SYSTEM_RESOURCE", if both are defined
     - Made IP-address finding code more robust
 	Finding an IP address is complex and the old code didn't work in all environments
+    
 Windows installer Enhancements:
     - All files now end up under chosen location, removed hardcoded C:\virtualenv and C:\jython2.5.1
     - StoryText is now upgraded properly when the installer is run for a second time after a new release

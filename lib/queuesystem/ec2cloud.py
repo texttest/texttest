@@ -1,21 +1,25 @@
 
-import local, plugins, signal
+import local, plugins, signal, logging
 import time, os, sys
-from threading import Thread
+from threading import Thread, Lock
 from Queue import Queue
 from fnmatch import fnmatch
 
 class Ec2Machine:
-    def __init__(self, ipAddress, cores, synchDirs, app):
+    def __init__(self, ipAddress, cores, synchDirs, app, subprocessLock):
         self.ip = ipAddress
         self.fullMachine = "ec2-user@" + self.ip
         self.cores = cores 
         self.synchDirs = synchDirs
         self.app = app
         self.remoteProcessInfo = {}
+        self.remoteProcessInfoLock = Lock()
         self.thread = Thread(target=self.runThread)
+        self.thread.setName("Machine_" + self.ip)
+        self.diag = logging.getLogger("Ec2Machine")
         self.queue = Queue()
         self.errorMessage = ""
+        self.subprocessLock = subprocessLock
         
     def getNextJobId(self):
         return "job" + str(len(self.remoteProcessInfo)) + "_" + self.ip
@@ -34,10 +38,20 @@ class Ec2Machine:
     def hasJob(self, jobId):
         return jobId in self.remoteProcessInfo
     
+    def setLocalProcessId(self, jobId, localPid):
+        with self.remoteProcessInfoLock:
+            remotePid = None
+            if jobId in self.remoteProcessInfo:
+                _, remotePid = self.remoteProcessInfo[jobId]
+            self.remoteProcessInfo[jobId] = localPid, remotePid
+        self.diag.info("Job ID " + jobId + " now got local PID " + localPid)
+    
     def setRemoteProcessId(self, jobId, remotePid):
-        localPid, _ = self.remoteProcessInfo[jobId]
-        self.remoteProcessInfo[jobId] = localPid, remotePid
-                
+        with self.remoteProcessInfoLock:
+            localPid, _ = self.remoteProcessInfo[jobId]
+            self.remoteProcessInfo[jobId] = localPid, remotePid
+        self.diag.info("Job ID " + jobId + " now got remote PID " + remotePid)
+    
     def synchronise(self):
         parents = self.getParents(self.synchDirs)
         self.app.ensureRemoteDirExists(self.fullMachine, *parents)
@@ -47,12 +61,14 @@ class Ec2Machine:
             
     def synchronisePath(self, path):
         dirName = os.path.dirname(path)
-        self.synchProc = self.app.getRemoteCopyFileProcess(path, "localhost", dirName, self.fullMachine)
+        with self.subprocessLock:
+            self.synchProc = self.app.getRemoteCopyFileProcess(path, "localhost", dirName, self.fullMachine)
         self.synchProc.wait()
         self.synchProc = None
 
     def runThread(self):
         try:
+            self.diag.info("Synchronising files with EC2 instance with private IP address '" + self.ip + "'...")
             self.synchronise()
         except plugins.TextTestError, e:
             self.errorMessage = "Failed to synchronise files with EC2 instance with private IP address '" + self.ip + "'\n" + str(e) + "\n"
@@ -61,16 +77,23 @@ class Ec2Machine:
             return
         
         while True:
+            self.diag.info("Waiting for new job for IP '" + self.ip + "'...")
             jobId, submitCallable = self.queue.get()
             if jobId is None:
+                self.diag.info("No more tests for IP '" + self.ip + "', exiting.")
                 return
+            self.diag.info("Got job with ID " + jobId)
+            localPid = self.doSubmit(submitCallable)
+            self.setLocalProcessId(jobId, localPid)
+            
+    def doSubmit(self, submitCallable):
+        with self.subprocessLock:
             localPid, _ = submitCallable()
-            self.remoteProcessInfo[jobId] = localPid, None
+            return localPid
             
     def cleanup(self):
         if self.thread.isAlive():
             self.queue.put((None, None))
-            self.thread.join()
 
     def submitSlave(self, submitter, cmdArgs, fileArgs, *args):
         jobId = self.getNextJobId()
@@ -122,9 +145,10 @@ class QueueSystem(local.QueueSystem):
         self.nextMachineIndex = 0
         self.app = app
         self.fileArgs = []
+        self.subprocessLock = Lock()
         machineData = self.findMachines()
         synchDirs = self.getDirectoriesForSynch()
-        self.machines = [ Ec2Machine(m, self.instanceTypeInfo.get(instanceType, 1), synchDirs, app) for m, instanceType in machineData ]
+        self.machines = [ Ec2Machine(m, self.instanceTypeInfo.get(instanceType, 1), synchDirs, app, self.subprocessLock) for m, instanceType in machineData ]
         self.capacity = sum((m.cores for m in self.machines))
         
     def findMachines(self):
@@ -150,6 +174,7 @@ class QueueSystem(local.QueueSystem):
     def cleanup(self):
         for machine in self.machines:
             machine.cleanup()
+        return False # Submission is not really complete, as it happens in threads
             
     def matchesTag(self, instanceTags, tagName, tagPattern):
         tagValueForInstance = instanceTags.get(tagName, "")
@@ -286,7 +311,7 @@ class QueueSystem(local.QueueSystem):
             ipAddress = self.getArg(cmdArgs, "-servaddr").split(":")[0]
             self.fileArgs = [ "-slavefilesynch", os.getenv("USER", os.getenv("USERNAME")) + "@" + ipAddress ]
         return self.fileArgs
-        
+                
     def submitSlaveJob(self, cmdArgs, *args):
         machine = self.machines[self.nextMachineIndex]
         submitter = super(QueueSystem, self).submitSlaveJob

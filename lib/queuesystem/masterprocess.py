@@ -304,8 +304,13 @@ class QueueSystemServer(BaseActionRunner):
     def getTestForRun(self, block=True):
         if (self.testCount == 0 and self.allRead) or (self.testsSubmitted < self.maxCapacity):
             return self.getTestForRunNormalMode(block)
-        else:
+        elif self.reuseCanFail():
             return self.getTestForRunReuseOnlyMode(block)
+        else:
+            self.diag.info("No more tests found, reuse cannot fail, stopping.")
+
+    def reuseCanFail(self):
+        return any((not qs.slavesOnRemoteSystem() for qs in self.queueSystems.values()))
 
     def notifyAllComplete(self):
         BaseActionRunner.notifyAllComplete(self)
@@ -330,11 +335,13 @@ class QueueSystemServer(BaseActionRunner):
             sys.stderr.write("WARNING: error produced by slave job '" + jobName + "'\n" + msg)
     
     def cleanup(self):
+        cleanupComplete = True
         if self.jobs:
             queueSystem = self.getQueueSystem(self.jobs.keys()[0])
-            queueSystem.cleanup()
-        self.sendServerState("Completed submission of all tests")
-
+            cleanupComplete &= queueSystem.cleanup()
+        if cleanupComplete:
+            self.sendServerState("Completed submission of all tests")
+    
     def remainStr(self):
         return " : " + str(self.testCount) + " tests remain, " + str(self.testsSubmitted) + " are submitted."
 

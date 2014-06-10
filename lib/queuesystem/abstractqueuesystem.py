@@ -58,7 +58,7 @@ class QueueSystem(object):
         pass # only cloud cares about this
     
     def cleanup(self):
-        pass # only cloud cares about this
+        return True # only cloud cares about this
     
     def slavesOnRemoteSystem(self):
         return False

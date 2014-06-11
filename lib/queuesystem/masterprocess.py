@@ -154,15 +154,15 @@ class QueueSystemServer(BaseActionRunner):
         if statusInfo is not None: # queue system not available for some reason
             for test, jobs in self.jobs.items():
                 if not test.state.isComplete():
-                    for jobId, _ in jobs:
+                    for jobId, jobName in jobs:
                         status = statusInfo.get(jobId)
                         if status:
                             # Only do this to test jobs (might make a difference for derived configurations)
                             # Ignore filtering states for now, which have empty 'briefText'.
                             self.updateRunStatus(test, status)
-                        elif not status and not self.jobCompleted(test):
+                        elif not status and not self.jobCompleted(test, jobName):
                             # Do this to any jobs
-                            self.setSlaveFailed(test, False, True)
+                            self.setSlaveFailed(test, self.jobStarted(test, jobName), True)
         
     def updateRunStatus(self, test, status):
         newRunStatus, newExplanation = status
@@ -318,6 +318,7 @@ class QueueSystemServer(BaseActionRunner):
         errorFiles = []
         for logDir in self.slaveLogDirs:
             errorFiles += filter(os.path.getsize, glob(os.path.join(logDir, "*.errors")))
+        self.diag.info("All complete, processing " + str(len(errorFiles)) + " error files...")
         if len(errorFiles) == 0:
             return
 
@@ -618,7 +619,7 @@ class QueueSystemServer(BaseActionRunner):
     def killTest(self, test, jobId, jobName, wantStatus):
         self.diag.info("Killing test " + repr(test) + " in state " + test.state.category)
         jobExisted = self.killJob(test, jobId, jobName)
-        startNotified = self.jobStarted(test)
+        startNotified = self.jobStarted(test, jobName)
         if jobExisted:
             if startNotified:
                 self.diag.info("Job " + jobId + " was running.")
@@ -640,10 +641,10 @@ class QueueSystemServer(BaseActionRunner):
             for jobId, _ in self.getJobInfo(test):
                 queueSystem.setSuspendState(jobId, newState)
     
-    def jobStarted(self, test):
+    def jobStarted(self, test, *args):
         return test.state.hasStarted()
     
-    def jobCompleted(self, test):
+    def jobCompleted(self, test, *args):
         return test.state.isComplete()
     
     def setKilledPending(self, test, jobId):

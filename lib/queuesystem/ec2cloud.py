@@ -6,10 +6,11 @@ from Queue import Queue
 from fnmatch import fnmatch
 
 class Ec2Machine:
-    def __init__(self, ipAddress, cores, synchDirs, app, subprocessLock):
-        self.ip = ipAddress
+    instanceTypeInfo = { "8xlarge" : 32, "4xlarge": 16, "2xlarge" : 8, "xlarge" : 4, "large" : 2, "medium" : 1 }
+    def __init__(self, inst, synchDirs, app, subprocessLock):
+        self.ip = inst.private_ip_address
         self.fullMachine = "ec2-user@" + self.ip
-        self.cores = cores 
+        self.cores = self.instanceTypeInfo.get(inst.instance_type.split(".")[-1], 1)
         self.synchDirs = synchDirs
         self.app = app
         self.remoteProcessInfo = {}
@@ -139,19 +140,18 @@ class Ec2Machine:
 
 
 class QueueSystem(local.QueueSystem):
-    instanceTypeInfo = { "8xlarge" : 32, "4xlarge": 16, "2xlarge" : 8, "xlarge" : 4, "large" : 2, "medium" : 1 }
     def __init__(self, app):
         local.QueueSystem.__init__(self)
         self.nextMachineIndex = 0
         self.app = app
         self.fileArgs = []
         self.subprocessLock = Lock()
-        machineData = self.findMachines()
+        instances = self.findInstances()
         synchDirs = self.getDirectoriesForSynch()
-        self.machines = [ Ec2Machine(m, self.instanceTypeInfo.get(instanceType, 1), synchDirs, app, self.subprocessLock) for m, instanceType in machineData ]
+        self.machines = [ Ec2Machine(inst, synchDirs, app, self.subprocessLock) for inst in instances ]
         self.capacity = sum((m.cores for m in self.machines))
         
-    def findMachines(self):
+    def findInstances(self):
         region = self.app.getConfigValue("queue_system_ec2_region")
         try:
             import boto.ec2
@@ -160,13 +160,13 @@ class QueueSystem(local.QueueSystem):
             return []
         conn = boto.ec2.connect_to_region(region)
         instanceTags = self.app.getConfigValue("queue_system_resource")
-        idToIp = self.findTaggedInstances(conn, instanceTags)
-        if idToIp:
-            machines = self.filterOnStatus(conn, idToIp)
-            if not machines:
-                sys.stderr.write("Cannot run tests in EC2 cloud. " + str(len(idToIp)) + " instances were found matching '" + \
+        idToInstance = self.findTaggedInstances(conn, instanceTags)
+        if idToInstance:
+            instances = self.filterOnStatus(conn, idToInstance)
+            if not instances:
+                sys.stderr.write("Cannot run tests in EC2 cloud. " + str(len(idToInstance)) + " instances were found matching '" + \
                                  ",".join(instanceTags) + "' in their tags, but none are currently up.\n")
-            return machines
+            return instances
         else:
             sys.stderr.write("Cannot run tests in EC2 cloud. No instances were found matching '" + ",".join(instanceTags) + "' in their tags.\n")
             return []
@@ -184,22 +184,23 @@ class QueueSystem(local.QueueSystem):
         return tag.split("=", 1) if "=" in tag else [ tag, "1" ]
 
     def findTaggedInstances(self, conn, instanceTags):
-        idToIp = {}
+        idToInstance = {}
         parsedTags = [ self.parseTag(tag) for tag in instanceTags ]
         for inst in conn.get_only_instances():
             if all((self.matchesTag(inst.tags, tagName, tagPattern) for tagName, tagPattern in parsedTags)):
-                idToIp[inst.id] = inst.private_ip_address, inst.instance_type.split(".")[-1]
-        return idToIp
+                idToInstance[inst.id] = inst
+        return idToInstance
     
-    def getSortKey(self, info):
-        cores = self.instanceTypeInfo.get(info[1], 0)
-        return -cores, info[0]
+    def getSortKey(self, inst):
+        instanceSize = inst.instance_type.split(".")[-1]
+        cores = Ec2Machine.instanceTypeInfo.get(instanceSize, 0)
+        return -cores, inst.private_ip_address
     
-    def filterOnStatus(self, conn, idToIp):
+    def filterOnStatus(self, conn, idToInstance):
         machines = []
-        for stat in conn.get_all_instance_status(idToIp.keys()):
+        for stat in conn.get_all_instance_status(idToInstance.keys()):
             if stat.instance_status.status in [ "ok", "initializing" ]:
-                machines.append(idToIp.get(stat.id))
+                machines.append(idToInstance.get(stat.id))
                 
         machines.sort(key=self.getSortKey)
         return machines

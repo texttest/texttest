@@ -465,6 +465,7 @@ current-folder-changed = look in folder
 [Title=Create/Import Files and Directories]
 response.cancel = press cancel
 response.accept = press create
+delete-event = close import file dialog
 
 [Title=Show properties of selected files]
 response.accept = press close

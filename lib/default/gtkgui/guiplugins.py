@@ -550,10 +550,18 @@ class OptionGroupGUI(ActionGUI):
             label.set_tooltip_text(option.description)
         return label
 
-    def connectEntry(self, option, entryOrBuffer):
-        entryOrBuffer.set_text(str(option.getValue()))
+    def destroyedEntry(self, entry, data):
+        option, entryOrBuffer = data
+        if hasattr(option.valueMethod, "__self__") and option.valueMethod.__self__ is entryOrBuffer:
+            option.setMethods(None, None)
+
+    def connectEntry(self, option, entryOrBuffer, entryWidget):
+        entryWidget.connect("destroy", self.destroyedEntry, (option, entryOrBuffer))
+        def setText(t):
+            entryOrBuffer.set_text(str(t))
+        setText(option.getValue())
         # Don't pass entry.set_text directly, it will mess up StoryText's programmatic method interception
-        option.setMethods(self.getGetTextMethod(entryOrBuffer), lambda t: entryOrBuffer.set_text(str(t)))
+        option.setMethods(self.getGetTextMethod(entryOrBuffer), setText)
         if option.changeMethod:
             entryOrBuffer.connect("changed", option.changeMethod)
         
@@ -871,7 +879,7 @@ class ActionTabGUI(OptionGroupGUI):
                 labelEventBox.get_children()[0].set_alignment(1.0, 0.5)
                 table.attach(labelEventBox, 0, 1, rowIndex, rowIndex + 1, xoptions=gtk.FILL, xpadding=1)
                 entryWidget, entryOrBuffer = self.createOptionWidget(option)
-                self.connectEntry(option, entryOrBuffer) 
+                self.connectEntry(option, entryOrBuffer, entryWidget) 
                 if isinstance(entryOrBuffer, gtk.Entry):
                     entryOrBuffer.connect("activate", self.runInteractive)
                 table.attach(entryWidget, 1, 2, rowIndex, rowIndex + 1)
@@ -1075,7 +1083,7 @@ class ActionDialogGUI(OptionGroupGUI):
             vbox.pack_start(entryWidget, expand=False, fill=False)
         else:
             vbox.pack_start(entryWidget, expand=True, fill=True)
-        self.connectEntry(option, entryOrBuffer)
+        self.connectEntry(option, entryOrBuffer, entryWidget)
         return entryWidget, entryOrBuffer
 
     def addLabel(self, vbox, label):

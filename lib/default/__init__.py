@@ -354,7 +354,10 @@ class Config:
                 raise plugins.TextTestError, "'--new' option can only be provided with the static GUI"
             elif len(allApps) == 0:
                 raise plugins.TextTestError, "Could not find any matching applications (files of the form config.<app>) under " + " or ".join(self.optionMap.rootDirectories)
-            
+        
+        if any(self.useStaticGUI(app) for app in allApps) and self.isReconnecting():
+            raise plugins.TextTestError, "'-reconnect' option doesn't work with static GUI"  
+
         if self.useGUI():
             self.addGuiResponder(classes)
         else:

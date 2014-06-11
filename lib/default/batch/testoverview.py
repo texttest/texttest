@@ -660,14 +660,14 @@ class TestTable:
 
         
 class TestDetails:
-    def __init__(self, tag, pageTitle, pageSubTitle):
+    def __init__(self, tag, pageTitle, pageSubTitles):
         tagText = getDisplayText(tag)
         pageDetailTitle = "Detailed test results for " + pageTitle + ": " + tagText
         self.document = HTMLgen.SimpleDocument(title=TitleWithDateStamp(pageDetailTitle))
         headerText = tagText + " - detailed test results for " + pageTitle
         self.document.append(HTMLgen.Heading(1, headerText, align = 'center'))
-        subTitleText = "(To start TextTest for these tests, run '" + pageSubTitle + "')"
-        self.document.append(HTMLgen.Center(HTMLgen.Emphasis(subTitleText)))
+        for subTitle in pageSubTitles:
+            self.document.append(HTMLgen.Center(HTMLgen.Emphasis(subTitle)))
         self.totalCategoryHandler = CategoryHandler()
         self.versionSections = []
         

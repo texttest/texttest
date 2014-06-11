@@ -695,8 +695,8 @@ class WebPageResponder(plugins.Responder):
             self.diag.info("Found extra versions " + repr(extraVersions))
             relevantSubDirs = self.findRelevantSubdirectories(repositories, app, extraVersions)
             version = getVersionName(app, self.getAppsToGenerate())
-            pageSubTitle = self.makeCommandLine([ app ])
-            self.makeAndGenerate(relevantSubDirs, self.getConfigValueMethod(app), pageDir, pageTitle, pageSubTitle,
+            pageSubTitles = self.makePageSubTitles([ app ])
+            self.makeAndGenerate(relevantSubDirs, self.getConfigValueMethod(app), pageDir, pageTitle, pageSubTitles,
                                  version, extraVersions, self.getDescriptionInfo([ app ]))
 
     def getConfigValueMethod(self, app):
@@ -707,10 +707,15 @@ class WebPageResponder(plugins.Responder):
                 return app.getCompositeConfigValue(key, subKey)
         return getConfigValue
 
+    def makePageSubTitles(self, apps):
+        if len(apps) == 1:
+            return [self.makeReconnectCommandLine(apps[0]), self.makeCommandLine(apps)]
+        else:
+            return [self.makeCommandLine(apps)]
+
     def makeCommandLine(self, apps):
-        appStr = ",".join((app.name for app in apps))
-        progName = os.path.basename(plugins.getTextTestProgram())
-        cmd = progName + " -a " + appStr
+        startText = "(To start TextTest for these tests, run '"
+        cmd = self.getRunCommandStart(apps)
         version = apps[0].getFullVersion()
         if version:
             cmd += " -v " + version
@@ -721,8 +726,18 @@ class WebPageResponder(plugins.Responder):
                 cmd += " -c " + checkout
         directories = set((app.getRootDirectory() for app in apps))
         cmd += " -d " + os.pathsep.join(directories)
-        return cmd
+        return startText + cmd + "')"
 
+    def getRunCommandStart(self, apps):
+        appStr = ",".join((app.name for app in apps))
+        progName = os.path.basename(plugins.getTextTestProgram())
+        return progName + " -a " + appStr
+
+    def makeReconnectCommandLine(self, app):
+        startText = "(To reconnect the TextTest GUI to these results, run '"
+        cmd = self.getRunCommandStart([app])
+        return startText + cmd + " -reconnect " + app.writeDirectory + " -g" + "')"
+        
     def getAppRepositoryInfo(self):
         appInfo = OrderedDict()
         for suite in self.suitesToGenerate:
@@ -779,9 +794,9 @@ class WebPageResponder(plugins.Responder):
             extraVersions += self.getExtraVersions(app, extraApps)
             relevantSubDirs.update(self.findRelevantSubdirectories(repositories, app, extraVersions, self.getVersionTitle))
         getConfigValue = plugins.ResponseAggregator([ self.getConfigValueMethod(app) for app in allApps ])
-        pageSubTitle = self.makeCommandLine(allApps)
+        pageSubTitles = self.makePageSubTitles(allApps)
         descriptionInfo = self.getDescriptionInfo(allApps)
-        return relevantSubDirs, getConfigValue, version, extraVersions, pageSubTitle, descriptionInfo
+        return relevantSubDirs, getConfigValue, version, extraVersions, pageSubTitles, descriptionInfo
 
     def getVersionTitle(self, app, version):
         title = app.fullName()

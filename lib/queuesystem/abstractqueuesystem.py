@@ -57,7 +57,7 @@ class QueueSystem(object):
     def getRemoteTestMachine(self, *args):
         pass # only cloud cares about this
     
-    def cleanup(self):
+    def cleanup(self, *args):
         return True # only cloud cares about this
     
     def slavesOnRemoteSystem(self):

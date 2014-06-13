@@ -314,6 +314,7 @@ class QueueSystemServer(BaseActionRunner):
 
     def notifyAllComplete(self):
         BaseActionRunner.notifyAllComplete(self)
+        self.cleanup(final=True)
         errors = {}
         errorFiles = []
         for logDir in self.slaveLogDirs:
@@ -335,12 +336,12 @@ class QueueSystemServer(BaseActionRunner):
         for msg, jobName in errors.items():
             sys.stderr.write("WARNING: error produced by slave job '" + jobName + "'\n" + msg)
     
-    def cleanup(self):
+    def cleanup(self, final=False):
         cleanupComplete = True
         if self.jobs:
             queueSystem = self.getQueueSystem(self.jobs.keys()[0])
-            cleanupComplete &= queueSystem.cleanup()
-        if cleanupComplete:
+            cleanupComplete &= queueSystem.cleanup(final)
+        if cleanupComplete and not final:
             self.sendServerState("Completed submission of all tests")
     
     def remainStr(self):

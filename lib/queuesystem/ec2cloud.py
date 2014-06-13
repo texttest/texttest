@@ -8,10 +8,12 @@ from fnmatch import fnmatch
 class Ec2Machine:
     instanceTypeInfo = { "8xlarge" : 32, "4xlarge": 16, "2xlarge" : 8, "xlarge" : 4, "large" : 2, "medium" : 1 }
     def __init__(self, inst, synchDirs, app, subprocessLock):
+        self.id = inst.id
         self.ip = inst.private_ip_address
         self.fullMachine = "ec2-user@" + self.ip
         self.cores = self.instanceTypeInfo.get(inst.instance_type.split(".")[-1], 1)
         self.synchDirs = synchDirs
+        self.synchProc = None
         self.app = app
         self.remoteProcessInfo = {}
         self.remoteProcessInfoLock = Lock()
@@ -92,10 +94,20 @@ class Ec2Machine:
             localPid, _ = submitCallable()
             return localPid
             
-    def cleanup(self):
+    def cleanup(self, processes):
+        # Return whether we are still using the machine in some way
+        # i.e. if our thread is running or any of our processes are
         if self.thread.isAlive():
             self.queue.put((None, None))
-
+            return True
+        
+        for localPid, _ in self.remoteProcessInfo.values():
+            if localPid in processes:
+                proc = processes.get(localPid)
+                if proc.poll() is None:
+                    return True
+        return False
+        
     def submitSlave(self, submitter, cmdArgs, fileArgs, *args):
         jobId = self.getNextJobId()
         self.remoteProcessInfo[jobId] = None, None
@@ -140,6 +152,7 @@ class Ec2Machine:
 
 
 class QueueSystem(local.QueueSystem):
+    userTagName = "TextTest user"
     def __init__(self, app):
         local.QueueSystem.__init__(self)
         self.nextMachineIndex = 0
@@ -149,16 +162,20 @@ class QueueSystem(local.QueueSystem):
         instances = self.findInstances()
         synchDirs = self.getDirectoriesForSynch()
         self.machines = [ Ec2Machine(inst, synchDirs, app, self.subprocessLock) for inst in instances ]
+        self.releasedMachines = []
         self.capacity = sum((m.cores for m in self.machines))
         
-    def findInstances(self):
+    def makeEc2Connection(self):
+        import boto.ec2
         region = self.app.getConfigValue("queue_system_ec2_region")
+        return boto.ec2.connect_to_region(region)
+        
+    def findInstances(self):
         try:
-            import boto.ec2
+            conn = self.makeEc2Connection()
         except ImportError:
             sys.stderr.write("Cannot run tests in EC2 cloud. You need to install Python's boto package for this to work.\n")
             return []
-        conn = boto.ec2.connect_to_region(region)
         instanceTags = self.app.getConfigValue("queue_system_resource")
         idToInstance = self.findTaggedInstances(conn, instanceTags)
         if idToInstance:
@@ -166,14 +183,33 @@ class QueueSystem(local.QueueSystem):
             if not instances:
                 sys.stderr.write("Cannot run tests in EC2 cloud. " + str(len(idToInstance)) + " instances were found matching '" + \
                                  ",".join(instanceTags) + "' in their tags, but none are currently up.\n")
-            return instances
+                return []
+                
+            freeInstances, otherOwners = self.takeOwnership(conn, instances)
+            if not freeInstances:
+                sys.stderr.write("Cannot run tests in EC2 cloud. " + str(len(instances)) + " running instances were found matching '" + \
+                                 ",".join(instanceTags) + "' in their tags, \nbut all are currently being used by the following users:\n" + \
+                                 "\n".join(otherOwners) + "\n\n")
+            freeInstances.sort(key=self.getSortKey)
+            return freeInstances
         else:
             sys.stderr.write("Cannot run tests in EC2 cloud. No instances were found matching '" + ",".join(instanceTags) + "' in their tags.\n")
             return []
         
-    def cleanup(self):
-        for machine in self.machines:
-            machine.cleanup()
+    def cleanup(self, final=False):
+        if final:
+            # Processes might not be quite terminated, so we just hardcode that we release everything anyway
+            self.releaseOwnership(self.machines)
+        else:
+            unusedMachines, usedMachines = [], []
+            for machine in self.machines:
+                if machine.cleanup(self.processes):
+                    usedMachines.append(machine)
+                else:
+                    unusedMachines.append(machine)
+            self.releaseOwnership(unusedMachines)
+            self.machines = usedMachines
+            self.releasedMachines = unusedMachines
         return False # Submission is not really complete, as it happens in threads
             
     def matchesTag(self, instanceTags, tagName, tagPattern):
@@ -202,9 +238,48 @@ class QueueSystem(local.QueueSystem):
             if stat.instance_status.status in [ "ok", "initializing" ]:
                 machines.append(idToInstance.get(stat.id))
                 
-        machines.sort(key=self.getSortKey)
         return machines
-                    
+    
+    def takeOwnership(self, conn, instances):
+        tryOwnInstances, ownInstances, otherOwners = [], [], set()
+        myTag = self.getUserName() + "_" + plugins.startTimeString()
+        for inst in instances:
+            owner = inst.tags.get(self.userTagName, "")
+            if owner:
+                otherOwners.add(owner.split("_")[0])
+            else:
+                tryOwnInstances.append(inst.id)
+                inst.add_tag(self.userTagName, myTag)
+                
+        if not tryOwnInstances:
+            return [], sorted(otherOwners)
+        
+        for _ in range(20): 
+            newInsts = conn.get_only_instances(instance_ids=tryOwnInstances)
+            tryOwnInstances = []
+            for inst in newInsts:
+                owner = inst.tags.get(self.userTagName, "")
+                if owner == myTag:
+                    ownInstances.append(inst)
+                elif owner:
+                    # There's a race condition, somebody else grabbed it first, we drop it
+                    otherOwners.add(owner.split("_")[0])
+                else:
+                    tryOwnInstances.append(inst.id)
+            if tryOwnInstances:
+                time.sleep(0.1)
+            else:
+                break    
+                
+        return ownInstances, sorted(otherOwners)
+
+    def releaseOwnership(self, machines):
+        if machines:
+            conn = self.makeEc2Connection()
+            instanceIds = [ machine.id for machine in machines ]
+            for inst in conn.get_only_instances(instance_ids=instanceIds):
+                inst.remove_tag(self.userTagName)
+        
     def getCapacity(self):
         return self.capacity
     
@@ -263,8 +338,11 @@ class QueueSystem(local.QueueSystem):
         index = args.index(flag)
         return args[index + 1]
     
-    def getMachine(self, jobId):
-        for machine in self.machines:
+    def getMachine(self, jobId, includeReleased=False):
+        machines = self.machines
+        if includeReleased:
+            machines = self.machines + self.releasedMachines
+        for machine in machines:
             if machine.hasJob(jobId):
                 return machine
     
@@ -286,7 +364,7 @@ class QueueSystem(local.QueueSystem):
             return False, None
     
     def getJobFailureInfo(self, jobId):
-        machine = self.getMachine(jobId)
+        machine = self.getMachine(jobId, includeReleased=True)
         return machine.errorMessage if machine else ""
     
     def getStatusForAllJobs(self):
@@ -294,6 +372,7 @@ class QueueSystem(local.QueueSystem):
         jobStatus = {}
         for machine in self.machines:
             machine.collectJobStatus(jobStatus, procStatus)
+        self.cleanup() # Try to release any machines we're not using
         return jobStatus
         
     def killJob(self, jobId):
@@ -306,11 +385,14 @@ class QueueSystem(local.QueueSystem):
             return super(QueueSystem, self).killJob(localPid)
         else:
             return True
-                            
+
+    def getUserName(self):
+        return os.getenv("USER", os.getenv("USERNAME"))
+
     def getFileArgs(self, cmdArgs):
         if not self.fileArgs:
             ipAddress = self.getArg(cmdArgs, "-servaddr").split(":")[0]
-            self.fileArgs = [ "-slavefilesynch", os.getenv("USER", os.getenv("USERNAME")) + "@" + ipAddress ]
+            self.fileArgs = [ "-slavefilesynch", self.getUserName() + "@" + ipAddress ]
         return self.fileArgs
                 
     def submitSlaveJob(self, cmdArgs, *args):

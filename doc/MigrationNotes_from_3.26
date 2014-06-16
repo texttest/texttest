@@ -55,3 +55,22 @@ test-level option file: -X 2
 Previous behaviour: ["-X", "1","-X", "2"] 
 New behaviour: ["-X", "2"]
 
+Ex3)
+top-level options file: -X 1,2
+test-level option file: {CLEAR -X 2}
+Previous behaviour: ["-X", "1,2"] 
+New behaviour: ["-X", "1"] 
+
+(3) Performance-specific reporting has been simplified
+======================================================
+Instead of separate pages it now appears as additional rows in the normal overview.
+"historical_report_resource_pages" renamed to "historical_report_resources" - this indicates which resources to show.
+"historical_report_page_tables" is removed and has no effect any more.
+
+It seems not many people used this functionality in its old form: it is hoped that the new format will be more useful.
+See website for more details.
+
+(4) "Save" is renamed to "Approve" (and "Standard Files" to "Approved Files")
+=============================================================================
+There is no change in functionality, just a change of emphasis as we are now talking about Approval Testing a lot, in line with
+other tools that work in the same way.

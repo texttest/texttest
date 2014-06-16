@@ -392,6 +392,24 @@ def getBatchRepository(suite):
 def dateInSeconds(val):
     return time.mktime(time.strptime(val, "%d%b%Y"))
 
+def matchesApp(dir, app):
+    suffix = app.versionSuffix()
+    return dir.startswith(app.name + suffix) or dir.startswith(app.getBatchSession() + suffix)
+
+def getPreviousWriteDirsUnder(rootDir, app):
+    dirs = []
+    for dir in sorted(os.listdir(rootDir)):
+        fullDir = os.path.join(rootDir, dir)
+        if os.path.isdir(fullDir) and matchesApp(dir, app):
+            dirs.append(fullDir)
+    return dirs
+
+def getPreviousWriteDirs(app):
+    rootDir = app.getPreviousWriteDirInfo()
+    return getPreviousWriteDirsUnder(rootDir, app) if os.path.isdir(rootDir) else []
+
+
+
 # Allow saving results to a historical repository
 class SaveState(plugins.Responder):
     def __init__(self, optionMap, allApps):
@@ -708,10 +726,12 @@ class WebPageResponder(plugins.Responder):
         return getConfigValue
 
     def makePageSubTitles(self, apps):
+        subtitles = [ self.makeCommandLine(apps) ]
         if len(apps) == 1:
-            return [self.makeReconnectCommandLine(apps[0]), self.makeCommandLine(apps)]
-        else:
-            return [self.makeCommandLine(apps)]
+            reconnectCmdLine = self.makeReconnectCommandLine(apps[0])
+            if reconnectCmdLine:
+                subtitles.insert(0, reconnectCmdLine)
+        return subtitles
 
     def makeCommandLine(self, apps):
         startText = "(To start TextTest for these tests, run '"
@@ -734,9 +754,13 @@ class WebPageResponder(plugins.Responder):
         return progName + " -a " + appStr
 
     def makeReconnectCommandLine(self, app):
+        previousWriteDirs = getPreviousWriteDirs(app)
+        if not previousWriteDirs:
+            return
+        
         startText = "(To reconnect the TextTest GUI to these results, run '"
         cmd = self.getRunCommandStart([app])
-        return startText + cmd + " -reconnect " + app.writeDirectory + " -g" + "')"
+        return startText + cmd + " -reconnect " + previousWriteDirs[0] + " -g" + "')"
         
     def getAppRepositoryInfo(self):
         appInfo = OrderedDict()
@@ -900,26 +924,23 @@ class CollectFilesResponder(plugins.Responder):
                         "The main index page can be found at " + htmlIndex + "\n"
             
         return self.getBody(fileBodies, missingVersions)
-        
+            
     def collectFilesForApp(self, app):
         fileBodies = []
         totalValues = OrderedDict()
+        compulsoryVersions = set(app.getBatchConfigValue("batch_collect_compulsory_version"))
+        versionsFound = set()
         rootDir = app.getPreviousWriteDirInfo()
         if not os.path.isdir(rootDir):
             sys.stderr.write("No temporary directory found at " + rootDir + " - not collecting batch reports.\n")
             return
-        dirlist = os.listdir(rootDir)
-        dirlist.sort()
-        compulsoryVersions = set(app.getBatchConfigValue("batch_collect_compulsory_version"))
-        versionsFound = set()
-        for dir in dirlist:
-            fullDir = os.path.join(rootDir, dir)
-            if os.path.isdir(fullDir) and self.matchesApp(dir, app):
-                currBodies, currVersions = self.parseDirectory(fullDir, app, totalValues)
-                fileBodies += currBodies
-                versionsFound.update(currVersions)
+        
+        for previousWriteDir in getPreviousWriteDirsUnder(rootDir, app):
+            currBodies, currVersions = self.parseDirectory(previousWriteDir, app, totalValues)
+            fileBodies += currBodies
+            versionsFound.update(currVersions)
+
         if len(fileBodies) == 0:
-            self.diag.info("No information found in " + rootDir)
             return
 
         missingVersions = compulsoryVersions.difference(versionsFound)
@@ -954,10 +975,6 @@ class CollectFilesResponder(plugins.Responder):
                     bestPath, bestDate, bestTag = path, date, paddedTag
         return bestPath
             
-    def matchesApp(self, dir, app):
-        suffix = app.versionSuffix()
-        return dir.startswith(app.name + suffix) or dir.startswith(app.getBatchSession() + suffix)
-
     def parseDirectory(self, fullDir, app, totalValues):
         basicPrefix = "batchreport." + app.name
         prefix = basicPrefix + app.versionSuffix()

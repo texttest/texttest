@@ -728,13 +728,12 @@ class WebPageResponder(plugins.Responder):
     def makePageSubTitles(self, apps):
         cmdLine = self.makeCommandLine(apps)
         startText = "To start TextTest for these tests, run:"
-        subtitles = [ startText, cmdLine ]
+        subtitles = [ (startText, cmdLine) ]
         if len(apps) == 1:
             reconnectCmdLine = self.makeReconnectCommandLine(apps[0], cmdLine)
             if reconnectCmdLine:
                 reconnectText = "To reconnect the TextTest GUI to these results, run:"
-                subtitles.insert(0, reconnectCmdLine)
-                subtitles.insert(0, reconnectText)
+                subtitles.insert(0, (reconnectText, reconnectCmdLine))
         return subtitles
 
     def makeCommandLine(self, apps):
@@ -826,11 +825,11 @@ class WebPageResponder(plugins.Responder):
         return title
     
     def generateCommonPage(self, pageTitle, pageInfo):
-        relevantSubDirs, getConfigValue, version, extraVersions, pageSubTitle, descriptionInfo = self.transformToCommon(pageInfo)
+        relevantSubDirs, getConfigValue, version, extraVersions, pageSubTitles, descriptionInfo = self.transformToCommon(pageInfo)
         pageDir = os.path.expanduser(getConfigValue("historical_report_location"))
         self.copyJavaScript(pageDir)
         self.makeAndGenerate(relevantSubDirs, getConfigValue, pageDir, pageTitle,
-                             pageSubTitle, version, extraVersions, descriptionInfo)
+                             pageSubTitles, version, extraVersions, descriptionInfo)
 
     def copyJavaScript(self, pageDir):
         jsDir = os.path.join(pageDir, "javascript")

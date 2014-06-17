@@ -666,8 +666,9 @@ class TestDetails:
         self.document = HTMLgen.SimpleDocument(title=TitleWithDateStamp(pageDetailTitle))
         headerText = tagText + " - detailed test results for " + pageTitle
         self.document.append(HTMLgen.Heading(1, headerText, align = 'center'))
-        for subTitle in pageSubTitles:
+        for subTitle, command in pageSubTitles:
             self.document.append(HTMLgen.Center(HTMLgen.Emphasis(subTitle)))
+            self.document.append(HTMLgen.Center(HTMLgen.Paragraph(command, style='font-family:monospace')))
         self.totalCategoryHandler = CategoryHandler()
         self.versionSections = []
         

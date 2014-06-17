@@ -726,16 +726,20 @@ class WebPageResponder(plugins.Responder):
         return getConfigValue
 
     def makePageSubTitles(self, apps):
-        subtitles = [ self.makeCommandLine(apps) ]
+        cmdLine = self.makeCommandLine(apps)
+        startText = "To start TextTest for these tests, run:"
+        subtitles = [ startText, cmdLine ]
         if len(apps) == 1:
-            reconnectCmdLine = self.makeReconnectCommandLine(apps[0])
+            reconnectCmdLine = self.makeReconnectCommandLine(apps[0], cmdLine)
             if reconnectCmdLine:
+                reconnectText = "To reconnect the TextTest GUI to these results, run:"
                 subtitles.insert(0, reconnectCmdLine)
+                subtitles.insert(0, reconnectText)
         return subtitles
 
     def makeCommandLine(self, apps):
-        startText = "(To start TextTest for these tests, run '"
-        cmd = self.getRunCommandStart(apps)
+        cmd = os.path.basename(plugins.getTextTestProgram())
+        cmd += " -a " + ",".join((app.name for app in apps))
         version = apps[0].getFullVersion()
         if version:
             cmd += " -v " + version
@@ -746,21 +750,14 @@ class WebPageResponder(plugins.Responder):
                 cmd += " -c " + checkout
         directories = set((app.getRootDirectory() for app in apps))
         cmd += " -d " + os.pathsep.join(directories)
-        return startText + cmd + "')"
+        return cmd
 
-    def getRunCommandStart(self, apps):
-        appStr = ",".join((app.name for app in apps))
-        progName = os.path.basename(plugins.getTextTestProgram())
-        return progName + " -a " + appStr
-
-    def makeReconnectCommandLine(self, app):
+    def makeReconnectCommandLine(self, app, cmdLine):
         previousWriteDirs = getPreviousWriteDirs(app)
         if not previousWriteDirs:
             return
         
-        startText = "(To reconnect the TextTest GUI to these results, run '"
-        cmd = self.getRunCommandStart([app])
-        return startText + cmd + " -reconnect " + previousWriteDirs[0] + " -g" + "')"
+        return cmdLine + " -reconnect " + previousWriteDirs[0] + " -g"
         
     def getAppRepositoryInfo(self):
         appInfo = OrderedDict()

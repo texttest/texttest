@@ -309,9 +309,6 @@ class QueueSystemConfig(default.Config):
         app.setConfigDefault("queue_system_submit_args", "", "Additional arguments to provide to grid engine submission command")
         app.setConfigDefault("queue_system_proxy_executable", "", "Executable to run as a proxy for the real test program")
         app.setConfigDefault("queue_system_proxy_resource", [], "Grid engine resources required to locate machine to run proxy process")
-        # In theory we could work this out, but checking all the regions takes more than 10 seconds
-        # so it's better to get the user to tell us
-        app.setConfigDefault("queue_system_ec2_region", "", "EC2 region to look for TextTest-instances to use")
         app.setConfigDefault("queue_system_core_file_location", "", "System-wide location for core files from grid jobs, in case TEXTTEST_TMP is generated")
         app.addConfigEntry("builtin", "proxy_options", "definition_file_stems")
         

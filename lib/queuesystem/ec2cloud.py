@@ -167,7 +167,7 @@ class QueueSystem(local.QueueSystem):
         
     def makeEc2Connection(self):
         import boto.ec2
-        region = self.app.getConfigValue("queue_system_ec2_region")
+        region = boto.ec2.connection.EC2Connection.DefaultRegionName # stick to single region for now
         return boto.ec2.connect_to_region(region)
         
     def findInstances(self):

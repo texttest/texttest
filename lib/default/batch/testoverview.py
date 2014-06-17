@@ -43,9 +43,9 @@ class TitleWithDateStamp:
 
 class GenerateWebPages(object):
     def __init__(self, getConfigValue, pageDir, resourceNames,
-                 pageTitle, pageSubTitle, pageVersion, extraVersions, descriptionInfo):
+                 pageTitle, pageSubTitles, pageVersion, extraVersions, descriptionInfo):
         self.pageTitle = pageTitle
-        self.pageSubTitle = pageSubTitle
+        self.pageSubTitles = pageSubTitles
         self.pageVersion = pageVersion
         self.extraVersions = extraVersions
         self.pageDir = pageDir
@@ -127,7 +127,7 @@ class GenerateWebPages(object):
                 # put them in reverse order, most relevant first
                 linkFromDetailsToOverview = [ sel.getLinkInfo(self.pageVersion) for sel in allSelectors ]
                 for tag in tags:
-                    details = self.pagesDetails.setdefault(tag, TestDetails(tag, self.pageTitle, self.pageSubTitle))
+                    details = self.pagesDetails.setdefault(tag, TestDetails(tag, self.pageTitle, self.pageSubTitles))
                     details.addVersionSection(version, categoryHandlers[tag], linkFromDetailsToOverview)
                 
         selContainer = HTMLgen.Container()

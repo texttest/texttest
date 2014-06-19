@@ -31,6 +31,9 @@ class QueueSystem(gridqueuesystem.QueueSystem):
         self.errorReasons = {}
         gridqueuesystem.QueueSystem.__init__(self, *args)
         
+    def getSlaveStartErrorFile(self):
+        return os.path.join(self.coreFileLocation, "slave_start_errors." + os.getenv("USER"))
+
     def getSubmitCmdArgs(self, submissionRules, commandArgs=[], slaveEnv={}):
         qsubArgs = [ "qsub", "-N", submissionRules.getJobName() ]
         if submissionRules.processesNeeded != 1:
@@ -53,9 +56,9 @@ class QueueSystem(gridqueuesystem.QueueSystem):
                 qsubArgs.append("-v")
                 qsubArgs.append(",".join(slaveEnv))
             
-        qsubArgs += [ "-o", os.devnull, "-e", os.path.join(self.coreFileLocation, "slave_start_errors." + os.getenv("USER")) ]
+        qsubArgs += [ "-o", os.devnull, "-e", self.getSlaveStartErrorFile() ]
         return self.addExtraAndCommand(qsubArgs, submissionRules, commandArgs)
-
+    
     def getResourceArg(self, submissionRules):
         resourceList = submissionRules.findResourceList()
         machines = submissionRules.findMachineList()
@@ -135,6 +138,25 @@ class QueueSystem(gridqueuesystem.QueueSystem):
             if line.startswith("error reason"):
                 return line.strip()
         return ""
+    
+    def getSlaveStartErrorMessage(self):
+        errFile = self.getSlaveStartErrorFile()
+        if not os.path.isfile(errFile):
+            return ""
+        
+        errLines = open(errFile).read().splitlines()
+        errText = "\n".join(errLines[-3:])
+        if not errText:
+            return ""
+        
+        return self.makeHeader("Recent errors written when starting SGE slave jobs") + errText + "\n(full file is at " + errFile + " - please remove this file sometime you aren't running TextTest)"
+    
+    def getJobFailureInfo(self, jobId):
+        text = gridqueuesystem.QueueSystem.getJobFailureInfo(self, jobId)
+        errors = self.getSlaveStartErrorMessage()
+        if errors:
+            text = errors + "\n" + text 
+        return text
     
     def _getJobFailureInfo(self, jobId):
         if jobId in self.errorReasons: 

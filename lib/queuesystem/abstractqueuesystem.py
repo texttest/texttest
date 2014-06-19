@@ -84,10 +84,13 @@ class QueueSystem(object):
         
     def getSubmitCmdArgs(self, submissionRules, commandArgs=[], slaveEnv={}):
         return commandArgs
+    
+    def makeHeader(self, text):
+        return "-" * 10 + " " + text + " " + "-" * 10 + "\n"
 
     def getJobFailureInfo(self, jobId):
         name = self.getQueueSystemName()
-        header = "-" * 10 + " Full accounting info from " + name + " " + "-" * 10 + "\n"
+        header = self.makeHeader("Full accounting info from " + name)
         if jobId is None:
             return header + "No job has been submitted to " + name
         else:

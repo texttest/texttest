@@ -13,7 +13,7 @@ class JobStillRunningException(RuntimeError):
 
 class FingerprintNotReadyException(RuntimeError):
     pass
-            
+         
 def getBuildsDir(jobRoot, jobName):
     projectDir = os.path.join(jobRoot, jobName)
     local = os.path.join(projectDir, "builds")
@@ -35,7 +35,11 @@ class BuildDocument:
     def create(cls, buildsDir, buildName):
         xmlFile = os.path.join(buildsDir, buildName, "build.xml")
         if os.path.isfile(xmlFile):
-            return cls(xmlFile)
+            # Error handling due to parsing problems caused last power loss
+            try :
+                return cls(xmlFile)
+            except:
+                print "WARNING: Error while parsing XML file:" + xmlFile
         
     def __init__(self, xmlFile):
         self.document = parse(xmlFile)
@@ -431,8 +435,11 @@ class ChangeFinder:
         version2 = BuildDocument.create(buildsDir, build2).getArtefactVersion(regex)
         if version1 == version2:
             return projectName + " was updated", "", []
-        else:
+        elif version2:
             return projectName + " " + version2, "", []
+        else:
+            print "WARNING: Artefact version not found for: " + projectName + " build: " + build2
+            return "Artefact version not found", "", []
     
 
 def getChanges(build1, build2, *args):

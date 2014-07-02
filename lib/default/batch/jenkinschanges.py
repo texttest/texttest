@@ -137,7 +137,13 @@ class FingerprintDifferenceFinder:
             return []
         differences = []
         updatedHashes = {}
-        for artefact, (hash2, file2) in fingerprint2.items():
+        for artefact, value in fingerprint2.items():
+            if isinstance(value, tuple):
+                hash2 = value[0]
+                file2 = value[1]
+            else:
+                hash2 = value
+                file2 = artefact
             hash1 = fingerprint1.get(artefact)
             if isinstance(hash1, tuple):
                 hash1 = hash1[0]

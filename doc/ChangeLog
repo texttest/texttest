@@ -2613,3 +2613,4 @@ Bug Fixes:
     - -reconnect to static GUI now gives an error
     - Fixed various GTK warnings that were harmless but ugly
     - Fixed error handling generating batch report in Jenkins when build.xml is empty or artefact version is not present.
+    - Fixed ValueError when looking at jenkins fingerprint items

@@ -898,50 +898,39 @@ class SlaveRequestHandler(StreamRequestHandler):
                              " (process " + identifier + ")\nwhich could not be parsed:\n'" + testString + "'\n")
             self.connection.shutdown(socket.SHUT_RDWR)
         elif self.server.clientCorrect(test, (hostname, identifier)):
-            self.handleTestState(test, hostname, identifier, tryReuse, rerun)
+            if not test.state.isComplete(): # we might have killed it already...
+                oldBt = test.state.briefText
+                # The updates are only for testing against old slave traffic,
+                # a bit sad we can't disable them when not testing...
+                _, state = test.getNewState(self.rfile, updatePaths=True)
+                self.server.diag.info("Changed from '" + oldBt + "' to '" + state.briefText + "'")    
+                if rerun:
+                    self.server.diag.info("Instructed to rerun test " + test.uniqueName)
+                    self.server.clearClient(test) # it might come back from a different process
+                    QueueSystemServer.instance.queueTestForRerun(test)
+                else:
+                    self.server.changeState(test, state)
+                try:
+                    self.connection.shutdown(socket.SHUT_RD)
+                except socket.error, e:
+                    # This only occurs on a mac, and doesn't affect functionality.
+                    pass
+                if state.isComplete():
+                    newTest = QueueSystemServer.instance.getTestForReuse(test, state, tryReuse)
+                    if newTest:
+                        self.wfile.write(socketSerialise(newTest))
+                else:
+                    self.server.storeClient(test, (hostname, identifier))
+                    QueueSystemServer.instance.setRemoteProcessId(test, identifier)
+                self.connection.shutdown(socket.SHUT_WR)
         else:
             expectedHost, expectedPid = self.server.testClientInfo[test]
-            if rerun:
-                self.server.clearClient(test)
-                self.server.storeClient(test, identifier)
-                self.server.diag.info("Slave already registered from " + expectedHost + " (process " + expectedPid + ")")
-                self.server.diag.info("Cleaning up the old slave and rerunning from a new TextTest slave for " + repr(test) + " connected from " + \
-                             hostname + " (process " + identifier + ")")
-                self.handleTestState(test, hostname, identifier, tryReuse, rerun)
-            else:
-                sys.stderr.write("WARNING: Unexpected TextTest slave for " + repr(test) + " connected from " + \
+            sys.stderr.write("WARNING: Unexpected TextTest slave for " + repr(test) + " connected from " + \
                              hostname + " (process " + identifier + ")\n")
-                sys.stderr.write("Slave already registered from " + expectedHost + " (process " + expectedPid + ")\n")
-                sys.stderr.write("Ignored all communication from this unexpected TextTest slave\n")
-                sys.stderr.flush()
-                self.connection.shutdown(socket.SHUT_RDWR)
-            
-    def handleTestState(self, test, hostname, identifier, tryReuse, rerun):
-        if not test.state.isComplete(): # we might have killed it already...
-            oldBt = test.state.briefText
-            # The updates are only for testing against old slave traffic,
-            # a bit sad we can't disable them when not testing...
-            _, state = test.getNewState(self.rfile, updatePaths=True)
-            self.server.diag.info("Changed from '" + oldBt + "' to '" + state.briefText + "'")    
-            if rerun:
-                self.server.diag.info("Instructed to rerun test " + test.uniqueName)
-                self.server.clearClient(test) # it might come back from a different process
-                QueueSystemServer.instance.queueTestForRerun(test)
-            else:
-                self.server.changeState(test, state)
-            try:
-                self.connection.shutdown(socket.SHUT_RD)
-            except socket.error, e:
-                # This only occurs on a mac, and doesn't affect functionality.
-                pass
-            if state.isComplete():
-                newTest = QueueSystemServer.instance.getTestForReuse(test, state, tryReuse)
-                if newTest:
-                    self.wfile.write(socketSerialise(newTest))
-            else:
-                self.server.storeClient(test, (hostname, identifier))
-                QueueSystemServer.instance.setRemoteProcessId(test, identifier)
-            self.connection.shutdown(socket.SHUT_WR)
+            sys.stderr.write("Slave already registered from " + expectedHost + " (process " + expectedPid + ")\n")
+            sys.stderr.write("Ignored all communication from this unexpected TextTest slave\n")
+            sys.stderr.flush()
+            self.connection.shutdown(socket.SHUT_RDWR)
             
 
 class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):

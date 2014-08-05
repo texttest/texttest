@@ -897,40 +897,29 @@ class SlaveRequestHandler(StreamRequestHandler):
             sys.stderr.write("WARNING: Received request from hostname " + hostname +
                              " (process " + identifier + ")\nwhich could not be parsed:\n'" + testString + "'\n")
             self.connection.shutdown(socket.SHUT_RDWR)
-        elif self.server.clientCorrect(test, (hostname, identifier)):
-            if not test.state.isComplete(): # we might have killed it already...
-                oldBt = test.state.briefText
-                # The updates are only for testing against old slave traffic,
-                # a bit sad we can't disable them when not testing...
-                _, state = test.getNewState(self.rfile, updatePaths=True)
-                self.server.diag.info("Changed from '" + oldBt + "' to '" + state.briefText + "'")    
-                if rerun:
-                    self.server.diag.info("Instructed to rerun test " + test.uniqueName)
-                    self.server.clearClient(test) # it might come back from a different process
-                    QueueSystemServer.instance.queueTestForRerun(test)
-                else:
-                    self.server.changeState(test, state)
-                try:
-                    self.connection.shutdown(socket.SHUT_RD)
-                except socket.error, e:
-                    # This only occurs on a mac, and doesn't affect functionality.
-                    pass
-                if state.isComplete():
-                    newTest = QueueSystemServer.instance.getTestForReuse(test, state, tryReuse)
-                    if newTest:
-                        self.wfile.write(socketSerialise(newTest))
-                else:
-                    self.server.storeClient(test, (hostname, identifier))
-                    QueueSystemServer.instance.setRemoteProcessId(test, identifier)
-                self.connection.shutdown(socket.SHUT_WR)
-        else:
-            expectedHost, expectedPid = self.server.testClientInfo[test]
-            sys.stderr.write("WARNING: Unexpected TextTest slave for " + repr(test) + " connected from " + \
-                             hostname + " (process " + identifier + ")\n")
-            sys.stderr.write("Slave already registered from " + expectedHost + " (process " + expectedPid + ")\n")
-            sys.stderr.write("Ignored all communication from this unexpected TextTest slave\n")
-            sys.stderr.flush()
-            self.connection.shutdown(socket.SHUT_RDWR)
+        elif not test.state.isComplete(): # we might have killed it already...
+            oldBt = test.state.briefText
+            # The updates are only for testing against old slave traffic,
+            # a bit sad we can't disable them when not testing...
+            _, state = test.getNewState(self.rfile, updatePaths=True)
+            self.server.diag.info("Changed from '" + oldBt + "' to '" + state.briefText + "'")    
+            if rerun:
+                self.server.diag.info("Instructed to rerun test " + test.uniqueName)
+                QueueSystemServer.instance.queueTestForRerun(test)
+            else:
+                self.server.changeState(test, state)
+            try:
+                self.connection.shutdown(socket.SHUT_RD)
+            except socket.error:
+                # This only occurs on a mac, and doesn't affect functionality.
+                pass
+            if state.isComplete():
+                newTest = QueueSystemServer.instance.getTestForReuse(test, state, tryReuse)
+                if newTest:
+                    self.wfile.write(socketSerialise(newTest))
+            else:
+                QueueSystemServer.instance.setRemoteProcessId(test, identifier)
+            self.connection.shutdown(socket.SHUT_WR)
             
 
 class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
@@ -942,7 +931,6 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
         ThreadingTCPServer.__init__(self, (self.getIPAddress(), 0), self.handlerClass())
         self.testMap = {}
         self.testLocks = {}
-        self.testClientInfo = {}
         self.diag = logging.getLogger("Slave Server")
         self.terminate = False
         
@@ -1041,17 +1029,7 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
             return self.testMap[appName][testPath]
         except ValueError:
             return
-    
-    def clientCorrect(self, test, clientInfo):
-        # Only allow one client per test!
-        return test not in self.testClientInfo or self.testClientInfo[test] == clientInfo
-        
-    def storeClient(self, test, clientInfo):
-        self.testClientInfo[test] = clientInfo
-
-    def clearClient(self, test):
-        del self.testClientInfo[test]
-
+            
 
 class MasterTextResponder(TextDisplayResponder):
     def getPrefix(self, test):

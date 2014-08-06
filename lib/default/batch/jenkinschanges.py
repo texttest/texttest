@@ -67,6 +67,11 @@ class BuildDocument:
                 versionMatch = self.versionRegex.search(currString)
                 if versionMatch:
                     return versionMatch.group(0)
+                
+    def hasSourceCodeChange(self):
+        for obj in self.document.getElementsByTagName("hudson.model.CauseAction"):
+            for causes in obj.getElementsByTagName("causes"):
+                return any(("SCMTrigger" in childNode.nodeName for childNode in causes.childNodes))
 
     def getFingerprint(self, ignoreArtefact):
         prevString = None
@@ -217,6 +222,40 @@ class ChangeSetFinder:
         self.jenkinsUrl = jenkinsUrl
         self.bugSystemData = bugSystemData
         
+    def parseXmlChangeLog(self, document):
+        authors = []
+        bugs = []
+        for changeset in document.getElementsByTagName("changeset"):
+            author = self.parseAuthor(changeset.getAttribute("author"))
+            if author not in authors:
+                authors.append(author)
+            for msgNode in changeset.getElementsByTagName("msg"):
+                msg = msgNode.childNodes[0].nodeValue
+                self.addUnique(bugs, self.getBugs(msg))
+        
+        return authors, bugs
+    
+    def parsePlainChangeLog(self, fileName):
+        authors = []
+        bugs = []
+        with open(fileName) as f:
+            for line in f:
+                if "<" in line and "@" in line:
+                    author = self.parseAuthor(line.split(": ")[-1])
+                    if author not in authors:
+                        authors.append(author)
+                if line.startswith(" "):
+                    self.addUnique(bugs, self.getBugs(line))
+        return authors, bugs
+
+    def parseChangeLog(self, xmlFile):
+        try:
+            document = parse(xmlFile)
+        except:
+            return self.parsePlainChangeLog(xmlFile)
+        
+        return self.parseXmlChangeLog(document)
+        
     def getChangeSetData(self, projectChanges):
         changes = []
         for project, build in projectChanges:
@@ -225,16 +264,7 @@ class ChangeSetFinder:
                 continue
             xmlFile = os.path.join(buildsDir, build, "changelog.xml")
             if os.path.isfile(xmlFile):
-                document = parse(xmlFile)
-                authors = []
-                bugs = []
-                for changeset in document.getElementsByTagName("changeset"):
-                    author = self.parseAuthor(changeset.getAttribute("author"))
-                    if author not in authors:
-                        authors.append(author)
-                    for msgNode in changeset.getElementsByTagName("msg"):
-                        msg = msgNode.childNodes[0].nodeValue
-                        self.addUnique(bugs, self.getBugs(msg))
+                authors, bugs = self.parseChangeLog(xmlFile)
                 if authors:
                     fullUrl = os.path.join(self.jenkinsUrl, "job", project, build, "changes")
                     changes.append((",".join(authors), fullUrl, bugs))
@@ -364,6 +394,9 @@ class ChangeFinder:
             # If it was aborted, say this
             return [(str(e), "", [])]
         
+        if self.hasSourceCodeChange(build2): # If we're polling things from SCM, we should include the changes there
+            projectChanges.append((self.jobName, build2))
+        
         # Extract the changeset information from them
         changesFromProjects = self.changeSetFinder.getChangeSetData(projectChanges)
         changesFromMarking = [ self.getMarkChangeText(artefact, projectName, build1, build2) for artefact, projectName in markedChanges ]
@@ -434,6 +467,11 @@ class ChangeFinder:
                     projectChanges.append((project, build))
         return projectChanges, recursiveChanges
     
+    def hasSourceCodeChange(self, build):
+        buildsDir = getBuildsDir(self.jobRoot, self.jobName)
+        doc = BuildDocument.create(buildsDir, build)
+        return doc.hasSourceCodeChange() if doc else False
+        
     def getMarkChangeText(self, artefact, projectName, build1, build2):
         buildsDir = getBuildsDir(self.jobRoot, self.jobName)
         regex = re.compile(artefact)

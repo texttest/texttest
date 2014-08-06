@@ -362,6 +362,14 @@ class SummaryGenerator:
         else:
             pg.save(summaryGraphFile)
 
+    def showResultAsOld(self, info, mostRecentInfo):
+        # Only do this for timed results, i.e. nightjobs etc. From CI/Jenkins etc we can't really tell 
+        # - it depends on the schedule which we can't see and may not even exist
+        return info[0] != mostRecentInfo[0] and self.isDate(info[1])
+
+    def isDate(self, tag):
+        return len(tag) == 9 and tag[:2].isdigit() and tag[2:5].isalpha() and tag[5:].isdigit()
+
     def insertSummaryTable(self, file, dataFinder, mostRecentInfo, pageInfo, appOrder, versionOrder):
         versionWithColumns = self.getVersionsWithColumns(pageInfo)
         self.diag.info("Following versions will be placed in columns " + repr(versionWithColumns))
@@ -382,7 +390,7 @@ class SummaryGenerator:
                         columnVersions[columnIndex] = version
 
                     resultSummary, lastInfo = dataFinder.getLatestSummary(appName, version)
-                    oldResults = lastInfo != mostRecentInfo
+                    oldResults = self.showResultAsOld(lastInfo, mostRecentInfo)
                     fileToLink = dataFinder.getOverviewPage(appName, version)
                     if dataFinder.usePieChart(appName):
                         summaryGraphName = "summary_pie_" + version + ".png"

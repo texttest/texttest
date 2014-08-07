@@ -469,8 +469,11 @@ class ChangeFinder:
     
     def hasSourceCodeChange(self, build):
         buildsDir = getBuildsDir(self.jobRoot, self.jobName)
-        doc = BuildDocument.create(buildsDir, build)
-        return doc.hasSourceCodeChange() if doc else False
+        if buildsDir:
+            doc = BuildDocument.create(buildsDir, build)
+            if doc:
+                return doc.hasSourceCodeChange()
+        return False
         
     def getMarkChangeText(self, artefact, projectName, build1, build2):
         buildsDir = getBuildsDir(self.jobRoot, self.jobName)

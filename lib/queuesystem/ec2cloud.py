@@ -1,5 +1,6 @@
 
-import local, plugins, signal, logging
+import local, plugins, portlisten
+import signal, logging, errno
 import time, os, sys
 from threading import Thread, Lock
 from Queue import Queue
@@ -7,7 +8,7 @@ from fnmatch import fnmatch
 
 class Ec2Machine:
     instanceTypeInfo = { "8xlarge" : 32, "4xlarge": 16, "2xlarge" : 8, "xlarge" : 4, "large" : 2, "medium" : 1 }
-    def __init__(self, inst, synchDirs, app, subprocessLock):
+    def __init__(self, inst, synchDirs, app, subprocessLock, alreadyRunning):
         self.id = inst.id
         self.ip = inst.private_ip_address
         self.fullMachine = "ec2-user@" + self.ip
@@ -23,6 +24,7 @@ class Ec2Machine:
         self.queue = Queue()
         self.errorMessage = ""
         self.subprocessLock = subprocessLock
+        self.startMethod = None if alreadyRunning else inst.start
         
     def getNextJobId(self):
         return "job" + str(len(self.remoteProcessInfo)) + "_" + self.ip
@@ -68,8 +70,23 @@ class Ec2Machine:
             self.synchProc = self.app.getRemoteCopyFileProcess(path, "localhost", dirName, self.fullMachine)
         self.synchProc.wait()
         self.synchProc = None
+        
+    def waitForStart(self):
+        timeout = 1000
+        times = 0
+        self.diag.info("Waiting for response to ssh...")
+        while times < timeout:
+            ret = portlisten.getPortListenErrorCode(self.ip, 22)
+            if ret == 0:
+                break
+            times += 1
+            timedout = ret in [ errno.EWOULDBLOCK, errno.ETIMEDOUT ]
+            if not timedout:
+                time.sleep(1)
 
     def runThread(self):
+        if self.startMethod:
+            self.startMethod() # should be self.waitForStart that is called here, not instance.start. Don't use boto methods in a thread!
         try:
             self.diag.info("Synchronising files with EC2 instance with private IP address '" + self.ip + "'...")
             self.synchronise()
@@ -112,6 +129,11 @@ class Ec2Machine:
         jobId = self.getNextJobId()
         self.remoteProcessInfo[jobId] = None, None
         if not self.thread.isAlive():
+            if self.startMethod:
+                self.diag.info("Starting EC2 instance with private IP address '" + self.ip + "'...")
+                self.startMethod()
+                self.startMethod = self.waitForStart
+
             self.thread.start()
         remoteCmdArgs = self.app.getCommandArgsOn(self.fullMachine, cmdArgs, agentForwarding=True) + fileArgs
         self.queue.put((jobId, plugins.Callable(submitter, remoteCmdArgs, *args)))
@@ -159,9 +181,9 @@ class QueueSystem(local.QueueSystem):
         self.app = app
         self.fileArgs = []
         self.subprocessLock = Lock()
-        instances = self.findInstances()
+        instances, runningIds = self.findInstances()
         synchDirs = self.getDirectoriesForSynch()
-        self.machines = [ Ec2Machine(inst, synchDirs, app, self.subprocessLock) for inst in instances ]
+        self.machines = [ Ec2Machine(inst, synchDirs, app, self.subprocessLock, inst.id in runningIds) for inst in instances ]
         self.releasedMachines = []
         self.capacity = sum((m.cores for m in self.machines))
         
@@ -169,32 +191,38 @@ class QueueSystem(local.QueueSystem):
         import boto.ec2
         region = boto.ec2.connection.EC2Connection.DefaultRegionName # stick to single region for now
         return boto.ec2.connect_to_region(region)
+
+    def getCores(self, inst, defValue=0):
+        instanceSize = inst.instance_type.split(".")[-1]
+        return Ec2Machine.instanceTypeInfo.get(instanceSize, defValue)
         
     def findInstances(self):
         try:
             conn = self.makeEc2Connection()
         except ImportError:
             sys.stderr.write("Cannot run tests in EC2 cloud. You need to install Python's boto package for this to work.\n")
-            return []
+            return [], []
         instanceTags = self.app.getConfigValue("queue_system_resource")
-        idToInstance = self.findTaggedInstances(conn, instanceTags)
-        if idToInstance:
-            instances = self.filterOnStatus(conn, idToInstance)
-            if not instances:
-                sys.stderr.write("Cannot run tests in EC2 cloud. " + str(len(idToInstance)) + " instances were found matching '" + \
-                                 ",".join(instanceTags) + "' in their tags, but none are currently up.\n")
-                return []
-                
-            freeInstances, otherOwners = self.takeOwnership(conn, instances)
+        instances = self.findTaggedInstances(conn, instanceTags)
+        if instances:            
+            running = self.getRunningIds(conn, instances)
+            def getSortKey(inst):
+                isRunning = inst.id in running
+                cores = self.getCores(inst)
+                return not isRunning, -cores, inst.private_ip_address
+
+            instances.sort(key=getSortKey)
+            maxCapacity = self.app.getConfigValue("queue_system_max_capacity")
+            freeInstances, otherOwners = self.takeOwnership(conn, instances, maxCapacity)
             if not freeInstances:
                 sys.stderr.write("Cannot run tests in EC2 cloud. " + str(len(instances)) + " running instances were found matching '" + \
                                  ",".join(instanceTags) + "' in their tags, \nbut all are currently being used by the following users:\n" + \
                                  "\n".join(otherOwners) + "\n\n")
-            freeInstances.sort(key=self.getSortKey)
-            return freeInstances
+
+            return freeInstances, running
         else:
             sys.stderr.write("Cannot run tests in EC2 cloud. No instances were found matching '" + ",".join(instanceTags) + "' in their tags.\n")
-            return []
+            return [], []
         
     def cleanup(self, final=False):
         if final:
@@ -220,43 +248,55 @@ class QueueSystem(local.QueueSystem):
         return tag.split("=", 1) if "=" in tag else [ tag, "1" ]
 
     def findTaggedInstances(self, conn, instanceTags):
-        idToInstance = {}
+        instances = []
         parsedTags = [ self.parseTag(tag) for tag in instanceTags ]
         for inst in conn.get_only_instances():
             if all((self.matchesTag(inst.tags, tagName, tagPattern) for tagName, tagPattern in parsedTags)):
-                idToInstance[inst.id] = inst
-        return idToInstance
-    
-    def getSortKey(self, inst):
-        instanceSize = inst.instance_type.split(".")[-1]
-        cores = Ec2Machine.instanceTypeInfo.get(instanceSize, 0)
-        return -cores, inst.private_ip_address
-    
-    def filterOnStatus(self, conn, idToInstance):
-        machines = []
-        for stat in conn.get_all_instance_status(idToInstance.keys()):
+                instances.append(inst)
+        return instances
+        
+    def getRunningIds(self, conn, instances):
+        ids = [ inst.id for inst in instances ]
+        running = []
+        for stat in conn.get_all_instance_status(ids):
             if stat.instance_status.status in [ "ok", "initializing" ]:
-                machines.append(idToInstance.get(stat.id))
+                running.append(stat.id)
                 
-        return machines
+        return running
     
-    def takeOwnership(self, conn, instances):
-        tryOwnInstances, ownInstances, otherOwners = [], [], set()
-        myTag = self.getUserName() + "_" + plugins.startTimeString()
+
+    def tryAddTag(self, instances, maxCapacity, myTag, otherOwners):
+        tryOwnInstances, fallbackInstances = [], []
+        capacity = 0
         for inst in instances:
             owner = inst.tags.get(self.userTagName, "")
             if owner:
                 otherOwners.add(owner.split("_")[0])
             else:
-                tryOwnInstances.append(inst.id)
-                inst.add_tag(self.userTagName, myTag)
+                if capacity < maxCapacity:
+                    tryOwnInstances.append(inst.id)
+                    inst.add_tag(self.userTagName, myTag)
+                else:
+                    fallbackInstances.append(inst)
+                cores = self.getCores(inst, 1)
+                capacity += cores
+                
+        return tryOwnInstances, fallbackInstances
+
+    def takeOwnership(self, conn, instances, maxCapacity):
+        myTag = self.getUserName() + "_" + plugins.startTimeString()
+        otherOwners = set()
+        tryOwnInstances, fallbackInstances = self.tryAddTag(instances, maxCapacity, myTag, otherOwners)
                 
         if not tryOwnInstances:
             return [], sorted(otherOwners)
         
+        currTryInstances = tryOwnInstances
+        ownInstances = []
+        lostCapacity = 0
         for _ in range(20): 
-            newInsts = conn.get_only_instances(instance_ids=tryOwnInstances)
-            tryOwnInstances = []
+            newInsts = conn.get_only_instances(instance_ids=currTryInstances)
+            currTryInstances = []
             for inst in newInsts:
                 owner = inst.tags.get(self.userTagName, "")
                 if owner == myTag:
@@ -264,12 +304,22 @@ class QueueSystem(local.QueueSystem):
                 elif owner:
                     # There's a race condition, somebody else grabbed it first, we drop it
                     otherOwners.add(owner.split("_")[0])
+                    lostCapacity += self.getCores(inst, 1)
                 else:
-                    tryOwnInstances.append(inst.id)
-            if tryOwnInstances:
+                    currTryInstances.append(inst.id)
+            if currTryInstances:
                 time.sleep(0.1)
             else:
-                break    
+                break
+        
+        def getOrigOrder(inst):
+            return tryOwnInstances.index(inst.id)
+        ownInstances.sort(key=getOrigOrder)
+            
+        if lostCapacity:
+            fallbackInstances, fallbackOwners = self.takeOwnership(conn, fallbackInstances, lostCapacity)
+            ownInstances += fallbackInstances
+            otherOwners.update(fallbackOwners)
                 
         return ownInstances, sorted(otherOwners)
 

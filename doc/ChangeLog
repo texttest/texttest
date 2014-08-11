@@ -2548,7 +2548,9 @@ Batch Report Enhancements:
     - If "file_to_url" is set, now list URLs in the log file, of table pages and index pages
 	For example Jenkins will turn these into links directly.
     - Many improvements to Jenkins Changes functionality
-	Handles attached RPMs via Maven, separate "build" structure from "jobs", workspace subdirectories amongst other things
+	Handles attached RPMs via Maven, separate "build" structure from "jobs", plain text changelogs, workspace subdirectories amongst other things
+    - Runs are only shown as "greyed" in the index page if there is a clear dating schema to the names
+	Index pages created from e.g different Jenkins jobs should be correct now.
     - Overhaul of the additional performance data in HTML reports
 	Instead of separate pages it now appears as additional rows in the normal overview.
 	"historical_report_resource_pages" renamed to "historical_report_resources" to determine which ones to show.

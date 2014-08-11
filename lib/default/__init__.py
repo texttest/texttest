@@ -331,6 +331,7 @@ class Config:
             Config.loggingSetup = True
         
     def setUpLogging(self):
+        logging.logProcesses = 0 # Can cause deadlock problems with subprocess module and CaptureMock. Not useful in TextTest, simplify logging usage.
         filePatterns = [ "logging." + postfix for postfix in self.getLogfilePostfixes() ]
         includeSite, includePersonal = self.optionMap.configPathOptions()
         allPaths = plugins.findDataPaths(filePatterns, includeSite, includePersonal, dataDirName="log")

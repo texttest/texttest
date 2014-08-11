@@ -82,8 +82,6 @@ class RunTest(plugins.Action):
                 self.killedTests.remove(test)
         
         self.describe(test)
-        self.changeToRunningState(test)
-
         machine = test.app.getRunMachine()
         killTimeout = test.getConfigValue("kill_timeout")
         for postfix in self.getTestRunPostfixes(test):
@@ -92,6 +90,10 @@ class RunTest(plugins.Action):
 
             process = self.getTestProcess(test, machine, postfix)    
             self.registerProcess(test, process)
+            if not postfix:
+                # Don't claim to be running until we are, i.e. the process has started
+                self.changeToRunningState(test)
+
             if killTimeout and not test.app.isRecording() and not test.app.isActionReplay():
                 self.runMultiTimer(killTimeout, self.kill, (test, "timeout"))
                 self.wait(process)

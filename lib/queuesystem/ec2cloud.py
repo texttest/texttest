@@ -202,6 +202,9 @@ class QueueSystem(local.QueueSystem):
         except ImportError:
             sys.stderr.write("Cannot run tests in EC2 cloud. You need to install Python's boto package for this to work.\n")
             return [], []
+        except:
+            sys.stderr.write("Failed to establish a connection to the EC2 cloud. Make sure your credentials are available in your .boto file.\n")
+            return [], []
         instanceTags = self.app.getConfigValue("queue_system_resource")
         instances = self.findTaggedInstances(conn, instanceTags)
         if instances:            

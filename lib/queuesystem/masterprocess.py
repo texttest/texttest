@@ -57,7 +57,9 @@ class QueueSystemServer(BaseActionRunner):
         self.slaveLogDirs = set()
         self.delayedTestsForAdd = []
         self.remainingForApp = OrderedDict()
+        appCapacities = []
         for app in allApps:
+            appCapacity = self.maxCapacity
             queueSystem = self.getQueueSystem(app) # populate cache
             queueCapacity = queueSystem.getCapacity() if queueSystem else None
             # If the slaves run somewhere else, they won't create directories for us
@@ -65,11 +67,13 @@ class QueueSystemServer(BaseActionRunner):
                 self.createDirectories |= queueSystem.slavesOnRemoteSystem()
             configCapacity = app.getConfigValue("queue_system_max_capacity")
             for currCap in [queueCapacity, configCapacity]:
-                if currCap is not None and currCap < self.maxCapacity:
-                    self.maxCapacity = currCap
-        if self.maxCapacity == 0:
+                if currCap is not None and currCap < appCapacity:
+                    appCapacity = currCap
+            appCapacities.append(appCapacity)
+        if all((c == 0 for c in appCapacities)):
             raise plugins.TextTestError, "The queue system module is reporting zero capacity.\nEither you have set 'queue_system_max_capacity' to 0 or something is uninstalled or unavailable. Exiting."
         
+        self.maxCapacity = min((c for c in appCapacities if c != 0))
         capacityPerSuite = self.maxCapacity / len(allApps)
         for app in allApps:
             self.remainingForApp[app.name] = capacityPerSuite

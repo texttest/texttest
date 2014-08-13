@@ -1,7 +1,7 @@
 
 """ Base class for all the queue system implementations """
 
-import subprocess, os, socket, signal
+import subprocess, os, signal
 import abstractqueuesystem
 from multiprocessing import cpu_count
 
@@ -74,4 +74,5 @@ class MachineInfo:
         return []
 
 def getExecutionMachines():
-    return [ socket.gethostname() ]
+    from plugins import gethostname
+    return [ gethostname() ]

@@ -265,8 +265,7 @@ class QueueSystem(local.QueueSystem):
             if stat.instance_status.status in [ "ok", "initializing" ]:
                 running.append(stat.id)
                 
-        return running
-    
+        return running 
 
     def tryAddTag(self, instances, maxCapacity, myTag, otherOwners):
         tryOwnInstances, fallbackInstances = [], []
@@ -449,13 +448,13 @@ class QueueSystem(local.QueueSystem):
         return self.fileArgs
                 
     def submitSlaveJob(self, cmdArgs, *args):
+        if self.nextMachineIndex >= len(self.machines):
+            return None, "No more available machines to submit EC2 jobs to - existing jobs have failed"
         machine = self.machines[self.nextMachineIndex]
         submitter = super(QueueSystem, self).submitSlaveJob
         jobId = machine.submitSlave(submitter, cmdArgs, self.getFileArgs(cmdArgs), *args)
         if machine.isFull():
             self.nextMachineIndex += 1
-        if self.nextMachineIndex == len(self.machines):
-            self.nextMachineIndex = 0
         return jobId, None
 
         

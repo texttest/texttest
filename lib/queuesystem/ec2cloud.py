@@ -91,7 +91,8 @@ class Ec2Machine:
             self.diag.info("Synchronising files with EC2 instance with private IP address '" + self.ip + "'...")
             self.synchronise()
         except plugins.TextTestError, e:
-            self.errorMessage = "Failed to synchronise files with EC2 instance with private IP address '" + self.ip + "'\n" + str(e) + "\n"
+            self.errorMessage = "Failed to synchronise files with EC2 instance with private IP address '" + self.ip + "'\n" + \
+                "Intended usage is to start an ssh-agent, and add the keypair for this instance to it, in your shell before starting TextTest from it.\n\n(" + str(e) + ")\n"
             
         if self.errorMessage:
             return

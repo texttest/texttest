@@ -2,12 +2,6 @@
 
 
 import os
-
-if __name__ == "__main__":
-    import sys
-    libDir = os.path.dirname(os.path.dirname(os.path.realpath(sys.argv[0])))
-    sys.path.insert(0, libDir)
-
 import plugins, fpdiff, logging, shutil
 from optparse import OptionParser
 from StringIO import StringIO
@@ -503,24 +497,3 @@ class LineFilter:
                     return realWordNumber
                 wordNumber -= 1
         return len(words) + 1
-
-if __name__ == "__main__":
-    parser = OptionParser("usage: %prog [options] filter1 filter2 ...")
-    parser.add_option("-m", "--module",
-                      help="also import module MODULE", metavar="MODULE")
-    parser.add_option("-u", "--unordered", action="store_true", 
-                      help='Use unordered filter instead of standard one')
-    parser.add_option("-t", "--testrelpath", 
-                      help="use test relative path RELPATH", metavar="RELPATH")
-    (options, args) = parser.parse_args()
-    if options.module:
-        sys.modules["default.rundependent"] = sys.modules["__main__"]
-        sys.path.insert(0, os.path.join(libDir, "../site/lib"))
-        exec "import " + options.module
-    allPaths = plugins.findDataPaths([ "logging.console" ], dataDirName="log", includePersonal=True)
-    plugins.configureLogging(allPaths[-1]) # Won't have any effect if we've already got a log file
-    if options.unordered:
-        runDepFilter = UnorderedTextFilter(args, options.testrelpath)
-    else:
-        runDepFilter = RunDependentTextFilter(args, options.testrelpath)
-    runDepFilter.filterFile(sys.stdin, sys.stdout)

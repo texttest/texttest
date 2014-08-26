@@ -8,7 +8,7 @@ def fixSysPath(fileName):
     install_root = os.path.dirname(os.path.dirname(fileName))
     # We pick up the basic libraries.
     # or a "generic" directory containing the TextTest core with local modules in the root
-    for subdir in [ "", "site/lib", "generic" ]:
+    for subdir in [ "", "lib", "site/lib", "generic" ]:
         libDir = os.path.abspath(os.path.join(install_root, subdir))
         if os.path.isdir(libDir):
             sys.path.insert(0, libDir)

@@ -8,7 +8,7 @@ def fixSysPath(fileName):
     # Also accept a setup with a "site" subdirectory containing local modules,
     # or a "generic" directory containing the TextTest core with local modules in the root
     # Also allow tying a TextTest installation to a StoryText one
-    for subdir in [ "", "site/lib", "generic", "storytext", "generic/storytext" ]:
+    for subdir in [ "", "lib", "site/lib", "generic", "storytext", "generic/storytext" ]:
         libDir = os.path.abspath(os.path.join(install_root, subdir))
         if os.path.isdir(libDir):
             sys.path.insert(0, libDir)

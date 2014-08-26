@@ -1341,7 +1341,7 @@ class Config:
         sshOptions = "-o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10"
         rsyncExcludeFile = plugins.installationPath("etc", "rsync_exclude_patterns")
         return { "default": "", "ssh" : "-q " + sshOptions,
-                 "rsync" : "-e 'ssh -x " + sshOptions + "' -av --copy-unsafe-links --delete --delete-excluded --exclude-from=" + rsyncExcludeFile, "scp": "-Crp " + sshOptions }
+                 "rsync" : "-e 'ssh -x " + sshOptions + "' -av --copy-unsafe-links --delete --exclude-from=" + rsyncExcludeFile, "scp": "-Crp " + sshOptions }
 
     def getCommandArgsOn(self, app, machine, cmdArgs, graphical=False, agentForwarding=False):
         if machine == "localhost":

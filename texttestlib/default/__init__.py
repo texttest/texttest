@@ -1228,7 +1228,7 @@ class Config:
 
     def getDefaultCollateScripts(self):
         if os.name == "posix":
-            return { "default" : [], "stacktrace" : [ "interpretcore.py" ] }
+            return { "default" : [], "stacktrace" : [ "interpretcore" ] }
         else:
             return { "default" : [] }
 

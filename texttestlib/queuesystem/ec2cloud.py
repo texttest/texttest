@@ -377,12 +377,8 @@ class QueueSystem(local.QueueSystem):
         return linkedDirs
     
     def getDirectoriesForSynch(self):
-        dirs = []
-        for i, instRoot in enumerate(plugins.installationRoots):
-            if i == 0 or not instRoot.startswith(plugins.installationRoots[0]):
-                dirs.append(instRoot)
         appDir = self.app.getDirectory()
-        dirs.append(appDir)
+        dirs = [ plugins.installationRoots[0], appDir ]
         checkout = self.app.checkout
         if checkout and not checkout.startswith(appDir):
             dirs.append(checkout)

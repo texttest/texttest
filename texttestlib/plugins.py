@@ -50,16 +50,17 @@ class Callable:
         return self # don't copy these
 
 def findInstallationRoots():
-    installationRoot = os.path.dirname(os.path.dirname(__file__)).replace("\\", "/")
+    packageDir = os.path.dirname(__file__).replace("\\", "/")
+    installationRoot = os.path.dirname(packageDir)
     if os.path.basename(installationRoot) == "generic":
         siteRoot = os.path.dirname(installationRoot)
         return [ installationRoot, siteRoot ]
     else:
         siteDir = os.path.join(installationRoot, "site")
         if os.path.isdir(siteDir):
-            return [ installationRoot, siteDir ]
+            return [ packageDir, siteDir ]
         else:
-            return [ installationRoot ]
+            return [ packageDir ]
 
 globalStartTime = datetime.now()
 datetimeFormat = "%d%b%H:%M:%S"

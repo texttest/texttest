@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import sys, difflib, StringIO, optparse
+import sys, difflib
 
 def _getNumberAt(l, pos):
     start = pos
@@ -72,34 +72,3 @@ def fpfilter(fromlines, tolines, outlines, tolerance, relTolerance=None):
                     outlines.write(toline)
         else:
             outlines.writelines(tolines[j1:j2])
-
-def main():
-    parser = optparse.OptionParser("usage: %prog [options] fromfile tofile")
-    parser.add_option("-t", "--tolerance", type="float",
-                      help='Set absolute floating point tolerance')
-    parser.add_option("-r", "--relative", type="float",
-                      help='Set relative floating point tolerance')
-    parser.add_option("-o", "--output",
-                      help='Write filtered tofile to use external diff')
-    (options, args) = parser.parse_args()
-    if len(args) == 0: # pragma: no cover - not production code
-        parser.print_help()
-        sys.exit(1)
-    if len(args) != 2: # pragma: no cover - not production code
-        parser.error("need to specify both a fromfile and tofile")
-    fromfile, tofile = args
-    fromlines = open(fromfile, 'U').readlines()
-    tolines = open(tofile, 'U').readlines()
-    if options.output:
-        out = open(options.output, 'w')
-        fpfilter(fromlines, tolines, out, options.tolerance, options.relative)
-        out.close()
-    else: # pragma: no cover - not production code
-        out = StringIO.StringIO()
-        fpfilter(fromlines, tolines, out, options.tolerance, options.relative)
-        out.seek(0)
-        tolines = out.readlines()
-        sys.stdout.writelines(difflib.unified_diff(fromlines, tolines, fromfile, tofile))
-
-if __name__ == '__main__':
-    main()

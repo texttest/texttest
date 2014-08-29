@@ -5,3 +5,4 @@ coverage_tmp
 build
 .project
 .pydevproject
+TextTest.egg-info

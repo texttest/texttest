@@ -828,7 +828,10 @@ class CollateFiles(plugins.Action):
                 args = [ interpreter ] + args
 
         try:
-            return subprocess.Popen(args, env=test.getRunEnvironment(),
+            runEnv = test.getRunEnvironment()
+            libexecPaths = [ os.path.join(p, "libexec") for p in plugins.installationRoots ]
+            runEnv["PATH"] += os.pathsep + os.pathsep.join(libexecPaths)
+            return subprocess.Popen(args, env=runEnv,
                                     stdin=stdin, stdout=stdout, stderr=stderr,
                                     cwd=test.getDirectory(temporary=1), shell=useShell)
         except OSError:
@@ -852,7 +855,7 @@ class CollateFiles(plugins.Action):
         self.collationProc = None
         stdin = None
         for script in scripts:
-            args = getScriptArgs(script)
+            args = script.split()
             if self.collationProc:
                 stdin = self.collationProc.stdout
             else:

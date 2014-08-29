@@ -122,7 +122,7 @@ class DocumentEnvironment(plugins.Action):
             # We only want to document environment variables in the configuration we're using here, not every configuration we can find
             if root.endswith("lib"):
                 for dir in dirs:
-                    if not sys.modules.has_key(dir) and not sys.modules.has_key("texttestlib." + dir):
+                    if dir != "libexec" and not sys.modules.has_key(dir) and not sys.modules.has_key("texttestlib." + dir):
                         dirs.remove(dir)
             for file in files:
                 if file.endswith(".py"): 
@@ -166,8 +166,8 @@ class DocumentEnvironment(plugins.Action):
             return []
 
     def interpretArgument(self, arg):
-        if arg.endswith("texttest.py"):
-            return "<source directory>/bin/texttest.py"
+        if os.path.isfile(arg) and os.path.basename(arg) == "texttest":
+            return "<source directory>/bin/texttest"
         else:
             return arg
 

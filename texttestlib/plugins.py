@@ -54,7 +54,7 @@ def findInstallationRoots():
     installationRoot = os.path.dirname(packageDir)
     if os.path.basename(installationRoot) == "generic":
         siteRoot = os.path.dirname(installationRoot)
-        return [ installationRoot, siteRoot ]
+        return [ packageDir, siteRoot ]
     else:
         siteDir = os.path.join(installationRoot, "site")
         if os.path.isdir(siteDir):

@@ -1,0 +1,3 @@
+include readme.txt
+recursive-include bin *
+recursive-include texttestlib *

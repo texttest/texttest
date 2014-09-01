@@ -3,6 +3,9 @@
 
 from distutils.core import setup
 from distutils.command.build_py import build_py
+from distutils.command.install_scripts import install_scripts
+
+import os, shutil
 
 class build_py_preserve_permissions(build_py):
     def copy_file(self, src, dst, preserve_mode=True, **kw):
@@ -12,9 +15,22 @@ class build_py_preserve_permissions(build_py):
         else:
             return build_py.copy_file(self, src, dst, preserve_mode=preserve_mode, **kw)
 
-import os, shutil
+
+# Lifted from bzr setup.py, use for Jython on Windows which has no native installer
+class windows_install_scripts(install_scripts):
+    """ Customized install_scripts distutils action.
+    """
+    def run(self):
+        install_scripts.run(self)   # standard action
+        src = os.path.join(self.install_dir, "bin", "texttest")
+        os.rename(src, src + ".pyw")
+        shutil.copyfile(src + ".pyw", src + "c.py")
+
 
 command_classes = {"build_py" : build_py_preserve_permissions }
+if os.name == "nt":
+    command_classes['install_scripts'] = windows_install_scripts
+
 packages = ["texttestlib", "texttestlib.default", "texttestlib.queuesystem",
             "texttestlib.default.batch", "texttestlib.default.gtkgui", "texttestlib.default.knownbugs",
             "texttestlib.default.gtkgui.default_gui", "texttestlib.default.gtkgui.version_control"]
@@ -22,7 +38,9 @@ packages = ["texttestlib", "texttestlib.default", "texttestlib.queuesystem",
 package_data = {"texttestlib" : ["doc/ChangeLog", "doc/quick_start.txt", "doc/CREDITS.txt", "doc/MigrationNotes*", "doc/LICENSE.txt", 
                                  "etc/*", "etc/.*", "libexec/*", "log/*", "images/*" ], 
                 "texttestlib.default.batch":["testoverview_javascript/*"]}
-scripts = ["bin/texttest", "bin/filter_rundependent.py", "bin/filter_fpdiff.py", "texttestlib/libexec/interpretcore" ]
+scripts = ["bin/texttest", "bin/filter_rundependent.py", "bin/filter_fpdiff.py" ]
+if os.name == "posix":
+    scripts.append("texttestlib/libexec/interpretcore")
 
 setup(name='TextTest',
       version="trunk",

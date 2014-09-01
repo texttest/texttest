@@ -22,9 +22,18 @@ class windows_install_scripts(install_scripts):
     """
     def run(self):
         install_scripts.run(self)   # standard action
-        src = os.path.join(self.install_dir, "bin", "texttest")
-        os.rename(src, src + ".pyw")
-        shutil.copyfile(src + ".pyw", src + "c.py")
+        src = os.path.join(self.install_dir, "texttest")
+        dst = src + "c.py"
+        if os.path.isfile(dst):
+            os.remove(dst)
+        os.rename(src, dst)
+        with open(src + ".pyw", "w") as writeFile:
+            with open(dst) as readFile:
+                for line in readFile:
+                    if line.startswith("#!"):
+                        writeFile.write(line.replace("python.exe", "pythonw.exe"))
+                    else:
+                        writeFile.write(line)
 
 
 command_classes = {"build_py" : build_py_preserve_permissions }

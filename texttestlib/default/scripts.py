@@ -166,7 +166,7 @@ class DocumentEnvironment(plugins.Action):
             return []
 
     def interpretArgument(self, arg):
-        if os.path.isfile(arg) and os.path.basename(arg) == "texttest":
+        if os.path.isfile(arg) and os.path.basename(arg) in [ "texttest", "texttestc.py" ]:
             return "<source directory>/bin/texttest"
         else:
             return arg

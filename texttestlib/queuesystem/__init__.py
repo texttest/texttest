@@ -30,8 +30,6 @@ class QueueSystemConfig(default.Config):
         return len(set([ app.getConfigValue("queue_system_module") == "ec2cloud" for app in apps ])) == 1
 
     def addToOptionGroups(self, apps, groups):
-        if not self.cloudUseConsistent(apps):
-            raise plugins.TextTestError, "No support currently for running ec2cloud tests at the same time as tests with other queue systems"
         default.Config.addToOptionGroups(self, apps, groups)
         minTestCount = min((app.getConfigValue("queue_system_min_test_count") for app in apps))
         localQueueSystem = self.useLocalQueueSystem(apps)
@@ -248,6 +246,9 @@ class QueueSystemConfig(default.Config):
 
     def _getResponderClasses(self, allApps, *args):
         self.useQueueSystem = self.calculateUseQueueSystem(allApps)
+        if self.useQueueSystem and not self.cloudUseConsistent(allApps):
+            raise plugins.TextTestError, "No support currently for running ec2cloud tests at the same time as tests with other queue systems"
+        
         if self.slaveRun():
             return self.getSlaveResponderClasses()
         else:

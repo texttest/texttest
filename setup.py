@@ -51,13 +51,15 @@ scripts = ["bin/texttest", "bin/filter_rundependent.py", "bin/filter_fpdiff.py" 
 if os.name == "posix":
     scripts.append("texttestlib/libexec/interpretcore")
 
+from texttestlib.texttest_version import version
+
 setup(name='TextTest',
-      version="trunk",
+      version=version,
       author="Geoff Bache",
       author_email="geoff.bache@pobox.com",
       url="http://www.texttest.org",
-      description="A tool for text-based functional testing",
-      long_description="",
+      description="A tool for text-based Approval Testing",
+      long_description="TextTest is a tool for text-based Approval Testing, which is an approach to acceptance testing/functional testing. In other words, it provides support for regression testing by means of comparing program output files against a specified approved versions of what they should look like.",
       packages=packages,
       package_dir={},
       py_modules=[],

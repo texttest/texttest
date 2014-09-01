@@ -15,7 +15,7 @@
 
 # The -x flag should be provided if the temporary files are to be left. Mostly useful for testing.
 
-import os, sys, shutil
+import os, sys, shutil, subprocess
 from glob import glob
 from getopt import getopt
 
@@ -45,8 +45,9 @@ def exportFromBzr(dest, tagName):
     exportDir("StoryText", "source", "source/storytext", dest)
         
 def createSource(reldir):
-    versionFile = os.path.join(reldir, "source", "lib", "texttest_version.py")
+    versionFile = os.path.join(reldir, "source", "texttestlib", "texttest_version.py")
     updateVersionFile(versionFile, releaseName)
+    subprocess.call([ "python", "setup.py", "sdist" ], cwd=os.path.join(reldir, "source"))
     os.rename(os.path.join(reldir, "source", "readme.txt"), os.path.join(reldir, "readme.txt"))
     
 def updateVersionFile(versionFile, releaseName):

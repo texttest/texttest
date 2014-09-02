@@ -378,7 +378,7 @@ class QueueSystem(local.QueueSystem):
     
     def getDirectoriesForSynch(self):
         appDir = self.app.getDirectory()
-        dirs = [ plugins.installationRoots[0], appDir ]
+        dirs = [ appDir ]
         checkout = self.app.checkout
         if checkout and not checkout.startswith(appDir):
             dirs.append(checkout)
@@ -449,6 +449,9 @@ class QueueSystem(local.QueueSystem):
     def submitSlaveJob(self, cmdArgs, *args):
         if self.nextMachineIndex >= len(self.machines):
             return None, "No more available machines to submit EC2 jobs to - existing jobs have failed"
+    
+        # Use the centrally installed TextTest on the remote nodes
+        cmdArgs[0] = "texttest"
         machine = self.machines[self.nextMachineIndex]
         submitter = super(QueueSystem, self).submitSlaveJob
         jobId = machine.submitSlave(submitter, cmdArgs, self.getFileArgs(cmdArgs), *args)

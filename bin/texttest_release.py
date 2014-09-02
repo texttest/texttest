@@ -38,16 +38,17 @@ def exportDir(product, artefact, targetName, dest, tag=""):
     os.system(cmdLine)
     shutil.rmtree(os.path.join(destDir, ".bzr"))
 
-def exportFromBzr(dest, tagName):
+def exportFromBzr(dest, tagName, devRelease):
     exportDir("TextTest", "source", "source", dest, tagName)
-    os.mkdir(os.path.join(dest, "tests"))
-    exportDir("TextTest", "tests", "tests/texttest", dest, tagName)
-    exportDir("StoryText", "source", "source/storytext", dest)
+    if not devRelease:
+        os.mkdir(os.path.join(dest, "tests"))
+        exportDir("TextTest", "tests", "tests/texttest", dest, tagName)
+        exportDir("StoryText", "source", "source/storytext", dest)
         
 def createSource(reldir):
     versionFile = os.path.join(reldir, "source", "texttestlib", "texttest_version.py")
     updateVersionFile(versionFile, releaseName)
-    subprocess.call([ "python", "setup.py", "sdist" ], cwd=os.path.join(reldir, "source"))
+    subprocess.call([ "python", "setup.py", "sdist", "upload" ], cwd=os.path.join(reldir, "source"))
     os.rename(os.path.join(reldir, "source", "readme.txt"), os.path.join(reldir, "readme.txt"))
     
 def updateVersionFile(versionFile, releaseName):
@@ -71,14 +72,16 @@ if __name__ == "__main__":
         shutil.rmtree(actualRoot)
     os.makedirs(actualRoot)
     
-    exportFromBzr(actualRoot, tagName)
+    devRelease = "dev" in releaseName
+    exportFromBzr(actualRoot, tagName, devRelease)
     createSource(actualRoot)
     
-    os.chdir(rootDir)
-    zipName = reldir + ".zip"
-    if os.path.isfile(zipName):
-        os.remove(zipName)
-    print "Creating zip file", zipName
-    os.system("zip -r " + zipName + " " + reldir)
-    if not leaveDir:
-        shutil.rmtree(reldir)
+    if not devRelease:
+        os.chdir(rootDir)
+        zipName = reldir + ".zip"
+        if os.path.isfile(zipName):
+            os.remove(zipName)
+        print "Creating zip file", zipName
+        os.system("zip -r " + zipName + " " + reldir)
+        if not leaveDir:
+            shutil.rmtree(reldir)

@@ -10,9 +10,6 @@ SetCompressor lzma
 !include "WinVer.nsh"
 ; ------------ TextTest settings ---------
 !define PRODUCT_NAME "TextTest"
-!ifndef PRODUCT_VERSION
-  !define PRODUCT_VERSION "3.26"
-!endif
 !define PRODUCT_PUBLISHER "TextTest"
 !define PRODUCT_WEB_SITE "http://www.texttest.org"
 !define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\AppMainExe.exe"
@@ -35,21 +32,16 @@ Var JAVA_EXE
   !define ARCH "win32"
 !endif
 
+!ifndef TT_BIN
+  !define TT_BIN "bin"
+!endif
+
 !ifdef JEPPESEN
   !define CENTRAL_STORYTEXT_LOCATION "T:\texttest\release\storytext"
   !define CENTRAL_TEXTTEST_LOCATION "T:\texttest\release\current"
-  !define TT_BIN "bin"
   !ifndef STORYTEXT_UPDATER
     !define STORYTEXT_UPDATER "storytext_updater.bat"
   !endif
-!else
-  !ifndef TEXTTEST_ROOT
-    !define TEXTTEST_ROOT "texttest-3.26"
-  !endif
-  !ifndef TEXTTEST_DIST
-    !define TEXTTEST_DIST "${TEXTTEST_ROOT}.zip"
-  !endif
-  !define TT_BIN "${TEXTTEST_ROOT}\source\bin"
 !endif
 
 !ifndef VIRTUALENV_DIST
@@ -134,14 +126,14 @@ PageExEnd
 
 ; MUI end ------
 
-Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
+Name "${PRODUCT_NAME}"
 BrandingText " "
 RequestExecutionLevel user
 Caption "${PRODUCT_NAME}"
 !ifdef JEPPESEN
-  OutFile "texttest-all-in-one${PRODUCT_VERSION}.${ARCH}.jeppesen.exe"
+  OutFile "texttest-all-in-one.${ARCH}.jeppesen.exe"
 !else
-  OutFile "texttest-all-in-one${PRODUCT_VERSION}.${ARCH}.exe"
+  OutFile "texttest-all-in-one.${ARCH}.exe"
 !endif
 InstallDir "C:\TextTest"
 InstallDirRegKey HKLM "${PRODUCT_DIR_REGKEY}" ""
@@ -266,8 +258,7 @@ SectionGroupEnd
 SectionGroupEnd
 
 Section "Texttest" SEC09
-  ;SectionIn RO
-  ZipDLL::extractall "$OUTDIR\${TEXTTEST_DIST}" "$INSTDIR"
+  Call configureTextTest
   IfErrors onError
   Call updateTexttestPath
   IfErrors onError done
@@ -294,9 +285,6 @@ Function initialize
   Call setup
   File "${VIRTUALENV_DIST}"
   File "texttest-icon-dynamic.ico"
-  !ifndef JEPPESEN
-    File "open_source\${TEXTTEST_DIST}"
-  !endif
   CreateDirectory "$INSTDIR"
   writeUninstaller "$INSTDIR\Uninstall.exe"
   Call copyVirtualEnvFiles
@@ -349,7 +337,7 @@ Function setTexttestHome
 FunctionEnd
 
 Function updateTexttestPath
-  ${EnvVarUpdate} $0 "PATH" "P" "HKCU" "$INSTDIR\${TT_BIN}"
+  ${EnvVarUpdate} $0 "PATH" "P" "HKCU" "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\Scripts"
 FunctionEnd
 
 Function updatePythonPath
@@ -370,6 +358,25 @@ Function updateWinMergePath
   ${EnvVarUpdate} $0 "PATH" "P" "HKCU" "$WINMERGE_PATH"
 FunctionEnd
 */
+
+Function configureTextTest
+  IfFileExists "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\*.*" install
+  Call installVirtualEnvOnPython
+  IfErrors 0 install
+  MessageBox MB_OK|MB_ICONSTOP "Failed to install virtual environment on Python."
+  Quit
+  install:
+  ifFileExists "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\Scripts\texttest*" upgrade
+  ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring texttest & ${VIRTUAL_PYTHON}\Scripts\pip install texttest & EXIT'
+  IfErrors onError done
+  upgrade:
+  ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Configuring texttest & ${VIRTUAL_PYTHON}\Scripts\pip install --upgrade texttest & EXIT'
+  IfErrors onError done
+  onError:
+    MessageBox MB_OK|MB_ICONSTOP "Failed to install TextTest."
+    Quit
+  done:
+FunctionEnd
 
 Function configureStorytextPython
   IfFileExists "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\*.*" install
@@ -483,19 +490,11 @@ Function installVirtualEnvOnJython
     ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO installing virtualenv on jython & $JYTHON_PATH\bin\jython virtualenv.py --distribute ${VIRTUAL_JYTHON} && EXIT'
 Functionend
 
-Function copyTexttestBin
-  CopyFiles /SILENT "$INSTDIR\${TT_BIN}\texttest.py" $INSTDIR
-  Rename "$INSTDIR\texttest.py" "$INSTDIR\texttest.pyw"
-  CopyFiles /SILENT "$INSTDIR\texttest.pyw" $INSTDIR\${TT_BIN}
-  Delete "$INSTDIR\texttest.pyw"
-FunctionEnd
-
 Function makeShortcuts
-  Call copyTexttestBin
   CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
-  CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\${TT_BIN}\texttest.pyw" "" "$OUTDIR\texttest-icon-dynamic.ico" ""
+  CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\Scripts\texttest.pyw" "" "$OUTDIR\texttest-icon-dynamic.ico" ""
   CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
-  CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\${TT_BIN}\texttest.pyw" "" "$OUTDIR\texttest-icon-dynamic.ico" ""
+  CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\Scripts\texttest.pyw" "" "$OUTDIR\texttest-icon-dynamic.ico" ""
   !ifdef JEPPESEN
     CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\StoryTextUpdater.lnk" "cmd.exe" "/K $INSTDIR\storytext_updater.bat"
     CreateShortcut "$DESKTOP\StoryTextUpdater.lnk" "cmd.exe" "/K $INSTDIR\storytext_updater.bat"
@@ -543,7 +542,6 @@ FunctionEnd
 
 Function un.setEnv
   DeleteRegKey "HKCU" "Environment\TEXTTEST_HOME"
-  ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "$INSTDIR\${TT_BIN}"
   ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\bin"
   ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\Scripts"
   ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "$VIRTUALENV_PATH\${VIRTUAL_JYTHON}\bin"

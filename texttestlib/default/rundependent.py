@@ -233,7 +233,7 @@ class RunDependentTextFilter(plugins.Observable):
 
     def filterFile(self, file, newFile, filteredAway=None):
         lineNumber = 0
-        lengths = []
+        seekPoints = []
         lineFilters = self.findRelevantFilters(file)
         for line in file:
             # We don't want to stack up ActionProgreess calls in ThreaderNotificationHandler ...
@@ -241,19 +241,17 @@ class RunDependentTextFilter(plugins.Observable):
             lineNumber += 1
             lineFilter, filteredLine, removeCount = self.getFilteredLine(line, lineNumber, lineFilters)
             if removeCount:
-                lineLengths = lengths[-removeCount:]
-                offset = sum(lineLengths)
-                self.diag.info("Removing " + repr(removeCount) + " lines with lengths " + repr(lineLengths) + " total offset " + repr(offset))
-                newFile.seek(-offset, os.SEEK_CUR)
+                seekPoint = seekPoints[-removeCount - 1]
+                self.diag.info("Removing " + repr(removeCount) + " lines")
+                newFile.seek(seekPoint)
                 newFile.truncate()
-                lengths = []
+                seekPoints = []
             if filteredLine:
                 newFile.write(filteredLine)
-                lengths.append(len(filteredLine))
             else:
-                lengths.append(0)
                 if filteredAway is not None and lineFilter is not None:
                     filteredAway.setdefault(lineFilter, []).append(line)
+            seekPoints.append(newFile.tell())
 
     def getFilteredLine(self, line, lineNumber, lineFilters):
         appliedLineFilter = None

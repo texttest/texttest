@@ -1,3 +1,11 @@
+
+========================================================
+CHANGE IN ENVIRONMENT
+========================================================
+The command is now "texttest" on UNIX. On Windows, there is now texttest.pyw for the GUI and texttestc.py for the console.
+TextTest can be run from the source tree on UNIX still, but on Windows you now need to install it. The easiest way being
+via the Windows installer, or via pip/easy_install.
+
 =========================================================
 CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
 =========================================================

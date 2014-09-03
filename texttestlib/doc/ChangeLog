@@ -2516,6 +2516,10 @@ Bug Fixes:
 
 Version trunk
 =============
+Release Enhancements:
+    - TextTest now lives in a package called "texttestlib" and is available from PyPI ("pip install texttest" or "easy_install texttest")
+	Should make managing installations easier. Windows installer is now version-independent: it just grabs the latest version from PyPI.
+	Command is now always "texttest" on POSIX systems. Windows has "texttest.pyw" for the GUI, "texttestc.py" for the console.
 Dynamic GUI Enhancements:
     - New "Generate test summary" in Actions menu
 	Essentially generates the batch report for the selected tests, writing to a user-selected file
@@ -2617,3 +2621,7 @@ Bug Fixes:
     - Fixed various GTK warnings that were harmless but ugly
     - Fixed error handling generating batch report in Jenkins when build.xml is empty or artefact version is not present.
     - Fixed ValueError when looking at jenkins fingerprint items
+    - {PREVLINES ...} run_dependent_text filtering was unreliable, should work better now
+    - "Replace Text In Files" no longer falls over on auto-generated "missing version" files
+    - Fixed "remote machine" option when using local queue system
+    - Fixed use of full host name from local queue system setup

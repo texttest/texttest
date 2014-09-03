@@ -445,13 +445,14 @@ class QueueSystem(local.QueueSystem):
             ipAddress = self.getArg(cmdArgs, "-servaddr").split(":")[0]
             self.fileArgs = [ "-slavefilesynch", self.getUserName() + "@" + ipAddress ]
         return self.fileArgs
-                
+    
+    def getTextTestArgs(self):
+        return [ "texttest" ] # Assume remote nodes are UNIX-based with TextTest installed centrally
+     
     def submitSlaveJob(self, cmdArgs, *args):
         if self.nextMachineIndex >= len(self.machines):
             return None, "No more available machines to submit EC2 jobs to - existing jobs have failed"
     
-        # Use the centrally installed TextTest on the remote nodes
-        cmdArgs[0] = "texttest"
         machine = self.machines[self.nextMachineIndex]
         submitter = super(QueueSystem, self).submitSlaveJob
         jobId = machine.submitSlave(submitter, cmdArgs, self.getFileArgs(cmdArgs), *args)

@@ -1,7 +1,7 @@
 
 """ Base class for all the queue system implementations """
 
-import subprocess, os
+import subprocess, os, sys
 from texttestlib import plugins
 
 class QueueSystem(object):
@@ -62,7 +62,15 @@ class QueueSystem(object):
     
     def slavesOnRemoteSystem(self):
         return False
-
+    
+    def getWindowsExecutable(self):
+        # sys.executable could be something other than Python... like storytext. Don't involve that here
+        return os.path.join(sys.exec_prefix, "python.exe")
+    
+    def getTextTestArgs(self):
+        texttest = plugins.getTextTestProgram()
+        return [ self.getWindowsExecutable(), texttest ] if os.name == "nt" else [ texttest ]
+    
     def makeSlaveEnvironment(self, env):
         newEnv = plugins.copyEnvironment(ignoreVars=self.getSlaveVarsToBlock())
         for var, value in env.items():

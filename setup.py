@@ -40,6 +40,8 @@ command_classes = {"build_py" : build_py_preserve_permissions }
 if os.name == "nt":
     command_classes['install_scripts'] = windows_install_scripts
 
+mod_files = [ "ordereddict" ]
+
 packages = ["texttestlib", "texttestlib.default", "texttestlib.queuesystem",
             "texttestlib.default.batch", "texttestlib.default.gtkgui", "texttestlib.default.knownbugs",
             "texttestlib.default.gtkgui.default_gui", "texttestlib.default.gtkgui.version_control"]
@@ -62,7 +64,7 @@ setup(name='TextTest',
       long_description="TextTest is a tool for text-based Approval Testing, which is an approach to acceptance testing/functional testing. In other words, it provides support for regression testing by means of comparing program output files against a specified approved versions of what they should look like.",
       packages=packages,
       package_dir={},
-      py_modules=[],
+      py_modules=mod_files,
       package_data=package_data,
       classifiers=[ "Programming Language :: Python",
                     "License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)",

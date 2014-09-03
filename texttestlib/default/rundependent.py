@@ -241,7 +241,9 @@ class RunDependentTextFilter(plugins.Observable):
             lineNumber += 1
             lineFilter, filteredLine, removeCount = self.getFilteredLine(line, lineNumber, lineFilters)
             if removeCount:
-                offset = sum(lengths[-removeCount:])
+                lineLengths = lengths[-removeCount:]
+                offset = sum(lineLengths)
+                self.diag.info("Removing " + repr(removeCount) + " lines with lengths " + repr(lineLengths) + " total offset " + repr(offset))
                 newFile.seek(-offset, os.SEEK_CUR)
                 newFile.truncate()
                 lengths = []

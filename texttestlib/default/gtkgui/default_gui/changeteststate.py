@@ -85,7 +85,8 @@ class ApproveTests(BackgroundThreadHelper,guiplugins.ActionDialogGUI):
     def getTooltip(self):
         return "Approve results with non-default settings"
     def getDirectTooltip(self):
-        return "Approve results for selected tests"
+        return "Approve results for selected tests. This will save the files produced by this run as the new approved files " + \
+                "which future runs will be compared with. Used to be called Save."""
     
     def addToGroups(self, actionGroup, accelGroup):
         self.directAccel = self._addToGroups("Approve", self.directAction, actionGroup, accelGroup)

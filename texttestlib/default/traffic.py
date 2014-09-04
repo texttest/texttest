@@ -1,5 +1,5 @@
 
-import os, shutil, subprocess
+import os, shutil, subprocess, sys
 from texttestlib import plugins
 
 class SetUpCaptureMockHandlers(plugins.Action):
@@ -54,14 +54,17 @@ class SetUpCaptureMockHandlers(plugins.Action):
         recordEditDir = test.makeTmpFileName("file_edits", forComparison=0)
         replayEditDir = test.getFileName("file_edits") if extReplayFile else None
         sutDirectory = test.getDirectory(temporary=1, local=1)
-        from capturemock import setUpServer, setUpPython
-        externalActive = setUpServer(self.recordSetting, extRecordFile, extReplayFile,
-                                     recordEditDir=recordEditDir, replayEditDir=replayEditDir, 
-                                     rcFiles=rcFiles, interceptDir=interceptDir,
-                                     sutDirectory=sutDirectory, environment=test.environment)
-        pythonActive = setUpPython(self.recordSetting, pyRecordFile, pyReplayFile, rcFiles=rcFiles,
-                                   environment=test.environment)
-        return externalActive or pythonActive
+        try:
+            from capturemock import setUpServer, setUpPython
+            externalActive = setUpServer(self.recordSetting, extRecordFile, extReplayFile,
+                                         recordEditDir=recordEditDir, replayEditDir=replayEditDir, 
+                                         rcFiles=rcFiles, interceptDir=interceptDir,
+                                         sutDirectory=sutDirectory, environment=test.environment)
+            pythonActive = setUpPython(self.recordSetting, pyRecordFile, pyReplayFile, rcFiles=rcFiles,
+                                       environment=test.environment)
+            return externalActive or pythonActive
+        except ImportError:
+            raise plugins.TextTestError, "Test requires CaptureMock to be installed, but the capturemock module could not be found\nSearched in " + repr(sys.path)
             
     def intercept(self, moduleFile, interceptDir):
         interceptName = os.path.join(interceptDir, os.path.basename(moduleFile))

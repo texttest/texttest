@@ -701,17 +701,20 @@ class Config:
     def batchMode(self):
         return self.optionMap.has_key("b")
     
+    def actualBatchMode(self):
+        return self.batchMode() and not self.isReconnecting()
+    
     def keepTemporaryDirectories(self):
         if "keeptmp" in self.optionMap:
             return self.optionMap.get("keeptmp") != "0"
         else:
-            return self.batchMode() and not self.isReconnecting()
-
+            return self.actualBatchMode()
+    
     def hasKeeptmpFlag(self):
         return "keeptmp" in self.optionMap and self.optionMap.get("keeptmp") != "0"
 
     def cleanPreviousTempDirs(self):
-        return self.batchMode() and not self.isReconnecting() and "keeptmp" not in self.optionMap
+        return self.actualBatchMode() and "keeptmp" not in self.optionMap
 
     def cleanWriteDirectory(self, suite):
         if self.removePreviousThread and self.removePreviousThread.isAlive():
@@ -827,7 +830,7 @@ class Config:
         return comparetest.MakeComparisons(enableColor=self.optionMap.has_key("zen"))
     
     def getStateSaver(self):
-        if self.batchMode() and not self.isReconnecting():
+        if self.actualBatchMode():
             return batch.SaveState
         elif self.keepTemporaryDirectories():
             return SaveState

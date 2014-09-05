@@ -151,8 +151,14 @@ class QueueSystemConfig(default.Config):
             return default.Config.getExtraVersions(self, app)
 
     def keepTemporaryDirectories(self):
-        return default.Config.keepTemporaryDirectories(self) or (self.slaveRun() and self.optionMap.has_key("keepslave"))
-
+        if self.hasKeeptmpFlag():
+            return True
+        if self.slaveOnRemoteSystem():
+            return False
+        if self.slaveRun() and self.optionMap.has_key("keepslave"):
+            return True
+        return default.Config.keepTemporaryDirectories(self)
+        
     def cleanPreviousTempDirs(self):
         return not self.slaveRun() and default.Config.cleanPreviousTempDirs(self)
 
@@ -183,7 +189,11 @@ class QueueSystemConfig(default.Config):
                 plugins.removePath(fullPath)
                 
     def cleanEmptyDirectories(self, path):
-        files = os.listdir(path)
+        try:
+            files = os.listdir(path)
+        except OSError:
+            # Other slaves are potentially doing this at the same time, potential for race conditions
+            return False
         subdirs = []
         for f in files:
             fullpath = os.path.join(path, f)

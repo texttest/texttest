@@ -1402,7 +1402,7 @@ class Config:
         if exitCode > 0:
             raise plugins.TextTestError, "Unable to contact machine '" + machine + \
                   "'.\nMake sure you have passwordless access set up correctly. The failing command was:\n" + \
-                  " ".join(allArgs) + "\n\nThe command produced the following output:\n" + output.strip()
+                  " ".join(allArgs) + "\n\nThe command produced exit code " + str(exitCode) + " and the following output:\n" + output.strip()
 
     def ensureRemoteDirExists(self, app, machine, *dirnames):
         quotedDirs = map(plugins.quote, dirnames)

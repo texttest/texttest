@@ -273,6 +273,7 @@ class QueueSystem(local.QueueSystem):
     def tryAddTag(self, instances, maxCapacity, myTag, otherOwners):
         tryOwnInstances, fallbackInstances = [], []
         capacity = 0
+        # get_only_instances probably needed? Still doesn't eliminate race condition entirely...
         for inst in instances:
             owner = inst.tags.get(self.userTagName, "")
             if owner:
@@ -379,6 +380,8 @@ class QueueSystem(local.QueueSystem):
     def getDirectoriesForSynch(self):
         appDir = self.app.getDirectory()
         dirs = [ appDir ]
+        if self.synchSlaveCode():
+            dirs.append(plugins.installationRoots[0])
         checkout = self.app.checkout
         if checkout and not checkout.startswith(appDir):
             dirs.append(checkout)
@@ -446,8 +449,15 @@ class QueueSystem(local.QueueSystem):
             self.fileArgs = [ "-slavefilesynch", self.getUserName() + "@" + ipAddress ]
         return self.fileArgs
     
+    def synchSlaveCode(self):
+        # If we're running our self-diagnostics, make sure we copy our local code across and run it as the slaves
+        return "x" in self.app.inputOptions
+
     def getTextTestArgs(self):
-        return [ "texttest" ] # Assume remote nodes are UNIX-based with TextTest installed centrally
+        if self.synchSlaveCode():
+            return super(QueueSystem, self).getTextTestArgs()
+        else:
+            return [ "texttest" ] # Assume remote nodes are UNIX-based with TextTest installed centrally
      
     def submitSlaveJob(self, cmdArgs, *args):
         if self.nextMachineIndex >= len(self.machines):

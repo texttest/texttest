@@ -381,7 +381,10 @@ class QueueSystem(local.QueueSystem):
         appDir = self.app.getDirectory()
         dirs = [ appDir ]
         if self.synchSlaveCode():
-            dirs.append(plugins.installationRoots[0])
+            dirs.append(plugins.installationRoots[0]) 
+            personalLog = os.getenv("TEXTTEST_PERSONAL_LOG")
+            if personalLog:
+                dirs.append(personalLog)
         checkout = self.app.checkout
         if checkout and not checkout.startswith(appDir):
             dirs.append(checkout)
@@ -450,8 +453,8 @@ class QueueSystem(local.QueueSystem):
         return self.fileArgs
     
     def synchSlaveCode(self):
-        # If we're running our self-diagnostics, make sure we copy our local code across and run it as the slaves
-        return "x" in self.app.inputOptions
+        # If we're running our self-diagnostics on the slaves, make sure we copy our local code across and run it as the slaves
+        return "xs" in self.app.inputOptions
 
     def getTextTestArgs(self):
         if self.synchSlaveCode():

@@ -65,7 +65,7 @@ def runXvfb(logDir, extraArgs):
     ignoreSignals()
     signal.signal(signal.SIGUSR1, setReadyFlag)
     displayNum = getDisplayNumber()
-    logFile = os.path.join(logDir, "Xvfb." + displayNum + "." + gethostname())
+    logFile = os.path.join(logDir, "Xvfb." + displayNum + "." + gethostname().split(".")[0] + ".diag") if logDir != os.devnull else os.devnull
     startArgs = [ "Xvfb", "-ac" ] + extraArgs + [ "-audit", "2", ":" + displayNum ]
     proc = subprocess.Popen(startArgs, preexec_fn=ignoreSignals,
                             stdout=open(logFile, "w"), stderr=subprocess.STDOUT, stdin=open(os.devnull))

@@ -151,6 +151,12 @@ class VirtualDisplayResponder(plugins.Responder):
         messages = "Failed to start Xvfb in 5 attempts, giving up"
         plugins.printWarning(messages)
         return None, None, None
+
+    def getXvfbLogDir(self):
+        if not self.diag.isEnabledFor(logging.INFO):
+            return os.devnull
+        
+        return os.getenv("TEXTTEST_PERSONAL_LOG", os.devnull)
     
     def getVirtualServerArgs(self, machine, app):
         binDir = plugins.installationDir("libexec")
@@ -164,8 +170,7 @@ class VirtualDisplayResponder(plugins.Responder):
             fullPath = remoteXvfb
             pythonArgs = [ "python", "-u" ]
         else:
-            logDir = os.path.join(app.writeDirectory, "Xvfb") 
-            plugins.ensureDirectoryExists(logDir)
+            logDir = self.getXvfbLogDir()
             pythonArgs = self.findPythonArgs(machine)
             
         xvfbExtraArgs = plugins.splitcmd(app.getConfigValue("virtual_display_extra_args"))

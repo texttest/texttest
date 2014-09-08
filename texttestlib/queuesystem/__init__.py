@@ -205,7 +205,11 @@ class QueueSystemConfig(default.Config):
                 foundFiles |= self.cleanEmptyDirectories(subdir)
                 
         if not foundFiles:
-            os.rmdir(path)
+            try:
+                os.rmdir(path)
+            except OSError:
+                # Other slaves are potentially doing this at the same time, potential for race conditions
+                pass
         return foundFiles
 
     def getDataFiles(self, test):

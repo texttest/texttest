@@ -128,8 +128,6 @@ class TextTest(plugins.Responder, plugins.Observable):
             # To aid in debugging tests that hang...
             signal.signal(signal.SIGQUIT, self.printStackTrace) 
         self.setSignalHandlers(self.handleSignalWhileStarting)
-        if os.environ.has_key("FAKE_OS"):
-            os.name = os.environ["FAKE_OS"]
         self.inputOptions = testmodel.OptionFinder()
         self.diag = logging.getLogger("Find Applications")
         self.appSuites = OrderedDict()

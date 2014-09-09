@@ -135,11 +135,11 @@ class FingerprintDifferenceFinder:
     def findDifferences(self, jobName, build1, build2, verify):
         buildsDir = getBuildsDir(self.jobRoot, jobName)
         if not buildsDir:
-            return []
+            return [], False
         fingerprint1 = self.getFingerprint(buildsDir, jobName, build1, verify)
         fingerprint2 = self.getAndWaitForFingerprint(buildsDir, jobName, build2, verify)
         if not fingerprint1 or not fingerprint2:
-            return []
+            return [], bool(fingerprint2)
         differences = []
         updatedHashes = {}
         for artefact, value in fingerprint2.items():
@@ -175,7 +175,7 @@ class FingerprintDifferenceFinder:
             self.verifier.writeCache(build2, updatedHashes)
         
         differences.sort()
-        return differences
+        return differences, True
 
     def getAndWaitForFingerprint(self, *args):
         for i in range(500):
@@ -389,7 +389,9 @@ class ChangeFinder:
     
     def findChanges(self, build1, build2):
         try:
-            markedChanges, projectChanges = self.getChangesRecursively(self.jobName, build1, build2, verify=True)
+            markedChanges, projectChanges, fingerprintsFound = self.getChangesRecursively(self.jobName, build1, build2, verify=True)
+            if not fingerprintsFound:
+                print "WARNING: tried to find Jenkins changes, but no fingerprints found for", self.jobName, "build", build2
         except AbortedException, e:
             # If it was aborted, say this
             return [(str(e), "", [])]
@@ -404,21 +406,21 @@ class ChangeFinder:
     
     def getChangesRecursively(self, jobName, build1, build2, verify):
         # Find what artefacts have changed between times build
-        differences = self.diffFinder.findDifferences(jobName, build1, build2, verify)
+        differences, fingerprintsFound = self.diffFinder.findDifferences(jobName, build1, build2, verify)
         # Organise them by project
         markedChanges, differencesByProject = self.organiseByProject(differences)
         # For each project, find out which builds were affected
         projectChanges, recursiveChanges = self.getProjectChanges(differencesByProject)
         for subProj, subBuild1, subBuild2 in recursiveChanges:
             if subProj != jobName:
-                subMarkedChanges, subProjectChanges = self.getChangesRecursively(subProj, subBuild1, subBuild2, verify=False)
+                subMarkedChanges, subProjectChanges, _ = self.getChangesRecursively(subProj, subBuild1, subBuild2, verify=False)
                 for subMarkChange in subMarkedChanges:
                     if subMarkChange not in markedChanges:
                         markedChanges.append(subMarkChange)
                 for subProjectChange in subProjectChanges:
                     if subProjectChange not in projectChanges:
                         projectChanges.append(subProjectChange)
-        return markedChanges, projectChanges
+        return markedChanges, projectChanges, fingerprintsFound
     
     def organiseByProject(self, differences):
         differencesByProject = OrderedDict()

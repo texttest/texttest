@@ -2625,3 +2625,5 @@ Bug Fixes:
     - "Replace Text In Files" no longer falls over on auto-generated "missing version" files
     - Fixed "remote machine" option when using local queue system
     - Fixed use of full host name from local queue system setup
+    - Improve error message when remote connections fail (include exitcode)
+    - Better error message if Capturemock-based tests run without CaptureMock installed.

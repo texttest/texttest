@@ -196,13 +196,9 @@ class FingerprintDifferenceFinder:
                 return cached
     
         document = BuildDocument.create(buildsDir, buildName)
-        fingerprint = {}
-        if document is None:
-            return fingerprint
-        
-        fingerprint = document.getFingerprint(jobName)
+        fingerprint = document.getFingerprint(jobName) if document is not None else {}        
         if not fingerprint:
-            result = document.getResult()
+            result = document.getResult() if document is not None else None
             if result is None and os.getenv("BUILD_NUMBER") == buildName and os.getenv("JOB_NAME") == jobName:
                 if os.getenv("BUILD_ID") == "none": 
                     # Needed to prevent Jenkins from killing background jobs running after the job has exited
@@ -211,7 +207,7 @@ class FingerprintDifferenceFinder:
                 else:
                     raise JobStillRunningException()
             # No result means aborted (hard) if we're checking a previous run, otherwise it means we haven't finished yet
-            elif result == "ABORTED" or result is None:
+            elif result == "ABORTED" or (result is None and document is not None):
                 raise AbortedException, "Aborted in Jenkins"
         return fingerprint
 
@@ -392,6 +388,8 @@ class ChangeFinder:
             markedChanges, projectChanges, fingerprintsFound = self.getChangesRecursively(self.jobName, build1, build2, verify=True)
             if not fingerprintsFound:
                 print "WARNING: tried to find Jenkins changes, but no fingerprints found for", self.jobName, "build", build2
+                if os.getenv("BUILD_ID") == "none" and os.getenv("BUILD_NUMBER") == build2:
+                    print "(build is ongoing, so should have waited for results)"
         except AbortedException, e:
             # If it was aborted, say this
             return [(str(e), "", [])]

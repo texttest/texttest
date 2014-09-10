@@ -136,15 +136,18 @@ class QueueSystemServer(BaseActionRunner):
 
     def pollQueueSystem(self):
         # Start by polling after 5 seconds, ever after try every 15
-        attempts = int(os.getenv("TEXTTEST_QS_POLL_WAIT", "5")) * 2 # Amount of time to wait before initiating polling of SGE
+        interval = float(os.getenv("TEXTTEST_QS_POLL_INTERVAL", "0.5")) # Amount of time to wait between polls of grid/cloud
+        attempts = int(float(os.getenv("TEXTTEST_QS_POLL_WAIT", "5")) / interval) # Amount of time to wait before initiating polling of grid/cloud
+        subsequentAttempts = int(float(os.getenv("TEXTTEST_QS_POLL_SUBSEQUENT_WAIT", "15")) / interval) # Amount of time to wait before subsequent polling of grid/cloud
         if attempts >= 0: 
             while True:
                 for _ in range(attempts):
-                    time.sleep(0.5)
+                    time.sleep(interval)
                     if self.allComplete or self.exited:
                         return
                 self.updateJobStatus()
-                attempts = 30
+                attempts = subsequentAttempts
+                self.diag.info("Trying to rerun queues " + repr(self.testsSubmitted) + " out of " + repr(self.maxCapacity) + " tests submitted")
                 # In case any tests have had reruns triggered since we stopped submitting
                 self.runQueue(self.getTestForRun, self.runTest, "rerunning", block=False)
 
@@ -504,6 +507,8 @@ class QueueSystemServer(BaseActionRunner):
         
     def handleErrorState(self, test, previouslySubmitted=False):
         with self.counterLock:
+            if self.maxCapacity > 1:
+                self.maxCapacity -= 1
             if previouslySubmitted:
                 self.testsSubmitted -= 1
             else:

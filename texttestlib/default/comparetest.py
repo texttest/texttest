@@ -313,11 +313,11 @@ class TestComparison(BaseTestComparison):
         if stem in self.getPerformanceStems(test):
             if tmpFile:
                 return performance.PerformanceFileComparison(test, stem, standardFile, tmpFile)
-            else:
-                # Don't care if performance is missing
+            elif not test.app.executingOnPerformanceMachine(test, stem):
+                # Don't care if performance is missing if we aren't on performance machines
                 return None
-        else:
-            return FileComparison(test, stem, standardFile, tmpFile, testInProgress=0)
+        
+        return FileComparison(test, stem, standardFile, tmpFile, testInProgress=0)
 
     def categorise(self):
         if self.failedPrediction:

@@ -811,10 +811,10 @@ class Config:
     def getPerformanceFileMaker(self):
         return sandbox.MakePerformanceFile(self.getMachineInfoFinder())
     
-    def executingOnPerformanceMachine(self, test):
+    def executingOnPerformanceMachine(self, test, stem="cputime"):
         infoFinder = self.getMachineInfoFinder()
         infoFinder.setUpApplication(test.app)
-        return infoFinder.allMachinesTestPerformance(test, "cputime")
+        return infoFinder.allMachinesTestPerformance(test, stem)
     
     def getMachineInfoFinder(self):
         return sandbox.MachineInfoFinder()

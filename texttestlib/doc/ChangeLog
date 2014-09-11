@@ -2543,6 +2543,7 @@ Framework Enhancements:
     - "Knownbugs" functionality in Jira can now handle bugs that have been moved or renamed.
     - Now allow combining of comma-separated lists in options files.
     - Allow removing one or more elements of comma-separated lists in options files
+    - Missing performance files are now only ignored if the test does not run on a "performance machine"
 Version Control Browser Enhancements:
     - Now supports Git
     - "Update" operation is now always a "centralised-style" update

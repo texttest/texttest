@@ -173,7 +173,7 @@ class QueueSystemConfig(default.Config):
         if self.slaveOnRemoteSystem():
             # Don't keep anything on a remote system, we've transferred it all back anyhow...
             writeDir = test.getDirectory(temporary=1)
-            plugins.removePath(writeDir)
+            plugins.rmtree(writeDir)
         elif test.state.hasSucceeded():
             writeDir = test.getDirectory(temporary=1)
             # If we've made screenshots, keep them, we might want to look at them...

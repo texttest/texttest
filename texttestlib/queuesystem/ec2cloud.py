@@ -195,6 +195,11 @@ class QueueSystem(local.QueueSystem):
         region = boto.ec2.connection.EC2Connection.DefaultRegionName # stick to single region for now
         return boto.ec2.connect_to_region(region)
 
+    def makeCloudwatchConnection(self):
+        import boto.ec2.cloudwatch
+        region = boto.ec2.connection.EC2Connection.DefaultRegionName # stick to single region for now
+        return boto.ec2.cloudwatch.connect_to_region(region)
+
     def getCores(self, inst, defValue=0):
         instanceSize = inst.instance_type.split(".")[-1]
         return Ec2Machine.instanceTypeInfo.get(instanceSize, defValue)
@@ -224,7 +229,8 @@ class QueueSystem(local.QueueSystem):
                 sys.stderr.write("Cannot run tests in EC2 cloud. " + str(len(instances)) + " running instances were found matching '" + \
                                  ",".join(instanceTags) + "' in their tags, \nbut all are currently being used by the following users:\n" + \
                                  "\n".join(otherOwners) + "\n\n")
-
+            else:
+                self.disableAlarmActions(self.getAlarmNames(freeInstances))
             return freeInstances, running
         else:
             sys.stderr.write("Cannot run tests in EC2 cloud. No instances were found matching '" + ",".join(instanceTags) + "' in their tags.\n")
@@ -286,8 +292,22 @@ class QueueSystem(local.QueueSystem):
                     fallbackInstances.append(inst)
                 cores = self.getCores(inst, 1)
                 capacity += cores
-                
+
         return tryOwnInstances, fallbackInstances
+
+    def getAlarmNames(self, instances):
+        return ["stop-" + self.getInstanceName(iId) for iId in instances]
+    
+    def getInstanceName(self, instance):
+        return instance if isinstance(instance,(str, unicode)) else instance.id
+
+    def enableAlarmActions(self, alarmNames):
+        conn = self.makeCloudwatchConnection()
+        conn.enable_alarm_actions(alarmNames)
+    
+    def disableAlarmActions(self, alarmNames):
+        conn = self.makeCloudwatchConnection()
+        conn.disable_alarm_actions(alarmNames)
 
     def takeOwnership(self, conn, instances, maxCapacity):
         myTag = self.getUserName() + "_" + plugins.startTimeString()
@@ -296,7 +316,7 @@ class QueueSystem(local.QueueSystem):
                 
         if not tryOwnInstances:
             return [], sorted(otherOwners)
-        
+
         currTryInstances = tryOwnInstances
         ownInstances = []
         lostCapacity = 0
@@ -326,7 +346,7 @@ class QueueSystem(local.QueueSystem):
             fallbackInstances, fallbackOwners = self.takeOwnership(conn, fallbackInstances, lostCapacity)
             ownInstances += fallbackInstances
             otherOwners.update(fallbackOwners)
-                
+       
         return ownInstances, sorted(otherOwners)
 
     def releaseOwnership(self, machines):
@@ -335,6 +355,7 @@ class QueueSystem(local.QueueSystem):
             instanceIds = [ machine.id for machine in machines ]
             for inst in conn.get_only_instances(instance_ids=instanceIds):
                 inst.remove_tag(self.userTagName)
+            self.enableAlarmActions(self.getAlarmNames(instanceIds))
         
     def getCapacity(self):
         return self.capacity

@@ -904,11 +904,13 @@ class SlaveRequestHandler(StreamRequestHandler):
             sys.stderr.write("WARNING: Received request from hostname " + hostname +
                              " (process " + identifier + ")\nwhich could not be parsed:\n'" + testString + "'\n")
             self.connection.shutdown(socket.SHUT_RDWR)
-        elif not test.state.isComplete(): # we might have killed it already...
+        elif not test.state.isComplete() or not test.state.hasResults(): # we might have killed it already...
             oldBt = test.state.briefText
             # The updates are only for testing against old slave traffic,
             # a bit sad we can't disable them when not testing...
             _, state = test.getNewState(self.rfile, updatePaths=True)
+            if test.state.isComplete():
+                state.lifecycleChange = "recalculated"
             self.server.diag.info("Changed from '" + oldBt + "' to '" + state.briefText + "'")    
             if rerun:
                 self.server.diag.info("Instructed to rerun test " + test.uniqueName)
@@ -927,6 +929,8 @@ class SlaveRequestHandler(StreamRequestHandler):
             else:
                 QueueSystemServer.instance.setRemoteProcessId(test, identifier)
             self.connection.shutdown(socket.SHUT_WR)
+        else:
+            self.server.diag.info("Test " + test.uniqueName + " already complete, ignoring new results")
             
 
 class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):

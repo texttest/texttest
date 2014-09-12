@@ -62,10 +62,18 @@ class FileTransferResponder(plugins.Responder):
 
     def notifyLifecycleChange(self, test, state, changeDesc):
         if self.destination and changeDesc == "complete" and (self.transferAll or not test.state.hasSucceeded()):
-            plugins.log.info(test.getIndent() + "Transferring files for " + repr(test) + " to " + self.destination)
-            errorCode = test.app.copyFileRemotely(test.writeDirectory, "localhost", os.path.dirname(test.writeDirectory), self.destination, ignoreLinks=True)
-            if errorCode:
-                sys.stderr.write("ERROR: File transfer operation failed with error code " + str(errorCode) + "\n")
+            sleepTime = 1
+            errorCode = None
+            for i in range(10):
+                plugins.log.info(test.getIndent() + "Transferring files for " + repr(test) + " to " + self.destination)
+                errorCode = test.app.copyFileRemotely(test.writeDirectory, "localhost", os.path.dirname(test.writeDirectory), self.destination, ignoreLinks=True)
+                if errorCode:
+                    plugins.log.info(test.getIndent() + "File transfer operation failed with error code " + str(errorCode)+ " - waiting " +
+                                 str(sleepTime) + " seconds and then trying again.")
+                    time.sleep(1)
+                else:
+                    return
+            sys.stderr.write("ERROR: File transfer operation failed with error code " + str(errorCode) + "\n")
 
     def notifyRequiredTestData(self, test, paths):
         if self.destination:

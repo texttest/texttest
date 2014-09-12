@@ -225,12 +225,12 @@ class QueueSystem(local.QueueSystem):
             instances.sort(key=getSortKey)
             maxCapacity = self.app.getConfigValue("queue_system_max_capacity")
             freeInstances, otherOwners = self.takeOwnership(conn, instances, maxCapacity)
-            if not freeInstances:
+            if freeInstances:
+                self.disableAlarmActions(self.getAlarmNames(freeInstances))
+            else:
                 sys.stderr.write("Cannot run tests in EC2 cloud. " + str(len(instances)) + " running instances were found matching '" + \
                                  ",".join(instanceTags) + "' in their tags, \nbut all are currently being used by the following users:\n" + \
                                  "\n".join(otherOwners) + "\n\n")
-            else:
-                self.disableAlarmActions(self.getAlarmNames(freeInstances))
             return freeInstances, running
         else:
             sys.stderr.write("Cannot run tests in EC2 cloud. No instances were found matching '" + ",".join(instanceTags) + "' in their tags.\n")

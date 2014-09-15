@@ -715,7 +715,7 @@ class BasicSubmissionRules:
         path = self.test.getRelPath()
         parts = path.split("/")
         parts.reverse()
-        name = self.classPrefix + "-" + ".".join(parts) + "-" + repr(self.test.app).replace(" ", "_")
+        name = self.classPrefix + "-" + ".".join(parts) + "-" + repr(self.test.app).replace(" ", "_").replace("/", "_")
         return name.replace(":", "_")
 
     def getJobFiles(self):

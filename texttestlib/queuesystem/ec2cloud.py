@@ -276,15 +276,20 @@ class QueueSystem(local.QueueSystem):
                 
         return running 
 
-    def tryAddTag(self, instances, maxCapacity, myTag, otherOwners):
-        tryOwnInstances, fallbackInstances = [], []
-        capacity = 0
-        # get_only_instances probably needed? Still doesn't eliminate race condition entirely...
-        for inst in instances:
+    def tryAddTag(self, conn, instances, maxCapacity, myTag, otherOwners):
+        # inst.tags is only a local cache. Try to avoid race conditions by getting the most up-to-date info possible.
+        instanceIds = [ instance.id for instance in instances ]
+        idsInUse = set()
+        for inst in conn.get_only_instances(instance_ids=instanceIds):
             owner = inst.tags.get(self.userTagName, "")
             if owner:
                 otherOwners.add(owner.split("_")[0])
-            else:
+                idsInUse.add(inst.id)
+            
+        tryOwnInstances, fallbackInstances = [], []
+        capacity = 0
+        for inst in instances:
+            if inst.id not in idsInUse:
                 if capacity < maxCapacity:
                     tryOwnInstances.append(inst.id)
                     inst.add_tag(self.userTagName, myTag)
@@ -312,7 +317,7 @@ class QueueSystem(local.QueueSystem):
     def takeOwnership(self, conn, instances, maxCapacity):
         myTag = self.getUserName() + "_" + plugins.startTimeString()
         otherOwners = set()
-        tryOwnInstances, fallbackInstances = self.tryAddTag(instances, maxCapacity, myTag, otherOwners)
+        tryOwnInstances, fallbackInstances = self.tryAddTag(conn, instances, maxCapacity, myTag, otherOwners)
                 
         if not tryOwnInstances:
             return [], sorted(otherOwners)
@@ -320,6 +325,7 @@ class QueueSystem(local.QueueSystem):
         currTryInstances = tryOwnInstances
         ownInstances = []
         lostCapacity = 0
+        time.sleep(0.5) # add and check too close together makes racing more likely
         for _ in range(20): 
             newInsts = conn.get_only_instances(instance_ids=currTryInstances)
             currTryInstances = []

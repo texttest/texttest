@@ -188,7 +188,8 @@ class QueueSystemConfig(default.Config):
                 fullPath = test.makeTmpFileName(dataFile, forComparison=0)
                 plugins.removePath(fullPath)
                 
-    def cleanEmptyDirectories(self, path):
+    @classmethod
+    def cleanEmptyDirectories(cls, path):
         try:
             files = os.listdir(path)
         except OSError:
@@ -202,7 +203,7 @@ class QueueSystemConfig(default.Config):
         foundFiles = len(subdirs) != len(files)
         if not foundFiles:
             for subdir in subdirs:
-                foundFiles |= self.cleanEmptyDirectories(subdir)
+                foundFiles |= cls.cleanEmptyDirectories(subdir)
                 
         if not foundFiles:
             try:

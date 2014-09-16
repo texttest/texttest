@@ -94,12 +94,18 @@ class GenerateWebPages(object):
 
                 loggedTests = OrderedDict()
                 categoryHandlers = {}
+                self.diag.info("Processing " + str(len(allFiles)) + " teststate files")
+                relevantFiles = 0
                 for stateFile, repository in allFiles:
                     tag = self.getTagFromFile(stateFile)
                     if len(tags) == 0 or tag in tags:
+                        relevantFiles += 1
                         testId, state, extraVersion = self.processTestStateFile(stateFile, repository)
                         loggedTests.setdefault(extraVersion, OrderedDict()).setdefault(testId, OrderedDict())[tag] = state
                         categoryHandlers.setdefault(tag, CategoryHandler()).registerInCategory(testId, state, extraVersion)
+                        if relevantFiles % 100 == 0:
+                            self.diag.info("- Processed " + str(relevantFiles) + " files with matching tags so far")
+                self.diag.info("Processed " + str(relevantFiles) + " relevant teststate files")
 
                 versionToShow = self.removePageVersion(version)
                 hasData = False
@@ -202,12 +208,14 @@ class GenerateWebPages(object):
         allFiles = []
         allTags = set()
         for _, dir in repositoryDirs:
+            self.diag.info("Looking for teststate files in " + dir)
             for root, _, files in sorted(os.walk(dir)):
                 for file in files:
                     if file.startswith("teststate_"):
                         allFiles.append((os.path.join(root, file), dir))
                         allTags.add(self.getTagFromFile(file))
-                                
+        
+            self.diag.info("Found " + str(len(allFiles)) + " teststate files in " + dir)
         return allFiles, sorted(allTags, self.compareTags)
                           
     def processTestStateFile(self, stateFile, repository):

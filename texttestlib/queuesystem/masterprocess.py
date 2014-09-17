@@ -143,9 +143,12 @@ class QueueSystemServer(BaseActionRunner):
             while True:
                 for _ in range(attempts):
                     time.sleep(interval)
-                    if self.allComplete or self.exited:
+                    if self.allComplete:
                         return
-                self.updateJobStatus()
+                    if self.exited:
+                        break
+                if not self.exited:
+                    self.updateJobStatus()
                 attempts = subsequentAttempts
                 self.diag.info("Trying to rerun queues " + repr(self.testsSubmitted) + " out of " + repr(self.maxCapacity) + " tests submitted")
                 # In case any tests have had reruns triggered since we stopped submitting

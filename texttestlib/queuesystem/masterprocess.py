@@ -377,6 +377,12 @@ class QueueSystemServer(BaseActionRunner):
         if self.testsSubmitted == self.maxCapacity:
             self.sendServerState("Completed submission of tests up to capacity")
 
+    def fixConfigEnv(self, env, test):
+        for envVar in test.getConfigValue("queue_system_environment"):
+            val = os.getenv(envVar)
+            if val is not None:
+                env[envVar] = val
+
     def fixProxyVar(self, env, test, withProxy):
         if withProxy and test.getConfigValue("queue_system_proxy_executable"):
             env["TEXTTEST_SUBMIT_COMMAND_ARGS"] = "?"
@@ -481,6 +487,7 @@ class QueueSystemServer(BaseActionRunner):
         self.diag.info("Submitting job at " + plugins.localtime() + ":" + repr(commandArgs))
         self.diag.info("Creating job at " + plugins.localtime())
         self.fixDisplay(slaveEnv)
+        self.fixConfigEnv(slaveEnv, test)
         self.fixProxyVar(slaveEnv, test, withProxy)
         cmdArgs = self.getSubmitCmdArgs(test, submissionRules, commandArgs, slaveEnv)
         if withProxy:

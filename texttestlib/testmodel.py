@@ -1625,7 +1625,9 @@ class Application(object):
         dirCaches += self.getAllDirCaches(fileName, [ self.dircache ], includeRoot=True)
         configPath = self.getFileNameFromCaches(dirCaches, fileName)
         if not configPath:
-            raise BadConfigError, "Cannot find file '" + fileName + "' to import config file settings from"
+            dirs = [ dc.dir for dc in dirCaches ]
+            raise BadConfigError, "Cannot find file '" + fileName + "' to import config file settings from.\n" + \
+                "Tried directories: " + repr(dirs)
         return os.path.normpath(configPath)
 
     def getDataFileNames(self, test=None):

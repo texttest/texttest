@@ -127,8 +127,11 @@ class Ec2Machine:
                 if proc.poll() is None:
                     return True
         return False
+
+    def getCommandArgsWithEnvironment(self, cmdArgs, slaveEnv):
+        return [ envVar + "=" + value for (envVar, value) in slaveEnv.items() ] + cmdArgs
         
-    def submitSlave(self, submitter, cmdArgs, fileArgs, *args):
+    def submitSlave(self, submitter, cmdArgs, fileArgs, slaveEnv, *args):
         jobId = self.getNextJobId()
         self.remoteProcessInfo[jobId] = None, None
         if not self.thread.isAlive():
@@ -138,8 +141,9 @@ class Ec2Machine:
                 self.startMethod = self.waitForStart
 
             self.thread.start()
-        remoteCmdArgs = self.app.getCommandArgsOn(self.fullMachine, cmdArgs, agentForwarding=True) + fileArgs
-        self.queue.put((jobId, plugins.Callable(submitter, remoteCmdArgs, *args)))
+        argsWithEnv = self.getCommandArgsWithEnvironment(cmdArgs, slaveEnv)
+        remoteCmdArgs = self.app.getCommandArgsOn(self.fullMachine, argsWithEnv, agentForwarding=True) + fileArgs
+        self.queue.put((jobId, plugins.Callable(submitter, remoteCmdArgs, slaveEnv, *args)))
         return jobId
     
     def killRemoteProcess(self, jobId, sig):

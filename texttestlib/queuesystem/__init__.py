@@ -335,6 +335,7 @@ class QueueSystemConfig(default.Config):
         app.setConfigDefault("queue_system_max_capacity", self.defaultMaxCapacity, "Maximum possible number of parallel tests to run")
         app.setConfigDefault("queue_system_min_test_count", 0, "Minimum number of tests before it's worth submitting them to the grid")
         app.setConfigDefault("queue_system_resource", [], "Grid engine resources required to locate test execution machines")
+        app.setConfigDefault("queue_system_environment", [], "Environment variables (external to TextTest) whose values need to be transferred to the execution machine")
         app.setConfigDefault("queue_system_processes", 1, "Number of processes the grid engine should reserve for tests")
         app.setConfigDefault("queue_system_submit_args", "", "Additional arguments to provide to grid engine submission command")
         app.setConfigDefault("queue_system_proxy_executable", "", "Executable to run as a proxy for the real test program")
@@ -342,6 +343,12 @@ class QueueSystemConfig(default.Config):
         app.setConfigDefault("queue_system_core_file_location", "", "System-wide location for core files from grid jobs, in case TEXTTEST_TMP is generated")
         app.addConfigEntry("builtin", "proxy_options", "definition_file_stems")
         
+    def setDependentConfigDefaults(self, app):
+        # Cloud doesn't work without a remote copy program
+        # which should be rsync or a similar program. Use rsync as default.
+        if (app.getConfigValue("queue_system_module") == "ec2cloud" or self.slaveOnRemoteSystem()) and not app.getConfigValue("remote_copy_program"):
+            app.setConfigDefault("remote_copy_program", "rsync")
+        return default.Config.setDependentConfigDefaults(self, app)
 
 class DocumentEnvironment(default.DocumentEnvironment):
     def setUpApplication(self, app):

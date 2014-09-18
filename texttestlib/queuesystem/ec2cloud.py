@@ -312,11 +312,18 @@ class QueueSystem(local.QueueSystem):
 
     def enableAlarmActions(self, alarmNames):
         conn = self.makeCloudwatchConnection()
-        conn.enable_alarm_actions(alarmNames)
-    
+        try:
+            conn.enable_alarm_actions(alarmNames)
+        except:
+            pass
+        
     def disableAlarmActions(self, alarmNames):
         conn = self.makeCloudwatchConnection()
-        conn.disable_alarm_actions(alarmNames)
+        try:
+            conn.disable_alarm_actions(alarmNames)
+        except:
+            plugins.printWarning("Could not disable CloudWatch alarms. Your user does not have permission for this.\n" + 
+                                 "The risk is that an instance will be shut down while you are using it, so it is suggested your request this permission from your administrator.\n")
 
     def takeOwnership(self, conn, instances, maxCapacity):
         myTag = self.getUserName() + "_" + plugins.startTimeString()

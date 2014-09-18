@@ -1116,3 +1116,6 @@ activate = show vcs popup menu
 [Name=Reset Running Tab]
 clicked = reset running tab
 
+[Name=Edit Description]
+activate = edit test description
+

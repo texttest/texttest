@@ -8,6 +8,7 @@ from texttestlib import plugins
 from .. import guiplugins
 from string import Template
 from copy import copy
+from tempfile import mkstemp
 import subprocess
 
 class FileViewAction(guiplugins.ActionGUI):
@@ -547,8 +548,49 @@ class FollowFile(FileViewAction):
         else:
             return True 
 
+class EditTestDescription(EditTestFileInEditor):
+    def _getTitle(self):
+        return "Edit Description"
+    
+    def isActiveOnCurrent(self, *args):
+        if not guiplugins.ActionGUI.isActiveOnCurrent(self):
+            return False
+        return len(self.currTestSelection) == 1
+
+    def performOnCurrent(self):
+        test= self.currTestSelection[0]
+        fileName = self.createTmpFile(test.description)
+        _, args = self.getConfMessageForFile(fileName, test)
+        self.performOnFile(*args)
+    
+    def createTmpFile(self, text):
+        tmpFile, fileName = mkstemp()
+        os.write(tmpFile, text)
+        os.close(tmpFile)
+        return fileName
+        
+    def findExitHandlerInfo(self, fileName, test):
+        return self.updateDescription, (fileName, test)
+    
+    def updateDescription(self, fileName, test):
+        text = self.getEditedText(fileName)
+        test.rename(test.name, text)
+        if os.path.exists(fileName):
+            os.remove(fileName)
+        self.editingComplete()
+
+    def getEditedText(self, fileName):
+        text = ""
+        with open(fileName, "r") as f:
+            for line in f:
+                text += line
+        return text
+
+    def isDefaultViewer(self, *args):
+        return False
+
 def getInteractiveActionClasses(dynamic):
-    classes = [ ViewTestFileInEditor, EditTestFileInEditor ]
+    classes = [ ViewTestFileInEditor, EditTestFileInEditor]
     if dynamic:
         classes += [ ViewFilteredTestFileInEditor, ViewContentFilteredTestFileInEditor,
                      ViewOrigFileInEditor, EditOrigFileInEditor, ViewContentFilteredOrigFileInEditor, ViewFilteredOrigFileInEditor,
@@ -557,5 +599,6 @@ def getInteractiveActionClasses(dynamic):
                      FollowFile ]
     else:
         classes.append(ViewConfigFileInEditor)
+        classes.append(EditTestDescription)
 
     return classes

@@ -12,6 +12,7 @@
       <menuitem action="Paste"/>
       <menuitem action="Remove Tests"/>
       <menuitem action="Rename Test"/>
+      <menuitem action="Edit Description"/>
       <separator/>
       <menuitem name="Move to first" action="Move to first"/>
       <menuitem name="Move up" action="Move up"/>
@@ -51,6 +52,7 @@
     <menuitem action="Copy"/>
     <menuitem action="Paste"/>
     <menuitem action="Rename Test"/>
+    <menuitem action="Edit Description"/>
     <menuitem action="Remove Tests For Popup"/>
     <separator/>
     <menuitem action="Enter Failure Information"/>

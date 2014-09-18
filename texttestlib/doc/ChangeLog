@@ -2565,6 +2565,8 @@ Batch Report Enhancements:
 Grid Engine enhancements/bug fixes:
     - New experimental status support for EC2 Virtual Private Cloud added
 	Tests run parallel on any available cloud machines. Requires Python tool "boto". See website.
+    - New config setting "queue_system_environment"
+	Allows environment variables to be transferred. Equivalent to queue_system_submit_args:-v VAR with SGE, but portable
     - Grid usage is disabled when "visible GUIs" are requested during GUI testing
 	Usually it isn't desirable to try to show a GUI remotely from a grid machine
     - Fixed race conditions on NFS-systems between grid engines and the file server
@@ -2628,3 +2630,5 @@ Bug Fixes:
     - Fixed use of full host name from local queue system setup
     - Improve error message when remote connections fail (include exitcode)
     - Better error message if Capturemock-based tests run without CaptureMock installed.
+    - Don't use path separators in job names, even if they exist in full_name for the app
+

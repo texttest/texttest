@@ -3,7 +3,7 @@ import local
 import signal, logging, errno
 import time, os, sys
 from texttestlib import plugins
-from texttestlib.portlisten import getPortListenErrorCode
+from texttestlib.utils import getPortListenErrorCode, getUserName
 from threading import Thread, Lock
 from Queue import Queue
 from fnmatch import fnmatch
@@ -326,7 +326,7 @@ class QueueSystem(local.QueueSystem):
                                  "The risk is that an instance will be shut down while you are using it, so it is suggested your request this permission from your administrator.\n")
 
     def takeOwnership(self, conn, instances, maxCapacity):
-        myTag = self.getUserName() + "_" + plugins.startTimeString()
+        myTag = getUserName() + "_" + plugins.startTimeString()
         otherOwners = set()
         tryOwnInstances, fallbackInstances = self.tryAddTag(conn, instances, maxCapacity, myTag, otherOwners)
                 
@@ -481,13 +481,10 @@ class QueueSystem(local.QueueSystem):
         else:
             return True
 
-    def getUserName(self):
-        return os.getenv("USER", os.getenv("USERNAME"))
-
     def getFileArgs(self, cmdArgs):
         if not self.fileArgs:
             ipAddress = self.getArg(cmdArgs, "-servaddr").split(":")[0]
-            self.fileArgs = [ "-slavefilesynch", self.getUserName() + "@" + ipAddress ]
+            self.fileArgs = [ "-slavefilesynch", getUserName() + "@" + ipAddress ]
         return self.fileArgs
     
     def synchSlaveCode(self):

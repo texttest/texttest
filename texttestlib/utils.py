@@ -1,5 +1,5 @@
 
-import socket
+import socket, os
 
 # Method name used by CaptureMock - need to change in tests also if this is renamed!
 def getPortListenErrorCode(ip, port):
@@ -9,3 +9,5 @@ def getPortListenErrorCode(ip, port):
     s.close()
     return ret
 
+def getUserName():
+    return os.getenv("USER", os.getenv("USERNAME"))

@@ -209,6 +209,9 @@ class QueueSystem(local.QueueSystem):
         return Ec2Machine.instanceTypeInfo.get(instanceSize, defValue)
         
     def findInstances(self):
+        if not self.app.getConfigValue("remote_copy_program"):
+            sys.stderr.write("Cannot run tests in EC2 cloud. You need to set 'remote_copy_program' in your config file to a program such as 'rsync'.\n")
+            return [], []
         try:
             conn = self.makeEc2Connection()
         except ImportError:

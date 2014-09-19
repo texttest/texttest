@@ -18,9 +18,11 @@ class QueueSystemConfig(default.Config):
         default.Config.__init__(self, *args)
         self.useQueueSystem = None
 
-    def getRunningGroupNames(self):
-        groups = default.Config.getRunningGroupNames(self)
-        groups.insert(2, ("Grid", "l", 1))
+    def getRunningGroupNames(self, app):
+        groups = default.Config.getRunningGroupNames(self, app)
+        useGrid = app is None or app.getConfigValue("queue_system_module") not in [ "local", "ec2cloud" ]
+        label = "Grid" if useGrid else "Cloud"
+        groups.insert(2, (label, "l", 1))
         return groups
         
     def useLocalQueueSystem(self, apps):
@@ -34,6 +36,7 @@ class QueueSystemConfig(default.Config):
         minTestCount = min((app.getConfigValue("queue_system_min_test_count") for app in apps))
         localQueueSystem = self.useLocalQueueSystem(apps)
         useGrid = all((app.getConfigValue("queue_system_module") not in [ "local", "ec2cloud" ] for app in apps))
+        useCloud = all((app.getConfigValue("queue_system_module") == "ec2cloud" for app in apps))
         for group in groups:
             if group.name.startswith("Basic"):
                 options = [ "Always", "Never" ]
@@ -60,6 +63,9 @@ class QueueSystemConfig(default.Config):
                 self.addDefaultOption(group, "R", "Request grid resource", possibleValues = self.getPossibleResources())
                 self.addDefaultOption(group, "q", "Request grid queue", possibleValues = self.getPossibleQueues())
                 self.addDefaultSwitch(group, "keepslave", "Keep data files and successful tests until termination")
+                self.addDefaultSwitch(group, "perf", "Run on performance machines only")
+            elif group.name.startswith("Cloud") and useCloud:
+                self.addDefaultOption(group, "R", "Request EC2 tag", possibleValues = self.getPossibleResources())
                 self.addDefaultSwitch(group, "perf", "Run on performance machines only")
             elif group.name.startswith("Advanced") and not useGrid:
                 self.addDefaultSwitch(group, "keepslave", "Keep data files and successful tests until termination")

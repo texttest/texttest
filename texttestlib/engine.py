@@ -379,6 +379,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         for option in self.inputOptions.keys():
             if option not in validOptions:
                 sys.stderr.write("texttest.py: unrecognised option '-" + option + "'\n")
+                self.exitCode = 1
                 return False
         return True
 

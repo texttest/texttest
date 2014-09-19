@@ -221,6 +221,8 @@ class QueueSystem(local.QueueSystem):
             sys.stderr.write("Failed to establish a connection to the EC2 cloud. Make sure your credentials are available in your .boto file.\n")
             return [], []
         instanceTags = self.app.getConfigValue("queue_system_resource")
+        if "R" in self.app.inputOptions:
+            instanceTags.append(self.app.inputOptions["R"])
         instances = self.findTaggedInstances(conn, instanceTags)
         if instances:            
             running = self.getRunningIds(conn, instances)

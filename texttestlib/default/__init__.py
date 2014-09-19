@@ -156,12 +156,12 @@ class Config:
         given = self.optionValue("vanilla")
         return given or "all"
 
-    def getRunningGroupNames(self):
+    def getRunningGroupNames(self, *args):
         return [ ("Basic", None, None), ("Self-diagnostics (internal logging)", "x", 0), ("Advanced", None, None) ]
 
     def getAllRunningGroupNames(self, allApps):
         if len(allApps) == 0:
-            return self.getRunningGroupNames()
+            return self.getRunningGroupNames(None)
         
         names = []
         for app in allApps:

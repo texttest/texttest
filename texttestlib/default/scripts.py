@@ -77,17 +77,30 @@ class DocumentOptions(plugins.Action):
             return keyOutput, docs
         
 
-class DocumentConfig(plugins.Action):
+class DocumentConfig(plugins.ScriptWithArgs):
     def __init__(self, args=[]):
-        self.onlyEntries = args
-
+        argDict = self.parseArguments(args, [ "os", "entries" ])
+        self.onlyEntries = []
+        if "entries" in argDict:
+            self.onlyEntries = argDict["entries"].split(",")
+        self.overrideOs = argDict.get("os") if "os" in argDict else None
+        
     def getEntriesToUse(self, app):
         if len(self.onlyEntries) > 0:
             return self.onlyEntries
         else:
             return sorted(app.configDir.keys() + app.configDir.aliases.keys())
         
+
+    def reloadForOverrideOs(self, app):
+        if self.overrideOs and self.overrideOs != os.name:
+            realOs = self.overrideOs
+            os.name = self.overrideOs
+            app.reloadConfiguration()
+            os.name = realOs
+
     def setUpApplication(self, app):
+        self.reloadForOverrideOs(app)
         for key in self.getEntriesToUse(app):
             realKey = app.configDir.aliases.get(key, key)
             if realKey == key:
@@ -96,7 +109,10 @@ class DocumentConfig(plugins.Action):
                 docOutput = "Alias. See entry for '" + realKey + "'"
             if not docOutput.startswith("Private"):
                 value = app.configDir[realKey]
-                print key + "|" + str(value) + "|" + docOutput  
+                print key + "|" + self.interpretArgument(value) + "|" + docOutput  
+                
+    def interpretArgument(self, arg):
+        return str(arg).replace(plugins.installationRoots[0], "<source library>")
 
 class DocumentEnvironment(plugins.Action):
     def __init__(self, args=[]):

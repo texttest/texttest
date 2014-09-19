@@ -136,7 +136,7 @@ class QueueSystemServer(BaseActionRunner):
 
     def pollQueueSystem(self):
         # Start by polling after 5 seconds, ever after try every 15
-        interval = float(os.getenv("TEXTTEST_QS_POLL_INTERVAL", "0.5")) # Amount of time to wait between polls of grid/cloud
+        interval = float(os.getenv("TEXTTEST_QS_POLL_INTERVAL", "0.5")) # Amount of time to wait between checks for exit/completion when polling grid/cloud
         attempts = int(float(os.getenv("TEXTTEST_QS_POLL_WAIT", "5")) / interval) # Amount of time to wait before initiating polling of grid/cloud
         subsequentAttempts = int(float(os.getenv("TEXTTEST_QS_POLL_SUBSEQUENT_WAIT", "15")) / interval) # Amount of time to wait before subsequent polling of grid/cloud
         if attempts >= 0: 

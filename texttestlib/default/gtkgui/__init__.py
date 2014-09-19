@@ -1,10 +1,11 @@
 
 # One basic action that wants to bypass the GTK imports
 
-from texttestlib import plugins
+from texttestlib.default.scripts import DocumentConfig
         
-class DocumentGUIConfig(plugins.Action):
+class DocumentGUIConfig(DocumentConfig):
     def setUpApplication(self, app):
+        self.reloadForOverrideOs(app)
         from guiutils import GUIConfig
         from default_gui import InteractiveActionConfig
         guiConfig = GUIConfig(False, [ app ], GUIConfig.getDefaultColours(), InteractiveActionConfig().getDefaultAccelerators())

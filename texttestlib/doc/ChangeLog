@@ -2514,12 +2514,16 @@ Bug Fixes:
     - Replace Text in files now works properly cross-platform, assuming home_operating_system is set correctly
     - Fixed quoting problems when running tests remotely via SSH etc
 
-Version trunk
-=============
+Version 3.27
+============
 Release Enhancements:
     - TextTest now lives in a package called "texttestlib" and is available from PyPI ("pip install texttest" or "easy_install texttest")
 	Should make managing installations easier. Windows installer is now version-independent: it just grabs the latest version from PyPI.
 	Command is now always "texttest" on POSIX systems. Windows has "texttest.pyw" for the GUI, "texttestc.py" for the console.
+Static GUI Enhancements:
+    - New "Edit Description" in test pop-up menu
+	Allows editing the description in the normal text editor, rather than within TextTest using the rename dialog as before,
+	or by editing the testsuite file in the editor which requires a certain amount of syntax maintenance also.
 Dynamic GUI Enhancements:
     - New "Generate test summary" in Actions menu
 	Essentially generates the batch report for the selected tests, writing to a user-selected file
@@ -2632,3 +2636,13 @@ Bug Fixes:
     - Better error message if Capturemock-based tests run without CaptureMock installed.
     - Don't use path separators in job names, even if they exist in full_name for the app
 
+Version trunk
+=============
+Release Enhancements:
+Dynamic GUI Enhancements:
+General GUI Enhancements:
+Framework Enhancements:
+Version Control Browser Enhancements:
+Batch Report Enhancements:
+Grid Engine enhancements/bug fixes:
+Bug Fixes:

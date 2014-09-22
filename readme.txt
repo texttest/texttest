@@ -1,10 +1,10 @@
 Documentation Summary:
 
-    There is some stuff in source/doc here in this download, but the main documentation is kept at 
+    There is some stuff in texttestlib/doc here in this download, but the main documentation is kept at 
     http://www.texttest.org. At the bottom of this file there is also
     a brief summary of what TextTest is and what it can do for you.
 
-    In source/doc, you can find :
+    In texttestlib/doc, you can find :
        a) For those upgrading from previous versions of TextTest, migration notes are available for each 
           version. These list not only necessary migrations (which are now kept to a minimum) but also
           changes to the default behaviour of TextTest. These can also be viewed from the Help menu
@@ -16,9 +16,8 @@ Documentation Summary:
           features you haven't used before, under source/doc/quick_start.txt 
 
        d) A directory Upgrade_PyGTK_Enterprise_Linux, especially for people working on an Enterprise Linux
-          system such as Red Hat or SuSE, who are stuck with an old version of Python or PyGTK and a sysadmin 
-          group unwilling to upgrade the central version. This is basically a guide to building PyGTK from
-          source on Linux.
+          system such as Red Hat or SuSE, who are stuck with an old version of Python or PyGTK. This is basically 
+          a guide to building PyGTK from source on Linux.
 
 Installation and System Requirements:
 
@@ -27,19 +26,15 @@ Installation and System Requirements:
     The lightning summary is that you need Python, PyGTK, tkdiff which are probably already
     installed if you're on UNIX. On Windows there is a Windows installer available on the sourceforge page.
 
-    You now don't need to do anything to install TextTest itself as such. You can copy the contents
-    of the source directory to anywhere at all or leave it where it is. Running TextTest is a matter
-    of running source/bin/texttest.py with the above stuff installed.
+    To install TextTest itself, you can just run "sudo pip install texttest", or "sudo easy_install texttest" on
+    UNIX platforms.
 
 TEXTTEST_HOME and the Self-Tests:
 
-    The tests subdirectory is a sketch of what a basic test repository looks like. You can move this
-    to anywhere at all or leave it where it is, but wherever it ends up you should point the environment
-    variable TEXTTEST_HOME at it. It contains configuration for how to get debug information out of TextTest 
-    and also a large number of tests for itself (using itself, naturally!) under the texttest subdirectory. 
-    Your tests should be placed in product-specific subdirectories alongside the "texttest" directory.
+    TextTest will read and write tests under the location specified by TEXTTEST_HOME. It is usually a good idea
+    to create an empty directory and point the environment variable at this location in some persistent way when starting out.
 
-    The self-tests also function as working examples as described above, read source/doc/quickstart.txt for more 
+    The self-tests also function as working examples as described above, read texttestlib/doc/quickstart.txt for more 
     details.
 
 Bugs and Support:
@@ -68,6 +63,7 @@ Plugins included:
     hg.py             :   integration with Mercurial for version control
     sge.py            :   integration with Grid Engine for distributing tests
     lsf.py            :   integration with LSF for distributing tests - note LSF is not free! (see www.platform.com)
+    ec2cloud.py       :   integration with EC2 cloud for running tests in parallel.
     bugzilla.py       :   integration with Bugzilla version 3.x, using its native webservice API (see www.bugzilla.org)
     bugzillav2.py     :   integration with Bugzilla version 2.x, using the command-line interface program bugcli (Dennis Cox, v0.6)
     trac.py           :   integration with Trac for bug tracking
@@ -91,7 +87,9 @@ those runs. These are then the testcases.  It then provides means to subselect t
 compare the files produced (by default using line-based comparators such as 'diff'), to ensure that 
 behaviour changes in the target binary can be controlled. 
 
-It is currently supported on all flavours of UNIX and Windows XP. Development is funded by Jeppesen AB.
+It is currently supported on all flavours of UNIX and Windows. Development is funded by Jeppesen AB.
+
+It has integration with Amazon's EC2 cloud in order to support running tests in parallel there.
 
 A configuration for the load balancing software Grid Engine (formerly the open source Sun Grid Engine, which now comes in several
 descendant versions, some of which are open source) and LSF, available for a fee from Platform Computing, is also available. 

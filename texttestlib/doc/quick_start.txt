@@ -3,8 +3,9 @@ to follow the "Getting Started" tutorial and then possibly the "Course Material"
 http://www.texttest.org/index.php?page=documentation_trunk. For those who basically know the tool but
 want to explore features they haven't used, the self-tests provide a wealth of working examples.
 
-These can be found in the download, or the latest version of them can be had from source control.
-See http://www.texttest.org/index.php?page=download.
+These can be downloaded from source control. Install the Bazaar source control tool and then do
+bzr branch lp:/~geoff.bache/texttest/selftest-trunk
+See http://www.texttest.org/index.php?page=download for more details.
 
 There are various "TargetApp" directories to be found under it. Each of these contains a test-suite 
 for a simple program (which are in turn part of the larger test suite for TextTest, as it tests 

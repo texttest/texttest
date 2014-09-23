@@ -38,7 +38,7 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         guiplugins.ActionResultDialogGUI.createButtons(self)
         
     def addContents(self):
-        logoFile = os.path.join(plugins.installationDir("images"), "texttest-logo.gif")
+        logoFile = os.path.join(plugins.installationDir("images"), "texttest-logo.png")
         logoPixbuf = gtk.gdk.pixbuf_new_from_file(logoFile)
         logo = gtk.Image()
         logo.set_from_pixbuf(logoPixbuf)

@@ -302,7 +302,7 @@ class LineNumberTrigger:
     def matches(self, lineArg, lineNumber):
         return lineNumber == self.lineNumber
     def replace(self, lineArg, newText):
-        return newText + "\n"
+        return newText
     def reset(self):
         pass
 
@@ -476,7 +476,7 @@ class LineFilter:
                         del words[realNumber]
             return " ".join(words).rstrip() + "\n"
         elif trigger and self.replaceText != None:
-            return trigger.replace(line, self.replaceText)
+            return trigger.replace(line.rstrip(), self.replaceText) + "\n"
 
     def findRealWordNumber(self, words):
         if self.wordNumber < 0:

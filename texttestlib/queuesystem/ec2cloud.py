@@ -22,6 +22,7 @@ class Ec2Machine:
         self.remoteProcessInfoLock = Lock()
         self.thread = Thread(target=self.runThread)
         self.thread.setName("Machine_" + self.ip)
+        self.startWaitCounter = 0
         self.diag = logging.getLogger("Ec2Machine")
         self.queue = Queue()
         self.errorMessage = ""
@@ -75,13 +76,13 @@ class Ec2Machine:
         
     def waitForStart(self):
         timeout = 1000
-        times = 0
         self.diag.info("Waiting for response to ssh...")
-        while times < timeout:
+        while self.startWaitCounter < timeout:
             ret = getPortListenErrorCode(self.ip, 22)
-            if ret == 0:
+            if ret == 0 or self.errorMessage:
+                self.startWaitCounter = 0
                 break
-            times += 1
+            self.startWaitCounter += 1
             timedout = ret in [ errno.EWOULDBLOCK, errno.ETIMEDOUT ]
             if not timedout:
                 time.sleep(1)
@@ -89,6 +90,9 @@ class Ec2Machine:
     def runThread(self):
         if self.startMethod:
             self.startMethod() # should be self.waitForStart that is called here, not instance.start. Don't use boto methods in a thread!
+        
+        if self.errorMessage:
+            return
         try:
             self.diag.info("Synchronising files with EC2 instance with private IP address '" + self.ip + "'...")
             self.synchronise()
@@ -150,6 +154,9 @@ class Ec2Machine:
         if self.synchProc:
             self.errorMessage = "Terminated test during file synchronisation"
             self.synchProc.send_signal(signal.SIGTERM)
+            return True, None
+        if self.startWaitCounter:
+            self.errorMessage = "Terminated test while waiting for instance to start up"
             return True, None
         # ssh doesn't forward signals to remote processes.
         # We need to find it ourselves and send it explicitly. Can assume python exists remotely, but not much else.

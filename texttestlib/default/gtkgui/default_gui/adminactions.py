@@ -601,7 +601,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         
     def getFileOnPath(self, fileName):
         for pathElem in os.getenv("PATH").split(os.pathsep):
-            fullPath = os.path.join(pathElem, fileName) 
+            fullPath = os.path.abspath(os.path.join(pathElem, fileName)) 
             if os.path.isfile(fullPath):
                 return fullPath
         

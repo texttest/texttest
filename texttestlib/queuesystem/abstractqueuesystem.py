@@ -65,7 +65,14 @@ class QueueSystem(object):
     
     def getWindowsExecutable(self):
         # sys.executable could be something other than Python... like storytext. Don't involve that here
-        return os.path.join(sys.exec_prefix, "python.exe")
+        if os.path.basename(sys.executable) in [ "python.exe", "pythonw.exe" ]:
+            return sys.executable
+        else:
+            path = os.path.join(sys.exec_prefix, "Scripts", "python.exe")
+            if os.path.isfile(path):
+                return path
+            else:
+                return os.path.join(sys.exec_prefix, "python.exe")
     
     def getTextTestArgs(self):
         texttest = plugins.getTextTestProgram()

@@ -256,7 +256,8 @@ class RunTest(plugins.Action):
 
     def getProcessStartUpInfo(self, test):
         # Used for hiding the windows if we're on Windows!
-        if os.name == "nt" and test.getConfigValue("virtual_display_hide_windows") == "true":
+        if os.name == "nt" and test.getConfigValue("virtual_display_hide_windows") == "true" and \
+            not test.app.isRecording() and not test.app.isActionReplay():
             info = subprocess.STARTUPINFO()
             # Python doesn't make this easy for us: in 2.6.6 and later these flags became inaccessible
             # Alternative is to use win32api which seems excessive just for this purpose.

@@ -239,10 +239,7 @@ class Config:
             return self.createComposites(checkoutVersions, copyVersions)
 
     def getCopyExtraVersions(self):
-        try:
-            copyCount = int(self.optionMap.get("cp", 1))
-        except TypeError:
-            copyCount = 1
+        copyCount = self.optionIntValue("cp", 1)
         return [ "copy_" + str(i) for i in range(1, copyCount) ]
 
     def makeParts(self, c):
@@ -855,12 +852,17 @@ class Config:
     def optionValue(self, option):
         return self.optionMap.get(option, "")
 
-    def optionIntValue(self, option):
+    def optionIntValue(self, option, defaultValue=0, optionType=int):
         if self.optionMap.has_key(option):
             value = self.optionMap.get(option)
-            return int(value) if value is not None else 1
+            if value is None:
+                return 1
+            try:
+                return optionType(value)
+            except ValueError:
+                raise plugins.TextTestError, "ERROR: Arguments to -" + option + " flag must be numeric, received '" + value + "'"
         else:
-            return 0
+            return defaultValue
         
     def ignoreExecutable(self):
         return self.optionMap.has_key("s") or self.ignoreCheckout() or self.optionMap.has_key("coll") or self.optionMap.has_key("gx")
@@ -902,6 +904,7 @@ class Config:
         batchSession = self.getBatchSessionForSelect(suite.app)
         if self.optionMap.has_key("coll") and batchSession is None:
             raise plugins.TextTestError, "Must provide '-b' argument to identify the batch session when running with '-coll' to collect batch run data"
+        self.optionIntValue("delay", optionType=float) # throws if it's not numeric...
         if batchSession is not None and not self.optionMap.has_key("coll"):
             batchFilter = batch.BatchVersionFilter(batchSession)
             batchFilter.verifyVersions(suite.app)

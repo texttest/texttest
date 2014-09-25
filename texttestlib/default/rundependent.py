@@ -460,7 +460,9 @@ class LineFilter:
             
     def filterWords(self, line, trigger=None):
         if self.wordNumber != None:
-            words = line.rstrip().split(" ")
+            stripped = line.rstrip()
+            postfix = line.replace(stripped, "", 1)
+            words = stripped.split(" ")
             self.diag.info("Removing word " + str(self.wordNumber) + " from " + repr(words))
             realNumber = self.findRealWordNumber(words)
             self.diag.info("Real number was " + str(realNumber))
@@ -474,9 +476,11 @@ class LineFilter:
                         words[realNumber] = self.replaceText
                     else:
                         del words[realNumber]
-            return " ".join(words).rstrip() + "\n"
+            if realNumber == -1 or realNumber >= len(words) - 1: # Trim trailing spaces for words at end or beyond
+                postfix = "\n" 
+            return " ".join(words).rstrip() + postfix
         elif trigger and self.replaceText != None:
-            return trigger.replace(line.rstrip(), self.replaceText) + "\n"
+            return trigger.replace(line.rstrip("\n"), self.replaceText) + "\n"
 
     def findRealWordNumber(self, words):
         if self.wordNumber < 0:
@@ -488,6 +492,7 @@ class LineFilter:
                     return realWordNumber
                 wordNumber += 1
         return len(words) + 1
+    
     def findRealWordNumberBackwards(self, words):
         wordNumber = -1
         for index in range(len(words)):

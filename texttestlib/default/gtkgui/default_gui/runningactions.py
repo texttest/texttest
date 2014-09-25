@@ -601,7 +601,7 @@ class RecordTest(BasicRunningAction,guiplugins.ActionDialogGUI):
     def addSwitches(self):
         if self.currentApp and self.currentApp.usesCaptureMock():
             self.currentApp.addCaptureMockSwitch(self.optionGroup, value=1) # record new by default
-        self.addSwitch("rep", "Automatically replay test after recording it", 1,
+        self.addSwitch("rep", "Automatically replay test after recording it", 2,
                        options = [ "Disabled", "In background", "Using dynamic GUI" ])
         if self.currentApp and self.currentApp.getConfigValue("extra_test_process_postfix"):
             self.addSwitch("mult", "Record multiple runs of system")

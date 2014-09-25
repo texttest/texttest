@@ -1119,3 +1119,6 @@ clicked = reset running tab
 [Name=Edit Description]
 activate = edit test description
 
+[Label=In background]
+toggled.true = choose to auto-replay in background
+

@@ -2524,10 +2524,13 @@ Static GUI Enhancements:
     - New "Edit Description" in test pop-up menu
 	Allows editing the description in the normal text editor, rather than within TextTest using the rename dialog as before,
 	or by editing the testsuite file in the editor which requires a certain amount of syntax maintenance also.
+    - Default option for recording GUI tests is now to do the auto-replay in the GUI
+	Doing it in the background is very confusing if something goes wrong.
 Dynamic GUI Enhancements:
     - New "Generate test summary" in Actions menu
 	Essentially generates the batch report for the selected tests, writing to a user-selected file
 General GUI Enhancements:
+    - New icons! Thanks to Emily Bache for her efforts here.
     - File choosers always pick a default choice, should be more sensible than the ones we had before
     - Change of terminology in GUIs:
 	"Save" renamed to "Approve". "Standard Files" are now "Approved Files".
@@ -2629,12 +2632,14 @@ Bug Fixes:
     - Fixed error handling generating batch report in Jenkins when build.xml is empty or artefact version is not present.
     - Fixed ValueError when looking at jenkins fingerprint items
     - {PREVLINES ...} run_dependent_text filtering was unreliable, should work better now
+    - {REPLACE } run_dependent_text sometimes ate trailing spaces when it shouldn't
     - "Replace Text In Files" no longer falls over on auto-generated "missing version" files
     - Fixed "remote machine" option when using local queue system
     - Fixed use of full host name from local queue system setup
     - Improve error message when remote connections fail (include exitcode)
     - Better error message if Capturemock-based tests run without CaptureMock installed.
     - Don't use path separators in job names, even if they exist in full_name for the app
+    - Non-numeric arguments to options which expect numbers give an error rather than stacktrace now
 
 Version trunk
 =============

@@ -15,73 +15,86 @@
 
 # The -x flag should be provided if the temporary files are to be left. Mostly useful for testing.
 
-import os, sys, shutil, subprocess
+import os, sys, shutil, subprocess, stat, time
 from glob import glob
 from getopt import getopt
 
+def getSfUser():
+    userMap = { "geoff": "gjb1002", "dgalda" : "dagal" }
+    user = os.getenv("USER")
+    return userMap.get(user, user)
+        
+
+def system(args):
+    print " ".join(args)
+    subprocess.call(args)
+
 def getBzrLocation(product, artefact):
     # If $BZRROOT set, use the local repositories as laid out at Jeppesen, otherwise use Launchpad
-    bzrRoot = os.getenv("BZRROOT")
-    if bzrRoot:
+    bzrRoot = os.getenv("BZRROOT", "/carm/proj/texttest/bzr")
+    if bzrRoot and os.path.isdir(bzrRoot):
         return os.path.join(bzrRoot, product, artefact, "branches/HEAD")
     else:
         launchpadNames = { "source" : "trunk", "tests": "selftest-trunk" }
         return "lp:~geoff.bache/" + product.lower() + "/" + launchpadNames.get(artefact)
 
-def exportDir(product, artefact, targetName, dest, tag=""):
-    destDir = os.path.join(dest, targetName)
-    tagStr = tag
-    if tag:
-        tagStr = " -rtag:" + tag
-    cmdLine = "bzr checkout" + tagStr + " --lightweight " + getBzrLocation(product, artefact) + " " + destDir
-    print cmdLine
-    os.system(cmdLine)
-    shutil.rmtree(os.path.join(destDir, ".bzr"))
-
-def exportFromBzr(dest, tagName, devRelease):
-    exportDir("TextTest", "source", "source", dest, tagName)
-    if not devRelease:
-        os.mkdir(os.path.join(dest, "tests"))
-        exportDir("TextTest", "tests", "tests/texttest", dest, tagName)
-        exportDir("StoryText", "source", "source/storytext", dest)
+def exportFromBzr(dest, tagName):
+    args = [ "bzr", "checkout", "--lightweight" ]
+    if tagName:
+        args.append("-rtag:" + tagName)
+    args.append(getBzrLocation("TextTest", "source"))
+    args.append(dest)
+    system(args)
         
-def createSource(reldir):
-    versionFile = os.path.join(reldir, "source", "texttestlib", "texttest_version.py")
+def createSource(reldir, debug):
+    versionFile = os.path.join(reldir, "texttestlib", "texttest_version.py")
     updateVersionFile(versionFile, releaseName)
-    subprocess.call([ "python", "setup.py", "sdist", "upload" ], cwd=os.path.join(reldir, "source"))
-    os.rename(os.path.join(reldir, "source", "readme.txt"), os.path.join(reldir, "readme.txt"))
+    args = [ "python", "setup.py", "sdist" ]
+    if not debug:
+        args.append("upload")
+    subprocess.call(args, cwd=reldir)
     
 def updateVersionFile(versionFile, releaseName):
     newFileName = versionFile + ".new"
-    newFile = open(newFileName, "w")
-    for line in open(versionFile).xreadlines():
-        newFile.write(line.replace("trunk", releaseName))
-    newFile.close()
+    with open(newFileName, "w") as newFile:
+        for line in open(versionFile):
+            newFile.write(line.replace("trunk", releaseName))
     os.rename(newFileName, versionFile)
 
 def getCommandLine():
     options, leftovers = getopt(sys.argv[1:], "d:v:t:x")
     optDict = dict(options)
     return optDict.get("-d", os.getcwd()), optDict.get("-v", "current"), optDict.get("-t", ""), optDict.has_key("-x")
+
+def readmeUpdated(readme):
+    if not os.path.isfile(readme):
+        return False
+
+    mtime = os.stat(readme)[stat.ST_MTIME]
+    currTime = time.time()
+    hoursSinceEdit = (currTime - mtime) / 3600
+    return hoursSinceEdit < 24
     
 if __name__ == "__main__":
-    rootDir, releaseName, tagName, leaveDir = getCommandLine()
+    rootDir, releaseName, tagName, debug = getCommandLine()
+    devRelease = "dev" in releaseName
+    readme = os.path.join(rootDir, "readme.txt")
+    if not devRelease and not readmeUpdated(readme):
+        print "Cannot make external release, readme file at", readme, "has not been updated recently."
+        sys.exit(1)
     reldir = "texttest-" + releaseName
     actualRoot = os.path.join(rootDir, reldir)
     if os.path.isdir(actualRoot):
         shutil.rmtree(actualRoot)
     os.makedirs(actualRoot)
     
-    devRelease = "dev" in releaseName
-    exportFromBzr(actualRoot, tagName, devRelease)
-    createSource(actualRoot)
+    exportFromBzr(actualRoot, tagName)
+    createSource(actualRoot, debug)
     
     if not devRelease:
-        os.chdir(rootDir)
-        zipName = reldir + ".zip"
-        if os.path.isfile(zipName):
-            os.remove(zipName)
-        print "Creating zip file", zipName
-        os.system("zip -r " + zipName + " " + reldir)
-        if not leaveDir:
-            shutil.rmtree(reldir)
+        tarball = os.path.join(actualRoot, "dist", "TextTest-" + releaseName + ".tar.gz")
+        target = os.path.join("/home/frs/project/texttest/texttest", releaseName)
+        args = [ "rsync", "-av", "--rsh=ssh", tarball, readme, getSfUser() + "@web.sourceforge.net:" + target ]
+        print " ".join(args)
+        if not debug:
+            subprocess.call(args)

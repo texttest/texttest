@@ -62,23 +62,29 @@ class FileTransferResponder(plugins.Responder):
 
     def notifyLifecycleChange(self, test, state, changeDesc):
         if self.destination and changeDesc == "complete" and (self.transferAll or not test.state.hasSucceeded()):
-            sleepTime = 1
-            errorCode = None
-            for i in range(10):
-                plugins.log.info(test.getIndent() + "Transferring files for " + repr(test) + " to " + self.destination)
-                errorCode = test.app.copyFileRemotely(test.writeDirectory, "localhost", os.path.dirname(test.writeDirectory), self.destination, ignoreLinks=True)
-                if errorCode:
-                    plugins.log.info(test.getIndent() + "File transfer operation failed with error code " + str(errorCode)+ " - waiting " +
-                                 str(sleepTime) + " seconds and then trying again.")
-                    time.sleep(1)
-                else:
-                    return
-            sys.stderr.write("ERROR: File transfer operation failed with error code " + str(errorCode) + "\n")
+            plugins.log.info(test.getIndent() + "Transferring files for " + repr(test) + " to " + self.destination)
+            self.copyRemotelyWithRetry(test, test.writeDirectory, "localhost", os.path.dirname(test.writeDirectory), self.destination, ignoreLinks=True)
 
+    def copyRemotelyWithRetry(self, test, *args, **kw):
+        sleepTime = 1
+        errorCode = None
+        for attempt in range(10):
+            errorCode = test.app.copyFileRemotely(*args, **kw)
+            if errorCode:
+                plugins.log.info(test.getIndent() + "File transfer operation failed with error code " + str(errorCode)+ " - waiting " +
+                             str(sleepTime) + " seconds and then trying again.")
+                time.sleep(1)
+            else:
+                if attempt > 0:
+                    plugins.log.info(test.getIndent() + "File transfer operation succeeded on attempt " + str(attempt + 1))
+                return
+        sys.stderr.write("ERROR: File transfer operation failed with error code " + str(errorCode) + "\n")
+        
     def notifyRequiredTestData(self, test, paths):
         if self.destination:
             for path in paths:
-                test.app.copyFileRemotely(path, self.destination, os.path.dirname(path), "localhost")
+                plugins.log.info(test.getIndent() + "Fetching required test data at " + repr(path) + " from " + self.destination)
+                self.copyRemotelyWithRetry(test, path, self.destination, os.path.dirname(path), "localhost")
 
 
 class SocketResponder(plugins.Responder,plugins.Observable):

@@ -279,7 +279,8 @@ class QueueSystem(local.QueueSystem):
         instances = []
         parsedTags = [ self.parseTag(tag) for tag in instanceTags ]
         for inst in conn.get_only_instances():
-            if all((self.matchesTag(inst.tags, tagName, tagPattern) for tagName, tagPattern in parsedTags)):
+            if inst.private_ip_address is not None and \
+                all((self.matchesTag(inst.tags, tagName, tagPattern) for tagName, tagPattern in parsedTags)):
                 instances.append(inst)
         return instances
         

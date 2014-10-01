@@ -141,9 +141,13 @@ class Ec2Machine:
         if not self.thread.isAlive():
             if self.startMethod:
                 self.diag.info("Starting EC2 instance with private IP address '" + self.ip + "'...")
-                self.startMethod()
+                try:
+                    self.startMethod()
+                except Exception, e:
+                    sys.stderr.write("WARNING: failed to start instance with private IP address '" + self.ip + "'\n" + str(e))
+                    return
                 self.startMethod = self.waitForStart
-
+        
             self.thread.start()
         argsWithEnv = self.getCommandArgsWithEnvironment(cmdArgs, slaveEnv)
         remoteCmdArgs = self.app.getCommandArgsOn(self.fullMachine, argsWithEnv, agentForwarding=True) + fileArgs
@@ -517,6 +521,9 @@ class QueueSystem(local.QueueSystem):
         machine = self.machines[self.nextMachineIndex]
         submitter = super(QueueSystem, self).submitSlaveJob
         jobId = machine.submitSlave(submitter, cmdArgs, self.getFileArgs(cmdArgs), *args)
+        if jobId is None:
+            self.nextMachineIndex += 1
+            return self.submitSlaveJob(cmdArgs, *args)
         if machine.isFull():
             self.nextMachineIndex += 1
         return jobId, None

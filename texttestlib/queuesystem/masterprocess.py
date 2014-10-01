@@ -173,7 +173,7 @@ class QueueSystemServer(BaseActionRunner):
                             self.updateRunStatus(test, status)
                         elif not status and not self.jobCompleted(test, jobName):
                             # Do this to any jobs
-                            self.setSlaveFailed(test, self.jobStarted(test, jobName), True)
+                            self.setSlaveFailed(test, self.jobStarted(test, jobName), True, jobId)
         
     def updateRunStatus(self, test, status):
         newRunStatus, newExplanation = status
@@ -652,7 +652,7 @@ class QueueSystemServer(BaseActionRunner):
             self.diag.info("Job " + jobId + " did not exist.")
             # might get here when the test completed since we checked...
             if not test.state.isComplete():
-                self.setSlaveFailed(test, startNotified, wantStatus)
+                self.setSlaveFailed(test, startNotified, wantStatus, jobId)
         return False
 
     def setSuspendStateForTests(self, tests, newState):
@@ -681,9 +681,9 @@ class QueueSystemServer(BaseActionRunner):
             # Job accounting info can take ages to find, don't do it from GUI quit
             return "No accounting info found as quitting..."
         
-    def setSlaveFailed(self, test, startNotified, wantStatus):
+    def setSlaveFailed(self, test, startNotified, wantStatus, jobId):
         failReason, fullText = self.getSlaveFailure(test, startNotified, wantStatus)
-        fullText = failReason + "\n" + fullText
+        fullText = failReason + "\nJob ID was " + jobId + "\n" + fullText
         self.changeState(test, self.getSlaveFailureState(startNotified, failReason, fullText))
 
     def getSlaveFailure(self, test, startNotified, wantStatus):

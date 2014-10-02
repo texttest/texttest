@@ -203,7 +203,10 @@ class QueueSystem(local.QueueSystem):
         synchDirs = self.getDirectoriesForSynch()
         self.machines = [ Ec2Machine(inst, synchDirs, app, self.subprocessLock, inst.id in runningIds) for inst in instances ]
         self.releasedMachines = []
-        self.capacity = sum((m.cores for m in self.machines))
+        self.capacity = self.calculateCapacity()
+
+    def calculateCapacity(self):
+        return sum((m.cores for m in self.machines))
         
     def makeEc2Connection(self):
         import boto.ec2
@@ -522,7 +525,9 @@ class QueueSystem(local.QueueSystem):
         submitter = super(QueueSystem, self).submitSlaveJob
         jobId = machine.submitSlave(submitter, cmdArgs, self.getFileArgs(cmdArgs), *args)
         if jobId is None:
-            self.nextMachineIndex += 1
+            self.releaseOwnership([ machine ])
+            self.machines.remove(machine)
+            self.capacity = self.calculateCapacity()
             return self.submitSlaveJob(cmdArgs, *args)
         if machine.isFull():
             self.nextMachineIndex += 1

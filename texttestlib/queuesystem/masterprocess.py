@@ -507,7 +507,7 @@ class QueueSystemServer(BaseActionRunner):
             jobId, errorMessage = queueSystem.submitSlaveJob(cmdArgs, slaveEnv, logDir, submissionRules, jobType)
             if jobId is not None:
                 self.diag.info("Job created with id " + jobId)
-
+                self.checkQueueCapacity(queueSystem)
                 self.jobs.setdefault(test, []).append((jobId, jobName))
                 self.lockDiag.info("Releasing lock for submission...")
                 return True
@@ -516,6 +516,13 @@ class QueueSystemServer(BaseActionRunner):
                 test.changeState(plugins.Unrunnable(errorMessage, "NOT SUBMITTED"))
                 self.handleErrorState(test)
                 return False
+            
+    def checkQueueCapacity(self, queueSystem):
+        queueCapacity = queueSystem.getCapacity()
+        if queueCapacity:
+            with self.counterLock:
+                if queueCapacity < self.maxCapacity:
+                    self.maxCapacity = queueCapacity
         
     def handleErrorState(self, test, previouslySubmitted=False):
         with self.counterLock:

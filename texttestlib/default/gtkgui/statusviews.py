@@ -426,7 +426,7 @@ class TestProgressMonitor(guiutils.SubGUI):
 
     def getCategorySettings(self, category, nodeClassifier, classifiers):
         # Use the category description if there is only one level, otherwise rely on the status names
-        if len(classifiers.get(nodeClassifier)) == 0 or category in [ "failure", "success" ]:
+        if len(classifiers.get(nodeClassifier)) == 0 or category in [ "failure", "success", "bug" ]:
             return guiutils.guiConfig.getTestColour(category), guiutils.guiConfig.showCategoryByDefault(category)
         else:
             return None, True

@@ -297,7 +297,8 @@ class GUIConfig:
         dict["static"] = "grey90"
         dict["clipboard_cut"] = "red"
         dict["clipboard_copy"] = "grey60"
-        dict["marked"] = "orange"
+        dict["bug"] = "orange"
+        dict["marked"] = "lightblue"
         return dict
 
 

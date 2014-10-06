@@ -2645,6 +2645,8 @@ Version trunk
 =============
 Release Enhancements:
 Dynamic GUI Enhancements:
+    - Default colour for known bugs is now orange, as in HTML reports
+	"Marked" default colour changes to light blue accordingly
 General GUI Enhancements:
 Framework Enhancements:
 Version Control Browser Enhancements:

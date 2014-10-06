@@ -68,7 +68,7 @@ class FileTransferResponder(plugins.Responder):
     def copyRemotelyWithRetry(self, test, *args, **kw):
         sleepTime = 1
         errorCode = None
-        for attempt in range(10):
+        for attempt in range(20):
             errorCode = test.app.copyFileRemotely(*args, **kw)
             if errorCode:
                 plugins.log.info(test.getIndent() + "File transfer operation failed with error code " + str(errorCode)+ " - waiting " +

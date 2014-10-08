@@ -435,9 +435,7 @@ class TestProgressMonitor(guiutils.SubGUI):
         resultType, summary = state.getTypeBreakdown()
         catDesc = self.getCategoryDescription(state, resultType)
         mainColour = guiutils.guiConfig.getTestColour(catDesc, guiutils.guiConfig.getTestColour(resultType))
-        # Don't change suite states when unmarking tests
-        updateSuccess = state.hasSucceeded() and changeDesc != "unmarked"
-        self.notify("TestAppearance", test, summary, mainColour, colour, updateSuccess, "approve" in changeDesc)
+        self.notify("TestAppearance", test, summary, mainColour, colour, "approve" in changeDesc)
         self.notify("Visibility", [ test ], self.shouldBeVisible(test))
 
     def getInitialTestsForNode(self, test, parentIter, nodeClassifier):
@@ -461,7 +459,7 @@ class TestProgressMonitor(guiutils.SubGUI):
             self.insertTestAtIter(nodeIter, test, colour, incrementCount)
             self.classifications[test].append(nodeIter)
         else:
-            visibility = guiutils.guiConfig.showCategoryByDefault(nodeClassifier, parentHidden=not defaultVisibility)
+            visibility = guiutils.guiConfig.showCategoryByDefault(nodeClassifier, parentShown=defaultVisibility)
             initialTests = self.getInitialTestsForNode(test, parentIter, nodeClassifier)
             nodeIter = self.addNewIter(nodeClassifier, parentIter, colour, visibility, len(initialTests), initialTests, fileStem)
             for initTest in initialTests:

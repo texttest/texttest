@@ -241,8 +241,6 @@ class TestTreeGUI(guiutils.ContainerGUI):
         self.clipboardTests = set()
         self.dynamic = dynamic
         self.collapseStatic = self.getCollapseStatic()
-        self.successPerSuite = {} # map from suite to tests succeeded
-        self.collapsedRows = {}
         self.filteredModel = None
         self.treeView = None
         self.newTestsVisible = guiutils.guiConfig.showCategoryByDefault("not_started")
@@ -350,10 +348,6 @@ class TestTreeGUI(guiutils.ContainerGUI):
         return test.classId() == "test-case"
 
     def rowExpanded(self, treeview, iter, path):
-        if self.dynamic:
-            realPath = self.filteredModel.convert_path_to_child_path(path)
-            if self.collapsedRows.has_key(realPath):
-                del self.collapsedRows[realPath]
         self.expandLevel(treeview, self.filteredModel.iter_children(iter), not self.collapseStatic)
 
     def rowInserted(self, model, dummy, iter):
@@ -365,32 +359,16 @@ class TestTreeGUI(guiutils.ContainerGUI):
         path = self.filteredModel.get_path(iter)
         realPath = self.filteredModel.convert_path_to_child_path(path)
 
+        self.diag.info("Expanding path at " + repr(realPath))
+        self.treeView.expand_row(path, open_all=False)
+            
         # Iterate over children, call self if they have children
-        if not self.collapsedRows.has_key(realPath):
-            self.diag.info("Expanding path at " + repr(realPath))
-            self.treeView.expand_row(path, open_all=False)
         if recurse:
             childIter = self.filteredModel.iter_children(iter)
             while (childIter != None):
                 if self.filteredModel.iter_has_child(childIter):
                     self.expandRow(childIter, True)
                 childIter = self.filteredModel.iter_next(childIter)
-
-    def collapseRow(self, iter):
-        # To make sure that the path is marked as 'collapsed' even if the row cannot be collapsed
-        # (if the suite is empty, or not shown at all), we set self.collapsedRow manually, instead of
-        # waiting for rowCollapsed() to do it at the 'row-collapsed' signal (which will not be emitted
-        # in the above cases)
-        path = self.model.get_path(iter)
-        self.diag.info("Collapsed path " + repr(path))
-        self.collapsedRows[path] = 1
-        # Collapsing rows can cause indirect changes of selection, make sure we indicate this.
-        self.selecting = True
-        filterPath = self.filteredModel.convert_child_path_to_path(path)
-        if filterPath is not None: # don't collapse if it's already hidden
-            self.selection.get_tree_view().collapse_row(filterPath)
-        self.selecting = False
-        self.selectionChanged(direct=False)
 
     def userChangedSelection(self, *args):
         if not self.selecting and not hasattr(self.selection, "unseen_changes"):
@@ -413,9 +391,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         iter = self.itermap.getIterator(test)
         # If we've recomputed, clear the recalculation icons
         self.setNewRecalculationStatus(iter, test, [])
-        if test.stateInGui.hasFailed():
-            self.removeFromSuiteSuccess(test)            
-
+        
     def getSortedSelectedTests(self, suite):
         appTests = filter(lambda test: test.app is suite.app, self.selectedTests)
         allTests = suite.allTestsAndSuites()
@@ -591,13 +567,11 @@ class TestTreeGUI(guiutils.ContainerGUI):
 
             iter = view.get_model().iter_next(iter)
 
-    def notifyTestAppearance(self, test, detailText, colour1, colour2, updateSuccess, approved):
+    def notifyTestAppearance(self, test, detailText, colour1, colour2, approved):
         iter = self.itermap.getIterator(test)
         self.model.set_value(iter, 1, colour1)
         self.model.set_value(iter, 3, detailText)
         self.model.set_value(iter, 4, colour2)
-        if updateSuccess:
-            self.updateSuiteSuccess(test, colour1)
         if approved:
             self.checkRelatedForRecalculation(test)
 
@@ -617,54 +591,10 @@ class TestTreeGUI(guiutils.ContainerGUI):
         if test in self.selectedTests:
             self.notify("RefreshFilePreviews", test, *args)
 
-    def updateSuiteSuccess(self, test, colour):
-        suite = test.parent
-        if not suite:
-            return
-
-        self.successPerSuite.setdefault(suite, set()).add(test)
-        successCount = len(self.successPerSuite.get(suite))
-        suiteSize = len(filter(lambda subtest: not subtest.isEmpty(), suite.testcases))
-        if successCount == suiteSize:
-            self.setAllSucceeded(suite, colour)
-            self.updateSuiteSuccess(suite, colour)
-
-    def removeFromSuiteSuccess(self, test):
-        suite = test.parent
-        if suite and suite in self.successPerSuite and test in self.successPerSuite[suite]:
-            self.successPerSuite[suite].remove(test)
-            self.clearAllSucceeded(suite)
-            self.removeFromSuiteSuccess(suite)
-
-    def setAllSucceeded(self, suite, colour):
-        # Print how many tests succeeded, color details column in success color,
-        # collapse row, and try to collapse parent suite.
-        detailText = "All " + str(suite.size()) + " tests successful"
-        iter = self.itermap.getIterator(suite)
-        self.model.set_value(iter, 3, detailText)
-        self.model.set_value(iter, 4, colour)
-
-        if guiutils.guiConfig.getValue("auto_collapse_successful") == 1:
-            self.collapseRow(iter)
-
-    def clearAllSucceeded(self, suite):
-        iter = self.itermap.getIterator(suite)
-        self.model.set_value(iter, 3, "")
-        self.model.set_value(iter, 4, "white")
-
-        if guiutils.guiConfig.getValue("auto_collapse_successful") == 1:
-            path = self.model.get_path(iter)
-            if self.collapsedRows.has_key(path):
-                del self.collapsedRows[path]
-            filteredPath = self.filteredModel.convert_child_path_to_path(path)
-            self.treeView.expand_row(filteredPath, open_all=False)
-
     def isVisible(self, test):
         filteredIter = self.findIter(test)
         if filteredIter:
-            filteredPath = self.filteredModel.get_path(self.filteredModel.iter_parent(filteredIter))
-            path = self.filteredModel.convert_path_to_child_path(filteredPath)
-            return not self.collapsedRows.has_key(path)
+            return True
         else:
             self.diag.info("No iterator found for " + repr(test))
             return False

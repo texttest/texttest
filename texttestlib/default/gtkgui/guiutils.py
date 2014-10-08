@@ -125,7 +125,7 @@ class GUIConfig:
         self.setConfigDefaults(defaultColours, defaultAccelerators)
         if includePersonal:
             self.configDir.readValues(self.getAllPersonalConfigFiles(), insert=0, errorOnUnknown=0)
-
+        self.shownCategories = map(self.getConfigName, self.configDir.get("show_test_category"))
         self.hiddenCategories = map(self.getConfigName, self.configDir.get("hide_test_category"))
         self.colourDict = self.makeColourDictionary()
         
@@ -157,10 +157,10 @@ class GUIConfig:
         self.setConfigDefault("static_collapse_suites", 0, "Whether or not the static GUI will show everything collapsed")
         self.setConfigDefault("test_colours", colourDict, "Colours to use for each test state")
         self.setConfigDefault("file_colours", copy(colourDict), "Colours to use for each file state")
-        self.setConfigDefault("auto_collapse_successful", 1, "Automatically collapse successful test suites?")
         self.setConfigDefault("window_size", self.getWindowSizeSettings(), "To set the initial size of the dynamic/static GUI.")
         self.setConfigDefault("hide_gui_element", self.getDefaultHideWidgets(), "List of widgets to hide by default")
-        self.setConfigDefault("hide_test_category", [], "Categories of tests which should not appear in the dynamic GUI test view")
+        self.setConfigDefault("hide_test_category", ["cancelled"], "Categories of tests which should not appear in the dynamic GUI test view")
+        self.setConfigDefault("show_test_category", ["failed"], "Categories of tests which should appear in the dynamic GUI test view")
         self.setConfigDefault("query_kill_processes", { "default" : [], "static" : [ "Dynamic GUI" ] }, "Ask about whether to kill these processes when exiting texttest.")
         self.setConfigDefault("gui_accelerators", accelerators, "Custom action accelerators.")        
         self.setConfigDefault("gui_entry_completion_matching", 1, "Which matching type to use for entry completion. 0 means turn entry completions off, 1 means match the start of possible completions, 2 means match any part of possible completions")
@@ -237,15 +237,15 @@ class GUIConfig:
             diag.info("Setting window " + dimensionName + " to " + repr(int(100.0 * proportion)) + "% of screen.")
             return int(fullSize * proportion)
     
-    def showCategoryByDefault(self, category, parentHidden=False):
+    def showCategoryByDefault(self, category, parentShown=False):
         if self.dynamic:
-            if parentHidden:
-                return False
             nameToUse = self.getConfigName(category)
             if nameToUse in self.hiddenCategories:
                 return False
-            else:
+            elif nameToUse in self.shownCategories:
                 return True
+            else:
+                return parentShown
         else:
             return False    
     def getTestColour(self, category, fallback=None):

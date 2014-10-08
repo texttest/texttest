@@ -582,12 +582,15 @@ class TestProgressMonitor(guiutils.SubGUI):
                 selection.set_mode(gtk.SELECTION_SINGLE)
                 selection.set_mode(gtk.SELECTION_MULTIPLE)
 
-    def notifyResetVisibility(self):
+    def notifyResetVisibility(self, tests, show):
         self.diag.info("Resetting visibility from current status")
         testsForReset = []
-        self.treeModel.foreach(self.resetNodeVisibility, testsForReset)
-        self.notify("Visibility", testsForReset, True)
+        def resetNodeVisibility(model, dummyPath, iter):
+            if model.get_value(iter, 2) == show and not model.iter_has_child(iter):
+                for test in model.get_value(iter, 5):
+                    if test in tests:
+                        testsForReset.append(test)
+        
+        self.treeModel.foreach(resetNodeVisibility)
+        self.notify("Visibility", testsForReset, show)
 
-    def resetNodeVisibility(self, model, dummyPath, iter, testsForReset):
-        if model.get_value(iter, 2) and not model.iter_has_child(iter):
-            testsForReset += model.get_value(iter, 5)

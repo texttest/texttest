@@ -140,7 +140,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
     def isActiveOnCurrent(self, *args):
         return True
     def getSignalsSent(self):
-        return [ "SetTestSelection", "Visibility", "AllStems" ]
+        return [ "SetTestSelection", "Visibility", "ResetVisibility", "AllStems" ]
     def _getStockId(self):
         return "find"
     def _getTitle(self):
@@ -303,10 +303,11 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         newSelection = self._makeNewSelection(strategy=0, includeEmptySuites=True)
         strategy = self.filteringGroup.getSwitchValue("current_filtering")
         toShow = self.findTestsToShow(newSelection, strategy)
-        self.notify("Visibility", toShow, True)
+        signalToSend = "ResetVisibility" if self.dynamic else "Visibility"
+        self.notify(signalToSend, toShow, True)
         self.notify("ActionProgress")
         toHide = self.findTestsToHide(newSelection, strategy)
-        self.notify("Visibility", toHide, False)
+        self.notify(signalToSend, toHide, False)
         self.notify("ActionStop")
         self.notify("Status", "Changed filtering by showing " + str(len(toShow)) +
                     " tests/suites and hiding " + str(len(toHide)) + ".")
@@ -409,10 +410,8 @@ class ShowAll(guiplugins.BasicActionGUI,AllTestsHandler):
         return [ "Visibility", "ResetVisibility" ]
 
     def performOnCurrent(self):
-        if self.dynamic:
-            self.notify("ResetVisibility")
-        else:
-            self.notify("Visibility", self.findAllTests(), True)
+        signalToSend = "ResetVisibility" if self.dynamic else "Visibility"
+        self.notify(signalToSend, self.findAllTests(), True)
 
 
 class SaveSelection(guiplugins.ActionDialogGUI):

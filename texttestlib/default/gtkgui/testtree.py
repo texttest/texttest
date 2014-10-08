@@ -262,9 +262,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
             return guiutils.guiConfig.getValue("static_collapse_suites")
 
     def notifyAllRead(self, *args):
-        if self.dynamic:
-            self.filteredModel.connect('row-inserted', self.rowInserted)
-        else:
+        if not self.dynamic:
             self.newTestsVisible = True
             self.model.foreach(self.makeRowVisible)
             if self.collapseStatic:
@@ -349,26 +347,6 @@ class TestTreeGUI(guiutils.ContainerGUI):
 
     def rowExpanded(self, treeview, iter, path):
         self.expandLevel(treeview, self.filteredModel.iter_children(iter), not self.collapseStatic)
-
-    def rowInserted(self, model, dummy, iter):
-        self.expandRow(model.iter_parent(iter), False)
-
-    def expandRow(self, iter, recurse):
-        if iter == None:
-            return
-        path = self.filteredModel.get_path(iter)
-        realPath = self.filteredModel.convert_path_to_child_path(path)
-
-        self.diag.info("Expanding path at " + repr(realPath))
-        self.treeView.expand_row(path, open_all=False)
-            
-        # Iterate over children, call self if they have children
-        if recurse:
-            childIter = self.filteredModel.iter_children(iter)
-            while (childIter != None):
-                if self.filteredModel.iter_has_child(childIter):
-                    self.expandRow(childIter, True)
-                childIter = self.filteredModel.iter_next(childIter)
 
     def userChangedSelection(self, *args):
         if not self.selecting and not hasattr(self.selection, "unseen_changes"):
@@ -761,10 +739,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
                 
     def updateVisibilityInViews(self, newValue):
         if newValue: # if things have become visible, expand everything
-            rootIter = self.filteredModel.get_iter_root()
-            while rootIter != None:
-                self.expandRow(rootIter, True)
-                rootIter = self.filteredModel.iter_next(rootIter)
+            self.treeView.expand_all()
             gobject.idle_add(self.scrollToFirstTest)
         else:
             self.selectionChanged(direct=False)

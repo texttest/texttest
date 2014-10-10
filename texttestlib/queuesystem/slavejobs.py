@@ -66,18 +66,18 @@ class FileTransferResponder(plugins.Responder):
             self.copyRemotelyWithRetry(test, test.writeDirectory, "localhost", os.path.dirname(test.writeDirectory), self.destination, ignoreLinks=True)
 
     def copyRemotelyWithRetry(self, test, *args, **kw):
-        sleepTime = 1
         errorCode = None
-        for attempt in range(20):
-            errorCode = test.app.copyFileRemotely(*args, **kw)
-            if errorCode:
-                plugins.log.info(test.getIndent() + "File transfer operation failed with error code " + str(errorCode)+ " - waiting " +
-                             str(sleepTime) + " seconds and then trying again.")
-                time.sleep(1)
-            else:
-                if attempt > 0:
-                    plugins.log.info(test.getIndent() + "File transfer operation succeeded on attempt " + str(attempt + 1))
-                return
+        for sleepTime in range(1,6):
+            for attempt in range(20):
+                errorCode = test.app.copyFileRemotely(*args, **kw)
+                if errorCode:
+                    plugins.log.info(test.getIndent() + "File transfer operation failed with error code " + str(errorCode)+ " - waiting " +
+                                 str(sleepTime) + " seconds and then trying again.")
+                    time.sleep(sleepTime)
+                else:
+                    if attempt > 0:
+                        plugins.log.info(test.getIndent() + "File transfer operation succeeded on attempt " + str(attempt + 1))
+                    return
         sys.stderr.write("ERROR: File transfer operation failed with error code " + str(errorCode) + "\n")
         
     def notifyRequiredTestData(self, test, paths):

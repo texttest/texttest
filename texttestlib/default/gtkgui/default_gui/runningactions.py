@@ -837,15 +837,8 @@ class TestFileFiltering(guiplugins.ActionGUI):
     def isActiveOnCurrent(self, *args):
         return guiplugins.ActionGUI.isActiveOnCurrent(self) and len(self.currFileSelection) == 1
 
-    def getVersion(self, test, fileName):
-        fileVersions = set(os.path.basename(fileName).split(".")[1:])
-        testVersions = set(test.app.versions + [ test.app.name ])
-        additionalVersions = fileVersions.difference(testVersions)
-        return ".".join(additionalVersions)
-
     def getTextToShow(self, test, fileName):
-        version = self.getVersion(test, fileName)
-        return test.app.applyFiltering(test, fileName, version)
+        return test.app.applyFiltering(test, fileName)
     
     def performOnCurrent(self):
         self.reloadConfigForSelected() # Always make sure we're up to date here

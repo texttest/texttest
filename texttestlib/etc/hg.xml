@@ -9,6 +9,8 @@
         <separator/>
         <menuitem action="Mercurial Difference"/>
         <menuitem action="Mercurial Difference Recursive"/>
+        <menuitem action="Mercurial Filtered Difference"/>
+        <menuitem action="Mercurial Filtered Difference Recursive"/>
         <separator/>
         <menuitem action="Mercurial Status"/>
         <menuitem action="Mercurial Status Recursive"/>
@@ -32,6 +34,8 @@
       <separator/>
       <menuitem action="Mercurial Difference"/>
       <menuitem action="Mercurial Difference Recursive"/>
+      <menuitem action="Mercurial Filtered Difference"/>
+      <menuitem action="Mercurial Filtered Difference Recursive"/>
       <separator/>
       <menuitem action="Mercurial Status"/>
       <menuitem action="Mercurial Status Recursive"/>
@@ -53,6 +57,8 @@
       <separator/>
       <menuitem action="Mercurial Difference"/>
       <menuitem action="Mercurial Difference Recursive"/>
+      <menuitem action="Mercurial Filtered Difference"/>
+      <menuitem action="Mercurial Filtered Difference Recursive"/>
       <separator/>
       <menuitem action="Mercurial Status"/>
       <menuitem action="Mercurial Status Recursive"/>

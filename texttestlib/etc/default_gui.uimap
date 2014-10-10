@@ -1122,3 +1122,33 @@ activate = edit test description
 [Label=In background]
 toggled.true = choose to auto-replay in background
 
+[Name=reordermenu]
+activate = 
+
+[Name=Bazaar Filtered Difference]
+activate = filtered version control difference for the selected files
+
+[Name=Mercurial Filtered Difference]
+activate = filtered version control difference for the selected files
+
+[Name=Git Filtered Difference]
+activate = filtered version control difference for the selected files
+
+[Name=CVS Filtered Difference]
+activate = filtered version control difference for the selected files
+
+[Name=VCS cat info tree]
+changed.selection = select filtered differences for
+
+[Name=VCS show info tree]
+changed.selection = select filtered differences for
+
+[Name=VCS update info tree]
+changed.selection = select filtered differences for
+
+[Name=VCS Filtered Difference Window]
+response.accept = close filtered differences
+
+[Label=_Filtered Differences]
+clicked = show filtered version control differences
+

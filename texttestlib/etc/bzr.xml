@@ -9,6 +9,8 @@
         <separator/>
         <menuitem action="Bazaar Difference"/>
         <menuitem action="Bazaar Difference Recursive"/>
+        <menuitem action="Bazaar Filtered Difference"/>
+        <menuitem action="Bazaar Filtered Difference Recursive"/>
         <separator/>
         <menuitem action="Bazaar Status"/>
         <menuitem action="Bazaar Status Recursive"/>
@@ -32,6 +34,8 @@
       <separator/>
       <menuitem action="Bazaar Difference"/>
       <menuitem action="Bazaar Difference Recursive"/>
+      <menuitem action="Bazaar Filtered Difference"/>
+      <menuitem action="Bazaar Filtered Difference Recursive"/>
       <separator/>
       <menuitem action="Bazaar Status"/>
       <menuitem action="Bazaar Status Recursive"/>
@@ -53,6 +57,8 @@
       <separator/>
       <menuitem action="Bazaar Difference"/>
       <menuitem action="Bazaar Difference Recursive"/>
+      <menuitem action="Bazaar Filtered Difference"/>
+      <menuitem action="Bazaar Filtered Difference Recursive"/>
       <separator/>
       <menuitem action="Bazaar Status"/>
       <menuitem action="Bazaar Status Recursive"/>

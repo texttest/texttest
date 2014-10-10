@@ -9,6 +9,8 @@
         <separator/>
         <menuitem action="Git Difference"/>
         <menuitem action="Git Difference Recursive"/>
+        <menuitem action="Git Filtered Difference"/>
+        <menuitem action="Git Filtered Difference Recursive"/>
         <separator/>
         <menuitem action="Git Status"/>
         <menuitem action="Git Status Recursive"/>
@@ -32,6 +34,8 @@
       <separator/>
       <menuitem action="Git Difference"/>
       <menuitem action="Git Difference Recursive"/>
+      <menuitem action="Git Filtered Difference"/>
+      <menuitem action="Git Filtered Difference Recursive"/>
       <separator/>
       <menuitem action="Git Status"/>
       <menuitem action="Git Status Recursive"/>
@@ -53,6 +57,8 @@
       <separator/>
       <menuitem action="Git Difference"/>
       <menuitem action="Git Difference Recursive"/>
+      <menuitem action="Git Filtered Difference"/>
+      <menuitem action="Git Filtered Difference Recursive"/>
       <separator/>
       <menuitem action="Git Status"/>
       <menuitem action="Git Status Recursive"/>

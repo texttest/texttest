@@ -55,12 +55,12 @@ class CVSInterface(vcs_independent.VersionControlInterface):
     def setProgramArgs(self, cvsDir):
         cvsRoot = os.getenv("CVSROOT")
         if cvsRoot:
-            return [ "cvs" ], ""
+            return [ "cvs", "-q" ], ""
         else:
             rootFile = os.path.join(cvsDir, "Root")
             if os.path.isfile(rootFile):
                 cvsRoot = self.getCvsRootFromFile(rootFile)
-                return [ "cvs", "-d", cvsRoot ], ""
+                return [ "cvs", "-q", "-d", cvsRoot ], ""
             else:
                 return [], "Could not determine $CVSROOT: environment variable not set and no file present at:\n" + rootFile
 
@@ -248,10 +248,29 @@ class RenameTest(vcs_independent.RenameTest):
         else:
             vcs_independent.RenameTest.handleExistingDirectory(self, dir)
             
+class FilteredDiffGUI(vcs_independent.FilteredDiffGUI):
+    def __init__(self, *args):
+        vcs_independent.FilteredDiffGUI.__init__(self, *args)
+        self.cmdName = "update"
+        
+    def getTmpFileArgs(self, fileName, revision):
+        revArgs = vcs_independent.vcs.getSingleRevisionOptions(revision) if revision else []
+        return [ "-p" ] + revArgs + [ fileName ]
+    
+    def commandHadError(self, retcode, stderr, stdout):
+        # Diff returns an error code for differences, not just for errors
+        return retcode or (len(stderr) > 0 and len(stdout) == 0)
+    
+class FilteredDiffGUIRecursive(FilteredDiffGUI):
+    recursive = True
+
 #
 # Configuration for the Interactive Actions
 #
 class InteractiveActionConfig(vcs_independent.InteractiveActionConfig):
+    def diffClasses(self):
+        return [ vcs_independent.DiffGUI, vcs_independent.DiffGUIRecursive, FilteredDiffGUI, FilteredDiffGUIRecursive ]
+    
     def getInteractiveActionClasses(self, dynamic):
         return vcs_independent.InteractiveActionConfig.getInteractiveActionClasses(self, dynamic) + [ CVSLogLatest ]
     

@@ -23,6 +23,10 @@ class GitInterface(vcs_independent.VersionControlInterface):
 
     def getGraphicalDiffArgs(self, diffProgram):
         return [ "git", "difftool", "-t", diffProgram, "-y"]
+    
+    def startGUIProcess(self, cmdArgs, **kw):
+        relArgs = map(self.makeRelPath, cmdArgs)
+        vcs_independent.VersionControlInterface.startGUIProcess(self, relArgs, **kw)
 
     def parseDateTime(self, input):
         return time.strptime(input, "%b %d %H:%M:%S %Y")
@@ -56,16 +60,24 @@ class GitInterface(vcs_independent.VersionControlInterface):
             if relpath:
                 return relpath
         return arg
-        
+                
     def getProcessResults(self, args, cwd=None, **kwargs):
         workingDir = cwd if cwd else self.vcsDirectory
+        if workingDir == self.vcsDirectory:
+            args = map(self.makeRelPath, args)
         return vcs_independent.VersionControlInterface.getProcessResults(self, args, cwd=workingDir, **kwargs)
     
     def callProgram(self, cmdName, fileArgs=[], **kwargs):
+        if fileArgs:
+            # Only switch the first argument, otherwise gets difficult to capture
+            fileArgs = [ self.makeRelPath(fileArgs[0]) ] + map(os.path.realpath, fileArgs[1:])
         return vcs_independent.VersionControlInterface.callProgram(self, cmdName, fileArgs, cwd=self.vcsDirectory, **kwargs)
 
     def getCombinedRevisionOptions(self, r1, r2):
         return [ r1 + ".." + r2, "--" ]
+    
+    def getSingleRevisionOptions(self, r1):
+        return [ r1 ]
     
     def removePath(self, path):
         # Git doesn't remove unknown files
@@ -79,18 +91,17 @@ class GitInterface(vcs_independent.VersionControlInterface):
 
 vcs_independent.vcsClass = GitInterface
 
-class DiffGUI(vcs_independent.DiffGUI):
-    def getExtraArgs(self):
-        if self.revision1 and self.revision2:
-            return vcs_independent.vcs.getCombinedRevisionOptions(self.revision1, self.revision2)
-        if self.revision1:
-            return [ self.revision1 ]
-        elif self.revision2:
-            return [ self.revision2 ]
-        else:
-            return []
+class FilteredDiffGUI(vcs_independent.FilteredDiffGUI):
+    def __init__(self, *args):
+        vcs_independent.FilteredDiffGUI.__init__(self, *args)
+        self.cmdName = "show"
+        
+    def getTmpFileArgs(self, fileName, revision):
+        revStr = revision or "master"
+        return [ revStr + ":" + vcs_independent.vcs.makeRelPath(fileName) ]
 
-class DiffGUIRecursive(DiffGUI):
+
+class FilteredDiffGUIRecursive(FilteredDiffGUI):
     recursive = True
 
 class UpdateGUI(vcs_independent.UpdateGUI):
@@ -104,7 +115,7 @@ class UpdateGUI(vcs_independent.UpdateGUI):
     
 class InteractiveActionConfig(vcs_independent.InteractiveActionConfig):
     def diffClasses(self):
-        return [ DiffGUI, DiffGUIRecursive ]
+        return [ vcs_independent.DiffGUI, vcs_independent.DiffGUIRecursive, FilteredDiffGUI, FilteredDiffGUIRecursive ]
     
     def getUpdateClass(self):
         return UpdateGUI

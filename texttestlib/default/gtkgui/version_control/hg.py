@@ -86,7 +86,7 @@ class UpdateGUI(vcs_independent.UpdateGUI):
 vcs_independent.vcsClass = HgInterface
 
 class AnnotateGUI(vcs_independent.AnnotateGUI):
-    def commandHadError(self, retcode, stderr):
+    def commandHadError(self, retcode, stderr, *args):
         return len(stderr) > 0 # Mercurial doesn't do return codes in annotate for some reason...
 
 class AnnotateGUIRecursive(AnnotateGUI):

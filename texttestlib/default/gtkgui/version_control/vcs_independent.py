@@ -5,8 +5,9 @@ import gtk, gobject, custom_widgets, os, datetime, subprocess, shutil
 from texttestlib import plugins
 from .. import guiplugins, guiutils, entrycompletion
 from ..default_gui import adminactions, changeteststate
+import tempfile
 
-vcsClass, vcs, annotateClass, diffClass = None, None, None, None
+vcsClass, vcs, annotateClass, basicDiffClasses = None, None, None, None
     
 # All VCS specific stuff goes in this class. One global instance, "vcs" above
 class VersionControlInterface:
@@ -157,6 +158,23 @@ class VersionControlInterface:
     def hasLocalCommits(self, *args):
         return False # Not possible in cvs or bzr
 
+    def getRevisionOptions(self, r1, r2):    
+        if r1 and r2:
+            return self.getCombinedRevisionOptions(r1, r2)
+        elif r1:
+            return self.getSingleRevisionOptions(r1)
+        elif r2:
+            return self.getSingleRevisionOptions(r2)
+        else:
+            return []
+        
+    def getSingleRevisionOptions(self, r1):
+        return [ "-r", r1 ]
+    
+    def startGUIProcess(self, cmdArgs, **kw):
+        guiplugins.processMonitor.startProcess(cmdArgs, **kw)
+    
+
 class BasicVersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
     recursive = False
     def getTitle(self, includeMnemonics=False, adjectiveAfter=True):
@@ -228,13 +246,15 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
             message += "\nSubdirectories were ignored, use " + self.getTitle() + " Recursive to get the " + self.getResultTitle() + " for all subdirectories."
         return message
             
-    def extraResultDialogWidgets(self):
+    def extraResultDialogWidgets(self, exclude=""):
         all = ["log", "status", "diff", "annotate" ]
         if self.cmdName in all:
             all.remove(self.cmdName)
+        if exclude in all:
+            all.remove(exclude)
         return all
             
-    def commandHadError(self, retcode, stderr):
+    def commandHadError(self, retcode, *args):
         return retcode
 
     def outputIsInteresting(self, stdout):
@@ -252,7 +272,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
                                    outputHandler=self.handleVcsOutput, outputHandlerArgs=(test,))
                     
     def handleVcsOutput(self, retcode, stdout, stderr, fileName, test):
-        if self.commandHadError(retcode, stderr):
+        if self.commandHadError(retcode, stderr, stdout):
             self.notInRepository = True
             self.storeResult(fileName, stderr, test)
         elif self.outputIsInteresting(stdout):
@@ -320,29 +340,34 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         annotater = annotateClass()
         self.runWithSelections(annotater, file)
 
-    def viewDiffs(self, button):
+    def viewDiffs(self, button, differ):
         file = self.getSelectedFile()
-        differ = diffClass()
-        differ.setRevisions(self.revision1.get_text(), self.revision2.get_text())
+        differ.setRevisions(self.revisionEntry1.get_text(), self.revisionEntry2.get_text())
         self.runWithSelections(differ, file)
 
     def viewGraphicalDiff(self, button):
         path = self.filteredTreeModel.get_value(self.treeView.get_selection().get_selected()[1], 3)
         pathStem = os.path.basename(path).split(".")[0]
         diffProgram = guiutils.guiConfig.getCompositeValue("diff_program", pathStem)
-        revOptions = self.getExtraArgs()
-        graphDiffArgs = vcs.getGraphicalDiffArgs(diffProgram)
         try:
-            if not graphDiffArgs[0] == diffProgram:
-                subprocess.call([ diffProgram, "--help" ], stderr=open(os.devnull, "w"), stdout=open(os.devnull, "w"))
-            cmdArgs = graphDiffArgs + revOptions + [ path ]
-            guiplugins.processMonitor.startProcess(cmdArgs, description="Graphical " + vcs.name + " diff for file " + path,
-                                                   exitHandler = self.diffingComplete,
-                                                   stderr=open(os.devnull, "w"), stdout=open(os.devnull, "w"))
+            cmdArgs, exitHandlerArgs = self.getGraphicalDiffProgramArgs(diffProgram, path)
+            if not cmdArgs:
+                return # already shown error
+            vcs.startGUIProcess(cmdArgs, description="Graphical " + vcs.name + " diff for file " + path,
+                                exitHandler = self.diffingComplete, exitHandlerArgs=exitHandlerArgs,
+                                stderr=open(os.devnull, "w"), stdout=open(os.devnull, "w"))
         except OSError:
             self.showErrorDialog("\nCannot find graphical " + vcs.name + " difference program '" + diffProgram + \
                                      "'.\nPlease install it somewhere on your $PATH.\n")
-    
+            
+    def getGraphicalDiffProgramArgs(self, diffProgram, path):
+        revOptions = self.getExtraArgs()
+        graphDiffArgs = vcs.getGraphicalDiffArgs(diffProgram)
+        if not graphDiffArgs[0] == diffProgram:
+            # In order to get the correct error message if it doesn't exist
+            subprocess.call([ diffProgram, "--help" ], stderr=open(os.devnull, "w"), stdout=open(os.devnull, "w"))
+        return graphDiffArgs + revOptions + [ path ], ()
+        
     def diffingComplete(self, *args):
         self.applicationEvent("the version-control graphical diff program to terminate")
                                 
@@ -429,27 +454,29 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         self.extraButtonArea.pack_start(button, expand=False, fill=False)        
 
     def addDiffWidget(self):
-        diffButton = gtk.Button("_Differences")
         label1 = gtk.Label(" between revisions ")
         label2 = gtk.Label(" and ")
-        self.revision1 = gtk.Entry()
-        self.revision1.set_name("Revision 1")
-        entrycompletion.manager.register(self.revision1)
-        self.revision1.set_text(vcs.latestRevisionName)
-        self.revision2 = gtk.Entry()
-        self.revision2.set_name("Revision 2")
-        entrycompletion.manager.register(self.revision2)
-        self.revision1.set_alignment(1.0)
-        self.revision2.set_alignment(1.0)
-        self.revision1.set_width_chars(6)
-        self.revision2.set_width_chars(6)
-        self.extraButtonArea.pack_start(diffButton, expand=False, fill=False)
+        self.revisionEntry1 = gtk.Entry()
+        self.revisionEntry1.set_name("Revision 1")
+        entrycompletion.manager.register(self.revisionEntry1)
+        self.revisionEntry1.set_text(vcs.latestRevisionName)
+        self.revisionEntry2 = gtk.Entry()
+        self.revisionEntry2.set_name("Revision 2")
+        entrycompletion.manager.register(self.revisionEntry2)
+        self.revisionEntry1.set_alignment(1.0)
+        self.revisionEntry2.set_alignment(1.0)
+        self.revisionEntry1.set_width_chars(6)
+        self.revisionEntry2.set_width_chars(6)
+        for diffClass in basicDiffClasses:
+            diffObj = diffClass()
+            diffButton = gtk.Button(diffObj._getTitle() + "s")
+            diffButton.connect("clicked", self.viewDiffs, diffObj)
+            self.extraButtonArea.pack_start(diffButton, expand=False, fill=False)
         self.extraWidgetArea.pack_start(label1, expand=False, fill=False)
-        self.extraWidgetArea.pack_start(self.revision1, expand=False, fill=False)
+        self.extraWidgetArea.pack_start(self.revisionEntry1, expand=False, fill=False)
         self.extraWidgetArea.pack_start(label2, expand=False, fill=False)
-        self.extraWidgetArea.pack_start(self.revision2, expand=False, fill=False)
-        diffButton.connect("clicked", self.viewDiffs)
-
+        self.extraWidgetArea.pack_start(self.revisionEntry2, expand=False, fill=False)
+        
     def addGraphicalDiffWidget(self):
         button = gtk.Button("_Graphical Diffs")
         button.connect("clicked", self.viewGraphicalDiff)
@@ -626,19 +653,16 @@ class LogGUI(VersionControlDialogGUI):
         return stringDiff     
 
 
-class DiffGUI(VersionControlDialogGUI):
+class GenericDiffGUI(VersionControlDialogGUI):
     def __init__(self, *args):
         VersionControlDialogGUI.__init__(self, *args)
-        self.cmdName = "diff"
         self.revision1 = ""
         self.revision2 = ""
+        
     def setRevisions(self, rev1, rev2):
         self.revision1 = rev1
         self.revision2 = rev2
-    def _getTitle(self):
-        return "_Difference"
-    def getResultTitle(self):
-        return "differences"
+    
     def getResultDialogMessage(self):
         if len(self.pages) == 0:
             return "All files are up-to-date and unmodified compared to the latest repository version."
@@ -646,15 +670,11 @@ class DiffGUI(VersionControlDialogGUI):
             return VersionControlDialogGUI.getResultDialogMessage(self)
 
     def getFullResultTitle(self):
-        return "differences " + self.getRevisionMessage()
+        return self.getResultTitle() + " " + self.getRevisionMessage()
+
     def showWarning(self):
         return len(self.pages) > 0
-    def commandHadError(self, retcode, stderr):
-        # Diff returns an error code for differences, not just for errors
-        return retcode and len(stderr) > 0
-    def outputIsInteresting(self, stdout):
-        # Don't show diffs if they're empty
-        return len(stdout) > 0
+    
     def getRevisionMessage(self):
         if self.revision1 == "" and self.revision2 == "":
             return "compared to the latest revision"
@@ -665,20 +685,115 @@ class DiffGUI(VersionControlDialogGUI):
         else:
             return "between revisions " + self.revision1 + " and " + self.revision2
 
-    def getExtraArgs(self):
-        if self.revision1 and self.revision2:
-            return vcs.getCombinedRevisionOptions(self.revision1, self.revision2)
-        elif self.revision1:
-            return [ "-r", self.revision1 ]
-        elif self.revision2:
-            return [ "-r", self.revision2 ]
-        else:
-            return []
-
     def extraResultDialogWidgets(self):
-        return VersionControlDialogGUI.extraResultDialogWidgets(self) + ["graphical_diff"]
+        return VersionControlDialogGUI.extraResultDialogWidgets(self, "diff") + [ "graphical_diff" ]
 
+
+class DiffGUI(GenericDiffGUI):
+    def __init__(self, *args):
+        GenericDiffGUI.__init__(self, *args)
+        self.cmdName = "diff"
+
+    def _getTitle(self):
+        return "_Difference"
+    
+    def getResultTitle(self):
+        return "differences"
+    
+    def getExtraArgs(self):
+        return vcs.getRevisionOptions(self.revision1, self.revision2)
+    
+    def commandHadError(self, retcode, stderr, *args):
+        # Diff returns an error code for differences, not just for errors
+        return retcode and len(stderr) > 0
+    
+    def outputIsInteresting(self, stdout):
+        # Don't show diffs if they're empty
+        return len(stdout) > 0
+    
+
+class FilteredDiffGUI(GenericDiffGUI):
+    def __init__(self, *args):
+        GenericDiffGUI.__init__(self, *args)
+        self.cmdName = "cat"
+    
+    def _getTitle(self):
+        return "_Filtered Difference"
+    
+    def getResultTitle(self):
+        return "filtered differences"
+    
+    def getTmpFileArgs(self, fileName, revision):
+        extraArgs = vcs.getSingleRevisionOptions(revision) if revision else []
+        extraArgs.append(fileName)
+        return extraArgs
+
+    def makeTmpFile(self, fileName, revision, tmpDir):
+        extraArgs = self.getTmpFileArgs(fileName, revision)
+        args = vcs.getCmdArgs(self.cmdName, extraArgs)
+        retcode, stdout, stderr = vcs.getProcessResults(args)
+        if self.commandHadError(retcode, stderr, stdout):
+            return None, stderr
         
+        return self.writeTmpFile(stdout, tmpDir, os.path.basename(fileName)), None
+        
+    def writeTmpFile(self, text, tmpDir, fileName):
+        path = os.path.join(tmpDir, fileName)
+        with open(path, "w") as f:
+            f.write(text)
+        return path
+        
+    def runAndParse(self):
+        self.notInRepository = False
+        self.needsAttention = False
+        for test, fileArg in self.getFilesForCmd():
+            diffProgram = test.getConfigValue("text_diff_program")
+            tmpDir = tempfile.mkdtemp()
+            for fileName in vcs.getFileNamesForCmd("diff", fileArg, self.recursive):
+                args, errors = self.getDiffProgramArgs(diffProgram, fileName, test, tmpDir)
+                if errors:
+                    self.storeResult(fileName, errors, test)
+                    continue
+                proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                output = proc.communicate()[0]
+                self.storeResult(fileName, output, test)
+            shutil.rmtree(tmpDir)
+    
+    def getDiffProgramArgs(self, diffProgram, fileName, test, tmpDir):
+        dir1 = os.path.join(tmpDir, "revision" + self.revision1 if self.revision1 else vcs.name)
+        if not os.path.isdir(dir1):
+            os.mkdir(dir1)
+        file1, errors = self.makeTmpFile(fileName, self.revision1, dir1)
+        if errors:
+            return None, errors
+        
+        dir2 = os.path.join(tmpDir, "revision" + self.revision2 if self.revision2 else "local")
+        if not os.path.isdir(dir2):
+            os.mkdir(dir2)
+        if self.revision2:
+            file2, errors = self.makeTmpFile(fileName, self.revision2, dir2)
+            if errors:
+                return None, errors
+        else:
+            file2 = fileName
+        filterName = os.path.basename(fileName) + "(FILTERED)"
+        filteredFile1 = self.writeTmpFile(test.app.applyFiltering(test, file1), dir1, filterName)
+        filteredFile2 = self.writeTmpFile(test.app.applyFiltering(test, file2), dir2, filterName)
+        return [ diffProgram, filteredFile1, filteredFile2 ], None
+            
+    def getGraphicalDiffProgramArgs(self, diffProgram, path):
+        test = self.fileToTest[path]
+        tmpDir = tempfile.mkdtemp()
+        args, errors = self.getDiffProgramArgs(diffProgram, path, test, tmpDir)
+        if errors:
+            self.showErrorDialog("\nCannot show graphical differences. Could not find given files or revisions.\n")
+        return args, (tmpDir,)
+    
+    def diffingComplete(self, tmpDir):
+        GenericDiffGUI.diffingComplete(self, tmpDir)
+        shutil.rmtree(tmpDir)
+
+                
 class StatusGUI(VersionControlDialogGUI):
     def __init__(self, *args):
         VersionControlDialogGUI.__init__(self, *args)
@@ -818,7 +933,7 @@ class AddGUI(VersionControlDialogGUI):
         if not self.recursive:
             message += "\nSubdirectories were ignored, use " + self.getTitle() + " Recursive to add the files from all subdirectories."
         return message
-    def commandHadError(self, retcode, stderr):
+    def commandHadError(self, retcode, stderr, *args):
         # Particularly CVS likes to write add output on stderr for some reason...
         return len(stderr) > 0
 
@@ -880,6 +995,9 @@ class LogGUIRecursive(LogGUI):
 class DiffGUIRecursive(DiffGUI):
     recursive = True
 
+class FilteredDiffGUIRecursive(FilteredDiffGUI):
+    recursive = True
+
 class StatusGUIRecursive(StatusGUI):
     recursive = True
         
@@ -894,10 +1012,10 @@ class AddGUIRecursive(AddGUI):
 #
 class InteractiveActionConfig(guiplugins.InteractiveActionConfig):
     def __init__(self, controlDir):
-        global vcs, annotateClass, diffClass
+        global vcs, annotateClass, basicDiffClasses
         vcs = vcsClass(controlDir)
         annotateClass = self.annotateClasses()[0]
-        diffClass = self.diffClasses()[0]
+        basicDiffClasses = filter(lambda c: not c.recursive, self.diffClasses())
 
     def getMenuNames(self):
         return [ vcs.name ]
@@ -910,7 +1028,7 @@ class InteractiveActionConfig(guiplugins.InteractiveActionConfig):
         return [ AnnotateGUI, AnnotateGUIRecursive ]
 
     def diffClasses(self):
-        return [ DiffGUI, DiffGUIRecursive ]
+        return [ DiffGUI, DiffGUIRecursive, FilteredDiffGUI, FilteredDiffGUIRecursive ]
 
     def getRenameTestClass(self):
         return RenameTest

@@ -522,10 +522,17 @@ class Config:
         filterAction = rundependent.FilterErrorText()
         return filterAction.getFilteredText(app, errFile, app)
 
-    def applyFiltering(self, test, fileName, version):
+    def getFileNameVersion(self, test, fileName):
+        fileVersions = set(os.path.basename(fileName).split(".")[1:])
+        testVersions = set(test.app.versions + [ test.app.name ])
+        additionalVersions = fileVersions.difference(testVersions)
+        return ".".join(additionalVersions)
+
+    def applyFiltering(self, test, fileName):
+        version = self.getFileNameVersion(test, fileName)
         app = test.getAppForVersion(version)
         filterAction = rundependent.FilterAction()
-        return filterAction.getFilteredText(test, fileName, app)        
+        return filterAction.getFilteredText(test, fileName, app)
 
     def getTestProcessor(self):        
         catalogueCreator = self.getCatalogueCreator()

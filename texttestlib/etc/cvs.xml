@@ -10,6 +10,8 @@
         <separator/>
         <menuitem action="CVS Difference"/>
         <menuitem action="CVS Difference Recursive"/>
+        <menuitem action="CVS Filtered Difference"/>
+        <menuitem action="CVS Filtered Difference Recursive"/>
         <separator/>
         <menuitem action="CVS Status"/>
         <menuitem action="CVS Status Recursive"/>
@@ -34,6 +36,8 @@
       <separator/>
       <menuitem action="CVS Difference"/>
       <menuitem action="CVS Difference Recursive"/>
+      <menuitem action="CVS Filtered Difference"/>
+      <menuitem action="CVS Filtered Difference Recursive"/>
       <separator/>
       <menuitem action="CVS Status"/>
       <menuitem action="CVS Status Recursive"/>
@@ -56,6 +60,8 @@
       <separator/>
       <menuitem action="CVS Difference"/>
       <menuitem action="CVS Difference Recursive"/>
+      <menuitem action="CVS Filtered Difference"/>
+      <menuitem action="CVS Filtered Difference Recursive"/>
       <separator/>
       <menuitem action="CVS Status"/>
       <menuitem action="CVS Status Recursive"/>

@@ -457,11 +457,12 @@ class TopWindowGUI(guiutils.ContainerGUI):
         return appsWithVersions
         
     def getIcon(self):
-        imageDir = plugins.installationDir("images")
+        imageDir, retro = guiutils.getImageDir()
+        imageType = "jpg" if retro else "png"
         if self.dynamic:
-            return os.path.join(imageDir, "texttest-icon-dynamic.png")
+            return os.path.join(imageDir, "texttest-icon-dynamic." + imageType)
         else:
-            return os.path.join(imageDir, "texttest-icon-static.png")
+            return os.path.join(imageDir, "texttest-icon-static." + imageType)
 
     def forceQuit(self):
         self.exitStatus |= self.COMPLETION_NOTIFIED

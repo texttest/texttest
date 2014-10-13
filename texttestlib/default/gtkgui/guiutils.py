@@ -75,6 +75,12 @@ utf8Converter = Utf8Converter()
 def convertToUtf8(*args): # gtk.TextViews insist we do the conversion ourselves
     return utf8Converter.convert(*args)
 
+def getImageDir():
+    retro = guiConfig.getValue("retro_icons")
+    currImageDir = plugins.installationDir("images")
+    retroDir = os.path.join(currImageDir, "retro")
+    return (retroDir, True) if retro != 0 else (currImageDir, False)
+
 class RefreshTips:
     def __init__(self, name, refreshCell, refreshColumn, refreshIndex):
         self.name = name
@@ -167,6 +173,7 @@ class GUIConfig:
         self.setConfigDefault("gui_entry_completion_inline", 0, "Automatically inline common completion prefix in entry.")
         self.setConfigDefault("gui_entry_completions", { "default" : [] }, "Add these completions to the entry completion lists initially")
         self.setConfigDefault("sort_test_suites_recursively", 1, "Sort subsuites when sorting test suites")
+        self.setConfigDefault("retro_icons", 0, "Use the old TextTest icons in the dynamic and static GUIs")
         
     def setConfigDefault(self, key, value, docString):
         self.configDir[key] = value

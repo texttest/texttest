@@ -284,7 +284,7 @@ Installing StoryText for Java GUIs requires Java Runtime Environment (JRE) to be
 Function initialize
   Call setup
   File "${VIRTUALENV_DIST}"
-  File "texttest-icon-dynamic.ico"
+  File "texttest-icon.ico"
   CreateDirectory "$INSTDIR"
   writeUninstaller "$INSTDIR\Uninstall.exe"
   Call copyVirtualEnvFiles
@@ -492,9 +492,9 @@ Functionend
 
 Function makeShortcuts
   CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
-  CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\Scripts\pythonw.exe" "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\Scripts\texttest.pyw" "$OUTDIR\texttest-icon-dynamic.ico" ""
+  CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\Scripts\pythonw.exe" "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\Scripts\texttest.pyw" "$OUTDIR\texttest-icon.ico" ""
   CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
-  CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\Scripts\pythonw.exe" "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\Scripts\texttest.pyw" "$OUTDIR\texttest-icon-dynamic.ico" ""
+  CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\Scripts\pythonw.exe" "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\Scripts\texttest.pyw" "$OUTDIR\texttest-icon.ico" ""
   !ifdef JEPPESEN
     CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\StoryTextUpdater.lnk" "cmd.exe" "/K $INSTDIR\storytext_updater.bat"
     CreateShortcut "$DESKTOP\StoryTextUpdater.lnk" "cmd.exe" "/K $INSTDIR\storytext_updater.bat"

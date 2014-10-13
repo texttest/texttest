@@ -1,7 +1,7 @@
 
 import gtk, gobject, os, sys, glob
 from texttestlib import plugins, texttest_version
-from .. import guiplugins
+from .. import guiplugins, guiutils
 from types import StringType
 
 # Show useful info about TextTest.
@@ -38,7 +38,9 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         guiplugins.ActionResultDialogGUI.createButtons(self)
         
     def addContents(self):
-        logoFile = os.path.join(plugins.installationDir("images"), "texttest-logo.png")
+        imageDir, retro = guiutils.getImageDir()
+        imageType = "gif" if retro else "png"
+        logoFile = os.path.join(imageDir, "texttest-logo." + imageType)
         logoPixbuf = gtk.gdk.pixbuf_new_from_file(logoFile)
         logo = gtk.Image()
         logo.set_from_pixbuf(logoPixbuf)

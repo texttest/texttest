@@ -47,7 +47,7 @@ packages = ["texttestlib", "texttestlib.default", "texttestlib.queuesystem",
             "texttestlib.default.gtkgui.default_gui", "texttestlib.default.gtkgui.version_control"]
 
 package_data = {"texttestlib" : ["doc/ChangeLog", "doc/quick_start.txt", "doc/CREDITS.txt", "doc/MigrationNotes*", "doc/LICENSE.txt", 
-                                 "etc/*", "etc/.*", "libexec/*", "log/*", "images/*" ], 
+                                 "etc/*", "etc/.*", "libexec/*", "log/*", "images/*", "images/retro/*" ], 
                 "texttestlib.default.batch":["testoverview_javascript/*"]}
 scripts = ["bin/texttest", "bin/filter_rundependent.py", "bin/filter_fpdiff.py" ]
 if os.name == "posix":

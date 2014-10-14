@@ -2648,8 +2648,13 @@ Dynamic GUI Enhancements:
     - Default colour for known bugs is now orange, as in HTML reports
 	"Marked" default colour changes to light blue accordingly
 General GUI Enhancements:
+    - All test categories except Failed are now invisible by default. New config entry 'show_test_category' to configure this.
+    - The old 'auto_collapse_successful' functionality is removed as no longer necessary.
+    - Reenable the old texttest icons by adding the config entry 'retro_icons:1' to personal config file
 Framework Enhancements:
 Version Control Browser Enhancements:
+    - Added new feature "Difference with Filter" for all supported VCS
 Batch Report Enhancements:
 Grid Engine enhancements/bug fixes:
 Bug Fixes:
+    - Filter behaviour is now consistent with View/Show All

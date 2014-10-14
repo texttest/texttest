@@ -1,0 +1,21 @@
+=========================================================
+COMPULSORY MIGRATION
+=========================================================
+
+(1) auto_collapse_successful config file entry is no longer used
+================================================================
+You should just remove it
+
+========================================================
+CHANGE IN ENVIRONMENT
+========================================================
+
+
+=========================================================
+CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
+=========================================================
+
+
+(1) All test categories except Failed are now invisible by default
+==================================================================
+You should use 'show_test_category' to unhide categories. 'hide_test_category' would now only be used for hiding Failed category.

@@ -893,6 +893,9 @@ class SlaveRequestHandler(StreamRequestHandler):
         if identifier == "TERMINATE_SERVER":
             return
 
+        self.handleMessage(identifier)
+        
+    def handleMessage(self, identifier):
         # Don't use port, it changes all the time
         identifier, sendFiles, getFiles, tryReuse, rerun = parseIdentifier(identifier)
         testString = self.rfile.readline().strip()

@@ -9,6 +9,7 @@ from texttestlib import plugins
 from texttestlib.default.runtest import RunTest
 from texttestlib.default.sandbox import FindExecutionHosts, MachineInfoFinder
 from texttestlib.default.actionrunner import ActionRunner
+from texttestlib.utils import getUserName
 from cPickle import dumps
 
 def importAndCallFromQueueSystem(app, *args):
@@ -54,57 +55,26 @@ class RedirectLogResponder(plugins.Responder):
                 handler.setFormatter(formatter)
                 plugins.log.addHandler(handler)
 
-class FileTransferResponder(plugins.Responder):
-    def __init__(self, optionMap, *args):
-        plugins.Responder.__init__(self)
-        self.destination = optionMap.get("slavefilesynch")
-        self.transferAll = optionMap.get("keepslave") or optionMap.get("keeptmp")
-
-    def notifyLifecycleChange(self, test, state, changeDesc):
-        if self.destination and changeDesc == "complete" and (self.transferAll or not test.state.hasSucceeded()):
-            plugins.log.info(test.getIndent() + "Transferring files for " + repr(test) + " to " + self.destination)
-            self.copyRemotelyWithRetry(test, test.writeDirectory, "localhost", os.path.dirname(test.writeDirectory), self.destination, ignoreLinks=True)
-
-    def copyRemotelyWithRetry(self, test, *args, **kw):
-        sleepTime = 1
-        errorCode = None
-        for attempt in range(1, 21):
-            errorCode = test.app.copyFileRemotely(*args, **kw)
-            if errorCode:
-                plugins.log.info(test.getIndent() + "File transfer operation failed with error code " + str(errorCode)+ " - waiting " +
-                                str(sleepTime) + " seconds and then trying again.")
-                time.sleep(sleepTime)
-                if sleepTime < 9 and attempt % 2 == 0:
-                    sleepTime *= 2
-            else:
-                if attempt > 1:
-                    plugins.log.info(test.getIndent() + "File transfer operation succeeded on attempt " + str(attempt))
-                return
-        # We wait 3.7 minutes in the worst case, see TTT-3531 and ITS-955
-        sys.stderr.write("ERROR: File transfer operation failed with error code " + str(errorCode) + "\n")
-
-    def notifyRequiredTestData(self, test, paths):
-        if self.destination:
-            for path in paths:
-                plugins.log.info(test.getIndent() + "Fetching required test data at " + repr(path) + " from " + self.destination)
-                self.copyRemotelyWithRetry(test, path, self.destination, os.path.dirname(path), "localhost")
-
 
 class SocketResponder(plugins.Responder,plugins.Observable):
+    synchFiles = False
     def __init__(self, optionMap, *args):
         plugins.Responder.__init__(self)
         plugins.Observable.__init__(self)
         self.killed = False
+        self.transferAll = optionMap.get("keepslave") or optionMap.get("keeptmp")
         self.testsForRerun = []
         self.serverAddress = self.getServerAddress(optionMap)
+    
     def getServerAddress(self, optionMap):
         servAddrStr = optionMap.get("servaddr", os.getenv("CAPTUREMOCK_SERVER"))
         if not servAddrStr:
             raise plugins.TextTestError, "Cannot run slave, no server address has been provided to send results to!"
         host, port = servAddrStr.split(":")
         return host, int(port)
+    
     def connect(self, sendSocket):
-        for i in range(5):
+        for _ in range(5):
             try:
                 sendSocket.connect(self.serverAddress)
                 return True
@@ -121,14 +91,12 @@ class SocketResponder(plugins.Responder,plugins.Observable):
     def notifyKillProcesses(self, *args):
         self.killed = True
 
-    def getProcessIdentifier(self, test):
+    def getProcessIdentifier(self, test, sendFiles):
         identifier = str(os.getpid())
-        if self.killed:
-            identifier += ".NO_REUSE"
-        if test in self.testsForRerun:
+        rerun = test in self.testsForRerun
+        if rerun:
             self.testsForRerun.remove(test)
-            identifier += ".RERUN_TEST"
-        return identifier
+        return makeIdentifierLine(identifier, sendFiles, False, self.killed, rerun)
 
     def notifyRerun(self, test):
         self.testsForRerun.append(test)
@@ -136,15 +104,22 @@ class SocketResponder(plugins.Responder,plugins.Observable):
     def notifyLifecycleChange(self, test, state, changeDesc):
         testData = socketSerialise(test)
         pickleData = dumps(state)
-        fullData = self.getProcessIdentifier(test) + os.linesep + testData + os.linesep + pickleData
+        sendFiles = self.synchFiles and changeDesc == "complete" and (self.transferAll or not test.state.hasSucceeded())
+        fullData = self.getProcessIdentifier(test, sendFiles) + os.linesep + testData + os.linesep
+        if sendFiles:
+            fullData += directorySerialise(test.writeDirectory) + os.linesep
+        fullData += pickleData
+        return self.sendAndInterpret(fullData, self.interpretResponse, state)
+        
+    def sendAndInterpret(self, fullData, responseMethod, *args):
         sleepTime = 1
-        for i in range(9):
+        for _ in range(9):
             sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             if not self.connect(sendSocket):
                 return self.notify("NoMoreExtraTests")
             try:
                 response = self.sendData(sendSocket, fullData)
-                return self.interpretResponse(state, response)
+                return responseMethod(response, *args) if responseMethod else True
             except socket.error, e:
                 plugins.log.info("Failed to communicate with master process - waiting " +
                                  str(sleepTime) + " seconds and then trying again.")
@@ -164,13 +139,21 @@ class SocketResponder(plugins.Responder,plugins.Observable):
         sendSocket.close()
         return response
 
-    def interpretResponse(self, state, response):
+    def interpretResponse(self, response, state):
         if len(response) > 0:
             appDesc, testPath = socketParse(response)
             appParts = appDesc.split(".")
             self.notify("ExtraTest", testPath, appParts[0], appParts[1:])
         elif state.isComplete():
             self.notify("NoMoreExtraTests")
+            
+    def notifyRequiredTestData(self, test, paths):
+        if self.synchFiles:
+            for path in paths:
+                plugins.log.info(test.getIndent() + "Fetching required test data at " + repr(path) + " ...")
+            data = makeIdentifierLine(str(os.getpid()), getFiles=True) + "\n" + socketSerialise(test) + "\n" + \
+                getUserName() + "@" + getIPAddress() + "\n" + "\n".join(paths)
+            self.sendAndInterpret(data, None) # Just wait, no response to interpret
 
 
 class SlaveActionRunner(ActionRunner):

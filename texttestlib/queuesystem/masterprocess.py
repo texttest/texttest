@@ -888,68 +888,70 @@ class TestSubmissionRules(SubmissionRules):
 
 
 class SlaveRequestHandler(StreamRequestHandler):
-    noReusePostfix = ".NO_REUSE"
-    rerunPostfix = ".RERUN_TEST"
     def handle(self):
         identifier = self.rfile.readline().strip()
         if identifier == "TERMINATE_SERVER":
             return
-        clientHost = self.client_address[0]
+
         # Don't use port, it changes all the time
-        self.handleRequestFromHost(self.getHostName(clientHost), identifier)
+        identifier, sendFiles, getFiles, tryReuse, rerun = parseIdentifier(identifier)
+        testString = self.rfile.readline().strip()
+        test = self.server.getTest(testString)    
+        if test is None:
+            clientHost = self.client_address[0]
+            sys.stderr.write("WARNING: Received request from hostname " + self.getHostName(clientHost) +
+                             " (process " + identifier + ")\nwhich could not be parsed:\n'" + testString + "'\n")
+            self.connection.shutdown(socket.SHUT_RDWR)
+        elif getFiles:
+            self.pushFiles(test)
+        elif not test.state.isComplete() or not test.state.hasResults(): # we might have killed it already...
+            if sendFiles:
+                directoryUnserialise(test.writeDirectory, self.rfile)
+            # Don't use port, it changes all the time
+            self.handleRequestFromHost(test, identifier, tryReuse, rerun)
+        else:
+            self.server.diag.info("Test " + test.uniqueName + " already complete, ignoring new results")
 
     def getHostName(self, ipAddress):
         try:
             return socket.gethostbyaddr(ipAddress)[0].split(".")[0]
         except socket.error:
             return ipAddress
-
-    def parseIdentifier(self, identifier):
-        rerun = identifier.endswith(self.rerunPostfix)
-        if rerun:
-            identifier = identifier.replace(self.rerunPostfix, "")
-            
-        tryReuse = not identifier.endswith(self.noReusePostfix)
-        if not tryReuse:
-            identifier = identifier.replace(self.noReusePostfix, "")
-
-        return identifier, tryReuse, rerun
         
-    def handleRequestFromHost(self, hostname, identifier):
-        testString = self.rfile.readline().strip()
-        test = self.server.getTest(testString)
-        identifier, tryReuse, rerun = self.parseIdentifier(identifier)
-        if test is None:
-            sys.stderr.write("WARNING: Received request from hostname " + hostname +
-                             " (process " + identifier + ")\nwhich could not be parsed:\n'" + testString + "'\n")
-            self.connection.shutdown(socket.SHUT_RDWR)
-        elif not test.state.isComplete() or not test.state.hasResults(): # we might have killed it already...
-            oldBt = test.state.briefText
-            # The updates are only for testing against old slave traffic,
-            # a bit sad we can't disable them when not testing...
-            _, state = test.getNewState(self.rfile, updatePaths=True)
-            if test.state.isComplete():
-                state.lifecycleChange = "recalculated"
-            self.server.diag.info("Changed from '" + oldBt + "' to '" + state.briefText + "'")    
-            if rerun:
-                self.server.diag.info("Instructed to rerun test " + test.uniqueName)
-                QueueSystemServer.instance.queueTestForRerun(test)
-            else:
-                self.server.changeState(test, state)
-            try:
-                self.connection.shutdown(socket.SHUT_RD)
-            except socket.error:
-                # This only occurs on a mac, and doesn't affect functionality.
-                pass
-            if state.isComplete():
-                newTest = QueueSystemServer.instance.getTestForReuse(test, state, tryReuse)
-                if newTest:
-                    self.wfile.write(socketSerialise(newTest))
-            else:
-                QueueSystemServer.instance.setRemoteProcessId(test, identifier)
-            self.connection.shutdown(socket.SHUT_WR)
+    def pushFiles(self, test):
+        userAndHost = self.rfile.readline().strip()
+        paths = []
+        for line in self.rfile:
+            paths.append(line.strip())
+        self.server.pushFiles(test, userAndHost, paths)
+        self.connection.shutdown(socket.SHUT_RDWR)
+        
+    def handleRequestFromHost(self, test, pid, tryReuse, rerun):
+        oldBt = test.state.briefText
+        # The updates are only for testing against old slave traffic,
+        # a bit sad we can't disable them when not testing...
+        _, state = test.getNewState(self.rfile, updatePaths=True)
+        if test.state.isComplete():
+            state.lifecycleChange = "recalculated"
+        self.server.diag.info("Changed from '" + oldBt + "' to '" + state.briefText + "'")    
+        if rerun:
+            self.server.diag.info("Instructed to rerun test " + test.uniqueName)
+            QueueSystemServer.instance.queueTestForRerun(test)
         else:
-            self.server.diag.info("Test " + test.uniqueName + " already complete, ignoring new results")
+            self.server.changeState(test, state)
+        try:
+            self.connection.shutdown(socket.SHUT_RD)
+        except socket.error:
+            # This only occurs on a mac, and doesn't affect functionality.
+            pass
+        if state.isComplete():
+            newTest = QueueSystemServer.instance.getTestForReuse(test, state, tryReuse)
+            if newTest:
+                self.wfile.write(socketSerialise(newTest))
+        else:
+            QueueSystemServer.instance.setRemoteProcessId(test, pid)
+        self.connection.shutdown(socket.SHUT_WR)
+        
             
 
 class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
@@ -958,9 +960,11 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
     request_queue_size = socket.SOMAXCONN    
     def __init__(self, *args):
         plugins.Responder.__init__(self, *args)
-        ThreadingTCPServer.__init__(self, (self.getIPAddress(), 0), self.handlerClass())
+        ThreadingTCPServer.__init__(self, (getIPAddress(), 0), self.handlerClass())
         self.testMap = {}
         self.testLocks = {}
+        self.filePushLock = Lock()
+        self.filePushProcesses = {}
         self.diag = logging.getLogger("Slave Server")
         self.terminate = False
         
@@ -971,19 +975,6 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
         # We give up after 5 minutes
         if hasattr(socket, "TCP_KEEPIDLE"):
             self.socket.setsockopt(socket.SOL_TCP, socket.TCP_KEEPIDLE, 300)
-
-    def getIPAddress(self):
-        # Seems to be no good portable way to get the IP address in a portable way
-        # See e.g. http://stackoverflow.com/questions/166506/finding-local-ip-addresses-using-pythons-stdlib
-        # These two methods seem to be the only vaguely portable ones
-        try:
-            # Doesn't always work, sometimes not available
-            return socket.gethostbyname(socket.gethostname())
-        except socket.error:
-            # Relies on being online, but seems there is no other way...
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(('8.8.8.8', 0)) # Google's DNS server. Should always be there :)
-            return s.getsockname()[0]
     
     def addSuites(self, *args):
         # use this as an opportunity to broadcast our address
@@ -1059,7 +1050,28 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
             return self.testMap[appName][testPath]
         except ValueError:
             return
-            
+        
+    def getFilePushProcess(self, test, userAndHost, path):
+        key = userAndHost, path
+        with self.filePushLock:
+            if key in self.filePushProcesses:
+                return self.filePushProcesses[key], False
+            else:   
+                proc = test.app.getRemoteCopyFileProcess(path, "localhost", path, userAndHost)
+                self.filePushProcesses[key] = proc
+                return proc, True
+        
+    def pushFiles(self, test, userAndHost, paths):
+        for path in paths:
+            proc, started = self.getFilePushProcess(test, userAndHost, path)
+            if started:
+                proc.wait()
+                # Aim for synchronising tests properly
+                QueueSystemServer.instance.sendServerState("Sychronised " + path + " to " + userAndHost)
+            else:
+                while proc.poll() is None:
+                    time.sleep(0.1)
+
 
 class MasterTextResponder(TextDisplayResponder):
     def getPrefix(self, test):

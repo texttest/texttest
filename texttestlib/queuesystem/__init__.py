@@ -17,6 +17,7 @@ class QueueSystemConfig(default.Config):
     def __init__(self, *args):
         default.Config.__init__(self, *args)
         self.useQueueSystem = None
+        self.useCloud = None
 
     def getRunningGroupNames(self, app):
         groups = default.Config.getRunningGroupNames(self, app)
@@ -36,7 +37,7 @@ class QueueSystemConfig(default.Config):
         minTestCount = min((app.getConfigValue("queue_system_min_test_count") for app in apps))
         localQueueSystem = self.useLocalQueueSystem(apps)
         useGrid = all((app.getConfigValue("queue_system_module") not in [ "local", "ec2cloud" ] for app in apps))
-        useCloud = all((app.getConfigValue("queue_system_module") == "ec2cloud" for app in apps))
+        self.useCloud = all((app.getConfigValue("queue_system_module") == "ec2cloud" for app in apps))
         for group in groups:
             if group.name.startswith("Basic"):
                 options = [ "Always", "Never" ]
@@ -64,7 +65,7 @@ class QueueSystemConfig(default.Config):
                 self.addDefaultOption(group, "q", "Request grid queue", possibleValues = self.getPossibleQueues())
                 self.addDefaultSwitch(group, "keepslave", "Keep data files and successful tests until termination")
                 self.addDefaultSwitch(group, "perf", "Run on performance machines only")
-            elif group.name.startswith("Cloud") and useCloud:
+            elif group.name.startswith("Cloud") and self.useCloud:
                 self.addDefaultOption(group, "R", "Request EC2 tag", possibleValues = self.getPossibleResources())
                 self.addDefaultSwitch(group, "perf", "Run on performance machines only")
             elif group.name.startswith("Advanced") and not useGrid:
@@ -74,7 +75,6 @@ class QueueSystemConfig(default.Config):
             elif group.name.startswith("Invisible"):
                 group.addOption("slave", "Private: used to submit slave runs remotely")
                 group.addOption("servaddr", "Private: used to submit slave runs remotely")
-                group.addOption("slavefilesynch", "Private: used to push files from remote slave machine to master")
 
     def getReconnFullOptions(self):
         return default.Config.getReconnFullOptions(self) + [
@@ -159,10 +159,11 @@ class QueueSystemConfig(default.Config):
     def keepTemporaryDirectories(self):
         if self.hasKeeptmpFlag():
             return True
-        if self.slaveOnRemoteSystem():
-            return False
-        if self.slaveRun() and self.optionMap.has_key("keepslave"):
-            return True
+        if self.slaveRun():
+            if self.useCloud:
+                return False
+            elif self.optionMap.has_key("keepslave"):
+                return True
         return default.Config.keepTemporaryDirectories(self)
         
     def cleanPreviousTempDirs(self):
@@ -172,11 +173,8 @@ class QueueSystemConfig(default.Config):
         # Reads the data via a socket, need to set up categories
         return default.Config.readsTestStateFiles(self) or (self.useQueueSystem and not self.slaveRun())
 
-    def slaveOnRemoteSystem(self):
-        return "slavefilesynch" in self.optionMap
-
     def cleanSlaveFiles(self, test):
-        if self.slaveOnRemoteSystem():
+        if self.useCloud:
             # Don't keep anything on a remote system, we've transferred it all back anyhow...
             writeDir = test.getDirectory(temporary=1)
             plugins.rmtree(writeDir)
@@ -227,7 +225,7 @@ class QueueSystemConfig(default.Config):
             # Slaves leave their files for the master process to clean
             for test in suite.testCaseList():
                 self.cleanSlaveFiles(test)
-            if self.slaveOnRemoteSystem():
+            if self.useCloud:
                 self.cleanEmptyDirectories(suite.app.writeDirectory)
         else:
             default.Config._cleanWriteDirectory(self, suite)
@@ -259,8 +257,9 @@ class QueueSystemConfig(default.Config):
             return basicDescription
         
     def getSlaveResponderClasses(self):
-        classes = [ slavejobs.RedirectLogResponder ] if not self.slaveOnRemoteSystem() else []
-        classes += [ slavejobs.FileTransferResponder, slavejobs.SocketResponder, slavejobs.SlaveActionRunner ]
+        classes = [ slavejobs.RedirectLogResponder ] if not self.useCloud else []
+        slavejobs.SocketResponder.synchFiles = self.useCloud
+        classes += [ slavejobs.SocketResponder, slavejobs.SlaveActionRunner ]
         if os.name == "posix" and not self.isActionReplay():
             classes.append(VirtualDisplayResponder)
         classes.append(ApplicationEventResponder)
@@ -352,7 +351,7 @@ class QueueSystemConfig(default.Config):
     def setDependentConfigDefaults(self, app):
         # Cloud doesn't work without a remote copy program
         # which should be rsync or a similar program. Use rsync as default.
-        if (app.getConfigValue("queue_system_module") == "ec2cloud" or self.slaveOnRemoteSystem()) and not app.getConfigValue("remote_copy_program"):
+        if app.getConfigValue("queue_system_module") == "ec2cloud" and not app.getConfigValue("remote_copy_program"):
             app.setConfigDefault("remote_copy_program", "rsync")
         return default.Config.setDependentConfigDefaults(self, app)
 

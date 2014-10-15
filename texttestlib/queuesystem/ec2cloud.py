@@ -135,7 +135,7 @@ class Ec2Machine:
     def getCommandArgsWithEnvironment(self, cmdArgs, slaveEnv):
         return [ envVar + "=" + value for (envVar, value) in slaveEnv.items() ] + cmdArgs
         
-    def submitSlave(self, submitter, cmdArgs, fileArgs, slaveEnv, *args):
+    def submitSlave(self, submitter, cmdArgs, slaveEnv, *args):
         jobId = self.getNextJobId()
         self.remoteProcessInfo[jobId] = None, None
         if not self.thread.isAlive():
@@ -150,7 +150,7 @@ class Ec2Machine:
         
             self.thread.start()
         argsWithEnv = self.getCommandArgsWithEnvironment(cmdArgs, slaveEnv)
-        remoteCmdArgs = self.app.getCommandArgsOn(self.fullMachine, argsWithEnv, agentForwarding=True) + fileArgs
+        remoteCmdArgs = self.app.getCommandArgsOn(self.fullMachine, argsWithEnv, agentForwarding=True)
         self.queue.put((jobId, plugins.Callable(submitter, remoteCmdArgs, slaveEnv, *args)))
         return jobId
     
@@ -197,7 +197,6 @@ class QueueSystem(local.QueueSystem):
         local.QueueSystem.__init__(self)
         self.nextMachineIndex = 0
         self.app = app
-        self.fileArgs = []
         self.subprocessLock = Lock()
         instances, runningIds = self.findInstances()
         synchDirs = self.getDirectoriesForSynch()
@@ -449,10 +448,6 @@ class QueueSystem(local.QueueSystem):
             dirs += self.findVirtualEnvLinkedDirectories(checkout)
         return dirs
             
-    def getArg(self, args, flag):
-        index = args.index(flag)
-        return args[index + 1]
-    
     def getMachine(self, jobId, includeReleased=False):
         machines = self.machines
         if includeReleased:
@@ -501,12 +496,6 @@ class QueueSystem(local.QueueSystem):
         else:
             return True
 
-    def getFileArgs(self, cmdArgs):
-        if not self.fileArgs:
-            ipAddress = self.getArg(cmdArgs, "-servaddr").split(":")[0]
-            self.fileArgs = [ "-slavefilesynch", getUserName() + "@" + ipAddress ]
-        return self.fileArgs
-    
     def synchSlaveCode(self):
         # If we're running our self-diagnostics on the slaves, make sure we copy our local code across and run it as the slaves
         return "xs" in self.app.inputOptions
@@ -523,7 +512,7 @@ class QueueSystem(local.QueueSystem):
     
         machine = self.machines[self.nextMachineIndex]
         submitter = super(QueueSystem, self).submitSlaveJob
-        jobId = machine.submitSlave(submitter, cmdArgs, self.getFileArgs(cmdArgs), *args)
+        jobId = machine.submitSlave(submitter, cmdArgs, *args)
         if jobId is None:
             self.releaseOwnership([ machine ])
             self.machines.remove(machine)

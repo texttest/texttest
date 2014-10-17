@@ -1060,7 +1060,7 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
             if key in self.filePushProcesses:
                 return self.filePushProcesses[key], False
             else:   
-                proc = test.app.getRemoteCopyFileProcess(path, "localhost", path, userAndHost)
+                proc = test.app.getRemoteCopyFileProcess(path, "localhost", os.path.dirname(path), userAndHost)
                 self.filePushProcesses[key] = proc
                 return proc, True
         
@@ -1068,12 +1068,16 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
         for path in paths:
             proc, started = self.getFilePushProcess(test, userAndHost, path)
             if started:
+                self.diag.info("Pushing '" + path + "'...")
                 proc.wait()
+                self.diag.info("Done Pushing '" + path + "'")
                 # Aim for synchronising tests properly
                 QueueSystemServer.instance.sendServerState("Sychronised " + path + " to " + userAndHost)
             else:
+                self.diag.info("Waiting for '" + path + "'...")
                 while proc.poll() is None:
                     time.sleep(0.1)
+                self.diag.info("Done Waiting for '" + path + "'.")
 
 
 class MasterTextResponder(TextDisplayResponder):

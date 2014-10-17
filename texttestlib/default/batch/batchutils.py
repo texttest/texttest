@@ -20,11 +20,11 @@ class BatchVersionFilter:
                 return version
 
 
-def calculateBatchDate():
+def calculateBatchDate(format="%d%b%Y"):
     # Batch mode uses a standardised date that give a consistent answer for night-jobs.
     # Hence midnight is a bad cutover point. The day therefore starts and ends at 8am :)
     timeToUse = plugins.globalStartTime - datetime.timedelta(hours=8)
-    return timeToUse.strftime("%d%b%Y")
+    return timeToUse.strftime(format)
 
 def parseFileName(fileName, diag):
     versionStr = fileName[5:-5]

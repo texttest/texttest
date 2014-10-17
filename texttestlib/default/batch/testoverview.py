@@ -75,8 +75,8 @@ class GenerateWebPages(object):
         pageToGraphs = {}
         for version, repositoryDirInfo in repositoryDirs.items():
             self.diag.info("Generating " + version)
-            allFiles, tags = self.findTestStateFilesAndTags(repositoryDirInfo)
-            if len(allFiles) > 0:
+            stateFiles, successFiles, tags = self.findTestStateFilesAndTags(repositoryDirInfo)
+            if len(stateFiles) > 0 or len(successFiles) > 0:
                 selectors = self.makeSelectors(subPageNames, tags)
                 monthSelectors = SelectorByMonth.makeInstances(tags)
                 allMonthSelectors.update(monthSelectors)
@@ -94,19 +94,29 @@ class GenerateWebPages(object):
 
                 loggedTests = OrderedDict()
                 categoryHandlers = {}
-                self.diag.info("Processing " + str(len(allFiles)) + " teststate files")
+                self.diag.info("Processing " + str(len(stateFiles)) + " teststate files")
                 relevantFiles = 0
-                for stateFile, repository in allFiles:
+                for stateFile, repository in stateFiles:
                     tag = self.getTagFromFile(stateFile)
                     if len(tags) == 0 or tag in tags:
                         relevantFiles += 1
                         testId, state, extraVersion = self.processTestStateFile(stateFile, repository)
                         loggedTests.setdefault(extraVersion, OrderedDict()).setdefault(testId, OrderedDict())[tag] = state
-                        categoryHandlers.setdefault(tag, CategoryHandler()).registerInCategory(testId, state, extraVersion)
+                        categoryHandlers.setdefault(tag, CategoryHandler()).registerInCategory(testId, state.category, extraVersion, state)
                         if relevantFiles % 100 == 0:
                             self.diag.info("- Processed " + str(relevantFiles) + " files with matching tags so far")
                 self.diag.info("Processed " + str(relevantFiles) + " relevant teststate files")
-
+                self.diag.info("Processing " + str(len(successFiles)) + " success files")
+                for successFile, repository in successFiles:
+                    testId = self.getTestIdentifier(successFile, repository)
+                    extraVersion = self.findExtraVersion(repository)
+                    with open(successFile) as f:
+                        for line in f:
+                            tag, text = line.strip().split(" ", 1)
+                            if len(tags) == 0 or tag in tags:
+                                loggedTests.setdefault(extraVersion, OrderedDict()).setdefault(testId, OrderedDict())[tag] = text
+                                categoryHandlers.setdefault(tag, CategoryHandler()).registerInCategory(testId, "success", extraVersion, text)
+                self.diag.info("Processed " + str(len(successFiles)) + " success files")
                 versionToShow = self.removePageVersion(version)
                 hasData = False
                 for sel in selectors:
@@ -205,18 +215,24 @@ class GenerateWebPages(object):
         return os.path.basename(fileName).replace("teststate_", "")
         
     def findTestStateFilesAndTags(self, repositoryDirs):
-        allFiles = []
+        stateFiles, successFiles = [], []
         allTags = set()
         for _, dir in repositoryDirs:
             self.diag.info("Looking for teststate files in " + dir)
             for root, _, files in sorted(os.walk(dir)):
                 for file in files:
                     if file.startswith("teststate_"):
-                        allFiles.append((os.path.join(root, file), dir))
+                        stateFiles.append((os.path.join(root, file), dir))
                         allTags.add(self.getTagFromFile(file))
-        
-            self.diag.info("Found " + str(len(allFiles)) + " teststate files in " + dir)
-        return allFiles, sorted(allTags, self.compareTags)
+                    elif file.startswith("succeeded_"):
+                        path = os.path.join(root, file)
+                        successFiles.append((path, dir))
+                        with open(path) as f:
+                            for line in f:
+                                allTags.add(line.split()[0])
+                                
+            self.diag.info("Found " + str(len(stateFiles)) + " teststate files and " + str(len(successFiles)) + " success files in " + dir)
+        return stateFiles, successFiles, sorted(allTags, self.compareTags)
                           
     def processTestStateFile(self, stateFile, repository):
         state = self.readState(stateFile)
@@ -232,36 +248,40 @@ class GenerateWebPages(object):
                 return version
         return ""
 
-    def findGlobal(self, modName, className):
+    @staticmethod
+    def findGlobal(modName, className):
         try:
             exec "from " + modName + " import " + className + " as _class"
         except ImportError:
             exec "from texttestlib." + modName + " import " + className + " as _class"
         return _class #@UndefinedVariable
         
-    def getNewState(self, file):
+    @classmethod
+    def getNewState(cls, file):
         # Would like to do load(file) here... but it doesn't work with universal line endings, see Python bug 1724366
         from cStringIO import StringIO
         unpickler = Unpickler(StringIO(file.read()))
         # Magic to keep us backward compatible in the face of packages changing...
-        unpickler.find_global = self.findGlobal
+        unpickler.find_global = cls.findGlobal
         return unpickler.load()
         
-    def readState(self, stateFile):
+    @classmethod
+    def readState(cls, stateFile):
         file = open(stateFile, "rU")
         try:
-            state = self.getNewState(file)
+            state = cls.getNewState(file)
             if isinstance(state, plugins.TestState):
                 return state
             else:
-                return self.readErrorState("Incorrect type for state object.")
+                return cls.readErrorState("Incorrect type for state object.")
         except (UnpicklingError, ImportError, EOFError, AttributeError), e:
             if os.path.getsize(stateFile) > 0:
-                return self.readErrorState("Stack info follows:\n" + str(e))
+                return cls.readErrorState("Stack info follows:\n" + str(e))
             else:
                 return plugins.Unrunnable("Results file was empty, probably the disk it resides on is full.", "Disk full?")
 
-    def readErrorState(self, errMsg):
+    @staticmethod
+    def readErrorState(errMsg):
         freeText = "Failed to read results file, possibly deprecated format. " + errMsg
         return plugins.Unrunnable(freeText, "read error")
 
@@ -569,12 +589,12 @@ class TestTable:
         return "N/A", True, self.colourFinder.find("test_default_fg"), self.colourFinder.find("no_results_bg")
 
     def getCellDataFromState(self, state):
-        if hasattr(state, "getMostSevereFileComparison"):
-            fileComp = state.getMostSevereFileComparison()
-        else:
-            fileComp = None
-        fgcol, bgcol = self.getColours(state.category, fileComp)
-        success = state.category == "success"
+        fileComp = state.getMostSevereFileComparison() if hasattr(state, "getMostSevereFileComparison") else None
+        category = state.category if hasattr(state, "category") else "success"
+        fgcol, bgcol = self.getColours(category, fileComp)
+        if not hasattr(state, "category"):
+            return "ok " + state, True, fgcol, bgcol
+        success = category == "success"
         if success:
             cellContent = "ok"
             if state.briefText:
@@ -711,7 +731,7 @@ class TestDetails:
     def getFreeTextData(self, tests):
         data = OrderedDict()
         for testName, state, extraVersion in tests:
-            freeText = state.freeText
+            freeText = state.freeText if hasattr(state, "freeText") else None
             if freeText:
                 if not data.has_key(freeText):
                     data[freeText] = []
@@ -765,7 +785,8 @@ class TestDetails:
         else:
             headerText = str(len(tests)) + " TESTS " + repr(state)
             return HTMLgen.Heading(4, headerText) 
-    def getTestLines(self, tests, version, linkFromDetailsToOverview):
+    
+    def getTestLines(self, tests, version, linkFromDetailsToOverview):    
         lines = []
         for testName, _, extraVersion in tests:
             linksToOverview = self.getLinksToOverview(version, testName, extraVersion, linkFromDetailsToOverview)
@@ -773,11 +794,13 @@ class TestDetails:
             container = HTMLgen.Container(headerText, linksToOverview, ")<br>")
             lines.append(container)
         return lines
+
     def getLinksToOverview(self, version, testName, extraVersion, linkFromDetailsToOverview):
         links = HTMLgen.Container()
         for targetFile, linkName in linkFromDetailsToOverview:
             links.append(HTMLgen.Href(targetFile + "#" + version + testName + extraVersion, linkName))
         return links
+    
         
 class CategoryHandler:
     def __init__(self):
@@ -788,8 +811,8 @@ class CategoryHandler:
             testInfoList = self.testsInCategory.setdefault(category, [])
             testInfoList += testInfo
 
-    def registerInCategory(self, testId, state, extraVersion):
-        self.testsInCategory.setdefault(state.category, []).append((testId, state, extraVersion))
+    def registerInCategory(self, testId, category, extraVersion, state):
+        self.testsInCategory.setdefault(category, []).append((testId, state, extraVersion))
 
     def getDescription(self, cat, count):
         shortDescr, _ = getCategoryDescription(cat)

@@ -409,13 +409,20 @@ def getPreviousWriteDirs(app):
     rootDir = app.getPreviousWriteDirInfo()
     return getPreviousWriteDirsUnder(rootDir, app) if os.path.isdir(rootDir) else []
 
+def writeSuccessLine(f, runPostfix, state):
+    f.write(runPostfix)
+    if state.briefText:
+        f.write(" " + state.briefText)
+    f.write(" " + ", ".join(state.executionHosts) + "\n")
 
 
 # Allow saving results to a historical repository
 class SaveState(plugins.Responder):
     def __init__(self, optionMap, allApps):
         plugins.Responder.__init__(self)
-        self.fileName = self.createFileName(optionMap.get("name"))
+        self.runPostfix = self.getRunPostfix(optionMap.get("name"))
+        self.failureFileName = "teststate_" + self.runPostfix
+        self.successFileName = "succeeded_" + calculateBatchDate("%b%Y")
         self.repositories = {}
         self.allApps = allApps
         self.diag = logging.getLogger("Save Repository")
@@ -423,9 +430,9 @@ class SaveState(plugins.Responder):
     def isBatchDate(self, dateStr):
         return re.match("^[0-9]{2}[A-Za-z]{3}[0-9]{4}$", dateStr)
 
-    def createFileName(self, nameGiven):
+    def getRunPostfix(self, nameGiven):
         # include the date and the name, if any. Date is used for archiving, name for display
-        parts = [ "teststate" ]
+        parts = []
         if not nameGiven or not self.isBatchDate(nameGiven):
             parts.append(calculateBatchDate())
         if nameGiven:
@@ -443,22 +450,65 @@ class SaveState(plugins.Responder):
 
     def saveToRepository(self, test):
         testRepository = self.repositories[test.app]
-        targetFile = os.path.join(testRepository, test.app.name, getVersionName(test.app, self.allApps), \
-                                  test.getRelPath(), self.fileName)
-        if os.path.isfile(targetFile):
-            plugins.printWarning("File already exists at " + targetFile + " - not overwriting!")
+        targetDir = os.path.join(testRepository, test.app.name, getVersionName(test.app, self.allApps), \
+                                    test.getRelPath())
+        try:
+            plugins.ensureDirectoryExists(targetDir)
+        except EnvironmentError:
+            plugins.printWarning("Could not create directory at " + targetDir)
+        # Need to store teststate files for succeeded tests if we have resource pages
+        if test.state.hasSucceeded() and len(test.app.getBatchConfigValue("historical_report_resources")) == 0:
+            targetFile = os.path.join(targetDir, self.successFileName)
+            with open(targetFile, "a") as f:
+                writeSuccessLine(f, self.runPostfix, test.state)
         else:
-            try:
-                plugins.ensureDirExistsForFile(targetFile)
-                shutil.copyfile(test.getStateFile(), targetFile)
-            except IOError:
-                plugins.printWarning("Could not write file at " + targetFile)
+            targetFile = os.path.join(targetDir, self.failureFileName)
+            if os.path.isfile(targetFile):
+                plugins.printWarning("File already exists at " + targetFile + " - not overwriting!")
+            else:
+                try:
+                    shutil.copyfile(test.getStateFile(), targetFile)
+                except EnvironmentError:
+                    plugins.printWarning("Could not write file at " + targetFile)
 
     def addSuite(self, suite):
         testStateRepository = getBatchRepository(suite)
         self.diag.info("Test state repository is " + repr(testStateRepository))
         if testStateRepository:
             self.repositories[suite.app] = os.path.abspath(testStateRepository)
+            
+            
+class MigrateBatchRepository(plugins.Action):
+    def __init__(self):
+        self.successFileName = "succeeded_" + calculateBatchDate("%b%Y")
+    
+    def migrateFile(self, path):
+        state = testoverview.GenerateWebPages.readState(path)
+        if state.hasSucceeded():
+            dirname, fn = os.path.split(path)
+            runTag = fn.replace("teststate_", "")
+            successFile = os.path.join(dirname, self.successFileName)
+            with open(successFile, "a") as f:
+                writeSuccessLine(f, runTag, state)
+            os.remove(path)
+    
+    def migrate(self, repository):
+        plugins.log.info("Migrating repository at " + repository)
+        for root, _, files in os.walk(repository):
+            for f in files:
+                if f.startswith("teststate_"):
+                    path = os.path.join(root, f)
+                    self.migrateFile(path)
+
+    def setUpSuite(self, suite):
+        if suite.parent is None:
+            resources = suite.app.getBatchConfigValue("historical_report_resources")
+            if len(resources) > 0:
+                raise plugins.TextTestError, "Cannot migrate repository: historical_report_sources set to '" + ", ".join(resources) + "' - these require the full format"
+            repository = getBatchRepository(suite)
+            if not os.path.isdir(repository):
+                raise plugins.TextTestError, "Batch result repository " + repository + " does not exist"
+            self.migrate(repository)
 
 
 class ArchiveScript(plugins.ScriptWithArgs):

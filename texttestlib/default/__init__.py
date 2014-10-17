@@ -285,7 +285,7 @@ class Config:
         return basic
 
     def getDefaultInterface(self, allApps):
-        if self.optionMap.has_key("s"):
+        if self.runningScript():
             return "console"
         elif len(allApps) == 0 or self.optionMap.has_key("new"):
             return "static_gui"
@@ -364,7 +364,7 @@ class Config:
         if not self.optionMap.has_key("gx"):
             classes += self.getThreadActionClasses()
         
-        if self.batchMode() and not self.optionMap.has_key("s"):
+        if self.batchMode() and not self.runningScript():
             if self.optionMap.has_key("coll"):
                 arg = self.optionMap["coll"]
                 if arg != "mail": 
@@ -706,7 +706,7 @@ class Config:
         return self.optionMap.has_key("b")
     
     def actualBatchMode(self):
-        return self.batchMode() and not self.isReconnecting()
+        return self.batchMode() and not self.isReconnecting() and not self.runningScript()
     
     def keepTemporaryDirectories(self):
         if "keeptmp" in self.optionMap:
@@ -871,8 +871,11 @@ class Config:
         else:
             return defaultValue
         
+    def runningScript(self):
+        return "s" in self.optionMap
+        
     def ignoreExecutable(self):
-        return self.optionMap.has_key("s") or self.ignoreCheckout() or self.optionMap.has_key("coll") or self.optionMap.has_key("gx")
+        return self.runningScript() or self.ignoreCheckout() or self.optionMap.has_key("coll") or self.optionMap.has_key("gx")
 
     def ignoreCheckout(self):
         return self.isReconnecting() # No use of checkouts has yet been thought up when reconnecting :)

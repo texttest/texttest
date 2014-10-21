@@ -19,3 +19,12 @@ CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
 (1) All test categories except Failed are now invisible by default
 ==================================================================
 You should use 'show_test_category' to unhide categories. 'hide_test_category' would now only be used for hiding Failed category.
+
+(2) batch_result_repository now stored succeeded tests in a single file
+======================================================================
+This should make the HTML report faster to generate. To migrate, run e.g.
+
+texttest -b <batch_session> -s batch.MigrateBatchRepository
+
+which will convert the existing repository. Otherwise, just archive from time to time, and the new format will be written,
+so gradually migration will occur anyway.

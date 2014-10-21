@@ -2655,6 +2655,9 @@ Framework Enhancements:
 Version Control Browser Enhancements:
     - Added new feature "Difference with Filter" for all supported VCS
 Batch Report Enhancements:
-Grid Engine enhancements/bug fixes:
+    - Succeeded tests now stored in a more compact way in batch_result_repository
+	New migration script to convert. Old format is still understood, so migration will happen naturally (but slowly) anyway
+Grid Engine/Cloud enhancements/bug fixes:
+    - Reworked setup so that cloud instances don't flood master machine's SSH daemon with SSH requests
 Bug Fixes:
     - Filter behaviour is now consistent with View/Show All

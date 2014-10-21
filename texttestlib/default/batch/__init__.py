@@ -422,7 +422,7 @@ class SaveState(plugins.Responder):
         plugins.Responder.__init__(self)
         self.runPostfix = self.getRunPostfix(optionMap.get("name"))
         self.failureFileName = "teststate_" + self.runPostfix
-        self.successFileName = "succeeded_" + calculateBatchDate("%b%Y")
+        self.successFileName = "succeeded_runs"
         self.repositories = {}
         self.allApps = allApps
         self.diag = logging.getLogger("Save Repository")
@@ -480,7 +480,7 @@ class SaveState(plugins.Responder):
             
 class MigrateBatchRepository(plugins.Action):
     def __init__(self):
-        self.successFileName = "succeeded_" + calculateBatchDate("%b%Y")
+        self.successFileName = "succeeded_runs"
     
     def migrateFile(self, path):
         state = testoverview.GenerateWebPages.readState(path)
@@ -557,7 +557,7 @@ class ArchiveScript(plugins.ScriptWithArgs):
         for file in dirList:
             fullPath = os.path.join(repository, file)
             if self.shouldArchive(file, *args):
-                self.archiveFile(fullPath, app)
+                self.archiveFile(fullPath, app, *args)
                 count += 1
             elif os.path.isdir(fullPath):
                 self.archiveFilesUnder(fullPath, app, *args)
@@ -574,7 +574,7 @@ class ArchiveScript(plugins.ScriptWithArgs):
             if os.name == "posix":
                 self.makeTarArchive(suite, repository)
 
-    def archiveFile(self, fullPath, app):
+    def archiveFile(self, fullPath, app, *args):
         targetPath = self.getTargetPath(fullPath, app.name)
         plugins.ensureDirExistsForFile(targetPath)
         try:
@@ -618,11 +618,28 @@ class ArchiveRepository(ArchiveScript):
     def archiveFiles(self, suite):
         weekdays = self.getWeekDays(suite)
         self.archiveFilesUnder(self.repository, suite.app, weekdays)
+        
+    def archiveFile(self, fullPath, app, weekdays):
+        if os.path.basename(fullPath).startswith("teststate"):
+            return ArchiveScript.archiveFile(self, fullPath, app)
+        newFile = fullPath + ".new"
+        with open(newFile, "w") as writeFile:
+            with open(fullPath) as readFile:
+                for line in readFile:
+                    dateStr = line.strip().split()[0].split("_")[0]
+                    if not self.shouldArchiveGivenDateString(dateStr, weekdays):
+                        writeFile.write(line)
+        os.rename(newFile, fullPath)
                 
     def shouldArchive(self, file, weekdays):
+        if file.startswith("succeeded_"):
+            return True
         if not file.startswith("teststate"):
             return False
         dateStr = file.split("_")[1]
+        return self.shouldArchiveGivenDateString(dateStr, weekdays)
+    
+    def shouldArchiveGivenDateString(self, dateStr, weekdays):
         timeStruct = time.strptime(dateStr, self.getDateFormat(dateStr))
         date = time.mktime(timeStruct)
         return self.shouldArchiveWithDate(date) and (not self.weekdayBeforeDate or date < self.weekdayBeforeDate or timeStruct.tm_wday not in weekdays)

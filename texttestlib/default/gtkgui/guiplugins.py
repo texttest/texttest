@@ -15,7 +15,7 @@ class ProcessTerminationMonitor(plugins.Observable):
         self.processesForKill = OrderedDict()
         self.exitHandlers = OrderedDict()
 
-    def listRunningProcesses(self):
+    def listQueryKillProcesses(self):
         processesToCheck = guiConfig.getCompositeValue("query_kill_processes", "", modeDependent=True)
         if "all" in processesToCheck:
             processesToCheck = [ ".*" ]
@@ -24,11 +24,14 @@ class ProcessTerminationMonitor(plugins.Observable):
         
         running = []
         triggerGroup = plugins.TextTriggerGroup(processesToCheck)
-        for process, description in self.processesForKill.values():
+        for process, description in self.getProcesses():
             if triggerGroup.stringContainsText(description):
                 running.append("PID " + str(process.pid) + " : " + description)
                 
         return running
+    
+    def getProcesses(self):
+        return self.processesForKill.values()
 
     def getProcessIdentifier(self, process):
         # Unfortunately the child_watch_add method needs different ways to

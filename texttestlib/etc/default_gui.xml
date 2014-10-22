@@ -17,6 +17,8 @@
     <menu action="viewmenu">
       <menuitem action="Set Run Name"/>
       <separator/>
+      <menuitem action="Show Processes"/>
+      <separator/>
       <menuitem action="Show only selected"/>
       <menuitem action="Hide selected"/>
       <menuitem action="Show all"/>

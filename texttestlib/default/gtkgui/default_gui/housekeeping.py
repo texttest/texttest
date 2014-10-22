@@ -3,11 +3,12 @@
 Miscellaneous actions for generally housekeeping the state of the GUI
 """
 
-from .. import guiplugins, guiutils
+from .. import guiplugins
 from ordereddict import OrderedDict
 from texttestlib.default.batch import BatchApplicationData, MailSender
 from texttestlib import plugins
-import os, gtk
+import os, gtk, gobject
+from texttestlib.jobprocess import killSubProcessAndChildren
 
 class Quit(guiplugins.BasicActionGUI):
     def __init__(self, allApps, dynamic, inputOptions):
@@ -40,7 +41,7 @@ class Quit(guiplugins.BasicActionGUI):
         message = ""
         if self.runName and not self.runName.startswith("Tests started from"):
             message = "You named this run as follows : \n" + self.runName + "\n"
-        runningProcesses = guiplugins.processMonitor.listRunningProcesses()
+        runningProcesses = guiplugins.processMonitor.listQueryKillProcesses()
         if len(runningProcesses) > 0:
             message += "\nThese processes are still running, and will be terminated when quitting: \n\n   + " + \
                        "\n   + ".join(runningProcesses) + "\n"
@@ -205,8 +206,78 @@ class GenerateTestSummary(guiplugins.ActionDialogGUI):
         self.batchAppData[app] = BatchApplicationData(rootSuite)
         self.allApps.setdefault(app.name, []).append(app)
 
+
+class ShowProcesses(guiplugins.ActionResultDialogGUI):
+    def addContents(self):
+        runningProcesses = guiplugins.processMonitor.getProcesses()
+        if len(runningProcesses) > 0:
+            processBox = self.createProcessBox(runningProcesses)
+            self.dialog.vbox.pack_start(processBox)
+        else:
+            messageBox = self.createDialogMessage("No external processes have been launched from this TextTest instance.", gtk.STOCK_DIALOG_INFO)
+            self.dialog.vbox.pack_start(messageBox)
+            
+    def makePopup(self, treeView):
+        menu = gtk.Menu()
+        menuItem = gtk.MenuItem("Kill Process")
+        menu.append(menuItem)
+        menuItem.connect("activate", self.killProcess, treeView)
+        menuItem.show()
+        return menu
+    
+    def killProcess(self, menuItem, treeView):
+        iters = []
+        def addSelIter(model, path, iter):
+            proc = model.get_value(iter, 0)
+            killSubProcessAndChildren(proc)
+            iters.append(iter)
+            
+        treeView.get_selection().selected_foreach(addSelIter)
+        for iter in iters:
+            treeView.get_model().remove(iter)
+        
+    def showPopup(self, treeview, event, popupMenu):
+        if event.button == 3:
+            pathInfo = treeview.get_path_at_pos(int(event.x), int(event.y))
+            if pathInfo is not None:
+                treeview.grab_focus()
+                popupMenu.popup(None, None, None, event.button, event.time)
+                treeview.stop_emission("button_press_event") # Disable default handler which auto-selects rows
+        
+    def setPid(self, column, cell, model, iter):
+        cell.set_property('text', str(model.get_value(iter, 0).pid))
+        
+    def createProcessBox(self, runningProcesses):
+        listStore = gtk.ListStore(gobject.TYPE_PYOBJECT, str)
+        for proc, description in runningProcesses:
+            listStore.append([ proc, description ])
+        treeView = gtk.TreeView(listStore)
+        treeView.set_name("Process Tree View")
+        
+        cell = gtk.CellRendererText()
+        column = gtk.TreeViewColumn("PID") 
+        column.pack_start(cell)
+        column.set_cell_data_func(cell, self.setPid)
+        
+        treeView.append_column(column)
+        cell2 = gtk.CellRendererText()
+        column = gtk.TreeViewColumn("Description", cell2, text=1)
+        treeView.append_column(column)
+        
+        treeView.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
+        popup = self.makePopup(treeView) 
+        treeView.connect("button_press_event", self.showPopup, popup)
+        return treeView
+
+    def isActiveOnCurrent(self, *args):
+        return True
+    
+    def _getTitle(self):
+        return "Show Processes"
+
+
 def getInteractiveActionClasses(dynamic):
-    classes = [ Quit, SetRunName ]
+    classes = [ Quit, SetRunName, ShowProcesses ]
     if dynamic:
         classes.append(ViewScreenshots)
         classes.append(GenerateTestSummary)

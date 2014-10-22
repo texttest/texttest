@@ -1152,3 +1152,16 @@ response.accept = close filtered differences
 [Label=_Filtered Differences]
 clicked = show filtered version control differences
 
+[Name=Show Processes]
+activate = show processes
+
+[Name=Process Tree View]
+changed.selection = select process
+button-press-event = view actions for process
+
+[Label=Kill Process]
+activate = kill selected process
+
+[Title=Show Processes]
+response.accept = close process view
+

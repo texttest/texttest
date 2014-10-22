@@ -323,19 +323,26 @@ class TestProgressMonitor(guiutils.SubGUI):
             fileClass = [ "Failed", self.getDifferenceType(fileComp), (summary, fileComp.stem) ]
 
             filteredDiff = self.getFilteredDiff(fileComp)
+            extraGroupName = None
             if filteredDiff is not None:
                 groupNames, summaryDiffs = self.diffStore.setdefault(summary, ({}, OrderedDict()))
                 testList, groupName = summaryDiffs.setdefault(filteredDiff, ([], None))
                 if test not in testList:
                     testList.append(test)
-                if len(testList) > 1 and groupName is None:
-                    groupName = self.setGroupName(groupNames, summaryDiffs, filteredDiff)
+                if groupName is None:
+                    onlyIfRepeated = len(testList) == 1
+                    groupName, extraGroupName = self.setGroupName(groupNames, summaryDiffs, filteredDiff, onlyIfRepeated)
                 if groupName:
                     fileClass.append(("Group " + groupName, fileComp.stem))
 
+            if extraGroupName:
+                extraFileClass = copy(fileClass[:-1])
+                extraFileClass.append(("Group " + extraGroupName, fileComp.stem))
+                self.diag.info("Adding extra file classification for " + repr(fileComp) + " = " + repr(extraFileClass))
+                classifiers.addClassification(extraFileClass)
             self.diag.info("Adding file classification for " + repr(fileComp) + " = " + repr(fileClass))
             classifiers.addClassification(fileClass)
-
+            
         for fileComp in filter(lambda c: c.getType() != "failure", comparisons):
             summary = fileComp.getSummary(includeNumbers=False)
             desc = self.getCategoryDescription(state, summary)
@@ -360,28 +367,40 @@ class TestProgressMonitor(guiutils.SubGUI):
                     return firstPart, prime
         return None, None
 
-    def setGroupName(self, groupNames, summaryDiffs, filteredDiff):
-        groupName = self.getGroupName(groupNames, summaryDiffs, filteredDiff)
+    def setGroupName(self, groupNames, summaryDiffs, filteredDiff, onlyIfRepeated):
+        groupName, extraGroupName = self.getGroupName(groupNames, summaryDiffs, filteredDiff, onlyIfRepeated)
+        if not groupName:
+            return None, None
+        
         groupNames[groupName] = filteredDiff
         tests = summaryDiffs[filteredDiff][0] if filteredDiff in summaryDiffs else []
         summaryDiffs[filteredDiff] = (tests, groupName)
-        return groupName
+        return groupName, extraGroupName
                     
-    def getGroupName(self, groupNames, summaryDiffs, filteredDiff):
+    def getGroupName(self, groupNames, summaryDiffs, filteredDiff, onlyIfRepeated):
         self.diag.info("Getting group name for " + repr(filteredDiff))
-        singleVersion, timesRepeated = self.extractRepeats(filteredDiff)
+        singleVersion, timesRepeated = self.extractRepeats(filteredDiff)            
         if singleVersion:
+            self.diag.info("Extracted repeats of " + repr(singleVersion))
             _, group = summaryDiffs.get(singleVersion, (None, None))
             if group is None:
-                group = self.setGroupName(groupNames, summaryDiffs, singleVersion)
+                group, _ = self.setGroupName(groupNames, summaryDiffs, singleVersion, False)
+                self.diag.info("Created group " + repr(group))
+                tests, _ = summaryDiffs.get(singleVersion, (None, None))
+                extraGroupName = group if len(tests) == 1 else None           
+            else:
+                extraGroupName = None
+                self.diag.info("Found group " + repr(group))
+            
             if "*" in group:
                 core, timeStr = group.split("*")
-                return core + "*" + str(timesRepeated * int(timeStr))
+                return core + "*" + str(timesRepeated * int(timeStr)), None
             else:
-                return str(group) + "*" + str(timesRepeated)
-        else:
+                return str(group) + "*" + str(timesRepeated), extraGroupName
+        elif not onlyIfRepeated:
             group = len(groupNames) + 1
-            return str(group)
+            return str(group), None
+        return None, None
     
     def notifySelectInGroup(self, fileComp):
         summary = self.getFileSummary(fileComp)

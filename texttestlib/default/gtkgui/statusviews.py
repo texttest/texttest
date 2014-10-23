@@ -443,12 +443,16 @@ class TestProgressMonitor(guiutils.SubGUI):
 
     def removeFromModel(self, test):
         for iter in self.findTestIterators(test):
+            self.removeFromIter(iter, test)
+            
+    def removeFromIter(self, iter, test):
+        allTests = self.treeModel.get_value(iter, 5)
+        if test in allTests:
             testCount = self.treeModel.get_value(iter, 1)
             self.treeModel.set_value(iter, 1, testCount - 1)
             if testCount == 1:
                 self.treeModel.set_value(iter, 3, "white")
                 self.treeModel.set_value(iter, 4, "")
-            allTests = self.treeModel.get_value(iter, 5)
             allTests.remove(test)
             self.diag.info("Removing test " + repr(test) + " from node " + self.treeModel.get_value(iter, 0))
             self.treeModel.set_value(iter, 5, allTests)
@@ -482,6 +486,12 @@ class TestProgressMonitor(guiutils.SubGUI):
         self.notify("TestAppearance", test, summary, mainColour, colour, "approve" in changeDesc)
         self.notify("Visibility", [ test ], self.shouldBeVisible(test))
 
+    def removeFromUngroupedNode(self, test, parentIter):
+        self.diag.info("Removing previously ungrouped " + repr(test))
+        ungroupedIter = self.findIter("Ungrouped", parentIter)
+        if ungroupedIter is not None:
+            self.removeFromIter(ungroupedIter, test)
+
     def getInitialTestsForNode(self, test, parentIter, nodeClassifier):
         if nodeClassifier.startswith("Group "):
             groupName = nodeClassifier[6:]
@@ -492,6 +502,7 @@ class TestProgressMonitor(guiutils.SubGUI):
                 testList = summaryDiffs[filteredDiff][0]
                 for test in testList:
                     if test in ungrouped:
+                        self.removeFromUngroupedNode(test, parentIter)
                         ungrouped.remove(test)
                 return copy(testList)
         elif nodeClassifier == "Ungrouped":

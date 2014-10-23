@@ -379,12 +379,12 @@ class SummaryGenerator:
         columnVersions = {}
         for appName in self.getOrderedVersions(appOrder, pageInfo):
             file.write("<tr>\n")
-            file.write("  <td><h3>" + appName + "</h3></td>\n")
+            file.write('  <td class="application_name"><h3>' + appName + "</h3></td>\n")
             versions = pageInfo[appName]
             orderedVersions = self.getOrderedVersions(versionOrder, versions)
             self.diag.info("For " + appName + " found " + repr(orderedVersions))
             for columnIndex, version in enumerate(self.padWithEmpty(orderedVersions, columnVersions, minColumnIndices)):
-                file.write('  <td>')
+                file.write('  <td class="version_table">')
                 if version:
                     file.write('<table border="1" class="version_link"><tr>\n')
                     if version in versionWithColumns:

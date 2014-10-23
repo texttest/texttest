@@ -288,17 +288,12 @@ class TestProgressMonitor(guiutils.SubGUI):
             return "New"
         else:
             return "Differences"
-
-    def getClassifiers(self, test, state, changeDesc):
-        classifiers = ClassificationTree()
+        
+    def getCategoryDescriptionClassifier(self, state, changeDesc):
         catDesc = self.getCategoryDescription(state)
         if state.isMarked():
-            if state.briefText == catDesc:
-                # Just in case - otherwise we get an infinite loop...
-                classifiers.addClassification([ catDesc, "Marked as Marked" ])
-            else:
-                classifiers.addClassification([ catDesc, state.briefText ])
-            return classifiers
+            briefText = "Marked as Marked" if state.briefText == catDesc else state.briefText
+            return [ catDesc, briefText ]
 
         if not state.isComplete() or not state.hasFailed():
             classification = [ catDesc ]
@@ -308,53 +303,81 @@ class TestProgressMonitor(guiutils.SubGUI):
                 subState = state.briefText.split()[0]
                 if subState != state.defaultBriefText:
                     classification.append(subState)
-            classifiers.addClassification(classification)
-            return classifiers
+            return classification
 
         if not state.isSaveable() or state.warnOnSave(): # If it's not saveable, don't classify it by the files
             details = state.getTypeBreakdown()[1]
             self.diag.info("Adding unsaveable : " + catDesc + " " + details)
-            classifiers.addClassification([ "Failed", catDesc, details ])
-            return classifiers
+            return [ "Failed", catDesc, details ]
 
-        comparisons = state.getComparisons()
-        for fileComp in filter(lambda c: c.getType() == "failure", comparisons):
-            summary = self.getFileSummary(fileComp)
-            fileClass = [ "Failed", self.getDifferenceType(fileComp), (summary, fileComp.stem) ]
-
-            filteredDiff = self.getFilteredDiff(fileComp)
-            extraGroupName = None
-            if filteredDiff is not None:
-                groupNames, summaryDiffs = self.diffStore.setdefault(summary, ({}, OrderedDict()))
-                testList, groupName = summaryDiffs.setdefault(filteredDiff, ([], None))
-                if test not in testList:
-                    testList.append(test)
-                if groupName is None:
-                    onlyIfRepeated = len(testList) == 1
-                    groupName, extraGroupName = self.setGroupName(groupNames, summaryDiffs, filteredDiff, onlyIfRepeated)
-                if groupName:
-                    fileClass.append(("Group " + groupName, fileComp.stem))
-
-            if extraGroupName:
-                extraFileClass = copy(fileClass[:-1])
-                extraFileClass.append(("Group " + extraGroupName, fileComp.stem))
-                self.diag.info("Adding extra file classification for " + repr(fileComp) + " = " + repr(extraFileClass))
-                classifiers.addClassification(extraFileClass)
-            self.diag.info("Adding file classification for " + repr(fileComp) + " = " + repr(fileClass))
-            classifiers.addClassification(fileClass)
-            
-        for fileComp in filter(lambda c: c.getType() != "failure", comparisons):
-            summary = fileComp.getSummary(includeNumbers=False)
-            desc = self.getCategoryDescription(state, summary)
-            stem = fileComp.stem
-            fileClass = [ "Failed", "Performance differences", (desc, stem) ]
-            toleranceRange = fileComp.getToleranceMultipleRange(test)
-            if toleranceRange:
-                fileClass.append((toleranceRange, stem))
-            self.diag.info("Adding file classification for " + repr(fileComp) + " = " + repr(fileClass))
-            classifiers.addClassification(fileClass)
-
+    def getClassifiers(self, test, state, changeDesc):
+        classifiers = ClassificationTree()
+        catDescClassifier = self.getCategoryDescriptionClassifier(state, changeDesc)
+        if catDescClassifier:
+            classifiers.addClassification(catDescClassifier)
+        else:
+            self.addComparisonClassifiers(classifiers, test, state)
         return classifiers
+
+    def addComparisonClassifiers(self, classifiers, test, state):
+        failureComparisons, perfComparisons = [], []
+        for c in state.getComparisons():
+            l = failureComparisons if c.getType() == "failure" else perfComparisons
+            l.append(c)
+        
+        for fileComp in failureComparisons:
+            self.addFailureComparisonClassifiers(classifiers, test, state, fileComp)
+            
+        for fileComp in perfComparisons:
+            fileClass = self.getPerformanceComparisonClassifier(test, state, fileComp)
+            classifiers.addClassification(fileClass)
+    
+    def addFailureComparisonClassifiers(self, classifiers, test, state, fileComp):
+        summary = self.getFileSummary(fileComp)
+        fileClass = [ "Failed", self.getDifferenceType(fileComp), (summary, fileComp.stem) ]
+
+        filteredDiff = self.getFilteredDiff(fileComp)
+        extraGroupName = None
+        if filteredDiff is not None:
+            groupNames, summaryDiffs, ungrouped = self.diffStore.setdefault(summary, ({}, OrderedDict(), []))
+            hasGroups = len(groupNames) > 0
+            testList, groupName = summaryDiffs.setdefault(filteredDiff, ([], None))
+            if test not in testList:
+                testList.append(test)
+            if groupName is None:
+                onlyIfRepeated = len(testList) == 1
+                groupName, extraGroupName = self.setGroupName(groupNames, summaryDiffs, filteredDiff, onlyIfRepeated)
+            if groupName:
+                fileClass.append(("Group " + groupName, fileComp.stem))                        
+            else:
+                ungrouped.append(test)
+                if groupNames:
+                    fileClass.append(("Ungrouped", fileComp.stem))
+            
+        if extraGroupName:
+            extraFileClass = copy(fileClass[:-1])
+            extraFileClass.append(("Group " + extraGroupName, fileComp.stem))
+            self.diag.info("Adding extra file classification for " + repr(fileComp) + " = " + repr(extraFileClass))
+            classifiers.addClassification(extraFileClass)
+        self.diag.info("Adding file classification for " + repr(fileComp) + " = " + repr(fileClass))
+        classifiers.addClassification(fileClass)
+        if filteredDiff is not None and groupName and not hasGroups:
+            for _ in ungrouped:
+                extraFileClass = copy(fileClass[:-1])
+                extraFileClass.append(("Ungrouped", fileComp.stem))
+                self.diag.info("Adding extra ungrouped category for " + repr(fileComp) + " = " + repr(extraFileClass))
+                classifiers.addClassification(extraFileClass)
+
+    def getPerformanceComparisonClassifier(self, test, state, fileComp):
+        summary = fileComp.getSummary(includeNumbers=False)
+        desc = self.getCategoryDescription(state, summary)
+        stem = fileComp.stem
+        fileClass = [ "Failed", "Performance differences", (desc, stem) ]
+        toleranceRange = fileComp.getToleranceMultipleRange(test)
+        if toleranceRange:
+            fileClass.append((toleranceRange, stem))
+        self.diag.info("Adding file classification for " + repr(fileComp) + " = " + repr(fileClass))
+        return fileClass
 
     def extractRepeats(self, filteredDiff):
         size = len(filteredDiff)
@@ -404,7 +427,7 @@ class TestProgressMonitor(guiutils.SubGUI):
     
     def notifySelectInGroup(self, fileComp):
         summary = self.getFileSummary(fileComp)
-        _, summaryDiffs = self.diffStore.get(summary, {})
+        _, summaryDiffs, _ = self.diffStore.get(summary, {})
         filteredDiff = self.getFilteredDiff(fileComp)
         testList, groupName = summaryDiffs.get(filteredDiff, ([], False))
         if groupName:
@@ -431,10 +454,12 @@ class TestProgressMonitor(guiutils.SubGUI):
             self.treeModel.set_value(iter, 5, allTests)
 
     def removeFromDiffStore(self, test):
-        for _, fileInfo in self.diffStore.values():
+        for _, fileInfo, ungrouped in self.diffStore.values():
             for testList, _ in fileInfo.values():
                 if test in testList:
                     testList.remove(test)
+            if test in ungrouped:
+                ungrouped.remove(test)
 
     def insertTest(self, test, state, changeDesc, incrementCount):
         self.classifications[test] = []
@@ -461,11 +486,18 @@ class TestProgressMonitor(guiutils.SubGUI):
         if nodeClassifier.startswith("Group "):
             groupName = nodeClassifier[6:]
             parentName = self.treeModel.get_value(parentIter, 0)
-            groupNames, summaryDiffs = self.diffStore.get(parentName)
+            groupNames, summaryDiffs, ungrouped = self.diffStore.get(parentName)
             filteredDiff = groupNames.get(groupName)
             if filteredDiff is not None:
                 testList = summaryDiffs[filteredDiff][0]
+                for test in testList:
+                    if test in ungrouped:
+                        ungrouped.remove(test)
                 return copy(testList)
+        elif nodeClassifier == "Ungrouped":
+            parentName = self.treeModel.get_value(parentIter, 0)
+            _, _, ungrouped = self.diffStore.get(parentName)
+            return copy(ungrouped)
         return [ test ]
 
     def addTestForNode(self, test, defaultColour, defaultVisibility, nodeClassifier,
@@ -480,11 +512,13 @@ class TestProgressMonitor(guiutils.SubGUI):
         else:
             visibility = guiutils.guiConfig.showCategoryByDefault(nodeClassifier, parentShown=defaultVisibility)
             initialTests = self.getInitialTestsForNode(test, parentIter, nodeClassifier)
-            nodeIter = self.addNewIter(nodeClassifier, parentIter, colour, visibility, len(initialTests), initialTests, fileStem)
-            for initTest in initialTests:
-                self.diag.info("New node " + nodeClassifier + ", colour = " + repr(colour) + ", visible = " + repr(visibility) + " : add " + repr(initTest))
-                self.classifications[initTest].append(nodeIter)
-
+            if len(initialTests):
+                nodeIter = self.addNewIter(nodeClassifier, parentIter, colour, visibility, len(initialTests), initialTests, fileStem)
+                for initTest in initialTests:
+                    self.diag.info("New node " + nodeClassifier + ", colour = " + repr(colour) + ", visible = " + repr(visibility) + " : add " + repr(initTest))
+                    self.classifications[initTest].append(nodeIter)
+            else:
+                self.diag.info("Not adding new node for " + repr(test) + " for node " + nodeClassifier + ", no tests in category initially")
         subColours = []
         for subNodeClassifier, fileStem in classifiers[nodeClassifier]:
             subColour = self.addTestForNode(test, colour, visibility, subNodeClassifier,

@@ -51,6 +51,7 @@ class ProcessTerminationMonitor(plugins.Observable):
 
     def processExited(self, pid, *args):
         output = ""
+        self.notify("ProcessExited", pid)
         if self.processesForKill.has_key(pid):
             process = self.processesForKill[pid][0]
             if process.stdout is not None:

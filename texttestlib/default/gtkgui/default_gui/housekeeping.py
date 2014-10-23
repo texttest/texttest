@@ -208,6 +208,10 @@ class GenerateTestSummary(guiplugins.ActionDialogGUI):
 
 
 class ShowProcesses(guiplugins.ActionResultDialogGUI):
+    def __init__(self, *args, **kw):
+        guiplugins.ActionResultDialogGUI.__init__(self, *args, **kw)
+        self.treeView = None
+        
     def addContents(self):
         runningProcesses = guiplugins.processMonitor.getProcesses()
         if len(runningProcesses) > 0:
@@ -217,24 +221,35 @@ class ShowProcesses(guiplugins.ActionResultDialogGUI):
             messageBox = self.createDialogMessage("No external processes have been launched from this TextTest instance.", gtk.STOCK_DIALOG_INFO)
             self.dialog.vbox.pack_start(messageBox)
             
-    def makePopup(self, treeView):
+    def makePopup(self):
         menu = gtk.Menu()
         menuItem = gtk.MenuItem("Kill Process")
         menu.append(menuItem)
-        menuItem.connect("activate", self.killProcess, treeView)
+        menuItem.connect("activate", self.killProcess)
         menuItem.show()
         return menu
     
-    def killProcess(self, menuItem, treeView):
+    def killProcess(self, *args):
         iters = []
         def addSelIter(model, path, iter):
             proc = model.get_value(iter, 0)
             killSubProcessAndChildren(proc)
             iters.append(iter)
             
-        treeView.get_selection().selected_foreach(addSelIter)
+        self.treeView.get_selection().selected_foreach(addSelIter)
         for iter in iters:
-            treeView.get_model().remove(iter)
+            self.treeView.get_model().remove(iter)
+            
+    def notifyProcessExited(self, pid):
+        if self.treeView is None:
+            return
+        model = self.treeView.get_model()
+        def removeIfPidMatches(m, path, iter):
+            proc = model.get_value(iter, 0)
+            if proc.pid == pid:
+                model.remove(iter)
+                return True
+        model.foreach(removeIfPidMatches)
         
     def showPopup(self, treeview, event, popupMenu):
         if event.button == 3:
@@ -251,23 +266,23 @@ class ShowProcesses(guiplugins.ActionResultDialogGUI):
         listStore = gtk.ListStore(gobject.TYPE_PYOBJECT, str)
         for proc, description in runningProcesses:
             listStore.append([ proc, description ])
-        treeView = gtk.TreeView(listStore)
-        treeView.set_name("Process Tree View")
+        self.treeView = gtk.TreeView(listStore)
+        self.treeView.set_name("Process Tree View")
         
         cell = gtk.CellRendererText()
         column = gtk.TreeViewColumn("PID") 
         column.pack_start(cell)
         column.set_cell_data_func(cell, self.setPid)
         
-        treeView.append_column(column)
+        self.treeView.append_column(column)
         cell2 = gtk.CellRendererText()
         column = gtk.TreeViewColumn("Description", cell2, text=1)
-        treeView.append_column(column)
+        self.treeView.append_column(column)
         
-        treeView.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
-        popup = self.makePopup(treeView) 
-        treeView.connect("button_press_event", self.showPopup, popup)
-        return treeView
+        self.treeView.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
+        popup = self.makePopup() 
+        self.treeView.connect("button_press_event", self.showPopup, popup)
+        return self.treeView
 
     def isActiveOnCurrent(self, *args):
         return True

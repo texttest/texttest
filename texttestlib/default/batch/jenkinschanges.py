@@ -480,10 +480,11 @@ class ChangeFinder:
         regex = re.compile(artefact)
         version1 = BuildDocument.create(buildsDir, build1).getArtefactVersion(regex)
         version2 = BuildDocument.create(buildsDir, build2).getArtefactVersion(regex)
+        projectNameForDisplay = os.path.basename(projectName)
         if version1 == version2:
-            return projectName + " was updated", "", []
+            return projectNameForDisplay + " was updated", "", []
         elif version2:
-            return projectName + " " + version2, "", []
+            return projectNameForDisplay + " " + version2, "", []
         else:
             print "WARNING: Artefact version not found for: " + projectName + " build: " + build2
             return "Artefact version not found", "", []

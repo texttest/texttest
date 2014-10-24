@@ -260,7 +260,7 @@ class SummaryDataFinder:
         elif categoryName == "knownbugs":
             return "knownbug"
         else:
-            for perfCat in [ "faster", "slower", "memory+", "memory-" ]:
+            for perfCat in [ "faster", "slower", "memory+", "memory-", "larger", "smaller" ]:
                 if categoryName.startswith(perfCat):
                     return "performance"
             if categoryName in [ "killed", "unrunnable", "cancelled", "abandoned" ]:

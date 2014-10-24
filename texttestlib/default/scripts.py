@@ -137,9 +137,12 @@ class DocumentEnvironment(plugins.Action):
                 
             # We only want to document environment variables in the configuration we're using here, not every configuration we can find
             if root.endswith("lib"):
+                toRemove = []
                 for dir in dirs:
                     if dir != "libexec" and not sys.modules.has_key(dir) and not sys.modules.has_key("texttestlib." + dir):
-                        dirs.remove(dir)
+                        toRemove.append(dir)
+                for dir in toRemove:
+                    dirs.remove(dir)
             for file in files:
                 if file.endswith(".py"): 
                     path = os.path.join(root, file)

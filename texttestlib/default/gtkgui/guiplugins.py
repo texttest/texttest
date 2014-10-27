@@ -694,8 +694,18 @@ class OptionGroupGUI(ActionGUI):
             else:
                 options.append(option)
         return options, switches
+    
+    def findAutoEnableInfo(self, switches):
+        info = {}
+        for switch in switches:
+            if isinstance(switch, plugins.Switch) and switch.autoEnable:
+                for enableSwitchName in switch.autoEnable:
+                    enabler = self.getOption(enableSwitchName)
+                    if enabler:
+                        info[enabler] = switch
+        return info
 
-    def createSwitchWidget(self, switch, optionGroup, autoEnableInfo={}):
+    def createSwitchWidget(self, switch, optionGroup, autoEnableInfo):
         if len(switch.options) >= 1:
             if switch.hideOptions:
                 return self.createComboBox(switch, optionGroup)
@@ -897,15 +907,6 @@ class ActionTabGUI(OptionGroupGUI):
             widget = self.createSwitchWidget(switch, optionGroup, autoEnableInfo)
             vbox.pack_start(widget, expand=False, fill=False)
             
-    def findAutoEnableInfo(self, switches):
-        info = {}
-        for switch in switches:
-            if switch.autoEnable:
-                enabler = self.getOption(switch.autoEnable)
-                if enabler:
-                    info[enabler] = switch
-        return info
-
     def createResetButton(self):
         button = gtk.Button("Reset Tab")
         button.set_name("Reset " + self.getTabTitle() + " Tab")
@@ -1043,11 +1044,12 @@ class ActionDialogGUI(OptionGroupGUI):
     def fillVBox(self, vbox, optionGroup, includeOverrides=True):
         fileChooser, fileChooserOption = None, None
         allOptions = self.getOrderedOptions(optionGroup)
+        autoEnableInfo = self.findAutoEnableInfo(allOptions)
         for option in allOptions:
             self.addValuesFromConfig(option, includeOverrides)
             
             if isinstance(option, plugins.Switch):
-                widget = self.createSwitchWidget(option, optionGroup)
+                widget = self.createSwitchWidget(option, optionGroup, autoEnableInfo)
                 vbox.pack_start(widget, expand=False, fill=False)
             elif option.selectFile or option.selectDir or option.saveFile:
                 if not self.showFileChooserAsDialog():

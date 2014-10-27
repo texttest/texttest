@@ -59,7 +59,8 @@ class QueueSystemConfig(default.Config):
                     group.addSwitch("l", "Run tests sequentially", value=defaultValue)
                 else:
                     title = "Use grid" if useGrid else "Use cloud"
-                    group.addSwitch("l", title, value=defaultValue, options=options, description=descriptions, autoEnable="gui")
+                    replayOptions = [ opt for opt, _ in self.getInteractiveReplayOptions() ]
+                    group.addSwitch("l", title, value=defaultValue, options=options, description=descriptions, autoEnable=replayOptions)
             elif group.name.startswith("Grid") and useGrid:
                 self.addDefaultOption(group, "R", "Request grid resource", possibleValues = self.getPossibleResources())
                 self.addDefaultOption(group, "q", "Request grid queue", possibleValues = self.getPossibleQueues())

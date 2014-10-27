@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 
-import os, sys, time, shutil, datetime, testoverview, logging, re, tarfile
+import os, sys, time, shutil, datetime, testoverview, logging, re, tarfile, stat
 from texttestlib import plugins
 from summarypages import GenerateSummaryPage, GenerateGraphs # only so they become package level entities
 from ordereddict import OrderedDict
@@ -622,15 +622,17 @@ class ArchiveRepository(ArchiveScript):
     def archiveFile(self, fullPath, app, weekdays):
         if os.path.basename(fullPath).startswith("teststate"):
             return ArchiveScript.archiveFile(self, fullPath, app)
-        newFile = fullPath + ".new"
-        with open(newFile, "w") as writeFile:
-            with open(fullPath) as readFile:
-                for line in readFile:
-                    dateStr = line.strip().split()[0].split("_")[0]
-                    if not self.shouldArchiveGivenDateString(dateStr, weekdays):
-                        writeFile.write(line)
-        os.rename(newFile, fullPath)
-                
+        linesToKeep = []
+        with open(fullPath) as readFile:
+            for line in readFile:
+                dateStr = line.strip().split()[0].split("_")[0]
+                if not self.shouldArchiveGivenDateString(dateStr, weekdays):
+                    linesToKeep.append(line)
+           
+        with open(fullPath, "w") as writeFile:
+            for line in linesToKeep:
+                writeFile.write(line)
+                                       
     def shouldArchive(self, file, weekdays):
         if file.startswith("succeeded_"):
             return True

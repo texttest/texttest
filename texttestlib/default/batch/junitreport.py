@@ -1,7 +1,7 @@
 
 import logging, os
 from ordereddict import OrderedDict
-from batchutils import calculateBatchDate
+from batchutils import getBatchRunName
 from string import Template
 from locale import getpreferredencoding
 from texttestlib import plugins
@@ -14,7 +14,7 @@ class JUnitResponder(plugins.Responder):
     
     def __init__(self, optionMap, *args):
         plugins.Responder.__init__(self)
-        self.runId = optionMap.get("name", calculateBatchDate()) # use the command-line name if given, else the date
+        self.runId = getBatchRunName(optionMap)
         self.allApps = OrderedDict()
         self.appData = OrderedDict()
 

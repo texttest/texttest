@@ -4,7 +4,7 @@ import os, sys, time, shutil, datetime, testoverview, logging, re, tarfile
 from texttestlib import plugins
 from summarypages import GenerateSummaryPage, GenerateGraphs # only so they become package level entities
 from ordereddict import OrderedDict
-from batchutils import calculateBatchDate, BatchVersionFilter, parseFileName, convertToUrl
+from batchutils import getBatchRunName, BatchVersionFilter, parseFileName, convertToUrl
 import subprocess
 from glob import glob
                 
@@ -142,7 +142,7 @@ class BatchApplicationData:
 class EmailResponder(plugins.Responder):
     def __init__(self, optionMap, *args):
         plugins.Responder.__init__(self)
-        self.runId = optionMap.get("name", calculateBatchDate()) # use the command-line name if given, else the date
+        self.runId = getBatchRunName(optionMap)
         self.batchAppData = OrderedDict()
         self.allApps = OrderedDict()
 
@@ -420,7 +420,7 @@ def writeSuccessLine(f, runPostfix, state):
 class SaveState(plugins.Responder):
     def __init__(self, optionMap, allApps):
         plugins.Responder.__init__(self)
-        self.runPostfix = self.getRunPostfix(optionMap.get("name"))
+        self.runPostfix = self.getRunPostfix(optionMap)
         self.failureFileName = "teststate_" + self.runPostfix
         self.successFileName = "succeeded_runs"
         self.repositories = {}
@@ -430,13 +430,13 @@ class SaveState(plugins.Responder):
     def isBatchDate(self, dateStr):
         return re.match("^[0-9]{2}[A-Za-z]{3}[0-9]{4}$", dateStr)
 
-    def getRunPostfix(self, nameGiven):
+    def getRunPostfix(self, optionMap):
         # include the date and the name, if any. Date is used for archiving, name for display
+        runName = getBatchRunName(optionMap)
         parts = []
-        if not nameGiven or not self.isBatchDate(nameGiven):
-            parts.append(calculateBatchDate())
-        if nameGiven:
-            parts.append(nameGiven)
+        if not self.isBatchDate(runName):
+            parts.append(plugins.startTimeString("%d%b%Y"))
+        parts.append(runName)
         return "_".join(parts)
     
     def notifyComplete(self, test):

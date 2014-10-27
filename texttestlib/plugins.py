@@ -75,8 +75,8 @@ controlDirNames = [ "CVS", ".svn", ".bzr", ".hg", ".git", "RCS", "_darcs", "{arc
 def localtime(format=datetimeFormat):
     return datetime.now().strftime(format)
 
-def startTimeString():
-    return globalStartTime.strftime(datetimeFormat)
+def startTimeString(format=datetimeFormat):
+    return globalStartTime.strftime(format)
 
 def importAndCall(moduleName, callableName, *args):
     command = "from " + moduleName + " import " + callableName + " as _callable"

@@ -560,6 +560,10 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
                 writeDir = os.path.dirname(errFile)
                 plugins.rmtree(writeDir)
             testSel[0].notify("CloseDynamic", usecase)
+            
+    def getOrderedOptions(self, optionGroup):
+        options, switches = self.extractSwitches(optionGroup)
+        return options + switches
 
     def fillVBox(self, vbox, optionGroup):
         if optionGroup is self.optionGroup:

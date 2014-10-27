@@ -685,6 +685,15 @@ class OptionGroupGUI(ActionGUI):
     def transferEnable(self, enabler, switch):
         if enabler.get_active():
             switch.updateMethod(True)
+            
+    def extractSwitches(self, optionGroup):
+        options, switches = [], []
+        for option in optionGroup.options.values():
+            if isinstance(option, plugins.Switch):
+                switches.append(option)
+            else:
+                options.append(option)
+        return options, switches
 
     def createSwitchWidget(self, switch, optionGroup, autoEnableInfo={}):
         if len(switch.options) >= 1:
@@ -861,15 +870,6 @@ class ActionTabGUI(OptionGroupGUI):
     def notifyReset(self, *args):
         self.optionGroup.reset()
 
-    def extractSwitches(self, optionGroup):
-        options, switches = [], []
-        for option in optionGroup.options.values():
-            if isinstance(option, plugins.Switch):
-                switches.append(option)
-            else:
-                options.append(option)
-        return options, switches
-    
     def fillVBox(self, vbox, optionGroup):
         options, switches = self.extractSwitches(optionGroup)
         if len(options) > 0:
@@ -1037,9 +1037,12 @@ class ActionDialogGUI(OptionGroupGUI):
     def simulateResponse(self, dummy, dialog):
         dialog.response(gtk.RESPONSE_ACCEPT)
         
+    def getOrderedOptions(self, optionGroup):
+        return optionGroup.options.values()
+
     def fillVBox(self, vbox, optionGroup, includeOverrides=True):
         fileChooser, fileChooserOption = None, None
-        allOptions = optionGroup.options.values()
+        allOptions = self.getOrderedOptions(optionGroup)
         for option in allOptions:
             self.addValuesFromConfig(option, includeOverrides)
             

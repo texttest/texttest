@@ -1000,6 +1000,7 @@ clicked =
 
 [Title=Rerun selected tests]
 response.accept = perform rerun
+response.cancel = cancel rerun
 
 [Label=Mixed Mode]
 toggled.true = set option for recording only new traffic interactions

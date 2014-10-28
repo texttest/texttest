@@ -111,8 +111,15 @@ class GenerateWebPages(object):
                     testId = self.getTestIdentifier(successFile, repository)
                     extraVersion = self.findExtraVersion(repository)
                     with open(successFile) as f:
+                        fileTags = set()
                         for line in f:
                             tag, text = line.strip().split(" ", 1)
+                            if tag in fileTags:
+                                sys.stderr.write("WARNING: more than one result present for tag '" + tag + "' in file " + successFile + "!\n")
+                                sys.stderr.write("Ignoring later ones\n")
+                                continue
+                                
+                            fileTags.add(tag)
                             if len(tags) == 0 or tag in tags:
                                 loggedTests.setdefault(extraVersion, OrderedDict()).setdefault(testId, OrderedDict())[tag] = text
                                 categoryHandlers.setdefault(tag, CategoryHandler()).registerInCategory(testId, "success", extraVersion, text)

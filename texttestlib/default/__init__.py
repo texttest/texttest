@@ -1354,7 +1354,7 @@ class Config:
         # Disable passwords: only use public key based authentication.
         # Also disable hostkey checking, we assume we don't run tests on untrusted hosts.
         # Also don't run tests on machines which take a very long time to connect to...
-        sshOptions = "-o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10"
+        sshOptions = "-o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=30"
         rsyncExcludeFile = plugins.installationPath("etc", "rsync_exclude_patterns")
         return { "default": "", "ssh" : "-q " + sshOptions,
                  "rsync" : "-e 'ssh -x " + sshOptions + "' -av --copy-unsafe-links --delete --exclude-from=" + rsyncExcludeFile, "scp": "-Crp " + sshOptions }

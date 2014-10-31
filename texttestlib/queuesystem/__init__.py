@@ -14,11 +14,11 @@ def getConfig(optionMap):
             
 class QueueSystemConfig(default.Config):
     defaultMaxCapacity = 100000
+    useCloud = False
     def __init__(self, *args):
         default.Config.__init__(self, *args)
-        self.useQueueSystem = None
-        self.useCloud = None
-
+        self.useQueueSystem = False
+        
     def getRunningGroupNames(self, app):
         groups = default.Config.getRunningGroupNames(self, app)
         useGrid = app is None or app.getConfigValue("queue_system_module") not in [ "local", "ec2cloud" ]
@@ -37,7 +37,7 @@ class QueueSystemConfig(default.Config):
         minTestCount = min((app.getConfigValue("queue_system_min_test_count") for app in apps))
         localQueueSystem = self.useLocalQueueSystem(apps)
         useGrid = all((app.getConfigValue("queue_system_module") not in [ "local", "ec2cloud" ] for app in apps))
-        self.useCloud = all((app.getConfigValue("queue_system_module") == "ec2cloud" for app in apps))
+        QueueSystemConfig.useCloud = all((app.getConfigValue("queue_system_module") == "ec2cloud" for app in apps))
         for group in groups:
             if group.name.startswith("Basic"):
                 options = [ "Always", "Never" ]

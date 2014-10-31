@@ -909,6 +909,7 @@ class SlaveRequestHandler(StreamRequestHandler):
             self.pushFiles(test)
         elif not test.state.isComplete() or not test.state.hasResults(): # we might have killed it already...
             if sendFiles:
+                self.server.diag.info("Test " + test.uniqueName + " - receiving files sent from slave to sandbox directory")
                 directoryUnserialise(test.writeDirectory, self.rfile)
             # Don't use port, it changes all the time
             self.handleRequestFromHost(test, identifier, tryReuse, rerun)

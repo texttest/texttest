@@ -51,6 +51,19 @@ def parseFileName(fileName, diag):
             pass
     return None, None, None
 
+def getEnvironmentFromRunFiles(runNameDirs, tag):
+    env = {}
+    for dir in runNameDirs:
+        path = os.path.join(dir, tag)
+        if os.path.isfile(path):
+            with open(path) as f:
+                for line in f:
+                    if "=" in line:
+                        var, val = line.strip().split("=", 1)
+                        env[var] = val
+    return env
+
+
 def convertToUrl(path, fileMapping):
     for filePath, httpPath in fileMapping.items():
         if path.startswith(filePath):

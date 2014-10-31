@@ -6,7 +6,8 @@ from texttestlib import plugins
 from HTMLParser import HTMLParser
 from ordereddict import OrderedDict
 from glob import glob
-from batchutils import BatchVersionFilter, parseFileName, convertToUrl
+from itertools import groupby
+from batchutils import BatchVersionFilter, parseFileName, convertToUrl, getEnvironmentFromRunFiles
 
 class GenerateFromSummaryData(plugins.ScriptWithArgs):
     locationApps = OrderedDict()
@@ -101,6 +102,7 @@ class SummaryDataFinder:
         self.appVersionInfo = {}
         self.appUsePie = {}
         self.appDirs = OrderedDict()
+        self.appRuns = {}
         self.colourFinder, self.inputOptions = None, None
         if len(apps) > 0:
             self.colourFinder = testoverview.ColourFinder(apps[0][0].getCompositeConfigValue)
@@ -109,6 +111,11 @@ class SummaryDataFinder:
         for app, usePie, _ in apps:
             appnames.add(app.name)
             self.appUsePie[app.fullName()] = usePie
+            repo = app.getBatchConfigValue("batch_result_repository")
+            if repo:
+                runDir = os.path.join(repo, "run_names")
+                if os.path.isdir(runDir):
+                    self.appRuns[app.fullName()] = runDir
             appDir = os.path.join(location, app.name)
             self.diag.info("Searching under " + repr(appDir))
             if os.path.isdir(appDir):
@@ -186,14 +193,20 @@ class SummaryDataFinder:
     def getOverviewPage(self, appName, version):
         return os.path.join(self.basePath, self.getShortAppName(appName), self.getOverviewPageName(version))
 
-    def getMostRecentDateAndTag(self):
-        allDates = []
+    def getMostRecentDateAndTags(self):
+        allInfo = {}
         for appName, appInfo in self.appVersionInfo.items():
             for versionData in appInfo.values():
                 mostRecentInfo = max(versionData.keys(), key=self.getDateTagKey)
-                allDates.append(mostRecentInfo)
-                self.diag.info("Most recent date for " + appName + " = " + repr(mostRecentInfo))
-        return max(allDates)
+                allTagsRecentDate = filter(lambda x: x[0] == mostRecentInfo[0], versionData.keys())
+                lastInfoPerEnv = self.getLastInfoPerEnvironment(allTagsRecentDate, self.appRuns.get(appName))
+                for envData, lastInfo in lastInfoPerEnv.items():
+                    allInfo.setdefault(envData, []).append(lastInfo)
+                self.diag.info("Most recent date for " + appName + " = " + repr(lastInfoPerEnv))
+        mostRecent = []
+        for envData, lastInfoList in allInfo.items():
+            mostRecent.append(max(lastInfoList, key=self.getDateTagKey))
+        return mostRecent
     
     def getDateTagKey(self, info):
         return info[0], plugins.padNumbersWithZeroes(info[1])
@@ -209,27 +222,55 @@ class SummaryDataFinder:
                 return False # if matplotlib isn't installed or is too old
         else:
             return False
-
+        
+    def getLastInfoPerEnvironment(self, allTagsRecentDate, runDir):
+        if runDir is None:
+            return { (None, None) : max(allTagsRecentDate, key=self.getDateTagKey) }
+        def getEnvironmentData(tag):
+            date, actualTag = tag
+            fullTag = time.strftime("%d%b%Y", date) + "_" + actualTag
+            runEnv = getEnvironmentFromRunFiles([ runDir ], fullTag)
+            return runEnv.get("JENKINS_URL"), runEnv.get("JOB_NAME")
+            
+        allLastInfo = {}
+        for envData, tags in groupby(allTagsRecentDate, key=getEnvironmentData):
+            allLastInfo[envData] = max(tags, key=self.getDateTagKey)
+        if len(allLastInfo) > 1 and (None, None) in allLastInfo:
+            del allLastInfo[(None, None)]
+        return allLastInfo
+        
     def getLatestSummary(self, appName, version):
         versionData = self.appVersionInfo[appName][version]
         lastInfo = max(versionData.keys(), key=self.getDateTagKey)
-        path = versionData[lastInfo]
-        summary = self.extractSummary(path)
-        self.diag.info("For version " + version + ", found summary info " + repr(summary))
+        allTagsRecentDate = filter(lambda x: x[0] == lastInfo[0], versionData.keys())
+        summary = OrderedDict()
+        for lastInfo in self.getLastInfoPerEnvironment(allTagsRecentDate, self.appRuns.get(appName)).values():
+            path = versionData[lastInfo]
+            self.diag.info("Extracting summary information from " + path)
+            self.extractSummary(path, summary)
+            self.diag.info("For version " + version + ", found summary info " + repr(summary))
+        self.diag.info("Last Info for version " + version + " = " + repr(lastInfo))
         return summary, lastInfo
 
     def getAllSummaries(self, appName, version):
         versionData = self.appVersionInfo[appName][version]
         allDates = versionData.keys()
         allDates.sort(key=self.getDateTagKey)
-        return [ (time.strftime("%d%b%Y", currInfo[0]), self.extractSummary(versionData[currInfo])) for currInfo in allDates ]
+        summaries = [ (time.strftime("%d%b%Y", currInfo[0]), self.extractSummary(versionData[currInfo], OrderedDict())) for currInfo in allDates ]
+        self.diag.info("All Summaries = " + repr(summaries))
+        return summaries
 
-    def extractSummary(self, datedFile):
+    def extractSummary(self, datedFile, summary):
         for line in open(datedFile):
             if line.strip().startswith("<H2>"):
                 text = line.strip()[4:-5] # drop the tags
-                return self.parseSummaryText(text)
-        return {}
+                for cat, num in self.parseSummaryText(text).items():
+                    if cat in summary:
+                        summary[cat] += num
+                    else:
+                        summary[cat] = num
+                return summary
+        return summary
 
     def parseSummaryText(self, text):
         words = text.split()[3:] # Drop "Version: 12 tests"
@@ -282,9 +323,9 @@ class SummaryGenerator:
         file = open(dataFinder.summaryPageName, "w")
         versionOrder = [ "default" ]
         appOrder = []
-        mostRecentInfo = dataFinder.getMostRecentDateAndTag()
-        mostRecentTag = mostRecentInfo[1]
-        self.diag.info("Most recent results are from " + repr(mostRecentTag))
+        mostRecentInfo = dataFinder.getMostRecentDateAndTags()
+        mostRecentTags = [ i[1] for i in mostRecentInfo ]
+        self.diag.info("Most recent results are from " + repr(mostRecentTags))
         for line in open(dataFinder.getTemplateFile()):
             if "<title>" in line:
                 file.write(self.adjustLineForTitle(line))
@@ -295,7 +336,8 @@ class SummaryGenerator:
             if "Version order=" in line:
                 versionOrder += self.extractOrder(line)
             if "<h1" in line:
-                file.write("<h3 align=\"center\">(from test run " + mostRecentTag + ")</h3>\n")
+                postfix = "s" if len(mostRecentTags) > 1 else ""
+                file.write("<h3 align=\"center\">(from test run" + postfix + " " + ", ".join(mostRecentTags) + ")</h3>\n")
             if "Insert table here" in line:
                 self.insertSummaryTable(file, dataFinder, mostRecentInfo, appsWithVersions, appOrder, versionOrder)
         file.close()
@@ -366,7 +408,9 @@ class SummaryGenerator:
     def showResultAsOld(self, info, mostRecentInfo):
         # Only do this for timed results, i.e. nightjobs etc. From CI/Jenkins etc we can't really tell 
         # - it depends on the schedule which we can't see and may not even exist
-        return info[0] != mostRecentInfo[0] and self.isDate(info[1])
+        if not self.isDate(info[1]):
+            return False
+        return all((info[0] != i[0] for i in mostRecentInfo))
 
     def isDate(self, tag):
         return len(tag) == 9 and tag[:2].isdigit() and tag[2:5].isalpha() and tag[5:].isdigit()

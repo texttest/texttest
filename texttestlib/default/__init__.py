@@ -706,7 +706,7 @@ class Config:
         return self.optionMap.has_key("b")
     
     def actualBatchMode(self):
-        return self.batchMode() and not self.isReconnecting() and not self.runningScript()
+        return self.batchMode() and not self.isReconnecting() and not self.runningScript() and not "coll" in self.optionMap
     
     def keepTemporaryDirectories(self):
         if "keeptmp" in self.optionMap:

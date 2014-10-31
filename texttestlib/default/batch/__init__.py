@@ -476,7 +476,42 @@ class SaveState(plugins.Responder):
         self.diag.info("Test state repository is " + repr(testStateRepository))
         if testStateRepository:
             self.repositories[suite.app] = os.path.abspath(testStateRepository)
+            self.registerRunName(testStateRepository, suite.app)
             
+    def makeInitialRunFile(self, app, runFile):
+        plugins.ensureDirExistsForFile(runFile)
+        with open(runFile, "w") as f:
+            for envVar in ["JENKINS_URL", "JOB_NAME", "BUILD_NUMBER"]:
+                if envVar in os.environ:
+                    f.write(envVar + "=" + os.getenv(envVar) + "\n")
+                else:
+                    break
+        
+            f.write(repr(app) + "\n")
+
+    def runAlreadyExists(self, runFile, app):
+        text = repr(app)
+        with open(runFile) as f:
+            for line in f:
+                if line.strip() == text:
+                    return True
+        return False
+
+    def registerRunName(self, repository, app):
+        runFile = os.path.join(repository, "run_names", self.runPostfix)
+        if os.path.isfile(runFile):
+            if self.runAlreadyExists(runFile, app):
+                raise plugins.TextTestError, "ERROR: Cannot run batch tests with run name '" + self.runPostfix + "', name has already been used for a different run\n" + \
+                    "See file at " + runFile + ", which contains the entry '" + repr(app) + "'"
+
+            with open(runFile, "a") as f:
+                f.write(repr(app) + "\n")
+        else:
+            try:
+                self.makeInitialRunFile(app, runFile)
+            except EnvironmentError:
+                plugins.printWarning("Could not write run file at " + runFile)
+                    
             
 class MigrateBatchRepository(plugins.Action):
     def __init__(self):
@@ -617,10 +652,15 @@ class ArchiveRepository(ArchiveScript):
         
     def archiveFiles(self, suite):
         weekdays = self.getWeekDays(suite)
-        self.archiveFilesUnder(self.repository, suite.app, weekdays)
+        runDir = os.path.join(os.path.dirname(self.repository), "run_names")
+        if os.path.isdir(runDir):
+            self.archiveFilesUnder(runDir, suite.app, weekdays, True)
+        self.archiveFilesUnder(self.repository, suite.app, weekdays, False)
         
-    def archiveFile(self, fullPath, app, weekdays):
-        if os.path.basename(fullPath).startswith("teststate"):
+    def archiveFile(self, fullPath, app, weekdays, isRunFile):
+        if isRunFile:
+            return os.remove(fullPath)
+        elif os.path.basename(fullPath).startswith("teststate"):
             return ArchiveScript.archiveFile(self, fullPath, app)
         linesToKeep = []
         with open(fullPath) as readFile:
@@ -633,7 +673,11 @@ class ArchiveRepository(ArchiveScript):
             for line in linesToKeep:
                 writeFile.write(line)
                                        
-    def shouldArchive(self, file, weekdays):
+    def shouldArchive(self, file, weekdays, isRunFile):
+        if isRunFile:
+            dateStr = file.split("_")[0]
+            return self.shouldArchiveGivenDateString(dateStr, weekdays)
+            
         if file.startswith("succeeded_"):
             return True
         if not file.startswith("teststate"):

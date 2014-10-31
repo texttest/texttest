@@ -7,7 +7,7 @@ from cPickle import Unpickler, UnpicklingError
 from ordereddict import OrderedDict
 from glob import glob
 from pprint import pformat
-from batchutils import convertToUrl
+from batchutils import convertToUrl, getEnvironmentFromRunFiles
 HTMLgen.PRINTECHO = 0
 
 def getWeekDay(tag):
@@ -138,7 +138,7 @@ class GenerateWebPages(object):
                     tableHeader = self.getTableHeader(version, repositoryDirs)
                     heading = self.getHeading(versionToShow)
                     hasNewData, graphLink, tableColours = self.addTable(page, self.resourceNames, categoryHandlers, version,
-                                                                        loggedTests, sel, tableHeader, filePath, heading)
+                                                                        loggedTests, sel, tableHeader, filePath, heading, repositoryDirInfo)
                     hasData |= hasNewData
                     pageColours.update(tableColours)
                     if graphLink:
@@ -322,11 +322,11 @@ class GenerateWebPages(object):
     def getTestTable(self, *args):
         return TestTable(*args)
         
-    def addTable(self, page, resourceNames, categoryHandlers, version, loggedTests, selector, tableHeader, filePath, graphHeading):
+    def addTable(self, page, resourceNames, categoryHandlers, version, loggedTests, selector, tableHeader, filePath, graphHeading, repositoryDirs):
         graphDirname, graphFileRef = self.getGraphFileParts(filePath, version)
         testTable = self.getTestTable(self.getConfigValue, resourceNames, self.descriptionInfo,
                                       selector.selectedTags, categoryHandlers, self.pageVersion, version, os.path.join(graphDirname, graphFileRef))
-        table = testTable.generate(loggedTests, self.pageDir)
+        table = testTable.generate(loggedTests, self.pageDir, repositoryDirs)
         if table:
             cells = []
             if tableHeader:
@@ -414,9 +414,9 @@ class TestTable:
         else:
             return False
 
-    def generate(self, loggedTests, pageDir):
+    def generate(self, loggedTests, pageDir, repositoryDirs):
         table = HTMLgen.TableLite(border=0, cellpadding=4, cellspacing=2,width="100%")
-        table.append(self.generateTableHead())
+        table.append(self.generateTableHead(repositoryDirs))
         table.append(self.generateSummaries())
         if os.getenv("JENKINS_URL"):
             changeRow = self.generateJenkinsChanges(pageDir)
@@ -675,19 +675,31 @@ class TestTable:
     def findTagColour(self, tag):
         return self.colourFinder.find("run_" + getWeekDay(tag) + "_fg")
 
-    def generateTableHead(self):
+    def getRunNameDirs(self, repositoryDirs):
+        runNameDirs = set()
+        for _, dir in repositoryDirs:
+            runNameDirs.add(os.path.join(os.path.dirname(os.path.dirname(dir)), "run_names"))
+        return runNameDirs
+    
+    def getRunEnv(self, runEnv, key):
+        return runEnv.get(key, os.getenv(key))
+
+    def generateTableHead(self, repositoryDirs):
         head = [ HTMLgen.TH("Test") ]
+        jenkinsUrl = os.getenv("JENKINS_URL")
+        runNameDirs = self.getRunNameDirs(repositoryDirs) if jenkinsUrl else []
         for tag in self.tags:
             tagColour = self.findTagColour(tag)
             linkTarget = getDetailPageName(self.pageVersion, tag)
             linkText = HTMLgen.Font(getDisplayText(tag), color=tagColour)
             buildNumber = self.getJenkinsBuildNumber(tag)
-            if os.getenv("JENKINS_URL") and buildNumber.isdigit():
+            if jenkinsUrl and buildNumber.isdigit():
+                runEnv = getEnvironmentFromRunFiles(runNameDirs, tag)
                 container = HTMLgen.Container()
                 tooltip = jenkinschanges.getTimestamp(buildNumber)
                 container.append(HTMLgen.Href(linkTarget, linkText, title=tooltip))
                 container.append(HTMLgen.BR())
-                jobTarget = os.path.join(os.getenv("JENKINS_URL"), "job", os.getenv("JOB_NAME"), buildNumber)
+                jobTarget = os.path.join(self.getRunEnv(runEnv, "JENKINS_URL"), "job", self.getRunEnv(runEnv, "JOB_NAME"), buildNumber)
                 jobText = HTMLgen.Emphasis(HTMLgen.Font("(Jenkins " + buildNumber + ")", size=1))
                 container.append(HTMLgen.Href(jobTarget, jobText, title=tooltip))
                 head.append(HTMLgen.TH(container))

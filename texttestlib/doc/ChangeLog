@@ -2664,6 +2664,7 @@ Batch Report Enhancements:
 	New migration script to convert. Old format is still understood, so migration will happen naturally (but slowly) anyway
     - Batch runs from Jenkins now automatically add the Jenkins run number to their batch session, along with the date
     - additional HTML classes added to generated summary tables, allows for more CSS possibilities
+    - Adding new run-level data store to batch repositories
 Grid Engine/Cloud enhancements/bug fixes:
     - Reworked setup so that cloud instances don't flood master machine's SSH daemon with SSH requests
 Bug Fixes:

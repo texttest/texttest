@@ -440,6 +440,7 @@ class RunningAction(BasicRunningAction):
     def notifyReset(self, *args):
         for optionGroup in self.optionGroups:
             optionGroup.reset()
+        self.temporaryGroup.reset()
 
     def _getStockId(self):
         return "execute"

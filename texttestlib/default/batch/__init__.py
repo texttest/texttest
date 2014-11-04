@@ -553,18 +553,22 @@ class ArchiveScript(plugins.ScriptWithArgs):
         self.afterDate = self.parseDate(argDict, "after")
         self.descriptors.sort()
         self.repository = None
-        if not self.beforeDate and not self.afterDate:
-            raise plugins.TextTestError, "Cannot archive the entire repository - give cutoff dates!"
-        
-    def getCutoffParameters(self):
-        return [ "before", "after" ]
+        if len(argDict) == 0:
+            raise plugins.TextTestError, "Cannot archive the entire repository - give cutoff dates or run names!"
 
     def parseDate(self, dict, key):
-        if not dict.has_key(key):
+        return self.extractArg(dict, key, isDate=True)
+    
+    def extractArg(self, dict, key, isDate=False):
+        if not key in dict:
             return
         val = dict[key]
-        self.descriptors.append(key + " " + val)
-        return self.dateInSeconds(val)
+        if isDate:
+            self.descriptors.append("dated " + key + " " + val)
+            return self.dateInSeconds(val)
+        else:
+            self.descriptors.append("with " + key + " " + val)
+            return val
 
     def getDateFormat(self, val):
         return "%b%Y" if len(val) == 7 else "%d%b%Y"
@@ -573,11 +577,15 @@ class ArchiveScript(plugins.ScriptWithArgs):
         dateFormat = self.getDateFormat(val)
         return time.mktime(time.strptime(val, dateFormat))
 
+    def getShortDescriptorText(self):
+        shortDescriptors = [ d.split(" ", 1)[-1] for d in self.descriptors ]
+        return "_".join(shortDescriptors).replace(" ", "_")
+
     def makeTarArchive(self, suite, repository):
         historyDir = suite.app.name + "_history"
         fullHistoryDir = os.path.join(repository, historyDir)
         if os.path.isdir(fullHistoryDir):
-            tarFileName = historyDir + "_" + "_".join(self.descriptors).replace(" ", "_") + ".tar.gz"
+            tarFileName = historyDir + "_" + self.getShortDescriptorText() + ".tar.gz"
             plugins.log.info("Archiving completed for " + self.repository + ", created tarfile at " + tarFileName)
             subprocess.call(["tar", "cfz", tarFileName, historyDir], cwd=repository)
             plugins.rmtree(fullHistoryDir)
@@ -597,7 +605,7 @@ class ArchiveScript(plugins.ScriptWithArgs):
             elif os.path.isdir(fullPath):
                 self.archiveFilesUnder(fullPath, app, *args)
         if count > 0:
-            plugins.log.info("Archived " + str(count) + " files dated " + ", ".join(self.descriptors) + " under " + repository.replace(self.repository + os.sep, ""))
+            plugins.log.info("Archived " + str(count) + " files " + ", ".join(self.descriptors) + " under " + repository.replace(self.repository + os.sep, ""))
 
     def setUpSuite(self, suite):
         if suite.parent is None:
@@ -634,12 +642,12 @@ class ArchiveScript(plugins.ScriptWithArgs):
         return True
 
 
-
 class ArchiveRepository(ArchiveScript):
     scriptDoc = "Archive parts of the batch result repository to a history directory"
     def __init__(self, args):
-        argDict = self.parseArguments(args, [ "before", "after", "weekday_pages_before" ])
+        argDict = self.parseArguments(args, [ "before", "after", "weekday_pages_before", "name" ])
         ArchiveScript.__init__(self, argDict)
+        self.name = self.extractArg(argDict, "name")
         self.weekdayBeforeDate = self.parseDate(argDict, "weekday_pages_before")
         
     def getRepository(self, suite):
@@ -665,25 +673,33 @@ class ArchiveRepository(ArchiveScript):
         linesToKeep = []
         with open(fullPath) as readFile:
             for line in readFile:
-                dateStr = line.strip().split()[0].split("_")[0]
-                if not self.shouldArchiveGivenDateString(dateStr, weekdays):
+                tag = line.strip().split()[0]
+                if not self.shouldArchiveGivenTag(tag, weekdays):
                     linesToKeep.append(line)
            
         with open(fullPath, "w") as writeFile:
             for line in linesToKeep:
                 writeFile.write(line)
+                
+    def shouldArchiveGivenTag(self, tag, weekdays):
+        parts = tag.split("_")
+        dateStr = parts[0]
+        if self.name:
+            runName = dateStr if len(parts) == 1 else "_".join(parts[1:])
+            return runName == self.name
+        else:
+            return self.shouldArchiveGivenDateString(dateStr, weekdays)
                                        
     def shouldArchive(self, file, weekdays, isRunFile):
         if isRunFile:
-            dateStr = file.split("_")[0]
-            return self.shouldArchiveGivenDateString(dateStr, weekdays)
+            return self.shouldArchiveGivenTag(file, weekdays)
             
         if file.startswith("succeeded_"):
             return True
         if not file.startswith("teststate"):
             return False
-        dateStr = file.split("_")[1]
-        return self.shouldArchiveGivenDateString(dateStr, weekdays)
+        
+        return self.shouldArchiveGivenTag(file.replace("teststate_", ""), weekdays)
     
     def shouldArchiveGivenDateString(self, dateStr, weekdays):
         timeStruct = time.strptime(dateStr, self.getDateFormat(dateStr))

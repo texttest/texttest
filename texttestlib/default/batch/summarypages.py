@@ -193,20 +193,27 @@ class SummaryDataFinder:
     def getOverviewPage(self, appName, version):
         return os.path.join(self.basePath, self.getShortAppName(appName), self.getOverviewPageName(version))
 
+
+    def getAppRunDirectory(self, appName):
+        if appName in self.appRuns:
+            return self.appRuns.get(appName)
+        elif len(self.appRuns) == 1: # application in question might not be loaded right now
+            return self.appRuns.values()[0]
+
     def getMostRecentDateAndTags(self):
         allInfo = {}
         for appName, appInfo in self.appVersionInfo.items():
             for versionData in appInfo.values():
                 mostRecentInfo = max(versionData.keys(), key=self.getDateTagKey)
                 allTagsRecentDate = filter(lambda x: x[0] == mostRecentInfo[0], versionData.keys())
-                lastInfoPerEnv = self.getLastInfoPerEnvironment(allTagsRecentDate, self.appRuns.get(appName))
+                lastInfoPerEnv = self.getLastInfoPerEnvironment(allTagsRecentDate, self.getAppRunDirectory(appName))
                 for envData, lastInfo in lastInfoPerEnv.items():
                     allInfo.setdefault(envData, []).append(lastInfo)
                 self.diag.info("Most recent date for " + appName + " = " + repr(lastInfoPerEnv))
-        mostRecent = []
+        mostRecent = set()
         for envData, lastInfoList in allInfo.items():
-            mostRecent.append(max(lastInfoList, key=self.getDateTagKey))
-        return mostRecent
+            mostRecent.add(max(lastInfoList, key=self.getDateTagKey))
+        return sorted(mostRecent, key=self.getDateTagKey)
     
     def getDateTagKey(self, info):
         return info[0], plugins.padNumbersWithZeroes(info[1])
@@ -244,7 +251,7 @@ class SummaryDataFinder:
         lastInfo = max(versionData.keys(), key=self.getDateTagKey)
         allTagsRecentDate = filter(lambda x: x[0] == lastInfo[0], versionData.keys())
         summary = OrderedDict()
-        for lastInfo in self.getLastInfoPerEnvironment(allTagsRecentDate, self.appRuns.get(appName)).values():
+        for lastInfo in self.getLastInfoPerEnvironment(allTagsRecentDate, self.getAppRunDirectory(appName)).values():
             path = versionData[lastInfo]
             self.diag.info("Extracting summary information from " + path)
             self.extractSummary(path, summary)
@@ -422,7 +429,7 @@ class SummaryGenerator:
         self.diag.info("Minimum column indices are " + repr(minColumnIndices))
         columnVersions = {}
         for appName in self.getOrderedVersions(appOrder, pageInfo):
-            file.write("<tr>\n")
+            file.write('<tr class="application_row">\n')
             file.write('  <td class="application_name"><h3>' + appName + "</h3></td>\n")
             versions = pageInfo[appName]
             orderedVersions = self.getOrderedVersions(versionOrder, versions)

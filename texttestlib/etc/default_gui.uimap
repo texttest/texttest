@@ -1166,3 +1166,9 @@ activate = kill selected process
 [Title=Show Processes]
 response.accept = close process view
 
+[Name=Show Filters]
+activate = show filters
+
+[Title=Show Filters]
+response.accept = accept shown filters
+

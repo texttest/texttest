@@ -868,7 +868,46 @@ class TestFileFiltering(guiplugins.ActionGUI):
         
     def getSignalsSent(self):
         return [ "ViewReadonlyFile" ]
+    
 
+class ShowFilters(guiplugins.ActionResultDialogGUI):
+    def __init__(self, *args, **kw):
+        guiplugins.ActionResultDialogGUI.__init__(self, *args, **kw)
+        self.treeView = None
+        
+    def _getTitle(self):
+        return "Show Filters"
+    
+    def isActiveOnCurrent(self):
+        return len(self.currFileSelection) == 1 and len(self.currTestSelection) == 1
+        
+    def addContents(self):
+        fileName = self.currFileSelection[0][0]
+        test = self.currTestSelection[0]
+        allFilters = test.app.getAllFilters(test, fileName)
+        if allFilters:
+            self.addFilterBoxes(allFilters)
+        else:
+            messageBox = self.createDialogMessage("No run_dependent_text filters defined for file '" + os.path.basename(fileName) + "' for this test.", gtk.STOCK_DIALOG_INFO)
+            self.dialog.vbox.pack_start(messageBox)
+                
+    def addFilterBoxes(self, allFilters):
+        for filterObj in allFilters:
+            listStore = gtk.ListStore(str)
+            for lineFilter in filterObj.lineFilters:
+                listStore.append([ lineFilter.originalText ])
+            treeView = gtk.TreeView(listStore)
+            treeView.set_name(filterObj.configKey + " Tree View")
+        
+            cell = gtk.CellRendererText()
+            column = gtk.TreeViewColumn(filterObj.configKey.replace("_", "__"), cell, text=0)         
+            treeView.append_column(column)
+        
+            treeView.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
+            frame = gtk.Frame()
+            frame.add(treeView)
+            self.dialog.vbox.pack_start(frame)
+    
 
 class InsertShortcuts(RunScriptAction, guiplugins.OptionGroupGUI):
     def __init__(self, allApps, dynamic, inputOptions):
@@ -904,4 +943,4 @@ def getInteractiveActionClasses(dynamic):
     if dynamic:
         return [ RerunTests, ReloadTests ]
     else:
-        return [ RunTests, RecordTest, ReconnectToTests, ReplaceText, TestFileFiltering, InsertShortcuts ]
+        return [ RunTests, RecordTest, ReconnectToTests, ReplaceText, ShowFilters, TestFileFiltering, InsertShortcuts ]

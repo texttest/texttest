@@ -35,8 +35,8 @@ class FilterAction(plugins.Action):
     def performAllFilterings(self, test, stem, fileName, newFileName):
         currFileName = fileName
         filters = self.makeAllFilters(test, stem, test.app)
-        for fileFilter, extraPostfix in filters:
-            writeFileName = newFileName + extraPostfix
+        for fileFilter in filters:
+            writeFileName = newFileName + "." + fileFilter.postfix
             self.diag.info("Applying " + fileFilter.__class__.__name__ + " to make\n" + writeFileName + " from\n " + currFileName) 
             if os.path.isfile(writeFileName):
                 self.diag.info("Removing previous file at " + writeFileName)
@@ -49,16 +49,19 @@ class FilterAction(plugins.Action):
         if len(filters) > 0 and currFileName != newFileName:
             shutil.move(currFileName, newFileName)
 
-    def getFilteredText(self, test, fileName, app):
+    def getAllFilters(self, test, fileName, app):
         stem = self.getStem(fileName)
-        filters = self.makeAllFilters(test, stem, app)
+        return self.makeAllFilters(test, stem, app)
+
+    def getFilteredText(self, test, fileName, app):
+        filters = self.getAllFilters(test, fileName, app)
         inFile = open(fileName)
         if len(filters) == 0:
             try:
                 return inFile.read()
             finally:
                 inFile.close()
-        for fileFilter, _ in filters:
+        for fileFilter in filters:
             self.diag.info("Applying " + fileFilter.__class__.__name__ + " to " + fileName) 
             outFile = StringIO()
             fileFilter.filterFile(inFile, outFile)
@@ -72,7 +75,7 @@ class FilterAction(plugins.Action):
     def makeAllFilters(self, test, stem, app):
         filters = self._makeAllFilters(test, stem, app)
         if len(filters) == 0 and self.changedOs(app):
-            return  [ (RunDependentTextFilter([], ""), "") ]
+            return  [ RunDependentTextFilter([], "") ]
         else:
             return filters
 
@@ -81,13 +84,12 @@ class FilterAction(plugins.Action):
         configObj = test
         if test.app is not app: # happens when testing filtering in the static GUI
             configObj = app
-        runDepTexts = configObj.getCompositeConfigValue("run_dependent_text", stem)
-        if runDepTexts:
-            filters.append((RunDependentTextFilter(runDepTexts, test.getRelPath()), ".normal"))
+            
+        for filterClass in [ RunDependentTextFilter, UnorderedTextFilter ]:
+            texts = configObj.getCompositeConfigValue(filterClass.configKey, stem)
+            if texts:
+                filters.append(filterClass(texts, test.getRelPath()))
 
-        unorderedTexts = configObj.getCompositeConfigValue("unordered_text", stem)
-        if unorderedTexts:
-            filters.append((UnorderedTextFilter(unorderedTexts, test.getRelPath()), ".sorted"))
         return filters
             
     def changedOs(self, app):
@@ -124,7 +126,7 @@ class FilterTemporary(FilterAction):
             if not os.path.isfile(origFile):
                 origFile = test.getFileName(stem)
             if origFile and os.path.isfile(origFile):
-                filters.append((FloatingPointFilter(origFile, floatTolerance, relTolerance), ".fpdiff"))
+                filters.append(FloatingPointFilter(origFile, floatTolerance, relTolerance))
         return filters
 
     def changeToFilteringState(self, test):
@@ -146,7 +148,7 @@ class FilterOriginalForScript(FilterOriginal):
 class FilterErrorText(FilterAction):
     def _makeAllFilters(self, test, stem, app):
         texts = app.getConfigValue("suppress_stderr_text")
-        return [ (RunDependentTextFilter(texts), "") ]
+        return [ RunDependentTextFilter(texts) ]
     
 
 class FilterProgressRecompute(FilterAction):
@@ -166,6 +168,7 @@ class FilterResultRecompute(FilterAction):
         return result
 
 class FloatingPointFilter:
+    postfix = "fpdiff"
     def __init__(self, origFileName, tolerance, relative):
         self.origFileName = origFileName
         self.tolerance, self.relative = None, None
@@ -181,6 +184,8 @@ class FloatingPointFilter:
 
 
 class RunDependentTextFilter(plugins.Observable):
+    configKey = "run_dependent_text"
+    postfix = "normal"
     def __init__(self, filterTexts, testId=""):
         plugins.Observable.__init__(self)
         self.diag = logging.getLogger("Run Dependent Text")
@@ -277,6 +282,8 @@ class RunDependentTextFilter(plugins.Observable):
 
 
 class UnorderedTextFilter(RunDependentTextFilter):
+    configKey = "unordered_text"
+    postfix = "sorted"
     def filterFile(self, file, newFile):
         unorderedLines = {}
         RunDependentTextFilter.filterFile(self, file, newFile, unorderedLines)
@@ -351,7 +358,7 @@ class LineFilter:
         self.wordNumber = None
         self.replaceText = None
         self.divider = None
-        self.removeWordsAfter = 0
+        self.removeWordsAfter = False
         self.parseOriginalText()
         self.diag.info("Created trigger : " + repr(self.trigger))
         
@@ -405,7 +412,7 @@ class LineFilter:
             self.replaceText = parameter
         elif matchModifierString == "{WORD ":
             if parameter.endswith("+"):
-                self.removeWordsAfter = 1
+                self.removeWordsAfter = True
                 self.wordNumber = int(parameter[:-1])
             else:
                 self.wordNumber = int(parameter)

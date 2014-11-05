@@ -76,7 +76,10 @@
   </popup>
 
   <popup name="TestFilePopupMenu">
+    <separator/>
     <menuitem action="Test Filtering"/>
+    <menuitem action="Show Filters"/>
+    <separator/>
     <menuitem action="File Properties"/>
     <menuitem action="Copy Path To Clipboard"/>
     <separator/>

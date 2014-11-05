@@ -7,6 +7,7 @@ import gtk, os, sys, stat
 from texttestlib import plugins
 from .. import guiplugins
 from copy import copy, deepcopy
+from StringIO import StringIO
 
 # Runs the dynamic GUI, but not necessarily with all the options available from the configuration
 class BasicRunningAction:
@@ -835,21 +836,11 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
         else:
             guiplugins.ActionDialogGUI._respond(self, saidOK, dialog, fileChooserOption)
 
-class TestFileFiltering(guiplugins.ActionGUI):
-    def _getTitle(self):
-        return "Test Filtering"
 
-    def isActiveOnCurrent(self, *args):
-        return guiplugins.ActionGUI.isActiveOnCurrent(self) and len(self.currFileSelection) == 1
-
-    def getTextToShow(self, test, fileName):
-        return test.app.applyFiltering(test, fileName)
-    
-    def performOnCurrent(self):
-        self.reloadConfigForSelected() # Always make sure we're up to date here
+class TestFileFilterHelper:
+    def showTextInFile(self, text):
         test = self.currTestSelection[0]
         fileName = self.currFileSelection[0][0]
-        text = self.getTextToShow(test, fileName)
         root = test.getEnvironment("TEXTTEST_SANDBOX_ROOT")
         plugins.ensureDirectoryExists(root)
         tmpFileNameLocal = os.path.basename(fileName) + " (FILTERED)"
@@ -868,12 +859,30 @@ class TestFileFiltering(guiplugins.ActionGUI):
         
     def getSignalsSent(self):
         return [ "ViewReadonlyFile" ]
+
+
+
+class TestFileFiltering(TestFileFilterHelper, guiplugins.ActionGUI):
+    def _getTitle(self):
+        return "Test Filtering"
+
+    def isActiveOnCurrent(self, *args):
+        return guiplugins.ActionGUI.isActiveOnCurrent(self) and len(self.currFileSelection) == 1
+
+    def getTextToShow(self, test, fileName):
+        return test.app.applyFiltering(test, fileName)
+    
+    def performOnCurrent(self):
+        self.reloadConfigForSelected() # Always make sure we're up to date here
+        text = self.getTextToShow(self.currTestSelection[0], self.currFileSelection[0][0])
+        self.showTextInFile(text)
     
 
-class ShowFilters(guiplugins.ActionResultDialogGUI):
+class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
     def __init__(self, *args, **kw):
         guiplugins.ActionResultDialogGUI.__init__(self, *args, **kw)
-        self.treeView = None
+        self.textBuffer = None
+        self.allFilters = []
         
     def _getTitle(self):
         return "Show Filters"
@@ -882,17 +891,21 @@ class ShowFilters(guiplugins.ActionResultDialogGUI):
         return len(self.currFileSelection) == 1 and len(self.currTestSelection) == 1
         
     def addContents(self):
+        self.reloadConfigForSelected() # Always make sure we're up to date here
         fileName = self.currFileSelection[0][0]
         test = self.currTestSelection[0]
-        allFilters = test.app.getAllFilters(test, fileName)
-        if allFilters:
-            self.addFilterBoxes(allFilters)
+        self.allFilters = test.app.getAllFilters(test, fileName)
+        if self.allFilters:
+            self.addFilterBoxes(fileName)
         else:
             messageBox = self.createDialogMessage("No run_dependent_text filters defined for file '" + os.path.basename(fileName) + "' for this test.", gtk.STOCK_DIALOG_INFO)
             self.dialog.vbox.pack_start(messageBox)
                 
-    def addFilterBoxes(self, allFilters):
-        for filterObj in allFilters:
+    def addFilterBoxes(self, fileName):
+        filterFrame = gtk.Frame("Filters to apply")
+        filterFrame.set_border_width(1)
+        vbox = gtk.VBox()
+        for filterObj in self.allFilters:
             listStore = gtk.ListStore(str)
             for lineFilter in filterObj.lineFilters:
                 listStore.append([ lineFilter.originalText ])
@@ -905,8 +918,46 @@ class ShowFilters(guiplugins.ActionResultDialogGUI):
         
             treeView.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
             frame = gtk.Frame()
+            frame.set_border_width(1)
             frame.add(treeView)
-            self.dialog.vbox.pack_start(frame)
+            vbox.pack_start(frame)
+        filterFrame.add(vbox)
+        self.dialog.vbox.pack_start(filterFrame, expand=False)
+        self.dialog.vbox.pack_start(gtk.HSeparator(), expand=False)
+        frame, self.textBuffer = self.createTextWidget("Filter Text View", scroll=True)
+        frame.set_label("Text to filter (copied from " + os.path.basename(fileName) + ")")
+        with open(fileName) as f:
+            self.textBuffer.set_text(f.read())
+        self.dialog.vbox.pack_start(frame)
+        
+    def testFiltering(self, *args):
+        filteredText = self.getFilteredText()
+        self.showTextInFile(filteredText)
+        
+    def getText(self):
+        return self.textBuffer.get_text(self.textBuffer.get_start_iter(), self.textBuffer.get_end_iter())
+        
+    def getFilteredText(self):
+        inFile = StringIO()
+        inFile.write(self.getText())
+        inFile.seek(0)
+        for fileFilter in self.allFilters:
+            outFile = StringIO()
+            fileFilter.filterFile(inFile, outFile)
+            inFile.close()
+            inFile = outFile
+            inFile.seek(0)
+        value = outFile.getvalue()
+        outFile.close()
+        return value
+
+    def createButtons(self):        
+        button = self.dialog.add_button('Test Filtering', gtk.RESPONSE_NONE)
+        button.connect("clicked", self.testFiltering)
+        guiplugins.ActionResultDialogGUI.createButtons(self)
+        
+    def getSizeAsWindowFraction(self):
+        return 0.8, 0.9
     
 
 class InsertShortcuts(RunScriptAction, guiplugins.OptionGroupGUI):

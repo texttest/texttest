@@ -1172,3 +1172,9 @@ activate = show filters
 [Title=Show Filters]
 response.accept = accept shown filters
 
+[Label=Test Filtering]
+clicked = test filtering from filter view
+
+[Name=Filter Text View]
+changed = set text for filtering to
+

@@ -440,6 +440,27 @@ class ActionGUI(BasicActionGUI):
 
     def messageAfterPerform(self):
         return "Performed '" + self.getTooltip() + "' on " + self.describeTests() + "."
+    
+    def createTextWidget(self, name, scroll=False):
+        frame = gtk.Frame()
+        frame.set_shadow_type(gtk.SHADOW_OUT)
+        frame.set_border_width(1)
+        view = gtk.TextView()
+        view.set_name(name)
+        buffer = view.get_buffer()
+        if scroll:
+            view = self.addScrollBars(view, gtk.POLICY_AUTOMATIC)
+        frame.add(view)
+        return frame, buffer
+    
+    def tryResize(self, dialog):
+        horfrac, verfrac = self.getSizeAsWindowFraction()
+        if horfrac is not None and self.topWindow is not None:
+            width, height = self.topWindow.get_size()
+            dialog.resize(int(width * horfrac), int(height * verfrac))
+        
+    def getSizeAsWindowFraction(self):
+        return None, None
 
     def createButton(self):
         return self._createButton(self.gtkAction, self.getTooltip())
@@ -485,6 +506,7 @@ class ActionResultDialogGUI(ActionGUI):
         self.dialog = self.createDialog()
         self.addContents()
         self.createButtons()
+        self.tryResize(self.dialog)
         self.dialog.show_all()
         
     def addContents(self): # pragma: no cover - documentation only
@@ -747,13 +769,7 @@ class OptionGroupGUI(ActionGUI):
     def createOptionWidget(self, option):
         optionName = option.name.strip()
         if option.multilineEntry:
-            frame = gtk.Frame()
-            frame.set_shadow_type(gtk.SHADOW_OUT)
-            frame.set_border_width(1)
-            view = gtk.TextView()
-            view.set_name(optionName)
-            frame.add(view)
-            return frame, view.get_buffer()
+            return self.createTextWidget(optionName)
         else:
             box = gtk.HBox()
             value = option.getValue()
@@ -999,15 +1015,6 @@ class ActionDialogGUI(OptionGroupGUI):
         
     def defaultRespond(self, *args):
         OptionGroupGUI._respond(self, *args)
-
-    def tryResize(self, dialog):
-        horfrac, verfrac = self.getSizeAsWindowFraction()
-        if horfrac is not None and self.topWindow is not None:
-            width, height = self.topWindow.get_size()
-            dialog.resize(int(width * horfrac), int(height * verfrac))
-        
-    def getSizeAsWindowFraction(self):
-        return None, None
             
     def createAlignment(self):
         alignment = gtk.Alignment()

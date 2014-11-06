@@ -197,8 +197,13 @@ class SummaryDataFinder:
     def getAppRunDirectory(self, appName):
         if appName in self.appRuns:
             return self.appRuns.get(appName)
-        elif len(self.appRuns) == 1: # application in question might not be loaded right now
-            return self.appRuns.values()[0]
+        else:
+            # application in question might not be loaded right now
+            allRunDirs = set(self.appRuns.values())
+            if len(allRunDirs) == 1: 
+                return allRunDirs.pop()
+            else:
+                self.diag.info("No log dir found for " + appName + " stored are " + repr(self.appRuns))
 
     def getMostRecentDateAndTags(self):
         allInfo = {}

@@ -1178,3 +1178,7 @@ clicked = test filtering from filter view
 [Name=Filter Text View]
 changed = set text for filtering to
 
+[Name=run_dependent_text Tree View]
+toggled.Enabled.false = disable filter for
+changed.selection = select filter for
+

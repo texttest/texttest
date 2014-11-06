@@ -3,7 +3,7 @@
 The various ways to launch the dynamic GUI from the static GUI
 """
 
-import gtk, os, sys, stat
+import gtk, gobject, os, sys, stat
 from texttestlib import plugins
 from .. import guiplugins
 from copy import copy, deepcopy
@@ -882,7 +882,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
     def __init__(self, *args, **kw):
         guiplugins.ActionResultDialogGUI.__init__(self, *args, **kw)
         self.textBuffer = None
-        self.allFilters = []
+        self.filtersWithModels = []
         
     def _getTitle(self):
         return "Show Filters"
@@ -894,33 +894,54 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
         self.reloadConfigForSelected() # Always make sure we're up to date here
         fileName = self.currFileSelection[0][0]
         test = self.currTestSelection[0]
-        self.allFilters = test.app.getAllFilters(test, fileName)
-        if self.allFilters:
-            self.addFilterBoxes(fileName)
+        allFilters = test.app.getAllFilters(test, fileName)
+        if allFilters:
+            self.addFilterBoxes(allFilters, fileName)
         else:
             messageBox = self.createDialogMessage("No run_dependent_text filters defined for file '" + os.path.basename(fileName) + "' for this test.", gtk.STOCK_DIALOG_INFO)
             self.dialog.vbox.pack_start(messageBox)
+            
+    def showToggled(self, cell, path, model, treeView):
+        # Toggle the toggle button
+        newValue = not model[path][1]
+        model[path][1] = newValue
+        
+    def setText(self, column, cell, model, iter):
+        cell.set_property('text', model.get_value(iter, 0).originalText)
+            
+    def canSelect(self, path):
+        return False # No use for selections yet...
                 
-    def addFilterBoxes(self, fileName):
+    def addFilterBoxes(self, allFilters, fileName):
         filterFrame = gtk.Frame("Filters to apply")
         filterFrame.set_border_width(1)
         vbox = gtk.VBox()
-        for filterObj in self.allFilters:
-            listStore = gtk.ListStore(str)
+        for filterObj in allFilters:
+            listStore = gtk.ListStore(gobject.TYPE_PYOBJECT, bool)
             for lineFilter in filterObj.lineFilters:
-                listStore.append([ lineFilter.originalText ])
+                listStore.append([ lineFilter, True ])
             treeView = gtk.TreeView(listStore)
             treeView.set_name(filterObj.configKey + " Tree View")
         
             cell = gtk.CellRendererText()
-            column = gtk.TreeViewColumn(filterObj.configKey.replace("_", "__"), cell, text=0)         
+            column = gtk.TreeViewColumn(filterObj.configKey.replace("_", "__"))
+            column.pack_start(cell)
+            column.set_cell_data_func(cell, self.setText)
             treeView.append_column(column)
-        
+            
+            toggleCell = gtk.CellRendererToggle()
+            toggleCell.set_property('activatable', True)
+            toggleCell.connect("toggled", self.showToggled, listStore, treeView)
+            column = gtk.TreeViewColumn("Enabled", toggleCell, active=1)         
+            treeView.append_column(column)
+            
             treeView.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
+            treeView.get_selection().set_select_function(self.canSelect)
             frame = gtk.Frame()
             frame.set_border_width(1)
             frame.add(treeView)
             vbox.pack_start(frame)
+            self.filtersWithModels.append((filterObj, listStore))
         filterFrame.add(vbox)
         self.dialog.vbox.pack_start(filterFrame, expand=False)
         self.dialog.vbox.pack_start(gtk.HSeparator(), expand=False)
@@ -937,11 +958,20 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
     def getText(self):
         return self.textBuffer.get_text(self.textBuffer.get_start_iter(), self.textBuffer.get_end_iter())
         
+    def updateFilter(self, fileFilter, model):
+        enabledFilters = []
+        def addFilter(model, path, iter):
+            if model.get_value(iter, 1):
+                enabledFilters.append(model.get_value(iter, 0))
+        model.foreach(addFilter)
+        fileFilter.lineFilters = enabledFilters
+        
     def getFilteredText(self):
         inFile = StringIO()
         inFile.write(self.getText())
         inFile.seek(0)
-        for fileFilter in self.allFilters:
+        for fileFilter, model in self.filtersWithModels:
+            self.updateFilter(fileFilter, model)
             outFile = StringIO()
             fileFilter.filterFile(inFile, outFile)
             inFile.close()

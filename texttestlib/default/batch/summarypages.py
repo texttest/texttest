@@ -326,6 +326,25 @@ class SummaryGenerator:
         pos = line.find("</title>")
         return str(testoverview.TitleWithDateStamp(line[:pos])) + "</title>\n"
             
+    def getDateRangeText(self, info):
+        dates = [ i[0] for i in info ]
+        if len(dates) == 0:
+            return ""
+        firstDate = min(dates)
+        lastDate = max(dates)
+        text = " dated " + time.strftime("%d%b%Y", firstDate)
+        if firstDate != lastDate:
+            text += " - " + time.strftime("%d%b%Y", lastDate)
+        return text
+            
+    def getRecentTagText(self, mostRecentInfo):
+        if len(mostRecentInfo) > 2:
+            return str(len(mostRecentInfo)) + " test runs" + self.getDateRangeText(mostRecentInfo)
+        else:
+            suffix = "s" if len(mostRecentInfo) > 1 else ""
+            mostRecentTags = [ i[1] for i in mostRecentInfo ]
+            return "test run" + suffix + " " + ", ".join(mostRecentTags)
+
     def generatePage(self, dataFinder, appsWithVersions, fileToUrl):
         file = open(dataFinder.summaryPageName, "w")
         versionOrder = [ "default" ]
@@ -343,8 +362,7 @@ class SummaryGenerator:
             if "Version order=" in line:
                 versionOrder += self.extractOrder(line)
             if "<h1" in line:
-                postfix = "s" if len(mostRecentTags) > 1 else ""
-                file.write("<h3 align=\"center\">(from test run" + postfix + " " + ", ".join(mostRecentTags) + ")</h3>\n")
+                file.write("<h3 align=\"center\">(from " + self.getRecentTagText(mostRecentInfo) + ")</h3>\n")
             if "Insert table here" in line:
                 self.insertSummaryTable(file, dataFinder, mostRecentInfo, appsWithVersions, appOrder, versionOrder)
         file.close()

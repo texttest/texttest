@@ -1783,10 +1783,10 @@ class OptionGroup:
     def keys(self):
         return self.options.keys()
 
-    def getOptionsForCmdLine(self, onlyKeys):
+    def getOptionsForCmdLine(self, *args):
         commandLines = []
         for key, option in self.options.items():
-            if self.accept(key, option, onlyKeys):
+            if self.accept(key, option, *args):
                 commandLines.append((key, option.getCmdLineValue()))
             
         return commandLines
@@ -1796,12 +1796,9 @@ class OptionGroup:
             option = self.options.pop(key)
             self.options[key] = option
 
-    def accept(self, key, option, onlyKeys):
+    def accept(self, key, option, onlyKeys, excludeKeys):
         value = option.getValue()
         if not value or (isinstance(value, str) and value.startswith("<default>")):
             return False
-        if len(onlyKeys) == 0:
-            return True
-        return key in onlyKeys
-    
-
+        
+        return (len(onlyKeys) == 0 or key in onlyKeys) and key not in excludeKeys

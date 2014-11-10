@@ -293,20 +293,26 @@ class MarkTest(guiplugins.ActionDialogGUI):
         guiplugins.ActionDialogGUI.__init__(self, *args)
         self.addOption("brief", "Brief text", "Checked")
         self.addOption("free", "Free text", "Checked at " + plugins.localtime())
+    
     def _getTitle(self):
         return "_Mark"
+    
     def getTooltip(self):
         return "Mark the selected tests"
+    
     def performOnCurrent(self):
         for test in self.currTestSelection:
-            oldState = test.stateInGui
-            if oldState.isComplete():
-                if test.stateInGui.isMarked():
-                    oldState = test.stateInGui.oldState # Keep the old state so as not to build hierarchies ...
-                newState = plugins.MarkedTestState(self.optionGroup.getOptionValue("free"),
-                                                   self.optionGroup.getOptionValue("brief"), oldState)
-                test.changeState(newState)
-                self.notify("ActionProgress") # Just to update gui ...
+            self.notifyMark(test, self.optionGroup.getOptionValue("free"), self.optionGroup.getOptionValue("brief"))
+    
+    def notifyMark(self, test, freeText, briefText):
+        oldState = test.stateInGui
+        if oldState.isComplete():
+            if test.stateInGui.isMarked():
+                oldState = test.stateInGui.oldState # Keep the old state so as not to build hierarchies ...
+            newState = plugins.MarkedTestState(freeText, briefText, oldState)
+            test.changeState(newState)
+            self.notify("ActionProgress") # Just to update gui ...
+    
     def isActiveOnCurrent(self, test=None, state=None):
         if state and state.isComplete():
             return True

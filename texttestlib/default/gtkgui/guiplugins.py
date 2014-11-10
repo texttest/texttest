@@ -840,9 +840,9 @@ class OptionGroupGUI(ActionGUI):
             return []
         return fromConfig
 
-    def getCommandLineArgs(self, optionGroup, onlyKeys=[]):
+    def getCommandLineArgs(self, optionGroup, onlyKeys=[], excludeKeys=[]):
         args = []
-        for key, value in optionGroup.getOptionsForCmdLine(onlyKeys):
+        for key, value in optionGroup.getOptionsForCmdLine(onlyKeys, excludeKeys):
             args.append("-" + key)
             if value:
                 args.append(str(value))

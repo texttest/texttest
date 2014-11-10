@@ -7,7 +7,7 @@ from .. import guiplugins
 from ordereddict import OrderedDict
 from texttestlib.default.batch import BatchApplicationData, MailSender
 from texttestlib import plugins
-import os, gtk, gobject
+import os, gtk, gobject, re
 from texttestlib.jobprocess import killSubProcessAndChildren
 
 class Quit(guiplugins.BasicActionGUI):
@@ -39,7 +39,7 @@ class Quit(guiplugins.BasicActionGUI):
     
     def getConfirmationMessage(self):
         message = ""
-        if self.runName and not self.runName.startswith("Tests started from"):
+        if self.runName and not self.runName.startswith("Tests started from") and not re.search("rerun [0-9]* from", self.runName):
             message = "You named this run as follows : \n" + self.runName + "\n"
         runningProcesses = guiplugins.processMonitor.listQueryKillProcesses()
         if len(runningProcesses) > 0:

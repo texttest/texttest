@@ -1182,3 +1182,6 @@ changed = set text for filtering to
 toggled.Enabled.false = disable filter for
 changed.selection = select filter for
 
+[Label=Mark test as rerun in current window]
+toggled.false = disable automatic rerun marking
+

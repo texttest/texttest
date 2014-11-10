@@ -111,7 +111,7 @@ class BasicRunningAction:
     def getTextTestOptions(self, filterFile, app, usecase):
         ttOptions = self.getCmdlineOptionForApps(filterFile)
         for group in self.getOptionGroups():
-            ttOptions += self.getCommandLineArgs(group, self.getCommandLineKeys(usecase))
+            ttOptions += self.getCommandLineArgs(group, self.getCommandLineKeys(usecase), self.getCommandLineExcludeKeys())
         # May be slow to calculate for large test suites, cache it
         self.testCount = len(self.getTestCaseSelection())
         ttOptions += [ "-count", str(self.testCount * self.getCountMultiplier()) ]
@@ -124,6 +124,9 @@ class BasicRunningAction:
 
     def getCommandLineKeys(self, *args):
         # assume everything by default
+        return []
+    
+    def getCommandLineExcludeKeys(self):
         return []
 
     def getCountMultiplier(self):
@@ -483,6 +486,11 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
     def __init__(self, allApps, dummy, inputOptions):
         guiplugins.ActionDialogGUI.__init__(self, allApps)
         RunningAction.__init__(self, allApps, inputOptions)
+        for group in self.optionGroups:
+            if group.name == "Basic":
+                group.addSwitch("mark", "Mark test as rerun in current window", 1, description="Test will be automatically marked as having a newer result elsewhere." +
+                                "It will also be possible to import this result here in future.")
+                return
 
     def updateOptions(self):
         checkouts = []        
@@ -491,13 +499,13 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
             if path and path not in checkouts:
                 checkouts.append(path)
         if checkouts:
-            self.fixCheckout(",".join(checkouts))
-            
-    def fixCheckout(self, checkout):
-        for group in self.optionGroups:
-            if group.name == "Basic":
-                group.setValue("c", checkout)
-                return
+            self.getOption("c").setValue(",".join(checkouts))
+        basicTitle = self.topWindow.get_title().rsplit("-", 1)[0].strip()
+        if "started at" in basicTitle:
+            name = basicTitle.replace("started at", "rerun " + str(self.runNumber)+ " from")
+        else:
+            name = basicTitle + " (rerun " + str(self.runNumber) + ")"
+        self.getOption("name").setValue(name)
         
     def _getTitle(self):
         return "_Rerun"
@@ -507,10 +515,16 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
 
     def getUseCaseName(self):
         return "rerun"
+    
+    def getSignalsSent(self):
+        return RunningAction.getSignalsSent(self) + [ "Mark" ]
 
     def killOnTermination(self):
         return False # don't want rerun GUIs to disturb each other like this
 
+    def getCommandLineExcludeKeys(self):
+        return [ "mark" ]
+    
     def getTmpFilterDir(self, app):
         return "" # don't want selections returned here, send them to the static GUI
     
@@ -574,6 +588,13 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
             return None, None # no file chooser info
         else:
             return guiplugins.ActionDialogGUI.fillVBox(self, vbox, optionGroup, includeOverrides=False)
+        
+    def performOnCurrent(self):
+        RunningAction.performOnCurrent(self)
+        if self.getOption("mark").getValue():
+            lastRunText = str(self.runNumber - 1)
+            for test in self.currTestSelection:
+                self.notify("Mark", test, "Test is being rerun in another window, numbered " + lastRunText, "Rerun " + lastRunText)
 
     def getSizeAsWindowFraction(self):
         return 0.8, 0.9

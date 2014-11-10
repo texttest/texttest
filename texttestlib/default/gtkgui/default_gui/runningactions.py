@@ -500,12 +500,6 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
                 checkouts.append(path)
         if checkouts:
             self.getOption("c").setValue(",".join(checkouts))
-        basicTitle = self.topWindow.get_title().rsplit("-", 1)[0].strip()
-        if "started at" in basicTitle:
-            name = basicTitle.replace("started at", "rerun " + str(self.runNumber)+ " from")
-        else:
-            name = basicTitle + " (rerun " + str(self.runNumber) + ")"
-        self.getOption("name").setValue(name)
         
     def _getTitle(self):
         return "_Rerun"
@@ -530,6 +524,12 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
     
     def getConfirmationMessage(self):
         return BasicRunningAction.getConfirmationMessage(self)
+    
+    def getTextTestOptions(self, filterFile, app, usecase):
+        rerunId = str(self.runNumber)
+        if not self.getOption("name").getValue():
+            rerunId += " from " + plugins.startTimeString()
+        return RunningAction.getTextTestOptions(self, filterFile, app, usecase) + [ "-rerun", rerunId ]
     
     def getLogRootDirectory(self, app):
         if self.inputOptions.has_key("f"):

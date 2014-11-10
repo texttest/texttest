@@ -131,7 +131,7 @@ class GUIController(plugins.Responder, plugins.Observable):
         self.appFileGUI = filetrees.ApplicationFileGUI(self.dynamic, allApps, appFilePopupGUI)
         self.rightWindowGUI = self.createRightWindowGUI()
         
-        self.topWindowGUI = self.createTopWindowGUI(allApps, runName)
+        self.topWindowGUI = self.createTopWindowGUI(allApps, runName, optionMap.get("rerun"))
     
     def createNewApplication(self, optionMap):
         from default_gui import ImportApplication
@@ -269,11 +269,11 @@ class GUIController(plugins.Responder, plugins.Observable):
         # it doesn't seem to work very well :)
         return not self.dynamic or guiConfig.getWindowOption("maximize")
 
-    def createTopWindowGUI(self, allApps, name):
+    def createTopWindowGUI(self, *args):
         mainWindowGUI = PaneGUI(self.testTreeGUI, self.rightWindowGUI, horizontal=True, shrink=self.shouldShrinkMainPanes())
         parts = [ self.menuBarGUI, self.toolBarGUI, mainWindowGUI, self.shortcutBarGUI, self.statusMonitor ]
         boxGUI = VBoxGUI(parts)
-        return TopWindowGUI(boxGUI, self.dynamic, allApps, name)
+        return TopWindowGUI(boxGUI, self.dynamic, *args)
 
     def createMenuAndToolBarGUIs(self, uiManager, *args):
         menuNames = self.interactiveActionHandler.getMenuNames()
@@ -355,11 +355,12 @@ class GUIController(plugins.Responder, plugins.Observable):
 class TopWindowGUI(guiutils.ContainerGUI):
     EXIT_NOTIFIED = 1
     COMPLETION_NOTIFIED = 2
-    def __init__(self, contentGUI, dynamic, allApps, name):
+    def __init__(self, contentGUI, dynamic, allApps, name, rerunId):
         guiutils.ContainerGUI.__init__(self, [ contentGUI ])
         self.dynamic = dynamic
         self.topWindow = None
         self.name = name
+        self.rerunId = rerunId
         self.allApps = copy(allApps)
         self.exitStatus = 0
         self.diag = logging.getLogger("Top Window")
@@ -420,20 +421,25 @@ class TopWindowGUI(guiutils.ContainerGUI):
         guiText = "dynamic" if self.dynamic else "static"
         trailer = " - TextTest " + guiText + " GUI"
         if self.name:
-            title = self.name + trailer
+            title = self.name
+            if self.rerunId:
+                title += " (rerun " + self.rerunId + ")"
         elif self.dynamic:
             appNameDesc = self.dynamicAppNameTitle()
             checkoutTitle = self.getCheckoutTitle()
-            title = appNameDesc + " tests" + checkoutTitle + \
-                     " (started at " + plugins.startTimeString() + ")" + trailer
+            title = appNameDesc + " tests" + checkoutTitle
+            if self.rerunId:
+                title += " (rerun " + self.rerunId + ")"
+            else:
+                title += " (started at " + plugins.startTimeString() + ")"
         else:
             appNameDesc = self.staticAppNameTitle()
             basicTitle = "test management"
             if len(appNameDesc) > 0:
-                title = appNameDesc + " " + basicTitle + trailer
+                title = appNameDesc + " " + basicTitle
             else:
-                title = basicTitle.capitalize() + trailer
-        self.topWindow.set_title(title)
+                title = basicTitle.capitalize()
+        self.topWindow.set_title(title + trailer)
 
     def staticAppNameTitle(self):
         allAppNames = [ repr(app) for app in self.allApps ]

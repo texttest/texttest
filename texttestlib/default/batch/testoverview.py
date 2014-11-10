@@ -7,6 +7,7 @@ from cPickle import Unpickler, UnpicklingError
 from ordereddict import OrderedDict
 from glob import glob
 from pprint import pformat
+from datetime import datetime, timedelta
 from batchutils import convertToUrl, getEnvironmentFromRunFiles
 HTMLgen.PRINTECHO = 0
 
@@ -196,6 +197,11 @@ class GenerateWebPages(object):
             selContainer.append(HTMLgen.Href(target, linkName))
 
         monthContainer = HTMLgen.Container()
+        if len(allMonthSelectors) == 1:
+            # Don't want just one month, no navigation possible
+            prevMonth = list(allMonthSelectors)[0].getPreviousMonthSelector()
+            allMonthSelectors.add(prevMonth)
+        
         for sel in sorted(allMonthSelectors):
             target, linkName = sel.getLinkInfo(self.pageVersion)
             monthContainer.append(HTMLgen.Href(target, linkName))
@@ -956,13 +962,21 @@ class SelectorByMonth(BaseSelector):
             month = tag[2:9]
             allSelectors.setdefault(month, SelectorByMonth(month)).add(tag)
         return sorted(allSelectors.values())
+            
     def __init__(self, month):
         super(SelectorByMonth, self).__init__(month, "_all_" + month)
-    def getMonthTime(self):
-        return time.mktime(time.strptime(self.linkName, "%b%Y"))
+        self.month = datetime.strptime(self.linkName, "%b%Y")
+        
+    def getPreviousMonthSelector(self):
+        first_day_of_current_month = self.month.replace(day=1)
+        last_day_of_previous_month = first_day_of_current_month - timedelta(days=1)
+        return SelectorByMonth(last_day_of_previous_month.strftime("%b%Y"))
+
     def __cmp__(self, other):
-        return cmp(self.getMonthTime(), other.getMonthTime())
+        return cmp(self.month, other.month)
+    
     def __eq__(self, other):
         return self.linkName == other.linkName
+    
     def __hash__(self):
         return self.linkName.__hash__()

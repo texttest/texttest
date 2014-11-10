@@ -119,7 +119,7 @@ class GenerateWebPages(object):
                         if archiveUnused:
                             unusedTags.difference_update(currTags)
                     tags = filter(lambda t: t in selectedTags, tags)
-                    if archiveUnused:
+                    if archiveUnused and unusedTags:
                         plugins.log.info("WARNING: new automatic repository cleaning would remove data.")
                         plugins.log.info("To disable this new feature, please run with the new --manualarchive flag when collating the HTML report")
                         plugins.log.info("The following runs would now be removed:")

@@ -68,15 +68,37 @@ class GenerateWebPages(object):
             allSelectors.append(Selector(subPageName, suffix, self.getConfigValue, tags))
         return allSelectors
     
-    def generate(self, repositoryDirs, subPageNames):
+    def removeUnused(self, unused, tagData):
+        successTags = {}
+        for tag in unused:
+            for fn in tagData.get(tag):
+                if os.path.basename(fn).startswith("teststate_"):
+                    os.remove(fn)
+                else:
+                    successTags.setdefault(fn, []).append(tag)
+        for fn, tagsToRemove in successTags.items():
+            linesToKeep = []
+            with open(fn) as readFile:
+                for line in readFile:
+                    tag = line.strip().split()[0]
+                    if tag not in tagsToRemove:
+                        linesToKeep.append(line)
+           
+            with open(fn, "w") as writeFile:
+                for line in linesToKeep:
+                    writeFile.write(line)
+    
+    def generate(self, repositoryDirs, subPageNames, archiveUnused):
         minorVersionHeader = HTMLgen.Container()
         allMonthSelectors = set()
         latestMonth = None
         pageToGraphs = {}
         for version, repositoryDirInfo in repositoryDirs.items():
             self.diag.info("Generating " + version)
-            stateFiles, successFiles, tags = self.findTestStateFilesAndTags(repositoryDirInfo)
+            tagData, stateFiles, successFiles = self.findTestStateFilesAndTags(repositoryDirInfo)
             if len(stateFiles) > 0 or len(successFiles) > 0:
+                tags = tagData.keys()
+                tags.sort(self.compareTags)
                 selectors = self.makeSelectors(subPageNames, tags)
                 monthSelectors = SelectorByMonth.makeInstances(tags)
                 allMonthSelectors.update(monthSelectors)
@@ -89,8 +111,21 @@ class GenerateWebPages(object):
                     if latestMonth is None or currLatestMonthSel.linkName == latestMonth:
                         selectors.append(monthSelectors[-1])
                         latestMonth = currLatestMonthSel.linkName
-                    tags = list(reduce(set.union, (set(selector.selectedTags) for selector in selectors), set()))
-                    tags.sort(self.compareTags)
+                    selectedTags = set()
+                    unusedTags = set(tags)
+                    for selector in selectors:
+                        currTags = set(selector.selectedTags)
+                        selectedTags.update(currTags)
+                        if archiveUnused:
+                            unusedTags.difference_update(currTags)
+                    tags = filter(lambda t: t in selectedTags, tags)
+                    if archiveUnused:
+                        plugins.log.info("WARNING: new automatic repository cleaning would remove data.")
+                        plugins.log.info("To disable this new feature, please run with the new --manualarchive flag when collating the HTML report")
+                        plugins.log.info("The following runs would now be removed:")
+                        for tag in sorted(unusedTags, self.compareTags):
+                            plugins.log.info("- " + tag)
+                        #self.removeUnused(unusedTags, tagData)
 
                 loggedTests = OrderedDict()
                 categoryHandlers = {}
@@ -222,24 +257,25 @@ class GenerateWebPages(object):
         return os.path.basename(fileName).replace("teststate_", "")
         
     def findTestStateFilesAndTags(self, repositoryDirs):
-        stateFiles, successFiles = [], []
-        allTags = set()
+        tagData, stateFiles, successFiles = {}, [], []
         for _, dir in repositoryDirs:
             self.diag.info("Looking for teststate files in " + dir)
             for root, _, files in sorted(os.walk(dir)):
                 for file in files:
+                    path = os.path.join(root, file)
                     if file.startswith("teststate_"):
-                        stateFiles.append((os.path.join(root, file), dir))
-                        allTags.add(self.getTagFromFile(file))
+                        tag = self.getTagFromFile(file)
+                        stateFiles.append((path, dir))
+                        tagData.setdefault(tag, []).append(path)
                     elif file.startswith("succeeded_"):
-                        path = os.path.join(root, file)
                         successFiles.append((path, dir))
                         with open(path) as f:
                             for line in f:
-                                allTags.add(line.split()[0])
+                                tag = line.split()[0]
+                                tagData.setdefault(tag, []).append(path)
                                 
             self.diag.info("Found " + str(len(stateFiles)) + " teststate files and " + str(len(successFiles)) + " success files in " + dir)
-        return stateFiles, successFiles, sorted(allTags, self.compareTags)
+        return tagData, stateFiles, successFiles
                           
     def processTestStateFile(self, stateFile, repository):
         state = self.readState(stateFile)

@@ -96,6 +96,7 @@ class Config:
                 group.addSwitch("con", "use console interface")
                 group.addSwitch("coll", "Collect results for batch mode session")
                 group.addSwitch("collarchive", "Collect results for batch mode session using data in the archive, back to the given date")
+                group.addSwitch("manualarchive", "Disable the automatic archiving of unused repository files")
                 group.addOption("tp", "Private: Tests with exact path") # use for internal communication
                 group.addOption("finverse", "Tests not listed in file")
                 group.addOption("fintersect", "Tests in all files")

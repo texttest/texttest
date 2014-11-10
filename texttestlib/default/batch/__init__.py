@@ -780,6 +780,7 @@ class WebPageResponder(plugins.Responder):
         self.archiveExtractor = ArchiveExtractor(optionMap.get("collarchive")) if optionMap.get("collarchive") is not None else None
         self.diag = logging.getLogger("GenerateWebPages")
         self.suitesToGenerate = []
+        self.archiveUnused = "manualarchive" not in optionMap
         self.descriptionInfo = {}
         self.summaryGenerator = GenerateSummaryPage()
 
@@ -985,7 +986,7 @@ class WebPageResponder(plugins.Responder):
     def generateWebPages(self, subDirs, getConfigValue, *args):
         generator = self.getWebPageGenerator(getConfigValue, *args)
         subPageNames = getConfigValue("historical_report_subpages")
-        generator.generate(subDirs, subPageNames)
+        generator.generate(subDirs, subPageNames, self.archiveUnused)
 
     def findMatchingExtraVersion(self, dirVersions, extraVersions):
         # Check all tails that this is not an extraVersion

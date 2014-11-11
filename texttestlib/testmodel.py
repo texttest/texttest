@@ -4,7 +4,7 @@ from multiprocessing import cpu_count
 from ordereddict import OrderedDict
 from cPickle import Pickler, Unpickler, UnpicklingError
 from threading import Lock
-from tempfile import mkstemp
+from tempfile import mkstemp, mkdtemp
 from copy import deepcopy, copy
 
 helpIntro = """
@@ -836,6 +836,46 @@ class TestCase(Test):
             return os.path.join(dir, stem + "." + self.app.name)
         else:
             return os.path.join(dir, stem)
+    
+    def backupTemporaryData(self):
+        if self.hasTemporaryData():
+            self.backupPreviousTemporaryData()
+        
+    def hasTemporaryData(self):
+        tmpDir = self.getDirectory(temporary=1)
+        for f in os.listdir(tmpDir):
+            if os.path.isfile(os.path.join(tmpDir, f)):
+                return True
+        return False
+
+    def backupPreviousTemporaryData(self):
+        writeDir = self.getDirectory(temporary=1)
+        newBackupPath, oldBackupPaths = self.findBackupPaths()
+        localTmpDir = mkdtemp(dir=os.path.dirname(writeDir), prefix=os.path.basename(newBackupPath) + ".")
+        if os.name == "nt":
+            # Windows doesn't manage to overwrite empty directories. Linux does.
+            os.rmdir(localTmpDir)
+        os.rename(writeDir, localTmpDir)
+        self.makeWriteDirectory()
+        for oldBackupPath in oldBackupPaths:
+            currLocation = os.path.join(localTmpDir, plugins.relpath(oldBackupPath, writeDir))
+            os.rename(currLocation, oldBackupPath)
+        os.rename(localTmpDir, newBackupPath)
+        localWriteDir = self.getDirectory(temporary=1, local=1)
+        if localWriteDir != writeDir:
+            plugins.rmtree(localWriteDir)
+            plugins.ensureDirectoryExists(localWriteDir)
+
+    def findBackupPaths(self):
+        number = 1
+        oldPaths = []
+        while True:
+            path = self.makeBackupFileName(number)
+            if os.path.exists(path):
+                oldPaths.append(path)
+                number += 1
+            else:
+                return path, oldPaths
 
     def makeBackupFileName(self, number):
         return self.makeTmpFileName("backup.previous." + str(number), forFramework=1)

@@ -473,7 +473,8 @@ class Config:
             return [ "console" ]
 
     def getTimeDescriptor(self):
-        return plugins.startTimeString().replace(":", "")
+        timeStr = self.optionMap.get("rerun", plugins.startTimeString())
+        return timeStr.replace(":", "").replace(" ", "_")
 
     def getAppDescriptor(self):
         givenAppDescriptor = self.optionValue("a")
@@ -843,7 +844,7 @@ class Config:
     def getStateSaver(self):
         if self.actualBatchMode():
             return batch.SaveState
-        elif self.keepTemporaryDirectories():
+        elif self.keepTemporaryDirectories() or "rerun" in self.optionMap:
             return SaveState
         
     def getConfigEnvironment(self, test, allVars):

@@ -10,6 +10,7 @@ from adminactions import ReportBugs
 from texttestlib.default.knownbugs import CheckForBugs, BugMap
 from ConfigParser import ConfigParser
 from copy import copy
+from glob import glob
 from threading import Thread
 
 class BackgroundThreadHelper:
@@ -337,6 +338,47 @@ class UnmarkTest(guiplugins.ActionGUI):
             if test.stateInGui.isMarked():
                 return True
         return False
+    
+
+class LoadFromRerun(guiplugins.ActionGUI):
+    def _getTitle(self):
+        return "Load from Rerun"
+    
+    def getRerunMarkedTests(self): 
+        return filter(lambda test: test.stateInGui.isMarked() and test.stateInGui.briefText.startswith("Rerun"), self.currTestSelection)
+
+    def performOnCurrent(self):
+        for test in self.getRerunMarkedTests():
+            rerunNumber = test.stateInGui.briefText.split()[-1]
+            pattern = os.path.join(os.getenv("TEXTTEST_TMP"), "*." + rerunNumber + "_from_" + plugins.startTimeString().replace(":", "") + "*")
+            dirs = glob(pattern)
+            if len(dirs) == 1:
+                rerunDir = dirs[0]
+                appDir = os.path.join(rerunDir, test.app.name + test.app.versionSuffix())
+                if self.loadFrom(test, appDir):
+                    continue
+            raise plugins.TextTestError, "Cannot load data for rerun, test " + test.name + " has not yet completed or has been deleted in rerun " + rerunNumber
+            
+    def loadFrom(self, test, appDir):
+        from texttestlib.default.reconnect import ReconnectTest
+        reconn = ReconnectTest(appDir, False)
+        location = os.path.join(appDir, test.getRelPath())
+        state = reconn.getReconnectStateFrom(test, location)
+        if state:
+            state.lifecycleChange = "recalculated"
+            test.backupTemporaryData()
+            reconn.copyFiles(test, location)
+            test.changeState(state)
+            return True
+        else:
+            return False
+                
+    def notifyRerunDirectory(self, app, rerunNumber, directory):
+        self.rerunDirectories[(app, rerunNumber)] = directory
+    
+    def isActiveOnCurrent(self, *args):
+        return len(self.getRerunMarkedTests()) > 0
+
 
 class SuspendTests(guiplugins.ActionGUI):
     def _getTitle(self):
@@ -580,6 +622,6 @@ class FindKnownBugs(guiplugins.ActionDialogGUI):
 
         
 def getInteractiveActionClasses():
-    return [ ApproveTests, KillTests, MarkTest, UnmarkTest, RecomputeTests, ReportBugsAndRecompute,
+    return [ ApproveTests, KillTests, MarkTest, UnmarkTest, LoadFromRerun, RecomputeTests, ReportBugsAndRecompute,
              SuspendTests, UnsuspendTests, SplitResultFiles, FindKnownBugs ]
  

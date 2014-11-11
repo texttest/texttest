@@ -14,6 +14,7 @@
       <menuitem action="Kill"/>
       <menuitem action="Mark"/>
       <menuitem action="Unmark"/>
+      <menuitem action="Load from Rerun"/>
       <separator/>
       <menuitem action="Rerun"/>
       <menuitem action="Recompute Status"/>
@@ -50,6 +51,7 @@
     <separator/>
     <menuitem action="Mark"/>
     <menuitem action="Unmark"/>
+    <menuitem action="Load from Rerun"/>
     <separator/>
     <menuitem action="Rerun"/>
     <menuitem action="Recompute Status"/>

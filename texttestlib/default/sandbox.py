@@ -4,7 +4,6 @@ from texttestlib.jobprocess import killArbitaryProcess, killSubProcessAndChildre
 from runtest import Killed
 from ordereddict import OrderedDict
 from string import Template
-from tempfile import mkdtemp
 
 
 def getScriptArgs(script):
@@ -33,8 +32,7 @@ class PrepareWriteDirectory(plugins.Action):
             self.diag.info("Ignoring all information in catalogue files")
 
     def __call__(self, test):
-        if self.hasPreviousData(test):
-            self.backupPreviousData(test)
+        test.backupTemporaryData()
         machine, remoteTmpDir = test.app.getRemoteTestTmpDir(test)
         if remoteTmpDir:
             test.app.ensureRemoteDirExists(machine, remoteTmpDir)
@@ -44,42 +42,6 @@ class PrepareWriteDirectory(plugins.Action):
 
         self.collateAllPaths(test, remoteCopy)
         test.createPropertiesFiles()
-
-    def hasPreviousData(self, test):
-        tmpDir = test.getDirectory(temporary=1)
-        for f in os.listdir(tmpDir):
-            if os.path.isfile(os.path.join(tmpDir, f)):
-                return True
-        return False
-
-    def backupPreviousData(self, test):
-        writeDir = test.getDirectory(temporary=1)
-        newBackupPath, oldBackupPaths = self.findBackupPaths(test)
-        localTmpDir = mkdtemp(dir=os.path.dirname(writeDir), prefix=os.path.basename(newBackupPath) + ".")
-        if os.name == "nt":
-            # Windows doesn't manage to overwrite empty directories. Linux does.
-            os.rmdir(localTmpDir)
-        os.rename(writeDir, localTmpDir)
-        test.makeWriteDirectory()
-        for oldBackupPath in oldBackupPaths:
-            currLocation = os.path.join(localTmpDir, plugins.relpath(oldBackupPath, writeDir))
-            os.rename(currLocation, oldBackupPath)
-        os.rename(localTmpDir, newBackupPath)
-        localWriteDir = test.getDirectory(temporary=1, local=1)
-        if localWriteDir != writeDir:
-            plugins.rmtree(localWriteDir)
-            plugins.ensureDirectoryExists(localWriteDir)
-
-    def findBackupPaths(self, test):
-        number = 1
-        oldPaths = []
-        while True:
-            path = test.makeBackupFileName(number)
-            if os.path.exists(path):
-                oldPaths.append(path)
-                number += 1
-            else:
-                return path, oldPaths
 
     def collateAllPaths(self, test, remoteCopy):
         self.collatePaths(test, "copy_test_path", self.copyTestPath, remoteCopy)

@@ -1185,3 +1185,6 @@ changed.selection = select filter for
 [Label=Mark test as rerun in current window]
 toggled.false = disable automatic rerun marking
 
+[Name=Load from Rerun]
+activate = load from rerun
+

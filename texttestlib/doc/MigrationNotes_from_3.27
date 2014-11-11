@@ -20,7 +20,7 @@ CHANGES IN DEFAULT BEHAVIOUR (OR PROCEDURE)
 ==================================================================
 You should use 'show_test_category' to unhide categories. 'hide_test_category' would now only be used for hiding Failed category.
 
-(2) batch_result_repository now stored succeeded tests in a single file
+(2) batch_result_repository now stores succeeded tests in a single file
 ======================================================================
 This should make the HTML report faster to generate. To migrate, run e.g.
 
@@ -28,3 +28,12 @@ texttest -b <batch_session> -s batch.MigrateBatchRepository
 
 which will convert the existing repository. Otherwise, just archive from time to time, and the new format will be written,
 so gradually migration will occur anyway.
+
+(3) batch_result_repository will be automatically cleaned of old results
+========================================================================
+The default behaviour of -coll is now to remove all files it doesn't make use of.
+This reduces the possibilities of generating long-term data from the repositories, doing data mining etc, but keeps them in trim
+without needing to run batch.ArchiveRepository by hand from time to time.
+
+For people who want to keep more historical data, add the new --manualarchive flag when generating the web page, which restores the old
+behaviour.

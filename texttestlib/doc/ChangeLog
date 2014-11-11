@@ -2647,14 +2647,19 @@ Release Enhancements:
 Dynamic GUI Enhancements:
     - Default colour for known bugs is now orange, as in HTML reports
 	"Marked" default colour changes to light blue accordingly
+    - Rerun now marks tests in the original run window
+	Also rerun windows are identified with numbers
+	There is also a new menu item "Load from rerun" in the test popup menu, to load the rerun result into the original window
     - Rerun dialog now inherits all automatic setting updates from Run tab
 	for example disabling grid usage when requesting replay of GUI testing
     - Additional "Ungrouped" row when many tests are grouped in the Status view
-General GUI Enhancements:
-    - New "View / Show Processes" action
-	This allows you to view all processes (dynamic GUIs, file viewers) started from TextTest and to kill them individually
     - All test categories except Failed are now invisible by default. New config entry 'show_test_category' to configure this.
     - The old 'auto_collapse_successful' functionality is removed as no longer necessary.
+Static GUI Enhancements:
+    - New "View / Show Processes" action
+	This allows you to view all processes (dynamic GUIs, file viewers) started from TextTest and to kill them individually
+    - New "Show Filters" dialog in File View
+	Allows viewing and experimenting with the filters for a given file
     - Reenable the old texttest icons by adding the config entry 'retro_icons:1' to personal config file
 Framework Enhancements:
 Version Control Browser Enhancements:
@@ -2662,14 +2667,23 @@ Version Control Browser Enhancements:
 Batch Report Enhancements:
     - Succeeded tests now stored in a more compact way in batch_result_repository
 	New migration script to convert. Old format is still understood, so migration will happen naturally (but slowly) anyway
+    - Batch result repositories now automatically clean themselves
+	Any file not used by the HTML report generation is just removed
+	To disable this behaviour use the new --manualarchive flag, which will essentially restore the old behaviour
+    - Can now archive individual named runs
+	Using the new flag -s "batch.ArchiveRepository name=<run name>"
     - Batch runs from Jenkins now automatically add the Jenkins run number to their batch session, along with the date
     - additional HTML classes added to generated summary tables, allows for more CSS possibilities
     - Adding new run-level data store to batch repositories
 Grid Engine/Cloud enhancements/bug fixes:
     - Reworked setup so that cloud instances don't flood master machine's SSH daemon with SSH requests
+    - Fixed incorrect display in Run Info of environment variables used directly in copy_test_path
+    - UGE Job ID now stored with failed tests, to make troubleshooting easier
 Bug Fixes:
     - Filter behaviour is now consistent with View/Show All
     - Fixed bug with HTML summary page reporting and specific memory failure tests (i.e. anything not called "memory") being counted incorrectly
     - DocumentEnvironment script should always work, no longer depends on file sorting
     - neatened up output for Jenkins runs when full paths to artefacts are needed, don't write it in the webpage
     - Status view now shows repeat groups, even if there is only one test with exactly that number
+    - Fixed bug where Temporary Settings were not affected by the Reset button
+

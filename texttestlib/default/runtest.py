@@ -218,7 +218,17 @@ class RunTest(plugins.Action):
 
     def getEnvironmentChanges(self, test, postfix=""):
         testEnv = self.getTestRunEnvironment(test, postfix)
-        return sorted(filter(lambda (var, value): test.app.hasChanged(var, value), testEnv.items()))
+        changes = []
+        # copy_test_path might be handled in a grid/cloud slave
+        # Can't guarantee we get the right value here. So we fake it...
+        copyVars = test.getConfigValue("copy_test_path", expandVars=False)
+        for var, value in testEnv.items():
+            if test.app.hasChanged(var, value):
+                if "$" + var in copyVars or "${" + var + "}" in copyVars:
+                    value = test.makeTmpFileName(os.path.basename(value), forComparison=False)
+                changes.append((var, value))
+        
+        return sorted(changes)
         
     def getTestRunEnvironment(self, test, postfix):
         testEnv = test.getRunEnvironment()

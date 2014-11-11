@@ -58,7 +58,8 @@ class BaseTestComparison(plugins.TestState):
 
     def computeFor(self, test, ignoreMissing=False, incompleteOnly=False):
         self.makeComparisons(test, ignoreMissing)
-        self.categorise()
+        variablesToStore = test.app.getTestRunVariables()
+        self.categorise(variablesToStore)
         self.addAdditionalText(test)
         if not incompleteOnly or not test.state.isComplete():
             test.changeState(self)
@@ -319,10 +320,10 @@ class TestComparison(BaseTestComparison):
         
         return FileComparison(test, stem, standardFile, tmpFile, testInProgress=0)
 
-    def categorise(self):
+    def categorise(self, variablesToStore=[]):
         if self.failedPrediction:
             # Keep the category we had before
-            self.freeText += self.getFreeTextInfo()
+            self.freeText += self.getFreeTextInfo(variablesToStore)
             return
         worstResult = self.getMostSevereFileComparison()
         if not worstResult:
@@ -331,12 +332,20 @@ class TestComparison(BaseTestComparison):
                 self.freeText = "(Approved at " + plugins.localtime("%H:%M") + ")"
         else:
             self.category = worstResult.getType()
-            self.freeText = self.getFreeTextInfo()
+            self.freeText = self.getFreeTextInfo(variablesToStore)
 
-    def getFreeTextInfo(self):
-        texts = [ fileComp.getFreeText() for fileComp in self.getSortedComparisons() ] 
+    def getFreeTextInfo(self, variablesToStore=[]):
+        texts = []
+        for var in variablesToStore:
+            if os.getenv(var):
+                texts.append(self.variableToText(var) + "\n")
+        texts += [ fileComp.getFreeText() for fileComp in self.getSortedComparisons() ] 
         return "".join(texts)
     
+    def variableToText(self, var):
+        texts = [t[0] + t[1:] for t in var.split("_") ]
+        return " ".join(texts) + ":" + os.getenv(var)
+        
     def findParentStems(self, onlyStems):
         parents = set()
         for stem in onlyStems:
@@ -437,7 +446,8 @@ class TestComparison(BaseTestComparison):
         newState = TestComparison(self, test.app, "be " + lifeCycleDest, copyFailedPrediction=crashed)
         for comparison in self.allResults:
             newState.addComparison(comparison)
-        newState.categorise()
+        variablesToStore = test.app.getTestRunVariables()
+        newState.categorise(variablesToStore)
         return knownbugs.CheckForBugs().checkTest(test, newState)[0] or newState
     
     def removeSplitComparisons(self, test):
@@ -461,7 +471,7 @@ class ProgressTestComparison(BaseTestComparison):
             self.runningState = previousInfo
     def createFileComparison(self, test, stem, standardFile, tmpFile):
         return FileComparison(test, stem, standardFile, tmpFile, testInProgress=1)
-    def categorise(self):
+    def categorise(self, *args, **kwargs):
         self.briefText = self.runningState.briefText
         self.freeText = self.runningState.freeText + self.progressText()
     def progressText(self):

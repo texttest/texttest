@@ -408,6 +408,9 @@ class Config:
             if self.optionMap.has_key(option):
                 return True
         return False
+    
+    def getTestRunVariables(self):
+        return []
 
     def noFileAdvice(self):
         # What can we suggest if files aren't present? In this case, not much

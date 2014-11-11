@@ -291,6 +291,9 @@ class QueueSystemConfig(default.Config):
         else:
             return default.Config.useVirtualDisplay(self)
         
+    def getTestRunVariables(self):
+        return [ "JOB_ID" ] if self.slaveRun() else []
+    
     def getTextDisplayResponderClass(self):
         if self.useQueueSystem:
             return masterprocess.MasterTextResponder

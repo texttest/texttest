@@ -1381,11 +1381,21 @@ class MultiEntryDictionary(OrderedDict):
             self.warnings.append(message)
             printWarning(message)
             
-    def getFileDefining(self, sectionName, entryName, value):
-        for currEntry, filename in self.fileTrackSections.get(sectionName, {}).get(value, []):
-            if fnmatch.fnmatch(entryName, currEntry):
-                return filename
+    def getFileDefining(self, sectionName, entryName, value, envMapping=os.environ):
+        valueDict = self.fileTrackSections.get(sectionName)
+        if valueDict:
+            valueToUse = self.findFileDefiningValue(value, valueDict, envMapping)
+            for currEntry, filename in valueDict.get(valueToUse, []):
+                if fnmatch.fnmatch(entryName, currEntry):
+                    return filename
 
+    def findFileDefiningValue(self, value, valueDict, envMapping):
+        if value in valueDict:
+            return value
+        for storedValue in valueDict.keys():
+            if "$" in storedValue and self.expandEnvironment(storedValue, envMapping) == value:
+                return storedValue
+                
     def parseConfigLine(self, line, currSectionName, filename, *args, **kwargs):
         key, value = line.split(":", 1)
         entryName = self.getEntryName(string.Template(key).safe_substitute(os.environ))

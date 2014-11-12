@@ -227,11 +227,11 @@ class Test(plugins.Observable):
             self.configDir = newConfigDir
             self.diagnose("config file settings are: " + "\n" + repr(self.configDir))
             
-    def getConfigFileDefining(self, versionApp, *args):
+    def getConfigFileDefining(self, versionApp, sectionName, key, value):
         configDir = self.configDir or self.getParentConfigDir()
-        filename = configDir.getFileDefining(*args)
+        filename = configDir.getFileDefining(sectionName, key, value, envMapping=self.environment)
         if not filename and versionApp is not self.app:
-            return versionApp.getConfigFileDefining(*args)
+            return versionApp.getConfigFileDefining(sectionName, key, value, envMapping=self.environment)
         return filename
 
     def getParentConfigDir(self):

@@ -1326,14 +1326,14 @@ class MultilineTextTrigger(TextTrigger):
 # Used for application and personal configuration files
 class MultiEntryDictionary(OrderedDict):
     warnings = []
-    def __init__(self, importKey="", importFileFinder=None, aliases={}, allowSectionHeaders=True, *args, **kw):
+    def __init__(self, importKey="", importFileFinder=None, aliases={}, allowSectionHeaders=True, fileTrackSections={}, *args, **kw):
         OrderedDict.__init__(self, *args, **kw)
         self.diag = logging.getLogger("MultiEntryDictionary")
         self.aliases = aliases
         self.importKey = importKey
         self.importFileFinder= importFileFinder
         self.allowSectionHeaders = allowSectionHeaders
-        self.fileTrackSections = {}
+        self.fileTrackSections = fileTrackSections
 
     def __reduce__(self):
         # Need this because of __reduce__ in OrderedDict
@@ -1341,7 +1341,7 @@ class MultiEntryDictionary(OrderedDict):
         # Used when doing deepcopy()
         items = [[k, self[k]] for k in self]
         return self.__class__, (self.importKey, Callable(self.importFileFinder), 
-                                self.aliases, self.allowSectionHeaders, items)
+                                self.aliases, self.allowSectionHeaders, self.fileTrackSections, items)
         
     def addFileTracking(self, key):
         self.fileTrackSections[key] = {}

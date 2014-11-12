@@ -1382,7 +1382,7 @@ class MultiEntryDictionary(OrderedDict):
             printWarning(message)
             
     def getFileDefining(self, sectionName, entryName, value):
-        for currEntry, filename in self.fileTrackSections[sectionName].get(value, []):
+        for currEntry, filename in self.fileTrackSections.get(sectionName, {}).get(value, []):
             if fnmatch.fnmatch(entryName, currEntry):
                 return filename
 

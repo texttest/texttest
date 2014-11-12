@@ -915,9 +915,9 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
         self.reloadConfigForSelected() # Always make sure we're up to date here
         fileName = self.currFileSelection[0][0]
         test = self.currTestSelection[0]
-        allFilters = test.app.getAllFilters(test, fileName)
+        allFilters, versionApp = test.app.getAllFilters(test, fileName)
         if allFilters:
-            self.addFilterBoxes(allFilters, fileName)
+            self.addFilterBoxes(allFilters, fileName, test, versionApp)
         else:
             messageBox = self.createDialogMessage("No run_dependent_text filters defined for file '" + os.path.basename(fileName) + "' for this test.", gtk.STOCK_DIALOG_INFO)
             self.dialog.vbox.pack_start(messageBox)
@@ -936,15 +936,20 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
             
     def canSelect(self, path):
         return False # No use for selections yet...
-                
-    def addFilterBoxes(self, allFilters, fileName):
+    
+    def getStem(self, fileName):
+        return os.path.basename(fileName).split(".")[0]
+    
+    def addFilterBoxes(self, allFilters, fileName, test, versionApp):
         filterFrame = gtk.Frame("Filters to apply")
         filterFrame.set_border_width(1)
         vbox = gtk.VBox()
         for filterObj in allFilters:
-            listStore = gtk.ListStore(gobject.TYPE_PYOBJECT, bool)
+            listStore = gtk.ListStore(gobject.TYPE_PYOBJECT, bool, str)
             for lineFilter in filterObj.lineFilters:
-                listStore.append([ lineFilter, True ])
+                lineFilterFile = test.getConfigFileDefining(versionApp, filterObj.configKey, self.getStem(fileName), lineFilter.originalText)
+                relPath = plugins.relpath(lineFilterFile, test.app.getDirectory()) if lineFilterFile else "???"
+                listStore.append([ lineFilter, True, relPath ])
             treeView = gtk.TreeView(listStore)
             treeView.set_name(filterObj.configKey + " Tree View")
         
@@ -960,6 +965,10 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
             toggleCell.set_property('activatable', True)
             toggleCell.connect("toggled", self.showToggled, listStore)
             column = gtk.TreeViewColumn("Enabled", toggleCell, active=1)         
+            treeView.append_column(column)
+            
+            cell = gtk.CellRendererText()
+            column = gtk.TreeViewColumn("Config File", cell, text=2)         
             treeView.append_column(column)
             
             treeView.get_selection().set_mode(gtk.SELECTION_MULTIPLE)

@@ -226,6 +226,13 @@ class Test(plugins.Observable):
             self.app.readValues(newConfigDir, "config", [ self.dircache ], insert=False, errorOnUnknown=True)
             self.configDir = newConfigDir
             self.diagnose("config file settings are: " + "\n" + repr(self.configDir))
+            
+    def getConfigFileDefining(self, versionApp, *args):
+        configDir = self.configDir or self.getParentConfigDir()
+        filename = configDir.getFileDefining(*args)
+        if not filename and versionApp is not self.app:
+            return versionApp.getConfigFileDefining(*args)
+        return filename
 
     def getParentConfigDir(self):
         # Take the immediate parent first, upwards to the root suite
@@ -1496,6 +1503,9 @@ class Application(object):
                     self.configDir.addEntry(subKey, subValue, key, insert=False, errorOnUnknown=True, errorOnClashWithGlobal=False)
             else:
                 self.configDir[key] = value
+                
+    def getConfigFileDefining(self, *args):
+        return self.configDir.getFileDefining(*args)
 
     def writeConfigEntries(self, configEntries):
         configFileName = self.dircache.pathName("config." + self.name)
@@ -1972,18 +1982,20 @@ class Application(object):
     def getCompositeConfigValue(self, *args, **kw):
         return self.configDir.getComposite(*args, **kw)
        
-    def addConfigEntry(self, key, value, sectionName = "", **kw):
+    def addConfigEntry(self, key, value, sectionName="", **kw):
         self.configDir.addEntry(key, value, sectionName, insert=False, errorOnUnknown=True, **kw)
 
     def addConfigEntryOverride(self, key, value, sectionName):
         self.configDir.addEntry(key, value, sectionName, insert=False, errorOnUnknown=True, errorOnClashWithGlobal=False)
         self.overrideConfigDir.setdefault(sectionName, {})[key] = value
 
-    def removeConfigEntry(self, key, value, sectionName = ""):
+    def removeConfigEntry(self, key, value, sectionName=""):
         self.configDir.removeEntry(key, value, sectionName)
 
-    def setConfigDefault(self, key, value, docString = ""):
+    def setConfigDefault(self, key, value, docString="", trackFiles=False):
         self.configDir[key] = value
+        if trackFiles:
+            self.configDir.addFileTracking(key)
         if len(docString) > 0:
             self.configDocs[key] = docString
             

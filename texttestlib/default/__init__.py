@@ -543,7 +543,7 @@ class Config:
     def getAllFilters(self, test, fileName):
         app = self.getFileNameVersionApp(test, fileName)
         filterAction = rundependent.FilterAction()
-        return filterAction.getAllFilters(test, fileName, app)
+        return filterAction.getAllFilters(test, fileName, app), app
     
     def getTestProcessor(self):        
         catalogueCreator = self.getCatalogueCreator()
@@ -1295,8 +1295,8 @@ class Config:
         app.setConfigDefault("collect_traffic_python_ignore_callers", [], trafficText)
         app.setConfigDefault("collect_traffic_use_threads", "true", trafficText)
         app.setConfigDefault("collect_traffic_client_server", "false", trafficText)
-        app.setConfigDefault("run_dependent_text", { "default" : [] }, "Mapping of patterns to remove from result files")
-        app.setConfigDefault("unordered_text", { "default" : [] }, "Mapping of patterns to extract and sort from result files")
+        app.setConfigDefault("run_dependent_text", { "default" : [] }, "Mapping of patterns to remove from result files", trackFiles=True)
+        app.setConfigDefault("unordered_text", { "default" : [] }, "Mapping of patterns to extract and sort from result files", trackFiles=True)
         app.setConfigDefault("file_split_pattern", {}, "Pattern to use for splitting result files")
         app.setConfigDefault("create_catalogues", "false", "Do we create a listing of files created/removed by tests")
         app.setConfigDefault("catalogue_process_string", "", "String for catalogue functionality to identify processes created")

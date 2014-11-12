@@ -1333,6 +1333,7 @@ class MultiEntryDictionary(OrderedDict):
         self.importKey = importKey
         self.importFileFinder= importFileFinder
         self.allowSectionHeaders = allowSectionHeaders
+        self.fileTrackSections = {}
 
     def __reduce__(self):
         # Need this because of __reduce__ in OrderedDict
@@ -1341,6 +1342,9 @@ class MultiEntryDictionary(OrderedDict):
         items = [[k, self[k]] for k in self]
         return self.__class__, (self.importKey, Callable(self.importFileFinder), 
                                 self.aliases, self.allowSectionHeaders, items)
+        
+    def addFileTracking(self, key):
+        self.fileTrackSections[key] = {}
         
     def getSectionInfo(self, sectionName=""):
         if sectionName and sectionName != "end":
@@ -1365,7 +1369,7 @@ class MultiEntryDictionary(OrderedDict):
             if self.allowSectionHeaders and self.isSectionHeader(line):
                 currSectionName = self.getNewSectionInfo(line, *args, **kwargs)
             elif ":" in line:
-                self.parseConfigLine(line, currSectionName, *args, **kwargs)
+                self.parseConfigLine(line, currSectionName, filename, *args, **kwargs)
             else:
                 self.warn("Could not parse config line " + line)
 
@@ -1376,11 +1380,18 @@ class MultiEntryDictionary(OrderedDict):
         if message not in self.warnings:
             self.warnings.append(message)
             printWarning(message)
+            
+    def getFileDefining(self, sectionName, entryName, value):
+        for currEntry, filename in self.fileTrackSections[sectionName].get(value, []):
+            if fnmatch.fnmatch(entryName, currEntry):
+                return filename
 
-    def parseConfigLine(self, line, currSectionName, *args, **kwargs):
+    def parseConfigLine(self, line, currSectionName, filename, *args, **kwargs):
         key, value = line.split(":", 1)
         entryName = self.getEntryName(string.Template(key).safe_substitute(os.environ))
         self.addEntry(entryName, value, currSectionName, *args, **kwargs)
+        if currSectionName in self.fileTrackSections:
+            self.fileTrackSections[currSectionName].setdefault(value, []).append((entryName, filename))
         if key and key == self.importKey:
             self.readFromFile(self.importFileFinder(os.path.expandvars(value)), *args, **kwargs)
             

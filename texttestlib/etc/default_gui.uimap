@@ -1181,6 +1181,7 @@ changed = set text for filtering to
 [Name=run_dependent_text Tree View]
 toggled.Enabled.false = disable filter for
 changed.selection = select filter for
+edited.run__dependent__text = edit filter
 
 [Label=Mark test as rerun in current window]
 toggled.false = disable automatic rerun marking

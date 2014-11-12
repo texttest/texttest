@@ -922,7 +922,11 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
             messageBox = self.createDialogMessage("No run_dependent_text filters defined for file '" + os.path.basename(fileName) + "' for this test.", gtk.STOCK_DIALOG_INFO)
             self.dialog.vbox.pack_start(messageBox)
             
-    def showToggled(self, cell, path, model, treeView):
+    def editFilter(self, cell, path, newText, model):
+        lineFilter = model[path][0]
+        model[path][0] = lineFilter.makeNew(newText)
+            
+    def showToggled(self, cell, path, model):
         # Toggle the toggle button
         newValue = not model[path][1]
         model[path][1] = newValue
@@ -945,6 +949,8 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
             treeView.set_name(filterObj.configKey + " Tree View")
         
             cell = gtk.CellRendererText()
+            cell.set_property('editable', True)
+            cell.connect('edited', self.editFilter, listStore)
             column = gtk.TreeViewColumn(filterObj.configKey.replace("_", "__"))
             column.pack_start(cell)
             column.set_cell_data_func(cell, self.setText)
@@ -952,7 +958,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
             
             toggleCell = gtk.CellRendererToggle()
             toggleCell.set_property('activatable', True)
-            toggleCell.connect("toggled", self.showToggled, listStore, treeView)
+            toggleCell.connect("toggled", self.showToggled, listStore)
             column = gtk.TreeViewColumn("Enabled", toggleCell, active=1)         
             treeView.append_column(column)
             

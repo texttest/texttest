@@ -362,6 +362,9 @@ class LineFilter:
         self.parseOriginalText()
         self.diag.info("Created trigger : " + repr(self.trigger))
         
+    def makeNew(self, newText):
+        return LineFilter(newText, self.testId, self.diag)
+        
     def getInternalExpression(self, parameter):
         method = self.internalExpressions.get(parameter)
         return method(self.testId)

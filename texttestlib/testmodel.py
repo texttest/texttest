@@ -229,10 +229,10 @@ class Test(plugins.Observable):
             
     def getConfigFileDefining(self, versionApp, sectionName, key, value):
         configDir = self.configDir or self.getParentConfigDir()
-        filename = configDir.getFileDefining(sectionName, key, value, envMapping=self.environment)
+        filename, stem = configDir.getFileDefining(sectionName, key, value, envMapping=self.environment)
         if not filename and versionApp is not self.app:
             return versionApp.getConfigFileDefining(sectionName, key, value, envMapping=self.environment)
-        return filename
+        return filename, stem
 
     def getParentConfigDir(self):
         # Take the immediate parent first, upwards to the root suite

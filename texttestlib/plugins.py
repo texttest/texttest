@@ -1387,7 +1387,8 @@ class MultiEntryDictionary(OrderedDict):
             valueToUse = self.findFileDefiningValue(value, valueDict, envMapping)
             for currEntry, filename in valueDict.get(valueToUse, []):
                 if fnmatch.fnmatch(entryName, currEntry):
-                    return filename
+                    return filename, currEntry
+        return None, None
 
     def findFileDefiningValue(self, value, valueDict, envMapping):
         if value in valueDict:

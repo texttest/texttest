@@ -945,11 +945,11 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
         filterFrame.set_border_width(1)
         vbox = gtk.VBox()
         for filterObj in allFilters:
-            listStore = gtk.ListStore(gobject.TYPE_PYOBJECT, bool, str)
+            listStore = gtk.ListStore(gobject.TYPE_PYOBJECT, bool, str, str, str)
             for lineFilter in filterObj.lineFilters:
-                lineFilterFile = test.getConfigFileDefining(versionApp, filterObj.configKey, self.getStem(fileName), lineFilter.originalText)
+                lineFilterFile, stem = test.getConfigFileDefining(versionApp, filterObj.configKey, self.getStem(fileName), lineFilter.originalText)
                 relPath = plugins.relpath(lineFilterFile, test.app.getDirectory()) if lineFilterFile else "???"
-                listStore.append([ lineFilter, True, relPath ])
+                listStore.append([ lineFilter, True, relPath, stem, lineFilter.originalText ])
             treeView = gtk.TreeView(listStore)
             treeView.set_name(filterObj.configKey + " Tree View")
         
@@ -1017,10 +1017,62 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
         outFile.close()
         return value
 
+    def getChanges(self):
+        changes = {}
+        def addChange(model, path, iter, configKey):
+            text = model.get_value(iter, 0).originalText
+            oldText = model.get_value(iter, 4)
+            fileName = model.get_value(iter, 2)
+            stem = model.get_value(iter, 3)
+            if text != oldText:
+                oldLine = stem + ":" + oldText
+                newLine = stem + ":" + text
+                changes.setdefault(fileName, {}).setdefault(configKey, []).append((oldLine, newLine))
+        for fileFilter, model in self.filtersWithModels:
+            model.foreach(addChange, fileFilter.configKey)
+        return changes
+
+    def getSectionName(self, line):
+        pos = line.find("]")
+        return line[1:pos]
+    
+    def applyChanges(self, line, changeList):
+        for oldText, newText in changeList:
+            if line.startswith(oldText):
+                return line.replace(oldText, newText, 1)
+        return line
+    
+    def saveChanges(self):
+        changesByFile = self.getChanges()
+        if changesByFile:
+            app = self.currAppSelection[0]
+            for fileName, changes in changesByFile.items():
+                newFileLines = []
+                fullPath = os.path.join(app.getDirectory(), fileName)
+                currSection = None
+                with open(fullPath) as f:
+                    for line in f:
+                        if line.startswith("["):
+                            currSection = self.getSectionName(line)
+                        elif currSection in changes:
+                            line = self.applyChanges(line, changes.get(currSection))
+                        newFileLines.append(line)
+                with open(fullPath, "w") as f:
+                    for line in newFileLines:
+                        f.write(line)
+
     def createButtons(self):        
         button = self.dialog.add_button('Test Filtering', gtk.RESPONSE_NONE)
         button.connect("clicked", self.testFiltering)
-        guiplugins.ActionResultDialogGUI.createButtons(self)
+        self.dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL)
+        self.dialog.add_button("Apply and Close", gtk.RESPONSE_ACCEPT)
+        self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+        self.dialog.connect("response", self.respond)
+
+    def respond(self, dialog, responseId):
+        if responseId == gtk.RESPONSE_ACCEPT:
+            self.saveChanges()
+        guiplugins.ActionResultDialogGUI.respond(self, dialog, responseId)
         
     def getSizeAsWindowFraction(self):
         return 0.8, 0.9

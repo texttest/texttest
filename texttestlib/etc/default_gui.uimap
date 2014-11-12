@@ -1171,6 +1171,7 @@ activate = show filters
 
 [Title=Show Filters]
 response.accept = accept shown filters
+response.cancel = cancel filter editing
 
 [Label=Test Filtering]
 clicked = test filtering from filter view

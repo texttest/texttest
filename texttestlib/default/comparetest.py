@@ -323,7 +323,7 @@ class TestComparison(BaseTestComparison):
     def categorise(self, variablesToStore=[]):
         if self.failedPrediction:
             # Keep the category we had before
-            self.freeText += self.getFreeTextInfo()
+            self.freeText += self.getFreeTextInfo(variablesToStore)
             return
         worstResult = self.getMostSevereFileComparison()
         if not worstResult:

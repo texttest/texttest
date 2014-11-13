@@ -663,11 +663,37 @@ class ArchiveRepository(ArchiveScript):
         runDir = os.path.join(os.path.dirname(self.repository), "run_names")
         if os.path.isdir(runDir):
             self.archiveFilesUnder(runDir, suite.app, weekdays, True)
-        self.archiveFilesUnder(self.repository, suite.app, weekdays, False)
-        
+        self.archiveVersionDirsUnder(self.repository, suite.app, weekdays, False)
+
+    def archiveVersionDirsUnder(self, repository, app, *args):
+        appVersions = set(app.versions)
+        for directory in sorted(os.listdir(repository)):
+            dirversions = set(directory.split("."))
+            fullPath = os.path.join(repository, directory)
+            if appVersions.issubset(dirversions) and os.path.isdir(fullPath):
+                self.archiveFilesUnder(fullPath, app, *args)
+
+    def archiveRunFile(self, fullPath, app):
+        appParts = set(repr(app).split("."))
+        envVars, otherAppLines = [], []
+        with open(fullPath) as f:
+            for line in f:
+                if "=" in line:
+                    envVars.append(line)
+                else:
+                    lineParts = set(line.strip().split("."))
+                    if not appParts.issubset(lineParts):
+                        otherAppLines.append(line)
+        if otherAppLines:
+            with open(fullPath, "w") as f:
+                for line in envVars + otherAppLines:
+                    f.write(line)
+        else:
+            os.remove(fullPath)
+
     def archiveFile(self, fullPath, app, weekdays, isRunFile):
         if isRunFile:
-            return os.remove(fullPath)
+            return self.archiveRunFile(fullPath, app)
         elif os.path.basename(fullPath).startswith("teststate"):
             return ArchiveScript.archiveFile(self, fullPath, app)
         linesToKeep = []

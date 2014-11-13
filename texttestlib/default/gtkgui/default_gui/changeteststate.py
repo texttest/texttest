@@ -363,7 +363,7 @@ class LoadFromRerun(guiplugins.ActionGUI):
         from texttestlib.default.reconnect import ReconnectTest
         reconn = ReconnectTest(appDir, False)
         location = os.path.join(appDir, test.getRelPath())
-        state = reconn.getReconnectStateFrom(test, location)
+        state = reconn.getReconnectStateFrom(test, location, copyEvenIfLoadFails=False)
         if state:
             state.lifecycleChange = "recalculated"
             test.backupTemporaryData()

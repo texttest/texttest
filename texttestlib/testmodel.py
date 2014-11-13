@@ -850,9 +850,10 @@ class TestCase(Test):
         
     def hasTemporaryData(self):
         tmpDir = self.getDirectory(temporary=1)
-        for f in os.listdir(tmpDir):
-            if os.path.isfile(os.path.join(tmpDir, f)):
-                return True
+        if os.path.isdir(tmpDir):
+            for f in os.listdir(tmpDir):
+                if os.path.isfile(os.path.join(tmpDir, f)):
+                    return True
         return False
 
     def backupPreviousTemporaryData(self):

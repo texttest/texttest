@@ -272,7 +272,7 @@ class ReconnectTest(plugins.Action):
         else:
             return " (recomputing)"
 
-    def getReconnectStateFrom(self, test, location):
+    def getReconnectStateFrom(self, test, location, copyEvenIfLoadFails=True):
         stateToUse = None
         stateFile = os.path.join(location, "framework_tmp", "teststate")
         if os.path.isfile(stateFile):
@@ -282,7 +282,7 @@ class ReconnectTest(plugins.Action):
             if loaded and self.modifyState(test, newState): # if we can't read it, recompute it
                 stateToUse = newState
 
-        if self.fullRecalculate or not stateToUse:
+        if (copyEvenIfLoadFails or stateToUse) and (self.fullRecalculate or not stateToUse):
             self.copyFiles(test, location)
 
         return stateToUse
@@ -290,6 +290,7 @@ class ReconnectTest(plugins.Action):
     def copyFiles(self, test, reconnLocation):
         test.makeWriteDirectory()
         tmpDir = test.getDirectory(temporary=1)
+        plugins.ensureDirectoryExists(tmpDir)
         self.diag.info("Copying files from " + reconnLocation + " to " + tmpDir)
         for file in os.listdir(reconnLocation):
             fullPath = os.path.join(reconnLocation, file)

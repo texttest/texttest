@@ -163,7 +163,7 @@ class QueueSystemConfig(default.Config):
         if self.slaveRun():
             if self.useCloud:
                 return False
-            elif self.optionMap.has_key("keepslave"):
+            elif "keepslave" in self.optionMap or "rerun" in self.optionMap:
                 return True
         return default.Config.keepTemporaryDirectories(self)
         
@@ -239,7 +239,7 @@ class QueueSystemConfig(default.Config):
     
     def getSlaveSwitches(self):
         return [ "b", "trace", "ignorecat", "ignorefilters", "delay", "screenshot", "gui", "td",
-                 "rectraffic", "keeptmp", "keepslave", "reconnect", "reconnfull" ]
+                 "rectraffic", "keeptmp", "keepslave", "reconnect", "reconnfull", "rerun" ]
 
     def getExecHostFinder(self):
         if self.slaveRun():

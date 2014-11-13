@@ -904,6 +904,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
         guiplugins.ActionResultDialogGUI.__init__(self, *args, **kw)
         self.textBuffer = None
         self.filtersWithModels = []
+        self.toRemove = {}
         
     def _getTitle(self):
         return "Show Filters"
@@ -933,13 +934,35 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
         
     def setText(self, column, cell, model, iter):
         cell.set_property('text', model.get_value(iter, 0).originalText)
-            
-    def canSelect(self, path):
-        return False # No use for selections yet...
-    
+
     def getStem(self, fileName):
         return os.path.basename(fileName).split(".")[0]
     
+    def removeRow(self, menuItem, model, selection, configKey):
+        iters = []
+        def addSelIter(model, path, iter):
+            self.addChangeData(model, path, iter, configKey, self.toRemove)
+            iters.append(iter)
+            
+        selection.selected_foreach(addSelIter)
+        for iter in iters:
+            model.remove(iter)
+    
+    def makePopup(self, *args):
+        menu = gtk.Menu()
+        menuItem = gtk.MenuItem("Remove")
+        menu.append(menuItem)
+        menuItem.connect("activate", self.removeRow, *args)
+        menuItem.show()
+        return menu
+    
+    def showPopup(self, treeview, event, popupMenu):
+        if event.button == 3:
+            pathInfo = treeview.get_path_at_pos(int(event.x), int(event.y))
+            if pathInfo is not None:
+                treeview.grab_focus()
+                popupMenu.popup(None, None, None, event.button, event.time)
+                
     def addFilterBoxes(self, allFilters, fileName, test, versionApp):
         filterFrame = gtk.Frame("Filters to apply")
         filterFrame.set_border_width(1)
@@ -971,8 +994,12 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
             column = gtk.TreeViewColumn("Config File", cell, text=2)         
             treeView.append_column(column)
             
-            treeView.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
-            treeView.get_selection().set_select_function(self.canSelect)
+            selection = treeView.get_selection()
+            selection.set_mode(gtk.SELECTION_MULTIPLE)
+            
+            popup = self.makePopup(listStore, selection, filterObj.configKey) 
+            treeView.connect("button_press_event", self.showPopup, popup)
+            
             frame = gtk.Frame()
             frame.set_border_width(1)
             frame.add(treeView)
@@ -1016,20 +1043,27 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
         value = outFile.getvalue()
         outFile.close()
         return value
+    
+    def addChangeData(self, model, path, iter, configKey, changes):
+        fileName = model.get_value(iter, 2)
+        stem = model.get_value(iter, 3)
+        oldLine = stem + ":" + model.get_value(iter, 4)
+        newLine = None if changes is self.toRemove else stem + ":" + model.get_value(iter, 0).originalText
+        changes.setdefault(fileName, {}).setdefault(configKey, []).append((oldLine, newLine))
 
     def getChanges(self):
         changes = {}
         def addChange(model, path, iter, configKey):
             text = model.get_value(iter, 0).originalText
             oldText = model.get_value(iter, 4)
-            fileName = model.get_value(iter, 2)
-            stem = model.get_value(iter, 3)
             if text != oldText:
-                oldLine = stem + ":" + oldText
-                newLine = stem + ":" + text
-                changes.setdefault(fileName, {}).setdefault(configKey, []).append((oldLine, newLine))
+                self.addChangeData(model, path, iter, configKey, changes)
         for fileFilter, model in self.filtersWithModels:
             model.foreach(addChange, fileFilter.configKey)
+        for fileName, removeData in self.toRemove.items():
+            for removeKey, removeLines in removeData.items():
+                changes.setdefault(fileName, {}).setdefault(removeKey, []).extend(removeLines)
+        self.toRemove = {}
         return changes
 
     def getSectionName(self, line):
@@ -1039,7 +1073,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
     def applyChanges(self, line, changeList):
         for oldText, newText in changeList:
             if line.startswith(oldText):
-                return line.replace(oldText, newText, 1)
+                return line.replace(oldText, newText, 1) if newText else None
         return line
     
     def saveChanges(self):
@@ -1056,7 +1090,8 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
                             currSection = self.getSectionName(line)
                         elif currSection in changes:
                             line = self.applyChanges(line, changes.get(currSection))
-                        newFileLines.append(line)
+                        if line is not None:
+                            newFileLines.append(line)
                 with open(fullPath, "w") as f:
                     for line in newFileLines:
                         f.write(line)

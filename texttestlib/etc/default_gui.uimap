@@ -1194,3 +1194,6 @@ activate = load from rerun
 [Label=Remove]
 activate = remove selected filter row
 
+[Label=Add Row]
+activate = add new filter row
+

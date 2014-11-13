@@ -938,18 +938,33 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
     def getStem(self, fileName):
         return os.path.basename(fileName).split(".")[0]
     
-    def removeRow(self, menuItem, model, selection, configKey):
+    def addRow(self, menuItem, model, selection, configKey):
+        iter = self.getSelectedIters(selection)[-1]
+        lineFilter, relpath, stem = model.get(iter, 0, 2, 3)
+        newIter = model.insert_after(iter, [ lineFilter.makeNew(""), True, relpath, stem, "" ])
+        path = model.get_path(newIter)
+        column = selection.get_tree_view().get_column(0)
+        selection.get_tree_view().set_cursor(path, column, start_editing=True)
+    
+    def getSelectedIters(self, selection):
         iters = []
         def addSelIter(model, path, iter):
-            self.addChangeData(model, path, iter, configKey, self.toRemove)
             iters.append(iter)
             
         selection.selected_foreach(addSelIter)
-        for iter in iters:
+        return iters
+    
+    def removeRow(self, menuItem, model, selection, configKey):
+        for iter in self.getSelectedIters(selection):
+            self.addChangeData(model, iter, configKey, self.toRemove)
             model.remove(iter)
     
     def makePopup(self, *args):
         menu = gtk.Menu()
+        menuItem = gtk.MenuItem("Add Row")
+        menu.append(menuItem)
+        menuItem.connect("activate", self.addRow, *args)
+        menuItem.show()
         menuItem = gtk.MenuItem("Remove")
         menu.append(menuItem)
         menuItem.connect("activate", self.removeRow, *args)
@@ -1044,10 +1059,9 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
         outFile.close()
         return value
     
-    def addChangeData(self, model, path, iter, configKey, changes):
-        fileName = model.get_value(iter, 2)
-        stem = model.get_value(iter, 3)
-        oldLine = stem + ":" + model.get_value(iter, 4)
+    def addChangeData(self, model, iter, configKey, changes):
+        fileName, stem, origText = model.get(iter, 2, 3, 4)
+        oldLine = stem + ":" + origText
         newLine = None if changes is self.toRemove else stem + ":" + model.get_value(iter, 0).originalText
         changes.setdefault(fileName, {}).setdefault(configKey, []).append((oldLine, newLine))
 
@@ -1057,7 +1071,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
             text = model.get_value(iter, 0).originalText
             oldText = model.get_value(iter, 4)
             if text != oldText:
-                self.addChangeData(model, path, iter, configKey, changes)
+                self.addChangeData(model, iter, configKey, changes)
         for fileFilter, model in self.filtersWithModels:
             model.foreach(addChange, fileFilter.configKey)
         for fileName, removeData in self.toRemove.items():
@@ -1073,8 +1087,12 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
     def applyChanges(self, line, changeList):
         for oldText, newText in changeList:
             if line.startswith(oldText):
-                return line.replace(oldText, newText, 1) if newText else None
-        return line
+                if oldText.endswith(":") and newText.startswith(oldText):
+                    # Adding a new row
+                    return line, newText
+                else:
+                    return line.replace(oldText, newText, 1) if newText else None, None
+        return line, None
     
     def saveChanges(self):
         changesByFile = self.getChanges()
@@ -1084,14 +1102,22 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
                 newFileLines = []
                 fullPath = os.path.join(app.getDirectory(), fileName)
                 currSection = None
+                currNewLines = []
                 with open(fullPath) as f:
                     for line in f:
                         if line.startswith("["):
                             currSection = self.getSectionName(line)
                         elif currSection in changes:
-                            line = self.applyChanges(line, changes.get(currSection))
+                            line, newLine = self.applyChanges(line, changes.get(currSection))
+                            if newLine:
+                                currNewLines.append(newLine)
                         if line is not None:
+                            if currNewLines and not line.startswith(currNewLines[0].split(":")[0]):
+                                for newLine in currNewLines:
+                                    newFileLines.append(newLine + "\n")
+                                currNewLines = []
                             newFileLines.append(line)
+                                
                 with open(fullPath, "w") as f:
                     for line in newFileLines:
                         f.write(line)

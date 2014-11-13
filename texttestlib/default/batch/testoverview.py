@@ -121,12 +121,11 @@ class GenerateWebPages(object):
                             unusedTags.difference_update(currTags)
                     tags = filter(lambda t: t in selectedTags, tags)
                     if archiveUnused and unusedTags:
-                        plugins.log.info("WARNING: new automatic repository cleaning would remove data.")
-                        plugins.log.info("To disable this new feature, please run with the new --manualarchive flag when collating the HTML report")
-                        plugins.log.info("The following runs would now be removed:")
+                        plugins.log.info("Automatic repository cleaning will now remove old data for the following runs:")
                         for tag in sorted(unusedTags, self.compareTags):
                             plugins.log.info("- " + tag)
-                        #self.removeUnused(unusedTags, tagData)
+                        plugins.log.info("(To disable automatic repository cleaning in future, please run with the --manualarchive flag when collating the HTML report.)")
+                        self.removeUnused(unusedTags, tagData)
 
                 loggedTests = OrderedDict()
                 categoryHandlers = {}

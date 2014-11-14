@@ -1,4 +1,4 @@
-import os, shutil, re, stat, subprocess, glob, logging, difflib, time
+import os, shutil, re, stat, subprocess, glob, logging, difflib, time,sys
 from texttestlib import plugins
 from texttestlib.jobprocess import killArbitaryProcess, killSubProcessAndChildren
 from runtest import Killed
@@ -704,22 +704,25 @@ class CollateFiles(plugins.Action):
                 if self.containsRegexps(filePath, regexps):
                     self.removeUnwantedFile(filePath)
                 
-    def findEditedFile(self, test, patterns):
+    def findEditedFiles(self, test, patterns):
+        editedFiles = []
         for pattern in patterns:
             for fullpath in self.findPaths(test, pattern)[1]:
                 if self.testEdited(test, fullpath):
-                    return fullpath
+                    editedFiles.append(fullpath)
                 else:
                     self.diag.info("Found " + fullpath + " but it wasn't edited")
+        return editedFiles
+        
 
     def collate(self, test):
         for targetStem, sourcePatterns in self.expandCollations(test):
-            sourceFile = self.findEditedFile(test, sourcePatterns)
-            if sourceFile:
+            sourceFiles = self.findEditedFiles(test, sourcePatterns)
+            if sourceFiles:
                 targetFile = test.makeTmpFileName(targetStem)
                 collationErrFile = test.makeTmpFileName(targetStem + ".collate_errs", forFramework=1)
-                self.diag.info("Extracting " + sourceFile + " to " + targetFile)
-                self.extract(test, sourceFile, targetFile, collationErrFile)
+                self.diag.info("Extracting " + ",".join(sourceFiles) + " to " + targetFile)
+                self.extract(test, sourceFiles, targetFile, collationErrFile)
 
     def tryFetchRemoteFiles(self, test):
         machine, remoteTmpDir = test.app.getRemoteTestTmpDir(test)
@@ -808,11 +811,15 @@ class CollateFiles(plugins.Action):
             self.collationProc = None
             killSubProcessAndChildren(proc, cmd=test.getConfigValue("kill_command"))
             
-    def extract(self, test, sourceFile, targetFile, collationErrFile):
+    def extract(self, test, sourceFiles, targetFile, collationErrFile):
         stem = os.path.splitext(os.path.basename(targetFile))[0]
         scripts = test.getCompositeConfigValue("collate_script", stem)
+        sourceFilesStr = ",".join(sourceFiles)
         if len(scripts) == 0:
-            return shutil.copyfile(sourceFile, targetFile)
+            if len(sourceFiles) > 1:
+                msg = "Multiple files are found but no collate_script is defined\n"
+                sys.stderr.write(msg)
+            return shutil.copyfile(sourceFiles[0], targetFile)
             
         self.collationProc = None
         stdin = None
@@ -821,7 +828,7 @@ class CollateFiles(plugins.Action):
             if self.collationProc:
                 stdin = self.collationProc.stdout
             else:
-                args.append(sourceFile)
+                args += sourceFiles
             self.diag.info("Opening extract process with args " + repr(args))
             if script is scripts[-1]:
                 stdout = open(targetFile, "w")
@@ -835,7 +842,7 @@ class CollateFiles(plugins.Action):
             if not self.collationProc:
                 if os.path.isfile(targetFile):
                     os.remove(targetFile)
-                errorMsg = "Could not find extract script '" + script + "', not extracting file at\n" + sourceFile + "\n"
+                errorMsg = "Could not find extract script '" + script + "', not extracting file(s) at\n" + sourceFilesStr + "\n"
                 stderr = open(collationErrFile, "w")
                 stderr.write(errorMsg)
                 plugins.printWarning(errorMsg.strip())
@@ -850,12 +857,12 @@ class CollateFiles(plugins.Action):
             else:
                 procName = args[0]
                 briefText = "KILLED (" + os.path.basename(procName) + ")"
-                freeText = "Killed collation script '" + procName + "'\n while collating file at " + sourceFile + "\n"
+                freeText = "Killed collation script '" + procName + "'\n while collating file(s) at " + sourceFilesStr + "\n"
                 test.changeState(Killed(briefText, freeText, test.state))
             stdout.close()
             stderr.close()
 
-        if os.path.getsize(sourceFile) > 0 and os.path.getsize(targetFile) == 0 and os.path.getsize(collationErrFile) == 0:
+        if len(sourceFiles) == 1 and os.path.getsize(sourceFiles[0]) > 0 and os.path.getsize(targetFile) == 0 and os.path.getsize(collationErrFile) == 0:
             # Collation scripts that don't write anything shouldn't produce empty files...
             # If they write errors though, we might want to pick those up
             os.remove(targetFile)
@@ -863,7 +870,7 @@ class CollateFiles(plugins.Action):
         collateErrMsg = test.app.filterErrorText(collationErrFile)
         if collateErrMsg:
             msg = "Errors occurred running collate_script(s) " + " and ".join(scripts) + \
-                  "\nwhile trying to extract file at \n" + sourceFile + " : \n" + collateErrMsg
+                  "\nwhile trying to extract file(s) at \n" + sourceFilesStr + " : \n" + collateErrMsg
             plugins.printWarning(msg)
         
         

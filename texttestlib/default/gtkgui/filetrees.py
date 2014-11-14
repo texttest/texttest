@@ -9,6 +9,7 @@ from ordereddict import OrderedDict
 from copy import copy
 
 class FileViewGUI(guiutils.SubGUI):
+    inheritedText = "(Inherited from parent suites)"
     def __init__(self, dynamic, title = "", popupGUI = None):
         guiutils.SubGUI.__init__(self)
         self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING,\
@@ -192,10 +193,12 @@ class FileViewGUI(guiutils.SubGUI):
 
     def getFileType(self, iter):
         parent = self.model.iter_parent(iter)
-        if parent is not None:
+        name = self.model.get_value(iter, 0)
+        if name == self.inheritedText:
+            return "external"
+        elif parent is not None:
             return self.getFileType(parent)
         else:
-            name = self.model.get_value(iter, 0)
             return name.split()[0].lower()
 
     def getDirectory(self, iter):
@@ -587,7 +590,14 @@ class TestFileGUI(FileViewGUI):
         if len(self.currentTest.getDataFileNames()) == 0:
             return
         datiter, colour = self.getRootIterAndColour("Data")
-        self.addDataFilesUnderIter(datiter, self.currentTest.listDataFiles(), colour, self.currentTest.getDirectory())
+        dataFiles, inheritedDataFiles = self.currentTest.listDataFilesWithInherited()
+        currDir = self.currentTest.getDirectory()
+        self.addDataFilesUnderIter(datiter, dataFiles, colour, currDir)
+        if inheritedDataFiles:
+            inheritedRow = [ self.inheritedText, "white", currDir, None, "", "" ]
+            inheritedIter = self.model.insert_before(datiter, None, inheritedRow)
+            for suite, inherited in inheritedDataFiles.items():
+                self.addDataFilesUnderIter(inheritedIter, inherited, colour, suite.getDirectory())
 
     def addExternalFilesToModel(self):
         externalFiles = self.getExternalDataFiles()

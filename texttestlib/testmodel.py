@@ -362,18 +362,41 @@ class Test(plugins.Observable):
                 files.append(currFile)
         return files
 
-    def listDataFiles(self):
+    def getDataFilesWithName(self, dataFileName):
         existingDataFiles = []
-        for dataFile in self.getDataFileNames():
-            self.diagnose("Searching for data files called " + dataFile)
-            for fileName in self.dircache.findAllFiles(dataFile):
-                dataFiles, _ = self.listFiles(fileName, dataFile, followLinks=True)
-                for fullPath in dataFiles:
-                    if not fullPath in existingDataFiles:
-                        existingDataFiles.append(fullPath)
-
+        self.diagnose("Searching for data files called " + dataFileName)
+        for fileName in self.dircache.findAllFiles(dataFileName):
+            dataFiles, _ = self.listFiles(fileName, dataFileName, followLinks=True)
+            for fullPath in dataFiles:
+                if not fullPath in existingDataFiles:
+                    existingDataFiles.append(fullPath)
         self.diagnose("Found data files as " + repr(existingDataFiles))
         return existingDataFiles
+
+    def listDataFiles(self):
+        return sum((self.getDataFilesWithName(dataFile) for dataFile in self.getDataFileNames()), [])
+    
+    def listDataFilesWithInherited(self):
+        dataFiles = []
+        inheritedDataFiles = OrderedDict()
+        for dataFile in self.getDataFileNames():
+            currDataFiles = self.getDataFilesWithName(dataFile)
+            if currDataFiles:
+                for dataFile in currDataFiles:
+                    if dataFile not in dataFiles:
+                        dataFiles.append(dataFile)
+            else:
+                for suite in reversed(self.getAllTestsToRoot()[:-1]):
+                    currInherited = suite.getDataFilesWithName(dataFile)
+                    if currInherited:
+                        suiteInherited = inheritedDataFiles.setdefault(suite, [])
+                        for inherited in currInherited:
+                            if inherited not in suiteInherited:
+                                suiteInherited.append(inherited)
+                        break
+        self.diagnose("Local data files = " + repr(dataFiles))
+        self.diagnose("Inherited data files = " + repr(inheritedDataFiles))        
+        return dataFiles, inheritedDataFiles
 
     def listFiles(self, fileName, dataFile, followLinks):
         filesToIgnore = self.getCompositeConfigValue("test_data_ignore", dataFile)

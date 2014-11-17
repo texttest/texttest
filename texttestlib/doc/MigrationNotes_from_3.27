@@ -2,7 +2,30 @@
 COMPULSORY MIGRATION
 =========================================================
 
-(1) auto_collapse_successful config file entry is no longer used
+(1) Mapping multiple files to one in "collate_file" now generates a warning
+===========================================================================
+If you have
+
+[collate_file]
+my_file:some/path/file*
+
+and the expansion matches more than one file created by the test, previously
+we have simply taken the first one and proceeded. Now, however, this situation 
+generates a warning.
+
+There are three ways to handle this problem:
+
+a) Change the pattern expansion to more specifically point out the file you want
+b) Change it to
+
+[collate_file]
+my_file*:some/path/file*
+
+so that all the files are collated and added, if multiple ones are present.
+c) Suppress the warning using "suppress_stderr_text".
+
+
+(2) auto_collapse_successful config file entry is no longer used
 ================================================================
 You should just remove it
 

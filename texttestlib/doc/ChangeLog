@@ -2659,9 +2659,14 @@ Static GUI Enhancements:
     - New "View / Show Processes" action
 	This allows you to view all processes (dynamic GUIs, file viewers) started from TextTest and to kill them individually
     - New "Show Filters" dialog in File View
-	Allows viewing and experimenting with the filters for a given file
+	Allows viewing and experimenting with the filters for a given file, and also updating them.
+    - "Inherited" data files are now shown in the static GUI
+	Allows an overview of which data will be used for which test, and a convenient reference without having to walk up the hierarchy
     - Reenable the old texttest icons by adding the config entry 'retro_icons:1' to personal config file
 Framework Enhancements:
+    - "collate_script" now accepts all the files which match the pattern  in "collate_file"
+	This makes it easier to write a script to collate a summary of several related files.
+	There is also a warning now if multiple files match when no collate_script is provided. (see Migration Notes)
 Version Control Browser Enhancements:
     - Added new feature "Difference with Filter" for all supported VCS
 Batch Report Enhancements:
@@ -2672,6 +2677,7 @@ Batch Report Enhancements:
 	To disable this behaviour use the new --manualarchive flag, which will essentially restore the old behaviour
     - Can now archive individual named runs
 	Using the new flag -s "batch.ArchiveRepository name=<run name>"
+    - Archiving now respects selected versions ("-v" argument)
     - Batch runs from Jenkins now automatically add the Jenkins run number to their batch session, along with the date
     - additional HTML classes added to generated summary tables, allows for more CSS possibilities
     - Adding new run-level data store to batch repositories

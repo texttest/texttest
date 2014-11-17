@@ -426,6 +426,7 @@ class SaveState(plugins.Responder):
         self.repositories = {}
         self.allApps = allApps
         self.diag = logging.getLogger("Save Repository")
+        self.checkRunNameValid()
 
     def isBatchDate(self, dateStr):
         return re.match("^[0-9]{2}[A-Za-z]{3}[0-9]{4}$", dateStr)
@@ -497,13 +498,12 @@ class SaveState(plugins.Responder):
                     return True
         return False
 
-    def registerRunName(self, repository, app):
-        runFile = os.path.join(repository, "run_names", self.runPostfix)
-        if os.path.isfile(runFile):
-            if self.runAlreadyExists(runFile, app):
-                raise plugins.TextTestError, "ERROR: Cannot run batch tests with run name '" + self.runPostfix + "', name has already been used for a different run\n" + \
-                    "See file at " + runFile + ", which contains the entry '" + repr(app) + "'"
+    def getRunFileName(self, repository):
+        return os.path.join(repository, "run_names", self.runPostfix)
 
+    def registerRunName(self, repository, app):
+        runFile = self.getRunFileName(repository)
+        if os.path.isfile(runFile):
             with open(runFile, "a") as f:
                 f.write(repr(app) + "\n")
         else:
@@ -511,6 +511,14 @@ class SaveState(plugins.Responder):
                 self.makeInitialRunFile(app, runFile)
             except EnvironmentError:
                 plugins.printWarning("Could not write run file at " + runFile)
+                
+    def checkRunNameValid(self):
+        for app in self.allApps:
+            repository = os.path.expanduser(app.getBatchConfigValue("batch_result_repository"))
+            runFile = self.getRunFileName(repository)
+            if os.path.isfile(runFile) and self.runAlreadyExists(runFile, app):
+                raise plugins.TextTestError, "ERROR: Cannot run batch tests with run name '" + self.runPostfix + "', name has already been used for a different run\n" + \
+                    "See file at " + runFile + ", which contains the entry '" + repr(app) + "'"
                     
             
 class MigrateBatchRepository(plugins.Action):

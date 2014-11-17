@@ -608,8 +608,8 @@ class ArchiveScript(plugins.ScriptWithArgs):
         for file in dirList:
             fullPath = os.path.join(repository, file)
             if self.shouldArchive(file, *args):
-                self.archiveFile(fullPath, app, *args)
-                count += 1
+                if self.archiveFile(fullPath, app, *args):
+                    count += 1
             elif os.path.isdir(fullPath):
                 self.archiveFilesUnder(fullPath, app, *args)
         if count > 0:
@@ -630,9 +630,11 @@ class ArchiveScript(plugins.ScriptWithArgs):
         plugins.ensureDirExistsForFile(targetPath)
         try:
             os.rename(fullPath, targetPath)
+            return True
         except EnvironmentError, e:
             plugins.log.info("Rename failed: " + fullPath + " " + targetPath)
             plugins.log.info("Error was " + str(e))
+            return False
 
     def getTargetPath(self, fullPath, appName):
         parts = fullPath.split(os.sep)
@@ -684,20 +686,25 @@ class ArchiveRepository(ArchiveScript):
     def archiveRunFile(self, fullPath, app):
         appParts = set(repr(app).split("."))
         envVars, otherAppLines = [], []
+        archived = False
         with open(fullPath) as f:
             for line in f:
                 if "=" in line:
                     envVars.append(line)
                 else:
                     lineParts = set(line.strip().split("."))
-                    if not appParts.issubset(lineParts):
+                    if appParts.issubset(lineParts):
+                        archived = True
+                    else:
                         otherAppLines.append(line)
-        if otherAppLines:
-            with open(fullPath, "w") as f:
-                for line in envVars + otherAppLines:
-                    f.write(line)
-        else:
-            os.remove(fullPath)
+        if archived:
+            if otherAppLines:
+                with open(fullPath, "w") as f:
+                    for line in envVars + otherAppLines:
+                        f.write(line)
+            else:
+                os.remove(fullPath)
+        return archived
 
     def archiveFile(self, fullPath, app, weekdays, isRunFile):
         if isRunFile:
@@ -705,15 +712,20 @@ class ArchiveRepository(ArchiveScript):
         elif os.path.basename(fullPath).startswith("teststate"):
             return ArchiveScript.archiveFile(self, fullPath, app)
         linesToKeep = []
+        archived = False
         with open(fullPath) as readFile:
             for line in readFile:
                 tag = line.strip().split()[0]
-                if not self.shouldArchiveGivenTag(tag, weekdays):
+                if self.shouldArchiveGivenTag(tag, weekdays):
+                    archived = True
+                else:
                     linesToKeep.append(line)
            
-        with open(fullPath, "w") as writeFile:
-            for line in linesToKeep:
-                writeFile.write(line)
+        if archived:
+            with open(fullPath, "w") as writeFile:
+                for line in linesToKeep:
+                    writeFile.write(line)
+        return archived
                 
     def shouldArchiveGivenTag(self, tag, weekdays):
         parts = tag.split("_")

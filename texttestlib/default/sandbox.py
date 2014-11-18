@@ -817,7 +817,7 @@ class CollateFiles(plugins.Action):
         sourceFilesStr = ",".join(sourceFiles)
         if len(scripts) == 0:
             if len(sourceFiles) > 1:
-                msg = "Multiple files are found but no collate_script is defined\n"
+                msg = "Multiple files are found for '" + stem + "' in " + repr(test) + ", but no collate_script is defined.\n"
                 sys.stderr.write(msg)
             return shutil.copyfile(sourceFiles[0], targetFile)
             

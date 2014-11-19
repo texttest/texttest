@@ -59,16 +59,17 @@ class BaseTestComparison(plugins.TestState):
     def computeFor(self, test, ignoreMissing=False, incompleteOnly=False):
         self.makeComparisons(test, ignoreMissing)
         variablesToStore = test.app.getTestRunVariables()
-        self.categorise(variablesToStore)
+        isTestCase = test.classId() == "test-case"
+        self.categorise(variablesToStore, isTestCase)
         self.addAdditionalText(test)
-        if not incompleteOnly or not test.state.isComplete():
+        if (not incompleteOnly or not test.state.isComplete()) and self.category != "not_started":
             test.changeState(self)
 
     def getRerunCount(self, test):
         number = 1
         while True:
             path = test.makeBackupFileName(number)
-            if os.path.exists(path):
+            if path and os.path.exists(path):
                 number += 1
             else:
                 return number - 1
@@ -320,16 +321,19 @@ class TestComparison(BaseTestComparison):
         
         return FileComparison(test, stem, standardFile, tmpFile, testInProgress=0)
 
-    def categorise(self, variablesToStore=[]):
+    def categorise(self, variablesToStore=[], successOnNoResult=True):
         if self.failedPrediction:
             # Keep the category we had before
             self.freeText += self.getFreeTextInfo(variablesToStore)
             return
         worstResult = self.getMostSevereFileComparison()
         if not worstResult:
-            self.category = "success"
-            if "approve" in self.lifecycleChange:
-                self.freeText = "(Approved at " + plugins.localtime("%H:%M") + ")"
+            if successOnNoResult:
+                self.category = "success"
+                if "approve" in self.lifecycleChange:
+                    self.freeText = "(Approved at " + plugins.localtime("%H:%M") + ")"
+            else:
+                self.category = "not_started"
         else:
             self.category = worstResult.getType()
             self.freeText = self.getFreeTextInfo(variablesToStore)
@@ -507,11 +511,12 @@ class ProgressTestComparison(BaseTestComparison):
             return newState
 
 class MakeComparisons(plugins.Action):
-    def __init__(self, testComparisonClass=None, progressComparisonClass=None, ignoreMissing=False, enableColor=False):
+    def __init__(self, testComparisonClass=None, progressComparisonClass=None, ignoreMissing=False, enableColor=False, compareSuites=False):
         self.testComparisonClass = self.getClass(testComparisonClass, TestComparison)
         self.progressComparisonClass = self.getClass(progressComparisonClass, ProgressTestComparison)
         self.ignoreMissing = ignoreMissing
         self.enableColor = enableColor
+        self.compareSuites = compareSuites
         
     def getClass(self, given, defaultClass):
         if given:
@@ -540,7 +545,10 @@ class MakeComparisons(plugins.Action):
             newState.computeFor(test, ignoreMissing=True, incompleteOnly=True)        
 
     def setUpSuite(self, suite):
-        self.describe(suite)
+        if self.compareSuites:
+            self(suite)
+        else:
+            self.describe(suite)
 
     
 class PrintObsoleteVersions(plugins.Action):

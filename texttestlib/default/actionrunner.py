@@ -172,6 +172,20 @@ class ActionRunner(BaseActionRunner):
             actionClass.finalise()
         for appRunner in self.appRunners.values():
             appRunner.cleanActions()
+            
+
+class ActionsCompleteAction(plugins.Action):
+    def __call__(self, test):
+        test.actionsCompleted()
+        
+    def setUpSuite(self, suite):
+        # Only occasionally needed, e.g. in ReplaceText script
+        if suite.state.hasStarted():
+            suite.actionsCompleted()
+            
+    def callDuringAbandon(self, *args):
+        return True
+
     
 class ApplicationRunner:
     def __init__(self, testSuite, diag):
@@ -229,6 +243,8 @@ class ApplicationRunner:
         # Collapse lists and remove None actions
         for action in actionSequenceFromConfig:
             self.addActionToList(action, actionSequence)
+            
+        self.addActionToList(ActionsCompleteAction(), actionSequence)
         return actionSequence
 
     def addActionToList(self, action, actionSequence):
@@ -296,8 +312,6 @@ class TestRunner:
             if not abandon and self.test.state.shouldAbandon():
                 self.diag.info("Abandoning test...")
                 abandon = True
-
-        self.test.actionsCompleted()
 
     def kill(self, sig=None):
         self.diag.info("Killing test " + repr(self.test))

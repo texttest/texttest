@@ -208,10 +208,14 @@ class Test(plugins.Observable):
         self.properties = plugins.MultiEntryDictionary()
         # Test suites never change state, but it's convenient that they have one
         self.state = plugins.TestState("not_started")
+        self.writeDirectory = os.path.join(app.writeDirectory, self.getWriteDirRelPath())
 
     def refreshFilesRecursively(self):
         self.reloadTestConfigurations()
         self.filesChanged()
+
+    def getWriteDirRelPath(self):
+        return os.path.join(self.app.name + self.app.versionSuffix(), self.getRelPath())
 
     def reloadTestConfigurations(self):
         self.reloadConfiguration()
@@ -311,6 +315,9 @@ class Test(plugins.Observable):
     
     def readContents(self, *args, **kw):
         return True
+    
+    def makeBackupFileName(self, number):
+        pass
 
     def isDefinitionFileStem(self, stem):
         return self.app.fileMatches(stem, self.defFileStems())
@@ -344,6 +351,17 @@ class Test(plugins.Observable):
         predicate = lambda stem, vset: stem not in exclude and self.app.name in vset
         stems = self.dircache.findAllStems(predicate)
         return self.getFilesFromStems(stems, allVersions)
+    
+    def listTmpFiles(self):
+        tmpFiles = []
+        if not os.path.isdir(self.writeDirectory):
+            return tmpFiles
+        filelist = os.listdir(self.writeDirectory)
+        filelist.sort()
+        for file in filelist:
+            if file.endswith("." + self.app.name):
+                tmpFiles.append(os.path.join(self.writeDirectory, file))
+        return tmpFiles
 
     def getFilesFromStems(self, stems, allVersions):
         files = []
@@ -549,10 +567,14 @@ class Test(plugins.Observable):
                 return self.name
         else:
             return ""
+        
+    def getDirectory(self, temporary=False, **kw):
+        return self.writeDirectory if temporary else self.dircache.dir
 
-    def getDirectory(self, *args, **kw):
-        return self.dircache.dir
-
+    def makeTmpFileName(self, stem, **kw):
+        dir = self.getDirectory(temporary=True)
+        return os.path.join(dir, stem + "." + self.app.name)
+        
     def positionInParent(self):
         if self.parent:
             return self.parent.testcases.index(self)
@@ -654,14 +676,43 @@ class Test(plugins.Observable):
         else:
             return False
 
+    def changeState(self, state):
+        isCompletion = not self.state.isComplete() and state.isComplete()
+        self.state = state
+        self.diagnose("Change notified to state " + state.category)
+        if state and state.lifecycleChange:
+            self.sendStateNotify(isCompletion)
+
+    def sendStateNotify(self, isCompletion):
+        notifyMethod = self.getNotifyMethod(isCompletion)
+        notifyMethod("LifecycleChange", self.state, self.state.lifecycleChange)
+        self.diagnose("Send state notify with lifecycle change " + self.state.lifecycleChange)
+        if self.state.lifecycleChange == "complete":
+            notifyMethod("Complete")
+
+    def getNotifyMethod(self, isCompletion):
+        if isCompletion:
+            return self.notifyThreaded # use the idle handlers to avoid things in the wrong order
+        else:
+            # might as well do it instantly if the test isn't still "active"
+            return self.notify
+        
+    def actionsCompleted(self):
+        self.diagnose("All actions completed")
+        if self.state.isComplete():
+            if not self.state.lifecycleChange:
+                self.diagnose("Completion notified")
+                self.state.lifecycleChange = "complete"
+                self.sendStateNotify(True)
+        else:
+            self.notify("Complete")
 
 
 class TestCase(Test):
     def __init__(self, name, description, abspath, app, parent):
         Test.__init__(self, name, description, abspath, app, parent)
         # Directory where test executes from and hopefully where all its files end up
-        relPath = os.path.join(app.name + app.versionSuffix(), self.getRelPath())
-        self.writeDirectory = os.path.join(app.writeDirectory, relPath)
+        relPath = self.getWriteDirRelPath()
         self.localWriteDirectory = os.path.join(app.localWriteDirectory, relPath)
         
     def classId(self):
@@ -678,36 +729,6 @@ class TestCase(Test):
         else:
             return self.dircache.dir
             
-    def changeState(self, state):
-        isCompletion = not self.state.isComplete() and state.isComplete()
-        self.state = state
-        self.diagnose("Change notified to state " + state.category)
-        if state and state.lifecycleChange:
-            self.sendStateNotify(isCompletion)
-
-    def sendStateNotify(self, isCompletion):
-        notifyMethod = self.getNotifyMethod(isCompletion)
-        notifyMethod("LifecycleChange", self.state, self.state.lifecycleChange)
-        if self.state.lifecycleChange == "complete":
-            notifyMethod("Complete")
-
-    def getNotifyMethod(self, isCompletion):
-        if isCompletion:
-            return self.notifyThreaded # use the idle handlers to avoid things in the wrong order
-        else:
-            # might as well do it instantly if the test isn't still "active"
-            return self.notify
-
-    def actionsCompleted(self):
-        self.diagnose("All actions completed")
-        if self.state.isComplete():
-            if not self.state.lifecycleChange:
-                self.diagnose("Completion notified")
-                self.state.lifecycleChange = "complete"
-                self.sendStateNotify(True)
-        else:
-            self.notify("Complete")
-
     def getStateFile(self):
         return self.makeTmpFileName("teststate", forFramework=True)
 
@@ -835,17 +856,6 @@ class TestCase(Test):
         # We allow one non-option after the last one in case it's an argument
         return min(lastOptionIndex + 2, len(optionArgs))
         
-    def listTmpFiles(self):
-        tmpFiles = []
-        if not os.path.isdir(self.writeDirectory):
-            return tmpFiles
-        filelist = os.listdir(self.writeDirectory)
-        filelist.sort()
-        for file in filelist:
-            if file.endswith("." + self.app.name):
-                tmpFiles.append(os.path.join(self.writeDirectory, file))
-        return tmpFiles
-
     def listUnownedTmpPaths(self):
         paths, ignoredPaths = [], []
         filelist = os.listdir(self.localWriteDirectory)
@@ -2215,6 +2225,7 @@ class AllCompleteResponder(plugins.Responder,plugins.Observable):
             self.lock.acquire()
             self.unfinishedTests += 1
             self.lock.release()
+            
     def notifyAllRead(self, *args):
         self.lock.acquire()
         if self.unfinishedTests == 0 and self.hadCompletion:
@@ -2223,7 +2234,11 @@ class AllCompleteResponder(plugins.Responder,plugins.Observable):
         else:
             self.checkInCompletion = True
         self.lock.release()
+        
     def notifyComplete(self, test):
+        if not isinstance(test, TestCase):
+            return
+        
         self.diag.info("Complete " + str(self.unfinishedTests))
         self.lock.acquire()
         self.unfinishedTests -= 1

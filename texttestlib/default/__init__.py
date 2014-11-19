@@ -182,7 +182,7 @@ class Config:
         groups = self.createOptionGroups(allApps)
         return reduce(operator.add, (g.keys() for g in groups), [])
 
-    def getActionSequence(self):
+    def getActionSequence(self, app):
         if self.optionMap.has_key("coll"):
             return []
 
@@ -192,8 +192,9 @@ class Config:
         scriptObject = self.optionMap.getScriptObject()
         if scriptObject:
             if self.usesComparator(scriptObject):
-                return [ self.getWriteDirectoryMaker(), rundependent.FilterOriginalForScript(), scriptObject,  
-                        comparetest.MakeComparisons(ignoreMissing=True,enableColor=self.optionMap.has_key("zen")) ]
+                comparator = comparetest.MakeComparisons(ignoreMissing=True, enableColor=self.optionMap.has_key("zen"), 
+                                                         compareSuites=scriptObject.comparesSuites(app))
+                return [ self.getWriteDirectoryMaker(), rundependent.FilterOriginalForScript(), scriptObject, comparator ]
             else:
                 return [ scriptObject ]
         else:

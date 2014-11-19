@@ -247,6 +247,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         self.diag = logging.getLogger("Test Tree")
         self.longActionRunning = False
         self.recreateOnActionStop = False
+        self.testSuitesWithResults = set()
 
     def notifyDefaultVisibility(self, newValue):
         self.newTestsVisible = newValue
@@ -343,7 +344,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
     def canSelect(self, path):
         pathIter = self.filteredModel.get_iter(path)
         test = self.filteredModel.get_value(pathIter, 2)[0]
-        return test.classId() == "test-case"
+        return test.classId() == "test-case" or test in self.testSuitesWithResults
 
     def rowExpanded(self, treeview, iter, path):
         self.expandLevel(treeview, self.filteredModel.iter_children(iter), not self.collapseStatic)
@@ -550,6 +551,8 @@ class TestTreeGUI(guiutils.ContainerGUI):
         self.model.set_value(iter, 1, colour1)
         self.model.set_value(iter, 3, detailText)
         self.model.set_value(iter, 4, colour2)
+        if test.classId() == "test-suite": #Happens with Replace Text sometimes
+            self.testSuitesWithResults.add(test)
         if approved:
             self.checkRelatedForRecalculation(test)
 

@@ -276,11 +276,13 @@ class ReplaceText(plugins.ScriptWithArgs):
                     replaced = True
         return replaced
 
-    def replaceInFile(self, test, stdFile, stemless=False):
+    def replaceInFile(self, test, stdFile):
         fileName = os.path.basename(stdFile)
         self.describe(test, " - file " + fileName)
         sys.stdout.flush()
-        unversionedFileName = ".".join(fileName.split(".")[:2]) if not stemless else fileName
+        unversionedFileName = ".".join(fileName.split(".")[:2])
+        if "." not in unversionedFileName:
+            unversionedFileName += "." + test.app.name
         tmpFile = os.path.join(test.getDirectory(temporary=1), unversionedFileName)
         with open(tmpFile, "w") as writeFile:
             with open(stdFile) as readFile:

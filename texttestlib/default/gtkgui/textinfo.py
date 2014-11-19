@@ -272,7 +272,8 @@ class TestRunInfoGUI(TextViewGUI):
     def appendTestInfo(self, test):
         self.text += self.timeMonitor.getTimingReport(test)
         self.text += "\n" + self.getDescriptionText(test)
-        self.text += "\n\n" + test.app.getRunDescription(test)
+        if test.classId() == "test-case":
+            self.text += "\n\n" + test.app.getRunDescription(test)
 
 
 class TextInfoGUI(TextViewGUI):

@@ -122,8 +122,8 @@ class ProgressBarGUI(guiutils.SubGUI):
             self.totalNofTests = self.addedCount
             self.resetBar()
 
-    def notifyLifecycleChange(self, dummyTest, dummyState, changeDesc):
-        if changeDesc == "complete":
+    def notifyLifecycleChange(self, test, dummyState, changeDesc):
+        if changeDesc == "complete" and test.classId() == "test-case":
             self.nofCompletedTests += 1
             self.resetBar()
 

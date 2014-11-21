@@ -330,6 +330,7 @@ class TestComparison(BaseTestComparison):
         if not worstResult:
             if successOnNoResult:
                 self.category = "success"
+                self.freeText += "".join(self.variablesToText(variablesToStore))
                 if "approve" in self.lifecycleChange:
                     self.freeText = "(Approved at " + plugins.localtime("%H:%M") + ")"
             else:
@@ -339,13 +340,13 @@ class TestComparison(BaseTestComparison):
             self.freeText = self.getFreeTextInfo(variablesToStore)
 
     def getFreeTextInfo(self, variablesToStore=[]):
-        texts = []
-        for var in variablesToStore:
-            if os.getenv(var):
-                texts.append(self.variableToText(var) + "\n")
+        texts = self.variablesToText(variablesToStore)
         texts += [ fileComp.getFreeText() for fileComp in self.getSortedComparisons() ] 
         return "".join(texts)
     
+    def variablesToText(self, variables):
+        return [self.variableToText(var) + "\n" for var in variables if os.getenv(var)]
+
     def variableToText(self, var):
         texts = [t[0] + t[1:] for t in var.split("_") ]
         return " ".join(texts) + ":" + os.getenv(var)

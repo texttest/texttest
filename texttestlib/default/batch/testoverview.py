@@ -948,9 +948,10 @@ class Selector(BaseSelector):
         super(Selector, self).__init__(linkName, suffix)
         cutoff = getConfigValue("historical_report_subpage_cutoff", linkName)
         weekdays = getConfigValue("historical_report_subpage_weekdays", linkName)
-        self.selectedTags = tags[-cutoff:]
+        self.selectedTags = tags
         if len(weekdays) > 0:
             self.selectedTags = filter(lambda tag: getWeekDay(tag) in weekdays, self.selectedTags)
+        self.selectedTags = self.selectedTags[-cutoff:]
     
 
 class SelectorByMonth(BaseSelector):

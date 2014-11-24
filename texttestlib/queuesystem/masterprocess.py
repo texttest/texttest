@@ -729,6 +729,7 @@ class BasicSubmissionRules:
     classPrefix = "Test"
     def __init__(self, test):
         self.test = test
+        self.diag = logging.getLogger("Submission Rules")
 
     def getJobName(self):
         path = self.test.getRelPath()
@@ -831,17 +832,23 @@ class TestSubmissionRules(SubmissionRules):
 
     def findResourceList(self):
         resourceList = []
-        if self.optionMap.has_key("R"):
-            resourceList.append(self.optionMap["R"])
+        self.diag.info("Finding resource list for " + repr(self.test))
+        cmdResource = self.optionMap.get("R")
+        if cmdResource:
+            self.diag.info("Adding from command line resource: " + repr(cmdResource))
+            resourceList.append(cmdResource)
         resourceList += self.configResources
-        if self.optionMap.has_key("m"):
-            machine = self.optionMap["m"]
-            if machine != "localhost":
-                resourceList.append("hostname=" + machine) # Won't work with LSF, but can't be bothered to figure it out there for now...
+        machine = self.optionMap.get("m")
+        if machine and machine != "localhost":
+            machineResource = "hostname=" + machine # Won't work with LSF, but can't be bothered to figure it out there for now...
+            self.diag.info("Adding from command line machine: " + repr(machineResource))
+            resourceList.append(machineResource) 
         if self.forceOnPerformanceMachines():
             resources = self.getConfigValue("performance_test_resource")
+            self.diag.info("Forcing on performance machines: adding from all keys in performance_test_resource : " + repr(",".join(resources)))
             for resource in resources:
                 resourceList.append(resource)
+        self.diag.info("Resource list for " + repr(self.test) + " = " + ",".join(resourceList))
         return resourceList
 
     def getConfigValue(self, configKey):
@@ -855,12 +862,11 @@ class TestSubmissionRules(SubmissionRules):
         return []
 
     def findMachineList(self):
+        self.diag.info("Finding machine list for " + repr(self.test))
         if not self.forceOnPerformanceMachines():
             return []
         performanceMachines = self.getConfigValue("performance_test_machine")
-        if len(performanceMachines) == 0:
-            return []
-
+        self.diag.info("Machine list for " + repr(self.test) + " = " + ",".join(performanceMachines))
         return performanceMachines
 
     def getJobFiles(self):
@@ -869,13 +875,21 @@ class TestSubmissionRules(SubmissionRules):
 
     def forceOnPerformanceMachines(self):
         if self.optionMap.has_key("perf"):
-            return 1
+            self.diag.info("-perf flag provided, forcing on performance machines")
+            return True
 
         minTimeForce = plugins.getNumberOfSeconds(str(self.test.getConfigValue("min_time_for_performance_force")))
-        if minTimeForce >= 0 and getTestPerformance(self.test) > minTimeForce:
-            return 1
+        if minTimeForce >= 0:
+            testPerf = getTestPerformance(self.test)
+            if testPerf > minTimeForce:
+                self.diag.info("Test expects to take " + repr(testPerf) + " seconds, min_time_for_performance_force = " + repr(minTimeForce) + " seconds")
+                return True
         # If we haven't got a log_file yet, we should do this so we collect performance reliably
-        logFile = self.test.getFileName(self.test.getConfigValue("log_file"))
+        logFileStem = self.test.getConfigValue("log_file")
+        logFile = self.test.getFileName(logFileStem)
+        if logFile is None:
+            self.diag.info("No log file (file with stem " + repr(logFileStem) + 
+                           ") exists in test yet, forcing on performance machines to collect initial files")
         return logFile is None
 
     def allowsReuse(self, newRules):

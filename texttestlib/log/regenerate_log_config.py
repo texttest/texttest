@@ -1,34 +1,48 @@
 #!/usr/bin/env python
 
-import logconfiggen, os
+from texttestlib import logconfiggen
+import os
 from copy import copy
+from glob import glob
 
-def generateForSelfTests(selftestDir, trafficLoggers, *args):
+def generateForSelfTests(selftestDir, *args, **kw):
     if selftestDir:
-        consoleGen = logconfiggen.PythonLoggingGenerator(os.path.join(selftestDir, "logging.console"), prefix="%(TEXTTEST_LOG_DIR)s/", postfix="texttest")
+        consoleGen = logconfiggen.PythonLoggingGenerator(os.path.join(selftestDir, "logging.console"), prefix="%(TEXTTEST_LOG_DIR)s/", **kw)
         enabledLoggerNames = stdInfo + [ ("storytext replay log", "stdout"), ("kill processes", "stdout") ]
         consoleGen.generate(enabledLoggerNames, *args)
         
-        staticGen = logconfiggen.PythonLoggingGenerator(os.path.join(selftestDir, "logging.static_gui"), prefix="%(TEXTTEST_LOG_DIR)s/", postfix="texttest")
+        staticGen = logconfiggen.PythonLoggingGenerator(os.path.join(selftestDir, "logging.static_gui"), prefix="%(TEXTTEST_LOG_DIR)s/", **kw)
         enabledLoggerNames = stdInfo + [ ("gui log", "gui_log"), ("storytext replay log", "gui_log") ]
         staticGen.generate(enabledLoggerNames, *args)
 
-        dynamicGen = logconfiggen.PythonLoggingGenerator(os.path.join(selftestDir, "logging.dynamic_gui"), prefix="%(TEXTTEST_LOG_DIR)s/", postfix="texttest")
+        dynamicGen = logconfiggen.PythonLoggingGenerator(os.path.join(selftestDir, "logging.dynamic_gui"), prefix="%(TEXTTEST_LOG_DIR)s/", **kw)
         enabledLoggerNames = stdInfo + [ ("gui log", "dynamic_gui_log"), ("storytext replay log", "dynamic_gui_log"),
                                          ("kill processes", "dynamic_gui_log") ]
         dynamicGen.generate(enabledLoggerNames, *args)
 
-        trafficGen = logconfiggen.PythonLoggingGenerator(os.path.join(selftestDir, "logging.traffic"),
-                                                         prefix="%(TEXTTEST_CWD)s/", postfix="texttest")
-        trafficGen.generate([], trafficLoggers)
 
-def getSelfTestDir(subdir):
-    selftestDir = os.path.join(os.getenv("TEXTTEST_HOME"), "texttest", subdir)
-    if os.path.isdir(selftestDir):
-        return selftestDir
-    selftestDir = os.path.join(os.getenv("TEXTTEST_HOME"), subdir)
-    if os.path.isdir(selftestDir):
-        return selftestDir
+def getAppNames(logFileDir):
+    rootDir = os.path.dirname(logFileDir)
+    configFiles = glob(os.path.join(rootDir, "config.*"))
+    return set([ os.path.basename(f).split(".")[1] for f in configFiles ])
+    
+def findSelfTestDirs():
+    pattern = os.path.join(os.getenv("TEXTTEST_HOME"), "*", "log", "logging.console")
+    files = glob(pattern)
+    if len(files) == 0:
+        logDir = os.path.join(os.getenv("TEXTTEST_HOME"), "log")
+        return (logDir if os.path.isdir(logDir) else None), None
+
+    selfTestDir, otherDir, otherAppName = None, None, None
+    for f in files:
+        d = os.path.dirname(f)
+        appNames = getAppNames(d)
+        if "texttest" in appNames:
+            selfTestDir = d
+        elif len(appNames) == 1:
+            otherDir = d
+            otherAppName = appNames.pop()
+    return selfTestDir, otherDir, otherAppName
 
 def combineLoggers(coreLoggers, storytextLoggers):
     allLoggers = copy(coreLoggers)
@@ -52,29 +66,26 @@ if __name__ == "__main__":
     guiGen.generate(stdInfo, defaultLevel="WARNING")
 
     installationRoot = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    coreLib = os.path.join(installationRoot, "lib")
-    coreLoggers = logconfiggen.findLoggerNamesUnder(coreLib)
-    storytextLib = os.path.join(installationRoot, "storytext", "lib")
+    coreLoggers = logconfiggen.findLoggerNamesUnder(installationRoot)
+    storytextLib = os.path.join(installationRoot, "../storytext", "lib")
     storytextLoggers = logconfiggen.findLoggerNamesUnder(storytextLib)
-    trafficLib = os.path.join(installationRoot, "libexec")
-    trafficLoggers = logconfiggen.findLoggerNamesUnder(trafficLib)
     allLoggers, debugLoggers = combineLoggers(coreLoggers, storytextLoggers)
-    trafficGen = logconfiggen.PythonLoggingGenerator("logging.traffic", postfix="diag", prefix="%(TEXTTEST_PERSONAL_LOG)s/")
-    trafficGen.generate(enabledLoggerNames=[], allLoggerNames=trafficLoggers)
     
     debugGen = logconfiggen.PythonLoggingGenerator("logging.debug", postfix="diag", prefix="%(TEXTTEST_PERSONAL_LOG)s/")
     debugGen.generate(enabledLoggerNames=[], allLoggerNames=allLoggers, debugLevelLoggers=debugLoggers)
+
+    selfTestDir, siteSelfTestDir, siteAppName = findSelfTestDirs()
     
-    generateForSelfTests(getSelfTestDir("log"), trafficLoggers, allLoggers, debugLoggers)
+    generateForSelfTests(selfTestDir, allLoggers, debugLoggers, postfix="texttest")
     
     # Site-specific
-    siteDiagFile = os.path.join(installationRoot, "site/log/logging.debug")
+    siteDiagFile = os.path.join(installationRoot, "../site/log/logging.debug")
     if os.path.isfile(siteDiagFile):
-        siteLib = os.path.join(installationRoot, "site", "lib")
+        siteLib = os.path.join(installationRoot, "../site", "lib")
         siteLoggers = logconfiggen.findLoggerNamesUnder(siteLib)
         allLoggers = sorted(allLoggers + siteLoggers)
         debugGen = logconfiggen.PythonLoggingGenerator(siteDiagFile, postfix="diag", prefix="%(TEXTTEST_PERSONAL_LOG)s/")
         debugGen.generate(enabledLoggerNames=[], allLoggerNames=allLoggers, debugLevelLoggers=debugLoggers)
 
-        generateForSelfTests(getSelfTestDir("site/log"), trafficLoggers, allLoggers, debugLoggers)
+        generateForSelfTests(siteSelfTestDir, allLoggers, debugLoggers, postfix=siteAppName)
         

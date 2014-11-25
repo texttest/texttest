@@ -167,6 +167,8 @@ class TestColumnGUI(guiutils.SubGUI):
             return ""
                             
     def notifyNewTestSelection(self, tests, dummyApps, distinctTestCount, *args, **kw):
+        if self.dynamic:
+            tests = filter(lambda t: t.classId() == "test-case", tests)
         self.updateTestInfo(tests, distinctTestCount)
         
     def updateTestInfo(self, tests, distinctTestCount):
@@ -753,7 +755,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
             changed |= self.updateVisibilityWithParents(test.parent, newValue)
 
         changed |= self.updateVisibilityInModel(test, newValue)
-        if test.parent and not newValue and not self.hasVisibleChildren(test.parent):
+        if test.parent and not newValue and not self.hasVisibleChildren(test.parent) and not test.parent.state.hasStarted():
             self.diag.info("No visible children : hiding parent " + repr(test.parent))
             changed |= self.updateVisibilityWithParents(test.parent, newValue)
         return changed

@@ -2662,6 +2662,8 @@ Static GUI Enhancements:
 	Allows viewing and experimenting with the filters for a given file, and also updating them.
     - "Inherited" data files are now shown in the static GUI
 	Allows an overview of which data will be used for which test, and a convenient reference without having to walk up the hierarchy
+    - "Replace Text in Files" now works on files in test suites also
+	For example environment, options, config files
     - Reenable the old texttest icons by adding the config entry 'retro_icons:1' to personal config file
 Framework Enhancements:
     - "collate_script" now accepts all the files which match the pattern  in "collate_file"
@@ -2684,7 +2686,7 @@ Batch Report Enhancements:
 Grid Engine/Cloud enhancements/bug fixes:
     - Reworked setup so that cloud instances don't flood master machine's SSH daemon with SSH requests
     - Fixed incorrect display in Run Info of environment variables used directly in copy_test_path
-    - UGE Job ID now stored with failed tests, to make troubleshooting easier
+    - UGE Job ID now stored with test results, to make troubleshooting easier
 Bug Fixes:
     - Filter behaviour is now consistent with View/Show All
     - Fixed bug with HTML summary page reporting and specific memory failure tests (i.e. anything not called "memory") being counted incorrectly
@@ -2692,4 +2694,6 @@ Bug Fixes:
     - neatened up output for Jenkins runs when full paths to artefacts are needed, don't write it in the webpage
     - Status view now shows repeat groups, even if there is only one test with exactly that number
     - Fixed bug where Temporary Settings were not affected by the Reset button
-
+    - Fixed bug where duplicated known bugs triggering on absence meant they were always reported
+    - Updated log regeneration script and logging.* files, forgotten with 3.27
+    - HTML pages with a cutoff and a weekday apply the weekday first ("last 10 Fridays", instead of "the Fridays from the last 10 days" as before)

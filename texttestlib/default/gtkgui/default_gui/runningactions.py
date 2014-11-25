@@ -1034,7 +1034,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
         self.showTextInFile(filteredText)
         
     def getText(self):
-        return self.textBuffer.get_text(self.textBuffer.get_start_iter(), self.textBuffer.get_end_iter())
+        return self.textBuffer.get_text(self.textBuffer.get_start_iter(), self.textBuffer.get_end_iter(), True)
         
     def updateFilter(self, fileFilter, model):
         enabledFilters = []

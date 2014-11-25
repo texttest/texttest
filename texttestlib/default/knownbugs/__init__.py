@@ -231,13 +231,20 @@ class FileBugData:
             if bugTrigger not in bugs and bugTrigger.exactMatch(lines, **kw):
                 bugs.append(bugTrigger)
         for line in lines:
+            self.diag.info("Checking " + repr(line))
             for bugTrigger in self.presentList:
                 self.diag.info("Checking for existence of " + repr(bugTrigger))
                 if bugTrigger not in bugs and bugTrigger.hasBug(line, **kw):
+                    self.diag.info("FOUND!")
                     bugs.append(bugTrigger)
+            toRemove = []
             for bugTrigger in currAbsent:
+                self.diag.info("Checking for absence of " + repr(bugTrigger))
                 if bugTrigger.matchesText(line):
-                    currAbsent.remove(bugTrigger)
+                    self.diag.info("PRESENT!")
+                    toRemove.append(bugTrigger)
+            for bugTrigger in toRemove:
+                currAbsent.remove(bugTrigger)
 
         return bugs + self.findAbsenceBugs(currAbsent, **kw)
 

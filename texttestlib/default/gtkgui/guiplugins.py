@@ -604,7 +604,7 @@ class OptionGroupGUI(ActionGUI):
             return widget.get_text
         else:
             def get_text():
-                return widget.get_text(widget.get_start_iter(), widget.get_end_iter())
+                return widget.get_text(widget.get_start_iter(), widget.get_end_iter(), True)
             return get_text
 
     def addValuesFromConfig(self, option, includeOverrides=True):
@@ -755,7 +755,7 @@ class OptionGroupGUI(ActionGUI):
 
     def createComboBoxEntry(self, option):
         combobox = gtk.combo_box_entry_new_text()
-        entry = combobox.child
+        entry = combobox.get_child()
         combobox.set_row_separator_func(self.isRowSeparator)
         option.setPossibleValuesMethods(combobox.append_text, ComboBoxListFinder(combobox))
         

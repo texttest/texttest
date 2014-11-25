@@ -267,7 +267,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
             self.newTestsVisible = True
             self.model.foreach(self.makeRowVisible)
             if self.collapseStatic:
-                self.expandLevel(self.treeView, self.filteredModel.get_iter_root())
+                self.expandLevel(self.treeView, self.filteredModel.get_iter_first())
             else:
                 self.treeView.expand_all()
         self.notify("AllRead")
@@ -328,7 +328,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
             self.treeView.append_column(detailsColumn)
 
         self.treeView.connect('row-expanded', self.rowExpanded)
-        self.expandLevel(self.treeView, self.filteredModel.get_iter_root())
+        self.expandLevel(self.treeView, self.filteredModel.get_iter_first())
         self.treeView.connect("button_press_event", self.popupGUI.showMenu)
         self.selection.connect("changed", self.userChangedSelection)
 

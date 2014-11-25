@@ -42,7 +42,7 @@ class StatusMonitorGUI(guiutils.SubGUI):
     def notifyActionProgress(self, *args):
         if not self.closing:
             while gtk.events_pending():
-                gtk.main_iteration(False)
+                gtk.main_iteration_do(False)
 
     def notifyActionStop(self, lock=True):
         if self.throbber:
@@ -239,7 +239,7 @@ class TestProgressMonitor(guiutils.SubGUI):
         # Fix the not started count in case the initial guess was wrong
         if self.testCount > 0:
             self.diag.info("Reading complete, updating not-started count to actual answer")
-            iter = self.treeModel.get_iter_root()
+            iter = self.treeModel.get_iter_first()
             actualTestCount = len(self.treeModel.get_value(iter, 5))
             measuredTestCount = self.treeModel.get_value(iter, 1)
             if actualTestCount != measuredTestCount:

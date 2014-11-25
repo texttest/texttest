@@ -56,7 +56,7 @@ class FileViewGUI(guiutils.SubGUI):
 
     def reselect(self, selectionStore):
         for nameList in selectionStore:
-            iter = self.findIter(nameList, self.model.get_iter_root())
+            iter = self.findIter(nameList, self.model.get_iter_first())
             if iter is not None:
                 self.selection.select_iter(iter)
 

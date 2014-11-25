@@ -838,7 +838,7 @@ class StatusGUI(VersionControlDialogGUI):
 
     def toggleVisibility(self, menuItem):
         self.treeModel.foreach(self.setVisibility, (menuItem.get_name(), menuItem.get_active()))
-        self.treeView.expand_row(self.filteredTreeModel.get_path(self.filteredTreeModel.get_iter_root()), True)
+        self.treeView.expand_row(self.filteredTreeModel.get_path(self.filteredTreeModel.get_iter_first()), True)
         
     def getStatus(self, iter):
         markedUpStatus = self.treeModel.get_value(iter, 2)

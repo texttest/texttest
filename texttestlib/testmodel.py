@@ -5,7 +5,7 @@ from ordereddict import OrderedDict
 from cPickle import Pickler, Unpickler, UnpicklingError
 from threading import Lock
 from tempfile import mkstemp, mkdtemp
-from copy import deepcopy, copy
+from copy import deepcopy
 
 helpIntro = """
 Note: the purpose of this help is primarily to document derived configurations and how they differ from the

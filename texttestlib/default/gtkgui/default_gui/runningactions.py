@@ -166,7 +166,7 @@ class BasicRunningAction:
         testSel[0].notify("CloseDynamic", usecase)
     
     def checkErrorFile(self, errFile, testSel, usecase):
-        if os.path.isfile(errFile):
+        if os.path.isfile(errFile) and len(testSel) > 0:
             errText = testSel[0].app.filterErrorText(errFile)
             if len(errText):
                 self.notify("Status", usecase.capitalize() + " run failed for " + repr(testSel[0]))
@@ -486,6 +486,7 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
     def __init__(self, allApps, dummy, inputOptions):
         guiplugins.ActionDialogGUI.__init__(self, allApps)
         RunningAction.__init__(self, allApps, inputOptions)
+        self.rerunTests = []
         for group in self.optionGroups:
             if group.name == "Basic":
                 group.addSwitch("mark", "Mark test as rerun in current window", 1, description="Test will be automatically marked as having a newer result elsewhere." +
@@ -593,8 +594,17 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
         RunningAction.performOnCurrent(self)
         if self.getOption("mark").getValue():
             lastRunText = str(self.runNumber - 1)
+            self.rerunTests = copy(self.currTestSelection)
             for test in self.currTestSelection:
                 self.notify("Mark", test, "Test is being rerun in another window, numbered " + lastRunText, "Rerun " + lastRunText)
+                
+    def getTestCaseSelection(self):
+        if self.rerunTests:
+            tests = self.rerunTests
+            self.rerunTests = []
+            return tests
+        else:
+            return guiplugins.ActionDialogGUI.getTestCaseSelection(self)
 
     def getSizeAsWindowFraction(self):
         return 0.8, 0.9

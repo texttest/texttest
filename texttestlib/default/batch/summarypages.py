@@ -351,6 +351,11 @@ class SummaryGenerator:
             return "test run" + suffix + " " + ", ".join(mostRecentTags)
 
     def generatePage(self, dataFinder, appsWithVersions, fileToUrl):
+        jobLink = ""
+        if os.getenv("JENKINS_URL") and os.getenv("JOB_NAME") and os.getenv("BUILD_NUMBER"):
+            jobPath = os.path.join(os.getenv("JENKINS_URL"), "job", os.getenv("JOB_NAME"), os.getenv("BUILD_NUMBER"))
+            if jobPath:
+                jobLink = "(built by Jenkins job '" + os.getenv("JOB_NAME") + "', "+ "<a href='" + jobPath + "'> "+ "build number "+ os.getenv("BUILD_NUMBER")+ "</a>" + ")"
         file = open(dataFinder.summaryPageName, "w")
         versionOrder = [ "default" ]
         appOrder = []
@@ -370,6 +375,8 @@ class SummaryGenerator:
                 file.write("<h3 align=\"center\">(from " + self.getRecentTagText(mostRecentInfo) + ")</h3>\n")
             if "Insert table here" in line:
                 self.insertSummaryTable(file, dataFinder, mostRecentInfo, appsWithVersions, appOrder, versionOrder)
+            if jobLink and "Insert footer here" in line:
+                file.write(jobLink)
         file.close()
         plugins.log.info("wrote: '" + dataFinder.summaryPageName + "'") 
         if fileToUrl:

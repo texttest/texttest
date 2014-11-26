@@ -446,6 +446,7 @@ class ActionGUI(BasicActionGUI):
         frame.set_shadow_type(gtk.SHADOW_OUT)
         frame.set_border_width(1)
         view = gtk.TextView()
+        view.set_wrap_mode(gtk.WRAP_WORD)
         view.set_name(name)
         buffer = view.get_buffer()
         if scroll:

@@ -929,6 +929,25 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         if version:
             fileName += "." + version
         return fileName
+    
+    def getConfirmationMessage(self):
+        test = self.currTestSelection[0]
+        if test.getDirectory() == self.creationDir:
+            stemOption = self.optionGroup.getOption("stem")
+            stem = stemOption.getValue()
+            possible = stemOption.possibleValues
+            if possible and stem not in possible:
+                if os.sep in stem:
+                    firstPart = stem.split(os.sep)[0] # first component only, can provide a path here
+                    if firstPart in possible:
+                        return
+                
+                return "The type of file/directory you have chosen to create ('" + stem + "') is not currently recognised by TextTest.\n" + \
+                    "You can create it anyway, but it may not show up in the GUI and TextTest will probably not use it.\n" + \
+                    "Choose one of the drop-down options: " + repr(possible) + ".\n" + \
+                    "To fix this, adjust your configuration for 'copy_test_path', 'link_test_path' for data files,\n" + \
+                    "'definition_file_stems' for definition files, or 'collate_file' for approved files.\n" + \
+                    "Are you sure you want to proceed?"
 
     def performOnCurrent(self):
         stem = self.optionGroup.getOptionValue("stem")

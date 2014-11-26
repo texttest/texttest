@@ -69,11 +69,16 @@ class Ec2Machine:
             
     def synchronisePath(self, path):
         dirName = os.path.dirname(path)
-        with self.subprocessLock:
-            self.synchProc = self.app.getRemoteCopyFileProcess(path, "localhost", dirName, self.fullMachine)
-        self.synchProc.wait()
-        self.synchProc = None
-        
+        for _ in range(5):
+            with self.subprocessLock:
+                self.synchProc = self.app.getRemoteCopyFileProcess(path, "localhost", dirName, self.fullMachine)
+            errorCode = self.synchProc.wait()
+            if errorCode == 0:
+                self.synchProc = None
+                return
+            else:
+                time.sleep(1)
+
     def waitForStart(self):
         timeout = 1000
         self.diag.info("Waiting for response to ssh...")

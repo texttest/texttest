@@ -2683,6 +2683,7 @@ Batch Report Enhancements:
     - Batch runs from Jenkins now automatically add the Jenkins run number to their batch session, along with the date
     - additional HTML classes added to generated summary tables, allows for more CSS possibilities
     - Adding new run-level data store to batch repositories
+    - Adding a page footer to sumary_template.html . It will show a link to the associated jenkins build when available
 Grid Engine/Cloud enhancements/bug fixes:
     - Reworked setup so that cloud instances don't flood master machine's SSH daemon with SSH requests
     - Fixed incorrect display in Run Info of environment variables used directly in copy_test_path
@@ -2697,3 +2698,4 @@ Bug Fixes:
     - Fixed bug where duplicated known bugs triggering on absence meant they were always reported
     - Updated log regeneration script and logging.* files, forgotten with 3.27
     - HTML pages with a cutoff and a weekday apply the weekday first ("last 10 Fridays", instead of "the Fridays from the last 10 days" as before)
+    - Fixed word wrap in dialogs

@@ -372,7 +372,7 @@ class FileComparison:
             return self.tmpCmpFile
 
     def saveTmpFile(self, test, exact=True):
-        self.diag.info("Saving tmp file to " + self.stdFile)
+        self.diag.info("Saving tmp file to " + self.stdFile + ", exact=" + repr(exact))
         plugins.ensureDirExistsForFile(self.stdFile)
         # Allow for subclasses to differentiate between a literal overwrite and a
         # more intelligent save, e.g. for performance. Default is the same for exact

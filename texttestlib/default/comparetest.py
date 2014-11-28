@@ -376,7 +376,7 @@ class TestComparison(BaseTestComparison):
         return parentComp, splitComps
 
     def save(self, test, exact=True, versionString=None, overwriteSuccessFiles=False, onlyStems=[], backupVersions=[]):
-        self.diag.info("Approving " + repr(test) + " stems " + repr(onlyStems))
+        self.diag.info("Approving " + repr(test) + " stems " + repr(onlyStems) + ", exact=" + repr(exact))
         for comparison in self.filterComparisons(self.changedResults, onlyStems):
             self.updateStatus(test, str(comparison), versionString)
             comparison.overwrite(test, exact, versionString, backupVersions)

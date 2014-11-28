@@ -182,6 +182,7 @@ class PerformanceFileComparison(FileComparison):
     def saveResults(self, tmpFile, destFile):
         # Here we save the average of the old and new performance, assuming fluctuation
         avgPerformance = self.perfComparison.getAverage()
+        self.diag.info("Found average performance = " + str(avgPerformance) + ", new performance = " + str(self.perfComparison.newPerformance))
         line = open(tmpFile).readlines()[0]
         lineToWrite = line.replace(str(self.perfComparison.newPerformance), str(avgPerformance))
         newFile = open(destFile, "w")

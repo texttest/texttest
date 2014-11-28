@@ -1197,3 +1197,6 @@ activate = remove selected filter row
 [Label=Add Row]
 activate = add new filter row
 
+[Label=Skip known bug reporting - only use this to trigger reruns]
+toggled.true = skip known bug report
+

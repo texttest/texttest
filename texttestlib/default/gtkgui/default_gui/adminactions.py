@@ -1547,6 +1547,7 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         self.textDescGroup.addOption("brief_description", "Few-word summary")
         self.textDescGroup.addSwitch("internal_error", "Report as 'internal error' rather than 'known bug'")
         self.optionGroup.addOption("rerun_count", "Number of times to try to rerun the test if the issue is triggered", 0)
+        self.optionGroup.addSwitch("rerun_only", "Skip known bug reporting - only use this to trigger reruns")
         
     def isModal(self):
         return False # Want to be able to select text from the main GUI while we're in the dialog
@@ -1635,13 +1636,14 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         elif searchStr.startswith(" "):
             raise plugins.TextTestError, "'Knownbugs' file format cannot handle leading spaces in search string.\n" + \
                                          "If the line starts with spaces, suggest to add a ^ at the start, to match the beginning of the line"
-        if self.bugSystemGroup.getOptionValue("bug_system") == "<none>":
-            if len(self.textDescGroup.getOptionValue("full_description")) == 0 or \
+        if not self.optionGroup.getValue("rerun_only"):
+            if self.bugSystemGroup.getOptionValue("bug_system") == "<none>":
+                if len(self.textDescGroup.getOptionValue("full_description")) == 0 or \
                    len(self.textDescGroup.getOptionValue("brief_description")) == 0:
-                raise plugins.TextTestError, "Must either provide a bug system or fill in both description and summary fields"
-        else:
-            if len(self.bugSystemGroup.getOptionValue("bug_id")) == 0:
-                raise plugins.TextTestError, "Must provide a bug ID if bug system is given"
+                    raise plugins.TextTestError, "Must either provide a bug system or fill in both description and summary fields"
+            else:
+                if len(self.bugSystemGroup.getOptionValue("bug_id")) == 0:
+                    raise plugins.TextTestError, "Must provide a bug ID if bug system is given"
 
     def versionSuffix(self):
         version = self.applyGroup.getOptionValue("version")

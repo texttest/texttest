@@ -20,9 +20,10 @@ class FailedPrediction(plugins.TestState):
         return status, self.briefText
 
 class Bug:
-    def __init__(self, priority, rerunCount):
+    def __init__(self, priority, rerunCount, rerunOnly):
         self.priority = priority        
         self.rerunCount = rerunCount
+        self.rerunOnly = rerunOnly
                    
     def findCategory(self, internalError):
         if internalError or self.rerunCount:
@@ -78,7 +79,7 @@ class UnreportedBug(Bug):
         return self.briefText
 
     def isCancellation(self):
-        return not self.briefText and not self.fullText
+        return not self.rerunOnly and not self.briefText and not self.fullText
 
     def getPriority(self, priorityStr):
         if priorityStr:
@@ -119,10 +120,11 @@ class BugTrigger:
         bugSystem = getOption("bug_system")
         prioStr = getOption("priority")
         rerunCount = int(getOption("rerun_count", "0"))
+        rerunOnly = int(getOption("rerun_only", "0"))
         if bugSystem:
-            return BugSystemBug(bugSystem, getOption("bug_id"), prioStr, rerunCount)
+            return BugSystemBug(bugSystem, getOption("bug_id"), prioStr, rerunCount, rerunOnly)
         else:
-            return UnreportedBug(getOption("full_description"), getOption("brief_description"), self.reportInternalError, prioStr, rerunCount)
+            return UnreportedBug(getOption("full_description"), getOption("brief_description"), self.reportInternalError, prioStr, rerunCount, rerunOnly)
 
     def matchesText(self, line):
         return self.textTrigger.matches(line)
@@ -378,11 +380,11 @@ class CheckForBugs(plugins.Action):
         newState, rerunCount = self.checkTest(test, test.state)
         if newState:
             test.changeState(newState)
-            if rerunCount and not test.app.isReconnecting() and not os.path.exists(test.makeBackupFileName(rerunCount)):
-                self.describe(test, " - found an issue that triggered a rerun")
-                test.saveState()
-                # Current thread, must be done immediately or we might exit...
-                test.performNotify("Rerun")        
+        if rerunCount and not test.app.isReconnecting() and not os.path.exists(test.makeBackupFileName(rerunCount)):
+            self.describe(test, " - found an issue that triggered a rerun")
+            test.saveState()
+            # Current thread, must be done immediately or we might exit...
+            test.performNotify("Rerun")        
 
     def checkTest(self, test, state):
         activeBugs = self.readBugs(test)
@@ -395,11 +397,14 @@ class CheckForBugs(plugins.Action):
 
         bugTrigger, bugStem = self.findBug(test, state, activeBugs)
         if bugTrigger:
-            absenceBug = bugTrigger in activeBugs[bugStem].absentList
-            category, briefText, fullText = bugTrigger.findBugInfo(test, bugStem, absenceBug)
-            self.diag.info("Changing to " + category + " with text " + briefText)
-            bugState = FailedPrediction(category, fullText, briefText, completed=1)
-            return self.getNewState(state, bugState), bugTrigger.bugInfo.rerunCount
+            if bugTrigger.bugInfo.rerunOnly:
+                return None, bugTrigger.bugInfo.rerunCount
+            else:
+                absenceBug = bugTrigger in activeBugs[bugStem].absentList
+                category, briefText, fullText = bugTrigger.findBugInfo(test, bugStem, absenceBug)
+                self.diag.info("Changing to " + category + " with text " + briefText)
+                bugState = FailedPrediction(category, fullText, briefText, completed=1)
+                return self.getNewState(state, bugState), bugTrigger.bugInfo.rerunCount
         else:
             return None, 0
             

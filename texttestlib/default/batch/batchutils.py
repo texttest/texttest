@@ -21,8 +21,9 @@ class BatchVersionFilter:
 
 
 def getBatchRunName(optionMap):
-    if "name" in optionMap:
-        return optionMap["name"]
+    name = optionMap.get("name")
+    if name is not None:
+        return name
     
     jenkinsBuildNumber = os.getenv("BUILD_NUMBER")
     timeToUse = plugins.globalStartTime

@@ -447,7 +447,7 @@ class QueueSystem(local.QueueSystem):
             personalLog = os.getenv("TEXTTEST_PERSONAL_LOG")
             if personalLog:
                 dirs.append(personalLog)
-        checkout = self.app.checkout
+        checkout = self.app.getCheckoutForDisplay()
         if checkout and not checkout.startswith(appDir):
             dirs.append(checkout)
             dirs += self.findVirtualEnvLinkedDirectories(checkout)

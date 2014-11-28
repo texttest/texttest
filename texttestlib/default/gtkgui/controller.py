@@ -371,7 +371,7 @@ class TopWindowGUI(guiutils.ContainerGUI):
         allCheckouts = []
         for topApp in self.allApps:
             for app in [ topApp ] + topApp.extras:
-                checkout = app.checkout
+                checkout = app.getCheckoutForDisplay()
                 if checkout and not checkout in allCheckouts:
                     allCheckouts.append(checkout)
         if len(allCheckouts) == 0:

@@ -919,7 +919,7 @@ class WebPageResponder(plugins.Responder):
         version = apps[0].getFullVersion()
         if version:
             cmd += " -v " + version
-        checkouts = set((app.checkout for app in apps))
+        checkouts = set((app.getCheckoutForDisplay() for app in apps))
         if len(checkouts) == 1:
             checkout = checkouts.pop()
             if checkout:

@@ -52,7 +52,7 @@ class Config:
             elif group.name.startswith("Basic"):
                 if len(apps) > 0:
                     version = plugins.getAggregateString(apps, lambda app: app.getFullVersion())
-                    checkout = plugins.getAggregateString(apps, lambda app: app.checkout)
+                    checkout = plugins.getAggregateString(apps, lambda app: app.getCheckoutForDisplay())
                     machine = plugins.getAggregateString(apps, lambda app: app.getRunMachine())
                 else:
                     version, checkout, machine = "", "", ""
@@ -896,9 +896,7 @@ class Config:
         return self.getGivenCheckoutPath(app) if not self.ignoreCheckout() else ""
     
     def verifyCheckoutValid(self, app):
-        if not os.path.isabs(app.checkout):
-            raise plugins.TextTestError, "could not create absolute checkout from relative path '" + app.checkout + "'"
-        elif not os.path.isdir(app.checkout):
+        if not os.path.isdir(app.checkout):
             self.handleNonExistent(app.checkout, "checkout", app)
 
     def checkCheckoutExists(self, app):
@@ -1045,11 +1043,9 @@ class Config:
         if os.path.isabs(checkout):
             return os.path.normpath(checkout)
         checkoutLocations = app.getCompositeConfigValue("checkout_location", checkout, expandVars=False)
-        if len(checkoutLocations) > 0:
-            return self.makeAbsoluteCheckout(checkoutLocations, checkout, app)
-        else:
-            return checkout
-
+        checkoutLocations.append(os.getcwd())
+        return self.makeAbsoluteCheckout(checkoutLocations, checkout, app)
+        
     def getCheckout(self, app):
         if self.optionMap.has_key("c"):
             return plugins.commasplit(self.optionMap["c"])[0]

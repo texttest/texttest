@@ -152,11 +152,11 @@ def parseFailure(errMsg, debugger):
 def assembleInfo(signalDesc, summaryLine, stackLines, debugger):
     summary = signalDesc
     details = summaryLine + "\nStack trace from " + debugger + " :\n" + \
-              "\n".join(stackLines[:100])
+              "\n".join(stackLines[:1000])
     # Sometimes you get enormous stacktraces from GDB, for example, if you have
     # an infinite recursive loop.
-    if len(stackLines) > 100:
-        details += "\nStack trace print-out aborted after 100 function calls"
+    if len(stackLines) > 1000:
+        details += "\nStack trace print-out aborted after 1000 function calls"
     return summary, details
 
 

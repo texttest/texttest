@@ -944,20 +944,14 @@ class SlaveRequestHandler(StreamRequestHandler):
             paths.append(line.strip())
         self.server.pushFiles(test, userAndHost, paths)
         self.connection.shutdown(socket.SHUT_RDWR)
-        
+
     def handleRequestFromHost(self, test, pid, tryReuse, rerun):
-        oldBt = test.state.briefText
         # The updates are only for testing against old slave traffic,
         # a bit sad we can't disable them when not testing...
         _, state = test.getNewState(self.rfile, updatePaths=True)
         if test.state.isComplete():
             state.lifecycleChange = "recalculated"
-        self.server.diag.info("Changed from '" + oldBt + "' to '" + state.briefText + "'")    
-        if rerun:
-            self.server.diag.info("Instructed to rerun test " + test.uniqueName)
-            QueueSystemServer.instance.queueTestForRerun(test)
-        else:
-            self.server.changeState(test, state)
+        self.server.changeStateOrRerun(test, state, rerun)
         try:
             self.connection.shutdown(socket.SHUT_RD)
         except socket.error:
@@ -977,8 +971,8 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
     # Python's default value of 5 isn't very much...
     # There doesn't seem to be any disadvantage of allowing a longer queue, so we will use the system's maximum size
     request_queue_size = socket.SOMAXCONN    
-    def __init__(self, *args):
-        plugins.Responder.__init__(self, *args)
+    def __init__(self, optionMap, allApps):
+        plugins.Responder.__init__(self)
         ThreadingTCPServer.__init__(self, (getIPAddress(), 0), self.handlerClass())
         self.testMap = {}
         self.testLocks = {}
@@ -986,6 +980,8 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
         self.filePushProcesses = {}
         self.diag = logging.getLogger("Slave Server")
         self.terminate = False
+        self.totalReruns = 0
+        self.maxReruns = max((app.getConfigValue("queue_system_max_reruns") for app in allApps))
         
         # If a client rings in and then the connectivity is lost, we don't want to hang waiting for it forever
         # So we enable keepalive that will check the connection if no data is received for a while
@@ -1057,7 +1053,22 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
                 test.changeState(state)
             else:
                 self.diag.info("Rejecting state change, old state " + test.state.category + " is complete, new state " + state.category + " is not.")
-        return allow
+        return allow            
+
+    def changeStateOrRerun(self, test, state, rerun):
+        oldBt = test.state.briefText
+        self.diag.info("Changed from '" + oldBt + "' to '" + state.briefText + "'")    
+        if rerun and self.totalReruns < self.maxReruns:
+            lock = self.testLocks.get(test)
+            with lock:
+                self.totalReruns += 1
+            self.diag.info("Instructed to rerun test " + test.uniqueName + ", now performed " + 
+                           str(self.totalReruns) + " reruns of max " + str(self.maxReruns) + ".")
+            QueueSystemServer.instance.queueTestForRerun(test)
+        else:
+            if rerun:
+                self.diag.info("Instructed to rerun test " + test.uniqueName + ", but refusing, already rerun maximum " + str(self.totalReruns) + " times.")
+            self.changeState(test, state)
 
     def allowChange(self, oldState, newState):
         return newState.isComplete() or not oldState.isComplete()

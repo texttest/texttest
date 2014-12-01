@@ -14,6 +14,7 @@ def getConfig(optionMap):
             
 class QueueSystemConfig(default.Config):
     defaultMaxCapacity = 100000
+    defaultMaxReruns = 100
     useCloud = False
     def __init__(self, *args):
         default.Config.__init__(self, *args)
@@ -342,6 +343,7 @@ class QueueSystemConfig(default.Config):
         app.setConfigDefault("performance_test_resource", { "default" : [] }, "Resources to request from queue system for performance testing")
         app.setConfigDefault("parallel_environment_name", "*", "(SGE) Which SGE parallel environment to use when SUT is parallel")
         app.setConfigDefault("queue_system_max_capacity", self.defaultMaxCapacity, "Maximum possible number of parallel tests to run")
+        app.setConfigDefault("queue_system_max_reruns", self.defaultMaxReruns, "Maximum number of times to rerun tests due to known bugs")
         app.setConfigDefault("queue_system_min_test_count", 0, "Minimum number of tests before it's worth submitting them to the grid")
         app.setConfigDefault("queue_system_resource", [], "Grid engine resources required to locate test execution machines")
         app.setConfigDefault("queue_system_environment", [], "Environment variables (external to TextTest) whose values need to be transferred to the execution machine")

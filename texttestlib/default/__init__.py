@@ -59,7 +59,7 @@ class Config:
                 group.addOption("v", "Run this version", version)
                 group.addOption("c", self.getCheckoutLabel(), checkout)
                 group.addOption("m", self.getMachineLabel(), self.getMachineNameForDisplay(machine))
-                group.addOption("cp", "Times to run", 1, minimum=1, description="Set this to some number larger than 1 to run the same test multiple times, for example to try to catch indeterminism in the system under test")
+                group.addOption("cp", "Times to run", 1, minimum=1, maximum=10000, description="Set this to some number larger than 1 to run the same test multiple times, for example to try to catch indeterminism in the system under test")
                 if recordsUseCases:
                     group.addOption("delay", "Replay pause (sec)", 0.0, description="How long to wait, in seconds, between replaying each GUI action in the usecase file")
                     self.addDefaultSwitch(group, "gui", "Show GUI and record any extra actions", 

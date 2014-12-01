@@ -776,7 +776,7 @@ class OptionGroupGUI(ActionGUI):
             value = option.getValue()
             if isinstance(value, int) or isinstance(value, float):
                 adjustment = gtk.Adjustment(value=value, lower=option.minimum,
-                                            upper=1000, step_incr=1)
+                                            upper=option.maximum, step_incr=1)
                 digits = int(isinstance(value, float))
                 widget = gtk.SpinButton(adjustment, digits=digits)
                 widget.set_numeric(True)

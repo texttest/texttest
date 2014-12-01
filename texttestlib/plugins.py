@@ -1611,7 +1611,8 @@ class Option:
 class TextOption(Option):
     def __init__(self, name, value="", possibleValues=[], allocateNofValues=-1,
                  selectDir=False, selectFile=False, saveFile=False, possibleDirs=[],
-                 description="", changeMethod=None, multilineEntry=False, minimum=0):
+                 description="", changeMethod=None, multilineEntry=False, minimum=0, 
+                 maximum=1000):
         Option.__init__(self, name, value, description, changeMethod)
         self.possValAppendMethod = None
         self.possValListMethod = None
@@ -1624,6 +1625,7 @@ class TextOption(Option):
         self.clearMethod = None
         self.multilineEntry = multilineEntry
         self.minimum = minimum
+        self.maximum = maximum
         self.setPossibleValues(possibleValues)
         
     def resetMethods(self):

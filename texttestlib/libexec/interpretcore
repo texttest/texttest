@@ -80,7 +80,7 @@ def getBinary(corefile):
 def writeCmdFile():
     fileName = mktemp("coreCommands.gdb")
     file = open(fileName, "w")
-    file.write("bt\n")
+    file.write("thread apply all backtrace\n")
     file.close()
     return fileName
 

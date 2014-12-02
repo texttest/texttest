@@ -2664,11 +2664,18 @@ Static GUI Enhancements:
 	Allows an overview of which data will be used for which test, and a convenient reference without having to walk up the hierarchy
     - "Replace Text in Files" now works on files in test suites also
 	For example environment, options, config files
+    - Maximum copies of a test increased from 1000 to 10000
     - Reenable the old texttest icons by adding the config entry 'retro_icons:1' to personal config file
 Framework Enhancements:
     - "collate_script" now accepts all the files which match the pattern  in "collate_file"
 	This makes it easier to write a script to collate a summary of several related files.
 	There is also a warning now if multiple files match when no collate_script is provided. (see Migration Notes)
+    - "core file interpreting" script now shows a stack of all threads
+	Previously only showed main thread
+    - New checkbox in "Enter failure information" dialog
+	Allows you to just use this mechanism to trigger reruns without being required to report the result as a known bug.
+    - If checkout settings are not provided, TEXTTEST_CHECKOUT defaults to the current working directory
+	No more errors about failing to make an absolute path!
 Version Control Browser Enhancements:
     - Added new feature "Difference with Filter" for all supported VCS
 Batch Report Enhancements:
@@ -2685,9 +2692,12 @@ Batch Report Enhancements:
     - Adding new run-level data store to batch repositories
     - Adding a page footer to sumary_template.html . It will show a link to the associated jenkins build when available
 Grid Engine/Cloud enhancements/bug fixes:
+    - New config parameter "queue_system_max_reruns".
+	Aims to limit amount of rerunning caused by knownbugs. Defaults to 100. See website.
     - Reworked setup so that cloud instances don't flood master machine's SSH daemon with SSH requests
     - Fixed incorrect display in Run Info of environment variables used directly in copy_test_path
     - UGE Job ID now stored with test results, to make troubleshooting easier
+    - Cloud data synchronisation is now retried if it fails, e.g. if cloud drops connection
 Bug Fixes:
     - Filter behaviour is now consistent with View/Show All
     - Fixed bug with HTML summary page reporting and specific memory failure tests (i.e. anything not called "memory") being counted incorrectly
@@ -2699,3 +2709,4 @@ Bug Fixes:
     - Updated log regeneration script and logging.* files, forgotten with 3.27
     - HTML pages with a cutoff and a weekday apply the weekday first ("last 10 Fridays", instead of "the Fridays from the last 10 days" as before)
     - Fixed word wrap in dialogs
+    - Fixed stacktrace when -name provided without arguments. Now ignore this.

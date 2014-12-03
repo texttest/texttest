@@ -393,31 +393,36 @@ class TextTest(plugins.Responder, plugins.Observable):
         self.createResponders(allApps)
         raisedError, self.appSuites = self.createTestSuites(allApps)
         if not raisedError or len(self.appSuites) > 0:
-            self.addSuites(self.appSuites.values())
+            self.addSuites(self.appSuites.values(), allApps)
             
             # Set the signal handlers to use when running, if we actually plan to do any
             self.setSignalHandlers(self.handleSignal)
         
             self.runThreads()
 
-    def addSuites(self, emptySuites):
+    def addSuites(self, emptySuites, allApps):
         for object in self.observers:
             # For all observable responders, set them to be observed by the others if they
             # haven't fixed their own observers
             if isinstance(object, plugins.Observable) and len(object.observers) == 0:
                 self.diag.info("All responders now observing " + str(object.__class__))
                 object.setObservers([ self ] + self.observers)
-            suites = self.getSuitesToAdd(object, emptySuites)
+            suites = self.getSuitesToAdd(object, emptySuites, allApps)
             self.diag.info("Adding suites " + repr(suites) + " for " + str(object.__class__))
             object.addSuites(suites)
-    def getSuitesToAdd(self, observer, emptySuites):
+
+    def getSuitesToAdd(self, observer, emptySuites, allApps):
         for responderClass in self.getBuiltinResponderClasses():
             if isinstance(observer, responderClass):
                 return emptySuites
 
+        responderClassDict = {}
+        for app in allApps:
+            responderClassDict[app.name] = app.getResponderClasses(self.appSuites.keys())
+
         suites = []
         for testSuite in emptySuites:
-            for responderClass in testSuite.app.getResponderClasses(self.appSuites.keys()):
+            for responderClass in responderClassDict.get(testSuite.app.name):
                 if isinstance(observer, responderClass):
                     suites.append(testSuite)
                     break
@@ -440,7 +445,7 @@ class TextTest(plugins.Responder, plugins.Observable):
     def createEmptySuite(self, newApp):
         emptySuite = self.createInitialTestSuite(newApp)
         self.appSuites[newApp] = emptySuite
-        self.addSuites([ emptySuite ])
+        self.addSuites([ emptySuite ], [ newApp ])
         return emptySuite
 
     def createInitialTestSuite(self, app):

@@ -355,6 +355,12 @@ class LoadFromRerun(guiplugins.ActionGUI):
             if len(dirs) == 1:
                 rerunDir = dirs[0]
                 appDir = os.path.join(rerunDir, test.app.name + test.app.versionSuffix())
+                if not os.path.isdir(appDir):
+                    allAppDirs = glob(os.path.join(rerunDir, test.app.name + "*"))
+                    if len(allAppDirs) > 0:
+                        allAppVersions = [ d.replace(os.path.join(rerunDir, test.app.name + "."), "") for d in allAppDirs ]
+                        raise plugins.TextTestError, "Cannot load data for rerun, version '" + test.app.getFullVersion() + \
+                            "' could not be found, only version(s) '" + ", ".join(allAppVersions) + "'"
                 if self.loadFrom(test, appDir):
                     continue
             raise plugins.TextTestError, "Cannot load data for rerun, test " + test.name + " has not yet completed or has been deleted in rerun " + rerunNumber

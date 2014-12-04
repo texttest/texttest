@@ -1086,9 +1086,9 @@ class TestSuite(Test):
             self.createContentFile()
         self.autoSortOrder = self.getConfigValue("auto_sort_test_suites")
     
-    def readContents(self, filters=[], initial=True):
-        testNames, badTestNames = self.readTestNamesWithWarnings()
-        self.createTestCases(filters, testNames, initial)
+    def readContents(self, filters=[], initial=True, guideSuite=None):
+        testNames, badTestNames = self.readTestNamesWithWarnings(guideSuite=guideSuite)
+        self.createTestCases(filters, testNames, initial, guideSuite)
         if self.isEmpty() and len(testNames) > 0:
             # If the contents are filtered away, don't include the suite
             return False
@@ -1107,7 +1107,12 @@ class TestSuite(Test):
                 return False
         return True
 
-    def readTestNamesWithWarnings(self, ignoreCache=False):
+    def readTestNamesWithWarnings(self, ignoreCache=False, guideSuite=None):
+        if guideSuite:
+            testNames = OrderedDict()
+            for t in guideSuite.testcases:
+                testNames[t.name] = t.description
+            return testNames, OrderedDict()
         fileName = self.getContentFileName()
         if fileName:
             return self.testSuiteFileHandler.readWithWarnings(fileName, ignoreCache, self.fileExists)
@@ -1256,7 +1261,7 @@ class TestSuite(Test):
         else:
             return sorted(testNames, lambda a, b: self.compareTests(False, testCaseNames, a, b))
 
-    def createTestCases(self, filters, testNames, initial):
+    def createTestCases(self, filters, testNames, initial, guideSuite=None):
         testCaches = {}
         testCaseNames = []
         if self.autoSortOrder:
@@ -1270,14 +1275,16 @@ class TestSuite(Test):
             testName = os.path.basename(testNameOrPath)
             dirCache = testCaches.get(testName, self.createTestCache(testNameOrPath))
             desc = plugins.extractComment(testNames.get(testNameOrPath))
-            self.createTestOrSuite(testName, desc, dirCache, filters, initial)
+            self.createTestOrSuite(testName, desc, dirCache, filters, initial, guideSuite)
 
-    def createTestOrSuite(self, testName, description, dirCache, filters, initial=True):
+    def createTestOrSuite(self, testName, description, dirCache, filters, initial=True, guideSuite=None):
         className = self.getSubtestClass(dirCache)
         subTest = self.createSubtest(testName, description, dirCache, className)
-        if subTest and subTest.isAcceptedByAll(filters, checkContents=False) and subTest.readContents(filters, initial):
-            self.testcases.append(subTest)
-            subTest.notify("Add", initial)
+        if subTest and subTest.isAcceptedByAll(filters, checkContents=False):
+            guideSubTest = guideSuite.findSubtest(testName) if guideSuite else None
+            if subTest.readContents(filters, initial, guideSubTest):
+                self.testcases.append(subTest)
+                subTest.notify("Add", initial)
 
     def createTestCache(self, testName):
         return DirectoryCache(os.path.join(self.getDirectory(), testName))

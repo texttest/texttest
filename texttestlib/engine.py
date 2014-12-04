@@ -77,8 +77,20 @@ class Activator(plugins.Responder, plugins.Observable):
         self.allowEmpty = optionMap.has_key("gx") or optionMap.runScript()
         self.suites = []
         self.diag = logging.getLogger("Activator")
+        self.suiteCopyCache = {}
+        
     def addSuites(self, suites):
         self.suites = suites
+    
+    def findGuideSuiteForCopy(self, versions):
+        versionsForGuide = tuple(filter(lambda v: "copy_" not in v, versions))
+        if versionsForGuide in self.suiteCopyCache:
+            return self.suiteCopyCache.get(versionsForGuide)
+        
+        for suite in self.suites:
+            if tuple(suite.app.versions) == versionsForGuide:
+                self.suiteCopyCache[versionsForGuide] = suite
+                return suite
     
     def run(self):
         goodSuites = []
@@ -86,10 +98,15 @@ class Activator(plugins.Responder, plugins.Observable):
         self.notify("StartRead")
         for suite in self.suites:
             try:
-                filters = suite.app.getFilterList(self.suites)
-                self.diag.info("Creating test suite with filters " + repr(filters))
-        
-                suite.readContents(filters)
+                if any(("copy_" in v) for v in suite.app.versions):
+                    guideSuite = self.findGuideSuiteForCopy(suite.app.versions)
+                    self.diag.info("Creating test suite by copying " + repr(guideSuite))
+                    suite.readContents(guideSuite=guideSuite)
+                else:
+                    filters = suite.app.getFilterList(self.suites)
+                    self.diag.info("Creating test suite with filters " + repr(filters))
+                    suite.readContents(filters)
+                
                 self.diag.info("SUCCESS: Created test suite of size " + str(suite.size()))
                 if suite.size() > 0 or self.allowEmpty:
                     goodSuites.append(suite)

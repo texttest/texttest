@@ -1018,9 +1018,11 @@ def readListWithComments(filename, filterMethod=None):
                     continue
             items[line] = currComment.strip()
             currComment = ""
-    # Rescue dangling comments in the end (but put them before last test ...)
+    # Rescue dangling comments in the end (but put them and add an empty line before last test ...)
     if currComment and len(items) > 0:
-        items[items.keys()[-1]] = currComment + items[items.keys()[-1]]
+        lastComment = items[items.keys()[-1]]
+        emptyLine = "" if emptyLineSymbol in currComment[-len(emptyLineSymbol) -1:] else emptyLineSymbol + "\n"
+        items[items.keys()[-1]] = currComment + ("" if "\n" == currComment[-1] else "\n" ) + (emptyLine if lastComment else emptyLine[:-1]) + lastComment
     return items, badItems
 
 # comment can contain lines with __EMPTYLINE__ (see above) as a separator

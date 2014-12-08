@@ -4,6 +4,7 @@ from xml.dom.minidom import parse
 from ordereddict import OrderedDict
 from glob import glob
 from pprint import pprint
+from texttestlib import plugins
 
 class AbortedException(RuntimeError):
     pass
@@ -96,16 +97,18 @@ class FingerprintVerifier:
         self.fileFinder = fileFinder
         self.cacheDir = cacheDir
         
-    def getCacheFileName(self, buildName):
-        return os.path.join(self.cacheDir, "correct_hashes_" + buildName)
+    def getCacheFileName(self, jobName, buildName):
+        rootName = "correct_hashes_" + os.getenv("JENKINS_URL").split("/")[2].replace(":", "")
+        return os.path.join(self.cacheDir, rootName, jobName, buildName)
 
-    def getCachedFingerprint(self, buildName):
-        cacheFileName = self.getCacheFileName(buildName) 
+    def getCachedFingerprint(self, jobName, buildName):
+        cacheFileName = self.getCacheFileName(jobName, buildName) 
         if os.path.isfile(cacheFileName):
             return eval(open(cacheFileName).read())
 
-    def writeCache(self, buildName, updatedHashes):
-        cacheFileName = self.getCacheFileName(buildName)
+    def writeCache(self, jobName, buildName, updatedHashes):
+        cacheFileName = self.getCacheFileName(jobName, buildName) 
+        plugins.ensureDirExistsForFile(cacheFileName)
         with open(cacheFileName, "w") as f:
             pprint(updatedHashes, f) 
         
@@ -132,12 +135,12 @@ class FingerprintDifferenceFinder:
         self.jobRoot = jobRoot
         self.verifier = FingerprintVerifier(fileFinder, cacheDir) if fileFinder else None
                 
-    def findDifferences(self, jobName, build1, build2, verify):
+    def findDifferences(self, jobName, build1, build2):
         buildsDir = getBuildsDir(self.jobRoot, jobName)
         if not buildsDir:
             return [], False
-        fingerprint1 = self.getFingerprint(buildsDir, jobName, build1, verify)
-        fingerprint2 = self.getAndWaitForFingerprint(buildsDir, jobName, build2, verify)
+        fingerprint1 = self.getFingerprint(buildsDir, jobName, build1)
+        fingerprint2 = self.getAndWaitForFingerprint(buildsDir, jobName, build2)
         if not fingerprint1 or not fingerprint2:
             return [], bool(fingerprint2)
         differences = []
@@ -153,7 +156,7 @@ class FingerprintDifferenceFinder:
             if isinstance(hash1, tuple):
                 hash1 = hash1[0]
             if hash1 != hash2:
-                if verify and self.verifier:
+                if self.verifier:
                     correctedHash = self.verifier.getCorrectedHash(buildsDir, build2, file2, hash2)
                     if correctedHash:
                         hash2 = correctedHash
@@ -172,7 +175,7 @@ class FingerprintDifferenceFinder:
             for artefact, (hash2, file2) in fingerprint2.items():
                 if artefact not in updatedHashes:
                     updatedHashes[artefact] = hash2
-            self.verifier.writeCache(build2, updatedHashes)
+            self.verifier.writeCache(jobName, build2, updatedHashes)
         
         differences.sort()
         return differences, True
@@ -189,9 +192,9 @@ class FingerprintDifferenceFinder:
         print "Giving up waiting for fingerprints."
         raise JobStillRunningException()
     
-    def getFingerprint(self, buildsDir, jobName, buildName, verify):
-        if verify and self.verifier:
-            cached = self.verifier.getCachedFingerprint(buildName)
+    def getFingerprint(self, buildsDir, jobName, buildName):
+        if self.verifier:
+            cached = self.verifier.getCachedFingerprint(jobName, buildName)
             if cached:
                 return cached
     
@@ -385,7 +388,7 @@ class ChangeFinder:
     
     def findChanges(self, build1, build2):
         try:
-            markedChanges, projectChanges, fingerprintsFound = self.getChangesRecursively(self.jobName, build1, build2, verify=True)
+            markedChanges, projectChanges, fingerprintsFound = self.getChangesRecursively(self.jobName, build1, build2)
             if not fingerprintsFound:
                 print "WARNING: tried to find Jenkins changes, but no fingerprints found for", self.jobName, "build", build2
                 if os.getenv("BUILD_ID") == "none" and os.getenv("BUILD_NUMBER") == build2:
@@ -402,16 +405,16 @@ class ChangeFinder:
         changesFromMarking = [ self.getMarkChangeText(artefact, projectName, build1, build2) for artefact, projectName in markedChanges ]
         return changesFromMarking + changesFromProjects
     
-    def getChangesRecursively(self, jobName, build1, build2, verify):
+    def getChangesRecursively(self, jobName, build1, build2):
         # Find what artefacts have changed between times build
-        differences, fingerprintsFound = self.diffFinder.findDifferences(jobName, build1, build2, verify)
+        differences, fingerprintsFound = self.diffFinder.findDifferences(jobName, build1, build2)
         # Organise them by project
         markedChanges, differencesByProject = self.organiseByProject(differences)
         # For each project, find out which builds were affected
         projectChanges, recursiveChanges = self.getProjectChanges(differencesByProject)
         for subProj, subBuild1, subBuild2 in recursiveChanges:
             if subProj != jobName:
-                subMarkedChanges, subProjectChanges, _ = self.getChangesRecursively(subProj, subBuild1, subBuild2, verify=False)
+                subMarkedChanges, subProjectChanges, _ = self.getChangesRecursively(subProj, subBuild1, subBuild2)
                 for subMarkChange in subMarkedChanges:
                     if subMarkChange not in markedChanges:
                         markedChanges.append(subMarkChange)

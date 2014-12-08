@@ -2674,6 +2674,7 @@ Framework Enhancements:
 	Previously only showed main thread
     - New checkbox in "Enter failure information" dialog
 	Allows you to just use this mechanism to trigger reruns without being required to report the result as a known bug.
+    - If known bugs trigger reruns and those reruns are killed, the original test result is now shown instead of the killed rerun.
     - If checkout settings are not provided, TEXTTEST_CHECKOUT defaults to the current working directory
 	No more errors about failing to make an absolute path!
 Version Control Browser Enhancements:
@@ -2710,3 +2711,5 @@ Bug Fixes:
     - HTML pages with a cutoff and a weekday apply the weekday first ("last 10 Fridays", instead of "the Fridays from the last 10 days" as before)
     - Fixed word wrap in dialogs
     - Fixed stacktrace when -name provided without arguments. Now ignore this.
+    - Fixed GUI's test description when the last test in a suite has been commented out
+    - Performance improvements for running many copies of a test

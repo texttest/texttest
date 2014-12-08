@@ -889,7 +889,15 @@ class TestCase(Test):
                     return True
         return False
 
-    def backupPreviousTemporaryData(self):
+    def restoreLatestBackup(self):
+        newPath = self.backupPreviousTemporaryData(restoreLatest=True)
+        os.rename(newPath, os.path.join(os.path.dirname(newPath), "backup.aborted"))
+        stateFile = self.getStateFile()
+        if os.path.isfile(stateFile):
+            newState = self.getNewStateFromFile(open(stateFile))
+            return newState
+    
+    def backupPreviousTemporaryData(self, restoreLatest=False):
         writeDir = self.getDirectory(temporary=1)
         newBackupPath, oldBackupPaths = self.findBackupPaths()
         localTmpDir = mkdtemp(dir=os.path.dirname(writeDir), prefix=os.path.basename(newBackupPath) + ".")
@@ -897,15 +905,18 @@ class TestCase(Test):
             # Windows doesn't manage to overwrite empty directories. Linux does.
             os.rmdir(localTmpDir)
         os.rename(writeDir, localTmpDir)
-        self.makeWriteDirectory()
-        for oldBackupPath in oldBackupPaths:
+        if not restoreLatest:
+            self.makeWriteDirectory()
+        for oldBackupPath in reversed(oldBackupPaths):
             currLocation = os.path.join(localTmpDir, plugins.relpath(oldBackupPath, writeDir))
-            os.rename(currLocation, oldBackupPath)
+            currDest = writeDir if not os.path.exists(writeDir) else oldBackupPath
+            os.rename(currLocation, currDest)
         os.rename(localTmpDir, newBackupPath)
         localWriteDir = self.getDirectory(temporary=1, local=1)
         if localWriteDir != writeDir:
             plugins.rmtree(localWriteDir)
             plugins.ensureDirectoryExists(localWriteDir)
+        return newBackupPath
 
     def findBackupPaths(self):
         number = 1

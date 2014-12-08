@@ -18,12 +18,15 @@ class ApplicationEventResponder(plugins.Responder):
     def __init__(self, *args):
         plugins.Responder.__init__(self)
         applicationEvent("test configuration to be read", "read")
+        self.rerunTests = []
 
     def notifyLifecycleChange(self, test, state, changeDesc):
         if changeDesc.find("approved") != -1 or changeDesc.find("recalculated") != -1 or changeDesc.find("marked") != -1:
             # don't generate application events when a test is approved or recalculated or marked...
             return
         eventName = "test " + test.uniqueName + " to " + changeDesc
+        if test in self.rerunTests:
+            eventName += " rerun"
         category = test.uniqueName
         timeDelay = self.getTimeDelay()
         applicationEvent(eventName, category + " lifecycle", [ "lifecycle" ], timeDelay)
@@ -37,6 +40,9 @@ class ApplicationEventResponder(plugins.Responder):
         if test.classId() == "test-case":
             applicationEventRename("test " + test.uniqueName + " to", "test " + newName + " to",
                                                      test.uniqueName, newName)
+            
+    def notifyRerunTriggered(self, test):
+        self.rerunTests.append(test)
 
     def getTimeDelay(self):
         try:

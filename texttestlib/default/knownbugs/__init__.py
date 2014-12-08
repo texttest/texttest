@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os, string, shutil, sys, logging, glob
+import os, string, shutil, sys, logging, glob, re
 from texttestlib import plugins
 from ConfigParser import ConfigParser, NoOptionError
 from copy import copy
@@ -20,6 +20,8 @@ class FailedPrediction(plugins.TestState):
         return status, self.briefText
 
 class Bug:
+    rerunLine = "(NOTE: Test was run %d times in total and each time encountered this issue."
+    prevResultLine = "Results of previous runs can be found in framework_tmp/backup.previous.* under the sandbox directory.)"
     def __init__(self, priority, rerunCount, rerunOnly):
         self.priority = priority        
         self.rerunCount = rerunCount
@@ -36,12 +38,10 @@ class Bug:
 
     def getRerunText(self):
         if self.rerunCount:
-            return "\n(NOTE: Test was run " + str(self.rerunCount + 1) + " times in total and each time encountered this issue.\n" + \
-                   "Results of previous runs can be found in framework_tmp/backup.previous.* under the sandbox directory.)\n\n"
+            return "\n" + self.rerunLine % (self.rerunCount + 1) + "\n" + self.prevResultLine + "\n\n"
         else:
             return ""
         
-    
 
 class BugSystemBug(Bug):
     def __init__(self, bugSystem, bugId, priorityStr, *args):
@@ -384,8 +384,16 @@ class CheckForBugs(plugins.Action):
             self.describe(test, " - found an issue that triggered a rerun")
             test.saveState()
             # Current thread, must be done immediately or we might exit...
-            test.performNotify("Rerun")        
-
+            test.performNotify("Rerun")
+            # for test synchronisation, mainly
+            test.notify("RerunTriggered") 
+            
+        if test.state.category == "killed" and os.path.exists(test.makeBackupFileName(1)):
+            newState = test.restoreLatestBackup()
+            if newState:
+                self.fixBackupMessage(newState)
+                test.changeState(newState)
+            
     def checkTest(self, test, state):
         activeBugs = self.readBugs(test)
         return self.checkTestWithBugs(test, state, activeBugs)
@@ -484,6 +492,20 @@ class CheckForBugs(plugins.Action):
             self.diag.info("Reading bugs from file " + bugFile)
             bugMap.readFromFile(bugFile)
         return bugMap
+    
+    def fixBackupMessage(self, newState):
+        newFreeText = ""
+        backupRegex = re.compile(Bug.rerunLine.replace("%d", "[0-9]*").replace("(", "\\("))
+        for line in newState.freeText.splitlines():
+            if backupRegex.match(line):
+                newFreeText += "(NOTE: This issue triggered a rerun, but this rerun was killed before it could complete.\n" + \
+                    "The results presented here are those of the completed run.\n"
+            elif line == Bug.prevResultLine:
+                newFreeText += line.replace("previous runs", "the killed rerun").replace("previous.*", "aborted") + "\n"
+            else:
+                newFreeText += line + "\n"
+        newState.freeText = newFreeText
+            
 
 # For migrating from knownbugs files which are from TextTest 3.7 and older
 class MigrateFiles(plugins.Action):

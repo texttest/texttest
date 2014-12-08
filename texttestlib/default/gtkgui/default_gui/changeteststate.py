@@ -442,10 +442,11 @@ class KillTests(guiplugins.ActionGUI):
 def applyBugsToTests(tests, bugMap):
     foundMatch = False
     for test in tests:
-        newState, _ = CheckForBugs().checkTestWithBugs(test, test.stateInGui, bugMap)
+        newState, rerunCount = CheckForBugs().checkTestWithBugs(test, test.stateInGui, bugMap)
         if newState:
             newState.lifecycleChange = "recalculated"
             test.changeState(newState)
+        if newState or rerunCount:
             foundMatch = True
     
     return foundMatch

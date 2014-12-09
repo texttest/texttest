@@ -92,22 +92,26 @@ class Activator(plugins.Responder, plugins.Observable):
                 self.suiteCopyCache[versionsForGuide] = suite
                 return suite
     
+    def readTestSuiteContents(self, suite):
+        if any(("copy_" in v) for v in suite.app.versions):
+            guideSuite = self.findGuideSuiteForCopy(suite.app.versions)
+            if guideSuite is not None:
+                self.diag.info("Creating test suite by copying " + repr(guideSuite))
+                return suite.readContents(guideSuite=guideSuite)
+        
+        filters = suite.app.getFilterList(self.suites)
+        self.diag.info("Creating test suite with filters " + repr(filters))
+        return suite.readContents(filters)
+
     def run(self):
         goodSuites = []
         rejectionInfo = OrderedDict()
         self.notify("StartRead")
         for suite in self.suites:
             try:
-                if any(("copy_" in v) for v in suite.app.versions):
-                    guideSuite = self.findGuideSuiteForCopy(suite.app.versions)
-                    self.diag.info("Creating test suite by copying " + repr(guideSuite))
-                    suite.readContents(guideSuite=guideSuite)
-                else:
-                    filters = suite.app.getFilterList(self.suites)
-                    self.diag.info("Creating test suite with filters " + repr(filters))
-                    suite.readContents(filters)
-                
+                self.readTestSuiteContents(suite)
                 self.diag.info("SUCCESS: Created test suite of size " + str(suite.size()))
+                
                 if suite.size() > 0 or self.allowEmpty:
                     goodSuites.append(suite)
                     suite.notify("Add", initial=True)

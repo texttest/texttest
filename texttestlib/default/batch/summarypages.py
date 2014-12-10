@@ -150,13 +150,17 @@ class SummaryDataFinder:
                     return title[pos:endPos]
                 
     def getTemplateFile(self):
-        templateFile = os.path.join(self.location, "summary_template.html")
-        if not os.path.isfile(templateFile):
-            plugins.log.info("No file at '" + templateFile + "', copying default file from installation")
+        return self.ensureLocationFileExists("summary_template.html", "etc")
+    
+    def ensureLocationFileExists(self, fileName, dataDirName=""):
+        locationFile = os.path.join(self.location, fileName)
+        if not os.path.isfile(locationFile):
+            plugins.ensureDirExistsForFile(locationFile)
+            plugins.log.info("No file at '" + locationFile + "', copying default file from installation")
             includeSite, includePersonal = self.inputOptions.configPathOptions()
-            srcFile = plugins.findDataPaths([ "summary_template.html" ], includeSite, includePersonal)[-1]
-            shutil.copyfile(srcFile, templateFile)
-        return templateFile
+            srcFile = plugins.findDataPaths([ fileName ], includeSite, includePersonal, dataDirName)[-1]
+            shutil.copyfile(srcFile, locationFile)
+        return locationFile
 
     def getGraphFile(self, appName, version):        
         return os.path.join(self.location, self.getShortAppName(appName), "images", "GenerateGraphs_" + version + ".png")
@@ -235,9 +239,10 @@ class SummaryDataFinder:
         else:
             return False
         
-    def getLastInfoPerEnvironment(self, allTagsRecentDate, runDir):
+    def getLastInfoPerEnvironment(self, allTagsRecentDate, runDir, ignoreItems=0):
         if runDir is None:
-            return { (None, None) : max(allTagsRecentDate, key=self.getDateTagKey) }
+            value = self.getMax(allTagsRecentDate, ignoreItems, key=self.getDateTagKey)
+            return { (None, None) : value } if value is not None else {}
         def getEnvironmentData(tag):
             date, actualTag = tag
             fullTag = time.strftime("%d%b%Y", date) + "_" + actualTag
@@ -246,22 +251,41 @@ class SummaryDataFinder:
             
         allLastInfo = {}
         for envData, tags in groupby(allTagsRecentDate, key=getEnvironmentData):
-            allLastInfo[envData] = max(tags, key=self.getDateTagKey)
+            maxVal = self.getMax(tags, ignoreItems, key=self.getDateTagKey)
+            if maxVal is not None:
+                allLastInfo[envData] = maxVal 
         if len(allLastInfo) > 1 and (None, None) in allLastInfo:
             del allLastInfo[(None, None)]
         return allLastInfo
         
-    def getLatestSummary(self, appName, version):
+    def getMax(self, values, ignoreItems, **kw):
+        if ignoreItems == 0:
+            return max(values, **kw)
+        else:
+            valList = list(values)
+            if len(valList) > ignoreItems:
+                valList.sort(**kw)
+                return valList[-1 - ignoreItems]
+        
+    def getLatestSummary(self, appName, version, ignoreItems=0):
         versionData = self.appVersionInfo[appName][version]
-        lastInfo = max(versionData.keys(), key=self.getDateTagKey)
+        lastInfo = self.getMax(versionData.keys(), ignoreItems, key=self.getDateTagKey)
+        postfix = " (ignoring " + str(ignoreItems) + " items)" if ignoreItems else ""
+        self.diag.info("Finding last Info for version " + version + postfix + " = " + repr(lastInfo))
+        if lastInfo is None:
+            return None, None
         allTagsRecentDate = filter(lambda x: x[0] == lastInfo[0], versionData.keys())
+        self.diag.info("All tags for recent date " + repr(lastInfo[0]) + " = " + repr(allTagsRecentDate))
+        sameAsLast = not ignoreItems or lastInfo[0] == max(versionData.keys(), key=self.getDateTagKey)[0]
         summary = OrderedDict()
-        for lastInfo in self.getLastInfoPerEnvironment(allTagsRecentDate, self.getAppRunDirectory(appName)).values():
+        ignoreItemsPerEnv = ignoreItems if sameAsLast else 0
+        for lastInfo in self.getLastInfoPerEnvironment(allTagsRecentDate, self.getAppRunDirectory(appName), ignoreItemsPerEnv).values():
             path = versionData[lastInfo]
             self.diag.info("Extracting summary information from " + path)
             self.extractSummary(path, summary)
             self.diag.info("For version " + version + ", found summary info " + repr(summary))
-        self.diag.info("Last Info for version " + version + " = " + repr(lastInfo))
+        postfix = " (ignoring " + str(ignoreItems) + " items)" if ignoreItems else ""
+        self.diag.info("Last Info for version " + version + postfix + " = " + repr(lastInfo))
         return summary, lastInfo
 
     def getAllSummaries(self, appName, version):
@@ -451,6 +475,29 @@ class SummaryGenerator:
 
     def isDate(self, tag):
         return len(tag) == 9 and tag[:2].isdigit() and tag[2:5].isalpha() and tag[5:].isdigit()
+    
+    def getTrendImage(self, summary, prevSummary):
+        text = self.getTrendText(summary, prevSummary)
+        return "images/" + text + ".png"
+        
+    def getTrendText(self, summary, prevSummary):
+        currSuccess = summary.get("success", 0)
+        prevSuccess = prevSummary.get("success", 0)
+        if currSuccess > prevSuccess:
+            return "arrow_up"
+        elif currSuccess < prevSuccess:
+            return "arrow_down"
+        elif summary.get("failure") > 0:
+            return "red_arrow_across"
+        else:
+            return "green_arrow_across"
+        
+    def getTooltipForPrevious(self, prevSummary, prevTag):
+        text = "Comparing to " + prevTag + " :\n"
+        for colourKey, count in prevSummary.items():
+            if count:
+                text += colourKey + "=" + str(count) + "\n"
+        return text
 
     def insertSummaryTable(self, file, dataFinder, mostRecentInfo, pageInfo, appOrder, versionOrder):
         versionWithColumns = self.getVersionsWithColumns(pageInfo)
@@ -472,6 +519,7 @@ class SummaryGenerator:
                         columnVersions[columnIndex] = version
 
                     resultSummary, lastInfo = dataFinder.getLatestSummary(appName, version)
+                    prevResultSummary, nextLastInfo = dataFinder.getLatestSummary(appName, version, ignoreItems=1)
                     oldResults = self.showResultAsOld(lastInfo, mostRecentInfo)
                     fileToLink = dataFinder.getOverviewPage(appName, version)
                     if dataFinder.usePieChart(appName):
@@ -490,6 +538,11 @@ class SummaryGenerator:
                                 else:
                                     file.write(str(count))
                                 file.write("</h3></td>\n")
+                    if prevResultSummary:
+                        image = self.getTrendImage(resultSummary, prevResultSummary)
+                        dataFinder.ensureLocationFileExists(image)
+                        tooltip = self.getTooltipForPrevious(prevResultSummary, nextLastInfo[1])
+                        file.write('    <td class="arrow_cell"><img src="' + image + '" title="' + tooltip + '"/></td>\n')
                     file.write("  </tr></table>")
                 file.write("</td>\n")
             file.write("</tr>\n")

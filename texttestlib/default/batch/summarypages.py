@@ -6,7 +6,6 @@ from texttestlib import plugins
 from HTMLParser import HTMLParser
 from ordereddict import OrderedDict
 from glob import glob
-from itertools import groupby
 from batchutils import BatchVersionFilter, parseFileName, convertToUrl, getEnvironmentFromRunFiles
 
 class GenerateFromSummaryData(plugins.ScriptWithArgs):
@@ -216,8 +215,8 @@ class SummaryDataFinder:
                 mostRecentInfo = max(versionData.keys(), key=self.getDateTagKey)
                 allTagsRecentDate = filter(lambda x: x[0] == mostRecentInfo[0], versionData.keys())
                 lastInfoPerEnv = self.getLastInfoPerEnvironment(allTagsRecentDate, self.getAppRunDirectory(appName))
-                for envData, lastInfo in lastInfoPerEnv.items():
-                    allInfo.setdefault(envData, []).append(lastInfo)
+                for envData, lastInfo in lastInfoPerEnv:
+                    allInfo.setdefault(envData, []).append(lastInfo[0])
                 self.diag.info("Most recent date for " + appName + " = " + repr(lastInfoPerEnv))
         mostRecent = set()
         for envData, lastInfoList in allInfo.items():
@@ -239,54 +238,62 @@ class SummaryDataFinder:
         else:
             return False
         
-    def getLastInfoPerEnvironment(self, allTagsRecentDate, runDir, ignoreItems=0):
+    def extractLast(self, tags, count=1):
+        return sorted(tags, key=self.getDateTagKey)[-count:]
+        
+    def getLastInfoPerEnvironment(self, allTags, runDir, count=1):
         if runDir is None:
-            value = self.getMax(allTagsRecentDate, ignoreItems, key=self.getDateTagKey)
-            return { (None, None) : value } if value is not None else {}
+            value = self.extractLast(allTags, count)
+            return [ ((None, None), value) ] if value is not None else []
         def getEnvironmentData(tag):
             date, actualTag = tag
             fullTag = time.strftime("%d%b%Y", date) + "_" + actualTag
             runEnv = getEnvironmentFromRunFiles([ runDir ], fullTag)
             return runEnv.get("JENKINS_URL"), runEnv.get("JOB_NAME")
             
+        groupedData = {}
+        for tag in allTags:
+            envData = getEnvironmentData(tag)
+            groupedData.setdefault(envData, []).append(tag)
+            
+        mostRecentDate = max(allTags, key=self.getDateTagKey)[0]
         allLastInfo = {}
-        for envData, tags in groupby(allTagsRecentDate, key=getEnvironmentData):
-            maxVal = self.getMax(tags, ignoreItems, key=self.getDateTagKey)
-            if maxVal is not None:
-                allLastInfo[envData] = maxVal 
+        for envData, tags in groupedData.items():
+            last = self.extractLast(tags, count)
+            if last and last[-1][0] == mostRecentDate:
+                allLastInfo[envData] = last
+            
         if len(allLastInfo) > 1 and (None, None) in allLastInfo:
             del allLastInfo[(None, None)]
-        return allLastInfo
+            
+        return allLastInfo.items()
         
     def getMax(self, values, ignoreItems, **kw):
         if ignoreItems == 0:
             return max(values, **kw)
-        else:
-            valList = list(values)
-            if len(valList) > ignoreItems:
-                valList.sort(**kw)
-                return valList[-1 - ignoreItems]
+        elif len(values) > ignoreItems:
+            values.sort(**kw)
+            return values[-1 - ignoreItems]
         
-    def getLatestSummary(self, appName, version, ignoreItems=0):
+    def getLatestSummaries(self, appName, version):
         versionData = self.appVersionInfo[appName][version]
-        lastInfo = self.getMax(versionData.keys(), ignoreItems, key=self.getDateTagKey)
-        postfix = " (ignoring " + str(ignoreItems) + " items)" if ignoreItems else ""
-        self.diag.info("Finding last Info for version " + version + postfix + " = " + repr(lastInfo))
-        if lastInfo is None:
-            return None, None
-        allTagsRecentDate = filter(lambda x: x[0] == lastInfo[0], versionData.keys())
-        self.diag.info("All tags for recent date " + repr(lastInfo[0]) + " = " + repr(allTagsRecentDate))
-        sameAsLast = not ignoreItems or lastInfo[0] == max(versionData.keys(), key=self.getDateTagKey)[0]
-        summary = OrderedDict()
-        ignoreItemsPerEnv = ignoreItems if sameAsLast else 0
-        for lastInfo in self.getLastInfoPerEnvironment(allTagsRecentDate, self.getAppRunDirectory(appName), ignoreItemsPerEnv).values():
+        summary, prevSummary = OrderedDict(), OrderedDict()
+        infoPerEnv = self.getLastInfoPerEnvironment(versionData.keys(), self.getAppRunDirectory(appName), count=2)
+        lastInfo, nextLastInfo = None, None
+        for envData, lastInfoList in infoPerEnv:
+            lastInfo = lastInfoList[-1]
             path = versionData[lastInfo]
             self.diag.info("Extracting summary information from " + path)
             self.extractSummary(path, summary)
-            self.diag.info("For version " + version + ", found summary info " + repr(summary))
-        postfix = " (ignoring " + str(ignoreItems) + " items)" if ignoreItems else ""
-        self.diag.info("Last Info for version " + version + postfix + " = " + repr(lastInfo))
-        return summary, lastInfo
+            self.diag.info("For app " + appName + " version " + version + " environment " + repr(envData) + ", found summary info " + repr(summary))
+            if len(lastInfoList) == 2:
+                nextLastInfo = lastInfoList[0]
+                path = versionData[nextLastInfo]
+                self.diag.info("Extracting previous summary information from " + path)
+                self.extractSummary(path, prevSummary)
+                self.diag.info("For app " + appName + " version " + version + " environment " + repr(envData) + ", found previous summary info " + repr(prevSummary))
+        self.diag.info("Last Info for version " + version + " = " + repr(lastInfo) + ", previous = " + repr(nextLastInfo))
+        return summary, lastInfo, prevSummary, nextLastInfo
 
     def getAllSummaries(self, appName, version):
         versionData = self.appVersionInfo[appName][version]
@@ -354,7 +361,7 @@ class SummaryGenerator:
     def adjustLineForTitle(self, line):
         pos = line.find("</title>")
         return str(testoverview.TitleWithDateStamp(line[:pos])) + "</title>\n"
-            
+
     def getDateRangeText(self, info):
         dates = [ i[0] for i in info ]
         if len(dates) == 0:
@@ -518,8 +525,7 @@ class SummaryGenerator:
                     if version in versionWithColumns:
                         columnVersions[columnIndex] = version
 
-                    resultSummary, lastInfo = dataFinder.getLatestSummary(appName, version)
-                    prevResultSummary, nextLastInfo = dataFinder.getLatestSummary(appName, version, ignoreItems=1)
+                    resultSummary, lastInfo, prevResultSummary, nextLastInfo = dataFinder.getLatestSummaries(appName, version)
                     oldResults = self.showResultAsOld(lastInfo, mostRecentInfo)
                     fileToLink = dataFinder.getOverviewPage(appName, version)
                     if dataFinder.usePieChart(appName):

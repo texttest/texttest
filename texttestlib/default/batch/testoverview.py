@@ -148,7 +148,10 @@ class GenerateWebPages(object):
                     with open(successFile) as f:
                         fileTags = set()
                         for line in f:
-                            tag, text = line.strip().split(" ", 1)
+                            parts = line.strip().split(" ", 1)
+                            if len(parts) != 2:
+                                continue
+                            tag, text = parts
                             if tag in fileTags:
                                 sys.stderr.write("WARNING: more than one result present for tag '" + tag + "' in file " + successFile + "!\n")
                                 sys.stderr.write("Ignoring later ones\n")
@@ -276,8 +279,10 @@ class GenerateWebPages(object):
                         successFiles.append((path, dir))
                         with open(path) as f:
                             for line in f:
-                                tag = line.split()[0]
-                                tagData.setdefault(tag, []).append(path)
+                                parts = line.split()
+                                if parts:
+                                    tag = parts[0]
+                                    tagData.setdefault(tag, []).append(path)
                                 
             self.diag.info("Found " + str(len(stateFiles)) + " teststate files and " + str(len(successFiles)) + " success files in " + dir)
         return tagData, stateFiles, successFiles

@@ -7,6 +7,7 @@ from HTMLParser import HTMLParser
 from ordereddict import OrderedDict
 from glob import glob
 from batchutils import BatchVersionFilter, parseFileName, convertToUrl, getEnvironmentFromRunFiles
+import datetime
 
 class GenerateFromSummaryData(plugins.ScriptWithArgs):
     locationApps = OrderedDict()
@@ -212,9 +213,7 @@ class SummaryDataFinder:
         allInfo = {}
         for appName, appInfo in self.appVersionInfo.items():
             for versionData in appInfo.values():
-                mostRecentInfo = max(versionData.keys(), key=self.getDateTagKey)
-                allTagsRecentDate = filter(lambda x: x[0] == mostRecentInfo[0], versionData.keys())
-                lastInfoPerEnv = self.getLastInfoPerEnvironment(allTagsRecentDate, self.getAppRunDirectory(appName))
+                lastInfoPerEnv = self.getLastInfoPerEnvironment(versionData.keys(), self.getAppRunDirectory(appName))
                 for envData, lastInfo in lastInfoPerEnv:
                     allInfo.setdefault(envData, []).append(lastInfo[0])
                 self.diag.info("Most recent date for " + appName + " = " + repr(lastInfoPerEnv))
@@ -239,7 +238,10 @@ class SummaryDataFinder:
             return False
         
     def extractLast(self, tags, count=1):
-        return sorted(tags, key=self.getDateTagKey)[-count:]
+        if count == 1:
+            return [ max(tags, key=self.getDateTagKey) ]
+        else:
+            return sorted(tags, key=self.getDateTagKey)[-count:]
         
     def getLastInfoPerEnvironment(self, allTags, runDir, count=1):
         if runDir is None:
@@ -256,18 +258,23 @@ class SummaryDataFinder:
             envData = getEnvironmentData(tag)
             groupedData.setdefault(envData, []).append(tag)
             
-        mostRecentDate = max(allTags, key=self.getDateTagKey)[0]
+        mostRecentDate = self.toDate(max(allTags, key=self.getDateTagKey)[0])
+        oneDay = datetime.timedelta(days=1)
         allLastInfo = {}
         for envData, tags in groupedData.items():
             last = self.extractLast(tags, count)
-            if last and last[-1][0] == mostRecentDate:
+            lastDate = self.toDate(last[-1][0])
+            if last and mostRecentDate - lastDate <= oneDay:
                 allLastInfo[envData] = last
             
         if len(allLastInfo) > 1 and (None, None) in allLastInfo:
             del allLastInfo[(None, None)]
             
         return allLastInfo.items()
-        
+    
+    def toDate(self, timeStruct):
+        return datetime.date.fromtimestamp(time.mktime(timeStruct))
+    
     def getMax(self, values, ignoreItems, **kw):
         if ignoreItems == 0:
             return max(values, **kw)

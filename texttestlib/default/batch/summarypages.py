@@ -369,6 +369,12 @@ class SummaryGenerator:
         pos = line.find("</title>")
         return str(testoverview.TitleWithDateStamp(line[:pos])) + "</title>\n"
 
+    def adjustLineForColours(self, line, dataFinder):
+        mainPart = line.rsplit(";", 1)[0].rstrip()
+        var, template = mainPart.rsplit(" ", 1)
+        colourKey = template.split(".")[-1]
+        return var + " " + dataFinder.getColour(colourKey) + ";\n"
+
     def getDateRangeText(self, info):
         dates = [ i[0] for i in info ]
         if len(dates) == 0:
@@ -402,11 +408,16 @@ class SummaryGenerator:
             mostRecentInfo = dataFinder.getMostRecentDateAndTags()
             mostRecentTags = [ i[1] for i in mostRecentInfo ]
             self.diag.info("Most recent results are from " + repr(mostRecentTags))
+            cssColours = []
             for line in open(dataFinder.getTemplateFile()):
                 if "<title>" in line:
                     f.write(self.adjustLineForTitle(line))
+                elif "historical_report_colours" in line:
+                    f.write(self.adjustLineForColours(line, dataFinder))
                 else:
                     f.write(line)
+                if "td.cell_" in line:
+                    cssColours.append(line.rsplit("_", 1)[-1].split()[0])
                 if "App order=" in line:
                     appOrder += self.extractOrder(line)
                 if "Version order=" in line:
@@ -414,7 +425,7 @@ class SummaryGenerator:
                 if "<h1" in line:
                     f.write("<h3 align=\"center\">(from " + self.getRecentTagText(mostRecentInfo) + ")</h3>\n")
                 if "Insert table here" in line:
-                    self.insertSummaryTable(f, dataFinder, mostRecentInfo, appsWithVersions, appOrder, versionOrder)
+                    self.insertSummaryTable(f, dataFinder, mostRecentInfo, appsWithVersions, appOrder, versionOrder, cssColours)
                 if jobLink and "Insert footer here" in line:
                     f.write(jobLink)
                     
@@ -537,8 +548,15 @@ class SummaryGenerator:
             if count:
                 text += colourKey + "=" + str(count) + "\n"
         return text
+    
+    def getColourAttribute(self, colourKey, cssColours, dataFinder):
+        if colourKey in cssColours:
+            return 'class="cell_' + colourKey + '"'
+        else:
+            colour = dataFinder.getColour(colourKey)                    
+            return 'bgcolor="' + colour + '"'
 
-    def insertSummaryTable(self, file, dataFinder, mostRecentInfo, pageInfo, appOrder, versionOrder):
+    def insertSummaryTable(self, file, dataFinder, mostRecentInfo, pageInfo, appOrder, versionOrder, cssColours):
         versionWithColumns = self.getVersionsWithColumns(pageInfo)
         self.diag.info("Following versions will be placed in columns " + repr(versionWithColumns))
         minColumnIndices = self.getMinColumnIndices(pageInfo, versionOrder)
@@ -568,8 +586,7 @@ class SummaryGenerator:
                         file.write('    <td><h3><a href="' + fileToLink + '">' + version + '</a></h3></td>\n')
                         for colourKey, count in resultSummary.items():
                             if count:
-                                colour = dataFinder.getColour(colourKey)
-                                file.write('    <td bgcolor="' + colour + '"><h3>')
+                                file.write('    <td ' + self.getColourAttribute(colourKey, cssColours, dataFinder) + '><h3>')
                                 if oldResults:
                                     # Highlight old data by putting it in a paler foreground colour
                                     file.write('<font color="#999999">' + str(count) + "</font>")

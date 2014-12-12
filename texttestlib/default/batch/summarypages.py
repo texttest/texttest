@@ -394,32 +394,57 @@ class SummaryGenerator:
             jobPath = os.path.join(os.getenv("JENKINS_URL"), "job", os.getenv("JOB_NAME"), os.getenv("BUILD_NUMBER"))
             if jobPath:
                 jobLink = "(built by Jenkins job '" + os.getenv("JOB_NAME") + "', "+ "<a href='" + jobPath + "'> "+ "build number "+ os.getenv("BUILD_NUMBER")+ "</a>" + ")"
-        file = open(dataFinder.summaryPageName, "w")
-        versionOrder = [ "default" ]
-        appOrder = []
-        mostRecentInfo = dataFinder.getMostRecentDateAndTags()
-        mostRecentTags = [ i[1] for i in mostRecentInfo ]
-        self.diag.info("Most recent results are from " + repr(mostRecentTags))
-        for line in open(dataFinder.getTemplateFile()):
-            if "<title>" in line:
-                file.write(self.adjustLineForTitle(line))
-            else:
-                file.write(line)
-            if "App order=" in line:
-                appOrder += self.extractOrder(line)
-            if "Version order=" in line:
-                versionOrder += self.extractOrder(line)
-            if "<h1" in line:
-                file.write("<h3 align=\"center\">(from " + self.getRecentTagText(mostRecentInfo) + ")</h3>\n")
-            if "Insert table here" in line:
-                self.insertSummaryTable(file, dataFinder, mostRecentInfo, appsWithVersions, appOrder, versionOrder)
-            if jobLink and "Insert footer here" in line:
-                file.write(jobLink)
-        file.close()
+        
+        summaryPageTimeStamp = dataFinder.summaryPageName + "." + plugins.localtime("%Y%m%d_%H%M%S")
+        with open(summaryPageTimeStamp, "w") as f:
+            versionOrder = [ "default" ]
+            appOrder = []
+            mostRecentInfo = dataFinder.getMostRecentDateAndTags()
+            mostRecentTags = [ i[1] for i in mostRecentInfo ]
+            self.diag.info("Most recent results are from " + repr(mostRecentTags))
+            for line in open(dataFinder.getTemplateFile()):
+                if "<title>" in line:
+                    f.write(self.adjustLineForTitle(line))
+                else:
+                    f.write(line)
+                if "App order=" in line:
+                    appOrder += self.extractOrder(line)
+                if "Version order=" in line:
+                    versionOrder += self.extractOrder(line)
+                if "<h1" in line:
+                    f.write("<h3 align=\"center\">(from " + self.getRecentTagText(mostRecentInfo) + ")</h3>\n")
+                if "Insert table here" in line:
+                    self.insertSummaryTable(f, dataFinder, mostRecentInfo, appsWithVersions, appOrder, versionOrder)
+                if jobLink and "Insert footer here" in line:
+                    f.write(jobLink)
+                    
+        self.linkOrCopy(summaryPageTimeStamp, dataFinder.summaryPageName)
+        self.cleanOldest(dataFinder.summaryPageName)
+                    
         plugins.log.info("wrote: '" + dataFinder.summaryPageName + "'") 
         if fileToUrl:
             url = convertToUrl(dataFinder.summaryPageName, fileToUrl)
             plugins.log.info("(URL is " + url + ")")
+            
+    def linkOrCopy(self, src, dst):
+        if os.path.exists(dst):
+            os.remove(dst)
+        if os.name == "posix":
+            os.symlink(os.path.basename(src), dst)
+        else:
+            shutil.copy(src, dst)
+            
+    def getTimeStampFromIndexFile(self, fileName):
+        timeStamp = fileName.rsplit(".", 1)[-1]
+        return datetime.datetime.strptime(timeStamp, "%Y%m%d_%H%M%S")
+            
+    def cleanOldest(self, root):
+        allFiles = glob(root + ".*")
+        toRemove = len(allFiles) - 5
+        if toRemove:
+            allFiles.sort(key=self.getTimeStampFromIndexFile)
+            for _ in range(toRemove):
+                os.remove(allFiles.pop(0))
         
     def getOrderedVersions(self, predefined, info):
         fullList = sorted(info)

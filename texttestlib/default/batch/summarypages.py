@@ -395,7 +395,7 @@ class SummaryGenerator:
             if jobPath:
                 jobLink = "(built by Jenkins job '" + os.getenv("JOB_NAME") + "', "+ "<a href='" + jobPath + "'> "+ "build number "+ os.getenv("BUILD_NUMBER")+ "</a>" + ")"
         
-        summaryPageTimeStamp = dataFinder.summaryPageName + "." + plugins.localtime("%Y%m%d_%H%M%S")
+        summaryPageTimeStamp = dataFinder.summaryPageName + "." + plugins.startTimeString("%Y%m%d_%H%M%S")
         with open(summaryPageTimeStamp, "w") as f:
             versionOrder = [ "default" ]
             appOrder = []

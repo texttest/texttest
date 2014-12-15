@@ -732,9 +732,9 @@ class ArchiveRepository(ArchiveScript):
         dateStr = parts[0]
         if self.name:
             runName = dateStr if len(parts) == 1 else "_".join(parts[1:])
-            return runName == self.name
-        else:
-            return self.shouldArchiveGivenDateString(dateStr, weekdays)
+            if runName != self.name:
+                return False
+        return self.shouldArchiveGivenDateString(dateStr, weekdays)
                                        
     def shouldArchive(self, file, weekdays, isRunFile):
         if isRunFile:

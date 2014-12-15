@@ -453,8 +453,6 @@ class TestFileGUI(FileViewGUI):
         self.model.foreach(trySelect)
         
     def notifyViewerStarted(self):
-        if self.dynamic:
-            self.selection.unselect_all() # Mostly so viewing files doesn't cause only them to be approved
         self.applicationEvent("the viewer process to start", timeDelay=1)
 
     def notifyNewFile(self, fileName, overwrittenExisting):

@@ -995,55 +995,45 @@ def readList(filename):
     except IOError:
         return [] # It could be a broken link: don't bail out if so...
 
-emptyLineSymbol = "__EMPTYLINE__"
-
 def readListWithComments(filename, filterMethod=None):
     items = OrderedDict()
     badItems = OrderedDict()
     currComment = ""
+    emptyLineSymbol = "__EMPTYLINE__"
+
     for longline in open(filename).readlines():
         line = longline.strip()
         if len(line) == 0:
             if currComment:
-                currComment += emptyLineSymbol + "\n"
+                currComment = currComment.strip() + emptyLineSymbol
             continue
         if line.startswith("#"):
-            currComment += longline[1:].lstrip()
+            if emptyLineSymbol in currComment:
+                items[currComment] = currComment.replace(emptyLineSymbol, "")
+                currComment = ""
+            currComment += longline.lstrip()
         else:
             if filterMethod:
                 failReason, warningText = filterMethod(line, items, filename)
                 if failReason:
-                    currComment += line + " (automatically commented due to " + failReason + ")\n" + emptyLineSymbol + "\n"
+                    currComment += "# " + line + " (automatically commented due to " + failReason + ")"
                     badItems[line] = warningText
+                    items["#" + line] = currComment
+                    currComment = ""
                     continue
-            items[line] = currComment.strip()
+            if emptyLineSymbol in currComment:
+                items[currComment] = currComment.replace(emptyLineSymbol, "")
+                currComment = ""
+            items[line] = uncomment(currComment) if currComment else ""
             currComment = ""
-    # Rescue dangling comments in the end (but put them and add an empty line before last test ...)
+    # Rescue dangling comments in the end
     if currComment and len(items) > 0:
-        lastComment = items[items.keys()[-1]]
-        emptyLine = "" if emptyLineSymbol in currComment[-len(emptyLineSymbol) -1:] else emptyLineSymbol + "\n"
-        items[items.keys()[-1]] = currComment + ("" if "\n" == currComment[-1] else "\n" ) + (emptyLine if lastComment else emptyLine[:-1]) + lastComment
+        items[currComment] = currComment.replace(emptyLineSymbol, "")
     return items, badItems
 
-# comment can contain lines with __EMPTYLINE__ (see above) as a separator
-# from free comments, or commented out tests. This method extracts the comment
-# after any __EMPTYLINE__s.
-def extractComment(comment):
-    lastEmptyLinePos = comment.rfind(emptyLineSymbol)
-    if lastEmptyLinePos == -1:
-        return comment
-    else:
-        return comment[lastEmptyLinePos + len(emptyLineSymbol) + 1:]
-
-# comment can contain lines with __EMPTYLINE__ (see above) as a separator
-# from free comments, or commented out tests. This method replaces the real
-# comment for this test with newComment
-def replaceComment(comment, newComment):
-    lastEmptyLinePos = comment.rfind(emptyLineSymbol)
-    if lastEmptyLinePos == -1:
-        return newComment
-    else:
-        return comment[0:lastEmptyLinePos + len(emptyLineSymbol) + 1] + newComment
+def uncomment(comment):
+    lines = comment.split("\n")
+    return "\n".join([line[1:].lstrip() for line in lines if line.startswith("#")])
 
 def openForWrite(path):
     ensureDirExistsForFile(path)

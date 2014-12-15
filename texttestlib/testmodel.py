@@ -989,17 +989,32 @@ class TestSuiteFileHandler:
         self.cache = {}
 
     def readWithWarnings(self, fileName, ignoreCache=False, filterMethod=None):
+        items, badTests = self.readFromFileOrCache(fileName, ignoreCache, filterMethod)
+        goodTests = self.getTestWithDescriptions(items)
+        self.cache[fileName] = items
+        return goodTests, badTests
+
+    def readFromFileOrCache(self, fileName, ignoreCache=False, filterMethod=None):
         if not ignoreCache:
             cached = self.cache.get(fileName)
             if cached is not None:
                 return cached, OrderedDict()
+        return plugins.readListWithComments(fileName, plugins.Callable(self.getExclusionReasons, filterMethod))
 
-        goodTests, badTests = plugins.readListWithComments(fileName, plugins.Callable(self.getExclusionReasons, filterMethod))
-        self.cache[fileName] = goodTests
-        return goodTests, badTests
+    def getTestWithDescriptions(self, tests):
+        onlyTest = OrderedDict()
+        for key, value in tests.items():
+            if not key.startswith("#"):
+                onlyTest[key] = value
+        return onlyTest
 
     def read(self, *args, **kw):
         return self.readWithWarnings(*args, **kw)[0]
+    
+    def readWithComments(self, fileName, *args, **kw):
+        items, _ = self.readFromFileOrCache(fileName,*args, **kw)
+        self.cache[fileName] = items
+        return items
 
     def getExclusionReasons(self, testName, existingTestNames, fileName, filterMethod):
         if existingTestNames.has_key(testName):
@@ -1022,29 +1037,47 @@ class TestSuiteFileHandler:
 
     def makeWriteEntries(self, content):
         entries = []
+        prevComment = False
         for testName, comment in content.items():
-            entries.append(self.testOutput(testName, comment))
+            entries.append(self.testOutput(testName, comment, prevComment))
+            prevComment = testName.startswith("#")
         return entries
 
-    def testOutput(self, testName, comment):
+    def testOutput(self, testName, comment, prevComment):
         if len(comment) == 0:
-            return testName
+            return ("\n" if prevComment else "") + testName
+        elif testName.startswith("#"):
+            return "\n" + comment
         else:
-            return "\n# " + comment.replace("\n", "\n# ").replace("# __EMPTYLINE__", "") + "\n" + testName
+            return "\n# " + comment.replace("\n", "\n# ") + "\n" + testName
 
     def add(self, fileName, *args):
-        cache = self.read(fileName)
+        cache = self.readWithComments(fileName)
         self.addToCache(fileName, cache, *args)
         
-    def addToCache(self, fileName, cache, testName, description, index):
+    def addToCache(self, fileName, cache, testName, description, index, mapIndex=True):
         cacheList = cache.items()
-        cacheList.insert(index, (testName, description))
+        position = self.getInsertPosition(cache, index) if mapIndex else index
+        cacheList.insert(position, (testName, description))
         newCache = OrderedDict(cacheList)
         self.cache[fileName] = newCache
         self.write(fileName, newCache)
     
+    def getInsertPosition(self, cache, position):
+        testList = self.getTestWithDescriptions(cache).items()
+        cacheList = cache.items()
+        if position >= 1:
+            if position <= len(testList):
+                try:
+                    return cacheList.index(testList[position -1]) + 1
+                except:
+                    pass
+            else:
+                return len(cacheList)   
+        return position
+        
     def remove(self, fileName, testName):
-        cache = self.read(fileName)
+        cache = self.readWithComments(fileName)
         description = self.removeFromCache(cache, testName)[0]
         if description is not None:
             self.write(fileName, cache)
@@ -1059,18 +1092,15 @@ class TestSuiteFileHandler:
             return None, None
 
     def rename(self, fileName, oldName, newName, newDescription):
-        cache = self.read(fileName)
+        cache = self.readWithComments(fileName)
         description, index = self.removeFromCache(cache, oldName)
         if description is None:
             return False
-
-        # intended to preserve comments that aren't tied to a test
-        descToUse = plugins.replaceComment(description, newDescription)
-        self.addToCache(fileName, cache, newName, descToUse, index)
+        self.addToCache(fileName, cache, newName, newDescription, index, mapIndex=False)
         return True
 
     def reposition(self, fileName, testName, newIndex):
-        cache = self.read(fileName)
+        cache = self.readWithComments(fileName)
         description = self.removeFromCache(cache, testName)[0]
         if description is None:
             return False
@@ -1080,13 +1110,18 @@ class TestSuiteFileHandler:
 
     def sort(self, fileName, comparator):
         tests = self.read(fileName)
-        newDict = OrderedDict()
-        for testName in sorted(tests.keys(), comparator):
-            newDict[testName] = tests[testName]
+        comments = self.getCommentsWithPositions(fileName)
+        newList = [(testName,tests[testName]) for testName in sorted(tests.keys(), comparator)]
+        for index, key, comment in comments:
+            newList.insert(index, (key, comment))
+        newDict = OrderedDict(newList)
         self.cache[fileName] = newDict
         self.write(fileName, newDict)
 
-
+    def getCommentsWithPositions(self, fileName):
+        cache = self.readWithComments(fileName).items()
+        return [(index,key,comment) for index,(key,comment) in enumerate(cache) if key.startswith("#")]
+        
 class TestSuite(Test):
     testSuiteFileHandler = TestSuiteFileHandler()
     def __init__(self, name, description, dircache, app, parent=None):
@@ -1237,20 +1272,19 @@ class TestSuite(Test):
 
         for testName, descStr in newTestNames.items():
             existingTest = self.findSubtest(testName)
-            desc = plugins.extractComment(descStr)
             if existingTest:
-                existingTest.setDescription(desc)
+                existingTest.setDescription(descStr)
                 existingTest.refresh(filters)
                 testClass = self.getSubtestClass(existingTest.dircache)
                 if existingTest.__class__ != testClass:
                     self.diagnose("changing type for " + repr(existingTest))
                     self.testcases.remove(existingTest)
                     existingTest.notify("Remove")
-                    self.createTestOrSuite(testName, desc, existingTest.dircache, filters, initial=False)
+                    self.createTestOrSuite(testName, descStr, existingTest.dircache, filters, initial=False)
             else:
                 self.diagnose("creating new test called '" + testName + "'")
                 dirCache = self.createTestCache(testName)
-                self.createTestOrSuite(testName, desc, dirCache, filters, initial=False)
+                self.createTestOrSuite(testName, descStr, dirCache, filters, initial=False)
         self.updateOrder()
     
     def reloadTestConfigurations(self):
@@ -1285,7 +1319,7 @@ class TestSuite(Test):
         for testNameOrPath in self.getOrderedTestNames(testNames.keys(), testCaseNames):
             testName = os.path.basename(testNameOrPath)
             dirCache = testCaches.get(testName, self.createTestCache(testNameOrPath))
-            desc = plugins.extractComment(testNames.get(testNameOrPath))
+            desc = testNames.get(testNameOrPath)
             self.createTestOrSuite(testName, desc, dirCache, filters, initial, guideSuite)
 
     def createTestOrSuite(self, testName, description, dirCache, filters, initial=True, guideSuite=None):

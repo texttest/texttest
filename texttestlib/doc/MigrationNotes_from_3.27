@@ -60,3 +60,8 @@ without needing to run batch.ArchiveRepository by hand from time to time.
 
 For people who want to keep more historical data, add the new --manualarchive flag when generating the web page, which restores the old
 behaviour.
+
+(4) When a viewer program is started in the dynamic GUI, the file is no longer deselected automatically.
+========================================================================================================
+This long-standing behaviour of TextTest annoyed some users, and being unable to find
+anyone to speak up for it, we have removed it.

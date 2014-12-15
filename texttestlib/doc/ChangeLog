@@ -2655,6 +2655,8 @@ Dynamic GUI Enhancements:
     - Additional "Ungrouped" row when many tests are grouped in the Status view
     - All test categories except Failed are now invisible by default. New config entry 'show_test_category' to configure this.
     - The old 'auto_collapse_successful' functionality is removed as no longer necessary.
+    - Selected files in the file view are no longer automatically deselected when a viewer is started.
+	See Migration notes
 Static GUI Enhancements:
     - New "View / Show Processes" action
 	This allows you to view all processes (dynamic GUIs, file viewers) started from TextTest and to kill them individually
@@ -2687,11 +2689,15 @@ Batch Report Enhancements:
 	To disable this behaviour use the new --manualarchive flag, which will essentially restore the old behaviour
     - Can now archive individual named runs
 	Using the new flag -s "batch.ArchiveRepository name=<run name>"
+    - Arrows showing trend have been added to the index page
+	Mostly for a quick overview comparing to the previous run. Can be disabled via CSS.
     - Archiving now respects selected versions ("-v" argument)
     - Batch runs from Jenkins now automatically add the Jenkins run number to their batch session, along with the date
     - additional HTML classes added to generated summary tables, allows for more CSS possibilities
+	Can e.g. set colours in CSS as well as via the config file if desired.
     - Adding new run-level data store to batch repositories
     - Adding a page footer to sumary_template.html . It will show a link to the associated jenkins build when available
+    - Index page now stores the 5 latest versions of itself, to aid in debugging if it is regenerated many times a day
 Grid Engine/Cloud enhancements/bug fixes:
     - New config parameter "queue_system_max_reruns".
 	Aims to limit amount of rerunning caused by knownbugs. Defaults to 100. See website.
@@ -2713,3 +2719,5 @@ Bug Fixes:
     - Fixed stacktrace when -name provided without arguments. Now ignore this.
     - Fixed GUI's test description when the last test in a suite has been commented out
     - Performance improvements for running many copies of a test
+    - Better handling of loose comments and disabled tests in testsuite files
+	Should be much less prone to getting lost or moved arond now

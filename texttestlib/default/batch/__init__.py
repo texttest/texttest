@@ -795,7 +795,11 @@ class ArchiveExtractor:
         return [os.path.join(repository,f) for f in dirList if f.endswith(".tar.gz") and self.shouldOpen(f)]
 
     def shouldOpen(self, tarFileName):
-        startPos = tarFileName.rfind("before_") + len("before_")
+        beforePos = tarFileName.rfind("before_")
+        if beforePos == -1:
+            return False
+        
+        startPos = beforePos + len("before_")
         dateStr = tarFileName[startPos:startPos + 9] # %d%b%Y dates are always of length 9
         return dateInSeconds(self.dateStr) <= dateInSeconds(dateStr)
     

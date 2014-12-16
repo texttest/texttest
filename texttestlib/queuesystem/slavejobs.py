@@ -135,6 +135,10 @@ class SocketResponder(plugins.Responder,plugins.Observable):
     def sendData(self, sendSocket, fullData):
         sendSocket.sendall(fullData)
         sendSocket.shutdown(socket.SHUT_WR)
+        if self.synchFiles: 
+            # Remote socket, possibly firewalls that kill connections, possibly other things. Use timeout and be prepared to retry...
+            # TCP timeout is typically 30 seconds, give up a bit before that
+            sendSocket.settimeout(25)
         response = sendSocket.makefile().read()
         sendSocket.close()
         return response
@@ -154,7 +158,7 @@ class SocketResponder(plugins.Responder,plugins.Observable):
             data = makeIdentifierLine(str(os.getpid()), getFiles=True) + "\n" + socketSerialise(test) + "\n" + \
                 getUserName() + "@" + getIPAddress() + "\n" + "\n".join(paths)
             self.sendAndInterpret(data, None) # Just wait, no response to interpret
-
+            
 
 class SlaveActionRunner(ActionRunner):
     def notifyAllRead(self, goodSuites):

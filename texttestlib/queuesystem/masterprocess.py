@@ -51,6 +51,7 @@ class QueueSystemServer(BaseActionRunner):
         self.submissionRules = {}
         self.killedJobs = {}
         self.queueSystems = {}
+        self.reusedTests = {}
         self.reuseOnly = False
         self.allRead = False
         self.submitAddress = None
@@ -200,13 +201,20 @@ class QueueSystemServer(BaseActionRunner):
         # snap out of our loop if this was the last one. Rely on others to manage the test queue
         self.reuseFailureQueue.put(None)
 
-    def getTestForReuse(self, test, state, tryReuse):
+    def getTestForReuse(self, test, state, tryReuse, doneRerun):
         # Pick up any test that matches the current one's resource requirements
         if not self.exited:
+            if test in self.reusedTests:
+                newTest = self.reusedTests.get(test)
+                newTestName = newTest.uniqueName if newTest else " no test."
+                self.diag.info("Repeating answer: using slave from " + test.uniqueName + " for " + newTestName)
+                return newTest
             # Don't allow this to use up the terminator
             newTest = self.getTest(block=False, replaceTerminators=True)
             if newTest:
                 if tryReuse and self.allowReuse(test, state, newTest):
+                    if not doneRerun:
+                        self.reusedTests[test] = newTest
                     self.jobs[newTest] = self.getJobInfo(test)
                     with self.counterLock:
                         if self.testCount > 1:
@@ -223,7 +231,8 @@ class QueueSystemServer(BaseActionRunner):
                     self.reuseFailureQueue.put(newTest)
             else:
                 self.diag.info("No tests available for reuse : " + test.uniqueName)
-                
+            self.reusedTests[test] = None
+                    
         # Allowed a submitted job to terminate
         with self.counterLock:
             self.testsSubmitted -= 1
@@ -919,7 +928,6 @@ class SlaveRequestHandler(StreamRequestHandler):
             clientHost = self.client_address[0]
             sys.stderr.write("WARNING: Received request from hostname " + self.getHostName(clientHost) +
                              " (process " + identifier + ")\nwhich could not be parsed:\n'" + testString + "'\n")
-            self.connection.shutdown(socket.SHUT_RDWR)
         elif getFiles:
             self.pushFiles(test)
         elif not test.state.isComplete() or not test.state.hasResults(): # we might have killed it already...
@@ -930,7 +938,9 @@ class SlaveRequestHandler(StreamRequestHandler):
             self.handleRequestFromHost(test, identifier, tryReuse, rerun)
         else:
             self.server.diag.info("Test " + test.uniqueName + " already complete, ignoring new results")
-
+            self.sendReuseResponse(test, test.state, tryReuse, False)
+        self.connection.shutdown(socket.SHUT_RDWR)
+            
     def getHostName(self, ipAddress):
         try:
             return socket.gethostbyaddr(ipAddress)[0].split(".")[0]
@@ -943,7 +953,11 @@ class SlaveRequestHandler(StreamRequestHandler):
         for line in self.rfile:
             paths.append(line.strip())
         self.server.pushFiles(test, userAndHost, paths)
-        self.connection.shutdown(socket.SHUT_RDWR)
+        
+    def sendReuseResponse(self, *args):
+        newTest = QueueSystemServer.instance.getTestForReuse(*args)
+        if newTest:
+            self.wfile.write(socketSerialise(newTest))
 
     def handleRequestFromHost(self, test, pid, tryReuse, rerun):
         # The updates are only for testing against old slave traffic,
@@ -951,20 +965,16 @@ class SlaveRequestHandler(StreamRequestHandler):
         _, state = test.getNewState(self.rfile, updatePaths=True)
         if test.state.isComplete():
             state.lifecycleChange = "recalculated"
-        self.server.changeStateOrRerun(test, state, rerun)
+        doneRerun = self.server.changeStateOrRerun(test, state, rerun)
         try:
             self.connection.shutdown(socket.SHUT_RD)
         except socket.error:
             # This only occurs on a mac, and doesn't affect functionality.
             pass
         if state.isComplete():
-            newTest = QueueSystemServer.instance.getTestForReuse(test, state, tryReuse)
-            if newTest:
-                self.wfile.write(socketSerialise(newTest))
+            self.sendReuseResponse(test, state, tryReuse, doneRerun)
         else:
             QueueSystemServer.instance.setRemoteProcessId(test, pid)
-        self.connection.shutdown(socket.SHUT_WR)
-        
             
 
 class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
@@ -1065,10 +1075,12 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
             self.diag.info("Instructed to rerun test " + test.uniqueName + ", now performed " + 
                            str(self.totalReruns) + " reruns of max " + str(self.maxReruns) + ".")
             QueueSystemServer.instance.queueTestForRerun(test)
+            return True
         else:
             if rerun:
                 self.diag.info("Instructed to rerun test " + test.uniqueName + ", but refusing, already rerun maximum " + str(self.totalReruns) + " times.")
             self.changeState(test, state)
+            return False
 
     def allowChange(self, oldState, newState):
         return newState.isComplete() or not oldState.isComplete()

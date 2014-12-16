@@ -432,7 +432,7 @@ class SummaryGenerator:
         self.linkOrCopy(summaryPageTimeStamp, dataFinder.summaryPageName)
         self.cleanOldest(dataFinder.summaryPageName)
                     
-        plugins.log.info("wrote: '" + dataFinder.summaryPageName + "'") 
+        plugins.log.info("wrote: '" + summaryPageTimeStamp + "'") 
         if fileToUrl:
             url = convertToUrl(dataFinder.summaryPageName, fileToUrl)
             plugins.log.info("(URL is " + url + ")")
@@ -447,15 +447,25 @@ class SummaryGenerator:
             
     def getTimeStampFromIndexFile(self, fileName):
         timeStamp = fileName.rsplit(".", 1)[-1]
-        return datetime.datetime.strptime(timeStamp, "%Y%m%d_%H%M%S")
+        try:
+            return datetime.datetime.strptime(timeStamp, "%Y%m%d_%H%M%S")
+        except ValueError:
+            pass # Might not be the right format
             
     def cleanOldest(self, root):
         allFiles = glob(root + ".*")
         toRemove = len(allFiles) - 5
         if toRemove:
-            allFiles.sort(key=self.getTimeStampFromIndexFile)
+            withTimeStamps = []
+            for f in allFiles:
+                ts = self.getTimeStampFromIndexFile(f)
+                if ts is not None:
+                    withTimeStamps.append((ts, f))
+            withTimeStamps.sort()
+            toRemove = len(withTimeStamps) - 5
             for _ in range(toRemove):
-                os.remove(allFiles.pop(0))
+                _, f = withTimeStamps.pop(0)
+                os.remove(f)
         
     def getOrderedVersions(self, predefined, info):
         fullList = sorted(info)

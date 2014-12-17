@@ -212,11 +212,11 @@ class SummaryDataFinder:
     def getMostRecentDateAndTags(self):
         allInfo = {}
         for appName, appInfo in self.appVersionInfo.items():
-            for versionData in appInfo.values():
+            for version, versionData in appInfo.items():
                 lastInfoPerEnv = self.getLastInfoPerEnvironment(versionData.keys(), self.getAppRunDirectory(appName))
                 for envData, lastInfo in lastInfoPerEnv:
                     allInfo.setdefault(envData, []).append(lastInfo[0])
-                self.diag.info("Most recent date for " + appName + " = " + repr(lastInfoPerEnv))
+                self.diag.info("Most recent date for " + appName + " version " + version + " = " + repr(lastInfoPerEnv))
         mostRecent = set()
         for envData, lastInfoList in allInfo.items():
             mostRecent.add(max(lastInfoList, key=self.getDateTagKey))

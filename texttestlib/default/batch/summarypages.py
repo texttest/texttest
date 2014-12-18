@@ -380,10 +380,6 @@ class SummaryGenerator:
         self.diag = logging.getLogger("GenerateWebPages")
         self.diag.info("Generating summary...")
 
-    def adjustLineForTitle(self, line):
-        pos = line.find("</title>")
-        return str(testoverview.TitleWithDateStamp(line[:pos])) + "</title>\n"
-
     def adjustLineForColours(self, line, dataFinder):
         mainPart = line.rsplit(";", 1)[0].rstrip()
         var, template = mainPart.rsplit(" ", 1)
@@ -411,10 +407,11 @@ class SummaryGenerator:
 
     def generatePage(self, dataFinder, appsWithVersions, fileToUrl):
         jobLink = ""
+        creationDate = testoverview.TitleWithDateStamp("").__str__().strip()
         if os.getenv("JENKINS_URL") and os.getenv("JOB_NAME") and os.getenv("BUILD_NUMBER"):
             jobPath = os.path.join(os.getenv("JENKINS_URL"), "job", os.getenv("JOB_NAME"), os.getenv("BUILD_NUMBER"))
             if jobPath:
-                jobLink = "(built by Jenkins job '" + os.getenv("JOB_NAME") + "', "+ "<a href='" + jobPath + "'> "+ "build number "+ os.getenv("BUILD_NUMBER")+ "</a>" + ")"
+                jobLink = "<br>(built by Jenkins job '" + os.getenv("JOB_NAME") + "', "+ "<a href='" + jobPath + "'> "+ "build number "+ os.getenv("BUILD_NUMBER")+ "</a>" + ")"
         
         summaryPageTimeStamp = dataFinder.summaryPageName + "." + plugins.startTimeString("%Y%m%d_%H%M%S")
         with open(summaryPageTimeStamp, "w") as f:
@@ -426,7 +423,7 @@ class SummaryGenerator:
             cssColours = []
             for line in open(dataFinder.getTemplateFile()):
                 if "<title>" in line:
-                    f.write(self.adjustLineForTitle(line))
+                    f.write(line)
                 elif "historical_report_colours" in line:
                     f.write(self.adjustLineForColours(line, dataFinder))
                 else:
@@ -441,9 +438,9 @@ class SummaryGenerator:
                     f.write("<h3 align=\"center\">(from " + self.getRecentTagText(mostRecentInfo) + ")</h3>\n")
                 if "Insert table here" in line:
                     self.insertSummaryTable(f, dataFinder, mostRecentInfo, appsWithVersions, appOrder, versionOrder, cssColours)
-                if jobLink and "Insert footer here" in line:
-                    f.write(jobLink)
-                    
+                if "Insert footer here" in line:
+                    f.write(creationDate + (jobLink if jobLink else ""))
+
         self.linkOrCopy(summaryPageTimeStamp, dataFinder.summaryPageName)
         self.cleanOldest(dataFinder.summaryPageName)
                     

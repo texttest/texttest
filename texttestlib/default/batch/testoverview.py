@@ -217,6 +217,8 @@ class GenerateWebPages(object):
                 if not graphs is None and len(graphs) > 1:
                     page.prepend(HTMLgen.Heading(1, *graphs, align = 'center'))
                 page.prepend(HTMLgen.Heading(1, minorVersionHeader, align = 'center'))
+            creationDate = TitleWithDateStamp("").__str__().strip()
+            page.prepend(HTMLgen.Paragraph(creationDate, align="center"))
             page.prepend(HTMLgen.Heading(1, self.getHeading(), align = 'center'))
             if len(pageColours) > 0:
                 page.prepend(HTMLgen.BR());
@@ -352,7 +354,7 @@ class GenerateWebPages(object):
         
     def createPage(self):
         style = "body,td {color: #000000;font-size: 11px;font-family: Helvetica;} th {color: #000000;font-size: 13px;font-family: Helvetica;}"
-        title = TitleWithDateStamp("Test results for " + self.pageTitle)
+        title = "Test results for " + self.pageTitle
         return HTMLgen.SimpleDocument(title=title, style=style, xhtml=True)
 
     def makeTableHeaderCell(self, tableHeader):

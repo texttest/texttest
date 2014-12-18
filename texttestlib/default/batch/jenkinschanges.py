@@ -4,7 +4,6 @@ from xml.dom.minidom import parse
 from ordereddict import OrderedDict
 from glob import glob
 from pprint import pprint
-from texttestlib import plugins
 
 class AbortedException(RuntimeError):
     pass
@@ -108,6 +107,7 @@ class FingerprintVerifier:
 
     def writeCache(self, jobName, buildName, updatedHashes):
         cacheFileName = self.getCacheFileName(jobName, buildName) 
+        from texttestlib import plugins
         plugins.ensureDirExistsForFile(cacheFileName)
         with open(cacheFileName, "w") as f:
             pprint(updatedHashes, f) 
@@ -520,7 +520,9 @@ def parseEnvAsDict(varName):
     return ret
     
 if __name__ == "__main__":
-    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    localFile = os.path.abspath(__file__) # <root>/texttestlib/default/batch/jenkinschanges.py
+    rootDir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(localFile))))
+    sys.path.insert(0, rootDir)
     buildName = sys.argv[1]
     if len(sys.argv) > 2:
         prevBuildName = sys.argv[2]

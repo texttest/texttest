@@ -818,9 +818,10 @@ def commandLineString(cmdArgs, defaultQuoteChar='"'):
 
     return " ".join(map(quoteArg, cmdArgs))
 
-def relpath(fullpath, parentdir):
-    normFull = os.path.normpath(fullpath)
-    relPath = normFull.replace(os.path.normpath(parentdir), "")
+def relpath(fullpath, parentdir, normalise=True):
+    normFull = os.path.normpath(fullpath) if normalise else fullpath
+    normParent = os.path.normpath(parentdir) if normalise else parentdir
+    relPath = normFull.replace(normParent, "")
     if relPath != normFull:
         if relPath.startswith(os.sep):
             return relPath[1:]

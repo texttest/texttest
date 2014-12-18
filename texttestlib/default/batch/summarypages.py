@@ -161,6 +161,21 @@ class SummaryDataFinder:
             srcFile = plugins.findDataPaths([ fileName ], includeSite, includePersonal, dataDirName)[-1]
             shutil.copyfile(srcFile, locationFile)
         return locationFile
+    
+    def getLink(self, path):
+        relpath = plugins.relpath(self.summaryPageName, self.location, normalise=False)
+        if "/" not in relpath:
+            return path
+        
+        currLocation = self.location
+        newParts = []
+        for part in reversed(os.path.dirname(relpath).split("/")):
+            if part == "..":
+                currLocation, localName = os.path.split(currLocation)
+                newParts.append(localName)
+            else:
+                newParts.append("..")
+        return "/".join(newParts) + "/" + path
 
     def getGraphFile(self, appName, version):        
         return os.path.join(self.location, self.getShortAppName(appName), "images", "GenerateGraphs_" + version + ".png")
@@ -607,7 +622,7 @@ class SummaryGenerator:
                         image = self.getTrendImage(resultSummary, prevResultSummary)
                         dataFinder.ensureLocationFileExists(image)
                         tooltip = self.getTooltipForPrevious(prevResultSummary, nextLastInfo[1])
-                        file.write('    <td class="arrow_cell"><img src="' + image + '" title="' + tooltip + '"/></td>\n')
+                        file.write('    <td class="arrow_cell"><img src="' + dataFinder.getLink(image) + '" title="' + tooltip + '"/></td>\n')
                     file.write("  </tr></table>")
                 file.write("</td>\n")
             file.write("</tr>\n")

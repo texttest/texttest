@@ -272,6 +272,7 @@ class TextTest(plugins.Responder, plugins.Observable):
                 extraApp = copy(app)
                 extraApp.versions = appVersions + extraVersion.split(".")
                 extraApp.extras = []
+                extraApp.checkout = extraApp.configObject.setUpCheckout(extraApp)
             else:
                 extraApp = self.createApplication(appName, dircache, appVersions + extraVersion.split("."))
             if extraApp:

@@ -2698,6 +2698,7 @@ Batch Report Enhancements:
     - Adding new run-level data store to batch repositories
     - Adding a page footer to sumary_template.html . It will show a link to the associated jenkins build when available
     - Index page now stores the 5 latest versions of itself, to aid in debugging if it is regenerated many times a day
+    - Generation details are now in page footer rather than window title in index page
 Grid Engine/Cloud enhancements/bug fixes:
     - New config parameter "queue_system_max_reruns".
 	Aims to limit amount of rerunning caused by knownbugs. Defaults to 100. See website.
@@ -2705,6 +2706,7 @@ Grid Engine/Cloud enhancements/bug fixes:
     - Fixed incorrect display in Run Info of environment variables used directly in copy_test_path
     - UGE Job ID now stored with test results, to make troubleshooting easier
     - Cloud data synchronisation is now retried if it fails, e.g. if cloud drops connection
+    - UGE throughput prioritises finding problematic machines over completing quickly in batch mode now.
 Bug Fixes:
     - Filter behaviour is now consistent with View/Show All
     - Fixed bug with HTML summary page reporting and specific memory failure tests (i.e. anything not called "memory") being counted incorrectly
@@ -2720,4 +2722,6 @@ Bug Fixes:
     - Fixed GUI's test description when the last test in a suite has been commented out
     - Performance improvements for running many copies of a test
     - Better handling of loose comments and disabled tests in testsuite files
-	Should be much less prone to getting lost or moved arond now
+	Should be much less prone to getting lost or moved around now
+    - Multiple checkouts and multiple copies now work together
+    - Summary page generation with non-standard path now handles non-local paths properly

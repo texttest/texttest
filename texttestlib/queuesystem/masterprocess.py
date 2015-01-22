@@ -408,9 +408,8 @@ class QueueSystemServer(BaseActionRunner):
     def getSlaveCommandArgs(self, test, submissionRules):
         queueSystem = self.getQueueSystem(test)
         args = queueSystem.getTextTestArgs()
-        checkout = test.app.getCheckoutForDisplay()
-        if checkout:
-            args += [ "-c", checkout ] # pass explicitly, no guarantee it will expand the same remotely
+        if queueSystem.slavesOnRemoteSystem():
+            args += [ "-home", os.path.expanduser("~") ]
         return args + [ "-d", ":".join(self.optionMap.rootDirectories),
                  "-a", test.app.name + test.app.versionSuffix(),
                  "-l", "-tp", test.getRelPath() ] + \

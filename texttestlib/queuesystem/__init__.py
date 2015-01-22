@@ -77,7 +77,18 @@ class QueueSystemConfig(default.Config):
             elif group.name.startswith("Invisible"):
                 group.addOption("slave", "Private: used to submit slave runs remotely")
                 group.addOption("servaddr", "Private: used to submit slave runs remotely")
-
+                group.addOption("home", "Private: used to communicate local home directory to environments that run as a different user")
+                
+    def absCheckout(self, location, checkout, isSpecific):
+        if "home" in self.optionMap:
+            # Use 'home' from the master machine as provided on the command line: user may be different there.
+            # Important in cloud
+            if location.startswith("~"):
+                location = location.replace("~", self.optionValue("home"))
+            if checkout.startswith("~"):
+                checkout = checkout.replace("~", self.optionValue("home"))
+        return default.Config.absCheckout(self, location, checkout, isSpecific)
+        
     def getReconnFullOptions(self):
         return default.Config.getReconnFullOptions(self) + [
                 "Use raw data from the original run and recompute as above, but use the grid for computations"]
@@ -100,7 +111,7 @@ class QueueSystemConfig(default.Config):
     
     def calculateUseQueueSystem(self, allApps):
         for localFlag in self.getLocalRunArgs():
-            if self.optionMap.has_key(localFlag):
+            if localFlag in self.optionMap:
                 return False
             
         localQueueSystem = self.useLocalQueueSystem(allApps)
@@ -239,7 +250,7 @@ class QueueSystemConfig(default.Config):
             return default.Config.getTextResponder(self)
     
     def getSlaveSwitches(self):
-        return [ "b", "trace", "ignorecat", "ignorefilters", "delay", "screenshot", "gui", "td",
+        return [ "c", "b", "trace", "ignorecat", "ignorefilters", "delay", "screenshot", "gui", "td",
                  "rectraffic", "keeptmp", "keepslave", "reconnect", "reconnfull", "rerun" ]
 
     def getExecHostFinder(self):

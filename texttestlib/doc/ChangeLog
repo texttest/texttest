@@ -2682,6 +2682,8 @@ Framework Enhancements:
 Version Control Browser Enhancements:
     - Added new feature "Difference with Filter" for all supported VCS
 Batch Report Enhancements:
+    - New Javascript "comment plugin" added
+	Adds the ability to comment individual test failures in the HTML report. See website.
     - Succeeded tests now stored in a more compact way in batch_result_repository
 	New migration script to convert. Old format is still understood, so migration will happen naturally (but slowly) anyway
     - Batch result repositories now automatically clean themselves
@@ -2706,7 +2708,8 @@ Grid Engine/Cloud enhancements/bug fixes:
     - Fixed incorrect display in Run Info of environment variables used directly in copy_test_path
     - UGE Job ID now stored with test results, to make troubleshooting easier
     - Cloud data synchronisation is now retried if it fails, e.g. if cloud drops connection
-    - UGE throughput prioritises finding problematic machines over completing quickly in batch mode now.
+    - Fixed bug with multiple checkouts being used by the same slave process.
+    - Fixed Jenkins-related crash if date links aren't present as expected.
 Bug Fixes:
     - Filter behaviour is now consistent with View/Show All
     - Fixed bug with HTML summary page reporting and specific memory failure tests (i.e. anything not called "memory") being counted incorrectly

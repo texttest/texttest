@@ -234,7 +234,9 @@ class GenerateWebPages(object):
         # Always put green at the start, we often want to filter that
         sortedColours = sorted(pageColours, key=lambda c: (c != successColour, c))
         scriptCode = "var TEST_ROW_HEADER_COLOR = " + repr(rowHeaderColour) + ";\n" + \
-                     "var Colors = " + repr(sortedColours) + ";"  
+                     "var Colors = " + repr(sortedColours) + ";\n" + \
+                     "var CommentServer = \"../javascript/comment.php\";\n" + \
+                     "var CommentHtml = \"../javascript/comment.html\";"
         return [ HTMLgen.Script(code=scriptCode),
                  HTMLgen.Script(src="../javascript/jquery.js"),
                  HTMLgen.Script(src="../javascript/filter.js"),

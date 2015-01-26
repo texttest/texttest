@@ -324,7 +324,7 @@ class QueueSystemServer(BaseActionRunner):
     def getTestForRun(self, block=True):
         if (self.testCount == 0 and self.allRead) or (self.testsSubmitted < self.maxCapacity):
             return self.getTestForRunNormalMode(block)
-        elif self.reuseCanFail() and "b" not in self.optionMap:
+        elif self.reuseCanFail():
             return self.getTestForRunReuseOnlyMode(block)
         else:
             self.diag.info("No more tests found, reuse cannot fail, stopping.")

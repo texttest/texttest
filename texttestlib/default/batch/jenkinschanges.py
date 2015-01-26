@@ -503,7 +503,7 @@ def getTimestamp(build):
         buildsDir = getBuildsDir(jobRoot, os.getenv("JOB_NAME"))
         if buildsDir:
             buildLink = os.path.join(buildsDir, build)
-            if os.path.exists(buildLink):
+            if os.path.islink(buildLink):
                 return os.readlink(buildLink)
     
 def parseEnvAsList(varName):

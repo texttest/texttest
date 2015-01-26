@@ -238,7 +238,7 @@ class GenerateWebPages(object):
         return [ HTMLgen.Script(code=scriptCode),
                  HTMLgen.Script(src="../javascript/jquery.js"),
                  HTMLgen.Script(src="../javascript/filter.js"),
-                 HTMLgen.Script(src="../javascript/plugin.js")  ]
+                 HTMLgen.Script(src="../javascript/comment.js")  ]
 
     def getHeading(self, versionToShow=""):
         heading = "Test results for " + self.pageTitle

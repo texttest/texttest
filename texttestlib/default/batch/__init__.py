@@ -888,8 +888,8 @@ class WebPageResponder(plugins.Responder):
     def generatePagePerApp(self, pageTitle, pageInfo):
         for app, repositories, extraApps in pageInfo:
             pageTopDir = os.path.expanduser(app.getBatchConfigValue("historical_report_location"))
-            self.copyJavaScript(pageTopDir)
             pageDir = os.path.join(pageTopDir, app.name)
+            self.copyJavaScript(pageTopDir, pageDir)
             extraVersions = self.getExtraVersions(app, extraApps)
             self.diag.info("Found extra versions " + repr(extraVersions))
             relevantSubDirs = self.findRelevantSubdirectories(repositories, app, extraVersions)
@@ -1008,18 +1008,18 @@ class WebPageResponder(plugins.Responder):
     def generateCommonPage(self, pageTitle, pageInfo):
         relevantSubDirs, getConfigValue, version, extraVersions, pageSubTitles, descriptionInfo = self.transformToCommon(pageInfo)
         pageDir = os.path.expanduser(getConfigValue("historical_report_location"))
-        self.copyJavaScript(pageDir)
+        self.copyJavaScript(pageDir, pageDir)
         self.makeAndGenerate(relevantSubDirs, getConfigValue, pageDir, pageTitle,
                              pageSubTitles, version, extraVersions, descriptionInfo)
 
-    def copyJavaScript(self, pageDir):
-        jsDir = os.path.join(pageDir, "javascript")
+    def copyJavaScript(self, pageTopDir, pageDir):
+        jsDir = os.path.join(pageTopDir, "javascript")
         srcDir = os.path.join(os.path.dirname(__file__), "testoverview_javascript")
-        if os.path.isdir(jsDir):
-            for fn in os.listdir(srcDir):
-                shutil.copyfile(os.path.join(srcDir, fn), os.path.join(jsDir, fn))
-        else:
-            shutil.copytree(srcDir, jsDir)
+        plugins.ensureDirectoryExists(jsDir)
+        plugins.ensureDirectoryExists(pageDir)
+        for fn in os.listdir(srcDir):
+            targetDir = pageDir if fn.endswith(".php") else jsDir # Server-side stuff is per application
+            shutil.copyfile(os.path.join(srcDir, fn), os.path.join(targetDir, fn))
         
     def makeAndGenerate(self, subDirs, getConfigValue, pageDir, *args):
         resourceNames = getConfigValue("historical_report_resources")

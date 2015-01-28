@@ -2,13 +2,6 @@
 
 header('Content-Type: text/html; charset=UTF-8');
 
-// Lock
-$fp = fopen(basename($_SERVER[PHP_SELF]),'r+');
-if (!flock($fp, LOCK_EX))
-  die('{"err":"Could not obtain lock"}');
-
-$file = "comments.log";
-
 function existsEntry($id) {
 	exec('egrep "^'.$id.'" comments.log | wc -l', $count);
 	return strcmp($count[0], "1")==0;
@@ -107,13 +100,27 @@ function updateComment($file, $id, $newEntry)
 	fclose($fileHandle);
 }
 
-
-// Create comments log file if it does not exist
-if (!file_exists($file))
+function ensure_exists($f)
 {
-	touch($file);
-	chmod($file, 0666);
+  // Create comments log file if it does not exist
+  if (!file_exists($f))
+    {
+      touch($f);
+      chmod($f, 0666);
+    }
 }
+
+$lockfilename = ".lock";
+ensure_exists($lockfilename);
+$lockfile = fopen($lockfilename, 'r');
+
+// Lock
+if (!flock($lockfile, LOCK_EX))
+  die('{"err":"Someone else is using the comments right now, try again later!"}');
+
+$file = "comments.log";
+ensure_exists($file);
+
 
 if (strcmp($_POST['method'],"set")==0)
 {
@@ -131,5 +138,5 @@ else if (strcmp(($_POST['method']),"update")==0)
 {
      updateComment($file, $_POST['id'], $_POST['newentry']);
 }
-
+fclose($lockfile);
 ?>

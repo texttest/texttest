@@ -1,26 +1,3 @@
-<html>
-<head>
-<style>
-.rounded, 
-.rounded-bottom {
-    -moz-border-radius-bottomleft : 8px;
-    -moz-border-radius-bottomright : 8px;
-    border-bottom-left-radius : 8px;
-    border-bottom-right-radius : 8px;
-}
-
-.rounded, 
-.rounded-top {
-    -moz-border-radius-topleft : 8px;
-    -moz-border-radius-topright : 8px;
-    border-top-left-radius : 8px;
-    border-top-right-radius : 8px;
-}
-</style>
-
-<script src="jquery.js"></script>
-<script src="comment.js"></script>
-<script>
 
 var node = function(content, bgcolor, position)
 {
@@ -461,7 +438,7 @@ var setup = function()
 	var currDateLegacy = createTestDate("01Jan2000");
 	currDate.date( testDate.date() );
 	currDateLegacy.date( testDate.date() );
-	
+    
 	// Some test pages have both new and old date format
 	// and must show both.
     var addLegacy = true;
@@ -509,8 +486,3 @@ var setup = function()
 
 
 $(document).ready(setup);
-</script>
-</head>
-<body>
-</body>
-</html>

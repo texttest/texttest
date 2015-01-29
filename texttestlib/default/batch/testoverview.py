@@ -234,8 +234,7 @@ class GenerateWebPages(object):
         # Always put green at the start, we often want to filter that
         sortedColours = sorted(pageColours, key=lambda c: (c != successColour, c))
         scriptCode = "var TEST_ROW_HEADER_COLOR = " + repr(rowHeaderColour) + ";\n" + \
-                     "var Colors = " + repr(sortedColours) + ";\n" + \
-                     "var CommentHtml = \"../javascript/comment.html\";"
+                     "var Colors = " + repr(sortedColours) + ";"
         return [ HTMLgen.Script(code=scriptCode),
                  HTMLgen.Script(src="../javascript/jquery.js"),
                  HTMLgen.Script(src="../javascript/filter.js"),
@@ -425,6 +424,15 @@ class GenerateWebPages(object):
             pageName = getDetailPageName(self.pageVersion, tag)
             details.write(os.path.join(self.pageDir, pageName))
             plugins.log.info("wrote: '" + pageName + "'")
+        self.writeCommentListPage()
+        
+    def writeCommentListPage(self):
+        filename = os.path.join(self.pageDir, "commentlist.html")
+        plugins.log.info("Writing comment html page at " + filename + "...")
+        doc = HTMLgen.SimpleDocument(title="All Comments", stylesheet="../javascript/commentliststyle.css", xhtml=True)
+        for scriptFile in [ "jquery.js", "comment.js", "commentlist.js" ]:
+            doc.append(HTMLgen.Script(src="../javascript/" + scriptFile))
+        doc.write(filename)
 
     def getTestIdentifier(self, stateFile, repository):
         dir = os.path.dirname(stateFile)

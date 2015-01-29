@@ -1,5 +1,5 @@
 var CommentServer = CommentServer || "comment.php";
-var CommentHtml = CommentHtml || "comment.html";
+var CommentListHtml = CommentListHtml || "commentlist.html";
 
 //
 // Section representing the comments stored in extenal file.
@@ -143,7 +143,7 @@ Tests.prototype.deSerialize = function(str) {
     $(dateTestsList).each(function(i, dateTests) {
 	var strs = dateTests.split("=");
         var date = strs[0];
-	var tests = strs.slice(1,strs.length).join("=");
+        var tests = strs.slice(1,strs.length).join("=");
 	var strs2 = tests.split(",");
 	this_.tests[date] = [];
 	$(strs2).each(function(i,test){ 
@@ -296,7 +296,7 @@ var getEntries = function(dates)
 	    encodedDates.push(myEncode(date));
 	});
     var entriesRaw = null;
-    
+
     $.ajax({url: CommentServer, 
 	    async: false,
 	    type: "POST", 
@@ -393,9 +393,9 @@ var appendCommentLinks = function(entries)
     $( $.find("th:contains('Test')") ).siblings().each( function() { 
 	$(this).find("[name='AllLink']").remove(); // Remove existing links
 
-	var date = $(this).text();
+	var date = $(this).text().split("\n")[0];
 	var link = $("<div id='allLink" + date + "' name='AllLink'>All ("+countComments(entries, date)+")</div>");
-	link.click(function(){window.location.href = CommentHtml + '?'+date});
+	link.click(function(){window.location.href = CommentListHtml + '?'+date});
 	link.css({'float':'right', 
 		  'background-color':'#FFFFCC',
 		  'cursor':'default'});
@@ -551,7 +551,7 @@ var ColumnDateDefinition = function(rowElem) {
     var this_ = this;
     // Collect dates in row
     rowElem.find("th:contains('Test')").siblings().each( function() { 
-	this_.dateList.push($(this).text());
+	this_.dateList.push($(this).text().split("\n")[0]);
     });
     // Create mapping from date to column
     $(this.dateList).each(function(i,date) {

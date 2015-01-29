@@ -2684,6 +2684,7 @@ Version Control Browser Enhancements:
 Batch Report Enhancements:
     - New Javascript "comment plugin" added
 	Adds the ability to comment individual test failures in the HTML report. See website.
+	Internal marker format in pages changed to be more friendly to this
     - Succeeded tests now stored in a more compact way in batch_result_repository
 	New migration script to convert. Old format is still understood, so migration will happen naturally (but slowly) anyway
     - Batch result repositories now automatically clean themselves

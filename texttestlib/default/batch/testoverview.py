@@ -35,6 +35,13 @@ def getDisplayText(tag):
         return displayText
     else:
         return tag
+    
+def makeTestId(version, extraVersion, testName):
+    testId = version
+    if extraVersion:
+        testId += "." + extraVersion
+    testId += testName
+    return testId
 
 class TitleWithDateStamp:
     def __init__(self, title):
@@ -607,7 +614,7 @@ class TestTable:
         
     def generateTestRows(self, testName, extraVersion, results):
         bgColour = self.colourFinder.find("row_header_bg")
-        testId = self.version + testName + extraVersion
+        testId = makeTestId(self.version, extraVersion, testName)
         description = self.descriptionInfo.get(testName, "")
         container = HTMLgen.Container(HTMLgen.Name(testId), testName)
         rows = []
@@ -874,7 +881,8 @@ class TestDetails:
     def getLinksToOverview(self, version, testName, extraVersion, linkFromDetailsToOverview):
         links = HTMLgen.Container()
         for targetFile, linkName in linkFromDetailsToOverview:
-            links.append(HTMLgen.Href(targetFile + "#" + version + testName + extraVersion, linkName))
+            testId = makeTestId(version, extraVersion, testName)
+            links.append(HTMLgen.Href(targetFile + "#" + testId, linkName))
         return links
     
         

@@ -1017,7 +1017,7 @@ class WebPageResponder(plugins.Responder):
         srcDir = os.path.join(os.path.dirname(__file__), "testoverview_javascript")
         plugins.ensureDirectoryExists(jsDir)
         plugins.ensureDirectoryExists(pageDir)
-        for fn in os.listdir(srcDir):
+        for fn in sorted(os.listdir(srcDir)):
             targetDir = pageDir if fn.endswith(".php") else jsDir # Server-side stuff is per application
             targetPath = os.path.join(targetDir, fn)
             try:

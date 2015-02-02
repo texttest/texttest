@@ -1019,8 +1019,12 @@ class WebPageResponder(plugins.Responder):
         plugins.ensureDirectoryExists(pageDir)
         for fn in os.listdir(srcDir):
             targetDir = pageDir if fn.endswith(".php") else jsDir # Server-side stuff is per application
-            shutil.copyfile(os.path.join(srcDir, fn), os.path.join(targetDir, fn))
-        
+            targetPath = os.path.join(targetDir, fn)
+            try:
+                shutil.copyfile(os.path.join(srcDir, fn), targetPath)
+            except EnvironmentError:
+                plugins.printWarning("Could not copy Javascript-related file to " + targetPath)
+                
     def makeAndGenerate(self, subDirs, getConfigValue, pageDir, *args):
         resourceNames = getConfigValue("historical_report_resources")
         plugins.ensureDirectoryExists(pageDir)

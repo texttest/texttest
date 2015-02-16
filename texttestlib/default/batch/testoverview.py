@@ -829,7 +829,7 @@ class TestDetails:
         for freeText, tests in freeTextData:
             tests.sort(key=lambda info: info[0])
             for testName, _, extraVersion in tests:
-                fullText.append(HTMLgen.Name(version + testName + extraVersion))
+                fullText.append(HTMLgen.Name(makeTestId(version, extraVersion, testName)))
             fullText.append(self.getHeaderLine(tests, version, linkFromDetailsToOverview))
             self.appendFreeText(fullText, freeText)
             if len(tests) > 1:

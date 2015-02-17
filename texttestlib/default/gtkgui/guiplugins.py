@@ -52,14 +52,14 @@ class ProcessTerminationMonitor(plugins.Observable):
     def processExited(self, pidOrHandle, condition, pid):
         output = ""
         self.notify("ProcessExited", pid)
-        if self.processesForKill.has_key(pid):
-            process = self.processesForKill[pid][0]
+        if self.processesForKill.has_key(pidOrHandle):
+            process = self.processesForKill[pidOrHandle][0]
             if process.stdout is not None:
                 output = process.stdout.read().strip()
-            del self.processesForKill[pid]
+            del self.processesForKill[pidOrHandle]
             
-        if self.exitHandlers.has_key(pid):
-            exitHandler, exitHandlerArgs = self.exitHandlers.pop(pid)
+        if self.exitHandlers.has_key(pidOrHandle):
+            exitHandler, exitHandlerArgs = self.exitHandlers.pop(pidOrHandle)
             if exitHandler:
                 exitHandler(*exitHandlerArgs)
                 if output:

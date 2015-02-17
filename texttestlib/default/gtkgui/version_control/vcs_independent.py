@@ -754,7 +754,7 @@ class FilteredDiffGUI(GenericDiffGUI):
                 if errors:
                     self.storeResult(fileName, errors, test)
                     continue
-                proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
                 output = proc.communicate()[0]
                 self.storeResult(fileName, output, test)
             shutil.rmtree(tmpDir)

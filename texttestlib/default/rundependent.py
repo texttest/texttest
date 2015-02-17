@@ -112,11 +112,8 @@ class FilterOriginal(FilterAction):
         test.changeState(Filtering("initial_filter", executionHosts=execMachines,
                                    freeText=freeText, lifecycleChange="start initial filtering"))
 
-    
-class FilterTemporary(FilterAction):
-    def filesToFilter(self, test):
-        return self.constantPostfix(test.listTmpFiles(), "cmp")
 
+class FilterOnTempFile(FilterAction):
     def _makeAllFilters(self, test, stem, app):
         filters = FilterAction._makeAllFilters(self, test, stem, app)
         floatTolerance = app.getCompositeConfigValue("floating_point_tolerance", stem)
@@ -128,6 +125,11 @@ class FilterTemporary(FilterAction):
             if origFile and os.path.isfile(origFile):
                 filters.append(FloatingPointFilter(origFile, floatTolerance, relTolerance))
         return filters
+
+    
+class FilterTemporary(FilterOnTempFile):
+    def filesToFilter(self, test):
+        return self.constantPostfix(test.listTmpFiles(), "cmp")
 
     def changeToFilteringState(self, test):
         # Notifications of current status are only useful when doing normal filtering in the GUI
@@ -151,12 +153,12 @@ class FilterErrorText(FilterAction):
         return [ RunDependentTextFilter(texts) ]
     
 
-class FilterProgressRecompute(FilterAction):
+class FilterProgressRecompute(FilterOnTempFile):
     def filesToFilter(self, test):
         return self.constantPostfix(test.listTmpFiles(), "partcmp")
 
 
-class FilterResultRecompute(FilterAction):
+class FilterResultRecompute(FilterOnTempFile):
     def filesToFilter(self, test):
         result = []
         for fileComp in test.state.allResults:

@@ -47,9 +47,9 @@ class ProcessTerminationMonitor(plugins.Observable):
         self.exitHandlers[int(pidOrHandle)] = (exitHandler, exitHandlerArgs)
         if killOnTermination:
             self.processesForKill[int(pidOrHandle)] = (process, description)
-        gobject.child_watch_add(pidOrHandle, self.processExited)
+        gobject.child_watch_add(pidOrHandle, self.processExited, process.pid)
 
-    def processExited(self, pid, *args):
+    def processExited(self, pidOrHandle, condition, pid):
         output = ""
         self.notify("ProcessExited", pid)
         if self.processesForKill.has_key(pid):

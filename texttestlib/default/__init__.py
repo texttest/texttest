@@ -1,4 +1,3 @@
-
 """ The default configuration, from which all others should be derived """
 
 import os, sandbox, console, rundependent, comparetest, batch, performance, subprocess, operator, logging
@@ -62,13 +61,13 @@ class Config:
                 group.addOption("cp", "Times to run", 1, minimum=1, maximum=10000, description="Set this to some number larger than 1 to run the same test multiple times, for example to try to catch indeterminism in the system under test")
                 if recordsUseCases:
                     group.addOption("delay", "Replay pause (sec)", 0.0, description="How long to wait, in seconds, between replaying each GUI action in the usecase file")
-                    self.addDefaultSwitch(group, "gui", "Show GUI and record any extra actions", 
+                    self.addDefaultSwitch(group, "gui", "Show GUI and record any extra actions",
                                           description="Disable virtual display usage if any. Replay whatever is in the usecase file and enabled recording when done")
-                    self.addDefaultSwitch(group, "screenshot", "Generate a screenshot after each replayed action", 
+                    self.addDefaultSwitch(group, "screenshot", "Generate a screenshot after each replayed action",
                                           description="The screenshots can be viewed via the 'View Screenshots' action in the test (left panel) context menu")
                 self.addDefaultSwitch(group, "stop", "Stop after first failure")
                 if useCatalogues:
-                    self.addDefaultSwitch(group, "ignorecat", "Ignore catalogue file when isolating data", description="Treat test data identified by 'partial_copy_test_path' as if it were in 'copy_test_path', " + 
+                    self.addDefaultSwitch(group, "ignorecat", "Ignore catalogue file when isolating data", description="Treat test data identified by 'partial_copy_test_path' as if it were in 'copy_test_path', " +
                                           "i.e. copy everything without taking notice of the catalogue file. Useful when many things have changed with the files written by the test")
                 if useCaptureMock:
                     self.addCaptureMockSwitch(group)
@@ -164,7 +163,7 @@ class Config:
     def getAllRunningGroupNames(self, allApps):
         if len(allApps) == 0:
             return self.getRunningGroupNames(None)
-        
+
         names = []
         for app in allApps:
             for name in app.getRunningGroupNames():
@@ -177,7 +176,7 @@ class Config:
         optionGroups = map(plugins.OptionGroup, groupNames)
         self.addToOptionGroups(allApps, optionGroups)
         return optionGroups
-    
+
     def findAllValidOptions(self, allApps):
         groups = self.createOptionGroups(allApps)
         return reduce(operator.add, (g.keys() for g in groups), [])
@@ -192,7 +191,7 @@ class Config:
         scriptObject = self.optionMap.getScriptObject()
         if scriptObject:
             if self.usesComparator(scriptObject):
-                comparator = comparetest.MakeComparisons(ignoreMissing=True, enableColor=self.optionMap.has_key("zen"), 
+                comparator = comparetest.MakeComparisons(ignoreMissing=True, enableColor=self.optionMap.has_key("zen"),
                                                          compareSuites=scriptObject.comparesSuites(app))
                 return [ self.getWriteDirectoryMaker(), rundependent.FilterOriginalForScript(), scriptObject, comparator ]
             else:
@@ -222,7 +221,7 @@ class Config:
         return self.createComposites(fromConfig, fromCmd)
 
     def createComposites(self, vlist1, vlist2):
-        allVersions = copy(vlist1)        
+        allVersions = copy(vlist1)
         for v2 in vlist2:
             allVersions.append(v2)
             for v1 in vlist1:
@@ -255,10 +254,10 @@ class Config:
                 for otherPart in self.makeParts(other):
                     if otherPart in checkoutParts:
                         checkoutParts.remove(otherPart)
-                
+
         return checkoutParts[-1].replace(".", "_")
 
-    def getCheckoutExtraVersions(self, app):    
+    def getCheckoutExtraVersions(self, app):
         checkoutNames = plugins.commasplit(self.optionValue("c"))
         if len(checkoutNames) > 1:
             expandedNames = [ self.expandCheckout(c, app) for c in checkoutNames ]
@@ -272,7 +271,7 @@ class Config:
 
     def getBatchSessionForSelect(self, app):
         return self.getBatchSession(app) or self.optionMap.get("bx")
-        
+
     def getExtraVersionsFromConfig(self, app):
         basic = app.getConfigValue("extra_version")
         batchSession = self.getBatchSessionForSelect(app)
@@ -309,7 +308,7 @@ class Config:
             self.optionMap[mapping[defaultInterface]] = ""
         else:
             raise plugins.TextTestError, "Invalid value for default_interface '" + defaultInterface + "'"
-        
+
     def hasExplicitInterface(self):
         return self.useGUI() or self.batchMode() or self.useConsole() or self.optionMap.has_key("o")
 
@@ -329,7 +328,7 @@ class Config:
         if not self.loggingSetup:
             self.setUpLogging()
             Config.loggingSetup = True
-        
+
     def setUpLogging(self):
         logging.logProcesses = 0 # Can cause deadlock problems with subprocess module and CaptureMock. Not useful in TextTest, simplify logging usage.
         filePatterns = [ "logging." + postfix for postfix in self.getLogfilePostfixes() ]
@@ -339,7 +338,7 @@ class Config:
             plugins.configureLogging(allPaths[-1]) # Won't have any effect if we've already got a log file
         else:
             plugins.configureLogging()
-            
+
     def getResponderClasses(self, allApps):
         # Global side effects first :)
         if not self.hasExplicitInterface():
@@ -349,15 +348,15 @@ class Config:
         return self._getResponderClasses(allApps)
 
     def _getResponderClasses(self, allApps):
-        classes = []        
+        classes = []
         if not self.optionMap.has_key("gx"):
             if self.optionMap.has_key("new"):
                 raise plugins.TextTestError, "'--new' option can only be provided with the static GUI"
             elif len(allApps) == 0:
                 raise plugins.TextTestError, "Could not find any matching applications (files of the form config.<app>) under " + " or ".join(self.optionMap.rootDirectories)
-        
+
         if any(self.useStaticGUI(app) for app in allApps) and self.isReconnecting():
-            raise plugins.TextTestError, "'-reconnect' option doesn't work with static GUI"  
+            raise plugins.TextTestError, "'-reconnect' option doesn't work with static GUI"
 
         if self.useGUI():
             self.addGuiResponder(classes)
@@ -366,11 +365,11 @@ class Config:
 
         if not self.optionMap.has_key("gx"):
             classes += self.getThreadActionClasses()
-        
+
         if self.batchMode() and not self.runningScript():
             if self.optionMap.has_key("coll"):
                 arg = self.optionMap["coll"]
-                if arg != "mail": 
+                if arg != "mail":
                     classes.append(self.getWebPageResponder())
                 if not arg or "web" not in arg:
                     classes.append(batch.CollectFilesResponder)
@@ -383,7 +382,7 @@ class Config:
                 if self.anyAppHas(allApps, lambda app: self.getBatchConfigValue(app, "batch_junit_format") == "true"):
                     from batch.junitreport import JUnitResponder
                     classes.append(JUnitResponder)
-                
+
         if os.name == "posix" and self.useVirtualDisplay():
             from virtualdisplay import VirtualDisplayResponder
             classes.append(VirtualDisplayResponder)
@@ -409,20 +408,20 @@ class Config:
             if self.optionMap.has_key(option):
                 return True
         return False
-    
+
     def getTestRunVariables(self):
         return []
 
     def noFileAdvice(self):
         # What can we suggest if files aren't present? In this case, not much
         return ""
-        
+
     def useVirtualDisplay(self):
         # Don't try to set it if we're using the static GUI or
         # we've requested a slow motion replay or we're trying to record a new usecase.
         return not self.isRecording() and not self.optionMap.has_key("gx") and not self.isReconnecting() and \
                not self.isActionReplay() and not self.optionMap.has_key("coll") and not self.optionMap.runScript()
-    
+
     def getThreadActionClasses(self):
         from actionrunner import ActionRunner
         return [ ActionRunner ]
@@ -436,7 +435,7 @@ class Config:
 
     def usesCaptureMock(self, app):
         return "traffic" in app.defFileStems()
-    
+
     def hasWritePermission(self, path):
         if os.path.isdir(path):
             return os.access(path, os.W_OK)
@@ -451,7 +450,7 @@ class Config:
         localRootDir = self.optionMap.getPathFromOptionsOrEnv("TEXTTEST_LOCAL_TMP", app.getConfigValue("default_texttest_local_tmp")) # Location of temporary files on local disk from test runs. Defaults to value of TEXTTEST_TMP
         if localRootDir:
             return writeDir, os.path.join(localRootDir, self.getLocalWriteDirectoryName(app))
-        else:   
+        else:
             return writeDir, writeDir
 
     def getWriteDirectoryName(self, app):
@@ -459,7 +458,7 @@ class Config:
         parts = self.getBasicRunDescriptors(app, appDescriptor) + self.getVersionDescriptors(appDescriptor) + \
                 [ self.getTimeDescriptor(), str(os.getpid()) ]
         return ".".join(parts)
-    
+
     def getLocalWriteDirectoryName(self, app):
         return self.getWriteDirectoryName(app)
 
@@ -524,7 +523,7 @@ class Config:
     def getTemporaryFilterer(self):
         if not self.optionMap.has_key("ignorefilters"):
             return rundependent.FilterTemporary(useFilteringStates=not self.batchMode())
-    
+
     def filterErrorText(self, app, errFile):
         filterAction = rundependent.FilterErrorText()
         return filterAction.getFilteredText(app, errFile, app)
@@ -540,13 +539,13 @@ class Config:
         app = self.getFileNameVersionApp(test, fileName)
         filterAction = rundependent.FilterAction()
         return filterAction.getFilteredText(test, fileName, app)
-    
+
     def getAllFilters(self, test, fileName):
         app = self.getFileNameVersionApp(test, fileName)
         filterAction = rundependent.FilterAction()
         return filterAction.getAllFilters(test, fileName, app), app
-    
-    def getTestProcessor(self):        
+
+    def getTestProcessor(self):
         catalogueCreator = self.getCatalogueCreator()
         ignoreCatalogues = self.shouldIgnoreCatalogues()
         collator = self.getTestCollator()
@@ -560,22 +559,22 @@ class Config:
 
     def isRecording(self):
         return self.optionMap.has_key("record")
-    
+
     def shouldIgnoreCatalogues(self):
         return self.optionMap.has_key("ignorecat") or self.isRecording()
-    
+
     def hasPerformance(self, app, perfType=""):
         extractors = app.getConfigValue("performance_logfile_extractor")
         if (perfType and extractors.has_key(perfType)) or (not perfType and len(extractors) > 0):
             return True
         else:
             return app.hasAutomaticCputimeChecking()
-    
+
     def hasAutomaticCputimeChecking(self, app):
         return len(app.getCompositeConfigValue("performance_test_machine", "cputime")) > 0
-    
+
     def getFilterFileDirectories(self, apps, useOwnTmpDir):
-        # 
+        #
         # - For each application, collect
         #   - temporary filter dir
         #   - all dirs in filter_file_directory
@@ -612,12 +611,12 @@ class Config:
             return os.path.normpath(cmdLineDir)
         elif writeDir:
             return os.path.join(writeDir, "temporary_filter_files")
-        
+
     def getFilterClasses(self):
         return [ TestNameFilter, plugins.TestSelectionFilter, TestRelPathFilter,
                  performance.TimeFilter, performance.FastestFilter, performance.SlowestFilter,
                  plugins.ApplicationFilter, TestDescriptionFilter ]
-            
+
     def getAbsoluteFilterFileName(self, suite, filterFileName):
         if os.path.isabs(filterFileName):
             if os.path.isfile(filterFileName):
@@ -657,7 +656,7 @@ class Config:
             return self.filterFileMap.setdefault(app, self._getFilterList(app, self.optionMap, suites, includeConfig=True, **kw))
         else:
             return self._getFilterList(app, options, suites, includeConfig=False, **kw)
-        
+
     def checkFilterFileSanity(self, suite):
         # This will check all the files for existence from the input, and throw if it can't.
         # This is basically because we don't want to throw in a thread when we actually need the filters
@@ -668,7 +667,7 @@ class Config:
         for filterFileName in self.findAllFilterFileNames(suite.app, options, includeConfig):
             optionFinder = self.makeOptionFinder(suite, filterFileName)
             self._checkFilterFileSanity(suite, optionFinder)
-    
+
     def _getFilterList(self, app, options, suites, includeConfig, **kw):
         filters = self.getFiltersFromMap(options, app, suites, **kw)
         for filterFileName in self.findFilterFileNames(app, options, includeConfig):
@@ -691,13 +690,13 @@ class Config:
         absName = self.getAbsoluteFilterFileName(*args)
         fileData = ",".join(plugins.readList(absName))
         return plugins.OptionFinder(fileData.split(), defaultKey="t")
-        
+
     def getFiltersFromFile(self, app, filename, suites):
         for suite in suites:
             if suite.app is app:
                 optionFinder = self.makeOptionFinder(suite, filename)
                 return self._getFilterList(app, optionFinder, suites, includeConfig=False)
-    
+
     def getFiltersFromMap(self, optionMap, app, suites, **kw):
         filters = []
         for filterClass in self.getFilterClasses():
@@ -713,19 +712,19 @@ class Config:
             grepFile = optionMap.get("grepfile", app.getConfigValue("log_file"))
             filters.append(GrepFilter(optionMap["grep"], grepFile, **kw))
         return filters
-    
+
     def batchMode(self):
         return self.optionMap.has_key("b")
-    
+
     def actualBatchMode(self):
         return self.batchMode() and not self.isReconnecting() and not self.runningScript() and not "coll" in self.optionMap
-    
+
     def keepTemporaryDirectories(self):
         if "keeptmp" in self.optionMap:
             return self.optionMap.get("keeptmp") != "0"
         else:
             return self.actualBatchMode()
-    
+
     def hasKeeptmpFlag(self):
         return "keeptmp" in self.optionMap and self.optionMap.get("keeptmp") != "0"
 
@@ -747,7 +746,7 @@ class Config:
 
     def cleanRemoteDir(self, app, machine, tmpDir):
         self.runCommandOn(app, machine, [ "rm", "-rf", tmpDir ])
-                
+
     def _cleanWriteDirectory(self, suite):
         if os.path.isdir(suite.app.writeDirectory):
             plugins.rmtree(suite.app.writeDirectory)
@@ -766,7 +765,7 @@ class Config:
             return None, None
 
     def cleanPreviousWriteDirs(self, previousWriteDirs):
-        for previousWriteDir in previousWriteDirs:              
+        for previousWriteDir in previousWriteDirs:
             plugins.rmtree(previousWriteDir, attempts=3)
 
     def makeWriteDirectory(self, app, subdir=None):
@@ -803,7 +802,7 @@ class Config:
                     if os.path.isdir(previousWriteDir) and not plugins.samefile(previousWriteDir, writeDir):
                         previousWriteDirs.append(previousWriteDir)
         return previousWriteDirs
-    
+
     def isReconnecting(self):
         return self.optionMap.has_key("reconnect")
     def getWriteDirectoryMaker(self):
@@ -826,44 +825,44 @@ class Config:
         return sandbox.ExtractPerformanceFiles(self.getMachineInfoFinder())
     def getPerformanceFileMaker(self):
         return sandbox.MakePerformanceFile(self.getMachineInfoFinder())
-    
+
     def executingOnPerformanceMachine(self, test, stem="cputime"):
         infoFinder = self.getMachineInfoFinder()
         infoFinder.setUpApplication(test.app)
         return infoFinder.allMachinesTestPerformance(test, stem)
-    
+
     def getMachineInfoFinder(self):
         return sandbox.MachineInfoFinder()
-    
+
     def getFailureExplainer(self):
         from knownbugs import CheckForBugs, CheckForCrashes
         return [ CheckForCrashes(), CheckForBugs() ]
-    
+
     def showExecHostsInFailures(self, app):
         return self.batchMode() or app.getRunMachine() != "localhost"
-    
+
     def getTestComparator(self):
         return comparetest.MakeComparisons(enableColor=self.optionMap.has_key("zen"))
-    
+
     def getStateSaver(self):
         if self.actualBatchMode():
             return batch.SaveState
         elif self.keepTemporaryDirectories() or "rerun" in self.optionMap:
             return SaveState
-        
+
     def getConfigEnvironment(self, test, allVars):
         testEnvironmentCreator = self.getEnvironmentCreator(test)
         return testEnvironmentCreator.getVariables(allVars)
-    
+
     def getEnvironmentCreator(self, test):
         return sandbox.TestEnvironmentCreator(test, self.optionMap)
-    
+
     def getInteractiveReplayOptions(self):
         return [ ("gui", "visible GUI") ]
-    
+
     def getTextResponder(self):
         return console.InteractiveResponder
-    
+
     def getWebPageResponder(self):
         return batch.WebPageResponder
 
@@ -882,10 +881,10 @@ class Config:
                 raise plugins.TextTestError, "ERROR: Arguments to -" + option + " flag must be numeric, received '" + value + "'"
         else:
             return defaultValue
-        
+
     def runningScript(self):
         return "s" in self.optionMap
-        
+
     def ignoreExecutable(self):
         return self.runningScript() or self.ignoreCheckout() or self.optionMap.has_key("coll") or self.optionMap.has_key("gx")
 
@@ -894,7 +893,7 @@ class Config:
 
     def setUpCheckout(self, app):
         return self.getGivenCheckoutPath(app) if not self.ignoreCheckout() else ""
-    
+
     def verifyCheckoutValid(self, app):
         if not os.path.isdir(app.checkout):
             self.handleNonExistent(app.checkout, "checkout", app)
@@ -902,8 +901,8 @@ class Config:
     def checkCheckoutExists(self, app):
         if not app.checkout:
             return "" # Allow empty checkout, means no checkout is set, basically
-        
-        try: 
+
+        try:
             self.verifyCheckoutValid(app)
         except plugins.TextTestError, e:
             if self.ignoreExecutable():
@@ -954,7 +953,7 @@ class Config:
         for cat in allCategories:
             if cat:
                 plugins.addCategory(*plugins.commasplit(cat))
-                
+
     def checkExecutableExists(self, suite):
         executable = suite.getConfigValue("executable")
         if self.executableShouldBeFile(suite.app, executable) and not os.path.isfile(executable):
@@ -971,7 +970,7 @@ class Config:
 
     def checkConnection(self, app, machine):
         self.runCommandAndCheckMachine(app, machine, [ "echo", "hello" ])
- 
+
     def handleNonExistent(self, path, desc, app):
         message = "The " + desc + " '" + path + "' does not exist"
         remoteCopy = app.getConfigValue("remote_copy_program")
@@ -1001,7 +1000,7 @@ class Config:
 
     def hasChanged(self, var, value):
         return os.getenv(var) != value
-                
+
     def executableShouldBeFile(self, app, executable):
         if os.path.isabs(executable):
             return True
@@ -1009,13 +1008,13 @@ class Config:
         # If it's part of the data it will be available as a relative path anyway
         if executable in app.getDataFileNames():
             return False
-        
+
         # For finding java classes, don't warn if they don't exist as files...
         if executable.endswith(".jar"):
             return False
         interpreters = app.getConfigValue("interpreters").values()
-        return all(("java" not in i and "jython" not in i for i in interpreters)) 
-    
+        return all(("java" not in i and "jython" not in i for i in interpreters))
+
     def checkConfigSanity(self, app):
         for key in app.getConfigValue("collate_file"):
             if "." in key or "/" in key:
@@ -1045,7 +1044,7 @@ class Config:
         checkoutLocations = app.getCompositeConfigValue("checkout_location", checkout, expandVars=False)
         checkoutLocations.append(os.getcwd())
         return self.makeAbsoluteCheckout(checkoutLocations, checkout, app)
-        
+
     def getCheckout(self, app):
         if self.optionMap.has_key("c"):
             return plugins.commasplit(self.optionMap["c"])[0]
@@ -1056,7 +1055,7 @@ class Config:
                app.getConfigValue("checkout_location").has_key(batchSession):
             return batchSession
         else:
-            return app.getConfigValue("default_checkout")        
+            return app.getConfigValue("default_checkout")
 
     def makeAbsoluteCheckout(self, locations, checkout, app):
         isSpecific = app.getConfigValue("checkout_location").has_key(checkout)
@@ -1091,10 +1090,10 @@ class Config:
             fileFilter(test)
             comparator = self.getTestComparator()
             comparator.recomputeProgress(test, state, observers)
-            
+
     def getRunDescription(self, test):
         return RunTest().getRunDescription(test)
-    
+
     def expandExternalEnvironment(self):
         return True
 
@@ -1174,7 +1173,7 @@ class Config:
         app.setConfigDefault("batch_version", { "default" : [] }, "List of versions to allow if batch_use_version_filtering enabled")
         app.setConfigAlias("testoverview_colours", "historical_report_colours")
         app.setConfigAlias("historical_report_resource_pages", "historical_report_resources")
-        
+
     def setPerformanceDefaults(self, app):
         # Performance values
         app.setConfigDefault("cputime_include_system_time", 0, "Include system time when measuring CPU time?")
@@ -1184,7 +1183,7 @@ class Config:
         app.setConfigDefault("performance_test_machine", { "default" : [], "*mem*" : [ "any" ] }, \
                              "List of machines where performance can be collected")
         app.setConfigDefault("performance_variation_%", { "default" : 10.0 }, "How much variation in performance is allowed")
-        app.setConfigDefault("performance_variation_serious_%", { "default" : 0.0 }, "Additional cutoff to performance_variation_% for extra highlighting")                
+        app.setConfigDefault("performance_variation_serious_%", { "default" : 0.0 }, "Additional cutoff to performance_variation_% for extra highlighting")
         app.setConfigDefault("use_normalised_percentage_change", { "default" : "true" }, \
                              "Do we interpret performance percentage changes as normalised (symmetric) values?")
         app.setConfigDefault("performance_test_minimum", { "default" : 0.0 }, \
@@ -1195,7 +1194,7 @@ class Config:
         app.setConfigDefault("performance_ignore_improvements", { "default" : "false" }, "Should we ignore all improvements in performance?")
         app.setConfigAlias("performance_use_normalised_%", "use_normalised_percentage_change")
         app.setConfigAlias("batch_junit_performance", "default_performance_stem")
-        
+
     def setUsecaseDefaults(self, app):
         app.setConfigDefault("use_case_record_mode", "disabled", "Mode for Use-case recording (GUI, console or disabled)")
         app.setConfigDefault("use_case_recorder", "", "Which Use-case recorder is being used")
@@ -1298,7 +1297,7 @@ class Config:
         app.setConfigDefault("create_catalogues", "false", "Do we create a listing of files created/removed by tests")
         app.setConfigDefault("catalogue_process_string", "", "String for catalogue functionality to identify processes created")
         app.setConfigDefault("binary_file", [], "Which output files are known to be binary, and hence should not be shown/diffed?")
-        
+
         app.setConfigDefault("discard_file", [], "List of generated result files which should not be compared")
         app.setConfigDefault("discard_file_text", { "default" : [] }, "List of generated result files which should not be compared if they contain the given patterns")
         rectrafficValue = self.optionIntValue("rectraffic")
@@ -1311,7 +1310,7 @@ class Config:
         if homeOS != "any" and homeOS != os.name:
             app.addConfigEntry("implied", os.name, "base_version")
         app.setConfigAlias("collect_traffic_py_module", "collect_traffic_python")
-        
+
     def defaultViewProgram(self, homeOS):
         if os.name == "posix":
             return os.getenv("EDITOR", "emacs")
@@ -1321,13 +1320,13 @@ class Config:
                 return "wordpad"
             else:
                 return "notepad"
-            
+
     def defaultFollowProgram(self):
         if os.name == "posix":
             return "xterm -bg white -T $TEXTTEST_FOLLOW_FILE_TITLE -e tail -f"
         else:
             return "baretail"
-        
+
     def setExternalToolDefaults(self, app, homeOS):
         app.setConfigDefault("text_diff_program", "diff", \
                              "External program to use for textual comparison of files")
@@ -1347,7 +1346,7 @@ class Config:
         app.setConfigDefault("batch_jenkins_marked_artefacts", { "default": [] }, "Artefacts to highlight in the report when they are updated")
         app.setConfigDefault("batch_jenkins_archive_file_pattern", { "default": "" }, "Path to the built files in the archive, in case Jenkins fingerprints need double-checking")
         app.setConfigAlias("text_diff_program_max_file_size", "max_file_size")
-        
+
     def setInterfaceDefaults(self, app):
         app.setConfigDefault("default_interface", "static_gui", "Which interface to start if none of -con, -g and -gx are provided")
         # These configure the GUI but tend to have sensible defaults per application
@@ -1355,7 +1354,7 @@ class Config:
         app.setConfigDefault("gui_entry_options", { "default" : [] }, "Default drop-down box options for GUI entries")
         app.setConfigDefault("suppress_stderr_text", [], "List of patterns which, if written on TextTest's own stderr, should not be propagated to popups and further logfiles")
         app.setConfigAlias("suppress_stderr_popup", "suppress_stderr_text")
-        
+
     def getDefaultRemoteProgramOptions(self):
         # The aim is to ensure they never hang, but always return errors if contact not possible
         # Disable warnings, they get in the way of output
@@ -1378,7 +1377,7 @@ class Config:
                 else:
                     args.append("-x")
                 if agentForwarding:
-                    args.append("-A") 
+                    args.append("-A")
 
             args.append(machine)
             if graphical and args[0] == "rsh":
@@ -1444,17 +1443,17 @@ class Config:
                 return fileName
         else:
             return machine + ":" + plugins.quote(fileName)
-                        
+
     def copyFileRemotely(self, *args, **kw):
         proc = self.getRemoteCopyFileProcess(*args, **kw)
         return proc.wait()
-                                                 
+
     def getRemoteCopyFileProcess(self, app, srcFile, srcMachine, dstFile, dstMachine, ignoreLinks=False):
         srcPath = self.getRemotePath(srcFile, srcMachine)
         dstPath = self.getRemotePath(dstFile, dstMachine)
         args = self.getRemoteProgramArgs(app, "remote_copy_program") + [ srcPath, dstPath ]
         if ignoreLinks:
-            args = self.removeLinkArgs(args)    
+            args = self.removeLinkArgs(args)
         return subprocess.Popen(args, stdin=open(os.devnull), stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
 
     def removeLinkArgs(self, args):
@@ -1492,7 +1491,7 @@ class Config:
         app.addConfigEntry("builtin", self.getStdinName(namingScheme), "definition_file_stems")
         app.addConfigEntry("builtin", "knownbugs", "definition_file_stems")
         app.setConfigAlias("test_list_files_directory", "filter_file_directory")
-        
+
     def setApplicationDefaults(self, app):
         homeOS = app.getConfigValue("home_operating_system")
         namingScheme = app.getConfigValue("filename_convention_scheme")
@@ -1516,7 +1515,7 @@ class Config:
             app.addConfigEntry("builtin", stem, "definition_file_stems")
             for postfix in extraPostfixes:
                 app.addConfigEntry("builtin", stem + postfix, "definition_file_stems")
-        
+
         namingScheme = app.getConfigValue("filename_convention_scheme")
         for postfix in extraPostfixes:
             app.addConfigEntry("builtin", "options" + postfix, "definition_file_stems")
@@ -1554,7 +1553,7 @@ class NotFilter(plugins.Filter):
         self.filters = filters
     def acceptsTestCase(self, test):
         return not test.isAcceptedByAll(self.filters)
-    
+
 class TestNameFilter(plugins.TextFilter):
     option = "t"
     def acceptsTestCase(self, test):
@@ -1575,7 +1574,7 @@ class GrepFilter(plugins.TextFilter):
         plugins.TextFilter.__init__(self, filterText)
         self.fileStem = fileStem
         self.useTmpFiles = useTmpFiles
-        
+
     def acceptsTestCase(self, test):
         if self.fileStem == "free_text":
             return self.stringContainsText(test.state.freeText)
@@ -1618,4 +1617,3 @@ class TestDescriptionFilter(plugins.TextFilter):
     option = "desc"
     def acceptsTestCase(self, test):
         return self.stringContainsText(test.description)
-

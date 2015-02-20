@@ -213,7 +213,8 @@ class MailSender:
     def storeMail(self, app, mailContents):
         localFileName = "batchreport." + app.name + app.versionSuffix()
         collFile = os.path.join(app.writeDirectory, localFileName)
-        self.diag.info("Sending mail to", collFile)
+        self.diag.info("Adding mail report contents to " + collFile)
+
         file = plugins.openForWrite(collFile)
         file.write(mailContents)
         file.close()
@@ -243,7 +244,13 @@ class MailSender:
         smtpUsername = app.getConfigValue("smtp_server_username")
         smtpPassword = app.getConfigValue("smtp_server_password")
         fromAddress = app.getBatchConfigValue("batch_sender")
-        toAddresses = plugins.commasplit(app.getBatchConfigValue("batch_recipients"))
+        recipients = app.getBatchConfigValue("batch_recipients")
+
+        if not recipients:
+            return self.getNoRecipientsMessage(app)
+
+        toAddresses = plugins.commasplit(recipients)
+
         import smtplib
         smtp = smtplib.SMTP()
         try:
@@ -261,6 +268,12 @@ class MailSender:
         except smtplib.SMTPException:
             return "Mail could not be sent\n" + self.exceptionOutput()
         smtp.quit()
+
+    def getNoRecipientsMessage(self, app):
+        message = "Attempted to send mail, but batch_recipients is empty."
+        if app.getBatchConfigValue("batch_use_collection") == "true":
+            message += "\nHaving batch_use_collection set to true, but no batch_recipients indicates an erroneous configuration."
+        return message
 
     def createMailHeaderSection(self, title, app, batchDataList):
         if self.useCollection(app):

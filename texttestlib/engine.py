@@ -13,7 +13,7 @@ class UniqueNameFinder(plugins.Responder):
         plugins.Responder.__init__(self, optionMap)
         self.name2test = {}
         self.diag = logging.getLogger("Unique Names")
-        
+
     def notifyAdd(self, test, *args, **kw):
         if self.name2test.has_key(test.name):
             oldTest = self.name2test[test.name]
@@ -78,27 +78,27 @@ class Activator(plugins.Responder, plugins.Observable):
         self.suites = []
         self.diag = logging.getLogger("Activator")
         self.suiteCopyCache = {}
-        
+
     def addSuites(self, suites):
         self.suites = suites
-    
+
     def findGuideSuiteForCopy(self, versions):
         versionsForGuide = tuple(filter(lambda v: "copy_" not in v, versions))
         if versionsForGuide in self.suiteCopyCache:
             return self.suiteCopyCache.get(versionsForGuide)
-        
+
         for suite in self.suites:
             if tuple(suite.app.versions) == versionsForGuide:
                 self.suiteCopyCache[versionsForGuide] = suite
                 return suite
-    
+
     def readTestSuiteContents(self, suite):
         if any(("copy_" in v) for v in suite.app.versions):
             guideSuite = self.findGuideSuiteForCopy(suite.app.versions)
             if guideSuite is not None:
                 self.diag.info("Creating test suite by copying " + repr(guideSuite))
                 return suite.readContents(guideSuite=guideSuite)
-        
+
         filters = suite.app.getFilterList(self.suites)
         self.diag.info("Creating test suite with filters " + repr(filters))
         return suite.readContents(filters)
@@ -111,7 +111,7 @@ class Activator(plugins.Responder, plugins.Observable):
             try:
                 self.readTestSuiteContents(suite)
                 self.diag.info("SUCCESS: Created test suite of size " + str(suite.size()))
-                
+
                 if suite.size() > 0 or self.allowEmpty:
                     goodSuites.append(suite)
                     suite.notify("Add", initial=True)
@@ -121,12 +121,12 @@ class Activator(plugins.Responder, plugins.Observable):
                 rejectionInfo[suite.app] = str(e)
 
         self.notify("AllRead", goodSuites)
-            
+
         if len(rejectionInfo) > 0:
             self.writeErrors(rejectionInfo)
         self.performNotify("AllReadAndNotified") # triggers the ActionRunner to start if needed, do this in the same thread!
         return goodSuites
-    
+
     def writeErrors(self, rejectionInfo):
         # Don't write errors if only some of a group are rejected
         appsByName = OrderedDict()
@@ -134,7 +134,7 @@ class Activator(plugins.Responder, plugins.Observable):
         for suite in self.suites:
             app = suite.app
             appsByName.setdefault(app.name, []).append(app)
-            
+
         for _, appGroup in appsByName.items():
             if set(appGroup).issubset(rejectedApps):
                 for app in appGroup:
@@ -147,7 +147,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         plugins.Observable.__init__(self)
         if os.name == "posix":
             # To aid in debugging tests that hang...
-            signal.signal(signal.SIGQUIT, self.printStackTrace) 
+            signal.signal(signal.SIGQUIT, self.printStackTrace)
         self.setSignalHandlers(self.handleSignalWhileStarting)
         self.inputOptions = testmodel.OptionFinder()
         self.diag = logging.getLogger("Find Applications")
@@ -185,14 +185,14 @@ class TextTest(plugins.Responder, plugins.Observable):
             for root in self.inputOptions.rootDirectories:
                 sys.stderr.write("Test suite root directory does not exist: " + root + "\n")
             return True, []
-        
+
         # Just ignore any roots that don't exist
         self.inputOptions.rootDirectories = roots
         self.diag.info("Using test suite at " + repr(roots))
         searchDirs = self.findSearchDirs(roots)
         if self.inputOptions.has_key("new"):
             return False, []
-        
+
         appList = []
         raisedError = False
         selectedAppDict = self.inputOptions.findSelectedAppNames()
@@ -206,7 +206,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             for missingAppName in self.findMissingApps(appList, selectedAppDict.keys()):
                 sys.stderr.write("Could not read application '" + missingAppName + "'. No file named config." + missingAppName + " was found under " + " or ".join(self.inputOptions.rootDirectories) + ".\n")
                 raisedError = True
-            
+
         appList.sort(self.compareApps)
         self.diag.info("Found applications : " + repr(appList))
         return raisedError, appList
@@ -219,7 +219,7 @@ class TextTest(plugins.Responder, plugins.Observable):
 
     def compareApps(self, app1, app2):
         return cmp(app1.name, app2.name)
-    
+
     def findAppsUnder(self, dirName, selectedAppDict, ignoreNames):
         appList = []
         raisedError = False
@@ -232,7 +232,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             if len(components) != 2:
                 continue
             appName = components[1]
-            
+
             # Ignore emacs backup files and stuff we haven't selected
             if appName.endswith("~") or (len(selectedAppDict) and not selectedAppDict.has_key(appName)) or appName in ignoreNames:
                 continue
@@ -253,7 +253,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             for toRemove in filter(lambda app: app.getFullVersion() in extraVersionsDuplicating, appList):
                 appList.remove(toRemove)
         return raisedError, appList
-    
+
     def createApplication(self, appName, dircache, versions):
         try:
             return testmodel.Application(appName, dircache, versions, self.inputOptions)
@@ -288,7 +288,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             return allApps
         else:
             return [ plugins.importAndCall("default", "getConfig", self.inputOptions) ]
-        
+
     def createResponders(self, allApps):
         responderClasses = self.getBuiltinResponderClasses()
         for configObject in self.getAllConfigObjects(allApps):
@@ -316,13 +316,13 @@ class TextTest(plugins.Responder, plugins.Observable):
                     toRemove.append(class1)
                     if class2 not in newPositions:
                         newPositions[class2] = i
-                        
+
         for cls, i in newPositions.items():
             classes.remove(cls)
             classes.insert(i, cls)
         for cls in toRemove:
             classes.remove(cls)
-            
+
     def createTestSuites(self, allApps):
         appSuites = OrderedDict()
         raisedError = False
@@ -338,7 +338,7 @@ class TextTest(plugins.Responder, plugins.Observable):
                 except plugins.TextTestError, e:
                     sys.stderr.write(partApp.rejectionMessage(str(e)))
                     raisedError = True
-                except Exception:  
+                except Exception:
                     sys.stderr.write("Error creating test suite for " + partApp.description() + " :\n")
                     plugins.printException()
             fullMsg = "".join(warningMessages)
@@ -363,7 +363,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         testExitCode = test.state.getExitCode()
         if testExitCode and self.exitCode != 1:
             self.exitCode = testExitCode
-        
+
     def run(self):
         try:
             self._run()
@@ -389,11 +389,11 @@ class TextTest(plugins.Responder, plugins.Observable):
         if len(allApps) == 0 and appFindingWroteError:
             self.exitCode = 1
             return
-            
+
         if self.inputOptionsValid(allApps):
             try:
                 self.createAndRunSuites(allApps)
-            finally:        
+            finally:
                 self.notifyExit() # include the dud ones, possibly
 
     def inputOptionsValid(self, allApps):
@@ -410,17 +410,19 @@ class TextTest(plugins.Responder, plugins.Observable):
         for configObject in self.getAllConfigObjects(allApps):
             validOptions.update(set(configObject.findAllValidOptions(allApps)))
         return validOptions
-                                 
+
     def createAndRunSuites(self, allApps):
         self.createResponders(allApps)
         raisedError, self.appSuites = self.createTestSuites(allApps)
         if not raisedError or len(self.appSuites) > 0:
             self.addSuites(self.appSuites.values(), allApps)
-            
+
             # Set the signal handlers to use when running, if we actually plan to do any
             self.setSignalHandlers(self.handleSignal)
-        
+
             self.runThreads()
+        if raisedError:
+            self.exitCode = 1
 
     def addSuites(self, emptySuites, allApps):
         for object in self.observers:
@@ -472,7 +474,7 @@ class TextTest(plugins.Responder, plugins.Observable):
 
     def createInitialTestSuite(self, app):
         return app.createInitialTestSuite([ self ] + self.observers)
-    
+
     def makeDirectoryCache(self, appName):
         configFile = "config." + appName
         for rootDir in self.inputOptions.rootDirectories:
@@ -483,7 +485,7 @@ class TextTest(plugins.Responder, plugins.Observable):
                 allFiles = glob(os.path.join(rootDir, "*", configFile))
                 if len(allFiles) > 0:
                     return testmodel.DirectoryCache(os.path.dirname(allFiles[0]))
-            
+
     def notifyExtraTest(self, testPath, appName, versions):
         rootSuite = self.getRootSuite(appName, versions)
         if rootSuite:
@@ -495,7 +497,7 @@ class TextTest(plugins.Responder, plugins.Observable):
     def notifyNewApplication(self, newApp):
         suite = self.createEmptySuite(newApp)
         suite.notify("Add", initial=False)
-        
+
     def findThreadRunners(self):
         allRunners = filter(lambda x: hasattr(x, "run"), self.observers)
         mainThreadRunner = filter(lambda x: x.canBeMainThread(), allRunners)[0]
@@ -512,11 +514,11 @@ class TextTest(plugins.Responder, plugins.Observable):
             allThreads.append(thread)
             self.diag.info("Running " + str(subThreadRunner.__class__) + " in a subthread")
             thread.start()
-            
+
         if mainThreadRunner:
             self.diag.info("Running " + str(mainThreadRunner.__class__) + " in main thread")
             mainThreadRunner.run()
-            
+
         self.waitForThreads(allThreads)
 
     def waitForThreads(self, allThreads):
@@ -524,10 +526,10 @@ class TextTest(plugins.Responder, plugins.Observable):
         # caught. thread.join doesn't do this. signal.pause seems like a good idea but
         # doesn't return unless a signal is caught, leading to sending "fake" ones from the
         # threads when they finish. And playing with signals and threads together is playing with fire...
-        
+
         # So we poll, which we don't really want to do, but it seems better than using Twisted or asyncore
-        # just for this :) With a long enough sleep it shouldn't generate too much load... 
-        
+        # just for this :) With a long enough sleep it shouldn't generate too much load...
+
         # See http://groups.google.com/group/comp.lang.python/browse_thread/thread/a244905b86f06e48/7e969a0c7932fa91#
         currThreads = self.aliveThreads(allThreads)
         threadCount = len(currThreads)
@@ -537,7 +539,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             if len(currThreads) < threadCount:
                 self.diag.info("Thread(s) terminated, remaining are " + repr([ t.name for t in currThreads ]))
             threadCount = len(currThreads)
-        
+
     def aliveThreads(self, threads):
         return filter(lambda thread: thread.isAlive(), threads)
 
@@ -563,7 +565,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         if len(self.appSuites) > 0: # If the above succeeds in quitting they will be reset
             self.notify("KillProcesses", sig)
         return signalText
-    
+
     def handleSignalWhileStarting(self, sig, *args):
         signalText = self.handleSignal(sig)
         raise KeyboardInterrupt, signalText

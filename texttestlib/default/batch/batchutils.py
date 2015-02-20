@@ -8,12 +8,12 @@ class BatchVersionFilter:
     def verifyVersions(self, app):
         badVersion = self.findUnacceptableVersion(app)
         if badVersion is not None:
-            raise plugins.TextTestError, "unregistered version '" + badVersion + "' for " + self.batchSession + " session."
+            raise plugins.TextTestWarning, "unregistered version '" + badVersion + "' for " + self.batchSession + " session."
 
     def findUnacceptableVersion(self, app):
         if app.getCompositeConfigValue("batch_use_version_filtering", self.batchSession) != "true":
             return
-        
+
         allowedVersions = app.getCompositeConfigValue("batch_version", self.batchSession)
         for version in app.versions:
             if len(version) > 0 and version not in allowedVersions and not version.startswith("copy_"):
@@ -24,7 +24,7 @@ def getBatchRunName(optionMap):
     name = optionMap.get("name")
     if name is not None:
         return name
-    
+
     jenkinsBuildNumber = os.getenv("BUILD_NUMBER")
     timeToUse = plugins.globalStartTime
     if jenkinsBuildNumber is None:

@@ -2729,3 +2729,7 @@ Bug Fixes:
 	Should be much less prone to getting lost or moved around now
     - Multiple checkouts and multiple copies now work together
     - Summary page generation with non-standard path now handles non-local paths properly
+    - Fixed bug where 0 error code could be received despite no executable being present
+    - Improved error message with batch_use_collection and no batch_recipients
+    - Fixed so that floating point calculations are included when recomputing
+

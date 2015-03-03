@@ -248,7 +248,7 @@ class GUIController(plugins.Responder, plugins.Observable):
             self.topWindowGUI.addObserver(observer)
 
     def readGtkRCFiles(self, *args):
-        for file in plugins.findDataPaths([ ".gtkrc-2.0" ], *args):
+        for file in plugins.findDataPaths([ ".gtkrc-2.0*" ], *args):
             gtk.rc_parse(file)
 
     def addSuites(self, suites):

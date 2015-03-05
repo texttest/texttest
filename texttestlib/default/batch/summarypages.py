@@ -442,8 +442,10 @@ class SummaryGenerator:
                 if "Insert footer here" in line:
                     f.write(creationDate + (jobLink if jobLink else ""))
 
-        self.linkOrCopy(summaryPageTimeStamp, dataFinder.summaryPageName)
-        self.cleanOldest(dataFinder.summaryPageName)
+        fileNames = self.getSortedFileNames(dataFinder.summaryPageName)
+        self.linkOrCopy(fileNames[-1][1],
+                        dataFinder.summaryPageName)
+        self.cleanOldest(fileNames)
 
         plugins.log.info("wrote: '" + summaryPageTimeStamp + "'")
         if fileToUrl:
@@ -468,31 +470,34 @@ class SummaryGenerator:
             except ValueError:
                 pass # Might not be the right format
 
-    def cleanOldest(self, root):
-        allFileNames = glob(root + ".*")
+    def cleanOldest(self, fileNames):
         numberOfFilesToKeep = 5
-        anythingToRemove = len(allFileNames) - numberOfFilesToKeep > 0
+        anythingToRemove = len(fileNames) - numberOfFilesToKeep > 0
         if anythingToRemove:
-            withTimeStamps = []
-            for fileName in allFileNames:
-                timeStamp = self.getTimeStampFromIndexFile(fileName)
-                if timeStamp is not None:
-                    withTimeStamps.append((timeStamp, fileName))
-
-            withTimeStamps.sort()
-            numberOfFilesToRemove = len(withTimeStamps) - numberOfFilesToKeep
+            numberOfFilesToRemove = len(fileNames) - numberOfFilesToKeep
 
             # Don't remove newer files in order to mitigate the risk of
             # removing index.html links created by a job running at the
             # same time.
             deleteOlderThan = datetime.datetime.now() - datetime.timedelta(minutes = 5)
             for _ in range(numberOfFilesToRemove):
-                timeStamp, fileName = withTimeStamps.pop(0)
+                timeStamp, fileName = fileNames.pop(0)
                 if timeStamp >= deleteOlderThan:
-                    # withTimeStamps is sorted by time stamps, so no
+                    # fileNames is sorted by time stamps, so no
                     # more files can be removed.
                     break
                 os.remove(fileName)
+
+    def getSortedFileNames(self, root):
+        allFileNames = glob(root + ".*")
+        withTimeStamps = []
+        for fileName in allFileNames:
+            timeStamp = self.getTimeStampFromIndexFile(fileName)
+            if timeStamp is not None:
+                withTimeStamps.append((timeStamp, fileName))
+
+        withTimeStamps.sort()
+        return withTimeStamps
 
     def getOrderedVersions(self, predefined, info):
         fullList = sorted(info)

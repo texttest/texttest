@@ -1,4 +1,3 @@
-
 """ Code related to building the summary page and the graphs etc. """
 
 import testoverview, logging, os, shutil, time, operator, sys
@@ -78,13 +77,13 @@ class GenerateGraphs(GenerateFromSummaryData):
                     graphTitle = "Test results for Application: '" + appName + "'  Version: '" + version + "'"
                     graphGenerator = GraphGenerator()
                     graphGenerator.generateGraph(fileName, graphTitle, results, dataFinder.colourFinder)
- 
+
 class TitleFinder(HTMLParser):
     def __init__(self):
         HTMLParser.__init__(self)
         self.active = False
         self.title = None
-        
+
     def handle_starttag(self, rawname, attrs):
         self.active = rawname.lower() == "title"
 
@@ -120,7 +119,7 @@ class SummaryDataFinder:
             self.diag.info("Searching under " + repr(appDir))
             if os.path.isdir(appDir):
                 self.appDirs[app.fullName()] = appDir
-                
+
         if os.path.isdir(location):
             for dirName in os.listdir(location):
                 if dirName not in appnames and not dirName.endswith("_history") and dirName not in [ "images", "javascript", "jenkins_changes" ]:
@@ -130,7 +129,7 @@ class SummaryDataFinder:
                         if appFullName and appFullName not in self.appDirs:
                             self.appUsePie[appFullName] = defaultUsePie
                             self.appDirs[appFullName] = fullDir
-                        
+
     @staticmethod
     def findFullName(dirName):
         # All files have the application in the title attribute
@@ -148,10 +147,10 @@ class SummaryDataFinder:
                 endPos = title.find(" - ", pos)
                 if endPos != -1:
                     return title[pos:endPos]
-                
+
     def getTemplateFile(self):
         return self.ensureLocationFileExists("summary_template.html", "etc")
-    
+
     def ensureLocationFileExists(self, fileName, dataDirName=""):
         locationFile = os.path.join(self.location, fileName)
         if not os.path.isfile(locationFile):
@@ -161,12 +160,12 @@ class SummaryDataFinder:
             srcFile = plugins.findDataPaths([ fileName ], includeSite, includePersonal, dataDirName)[-1]
             shutil.copyfile(srcFile, locationFile)
         return locationFile
-    
+
     def getLink(self, path):
         relpath = plugins.relpath(self.summaryPageName, self.location, normalise=False)
         if "/" not in relpath:
             return path
-        
+
         currLocation = self.location
         newParts = []
         for part in reversed(os.path.dirname(relpath).split("/")):
@@ -177,7 +176,7 @@ class SummaryDataFinder:
                 newParts.append("..")
         return "/".join(newParts) + "/" + path
 
-    def getGraphFile(self, appName, version):        
+    def getGraphFile(self, appName, version):
         return os.path.join(self.location, self.getShortAppName(appName), "images", "GenerateGraphs_" + version + ".png")
 
     def getAppsWithVersions(self):
@@ -219,7 +218,7 @@ class SummaryDataFinder:
         else:
             # application in question might not be loaded right now
             allRunDirs = set(self.appRuns.values())
-            if len(allRunDirs) == 1: 
+            if len(allRunDirs) == 1:
                 return allRunDirs.pop()
             else:
                 self.diag.info("No log dir found for " + appName + " stored are " + repr(self.appRuns))
@@ -236,10 +235,10 @@ class SummaryDataFinder:
         for envData, lastInfoList in allInfo.items():
             mostRecent.add(max(lastInfoList, key=self.getDateTagKey))
         return sorted(mostRecent, key=self.getDateTagKey)
-    
+
     def getDateTagKey(self, info):
         return info[0], plugins.padNumbersWithZeroes(info[1])
-        
+
     def usePieChart(self, appName):
         if self.appUsePie.get(appName):
             try:
@@ -251,13 +250,13 @@ class SummaryDataFinder:
                 return False # if matplotlib isn't installed or is too old
         else:
             return False
-        
+
     def extractLast(self, tags, count=1):
         if count == 1:
             return [ max(tags, key=self.getDateTagKey) ]
         else:
             return sorted(tags, key=self.getDateTagKey)[-count:]
-        
+
     def getLastInfoPerEnvironment(self, allTags, runDir, count=1):
         if runDir is None:
             value = self.extractLast(allTags, count)
@@ -267,12 +266,12 @@ class SummaryDataFinder:
             fullTag = time.strftime("%d%b%Y", date) + "_" + actualTag
             runEnv = getEnvironmentFromRunFiles([ runDir ], fullTag)
             return runEnv.get("JENKINS_URL"), runEnv.get("JOB_NAME")
-            
+
         groupedData = {}
         for tag in allTags:
             envData = getEnvironmentData(tag)
             groupedData.setdefault(envData, []).append(tag)
-            
+
         mostRecentDate = self.toDate(max(allTags, key=self.getDateTagKey)[0])
         oneDay = datetime.timedelta(days=1)
         allLastInfo = {}
@@ -281,22 +280,22 @@ class SummaryDataFinder:
             lastDate = self.toDate(last[-1][0])
             if last and mostRecentDate - lastDate <= oneDay:
                 allLastInfo[envData] = last
-            
+
         if len(allLastInfo) > 1 and (None, None) in allLastInfo:
             del allLastInfo[(None, None)]
-            
+
         return allLastInfo.items()
-    
+
     def toDate(self, timeStruct):
         return datetime.date.fromtimestamp(time.mktime(timeStruct))
-    
+
     def getMax(self, values, ignoreItems, **kw):
         if ignoreItems == 0:
             return max(values, **kw)
         elif len(values) > ignoreItems:
             values.sort(**kw)
             return values[-1 - ignoreItems]
-        
+
     def getLatestSummaries(self, appName, version):
         versionData = self.appVersionInfo[appName][version]
         summary, prevSummary = OrderedDict(), OrderedDict()
@@ -379,6 +378,8 @@ class SummaryGenerator:
     def __init__(self):
         self.diag = logging.getLogger("GenerateWebPages")
         self.diag.info("Generating summary...")
+        self.oldTimeFormat = "%Y%m%d_%H%M%S"
+        self.timeFormat = self.oldTimeFormat + "_%f"
 
     def adjustLineForColours(self, line, dataFinder):
         mainPart = line.rsplit(";", 1)[0].rstrip()
@@ -396,7 +397,7 @@ class SummaryGenerator:
         if firstDate != lastDate:
             text += " - " + time.strftime("%d%b%Y", lastDate)
         return text
-            
+
     def getRecentTagText(self, mostRecentInfo):
         if len(mostRecentInfo) > 2:
             return str(len(mostRecentInfo)) + " test runs" + self.getDateRangeText(mostRecentInfo)
@@ -412,8 +413,8 @@ class SummaryGenerator:
             jobPath = os.path.join(os.getenv("JENKINS_URL"), "job", os.getenv("JOB_NAME"), os.getenv("BUILD_NUMBER"))
             if jobPath:
                 jobLink = "<br>(built by Jenkins job '" + os.getenv("JOB_NAME") + "', "+ "<a href='" + jobPath + "'> "+ "build number "+ os.getenv("BUILD_NUMBER")+ "</a>" + ")"
-        
-        summaryPageTimeStamp = dataFinder.summaryPageName + "." + plugins.startTimeString("%Y%m%d_%H%M%S")
+
+        summaryPageTimeStamp = dataFinder.summaryPageName + "." + plugins.startTimeString(self.timeFormat)
         with open(summaryPageTimeStamp, "w") as f:
             versionOrder = [ "default" ]
             appOrder = []
@@ -443,12 +444,12 @@ class SummaryGenerator:
 
         self.linkOrCopy(summaryPageTimeStamp, dataFinder.summaryPageName)
         self.cleanOldest(dataFinder.summaryPageName)
-                    
-        plugins.log.info("wrote: '" + summaryPageTimeStamp + "'") 
+
+        plugins.log.info("wrote: '" + summaryPageTimeStamp + "'")
         if fileToUrl:
             url = convertToUrl(dataFinder.summaryPageName, fileToUrl)
             plugins.log.info("(URL is " + url + ")")
-            
+
     def linkOrCopy(self, src, dst):
         if os.path.exists(dst):
             os.remove(dst)
@@ -456,29 +457,43 @@ class SummaryGenerator:
             os.symlink(os.path.basename(src), dst)
         else:
             shutil.copy(src, dst)
-            
+
     def getTimeStampFromIndexFile(self, fileName):
-        timeStamp = fileName.rsplit(".", 1)[-1]
+        timeStampString = fileName.rsplit(".", 1)[-1]
         try:
-            return datetime.datetime.strptime(timeStamp, "%Y%m%d_%H%M%S")
+            return datetime.datetime.strptime(timeStampString, self.timeFormat)
         except ValueError:
-            pass # Might not be the right format
-            
+            try:
+                return datetime.datetime.strptime(timeStampString, self.oldTimeFormat)
+            except ValueError:
+                pass # Might not be the right format
+
     def cleanOldest(self, root):
-        allFiles = glob(root + ".*")
-        toRemove = len(allFiles) - 5
-        if toRemove:
+        allFileNames = glob(root + ".*")
+        numberOfFilesToKeep = 5
+        anythingToRemove = len(allFileNames) - numberOfFilesToKeep > 0
+        if anythingToRemove:
             withTimeStamps = []
-            for f in allFiles:
-                ts = self.getTimeStampFromIndexFile(f)
-                if ts is not None:
-                    withTimeStamps.append((ts, f))
+            for fileName in allFileNames:
+                timeStamp = self.getTimeStampFromIndexFile(fileName)
+                if timeStamp is not None:
+                    withTimeStamps.append((timeStamp, fileName))
+
             withTimeStamps.sort()
-            toRemove = len(withTimeStamps) - 5
-            for _ in range(toRemove):
-                _, f = withTimeStamps.pop(0)
-                os.remove(f)
-        
+            numberOfFilesToRemove = len(withTimeStamps) - numberOfFilesToKeep
+
+            # Don't remove newer files in order to mitigate the risk of
+            # removing index.html links created by a job running at the
+            # same time.
+            deleteOlderThan = datetime.datetime.now() - datetime.timedelta(minutes = 5)
+            for _ in range(numberOfFilesToRemove):
+                timeStamp, fileName = withTimeStamps.pop(0)
+                if timeStamp >= deleteOlderThan:
+                    # withTimeStamps is sorted by time stamps, so no
+                    # more files can be removed.
+                    break
+                os.remove(fileName)
+
     def getOrderedVersions(self, predefined, info):
         fullList = sorted(info)
         versions = []
@@ -486,7 +501,7 @@ class SummaryGenerator:
             if version in fullList:
                 versions.append(version)
                 fullList.remove(version)
-        return versions + fullList        
+        return versions + fullList
 
     def padWithEmpty(self, versions, columnVersions, minColumnIndices):
         newVersions = []
@@ -539,7 +554,7 @@ class SummaryGenerator:
             pg.save(summaryGraphFile)
 
     def showResultAsOld(self, info, mostRecentInfo):
-        # Only do this for timed results, i.e. nightjobs etc. From CI/Jenkins etc we can't really tell 
+        # Only do this for timed results, i.e. nightjobs etc. From CI/Jenkins etc we can't really tell
         # - it depends on the schedule which we can't see and may not even exist
         if not self.isDate(info[1]):
             return False
@@ -547,11 +562,11 @@ class SummaryGenerator:
 
     def isDate(self, tag):
         return len(tag) == 9 and tag[:2].isdigit() and tag[2:5].isalpha() and tag[5:].isdigit()
-    
+
     def getTrendImage(self, summary, prevSummary):
         text = self.getTrendText(summary, prevSummary)
         return "images/" + text + ".png"
-        
+
     def getTrendText(self, summary, prevSummary):
         currSuccess = summary.get("success", 0)
         prevSuccess = prevSummary.get("success", 0)
@@ -563,19 +578,19 @@ class SummaryGenerator:
             return "red_arrow_across"
         else:
             return "green_arrow_across"
-        
+
     def getTooltipForPrevious(self, prevSummary, prevTag):
         text = "Comparing to " + prevTag + " :\n"
         for colourKey, count in prevSummary.items():
             if count:
                 text += colourKey + "=" + str(count) + "\n"
         return text
-    
+
     def getColourAttribute(self, colourKey, cssColours, dataFinder):
         if colourKey in cssColours:
             return 'class="cell_' + colourKey + '"'
         else:
-            colour = dataFinder.getColour(colourKey)                    
+            colour = dataFinder.getColour(colourKey)
             return 'bgcolor="' + colour + '"'
 
     def insertSummaryTable(self, file, dataFinder, mostRecentInfo, pageInfo, appOrder, versionOrder, cssColours):
@@ -628,5 +643,3 @@ class SummaryGenerator:
         startPos = line.find("order=") + 6
         endPos = line.rfind("-->")
         return plugins.commasplit(line[startPos:endPos])
-
-

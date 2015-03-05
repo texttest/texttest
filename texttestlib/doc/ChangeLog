@@ -22,7 +22,7 @@ Version 1.0:
 	Can now "collect" several batch runs with use_collection:true to avoid multiple
 	emails being sent.
     - Performance development (performance.py)
-	Will now examine what's happening on the other processor of multi-processor 
+	Will now examine what's happening on the other processor of multi-processor
 	machines and print a little message. This has been found to affect the performance
 	due to competition for the memory bus.
     - "extra versions" development (texttest.py)
@@ -51,14 +51,14 @@ Version 2.0:
 	Should be very easy to add own files for comparison by creating CollateFile objects
 	in configurations
     - GUI added! (texttestgui.py)
-	For anyone with PyGTK installed this should make life a lot easier. It is essentially 
+	For anyone with PyGTK installed this should make life a lot easier. It is essentially
 	for monitoring the tests (rather than starting them) and is enabled with the new -g option.
     - major refactoring
 	To accommodate the GUI, tests are now regarded as having various states: this makes them
 	easier to observe and also removes a lot of global data.
 
 Version 2.1:
-   
+
     - Major GUI development (texttestgui.py)
 	Monitoring of tests as they run, configurable plugin tools for file viewing, extendable plugin
 	tools and a lot more besides...
@@ -82,8 +82,8 @@ Version 2.1:
 Version 3.0:
 
     - Compatibility changes in config file format. If you are upgrading from TextTest 2.x, read the
-        MigrationNotes file for details (otherwise just read the documentation). You will need to change
-        your config files!
+	MigrationNotes file for details (otherwise just read the documentation). You will need to change
+	your config files!
     - All config file entries now default sensibly (texttest.py)
 	The only compulsory one (that will cause error if not present) is "binary" now.
 	Unrecognised entries will produce warnings now too.
@@ -112,10 +112,10 @@ Version 3.0:
 	The unordered_text entry works much like the run_dependent_text entry, except that matching lines
 	are stored, sorted and produced in a section at the end.
     - various bug fixes and many more self-tests, including a suite for the LSF module.
-	
+
 Version 3.1:
 
-    - Plug-in for bugzilla command line interface (bugzilla.py) 
+    - Plug-in for bugzilla command line interface (bugzilla.py)
 	Makes use of bugcli program to allow linking test failures to known bugs in bugzilla, thus
 	saving time and being clearer when problems not immediately fixed.
     - Record/replay layer heading for independence (usecase.py/gtkusecase.py)
@@ -129,19 +129,19 @@ Version 3.1:
     - Can force long tests on performance machines when using LSF (performance.py/lsf.py)
 	Generally very long tests are there to test performance... "force_on_performance_machines"
     - Can change GUI defaults in config file (texttestgui.py)
-	By changing text to lower case and inserting underscores: 
+	By changing text to lower case and inserting underscores:
 	[gui_entry_overrides]
 	follow_file_rather_than_view_it:0
     - Improving interface between static and dynamic GUI (texttestgui.py)
 	Static GUI now displays errors on failed dynamic runs
-    	Separated temporary directories for the two
+	Separated temporary directories for the two
 	Where tests have same name, reduced instances of more tests than requested being started.
     - Refresh abilities in static GUI (texttestgui.py)
 	Will now handle some live updates, e.g. options file and re-ordering in testsuite file.
     - Various bug fixes
 	A couple to do with the "Save All" button, clean up of extra write directories and some
 	inconsistency fixed with the "slowdown job" feature of the LSF module.
-	
+
 Version 3.1.1:
 
     - PyUseCase now released separately (usecase.py/gtkusecase.py)
@@ -165,7 +165,7 @@ Version 3.2:
     - GUI widgets improved (texttestgui.py)
 	Now get radio buttons for some options and configurable drop-down lists for all text boxes
     - Improved GUI definition file concept (texttestgui.py,texttest.py)
-	New config file entry "definition_file_stems" added so that custom files can be declared as definition files. 
+	New config file entry "definition_file_stems" added so that custom files can be declared as definition files.
 	Added diagnostic definitions as definition files.
     - Generic diagnostics plugin provided (texttest.py)
 	Can now configure what is output via diagnostic configuration files placed anywhere in the test subtree, and also
@@ -246,7 +246,7 @@ Version 3.4:
     - Can now specify performance machines in a queue system via resources rather than hosts or host groups (queuesystem.py)
 	This is done by the new config file setting "performance_test_resource". Indeed it is the only way in SGE.
     - Introduced line wrapping for long output lines (comparetest.py)
-	This is useful for example in batch mode where newsgroups reject TextTest reports due to 
+	This is useful for example in batch mode where newsgroups reject TextTest reports due to
 	long lines. Config file setting called 'max_width_text_difference' defaulting to 900.
     - Unfolding tests in the tree view in GUI now unfolds all (texttestgui.py)
 	This is deemed to be more useful as it reverses the folding procedure
@@ -262,7 +262,7 @@ Version 3.4:
 
 Version 3.5:
     - Support for Windows XP introduced (default.py)
-	All features supported on UNIX are available in some form on Windows where appropriate. This has 
+	All features supported on UNIX are available in some form on Windows where appropriate. This has
 	meant the demise of the 'unixConfig' configuration, which is now inferred by using the default
 	configuration on UNIX.
     - Performance-related functionality overhauled and generalised (performance.py)
@@ -314,8 +314,8 @@ Version 3.5.1
     - Minor bugfixes as follows:
 	Reconnect with -reconnfull option and -b option cleaned previous tmp dirs (default.py)
 	Reconnect with -reconnfull option sometimes reconnected to itself (default.py)
-	GUIs from the system under test sometimes got sent to the real display if tests run together 
-	with a non-GUI application (unixonly.py) 
+	GUIs from the system under test sometimes got sent to the real display if tests run together
+	with a non-GUI application (unixonly.py)
 
 Version 3.5.2
     - More bugfixes for Windows XP (plugins.py)
@@ -332,7 +332,7 @@ Version 3.5.2
     - SGE plugin fixes (sge.py)
 	Takes account of SGE's file rotation scheme for finding exit status of jobs
 	Lengthened the sleep between polls to check job status, makes it less prone to busy-wait under load
-	
+
 Version 3.5.3
     - Added ability to specify directory for finding test list files in (testmodel.py)
 	Now use the "test_list_files_directory" config file setting to configure this.
@@ -396,7 +396,7 @@ Framework Enhancements:
 Grid Engine (LSF/SGE) enhancements:
     - Major refactoring of queuesystem module (queuesystem.py)
 	Slaves now communicate with the master process via sockets rather than relying
-	on master polling the queuesystem. Makes it much easier to add new grid engines 
+	on master polling the queuesystem. Makes it much easier to add new grid engines
 	besides SGE/LSF, and less prone to the vagaries of these products.
     - Tests that hit LSF/SGE queue limits handled in a better way (queuesystem.py)
 	They are reported as 'killed' and partial results are collected
@@ -471,16 +471,16 @@ GUI Enhancements:
 	of the panes
 Framework Enhancements:
     - Now possible to collate files using a plugin script instead of just copying them (default.py)
-	New config file entry "collate_script" makes this easy to do. 
+	New config file entry "collate_script" makes this easy to do.
     - Virtual display (Xvfb) handling much more sophisticated (unixonly.py)
 	It is now properly tested, and handles a few more cases: machines being down, only local connections being accepted,
 	VNC connection errors, failure to kill unusable servers etc.
     - No longer assumes console is the default interface (default.py)
 	There is a config file setting "default_interface" which defaults to the static GUI.
     - Can now generically ignore some parts of test data structures (testmodel.py)
-	The "test_data_ignore" config setting allows this. Side-effect is that catalogue files are sorted alphabetically. 
+	The "test_data_ignore" config setting allows this. Side-effect is that catalogue files are sorted alphabetically.
     - Added external "search path" for test data (testmodel.py)
-	Besides finding test data via environment variables or directly from the test tree, can now specify extra 
+	Besides finding test data via environment variables or directly from the test tree, can now specify extra
 	locations to act as default via "test_data_searchpath" config file setting
     - Overwrite option (-o) has reverted to its version 3.5.3 behaviour (respond.py)
 	It now saves the full version specified again. In version 3.6 this was changed to try to fix the version problem
@@ -514,7 +514,7 @@ Grid Engine (LSF/SGE) enhancements:
     - SGE lists owners of other jobs correctly in performance file (sge.py)
 	Previously it claimed everything was owned by the owner of the first job
     - Explicit shell login ("login_shell" config file setting) moved to queuesystem configuration (queuesystem.py)
-	It was also present in local mode but seemed mainly useful for grid engines. 
+	It was also present in local mode but seemed mainly useful for grid engines.
 	It occasionally caused environment settings to be overridden.
 Bug Fixes:
     - Fixed problems on Windows when pslist doesn't work properly (texttestgui.py)
@@ -542,7 +542,7 @@ Version 3.7.1
 Framework enhancements:
     - Plugin scripts (-s option) will no longer be rejected by the framework if no tests are found (engine.py)
 	- sometimes they only act on the application anyway.
-    - A couple of config file defaults changed: 
+    - A couple of config file defaults changed:
 	"view_program" now defaults to "emacs" rather than "xemacs" on UNIX, as it is slightly more universally available
 	"slow_motion_replay_speed" defaults to 3 instead of 0 (this was more or less a bug)
 LSF/SGE enhancements:
@@ -571,7 +571,7 @@ Bug Fixes:
     - Test data identified by environment variables can now be used as keys in "test_data_searchpath" (default.py)
     - Disable interactive dialogue in console interface after ^C has been pressed (respond.py)
 Test Fixes:
-    - A certain amount of work done stablising the self-tests and reducing the probability of occasional failures, 
+    - A certain amount of work done stablising the self-tests and reducing the probability of occasional failures,
       particularly the tests for SGE/LSF.
 
 Version 3.8
@@ -587,8 +587,8 @@ Major Enhancements:
     - "Known bugs" functionality overhauled and integrated with "Internal errors" (knownbugs.py)
 	See migration notes for more details. Many more things are now possible.
     - New "traffic interception mechanism" introduced (traffic.py)
-	Can record and replay the results (stdout/stderr/exit status) of command-line programs. 
-	Can also intercept network textual traffic and replay it, allowing client/server tests 
+	Can record and replay the results (stdout/stderr/exit status) of command-line programs.
+	Can also intercept network textual traffic and replay it, allowing client/server tests
 	without the whole system present.
 General GUI Enhancements:
     - Tests are now selected with single-click instead of double-click (texttestgui.py)
@@ -606,7 +606,7 @@ General GUI Enhancements:
 	Use the "gui_accelerators" section to change or add more.
     - Text boxes in tabs are now the same width as each other (texttestgui.py)
     - Layout configuration enhanced (texttestgui.py)
-	New entries in [window_size] section of config file allow maximising window and configuring pane separator 
+	New entries in [window_size] section of config file allow maximising window and configuring pane separator
 	positions.
 Static GUI Enhancements:
     - Test tree is now tests and suites only, and each only appears once (texttestgui.py)
@@ -629,7 +629,7 @@ Dynamic GUI Enhancements:
 	Means that more than one, but not all, files can be saved when saving tests in the dynamic GUI.
     - Improved how running tests are viewed (texttestgui.py)
 	Rather than dynamic info updating running info when test is selected, request it explicitly via new
-	"Update Info" button. 
+	"Update Info" button.
     - Unicode handling improved in Text Info tab (texttestgui.py)
 	Should now be able to display non-ASCII characters written by tests OK
     - Cannot select test suites or file view header lines any more (texttestgui.py)
@@ -671,8 +671,8 @@ Bug Fixes:
 	Problems before when trying to select an "extra_version".
     - Don't use the last selection criteria when running tests from static GUI (guiplugins.py)
 	This tended to cause the wrong tests to be run sometimes
-    - Large test selections can now be run on Windows XP (guiplugins.py) 
-	Previously all tests were written to command line and Windows has a max command line length. 
+    - Large test selections can now be run on Windows XP (guiplugins.py)
+	Previously all tests were written to command line and Windows has a max command line length.
 	Now use a temporary file instead.
     - Directory for saving selections is now created on demand if it doesn't exist (guiplugins.py)
 	By default the "filter_files" subdirectory of the application directory
@@ -706,7 +706,7 @@ Bug Fixes:
 Version 3.9
 ===========
 System requirements:
-    - TextTest now requires at least Python 2.4 (all interfaces). 
+    - TextTest now requires at least Python 2.4 (all interfaces).
 	This is because process management is vastly improved there.
     - TextTest GUI now requires at least PyGTK 2.6 also.
 	This is mostly because PyGTK 2.4 had some stability problems around the tree view filtering.
@@ -770,7 +770,7 @@ Framework Enhancements:
     - Virtual server functionality doesn't rely on "rsh" any more (unixonly.py)
 	Means that "virtual_display_machine:localhost" should work fine even if no permission for rsh.
     - Don't test virtual server more often than necessary now when running multiple apps (unixonly.py)
-	For GUI testing on UNIX: previously checked for every app and every version 
+	For GUI testing on UNIX: previously checked for every app and every version
     - Virtual server's display number is now configurable (unixonly.py)
 	Now use the config entry "virtual_display_number". Previously hardcoded to 42.
     - Command-line/client-server traffic replay enhanced (traffic.py)
@@ -793,9 +793,9 @@ Grid Engine (LSF/SGE) enhancements:
 	Generally it's because wrong resources or queues have crept in somewhere
 Old functionality removed (see migration notes):
     - Temporary diagnostic mode (comparetest.py/testmodel.py)
-	Just seemed to complicate things unnecessarily. 
+	Just seemed to complicate things unnecessarily.
     - Automatic performance measurement on Windows (default.py)
-	Never worked very well and unclear if anyone's ever used it. 
+	Never worked very well and unclear if anyone's ever used it.
     - Record Standard Input functionality (default.py)
 	Unclear if anybody's ever used this. I certainly haven't.
     - Shell syntax in QUEUE_SYSTEM_RESOURCE (queuesystem.py)
@@ -850,13 +850,13 @@ Version 3.9.1
 Fixes for bugs introduced in 3.9:
     - Fixed "Follow file progress" on UNIX (The "tail -f" window, which just produced an error in 3.9) (guiplugins.py)
     - Fixed handling of Windows path names in "binary" config file setting and options.<app> files (default.py)
-Fixes for older bugs: 
+Fixes for older bugs:
     - Fixed dynamic GUI bug where deselecting all tests (e.g. by hiding or collapsing) blocked all Text Info updates (texttestgui.py)
 	Could lead to a Text Info window which showed "Running" even when the test was complete.
     - Fixed HTML report bug where generating a report on UNIX from a run done on Windows produced "read error" (testoverview.py)
 	Windows line-ending trouble again
     - Fixed bug where terminated processes on UNIX got named "CMD" (jobprocess.py)
-	Could lead to occasional confusing printouts. 
+	Could lead to occasional confusing printouts.
 
 Version 3.10
 ============
@@ -869,7 +869,7 @@ Major Enhancements:
 	The tests are now read in a separate thread so that execution and display can start before all are read.
 	Environment files are also only read on demand.
     - Radical rework to improve throughput for grid engines (queuesystem.py)
-	Instead of submitting every new test as a new job, introduced socket communication to reuse jobs. 
+	Instead of submitting every new test as a new job, introduced socket communication to reuse jobs.
 	Improves response time greatly if running a lot of short tests, by eliminating dispatch time.
 General GUI Enhancements:
     - TextTest now has its own icons! (texttestgui.py)
@@ -894,7 +894,7 @@ Dynamic GUI Enhancements:
     - Quitting no longer freezes the dynamic GUI (texttestgui.py)
 	Informs you about what its doing (killing tests, viewers, removing files etc.)
     - "Double Quit" now properly supported (texttestgui.py)
-	Useful for cleaning up when tests refuse to be killed. 
+	Useful for cleaning up when tests refuse to be killed.
     - Can now mark tests when they have been viewed (texttestgui.py)
 	Useful when wading through lots of changes, so already examined tests can be hidden.
     - Performance of "Update Info" button greatly improved. (guiplugins.py)
@@ -909,7 +909,7 @@ Framework Enhancements:
     - Now possible to easily run multiple copies of the same test (default.py)
 	Command line option -copy, or "Times to run" box in static GUI
     - Reorganised the temporary directory structure to have one top directory per run (default.py)
-	Previously had one directory per application run which could lead to confusion. 
+	Previously had one directory per application run which could lead to confusion.
 	Has a few implications, see Migration Notes.
     - Virtual display mechanism for testing GUIs on UNIX rewritten (unixonly.py)
 	Instead of running all tests against a single central display, start one local virtual display per test
@@ -924,7 +924,7 @@ Framework Enhancements:
 	OK for variables to refer to definitions below them in the file now
     - "view_program" config setting now expands environment variables from the tests (guiplugins.py)
     - Can now inform TextTest about binary files in the tests so it doesn't try to do tkdiff on them... (default.py)
-    - New mechanism for sharing enviroment files between different tested applications (testmodel.py) 
+    - New mechanism for sharing enviroment files between different tested applications (testmodel.py)
 	Use "extra_config_directory"
 Batch Report Enhancements:
     - Can now have extra_versions that are only used in particular batch sessions (default.py)
@@ -934,7 +934,7 @@ Grid Engine (LSF/SGE) enhancements:
     - Remote jobs remove the bulk of their own files
 	Unless -keepslave is specified, slave jobs will remove all files in succeeded tests, and all data files.
 	See Migration Notes.
-    - Job bookkeeping improved	
+    - Job bookkeeping improved
 	Fixed problems to do with the wrong SGE/LSF job being found when tests are killed hard.
     - TextTest now manages job control signals itself
 	Installs default handlers for SIGXCPU, SIGUSR1 and SIGUSR2 to tested programs as these are a fact
@@ -969,7 +969,7 @@ Bug Fixes:
 	Really a side-effect of environment cleanup mentioned above
     - Current working directory now set correctly again when automatic cputime checking is enabled (unixonly.py)
 	Vital for finding core files correctly
-    - Fixed replay bug in traffic mechanism where repeated input has no associated reply second time around (traffic.py) 
+    - Fixed replay bug in traffic mechanism where repeated input has no associated reply second time around (traffic.py)
     - Fixed stacktrace when doing "view raw differences" on a new file in the dynamic GUI
     - Fixed bug where hidden tests that aren't being viewed becoming visible wipes the files selected in the viewed test (texttestgui.py)
     - Fixed some inconsistencies between different error messages for config file inconsistency (testmodel.py)
@@ -994,13 +994,13 @@ Major Enhancements:
     - Recomputation functionality totally reworked (default_gui.py, comparetest.py)
 	Can be applied to multiple tests at once. No longer happens magically but shows a refresh icon
 	when suggested. Takes config file changes into account. Works after fast reconnect. Handles
-	file deletions. See migration notes. 
+	file deletions. See migration notes.
 General GUI Enhancements:
     - Many tabs replaced by dialogs. (guiplugins.py)
 	This is more in line with what GUIs usually do. If your tabbed functionality isn't there any more,
 	check the popup menus.
     - GUI configuration modules separated from standard configuration modules (guiplugins.py)
-	"interactive_action_module" is no longer a list and works like "config_module". 
+	"interactive_action_module" is no longer a list and works like "config_module".
 	Naming scheme for layout XML files changed. See migration notes
     - All actions now exist in the menus and can have accelerators. New default accelerators added (guiplugins.py)
 	Add Test = <ctrl>N, Remove and Kill = <ctrl>Del, Refresh/Recompute = F5, Record = F9, Enter failure info = <ctrl>I
@@ -1069,7 +1069,7 @@ Framework Enhancements:
     - Core file collection improved (interpretcore.py)
 	Summary of what binary and core were used is displayed, along with debug info if any
     - Bugzilla plugin no longer depends on perl (bugzilla.py)
-	But still requires the cli.cgi script to be present. 
+	But still requires the cli.cgi script to be present.
 	Need to tell it how to find this via the config entry "bug_system_script". See migration notes.
     - Temporary directories now have a PID identifier (default.py)
 	Mainly to make it impossible for two runs to write to the same place.
@@ -1139,7 +1139,7 @@ Grid Engine bug fixes:
 
 Version 3.11.1
 ==============
-	
+
 Framework Enhancements:
     - Can now configure how the units of performance are described (sandbox.py)
 	See docs for "performance_unit"
@@ -1164,8 +1164,8 @@ Version 3.12
 ============
 System requirements (see Migration Notes):
     - TextTest GUI now requires at least Python 2.5.1 on Windows.
-	Python 2.4 still supported on UNIX only. 
-    	This allowed removing all hacks for killing processes on Windows, so "pskill" is no longer required on Windows 2000.
+	Python 2.4 still supported on UNIX only.
+	This allowed removing all hacks for killing processes on Windows, so "pskill" is no longer required on Windows 2000.
 Major Enhancements:
     - Can now define new applications from the static GUI, and hence start TextTest without creating anything beforehand (testmodel.py)
 	Edit / Add application produces this dialog. Also texttest.py --new, or starting with an empty TEXTTEST_HOME.
@@ -1192,7 +1192,7 @@ Dynamic GUI Enhancements:
     - "follow_program" setting for the dynamic GUI file view no longer magically inserts 'xterm' prefixes on UNIX (default_gui.py)
 	What you see is what you get now. See Migration Notes.
     - When a known bug in bugzilla is triggered, a "hyperlink" to that bug in bugzilla appears in the Text Info window. (testoverview.py)
-	This will open that bug in your default browser on Windows. 
+	This will open that bug in your default browser on Windows.
 	On Unix, it uses the $BROWSER environment variable for this, and tries to start "firefox" if it isn't defined
     - New "Annotate" feature in Edit menu (default_gui.py)
 	This is essentially a post-it note on a run reminding you why it's there and not to kill it lightly.
@@ -1204,7 +1204,7 @@ Framework Enhancements:
 	Can essentially record and replay UNIX signals sent to them. On Windows, replaying a signal will just terminate
 	the process, and record is not supported.
     - Traffic mechanism works much better on Windows (traffic.py)
-	Before it usually needed hacking in the application code to make it work properly with non-python programs. 
+	Before it usually needed hacking in the application code to make it work properly with non-python programs.
 	Now there is a .exe file which Windows likes better.
     - Bugzilla plugin upgraded to Bugzilla 3.x, and no longer needs external software (bugzilla.py)
 	Uses the new webservice interface. Bugzilla 2.x plugin is now called bugzillav2. See Migration Notes.
@@ -1231,7 +1231,7 @@ Bug Fixes:
     - Fixed bug in config file parsing where {CLEAR LIST} as the first entry in a list was interpreted naturally (testmodel.py)
     - Fixed bug where test suites being removed and re-added via static GUI refresh caused a stack trace (testmodel.py)
     - Fixed bug where recomputation and/or marking tests while others were running occasionally confused the grouping in the status view (texttestgui.py)
-    - Selecting multiple rows referring to the same test in the status view no longer screws up the selection count in the dynamic GUI (texttestgui.py) 
+    - Selecting multiple rows referring to the same test in the status view no longer screws up the selection count in the dynamic GUI (texttestgui.py)
     - UNIX Virtual display handling doesn't refer to 'localhost' any more in DISPLAY names (unixonly.py)
 	More robust to just use a blank machine name, then we remain within the X internal mechanisms
     - Authors now appear with Swedish characters uncorrupted even in non-Swedish locales! (helpdialogs.py)
@@ -1243,7 +1243,7 @@ Version 3.12.1
 Installation and self-test changes:
     - ViewHelp self-test fixed, oversight in 3.12 release
     - 2 reconnect self-tests fixed on Ubuntu that worked on both RHEL and Windows...
-    - Self-test coverage work: tests added, dead code removed, no-coverage pragmas added. Coverage now 97.2% 
+    - Self-test coverage work: tests added, dead code removed, no-coverage pragmas added. Coverage now 97.2%
 Bug Fixes to 3.12:
     - Reconnecting to several runs simultaneously with extra versions will find all extra versions correctly (reconnect.py)
     - Reconnecting to extra version tests only now works correctly in the static GUI (default_gui.py)
@@ -1273,7 +1273,7 @@ Framework Enhancements:
     - Can now provide several checkouts on the command line with -c <checkout1>,<checkout2>
 	Internally a version is generated for all except the first one
     - Config file error handling improved (plugins.py)
-	Now get a wider range of warnings and don't get the same warning lots of time. 
+	Now get a wider range of warnings and don't get the same warning lots of time.
 	Looks for missing [end] statements.
     - Self-diagnostics moved to ~/.texttest/log by default (engine.py)
 	But still fully configurable. Default log config file now lives with the source under log subdirectory.
@@ -1314,7 +1314,7 @@ Grid Engine (LSF/SGE) enhancements:
     - Information about other processes on the machine improved (queuesystem.py)
 	Doesn't report itself, picks up processes from other users (SGE) and reports the job ID
 Installation and self-test changes:
-    - Self-tests (and source code) are now available from Launchpad, if you're changing the code you should get them from there 
+    - Self-tests (and source code) are now available from Launchpad, if you're changing the code you should get them from there
     - CVS browser tests greatly improved and come with an entire CVS repository. (cvs.py)
 Bug Fixes:
     - Reconnecting to runs done with -v v1,v2 is now possible (reconnect.py)
@@ -1360,7 +1360,7 @@ Static GUI Enhancements:
 	Also works for reconnecting and saving selections.
 Framework Enhancements:
     - Can now run tests on a remote machine (UNIX only) (default.py)
-	Even works if file system not shared. New config entries "remote_shell_program" 
+	Even works if file system not shared. New config entries "remote_shell_program"
 	and "remote_copy_program". See website for details.
     - TextTest now collects exit codes from the system under test by default (default.py)
 	Only writes files for non-zero status. Can be disabled via discard_file
@@ -1369,7 +1369,7 @@ Framework Enhancements:
     - Can now tell TextTest to merge data directories with each other (sandbox.py)
 	Use new config setting "copy_test_path_merge". "copy_test_path" causes directories to be overwritten.
     - Can now filter floating-point differences to within a certain tolerance (rundependent.py/fpdiff.py)
-	New config file setting "floating_point_tolerance". 
+	New config file setting "floating_point_tolerance".
 	See documentation on website. Thanks to Michael Behrisch for this.
     - Can now collate result files from a variety of possible source patterns (sandbox.py)
 	Essentially collate_file is now a list. May require migration in theory.
@@ -1380,7 +1380,7 @@ Framework Enhancements:
     - Config file setting "performance_use_normalised_%" renamed for generic application (default.py)
 	Now called "use_normalised_percentage_change" to reflect possible usage for other purposes. Old name aliased.
     - Traffic mechanism does not assume asynchronous file edits are possible any more (traffic.py)
-	Need to explicitly list programs that might do this : key with "asynchronous" in "collect_traffic" 
+	Need to explicitly list programs that might do this : key with "asynchronous" in "collect_traffic"
 	config file setting, which is now a dictionary.
     - No longer ignores missing traffic and usecase files. (default.py)
 	"definition_file_stems" is now a dictionary, where items like these can be keyed "regenerate"
@@ -1819,7 +1819,7 @@ Framework Enhancements:
     - File difference previews now indicate when they have truncated some long text (plugins.py)
 	In either batch mode reports or the dynamic GUI's text window at the bottom right.
     - System warnings reviewed (plugins.py)
-	Many that were previously largely invisible when running the GUI will now turn up as GUI popup windows. 
+	Many that were previously largely invisible when running the GUI will now turn up as GUI popup windows.
 	Others will also appear on the console. One example is when a test is referred to but cannot be found.
     - Can now stop test execution after the first test failure (actionrunner.py)
 	-stop on the command line, or appropriate check box on Running tab. See docs.
@@ -1906,7 +1906,7 @@ Framework Enhancements:
     - "collect_traffic_py_attributes" now called "collect_traffic_python" and works on builtin modules (traffic.py)
 	Changed how it operates. Config form of it has changed and unified with "collect_traffic_py_module", see migration notes.
     - Can now filter out certain calling modules/directories when doing Python interception (traffic.py)
-	New config setting "collect_traffic_python_ignore_callers". 
+	New config setting "collect_traffic_python_ignore_callers".
 	By default it includes the whole standard library and TextTest itself. See website docs.
     - Python attributes that get requested repeatedly don't cause extra traffic file entires (traffic_server.py)
 	Just causes traffic files to be long and there is little point keeping track of the number of calls.
@@ -2124,7 +2124,7 @@ Framework Enhancements:
 	Both virtual display and accessibility of usecase and UI map files fixed
     - "performance_logfile" now works on any file, not just those that are being compared
 	Unix file expansions can also be used
-    - performance percentage numbers are now rounded to the nearest integer rather than truncated 
+    - performance percentage numbers are now rounded to the nearest integer rather than truncated
     - Allow disabling of CaptureMock from TextTest (-rectraffic 3, or an extra radio button in the static GUI)
 Batch Report Enhancements:
     - New filtering toolbar in the HTML pages
@@ -2205,11 +2205,11 @@ Dynamic GUI Enhancements:
     - New "Find failure information" action
 	Allows finding other reported bugs in the test suite that might match a given failure, and applying them
     - New "split result files" action
-	This allows viewing, grouping and saving the differences of parts of your files separately, for example in case many 
+	This allows viewing, grouping and saving the differences of parts of your files separately, for example in case many
 	things have changed at once. There is a new config value "file_split_pattern", see the documentation of that in
 	the config file documenation for more details of how to use it.
     - New "reload tests" action
-	This is essentially like reconnecting to the current run. Main point being to make it possible to reload results 
+	This is essentially like reconnecting to the current run. Main point being to make it possible to reload results
 	using the grid, and/or without interfering with the currently shown results.
 Static GUI Enhancements:
     - Record dialog now allows recording on a different machine via SSH
@@ -2235,7 +2235,7 @@ Grid Engine (LSF/SGE) enhancements/bug fixes:
 	New "-xs" flag for this. Not automatically inferred from "-x" any more.
     - Error messages from slave processes now shown also when running GUI
     - Error messages from proxy slave jobs are now shown
-    - Proxy slave jobs now also use queues specified on the command line 
+    - Proxy slave jobs now also use queues specified on the command line
     - Workaround for LS_COLORS bug in ancient version of tcsh
     - Fixed issue with "kill_timeout" if test gets suspended by grid engine
 	Timeout only worked on wallclock time so test could time out prematurely.
@@ -2266,7 +2266,7 @@ Bug Fixes:
 	Previous stored them, forwarded them, kept looking in them etc
     - Error messages are now shown when doing "Follow File" remotely in the dynamic GUI file view.
 	e.g. if the viewer requested doesn't exist or the remote shell configuration does not work.
-    - Fixed bug in dynamic GUI where file view selections from actions in the status view 
+    - Fixed bug in dynamic GUI where file view selections from actions in the status view
 	Did not clear previous selections but added to them.
     - Now works when recomputing or saving causes a known bug to become irrelevant, state correctly updated
     - Core file interpretation now handles 'file' version 5 (previously only handled up to version 4)
@@ -2418,7 +2418,7 @@ Static GUI Enhancements:
 	Many viewing actions, including version control ones, can now be carried out there.
     - (GUI testing) "run in slow motion replay" checkbox removed. It has been replaced with a spinner for adding a pause after each event and
 	a new check box "Show GUI and record any extra actions".
-    - (GUI testing) "Replace Text in Files" action now allows text search/replace in shortcut files. 
+    - (GUI testing) "Replace Text in Files" action now allows text search/replace in shortcut files.
 	It shows a new check box, "Replace text in shortcut files" when GUI testing is enabled.
     - "Replace Text in Files" now applies back references as a whole, allowing e.g. swapping lines
 	See migration notes
@@ -2439,9 +2439,9 @@ Framework Enhancements:
     - "Enter Failure Information" (known bugs) dialog has an extra option for providing exact matching
 	Mostly for when you need to match an exact small diff, and not also trigger when other things are present.
     - Known bugs mechanism priorities
-	If two known bugs are triggered and one of them requests a rerun, we report the one that didn't request a rerun. 
+	If two known bugs are triggered and one of them requests a rerun, we report the one that didn't request a rerun.
 	Can add priorities explicitly via "priority" field (not available via GUI yet)
-    - New setting "custom_trigger" for known bugs, to allow further configuration of when to trigger 
+    - New setting "custom_trigger" for known bugs, to allow further configuration of when to trigger
 	(usually checking the environment)
     - TextTest now returns an exit code of 2 if there are only performanace differences
 	Allows wrapper scripts to treat this differently from if there are failures.
@@ -2644,6 +2644,7 @@ Bug Fixes:
 Version trunk
 =============
 Release Enhancements:
+    - Spec file for RPM packaging added.
 Dynamic GUI Enhancements:
     - Default colour for known bugs is now orange, as in HTML reports
 	"Marked" default colour changes to light blue accordingly
@@ -2732,4 +2733,3 @@ Bug Fixes:
     - Fixed bug where 0 error code could be received despite no executable being present
     - Improved error message with batch_use_collection and no batch_recipients
     - Fixed so that floating point calculations are included when recomputing
-

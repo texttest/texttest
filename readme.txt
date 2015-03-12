@@ -106,3 +106,5 @@ for Python and Java GUIs, which relies on a record/replay layer between the appl
 There is also "NUseCase" for .net GUIs. TextTest integrates with these, and includes 
 StoryText as it uses it for its own testing. If you want to use it for your own GUIs you are however recommended 
 to download it separately from its own page.
+
+

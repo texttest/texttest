@@ -2641,8 +2641,8 @@ Bug Fixes:
     - Don't use path separators in job names, even if they exist in full_name for the app
     - Non-numeric arguments to options which expect numbers give an error rather than stacktrace now
 
-Version trunk
-=============
+Version 3.28
+============
 Release Enhancements:
     - Spec file for RPM packaging added.
 Dynamic GUI Enhancements:
@@ -2733,3 +2733,14 @@ Bug Fixes:
     - Fixed bug where 0 error code could be received despite no executable being present
     - Improved error message with batch_use_collection and no batch_recipients
     - Fixed so that floating point calculations are included when recomputing
+
+Version trunk
+=============
+Release Enhancements:
+Dynamic GUI Enhancements:
+Static GUI Enhancements:
+Framework Enhancements:
+Version Control Browser Enhancements:
+Batch Report Enhancements:
+Grid Engine/Cloud enhancements/bug fixes:
+Bug Fixes:

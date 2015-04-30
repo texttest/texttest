@@ -891,7 +891,7 @@ class CreateCatalogue(plugins.Action):
         self.diag = logging.getLogger("catalogues")
         
     def __call__(self, test):
-        if test.app.getConfigValue("create_catalogues") != "true":
+        if test.getConfigValue("create_catalogues") != "true":
             return
 
         if self.catalogues.has_key(test):

@@ -265,8 +265,9 @@ class RunDependentTextFilter(plugins.Observable):
         filteredLine = line
         linesToRemove = 0
         filtersToRemove = []
+        alreadyFilteredAway = False
         for lineFilter, lastRelevantLine in lineFilters:
-            changed, currFilteredLine, removeCount = lineFilter.applyTo(line, lineNumber)
+            changed, currFilteredLine, removeCount = lineFilter.applyTo(line, lineNumber, alreadyFilteredAway)
             if lastRelevantLine is not None and lineNumber >= lastRelevantLine:
                 filtersToRemove.append((lineFilter, lastRelevantLine))
 
@@ -277,6 +278,8 @@ class RunDependentTextFilter(plugins.Observable):
                     line = currFilteredLine
                 if filteredLine:
                     filteredLine = currFilteredLine
+                if currFilteredLine is None:
+                    alreadyFilteredAway = True
         for lineFilter, lastRelevantLine in filtersToRemove:
             lineFilters.remove((lineFilter, lastRelevantLine))
                     
@@ -439,9 +442,14 @@ class LineFilter:
         else:
             return plugins.TextTrigger(text)
 
-    def applyTo(self, line, lineNumber=0):
+    def isMultiLine(self):
+        return self.linesToRemove > 1 or self.prevLinesToRemove > 0 or self.untrigger is not None
+
+    def applyTo(self, line, lineNumber=0, alreadyFilteredAway=False):
         if self.autoRemove:
             return self.applyAutoRemove(line)
+        elif alreadyFilteredAway and not self.isMultiLine():
+            return False, None, 0
 
         if self.trigger.matches(line, lineNumber):
             self.diag.info(repr(self.trigger) + " matched " + line.rstrip())

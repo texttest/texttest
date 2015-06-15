@@ -20,8 +20,8 @@ from glob import glob
 from getopt import getopt
 
 def getSfUser():
-    userMap = { "geoff": "gjb1002", "dgalda" : "dagal" }
-    user = os.getenv("USER")
+    userMap = { "geoff": "gjb1002", "E601429": "gjb1002", "dgalda" : "dagal" }
+    user = os.getenv("USER", os.getenv("USERNAME"))
     return userMap.get(user, user)
         
 
@@ -59,6 +59,7 @@ def updateVersionFile(versionFile, releaseName):
     with open(newFileName, "w") as newFile:
         for line in open(versionFile):
             newFile.write(line.replace("trunk", releaseName))
+    os.remove(versionFile)
     os.rename(newFileName, versionFile)
 
 def getCommandLine():

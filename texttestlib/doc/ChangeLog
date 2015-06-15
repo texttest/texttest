@@ -2739,4 +2739,13 @@ Version 3.28.1
 Bug Fixes:
     - Don't apply subsequent single line filters if a line has already been filtered away
 
-
+Version trunk
+=============
+Release Enhancements:
+Dynamic GUI Enhancements:
+Static GUI Enhancements:
+Framework Enhancements:
+Version Control Browser Enhancements:
+Batch Report Enhancements:
+Grid Engine/Cloud enhancements/bug fixes:
+Bug Fixes:

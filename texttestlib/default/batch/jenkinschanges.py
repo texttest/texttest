@@ -226,7 +226,7 @@ class ChangeSetFinder:
         bugs = []
         for changeset in document.getElementsByTagName("changeset"):
             author = self.parseAuthor(changeset.getAttribute("author"))
-            if author not in authors:
+            if author and (author not in authors):
                 authors.append(author)
             for msgNode in changeset.getElementsByTagName("msg"):
                 msg = msgNode.childNodes[0].nodeValue
@@ -241,7 +241,7 @@ class ChangeSetFinder:
             for line in f:
                 if "<" in line and "@" in line:
                     author = self.parseAuthor(line.split(": ")[-1])
-                    if author not in authors:
+                    if author and (author not in authors):
                         authors.append(author)
                 if line.startswith(" "):
                     self.addUnique(bugs, self.getBugs(line))
@@ -274,7 +274,21 @@ class ChangeSetFinder:
         if "." in withoutEmail:
             return " ".join([ part.capitalize() for part in withoutEmail.split(".") ])
         else:
-            return withoutEmail.encode("ascii", "xmlcharrefreplace")
+            try:
+                withoutEmail = withoutEmail.encode("ascii", "xmlcharrefreplace")
+            except UnicodeDecodeError, exception:
+                fallback = "replace"
+                print "FAILED to encode name '" + withoutEmail + "'", \
+                          "(" + str(type(withoutEmail)) + ", default encoding: '" \
+                          + sys.getdefaultencoding() + "') due to:\n", \
+                          exception, "\nTrying encode with '" + fallback + "' as fallback..."
+                try:
+                    withoutEmail = withoutEmail.encode("ascii", fallback)
+                except UnicodeDecodeError, exception:
+                    print "Fallback FAILED!"
+                    return None
+            return withoutEmail
+
 
     def addUnique(self, items, newItems):
         for newItem in newItems:

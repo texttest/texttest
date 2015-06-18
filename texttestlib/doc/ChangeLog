@@ -2739,6 +2739,11 @@ Version 3.28.1
 Bug Fixes:
     - Don't apply subsequent single line filters if a line has already been filtered away
 
+Version 3.28.2
+==============
+Bug Fixes:
+    - Make killing tests work better when running in parallel on Windows
+
 Version trunk
 =============
 Release Enhancements:

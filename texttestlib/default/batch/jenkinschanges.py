@@ -1,4 +1,10 @@
-import os, sys, re, hashlib, time
+import os
+import sys
+import re
+import hashlib
+import time
+import codecs
+import locale
 from xml.dom.minidom import parse
 from ordereddict import OrderedDict
 from glob import glob
@@ -237,14 +243,20 @@ class ChangeSetFinder:
     def parsePlainChangeLog(self, fileName):
         authors = []
         bugs = []
-        with open(fileName) as f:
-            for line in f:
+        # If there are non-ascii characters in the changelog, there
+        # will be encoding errors if the file is opened with plain
+        # open(). People's names are expected to be spelled as
+        # intended in this day and age. It's not clear why this is
+        # needed, a standalone python program reading the same file
+        # have no issues.
+        with codecs.open(fileName, "r", "utf-8") as changelog:
+            for line in changelog:
                 if "<" in line and "@" in line:
                     author = self.parseAuthor(line.split(": ")[-1])
                     if author and (author not in authors):
                         authors.append(author)
                 if line.startswith(" "):
-                    self.addUnique(bugs, self.getBugs(line))
+                    self.addUnique(bugs, self.getBugs(line.encode("ascii")))
         return authors, bugs
 
     def parseChangeLog(self, xmlFile):
@@ -277,16 +289,12 @@ class ChangeSetFinder:
             try:
                 withoutEmail = withoutEmail.encode("ascii", "xmlcharrefreplace")
             except UnicodeDecodeError, exception:
-                fallback = "replace"
-                print "FAILED to encode name '" + withoutEmail + "'", \
-                          "(" + str(type(withoutEmail)) + ", default encoding: '" \
-                          + sys.getdefaultencoding() + "') due to:\n", \
-                          exception, "\nTrying encode with '" + fallback + "' as fallback..."
-                try:
-                    withoutEmail = withoutEmail.encode("ascii", fallback)
-                except UnicodeDecodeError, exception:
-                    print "Fallback FAILED!"
-                    return None
+                print "FAILED to encode name '" + withoutEmail + "' (repr: " + repr(withoutEmail) + ", " \
+                      + str(type(withoutEmail)) + ", default encoding: '" \
+                      + sys.getdefaultencoding() + "', default locale: " \
+                      + str(locale.getdefaultlocale()) + ") due to:\n", \
+                      exception, "\nIgnoring this entry"
+                return None
             return withoutEmail
 
 

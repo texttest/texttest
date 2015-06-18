@@ -4,6 +4,7 @@
 import subprocess, os, signal
 import abstractqueuesystem
 from multiprocessing import cpu_count
+from texttestlib import plugins
 
 class QueueSystem(abstractqueuesystem.QueueSystem):
     def __init__(self, *args):
@@ -15,7 +16,8 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
             process = subprocess.Popen(cmdArgs, 
                                        stdout=open(os.path.join(logDir, outputFile), "w"), 
                                        stderr=open(os.path.join(logDir, errorsFile), "w"),
-                                       cwd=logDir, env=self.getSlaveEnvironment(slaveEnv))
+                                       cwd=logDir, env=self.getSlaveEnvironment(slaveEnv), 
+                                       startupinfo=plugins.getHideStartUpInfo())
             errorMessage = None
         except OSError, e:
             errorMessage = "Failed to start slave process : " + str(e)
@@ -34,14 +36,20 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
 
     def getSignal(self):
         return signal.SIGUSR2 if os.name == "posix" else signal.SIGTERM
-
+        
     def killJob(self, jobId):
         proc = self.processes[jobId]
         jobExisted = proc.poll() is None
         if jobExisted:
-            sig = self.getSignal()
-            proc.send_signal(sig)
-        return jobExisted        
+            if os.name == "posix":
+                proc.send_signal(self.getSignal())
+            else:
+                if not self.runTaskKill(proc): # Sometimes Windows decides we can't kill the slave process. Better to kill it hard than not at all then.
+                    self.runTaskKill(proc, [ "/T", "/F" ])
+        return jobExisted
+    
+    def runTaskKill(self, proc, extraArgs=[]):
+        return subprocess.call([ "taskkill" ] + extraArgs + [ "/PID", str(proc.pid) ], stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT, startupinfo=plugins.getHideStartUpInfo()) == 0
     
     def getStatusForAllJobs(self):
         statusDict = {}

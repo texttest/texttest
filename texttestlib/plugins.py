@@ -1,5 +1,5 @@
 
-import sys, os, logging.config, string, shutil, socket, time, re, stat, shlex, types, fnmatch
+import sys, os, logging.config, string, shutil, socket, time, re, stat, shlex, types, fnmatch, subprocess
 from ordereddict import OrderedDict
 from traceback import format_exception
 from threading import currentThread
@@ -124,6 +124,16 @@ def pluralise(num, name):
         return "1 " + name
     else:
         return str(num) + " " + name + "s"
+
+def getHideStartUpInfo():
+    if os.name == "nt":
+        info = subprocess.STARTUPINFO()
+        # Python doesn't make this easy for us: in 2.6.6 and later these flags became inaccessible
+        # Alternative is to use win32api which seems excessive just for this purpose.
+        winFlagModule = subprocess if hasattr(subprocess, "STARTF_USESHOWWINDOW") else subprocess._subprocess #@UndefinedVariable
+        info.dwFlags |= winFlagModule.STARTF_USESHOWWINDOW
+        info.wShowWindow = winFlagModule.SW_HIDE
+        return info
 
 
 def findDataDirs(includeSite=True, includePersonal=False, dataDirName="etc"):

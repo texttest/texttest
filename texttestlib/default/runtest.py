@@ -154,16 +154,14 @@ class RunTest(plugins.Action):
         test.changeState(Killed(briefText, freeText, test.state))
 
     def getKillInfo(self, test):
-        if self.killSignal is None:
+        if self.killSignal is None or self.killSignal == signal.SIGINT:
             return self.getExplicitKillInfo()
         elif self.killSignal == "timeout":
             return "TIMEOUT", "exceeded wallclock time limit of " + str(test.getConfigValue("kill_timeout")) + " seconds"
-        elif self.killSignal == signal.SIGXCPU:
-            return "CPULIMIT", "exceeded maximum cpu time allowed"
-        elif self.killSignal == signal.SIGINT:
-            return "INTERRUPT", "terminated via a keyboard interrupt (Ctrl-C)"
         elif self.killSignal == signal.SIGTERM:
             return "TERMINATED", "terminated via SIGTERM signal"
+        elif hasattr(signal, "SIGXCPU") and self.killSignal == signal.SIGXCPU:
+            return "CPULIMIT", "exceeded maximum cpu time allowed"
         else:
             return self.getKillInfoOtherSignal(test)
 
@@ -173,6 +171,7 @@ class RunTest(plugins.Action):
                 number = getattr(signal, entry)
                 if number == sigNum:
                     return entry
+        return str(sigNum)
 
     def getKillInfoOtherSignal(self, test):
         briefText = self.getSignalName(self.killSignal)
@@ -268,13 +267,7 @@ class RunTest(plugins.Action):
         # Used for hiding the windows if we're on Windows!
         if os.name == "nt" and test.getConfigValue("virtual_display_hide_windows") == "true" and \
             not test.app.isRecording() and not test.app.isActionReplay():
-            info = subprocess.STARTUPINFO()
-            # Python doesn't make this easy for us: in 2.6.6 and later these flags became inaccessible
-            # Alternative is to use win32api which seems excessive just for this purpose.
-            winFlagModule = subprocess if hasattr(subprocess, "STARTF_USESHOWWINDOW") else subprocess._subprocess #@UndefinedVariable
-            info.dwFlags |= winFlagModule.STARTF_USESHOWWINDOW
-            info.wShowWindow = winFlagModule.SW_HIDE
-            return info
+            return plugins.getHideStartUpInfo()
         
     def getPreExecFunction(self):
         if os.name == "posix": # pragma: no cover - only run in the subprocess!

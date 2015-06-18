@@ -11,7 +11,8 @@ class QueueSystem(object):
     def submitSlaveJob(self, cmdArgs, slaveEnv, logDir, submissionRules, jobType):
         try:
             process = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                       cwd=logDir, env=self.getSlaveEnvironment(slaveEnv))
+                                       cwd=logDir, env=self.getSlaveEnvironment(slaveEnv), 
+                                       startupinfo=plugins.getHideStartUpInfo())
             stdout, stderr = process.communicate()
             errorMessage = self.findErrorMessage(stderr, cmdArgs, jobType)
         except OSError:
@@ -65,7 +66,7 @@ class QueueSystem(object):
     
     def getWindowsExecutable(self):
         # sys.executable could be something other than Python... like storytext. Don't involve that here
-        if os.path.basename(sys.executable) in [ "python.exe", "pythonw.exe" ]:
+        if os.path.basename(sys.executable) == "python.exe":
             return sys.executable
         else:
             path = os.path.join(sys.exec_prefix, "Scripts", "python.exe")

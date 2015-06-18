@@ -6,6 +6,7 @@ from ordereddict import OrderedDict
 from time import sleep
 from glob import glob
 from copy import copy
+import time
 
 # Class to allocate unique names to tests for script identification and cross process communication
 class UniqueNameFinder(plugins.Responder):
@@ -552,8 +553,14 @@ class TextTest(plugins.Responder, plugins.Observable):
             return []
 
     def setSignalHandlers(self, handler):
-        for sig in self.getSignals():
-            signal.signal(sig, handler)
+        if os.name == "nt":
+            import ctypes
+            # Must store this, otherwise it gets garbage collected, and a crash results...
+            self.wrapper = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_uint)(handler)
+            ctypes.windll.kernel32.SetConsoleCtrlHandler(self.wrapper, True)
+        else:
+            for sig in self.getSignals():
+                signal.signal(sig, handler)
 
     def handleSignal(self, sig, *args):
         # Respond to the same signal only once and ignore all others!
@@ -564,11 +571,15 @@ class TextTest(plugins.Responder, plugins.Observable):
         self.notify("Quit", sig)
         if len(self.appSuites) > 0: # If the above succeeds in quitting they will be reset
             self.notify("KillProcesses", sig)
-        return signalText
+        if os.name == "nt":
+            time.sleep(20) # Time to clean up, process is killed when we exit
+        else:
+            return signalText
 
-    def handleSignalWhileStarting(self, sig, *args):
+    def handleSignalWhileStarting(self, sig):
         signalText = self.handleSignal(sig)
-        raise KeyboardInterrupt, signalText
+        if os.name != "nt":
+            raise KeyboardInterrupt, signalText
 
     def writeTermMessage(self, signalText):
         message = "Terminating testing due to external interruption"
@@ -578,11 +589,11 @@ class TextTest(plugins.Responder, plugins.Observable):
         sys.stdout.flush() # Try not to lose log file information...
 
     def getSignalText(self, sig):
-        if sig == signal.SIGUSR1:
-            return "RUNLIMIT1"
-        elif sig == signal.SIGXCPU:
-            return "CPULIMIT"
-        elif sig == signal.SIGUSR2:
-            return "RUNLIMIT2"
-        else:
-            return "" # mostly for historical reasons to be compatible with the default handler
+        if hasattr(signal, "SIGUSR1"):
+            if sig == signal.SIGUSR1:
+                return "RUNLIMIT1"
+            elif sig == signal.SIGXCPU:
+                return "CPULIMIT"
+            elif sig == signal.SIGUSR2:
+                return "RUNLIMIT2"
+        return "" # mostly for historical reasons to be compatible with the default handler

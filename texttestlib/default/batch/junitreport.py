@@ -102,7 +102,37 @@ class JUnitApplicationData:
     
     def _longMessage(self, test):
         message = test.state.freeText.replace("]]>", "END_MARKER")
-        return message       
+        return self._char_filter(message)
+
+    @classmethod
+    def _char_filter(cls, text):
+        """
+        Replace char with `"\\x%02x" % ord(char)` if char not allowed in CDATA.
+        """
+        s = ""
+        u_text = unicode(text, getpreferredencoding(), 'replace')
+#        return u_text.encode('utf-8')
+        return u"".join((u"\\x%02x" % ord(char), char)[cls._allowed(ord(char))]
+                       for char in u_text).encode('utf-8')
+
+    @staticmethod
+    def _allowed(num):
+        """
+        See http://www.w3.org/TR/REC-xml/#NT-Char
+        """
+        if num < 0x20:
+            return num in (0x9, 0xA, 0xD)
+        if num <= 0xD7FF:
+            return True
+        if num < 0xE000:
+            return False
+        if num <= 0xFFFD:
+            return True
+        if num < 0x10000:
+            return False
+        if num <= 0x10FFFF:
+            return True
+        return False
 
 
 failure_template = """\

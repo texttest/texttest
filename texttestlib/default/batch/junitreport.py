@@ -111,7 +111,6 @@ class JUnitApplicationData:
         """
         s = ""
         u_text = unicode(text, getpreferredencoding(), 'replace')
-#        return u_text.encode('utf-8')
         return u"".join((u"\\x%02x" % ord(char), char)[cls._allowed(ord(char))]
                        for char in u_text).encode('utf-8')
 

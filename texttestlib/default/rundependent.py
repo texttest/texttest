@@ -116,8 +116,8 @@ class FilterOriginal(FilterAction):
 class FilterOnTempFile(FilterAction):
     def _makeAllFilters(self, test, stem, app):
         filters = FilterAction._makeAllFilters(self, test, stem, app)
-        floatTolerance = app.getCompositeConfigValue("floating_point_tolerance", stem)
-        relTolerance = app.getCompositeConfigValue("relative_float_tolerance", stem)
+        floatTolerance = test.getCompositeConfigValue("floating_point_tolerance", stem)
+        relTolerance = test.getCompositeConfigValue("relative_float_tolerance", stem)
         if floatTolerance or relTolerance:
             origFile = test.makeTmpFileName(stem + "." + app.name + "origcmp", forFramework=1)
             if not os.path.isfile(origFile):

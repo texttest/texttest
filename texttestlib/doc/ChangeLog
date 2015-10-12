@@ -2744,6 +2744,12 @@ Version 3.28.2
 Bug Fixes:
     - Make killing tests work better when running in parallel on Windows
 
+Version 3.28.3
+==============
+Bug Fixes:
+    - Floating point configuration now works in test-specific files (thanks Michael Behrisch)
+    - JUnit report now carefully excludes illegal characters (thanks Magnus Lyckå)
+
 Version trunk
 =============
 Release Enhancements:

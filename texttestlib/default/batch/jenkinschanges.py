@@ -229,8 +229,9 @@ class ChangeSetFinder:
             if author not in authors:
                 authors.append(author)
             for msgNode in changeset.getElementsByTagName("msg"):
-                msg = msgNode.childNodes[0].nodeValue
-                self.addUnique(bugs, self.getBugs(msg))
+                if len(msgNode.childNodes):
+                    msg = msgNode.childNodes[0].nodeValue
+                    self.addUnique(bugs, self.getBugs(msg))
         
         return authors, bugs
     

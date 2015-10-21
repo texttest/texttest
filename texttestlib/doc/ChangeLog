@@ -2750,6 +2750,11 @@ Bug Fixes:
     - Floating point configuration now works in test-specific files (thanks Michael Behrisch)
     - JUnit report now carefully excludes illegal characters (thanks Magnus Lyckå)
 
+Version 3.28.4
+==============
+Bug Fixes:
+    - Fixed Jenkins plugin crash when checkin messages are empty
+
 Version trunk
 =============
 Release Enhancements:

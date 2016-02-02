@@ -85,7 +85,7 @@ class Graph:
         if lower < 0:
             self.sub1.set_ylim(ymin=0) # don't get less than 0, which matplotlib 0.99 does sometimes
         self.sub1.autoscale_view(tight=True, scaley=False)
-        leg = self.sub1.legend(self.legendItems, tuple(self.plotLabels), 'best', shadow=False)
+        leg = self.sub1.legend(self.legendItems, tuple(self.plotLabels), loc='best', shadow=False)
         leg.get_frame().set_alpha(0.5) # transparent legend box		
         
 class PieGraph:

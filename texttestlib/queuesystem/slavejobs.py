@@ -23,12 +23,13 @@ class RunTestInSlave(RunTest):
         return "RUN (" + ",".join(execMachines) + ")"
 
     def getKillInfoOtherSignal(self, test):
-        if self.killSignal == signal.SIGUSR1:
-            return self.getUserSignalKillInfo(test, "1")
-        elif self.killSignal == signal.SIGUSR2:
-            return self.getUserSignalKillInfo(test, "2")
-        else:
-            return RunTest.getKillInfoOtherSignal(self, test)
+        if os.name == "posix":
+            if self.killSignal == signal.SIGUSR1:
+                return self.getUserSignalKillInfo(test, "1")
+            elif self.killSignal == signal.SIGUSR2:
+                return self.getUserSignalKillInfo(test, "2")
+            
+        return RunTest.getKillInfoOtherSignal(self, test)
     
     def getUserSignalKillInfo(self, test, userSignalNumber):
         return importAndCallFromQueueSystem(test.app, "getUserSignalKillInfo", userSignalNumber, self.getExplicitKillInfo)

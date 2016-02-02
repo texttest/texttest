@@ -275,8 +275,11 @@ class ChangeSetFinder:
         if "." in withoutEmail:
             return " ".join([ part.capitalize() for part in withoutEmail.split(".") ])
         else:
-            return withoutEmail.encode("ascii", "xmlcharrefreplace")
-        
+            try:
+                return withoutEmail.encode("ascii", "xmlcharrefreplace")
+            except UnicodeError:
+                return "unparseable author"
+            
     def addUnique(self, items, newItems):
         for newItem in newItems:
             if newItem not in items:

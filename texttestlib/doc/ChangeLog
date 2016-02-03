@@ -2755,6 +2755,12 @@ Version 3.28.4
 Bug Fixes:
     - Fixed Jenkins plugin crash when checkin messages are empty
 
+Version 3.28.5
+==============
+Bug Fixes:
+    - Fixed Jenkins plugin crash when unprintable characters (= wrong encoding) in author names
+    - Fixed matplotlib code to handle version 1.5 (thanks Michael Behrisch)
+
 Version trunk
 =============
 Release Enhancements:

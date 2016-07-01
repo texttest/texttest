@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/home/eliasd/tools/python-vms/tt2.7/bin/python
 
 import sys, os
 
@@ -34,3 +34,7 @@ else:
     sys.stderr.write("Could not start TextTest due to Python version problems :\n" + \
                      "TextTest " + texttest_version.version + " requires at least Python " + \
                      reqVersion + ": found version " + strVersion + ".\n")
+
+
+import locale
+locale.setlocale(locale.LC_ALL, "en_US.UTF-8")

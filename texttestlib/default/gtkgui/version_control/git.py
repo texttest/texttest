@@ -29,8 +29,10 @@ class GitInterface(vcs_independent.VersionControlInterface):
         vcs_independent.VersionControlInterface.startGUIProcess(self, relArgs, **kw)
 
     def parseDateTime(self, input):
+        import locale
+        locale.setlocale(locale.LC_ALL, "en_US.UTF-8")
         return time.strptime(input, "%b %d %H:%M:%S %Y")
-    
+
     def getStateFromStatus(self, output):
         words = output.split()
         if len(words) > 0:
@@ -69,8 +71,7 @@ class GitInterface(vcs_independent.VersionControlInterface):
     
     def callProgram(self, cmdName, fileArgs=[], **kwargs):
         if fileArgs:
-            # Only switch the first argument, otherwise gets difficult to capture
-            fileArgs = [ self.makeRelPath(fileArgs[0]) ] + map(os.path.realpath, fileArgs[1:])
+            fileArgs = map(os.path.realpath, fileArgs)
         return vcs_independent.VersionControlInterface.callProgram(self, cmdName, fileArgs, cwd=self.vcsDirectory, **kwargs)
 
     def getCombinedRevisionOptions(self, r1, r2):

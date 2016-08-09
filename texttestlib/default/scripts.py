@@ -1,7 +1,8 @@
 
 """ All the standard scripts that come with the default configuration """
 
-import sandbox, operator, os, shutil, sys
+import sandbox, operator, os, shutil, sys, random
+from glob import glob
 from texttestlib import plugins
 from ordereddict import OrderedDict
 from ConfigParser import RawConfigParser
@@ -27,6 +28,34 @@ class CountTest(plugins.Action):
 
     def setUpApplication(self, app):
         self.appCount[app] = 0
+        
+        
+class WriteDividedSelections(plugins.ScriptWithArgs):
+    scriptDoc = "divide the test suite into equally sized selections, for parallel testing without communication possibilities"
+    def __init__(self, args=[]):
+        argDict = self.parseArguments(args, [ "count", "prefix" ])
+        self.files = []
+        prefix = argDict["prefix"]
+        for fn in glob(prefix + "_*"):
+            os.remove(fn)
+        for i in range(int(argDict["count"])):
+            fn = prefix + "_" + str(i + 1)
+            f = open(fn, "a")
+            f.write("-tp ")
+            self.files.append(f)
+        self.counts = [ 0 ] * len(self.files) 
+        
+    def setUpApplication(self, app):
+        for f in self.files:
+            f.write("appdata=" + app.name + app.versionSuffix() + "\n")
+            
+    def __call__(self, test):
+        minCount = min(self.counts)
+        minIndices = [ i for (i, count) in enumerate(self.counts) if count == minCount ]
+        chosenIndex = int(random.random() * len(minIndices)) if len(minIndices) > 1 else minIndices[0]
+        self.counts[chosenIndex] += 1
+        self.files[chosenIndex].write(test.getRelPath() + "\n")
+    
 
 
 class DocumentOptions(plugins.Action):
@@ -172,7 +201,7 @@ class DocumentEnvironment(plugins.Action):
         class FakeApp:
             def getConfigValue(self, name):
                 return "Config value '" + name + "'"
-        app = FakeApp() #@UnusedVariable
+        app = FakeApp()  # @UnusedVariable
         try:
             argTuple = eval(argStr)
             from types import TupleType
@@ -181,7 +210,7 @@ class DocumentEnvironment(plugins.Action):
                 return [ self.interpretArgument(str(allArgs[1])) ]
             else:
                 return []
-        except Exception: # could be anything at all
+        except Exception:  # could be anything at all
             return []
 
     def interpretArgument(self, arg):

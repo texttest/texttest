@@ -862,7 +862,7 @@ class CollateFiles(plugins.Action):
             stdout.close()
             stderr.close()
 
-        if len(sourceFiles) == 1 and os.path.getsize(sourceFiles[0]) > 0 and os.path.getsize(targetFile) == 0 and os.path.getsize(collationErrFile) == 0:
+        if len(sourceFiles) > 0 and any((os.path.getsize(fn) > 0 for fn in sourceFiles)) and os.path.getsize(targetFile) == 0 and os.path.getsize(collationErrFile) == 0:
             # Collation scripts that don't write anything shouldn't produce empty files...
             # If they write errors though, we might want to pick those up
             os.remove(targetFile)

@@ -29,8 +29,6 @@ class GitInterface(vcs_independent.VersionControlInterface):
         vcs_independent.VersionControlInterface.startGUIProcess(self, relArgs, **kw)
 
     def parseDateTime(self, input):
-        import locale
-        locale.setlocale(locale.LC_ALL, "en_US.UTF-8")
         return time.strptime(input, "%b %d %H:%M:%S %Y")
 
     def getStateFromStatus(self, output):

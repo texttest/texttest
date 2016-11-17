@@ -336,7 +336,7 @@ class GenerateWebPages(object):
                 return state
             else:
                 return cls.readErrorState("Incorrect type for state object.")
-        except (UnpicklingError, ImportError, EOFError, AttributeError), e:
+        except Exception, e:
             if os.path.getsize(stateFile) > 0:
                 return cls.readErrorState("Stack info follows:\n" + str(e))
             else:

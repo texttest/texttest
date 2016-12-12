@@ -456,7 +456,8 @@ class Action:
         pass
 
 class ScriptWithArgs(Action):
-    def parseArguments(self, args, allowedArgs):
+    @classmethod
+    def parseArguments(cls, args, allowedArgs):
         currKey = ""
         dict = {}
         for arg in args:

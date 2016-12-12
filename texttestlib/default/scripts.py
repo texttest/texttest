@@ -32,9 +32,15 @@ class CountTest(plugins.Action):
         
 class WriteDividedSelections(plugins.ScriptWithArgs):
     scriptDoc = "divide the test suite into equally sized selections, for parallel testing without communication possibilities"
+    files = []
+    counts = []    
     def __init__(self, args=[]):
-        argDict = self.parseArguments(args, [ "count", "prefix" ])
-        self.files = []
+        if len(self.files) == 0:
+            WriteDividedSelections.initialise(args)
+            
+    @classmethod
+    def initialise(cls, args):
+        argDict = cls.parseArguments(args, [ "count", "prefix" ])
         prefix = argDict["prefix"]
         for fn in glob(prefix + "_*"):
             os.remove(fn)
@@ -42,12 +48,13 @@ class WriteDividedSelections(plugins.ScriptWithArgs):
             fn = prefix + "_" + str(i + 1)
             f = open(fn, "a")
             f.write("-tp ")
-            self.files.append(f)
-        self.counts = [ 0 ] * len(self.files) 
+            cls.files.append(f)
+        cls.counts = [ 0 ] * len(cls.files) 
         
-    def setUpApplication(self, app):
-        for f in self.files:
-            f.write("appdata=" + app.name + app.versionSuffix() + "\n")
+    def setUpSuite(self, suite):
+        if suite.parent is None:
+            for f in self.files:
+                f.write("appdata=" + suite.app.name + suite.app.versionSuffix() + "\n")
             
     def __call__(self, test):
         minCount = min(self.counts)

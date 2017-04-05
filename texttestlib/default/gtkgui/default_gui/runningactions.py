@@ -447,7 +447,7 @@ class RunningAction(BasicRunningAction):
         self.temporaryGroup.reset()
 
     def _getStockId(self):
-        return "execute"
+        return "media-play"
 
 
 class RunTests(RunningAction,guiplugins.ActionTabGUI):

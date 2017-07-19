@@ -11,6 +11,28 @@ from datetime import datetime, timedelta
 from batchutils import convertToUrl, getEnvironmentFromRunFiles
 HTMLgen.PRINTECHO = 0
 
+def parseState(state):
+    '''Separate brief text and host list from succeeded_runs file, e.g.
+    21Jan2006 after 7 reruns placerville, placerville
+    Date field is not part of state.'''
+    hosts = state.split(", ")
+    possibleBrief = hosts[0].rsplit(" ", 1)
+    if len(possibleBrief) > 1:
+        # possibleBrief is actually [brief, host0]
+        hosts[0] = possibleBrief[1]
+        return possibleBrief[0] + " ", hosts
+    else:
+        return "", hosts
+
+def compactHostRepr(hosts):
+    """Convert list ['a', 'a', 'b'] -> 'a*2, b'"""
+    hostCount = dict((host, hosts.count(host)) for host in set(hosts))
+    hostCountStrings = \
+        (('*'.join([host, str(hostCount[host])])
+          if hostCount[host] > 1 else host
+          for host in hostCount))
+    return ', '.join(hostCountStrings)
+
 def getWeekDay(tag):
     return plugins.weekdays[time.strptime(tag.split("_")[0], "%d%b%Y")[6]]
     
@@ -664,7 +686,8 @@ class TestTable:
         category = state.category if hasattr(state, "category") else "success"
         fgcol, bgcol = self.getColours(category, fileComp)
         if not hasattr(state, "category"):
-            return "ok " + state, True, fgcol, bgcol
+            brief, hosts = parseState(state)
+            return "ok " + brief + compactHostRepr(hosts), True, fgcol, bgcol
         success = category == "success"
         if success:
             cellContent = "ok"
@@ -672,7 +695,7 @@ class TestTable:
                 cellContent += " " + state.briefText
         else:
             cellContent = state.getTypeBreakdown()[1]
-        cellContent += " " + ", ".join(state.executionHosts)
+        cellContent += " " + compactHostRepr(state.executionHosts)
         return cellContent.strip(), success, fgcol, bgcol
 
     def getCellDataFromFileComp(self, fileComp):

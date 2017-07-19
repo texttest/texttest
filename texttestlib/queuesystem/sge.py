@@ -39,6 +39,8 @@ class QueueSystem(gridqueuesystem.QueueSystem):
         if submissionRules.processesNeeded != 1:
             qsubArgs += [ "-pe", submissionRules.getParallelEnvironment(), \
                           str(submissionRules.processesNeeded) ]
+        if submissionRules.useCoreBinding():
+            qsubArgs += [ "-binding", "linear:"+str(submissionRules.processesNeeded) ]
         queue = submissionRules.findQueue()
         if queue:
             qsubArgs += [ "-q", queue ]

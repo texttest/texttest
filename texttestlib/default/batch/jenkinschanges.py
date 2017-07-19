@@ -1,9 +1,15 @@
-
-import os, sys, re, hashlib, time
+import os
+import sys
+import re
+import hashlib
+import time
+import codecs
+import locale
 from xml.dom.minidom import parse
 from ordereddict import OrderedDict
 from glob import glob
 from pprint import pprint
+from xml.parsers.expat import ExpatError
 
 class AbortedException(RuntimeError):
     pass
@@ -13,13 +19,13 @@ class JobStillRunningException(RuntimeError):
 
 class FingerprintNotReadyException(RuntimeError):
     pass
-         
+
 def getBuildsDir(jobRoot, jobName):
     projectDir = os.path.join(jobRoot, jobName)
     local = os.path.join(projectDir, "builds")
     if os.path.isdir(local):
         return local
-        
+
     if hasattr(os, "readlink"):
         link = os.path.join(projectDir, "lastStable")
         try:
@@ -30,7 +36,7 @@ def getBuildsDir(jobRoot, jobName):
 
 class BuildDocument:
     versionRegex = re.compile("[0-9]+(\\.[0-9]+)+")
-    versionRegexRpm = re.compile("[0-9]+(\\.[0-9]+)+.*.rpm")       
+    versionRegexRpm = re.compile("[0-9]+(\\.[0-9]+)+.*.rpm")
     @classmethod
     def create(cls, buildsDir, buildName):
         xmlFile = os.path.join(buildsDir, buildName, "build.xml")
@@ -40,7 +46,7 @@ class BuildDocument:
                 return cls(xmlFile)
             except:
                 print "WARNING: Error while parsing XML file:" + xmlFile
-        
+
     def __init__(self, xmlFile):
         self.document = parse(xmlFile)
 
@@ -48,11 +54,11 @@ class BuildDocument:
         for obj in self.document.getElementsByTagName("hudson.tasks.Fingerprinter_-FingerprintAction"):
             for entry in obj.getElementsByTagName("string"):
                 yield entry.childNodes[0].nodeValue
-                
+
     def getResult(self):
         for entry in self.document.getElementsByTagName("result"):
             return entry.childNodes[0].nodeValue
-    
+
     def checkHashes(self, oldHashes, newHashes):
         for currString in self.fingerprintStrings():
             if currString in oldHashes:
@@ -67,7 +73,7 @@ class BuildDocument:
                 versionMatch = self.versionRegex.search(currString)
                 if versionMatch:
                     return versionMatch.group(0)
-                
+
     def hasSourceCodeChange(self):
         for obj in self.document.getElementsByTagName("hudson.model.CauseAction"):
             for causes in obj.getElementsByTagName("causes"):
@@ -90,35 +96,35 @@ class BuildDocument:
                 prevString = currString
         return fingerprint
 
-            
+
 class FingerprintVerifier:
     def __init__(self, fileFinder, cacheDir):
         self.fileFinder = fileFinder
         self.cacheDir = cacheDir
-        
+
     def getCacheFileName(self, jobName, buildName):
         rootName = "correct_hashes_" + os.getenv("JENKINS_URL").split("/")[2].replace(":", "")
         return os.path.join(self.cacheDir, rootName, jobName, buildName)
 
     def getCachedFingerprint(self, jobName, buildName):
-        cacheFileName = self.getCacheFileName(jobName, buildName) 
+        cacheFileName = self.getCacheFileName(jobName, buildName)
         if os.path.isfile(cacheFileName):
             return eval(open(cacheFileName).read())
 
     def writeCache(self, jobName, buildName, updatedHashes):
-        cacheFileName = self.getCacheFileName(jobName, buildName) 
+        cacheFileName = self.getCacheFileName(jobName, buildName)
         from texttestlib import plugins
         plugins.ensureDirExistsForFile(cacheFileName)
         with open(cacheFileName, "w") as f:
-            pprint(updatedHashes, f) 
-        
+            pprint(updatedHashes, f)
+
     def md5sum(self, filename):
         md5 = hashlib.md5()
-        with open(filename,'rb') as f: 
-            for chunk in iter(lambda: f.read(128*md5.block_size), b''): 
+        with open(filename,'rb') as f:
+            for chunk in iter(lambda: f.read(128*md5.block_size), b''):
                 md5.update(chunk)
         return md5.hexdigest()
-    
+
     def getCorrectedHash(self, buildsDir, build, f, hash):
         fullFileFinder = os.path.join(buildsDir, build, self.fileFinder)
         filePattern = f.split(":")[-1].replace("-", "?")
@@ -128,13 +134,13 @@ class FingerprintVerifier:
             correctHash = self.md5sum(path)
             if correctHash != hash:
                 return correctHash
-            
+
 
 class FingerprintDifferenceFinder:
     def __init__(self, jobRoot, fileFinder, cacheDir):
         self.jobRoot = jobRoot
         self.verifier = FingerprintVerifier(fileFinder, cacheDir) if fileFinder else None
-                
+
     def findDifferences(self, jobName, build1, build2):
         buildsDir = getBuildsDir(self.jobRoot, jobName)
         if not buildsDir:
@@ -164,19 +170,19 @@ class FingerprintDifferenceFinder:
                     if hash1 == hash2:
                         continue
                 differences.append((artefact, hash1, hash2))
-        
+
         if updatedHashes:
             print "WARNING: incorrect hashes found!"
             print "This is probably due to fingerprint data being wrongly updated from artefacts produced during the build"
             print "Storing a cached file of corrected versions. The following were changed:"
             for artefact, hash in updatedHashes.items():
                 print artefact, fingerprint2.get(artefact)[0], hash
-                
+
             for artefact, (hash2, file2) in fingerprint2.items():
                 if artefact not in updatedHashes:
                     updatedHashes[artefact] = hash2
             self.verifier.writeCache(jobName, build2, updatedHashes)
-        
+
         differences.sort()
         return differences, True
 
@@ -188,22 +194,22 @@ class FingerprintDifferenceFinder:
                 if i % 10 == 0:
                     print "No Jenkins fingerprints available yet, sleeping..."
                 time.sleep(1)
-                    
+
         print "Giving up waiting for fingerprints."
         raise JobStillRunningException()
-    
+
     def getFingerprint(self, buildsDir, jobName, buildName):
         if self.verifier:
             cached = self.verifier.getCachedFingerprint(jobName, buildName)
             if cached:
                 return cached
-    
+
         document = BuildDocument.create(buildsDir, buildName)
-        fingerprint = document.getFingerprint(jobName) if document is not None else {}        
+        fingerprint = document.getFingerprint(jobName) if document is not None else {}
         if not fingerprint:
             result = document.getResult() if document is not None else None
             if result is None and os.getenv("BUILD_NUMBER") == buildName and os.getenv("JOB_NAME") == jobName:
-                if os.getenv("BUILD_ID") == "none": 
+                if os.getenv("BUILD_ID") == "none":
                     # Needed to prevent Jenkins from killing background jobs running after the job has exited
                     # If we have this, we should wait a bit
                     raise FingerprintNotReadyException()
@@ -220,32 +226,37 @@ class ChangeSetFinder:
         self.jobRoot = jobRoot
         self.jenkinsUrl = jenkinsUrl
         self.bugSystemData = bugSystemData
-        
+
     def parseXmlChangeLog(self, document):
         authors = []
         bugs = []
         for changeset in document.getElementsByTagName("changeset"):
             author = self.parseAuthor(changeset.getAttribute("author"))
-            if author not in authors:
+            if author and (author not in authors):
                 authors.append(author)
             for msgNode in changeset.getElementsByTagName("msg"):
                 if len(msgNode.childNodes):
                     msg = msgNode.childNodes[0].nodeValue
                     self.addUnique(bugs, self.getBugs(msg))
-        
         return authors, bugs
-    
+
     def parsePlainChangeLog(self, fileName):
         authors = []
         bugs = []
-        with open(fileName) as f:
-            for line in f:
+        # If there are non-ascii characters in the changelog, there
+        # will be encoding errors if the file is opened with plain
+        # open(). People's names are expected to be spelled as
+        # intended in this day and age. It's not clear why this is
+        # needed, a standalone python program reading the same file
+        # have no issues.
+        with codecs.open(fileName, "r", "utf-8") as changelog:
+            for line in changelog:
                 if "<" in line and "@" in line:
                     author = self.parseAuthor(line.split(": ")[-1])
-                    if author not in authors:
+                    if author and (author not in authors):
                         authors.append(author)
                 if line.startswith(" "):
-                    self.addUnique(bugs, self.getBugs(line))
+                    self.addUnique(bugs, self.getBugs(line.encode("ascii")))
         return authors, bugs
 
     def parseChangeLog(self, xmlFile):
@@ -253,9 +264,9 @@ class ChangeSetFinder:
             document = parse(xmlFile)
         except:
             return self.parsePlainChangeLog(xmlFile)
-        
+
         return self.parseXmlChangeLog(document)
-        
+
     def getChangeSetData(self, projectChanges):
         changes = []
         for project, build in projectChanges:
@@ -269,22 +280,28 @@ class ChangeSetFinder:
                     fullUrl = os.path.join(self.jenkinsUrl, "job", project, build, "changes")
                     changes.append((",".join(authors), fullUrl, bugs))
         return changes
-    
+
     def parseAuthor(self, author):
         withoutEmail = author.split("<")[0].strip().split("@")[0]
         if "." in withoutEmail:
             return " ".join([ part.capitalize() for part in withoutEmail.split(".") ])
         else:
             try:
-                return withoutEmail.encode("ascii", "xmlcharrefreplace")
-            except UnicodeError:
-                return "unparseable author"
-            
+               withoutEmail = withoutEmail.encode("ascii", "xmlcharrefreplace")
+            except UnicodeDecodeError, exception:
+                print "FAILED to encode name '" + withoutEmail + "' (repr: " + repr(withoutEmail) + ", " \
+                      + str(type(withoutEmail)) + ", default encoding: '" \
+                      + sys.getdefaultencoding() + "', default locale: " \
+                      + str(locale.getdefaultlocale()) + ") due to:\n", \
+                      exception, "\nIgnoring this entry"
+                return None
+            return withoutEmail
+
     def addUnique(self, items, newItems):
         for newItem in newItems:
             if newItem not in items:
                 items.append(newItem)
-        
+
     def getBugs(self, msg):
         bugs = []
         for systemName, location in self.bugSystemData.items():
@@ -295,7 +312,7 @@ class ChangeSetFinder:
                 pass
         return bugs
 
-    
+
 class ProjectData:
     def __init__(self, jobRoot):
         self.data = {}
@@ -307,10 +324,10 @@ class ProjectData:
                 workspaceDir = os.path.join(workspaceRoot, jobName, subdir)
                 for artefactName, providedScope in self.getArtefactsFromPomFiles(workspaceDir):
                     self.data.setdefault(artefactName, []).append((jobName, providedScope))
-                    
+
     def isAttachedRpm(self, pluginNode):
         return any((goalNode.childNodes[0].nodeValue == "rpm-maven-plugin" for goalNode in pluginNode.getElementsByTagName("artifactId")))
-    
+
     def getRpmName(self, node):
         for pluginNode in node.getElementsByTagName("plugin"):
             if self.isAttachedRpm(pluginNode):
@@ -319,7 +336,7 @@ class ProjectData:
                         for nameNode in confNode.childNodes:
                             if nameNode.nodeName == "name":
                                 return nameNode.childNodes[0].nodeValue
-    
+
     def getPomData(self, pomFile):
         document = parse(pomFile)
         artifactId, groupId = None, None
@@ -342,28 +359,31 @@ class ProjectData:
         if rpmName:
             artefacts.append((groupPrefix + rpmName, True))
         return artefacts, modules
-    
+
     def getArtefactsFromPomFiles(self, workspaceDir):
         pomFile = os.path.join(workspaceDir, "pom.xml")
         if not os.path.isfile(pomFile):
             return []
-            
+
         artefacts, modules = self.getPomData(pomFile)
         for module in modules:
             moduleDir = os.path.join(workspaceDir, module)
             artefacts += self.getArtefactsFromPomFiles(moduleDir)
         return artefacts
-    
+
     def getSubdirectory(self, jobDir):
         configFile = os.path.join(jobDir, "config.xml")
         if not os.path.isfile(configFile):
             return ""
-        
-        document = parse(configFile)
-        for subDir in document.getElementsByTagName("subdir"):
-            return subDir.childNodes[0].nodeValue
+
+        try:
+            document = parse(configFile)
+            for subDir in document.getElementsByTagName("subdir"):
+                return subDir.childNodes[0].nodeValue
+        except ExpatError, exception:
+            print "WARNING: Corrupt config file:\n ", os.path.abspath(configFile), "\n Collection of Jenkins data will be incomplete."
         return ""
-    
+
     def getProjects(self, artefact):
         currProjArtefact = None
         currProjects = []
@@ -377,9 +397,9 @@ class ProjectData:
                     if artefact.startswith(local):
                         currProjArtefact = group + ":" + artefact
                         currProjects = projects
-        
+
         return currProjArtefact or artefact, currProjects
-    
+
 
 class ChangeFinder:
     def __init__(self, bugSystemData, markedArtefacts, *args):
@@ -389,7 +409,7 @@ class ChangeFinder:
         self.markedArtefacts = markedArtefacts
         self.changeSetFinder = ChangeSetFinder(self.jobRoot, os.getenv("JENKINS_URL"), bugSystemData)
         self.diffFinder = FingerprintDifferenceFinder(self.jobRoot, *args)
-    
+
     def findChanges(self, build1, build2):
         try:
             markedChanges, projectChanges, fingerprintsFound = self.getChangesRecursively(self.jobName, build1, build2)
@@ -400,15 +420,15 @@ class ChangeFinder:
         except AbortedException, e:
             # If it was aborted, say this
             return [(str(e), "", [])]
-        
+
         if self.hasSourceCodeChange(build2): # If we're polling things from SCM, we should include the changes there
             projectChanges.append((self.jobName, build2))
-        
+
         # Extract the changeset information from them
         changesFromProjects = self.changeSetFinder.getChangeSetData(projectChanges)
         changesFromMarking = [ self.getMarkChangeText(artefact, projectName, build1, build2) for artefact, projectName in markedChanges ]
         return changesFromMarking + changesFromProjects
-    
+
     def getChangesRecursively(self, jobName, build1, build2):
         # Find what artefacts have changed between times build
         differences, fingerprintsFound = self.diffFinder.findDifferences(jobName, build1, build2)
@@ -426,7 +446,7 @@ class ChangeFinder:
                     if subProjectChange not in projectChanges:
                         projectChanges.append(subProjectChange)
         return markedChanges, projectChanges, fingerprintsFound
-    
+
     def organiseByProject(self, differences):
         differencesByProject = OrderedDict()
         changes = []
@@ -441,9 +461,9 @@ class ChangeFinder:
                 projectName = artefact.split(":")[-1].split("[")[0][:-1]
                 if projectName in self.markedArtefacts:
                     changes.append((actualArtefact, projectName))
-        
+
         return changes, differencesByProject
-    
+
     def getProjectChanges(self, differencesByProject):
         projectChanges = []
         recursiveChanges = []
@@ -454,13 +474,13 @@ class ChangeFinder:
             allBuilds = sorted([ build for build in os.listdir(buildsDir) if build.isdigit()], key=lambda b: -int(b))
             oldHashes = [ oldHash for _, oldHash, _, _ in diffs ]
             newHashes = [ hash for _, _, hash, _ in diffs ]
-            scopeProvided = any((s for _, _, _, s in diffs))  
+            scopeProvided = any((s for _, _, _, s in diffs))
             activeBuild = None
             for build in allBuilds:
                 document = BuildDocument.create(buildsDir, build)
                 if not document:
                     continue
-        
+
                 if document.getResult() != "FAILURE":
                     matched, matchedNew = document.checkHashes(oldHashes, newHashes)
                     if matched:
@@ -469,11 +489,11 @@ class ChangeFinder:
                         else:
                             if scopeProvided and activeBuild:
                                 recursiveChanges.append((project, build, activeBuild))
-                            break       
+                            break
                 if activeBuild and (project, build) not in projectChanges:
                     projectChanges.append((project, build))
         return projectChanges, recursiveChanges
-    
+
     def hasSourceCodeChange(self, build):
         buildsDir = getBuildsDir(self.jobRoot, self.jobName)
         if buildsDir:
@@ -481,7 +501,7 @@ class ChangeFinder:
             if doc:
                 return doc.hasSourceCodeChange()
         return False
-        
+
     def getMarkChangeText(self, artefact, projectName, build1, build2):
         buildsDir = getBuildsDir(self.jobRoot, self.jobName)
         regex = re.compile(artefact)
@@ -495,12 +515,12 @@ class ChangeFinder:
         else:
             print "WARNING: Artefact version not found for: " + projectName + " build: " + build2
             return "Artefact version not found", "", []
-    
+
 
 def getChanges(build1, build2, *args):
     finder = ChangeFinder(*args)
     return finder.findChanges(build1, build2)
-    
+
 def getTimestamp(build):
     if hasattr(os, "readlink"):
         jobRoot = os.path.join(os.getenv("JENKINS_HOME"), "jobs")
@@ -509,20 +529,20 @@ def getTimestamp(build):
             buildLink = os.path.join(buildsDir, build)
             if os.path.islink(buildLink):
                 return os.readlink(buildLink)
-    
+
 def parseEnvAsList(varName):
     if varName in os.environ:
         return os.getenv(varName).split(",")
     else:
         return []
-        
+
 def parseEnvAsDict(varName):
     ret = {}
     for pairText in parseEnvAsList(varName):
         var, value = pairText.split("=")
         ret[var] = value
     return ret
-    
+
 if __name__ == "__main__":
     localFile = os.path.abspath(__file__) # <root>/texttestlib/default/batch/jenkinschanges.py
     rootDir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(localFile))))
@@ -532,6 +552,5 @@ if __name__ == "__main__":
         prevBuildName = sys.argv[2]
     else:
         prevBuildName = str(int(buildName) - 1)
-    pprint(getChanges(prevBuildName, buildName, parseEnvAsDict("BUG_SYSTEM_DATA"), parseEnvAsList("MARKED_ARTEFACTS"), 
+    pprint(getChanges(prevBuildName, buildName, parseEnvAsDict("BUG_SYSTEM_DATA"), parseEnvAsList("MARKED_ARTEFACTS"),
                       os.getenv("FILE_FINDER", ""), os.getenv("CACHE_DIRECTORY", os.getcwd())))
-    

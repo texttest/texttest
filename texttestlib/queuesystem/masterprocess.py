@@ -768,6 +768,9 @@ class SubmissionRules(BasicSubmissionRules):
     def getParallelEnvironment(self):
         return ""
 
+    def useCoreBinding(self):
+        return False
+
     def findPriority(self):
         return 0
 

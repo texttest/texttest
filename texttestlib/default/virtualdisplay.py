@@ -9,7 +9,7 @@ class VirtualDisplayResponder(plugins.Responder):
     instance = None
     def __init__(self, *args):
         plugins.Responder.__init__(self, *args)
-        self.displayInfo = []
+        self.displayInfoList = []
         self.guiSuites = []
         self.diag = logging.getLogger("virtual display")
         self.killDiag = logging.getLogger("kill processes")
@@ -17,14 +17,14 @@ class VirtualDisplayResponder(plugins.Responder):
         
     def addSuites(self, suites):
         guiSuites = filter(lambda suite : suite.getConfigValue("use_case_record_mode") == "GUI", suites)
-        if len(self.displayInfo) == 0:
+        if len(self.displayInfoList) == 0:
             self.setUpVirtualDisplay(guiSuites)
             for var, value in self.getVariablesToSet():
                 plugins.log.info("Tests will run with " + var + " variable set to " + value)
                 
     def getVariablesToSet(self):
         vars = []
-        for i, (_, displayName, _, _) in enumerate(self.displayInfo):
+        for i, (_, displayName, _, _, _, _) in enumerate(self.displayInfoList):
             suffix = "" if i == 0 else str(i + 1)
             vars.append(("DISPLAY" + suffix, displayName))
         return vars
@@ -37,16 +37,16 @@ class VirtualDisplayResponder(plugins.Responder):
         for _ in range(displayCount):
             displayInfo = self.getDisplayInfo(machines, guiSuites[0].app)
             if displayInfo:
-                self.displayInfo.append(displayInfo)
+                self.displayInfoList.append(displayInfo)
                 self.guiSuites = guiSuites
             elif len(machines) > 0:
                 plugins.printWarning("Failed to start virtual display on " + ",".join(machines) + " - using real display.")
 
     def getDisplayInfo(self, machines, app):
         for machine in machines:
-            displayName, pid, proc = self.createDisplay(machine, app)
+            displayName, xvfbPid, xvfbOrSshProc, wmPid, wmOrSshProc = self.createDisplay(machine, app)
             if displayName:
-                return machine, displayName, pid, proc
+                return machine, displayName, xvfbPid, xvfbOrSshProc, wmPid, wmOrSshProc
             else:
                 plugins.printWarning("Virtual display program Xvfb not available on " + machine, stdout=True)
     
@@ -61,34 +61,34 @@ class VirtualDisplayResponder(plugins.Responder):
         return allMachines
 
     def notifyTestProcessComplete(self, test):
-        if self.restartXvfb():
+        if self.restartXvfbAndWm():
             plugins.log.info("Virtual display had terminated unexpectedly with some test processes still to run.")
             for var, value in self.getVariablesToSet():
                 plugins.log.info("Reset " + var + " variable to " + value + " for test " + repr(test))
                 test.setEnvironment(var, value)
         
     def notifyComplete(self, *args):
-        if self.restartXvfb():
+        if self.restartXvfbAndWm():
             plugins.log.info("Virtual display had terminated unexpectedly.")
             for var, value in self.getVariablesToSet():
                 plugins.log.info("Reset " + var + " variable to " + value + ".")
         
-    def restartXvfb(self):
+    def restartXvfbAndWm(self):
         # Whenever a test completes, we check to see if the virtual server is still going
         changed = False
-        for i, displayInfo in enumerate(self.displayInfo):
-            displayProc = displayInfo[-1]
-            if displayProc is not None and displayProc.poll() is not None:
-                displayProc.wait() # Don't leave zombie processes around
+        for i, displayInfo in enumerate(self.displayInfoList):
+            xvfbOrSshProc = displayInfo[3]
+            if xvfbOrSshProc is not None and xvfbOrSshProc.poll() is not None:
+                xvfbOrSshProc.wait() # Don't leave zombie processes around
                 # If Xvfb has terminated, we need to restart it
                 newDisplayInfo = self.getDisplayInfo(self.findMachines(self.guiSuites), self.guiSuites[0].app)
                 if newDisplayInfo:
-                    self.displayInfo[i] = newDisplayInfo
+                    self.displayInfoList[i] = newDisplayInfo
                     changed = True
         return changed
             
     def notifyAllComplete(self):
-        self.cleanXvfb()
+        self.cleanXvfbAndWm()
 
     def terminateIfRunning(self, pid):
         try:
@@ -96,85 +96,98 @@ class VirtualDisplayResponder(plugins.Responder):
         except OSError: # pragma: no cover - only set up this way to avoid race conditions. Should never happen in real life anyway
             pass
     
-    def cleanXvfb(self):
-        if len(self.displayInfo) and os.name == "posix":
-            for displayInfo in self.displayInfo:
-                machine, _, pid, proc = displayInfo
-                if machine == "localhost":
-                    self.killDiag.info("Killing Xvfb process " + str(pid))
-                    self.terminateIfRunning(pid)
-                else:
-                    self.killRemoteServer(machine, pid, proc)
-                proc.wait() # don't leave zombies around
-            self.displayInfo = []
-
-    def killRemoteServer(self, machine, pid, proc):
-        self.diag.info("Getting ps output from " + machine)
-        self.killDiag.info("Killing remote Xvfb process on " + machine + " with pid " + str(pid))
-        self.guiSuites[0].app.runCommandOn(machine, [ "kill", str(pid) ])
-        self.terminateIfRunning(proc.pid) # only for self-tests really : traffic mechanism doesn't fake remote process
+    def cleanXvfbAndWm(self):
+        if len(self.displayInfoList) and os.name == "posix":
+            wmExecutable = self.guiSuites[0].app.getConfigValue("virtual_display_wm_executable")
+            for displayInfo in self.displayInfoList:
+                machine, _, xvfbPid, xvfbOrSshProc, wmPid, wmOrSshProc = displayInfo
+                if wmExecutable:
+                    self.killProcess("window manager", machine, wmPid, wmOrSshProc)
+                self.killProcess("Xvfb", machine, xvfbPid, xvfbOrSshProc)
+            self.displayInfoList = []
+    
+    def killProcess(self, procName, machine, pid, localProc):
+        if machine == "localhost":
+            self.killDiag.info("Killing " + procName + " process " + str(pid))
+            self.terminateIfRunning(pid)
+        else:
+            self.killDiag.info("Killing remote " + procName + " process on " + machine + " with pid " + str(pid))
+            self.guiSuites[0].app.runCommandOn(machine, [ "kill", str(pid) ])
+            self.terminateIfRunning(localProc.pid) # only for self-tests really : traffic mechanism doesn't fake remote process
+        localProc.wait() # don't leave zombies around
 
     def createDisplay(self, machine, app):
-        if not self.canRunVirtualServer(machine, app):
-            return None, None, None
-
-        startArgs = self.getVirtualServerArgs(machine, app)
-        return self.startXvfb(startArgs, machine)
+        if not self.executableExists(machine, app, "Xvfb"):
+            return None, None, None, None, None
+        wmExecutable = app.getConfigValue("virtual_display_wm_executable")
+        if wmExecutable and not self.executableExists(machine, app, wmExecutable):
+            return None, None, None, None, None
+        
+        extraArgs = plugins.splitcmd(app.getConfigValue("virtual_display_extra_args"))
+        xvfbCmd = self.getRemoteCmd(machine, app, "startXvfb.py", extraArgs)
+        displayName, xvfbPid, xvfbOrSshProc = self.startXvfb(xvfbCmd, machine)
+        
+        wmPid, wmOrSshProc = None, None
+        if wmExecutable:
+            extraArgs = [ wmExecutable, displayName ]
+            wmArgs = self.getRemoteCmd(machine, app, "startWindowManager.py", extraArgs)
+            wmPid, wmOrSshProc = self.startWindowManager(wmArgs, machine)
+        return displayName, xvfbPid, xvfbOrSshProc, wmPid, wmOrSshProc
 
     def ignoreSignals(self):
         for signum in [ signal.SIGUSR1, signal.SIGUSR2, signal.SIGXCPU ]:
             signal.signal(signum, signal.SIG_IGN)
 
-    def startXvfb(self, startArgs, machine):
+    def startXvfb(self, command, machine):
         for _ in range(5):
-            self.diag.info("Starting Xvfb using args " + repr(startArgs))
+            self.diag.info("Starting Xvfb using args " + repr(command))
             # Ignore job control signals for remote processes
             # Otherwise the ssh process gets killed, but the stuff it's started remotely doesn't, and we leak Xvfb processes
             preexec_fn = None if machine == "localhost" else self.ignoreSignals
-            displayProc = subprocess.Popen(startArgs, preexec_fn=preexec_fn, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=open(os.devnull, "w"))
-            line = plugins.retryOnInterrupt(displayProc.stdout.readline)
+            xvfbOrSshProc = subprocess.Popen(command, preexec_fn=preexec_fn, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=open(os.devnull, "w"))
+            line = plugins.retryOnInterrupt(xvfbOrSshProc.stdout.readline)
             if "Time Out!" in line:
-                displayProc.wait()
-                displayProc.stdout.close()
+                xvfbOrSshProc.wait()
+                xvfbOrSshProc.stdout.close()
                 self.diag.info("Timed out waiting for Xvfb to come up")
                 # We try again and hope for a better process ID!
                 continue
             try:
-                displayNum, pid = map(int, line.strip().split(","))
-                displayProc.stdout.close()
-                return self.getDisplayName(machine, displayNum), pid, displayProc
+                displayNum, xvfbPid = map(int, line.strip().split(","))
+                xvfbOrSshProc.stdout.close()
+                return self.getDisplayName(machine, displayNum), xvfbPid, xvfbOrSshProc
             except ValueError: #pragma : no cover - should never happen, just a fail-safe
                 sys.stderr.write("ERROR: Failed to parse startXvfb.py line :\n " + line + "\n")
-                displayProc.stdout.close()
+                xvfbOrSshProc.stdout.close()
                 return None, None, None
 
         messages = "Failed to start Xvfb in 5 attempts, giving up"
         plugins.printWarning(messages)
         return None, None, None
 
-    def getXvfbLogDir(self):
+    def getPersonalLogDir(self):
         if not self.diag.isEnabledFor(logging.INFO):
             return os.devnull
         
         return os.getenv("TEXTTEST_PERSONAL_LOG", os.devnull)
     
-    def getVirtualServerArgs(self, machine, app):
+    def getRemoteCmd(self, machine, app, pythonScript, extraArgs):
         binDir = plugins.installationDir("libexec")
-        fullPath = os.path.join(binDir, "startXvfb.py")
+        localPath = os.path.join(binDir, pythonScript)
         appTmpDir = app.getRemoteTmpDirectory()[1]
         if appTmpDir:
             logDir = os.path.join(appTmpDir, "Xvfb")
             app.ensureRemoteDirExists(machine, logDir)
-            remoteXvfb = os.path.join(appTmpDir, "startXvfb.py")
-            app.copyFileRemotely(fullPath, "localhost", remoteXvfb, machine)
-            fullPath = remoteXvfb
+            remotePath = os.path.join(appTmpDir, pythonScript)
+            app.copyFileRemotely(localPath, "localhost", remotePath, machine)
+            fullPath = remotePath
             pythonArgs = [ "python", "-u" ]
         else:
-            logDir = self.getXvfbLogDir()
+            logDir = self.getPersonalLogDir()
+            fullPath = localPath
             pythonArgs = self.findPythonArgs(machine)
-            
-        xvfbExtraArgs = plugins.splitcmd(app.getConfigValue("virtual_display_extra_args"))
-        cmdArgs = pythonArgs + [ fullPath, logDir ] + xvfbExtraArgs
+        
+        cmdArgs = pythonArgs + [ fullPath, logDir ] + extraArgs
         return app.getCommandArgsOn(machine, cmdArgs)
 
     def findPythonArgs(self, machine):
@@ -197,7 +210,21 @@ class VirtualDisplayResponder(plugins.Responder):
         else:
             # Don't include user name, if any
             return machine.split("@")[-1] + displayStr
+        
+    def startWindowManager(self, command, machine):
+        self.diag.info("Starting window manager")
+        preexec_fn = None if machine == "localhost" else self.ignoreSignals
+        wmProc = subprocess.Popen(command, preexec_fn=preexec_fn, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=open(os.devnull, "w"))
+        line = plugins.retryOnInterrupt(wmProc.stdout.readline)
+        try:
+            wmPid = int(line.strip())
+            wmProc.stdout.close()
+        except ValueError:
+            sys.stderr.write("ERROR: Failed to start window manager")
+            wmProc.stdout.close()
+            return None, None
+        return wmPid, wmProc
 
-    def canRunVirtualServer(self, machine, app):
-        retcode = app.runCommandOn(machine, [ "which", "Xvfb" ], collectExitCode=True)
+    def executableExists(self, machine, app, executable):
+        retcode = app.runCommandOn(machine, [ "which", executable ], collectExitCode=True)
         return retcode == 0

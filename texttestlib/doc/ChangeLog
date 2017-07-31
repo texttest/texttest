@@ -2747,8 +2747,8 @@ Bug Fixes:
 Version 3.28.3
 ==============
 Bug Fixes:
-    - Floating point configuration now works in test-specific files (thanks Michael Behrisch)
-    - JUnit report now carefully excludes illegal characters (thanks Magnus Lyckå)
+    - Floating point configuration now works in test-specific files (thanks Michael Behrisch/DZLR)
+    - JUnit report now carefully excludes illegal characters (thanks Magnus Lyckå/Pagero)
 
 Version 3.28.4
 ==============
@@ -2759,15 +2759,25 @@ Version 3.28.5
 ==============
 Bug Fixes:
     - Fixed Jenkins plugin crash when unprintable characters (= wrong encoding) in author names
-    - Fixed matplotlib code to handle version 1.5 (thanks Michael Behrisch)
+    - Fixed matplotlib code to handle version 1.5 (thanks Michael Behrisch/DZLR)
 
-Version trunk
-=============
-Release Enhancements:
-Dynamic GUI Enhancements:
+Version 3.29
+============
 Static GUI Enhancements:
+    - Run icon changed to green arrow
 Framework Enhancements:
-Version Control Browser Enhancements:
+    - New support added for running a window manager under Xvfb. (thanks Mikhail Kalkov/Jeppesen)
+    Uses new config variable "virtual_display_wm_executable". 
 Batch Report Enhancements:
+    - more compact format for repeated host names in HTML tables when tests run on many machines in parallel (thanks Henrik Delin/Jeppesen)
+    - new script default.WriteDividedSelections
+    The point is to division of a set of tests to allow parallel batch environments even where TextTest's own parallel model cannot run due to lack of reciprical access 
+    (e.g. in locked-down corporate Windows environments) 
 Grid Engine/Cloud enhancements/bug fixes:
+    - support added for Core-binding option in Grid Engine. (thanks Lennart Bengtsson/Jeppesen)
 Bug Fixes:
+    - handle corrupted Jenkins config.xml files without stacktracing (thanks Jens Kjerrström/Jeppesen)
+    - fix problem where "create_catalogues" could not be applied on a per-test basiss (thanks Rikard Lundmark/Jeppesen)
+    - expand Git file arguments to full paths, Git does not like symlinks (thanks Wilhelm Hedman/Pagero)
+    - Fixed bug where a script that collates multiple files and writes nothing created empty files
+    - Handle unreadable teststate files in a generic way

@@ -4,9 +4,7 @@ SetCompressor lzma
 ; MUI 1.67 compatible ------
 !include "MUI2.nsh"
 !include "FileFunc.nsh"
-
-!include "ZipDLL.nsh"
-!include "EnvVarUpdate.nsh"
+!include "EnvVarUpdate.nsh"  #download http://nsis.sourceforge.net/mediawiki/images/a/ad/EnvVarUpdate.7z
 !include "WinVer.nsh"
 ; ------------ TextTest settings ---------
 !define PRODUCT_NAME "TextTest"
@@ -36,22 +34,11 @@ Var JAVA_EXE
   !define TT_BIN "bin"
 !endif
 
-!ifdef JEPPESEN
-  !define CENTRAL_STORYTEXT_LOCATION "T:\texttest\release\storytext"
-  !define CENTRAL_TEXTTEST_LOCATION "T:\texttest\release\current"
-  !ifndef STORYTEXT_UPDATER
-    !define STORYTEXT_UPDATER "storytext_updater.bat"
-  !endif
-!endif
-
-!ifndef VIRTUALENV_DIST
-  !define VIRTUALENV_DIST "virtualenv.py"
-!endif
 !ifndef PYTHON_VERSION
-  !DEFINE PYTHON_VERSION "2.6"
+  !DEFINE PYTHON_VERSION "2.7"
 !endif
 !ifndef JYTHON_VERSION
-  !DEFINE JYTHON_VERSION "2.5.1"
+  !DEFINE JYTHON_VERSION "2.5.3"
 !endif
 
 !ifndef VIRTUAL_PYTHON
@@ -62,13 +49,13 @@ Var JAVA_EXE
 !endif
 
 !ifndef PYTHON_INSTALLER
-  !define PYTHON_INSTALLER "python-2.6.6.msi"
+  !define PYTHON_INSTALLER "python-2.7.14.msi"
 !endif
 !ifndef JYTHON_INSTALLER
-  !define JYTHON_INSTALLER "jython_installer-2.5.1.jar"
+  !define JYTHON_INSTALLER "jython-installer-2.5.3.jar"
 !endif
 !ifndef PYGTK_INSTALLER
-  !define PYGTK_INSTALLER "pygtk-all-in-one-2.22.6.win32-py2.6.msi"
+  !define PYGTK_INSTALLER "pygtk-all-in-one-2.24.2.win32-py2.7.msi"
 !endif
 
 !ifndef TKDIFF_INSTALLER
@@ -86,7 +73,8 @@ Var JAVA_EXE
 
 ; Welcome page
 ;!define MUI_WELCOMEPAGE_TITLE "Please Note:"
-LangString WELCOME_TEXT ${LANG_ENGLSH} "This wizard will guide you through the installation of TextTest.$\r$\n$\r$\n \
+;LoadLanguageFile "${NSISDIR}\Contrib\Language files\English.nlf"
+LangString WELCOME_TEXT ${LANG_ENGLISH} "This wizard will guide you through the installation of TextTest.$\r$\n$\r$\n \
 Click Next to continue.$\r$\n"
 !define MUI_WELCOMEPAGE_TEXT "$(WELCOME_TEXT)"
 ;!define MUI_WELCOMEPAGE_TITLE_3LINES
@@ -96,13 +84,11 @@ Click Next to continue.$\r$\n"
 !insertmacro MUI_PAGE_COMPONENTS
 
 ; Directory page
-!ifndef JEPPESEN
-LangString TEXT_TOP ${LANG_ENGLSH} "Setup will install \
+LangString TEXT_TOP ${LANG_ENGLISH} "Setup will install \
 TextTest in the following folder..."
 !define MUI_DIRECTORYPAGE_TEXT_TOP "$(TEXT_TOP)"
 ;!DEFINE MUI_DIRECTORYPAGE_VARIABLE $INSTDIR
 !insertmacro MUI_PAGE_DIRECTORY
-!endif
 
 ; Instfiles page
 !insertmacro MUI_PAGE_INSTFILES
@@ -130,11 +116,7 @@ Name "${PRODUCT_NAME}"
 BrandingText " "
 RequestExecutionLevel user
 Caption "${PRODUCT_NAME}"
-!ifdef JEPPESEN
-  OutFile "texttest-all-in-one.${ARCH}.jeppesen.exe"
-!else
-  OutFile "texttest-all-in-one.${ARCH}.exe"
-!endif
+OutFile "texttest-all-in-one.${ARCH}.exe"
 InstallDir "C:\TextTest"
 InstallDirRegKey HKLM "${PRODUCT_DIR_REGKEY}" ""
 ShowInstDetails hide
@@ -208,25 +190,6 @@ SectionGroup /e "Diff tool" G1
 */
 SectionGroupEnd
 
-!ifdef JEPPESEN
-Section /o "TextTest and StoryText configuration" SEC06
-  IfFileExists "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\*.*" ok
-  Call installVirtualEnvOnPython
-  IfErrors 0 ok
-  MessageBox MB_OK|MB_ICONSTOP "Failed to install virtual environment on Python."
-  Quit
-  ok:
-  Call installJython
-  IfErrors onError
-  Call configureStoryTextJepp
-  IfErrors onError
-  Call updateTexttestPath
-  IfErrors onError done
-  onError:
-    Abort
-  done:
-SectionEnd
-!else
 SectionGroup /e "StoryText" G2
 Section /o "" TOGGLE ;hidden section to keep track of section group's state
 SectionEnd
@@ -266,7 +229,6 @@ Section "Texttest" SEC09
     Abort
   done:
 SectionEnd
-!endif
 
 Section "Uninstall"
   Call un.install
@@ -283,22 +245,12 @@ Installing StoryText for Java GUIs requires Java Runtime Environment (JRE) to be
 ; ============== Fuctions ========================
 Function initialize
   Call setup
-  File "${VIRTUALENV_DIST}"
   File "texttest-icon.ico"
   CreateDirectory "$INSTDIR"
+  CreateDirectory "$VIRTUALENV_PATH"
   writeUninstaller "$INSTDIR\Uninstall.exe"
-  Call copyVirtualEnvFiles
 FunctionEnd
 
-Function copyVirtualEnvFiles
-  CreateDirectory "$VIRTUALENV_PATH"
-  IfErrors onError
-  CopyFiles /SILENT "$OUTDIR\${VIRTUALENV_DIST}" $VIRTUALENV_PATH
-  IfErrors onError done
-  onError:
-    Abort
-  done:
-FunctionEnd
 
 Function installJython
   File "${JYTHON_INSTALLER}"
@@ -417,24 +369,6 @@ Function configureStorytextJava
   done:
 FunctionEnd
 
-!ifdef JEPPESEN
-Function configureStoryTextJepp
-  FILE "${STORYTEXT_UPDATER}"
-  FILE "exclude.txt"
-  CreateDirectory "$INSTDIR\storytext"
-  CopyFiles /SILENT "$OUTDIR\${STORYTEXT_UPDATER}" $INSTDIR
-  CopyFiles /SILENT "$OUTDIR\exclude.txt" $INSTDIR
-  IfErrors onError
-  ExecWait '"cmd.exe" /K CD $INSTDIR & ${STORYTEXT_UPDATER} & exit'
-  IfErrors onError
-  ExecWait '"cmd.exe" /K schtasks /create /tn "StoryText Updater" /tr "$INSTDIR\${STORYTEXT_UPDATER}" /sc daily /st 23:00 & exit'
-  IfErrors onError done
-  onError:
-    Abort
-  done:
-FunctionEnd
-!endif
-
 Function checkPythonPath
   ReadRegStr $PYTHON_PATH HKCU "SOFTWARE\Python\PythonCore\${PYTHON_VERSION}\InstallPath" ""
   IfErrors 0 done
@@ -475,7 +409,8 @@ FunctionEnd
 
 Function installVirtualEnvOnPython
   Call checkPythonPath
-  ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO installing virtualenv on python & "$PYTHON_PATH"python virtualenv.py --distribute ${VIRTUAL_PYTHON} && EXIT'
+  ExecWait '"cmd.exe" /K ECHO installing virtualenv on python & $PYTHON_PATH\Scripts\pip install virtualenv && EXIT'
+  ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Making python virtualenv for TextTest & $PYTHON_PATH\scripts\virtualenv --system-site-packages ${VIRTUAL_PYTHON} && EXIT'
 Functionend
 
 Function installVirtualEnvOnJython
@@ -486,8 +421,10 @@ Function installVirtualEnvOnJython
     sleep 500
     IfFileExists "$VIRTUALENV_PATH\${VIRTUAL_JYTHON}" checkEmpty install
   install:
+    ExecWait '"cmd.exe" /K ECHO installing virtualenv on jython & $JYTHON_PATH\bin\pip install virtualenv && EXIT'
+    ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO Making Jython virtualenv for TextTest & $JYTHON_PATH\bin\virtualenv ${VIRTUAL_JYTHON} && EXIT'
     ;ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO installing virtualenv on jython & "$PYTHON_PATH"python virtualenv.py -p $JYTHON_PATH\bin\jython.bat ${VIRTUAL_JYTHON} && EXIT'
-    ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO installing virtualenv on jython & $JYTHON_PATH\bin\jython virtualenv.py --distribute ${VIRTUAL_JYTHON} && EXIT'
+    ;ExecWait '"cmd.exe" /K CD $VIRTUALENV_PATH & ECHO installing virtualenv on jython & $JYTHON_PATH\bin\jython virtualenv.py --distribute ${VIRTUAL_JYTHON} && EXIT'
 Functionend
 
 Function makeShortcuts
@@ -495,10 +432,6 @@ Function makeShortcuts
   CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\Scripts\pythonw.exe" "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\Scripts\texttest.pyw" "$OUTDIR\texttest-icon.ico" ""
   CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
   CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\Scripts\pythonw.exe" "$VIRTUALENV_PATH\${VIRTUAL_PYTHON}\Scripts\texttest.pyw" "$OUTDIR\texttest-icon.ico" ""
-  !ifdef JEPPESEN
-    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\StoryTextUpdater.lnk" "cmd.exe" "/K $INSTDIR\storytext_updater.bat"
-    CreateShortcut "$DESKTOP\StoryTextUpdater.lnk" "cmd.exe" "/K $INSTDIR\storytext_updater.bat"
-  !endif
 FunctionEnd
 
 Function .onInit
@@ -533,10 +466,6 @@ Function un.install
   RMDir /r $SMPROGRAMS\${PRODUCT_NAME}
   Delete "$DESKTOP\${PRODUCT_NAME}.lnk"
   Call un.setEnv
-  !ifdef JEPPESEN
-    Delete "$DESKTOP\StoryTextUpdater.lnk"
-  	ExecWait '"cmd.exe" /K schtasks /delete /tn "StoryText Updater" & exit'
-  !endif
   Delete "$INSTDIR\Uninstall.exe"
 FunctionEnd
 

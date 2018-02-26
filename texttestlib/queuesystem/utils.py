@@ -11,7 +11,10 @@ rerunPostfix = ".RERUN_TEST"
 sendFilePostfix = ".SEND_FILES"
 getFilePostfix = ".GET_FILES"
 
-def getIPAddress():
+def getIPAddress(apps):
+    if useLocalQueueSystem(apps):
+        return "127.0.0.1" # always works if everything is local
+
     # Seems to be no good portable way to get the IP address in a portable way
     # See e.g. http://stackoverflow.com/questions/166506/finding-local-ip-addresses-using-pythons-stdlib
     # These two methods seem to be the only vaguely portable ones
@@ -26,6 +29,9 @@ def getIPAddress():
 
 def queueSystemName(app):
     return app.getConfigValue("queue_system_module")
+
+def useLocalQueueSystem(apps):
+    return all((queueSystemName(app) == "local" for app in apps))
 
 def socketSerialise(test):
     return test.app.name + test.app.versionSuffix() + ":" + test.getRelPath()        

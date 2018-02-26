@@ -27,16 +27,13 @@ class QueueSystemConfig(default.Config):
         groups.insert(2, (label, "l", 1))
         return groups
         
-    def useLocalQueueSystem(self, apps):
-        return all((app.getConfigValue("queue_system_module") == "local" for app in apps))
-
     def cloudUseConsistent(self, apps):
         return len(set([ app.getConfigValue("queue_system_module") == "ec2cloud" for app in apps ])) == 1
 
     def addToOptionGroups(self, apps, groups):
         default.Config.addToOptionGroups(self, apps, groups)
         minTestCount = min((app.getConfigValue("queue_system_min_test_count") for app in apps))
-        localQueueSystem = self.useLocalQueueSystem(apps)
+        localQueueSystem = utils.useLocalQueueSystem(apps)
         useGrid = all((app.getConfigValue("queue_system_module") not in [ "local", "ec2cloud" ] for app in apps))
         QueueSystemConfig.useCloud = all((app.getConfigValue("queue_system_module") == "ec2cloud" for app in apps))
         for group in groups:
@@ -114,7 +111,7 @@ class QueueSystemConfig(default.Config):
             if localFlag in self.optionMap:
                 return False
             
-        localQueueSystem = self.useLocalQueueSystem(allApps)
+        localQueueSystem = utils.useLocalQueueSystem(allApps)
         if localQueueSystem and self.optionValue("m"):
             return False
 

@@ -985,7 +985,7 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
     request_queue_size = socket.SOMAXCONN    
     def __init__(self, optionMap, allApps):
         plugins.Responder.__init__(self)
-        ThreadingTCPServer.__init__(self, (getIPAddress(), 0), self.handlerClass())
+        ThreadingTCPServer.__init__(self, (getIPAddress(allApps), 0), self.handlerClass())
         self.testMap = {}
         self.testLocks = {}
         self.filePushLock = Lock()

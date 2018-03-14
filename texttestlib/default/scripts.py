@@ -59,7 +59,7 @@ class WriteDividedSelections(plugins.ScriptWithArgs):
     def __call__(self, test):
         minCount = min(self.counts)
         minIndices = [ i for (i, count) in enumerate(self.counts) if count == minCount ]
-        chosenIndex = int(random.random() * len(minIndices)) if len(minIndices) > 1 else minIndices[0]
+        chosenIndex = minIndices[int(random.random() * len(minIndices))] if len(minIndices) > 1 else minIndices[0]
         self.counts[chosenIndex] += 1
         self.files[chosenIndex].write(test.getRelPath() + "\n")
     

@@ -313,13 +313,14 @@ class PrepareWriteDirectory(plugins.Action):
                 fullPaths[prevPath].append(fullPath)
         del fullPaths[rootDir]
         return fullPaths
+    
     def parseCatalogue(self, line):
         pos = line.rfind("----")
         if pos == -1:
             return None, None
         pos += 4
         dashes = line[:pos]
-        indent = len(dashes) / 4
+        indent = len(dashes) // 4
         fileName = line.strip()[pos:]
         return fileName, indent
 

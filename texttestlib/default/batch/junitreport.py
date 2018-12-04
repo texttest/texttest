@@ -109,9 +109,7 @@ class JUnitApplicationData:
         """
         Replace char with `"\\x%02x" % ord(char)` if char not allowed in CDATA.
         """
-        u_text = str(text, getpreferredencoding(), 'replace')
-        return "".join(("\\x%02x" % ord(char), char)[cls._allowed(ord(char))]
-                       for char in u_text).encode('utf-8')
+        return "".join(("\\x%02x" % ord(char), char)[cls._allowed(ord(char))] for char in text)
 
     @staticmethod
     def _allowed(num):

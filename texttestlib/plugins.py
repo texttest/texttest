@@ -6,6 +6,7 @@ from threading import currentThread
 from queue import Queue, Empty
 from glob import glob
 from datetime import datetime
+from pickle import Unpickler, UnpicklingError
 
 # We standardise around UNIX paths, it's all much easier that way. They work fine,
 # and they don't run into weird issues in being confused with escape characters
@@ -769,6 +770,27 @@ class MarkedTestState(TestState):
         newOldState = self.oldState.makeNewState(*args)
         return MarkedTestState(self.myFreeText, self.briefText, newOldState, self.executionHosts)
     
+
+class TestStateUnpickler(Unpickler):
+    def find_class(self, modName, className):
+        try:
+            namespace = {}
+            exec("from " + modName + " import " + className + " as _class", globals(), namespace)
+            return namespace["_class"]
+        except ImportError as e:
+            if not modName.startswith("texttestlib"):
+                try:
+                    return self.find_class("texttestlib." + modName, className)
+                except:
+                    raise e
+            else:
+                raise e
+
+def getNewTestStateFromFile(file):
+    from io import StringIO
+    unpickler = TestStateUnpickler(file)
+    return unpickler.load()
+
 
 log = None
 def configureLogging(configFile=None):

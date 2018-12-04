@@ -896,8 +896,7 @@ class TestCase(Test):
         os.rename(newPath, os.path.join(os.path.dirname(newPath), "backup.aborted"))
         stateFile = self.getStateFile()
         if os.path.isfile(stateFile):
-            newState = self.getNewStateFromFile(open(stateFile))
-            return newState
+            return plugins.getNewTestStateFromFile(open(stateFile))
 
     def backupPreviousTemporaryData(self, restoreLatest=False):
         writeDir = self.getDirectory(temporary=1)
@@ -934,26 +933,11 @@ class TestCase(Test):
     def makeBackupFileName(self, number):
         return self.makeTmpFileName("backup.previous." + str(number), forFramework=1)
 
-    def findGlobal(self, modName, className):
-        try:
-            exec("from " + modName + " import " + className + " as _class")
-        except ImportError:
-            exec("from texttestlib." + modName + " import " + className + " as _class")
-        return _class #@UndefinedVariable
-
-    def getNewStateFromFile(self, file):
-        # Would like to do load(file) here... but it doesn't work with universal line endings, see Python bug 1724366
-        from io import StringIO
-        unpickler = Unpickler(StringIO(file.read()))
-        # Magic to keep us backward compatible in the face of packages changing...
-        unpickler.find_global = self.findGlobal
-        return unpickler.load()
-
     def getNewState(self, file, **updateArgs):
         try:
             # Would like to do load(file) here... but it doesn't work with universal line endings, see Python bug 1724366
             # http://sourceforge.net/tracker/index.php?func=detail&aid=1724366&group_id=5470&atid=105470from cStringIO import StringIO
-            newState = self.getNewStateFromFile(file)
+            newState = plugins.getNewTestStateFromFile(file)
             newState.updateAfterLoad(self.app, **updateArgs)
             return True, newState
         except (UnpicklingError, ImportError, EOFError, AttributeError):

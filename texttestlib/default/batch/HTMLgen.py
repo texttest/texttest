@@ -310,7 +310,7 @@ class SimpleDocument(BasicDocument):
         if self.onLoad:     s.append(' onLoad="%s"' % self.onLoad)
         if self.onUnload:   s.append(' onUnload="%s"' % self.onUnload)
         s.append('>\n')
-        return ''.join(s)(s, '')
+        return ''.join(s)
 
 
 class SeriesDocument(SimpleDocument):
@@ -986,7 +986,7 @@ class List(collections.UserList):
             else:
                 self.data[:] = list.data[:]
         for item in list(kw.keys()):
-            self.__dict__[string.lower(item)] = kw[item]
+            self.__dict__[item.lower()] = kw[item]
 
     def __getslice__(self, i, j):
         newlist = copy.copy(self)
@@ -1651,7 +1651,7 @@ class AbstractTagSingle:
         self.__dict__['attr_dict'] = copy.copy(self.__class__.attr_dict)
         self.args = args
         for name, value in list(kw.items()):
-            name = string.lower(name)
+            name = name.lower()
             setattr(self, name, value)
 
     def __str__(self):
@@ -1666,7 +1666,7 @@ class AbstractTagSingle:
         dict used for substitution in __str__, otherwise just set it as
         an instance attribute.
         """
-        name = string.lower(name)
+        name = name.lower()
         if name in self.attrs:
             self.attr_dict[name] = ' %s="%s"' % (name, value)
         self.__dict__[name] = value
@@ -1820,7 +1820,7 @@ class AbstractTag:
         for item in contents:
             self.contents.append(item)
         for name, value in list(kw.items()):
-            name = string.lower(name)
+            name = name.lower()
             setattr(self, name, value)
 
     def __str__(self):
@@ -1845,7 +1845,7 @@ class AbstractTag:
         dict used for substitution in __str__, otherwise just set it as
         an instance attribute.
         """
-        name = string.lower(name)
+        name = name.lower()
         if name in self.attrs:
             self.attr_dict[name] = ' %s="%s"' % (name, value)
         else:

@@ -42,7 +42,7 @@ class FilterAction(plugins.Action):
             if os.path.isfile(writeFileName):
                 self.diag.info("Removing previous file at " + writeFileName)
                 os.remove(writeFileName)
-            currFile = open(currFileName, "rU") # use universal newlines to simplify
+            currFile = open(currFileName, "rU", errors="replace") # use universal newlines to simplify
             writeFile = plugins.openForWrite(writeFileName)
             fileFilter.filterFile(currFile, writeFile)
             writeFile.close()

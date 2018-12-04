@@ -146,7 +146,7 @@ class GraphGenerator:
         range = max(max(topPlot) - actualMin, 1)
         targetMin = max(actualMin - range * 2, 0)
         # Round to nearest 10 to avoid a white blob at the bottom
-        return (targetMin / 10) * 10
+        return (targetMin // 10) * 10
 
     def addAllPlots(self, graph, results, *args):
         prevYlist = [ 0 ] * len(results)

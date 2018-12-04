@@ -4,7 +4,6 @@
 import os, time, cgi, sys, logging, locale
 from texttestlib.default.batch import HTMLgen, HTMLcolors, jenkinschanges 
 from texttestlib import plugins
-from pickle import Unpickler, UnpicklingError
 from collections import OrderedDict
 from glob import glob
 from pprint import pformat
@@ -129,7 +128,7 @@ class GenerateWebPages(object):
             tagData, stateFiles, successFiles = self.findTestStateFilesAndTags(repositoryDirInfo)
             if len(stateFiles) > 0 or len(successFiles) > 0:
                 tags = list(tagData.keys())
-                tags.sort(self.compareTags)
+                tags.sort(key=self.tagSortKey)
                 selectors = self.makeSelectors(subPageNames, tags)
                 monthSelectors = SelectorByMonth.makeInstances(tags)
                 allMonthSelectors.update(monthSelectors)
@@ -152,7 +151,7 @@ class GenerateWebPages(object):
                     tags = [t for t in tags if t in selectedTags]
                     if archiveUnused and unusedTags:
                         plugins.log.info("Automatic repository cleaning will now remove old data for the following runs:")
-                        for tag in sorted(unusedTags, self.compareTags):
+                        for tag in sorted(unusedTags, key=self.tagSortKey):
                             plugins.log.info("- " + tag)
                         plugins.log.info("(To disable automatic repository cleaning in future, please run with the --manualarchive flag when collating the HTML report.)")
                         self.removeUnused(unusedTags, tagData)
@@ -234,7 +233,7 @@ class GenerateWebPages(object):
             prevMonth = list(allMonthSelectors)[0].getPreviousMonthSelector()
             allMonthSelectors.add(prevMonth)
         
-        for sel in sorted(allMonthSelectors):
+        for sel in sorted(allMonthSelectors, key=lambda s: s.sortKey()):
             target, linkName = sel.getLinkInfo(self.pageVersion)
             monthContainer.append(HTMLgen.Href(target, linkName))
         
@@ -282,16 +281,8 @@ class GenerateWebPages(object):
     def getExistingMonthPages(self):
         return glob(os.path.join(self.pageDir, "test_" + self.pageVersion + "_all_???[0-9][0-9][0-9][0-9].html"))
 
-    def compareTags(self, x, y):
-        timeCmp = cmp(self.getTagTimeInSeconds(x), self.getTagTimeInSeconds(y))
-        if timeCmp:
-            return timeCmp
-        elif len(x) != len(y):
-            # If the timing is the same, sort alphabetically
-            # Any number should be sorted numerically, do this by padding them with leading zeroes
-            return cmp(plugins.padNumbersWithZeroes(x), plugins.padNumbersWithZeroes(y))
-        else:
-            return cmp(x, y)
+    def tagSortKey(self, x):
+        return self.getTagTimeInSeconds(x), plugins.padNumbersWithZeroes(x)
         
     def getTagFromFile(self, fileName):
         return os.path.basename(fileName).replace("teststate_", "")
@@ -332,29 +323,12 @@ class GenerateWebPages(object):
             if version in self.extraVersions:
                 return version
         return ""
-
-    @staticmethod
-    def findGlobal(modName, className):
-        try:
-            exec("from " + modName + " import " + className + " as _class")
-        except ImportError:
-            exec("from texttestlib." + modName + " import " + className + " as _class")
-        return _class #@UndefinedVariable
-        
-    @classmethod
-    def getNewState(cls, file):
-        # Would like to do load(file) here... but it doesn't work with universal line endings, see Python bug 1724366
-        from io import StringIO
-        unpickler = Unpickler(StringIO(file.read()))
-        # Magic to keep us backward compatible in the face of packages changing...
-        unpickler.find_global = cls.findGlobal
-        return unpickler.load()
         
     @classmethod
     def readState(cls, stateFile):
-        file = open(stateFile, "rU")
+        file = open(stateFile, "rb")
         try:
-            state = cls.getNewState(file)
+            state = plugins.getNewTestStateFromFile(file)
             if isinstance(state, plugins.TestState):
                 return state
             else:
@@ -631,9 +605,9 @@ class TestTable:
         return HTMLgen.TR(columnHeader)
     
     def escapeForHtml(self, text):
-        localeEncoding = locale.getdefaultlocale()[1] or "utf-8"
         text = cgi.escape(text, True)
-        return str(text, localeEncoding).encode("ascii", "xmlcharrefreplace")
+        localeEncoding = locale.getdefaultlocale()[1] or "utf-8"
+        return str(text.encode("ascii", "xmlcharrefreplace"), localeEncoding)
         
     def generateTestRows(self, testName, extraVersion, results):
         bgColour = self.colourFinder.find("row_header_bg")
@@ -985,11 +959,15 @@ class BaseSelector(object):
         self.selectedTags = []
         self.linkName = linkName
         self.suffix = suffix
+    
     def add(self, tag):
         self.selectedTags.append(tag)
+    
     def getLinkInfo(self, pageVersion):
         return "test_" + pageVersion + self.suffix + ".html", self.linkName
 
+    def sortKey(self):
+        pass
 
 class Selector(BaseSelector):
     def __init__(self, linkName, suffix, getConfigValue, tags):
@@ -1000,6 +978,7 @@ class Selector(BaseSelector):
         if len(weekdays) > 0:
             self.selectedTags = [tag for tag in self.selectedTags if getWeekDay(tag) in weekdays]
         self.selectedTags = self.selectedTags[-cutoff:]
+            
     
 
 class SelectorByMonth(BaseSelector):
@@ -1009,7 +988,7 @@ class SelectorByMonth(BaseSelector):
         for tag in tags:
             month = tag[2:9]
             allSelectors.setdefault(month, SelectorByMonth(month)).add(tag)
-        return sorted(allSelectors.values())
+        return sorted(allSelectors.values(), key=lambda s: s.sortKey())
             
     def __init__(self, month):
         super(SelectorByMonth, self).__init__(month, "_all_" + month)
@@ -1020,8 +999,8 @@ class SelectorByMonth(BaseSelector):
         last_day_of_previous_month = first_day_of_current_month - timedelta(days=1)
         return SelectorByMonth(last_day_of_previous_month.strftime("%b%Y"))
 
-    def __cmp__(self, other):
-        return cmp(self.month, other.month)
+    def sortKey(self):
+        return self.month
     
     def __eq__(self, other):
         return self.linkName == other.linkName

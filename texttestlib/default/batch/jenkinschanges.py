@@ -306,8 +306,9 @@ class ChangeSetFinder:
         bugs = []
         for systemName, location in list(self.bugSystemData.items()):
             try:
-                exec("from texttestlib.default.knownbugs." + systemName + " import getBugsFromText")
-                self.addUnique(bugs, getBugsFromText(msg, location)) #@UndefinedVariable
+                namespace = {}
+                exec("from texttestlib.default.knownbugs." + systemName + " import getBugsFromText", globals(), namespace)
+                self.addUnique(bugs, namespace["getBugsFromText"](msg, location))
             except ImportError:
                 pass
         return bugs

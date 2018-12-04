@@ -1,6 +1,4 @@
-#!/usr/bin/env python
-
-from gi.repository import Gtk
+from gi.repository import Gtk, Gdk
 
 # We register our own stock items here.
 # The code is inspired by the example

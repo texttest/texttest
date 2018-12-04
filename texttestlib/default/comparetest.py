@@ -268,20 +268,20 @@ class TestComparison(BaseTestComparison):
     def getComparisons(self):
         return self.changedResults + self.newResults + self.missingResults    
     def _comparisonsString(self, comparisons):
-        return string.join([repr(x) for x in comparisons], ",")
+        return ",".join([repr(x) for x in comparisons])
     # Sort according to failure_display_priority. Lower means show earlier,
     # files with the same prio should be not be shuffled. 
     def getSortedComparisons(self):
-        return sorted(self.changedResults, self.lessDisplayPriority) + \
-               sorted(self.newResults, self.lessDisplayPriority) + \
-               sorted(self.missingResults, self.lessDisplayPriority)
-    def lessDisplayPriority(self, first, second):
-        if first.displayPriority == second.displayPriority:
-            return cmp(first.stem, second.stem)
-        else:
-            return cmp(first.displayPriority, second.displayPriority)
+        return sorted(self.changedResults, key=self.displayPriority) + \
+               sorted(self.newResults, key=self.displayPriority) + \
+               sorted(self.missingResults, key=self.displayPriority)
+    
+    def displayPriority(self, item):
+        return item.displayPriority, item.stem
+
     def description(self):
         return repr(self) + self.getDifferenceSummary()
+    
     def getDifferenceSummary(self):
         texts = []
         if len(self.newResults) > 0:
@@ -291,7 +291,7 @@ class TestComparison(BaseTestComparison):
         if len(self.changedResults) > 0:
             texts.append("differences in " + self._comparisonsString(self.changedResults))
         if len(texts) > 0:
-            return " " + string.join(texts, ", ")
+            return " " + ", ".join(texts)
         else:
             return ""
     def getPostText(self):
@@ -307,7 +307,7 @@ class TestComparison(BaseTestComparison):
                 baseNames.append(os.path.basename(comparison.tmpFile))
             else:
                 baseNames.append(os.path.basename(comparison.stdFile))
-        return string.join(baseNames, ",")
+        return ",".join(baseNames)
 
     def getPerformanceStems(self, test):
         return [ "performance" ] + list(test.getConfigValue("performance_logfile_extractor").keys())

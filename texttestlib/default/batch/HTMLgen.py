@@ -119,7 +119,7 @@ class BasicDocument:
 
         # CLOSE the document
         s.append('\n</BODY> </HTML>\n')
-        return string.join(s, '')
+        return ''.join(s)
 
     def get_doc_type(self):
         if self.xhtml:
@@ -147,7 +147,7 @@ class BasicDocument:
         if self.vlinkcolor: s.append(' VLINK="%s"' % self.vlinkcolor)
         if self.alinkcolor: s.append(' ALINK="%s"' % self.alinkcolor)
         s.append('>\n')
-        return string.join(s, '')
+        return ''.join(s)
 
     def append_file(self, filename, marker_function = None):
         """Add the contents of a file to the document.
@@ -234,7 +234,7 @@ class FramesetDocument(BasicDocument):
 
         # CLOSE the document
         s.append('\n</HTML>')        
-        return string.join(s, '')
+        return ''.join(s)
 
 
 class SimpleDocument(BasicDocument):
@@ -274,7 +274,7 @@ class SimpleDocument(BasicDocument):
         s.append((bodystring % tuple(self.contents)))
 
         s.append('\n</BODY> </HTML>\n') # CLOSE the document
-        return string.join(s, '')
+        return ''.join(s)
 
     def html_head(self):
         """Generate the HEAD TITLE and BODY tags.
@@ -295,7 +295,7 @@ class SimpleDocument(BasicDocument):
             else:
                 s.append(str(self.script))
         s.append('</HEAD>\n')
-        return string.join(s, '')
+        return ''.join(s)
 
     def html_body_tag(self):
         """Return BODY tag with attributes.
@@ -310,7 +310,7 @@ class SimpleDocument(BasicDocument):
         if self.onLoad:     s.append(' onLoad="%s"' % self.onLoad)
         if self.onUnload:   s.append(' onUnload="%s"' % self.onUnload)
         s.append('>\n')
-        return string.join(s, '')
+        return ''.join(s)(s, '')
 
 
 class SeriesDocument(SimpleDocument):
@@ -403,7 +403,7 @@ class SeriesDocument(SimpleDocument):
         
         s.append(self.footer())
         s.append('\n</BODY> </HTML>\n') # CLOSE the document
-        return string.join(s, '')
+        return ''.join(s)
     
     def header(self):
         """Generate the standard header markups.
@@ -424,7 +424,7 @@ class SeriesDocument(SimpleDocument):
         if self.subtitle:
             s.append('<H2>%s</H2>\n' % self.subtitle)
         s.append('<HR>\n\n')
-        return string.join(s, '')
+        return ''.join(s)
 
     def nav_buttons(self):
         """Generate hyperlinked navigation buttons.
@@ -462,7 +462,7 @@ class SeriesDocument(SimpleDocument):
         else: # place a blank gif as spacer
             btn = Image(self.blank)
             s.append(str(btn) + ' \n')
-        return string.join(s, '')
+        return ''.join(s)
  
     def footer(self):
         """Generate the standard footer markups.
@@ -472,7 +472,7 @@ class SeriesDocument(SimpleDocument):
         #self.datetime = time.strftime("%c %Z", t)    #not available in JPython
         self.datetime = time.asctime(t)
         #self.date = time.strftime("%A %B %d, %Y", t)
-        x = string.split(self.datetime)
+        x = self.datetime.split()
         self.date = x[0] + ' ' + x[1] + ' ' + x[2] + ', ' + x[4]
         s =  ['\n<P><HR>\n']
         if self.place_nav_buttons:
@@ -483,7 +483,7 @@ class SeriesDocument(SimpleDocument):
         s.append('\nComments to author: ' + str(MailTo(self.email)) )
         s.append('<br>\nGenerated: %s <BR>' % self.date) # can use self.datetime here instead
         s.append('<hr>\n</FONT>')
-        return string.join(s, '')
+        return ''.join(s)
 
 # Aliases for backward compatability with HTMLgen 1.2
 Document = SeriesDocument
@@ -565,7 +565,7 @@ class StringTemplate:
             matched = self.subpat.search(source[i:])
         else:
             output.append(source[i:])
-        return string.join(output, '')
+        return ''.join(output)
     
     def write(self, filename = None):
         """Emit the Document HTML to a file or standard output.
@@ -658,7 +658,7 @@ class AutoStringTemplate(StringTemplate):
             else:
                 newtemplate.append(source[a:])
                 break
-        self.source = string.join(newtemplate, '')
+        self.source = ''.join(newtemplate)
         self.substitutions.update(newsubs)
 
     def _sub(self, source, subs=None):
@@ -685,7 +685,7 @@ class AutoStringTemplate(StringTemplate):
             matched = self.subpat.search(source[i:])
         else:
             output.append(source[i:])
-        return string.join(output, '')
+        return ''.join(output)(output, '')
 
 class AutoTemplateDocument(AutoStringTemplate):
     """Generate documents based on a template and a substitution mapping.
@@ -823,7 +823,7 @@ class Meta:
         if self.content: s.append(' CONTENT="%s"' % self.content)
         if self.url: s.append(' URL="%s"' % self.url)
         s.append('>\n')
-        return string.join(s, '')
+        return ''.join(s)
 
 ##### Client-side Imagemap Support #####
 
@@ -845,7 +845,7 @@ class Map:
         for area in self.areas:
             s.append(str(area))
         s.append('</MAP>\n')
-        return string.join(s, '')
+        return ''.join(s)
 
 
 class Href:
@@ -887,7 +887,7 @@ class Href:
         if self.onMouseOut: s.append(' onMouseOut="%s"' % self.onMouseOut)
         if self.style: s.append(' style="%s"' % self.style)
         s.append('>%s</A>' % self.text)
-        return string.join(s, '')
+        return ''.join(s)
 
     def append(self, content):
         self.text = self.text + str(content)
@@ -929,7 +929,7 @@ class MailTo:
         buffer = list(address)
         for i in range(0, len(address), choice((2,3,4))):
             buffer[i] = '&#%d;' % ord(buffer[i])
-        return string.join(buffer,'')
+        return ''.join(buffer)
 
 MAILTO = Mailto = MailTo # aliases
 
@@ -1048,7 +1048,7 @@ class List(collections.UserList):
         if self.indent: #close out this level of list
             self.s.append(self.pad*self.lvl + self.end_element())
         self.lvl = 0
-        return string.join(self.s, '')
+        return ''.join(self.s)
 
     def sub_list(self, list):
         """Recursive method for generating a subordinate list
@@ -1104,7 +1104,7 @@ class List(collections.UserList):
             except AttributeError:
                 pass
         s.append('>\n')
-        return string.join(s, '')
+        return ''.join(s)
 
     def end_element(self):
         """Closes the HTML element
@@ -1240,7 +1240,7 @@ class Form:
         s.append(str(self.submit))
         if self.reset: s.append(str(self.reset))
         s.append('\n</FORM>\n')
-        return string.join(s, '')
+        return ''.join(s)
         
         
 def overlay_values(obj, dict):
@@ -1327,7 +1327,7 @@ class Input:
         if self.align: s.append(' ALIGN="%s"' % self.align)
         s.append('>')
         if self.rlabel: s.append(str(self.rlabel))
-        return string.join(s, '')
+        return ''.join(s)
 
 
 class Select(collections.UserList):
@@ -1390,7 +1390,7 @@ class Select(collections.UserList):
                 else:
                     s.append('<OPTION SELECTED>%s\n' % item)
         s.append('</SELECT>\n')
-        return string.join(s, '')
+        return ''.join(s)
 
 class Textarea:
     """Used for an entry widget to type multi-line text (for forms).
@@ -1429,7 +1429,7 @@ class Textarea:
         s.append('>')
         s.append(str(self.text))
         s.append('</TEXTAREA>')
-        return string.join(s, '')
+        return ''.join(s)
 
 class Script:
     """Construct a Script
@@ -1462,7 +1462,7 @@ class Script:
         s.append('>')
         if self.code: s.append('<!--\n%s\n//-->\n' % self.code)
         s.append('</SCRIPT>')
-        return string.join(s, '')
+        return ''.join(s)
     
     def append(self, s):
         self.code = self.code + s
@@ -1613,7 +1613,7 @@ class Table:
             s.append('</TR>\n')
         #close table
         s.append('</TABLE><P>\n')
-        return string.join(s, '')
+        return ''.join(s)
     
     def get_body_color(self, colors, i):
         """Return bgcolor argument for column number i
@@ -1638,7 +1638,7 @@ def _make_attr_inits(opts):
     for name in opts:
         a.append('%('+name+')s')
         d[name] = ''
-    return string.join(a, ''), d  
+    return ''.join(a), d  
 
 class AbstractTagSingle:
     "Abstract base class for all tag markup classes not requiring a closure tag."
@@ -1836,7 +1836,7 @@ class AbstractTag:
                 s.append(str(item))
         # close out the marked region
         s.append( '</%s>' % self.tagname)
-        return string.join(s, '') + self.trailer
+        return ''.join(s) + self.trailer
         
     def __setattr__(self, name, value):
         """Intercept attribute assignments.
@@ -1926,7 +1926,7 @@ class AbstractTag:
         """
         collapse = 0
         if 'collapse' in kw: collapse = kw['collapse']
-        text = string.join(map(str, self.contents))
+        text = ' '.join(map(str, self.contents))
         newtext, count = markup_re(text, rex, marker, collapse)
         if count:
             self.contents = [newtext]
@@ -2315,12 +2315,12 @@ class InitialCaps:
         self.downsize = downsize
 
     def __str__(self):
-        list = string.split(self.text)
+        list = self.text.split()
         wordlist = []
         for word in list:
             word = self.hi(string.upper(word[0])) + self.lo(string.upper(word[1:]))
             wordlist.append(word)
-        return string.join(wordlist)
+        return ' '.join(wordlist)
 
     def __call__(self, text):
         self.text = text
@@ -2381,13 +2381,15 @@ class Comment:
 
 ###### UTILITIES USED INTERNALLY ########
 
-def escape(text, replace=string.replace):
+def escape(text, replace=None):
     """Converts the special characters '<', '>', and '&'.
 
     RFC 1866 specifies that these characters be represented
     in HTML as &lt; &gt; and &amp; respectively. In Python
     1.5 we use the new string.replace() function for speed.
     """
+    if not replace:
+        replace = lambda text, s1, s2: text.replace(s1, s2)
     text = replace(text, '&', '&amp;') # must be done 1st
     text = replace(text, '<', '&lt;')
     text = replace(text, '>', '&gt;')
@@ -2443,7 +2445,7 @@ def markup_re(text, rex=None, marker=None, collapse=0):
             output.append(marker(text[begin:end]))
         else:
             output.append(text[begin:end])
-    return string.join(output, ''), count
+    return ''.join(output), count
 
 
 class URL:
@@ -2513,8 +2515,8 @@ def mpath(path):
             path = path[1:]
         else: # bare relative
             mp = ''
-        pl = string.split(path, '/')
-        mp = mp + string.join(pl, ':')
+        pl = path.split('/')
+        mp = mp + ':'.join(pl)
         return mp
     elif os.name == 'posix': # Expand Unix variables
         if path[0] == '~' :
@@ -2547,7 +2549,7 @@ def relpath(path1, path2):
     path1 = path1[sliceoff:]
     path2 = path2[sliceoff:]
 
-    dirs1 = string.split(path1, os.sep) # list of directory components below
+    dirs1 = path1.split(os.sep) # list of directory components below
                                         # the common path
     dirs1 = [x for x in dirs1 if x]  # filter out empty elements
     rel = (os.pardir+os.sep)*len(dirs1) # construct the relative path to the

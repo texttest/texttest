@@ -574,7 +574,7 @@ class OptionGroupGUI(ActionGUI):
     def createLabelEventBox(self, option, separator):
         label = gtk.EventBox()
         label.add(gtk.Label(option.name + separator))
-        if option.description and type(option.description) == bytes:
+        if option.description and type(option.description) in (str, bytes):
             label.set_tooltip_text(option.description)
         return label
 

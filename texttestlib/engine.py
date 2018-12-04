@@ -503,7 +503,11 @@ class TextTest(plugins.Responder, plugins.Observable):
 
     def findThreadRunners(self):
         allRunners = [x for x in self.observers if hasattr(x, "run")]
-        mainThreadRunner = filter(lambda x: x.canBeMainThread(), allRunners)[0]
+        mainThreadRunner = None
+        for runner in allRunners:
+            if runner.canBeMainThread():
+                mainThreadRunner = runner
+                break
         allRunners.remove(mainThreadRunner)
         return mainThreadRunner, allRunners
 

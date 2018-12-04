@@ -168,7 +168,7 @@ class TestEnvironment(OrderedDict):
             pass
 
     def expandSelfReferences(self, var, valueOrMethod, expandExternal):
-        if type(valueOrMethod) == bytes:
+        if type(valueOrMethod) in (str, bytes):
             mapping = DynamicMapping(self.getSelfReference, var, expandExternal)
             self.diag.info("Expanding self references for " + repr(var) + " in " + repr(valueOrMethod))
             return string.Template(valueOrMethod).safe_substitute(mapping)
@@ -627,7 +627,7 @@ class Test(plugins.Observable):
         relPath = self.getRelPath()
         if not len(relPath):
             return ""
-        dirCount = string.count(relPath, "/") + 1
+        dirCount = relPath.count("/") + 1
         return " " * (dirCount * 2)
 
     def testCaseList(self, filters=[]):
@@ -1421,9 +1421,9 @@ class TestSuite(Test):
         if a in testNames:
             if b in testNames:
                 if ascending:
-                    return cmp(a.lower(), b.lower())
+                    return self.cmp(a.lower(), b.lower())
                 else:
-                    return cmp(b.lower(), a.lower())
+                    return self.cmp(b.lower(), a.lower())
             else:
                 return -1
         else:
@@ -1431,9 +1431,9 @@ class TestSuite(Test):
                 return 1
             else:
                 if ascending:
-                    return cmp(a.lower(), b.lower())
+                    return self.cmp(a.lower(), b.lower())
                 else:
-                    return cmp(b.lower(), a.lower())
+                    return self.cmp(b.lower(), a.lower())
 
     def changeDirectory(self, newDir, origRelPath):
         Test.changeDirectory(self, newDir, origRelPath)
@@ -1662,8 +1662,6 @@ class Application(object):
             # Allow config modules to be stored under the test suite
             sys.path.insert(0, self.dircache.pathName("texttest_config_modules"))
         try:
-            print(moduleName)
-            sys.stdout.flush()
             return plugins.importAndCall(moduleName, "getConfig", self.inputOptions)
         except:
             if sys.exc_info()[0] == ImportError:
@@ -1886,7 +1884,7 @@ class Application(object):
         self.setConfigDefault("link_test_path", [], "Paths to be linked from the temp. directory when running tests")
         self.setConfigDefault("test_data_ignore", { "default" : [] }, \
                               "Elements under test data structures which should not be viewed or change-monitored")
-        self.setConfigDefault("definition_file_stems", { "default": [], "builtin": [ "config", "environment", "testsuite" ]}, \
+        self.setConfigDefault("definition_file_stems", { "default": [], "regenerate": [], "builtin": [ "config", "environment", "testsuite" ]}, \
                               "files to be shown as definition files by the static GUI")
         self.setConfigDefault("unsaveable_version", [], "Versions which should not have results saved for them")
         self.setConfigDefault("version_priority", { "default": 99 }, \
@@ -2004,13 +2002,16 @@ class Application(object):
         extraVersions = self.getExtraVersions()
         extraIndex1 = self.extraVersionIndex(vset1, extraVersions)
         extraIndex2 = self.extraVersionIndex(vset2, extraVersions)
-        return cmp(extraIndex1, extraIndex2)
+        return self.cmp(extraIndex1, extraIndex2)
 
     def extraVersionIndex(self, vset, extraVersions):
         for version in vset:
             if version in extraVersions:
                 return extraVersions.index(version)
         return 99
+    
+    def cmp(self, a, b):
+        return (a > b) - (a < b) #python 3 equivalent of cmp() function
 
     def compareForPriority(self, vset1, vset2):
         versionSet = set(self.versions)
@@ -2027,21 +2028,21 @@ class Application(object):
         # Low number implies higher priority...
         if priority1 != priority2:
             self.diag.info("Version priority " + repr(priority1) + " vs " + repr(priority2))
-            return cmp(priority2, priority1)
+            return self.cmp(priority2, priority1)
 
         versionCount1 = len(vset1.intersection(explicitVersions))
         versionCount2 = len(vset2.intersection(explicitVersions))
         if versionCount1 != versionCount2:
             # More explicit versions implies higher priority
             self.diag.info("Version count " + repr(versionCount1) + " vs " + repr(versionCount2))
-            return cmp(versionCount1, versionCount2)
+            return self.cmp(versionCount1, versionCount2)
 
         baseVersions = set(self.getBaseVersions())
         baseCount1 = len(vset1.intersection(baseVersions))
         baseCount2 = len(vset2.intersection(baseVersions))
         self.diag.info("Base count " + repr(baseCount1) + " vs " + repr(baseCount2))
-        # More base versions implies higher priority
-        return cmp(baseCount1, baseCount2)
+        # More base versions implies higher priority. 
+        return self.cmp(baseCount1, baseCount2)
 
     def getVersionSetPriority(self, vlist):
         if len(vlist) == 0:

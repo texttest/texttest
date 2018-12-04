@@ -11,16 +11,24 @@ from datetime import datetime
 # and they don't run into weird issues in being confused with escape characters
 
 # basically posixpath.join, adapted to be portable...
+def _get_sep(path):
+    if isinstance(path, bytes):
+        return b'/'
+    else:
+        return '/'
+
 def joinpath(a, *p):
     path = a
+    sep =_get_sep(a)
     for b in p:
         if os.path.isabs(b) and (path[1:2] != ":" or b[1:2] == ":"):
             path = b
-        elif path == '' or path.endswith('/'):
+        elif path == '' or path.endswith(sep):
             path +=  b
         else:
-            path += '/' + b
+            path += sep + b
     return path
+
 
 os.path.join = joinpath
 if os.name == "nt":
@@ -80,22 +88,21 @@ def startTimeString(format=datetimeFormat):
 
 def importAndCall(moduleName, callableName, *args):
     command = "from " + moduleName + " import " + callableName + " as _callable"
+    namespace = {}
     try:
-        exec(command)
+        exec(command, namespace)
     except ImportError as err:
-        print("### catched first err")
         # try resolve import by prepending 'texttestlib.' (python3)
-        moduleName = "texttestlib."+moduleName
-        command = "from " + moduleName + " import " + callableName + " as _callable"
-        try:
-            print("### new command: %s"%command)
-            sys.stdout.flush()
-            exec(command)
-        except ImportError as err2:
-            print("### catched second err")  
-            sys.stdout.flush()
-        
-    return _callable(*args) #@UndefinedVariable
+        errorString = "No module named '" + moduleName + "'"
+        if str(err) == errorString:
+            moduleName = "texttestlib." + moduleName
+            command = "from " + moduleName + " import " + callableName + " as _callable"
+            exec(command, namespace)
+        else:
+            raise
+    
+    return namespace["_callable"](*args)
+            
 
 def installationDir(name):
     # Generic modules only, we're confident we know where they are
@@ -1475,12 +1482,12 @@ class MultiEntryDictionary(OrderedDict):
     def getDictionaryValueType(self, currDict):
         val = list(currDict.values())
         if len(val) == 0:
-            return bytes
+            return str
         else:
             return type(val[0])
 
     def castEntry(self, dummy, entry, currDict):
-        if type(entry) != bytes:
+        if type(entry) not in (str, bytes):
             return entry
         dictValType = self.getDictionaryValueType(currDict)
         if dictValType == list:

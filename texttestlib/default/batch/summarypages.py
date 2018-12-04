@@ -1,6 +1,7 @@
 """ Code related to building the summary page and the graphs etc. """
 
-import testoverview, logging, os, shutil, time, operator, sys
+from . import testoverview
+import logging, os, shutil, time, operator, sys
 from texttestlib import plugins
 from html.parser import HTMLParser
 from collections import OrderedDict

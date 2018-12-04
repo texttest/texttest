@@ -1,7 +1,8 @@
 
 """ All the standard scripts that come with the default configuration """
 
-import sandbox, operator, os, shutil, sys, random
+from . import sandbox
+import operator, os, shutil, sys, random
 from glob import glob
 from texttestlib import plugins
 from collections import OrderedDict

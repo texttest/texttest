@@ -14,7 +14,6 @@ from texttestlib.default.console import TextDisplayResponder, InteractiveRespond
 from texttestlib.default.knownbugs import CheckForBugs
 from texttestlib.default.actionrunner import BaseActionRunner
 from texttestlib.default.performance import getTestPerformance
-from types import StringType
 from glob import glob
 
 plugins.addCategory("abandoned", "abandoned", "were abandoned")
@@ -278,7 +277,7 @@ class QueueSystemServer(BaseActionRunner):
         testOrStatus = self.getItemFromQueue(self.testQueue, block, replaceTerminators)
         if not testOrStatus:
             return
-        if type(testOrStatus) == StringType:
+        if type(testOrStatus) == str:
             self.sendServerState(testOrStatus)
             return self.getTest(block)
         else:
@@ -603,9 +602,10 @@ class QueueSystemServer(BaseActionRunner):
         if queueModule in self.queueSystems:
             return self.queueSystems[queueModule]
         
-        command = "from " + queueModule + " import QueueSystem as _QueueSystem"
-        exec(command)
-        system = _QueueSystem(test) #@UndefinedVariable
+        namespace = {}
+        command = "from ." + queueModule + " import QueueSystem as _QueueSystem"
+        exec(command, globals(), namespace)
+        system = namespace["_QueueSystem"](test)
         self.queueSystems[queueModule] = system
         return system
     

@@ -8,6 +8,7 @@ from texttestlib import plugins
 from collections import OrderedDict
 from configparser import RawConfigParser
 from functools import reduce
+from pprint import pformat
                     
 class CountTest(plugins.Action):
     scriptDoc = "report on the number of tests selected, by application"
@@ -127,8 +128,7 @@ class DocumentConfig(plugins.ScriptWithArgs):
         if len(self.onlyEntries) > 0:
             return self.onlyEntries
         else:
-            return sorted(list(app.configDir.keys()) + list(app.configDir.aliases.keys()))
-        
+            return sorted(list(app.configDir.keys()) + list(app.configDir.aliases.keys()))  
 
     def reloadForOverrideOs(self, app):
         if self.overrideOs and self.overrideOs != os.name:
@@ -150,7 +150,8 @@ class DocumentConfig(plugins.ScriptWithArgs):
                 print(key + "|" + self.interpretArgument(value) + "|" + docOutput)  
                 
     def interpretArgument(self, arg):
-        return str(arg).replace(plugins.installationRoots[0], "<source library>")
+        argStr = pformat(arg, width=1000) if isinstance(arg, dict) else str(arg)
+        return argStr.replace(plugins.installationRoots[0], "<source library>")
 
 class DocumentEnvironment(plugins.Action):
     def __init__(self, args=[]):

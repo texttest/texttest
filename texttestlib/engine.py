@@ -210,7 +210,7 @@ class TextTest(plugins.Responder, plugins.Observable):
                 sys.stderr.write("Could not read application '" + missingAppName + "'. No file named config." + missingAppName + " was found under " + " or ".join(self.inputOptions.rootDirectories) + ".\n")
                 raisedError = True
 
-        appList.sort(key=cmp_to_key(self.compareApps))
+        appList.sort(key=lambda app: app.name)
         self.diag.info("Found applications : " + repr(appList))
         return raisedError, appList
 
@@ -219,9 +219,6 @@ class TextTest(plugins.Responder, plugins.Observable):
 
     def appMissing(self, appName, apps):
         return reduce(operator.and_, (app.name != appName for app in apps), True)
-
-    def compareApps(self, app1, app2):
-        return cmp(app1.name, app2.name)
 
     def findAppsUnder(self, dirName, selectedAppDict, ignoreNames):
         appList = []

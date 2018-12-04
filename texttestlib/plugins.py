@@ -90,14 +90,14 @@ def importAndCall(moduleName, callableName, *args):
     command = "from " + moduleName + " import " + callableName + " as _callable"
     namespace = {}
     try:
-        exec(command, namespace)
+        exec(command, globals(), namespace)
     except ImportError as err:
         # try resolve import by prepending 'texttestlib.' (python3)
         errorString = "No module named '" + moduleName + "'"
         if str(err) == errorString:
             moduleName = "texttestlib." + moduleName
             command = "from " + moduleName + " import " + callableName + " as _callable"
-            exec(command, namespace)
+            exec(command, globals(), namespace)
         else:
             raise
     
@@ -1068,9 +1068,9 @@ def uncomment(comment):
     lines = comment.split("\n")
     return "\n".join([line[1:].lstrip() for line in lines if line.startswith("#")])
 
-def openForWrite(path):
+def openForWrite(path, mode="w"):
     ensureDirExistsForFile(path)
-    return open(path, "w")
+    return open(path, mode)
 
 # Make sure the dir exists
 def ensureDirExistsForFile(path):

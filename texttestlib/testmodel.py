@@ -968,8 +968,8 @@ class TestCase(Test):
             # Don't overwrite previous saved state
             return
 
-        file = plugins.openForWrite(stateFile)
-        pickler = Pickler(file)
+        file = plugins.openForWrite(stateFile, "wb")
+        pickler = Pickler(file, protocol=2)
         pickler.dump(self.state)
         file.close()
 
@@ -1304,9 +1304,9 @@ class TestSuite(Test):
         if self.autoSortOrder == 0:
             return testNames
         elif self.autoSortOrder == 1:
-            return sorted(testNames, lambda a, b: self.compareTests(True, testCaseNames, a, b))
+            return sorted(testNames, key=cmp_to_key(lambda a, b: self.compareTests(True, testCaseNames, a, b)))
         else:
-            return sorted(testNames, lambda a, b: self.compareTests(False, testCaseNames, a, b))
+            return sorted(testNames, key=cmp_to_key(lambda a, b: self.compareTests(False, testCaseNames, a, b)))
 
     def createTestCases(self, filters, testNames, initial, guideSuite=None):
         testCaches = {}
@@ -1421,9 +1421,9 @@ class TestSuite(Test):
         if a in testNames:
             if b in testNames:
                 if ascending:
-                    return self.cmp(a.lower(), b.lower())
+                    return self.app.cmp(a.lower(), b.lower())
                 else:
-                    return self.cmp(b.lower(), a.lower())
+                    return self.app.cmp(b.lower(), a.lower())
             else:
                 return -1
         else:
@@ -1431,9 +1431,9 @@ class TestSuite(Test):
                 return 1
             else:
                 if ascending:
-                    return self.cmp(a.lower(), b.lower())
+                    return self.app.cmp(a.lower(), b.lower())
                 else:
-                    return self.cmp(b.lower(), a.lower())
+                    return self.app.cmp(b.lower(), a.lower())
 
     def changeDirectory(self, newDir, origRelPath):
         Test.changeDirectory(self, newDir, origRelPath)
@@ -2240,9 +2240,11 @@ class OptionFinder(plugins.OptionFinder):
 
     def _getScriptObject(self, actionCmd, actionArgs):
         module, className = actionCmd.rsplit(".", 1)
-        importCommand = "from " + module + " import " + className + " as _class"
         try:
-            exec(importCommand)
+            if len(actionArgs) > 0:
+                return plugins.importAndCall(module, className, actionArgs)
+            else:
+                return plugins.importAndCall(module, className)
         except:
             # Backwards compatibility : many scripts are now in the default package
             excString = plugins.getExceptionString()
@@ -2253,15 +2255,6 @@ class OptionFinder(plugins.OptionFinder):
                     pass
             raise plugins.TextTestError("Could not import script " + className + " from module " + module + "\n" +\
                   "Import failed, looked at " + repr(sys.path) + "\n" + excString)
-
-        try:
-            if len(actionArgs) > 0:
-                return _class(actionArgs) #@UndefinedVariable
-            else:
-                return _class() #@UndefinedVariable
-        except:
-            raise plugins.TextTestError("Could not instantiate script action " + repr(actionCmd) +\
-                  " with arguments " + repr(actionArgs) + "\n" + plugins.getExceptionString())
 
     def configPathOptions(self):
         # Returns includeSite, includePersonal

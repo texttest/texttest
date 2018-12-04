@@ -105,7 +105,7 @@ class JobProcess:
     def poll(self):
         try:
             lines = self.getPsLines([ "-p", str(self.pid) ])
-            if len(lines) < 2 or lines[-1].strip().endswith("<defunct>"):
+            if len(lines) < 2 or lines[-1].strip().endswith(b"<defunct>"):
                 return "returncode" # should return return code but can't be bothered, don't use it currently
         except (OSError, select.error) as detail:
             if str(detail).find("Interrupted system call") != -1:

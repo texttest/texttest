@@ -6,7 +6,7 @@ of the current run/setup
 
 import gtk, gobject, pango, guiutils, os, logging
 from texttestlib import plugins
-from ordereddict import OrderedDict
+from collections import OrderedDict
 from copy import copy
 
 #

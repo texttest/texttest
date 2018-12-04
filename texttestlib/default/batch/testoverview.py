@@ -4,7 +4,7 @@
 import os, time, HTMLgen, HTMLcolors, cgi, sys, logging, jenkinschanges, locale
 from texttestlib import plugins
 from pickle import Unpickler, UnpicklingError
-from ordereddict import OrderedDict
+from collections import OrderedDict
 from glob import glob
 from pprint import pformat
 from datetime import datetime, timedelta

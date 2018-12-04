@@ -3,7 +3,7 @@
 import os, sys, time, shutil, datetime, testoverview, logging, re, tarfile, stat
 from texttestlib import plugins
 from .summarypages import GenerateSummaryPage, GenerateGraphs # only so they become package level entities
-from ordereddict import OrderedDict
+from collections import OrderedDict
 from .batchutils import getBatchRunName, BatchVersionFilter, parseFileName, convertToUrl
 import subprocess
 from glob import glob

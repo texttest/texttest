@@ -4,7 +4,7 @@ import os, string, shutil, sys, logging, glob, re
 from texttestlib import plugins
 from configparser import ConfigParser, NoOptionError
 from copy import copy
-from ordereddict import OrderedDict
+from collections import OrderedDict
 
 plugins.addCategory("bug", "known bugs", "had known bugs")
 plugins.addCategory("badPredict", "internal errors", "had internal errors")

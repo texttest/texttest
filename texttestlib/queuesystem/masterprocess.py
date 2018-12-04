@@ -8,7 +8,7 @@ from .utils import *
 from queue import Queue
 from socketserver import ThreadingTCPServer, StreamRequestHandler
 from threading import RLock, Lock
-from ordereddict import OrderedDict
+from collections import OrderedDict
 from texttestlib import plugins
 from texttestlib.default.console import TextDisplayResponder, InteractiveResponder
 from texttestlib.default.knownbugs import CheckForBugs

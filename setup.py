@@ -41,8 +41,6 @@ if os.name == "nt":
     command_classes['install_scripts'] = windows_install_scripts
 
 py_modules = []
-if "FROM_RPM" not in os.environ:
-    py_modules.append("ordereddict")
 
 packages = ["texttestlib", "texttestlib.default", "texttestlib.queuesystem",
             "texttestlib.default.batch", "texttestlib.default.gtkgui", "texttestlib.default.knownbugs",

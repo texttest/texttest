@@ -6,7 +6,7 @@ to store the simple actions and the dialogs, and a notebook to store the tabs in
 
 import gtk, guiutils, os, sys, logging, types
 from texttestlib import plugins
-from ordereddict import OrderedDict
+from collections import OrderedDict
 from pprint import pformat
 
 class MenuBarGUI(guiutils.SubGUI):

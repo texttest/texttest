@@ -25,7 +25,7 @@
 """
 
 import xmlrpc.client, re, urllib.request, urllib.parse, urllib.error
-from ordereddict import OrderedDict
+from collections import OrderedDict
 
 def convertToString(value):
     if type(value) in (str, str):

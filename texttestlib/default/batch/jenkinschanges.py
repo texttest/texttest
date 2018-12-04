@@ -6,7 +6,7 @@ import time
 import codecs
 import locale
 from xml.dom.minidom import parse
-from ordereddict import OrderedDict
+from collections import OrderedDict
 from glob import glob
 from pprint import pprint
 from xml.parsers.expat import ExpatError

@@ -5,7 +5,7 @@ Module to handle the various file-trees in the GUI
 
 import gtk, gobject, guiutils, os, sys, operator, logging, string
 from texttestlib import plugins
-from ordereddict import OrderedDict
+from collections import OrderedDict
 from copy import copy
 from functools import reduce
 

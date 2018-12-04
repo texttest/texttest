@@ -4,7 +4,7 @@
 import sandbox, operator, os, shutil, sys, random
 from glob import glob
 from texttestlib import plugins
-from ordereddict import OrderedDict
+from collections import OrderedDict
 from configparser import RawConfigParser
 from functools import reduce
                     

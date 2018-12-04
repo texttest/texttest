@@ -33,7 +33,7 @@ except Exception as e:
 import testtree, filetrees, statusviews, textinfo, actionholders, version_control, guiplugins, guiutils, os, sys, logging
 from texttestlib import plugins
 from copy import copy
-from ordereddict import OrderedDict
+from collections import OrderedDict
 from texttestlib.default.gtkgui.guiplugins import CloseWindowCancelException
 
 class IdleHandlerManager:

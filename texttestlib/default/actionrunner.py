@@ -2,7 +2,7 @@
 import sys, logging, types
 from texttestlib import plugins
 from queue import Queue, Empty
-from ordereddict import OrderedDict
+from collections import OrderedDict
 from threading import Lock
 
 plugins.addCategory("cancelled", "cancelled", "were cancelled before starting")

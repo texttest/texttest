@@ -2,7 +2,7 @@
 import gtk, os, time, stat
 from texttestlib import plugins
 from .. import guiplugins
-from ordereddict import OrderedDict
+from collections import OrderedDict
 
 # pwd and grp doesn't exist on windows ...
 try:

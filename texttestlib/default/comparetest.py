@@ -1,6 +1,6 @@
 import os, performance, knownbugs, filecmp, string, shutil, logging
 from texttestlib import plugins
-from ordereddict import OrderedDict
+from collections import OrderedDict
 from tempfile import mktemp
 from .comparefile import FileComparison, SplitFileComparison
 from fnmatch import fnmatch

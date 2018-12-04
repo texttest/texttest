@@ -3,7 +3,7 @@
 import testoverview, logging, os, shutil, time, operator, sys
 from texttestlib import plugins
 from html.parser import HTMLParser
-from ordereddict import OrderedDict
+from collections import OrderedDict
 from glob import glob
 from .batchutils import BatchVersionFilter, parseFileName, convertToUrl, getEnvironmentFromRunFiles
 import datetime

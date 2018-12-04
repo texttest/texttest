@@ -4,7 +4,7 @@ Miscellaneous actions for generally housekeeping the state of the GUI
 """
 
 from .. import guiplugins
-from ordereddict import OrderedDict
+from collections import OrderedDict
 from texttestlib.default.batch import BatchApplicationData, MailSender
 from texttestlib import plugins
 import os, gtk, gobject

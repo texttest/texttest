@@ -2,7 +2,7 @@ import os, shutil, re, stat, subprocess, glob, logging, difflib, time,sys
 from texttestlib import plugins
 from texttestlib.jobprocess import killArbitaryProcess, killSubProcessAndChildren
 from .runtest import Killed
-from ordereddict import OrderedDict
+from collections import OrderedDict
 from string import Template
 
 

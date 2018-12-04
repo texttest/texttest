@@ -3,7 +3,7 @@ import sys, os, subprocess, colorer
 from texttestlib import plugins
 from texttestlib.jobprocess import killSubProcessAndChildren
 from time import sleep
-from ordereddict import OrderedDict
+from collections import OrderedDict
 
 
 class TextDisplayResponder(plugins.Responder):

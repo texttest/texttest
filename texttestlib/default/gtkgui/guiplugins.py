@@ -4,7 +4,7 @@ import gtk, gobject, entrycompletion, os, subprocess, types, logging, sys
 from texttestlib import plugins
 from .guiutils import guiConfig, SubGUI, GUIConfig, createApplicationEvent
 from texttestlib.jobprocess import killSubProcessAndChildren
-from ordereddict import OrderedDict
+from collections import OrderedDict
         
 # The purpose of this class is to provide a means to monitor externally
 # started process, so that (a) code can be called when they exit, and (b)

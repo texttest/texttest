@@ -1,6 +1,6 @@
 
 import logging, os
-from ordereddict import OrderedDict
+from collections import OrderedDict
 from .batchutils import getBatchRunName
 from string import Template
 from locale import getpreferredencoding

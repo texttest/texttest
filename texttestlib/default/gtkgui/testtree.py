@@ -5,7 +5,7 @@ Code associated with the left-hand tree view for tests
 
 import gtk, gobject, pango, guiutils, logging
 from texttestlib import plugins
-from ordereddict import OrderedDict
+from collections import OrderedDict
 
 class TestColumnGUI(guiutils.SubGUI):
     def __init__(self, dynamic, testCount):

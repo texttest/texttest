@@ -154,7 +154,7 @@ class ModifyTraffic(plugins.ScriptWithArgs):
 class ConvertToCaptureMock(plugins.Action):
     def convert(self, confObj, newFile):
         from configparser import ConfigParser
-        from ordereddict import OrderedDict
+        from collections import OrderedDict
         parser = ConfigParser(dict_type=OrderedDict)
         multiThreads = confObj.getConfigValue("collect_traffic_use_threads") == "true"
         if not multiThreads:

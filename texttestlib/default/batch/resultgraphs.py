@@ -18,7 +18,7 @@ if versionParts < (0, 98):
 matplotlib.use("Agg") # set backend to one that doesn't need a DISPLAY
 import pylab, logging, operator
 from texttestlib import plugins
-from ordereddict import OrderedDict
+from collections import OrderedDict
 from functools import reduce
     
 

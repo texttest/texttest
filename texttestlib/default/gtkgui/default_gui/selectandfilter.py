@@ -34,7 +34,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         AllTestsHandler.__init__(self)
         self.dynamic = dynamic
         self.filterAccel = None
-        self.filterAction = gtk.Action("Filter", "Filter", \
+        self.filterAction = Gtk.Action("Filter", "Filter", \
                                        self.getFilterTooltip(), self.getStockId())
         self.filterAction.connect("activate", self.filterTests)
         self.selectDiag = logging.getLogger("Select Tests")
@@ -331,10 +331,10 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         return self._createButton(self.filterAction, self.getFilterTooltip())
 
     def createFrame(self, name, group, button):
-        frame = gtk.Frame(name)
+        frame = Gtk.Frame(name)
         frame.set_label_align(0.5, 0.5)
-        frame.set_shadow_type(gtk.SHADOW_IN)
-        frameBox = gtk.VBox()
+        frame.set_shadow_type(Gtk.ShadowType.IN)
+        frameBox = Gtk.VBox()
         self.fillVBox(frameBox, group)
         self.addCentralButton(frameBox, button, padding=8)
         frame.add(frameBox)
@@ -454,7 +454,7 @@ class SaveSelection(guiplugins.ActionDialogGUI):
             return "\nThe file \n" + fileName + "\nalready exists.\n\nDo you want to overwrite it?\n"
 
     def getConfirmationDialogSettings(self):
-        return gtk.STOCK_DIALOG_QUESTION, "Query"
+        return Gtk.STOCK_DIALOG_QUESTION, "Query"
 
     def notifySaveSelection(self, fileName, writeCriteria=False):
         try:

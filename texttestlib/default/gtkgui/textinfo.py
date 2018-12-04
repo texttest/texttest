@@ -3,8 +3,8 @@
 The various text info views, i.e. the bottom right-corner "Text Info" and
 the "Run Info" tab from the dynamic GUI
 """
-
-import gtk, pango, guiutils, os, sys, datetime, guiplugins
+from gi.repository import Gtk, GObject, Gdk
+import guiutils, os, sys, datetime, guiplugins
 from texttestlib import plugins
 from texttestlib.default import performance
 
@@ -46,8 +46,8 @@ class TimeMonitor:
 
 class TextViewGUI(guiutils.SubGUI):
     hovering_over_link = False
-    hand_cursor = gtk.gdk.Cursor(gtk.gdk.HAND2)
-    regular_cursor = gtk.gdk.Cursor(gtk.gdk.XTERM)
+    hand_cursor = Gdk.Cursor.new(Gdk.CursorType.HAND2)
+    regular_cursor = Gdk.Cursor.new(Gdk.CursorType.XTERM)
     linkMarker = "URL=http"
     timeMonitor = TimeMonitor()
     
@@ -70,18 +70,18 @@ class TextViewGUI(guiutils.SubGUI):
             self.updateViewFromText(self.text)
 
     def createView(self):
-        self.view = gtk.TextView()
+        self.view = Gtk.TextView()
         self.view.set_name(self.getTabTitle())
         self.view.set_editable(False)
         self.view.set_cursor_visible(False)
-        self.view.set_wrap_mode(gtk.WRAP_WORD)
+        self.view.set_wrap_mode(Gtk.WrapMode.WORD)
         self.updateViewFromText(self.text)
         self.view.show()
-        return self.addScrollBars(self.view, hpolicy=gtk.POLICY_AUTOMATIC)
+        return self.addScrollBars(self.view, hpolicy=Gtk.PolicyType.AUTOMATIC)
 
     def updateViewFromText(self, text):
         textbuffer = self.view.get_buffer()
-        # Encode to UTF-8, necessary for gtk.TextView
+        # Encode to UTF-8, necessary for Gtk.TextView
         textToUse = guiutils.convertToUtf8(text, self.getEnvironmentLookup())
         if self.linkMarker in textToUse:
             self.view.connect("event-after", self.event_after)
@@ -96,7 +96,7 @@ class TextViewGUI(guiutils.SubGUI):
     # Links can be activated by clicking. Low-level code lifted from Maik Hertha's
     # GTK hypertext demo
     def event_after(self, text_view, event): # pragma : no cover - external code and untested browser code
-        if event.type != gtk.gdk.BUTTON_RELEASE:
+        if event.type != Gdk.BUTTON_RELEASE:
             return False
         if event.button != 1:
             return False
@@ -112,7 +112,7 @@ class TextViewGUI(guiutils.SubGUI):
             if start.get_offset() != end.get_offset():
                 return False
 
-        x, y = text_view.window_to_buffer_coords(gtk.TEXT_WINDOW_WIDGET, int(event.x), int(event.y))
+        x, y = text_view.window_to_buffer_coords(Gtk.TextWindowType.WIDGET, int(event.x), int(event.y))
         iter = text_view.get_iter_at_location(x, y)
         target = self.findLinkTarget(iter)
         if target:
@@ -134,9 +134,9 @@ class TextViewGUI(guiutils.SubGUI):
             self.hovering_over_link = hovering
 
         if self.hovering_over_link:
-            text_view.get_window(gtk.TEXT_WINDOW_TEXT).set_cursor(self.hand_cursor)
+            text_view.get_window(Gtk.TextWindowType.TEXT).set_cursor(self.hand_cursor)
         else:
-            text_view.get_window(gtk.TEXT_WINDOW_TEXT).set_cursor(self.regular_cursor)
+            text_view.get_window(Gtk.TextWindowType.TEXT).set_cursor(self.regular_cursor)
 
     def findLinkTarget(self, iter): # pragma : no cover - called by external code
         tags = iter.get_tags()
@@ -147,7 +147,7 @@ class TextViewGUI(guiutils.SubGUI):
 
     # Update the cursor image if the pointer moved.
     def motion_notify_event(self, text_view, event): # pragma : no cover - external code
-        x, y = text_view.window_to_buffer_coords(gtk.TEXT_WINDOW_WIDGET,
+        x, y = text_view.window_to_buffer_coords(Gtk.TextWindowType.WIDGET,
             int(event.x), int(event.y))
         self.set_cursor_if_appropriate(text_view, x, y)
         text_view.window.get_pointer()
@@ -164,7 +164,7 @@ class TextViewGUI(guiutils.SubGUI):
 
     def insertLinkLine(self, buffer, iter, line):
         # Assumes text description followed by link
-        tag = buffer.create_tag(None, foreground="blue", underline=pango.UNDERLINE_SINGLE)
+        tag = buffer.create_tag(None, foreground="blue", underline=Pango.Underline.SINGLE)
         words = line.strip().split()
         linkTarget = words[-1][4:] # strip off the URL=
         newLine = " ".join(words[:-1]) + "\n"

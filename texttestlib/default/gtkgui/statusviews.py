@@ -3,8 +3,8 @@
 Module for the various widgets that keep an overall view of the status or progress
 of the current run/setup
 """
-
-import gtk, gobject, pango, guiutils, os, logging
+from gi.repository import Gtk, GObject
+import guiutils, os, logging
 from texttestlib import plugins
 from ordereddict import OrderedDict
 from copy import copy
@@ -41,8 +41,8 @@ class StatusMonitorGUI(guiutils.SubGUI):
 
     def notifyActionProgress(self, *args):
         if not self.closing:
-            while gtk.events_pending():
-                gtk.main_iteration_do(False)
+            while Gtk.events_pending():
+                Gtk.main_iteration_do(False)
 
     def notifyActionStop(self, lock=True):
         if self.throbber:
@@ -56,10 +56,10 @@ class StatusMonitorGUI(guiutils.SubGUI):
             self.label.set_markup(plugins.convertForMarkup(message))
 
     def createView(self):
-        hbox = gtk.HBox()
-        self.label = gtk.Label()
+        hbox = Gtk.HBox()
+        self.label = Gtk.Label()
         self.label.set_name("GUI status")
-        self.label.set_ellipsize(pango.ELLIPSIZE_END)
+        self.label.set_ellipsize(Pango.EllipsizeMode.END)
         # It seems difficult to say 'ellipsize when you'd otherwise need
         # to enlarge the window', so we'll have to settle for a fixed number
         # of max char's ... The current setting (90) is just a good choice
@@ -73,18 +73,18 @@ class StatusMonitorGUI(guiutils.SubGUI):
         imageDir = plugins.installationDir("images")
         try:
             staticIcon = os.path.join(imageDir, "throbber_inactive.png")
-            temp = gtk.gdk.pixbuf_new_from_file(staticIcon)
-            self.throbber = gtk.Image()
+            temp = GdkPixbuf.Pixbuf.new_from_file(staticIcon)
+            self.throbber = Gtk.Image()
             self.throbber.set_from_pixbuf(temp)
             animationIcon = os.path.join(imageDir, "throbber_active.gif")
-            self.animation = gtk.gdk.PixbufAnimation(animationIcon)
+            self.animation = GdkPixbuf.PixbufAnimation(animationIcon)
             hbox.pack_end(self.throbber, expand=False, fill=False)
         except Exception, e:
             plugins.printWarning("Failed to create icons for the status throbber:\n" + str(e) + \
                                  "\nAs a result, the throbber will be disabled.", stdout=True)
             self.throbber = None
-        self.widget = gtk.Frame()
-        self.widget.set_shadow_type(gtk.SHADOW_ETCHED_IN)
+        self.widget = Gtk.Frame()
+        self.widget.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
         self.widget.add(hbox)
         self.widget.show_all()
         return self.widget
@@ -103,7 +103,7 @@ class ProgressBarGUI(guiutils.SubGUI):
         return self.dynamic
     
     def createView(self):
-        self.widget = gtk.ProgressBar()
+        self.widget = Gtk.ProgressBar()
         self.resetBar()
         self.widget.show()
         return self.widget
@@ -169,9 +169,9 @@ class TestProgressMonitor(guiutils.SubGUI):
         self.classifications = {} # map from test to list of iterators where it exists
 
         # Each row has 'type', 'number', 'show', 'tests'
-        self.treeModel = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_INT, gobject.TYPE_BOOLEAN, 
-                                       gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,
-                                       gobject.TYPE_STRING)
+        self.treeModel = Gtk.TreeStore(GObject.TYPE_STRING, GObject.TYPE_INT, GObject.TYPE_BOOLEAN, 
+                                       GObject.TYPE_STRING, GObject.TYPE_STRING, GObject.TYPE_PYOBJECT,
+                                       GObject.TYPE_STRING)
         self.diag = logging.getLogger("Progress Monitor")
         self.progressReport = None
         self.treeView = None
@@ -198,33 +198,33 @@ class TestProgressMonitor(guiutils.SubGUI):
         return self.dynamic
 
     def createView(self):
-        self.treeView = gtk.TreeView(self.treeModel)
+        self.treeView = Gtk.TreeView(self.treeModel)
         self.treeView.set_name("Test Status View")
         self.treeView.set_enable_search(False)
         selection = self.treeView.get_selection()
-        selection.set_mode(gtk.SELECTION_MULTIPLE)
+        selection.set_mode(Gtk.SelectionMode.MULTIPLE)
         selection.set_select_function(self.canSelect)
         selection.connect("changed", self.selectionChanged)
-        textRenderer = gtk.CellRendererText()
+        textRenderer = Gtk.CellRendererText()
         textRenderer.set_property('wrap-width', 350)
-        textRenderer.set_property('wrap-mode', pango.WRAP_WORD_CHAR)
-        numberRenderer = gtk.CellRendererText()
+        textRenderer.set_property('wrap-mode', Pango.WrapMode.WORD_CHAR)
+        numberRenderer = Gtk.CellRendererText()
         numberRenderer.set_property('xalign', 1)
-        statusColumn = gtk.TreeViewColumn("Status", textRenderer, text=0, background=3, font=4)
-        numberColumn = gtk.TreeViewColumn("Number", numberRenderer, text=1, background=3, font=4)
+        statusColumn = Gtk.TreeViewColumn("Status", textRenderer, text=0, background=3, font=4)
+        numberColumn = Gtk.TreeViewColumn("Number", numberRenderer, text=1, background=3, font=4)
         statusColumn.set_resizable(True)
         numberColumn.set_resizable(True)
         self.treeView.append_column(statusColumn)
         self.treeView.append_column(numberColumn)
-        toggle = gtk.CellRendererToggle()
+        toggle = Gtk.CellRendererToggle()
         toggle.set_property('activatable', True)
         toggle.connect("toggled", self.showToggled)
-        toggleColumn = gtk.TreeViewColumn("Visible", toggle, active=2)
+        toggleColumn = Gtk.TreeViewColumn("Visible", toggle, active=2)
         toggleColumn.set_resizable(True)
         toggleColumn.set_alignment(0.5)
         self.treeView.append_column(toggleColumn)
         self.treeView.show()
-        return self.addScrollBars(self.treeView, hpolicy=gtk.POLICY_NEVER)
+        return self.addScrollBars(self.treeView, hpolicy=Gtk.PolicyType.NEVER)
 
     def canSelect(self, path):
         pathIter = self.treeModel.get_iter(path)
@@ -643,8 +643,8 @@ class TestProgressMonitor(guiutils.SubGUI):
             
             if selection.path_is_selected(path):
                 #WORKAROUND: selection.unselect_path(path) Doesn't seem to work here
-                selection.set_mode(gtk.SELECTION_SINGLE)
-                selection.set_mode(gtk.SELECTION_MULTIPLE)
+                selection.set_mode(Gtk.SelectionMode.SINGLE)
+                selection.set_mode(Gtk.SelectionMode.MULTIPLE)
 
     def notifyResetVisibility(self, tests, show):
         self.diag.info("Resetting visibility from current status")

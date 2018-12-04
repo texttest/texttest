@@ -17,7 +17,7 @@ class FocusDependentAction(guiplugins.ActionGUI):
         window.connect("set-focus", self.focusChanged)
 
     def focusChanged(self, dummy, widget):
-        freeTextWidget = isinstance(widget, gtk.Entry) or isinstance(widget, gtk.TextView)
+        freeTextWidget = isinstance(widget, Gtk.Entry) or isinstance(widget, Gtk.TextView)
         if freeTextWidget:
             self.setSensitivity(False)
         elif self.isActiveOnCurrent():
@@ -587,7 +587,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         dialog.resize(width, height)
         while True:
             response = dialog.run()
-            if response != gtk.RESPONSE_ACCEPT:
+            if response != Gtk.ResponseType.ACCEPT:
                 raise plugins.TextTestError, "Application creation cancelled."
 
             try:
@@ -846,7 +846,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         return self.fileChooser
     
     def addText(self, vbox, text):
-        header = gtk.Label()
+        header = Gtk.Label()
         header.set_markup(text + "\n")
         vbox.pack_start(header, expand=False, fill=False)
     
@@ -1314,7 +1314,7 @@ class RenameTest(RenameAction):
         return True
 
     def fillVBox(self, vbox, group):
-        header = gtk.Label()
+        header = Gtk.Label()
         header.set_markup("<b>" + plugins.convertForMarkup(self.oldName) + "</b>")
         vbox.pack_start(header, expand=False, fill=False)
         return guiplugins.ActionDialogGUI.fillVBox(self, vbox, group)
@@ -1560,8 +1560,8 @@ class ReportBugs(guiplugins.ActionDialogGUI):
                 else:
                     widget = self.createFrame(group, group.name)
                 vbox.pack_start(widget, fill=False, expand=False, padding=8)
-            vbox.pack_start(gtk.HSeparator(), padding=8)
-            header = gtk.Label()
+            vbox.pack_start(Gtk.Separator(Gtk.Orientation.HORIZONTAL), padding=8)
+            header = Gtk.Label()
             header.set_markup("<u>Fill in exactly <i>one</i> of the sections below</u>\n")
             vbox.pack_start(header, expand=False, fill=False, padding=8)
             for group in [ self.bugSystemGroup, self.textDescGroup ]:
@@ -1570,7 +1570,7 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         return guiplugins.ActionDialogGUI.fillVBox(self, vbox, optionGroup)
 
     def createExpander(self, group):
-        expander = gtk.Expander(group.name)
+        expander = Gtk.Expander(group.name)
         expander.add(self.createGroupBox(group))
         return expander
 

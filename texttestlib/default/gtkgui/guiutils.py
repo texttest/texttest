@@ -7,15 +7,15 @@ import os, sys, operator, subprocess, locale
 from texttestlib import plugins
 from copy import copy
 
-# gtk.accelerator_valid appears utterly broken on Windows
+# Gtk.accelerator_valid appears utterly broken on Windows
 def windowsAcceleratorValid(key, mod):
-    name = gtk.accelerator_name(key, mod)
+    name = Gtk.accelerator_name(key, mod)
     return len(name) > 0 and name != "VoidSymbol"
 
 try:
-    import gtk
+    from gi.repository import Gtk
     if os.name == "nt":
-        gtk.accelerator_valid = windowsAcceleratorValid
+        Gtk.accelerator_valid = windowsAcceleratorValid
 except ImportError:
     pass # We might want to document the config entries, silly to fail on lack of GTK...
 
@@ -72,7 +72,7 @@ class Utf8Converter:
 
 utf8Converter = Utf8Converter()
 
-def convertToUtf8(*args): # gtk.TextViews insist we do the conversion ourselves
+def convertToUtf8(*args): # Gtk.TextViews insist we do the conversion ourselves
     return utf8Converter.convert(*args)
 
 def getImageDir():
@@ -90,7 +90,7 @@ class RefreshTips:
 
     def hasRefreshIcon(self, view, path): # pragma: no cover - StoryText cannot test tooltips (future?)
         model = view.get_model()
-        if isinstance(model, gtk.TreeModelFilter):
+        if isinstance(model, Gtk.TreeModelFilter):
             childPath = model.convert_path_to_child_path(path)
             return model.get_model()[childPath][self.refreshIndex]
         else:
@@ -116,7 +116,7 @@ class RefreshTips:
 
 
 def addRefreshTips(view, *args):
-    if gtk.gtk_version >= (2, 12, 0): # Tree view tooltips don't exist prior to this version
+    if Gtk.gtk_version >= (2, 12, 0): # Tree view tooltips don't exist prior to this version
         view.set_property("has-tooltip", True)
         refreshTips = RefreshTips(*args)
         view.connect("query-tooltip", refreshTips.getTooltip)
@@ -239,7 +239,7 @@ class GUIConfig:
             diag.info("Setting window " + dimensionName + " to " + pixelDimension + " pixels.")
             return int(pixelDimension)
         else:
-            fullSize = getattr(gtk.gdk, "screen_" + dimensionName)()
+            fullSize = getattr(Gtk.gdk, "screen_" + dimensionName)()
             proportion = float(self.getWindowOption(dimensionName + "_screen"))
             diag.info("Setting window " + dimensionName + " to " + repr(int(100.0 * proportion)) + "% of screen.")
             return int(fullSize * proportion)
@@ -331,14 +331,14 @@ class SubGUI(plugins.Observable):
         return False
 
     def addScrollBars(self, view, hpolicy):
-        window = gtk.ScrolledWindow()
-        window.set_policy(hpolicy, gtk.POLICY_AUTOMATIC)
+        window = Gtk.ScrolledWindow()
+        window.set_policy(hpolicy, Gtk.PolicyType.AUTOMATIC)
         self.addToScrolledWindow(window, view)
         window.show()
         return window
 
     def addToScrolledWindow(self, window, widget):
-        if isinstance(widget, gtk.VBox):
+        if isinstance(widget, Gtk.VBox):
             window.add_with_viewport(widget)
         else:
             window.add(widget)

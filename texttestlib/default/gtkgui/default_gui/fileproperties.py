@@ -119,9 +119,9 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
 
     # xalign = 1.0 means right aligned, 0.0 means left aligned
     def justify(self, text, xalign = 0.0):
-        alignment = gtk.Alignment()
+        alignment = Gtk.Alignment.new()
         alignment.set(xalign, 0.0, 0.0, 0.0)
-        label = gtk.Label(text)
+        label = Gtk.Label(label=text)
         alignment.add(label)
         return alignment
 
@@ -134,11 +134,11 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
         self.dialog.vbox.pack_start(vbox, expand=True, fill=True)
 
     def createVBox(self, dirToProperties):
-        vbox = gtk.VBox()
+        vbox = Gtk.VBox()
         for dir, properties in dirToProperties.items():
-            expander = gtk.Expander()
+            expander = Gtk.Expander()
             expander.set_label_widget(self.justify(dir))
-            table = gtk.Table(len(properties), 7)
+            table = Gtk.Table(len(properties), 7)
             table.set_col_spacings(5)
             row = 0
             for prop in properties:
@@ -151,14 +151,14 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
                 table.attach(self.justify(values[6], 1.0), 5, 6, row, row + 1)
                 table.attach(self.justify(prop.filename, 0.0), 6, 7, row, row + 1)
                 row += 1
-            hbox = gtk.HBox()
+            hbox = Gtk.HBox()
             hbox.pack_start(table, expand=False, fill=False)
-            innerBorder = gtk.Alignment()
+            innerBorder = Gtk.Alignment.new()
             innerBorder.set_padding(5, 0, 0, 0)
             innerBorder.add(hbox)
             expander.add(innerBorder)
             expander.set_expanded(True)
-            border = gtk.Alignment()
+            border = Gtk.Alignment.new()
             border.set_padding(5, 5, 5, 5)
             border.add(expander)
             vbox.pack_start(border, expand=False, fill=False)
@@ -179,7 +179,7 @@ class CopyPathToClipboard(guiplugins.ActionGUI):
         if comp and hasattr(comp, "tmpFile"):
             fileName = comp.tmpFile
         # Copy to both, for good measure, avoid problems with e.g. Exceed configuration
-        for clipboard in [ gtk.clipboard_get(), gtk.clipboard_get("PRIMARY") ]:
+        for clipboard in [ Gtk.clipboard_get(), Gtk.clipboard_get("PRIMARY") ]:
             clipboard.set_text(fileName)
 
 def getInteractiveActionClasses():

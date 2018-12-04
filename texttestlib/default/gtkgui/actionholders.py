@@ -45,7 +45,7 @@ class MenuBarGUI(guiutils.SubGUI):
         for observer in self.observers:
             actionTitle = observer.getWidgetName()
             actionName = actionTitle.replace("_", "")
-            gtkAction = gtk.ToggleAction(actionName, actionTitle, None, None)
+            gtkAction = Gtk.ToggleAction(actionName, actionTitle, None, None)
             if observer.shouldShow():
                 gtkAction.set_active(True)
             else:
@@ -60,7 +60,7 @@ class MenuBarGUI(guiutils.SubGUI):
             realMenuName = menuName
             if not menuName.isupper():
                 realMenuName = menuName.capitalize()
-            self.actionGroup.add_action(gtk.Action(menuName + "menu", "_" + realMenuName, None, None))
+            self.actionGroup.add_action(Gtk.Action(menuName + "menu", "_" + realMenuName, None, None))
         self.createToggleActions()
 
         for file in self.getGUIDescriptionFileNames():
@@ -153,7 +153,7 @@ class ToolBarGUI(guiutils.ContainerGUI):
         return "_Toolbar"
     def ensureVisible(self, toolbar):
         for item in toolbar.get_children():
-            item.set_is_important(True) # Or newly added children without stock ids won't be visible in gtk.TOOLBAR_BOTH_HORIZ style
+            item.set_is_important(True) # Or newly added children without stock ids won't be visible in Gtk.ToolbarStyle.BOTH_HORIZ style
     def shouldShow(self):
         return True # don't care about whether we have a progress bar or not
     def createView(self):
@@ -161,18 +161,18 @@ class ToolBarGUI(guiutils.ContainerGUI):
         toolbar = self.uiManager.get_widget("/MainToolBar")
         self.ensureVisible(toolbar)
 
-        self.widget = gtk.HandleBox()
+        self.widget = Gtk.HandleBox()
         self.widget.add(toolbar)
-        toolbar.set_orientation(gtk.ORIENTATION_HORIZONTAL)
+        toolbar.set_orientation(Gtk.Orientation.HORIZONTAL)
         progressBarGUI = self.subguis[0]
         if progressBarGUI.shouldShow():
             progressBar = progressBarGUI.createView()
-            width = 7 # Looks good, same as gtk.Paned border width
-            alignment = gtk.Alignment()
+            width = 7 # Looks good, same as Gtk.Paned border width
+            alignment = Gtk.Alignment.new()
             alignment.set(1.0, 1.0, 1.0, 1.0)
             alignment.set_padding(width, width, 1, width)
             alignment.add(progressBar)
-            toolItem = gtk.ToolItem()
+            toolItem = Gtk.ToolItem()
             toolItem.add(alignment)
             toolItem.set_expand(True)
             toolbar.insert(toolItem, -1)
@@ -220,11 +220,11 @@ class NotebookGUI(guiutils.SubGUI):
         self.diag.info("Current page set to '" + self.currentTabGUI.getTabTitle() + "'")
 
     def createView(self):
-        self.notebook = gtk.Notebook()
+        self.notebook = Gtk.Notebook()
         self.notebook.set_name("main right-hand notebook")
         for tabGUI in self.tabInfo:
             tabName = tabGUI.getTabTitle()
-            label = gtk.Label(tabName)
+            label = Gtk.Label(label=tabName)
             page = self.createPage(tabGUI, tabName)
             self.notebook.append_page(page, label)
 

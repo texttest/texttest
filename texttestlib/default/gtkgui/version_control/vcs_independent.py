@@ -1,7 +1,7 @@
 
 # Generic interface to version control systems. We try to keep it as general as possible.
-
-import gtk, gobject, custom_widgets, os, datetime, subprocess, shutil
+from gi.repository import Gdk, GObject
+import custom_widgets, os, datetime, subprocess, shutil
 from texttestlib import plugins
 from .. import guiplugins, guiutils, entrycompletion
 from ..default_gui import adminactions, changeteststate
@@ -224,9 +224,9 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
 
     def getResultDialogIconType(self):
         if self.showWarning():
-            return gtk.STOCK_DIALOG_WARNING
+            return Gtk.STOCK_DIALOG_WARNING
         else:
-            return gtk.STOCK_DIALOG_INFO
+            return Gtk.STOCK_DIALOG_INFO
 
     def getExtraArgs(self):
         return []
@@ -412,17 +412,17 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         self.pages = []
         self.fileToTest = {}
         self.runAndParse() # will write to the above two structures
-        self.vbox = gtk.VBox()
+        self.vbox = Gtk.VBox()
         self.addExtraWidgets()
         self.addHeader()
         self.addTreeView()
         
     def addExtraWidgets(self):
-        self.extraWidgetArea = gtk.HBox()
-        self.extraButtonArea = gtk.HButtonBox()
+        self.extraWidgetArea = Gtk.HBox()
+        self.extraButtonArea = Gtk.HButtonBox()
         self.extraWidgetArea.pack_start(self.extraButtonArea, expand=False, fill=False)        
         if len(self.pages) > 0:
-            padding = gtk.Alignment()
+            padding = Gtk.Alignment.new()
             padding.set_padding(3, 3, 3, 3)
             padding.add(self.extraWidgetArea)
             self.dialog.vbox.pack_end(padding, expand=False, fill=False)
@@ -439,28 +439,28 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
                 self.addDiffWidget()
 
     def addStatusWidget(self):
-        button = gtk.Button("_Status")
+        button = Gtk.Button("_Status")
         button.connect("clicked", self.viewStatus)
         self.extraButtonArea.pack_start(button, expand=False, fill=False)        
 
     def addLogWidget(self):
-        button = gtk.Button("_Log")
+        button = Gtk.Button("_Log")
         button.connect("clicked", self.viewLog)
         self.extraButtonArea.pack_start(button, expand=False, fill=False)        
 
     def addAnnotateWidget(self):
-        button = gtk.Button("_Annotate")
+        button = Gtk.Button("_Annotate")
         button.connect("clicked", self.viewAnnotations)
         self.extraButtonArea.pack_start(button, expand=False, fill=False)        
 
     def addDiffWidget(self):
-        label1 = gtk.Label(" between revisions ")
-        label2 = gtk.Label(" and ")
-        self.revisionEntry1 = gtk.Entry()
+        label1 = Gtk.Label(label=" between revisions ")
+        label2 = Gtk.Label(label=" and ")
+        self.revisionEntry1 = Gtk.Entry()
         self.revisionEntry1.set_name("Revision 1")
         entrycompletion.manager.register(self.revisionEntry1)
         self.revisionEntry1.set_text(vcs.latestRevisionName)
-        self.revisionEntry2 = gtk.Entry()
+        self.revisionEntry2 = Gtk.Entry()
         self.revisionEntry2.set_name("Revision 2")
         entrycompletion.manager.register(self.revisionEntry2)
         self.revisionEntry1.set_alignment(1.0)
@@ -469,7 +469,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         self.revisionEntry2.set_width_chars(6)
         for diffClass in basicDiffClasses:
             diffObj = diffClass()
-            diffButton = gtk.Button(diffObj._getTitle() + "s")
+            diffButton = Gtk.Button(diffObj._getTitle() + "s")
             diffButton.connect("clicked", self.viewDiffs, diffObj)
             self.extraButtonArea.pack_start(diffButton, expand=False, fill=False)
         self.extraWidgetArea.pack_start(label1, expand=False, fill=False)
@@ -478,45 +478,45 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         self.extraWidgetArea.pack_start(self.revisionEntry2, expand=False, fill=False)
         
     def addGraphicalDiffWidget(self):
-        button = gtk.Button("_Graphical Diffs")
+        button = Gtk.Button("_Graphical Diffs")
         button.connect("clicked", self.viewGraphicalDiff)
         self.extraButtonArea.pack_start(button, expand=False, fill=False)        
 
     def addHeader(self):
         message = self.getResultDialogMessage()
         if message:
-            hbox = gtk.HBox()
+            hbox = Gtk.HBox()
             iconType = self.getResultDialogIconType()
-            hbox.pack_start(self.getStockIcon(iconType), expand=False, fill=False)
-            hbox.pack_start(gtk.Label(message), expand=False, fill=False)        
-            alignment = gtk.Alignment()
+            hbox.pack_start(self.getStockIcon(iconType, True, True, 0), expand=False, fill=False)
+            hbox.pack_start(Gtk.Label(message, True, True, 0), expand=False, fill=False)        
+            alignment = Gtk.Alignment.new()
             alignment.set(0.0, 1.0, 1.0, 1.0)
             alignment.set_padding(5, 5, 0, 5)
             alignment.add(hbox)
             self.vbox.pack_start(alignment, expand=False, fill=False)
 
     def getStockIcon(self, stockItem):
-        imageBox = gtk.VBox()
-        imageBox.pack_start(gtk.image_new_from_stock(stockItem, gtk.ICON_SIZE_DIALOG), expand=False)
+        imageBox = Gtk.VBox()
+        imageBox.pack_start(Gtk.Image.new_from_stock(stockItem, Gtk.IconSize.DIALOG), expand=False)
         return imageBox
 
     def addTreeView(self):
-        hpaned = gtk.HPaned()
+        hpaned = Gtk.HPaned()
         hpaned.set_name("VCS dialog separator") # Mostly so we can filter the proportions, which we don't set
 
         # We need buffer when creating treeview, so create right-hand side first ...
-        self.textBuffer = gtk.TextBuffer()
-        textView = gtk.TextView(self.textBuffer)
+        self.textBuffer = Gtk.TextBuffer()
+        textView = Gtk.TextView(self.textBuffer)
         textView.set_editable(False)
         textView.set_name("VCS Output View")
-        window2 = gtk.ScrolledWindow()
-        window2.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        window2 = Gtk.ScrolledWindow()
+        window2.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         window2.add(textView)
         hpaned.pack2(window2, True, True)
 
         self.createTreeView()
-        window1 = gtk.ScrolledWindow()
-        window1.set_policy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC)
+        window1 = Gtk.ScrolledWindow()
+        window1.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         window1.add(self.treeView)
         hpaned.pack1(window1, False, True)
 
@@ -533,9 +533,9 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         #                  is shown in the second column. If not it should be empty.
         #              3 - Full path to the file corresponding to the node
         #              4 - Should the row be visible?
-        self.treeModel = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING,
-                                       gobject.TYPE_STRING, gobject.TYPE_STRING,
-                                       gobject.TYPE_BOOLEAN)
+        self.treeModel = Gtk.TreeStore(GObject.TYPE_STRING, GObject.TYPE_STRING,
+                                       GObject.TYPE_STRING, GObject.TYPE_STRING,
+                                       GObject.TYPE_BOOLEAN)
         self.filteredTreeModel = self.treeModel.filter_new()
         self.filteredTreeModel.set_visible_column(4)
         rootDir = self.getRootPath()
@@ -562,16 +562,16 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
                     fileToIter[currentFile] = currIter
                 prevIter = currIter
                         
-        self.treeView = gtk.TreeView(self.filteredTreeModel)
+        self.treeView = Gtk.TreeView(self.filteredTreeModel)
         self.treeView.set_name("VCS " + self.cmdName + " info tree")
         self.treeView.set_enable_search(False)
-        fileRenderer = gtk.CellRendererText()
-        fileColumn = gtk.TreeViewColumn("File", fileRenderer, markup=0)
+        fileRenderer = Gtk.CellRendererText()
+        fileColumn = Gtk.TreeViewColumn("File", fileRenderer, markup=0)
         fileColumn.set_resizable(True)
         self.treeView.append_column(fileColumn)
         self.treeView.set_expander_column(fileColumn)
         if self.getResultDialogTwoColumnsInTreeView():
-            infoRenderer = gtk.CellRendererText()
+            infoRenderer = Gtk.CellRendererText()
             self.infoColumn = custom_widgets.ButtonedTreeViewColumn(self.getResultDialogSecondColumnTitle(), infoRenderer, markup=2)
             self.infoColumn.set_resizable(True)
             self.treeView.append_column(self.infoColumn)
@@ -826,9 +826,9 @@ class StatusGUI(VersionControlDialogGUI):
         uniqueInfos = []
         self.treeModel.foreach(self.collectInfos, uniqueInfos)
 
-        menu = gtk.Menu()
+        menu = Gtk.Menu()
         for info in uniqueInfos:
-            menuItem = gtk.CheckMenuItem(info)
+            menuItem = Gtk.CheckMenuItem(info)
             menuItem.set_active(True)
             menuItem.set_name(info)
             menu.append(menuItem)
@@ -911,9 +911,9 @@ class UpdateGUI(BasicVersionControlDialogGUI):
             
         else:
             text = "You have local commits. Aborting updating via TextTest. You will need to merge by hand."
-        buffer = gtk.TextBuffer()
+        buffer = Gtk.TextBuffer()
         buffer.set_text(text)
-        textView = gtk.TextView(buffer)
+        textView = Gtk.TextView(buffer)
         self.dialog.vbox.pack_start(textView, expand=True, fill=True)
         if canUpdate:
             self.notify("Refresh")

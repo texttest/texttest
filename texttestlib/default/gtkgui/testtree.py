@@ -2,8 +2,9 @@
 """
 Code associated with the left-hand tree view for tests 
 """
-
-import gtk, gobject, pango, guiutils, logging
+from gi.repository import Gtk,GObject
+#import gtk, gobject, pango, guiutils, logging
+import guiutils, logging
 from texttestlib import plugins
 from ordereddict import OrderedDict
 
@@ -27,9 +28,9 @@ class TestColumnGUI(guiutils.SubGUI):
         self.allSuites = suites
 
     def createView(self):
-        testRenderer = gtk.CellRendererText()
-        self.column = gtk.TreeViewColumn(self.getTitle(), testRenderer, text=0, background=1, foreground=7)
-        self.column.set_data("name", "Test Name") # Not a widget, so we can't set a name, do this instead
+        testRenderer = Gtk.CellRendererText()
+        self.column = Gtk.TreeViewColumn(self.getTitle(), testRenderer, text=0, background=1, foreground=7)
+        self.column.name = "Test Name" # Not a widget, so we can't set a name, do this instead
         self.column.set_resizable(True)
         self.column.set_cell_data_func(testRenderer, self.renderSuitesBold)
         if not self.dynamic:
@@ -37,10 +38,10 @@ class TestColumnGUI(guiutils.SubGUI):
             self.column.connect("clicked", self.columnClicked)
         if guiutils.guiConfig.getValue("auto_sort_test_suites") == 1:
             self.column.set_sort_indicator(True)
-            self.column.set_sort_order(gtk.SORT_ASCENDING)
+            self.column.set_sort_order(Gtk.SortType.ASCENDING)
         elif guiutils.guiConfig.getValue("auto_sort_test_suites") == -1:
             self.column.set_sort_indicator(True)
-            self.column.set_sort_order(gtk.SORT_DESCENDING)
+            self.column.set_sort_order(Gtk.SortType.DESCENDING)
         return self.column
     
     def renderSuitesBold(self, dummy, cell, model, iter):
@@ -52,12 +53,12 @@ class TestColumnGUI(guiutils.SubGUI):
     def columnClicked(self, *args):
         if not self.column.get_sort_indicator():
             self.column.set_sort_indicator(True)
-            self.column.set_sort_order(gtk.SORT_ASCENDING)
+            self.column.set_sort_order(Gtk.SortType.ASCENDING)
             order = 1
         else:
             order = self.column.get_sort_order()
-            if order == gtk.SORT_ASCENDING:
-                self.column.set_sort_order(gtk.SORT_DESCENDING)
+            if order == Gtk.SortType.ASCENDING:
+                self.column.set_sort_order(Gtk.SortType.DESCENDING)
                 order = -1
             else:
                 self.column.set_sort_indicator(False)
@@ -232,9 +233,9 @@ class TestIteratorMap:
 class TestTreeGUI(guiutils.ContainerGUI):
     def __init__(self, dynamic, allApps, popupGUI, subGUI):
         guiutils.ContainerGUI.__init__(self, [ subGUI ])
-        self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,\
-                                   gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_BOOLEAN, \
-                                   gobject.TYPE_STRING, gobject.TYPE_STRING)
+        self.model = Gtk.TreeStore(GObject.TYPE_STRING, GObject.TYPE_STRING, GObject.TYPE_PYOBJECT,\
+                                   GObject.TYPE_STRING, GObject.TYPE_STRING, GObject.TYPE_BOOLEAN, \
+                                   GObject.TYPE_STRING, GObject.TYPE_STRING)
         self.popupGUI = popupGUI
         self.itermap = TestIteratorMap(dynamic, allApps)
         self.selection = None
@@ -302,26 +303,26 @@ class TestTreeGUI(guiutils.ContainerGUI):
     def createView(self):
         self.filteredModel = self.model.filter_new()
         self.filteredModel.set_visible_column(5)
-        self.treeView = gtk.TreeView(self.filteredModel)
+        self.treeView = Gtk.TreeView(self.filteredModel)
         self.treeView.set_search_column(0)
         self.treeView.set_name("Test Tree")
         self.treeView.expand_all()
 
         self.selection = self.treeView.get_selection()
-        self.selection.set_mode(gtk.SELECTION_MULTIPLE)
+        self.selection.set_mode(Gtk.SelectionMode.MULTIPLE)
         if self.dynamic:
             self.selection.set_select_function(self.canSelect)
 
         testsColumn = self.subguis[0].createView()
         self.treeView.append_column(testsColumn)
         if self.dynamic:
-            detailsRenderer = gtk.CellRendererText()
+            detailsRenderer = Gtk.CellRendererText()
             detailsRenderer.set_property('wrap-width', 350)
-            detailsRenderer.set_property('wrap-mode', pango.WRAP_WORD_CHAR)
-            recalcRenderer = gtk.CellRendererPixbuf()
-            detailsColumn = gtk.TreeViewColumn("Details")
-            detailsColumn.pack_start(detailsRenderer, expand=True)
-            detailsColumn.pack_start(recalcRenderer, expand=False)
+            detailsRenderer.set_property('wrap-mode', Pango.WrapMode.WORD_CHAR)
+            recalcRenderer = Gtk.CellRendererPixbuf()
+            detailsColumn = Gtk.TreeViewColumn("Details")
+            detailsColumn.pack_start(detailsRenderer, True, True, 0)
+            detailsColumn.pack_start(recalcRenderer, False, True, 0)
             detailsColumn.add_attribute(detailsRenderer, 'text', 3)
             detailsColumn.add_attribute(detailsRenderer, 'background', 4)
             detailsColumn.add_attribute(recalcRenderer, 'stock_id', 6)
@@ -337,7 +338,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         self.treeView.show()
 
         self.popupGUI.createView()
-        return self.addScrollBars(self.treeView, hpolicy=gtk.POLICY_NEVER)
+        return self.addScrollBars(self.treeView, hpolicy=Gtk.PolicyType.NEVER)
     
     def notifyTopWindow(self, *args):
         # avoid the quit button getting initial focus, give it to the tree view (why not?)
@@ -745,7 +746,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
     def updateVisibilityInViews(self, newValue):
         if newValue: # if things have become visible, expand everything
             self.treeView.expand_all()
-            gobject.idle_add(self.scrollToFirstTest)
+            GObject.idle_add(self.scrollToFirstTest)
         else:
             self.selectionChanged(direct=False)
 

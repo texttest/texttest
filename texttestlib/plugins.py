@@ -80,7 +80,17 @@ def startTimeString(format=datetimeFormat):
 
 def importAndCall(moduleName, callableName, *args):
     command = "from " + moduleName + " import " + callableName + " as _callable"
-    exec(command)
+    try:
+        exec(command)
+    except ImportError as err:
+        # try resolve import by prepending 'texttestlib.' (python3)
+        moduleName = "texttestlib."+moduleName
+        command = "from " + moduleName + " import " + callableName + " as _callable"
+        try:
+            exec(command)
+        except ImportError as err2:
+            raise err2
+        
     return _callable(*args) #@UndefinedVariable
 
 def installationDir(name):
@@ -858,7 +868,7 @@ def removePath(path):
 
 # Useful utility, free text input as comma-separated list which may have spaces
 def commasplit(input):
-    return list(map(string.strip, input.split(",")))
+    return list(map(str.strip, input.split(",")))
 
 # Another useful thing that saves an import and remembering weird stuff
 def modifiedTime(filename):

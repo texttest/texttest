@@ -3,7 +3,10 @@
 Module for the queuesystem configuration, i.e. using grid engines to run tests in parallel
 """
 
-import masterprocess, slavejobs, utils, os
+import texttestlib.queuesystem.masterprocess
+import texttestlib.queuesystem.slavejobs
+import texttestlib.queuesystem.utils
+import os
 from texttestlib import plugins, default
 from texttestlib.default.virtualdisplay import VirtualDisplayResponder
 from texttestlib.default.storytext_interface import ApplicationEventResponder

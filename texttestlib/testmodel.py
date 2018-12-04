@@ -7,7 +7,7 @@ from pickle import Pickler, Unpickler, UnpicklingError
 from threading import Lock
 from tempfile import mkstemp, mkdtemp
 from copy import deepcopy
-from functools import reduce
+from functools import reduce, cmp_to_key
 
 helpIntro = """
 Note: the purpose of this help is primarily to document derived configurations and how they differ from the
@@ -1662,9 +1662,11 @@ class Application(object):
             # Allow config modules to be stored under the test suite
             sys.path.insert(0, self.dircache.pathName("texttest_config_modules"))
         try:
+            print(moduleName)
+            sys.stdout.flush()
             return plugins.importAndCall(moduleName, "getConfig", self.inputOptions)
         except:
-            if sys.exc_info()[0] == exceptions.ImportError:
+            if sys.exc_info()[0] == ImportError:
                 errorString = "No module named " + moduleName
                 if str(sys.exc_info()[1]) == errorString: #@UndefinedVariable
                     raise BadConfigError("could not find config_module " + repr(moduleName))
@@ -1823,9 +1825,9 @@ class Application(object):
                 versionSets.setdefault(vset, []).extend(files)
 
         if allVersions:
-            sortedVersionSets = sorted(list(versionSets.keys()), self.compareForDisplay)
+            sortedVersionSets = sorted(list(versionSets.keys()), key=cmp_to_key(self.compareForDisplay))
         else:
-            sortedVersionSets = sorted(list(versionSets.keys()), self.compareForPriority)
+            sortedVersionSets = sorted(list(versionSets.keys()), key=cmp_to_key(self.compareForPriority))
         allFiles = []
         for vset in sortedVersionSets:
             allFiles += versionSets[vset]

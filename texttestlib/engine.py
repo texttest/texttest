@@ -8,7 +8,7 @@ from time import sleep
 from glob import glob
 from copy import copy
 import time
-from functools import reduce
+from functools import reduce, cmp_to_key
 
 # Class to allocate unique names to tests for script identification and cross process communication
 class UniqueNameFinder(plugins.Responder):
@@ -210,7 +210,7 @@ class TextTest(plugins.Responder, plugins.Observable):
                 sys.stderr.write("Could not read application '" + missingAppName + "'. No file named config." + missingAppName + " was found under " + " or ".join(self.inputOptions.rootDirectories) + ".\n")
                 raisedError = True
 
-        appList.sort(self.compareApps)
+        appList.sort(key=cmp_to_key(self.compareApps))
         self.diag.info("Found applications : " + repr(appList))
         return raisedError, appList
 

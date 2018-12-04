@@ -1,5 +1,6 @@
 
-import sys, os, subprocess, colorer
+import sys, os, subprocess
+from texttestlib.default import colorer
 from texttestlib import plugins
 from texttestlib.jobprocess import killSubProcessAndChildren
 from time import sleep

@@ -1,6 +1,12 @@
 """ The default configuration, from which all others should be derived """
 
-import os, sandbox, console, rundependent, comparetest, batch, performance, subprocess, operator, logging
+import os, subprocess, operator, logging
+import texttestlib.default.sandbox
+import texttestlib.default.console
+import texttestlib.default.rundependent
+import texttestlib.default.comparetest
+import texttestlib.default.batch
+import texttestlib.default.performance
 from .. import plugins
 from copy import copy
 from string import Template

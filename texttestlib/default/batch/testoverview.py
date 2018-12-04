@@ -1,7 +1,8 @@
 # Code to generate HTML report of historical information. This report generated
 # either via the -coll flag, or via -s 'batch.GenerateHistoricalReport <batchid>'
 
-import os, time, HTMLgen, HTMLcolors, cgi, sys, logging, jenkinschanges, locale
+import os, time, cgi, sys, logging, locale
+from texttestlib.default.batch import HTMLgen, HTMLcolors, jenkinschanges 
 from texttestlib import plugins
 from pickle import Unpickler, UnpicklingError
 from collections import OrderedDict

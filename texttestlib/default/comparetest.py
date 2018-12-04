@@ -1,4 +1,5 @@
-import os, performance, knownbugs, filecmp, string, shutil, logging
+import os, filecmp, string, shutil, logging
+from texttestlib.default import performance, knownbugs
 from texttestlib import plugins
 from collections import OrderedDict
 from tempfile import mktemp

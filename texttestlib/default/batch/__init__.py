@@ -1,6 +1,7 @@
 #!/usr/local/bin/python
 
-import os, sys, time, shutil, datetime, testoverview, logging, re, tarfile, stat
+import os, sys, time, shutil, datetime, logging, re, tarfile, stat
+from texttestlib.default.batch import testoverview
 from texttestlib import plugins
 from .summarypages import GenerateSummaryPage, GenerateGraphs # only so they become package level entities
 from collections import OrderedDict

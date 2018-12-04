@@ -83,13 +83,17 @@ def importAndCall(moduleName, callableName, *args):
     try:
         exec(command)
     except ImportError as err:
+        print("### catched first err")
         # try resolve import by prepending 'texttestlib.' (python3)
         moduleName = "texttestlib."+moduleName
         command = "from " + moduleName + " import " + callableName + " as _callable"
         try:
+            print("### new command: %s"%command)
+            sys.stdout.flush()
             exec(command)
         except ImportError as err2:
-            raise err2
+            print("### catched second err")  
+            sys.stdout.flush()
         
     return _callable(*args) #@UndefinedVariable
 

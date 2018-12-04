@@ -1976,18 +1976,18 @@ class NoFrames(AbstractTag):
     attr_template, attr_dict = _make_attr_inits(attrs)
 
     def __init__(self, *contents, **kw):
-	AbstractTag.__init__(self)
-	for content in contents: self.append(content)
-	for name, value in list(kw.items()): self.__setattr__(name,value)
-	if len(contents) == 0:
-	    self.append(Heading(2,'Frame ALERT!',align='center'),
-			Para("""This document is designed to be viewed using Netscape's
-			Frame features.  If you are seeing this message, you are using
-			a frame challenged browser."""),
-			Para('A ',Strong('Frame-capable'),' browser can be retrieved from',
-			     Href('http://home.netscape.com/','Netscape Communications'),
-			     ' or ',
-			     Href('http://www.microsoft.com/','Microsoft')))
+        AbstractTag.__init__(self)
+        for content in contents: self.append(content)
+        for name, value in list(kw.items()): self.__setattr__(name,value)
+        if len(contents) == 0:
+            self.append(Heading(2,'Frame ALERT!',align='center'),
+    			Para("""This document is designed to be viewed using Netscape's
+    			Frame features.  If you are seeing this message, you are using
+    			a frame challenged browser."""),
+    			Para('A ',Strong('Frame-capable'),' browser can be retrieved from',
+    			     Href('http://home.netscape.com/','Netscape Communications'),
+    			     ' or ',
+    			     Href('http://www.microsoft.com/','Microsoft')))
 
 class Frame(AbstractTag):
     """Define the characteristics of an individual frame.

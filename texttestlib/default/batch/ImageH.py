@@ -29,7 +29,7 @@ VERSION = "0.3a3"
 
 class _imaging_not_installed:
     def __getattr__(self, id):
-	raise ImportError("The _imaging C module is not installed")
+        raise ImportError("The _imaging C module is not installed")
 
 try:
     # If the _imaging C module is not present, you can only use the
@@ -105,7 +105,7 @@ def preinit():
 
     global _initialized
     if _initialized >= 1:
-	return
+        return
 
     for m in ["BmpImagePlugin", "GifImagePluginH", "JpegImagePluginH",
               "PpmImagePlugin", "TiffImagePlugin"]:
@@ -121,29 +121,29 @@ def init():
 
     global _initialized
     if _initialized >= 2:
-	return
+        return
 
     import os, sys
 
     # only check directories (including current, if present in the path)
     for path in filter(os.path.isdir, sys.path):
-	for file in os.listdir(path):
-	    if file[-15:] == "ImagePluginH.py":
-		p, f = os.path.split(file)
-		f, e = os.path.splitext(f)
-		try:
-		    sys.path.insert(0, path)
-		    try:
-			__import__(f)
-		    finally:
-			del sys.path[0]
-		except ImportError:
-		    if DEBUG:
-			print("Image: failed to import", end=' ')
-			print(f, ":", sys.exc_info()[1])
+        for file in os.listdir(path):
+            if file[-15:] == "ImagePluginH.py":
+                p, f = os.path.split(file)
+                f, e = os.path.splitext(f)
+                try:
+                    sys.path.insert(0, path)
+                    try:
+                        __import__(f)
+                    finally:
+                        del sys.path[0]
+                except ImportError:
+                    if DEBUG:
+                        print("Image: failed to import", end=' ')
+                        print(f, ":", sys.exc_info()[1])
 
     if OPEN or SAVE:
-	_initialized = 2
+        initialized = 2
 
 
 # --------------------------------------------------------------------

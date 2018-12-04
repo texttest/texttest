@@ -2,7 +2,8 @@
 
 
 import os
-import fpdiff, logging, shutil
+import logging, shutil
+from texttestlib.default import fpdiff
 from texttestlib import plugins
 from optparse import OptionParser
 from io import StringIO

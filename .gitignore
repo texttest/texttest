@@ -1,1 +1,17 @@
+
 .bzr
+generic
+site
+storytext
+coverage_tmp
+build
+MANIFEST
+dist
+.project
+.pydevproject
+TextTest.egg-info
+*.pyc
+*.bak
+*~
+#*
+.#*

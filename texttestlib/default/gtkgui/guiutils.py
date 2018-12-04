@@ -3,6 +3,7 @@
 Generic module broken out from guiplugins. Contains utility code that can be
 called from anywhere in the gtkgui package
 """
+from gi.repository import Gdk
 import os, sys, operator, subprocess, locale
 from texttestlib import plugins
 from copy import copy
@@ -239,7 +240,8 @@ class GUIConfig:
             diag.info("Setting window " + dimensionName + " to " + pixelDimension + " pixels.")
             return int(pixelDimension)
         else:
-            fullSize = getattr(Gtk.gdk, "screen_" + dimensionName)()
+            # needs review MB 2018-12-04
+            fullSize = getattr(Gdk.Screen.get_default(), "get_" + dimensionName)()
             proportion = float(self.getWindowOption(dimensionName + "_screen"))
             diag.info("Setting window " + dimensionName + " to " + repr(int(100.0 * proportion)) + "% of screen.")
             return int(fullSize * proportion)

@@ -2,8 +2,8 @@
 """
 All the actions for administering the files and directories in a test suite
 """
-
-import gtk, os, shutil, subprocess, re
+from gi.repository import Gtk
+import os, shutil, subprocess, re
 from texttestlib import plugins, testmodel
 from .. import guiplugins, guiutils
 from ordereddict import OrderedDict

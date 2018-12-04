@@ -59,15 +59,15 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         urlButton = Gtk.LinkButton(self.website, self.website)
         urlButton.set_property("border-width", 0)
         urlButtonbox = Gtk.HBox()
-        urlButtonbox.pack_start(urlButton, expand=True, fill=False)
+        urlButtonbox.pack_start(urlButton, True, False, 0)
         urlButton.connect("clicked", self.urlClicked)
         licenseLabel = Gtk.Label()
         licenseLabel.set_markup("<span size='small'>Copyright " + u'\xa9' + " The authors</span>\n")
-        self.dialog.vbox.pack_start(logoFrame, expand=False, fill=False)
-        self.dialog.vbox.pack_start(mainLabel, expand=True, fill=True)
-        self.dialog.vbox.pack_start(messageLabel, expand=False, fill=False)
-        self.dialog.vbox.pack_start(urlButtonbox, expand=False, fill=False)
-        self.dialog.vbox.pack_start(licenseLabel, expand=False, fill=False)
+        self.dialog.vbox.pack_start(logoFrame, False, False, 0)
+        self.dialog.vbox.pack_start(mainLabel, True, True, 0)
+        self.dialog.vbox.pack_start(messageLabel, False, False, 0)
+        self.dialog.vbox.pack_start(urlButtonbox, False, False, 0)
+        self.dialog.vbox.pack_start(licenseLabel, False, False, 0)
         self.dialog.set_resizable(False)
 
     def urlClicked(self, *args): 
@@ -116,11 +116,11 @@ class ShowVersions(guiplugins.ActionResultDialogGUI):
         header = Gtk.Label()
         header.set_markup("<b>You are using these " + name + "s:\n</b>")
         tableVbox = Gtk.VBox()
-        tableVbox.pack_start(header, expand=False, fill=False)
-        tableVbox.pack_start(table, expand=True, fill=True)
+        tableVbox.pack_start(header, False, False, 0)
+        tableVbox.pack_start(table, True, True, 0)
         centeredTable = Gtk.Alignment.new(0.5)
         centeredTable.add(tableVbox)
-        vbox.pack_start(centeredTable, expand=True, fill=True, **kw)
+        vbox.pack_start(centeredTable, True, True, 0, **kw)
     
     def addContents(self):
         versionList = [ ("TextTest", texttest_version.version),
@@ -140,7 +140,7 @@ class ShowVersions(guiplugins.ActionResultDialogGUI):
         frame = Gtk.Alignment.new(0.5, 0.5, 1.0, 1.0)
         frame.set_padding(10, 10, 10, 10)
         frame.add(vbox)
-        self.dialog.vbox.pack_start(frame, expand=True, fill=True)
+        self.dialog.vbox.pack_start(frame, True, True, 0)
         
     def justify(self, label, leftFill, markup = False):
         alignment = Gtk.Alignment.new(leftFill, 0.0, 0.0, 0.0)
@@ -219,7 +219,7 @@ class TextFileDisplayDialog(guiplugins.ActionResultDialogGUI):
         else:
             notebook.append_page(textView, label)
             
-        self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
+        self.dialog.vbox.pack_start(notebook, True, True, 0)
         
         
 class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
@@ -264,7 +264,7 @@ class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
         else:
             parentSize = self.topWindow.get_size()
             self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[1] * 0.7))
-            self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
+            self.dialog.vbox.pack_start(notebook, True, True, 0)
             
     def labelPrefix(self):
         return ""

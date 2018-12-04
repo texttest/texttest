@@ -542,7 +542,7 @@ class VBoxGUI(guiutils.ContainerGUI):
             if subgui.shouldShow():
                 view = subgui.createView()
                 expand = view.__class__ in expandWidgets
-                box.pack_start(view, expand=expand, fill=expand)
+                box.pack_start(view, expand, expand, 0)
 
         box.show()
         return box

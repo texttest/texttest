@@ -131,7 +131,7 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
         for prop in props:
             dirToProperties.setdefault(prop.dir, []).append(prop)
         vbox = self.createVBox(dirToProperties)
-        self.dialog.vbox.pack_start(vbox, expand=True, fill=True)
+        self.dialog.vbox.pack_start(vbox, True, True, 0)
 
     def createVBox(self, dirToProperties):
         vbox = Gtk.VBox()
@@ -152,7 +152,7 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
                 table.attach(self.justify(prop.filename, 0.0), 6, 7, row, row + 1)
                 row += 1
             hbox = Gtk.HBox()
-            hbox.pack_start(table, expand=False, fill=False)
+            hbox.pack_start(table, False, False, 0)
             innerBorder = Gtk.Alignment.new()
             innerBorder.set_padding(5, 0, 0, 0)
             innerBorder.add(hbox)
@@ -161,7 +161,7 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
             border = Gtk.Alignment.new()
             border.set_padding(5, 5, 5, 5)
             border.add(expander)
-            vbox.pack_start(border, expand=False, fill=False)
+            vbox.pack_start(border, False, False, 0)
         return vbox
 
 class CopyPathToClipboard(guiplugins.ActionGUI):

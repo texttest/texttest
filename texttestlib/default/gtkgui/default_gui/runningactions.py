@@ -419,7 +419,7 @@ class RunningAction(BasicRunningAction):
             frames.append(self.createFrame(group, "Miscellaneous"))
             frames.append(self.createFrame(self.temporaryGroup,  self.temporaryGroup.name))
             for frame in frames:
-                tabBox.pack_start(frame, fill=False, expand=False, padding=8)
+                tabBox.pack_start(frame, False, False, 8)
         else:
             self.fillVBox(tabBox, group)
         if isinstance(self, guiplugins.ActionTabGUI):
@@ -1032,7 +1032,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
             self.filtersWithModels.append((filterObj, listStore))
         filterFrame.add(vbox)
         self.dialog.vbox.pack_start(filterFrame, False, True, 0)
-        self.dialog.vbox.pack_start(Gtk.Separator(Gtk.Orientation.HORIZONTAL), expand=False)
+        self.dialog.vbox.pack_start(Gtk.Separator(Gtk.Orientation.HORIZONTAL), False, True, 0)
         frame, self.textBuffer = self.createTextWidget("Filter Text View", scroll=True)
         frame.set_label("Text to filter (copied from " + os.path.basename(fileName) + ")")
         with open(fileName) as f:

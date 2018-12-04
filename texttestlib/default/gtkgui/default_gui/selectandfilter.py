@@ -353,9 +353,9 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
 
     def createButtons(self, vbox):
         selFrame = self.createFrame("Selection", self.selectionGroup, self.createButton())
-        vbox.pack_start(selFrame, fill=False, expand=False, padding=8)
+        vbox.pack_start(selFrame, False, False, 8)
         filterFrame = self.createFrame("Filtering", self.filteringGroup, self.createFilterButton())
-        vbox.pack_start(filterFrame, fill=False, expand=False, padding=8)
+        vbox.pack_start(filterFrame, False, False, 8)
         self.addCentralButton(vbox, self.createResetButton(), padding=16)
 
 

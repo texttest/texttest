@@ -420,12 +420,12 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
     def addExtraWidgets(self):
         self.extraWidgetArea = Gtk.HBox()
         self.extraButtonArea = Gtk.HButtonBox()
-        self.extraWidgetArea.pack_start(self.extraButtonArea, expand=False, fill=False)        
+        self.extraWidgetArea.pack_start(self.extraButtonArea, False, False, 0)
         if len(self.pages) > 0:
             padding = Gtk.Alignment.new()
             padding.set_padding(3, 3, 3, 3)
             padding.add(self.extraWidgetArea)
-            self.dialog.vbox.pack_end(padding, expand=False, fill=False)
+            self.dialog.vbox.pack_end(padding, False, False, 0)
             extraWidgetsToShow = self.extraResultDialogWidgets()
             if "status" in extraWidgetsToShow:
                 self.addStatusWidget()
@@ -441,17 +441,17 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
     def addStatusWidget(self):
         button = Gtk.Button("_Status")
         button.connect("clicked", self.viewStatus)
-        self.extraButtonArea.pack_start(button, expand=False, fill=False)        
+        self.extraButtonArea.pack_start(button, False, False, 0)
 
     def addLogWidget(self):
         button = Gtk.Button("_Log")
         button.connect("clicked", self.viewLog)
-        self.extraButtonArea.pack_start(button, expand=False, fill=False)        
+        self.extraButtonArea.pack_start(button, False, False, 0)
 
     def addAnnotateWidget(self):
         button = Gtk.Button("_Annotate")
         button.connect("clicked", self.viewAnnotations)
-        self.extraButtonArea.pack_start(button, expand=False, fill=False)        
+        self.extraButtonArea.pack_start(button, False, False, 0)
 
     def addDiffWidget(self):
         label1 = Gtk.Label(label=" between revisions ")
@@ -471,33 +471,32 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
             diffObj = diffClass()
             diffButton = Gtk.Button(diffObj._getTitle() + "s")
             diffButton.connect("clicked", self.viewDiffs, diffObj)
-            self.extraButtonArea.pack_start(diffButton, expand=False, fill=False)
-        self.extraWidgetArea.pack_start(label1, expand=False, fill=False)
-        self.extraWidgetArea.pack_start(self.revisionEntry1, expand=False, fill=False)
-        self.extraWidgetArea.pack_start(label2, expand=False, fill=False)
-        self.extraWidgetArea.pack_start(self.revisionEntry2, expand=False, fill=False)
+            self.extraButtonArea.pack_start(diffButton, False, False, 0)
+        self.extraWidgetArea.pack_start(label1, False, False, 0)
+        self.extraWidgetArea.pack_start(self.revisionEntry1, False, False, 0)
+        self.extraWidgetArea.pack_start(label2, False, False, 0)
+        self.extraWidgetArea.pack_start(self.revisionEntry2, False, False, 0)
         
     def addGraphicalDiffWidget(self):
         button = Gtk.Button("_Graphical Diffs")
         button.connect("clicked", self.viewGraphicalDiff)
-        self.extraButtonArea.pack_start(button, expand=False, fill=False)        
+        self.extraButtonArea.pack_start(button, False, False, 0)
 
     def addHeader(self):
         message = self.getResultDialogMessage()
         if message:
             hbox = Gtk.HBox()
             iconType = self.getResultDialogIconType()
-            hbox.pack_start(self.getStockIcon(iconType, True, True, 0), expand=False, fill=False)
-            hbox.pack_start(Gtk.Label(message, True, True, 0), expand=False, fill=False)        
-            alignment = Gtk.Alignment.new()
-            alignment.set(0.0, 1.0, 1.0, 1.0)
+            hbox.pack_start(self.getStockIcon(iconType), False, False, 0)
+            hbox.pack_start(Gtk.Label(message), False, False, 0)
+            alignment = Gtk.Alignment.new(0.0, 1.0, 1.0, 1.0)
             alignment.set_padding(5, 5, 0, 5)
             alignment.add(hbox)
-            self.vbox.pack_start(alignment, expand=False, fill=False)
+            self.vbox.pack_start(alignment, False, False, 0)
 
     def getStockIcon(self, stockItem):
         imageBox = Gtk.VBox()
-        imageBox.pack_start(Gtk.Image.new_from_stock(stockItem, Gtk.IconSize.DIALOG), expand=False)
+        imageBox.pack_start(Gtk.Image.new_from_stock(stockItem, Gtk.IconSize.DIALOG), False, True, 0)
         return imageBox
 
     def addTreeView(self):
@@ -523,8 +522,8 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         if len(self.pages) > 0:
             parentSize = self.topWindow.get_size()
             self.dialog.resize(parentSize[0], int(parentSize[0] / 1.5))
-            self.vbox.pack_start(hpaned, expand=True, fill=True)
-        self.dialog.vbox.pack_start(self.vbox, expand=True, fill=True)
+            self.vbox.pack_start(hpaned, True, True, 0)
+        self.dialog.vbox.pack_start(self.vbox, True, True, 0)
                 
     def createTreeView(self):
         # Columns are: 0 - Tree node name
@@ -914,7 +913,7 @@ class UpdateGUI(BasicVersionControlDialogGUI):
         buffer = Gtk.TextBuffer()
         buffer.set_text(text)
         textView = Gtk.TextView(buffer)
-        self.dialog.vbox.pack_start(textView, expand=True, fill=True)
+        self.dialog.vbox.pack_start(textView, True, True, 0)
         if canUpdate:
             self.notify("Refresh")
             self.notify("ActionStop")

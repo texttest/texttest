@@ -206,13 +206,12 @@ class CVSLogLatest(vcs_independent.LogGUI):
         if message:
             hbox = Gtk.HBox()
             icon = Gtk.STOCK_DIALOG_INFO
-            hbox.pack_start(self.getStockIcon(icon, True, True, 0), expand=False, fill=False)
-            hbox.pack_start(Gtk.Label(message, True, True, 0), expand=False, fill=False)        
-            alignment = Gtk.Alignment.new()
-            alignment.set(0.0, 1.0, 1.0, 1.0)
+            hbox.pack_start(self.getStockIcon(icon), False, False, 0)
+            hbox.pack_start(Gtk.Label(message), False, False, 0)
+            alignment = Gtk.Alignment.new(0.0, 1.0, 1.0, 1.0)
             alignment.set_padding(5, 5, 0, 5)
             alignment.add(hbox)
-            self.vbox.pack_start(alignment, expand=False, fill=False)
+            self.vbox.pack_start(alignment, False, False, 0)
         
     def addNotebook(self):
         notebook = Gtk.Notebook()
@@ -232,8 +231,8 @@ class CVSLogLatest(vcs_independent.LogGUI):
         if len(notebook.get_children()) > 0: # Resize to a nice-looking dialog window ...
             parentSize = self.topWindow.get_size()
             self.dialog.resize(int(parentSize[0] / 1.5), int(parentSize[0] / 2))
-        self.vbox.pack_start(notebook, expand=True, fill=True)
-        self.dialog.vbox.pack_start(self.vbox, expand=True, fill=True)
+        self.vbox.pack_start(notebook, True, True, 0)
+        self.dialog.vbox.pack_start(self.vbox, True, True, 0)
         
 vcs_independent.vcsClass = CVSInterface
 

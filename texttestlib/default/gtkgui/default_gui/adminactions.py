@@ -848,7 +848,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
     def addText(self, vbox, text):
         header = Gtk.Label()
         header.set_markup(text + "\n")
-        vbox.pack_start(header, expand=False, fill=False)
+        vbox.pack_start(header, False, False, 0)
     
     def getDirectoryText(self, test):
         relDir = plugins.relpath(self.creationDir, test.getDirectory())
@@ -1316,7 +1316,7 @@ class RenameTest(RenameAction):
     def fillVBox(self, vbox, group):
         header = Gtk.Label()
         header.set_markup("<b>" + plugins.convertForMarkup(self.oldName) + "</b>")
-        vbox.pack_start(header, expand=False, fill=False)
+        vbox.pack_start(header, False, False, 0)
         return guiplugins.ActionDialogGUI.fillVBox(self, vbox, group)
     
     def getTooltip(self):
@@ -1559,14 +1559,14 @@ class ReportBugs(guiplugins.ActionDialogGUI):
                     widget = self.createExpander(group)
                 else:
                     widget = self.createFrame(group, group.name)
-                vbox.pack_start(widget, fill=False, expand=False, padding=8)
-            vbox.pack_start(Gtk.Separator(Gtk.Orientation.HORIZONTAL), padding=8)
+                vbox.pack_start(widget, False, False, 8)
+            vbox.pack_start(Gtk.Separator(Gtk.Orientation.HORIZONTAL), True, True, 8)
             header = Gtk.Label()
             header.set_markup("<u>Fill in exactly <i>one</i> of the sections below</u>\n")
-            vbox.pack_start(header, expand=False, fill=False, padding=8)
+            vbox.pack_start(header, False, False, 8)
             for group in [ self.bugSystemGroup, self.textDescGroup ]:
                 frame = self.createFrame(group, group.name)
-                vbox.pack_start(frame, fill=False, expand=False, padding=8)
+                vbox.pack_start(frame, False, False, 8)
         return guiplugins.ActionDialogGUI.fillVBox(self, vbox, optionGroup)
 
     def createExpander(self, group):

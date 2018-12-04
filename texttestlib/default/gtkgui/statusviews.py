@@ -69,7 +69,7 @@ class StatusMonitorGUI(guiutils.SubGUI):
         self.label.set_max_width_chars(90)
         self.label.set_use_markup(True)
         self.label.set_markup(self.initialMessage)
-        hbox.pack_start(self.label, expand=False, fill=False)
+        hbox.pack_start(self.label, False, False, 0)
         imageDir = plugins.installationDir("images")
         try:
             staticIcon = os.path.join(imageDir, "throbber_inactive.png")

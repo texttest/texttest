@@ -2,8 +2,8 @@
 """
 The actions in the dynamic GUI that affect the state of a test
 """
-
-import gtk, os
+from gi.repository import Gtk
+import os
 from texttestlib import plugins
 from .. import guiplugins
 from adminactions import ReportBugs

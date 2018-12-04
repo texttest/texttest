@@ -2,8 +2,8 @@
 """
 Actions for managing selections and filterings of the test tree
 """
-
-import gtk, os, operator, logging
+from gi.repository import Gtk
+import os, operator, logging
 from texttestlib import plugins
 from .. import guiplugins
 

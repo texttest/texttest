@@ -1,5 +1,5 @@
-
-import gtk, os, time, stat
+from gi.repository import Gtk
+import os, time, stat
 from texttestlib import plugins
 from .. import guiplugins
 from ordereddict import OrderedDict

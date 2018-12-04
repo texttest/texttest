@@ -2,8 +2,7 @@
 """
 Code associated with the left-hand tree view for tests 
 """
-from gi.repository import Gtk,GObject
-#import gtk, gobject, pango, guiutils, logging
+from gi.repository import Gtk, GObject
 import guiutils, logging
 from texttestlib import plugins
 from ordereddict import OrderedDict

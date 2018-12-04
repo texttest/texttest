@@ -1,5 +1,5 @@
-
-import gtk, vcs_independent, datetime, shutil, time, os
+from gi.repository import Gtk
+import vcs_independent, datetime, shutil, time, os
 from texttestlib import plugins
 from .. import guiutils
 from ordereddict import OrderedDict

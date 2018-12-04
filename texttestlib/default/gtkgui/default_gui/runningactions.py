@@ -2,8 +2,8 @@
 """
 The various ways to launch the dynamic GUI from the static GUI
 """
-
-import gtk, gobject, os, sys, stat
+from gi.repository import Gtk, GObject
+import os, sys, stat
 from texttestlib import plugins
 from .. import guiplugins
 from copy import copy, deepcopy

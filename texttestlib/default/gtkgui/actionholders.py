@@ -3,8 +3,8 @@
 The various "holders" for displaying the "ActionGUI" abstraction: i.e. menus, toolbars and popups,
 to store the simple actions and the dialogs, and a notebook to store the tabs in.
 """
-
-import gtk, guiutils, os, sys, logging, types
+from gi.repository import Gtk
+import guiutils, os, sys, logging, types
 from texttestlib import plugins
 from ordereddict import OrderedDict
 from pprint import pformat

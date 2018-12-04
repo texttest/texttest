@@ -2,12 +2,12 @@
 """
 Miscellaneous actions for generally housekeeping the state of the GUI
 """
-
+from gi.repository import Gtk, GObject
 from .. import guiplugins
 from ordereddict import OrderedDict
 from texttestlib.default.batch import BatchApplicationData, MailSender
 from texttestlib import plugins
-import os, gtk, gobject
+import os
 from texttestlib.jobprocess import killSubProcessAndChildren
 
 class Quit(guiplugins.BasicActionGUI):

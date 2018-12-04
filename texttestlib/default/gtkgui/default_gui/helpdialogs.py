@@ -1,5 +1,5 @@
-
-import gtk, gobject, os, sys, glob
+from gi.repository import Gtk, GObject
+import os, sys, glob
 from texttestlib import plugins, texttest_version
 from .. import guiplugins, guiutils
 from types import StringType

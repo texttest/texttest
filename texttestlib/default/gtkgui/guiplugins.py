@@ -2,7 +2,7 @@
 
 import gtk, gobject, entrycompletion, os, subprocess, types, logging, sys
 from texttestlib import plugins
-from guiutils import guiConfig, SubGUI, GUIConfig, createApplicationEvent
+from .guiutils import guiConfig, SubGUI, GUIConfig, createApplicationEvent
 from texttestlib.jobprocess import killSubProcessAndChildren
 from ordereddict import OrderedDict
         
@@ -31,7 +31,7 @@ class ProcessTerminationMonitor(plugins.Observable):
         return running
     
     def getProcesses(self):
-        return self.processesForKill.values()
+        return list(self.processesForKill.values())
 
     def getProcessIdentifier(self, process):
         # Unfortunately the child_watch_add method needs different ways to
@@ -52,13 +52,13 @@ class ProcessTerminationMonitor(plugins.Observable):
     def processExited(self, pidOrHandle, condition, pid):
         output = ""
         self.notify("ProcessExited", pid)
-        if self.processesForKill.has_key(pidOrHandle):
+        if pidOrHandle in self.processesForKill:
             process = self.processesForKill[pidOrHandle][0]
             if process.stdout is not None:
                 output = process.stdout.read().strip()
             del self.processesForKill[pidOrHandle]
             
-        if self.exitHandlers.has_key(pidOrHandle):
+        if pidOrHandle in self.exitHandlers:
             exitHandler, exitHandlerArgs = self.exitHandlers.pop(pidOrHandle)
             if exitHandler:
                 exitHandler(*exitHandlerArgs)
@@ -72,8 +72,8 @@ class ProcessTerminationMonitor(plugins.Observable):
             return
         diag = logging.getLogger("kill processes")
         self.notify("Status", "Terminating all external viewers ...")
-        for pid, (process, description) in self.processesForKill.items():
-            if self.exitHandlers.has_key(pid):
+        for pid, (process, description) in list(self.processesForKill.items()):
+            if pid in self.exitHandlers:
                 self.exitHandlers.pop(pid) # don't call exit handlers in this case, we're terminating
             self.notify("ActionProgress")
             diag.info("Killing '" + description + "' interactive process")
@@ -82,7 +82,7 @@ class ProcessTerminationMonitor(plugins.Observable):
 processMonitor = ProcessTerminationMonitor()
 
 def openLinkInBrowser(*files):
-    if os.name == "nt" and not os.environ.has_key("BROWSER") and len(files) == 1:
+    if os.name == "nt" and "BROWSER" not in os.environ and len(files) == 1:
         os.startfile(files[0]) #@UndefinedVariable
         createApplicationEvent("the browser to be closed", "browser")
         return 'Started "<default browser> ' + files[0] + '" in background.'
@@ -282,7 +282,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         saidOK = responseId in [ gtk.RESPONSE_ACCEPT, gtk.RESPONSE_YES, gtk.RESPONSE_OK ]
         try:
             self._respond(saidOK, dialog, *args)
-        except plugins.TextTestError, e:
+        except plugins.TextTestError as e:
             self.showErrorDialog(str(e))
             
     def _respond(self, saidOK, dialog, *args):
@@ -310,9 +310,9 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
                 # Actions showing dialogs will handle this in the dialog code.
                 entrycompletion.manager.collectCompletions()
                 self._runInteractive()
-        except plugins.TextTestError, e:
+        except plugins.TextTestError as e:
             self.showErrorDialog(str(e))
-        except Exception, e:
+        except Exception as e:
             self.showErrorDialog(plugins.getExceptionString())
             
     def _runInteractive(self):
@@ -395,7 +395,7 @@ class ActionGUI(BasicActionGUI):
             self.currTestSelection = tests
             testClass = self.correctTestClass()
             if testClass:
-                self.currTestSelection = filter(lambda test: test.classId() == testClass, tests)
+                self.currTestSelection = [test for test in tests if test.classId() == testClass]
                 
         self.currAppSelection = apps
         newActive = self.allAppsValid() and self.isActiveOnCurrent()
@@ -541,7 +541,7 @@ class RadioGroupIndexer:
         self.buttons = listOfButtons
 
     def getActiveIndex(self):
-        for i in xrange(0, len(self.buttons)):
+        for i in range(0, len(self.buttons)):
             if self.buttons[i].get_active():
                 return i
 
@@ -574,7 +574,7 @@ class OptionGroupGUI(ActionGUI):
     def createLabelEventBox(self, option, separator):
         label = gtk.EventBox()
         label.add(gtk.Label(option.name + separator))
-        if option.description and type(option.description) == types.StringType:
+        if option.description and type(option.description) == bytes:
             label.set_tooltip_text(option.description)
         return label
 
@@ -640,7 +640,7 @@ class OptionGroupGUI(ActionGUI):
     def createRadioButtons(self, switch, optionGroup):
         buttons = []
         mainRadioButton = None
-        individualToolTips = type(switch.description) == types.ListType
+        individualToolTips = type(switch.description) == list
         for index, option in enumerate(switch.options):
             self.setConfigOverride(switch, index, option, optionGroup)
             radioButton = gtk.RadioButton(mainRadioButton, option, use_underline=True)
@@ -711,7 +711,7 @@ class OptionGroupGUI(ActionGUI):
             
     def extractSwitches(self, optionGroup):
         options, switches = [], []
-        for option in optionGroup.options.values():
+        for option in list(optionGroup.options.values()):
             if isinstance(option, plugins.Switch):
                 switches.append(option)
             else:
@@ -955,7 +955,7 @@ class ActionDialogGUI(OptionGroupGUI):
         self.updateOptions()
         try:
             self.showConfigurationDialog()
-        except plugins.TextTestError, e:
+        except plugins.TextTestError as e:
             self.showErrorDialog(str(e))
             
     def showConfigurationDialog(self):
@@ -988,7 +988,7 @@ class ActionDialogGUI(OptionGroupGUI):
                                          self.confirmationRespond, fileChooserOption)
                 else:
                     self.defaultRespond(saidOK, dialog, fileChooserOption)
-            except plugins.TextTestError, e:
+            except plugins.TextTestError as e:
                 self.showErrorDialog(str(e))
             except Exception:
                 self.showErrorDialog(plugins.getExceptionString())
@@ -1047,7 +1047,7 @@ class ActionDialogGUI(OptionGroupGUI):
         dialog.response(gtk.RESPONSE_ACCEPT)
         
     def getOrderedOptions(self, optionGroup):
-        return optionGroup.options.values()
+        return list(optionGroup.options.values())
 
     def fillVBox(self, vbox, optionGroup, includeOverrides=True):
         fileChooser, fileChooserOption = None, None

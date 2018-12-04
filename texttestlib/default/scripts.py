@@ -5,16 +5,17 @@ import sandbox, operator, os, shutil, sys, random
 from glob import glob
 from texttestlib import plugins
 from ordereddict import OrderedDict
-from ConfigParser import RawConfigParser
+from configparser import RawConfigParser
+from functools import reduce
                     
 class CountTest(plugins.Action):
     scriptDoc = "report on the number of tests selected, by application"
     appCount = OrderedDict()
     @classmethod
     def finalise(self):
-        for app, count in self.appCount.items():
-            print app.description(), "has", count, "tests"
-        print "There are", sum(self.appCount.values()), "tests in total."
+        for app, count in list(self.appCount.items()):
+            print(app.description(), "has", count, "tests")
+        print("There are", sum(self.appCount.values()), "tests in total.")
 
     def __repr__(self):
         return "Counting"
@@ -69,7 +70,7 @@ class DocumentOptions(plugins.Action):
     multiValueOptions = [ "a", "c", "f", "funion", "fintersect", "t", "ts", "v" ]
     def setUpApplication(self, app):
         groups = app.createOptionGroups([ app ])
-        keys = reduce(operator.add, (g.keys() for g in groups), [])
+        keys = reduce(operator.add, (list(g.keys()) for g in groups), [])
         keys.sort()
         for key in keys:
             self.displayKey(key, groups)
@@ -83,7 +84,7 @@ class DocumentOptions(plugins.Action):
 
     def display(self, keyOutput, groupOutput, docOutput):
         if not docOutput.startswith("Private"):
-            print keyOutput + ";" + groupOutput + ";" + docOutput.replace("SGE", "SGE/LSF")
+            print(keyOutput + ";" + groupOutput + ";" + docOutput.replace("SGE", "SGE/LSF"))
 
     def groupOutput(self, group):
         knownGroups = [ "Selection", "Basic", "Advanced" ]
@@ -125,7 +126,7 @@ class DocumentConfig(plugins.ScriptWithArgs):
         if len(self.onlyEntries) > 0:
             return self.onlyEntries
         else:
-            return sorted(app.configDir.keys() + app.configDir.aliases.keys())
+            return sorted(list(app.configDir.keys()) + list(app.configDir.aliases.keys()))
         
 
     def reloadForOverrideOs(self, app):
@@ -145,7 +146,7 @@ class DocumentConfig(plugins.ScriptWithArgs):
                 docOutput = "Alias. See entry for '" + realKey + "'"
             if not docOutput.startswith("Private"):
                 value = app.configDir[realKey]
-                print key + "|" + self.interpretArgument(value) + "|" + docOutput  
+                print(key + "|" + self.interpretArgument(value) + "|" + docOutput)  
                 
     def interpretArgument(self, arg):
         return str(arg).replace(plugins.installationRoots[0], "<source library>")
@@ -175,7 +176,7 @@ class DocumentEnvironment(plugins.Action):
             if root.endswith("lib"):
                 toRemove = []
                 for dir in dirs:
-                    if dir != "libexec" and not sys.modules.has_key(dir) and not sys.modules.has_key("texttestlib." + dir):
+                    if dir != "libexec" and dir not in sys.modules and "texttestlib." + dir not in sys.modules:
                         toRemove.append(dir)
                 for dir in toRemove:
                     dirs.remove(dir)
@@ -236,7 +237,7 @@ class DocumentEnvironment(plugins.Action):
     def findVarsInFile(self, path, vars, prefixes):
         import re
         regexes = [ re.compile("([^/ \"'\.,\(]*)[\(]?[\"'](" + prefix + "[^/ \"'\.,]*)") for prefix in prefixes ]
-        for line in open(path).xreadlines():
+        for line in open(path):
             for regex in regexes:
                 match = regex.search(line)
                 if match is not None:
@@ -248,27 +249,27 @@ class DocumentEnvironment(plugins.Action):
         
     def setUpApplication(self, app):
         vars = self.getEntriesToUse(app)
-        print "The following variables may be set by the user :"
+        print("The following variables may be set by the user :")
         for key in sorted(vars.keys()):
             argList = vars[key]
             if len(argList) > 1:
-                print key + "|" + "|".join(argList)
+                print(key + "|" + "|".join(argList))
 
-        print "The following variables are set by TextTest :"
-        for var in sorted(filter(lambda key: len(vars[key]) == 1, vars.keys())):
-            print var + "|" + vars[var][0]
+        print("The following variables are set by TextTest :")
+        for var in sorted([key for key in list(vars.keys()) if len(vars[key]) == 1]):
+            print(var + "|" + vars[var][0])
 
 
 class DocumentScripts(plugins.Action):
     def setUpApplication(self, app):
-        import batch, comparetest, performance
+        from . import batch, comparetest, performance
         for module in [ batch, comparetest, sys.modules[__name__], performance ]:
             names = dir(module)
             for name in names:
                 try:
                     docString = getattr(getattr(module, name), "scriptDoc")
                     scriptName = module.__name__.replace("texttestlib.default.", "").replace("scripts", "default") + "." + name
-                    print scriptName + "|" + docString
+                    print(scriptName + "|" + docString)
                 except AttributeError:
                     pass
 
@@ -356,7 +357,7 @@ class ExportTests(plugins.ScriptWithArgs):
         self.otherSuites = {}
         self.placements = {}
         if not self.otherTTHome:
-            raise plugins.TextTestError, "Must provide 'dest' argument to indicate where tests should be exported"
+            raise plugins.TextTestError("Must provide 'dest' argument to indicate where tests should be exported")
     def __repr__(self):
         return "Checking for export of"
     def __call__(self, test):
@@ -512,7 +513,7 @@ class FilterUIMapFile(plugins.ScriptWithArgs):
    
     @classmethod     
     def finalise(cls):
-        for uiMapFile, instance in cls.instancesByFile.items():
+        for uiMapFile, instance in list(cls.instancesByFile.items()):
             instance.writeResults(uiMapFile)
 
     def writeResults(self, uiMapFile):
@@ -520,16 +521,16 @@ class FilterUIMapFile(plugins.ScriptWithArgs):
             if shortcut in self.shortcutsUsed:
                 self.storeUsage(shortcut)
             else:
-                print "Shortcut not used", shortcut.name
+                print("Shortcut not used", shortcut.name)
 
         writeParser = RawConfigParser(dict_type=OrderedDict)
         writeParser.optionxform = str
         for section in self.uiMapFileHandler.sections():
             usedActions = self.uiMapFileUsed.get(section, [])
-            entriesToAdd = filter(lambda (action, event): action in usedActions or len(event.strip()) == 0, self.uiMapFileHandler.items(section))
+            entriesToAdd = [action_event for action_event in self.uiMapFileHandler.items(section) if action_event[0] in usedActions or len(action_event[1].strip()) == 0]
             if entriesToAdd:
                 writeParser.add_section(section)
                 for actionName, eventName in entriesToAdd:
                     writeParser.set(section, actionName, eventName)
-        print "Updating UI map file..."
+        print("Updating UI map file...")
         writeParser.write(open(uiMapFile, "w"))

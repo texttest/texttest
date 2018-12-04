@@ -1,7 +1,7 @@
 
 import sys, logging, types
 from texttestlib import plugins
-from Queue import Queue, Empty
+from queue import Queue, Empty
 from ordereddict import OrderedDict
 from threading import Lock
 
@@ -40,7 +40,7 @@ class BaseActionRunner(plugins.Responder, plugins.Observable):
         self.testQueue.put(None)    
 
     def notifyComplete(self, test):
-        if not self.exited and self.optionMap.has_key("stop") and test.state.hasFailed():
+        if not self.exited and "stop" in self.optionMap and test.state.hasFailed():
             self.exited = True
             self.cancelFreeText = "Test run was cancelled due to previous failure of test " + test.getRelPath()
 
@@ -162,7 +162,7 @@ class ActionRunner(BaseActionRunner):
 
     def getAllActionClasses(self):
         classes = set()
-        for appRunner in self.appRunners.values():
+        for appRunner in list(self.appRunners.values()):
             for action in appRunner.actionSequence:
                 classes.add(action.__class__)
         return classes
@@ -170,7 +170,7 @@ class ActionRunner(BaseActionRunner):
     def cleanup(self):
         for actionClass in self.getAllActionClasses():
             actionClass.finalise()
-        for appRunner in self.appRunners.values():
+        for appRunner in list(self.appRunners.values()):
             appRunner.cleanActions()
             
 
@@ -225,7 +225,7 @@ class ApplicationRunner:
     def setUpSuite(self, action, suite):
         self.diag.info(str(action) + " set up " + repr(suite))
         action.setUpSuite(suite)
-        if self.suitesSetUp.has_key(suite):
+        if suite in self.suitesSetUp:
             self.suitesSetUp[suite].append(action)
         else:
             self.suitesSetUp[suite] = [ action ]
@@ -248,7 +248,7 @@ class ApplicationRunner:
         return actionSequence
 
     def addActionToList(self, action, actionSequence):
-        if type(action) == types.ListType:
+        if type(action) == list:
             for subAction in action:
                 self.addActionToList(subAction, actionSequence)
         elif action != None:
@@ -280,7 +280,7 @@ class TestRunner:
         try:
             method(*args)
             return True
-        except plugins.TextTestError, e:
+        except plugins.TextTestError as e:
             self.failTest(str(e))
         except:
             exceptionText = plugins.getExceptionString()

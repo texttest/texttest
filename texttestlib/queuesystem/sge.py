@@ -1,6 +1,6 @@
 
 import os, string, subprocess
-import gridqueuesystem
+from . import gridqueuesystem
 from texttestlib.plugins import gethostname, log, TextTestError
 from time import sleep
 
@@ -83,8 +83,8 @@ class QueueSystem(gridqueuesystem.QueueSystem):
         output = proc.communicate()[0]
         # unsuspend always provides return code 1, even when it works (bug in SGE)
         if newState and proc.returncode > 0:
-            raise TextTestError, "Failed to suspend job using command '" + " ".join(cmdArgs) + \
-                  "'\nError message from SGE follows:\n" + output
+            raise TextTestError("Failed to suspend job using command '" + " ".join(cmdArgs) + \
+                  "'\nError message from SGE follows:\n" + output)
             
     def getJobId(self, line):
         return line.split()[2]
@@ -212,7 +212,7 @@ class QueueSystem(gridqueuesystem.QueueSystem):
         return None, acctError
 
     def findAccountingFile(self, logNum):
-        if os.environ.has_key("SGE_ROOT") and os.environ.has_key("SGE_CELL"):
+        if "SGE_ROOT" in os.environ and "SGE_CELL" in os.environ:
             findPattern = os.path.join(os.environ["SGE_ROOT"], os.environ["SGE_CELL"])
             acctFile = os.path.join(findPattern, "common", "accounting." + str(logNum))
             if os.path.isfile(acctFile):
@@ -239,7 +239,7 @@ class MachineInfo:
         jobs = []
         user, jobId = "", ""
         myJobId = os.path.basename(os.getenv("SGE_JOB_SPOOL_DIR", "")).split(".")[0]
-        for line in os.popen("qstat -r -s r -u '*' -l hostname='" + machine + "'").xreadlines():
+        for line in os.popen("qstat -r -s r -u '*' -l hostname='" + machine + "'"):
             if line.startswith("job") or line.startswith("----"):
                 continue
             if line[0] in string.digits:

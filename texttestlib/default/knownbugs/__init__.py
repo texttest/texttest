@@ -2,7 +2,7 @@
 
 import os, string, shutil, sys, logging, glob, re
 from texttestlib import plugins
-from ConfigParser import ConfigParser, NoOptionError
+from configparser import ConfigParser, NoOptionError
 from copy import copy
 from ordereddict import OrderedDict
 
@@ -64,7 +64,7 @@ class BugSystemBug(Bug):
         return category, briefText, self.getRerunText() + bugText
 
     def findBugInfo(self, bugId, location, username, password):
-        exec "from " + self.bugSystem + " import findBugInfo as _findBugInfo"
+        exec("from " + self.bugSystem + " import findBugInfo as _findBugInfo")
         return _findBugInfo(self.bugId, location, username, password) #@UndefinedVariable
 
 class UnreportedBug(Bug):
@@ -220,7 +220,7 @@ class FileBugData:
             self.diag.info("File doesn't exist, checking only for absence bugs")
             return self.findAbsenceBugs(self.absentList, execHosts=execHosts, isChanged=isChanged, multipleDiffs=multipleDiffs, tmpDir=None)
         if not os.path.exists(fileName):
-            raise plugins.TextTestError, "The file '"+ fileName + "' does not exist. Maybe it has been removed by an external process. "
+            raise plugins.TextTestError("The file '"+ fileName + "' does not exist. Maybe it has been removed by an external process. ")
 
         self.diag.info("Looking for bugs in " + fileName)
         dirname = os.path.dirname(fileName)
@@ -289,7 +289,7 @@ class ParserSectionDict(OrderedDict):
 
 class BugMap(OrderedDict):
     def checkUnchanged(self):
-        for bugData in self.values():
+        for bugData in list(self.values()):
             if bugData.checkUnchanged:
                 return True
         return False
@@ -419,7 +419,7 @@ class CheckForBugs(plugins.Action):
     def findAllBugs(self, test, state, activeBugs):
         multipleDiffs = self.hasMultipleDifferences(test, state)
         bugs, bugStems = [], []
-        for stem, fileBugData in activeBugs.items():
+        for stem, fileBugData in list(activeBugs.items()):
             newBugs = self.findBugsInFile(test, state, stem, fileBugData, multipleDiffs)
             if newBugs:
                 bugs += newBugs
@@ -536,8 +536,8 @@ class MigrateFiles(plugins.Action):
         newBugFile = open(newBugFileName, "w")
         self.writeNew(parser, newBugFile)
         newBugFile.close()
-        print "Old File:\n" + open(bugFileName).read()
-        print "New File:\n" + open(newBugFileName).read()
+        print("Old File:\n" + open(bugFileName).read())
+        print("New File:\n" + open(newBugFileName).read())
         shutil.move(newBugFileName, bugFileName)
     def writeNew(self, parser, newBugFile):
         sectionNo = 0

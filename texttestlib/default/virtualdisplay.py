@@ -16,7 +16,7 @@ class VirtualDisplayResponder(plugins.Responder):
         VirtualDisplayResponder.instance = self
         
     def addSuites(self, suites):
-        guiSuites = filter(lambda suite : suite.getConfigValue("use_case_record_mode") == "GUI", suites)
+        guiSuites = [suite for suite in suites if suite.getConfigValue("use_case_record_mode") == "GUI"]
         if len(self.displayInfoList) == 0:
             self.setUpVirtualDisplay(guiSuites)
             for var, value in self.getVariablesToSet():
@@ -153,7 +153,7 @@ class VirtualDisplayResponder(plugins.Responder):
                 # We try again and hope for a better process ID!
                 continue
             try:
-                displayNum, xvfbPid = map(int, line.strip().split(","))
+                displayNum, xvfbPid = list(map(int, line.strip().split(",")))
                 xvfbOrSshProc.stdout.close()
                 return self.getDisplayName(machine, displayNum), xvfbPid, xvfbOrSshProc
             except ValueError: #pragma : no cover - should never happen, just a fail-safe

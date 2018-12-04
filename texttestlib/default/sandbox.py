@@ -1,7 +1,7 @@
 import os, shutil, re, stat, subprocess, glob, logging, difflib, time,sys
 from texttestlib import plugins
 from texttestlib.jobprocess import killArbitaryProcess, killSubProcessAndChildren
-from runtest import Killed
+from .runtest import Killed
 from ordereddict import OrderedDict
 from string import Template
 
@@ -58,10 +58,10 @@ class PrepareWriteDirectory(plugins.Action):
             msg = "No data source found for required test data '" + configName + "'"
             if sourcePaths:
                 msg += "\nNo such file or directory : " + ", ".join(sourcePaths)
-            raise plugins.TextTestError, msg
+            raise plugins.TextTestError(msg)
     
     def handleRequiredData(self, test, configName, sourcePaths):
-        unseenSource = filter(lambda p: p not in self.handledRequiredPaths, sourcePaths)
+        unseenSource = [p for p in sourcePaths if p not in self.handledRequiredPaths]
         if unseenSource and configName in test.getConfigValue("test_data_require", expandVars=False):
             test.notify("RequiredTestData", sourcePaths)
             self.handledRequiredPaths.update(sourcePaths)
@@ -205,8 +205,8 @@ class PrepareWriteDirectory(plugins.Action):
                     self.copytree(srcname, dstname)
                 else:
                     self.copyfile(srcname, dstname)
-            except (IOError, os.error), why:
-                print "Can't copy", srcname, "to", dstname, ":", why
+            except (IOError, os.error) as why:
+                print("Can't copy", srcname, "to", dstname, ":", why)
         # Last of all, keep the modification time as it was
         self.copytimes(src, dst)
     def copylink(self, srcname, dstname):
@@ -226,7 +226,7 @@ class PrepareWriteDirectory(plugins.Action):
         if not os.path.exists(target):
             os.symlink(fullPath, target)
         else: #pragma : no cover
-            raise plugins.TextTestError, "File already existed at " + target + "\nTrying to link to " + fullPath
+            raise plugins.TextTestError("File already existed at " + target + "\nTrying to link to " + fullPath)
     
     def partialCopyTestPath(self, test, sourcePath, targetPath):
         # Linking doesn't exist on windows!
@@ -236,7 +236,7 @@ class PrepareWriteDirectory(plugins.Action):
         if modifiedPaths is None:
             # If we don't know, assume anything can change...
             self.copyTestPath(test, sourcePath, targetPath)
-        elif not modifiedPaths.has_key(sourcePath):
+        elif sourcePath not in modifiedPaths:
             self.linkTestPath(test, sourcePath, targetPath)
         else:
             os.mkdir(targetPath)
@@ -276,7 +276,7 @@ class PrepareWriteDirectory(plugins.Action):
         try:
             self.copylink(sourceFile, targetFile)
         except OSError: #pragma : no cover
-            print "Failed to create symlink " + targetFile
+            print("Failed to create symlink " + targetFile)
             
     def isWriteDir(self, dummy, modPaths):
         for modPath in modPaths:
@@ -307,7 +307,7 @@ class PrepareWriteDirectory(plugins.Action):
                 currentPaths.append(fullPath)
             else:
                 currentPaths[indent] = fullPath
-            if not fullPaths.has_key(fullPath):
+            if fullPath not in fullPaths:
                 fullPaths[fullPath] = []
             if not fullPath in fullPaths[prevPath]:
                 fullPaths[prevPath].append(fullPath)
@@ -369,7 +369,7 @@ class PrepareWriteDirectory(plugins.Action):
         if remoteCheckout:
             suite.app.checkout = remoteCheckout
             
-        for interpreterName, localFile in suite.getConfigValue("interpreters").items():
+        for interpreterName, localFile in list(suite.getConfigValue("interpreters").items()):
             remoteFile = self.copySUTFileIfNeeded(machine, suite, fullTmpDir, checkout, remoteCheckout, localFile)
             if remoteFile:
                 self.diag.info("Setting interpreter " + repr(interpreterName) + " to " + repr(remoteFile))
@@ -386,7 +386,7 @@ class PrepareWriteDirectory(plugins.Action):
 
         scripts = suite.getConfigValue("copy_test_path_script")
         newScripts = {}
-        for fileName, script in scripts.items():
+        for fileName, script in list(scripts.items()):
             if script:
                 localScript = getScriptArgs(script)[0]
                 remoteScript = self.tryCopyPathRemotely(localScript, fullTmpDir, machine, suite.app)
@@ -429,7 +429,7 @@ class TestEnvironmentCreator:
                 usecaseRecorder = self.test.getConfigValue("use_case_recorder")
                 # Mostly to make sure StoryText's own tests have a chance of working
                 # Almost any other test suite shouldn't be doing this...
-                envSetInTests = self.test.getConfigValue("test_data_environment").values()
+                envSetInTests = list(self.test.getConfigValue("test_data_environment").values())
                 if usecaseRecorder != "none":
                     if "STORYTEXT_HOME" not in envSetInTests:
                         if not usecaseRecorder:
@@ -454,7 +454,7 @@ class TestEnvironmentCreator:
                         vars.append(("CLASSPATH", os.pathsep.join(jars)))
                     
                 if os.name == "posix":
-                    from virtualdisplay import VirtualDisplayResponder
+                    from .virtualdisplay import VirtualDisplayResponder
                     if VirtualDisplayResponder.instance:
                         for var, value in VirtualDisplayResponder.instance.getVariablesToSet():
                             vars.append((var, value))
@@ -522,7 +522,7 @@ class TestEnvironmentCreator:
             if delay > 0:
                 vars.append(self.getReplayDelayVariable(delay))
                 
-            screenshot = self.optionMap.has_key("screenshot")
+            screenshot = "screenshot" in self.optionMap
             if screenshot:
                 vars.append(("USECASE_REPLAY_SCREENSHOTS", "1")) # Whether to take screenshots between each action in GUI tests
         if usecaseFile or self.isRecording():
@@ -531,13 +531,13 @@ class TestEnvironmentCreator:
         return vars
 
     def isRecording(self):
-        return self.optionMap.has_key("record")
+        return "record" in self.optionMap
     
     def findReplayUseCase(self, usecaseFile):
         if not self.isRecording():
             if usecaseFile:
                 return self.copyRemoteReplayFilesIfNeeded(usecaseFile)
-            elif os.environ.has_key("USECASE_REPLAY_SCRIPT") and not self.useJavaRecorder():
+            elif "USECASE_REPLAY_SCRIPT" in os.environ and not self.useJavaRecorder():
                 return "" # Clear our own script, if any, for further apps wanting to use StoryText
 
     def copyRemoteReplayFilesIfNeeded(self, path):
@@ -625,7 +625,7 @@ class CollateFiles(plugins.Action):
                     newTargetStem = self.makeTargetStem(targetPattern, sourcePattern, relativeSourcePath)
                     self.diag.info("New collation to " + newTargetStem + " : from " + relativeSourcePath)
                     newColl.setdefault(newTargetStem, []).append(sourcePath)
-        return newColl.items()
+        return list(newColl.items())
 
     def makeTargetStem(self, targetPattern, sourcePattern, sourcePath):
         newTargetStem = targetPattern
@@ -641,7 +641,7 @@ class CollateFiles(plugins.Action):
         return openBracket == -1 or closeBracket < openBracket
 
     def findWildCardMatches(self, pattern, result):
-        parts = zip(pattern.split("/"), result.split("/"))
+        parts = list(zip(pattern.split("/"), result.split("/")))
         allMatches = []
         # We take wildcards in the file name first, then those in directory names
         for subPattern, subResult in reversed(parts):
@@ -667,7 +667,7 @@ class CollateFiles(plugins.Action):
         return matches
                     
     def __call__(self, test):
-        if not self.filesPresentBefore.has_key(test):
+        if test not in self.filesPresentBefore:
             self.filesPresentBefore[test] = self.getFilesPresent(test)
         else:
             self.tryFetchRemoteFiles(test)
@@ -694,12 +694,12 @@ class CollateFiles(plugins.Action):
             filePath = test.makeTmpFileName(stem)
             self.removeUnwantedFile(filePath)
             
-        for stemPattern, texts in test.getConfigValue("discard_file_text").items():
+        for stemPattern, texts in list(test.getConfigValue("discard_file_text").items()):
             if not texts:
                 continue
             if stemPattern == "default":
                 stemPattern = "*"
-            regexps = map(re.compile, texts)
+            regexps = list(map(re.compile, texts))
             for filePath in glob.glob(test.makeTmpFileName(stemPattern)):
                 if self.containsRegexps(filePath, regexps):
                     self.removeUnwantedFile(filePath)
@@ -735,7 +735,7 @@ class CollateFiles(plugins.Action):
     
     def getFilesPresent(self, test):
         files = OrderedDict()
-        for sourcePatterns in test.getConfigValue("collate_file").values():
+        for sourcePatterns in list(test.getConfigValue("collate_file").values()):
             for sourcePattern in sourcePatterns:
                 for fullPath in self.findPaths(test, sourcePattern)[1]:
                     self.diag.info("Pre-existing file found " + fullPath)
@@ -744,7 +744,7 @@ class CollateFiles(plugins.Action):
     
     def testEdited(self, test, fullPath):
         filesBefore = self.filesPresentBefore[test]
-        if not filesBefore.has_key(fullPath):
+        if fullPath not in filesBefore:
             return True
         return filesBefore[fullPath] != plugins.modifiedTime(fullPath)
 
@@ -779,9 +779,9 @@ class CollateFiles(plugins.Action):
         self.diag.info("Looking for pattern " + sourcePattern + " for " + repr(test))
         testDir, paths = self.glob(test, sourcePattern)
         paths.sort()
-        existingPaths = filter(os.path.isfile, paths)
+        existingPaths = list(filter(os.path.isfile, paths))
         if sourcePattern == "*": # interpret this specially to mean 'all files which are not collated already'
-            return testDir, filter(lambda f: not self.alreadyCollated(test, f, sourcePattern), existingPaths)
+            return testDir, [f for f in existingPaths if not self.alreadyCollated(test, f, sourcePattern)]
         else:
             return testDir, existingPaths
 
@@ -894,7 +894,7 @@ class CreateCatalogue(plugins.Action):
         if test.getConfigValue("create_catalogues") != "true":
             return
 
-        if self.catalogues.has_key(test):
+        if test in self.catalogues:
             self.diag.info("Creating catalogue change file...")
             self.createCatalogueChangeFile(test)
         else:
@@ -955,7 +955,7 @@ class CreateCatalogue(plugins.Action):
         logFile = test.makeTmpFileName(test.getConfigValue("log_file"))
         if not os.path.isfile(logFile):
             return []
-        for line in open(logFile).xreadlines():
+        for line in open(logFile):
             if line.startswith(searchString):
                 parts = line.strip().split(" : ")
                 try:
@@ -985,13 +985,13 @@ class CreateCatalogue(plugins.Action):
     
     def findDifferences(self, oldPaths, newPaths, ignoredPaths, writeDir):
         pathsGained, pathsEdited, pathsLost = [], [], []
-        for path, modTime in newPaths.items():
-            if not oldPaths.has_key(path):
+        for path, modTime in list(newPaths.items()):
+            if path not in oldPaths:
                 pathsGained.append(self.outputPathName(path, writeDir))
             elif oldPaths[path] != modTime:
                 pathsEdited.append(self.outputPathName(path, writeDir))
-        for path, modTime in oldPaths.items():
-            if not newPaths.has_key(path):
+        for path, modTime in list(oldPaths.items()):
+            if path not in newPaths:
                 pathsLost.append(self.outputPathName(path, writeDir))
         # Clear out duplicates
         ignoredOutputPaths = [ self.outputPathName(path, writeDir) for path in ignoredPaths ]
@@ -1124,7 +1124,7 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
         entryFiles = test.getConfigValue("performance_logfile")
         defaultLogFileStem = test.getConfigValue("log_file")
         self.diag.info("Found the following entry finders:" + str(entryFinders))
-        for fileStem, entryFinder in entryFinders.items():
+        for fileStem, entryFinder in list(entryFinders.items()):
             if len(entryFinder) == 0:
                 continue # don't allow empty entry finders
             if not self.allMachinesTestPerformance(test, fileStem):
@@ -1179,7 +1179,7 @@ class ExtractPerformanceFiles(PerformanceFileCreator):
     
     def findValues(self, logFile, entryFinder):
         values = []
-        for line in open(logFile).xreadlines():
+        for line in open(logFile):
             value = self.getValue(line, entryFinder)
             if value is not None:
                 self.diag.info(" found value: " + str(value))

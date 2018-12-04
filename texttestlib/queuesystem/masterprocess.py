@@ -4,9 +4,9 @@ Code to do with the grid engine master process, i.e. submitting slave jobs and w
 """
 
 import os, sys, socket, signal, logging, time
-from utils import *
-from Queue import Queue
-from SocketServer import ThreadingTCPServer, StreamRequestHandler
+from .utils import *
+from queue import Queue
+from socketserver import ThreadingTCPServer, StreamRequestHandler
 from threading import RLock, Lock
 from ordereddict import OrderedDict
 from texttestlib import plugins
@@ -73,7 +73,7 @@ class QueueSystemServer(BaseActionRunner):
                     appCapacity = currCap
             appCapacities.append(appCapacity)
         if all((c == 0 for c in appCapacities)):
-            raise plugins.TextTestError, "The queue system module is reporting zero capacity.\nEither you have set 'queue_system_max_capacity' to 0 or something is uninstalled or unavailable. Exiting."
+            raise plugins.TextTestError("The queue system module is reporting zero capacity.\nEither you have set 'queue_system_max_capacity' to 0 or something is uninstalled or unavailable. Exiting.")
         
         self.maxCapacity = min((c for c in appCapacities if c != 0))
         capacityPerSuite = self.maxCapacity / len(allApps)
@@ -99,7 +99,7 @@ class QueueSystemServer(BaseActionRunner):
             self.addTestToQueues(test)
             self.remainingForApp[test.app.name] = capacityForApp - 1
         else:
-            if test.app.name == self.remainingForApp.keys()[-1]:
+            if test.app.name == list(self.remainingForApp.keys())[-1]:
                 self.addTestToQueues(test) # For the last app (which may be the only one) there is no point in delaying
             else:
                 self.delayedTestsForAdd.append(test)
@@ -156,15 +156,15 @@ class QueueSystemServer(BaseActionRunner):
                 self.runQueue(self.getTestForRun, self.runTest, "rerunning", block=False)
 
     def canPoll(self):
-        queueSystem = self.getQueueSystem(self.jobs.keys()[0])
+        queueSystem = self.getQueueSystem(list(self.jobs.keys())[0])
         return queueSystem.supportsPolling()
     
     def updateJobStatus(self):
-        queueSystem = self.getQueueSystem(self.jobs.keys()[0])
+        queueSystem = self.getQueueSystem(list(self.jobs.keys())[0])
         statusInfo = queueSystem.getStatusForAllJobs()
         self.diag.info("Got status for all jobs : " + repr(statusInfo))
         if statusInfo is not None: # queue system not available for some reason
-            for test, jobs in self.jobs.items():
+            for test, jobs in list(self.jobs.items()):
                 if not test.state.isComplete():
                     for jobId, jobName in jobs:
                         status = statusInfo.get(jobId)
@@ -267,7 +267,7 @@ class QueueSystemServer(BaseActionRunner):
             return self.getSubmissionRules(test)
 
     def getSubmissionRules(self, test):
-        if self.submissionRules.has_key(test):
+        if test in self.submissionRules:
             return self.submissionRules[test]
         else:
             submissionRules = test.app.getSubmissionRules(test)
@@ -330,7 +330,7 @@ class QueueSystemServer(BaseActionRunner):
             self.diag.info("No more tests found, reuse cannot fail, stopping.")
 
     def reuseCanFail(self):
-        return any((not qs.slavesOnRemoteSystem() for qs in self.queueSystems.values()))
+        return any((not qs.slavesOnRemoteSystem() for qs in list(self.queueSystems.values())))
 
     def notifyAllComplete(self):
         BaseActionRunner.notifyAllComplete(self)
@@ -338,7 +338,7 @@ class QueueSystemServer(BaseActionRunner):
         errors = {}
         errorFiles = []
         for logDir in self.slaveLogDirs:
-            errorFiles += filter(os.path.getsize, glob(os.path.join(logDir, "*.errors")))
+            errorFiles += list(filter(os.path.getsize, glob(os.path.join(logDir, "*.errors"))))
         self.diag.info("All complete, processing " + str(len(errorFiles)) + " error files...")
         if len(errorFiles) == 0:
             return
@@ -353,13 +353,13 @@ class QueueSystemServer(BaseActionRunner):
             if contents:
                 errors[contents] = os.path.basename(fileName)[:-7]
 
-        for msg, jobName in errors.items():
+        for msg, jobName in list(errors.items()):
             sys.stderr.write("WARNING: error produced by slave job '" + jobName + "'\n" + msg)
     
     def cleanup(self, final=False):
         cleanupComplete = True
         if self.jobs:
-            queueSystem = self.getQueueSystem(self.jobs.keys()[0])
+            queueSystem = self.getQueueSystem(list(self.jobs.keys())[0])
             cleanupComplete &= queueSystem.cleanup(final)
         if cleanupComplete and not final:
             self.sendServerState("Completed submission of all tests")
@@ -421,14 +421,14 @@ class QueueSystemServer(BaseActionRunner):
     def getRunOptions(self, app, submissionRules):
         runOptions = []
         for slaveSwitch in app.getSlaveSwitches():
-            if self.optionMap.has_key(slaveSwitch):
+            if slaveSwitch in self.optionMap:
                 option = "-" + slaveSwitch
                 runOptions.append(option)
                 value = self.optionMap.get(slaveSwitch)
                 if value:
                     runOptions.append(value)
 
-        if self.optionMap.has_key("xs"):
+        if "xs" in self.optionMap:
             runOptions.append("-x")
             runOptions.append("-xr")
             runOptions.append(self.optionMap.get("xr", os.path.expandvars("$TEXTTEST_PERSONAL_LOG/logging.debug")))
@@ -600,11 +600,11 @@ class QueueSystemServer(BaseActionRunner):
         if queueModuleText is None:
             return None
         queueModule = queueModuleText.lower()
-        if self.queueSystems.has_key(queueModule):
+        if queueModule in self.queueSystems:
             return self.queueSystems[queueModule]
         
         command = "from " + queueModule + " import QueueSystem as _QueueSystem"
-        exec command
+        exec(command)
         system = _QueueSystem(test) #@UndefinedVariable
         self.queueSystems[queueModule] = system
         return system
@@ -618,7 +618,7 @@ class QueueSystemServer(BaseActionRunner):
         # all tests terminate. Otherwise we rely on them terminating naturally, and if they don't
         wantStatus = self.killSignal and self.killSignal not in [ signal.SIGINT, signal.SIGTERM ]
         killedTests = []
-        for test, jobList in self.jobs.items():
+        for test, jobList in list(self.jobs.items()):
             if not test.state.isComplete():
                 for jobId, jobName in jobList:
                     if self.killTest(test, jobId, jobName, wantStatus):
@@ -630,7 +630,7 @@ class QueueSystemServer(BaseActionRunner):
         # Wait for a minute for the kill to take effect, otherwise give up
         stillRunning = killedTests
         for attempt in range(1, 61):
-            stillRunning = filter(lambda (test, jobId): not test.state.isComplete(), stillRunning)
+            stillRunning = [test_jobId for test_jobId in stillRunning if not test_jobId[0].state.isComplete()]
             if len(stillRunning) == 0:
                 return
             time.sleep(1)
@@ -809,7 +809,7 @@ class ProxySubmissionRules(SubmissionRules):
 class TestSubmissionRules(SubmissionRules):
     classPrefix = "Test"
     def getConfigResources(self, test):
-        if not self.optionMap.has_key("reconnect"):
+        if "reconnect" not in self.optionMap:
             configSettings = test.getConfigValue("queue_system_resource")
             envSetting = os.path.expandvars(test.getEnvironment("QUEUE_SYSTEM_RESOURCE", "")) # Deprecated. See "queue_system_resource" in config file docs
             return configSettings + [ envSetting ] if envSetting else configSettings
@@ -817,14 +817,14 @@ class TestSubmissionRules(SubmissionRules):
             return ""
 
     def getProcessesNeeded(self):
-        if not self.optionMap.has_key("reconnect"):
+        if "reconnect" not in self.optionMap:
             envSetting = self.test.getEnvironment("QUEUE_SYSTEM_PROCESSES", "") # Deprecated. See "queue_system_processes" in config file docs
             return int(envSetting) if envSetting else self.test.getConfigValue("queue_system_processes")
         else:
             return 1
 
     def getExtraSubmitArgs(self):
-        if not self.optionMap.has_key("reconnect"):
+        if "reconnect" not in self.optionMap:
             envSetting = os.path.expandvars(self.test.getEnvironment("QUEUE_SYSTEM_SUBMIT_ARGS", "")) #  Deprecated. See "queue_system_submit_args" in config file docs
             argStr = envSetting or self.test.getConfigValue("queue_system_submit_args")
             return plugins.splitcmd(argStr)
@@ -868,7 +868,7 @@ class TestSubmissionRules(SubmissionRules):
         defVal = configDict.get("default")
         if len(defVal) > 0:
             return defVal
-        for val in configDict.values():
+        for val in list(configDict.values()):
             if len(val) > 0 and val[0] != "any" and val[0] != "none":
                 return val
         return []
@@ -886,7 +886,7 @@ class TestSubmissionRules(SubmissionRules):
         return jobName + ".log", jobName + ".errors"
 
     def forceOnPerformanceMachines(self):
-        if self.optionMap.has_key("perf"):
+        if "perf" in self.optionMap:
             self.diag.info("-perf flag provided, forcing on performance machines")
             return True
 
@@ -905,7 +905,7 @@ class TestSubmissionRules(SubmissionRules):
         return logFile is None
 
     def allowsReuse(self, newRules):
-        if self.optionMap.has_key("reconnect"):
+        if "reconnect" in self.optionMap:
             return True # should be able to reconnect anywhere...
         else:
             # Don't care about the order of the resources
@@ -1051,7 +1051,7 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
     def storeTest(self, test):
         testPath = test.getRelPath()
         testApp = test.app.name + test.app.versionSuffix()
-        if not self.testMap.has_key(testApp):
+        if testApp not in self.testMap:
             self.testMap[testApp] = {}
         self.testMap[testApp][testPath] = test
         self.testLocks[test] = RLock()

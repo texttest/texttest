@@ -29,7 +29,7 @@ VERSION = "0.3a3"
 
 class _imaging_not_installed:
     def __getattr__(self, id):
-	raise ImportError, "The _imaging C module is not installed"
+	raise ImportError("The _imaging C module is not installed")
 
 try:
     # If the _imaging C module is not present, you can only use the
@@ -42,7 +42,7 @@ try:
 except ImportError:
     core = _imaging_not_installed()
 
-import ImagePaletteH
+from . import ImagePaletteH
 import os, string
 
 # type stuff
@@ -139,8 +139,8 @@ def init():
 			del sys.path[0]
 		except ImportError:
 		    if DEBUG:
-			print "Image: failed to import",
-			print f, ":", sys.exc_value
+			print("Image: failed to import", end=' ')
+			print(f, ":", sys.exc_info()[1])
 
     if OPEN or SAVE:
 	_initialized = 2
@@ -160,9 +160,9 @@ def _getdecoder(d, e, a, ac = ()):
     try:
 	# get decoder
 	decoder = getattr(core, d + "_decoder")
-	return apply(decoder, a + ac)
+	return decoder(*a + ac)
     except AttributeError:
-	raise IOError, "decoder %s not available" % d
+	raise IOError("decoder %s not available" % d)
 
 def _getencoder(mode, encoder_name, args, extra = ()):
 
@@ -175,9 +175,9 @@ def _getencoder(mode, encoder_name, args, extra = ()):
     try:
 	# get encoder
 	encoder = getattr(core, encoder_name + "_encoder")
-	return apply(encoder, (mode,) + args + extra)
+	return encoder(*(mode,) + args + extra)
     except AttributeError:
-	raise IOError, "encoder %s not available" % encoder_name
+	raise IOError("encoder %s not available" % encoder_name)
 
 
 # --------------------------------------------------------------------
@@ -205,7 +205,7 @@ def _getscaleoffset(expr):
             d == "__add__" and isNumberType(e)):
             return c, e
     except TypeError: pass
-    raise ValueError, "illegal expression"
+    raise ValueError("illegal expression")
 
 
 # --------------------------------------------------------------------
@@ -277,7 +277,7 @@ class Image:
             if s:
                 break
         if s < 0:
-            raise RuntimeError, "encoder error %d in tostring" % s
+            raise RuntimeError("encoder error %d in tostring" % s)
 
         return string.join(data, "")
 
@@ -286,7 +286,7 @@ class Image:
 
 	self.load()
 	if self.mode != "1":
-	    raise ValueError, "not a bitmap"
+	    raise ValueError("not a bitmap")
         data = self.tostring("xbm")
 	return string.join(["#define %s_width %d\n" % (name, self.size[0]),
 		"#define %s_height %d\n"% (name, self.size[1]),
@@ -312,14 +312,14 @@ class Image:
         s = d.decode(data)
 
         if s != (-1, 0):
-            raise ValueError, "cannot decode image data"
+            raise ValueError("cannot decode image data")
 
     def load(self):
 	if self.im and self.palette and self.palette.rawmode:
 	    self.im.putpalette(self.palette.rawmode, self.palette.data)
             self.palette.mode = "RGB"
             self.palette.rawmode = None
-            if self.info.has_key("transparency"):
+            if "transparency" in self.info:
                 self.im.putpalettealpha(self.info["transparency"], 0)
                 self.palette.mode = "RGBA"
 
@@ -393,10 +393,10 @@ class Image:
 	    return self.im.getband(band)
 	return self.im # could be misused
 
-    def getpixel(self, (x, y)):
+    def getpixel(self, xxx_todo_changeme):
 	"Get pixel value"
-
-    	self.load()
+	(x, y) = xxx_todo_changeme
+	self.load()
         if 0 <= x < self.size[0] and 0 <= y <= self.size[1]:
             return self.im[int(x + y * self.size[0])]
         raise IndexError
@@ -406,7 +406,7 @@ class Image:
 
     	self.load()
 	x, y = self.im.getprojection()
-	return map(ord, x), map(ord, y)
+	return list(map(ord, x)), list(map(ord, y))
 
     def histogram(self, mask = None):
         "Take histogram of image"
@@ -466,7 +466,7 @@ class Image:
             # integer image; use lut and mode
             if not isSequenceType(lut):
                 # if it isn't a list, it should be a function
-                lut = map(lut, range(256)) * len(self.mode)
+                lut = list(map(lut, list(range(256)))) * len(self.mode)
             self.load()
             im = self.im.point(lut, mode)
 
@@ -476,7 +476,7 @@ class Image:
         "Set alpha layer"
 
 	if self.mode != "RGBA" or im.mode not in ["1", "L"]:
-	    raise ValueError, "illegal image mode"
+	    raise ValueError("illegal image mode")
 
 	im.load()
 	self.load()
@@ -496,9 +496,9 @@ class Image:
 	"Put palette data into an image."
 
         if self.mode not in ("L", "P"):
-            raise ValueError, "illegal image mode"
+            raise ValueError("illegal image mode")
         if type(data) != StringType:
-            data = string.join(map(chr, data), "")
+            data = string.join(list(map(chr, data)), "")
         self.mode = "P"
         self.palette = ImagePaletteH.raw(rawmode, data)
         self.palette.mode = "RGB"
@@ -507,7 +507,7 @@ class Image:
         "Resize image"
 
 	if resample not in [NEAREST, ANTIALIAS]:
-	    raise ValueError, "unknown resampling method"
+	    raise ValueError("unknown resampling method")
 
 	self.load()
 	if resample == NEAREST:
@@ -520,7 +520,7 @@ class Image:
         "Rotate image.  Angle given as degrees counter-clockwise."
 
 	if resample != NEAREST:
-	    raise ValueError, "unknown resampling method"
+	    raise ValueError("unknown resampling method")
 
 	self.load()
 	im = self.im.rotate(angle)
@@ -530,9 +530,9 @@ class Image:
         "Save image to file or stream"
 
 	if isStringType(fp):
-	    import __builtin__
+	    import builtins
 	    filename = fp
-            fp = __builtin__.open(fp, "wb")
+            fp = builtins.open(fp, "wb")
             close = 1
 	else:
 	    filename = ""
@@ -554,7 +554,7 @@ class Image:
 
 	    SAVE[string.upper(format)](self, fp, filename)
 
-	except KeyError, v:
+	except KeyError as v:
 
             init()
 
@@ -625,9 +625,9 @@ class Image:
 	    ys = float(y1 - y0) / size[1]
 	    data = (xs, 0, x0 + xs/2, 0, ys, y0 + ys/2)
 	elif method != AFFINE:
-	    raise ValueError, "unknown transformation method"
+	    raise ValueError("unknown transformation method")
 	if resample != NEAREST:
-	    raise ValueError, "unknown resampling method"
+	    raise ValueError("unknown resampling method")
 
 	self.load()
 	im = self.im.transform(size, data)
@@ -733,12 +733,12 @@ def open(fp, mode = "r"):
     "Open an image file, without loading the raster data"
 
     if mode != "r":
-        raise ValueError, "bad mode"
+        raise ValueError("bad mode")
 
     if isStringType(fp):
-        import __builtin__
+        import builtins
 	filename = fp
-        fp = __builtin__.open(fp, "rb")
+        fp = builtins.open(fp, "rb")
     else:
         filename = ""
 
@@ -766,7 +766,7 @@ def open(fp, mode = "r"):
 	except SyntaxError:
 	    pass
 
-    raise IOError, "cannot identify image file"
+    raise IOError("cannot identify image file")
 
 #
 # Image processing.
@@ -796,10 +796,10 @@ def merge(mode, bands):
     "Merge a set of single band images into a new multiband image."
 
     if len(mode) != len(bands) or "*" in mode:
-        raise ValueError, "wrong number of bands"
+        raise ValueError("wrong number of bands")
     for im in bands[1:]:
         if len(im.mode) != 1 or im.size != bands[0].size:
-            raise ValueError, "wrong number of bands"
+            raise ValueError("wrong number of bands")
     im = core.new(mode, bands[0].size)
     for i in range(len(mode)):
 	bands[i].load()

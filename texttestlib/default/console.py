@@ -9,8 +9,8 @@ from ordereddict import OrderedDict
 class TextDisplayResponder(plugins.Responder):
     def __init__(self, optionMap, *args):
         plugins.Responder.__init__(self)
-        self.enableColor = optionMap.has_key("zen")
-        self.enableSummary = optionMap.has_key("b") and not optionMap.has_key("s") and not optionMap.has_key("coll")
+        self.enableColor = "zen" in optionMap
+        self.enableSummary = "b" in optionMap and "s" not in optionMap and "coll" not in optionMap
         self.failedTests = []
         self.resultSummary = OrderedDict()
         self.resultSummary["Tests Run"] = 0
@@ -58,7 +58,7 @@ class TextDisplayResponder(plugins.Responder):
                 for test in self.failedTests:
                     self.writeDescription(test, summary=True)
                 plugins.log.info("")
-            parts = [ summaryKey + ": " + str(count) for summaryKey, count in self.resultSummary.items() ]
+            parts = [ summaryKey + ": " + str(count) for summaryKey, count in list(self.resultSummary.items()) ]
             plugins.log.info(", ".join(parts))
      
     def printTestWithColorEnabled(self, test, color, summary):
@@ -80,8 +80,8 @@ class TextDisplayResponder(plugins.Responder):
 class InteractiveResponder(plugins.Responder):
     def __init__(self, optionMap, *args):
         plugins.Responder.__init__(self)
-        self.overwriteSuccess = optionMap.has_key("n")
-        self.overwriteFailure = optionMap.has_key("o")
+        self.overwriteSuccess = "n" in optionMap
+        self.overwriteFailure = "o" in optionMap
         self.overwriteVersion = optionMap.get("o")
 
     def notifyComplete(self, test):

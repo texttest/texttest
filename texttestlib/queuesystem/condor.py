@@ -1,6 +1,6 @@
 
 import os, subprocess
-import abstractqueuesystem
+from . import abstractqueuesystem
 from texttestlib.plugins import log
 
 # Used by the master to submit, monitor and delete jobs...
@@ -35,7 +35,7 @@ class QueueSystem(abstractqueuesystem.QueueSystem):
                                    'log = ' + jobName + '.log\n',
                                    'queue' + '\n'])
             if slaveEnv:
-                envStr = [ var + "=" + value for var, value in slaveEnv.items()]
+                envStr = [ var + "=" + value for var, value in list(slaveEnv.items())]
                 submitFile.write("environment = " + "|".join(envStr) + "\n")
                 
         return submitFileName

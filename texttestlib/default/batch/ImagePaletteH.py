@@ -20,16 +20,16 @@ try:
 except ImportError:
     import jarray
     jpython = 1
-import ImageH
+from . import ImageH
 
 class ImagePalette:
     "Colour palette for palette mapped images"
 
     def __init__(self, mode = "RGB", palette = None):
         self.mode = mode
-        self.palette = palette or range(256)*len(self.mode)
+        self.palette = palette or list(range(256))*len(self.mode)
 	if len(self.mode)*256 != len(self.palette):
-	    raise ValueError, "wrong palette size"
+	    raise ValueError("wrong palette size")
 
     def tostring(self):
         if jpython == 0:
@@ -65,17 +65,17 @@ def new(mode, data):
     ImageH.core.new_palette(mode, data)
 
 def negative(mode = "RGB"):
-    palette = range(256)
+    palette = list(range(256))
     palette.reverse()
     return ImagePalette(mode, palette * len(mode))
 
 def random(mode = "RGB"):
     from random import randint
-    palette = map(lambda a: randint(0, 255), [0]*256*len(mode))
+    palette = [randint(0, 255) for a in [0]*256*len(mode)]
     return ImagePalette(mode, palette)
 
 def wedge(mode = "RGB"):
-    return ImagePalette(mode, range(256) * len(mode))
+    return ImagePalette(mode, list(range(256)) * len(mode))
 
 def load(filename):
 
@@ -113,7 +113,7 @@ def load(filename):
             pass
 
     if not lut:
-        raise IOError, "cannot load palette"
+        raise IOError("cannot load palette")
 
     return lut # data, rawmode
 

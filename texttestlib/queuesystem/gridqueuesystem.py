@@ -1,5 +1,5 @@
 
-import abstractqueuesystem
+from . import abstractqueuesystem
 import os
 from texttestlib import plugins
 

@@ -76,13 +76,13 @@ class FileViewAction(guiplugins.ActionGUI):
                     
                 return "", args
             else:
-                raise plugins.TextTestError, "No " + self.getToolDescription() + " is defined for files of type '" + \
+                raise plugins.TextTestError("No " + self.getToolDescription() + " is defined for files of type '" + \
                       os.path.basename(fileToView).split(".")[0] + \
                       "'.\nPlease point the configuration entry '" + self.getToolConfigEntry() + \
-                      "' at a valid program to view the file."
+                      "' at a valid program to view the file.")
         else:
-            raise plugins.TextTestError, "File '" + os.path.basename(fileName) + \
-                      "' cannot be viewed as it has been removed in the file system." + self.noFileAdvice()
+            raise plugins.TextTestError("File '" + os.path.basename(fileName) + \
+                      "' cannot be viewed as it has been removed in the file system." + self.noFileAdvice())
 
     def isDefaultViewer(self, *args):
         return False

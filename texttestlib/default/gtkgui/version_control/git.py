@@ -10,7 +10,7 @@ class GitInterface(vcs_independent.VersionControlInterface):
         self.allStateInfo.update(self.errorStateInfo)
         self.vcsDirectory = os.path.dirname(controlDir)
         vcs_independent.VersionControlInterface.__init__(self, controlDir, "Git",
-                                                         self.warningStateInfo.values(), self.errorStateInfo.values(), "HEAD")
+                                                         list(self.warningStateInfo.values()), list(self.errorStateInfo.values()), "HEAD")
         self.defaultArgs["rm"] = [ "--force", "-r" ]
         self.defaultArgs["status"] = [ "--porcelain" ] # Would like to use --ignored but it is not available on git versions < 1.7.4
         self.defaultArgs["log"] = [ "-p", "--follow" ]
@@ -25,7 +25,7 @@ class GitInterface(vcs_independent.VersionControlInterface):
         return [ "git", "difftool", "-t", diffProgram, "-y"]
     
     def startGUIProcess(self, cmdArgs, **kw):
-        relArgs = map(self.makeRelPath, cmdArgs)
+        relArgs = list(map(self.makeRelPath, cmdArgs))
         vcs_independent.VersionControlInterface.startGUIProcess(self, relArgs, **kw)
 
     def parseDateTime(self, input):
@@ -64,12 +64,12 @@ class GitInterface(vcs_independent.VersionControlInterface):
     def getProcessResults(self, args, cwd=None, **kwargs):
         workingDir = cwd if cwd else self.vcsDirectory
         if workingDir == self.vcsDirectory:
-            args = map(self.makeRelPath, args)
+            args = list(map(self.makeRelPath, args))
         return vcs_independent.VersionControlInterface.getProcessResults(self, args, cwd=workingDir, **kwargs)
     
     def callProgram(self, cmdName, fileArgs=[], **kwargs):
         if fileArgs:
-            fileArgs = map(os.path.realpath, fileArgs)
+            fileArgs = list(map(os.path.realpath, fileArgs))
         return vcs_independent.VersionControlInterface.callProgram(self, cmdName, fileArgs, cwd=self.vcsDirectory, **kwargs)
 
     def getCombinedRevisionOptions(self, r1, r2):

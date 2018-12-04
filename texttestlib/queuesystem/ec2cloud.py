@@ -1,11 +1,11 @@
 
-import local
+from . import local
 import signal, logging, errno
 import time, os, sys
 from texttestlib import plugins
 from texttestlib.utils import getPortListenErrorCode, getUserName
 from threading import Thread, Lock
-from Queue import Queue
+from queue import Queue
 from fnmatch import fnmatch
 
 class Ec2Machine:
@@ -101,7 +101,7 @@ class Ec2Machine:
         try:
             self.diag.info("Synchronising files with EC2 instance with private IP address '" + self.ip + "'...")
             self.synchronise()
-        except plugins.TextTestError, e:
+        except plugins.TextTestError as e:
             self.errorMessage = "Failed to synchronise files with EC2 instance with private IP address '" + self.ip + "'\n" + \
                 "Intended usage is to start an ssh-agent, and add the keypair for this instance to it, in your shell before starting TextTest from it.\n\n(" + str(e) + ")\n"
             
@@ -130,7 +130,7 @@ class Ec2Machine:
             self.queue.put((None, None))
             return True
         
-        for localPid, _ in self.remoteProcessInfo.values():
+        for localPid, _ in list(self.remoteProcessInfo.values()):
             if localPid in processes:
                 proc = processes.get(localPid)
                 if proc.poll() is None:
@@ -138,7 +138,7 @@ class Ec2Machine:
         return False
 
     def getCommandArgsWithEnvironment(self, cmdArgs, slaveEnv):
-        return [ envVar + "=" + value for (envVar, value) in slaveEnv.items() ] + cmdArgs
+        return [ envVar + "=" + value for (envVar, value) in list(slaveEnv.items()) ] + cmdArgs
         
     def submitSlave(self, submitter, cmdArgs, slaveEnv, *args):
         jobId = self.getNextJobId()
@@ -148,7 +148,7 @@ class Ec2Machine:
                 self.diag.info("Starting EC2 instance with private IP address '" + self.ip + "'...")
                 try:
                     self.startMethod()
-                except Exception, e:
+                except Exception as e:
                     sys.stderr.write("WARNING: failed to start instance with private IP address '" + self.ip + "'\n" + str(e))
                     return
                 self.startMethod = self.waitForStart
@@ -188,7 +188,7 @@ class Ec2Machine:
     
     def collectJobStatus(self, jobStatus, procStatus):
         if not self.errorMessage:
-            for jobId, (localPid, _) in self.remoteProcessInfo.items():
+            for jobId, (localPid, _) in list(self.remoteProcessInfo.items()):
                 if localPid:
                     if localPid in procStatus:
                         jobStatus[jobId] = procStatus[localPid]
@@ -332,7 +332,7 @@ class QueueSystem(local.QueueSystem):
         return ["stop-" + self.getInstanceName(iId) for iId in instances]
     
     def getInstanceName(self, instance):
-        return instance if isinstance(instance,(str, unicode)) else instance.id
+        return instance if isinstance(instance,str) else instance.id
 
     def enableAlarmActions(self, alarmNames):
         conn = self.makeCloudwatchConnection()
@@ -528,4 +528,4 @@ class QueueSystem(local.QueueSystem):
         return jobId, None
 
         
-from local import MachineInfo, getUserSignalKillInfo, getExecutionMachines
+from .local import MachineInfo, getUserSignalKillInfo, getExecutionMachines

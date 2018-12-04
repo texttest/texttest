@@ -64,7 +64,7 @@ class SetUpCaptureMockHandlers(plugins.Action):
                                        environment=test.environment)
             return externalActive or pythonActive
         except ImportError:
-            raise plugins.TextTestError, "Test requires CaptureMock to be installed, but the capturemock module could not be found\nSearched in " + repr(sys.path)
+            raise plugins.TextTestError("Test requires CaptureMock to be installed, but the capturemock module could not be found\nSearched in " + repr(sys.path))
             
     def intercept(self, moduleFile, interceptDir):
         interceptName = os.path.join(interceptDir, os.path.basename(moduleFile))
@@ -104,8 +104,8 @@ class ModifyTraffic(plugins.ScriptWithArgs):
         self.describe(test)
         try:
             newTexts = [ self.getModified(t, test.getDirectory()) for t in self.readIntoList(fileName) ]
-        except plugins.TextTestError, e:
-            print str(e).strip()
+        except plugins.TextTestError as e:
+            print(str(e).strip())
             return
 
         newFileName = fileName + "tmpedit"
@@ -119,7 +119,7 @@ class ModifyTraffic(plugins.ScriptWithArgs):
         # Copied from CaptureMock ReplayInfo, easier than trying to reuse it
         trafficList = []
         currTraffic = ""
-        for line in open(fileName, "rU").xreadlines():
+        for line in open(fileName, "rU"):
             if line.startswith("<-") or line.startswith("->"):
                 if currTraffic:
                     trafficList.append(currTraffic)
@@ -136,7 +136,7 @@ class ModifyTraffic(plugins.ScriptWithArgs):
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=os.name=="nt")
             stdout, stderr = proc.communicate()
             if len(stderr) > 0:
-                raise plugins.TextTestError, "Couldn't modify traffic :\n " + stderr
+                raise plugins.TextTestError("Couldn't modify traffic :\n " + stderr)
             else:
                 return fullLine[:6] + stdout
         else:
@@ -153,7 +153,7 @@ class ModifyTraffic(plugins.ScriptWithArgs):
 
 class ConvertToCaptureMock(plugins.Action):
     def convert(self, confObj, newFile):
-        from ConfigParser import ConfigParser
+        from configparser import ConfigParser
         from ordereddict import OrderedDict
         parser = ConfigParser(dict_type=OrderedDict)
         multiThreads = confObj.getConfigValue("collect_traffic_use_threads") == "true"
@@ -188,12 +188,12 @@ class ConvertToCaptureMock(plugins.Action):
                 parser.set("python", "ignore_callers", ",".join(ignore_callers))
 
         if len(parser.sections()) > 0: # don't write empty files
-            print "Wrote file at", newFile
+            print("Wrote file at", newFile)
             parser.write(open(newFile, "w"))
 
     def setUpApplication(self, app):
         newFile = os.path.join(app.getDirectory(), "capturemockrc." + app.name + app.versionSuffix())
-        print "Converting", repr(app)
+        print("Converting", repr(app))
         self.convert(app, newFile)
 
     def __call__(self, test):
@@ -205,6 +205,6 @@ class ConvertToCaptureMock(plugins.Action):
     def checkTest(self, test):
         configFile = test.getFileName("config")
         if configFile and test.parent:
-            print "Converting", repr(test)
+            print("Converting", repr(test))
             newFile = os.path.join(test.getDirectory(), "capturemockrc." + test.app.name + test.app.versionSuffix())
             self.convert(test, newFile)

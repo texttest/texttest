@@ -7,8 +7,9 @@ from string import Template
 from fnmatch import fnmatch
 from threading import Thread
 # For back-compatibility
-from runtest import RunTest, Running, Killed
-from scripts import *
+from .runtest import RunTest, Running, Killed
+from .scripts import *
+from functools import reduce
 
 def getConfig(optionMap):
     return Config(optionMap)
@@ -21,7 +22,7 @@ class Config:
         self.filterFileMap = {}
         if self.hasExplicitInterface():
             self.trySetUpLogging()
-        from reconnect import ReconnectConfig
+        from .reconnect import ReconnectConfig
         self.reconnectConfig = ReconnectConfig(optionMap)
 
     def getMachineNameForDisplay(self, machine):
@@ -152,7 +153,7 @@ class Config:
         return False
 
     def defaultVanillaValue(self):
-        if not self.optionMap.has_key("vanilla"):
+        if "vanilla" not in self.optionMap:
             return ""
         given = self.optionValue("vanilla")
         return given or "all"
@@ -173,16 +174,16 @@ class Config:
 
     def createOptionGroups(self, allApps):
         groupNames = [ "Selection", "Invisible" ] + [ x[0] for x in self.getAllRunningGroupNames(allApps) ]
-        optionGroups = map(plugins.OptionGroup, groupNames)
+        optionGroups = list(map(plugins.OptionGroup, groupNames))
         self.addToOptionGroups(allApps, optionGroups)
         return optionGroups
 
     def findAllValidOptions(self, allApps):
         groups = self.createOptionGroups(allApps)
-        return reduce(operator.add, (g.keys() for g in groups), [])
+        return reduce(operator.add, (list(g.keys()) for g in groups), [])
 
     def getActionSequence(self, app):
-        if self.optionMap.has_key("coll"):
+        if "coll" in self.optionMap:
             return []
 
         if self.isReconnecting():
@@ -191,7 +192,7 @@ class Config:
         scriptObject = self.optionMap.getScriptObject()
         if scriptObject:
             if self.usesComparator(scriptObject):
-                comparator = comparetest.MakeComparisons(ignoreMissing=True, enableColor=self.optionMap.has_key("zen"),
+                comparator = comparetest.MakeComparisons(ignoreMissing=True, enableColor="zen" in self.optionMap,
                                                          compareSuites=scriptObject.comparesSuites(app))
                 return [ self.getWriteDirectoryMaker(), rundependent.FilterOriginalForScript(), scriptObject, comparator ]
             else:
@@ -206,14 +207,14 @@ class Config:
             return False
 
     def useGUI(self):
-        return self.optionMap.has_key("g") or self.optionMap.has_key("gx")
+        return "g" in self.optionMap or "gx" in self.optionMap
 
     def useStaticGUI(self, app):
-        return self.optionMap.has_key("gx") or \
+        return "gx" in self.optionMap or \
                (not self.hasExplicitInterface() and app.getConfigValue("default_interface") == "static_gui")
 
     def useConsole(self):
-        return self.optionMap.has_key("con")
+        return "con" in self.optionMap
 
     def getExtraVersions(self, app):
         fromConfig = self.getExtraVersionsFromConfig(app)
@@ -279,7 +280,7 @@ class Config:
             for batchExtra in app.getCompositeConfigValue("batch_extra_version", batchSession):
                 if batchExtra not in basic:
                     basic.append(batchExtra)
-        if self.optionMap.has_key("count"):
+        if "count" in self.optionMap:
             return [] # dynamic GUI started from static GUI, rely on it telling us what to load
         for extra in basic:
             if extra in app.versions:
@@ -289,35 +290,35 @@ class Config:
     def getDefaultInterface(self, allApps):
         if self.runningScript():
             return "console"
-        elif len(allApps) == 0 or self.optionMap.has_key("new"):
+        elif len(allApps) == 0 or "new" in self.optionMap:
             return "static_gui"
 
         defaultIntf = None
         for app in allApps:
             appIntf = app.getConfigValue("default_interface")
             if defaultIntf and appIntf != defaultIntf:
-                raise plugins.TextTestError, "Conflicting default interfaces for different applications - " + \
-                      appIntf + " and " + defaultIntf
+                raise plugins.TextTestError("Conflicting default interfaces for different applications - " + \
+                      appIntf + " and " + defaultIntf)
             defaultIntf = appIntf
         return defaultIntf
 
     def setDefaultInterface(self, allApps):
         mapping = { "static_gui" : "gx", "dynamic_gui": "g", "console": "con" }
         defaultInterface = self.getDefaultInterface(allApps)
-        if mapping.has_key(defaultInterface):
+        if defaultInterface in mapping:
             self.optionMap[mapping[defaultInterface]] = ""
         else:
-            raise plugins.TextTestError, "Invalid value for default_interface '" + defaultInterface + "'"
+            raise plugins.TextTestError("Invalid value for default_interface '" + defaultInterface + "'")
 
     def hasExplicitInterface(self):
-        return self.useGUI() or self.batchMode() or self.useConsole() or self.optionMap.has_key("o")
+        return self.useGUI() or self.batchMode() or self.useConsole() or "o" in self.optionMap
 
     def getLogfilePostfixes(self):
-        if self.optionMap.has_key("x"):
+        if "x" in self.optionMap:
             return [ "debug" ]
-        elif self.optionMap.has_key("gx"):
+        elif "gx" in self.optionMap:
             return [ "gui", "static_gui" ]
-        elif self.optionMap.has_key("g"):
+        elif "g" in self.optionMap:
             return [ "gui", "dynamic_gui" ]
         elif self.batchMode():
             return [ "console", "batch" ]
@@ -349,25 +350,25 @@ class Config:
 
     def _getResponderClasses(self, allApps):
         classes = []
-        if not self.optionMap.has_key("gx"):
-            if self.optionMap.has_key("new"):
-                raise plugins.TextTestError, "'--new' option can only be provided with the static GUI"
+        if "gx" not in self.optionMap:
+            if "new" in self.optionMap:
+                raise plugins.TextTestError("'--new' option can only be provided with the static GUI")
             elif len(allApps) == 0:
-                raise plugins.TextTestError, "Could not find any matching applications (files of the form config.<app>) under " + " or ".join(self.optionMap.rootDirectories)
+                raise plugins.TextTestError("Could not find any matching applications (files of the form config.<app>) under " + " or ".join(self.optionMap.rootDirectories))
 
         if any(self.useStaticGUI(app) for app in allApps) and self.isReconnecting():
-            raise plugins.TextTestError, "'-reconnect' option doesn't work with static GUI"
+            raise plugins.TextTestError("'-reconnect' option doesn't work with static GUI")
 
         if self.useGUI():
             self.addGuiResponder(classes)
         else:
             classes.append(self.getTextDisplayResponderClass())
 
-        if not self.optionMap.has_key("gx"):
+        if "gx" not in self.optionMap:
             classes += self.getThreadActionClasses()
 
         if self.batchMode() and not self.runningScript():
-            if self.optionMap.has_key("coll"):
+            if "coll" in self.optionMap:
                 arg = self.optionMap["coll"]
                 if arg != "mail":
                     classes.append(self.getWebPageResponder())
@@ -380,11 +381,11 @@ class Config:
                 if self.anyAppHas(allApps, lambda app: self.emailEnabled(app)):
                     classes.append(batch.EmailResponder)
                 if self.anyAppHas(allApps, lambda app: self.getBatchConfigValue(app, "batch_junit_format") == "true"):
-                    from batch.junitreport import JUnitResponder
+                    from .batch.junitreport import JUnitResponder
                     classes.append(JUnitResponder)
 
         if os.name == "posix" and self.useVirtualDisplay():
-            from virtualdisplay import VirtualDisplayResponder
+            from .virtualdisplay import VirtualDisplayResponder
             classes.append(VirtualDisplayResponder)
         stateSaver = self.getStateSaver()
         if stateSaver is not None:
@@ -392,7 +393,7 @@ class Config:
         if not self.useGUI() and not self.batchMode():
             classes.append(self.getTextResponder())
         # At the end, so we've done the processing before we proceed
-        from storytext_interface import ApplicationEventResponder
+        from .storytext_interface import ApplicationEventResponder
         classes.append(ApplicationEventResponder)
         return classes
 
@@ -405,7 +406,7 @@ class Config:
 
     def isActionReplay(self):
         for option, _ in self.getInteractiveReplayOptions():
-            if self.optionMap.has_key(option):
+            if option in self.optionMap:
                 return True
         return False
 
@@ -419,11 +420,11 @@ class Config:
     def useVirtualDisplay(self):
         # Don't try to set it if we're using the static GUI or
         # we've requested a slow motion replay or we're trying to record a new usecase.
-        return not self.isRecording() and not self.optionMap.has_key("gx") and not self.isReconnecting() and \
-               not self.isActionReplay() and not self.optionMap.has_key("coll") and not self.optionMap.runScript()
+        return not self.isRecording() and "gx" not in self.optionMap and not self.isReconnecting() and \
+               not self.isActionReplay() and "coll" not in self.optionMap and not self.optionMap.runScript()
 
     def getThreadActionClasses(self):
-        from actionrunner import ActionRunner
+        from .actionrunner import ActionRunner
         return [ ActionRunner ]
 
     def getTextDisplayResponderClass(self):
@@ -470,7 +471,7 @@ class Config:
             return appDescriptors
         elif self.getBatchSession(app):
             return [ self.getBatchSession(app) ]
-        elif self.optionMap.has_key("g"):
+        elif "g" in self.optionMap:
             return [ "dynamic_gui" ]
         else:
             return [ "console" ]
@@ -507,7 +508,7 @@ class Config:
         return filteredVersions
 
     def addGuiResponder(self, classes):
-        from gtkgui.controller import GUIController
+        from .gtkgui.controller import GUIController
         classes.append(GUIController)
 
     def getReconnectSequence(self):
@@ -517,11 +518,11 @@ class Config:
         return actions
 
     def getOriginalFilterer(self):
-        if not self.optionMap.has_key("ignorefilters"):
+        if "ignorefilters" not in self.optionMap:
             return rundependent.FilterOriginal(useFilteringStates=not self.batchMode())
 
     def getTemporaryFilterer(self):
-        if not self.optionMap.has_key("ignorefilters"):
+        if "ignorefilters" not in self.optionMap:
             return rundependent.FilterTemporary(useFilteringStates=not self.batchMode())
 
     def filterErrorText(self, app, errFile):
@@ -549,7 +550,7 @@ class Config:
         catalogueCreator = self.getCatalogueCreator()
         ignoreCatalogues = self.shouldIgnoreCatalogues()
         collator = self.getTestCollator()
-        from traffic import SetUpCaptureMockHandlers, TerminateCaptureMockHandlers
+        from .traffic import SetUpCaptureMockHandlers, TerminateCaptureMockHandlers
         trafficSetup = SetUpCaptureMockHandlers(self.optionIntValue("rectraffic"))
         trafficTerminator = TerminateCaptureMockHandlers()
         return [ self.getExecHostFinder(), self.getWriteDirectoryMaker(), \
@@ -558,14 +559,14 @@ class Config:
                  trafficTerminator, catalogueCreator, collator, self.getTestEvaluator() ]
 
     def isRecording(self):
-        return self.optionMap.has_key("record")
+        return "record" in self.optionMap
 
     def shouldIgnoreCatalogues(self):
-        return self.optionMap.has_key("ignorecat") or self.isRecording()
+        return "ignorecat" in self.optionMap or self.isRecording()
 
     def hasPerformance(self, app, perfType=""):
         extractors = app.getConfigValue("performance_logfile_extractor")
-        if (perfType and extractors.has_key(perfType)) or (not perfType and len(extractors) > 0):
+        if (perfType and perfType in extractors) or (not perfType and len(extractors) > 0):
             return True
         else:
             return app.hasAutomaticCputimeChecking()
@@ -622,18 +623,18 @@ class Config:
             if os.path.isfile(filterFileName):
                 return filterFileName
             else:
-                raise plugins.TextTestError, "Could not find filter file at '" + filterFileName + "'"
+                raise plugins.TextTestError("Could not find filter file at '" + filterFileName + "'")
         else:
             dirsToSearchIn = self._getFilterFileDirs(suite, suite.app.getDirectory())
             absName = suite.app.getFileName(dirsToSearchIn, filterFileName)
             if absName:
                 return absName
             else:
-                raise plugins.TextTestError, "No filter file named '" + filterFileName + "' found in :\n" + \
-                      "\n".join(dirsToSearchIn)
+                raise plugins.TextTestError("No filter file named '" + filterFileName + "' found in :\n" + \
+                      "\n".join(dirsToSearchIn))
 
     def optionListValue(self, options, key):
-        if options.has_key(key):
+        if key in options:
             return plugins.commasplit(options[key])
         else:
             return []
@@ -708,13 +709,13 @@ class Config:
             timeLimit = app.getCompositeConfigValue("batch_timelimit", batchSession)
             if timeLimit:
                 filters.append(performance.TimeFilter(timeLimit))
-        if optionMap.has_key("grep"):
+        if "grep" in optionMap:
             grepFile = optionMap.get("grepfile", app.getConfigValue("log_file"))
             filters.append(GrepFilter(optionMap["grep"], grepFile, **kw))
         return filters
 
     def batchMode(self):
-        return self.optionMap.has_key("b")
+        return "b" in self.optionMap
 
     def actualBatchMode(self):
         return self.batchMode() and not self.isReconnecting() and not self.runningScript() and not "coll" in self.optionMap
@@ -804,7 +805,7 @@ class Config:
         return previousWriteDirs
 
     def isReconnecting(self):
-        return self.optionMap.has_key("reconnect")
+        return "reconnect" in self.optionMap
     def getWriteDirectoryMaker(self):
         return sandbox.MakeWriteDirectory()
     def getExecHostFinder(self):
@@ -835,14 +836,14 @@ class Config:
         return sandbox.MachineInfoFinder()
 
     def getFailureExplainer(self):
-        from knownbugs import CheckForBugs, CheckForCrashes
+        from .knownbugs import CheckForBugs, CheckForCrashes
         return [ CheckForCrashes(), CheckForBugs() ]
 
     def showExecHostsInFailures(self, app):
         return self.batchMode() or app.getRunMachine() != "localhost"
 
     def getTestComparator(self):
-        return comparetest.MakeComparisons(enableColor=self.optionMap.has_key("zen"))
+        return comparetest.MakeComparisons(enableColor="zen" in self.optionMap)
 
     def getStateSaver(self):
         if self.actualBatchMode():
@@ -871,14 +872,14 @@ class Config:
         return self.optionMap.get(option, "")
 
     def optionIntValue(self, option, defaultValue=0, optionType=int):
-        if self.optionMap.has_key(option):
+        if option in self.optionMap:
             value = self.optionMap.get(option)
             if value is None:
                 return 1
             try:
                 return optionType(value)
             except ValueError:
-                raise plugins.TextTestError, "ERROR: Arguments to -" + option + " flag must be numeric, received '" + value + "'"
+                raise plugins.TextTestError("ERROR: Arguments to -" + option + " flag must be numeric, received '" + value + "'")
         else:
             return defaultValue
 
@@ -886,7 +887,7 @@ class Config:
         return "s" in self.optionMap
 
     def ignoreExecutable(self):
-        return self.runningScript() or self.ignoreCheckout() or self.optionMap.has_key("coll") or self.optionMap.has_key("gx")
+        return self.runningScript() or self.ignoreCheckout() or "coll" in self.optionMap or "gx" in self.optionMap
 
     def ignoreCheckout(self):
         return self.isReconnecting() # No use of checkouts has yet been thought up when reconnecting :)
@@ -904,7 +905,7 @@ class Config:
 
         try:
             self.verifyCheckoutValid(app)
-        except plugins.TextTestError, e:
+        except plugins.TextTestError as e:
             if self.ignoreExecutable():
                 plugins.printWarning(str(e), stdout=True)
                 return ""
@@ -921,10 +922,10 @@ class Config:
         self.checkCaptureMockMigration(suite)
         self.checkConfigSanity(suite.app)
         batchSession = self.getBatchSessionForSelect(suite.app)
-        if self.optionMap.has_key("coll") and batchSession is None:
-            raise plugins.TextTestError, "Must provide '-b' argument to identify the batch session when running with '-coll' to collect batch run data"
+        if "coll" in self.optionMap and batchSession is None:
+            raise plugins.TextTestError("Must provide '-b' argument to identify the batch session when running with '-coll' to collect batch run data")
         self.optionIntValue("delay", optionType=float) # throws if it's not numeric...
-        if batchSession is not None and not self.optionMap.has_key("coll"):
+        if batchSession is not None and "coll" not in self.optionMap:
             batchFilter = batch.BatchVersionFilter(batchSession)
             batchFilter.verifyVersions(suite.app)
         if self.isReconnecting():
@@ -938,18 +939,18 @@ class Config:
         if (suite.getCompositeConfigValue("collect_traffic", "asynchronous") or \
             suite.getConfigValue("collect_traffic_python")) and \
                not self.optionMap.runScript():
-            raise plugins.TextTestError, "collect_traffic settings have been deprecated.\n" + \
+            raise plugins.TextTestError("collect_traffic settings have been deprecated.\n" + \
                   "They have been replaced by using the CaptureMock program which is now separate from TextTest.\n" + \
                   "Please run with '-s traffic.ConvertToCaptureMock' and consult the migration notes at\n" + \
-                  os.path.join(plugins.installationDir("doc"), "MigrationNotes_from_3.20") + "\n"
+                  os.path.join(plugins.installationDir("doc"), "MigrationNotes_from_3.20") + "\n")
 
     def readsTestStateFiles(self):
-        return self.isReconnecting() or self.optionMap.has_key("coll")
+        return self.isReconnecting() or "coll" in self.optionMap
 
     def setUpPerformanceCategories(self, app):
         # We don't create these in the normal way, so we don't know what they are.
-        allCategories = app.getConfigValue("performance_descriptor_decrease").values() + \
-                        app.getConfigValue("performance_descriptor_increase").values()
+        allCategories = list(app.getConfigValue("performance_descriptor_decrease").values()) + \
+                        list(app.getConfigValue("performance_descriptor_increase").values())
         for cat in allCategories:
             if cat:
                 plugins.addCategory(*plugins.commasplit(cat))
@@ -959,7 +960,7 @@ class Config:
         if self.executableShouldBeFile(suite.app, executable) and not os.path.isfile(executable):
             self.handleNonExistent(executable, "executable program", suite.app)
 
-        for interpreterStr in suite.getConfigValue("interpreters").values():
+        for interpreterStr in list(suite.getConfigValue("interpreters").values()):
             interpreter = plugins.splitcmd(interpreterStr)[0]
             if os.path.isabs(interpreter) and not os.path.exists(interpreter):
                 self.handleNonExistent(interpreter, "interpreter program", suite.app)
@@ -979,9 +980,9 @@ class Config:
             if runMachine != "localhost":
                 if not self.pathExistsRemotely(app, path, runMachine):
                     self.checkConnection(app, runMachine) # throws if we can't get to it
-                    raise plugins.TextTestError, message + ", either locally or on machine '" + runMachine + "'."
+                    raise plugins.TextTestError(message + ", either locally or on machine '" + runMachine + "'.")
         else:
-            raise plugins.TextTestError, message + "."
+            raise plugins.TextTestError(message + ".")
 
     def getRemoteTmpDirectory(self, app):
         remoteCopy = app.getConfigValue("remote_copy_program")
@@ -1012,24 +1013,24 @@ class Config:
         # For finding java classes, don't warn if they don't exist as files...
         if executable.endswith(".jar"):
             return False
-        interpreters = app.getConfigValue("interpreters").values()
+        interpreters = list(app.getConfigValue("interpreters").values())
         return all(("java" not in i and "jython" not in i for i in interpreters))
 
     def checkConfigSanity(self, app):
         for key in app.getConfigValue("collate_file"):
             if "." in key or "/" in key:
-                raise plugins.TextTestError, "Cannot collate files to stem '" + key + "' - '.' and '/' characters are not allowed"
+                raise plugins.TextTestError("Cannot collate files to stem '" + key + "' - '.' and '/' characters are not allowed")
 
         definitionFileStems = app.defFileStems()
         definitionFileStems += [ stem + "." + app.name for stem in definitionFileStems ]
         for dataFileName in app.getDataFileNames():
             if dataFileName in definitionFileStems:
-                raise plugins.TextTestError, "Cannot name data files '" + dataFileName + \
+                raise plugins.TextTestError("Cannot name data files '" + dataFileName + \
                       "' - this name is reserved by TextTest for a particular kind of definition file.\n" + \
-                      "Please adjust the naming in your config file."
+                      "Please adjust the naming in your config file.")
 
     def getGivenCheckoutPath(self, app):
-        if self.optionMap.has_key("c"):
+        if "c" in self.optionMap:
             extraVersions, extraCheckouts = self.getCheckoutExtraVersions(app)
             for versionName, checkout in zip(extraVersions, extraCheckouts):
                 if versionName in app.versions:
@@ -1046,19 +1047,19 @@ class Config:
         return self.makeAbsoluteCheckout(checkoutLocations, checkout, app)
 
     def getCheckout(self, app):
-        if self.optionMap.has_key("c"):
+        if "c" in self.optionMap:
             return plugins.commasplit(self.optionMap["c"])[0]
 
         # Under some circumstances infer checkout from batch session
         batchSession = self.getBatchSession(app)
         if batchSession and  batchSession != "default" and \
-               app.getConfigValue("checkout_location").has_key(batchSession):
+               batchSession in app.getConfigValue("checkout_location"):
             return batchSession
         else:
             return app.getConfigValue("default_checkout")
 
     def makeAbsoluteCheckout(self, locations, checkout, app):
-        isSpecific = app.getConfigValue("checkout_location").has_key(checkout)
+        isSpecific = checkout in app.getConfigValue("checkout_location")
         for location in locations:
             fullCheckout = self.absCheckout(location, checkout, isSpecific)
             if os.path.isdir(fullCheckout):
@@ -1104,16 +1105,16 @@ class Config:
         pass
     def printHelpDescription(self):
         configName = self.__class__.__module__.replace("texttestlib.", "")
-        print "The " + configName + " configuration is a published configuration. Consult the online documentation."
+        print("The " + configName + " configuration is a published configuration. Consult the online documentation.")
     def printHelpOptions(self):
         pass
     def printHelpText(self):
         self.printHelpDescription()
-        print "\nAdditional Command line options supported :"
-        print "-------------------------------------------"
+        print("\nAdditional Command line options supported :")
+        print("-------------------------------------------")
         self.printHelpOptions()
-        print "\nPython scripts: (as given to -s <module>.<class> [args])"
-        print "--------------------------------------------------------"
+        print("\nPython scripts: (as given to -s <module>.<class> [args])")
+        print("--------------------------------------------------------")
         self.printHelpScripts()
     def getDefaultMailAddress(self):
         user = os.getenv("USER", "$USER")
@@ -1422,12 +1423,12 @@ class Config:
         output = proc.communicate()[0]
         exitCode = proc.returncode
         if exitCode > 0:
-            raise plugins.TextTestError, "Unable to contact machine '" + machine + \
+            raise plugins.TextTestError("Unable to contact machine '" + machine + \
                   "'.\nMake sure you have passwordless access set up correctly. The failing command was:\n" + \
-                  " ".join(allArgs) + "\n\nThe command produced exit code " + str(exitCode) + " and the following output:\n" + output.strip()
+                  " ".join(allArgs) + "\n\nThe command produced exit code " + str(exitCode) + " and the following output:\n" + output.strip())
 
     def ensureRemoteDirExists(self, app, machine, *dirnames):
-        quotedDirs = map(plugins.quote, dirnames)
+        quotedDirs = list(map(plugins.quote, dirnames))
         self.runCommandAndCheckMachine(app, machine, [ "mkdir", "-p" ] + quotedDirs)
 
     @staticmethod
@@ -1508,11 +1509,11 @@ class Config:
     def setDependentConfigDefaults(self, app):
         # For setting up configuration where the config file needs to have been read first
         # Should return True if it does anything that could cause new config files to be found
-        interpreters = app.getConfigValue("interpreters").values()
+        interpreters = list(app.getConfigValue("interpreters").values())
         if any(("python" in i or "storytext" in i for i in interpreters)):
             app.addConfigEntry("default", "testcustomize.py", "definition_file_stems")
         extraPostfixes = app.getConfigValue("extra_test_process_postfix")
-        for interpreterName in app.getConfigValue("interpreters").keys():
+        for interpreterName in list(app.getConfigValue("interpreters").keys()):
             stem = interpreterName + "_options"
             app.addConfigEntry("builtin", stem, "definition_file_stems")
             for postfix in extraPostfixes:
@@ -1609,7 +1610,7 @@ class GrepFilter(plugins.TextFilter):
         return logFiles
 
     def matches(self, logFile):
-        for line in open(logFile).xreadlines():
+        for line in open(logFile):
             if self.stringContainsText(line):
                 return True
         return False

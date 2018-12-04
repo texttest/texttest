@@ -10,7 +10,7 @@ class HgInterface(vcs_independent.VersionControlInterface):
         self.allStateInfo.update(self.warningStateInfo)
         self.allStateInfo.update(self.errorStateInfo)
         vcs_independent.VersionControlInterface.__init__(self, controlDir, "Mercurial",
-                                                         self.warningStateInfo.values(), self.errorStateInfo.values(), "tip")
+                                                         list(self.warningStateInfo.values()), list(self.errorStateInfo.values()), "tip")
         self.defaultArgs["rm"] = [ "--force" ]
         self.defaultArgs["status"] = [ "-A" ] # Otherwise we can't tell difference between Unchanged and Ignored
         self.defaultArgs["log"] = [ "-f" ] # "follow" renames, which isn't default

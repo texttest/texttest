@@ -4,17 +4,17 @@ The default configuration's worth of action GUIs, implementing the interfaces in
 
 try:
     # For backwards compatibility, don't require derived modules to know the internal structure here
-    from helpdialogs import *
-    from adminactions import *
-    from fileviewers import *
-    from fileproperties import *
-    from selectandfilter import *
-    from runningactions import *
-    from changeteststate import *
-    from housekeeping import *
+    from .helpdialogs import *
+    from .adminactions import *
+    from .fileviewers import *
+    from .fileproperties import *
+    from .selectandfilter import *
+    from .runningactions import *
+    from .changeteststate import *
+    from .housekeeping import *
     
     from ..guiplugins import InteractiveActionConfig as BaseInteractiveActionConfig
-except ImportError, e:
+except ImportError as e:
     # Might want the default accelerators, don't crash if so
     if "No module named gtk" in str(e):
         class BaseInteractiveActionConfig:

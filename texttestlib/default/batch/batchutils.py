@@ -8,7 +8,7 @@ class BatchVersionFilter:
     def verifyVersions(self, app):
         badVersion = self.findUnacceptableVersion(app)
         if badVersion is not None:
-            raise plugins.TextTestWarning, "unregistered version '" + badVersion + "' for " + self.batchSession + " session."
+            raise plugins.TextTestWarning("unregistered version '" + badVersion + "' for " + self.batchSession + " session.")
 
     def findUnacceptableVersion(self, app):
         if app.getCompositeConfigValue("batch_use_version_filtering", self.batchSession) != "true":
@@ -66,7 +66,7 @@ def getEnvironmentFromRunFiles(runNameDirs, tag):
 
 
 def convertToUrl(path, fileMapping):
-    for filePath, httpPath in fileMapping.items():
+    for filePath, httpPath in list(fileMapping.items()):
         if path.startswith(filePath):
             return path.replace(filePath, httpPath)
     return "file://" + os.path.abspath(path)

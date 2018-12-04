@@ -2,15 +2,15 @@
 
 # Interface to trac version >= 0.11. Not tested on earlier versions.
 
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 
 def findBugInfo(bugId, location, *args):
     if location and location[-1] != '/':
         location += '/'
     tracRequest = "%sticket/%s?format=tab" % (location, bugId)
     try:
-        reply = urllib2.urlopen(tracRequest).readlines()
-    except Exception, e:
+        reply = urllib.request.urlopen(tracRequest).readlines()
+    except Exception as e:
         message = "Failed to open URL '" + tracRequest + "': " + str(e) + \
                   ".\n\nPlease make sure that bug " + bugId + " exists\n" + \
                   "and that the configuration entry 'bug_system_location' " + \
@@ -38,4 +38,4 @@ def findBugInfo(bugId, location, *args):
 if __name__ == "__main__": # pragma: no cover - test code
     import sys
     for item in findBugInfo(sys.argv[1], sys.argv[2]):
-        print item
+        print(item)

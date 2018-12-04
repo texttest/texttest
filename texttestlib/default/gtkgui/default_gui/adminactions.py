@@ -53,7 +53,7 @@ class ClipboardAction(FocusDependentAction):
         
     def performOnCurrent(self):
         # If suites are selected, don't also select their contents
-        testsForClipboard = filter(self.noAncestorsSelected, self.currTestSelection)
+        testsForClipboard = list(filter(self.noAncestorsSelected, self.currTestSelection))
         self.notify("Clipboard", testsForClipboard, cut=self.shouldCut())
 
 
@@ -160,10 +160,10 @@ class PasteTests(FocusDependentAction):
                 newName = self.getNewTestName(suite, test.name)
                 destInfo[test] = suite, placement, newName
         if len(destInfo) == 0:
-            raise plugins.TextTestError, "Cannot paste test there, as the copied test and currently selected test have no application/version in common"
+            raise plugins.TextTestError("Cannot paste test there, as the copied test and currently selected test have no application/version in common")
 
         suiteDeltas = {} # When we insert as we go along, need to update subsequent placements
-        for test, (suite, placement, newName) in destInfo.items():
+        for test, (suite, placement, newName) in list(destInfo.items()):
             suiteDeltas.setdefault(suite, 0)
             realPlacement = placement + suiteDeltas.get(suite)
             if self.removeAfter and newName == test.name and suite is test.parent:
@@ -189,7 +189,7 @@ class PasteTests(FocusDependentAction):
                     if self.removeAfter:
                         message = "Failed to remove old test: didn't have sufficient write permission to the test files. Test copied instead of moved."
                         plugins.tryFileChange(test.remove, message)
-                except EnvironmentError, e:
+                except EnvironmentError as e:
                     if os.path.isdir(testDir):
                         shutil.rmtree(testDir)
                     self.showErrorDialog("Failed to paste test:\n" + str(e))
@@ -202,11 +202,11 @@ class PasteTests(FocusDependentAction):
             self.notify("Clipboard", newTests, cut=False)
             self.clipboardTests = newTests
             self.removeAfter = False
-        for suite, placement, newName in destInfo.values():
+        for suite, placement, newName in list(destInfo.values()):
             suite.contentChanged()
 
     def getStatusMessage(self, suiteDeltas):
-        suiteName = suiteDeltas.keys()[0].name
+        suiteName = list(suiteDeltas.keys())[0].name
         if self.removeAfter:
             return "Moved " + self.describeTests() + " to suite '" + suiteName + "'"
         else:
@@ -251,8 +251,8 @@ class ImportTest(guiplugins.ActionDialogGUI):
         newDir = os.path.join(suite.getDirectory(), testName)
         if os.path.isdir(newDir):
             if self.testFilesExist(newDir, suite.app):
-                raise plugins.TextTestError, "Test already exists for application " + suite.app.fullName() + \
-                          " : " + os.path.basename(newDir)
+                raise plugins.TextTestError("Test already exists for application " + suite.app.fullName() + \
+                          " : " + os.path.basename(newDir))
             else:
                 return "Test directory already exists for '" + testName + "'\nAre you sure you want to use this name?"
         else:
@@ -347,15 +347,15 @@ class ImportTest(guiplugins.ActionDialogGUI):
 
     def checkName(self, suite, testName):
         if len(testName) == 0:
-            raise plugins.TextTestError, "No name given for new " + self.testType() + "!" + "\n" + \
-                  "Fill in the 'Adding " + self.testType() + "' tab below."
+            raise plugins.TextTestError("No name given for new " + self.testType() + "!" + "\n" + \
+                  "Fill in the 'Adding " + self.testType() + "' tab below.")
         if testName.find(" ") != -1:
-            raise plugins.TextTestError, "The new " + self.testType() + \
-                  " name is not permitted to contain spaces, please specify another"
+            raise plugins.TextTestError("The new " + self.testType() + \
+                  " name is not permitted to contain spaces, please specify another")
         for test in suite.testcases:
             if test.name == testName:
-                raise plugins.TextTestError, "A " + self.testType() + " with the name '" + \
-                      testName + "' already exists, please choose another name"
+                raise plugins.TextTestError("A " + self.testType() + " with the name '" + \
+                      testName + "' already exists, please choose another name")
 
 
 class ImportTestCase(ImportTest):
@@ -381,7 +381,7 @@ class ImportTestCase(ImportTest):
         if len(envDir) == 0:
             return
         envFile = self.getWriteFile("environment", suite, testDir)
-        for var, value in envDir.items():
+        for var, value in list(envDir.items()):
             envFile.write(var + ":" + value + "\n")
         envFile.close()
 
@@ -480,11 +480,11 @@ class ImportApplication(guiplugins.ActionDialogGUI):
     def findSubDirectories(self):
         allDirs = []
         for rootDir in self.rootDirectories:
-            usableFiles = filter(lambda f: f not in plugins.controlDirNames, os.listdir(rootDir))
+            usableFiles = [f for f in os.listdir(rootDir) if f not in plugins.controlDirNames]
             allFiles = [ os.path.join(rootDir, f) for f in usableFiles ]
-            allDirs += filter(os.path.isdir, allFiles)
+            allDirs += list(filter(os.path.isdir, allFiles))
         allDirs.sort()
-        return map(os.path.basename, allDirs)
+        return list(map(os.path.basename, allDirs))
 
     def isActiveOnCurrent(self, *args):
         return True
@@ -499,21 +499,21 @@ class ImportApplication(guiplugins.ActionDialogGUI):
 
     def checkSanity(self, ext, executable, subdir, directory, javaClass):
         if not ext:
-            raise plugins.TextTestError, "Must provide a file extension for TextTest files"
+            raise plugins.TextTestError("Must provide a file extension for TextTest files")
 
         for char in " ./":
             if char in ext:
-                raise plugins.TextTestError, "File extensions may not contain the character " + repr(char) + ". It's recommended to stick to alphanumeric characters for this field."
+                raise plugins.TextTestError("File extensions may not contain the character " + repr(char) + ". It's recommended to stick to alphanumeric characters for this field.")
 
         if not javaClass and (not executable or not os.path.isfile(executable)):
-            raise plugins.TextTestError, "Must provide a valid path to a program to test"
+            raise plugins.TextTestError("Must provide a valid path to a program to test")
 
         for char in "/\\":
             if char in subdir:
-                raise plugins.TextTestError, "Subdirectory name must be a local name (not contain " + repr(char) + ").\nTextTest only looks for applications one level down in the hierarchy."
+                raise plugins.TextTestError("Subdirectory name must be a local name (not contain " + repr(char) + ").\nTextTest only looks for applications one level down in the hierarchy.")
 
         if os.path.exists(os.path.join(directory, "config." + ext)):
-            raise plugins.TextTestError, "Test-application already exists at the indicated location with the indicated extension: please choose another name"
+            raise plugins.TextTestError("Test-application already exists at the indicated location with the indicated extension: please choose another name")
 
     def getSignalsSent(self):
         return [ "NewApplication" ]
@@ -588,12 +588,12 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         while True:
             response = dialog.run()
             if response != gtk.RESPONSE_ACCEPT:
-                raise plugins.TextTestError, "Application creation cancelled."
+                raise plugins.TextTestError("Application creation cancelled.")
 
             try:
                 self.performOnCurrent()
                 break
-            except plugins.TextTestError, e:
+            except plugins.TextTestError as e:
                 self.showErrorDialog(str(e))
         dialog.hide()
         dialog.destroy()
@@ -613,7 +613,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
             if storytextPath:
                 return "python " + storytextPath + " -i " + toolkit
             else:
-                raise plugins.TextTestError, "Could not set up Python-GUI testing with StoryText, could not find StoryText installation on PATH"
+                raise plugins.TextTestError("Could not set up Python-GUI testing with StoryText, could not find StoryText installation on PATH")
 
     def setPythonGuiTestingEntries(self, toolkit, directory, ext, configEntries):
         configEntries["interpreter"] = self.getStoryTextPythonInterpreter(toolkit)
@@ -683,7 +683,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
     def setJavaGuiTestingEntries(self, toolkit, directory, ext, configEntries):
         storytextPath, jythonPath = self.findStoryTextInPath()
         if not storytextPath:
-            raise plugins.TextTestError, "Could not set up Java-GUI testing with StoryText, could not find StoryText/Jython installation on PATH"
+            raise plugins.TextTestError("Could not set up Java-GUI testing with StoryText, could not find StoryText/Jython installation on PATH")
         interpreters = [("jython", jythonPath), ("storytext", storytextPath)]
         configEntries["interpreters"] = interpreters
         # Jython messages, probably don't want to compare them
@@ -695,7 +695,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
             # We don't know how to load jar files directly, store the main class name and add the jar file to the environment.
             mainClass = self.getMainClass(executable)
             if not mainClass:
-                raise plugins.TextTestError, "Jar file provided has no main class specified, cannot use it as an executable"
+                raise plugins.TextTestError("Jar file provided has no main class specified, cannot use it as an executable")
             classpath.append(self.get_dos_corrected_path(executable))
             configEntries["executable"] = mainClass
         if "swing" in toolkit:
@@ -890,7 +890,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         defFiles.append("environment")
         defFiles.append("config")
         defFiles.append("options")
-        for interpreter in self.currTestSelection[0].getConfigValue("interpreters").keys():
+        for interpreter in list(self.currTestSelection[0].getConfigValue("interpreters").keys()):
             defFiles.append(interpreter + "_options")
         if self.currTestSelection[0].classId() == "test-case":
             recordMode = self.currTestSelection[0].getConfigValue("use_case_record_mode")
@@ -907,12 +907,12 @@ class ImportFiles(guiplugins.ActionDialogGUI):
 
     def getApprovedFiles(self):
         app = self.currTestSelection[0].app
-        collateKeys = app.getConfigValue("collate_file").keys()
+        collateKeys = list(app.getConfigValue("collate_file").keys())
         # Don't pick up "dummy" indicators on Windows...
         namingScheme = app.getConfigValue("filename_convention_scheme")
-        stdFiles = [ app.getStdoutName(namingScheme), app.getStderrName(namingScheme) ] + filter(lambda k: k, collateKeys)
+        stdFiles = [ app.getStdoutName(namingScheme), app.getStderrName(namingScheme) ] + [k for k in collateKeys if k]
         discarded = [ "stacktrace" ] + app.getConfigValue("discard_file")
-        return filter(lambda f: f not in discarded, stdFiles)
+        return [f for f in stdFiles if f not in discarded]
 
     def updateStems(self, fileType):
         stems = self.findAllStems(fileType)
@@ -957,7 +957,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         if action > 0: # Create new
             targetPath = self.getTargetPath(stem, version)
             if os.path.exists(targetPath):
-                raise plugins.TextTestError, "Not creating file or directory : path already exists:\n" + targetPath
+                raise plugins.TextTestError("Not creating file or directory : path already exists:\n" + targetPath)
 
             if action == 1:
                 plugins.ensureDirExistsForFile(targetPath)
@@ -973,7 +973,7 @@ class ImportFiles(guiplugins.ActionDialogGUI):
             appendAppName = os.path.basename(sourcePath).startswith(stem + "." + test.app.name)
             targetPath = self.getTargetPath(stem, version, appendAppName)
             if targetPath.startswith(sourcePath) and os.path.isdir(sourcePath):
-                raise plugins.TextTestError, "Need to select a valid file or directory to copy, not a parent directory:\n" + sourcePath
+                raise plugins.TextTestError("Need to select a valid file or directory to copy, not a parent directory:\n" + sourcePath)
             plugins.ensureDirExistsForFile(targetPath)
             fileExisted = os.path.exists(targetPath)
             plugins.copyPath(sourcePath, targetPath)
@@ -1190,7 +1190,7 @@ class RepositionTest(guiplugins.ActionGUI):
         if plugins.tryFileChange(test.parent.repositionTest, permMessage, test, newIndex):
             self.notify("RefreshTestSelection")
         else:
-            raise plugins.TextTestError, "\nThe test\n'" + test.name + "'\nis not present in the default version\nand hence cannot be reordered.\n"
+            raise plugins.TextTestError("\nThe test\n'" + test.name + "'\nis not present in the default version\nand hence cannot be reordered.\n")
 
 class RepositionTestDown(RepositionTest):
     def _getStockId(self):
@@ -1272,16 +1272,16 @@ class RenameAction(guiplugins.ActionDialogGUI):
 
     def basicNameCheck(self, newName):
         if len(newName) == 0:
-            raise plugins.TextTestError, "Please enter a new name."
+            raise plugins.TextTestError("Please enter a new name.")
         if " " in newName:
-            raise plugins.TextTestError, "The new name must not contain spaces, please choose another name."
+            raise plugins.TextTestError("The new name must not contain spaces, please choose another name.")
 
     def performOnCurrent(self):
         try:
             newName = self.optionGroup.getOptionValue("name")
             self.basicNameCheck(newName)
             self.performRename(newName)
-        except (IOError, OSError), e:
+        except (IOError, OSError) as e:
             self.showErrorDialog("Failed to " + self.getActionName().lower() + ":\n" + str(e))
 
     @staticmethod
@@ -1345,13 +1345,13 @@ class RenameTest(RenameAction):
         if newName != self.oldName:
             for test in self.currTestSelection[0].parent.testCaseList():
                 if test.name == newName:
-                    raise plugins.TextTestError, "The name '" + newName + "' is already taken, please choose another name."
+                    raise plugins.TextTestError("The name '" + newName + "' is already taken, please choose another name.")
             newDir = os.path.join(self.currTestSelection[0].parent.getDirectory(), newName)
             if os.path.isdir(newDir):
                 self.handleExistingDirectory(newDir)
 
     def handleExistingDirectory(self, newDir): # In CVS we might need to override this...
-        raise plugins.TextTestError, "The directory " + newDir + " already exists, please choose another name."
+        raise plugins.TextTestError("The directory " + newDir + " already exists, please choose another name.")
 
     def performRename(self, newName):
         self.checkNewName(newName)
@@ -1425,9 +1425,9 @@ class RenameFile(RenameAction):
 
     def checkNewName(self, newName, newPath):
         if newName == self.oldName:
-            raise plugins.TextTestError, "Please enter a new name."
+            raise plugins.TextTestError("Please enter a new name.")
         if os.path.exists(newPath):
-            raise plugins.TextTestError, "There is already a file or directory at '" + newName + "', please choose another name."
+            raise plugins.TextTestError("There is already a file or directory at '" + newName + "', please choose another name.")
 
     def getConfirmationMessage(self):
         oldStem = self.oldName.split(".")[0]
@@ -1586,7 +1586,7 @@ class ReportBugs(guiplugins.ActionDialogGUI):
     def findBugSystems(self, allApps):
         bugSystems = []
         for app in allApps:
-            for appSystem in app.getConfigValue("bug_system_location").keys():
+            for appSystem in list(app.getConfigValue("bug_system_location").keys()):
                 if appSystem not in bugSystems:
                     bugSystems.append(appSystem)
         return bugSystems
@@ -1632,18 +1632,18 @@ class ReportBugs(guiplugins.ActionDialogGUI):
     def checkSanity(self):
         searchStr = self.textGroup.getOptionValue("search_string")
         if len(searchStr) == 0:
-            raise plugins.TextTestError, "Must fill in the field 'text or regexp to match'"
+            raise plugins.TextTestError("Must fill in the field 'text or regexp to match'")
         elif searchStr.startswith(" "):
-            raise plugins.TextTestError, "'Knownbugs' file format cannot handle leading spaces in search string.\n" + \
-                                         "If the line starts with spaces, suggest to add a ^ at the start, to match the beginning of the line"
+            raise plugins.TextTestError("'Knownbugs' file format cannot handle leading spaces in search string.\n" + \
+                                         "If the line starts with spaces, suggest to add a ^ at the start, to match the beginning of the line")
         if not self.optionGroup.getValue("rerun_only"):
             if self.bugSystemGroup.getOptionValue("bug_system") == "<none>":
                 if len(self.textDescGroup.getOptionValue("full_description")) == 0 or \
                    len(self.textDescGroup.getOptionValue("brief_description")) == 0:
-                    raise plugins.TextTestError, "Must either provide a bug system or fill in both description and summary fields"
+                    raise plugins.TextTestError("Must either provide a bug system or fill in both description and summary fields")
             else:
                 if len(self.bugSystemGroup.getOptionValue("bug_id")) == 0:
-                    raise plugins.TextTestError, "Must provide a bug ID if bug system is given"
+                    raise plugins.TextTestError("Must provide a bug ID if bug system is given")
 
     def versionSuffix(self):
         version = self.applyGroup.getOptionValue("version")
@@ -1696,7 +1696,7 @@ class ReportBugs(guiplugins.ActionDialogGUI):
             writeFile.write("\n[Reported by " + os.getenv("USER", "Windows") + " at " + plugins.localtime() + "]\n")
             for group in [ self.textGroup, self.searchGroup, self.applyGroup,
                           self.bugSystemGroup, self.textDescGroup, self.optionGroup ]:
-                for name, option in group.options.items():
+                for name, option in list(group.options.items()):
                     value = option.getValue()
                     if name in namesToIgnore or self.hasDefaultValue(name, value):
                         continue

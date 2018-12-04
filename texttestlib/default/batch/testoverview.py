@@ -3,12 +3,12 @@
 
 import os, time, HTMLgen, HTMLcolors, cgi, sys, logging, jenkinschanges, locale
 from texttestlib import plugins
-from cPickle import Unpickler, UnpicklingError
+from pickle import Unpickler, UnpicklingError
 from ordereddict import OrderedDict
 from glob import glob
 from pprint import pformat
 from datetime import datetime, timedelta
-from batchutils import convertToUrl, getEnvironmentFromRunFiles
+from .batchutils import convertToUrl, getEnvironmentFromRunFiles
 HTMLgen.PRINTECHO = 0
 
 def parseState(state):
@@ -106,7 +106,7 @@ class GenerateWebPages(object):
                     os.remove(fn)
                 else:
                     successTags.setdefault(fn, []).append(tag)
-        for fn, tagsToRemove in successTags.items():
+        for fn, tagsToRemove in list(successTags.items()):
             linesToKeep = []
             with open(fn) as readFile:
                 for line in readFile:
@@ -123,11 +123,11 @@ class GenerateWebPages(object):
         allMonthSelectors = set()
         latestMonth = None
         pageToGraphs = {}
-        for version, repositoryDirInfo in repositoryDirs.items():
+        for version, repositoryDirInfo in list(repositoryDirs.items()):
             self.diag.info("Generating " + version)
             tagData, stateFiles, successFiles = self.findTestStateFilesAndTags(repositoryDirInfo)
             if len(stateFiles) > 0 or len(successFiles) > 0:
-                tags = tagData.keys()
+                tags = list(tagData.keys())
                 tags.sort(self.compareTags)
                 selectors = self.makeSelectors(subPageNames, tags)
                 monthSelectors = SelectorByMonth.makeInstances(tags)
@@ -148,7 +148,7 @@ class GenerateWebPages(object):
                         selectedTags.update(currTags)
                         if archiveUnused:
                             unusedTags.difference_update(currTags)
-                    tags = filter(lambda t: t in selectedTags, tags)
+                    tags = [t for t in tags if t in selectedTags]
                     if archiveUnused and unusedTags:
                         plugins.log.info("Automatic repository cleaning will now remove old data for the following runs:")
                         for tag in sorted(unusedTags, self.compareTags):
@@ -195,7 +195,7 @@ class GenerateWebPages(object):
                 hasData = False
                 for sel in selectors:
                     filePath = self.getPageFilePath(sel)
-                    if self.pagesOverview.has_key(filePath):
+                    if filePath in self.pagesOverview:
                         page, pageColours = self.pagesOverview[filePath]
                     else:
                         page = self.createPage()
@@ -237,7 +237,7 @@ class GenerateWebPages(object):
             target, linkName = sel.getLinkInfo(self.pageVersion)
             monthContainer.append(HTMLgen.Href(target, linkName))
         
-        for page, pageColours in self.pagesOverview.values():
+        for page, pageColours in list(self.pagesOverview.values()):
             if len(monthContainer.contents) > 0:
                 page.prepend(HTMLgen.Heading(2, monthContainer, align = 'center'))
             graphs = pageToGraphs.get(page)
@@ -326,7 +326,7 @@ class GenerateWebPages(object):
     
     def findExtraVersion(self, repository):
         versions = os.path.basename(repository).split(".")
-        for i in xrange(len(versions)):
+        for i in range(len(versions)):
             version = ".".join(versions[i:])
             if version in self.extraVersions:
                 return version
@@ -335,15 +335,15 @@ class GenerateWebPages(object):
     @staticmethod
     def findGlobal(modName, className):
         try:
-            exec "from " + modName + " import " + className + " as _class"
+            exec("from " + modName + " import " + className + " as _class")
         except ImportError:
-            exec "from texttestlib." + modName + " import " + className + " as _class"
+            exec("from texttestlib." + modName + " import " + className + " as _class")
         return _class #@UndefinedVariable
         
     @classmethod
     def getNewState(cls, file):
         # Would like to do load(file) here... but it doesn't work with universal line endings, see Python bug 1724366
-        from cStringIO import StringIO
+        from io import StringIO
         unpickler = Unpickler(StringIO(file.read()))
         # Magic to keep us backward compatible in the face of packages changing...
         unpickler.find_global = cls.findGlobal
@@ -358,7 +358,7 @@ class GenerateWebPages(object):
                 return state
             else:
                 return cls.readErrorState("Incorrect type for state object.")
-        except Exception, e:
+        except Exception as e:
             if os.path.getsize(stateFile) > 0:
                 return cls.readErrorState("Stack info follows:\n" + str(e))
             else:
@@ -422,7 +422,7 @@ class GenerateWebPages(object):
                 initialTable.append(row)
                 page.append(initialTable)
 
-            extraVersions = loggedTests.keys()[1:]
+            extraVersions = list(loggedTests.keys())[1:]
             if len(extraVersions) > 0:
                 page.append(testTable.generateExtraVersionLinks(extraVersions))
 
@@ -442,14 +442,14 @@ class GenerateWebPages(object):
     def writePages(self):
         plugins.log.info("Writing overview pages...")
         fileToUrl = self.getConfigValue("file_to_url", allSubKeys=True)
-        for pageFile, (page, _) in self.pagesOverview.items():
+        for pageFile, (page, _) in list(self.pagesOverview.items()):
             page.write(pageFile)
             plugins.log.info("wrote: '" + plugins.relpath(pageFile, self.pageDir) + "'")
             if fileToUrl:
                 url = convertToUrl(pageFile, fileToUrl)
                 plugins.log.info("(URL is " + url + ")")
         plugins.log.info("Writing detail pages...")
-        for tag, details in self.pagesDetails.items():
+        for tag, details in list(self.pagesDetails.items()):
             pageName = getDetailPageName(self.pageVersion, tag)
             details.write(os.path.join(self.pageDir, pageName))
             plugins.log.info("wrote: '" + pageName + "'")
@@ -488,8 +488,8 @@ class TestTable:
     def generateGraph(self, fileName, heading):
         if len(self.tags) > 1: # Don't bother with graphs when tests have only run once
             try:
-                from resultgraphs import GraphGenerator
-            except Exception, e:
+                from .resultgraphs import GraphGenerator
+            except Exception as e:
                 sys.stderr.write("Not producing result graphs: " + str(e) + "\n")
                 return False # if matplotlib isn't installed or is too old
         
@@ -509,7 +509,7 @@ class TestTable:
             if changeRow:
                 table.append(changeRow)
         hasRows = False
-        for extraVersion, testInfo in loggedTests.items():
+        for extraVersion, testInfo in list(loggedTests.items()):
             currRows = []
             for test in sorted(testInfo.keys()):
                 results = testInfo[test]
@@ -632,7 +632,7 @@ class TestTable:
     def escapeForHtml(self, text):
         localeEncoding = locale.getdefaultlocale()[1] or "utf-8"
         text = cgi.escape(text, True)
-        return unicode(text, localeEncoding).encode("ascii", "xmlcharrefreplace")
+        return str(text, localeEncoding).encode("ascii", "xmlcharrefreplace")
         
     def generateTestRows(self, testName, extraVersion, results):
         bgColour = self.colourFinder.find("row_header_bg")
@@ -839,10 +839,10 @@ class TestDetails:
         for testName, state, extraVersion in tests:
             freeText = state.freeText if hasattr(state, "freeText") else None
             if freeText:
-                if not data.has_key(freeText):
+                if freeText not in data:
                     data[freeText] = []
                 data[freeText].append((testName, state, extraVersion))
-        return data.items()
+        return list(data.items())
 
     def getFullDescription(self, tests, version, linkFromDetailsToOverview):
         freeTextData = self.getFreeTextData(tests)
@@ -914,7 +914,7 @@ class CategoryHandler:
         self.testsInCategory = OrderedDict()
 
     def update(self, categoryHandler):
-        for category, testInfo in categoryHandler.testsInCategory.items():
+        for category, testInfo in list(categoryHandler.testsInCategory.items()):
             testInfoList = self.testsInCategory.setdefault(category, [])
             testInfoList += testInfo
 
@@ -956,7 +956,7 @@ class CategoryHandler:
     def getSummaryData(self, extraVersion=None):
         numTests = 0
         summaryData = []
-        for cat, testInfo in self.testsInCategory.items():
+        for cat, testInfo in list(self.testsInCategory.items()):
             testCount = self.countTests(testInfo, extraVersion)
             if testCount > 0:
                 summaryData.append((cat, testCount))
@@ -965,7 +965,7 @@ class CategoryHandler:
         return numTests, summaryData
     
     def getTestsWithDescriptions(self):
-        return sorted([ (getCategoryDescription(cat)[1], testInfo) for cat, testInfo in self.testsInCategory.items() ])
+        return sorted([ (getCategoryDescription(cat)[1], testInfo) for cat, testInfo in list(self.testsInCategory.items()) ])
 
     def getSummarySortKey(self, data):
         # Put success at the start, it's neater like that
@@ -997,7 +997,7 @@ class Selector(BaseSelector):
         weekdays = getConfigValue("historical_report_subpage_weekdays", linkName)
         self.selectedTags = tags
         if len(weekdays) > 0:
-            self.selectedTags = filter(lambda tag: getWeekDay(tag) in weekdays, self.selectedTags)
+            self.selectedTags = [tag for tag in self.selectedTags if getWeekDay(tag) in weekdays]
         self.selectedTags = self.selectedTags[-cutoff:]
     
 

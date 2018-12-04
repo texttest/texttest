@@ -48,7 +48,7 @@ class CVSInterface(vcs_independent.VersionControlInterface):
 
     def getProgramArgs(self):
         if self.errorMessage:
-            raise plugins.TextTestError, self.errorMessage
+            raise plugins.TextTestError(self.errorMessage)
         else:
             return self.programArgs
     
@@ -218,7 +218,7 @@ class CVSLogLatest(vcs_independent.LogGUI):
         notebook = gtk.Notebook()
         notebook.set_scrollable(True)
         notebook.popup_enable()
-        for label, content in self.pages.items():
+        for label, content in list(self.pages.items()):
             buffer = gtk.TextBuffer()
             # Encode to UTF-8, necessary for gtk.TextView
             buffer.set_text(guiutils.convertToUtf8(content))

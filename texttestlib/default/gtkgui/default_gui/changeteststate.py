@@ -6,9 +6,9 @@ The actions in the dynamic GUI that affect the state of a test
 import gtk, os
 from texttestlib import plugins
 from .. import guiplugins
-from adminactions import ReportBugs
+from .adminactions import ReportBugs
 from texttestlib.default.knownbugs import CheckForBugs, BugMap
-from ConfigParser import ConfigParser
+from configparser import ConfigParser
 from copy import copy
 from glob import glob
 from threading import Thread
@@ -33,7 +33,7 @@ class BackgroundThreadHelper:
         self.notify("ActionStart", False)
         try:
             errorMsg = self.performBackgroundAction(*args)
-        except plugins.TextTestError, e:
+        except plugins.TextTestError as e:
             errorMsg = str(e)
         self.notify("ActionStop", False)
         self.notify("BackgroundActionCompleted", errorMsg, self)
@@ -64,7 +64,7 @@ class ApproveTests(BackgroundThreadHelper,guiplugins.ActionDialogGUI):
         if self.hasPerformance(allApps):
             self.addSwitch("ex", "Store", 1, ["Average performance", "Exact performance"])
         # Must do this in the constructor, so that "Approve" also takes account of them
-        for option in self.optionGroup.options.values():
+        for option in list(self.optionGroup.options.values()):
             self.addValuesFromConfig(option)
 
     def createDialog(self):
@@ -100,7 +100,7 @@ class ApproveTests(BackgroundThreadHelper,guiplugins.ActionDialogGUI):
             self.updateOptions()
 
     def getConfirmationMessage(self):
-        testsForWarn = filter(lambda test: test.stateInGui.warnOnSave(), self.currTestSelection)
+        testsForWarn = [test for test in self.currTestSelection if test.stateInGui.warnOnSave()]
         if len(testsForWarn) == 0:
             return ""
         message = "You have selected tests whose results are partial or which are registered as bugs:\n"
@@ -110,7 +110,7 @@ class ApproveTests(BackgroundThreadHelper,guiplugins.ActionDialogGUI):
         return message
 
     def getSaveableTests(self, selection):
-        return filter(lambda test: test.stateInGui.isSaveable(), selection)
+        return [test for test in selection if test.stateInGui.isSaveable()]
 
     def updateOptions(self):
         versionOption = self.optionGroup.getOption("v")
@@ -165,7 +165,7 @@ class ApproveTests(BackgroundThreadHelper,guiplugins.ActionDialogGUI):
     def performOnCurrent(self):
         backupVersions = self.getBackupVersions()
         if self.optionGroup.getOptionValue("v") in backupVersions:
-            raise plugins.TextTestError, "Cannot backup to the same version we're trying to approve! Choose another name."
+            raise plugins.TextTestError("Cannot backup to the same version we're trying to approve! Choose another name.")
         
     def performBackgroundAction(self, selection):
         backupVersions = self.getBackupVersions()
@@ -186,7 +186,7 @@ class ApproveTests(BackgroundThreadHelper,guiplugins.ActionDialogGUI):
                 test.changeState(newState)
 
             self.notify("Status", "Approved " + testDesc + ".")
-        except OSError, e:
+        except OSError as e:
             self.notify("Status", "Failed to approve " + testDesc + ".")
             errorStr = str(e)
             if "Permission" in errorStr:
@@ -345,7 +345,7 @@ class LoadFromRerun(guiplugins.ActionGUI):
         return "Load from Rerun"
     
     def getRerunMarkedTests(self): 
-        return filter(lambda test: test.stateInGui.isMarked() and test.stateInGui.briefText.startswith("Rerun"), self.currTestSelection)
+        return [test for test in self.currTestSelection if test.stateInGui.isMarked() and test.stateInGui.briefText.startswith("Rerun")]
 
     def performOnCurrent(self):
         for test in self.getRerunMarkedTests():
@@ -359,11 +359,11 @@ class LoadFromRerun(guiplugins.ActionGUI):
                     allAppDirs = glob(os.path.join(rerunDir, test.app.name + "*"))
                     if len(allAppDirs) > 0:
                         allAppVersions = [ d.replace(os.path.join(rerunDir, test.app.name + "."), "") for d in allAppDirs ]
-                        raise plugins.TextTestError, "Cannot load data for rerun, version '" + test.app.getFullVersion() + \
-                            "' could not be found, only version(s) '" + ", ".join(allAppVersions) + "'"
+                        raise plugins.TextTestError("Cannot load data for rerun, version '" + test.app.getFullVersion() + \
+                            "' could not be found, only version(s) '" + ", ".join(allAppVersions) + "'")
                 if self.loadFrom(test, appDir):
                     continue
-            raise plugins.TextTestError, "Cannot load data for rerun, test " + test.name + " has not yet completed or has been deleted in rerun " + rerunNumber
+            raise plugins.TextTestError("Cannot load data for rerun, test " + test.name + " has not yet completed or has been deleted in rerun " + rerunNumber)
             
     def loadFrom(self, test, appDir):
         from texttestlib.default.reconnect import ReconnectTest
@@ -429,7 +429,7 @@ class KillTests(guiplugins.ActionGUI):
     def getSignalsSent(self):
         return [ "Kill" ]
     def performOnCurrent(self):
-        tests = filter(lambda test: not test.stateInGui.isComplete(), self.currTestSelection)
+        tests = [test for test in self.currTestSelection if not test.stateInGui.isComplete()]
         tests.reverse() # best to cut across the action thread rather than follow it and disturb it excessively
         testDesc = str(len(tests)) + " tests"
         self.notify("Status", "Killing " + testDesc + " ...")
@@ -454,7 +454,7 @@ def applyBugsToTests(tests, bugMap):
         
 class ReportBugsAndRecompute(ReportBugs):
     def getFiles(self, *args):
-        from cStringIO import StringIO
+        from io import StringIO
         return [ StringIO() ]
     
     def updateOptions(self):
@@ -485,7 +485,7 @@ class ReportBugsAndRecompute(ReportBugs):
                 realFile.write(bugFile.getvalue())
                 realFile.close()
         else:
-            raise plugins.TextTestError, "Information entered did not trigger on the selected test, please try again"
+            raise plugins.TextTestError("Information entered did not trigger on the selected test, please try again")
         
     
 class FindKnownBugs(guiplugins.ActionDialogGUI):

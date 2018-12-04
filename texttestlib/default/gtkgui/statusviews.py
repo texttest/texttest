@@ -79,7 +79,7 @@ class StatusMonitorGUI(guiutils.SubGUI):
             animationIcon = os.path.join(imageDir, "throbber_active.gif")
             self.animation = gtk.gdk.PixbufAnimation(animationIcon)
             hbox.pack_end(self.throbber, expand=False, fill=False)
-        except Exception, e:
+        except Exception as e:
             plugins.printWarning("Failed to create icons for the status throbber:\n" + str(e) + \
                                  "\nAs a result, the throbber will be disabled.", stdout=True)
             self.throbber = None
@@ -155,7 +155,7 @@ class ClassificationTree(OrderedDict):
             else:
                 elementName = element
                 elementTuple = element, None
-            if not self.has_key(elementName):
+            if elementName not in self:
                 self[elementName] = []
             if prevElementName and elementTuple not in self[prevElementName]:
                 self[prevElementName].append(elementTuple)
@@ -458,8 +458,8 @@ class TestProgressMonitor(guiutils.SubGUI):
             self.treeModel.set_value(iter, 5, allTests)
 
     def removeFromDiffStore(self, test):
-        for _, fileInfo, ungrouped in self.diffStore.values():
-            for testList, _ in fileInfo.values():
+        for _, fileInfo, ungrouped in list(self.diffStore.values()):
+            for testList, _ in list(fileInfo.values()):
                 if test in testList:
                     testList.remove(test)
             if test in ungrouped:
@@ -468,7 +468,7 @@ class TestProgressMonitor(guiutils.SubGUI):
     def insertTest(self, test, state, changeDesc, incrementCount):
         self.classifications[test] = []
         classifiers = self.getClassifiers(test, state, changeDesc)
-        nodeClassifier = classifiers.keys()[0]
+        nodeClassifier = list(classifiers.keys())[0]
         defaultColour, defaultVisibility = self.getCategorySettings(state.category, nodeClassifier, classifiers)
         return self.addTestForNode(test, defaultColour, defaultVisibility, nodeClassifier, classifiers, incrementCount)
 
@@ -604,7 +604,7 @@ class TestProgressMonitor(guiutils.SubGUI):
         iters = self.findTestIterators(test)
         # ignore the parent nodes where visibility is concerned
         visibilityIters = self.removeParentIters(iters)
-        self.diag.info("Visibility for " + repr(test) + " : iters " + repr(map(self.treeModel.get_path, visibilityIters)))
+        self.diag.info("Visibility for " + repr(test) + " : iters " + repr(list(map(self.treeModel.get_path, visibilityIters))))
         for nodeIter in visibilityIters:
             visible = self.treeModel.get_value(nodeIter, 2)
             if visible:

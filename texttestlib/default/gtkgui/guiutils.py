@@ -6,6 +6,7 @@ called from anywhere in the gtkgui package
 import os, sys, operator, subprocess, locale
 from texttestlib import plugins
 from copy import copy
+from functools import reduce
 
 # gtk.accelerator_valid appears utterly broken on Windows
 def windowsAcceleratorValid(key, mod):
@@ -64,11 +65,11 @@ class Utf8Converter:
         encodingsToTry = self.encodings + self.getExtraEncodings(extraEncodingLookup)
         for encoding in encodingsToTry:
             try:
-                return unicode(text, encoding, errors="strict")
+                return str(text, encoding, errors="strict")
             except Exception:
                 pass
 
-        return unicode(text, encodingsToTry[0], errors="replace")
+        return str(text, encodingsToTry[0], errors="replace")
 
 utf8Converter = Utf8Converter()
 
@@ -131,8 +132,8 @@ class GUIConfig:
         self.setConfigDefaults(defaultColours, defaultAccelerators)
         if includePersonal:
             self.configDir.readValues(self.getAllPersonalConfigFiles(), insert=0, errorOnUnknown=0)
-        self.shownCategories = map(self.getConfigName, self.configDir.get("show_test_category"))
-        self.hiddenCategories = map(self.getConfigName, self.configDir.get("hide_test_category"))
+        self.shownCategories = list(map(self.getConfigName, self.configDir.get("show_test_category")))
+        self.hiddenCategories = list(map(self.getConfigName, self.configDir.get("hide_test_category")))
         self.colourDict = self.makeColourDictionary()
         
     def getAllPersonalConfigFiles(self):
@@ -155,7 +156,7 @@ class GUIConfig:
 
     def makeColourDictionary(self):
         dict = {}
-        for key, value in self.configDir.get("test_colours").items():
+        for key, value in list(self.configDir.get("test_colours").items()):
             dict[self.getConfigName(key)] = value
         return dict
 
@@ -190,7 +191,7 @@ class GUIConfig:
         aggregator = plugins.ResponseAggregator(callables)
         try:
             return aggregator(**kwargs)
-        except plugins.AggregationError, e:
+        except plugins.AggregationError as e:
             app = self.apps[e.index]
             plugins.printWarning("GUI configuration '" + "::".join(args) +\
                                  "' differs between applications, ignoring that from " + repr(app) + "\n" + \
@@ -258,7 +259,7 @@ class GUIConfig:
     def getTestColour(self, category, fallback=None):
         if self.dynamic:
             nameToUse = self.getConfigName(category)
-            if self.colourDict.has_key(nameToUse):
+            if nameToUse in self.colourDict:
                 return self.colourDict[nameToUse]
             elif fallback:
                 return fallback

@@ -4,13 +4,13 @@ Module containing code that's only run in the slave jobs when running with a gri
 """
 
 import os, sys, time, socket, signal, logging
-from utils import *
+from .utils import *
 from texttestlib import plugins
 from texttestlib.default.runtest import RunTest
 from texttestlib.default.sandbox import FindExecutionHosts, MachineInfoFinder
 from texttestlib.default.actionrunner import ActionRunner
 from texttestlib.utils import getUserName
-from cPickle import dumps
+from pickle import dumps
 
 def importAndCallFromQueueSystem(app, *args):
     moduleName = "queuesystem." + queueSystemName(app).lower()
@@ -70,7 +70,7 @@ class SocketResponder(plugins.Responder,plugins.Observable):
     def getServerAddress(self, optionMap):
         servAddrStr = optionMap.get("servaddr", os.getenv("CAPTUREMOCK_SERVER"))
         if not servAddrStr:
-            raise plugins.TextTestError, "Cannot run slave, no server address has been provided to send results to!"
+            raise plugins.TextTestError("Cannot run slave, no server address has been provided to send results to!")
         host, port = servAddrStr.split(":")
         return host, int(port)
     
@@ -121,7 +121,7 @@ class SocketResponder(plugins.Responder,plugins.Observable):
             try:
                 response = self.sendData(sendSocket, fullData)
                 return responseMethod(response, *args) if responseMethod else True
-            except socket.error, e:
+            except socket.error as e:
                 plugins.log.info("Failed to communicate with master process - waiting " +
                                  str(sleepTime) + " seconds and then trying again.")
                 plugins.log.info("Error received was " + str(e))

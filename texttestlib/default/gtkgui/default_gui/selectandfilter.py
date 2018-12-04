@@ -6,6 +6,7 @@ Actions for managing selections and filterings of the test tree
 import gtk, os, operator, logging
 from texttestlib import plugins
 from .. import guiplugins
+from functools import reduce
 
 class AllTestsHandler:
     def __init__(self):
@@ -25,7 +26,7 @@ class AllTestsHandler:
         return reduce(operator.add, (self.getTests(suite) for suite in self.rootTestSuites), [])
 
     def findTestsNotIn(self, tests):
-        return filter(lambda test: test not in tests, self.findAllTests())
+        return [test for test in self.findAllTests() if test not in tests]
 
 
 class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
@@ -157,7 +158,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
     # No messageAfterPerform necessary - we update the status bar when the selection changes inside TextTestGUI
     def getFilterList(self, app):
         optionMap = self.optionGroup.getOptionValueMap()
-        useTmpFiles = self.optionGroup.getOption("std") and not optionMap.has_key("std")
+        useTmpFiles = self.optionGroup.getOption("std") and "std" not in optionMap
         return app.getFilterList(self.rootTestSuites, optionMap, useTmpFiles=useTmpFiles)
     
     def makeNewSelection(self):
@@ -219,12 +220,12 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
             for extra in app.extras:
                 if len(set(extra.versions).intersection(newExtras)) == 0:
                     removeApps.append(extra)
-        return filter(lambda s: s.app not in removeApps, rootSuites)
+        return [s for s in rootSuites if s.app not in removeApps]
 
     def getSuitesToTry(self):
         # If only some of the suites present match the version selection, only consider them.
         # If none of them do, try to filter them all
-        toTry = filter(self.matchesVersions, self.rootTestSuites)
+        toTry = list(filter(self.matchesVersions, self.rootTestSuites))
         if len(toTry) == 0:
             return self.adjustForExtraVersions(self.rootTestSuites)
         else:
@@ -233,7 +234,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
     def getRequestedTests(self, suite, filters, strategy, includeEmptySuites):
         self.notify("ActionProgress") # Just to update gui ...
         if strategy == 1: # refine, don't check the whole suite
-            tests = filter(lambda test: test.app is suite.app and test.isAcceptedByAll(filters), self.currTestSelection)
+            tests = [test for test in self.currTestSelection if test.app is suite.app and test.isAcceptedByAll(filters)]
         else:
             tests = self.getRequestedTestsFromSuite(suite, filters, includeEmptySuites)
 
@@ -264,9 +265,9 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         if strategy < 2:
             return reqTests
         else:
-            extraRequested = filter(lambda test: test not in self.currTestSelection, reqTests)
+            extraRequested = [test for test in reqTests if test not in self.currTestSelection]
             if strategy == 2:
-                selectedThisApp = filter(lambda test: test.app is app, self.currTestSelection)
+                selectedThisApp = [test for test in self.currTestSelection if test.app is app]
                 return extraRequested + selectedThisApp
             elif strategy == 3:
                 return extraRequested
@@ -294,7 +295,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         return combined
 
     def getGivenVersion(self, version, baseVersions):
-        parts = filter(lambda v: v not in baseVersions, version.split("."))
+        parts = [v for v in version.split(".") if v not in baseVersions]
         return ".".join(parts)
 
     def filterTests(self, *args):
@@ -464,15 +465,15 @@ class SaveSelection(guiplugins.ActionDialogGUI):
             else:
                 self.writeTestList(file)
             file.close()
-        except IOError, e:
-            raise plugins.TextTestError, "\nFailed to save selection:\n" + str(e) + "\n"
+        except IOError as e:
+            raise plugins.TextTestError("\nFailed to save selection:\n" + str(e) + "\n")
        
     def getFileName(self):
         fileName = self.optionGroup.getOptionValue("f")
         if not fileName:
-            raise plugins.TextTestError, "Cannot save selection - no file name specified"
+            raise plugins.TextTestError("Cannot save selection - no file name specified")
         elif os.path.isdir(fileName):
-            raise plugins.TextTestError, "Cannot save selection - existing directory specified"
+            raise plugins.TextTestError("Cannot save selection - existing directory specified")
         else:
             return fileName
         

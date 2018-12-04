@@ -168,7 +168,7 @@ class TestColumnGUI(guiutils.SubGUI):
                             
     def notifyNewTestSelection(self, tests, dummyApps, distinctTestCount, *args, **kw):
         if self.dynamic:
-            tests = filter(lambda t: t.classId() == "test-case", tests)
+            tests = [t for t in tests if t.classId() == "test-case"]
         self.updateTestInfo(tests, distinctTestCount)
         
     def updateTestInfo(self, tests, distinctTestCount):
@@ -225,7 +225,7 @@ class TestIteratorMap:
 
     def remove(self, test):
         key = self.getKey(test)
-        if self.dict.has_key(key):
+        if key in self.dict:
             del self.dict[key]
 
 
@@ -374,7 +374,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         self.setNewRecalculationStatus(iter, test, [])
         
     def getSortedSelectedTests(self, suite):
-        appTests = filter(lambda test: test.app is suite.app, self.selectedTests)
+        appTests = [test for test in self.selectedTests if test.app is suite.app]
         allTests = suite.allTestsAndSuites()
         appTests.sort(key=allTests.index)
         return appTests

@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 
-import plugins, os, sys, testmodel, signal, operator, logging
+from . import plugins, testmodel
+import os, sys, signal, operator, logging
 from threading import Thread
-from ordereddict import OrderedDict
+from collections import OrderedDict
 from time import sleep
 from glob import glob
 from copy import copy
 import time
+from functools import reduce
 
 # Class to allocate unique names to tests for script identification and cross process communication
 class UniqueNameFinder(plugins.Responder):
@@ -16,7 +18,7 @@ class UniqueNameFinder(plugins.Responder):
         self.diag = logging.getLogger("Unique Names")
 
     def notifyAdd(self, test, *args, **kw):
-        if self.name2test.has_key(test.name):
+        if test.name in self.name2test:
             oldTest = self.name2test[test.name]
             self.storeUnique(oldTest, test)
         else:
@@ -26,7 +28,7 @@ class UniqueNameFinder(plugins.Responder):
         self.removeName(test.name)
 
     def removeName(self, name):
-        if self.name2test.has_key(name):
+        if name in self.name2test:
             self.diag.info("Removing test name " + name)
             del self.name2test[name]
 
@@ -75,7 +77,7 @@ class Activator(plugins.Responder, plugins.Observable):
     def __init__(self, optionMap, allApps):
         plugins.Responder.__init__(self, optionMap, allApps)
         plugins.Observable.__init__(self)
-        self.allowEmpty = optionMap.has_key("gx") or optionMap.runScript()
+        self.allowEmpty = "gx" in optionMap or optionMap.runScript()
         self.suites = []
         self.diag = logging.getLogger("Activator")
         self.suiteCopyCache = {}
@@ -84,7 +86,7 @@ class Activator(plugins.Responder, plugins.Observable):
         self.suites = suites
 
     def findGuideSuiteForCopy(self, versions):
-        versionsForGuide = tuple(filter(lambda v: "copy_" not in v, versions))
+        versionsForGuide = tuple([v for v in versions if "copy_" not in v])
         if versionsForGuide in self.suiteCopyCache:
             return self.suiteCopyCache.get(versionsForGuide)
 
@@ -118,7 +120,7 @@ class Activator(plugins.Responder, plugins.Observable):
                     suite.notify("Add", initial=True)
                 else:
                     rejectionInfo[suite.app] = "no tests matching the selection criteria found."
-            except plugins.TextTestError, e:
+            except plugins.TextTestError as e:
                 rejectionInfo[suite.app] = str(e)
 
         self.notify("AllRead", goodSuites)
@@ -136,7 +138,7 @@ class Activator(plugins.Responder, plugins.Observable):
             app = suite.app
             appsByName.setdefault(app.name, []).append(app)
 
-        for _, appGroup in appsByName.items():
+        for _, appGroup in list(appsByName.items()):
             if set(appGroup).issubset(rejectedApps):
                 for app in appGroup:
                     if app in rejectionInfo:
@@ -161,7 +163,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         sys.stderr.write("Received SIGQUIT: showing current stack trace below:\n")
         code = []
         from traceback import extract_stack
-        for threadId, stack in sys._current_frames().items():
+        for threadId, stack in list(sys._current_frames().items()):
             code.append("# ThreadID: %s" % threadId)
             for filename, lineno, name, line in extract_stack(stack):
                 code.append('  File "%s", line %d, in %s' % (filename, lineno, name))
@@ -181,7 +183,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         return roots + subDirs
 
     def findApps(self):
-        roots = filter(os.path.isdir, self.inputOptions.rootDirectories)
+        roots = list(filter(os.path.isdir, self.inputOptions.rootDirectories))
         if len(roots) == 0:
             for root in self.inputOptions.rootDirectories:
                 sys.stderr.write("Test suite root directory does not exist: " + root + "\n")
@@ -191,7 +193,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         self.inputOptions.rootDirectories = roots
         self.diag.info("Using test suite at " + repr(roots))
         searchDirs = self.findSearchDirs(roots)
-        if self.inputOptions.has_key("new"):
+        if "new" in self.inputOptions:
             return False, []
 
         appList = []
@@ -204,7 +206,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             raisedError |= subRaisedError
 
         if not raisedError:
-            for missingAppName in self.findMissingApps(appList, selectedAppDict.keys()):
+            for missingAppName in self.findMissingApps(appList, list(selectedAppDict.keys())):
                 sys.stderr.write("Could not read application '" + missingAppName + "'. No file named config." + missingAppName + " was found under " + " or ".join(self.inputOptions.rootDirectories) + ".\n")
                 raisedError = True
 
@@ -213,7 +215,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         return raisedError, appList
 
     def findMissingApps(self, appList, selectedApps):
-        return filter(lambda appName: self.appMissing(appName, appList), selectedApps)
+        return [appName for appName in selectedApps if self.appMissing(appName, appList)]
 
     def appMissing(self, appName, apps):
         return reduce(operator.and_, (app.name != appName for app in apps), True)
@@ -235,30 +237,30 @@ class TextTest(plugins.Responder, plugins.Observable):
             appName = components[1]
 
             # Ignore emacs backup files and stuff we haven't selected
-            if appName.endswith("~") or (len(selectedAppDict) and not selectedAppDict.has_key(appName)) or appName in ignoreNames:
+            if appName.endswith("~") or (len(selectedAppDict) and appName not in selectedAppDict) or appName in ignoreNames:
                 continue
 
             self.diag.info("Building apps from " + f)
             versionList = self.inputOptions.findVersionList()
-            if selectedAppDict.has_key(appName):
+            if appName in selectedAppDict:
                 versionList = selectedAppDict[appName]
             extraVersionsDuplicating = []
             for versionStr in versionList:
-                appVersions = filter(len, versionStr.split(".")) # remove empty versions
+                appVersions = list(filter(len, versionStr.split("."))) # remove empty versions
                 app, currExtra = self.addApplication(appName, dircache, appVersions, versionList)
                 if app:
                     appList.append(app)
                     extraVersionsDuplicating += currExtra
                 else:
                     raisedError = True
-            for toRemove in filter(lambda app: app.getFullVersion() in extraVersionsDuplicating, appList):
+            for toRemove in [app for app in appList if app.getFullVersion() in extraVersionsDuplicating]:
                 appList.remove(toRemove)
         return raisedError, appList
 
     def createApplication(self, appName, dircache, versions):
         try:
             return testmodel.Application(appName, dircache, versions, self.inputOptions)
-        except (testmodel.BadConfigError, plugins.TextTestError), e:
+        except (testmodel.BadConfigError, plugins.TextTestError) as e:
             sys.stderr.write("Unable to load application from file 'config." + appName +  "' - " + str(e) + ".\n")
 
     def addApplication(self, appName, dircache, appVersions, allVersions=[]):
@@ -299,7 +301,7 @@ class TextTest(plugins.Responder, plugins.Observable):
                     responderClasses.insert(-2, respClass) # keep Activator and AllCompleteResponder at the end
         self.removeBaseClasses(responderClasses)
         self.diag.info("Filtering away base classes, using " + repr(responderClasses))
-        self.observers = map(lambda x : x(self.inputOptions, allApps), responderClasses)
+        self.observers = [x(self.inputOptions, allApps) for x in responderClasses]
 
     def getBuiltinResponderClasses(self):
         return [ UniqueNameFinder, Activator, testmodel.AllCompleteResponder ]
@@ -318,7 +320,7 @@ class TextTest(plugins.Responder, plugins.Observable):
                     if class2 not in newPositions:
                         newPositions[class2] = i
 
-        for cls, i in newPositions.items():
+        for cls, i in list(newPositions.items()):
             classes.remove(cls)
             classes.insert(i, cls)
         for cls in toRemove:
@@ -334,9 +336,9 @@ class TextTest(plugins.Responder, plugins.Observable):
                 try:
                     testSuite = self.createInitialTestSuite(partApp)
                     appSuites[partApp] = testSuite
-                except plugins.TextTestWarning, e:
+                except plugins.TextTestWarning as e:
                     warningMessages.append(partApp.rejectionMessage(str(e)))
-                except plugins.TextTestError, e:
+                except plugins.TextTestError as e:
                     sys.stderr.write(partApp.rejectionMessage(str(e)))
                     raisedError = True
                 except Exception:
@@ -355,7 +357,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         # Can get called several times, protect against this...
         if len(self.appSuites) > 0:
             self.notify("Status", "Removing all temporary files ...")
-            for app, testSuite in self.appSuites.items():
+            for app, testSuite in list(self.appSuites.items()):
                 self.notify("ActionProgress")
                 app.cleanWriteDirectory(testSuite)
             self.appSuites = []
@@ -369,7 +371,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         try:
             self._run()
             sys.exit(self.exitCode)
-        except plugins.TextTestError, e:
+        except plugins.TextTestError as e:
             sys.stderr.write(str(e) + "\n")
             sys.exit(1)
         except KeyboardInterrupt:
@@ -381,10 +383,10 @@ class TextTest(plugins.Responder, plugins.Observable):
             if len(allApps) > 0:
                 allApps[0].printHelpText()
             else:
-                print "TextTest didn't find any valid test applications - you probably need to tell it where to find them."
-                print "The most common way to do this is to set the environment variable TEXTTEST_HOME."
-                print "If this makes no sense, read the online documentation..."
-                print testmodel.helpIntro
+                print("TextTest didn't find any valid test applications - you probably need to tell it where to find them.")
+                print("The most common way to do this is to set the environment variable TEXTTEST_HOME.")
+                print("If this makes no sense, read the online documentation...")
+                print(testmodel.helpIntro)
             return
 
         if len(allApps) == 0 and appFindingWroteError:
@@ -399,7 +401,7 @@ class TextTest(plugins.Responder, plugins.Observable):
 
     def inputOptionsValid(self, allApps):
         validOptions = self.findAllValidOptions(allApps)
-        for option in self.inputOptions.keys():
+        for option in list(self.inputOptions.keys()):
             if option not in validOptions:
                 sys.stderr.write("texttest: unrecognised option '-" + option + "'\n")
                 self.exitCode = 1
@@ -416,7 +418,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         self.createResponders(allApps)
         raisedError, self.appSuites = self.createTestSuites(allApps)
         if not raisedError or len(self.appSuites) > 0:
-            self.addSuites(self.appSuites.values(), allApps)
+            self.addSuites(list(self.appSuites.values()), allApps)
 
             # Set the signal handlers to use when running, if we actually plan to do any
             self.setSignalHandlers(self.handleSignal)
@@ -443,7 +445,7 @@ class TextTest(plugins.Responder, plugins.Observable):
 
         responderClassDict = {}
         for app in allApps:
-            responderClassDict[app.name] = app.getResponderClasses(self.appSuites.keys())
+            responderClassDict[app.name] = app.getResponderClasses(list(self.appSuites.keys()))
 
         suites = []
         for testSuite in emptySuites:
@@ -454,7 +456,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         return suites
 
     def getRootSuite(self, appName, versions):
-        for app, testSuite in self.appSuites.items():
+        for app, testSuite in list(self.appSuites.items()):
             if app.name == appName and app.versions == versions:
                 return testSuite
 
@@ -500,7 +502,7 @@ class TextTest(plugins.Responder, plugins.Observable):
         suite.notify("Add", initial=False)
 
     def findThreadRunners(self):
-        allRunners = filter(lambda x: hasattr(x, "run"), self.observers)
+        allRunners = [x for x in self.observers if hasattr(x, "run")]
         mainThreadRunner = filter(lambda x: x.canBeMainThread(), allRunners)[0]
         allRunners.remove(mainThreadRunner)
         return mainThreadRunner, allRunners
@@ -542,7 +544,7 @@ class TextTest(plugins.Responder, plugins.Observable):
             threadCount = len(currThreads)
 
     def aliveThreads(self, threads):
-        return filter(lambda thread: thread.isAlive(), threads)
+        return [thread for thread in threads if thread.isAlive()]
 
     def getSignals(self):
         if hasattr(signal, "SIGUSR1"):
@@ -579,13 +581,13 @@ class TextTest(plugins.Responder, plugins.Observable):
     def handleSignalWhileStarting(self, sig):
         signalText = self.handleSignal(sig)
         if os.name != "nt":
-            raise KeyboardInterrupt, signalText
+            raise KeyboardInterrupt(signalText)
 
     def writeTermMessage(self, signalText):
         message = "Terminating testing due to external interruption"
         if signalText:
             message += " (" + signalText + ")"
-        print message
+        print(message)
         sys.stdout.flush() # Try not to lose log file information...
 
     def getSignalText(self, sig):

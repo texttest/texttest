@@ -7,18 +7,19 @@ class MatplotlibError(Exception):
 try:
     import matplotlib
 except ImportError:
-    raise MatplotlibError, "Could not find the Matplotlib module, which must be present for graphs to be produced."
+    raise MatplotlibError("Could not find the Matplotlib module, which must be present for graphs to be produced.")
 
 version = matplotlib.__version__
 versionParts = tuple(map(int, version.split(".")[:2]))
 if versionParts < (0, 98):
-    raise MatplotlibError, "Graph generation requires at least matplotlib version 0.98" + \
-          ", while version " + version + " is installed."
+    raise MatplotlibError("Graph generation requires at least matplotlib version 0.98" + \
+          ", while version " + version + " is installed.")
 
 matplotlib.use("Agg") # set backend to one that doesn't need a DISPLAY
 import pylab, logging, operator
 from texttestlib import plugins
 from ordereddict import OrderedDict
+from functools import reduce
     
 
 class Graph:
@@ -77,7 +78,7 @@ class Graph:
         return lists
         
     def setXticks(self, labelList):
-        pylab.xticks(range(len(labelList)), labelList)
+        pylab.xticks(list(range(len(labelList))), labelList)
         pylab.setp(self.sub1.get_xticklabels(), 'rotation', 90, fontsize=7)
 
     def finalise_graph(self):
@@ -150,18 +151,18 @@ class GraphGenerator:
     def addAllPlots(self, graph, results, *args):
         prevYlist = [ 0 ] * len(results)
         plotData = OrderedDict()
-        for category in self.labels.keys():
+        for category in list(self.labels.keys()):
             currYlist = [ summary.get(category, 0) for _, summary in results ]
             if self.hasNonZero(currYlist):
                 ylist = [ (currYlist[x] + prevYlist[x]) for x in range(len(prevYlist)) ]
                 plotData[category] = prevYlist, ylist
                 prevYlist = ylist
 
-        for category in reversed(plotData.keys()):
+        for category in reversed(list(plotData.keys())):
             prevYlist, ylist = plotData[category]
             if not self.hasNonZero(prevYlist):
                 # Adjust the bottom of the graph to avoid a huge block of green for large suites
-                prevYlist = [ self.getGraphMinimum(ylist, plotData.values()[-1][-1]) ] * len(ylist)
+                prevYlist = [ self.getGraphMinimum(ylist, list(plotData.values())[-1][-1]) ] * len(ylist)
             self.addPlot(prevYlist, ylist, graph, category=category, *args)
         
     def hasNonZero(self, numbers):
@@ -171,7 +172,7 @@ class GraphGenerator:
         colour = colourFinder.find(category + "_bg")
         label = self.labels[category]
         self.diag.info("Creating plot '" + label + "', coloured " + colour)
-        xlist = range(len(ylist))
+        xlist = list(range(len(ylist)))
         self.diag.info("Data to plot = " + repr(ylist))
         graph.addFilledRegion(xlist, prevYlist, ylist, label=label, linewidth=2, linestyle="-", color=colour)
         

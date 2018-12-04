@@ -5,13 +5,13 @@
 # never officially part of bugzilla, and assumes the "cli.cgi" script is deployed on the bugzilla
 # server. Tested on bugzilla 2.16. 
 
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 
 def findBugInfo(bugId, location, *args):
     bugzillaRequest = location + "/cli.cgi?bug=" + bugId
     try:
-        reply = urllib2.urlopen(bugzillaRequest).read().split(':jaeger:')
-    except Exception, e:
+        reply = urllib.request.urlopen(bugzillaRequest).read().split(':jaeger:')
+    except Exception as e:
         message = "Failed to open URL '" + bugzillaRequest + "': " + str(e) + \
                   ".\n\nPlease make sure that the configuration entry 'bug_system_location' " + \
                   "points to the correct script to run to extract bugzilla information. The current value is '" + location + "'."

@@ -178,6 +178,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
             dialog = Gtk.Dialog(self.getDialogTitle())
 
         dialog.set_default_response(Gtk.ResponseType.ACCEPT)
+        # may need review MB 2018-12-04
         # there may be a flag achieving the behavior, as mentioned here http://docs.adacore.com/live/wave/gtkada/html/gtkada_ug/transition.html
         # dialog.set_has_separator(False)
         return dialog
@@ -228,7 +229,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         textView.set_right_margin(5)
         hbox = Gtk.HBox()
         imageBox = Gtk.VBox()
-        imageBox.pack_start(Gtk.Image.new_from_stock(stockIcon, Gtk.IconSize.DIALOG), expand=False)
+        imageBox.pack_start(Gtk.Image.new_from_stock(stockIcon, Gtk.IconSize.DIALOG), False, True, 0)
         hbox.pack_start(imageBox, False, True, 0)
         scrolledWindow = Gtk.ScrolledWindow()
         # What we would like is that the dialog expands without scrollbars
@@ -238,7 +239,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         scrolledWindow.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.NEVER)
         scrolledWindow.add(textView)
         scrolledWindow.set_shadow_type(Gtk.ShadowType.IN)
-        hbox.pack_start(scrolledWindow, expand=True, fill=True)
+        hbox.pack_start(scrolledWindow, True, True)
         alignment = Gtk.Alignment.new(0.5, 0.5, 1.0, 1.0)
         alignment.set_padding(5, 5, 0, 5)
         alignment.add(hbox)
@@ -262,7 +263,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         dialog.set_has_separator(False)
         
         contents = self.createDialogMessage(message, stockIcon)
-        dialog.vbox.pack_start(contents, expand=True, fill=True)
+        dialog.vbox.pack_start(contents, True, True, 0)
         return dialog
     
     def showQueryDialog(self, parent, message, stockIcon, alarmLevel, respondMethod, respondData=None):
@@ -621,9 +622,9 @@ class OptionGroupGUI(ActionGUI):
         hbox = Gtk.HBox()
         if len(switch.name) > 0:
             label = self.createLabelEventBox(switch, ":")
-            hbox.pack_start(label, expand=False, fill=False)
+            hbox.pack_start(label, False, False, 0)
         for button in self.createRadioButtons(switch, optionGroup):
-            hbox.pack_start(button, expand=True, fill=False)
+            hbox.pack_start(button, True, False, 0)
         hbox.show_all()
         return hbox
 
@@ -756,6 +757,7 @@ class OptionGroupGUI(ActionGUI):
         return checkButton
 
     def createComboBoxEntry(self, option):
+        # may need review MB 2018-12-04
         combobox = Gtk.ComboBoxText.new_with_entry()
         entry = combobox.get_child()
         combobox.set_row_separator_func(self.isRowSeparator)
@@ -800,7 +802,7 @@ class OptionGroupGUI(ActionGUI):
 
     def createFileChooserDialog(self, box, entry, option):
         button = Gtk.Button("...")
-        box.pack_start(button, expand=False, fill=False)
+        box.pack_start(button, False, False, 0)
         button.connect("clicked", self.showFileChooser, entry, option)
         
     def showFileChooser(self, dummyWidget, entry, option):
@@ -918,12 +920,12 @@ class ActionTabGUI(OptionGroupGUI):
                 table.attach(entryWidget, 1, 2, rowIndex, rowIndex + 1)
                 rowIndex += 1
                 table.show_all()
-            vbox.pack_start(table, expand=False, fill=False)
+            vbox.pack_start(table, False, False, 0)
 
         autoEnableInfo = self.findAutoEnableInfo(switches)
         for switch in switches:
             widget = self.createSwitchWidget(switch, optionGroup, autoEnableInfo)
-            vbox.pack_start(widget, expand=False, fill=False)
+            vbox.pack_start(widget, False, False, 0)
             
     def createResetButton(self):
         button = Gtk.Button("Reset Tab")
@@ -939,8 +941,8 @@ class ActionTabGUI(OptionGroupGUI):
 
     def addCentralButton(self, vbox, button, padding):
         buttonbox = Gtk.HButtonBox()
-        buttonbox.pack_start(button, expand=True, fill=False)
-        vbox.pack_start(buttonbox, expand=False, fill=False, padding=padding)
+        buttonbox.pack_start(button, True, False, 0)
+        vbox.pack_start(buttonbox, False, False, padding)
 
     def createOptionWidget(self, option):
         box, entry = OptionGroupGUI.createOptionWidget(self, option)
@@ -967,7 +969,7 @@ class ActionDialogGUI(OptionGroupGUI):
         if self.needsScrollBars():
             vbox = self.addScrollBars(vbox, Gtk.PolicyType.AUTOMATIC)
         alignment.add(vbox)
-        dialog.vbox.pack_start(alignment, expand=True, fill=True)
+        dialog.vbox.pack_start(alignment, True, True, 0)
         self.createButtons(dialog, fileChooser, fileChooserOption)
         self.tryResize(dialog)
         dialog.show_all()
@@ -1070,9 +1072,9 @@ class ActionDialogGUI(OptionGroupGUI):
                         frame = Gtk.Frame()
                         frame.set_label_widget(labelEventBox)
                         frame.add(fileChooser)
-                        vbox.pack_start(frame, expand=True, fill=True)
+                        vbox.pack_start(frame, True, True, 0)
                     else:
-                        vbox.pack_start(fileChooser, expand=True, fill=True)
+                        vbox.pack_start(fileChooser, True, True, 0)
                 else:
                     widget, entry = self.createOptWidget(vbox, option)
                     self.createFileChooserDialog(widget, entry, option)
@@ -1175,8 +1177,9 @@ class ActionDialogGUI(OptionGroupGUI):
         # It not only prevents set_filename from working but causes GTK events to be created and never executed
         # making the GUI think it is constantly busy and sending our throbber into an infinite loop
         # See bugs TTT-3469, TTT-3483
-        if Gtk.gtk_version < (2, 20) or Gtk.gtk_version >= (2, 24):
-            return True
+        # this block can probably removed MB 2018-12-04
+        #if Gtk.gtk_version < (2, 20) or Gtk.gtk_version >= (2, 24):
+        #    return True
         
         fileChooserConfigFile = self.getFileChooserConfigFile()
         if not self.showHiddenFilesEnabled(fileChooserConfigFile):

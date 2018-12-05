@@ -385,7 +385,7 @@ class TestProgressMonitor(guiutils.SubGUI):
         smallPrimes = [ 2, 3, 5, 7, 11, 13, 17, 19 ] # Surely we won't repeat stuff more than 20 times :)
         for prime in smallPrimes:
             if size > prime and size % prime == 0:
-                chunkSize = size / prime
+                chunkSize = size // prime
                 firstPart = filteredDiff[:chunkSize]
                 if filteredDiff == firstPart * prime:
                     return firstPart, prime

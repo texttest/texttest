@@ -507,8 +507,8 @@ class TestTreeGUI(guiutils.ContainerGUI):
         firstPath = None
         actuallySelected = []
         for test in selTests:
-            iter = self.findIter(test)
-            if not iter or (not selectCollapsed and not self.isExpanded(iter)):
+            iterValid, iter = self.findIter(test)
+            if not iterValid or (not selectCollapsed and not self.isExpanded(iter)):
                 continue
 
             actuallySelected.append(test)
@@ -527,7 +527,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
     def scrollToFirstTest(self):
         if len(self.selectedTests) > 0:
             test = self.selectedTests[0]
-            iter = self.findIter(test)
+            iterValid, iter = self.findIter(test)
             path = self.filteredModel.get_path(iter)
             self.scrollToPath(path)
         
@@ -577,8 +577,8 @@ class TestTreeGUI(guiutils.ContainerGUI):
             self.notify("RefreshFilePreviews", test, *args)
 
     def isVisible(self, test):
-        filteredIter = self.findIter(test)
-        if filteredIter:
+        iterValid, filteredIter = self.findIter(test)
+        if iterValid:
             return True
         else:
             self.diag.info("No iterator found for " + repr(test))

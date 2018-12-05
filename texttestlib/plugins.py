@@ -104,7 +104,13 @@ def importAndCall(moduleName, callableName, *args):
         if isModuleMissing(str(err), moduleName):
             moduleName = "texttestlib." + moduleName
             command = "from " + moduleName + " import " + callableName + " as _callable"
-            exec(command, globals(), namespace)
+            try:
+                exec(command, globals(), namespace)
+            except ImportError as err2:
+                if isModuleMissing(str(err2), moduleName):
+                    raise err
+                else:
+                    raise err2
         else:
             raise
     

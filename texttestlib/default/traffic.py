@@ -1,6 +1,7 @@
 
 import os, shutil, subprocess, sys
 from texttestlib import plugins
+from locale import getpreferredencoding
 
 class SetUpCaptureMockHandlers(plugins.Action):
     def __init__(self, recordSetting):
@@ -136,9 +137,9 @@ class ModifyTraffic(plugins.ScriptWithArgs):
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=os.name=="nt")
             stdout, stderr = proc.communicate()
             if len(stderr) > 0:
-                raise plugins.TextTestError("Couldn't modify traffic :\n " + stderr)
+                raise plugins.TextTestError("Couldn't modify traffic :\n " + str(stderr, getpreferredencoding()))
             else:
-                return fullLine[:6] + stdout
+                return fullLine[:6] + str(stdout, getpreferredencoding())
         else:
             return fullLine
             
@@ -159,7 +160,7 @@ class ConvertToCaptureMock(plugins.Action):
         multiThreads = confObj.getConfigValue("collect_traffic_use_threads") == "true"
         if not multiThreads:
             parser.add_section("general")
-            parser.set("general", "server_multithreaded", multiThreads)
+            parser.set("general", "server_multithreaded", str(multiThreads))
         cmdTraffic = confObj.getCompositeConfigValue("collect_traffic", "asynchronous")
         if cmdTraffic:
             parser.add_section("command line")
@@ -173,7 +174,7 @@ class ConvertToCaptureMock(plugins.Action):
                     if env:
                         parser.set(cmd, "environment", ",".join(env))
                     if cmdAsync:
-                        parser.set(cmd, "asynchronous", cmdAsync)
+                        parser.set(cmd, "asynchronous", str(cmdAsync))
 
         envVars = confObj.getConfigValue("collect_traffic_environment").get("default")
         if envVars:

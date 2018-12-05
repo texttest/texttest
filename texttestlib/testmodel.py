@@ -1647,12 +1647,11 @@ class Application(object):
             sys.path.insert(0, self.dircache.pathName("texttest_config_modules"))
         try:
             return plugins.importAndCall(moduleName, "getConfig", self.inputOptions)
-        except:
-            if sys.exc_info()[0] == ImportError:
-                errorString = "No module named " + moduleName
-                if str(sys.exc_info()[1]) == errorString: #@UndefinedVariable
+        except Exception as err:
+            if isinstance(err, ImportError):
+                if plugins.isModuleMissing(str(err), moduleName):
                     raise BadConfigError("could not find config_module " + repr(moduleName))
-                elif str(sys.exc_info()[1]) == "cannot import name getConfig": #@UndefinedVariable
+                elif str(err) == "cannot import name 'getConfig'": #@UndefinedVariable
                     raise BadConfigError("module " + repr(moduleName) + " is not intended for use as a config_module")
             plugins.printException()
             raise BadConfigError("config_module " + repr(moduleName) + " contained errors and could not be imported")
@@ -2229,16 +2228,18 @@ class OptionFinder(plugins.OptionFinder):
                 return plugins.importAndCall(module, className, actionArgs)
             else:
                 return plugins.importAndCall(module, className)
-        except ImportError:
+        except ImportError as imperr:
             # Backwards compatibility : many scripts are now in the default package
-            excString = plugins.getExceptionString()
             if not module.startswith("default"):
                 try:
                     return self._getScriptObject("default." + actionCmd, actionArgs)
                 except plugins.TextTestError:
                     pass
             raise plugins.TextTestError("Could not import script " + className + " from module " + module + "\n" +\
-                  "Import failed, looked at " + repr(sys.path) + "\n" + excString)
+                  "Import failed, looked at " + repr(sys.path) + "\n" + str(imperr))
+        except Exception as e:
+            raise plugins.TextTestError("Failed to instantiate script object " + className + " from module " + module + "\n" +\
+                  "Raised exception error follows:\n" + str(e))
 
     def configPathOptions(self):
         # Returns includeSite, includePersonal

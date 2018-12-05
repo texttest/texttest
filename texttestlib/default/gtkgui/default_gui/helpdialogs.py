@@ -250,7 +250,7 @@ class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
         for version in reversed(sorted(versionInfo.keys())):
             buffer = Gtk.TextBuffer()
             buffer.set_text(versionInfo[version])
-            textView = Gtk.TextView(buffer)
+            textView = Gtk.TextView.new_with_buffer(buffer)
             textView.set_editable(False)
             textView.set_cursor_visible(False)
             textView.set_left_margin(5)

@@ -150,11 +150,12 @@ class GUIConfig:
                 self.apps.append(suite.app)
 
     def makeColourDictionary(self):
+        d={}
         if self.configDir.get("test_colours") is None:
-            return dict
+            return d
         for key, value in list(self.configDir.get("test_colours").items()):
-            dict[self.getConfigName(key)] = value
-        return dict
+            d[self.getConfigName(key)] = value
+        return d
 
     def setConfigDefaults(self, colourDict, accelerators):
         self.setConfigDefault("static_collapse_suites", 0, "Whether or not the static GUI will show everything collapsed")
@@ -270,41 +271,41 @@ class GUIConfig:
 
     @staticmethod
     def getWindowSizeSettings():
-        dict = {}
-        dict["maximize"] = 0
-        dict["horizontal_separator_position"] = 0.46
-        dict["vertical_separator_position"] = 0.5
-        dict["height_pixels"] = "<not set>"
-        dict["width_pixels"] = "<not set>"
-        dict["height_screen"] = float(5.0) / 6
-        dict["width_screen"] = 0.6
-        return dict
+        d = {}
+        d["maximize"] = 0
+        d["horizontal_separator_position"] = 0.46
+        d["vertical_separator_position"] = 0.5
+        d["height_pixels"] = "<not set>"
+        d["width_pixels"] = "<not set>"
+        d["height_screen"] = float(5.0) / 6
+        d["width_screen"] = 0.6
+        return d
 
     @staticmethod
     def getDefaultHideWidgets():
-        dict = {}
-        dict["status_bar"] = 0
-        dict["toolbar"] = 0
-        dict["shortcut_bar"] = 0
-        return dict
+        d = {}
+        d["status_bar"] = 0
+        d["toolbar"] = 0
+        d["shortcut_bar"] = 0
+        return d
 
     @staticmethod
     def getDefaultColours():
-        dict = {}
-        dict["default"] = "salmon"
-        dict["success"] = "DarkSeaGreen2"
-        dict["failure"] = "salmon"
-        dict["running"] = "LightGoldenrod1"
-        dict["initial_filter"] = "LightGoldenrod1"
-        dict["final_filter"] = "LightGoldenrod1"
-        dict["not_started"] = "white"
-        dict["pending"] = "grey80"
-        dict["static"] = "grey90"
-        dict["clipboard_cut"] = "red"
-        dict["clipboard_copy"] = "grey60"
-        dict["bug"] = "orange"
-        dict["marked"] = "lightblue"
-        return dict
+        d = {}
+        d["default"] = "salmon"
+        d["success"] = "DarkSeaGreen2"
+        d["failure"] = "salmon"
+        d["running"] = "LightGoldenrod1"
+        d["initial_filter"] = "LightGoldenrod1"
+        d["final_filter"] = "LightGoldenrod1"
+        d["not_started"] = "white"
+        d["pending"] = "grey80"
+        d["static"] = "grey90"
+        d["clipboard_cut"] = "red"
+        d["clipboard_copy"] = "grey60"
+        d["bug"] = "orange"
+        d["marked"] = "lightblue"
+        return d
 
 
 # base class for all "GUI" classes which manage parts of the display

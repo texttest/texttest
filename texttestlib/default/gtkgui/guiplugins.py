@@ -664,7 +664,7 @@ class OptionGroupGUI(ActionGUI):
         return buttons
 
     def createFrame(self, group, name):
-        frame = Gtk.Frame(name)
+        frame = Gtk.Frame.new(name)
         frame.set_label_align(0.5, 0.5)
         frame.set_shadow_type(Gtk.ShadowType.IN)
         frame.add(self.createGroupBox(group))
@@ -684,7 +684,8 @@ class OptionGroupGUI(ActionGUI):
     def setChildSensitivity(self, widget, sensitive, ignoreWidget=None):
         if widget is ignoreWidget or isinstance(widget, Gtk.RadioButton):
             return
-        elif isinstance(widget, (Gtk.Entry, Gtk.CheckButton, Gtk.ComboBoxEntry)):
+        # needs review, just replaced ComboBoxEntry by ComboBox, maybe ComboBoxText would be better? MB 2018-12-05
+        elif isinstance(widget, (Gtk.Entry, Gtk.CheckButton, Gtk.ComboBox)):
             widget.set_sensitive(sensitive)
         elif hasattr(widget, "get_children"):
             for child in widget.get_children():
@@ -797,7 +798,8 @@ class OptionGroupGUI(ActionGUI):
                 entrycompletion.manager.register(entry)
             # Options in drop-down lists don't change, so we just add them once and for all.
             for text in option.listPossibleValues():
-                entrycompletion.manager.addTextCompletion(text)
+                # needs review, just added str to work around expected type error, MB 2018-12-05
+                entrycompletion.manager.addTextCompletion(str(text))
 
             return box, entry
 

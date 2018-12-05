@@ -65,6 +65,8 @@ class IdleHandlerManager:
 
     def getIdlePriority(self):
         try:
+            # this should be removed after storytext got ported! MB 2018-12-05
+            raise ImportError()
             # Same priority as StoryText replay, so they get called interchangeably
             # Non-default as a workaround for bugs in filechooser handling in GTK
             from storytext.gtktoolkit import PRIORITY_STORYTEXT_IDLE

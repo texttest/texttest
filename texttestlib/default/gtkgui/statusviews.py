@@ -3,7 +3,7 @@
 Module for the various widgets that keep an overall view of the status or progress
 of the current run/setup
 """
-from gi.repository import Gtk, GObject
+from gi.repository import Gtk, GObject, Pango
 import guiutils, os, logging
 from texttestlib import plugins
 from ordereddict import OrderedDict

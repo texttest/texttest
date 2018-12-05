@@ -203,7 +203,7 @@ class TestProgressMonitor(guiutils.SubGUI):
         self.treeView.set_enable_search(False)
         selection = self.treeView.get_selection()
         selection.set_mode(Gtk.SelectionMode.MULTIPLE)
-        selection.set_select_function(self.canSelect)
+        selection.set_select_function(self.canSelect, None)
         selection.connect("changed", self.selectionChanged)
         textRenderer = Gtk.CellRendererText()
         textRenderer.set_property('wrap-width', 350)

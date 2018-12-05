@@ -15,6 +15,7 @@ from texttestlib.default.knownbugs import CheckForBugs
 from texttestlib.default.actionrunner import BaseActionRunner
 from texttestlib.default.performance import getTestPerformance
 from glob import glob
+from locale import getpreferredencoding
 
 plugins.addCategory("abandoned", "abandoned", "were abandoned")
 
@@ -291,7 +292,7 @@ class QueueSystemServer(BaseActionRunner):
             serverAddress = (host, int(port))
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.connect(serverAddress)
-            sock.sendall("SUT_SERVER:" + state + "\n")
+            sock.sendall(("SUT_SERVER:" + state + "\n").encode(getpreferredencoding()))
             sock.close()
             
     def getTestForRunNormalMode(self, block):
@@ -1037,7 +1038,7 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
         self.terminate = True
         sendSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sendSocket.connect(self.socket.getsockname())
-        sendSocket.sendall("TERMINATE_SERVER\n")
+        sendSocket.sendall("TERMINATE_SERVER\n".encode(getpreferredencoding()))
         sendSocket.close()
         
     def getAddress(self):

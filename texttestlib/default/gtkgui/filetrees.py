@@ -376,8 +376,8 @@ class TestFileGUI(FileViewGUI):
         self.currentTest = None
 
     @staticmethod
-    def canSelect(selection, model, path, is_selected, dynamic):
-        if dynamic:
+    def canSelect(selection, model, path, is_selected, user_data):
+        if user_data:
             pathIter = model.get_iter(path)
             return model.iter_parent(pathIter) is not None
         else:

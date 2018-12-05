@@ -642,7 +642,7 @@ class TestProgressMonitor(guiutils.SubGUI):
         if newValue is False:
             selection = self.treeView.get_selection()
             
-            if selection.path_is_selected(path):
+            if selection.path_is_selected(Gtk.TreePath(path)):
                 #WORKAROUND: selection.unselect_path(path) Doesn't seem to work here
                 selection.set_mode(Gtk.SelectionMode.SINGLE)
                 selection.set_mode(Gtk.SelectionMode.MULTIPLE)

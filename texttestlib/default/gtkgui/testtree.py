@@ -345,10 +345,10 @@ class TestTreeGUI(guiutils.ContainerGUI):
         self.treeView.grab_focus()
 
     @staticmethod
-    def canSelect(selection, model, path, is_selected, self):
-        pathIter = self.filteredModel.get_iter(path)
-        test = self.filteredModel.get_value(pathIter, 2)[0]
-        return test.classId() == "test-case" or test in self.testSuitesWithResults
+    def canSelect(selection, model, path, is_selected, user_data):
+        pathIter = user_data.filteredModel.get_iter(path)
+        test = user_data.filteredModel.get_value(pathIter, 2)[0]
+        return test.classId() == "test-case" or test in user_data.testSuitesWithResults
 
     def rowExpanded(self, treeview, iter, path):
         self.expandLevel(treeview, self.filteredModel.iter_children(iter), not self.collapseStatic)

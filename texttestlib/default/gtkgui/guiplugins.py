@@ -649,7 +649,7 @@ class OptionGroupGUI(ActionGUI):
         individualToolTips = type(switch.description) == list
         for index, option in enumerate(switch.options):
             self.setConfigOverride(switch, index, option, optionGroup)
-            radioButton = Gtk.RadioButton(mainRadioButton, option, use_underline=True)
+            radioButton = Gtk.RadioButton.new_with_mnemonic_from_widget(mainRadioButton, option)
             self.setRadioButtonName(radioButton, option, optionGroup)
             if individualToolTips:
                 radioButton.set_tooltip_text(switch.description[index])

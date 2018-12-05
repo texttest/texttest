@@ -43,7 +43,7 @@ class TestColumnGUI(guiutils.SubGUI):
             self.column.set_sort_order(Gtk.SortType.DESCENDING)
         return self.column
     
-    def renderSuitesBold(self, dummy, cell, model, iter):
+    def renderSuitesBold(self, dummy, cell, model, iter, data):
         if model.get_value(iter, 2)[0].classId() == "test-case":
             cell.set_property('font', "")
         else:

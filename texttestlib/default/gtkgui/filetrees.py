@@ -113,7 +113,7 @@ class FileViewGUI(guiutils.SubGUI):
         self.selectionChanged(self.selection)
         self.popupGUI.showMenu(*args)
 
-    def renderParentsBold(self, dummyColumn, cell, model, iter):
+    def renderParentsBold(self, dummyColumn, cell, model, iter, data):
         if model.iter_has_child(iter):
             cell.set_property('font', "bold")
         else:

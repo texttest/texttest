@@ -144,17 +144,16 @@ class VirtualDisplayResponder(plugins.Responder):
             # Ignore job control signals for remote processes
             # Otherwise the ssh process gets killed, but the stuff it's started remotely doesn't, and we leak Xvfb processes
             preexec_fn = None if machine == "localhost" else self.ignoreSignals
-            xvfbOrSshProc = subprocess.Popen(command, preexec_fn=preexec_fn, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=open(os.devnull, "w"))
+            xvfbOrSshProc = subprocess.Popen(command, preexec_fn=preexec_fn, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=open(os.devnull, "w"), universal_newlines=True)
             line = plugins.retryOnInterrupt(xvfbOrSshProc.stdout.readline)
-            if b"Time Out!" in line:
+            if "Time Out!" in line:
                 xvfbOrSshProc.wait()
                 xvfbOrSshProc.stdout.close()
                 self.diag.info("Timed out waiting for Xvfb to come up")
                 # We try again and hope for a better process ID!
                 continue
             try:
-                print(line)
-                displayNum, xvfbPid = list(map(int, line.strip().split(b",")))
+                displayNum, xvfbPid = list(map(int, line.strip().split(",")))
                 xvfbOrSshProc.stdout.close()
                 return self.getDisplayName(machine, displayNum), xvfbPid, xvfbOrSshProc
             except ValueError: #pragma : no cover - should never happen, just a fail-safe

@@ -53,19 +53,19 @@ def makeIdentifierLine(identifier, sendFiles=False, getFiles=False, noReuse=Fals
     return identifier
 
 def parseIdentifier(line):
-    rerun = line.endswith(rerunPostfix.encode(getpreferredencoding()))
+    rerun = line.endswith(rerunPostfix)
     if rerun:
         line = line.replace(rerunPostfix, "")
             
-    tryReuse = not line.endswith(noReusePostfix.encode(getpreferredencoding()))
+    tryReuse = not line.endswith(noReusePostfix)
     if not tryReuse:
         line = line.replace(noReusePostfix, "")
 
-    sendFiles = line.endswith(sendFilePostfix.encode(getpreferredencoding()))
+    sendFiles = line.endswith(sendFilePostfix)
     if sendFiles:
         line = line.replace(sendFilePostfix, "")
         
-    getFiles = line.endswith(getFilePostfix.encode(getpreferredencoding()))
+    getFiles = line.endswith(getFilePostfix)
     if getFiles:
         line = line.replace(getFilePostfix, "")
 

@@ -1,7 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import os, sys, subprocess
 from tempfile import mktemp
+from locale import getpreferredencoding
 
 def interpretCore(corefile):
     if os.path.getsize(corefile) == 0:
@@ -146,7 +147,7 @@ def parseFailure(errMsg, debugger):
     if len(errMsg) > 50000:
         return summary, "Over 50000 error characters printed - suspecting binary output"
     else:
-        return summary, debugger + " backtrace command failed : Stack trace not produced for crash\nErrors from " + debugger + ":\n" + errMsg
+        return summary, debugger + " backtrace command failed : Stack trace not produced for crash\nErrors from " + debugger + ":\n" + str(errMsg, getpreferredencoding())
 
 
 def assembleInfo(signalDesc, summaryLine, stackLines, debugger):
@@ -165,7 +166,7 @@ def writeGdbStackTrace(corefile, binary):
     cmdArgs = [ "gdb", "-q", "-batch", "-x", fileName, binary, corefile ]
     proc = subprocess.Popen(cmdArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     output, errors = proc.communicate()
-    signalDesc, summaryLine, stackLines = parseGdbOutput(output)
+    signalDesc, summaryLine, stackLines = parseGdbOutput(str(output, getpreferredencoding()))
     os.remove(fileName)
     if summaryLine:
         return assembleInfo(signalDesc, summaryLine, stackLines, "GDB")
@@ -176,7 +177,7 @@ def writeDbxStackTrace(corefile, binary):
     cmdArgs = [ "dbx", "-f", "-q", "-c", "where; quit", binary, corefile ]
     proc = subprocess.Popen(cmdArgs, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     output, errors = proc.communicate()
-    signalDesc, summaryLine, stackLines = parseDbxOutput(output)
+    signalDesc, summaryLine, stackLines = parseDbxOutput(str(output, getpreferredencoding()))
     if summaryLine:
         return assembleInfo(signalDesc, summaryLine, stackLines, "DBX")
     else:
@@ -188,17 +189,17 @@ def printCoreInfo(corefile):
         os.system("uncompress " + corefile)
         corefile = corefile[:-2]
     summary, details, binary = interpretCore(corefile)
-    print summary
-    print "-" * len(summary)
-    print "(Core file at", corefile + ")"
+    print(summary)
+    print("-" * len(summary))
+    print("(Core file at", corefile + ")")
     if binary:
-        print "(Created by binary", binary + ")"
-    print details
+        print("(Created by binary", binary + ")")
+    print(details)
     if compression:
         os.system("compress " + corefile)
 
 if len(sys.argv) != 2:
-    print "Usage: interpretcore.py <corefile>"
+    print("Usage: interpretcore.py <corefile>")
 else:
     corefile = sys.argv[1]
     if os.path.isfile(corefile):

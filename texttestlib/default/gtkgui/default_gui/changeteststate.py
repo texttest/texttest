@@ -2,8 +2,8 @@
 """
 The actions in the dynamic GUI that affect the state of a test
 """
-
-import gtk, os
+from gi.repository import Gtk
+import os
 from texttestlib import plugins
 from .. import guiplugins
 from .adminactions import ReportBugs
@@ -54,7 +54,7 @@ class ApproveTests(BackgroundThreadHelper,guiplugins.ActionDialogGUI):
     def __init__(self, allApps, *args):
         guiplugins.ActionDialogGUI.__init__(self, allApps, *args)
         self.directAccel = None
-        self.directAction = gtk.Action("Approve", "_Approve", \
+        self.directAction = Gtk.Action("Approve", "_Approve", \
                                        self.getDirectTooltip(), self.getStockId())
         self.directAction.connect("activate", self._respond)
         self.directAction.set_property("sensitive", False)

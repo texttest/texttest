@@ -14,11 +14,13 @@ def raiseException(msg):
     raise TextTestError("Could not start TextTest " + texttest_version.version + " GUI due to PyGTK GUI library problems :\n" + msg)
 
 try:
-    import gtk
+    import gi
+    gi.require_version('Gtk', '3.0')
+    from gi.repository import Gtk
 except Exception as e:
     raiseException("Unable to import module 'gtk' - " + str(e))
 
-pygtkVersion = gtk.pygtk_version
+pygtkVersion = (Gtk.get_major_version(), Gtk.get_minor_version(), Gtk.get_micro_version())
 requiredPygtkVersion = texttest_version.required_pygtk_version
 if pygtkVersion < requiredPygtkVersion:
     raiseException("TextTest " + texttest_version.version + " GUI requires at least PyGTK " +
@@ -26,7 +28,7 @@ if pygtkVersion < requiredPygtkVersion:
                    ".".join(map(str, pygtkVersion)))
 
 try:
-    import gobject
+    from gi.repository import GObject
 except Exception as e:
     raiseException("Unable to import module 'gobject' - " + str(e))
 
@@ -64,6 +66,8 @@ class IdleHandlerManager:
 
     def getIdlePriority(self):
         try:
+            # this should be removed after storytext got ported! MB 2018-12-05
+            raise ImportError()
             # Same priority as StoryText replay, so they get called interchangeably
             # Non-default as a workaround for bugs in filechooser handling in GTK
             from storytext.gtktoolkit import PRIORITY_STORYTEXT_IDLE
@@ -71,18 +75,18 @@ class IdleHandlerManager:
         except ImportError:
             # It should still work if we can't find StoryText
             # so we hardcode the right answer...
-            return gobject.PRIORITY_DEFAULT_IDLE + 20
+            return GObject.PRIORITY_DEFAULT_IDLE + 20
 
     def enableHandler(self):
         if self.sourceId == -1:
-            self.sourceId = plugins.Observable.threadedNotificationHandler.enablePoll(gobject.idle_add,
+            self.sourceId = plugins.Observable.threadedNotificationHandler.enablePoll(GObject.idle_add,
                                                                                       priority=self.getIdlePriority())
             self.diag.info("Adding idle handler")
 
     def disableHandler(self):
         if self.sourceId >= 0:
             self.diag.info("Removing idle handler")
-            gobject.source_remove(self.sourceId)
+            GObject.source_remove(self.sourceId)
             self.sourceId = -1
 
     def notifyWindowClosed(self):
@@ -123,7 +127,7 @@ class GUIController(plugins.Responder, plugins.Observable):
         self.progressMonitor = statusviews.TestProgressMonitor(self.dynamic, testCount)
         self.progressBarGUI = statusviews.ProgressBarGUI(self.dynamic, testCount)
         self.idleManager = IdleHandlerManager()
-        uiManager = gtk.UIManager()
+        uiManager = Gtk.UIManager()
         self.defaultActionGUIs, self.actionTabGUIs = self.interactiveActionHandler.getPluginGUIs(uiManager)
         self.menuBarGUI, self.toolBarGUI, testPopupGUI, testFilePopupGUI, appFilePopupGUI = self.createMenuAndToolBarGUIs(uiManager, includeSite, includePersonal)
         self.testColumnGUI = testtree.TestColumnGUI(self.dynamic, testCount)
@@ -250,7 +254,7 @@ class GUIController(plugins.Responder, plugins.Observable):
 
     def readGtkRCFiles(self, *args):
         for file in plugins.findDataPaths([ ".gtkrc-2.0*" ], *args):
-            gtk.rc_parse(file)
+            Gtk.rc_parse(file)
 
     def addSuites(self, suites):
         for observer in self.getAddSuitesObservers():
@@ -290,10 +294,10 @@ class GUIController(plugins.Responder, plugins.Observable):
         return actionholders.NotebookGUI(tabGUIs)
 
     def run(self):
-        gtk.main()
+        Gtk.main()
         
     def notifyExit(self):
-        gtk.main_quit()
+        Gtk.main_quit()
 
     def notifyLifecycleChange(self, test, state, changeDesc):
         test.stateInGui = state
@@ -394,7 +398,7 @@ class TopWindowGUI(guiutils.ContainerGUI):
             
     def createView(self):
         # Create toplevel window to show it all.
-        self.topWindow = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        self.topWindow = Gtk.Window(Gtk.WindowType.TOPLEVEL)
         self.topWindow.set_name("Top Window")
         try:
             from . import stockitems
@@ -514,6 +518,8 @@ class ShortcutBarGUI(guiutils.SubGUI):
         guiutils.SubGUI.__init__(self)
         # Do this first, so we set up interceptors and so on early on
         try:
+            # this should be removed after storytext got ported! MB 2018-12-05
+            raise ImportError()
             from storytext import createShortcutBar
             from .version_control.custom_widgets_storytext import customEventTypes
             uiMapFiles = plugins.findDataPaths([ "*.uimap" ], *args)
@@ -534,13 +540,13 @@ class ShortcutBarGUI(guiutils.SubGUI):
 
 class VBoxGUI(guiutils.ContainerGUI):    
     def createView(self):
-        box = gtk.VBox()
-        expandWidgets = [ gtk.HPaned, gtk.ScrolledWindow ]
+        box = Gtk.VBox()
+        expandWidgets = [ Gtk.HPaned, Gtk.ScrolledWindow ]
         for subgui in self.subguis:
             if subgui.shouldShow():
                 view = subgui.createView()
                 expand = view.__class__ in expandWidgets
-                box.pack_start(view, expand=expand, fill=expand)
+                box.pack_start(view, expand, expand, 0)
 
         box.show()
         return box
@@ -565,16 +571,16 @@ class PaneGUI(guiutils.ContainerGUI):
 
     def createPaned(self):
         if self.horizontal:
-            return gtk.HPaned()
+            return Gtk.HPaned()
         else:
-            return gtk.VPaned()
+            return Gtk.VPaned()
 
     def createView(self):
         frames = []
         for subgui in self.subguis:
             if subgui.shouldShow():
-                frame = gtk.Frame()
-                frame.set_shadow_type(gtk.SHADOW_IN)
+                frame = Gtk.Frame()
+                frame.set_shadow_type(Gtk.ShadowType.IN)
                 frame.add(subgui.createView())
                 frame.show()
                 frames.append(frame)
@@ -725,7 +731,7 @@ class InteractiveActionHandler:
                 self.diag.info("Menu/toolbar: " + str(action.__class__))
                 defaultGUIs.append(action)
 
-        actionGroup = gtk.ActionGroup("AllActions")
+        actionGroup = Gtk.ActionGroup("AllActions")
         uiManager.insert_action_group(actionGroup, 0)
         accelGroup = uiManager.get_accel_group()
         for actionGUI in defaultGUIs + actionTabGUIs:

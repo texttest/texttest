@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-import gtk
+from gi.repository import Gtk
 
 class EntryCompletionManager:
     def __init__(self):
-        self.completions = gtk.ListStore(str)
+        self.completions = Gtk.ListStore(str)
         self.entries = []
         self.enabled = False
         self.useContainsFunction = False
@@ -20,12 +20,12 @@ class EntryCompletionManager:
             
     def register(self, entry):
         if self.enabled:
-            completion = gtk.EntryCompletion()
+            completion = Gtk.EntryCompletion()
             completion.set_model(self.completions)
             if self.inlineCompletions:
                 completion.set_inline_completion(True)
             completion.set_text_column(0)        
-            if self.useContainsFunction: # Matching on start is default for gtk.EntryCompletion
+            if self.useContainsFunction: # Matching on start is default for Gtk.EntryCompletion
                 completion.set_match_func(self.containsMatchFunction)        
 
             self.addCompletion(entry)

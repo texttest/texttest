@@ -2,8 +2,8 @@
 """
 All the actions for administering the files and directories in a test suite
 """
-
-import gtk, os, shutil, subprocess, re
+from gi.repository import Gtk
+import os, shutil, subprocess, re
 from texttestlib import plugins, testmodel
 from .. import guiplugins, guiutils
 from collections import OrderedDict
@@ -17,7 +17,7 @@ class FocusDependentAction(guiplugins.ActionGUI):
         window.connect("set-focus", self.focusChanged)
 
     def focusChanged(self, dummy, widget):
-        freeTextWidget = isinstance(widget, gtk.Entry) or isinstance(widget, gtk.TextView)
+        freeTextWidget = isinstance(widget, Gtk.Entry) or isinstance(widget, Gtk.TextView)
         if freeTextWidget:
             self.setSensitivity(False)
         elif self.isActiveOnCurrent():
@@ -587,7 +587,7 @@ class ImportApplication(guiplugins.ActionDialogGUI):
         dialog.resize(width, height)
         while True:
             response = dialog.run()
-            if response != gtk.RESPONSE_ACCEPT:
+            if response != Gtk.ResponseType.ACCEPT:
                 raise plugins.TextTestError("Application creation cancelled.")
 
             try:
@@ -846,9 +846,9 @@ class ImportFiles(guiplugins.ActionDialogGUI):
         return self.fileChooser
     
     def addText(self, vbox, text):
-        header = gtk.Label()
+        header = Gtk.Label()
         header.set_markup(text + "\n")
-        vbox.pack_start(header, expand=False, fill=False)
+        vbox.pack_start(header, False, False, 0)
     
     def getDirectoryText(self, test):
         relDir = plugins.relpath(self.creationDir, test.getDirectory())
@@ -1314,9 +1314,9 @@ class RenameTest(RenameAction):
         return True
 
     def fillVBox(self, vbox, group):
-        header = gtk.Label()
+        header = Gtk.Label()
         header.set_markup("<b>" + plugins.convertForMarkup(self.oldName) + "</b>")
-        vbox.pack_start(header, expand=False, fill=False)
+        vbox.pack_start(header, False, False, 0)
         return guiplugins.ActionDialogGUI.fillVBox(self, vbox, group)
     
     def getTooltip(self):
@@ -1559,18 +1559,18 @@ class ReportBugs(guiplugins.ActionDialogGUI):
                     widget = self.createExpander(group)
                 else:
                     widget = self.createFrame(group, group.name)
-                vbox.pack_start(widget, fill=False, expand=False, padding=8)
-            vbox.pack_start(gtk.HSeparator(), padding=8)
-            header = gtk.Label()
+                vbox.pack_start(widget, False, False, 8)
+            vbox.pack_start(Gtk.Separator(Gtk.Orientation.HORIZONTAL), True, True, 8)
+            header = Gtk.Label()
             header.set_markup("<u>Fill in exactly <i>one</i> of the sections below</u>\n")
-            vbox.pack_start(header, expand=False, fill=False, padding=8)
+            vbox.pack_start(header, False, False, 8)
             for group in [ self.bugSystemGroup, self.textDescGroup ]:
                 frame = self.createFrame(group, group.name)
-                vbox.pack_start(frame, fill=False, expand=False, padding=8)
+                vbox.pack_start(frame, False, False, 8)
         return guiplugins.ActionDialogGUI.fillVBox(self, vbox, optionGroup)
 
     def createExpander(self, group):
-        expander = gtk.Expander(group.name)
+        expander = Gtk.Expander(group.name)
         expander.add(self.createGroupBox(group))
         return expander
 

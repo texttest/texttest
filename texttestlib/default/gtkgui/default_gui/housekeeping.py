@@ -2,12 +2,12 @@
 """
 Miscellaneous actions for generally housekeeping the state of the GUI
 """
-
+from gi.repository import Gtk, GObject
 from .. import guiplugins
 from collections import OrderedDict
 from texttestlib.default.batch import BatchApplicationData, MailSender
 from texttestlib import plugins
-import os, gtk, gobject
+import os
 from texttestlib.jobprocess import killSubProcessAndChildren
 
 class Quit(guiplugins.BasicActionGUI):
@@ -53,9 +53,9 @@ class Quit(guiplugins.BasicActionGUI):
         confirmationMessage = self.getConfirmationMessage()
         if confirmationMessage:
             dialog = self.showQueryDialog(self.getParentWindow(), confirmationMessage,
-                                          gtk.STOCK_DIALOG_WARNING, "Confirmation", None)
+                                          Gtk.STOCK_DIALOG_WARNING, "Confirmation", None)
             responseId = dialog.run()
-            saidCancel = responseId not in [ gtk.RESPONSE_ACCEPT, gtk.RESPONSE_YES, gtk.RESPONSE_OK ]
+            saidCancel = responseId not in [ Gtk.ResponseType.ACCEPT, Gtk.ResponseType.YES, Gtk.ResponseType.OK ]
             dialog.hide()
             dialog.destroy()
             if saidCancel:
@@ -216,14 +216,14 @@ class ShowProcesses(guiplugins.ActionResultDialogGUI):
         runningProcesses = guiplugins.processMonitor.getProcesses()
         if len(runningProcesses) > 0:
             processBox = self.createProcessBox(runningProcesses)
-            self.dialog.vbox.pack_start(processBox)
+            self.dialog.vbox.pack_start(processBox, True, True, 0)
         else:
-            messageBox = self.createDialogMessage("No external processes have been launched from this TextTest instance.", gtk.STOCK_DIALOG_INFO)
-            self.dialog.vbox.pack_start(messageBox)
+            messageBox = self.createDialogMessage("No external processes have been launched from this TextTest instance.", Gtk.STOCK_DIALOG_INFO)
+            self.dialog.vbox.pack_start(messageBox, True, True, 0)
             
     def makePopup(self):
-        menu = gtk.Menu()
-        menuItem = gtk.MenuItem("Kill Process")
+        menu = Gtk.Menu()
+        menuItem = Gtk.MenuItem("Kill Process")
         menu.append(menuItem)
         menuItem.connect("activate", self.killProcess)
         menuItem.show()
@@ -263,23 +263,23 @@ class ShowProcesses(guiplugins.ActionResultDialogGUI):
         cell.set_property('text', str(model.get_value(iter, 0).pid))
         
     def createProcessBox(self, runningProcesses):
-        listStore = gtk.ListStore(gobject.TYPE_PYOBJECT, str)
+        listStore = Gtk.ListStore(GObject.TYPE_PYOBJECT, str)
         for proc, description in runningProcesses:
             listStore.append([ proc, description ])
-        self.treeView = gtk.TreeView(listStore)
+        self.treeView = Gtk.TreeView(listStore)
         self.treeView.set_name("Process Tree View")
         
-        cell = gtk.CellRendererText()
-        column = gtk.TreeViewColumn("PID") 
-        column.pack_start(cell)
+        cell = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn("PID") 
+        column.pack_start(cell, True)
         column.set_cell_data_func(cell, self.setPid)
         
         self.treeView.append_column(column)
-        cell2 = gtk.CellRendererText()
-        column = gtk.TreeViewColumn("Description", cell2, text=1)
+        cell2 = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn("Description", cell2, text=1)
         self.treeView.append_column(column)
         
-        self.treeView.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
+        self.treeView.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
         popup = self.makePopup() 
         self.treeView.connect("button_press_event", self.showPopup, popup)
         return self.treeView

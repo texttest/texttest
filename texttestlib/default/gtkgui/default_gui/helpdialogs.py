@@ -1,11 +1,11 @@
-
-import gtk, gobject, os, sys, glob
+from gi.repository import Gtk, GObject, GdkPixbuf
+import os, sys, glob
 from texttestlib import plugins, texttest_version
 from .. import guiplugins, guiutils
 from types import StringType
 
 # Show useful info about TextTest.
-# I don't particularly like the standard gtk.AboutDialog, and we also want
+# I don't particularly like the standard Gtk.AboutDialog, and we also want
 # to show pygtk/gtk/python versions in our dialog, so we create our own ...
 class AboutTextTest(guiplugins.ActionResultDialogGUI):
     website = "http://www.texttest.org"
@@ -29,9 +29,9 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         return "show information about texttest"
     
     def createButtons(self):        
-        self.creditsButton = self.dialog.add_button('texttest-stock-credits', gtk.RESPONSE_NONE)
-        self.licenseButton = self.dialog.add_button('_License', gtk.RESPONSE_NONE)
-        self.versionsButton = self.dialog.add_button('_Versions', gtk.RESPONSE_NONE)
+        self.creditsButton = self.dialog.add_button('texttest-stock-credits', Gtk.ResponseType.NONE)
+        self.licenseButton = self.dialog.add_button('_License', Gtk.ResponseType.NONE)
+        self.versionsButton = self.dialog.add_button('_Versions', Gtk.ResponseType.NONE)
         self.creditsButton.connect("clicked", self.showCredits)
         self.licenseButton.connect("clicked", self.showLicense)
         self.versionsButton.connect("clicked", self.showVersions)
@@ -41,33 +41,33 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         imageDir, retro = guiutils.getImageDir()
         imageType = "gif" if retro else "png"
         logoFile = os.path.join(imageDir, "texttest-logo." + imageType)
-        logoPixbuf = gtk.gdk.pixbuf_new_from_file(logoFile)
-        logo = gtk.Image()
+        logoPixbuf = GdkPixbuf.Pixbuf.new_from_file(logoFile)
+        logo = Gtk.Image()
         logo.set_from_pixbuf(logoPixbuf)
-        logoFrame = gtk.Alignment(0.5, 0.5, 0.0, 0.0)
+        logoFrame = Gtk.Alignment.new(0.5, 0.5, 0.0, 0.0)
         logoFrame.set_padding(10, 10, 10, 10)
         logoFrame.add(logo)
-        mainLabel = gtk.Label()
+        mainLabel = Gtk.Label()
         mainLabel.set_markup("<span size='xx-large'>TextTest " + texttest_version.version + "</span>\n")
-        messageLabel = gtk.Label()
+        messageLabel = Gtk.Label()
         message = "TextTest is an application-independent tool for text-based\nfunctional testing. This means running a batch-mode program\nin lots of different ways, and using the text output produced\nas a means of controlling the behaviour of that application."
         messageLabel.set_markup("<i>" + message + "</i>\n")
-        messageLabel.set_justify(gtk.JUSTIFY_CENTER)
+        messageLabel.set_justify(Gtk.Justification.CENTER)
         # On Windows the default URI hook fails and causes trouble...
         # According to the docs you can set "None" here but that doesn't seem to work...
-        gtk.link_button_set_uri_hook(lambda x, y : None) 
-        urlButton = gtk.LinkButton(self.website, self.website)
+        Gtk.link_button_set_uri_hook(lambda x, y : None) 
+        urlButton = Gtk.LinkButton(self.website, self.website)
         urlButton.set_property("border-width", 0)
-        urlButtonbox = gtk.HBox()
-        urlButtonbox.pack_start(urlButton, expand=True, fill=False)
+        urlButtonbox = Gtk.HBox()
+        urlButtonbox.pack_start(urlButton, True, False, 0)
         urlButton.connect("clicked", self.urlClicked)
-        licenseLabel = gtk.Label()
-        licenseLabel.set_markup("<span size='small'>Copyright " + '\xa9' + " The authors</span>\n")
-        self.dialog.vbox.pack_start(logoFrame, expand=False, fill=False)
-        self.dialog.vbox.pack_start(mainLabel, expand=True, fill=True)
-        self.dialog.vbox.pack_start(messageLabel, expand=False, fill=False)
-        self.dialog.vbox.pack_start(urlButtonbox, expand=False, fill=False)
-        self.dialog.vbox.pack_start(licenseLabel, expand=False, fill=False)
+        licenseLabel = Gtk.Label()
+        licenseLabel.set_markup("<span size='small'>Copyright " + u'\xa9' + " The authors</span>\n")
+        self.dialog.vbox.pack_start(logoFrame, False, False, 0)
+        self.dialog.vbox.pack_start(mainLabel, True, True, 0)
+        self.dialog.vbox.pack_start(messageLabel, False, False, 0)
+        self.dialog.vbox.pack_start(urlButtonbox, False, False, 0)
+        self.dialog.vbox.pack_start(licenseLabel, False, False, 0)
         self.dialog.set_resizable(False)
 
     def urlClicked(self, *args): 
@@ -106,50 +106,50 @@ class ShowVersions(guiplugins.ActionResultDialogGUI):
             return ".".join(map(str, versionTuple))
 
     def addTable(self, vbox, name, data, alignRight, columnSpacings, **kw):
-        table = gtk.Table(len(data), 2, homogeneous=False)
+        table = Gtk.Table(len(data), 2, homogeneous=False)
         table.set_row_spacings(1)
         table.set_col_spacings(columnSpacings)
         for rowNo, (title, versionTuple) in enumerate(data):
-            table.attach(self.justify(title + ":", 0.0), 0, 1, rowNo, rowNo + 1, xoptions=gtk.FILL, xpadding=1)
+            table.attach(self.justify(title + ":", 0.0), 0, 1, rowNo, rowNo + 1, xoptions=Gtk.AttachOptions.FILL, xpadding=1)
             table.attach(self.justify(self.makeString(versionTuple), float(alignRight)), 1, 2, rowNo, rowNo + 1)
 
-        header = gtk.Label()
+        header = Gtk.Label()
         header.set_markup("<b>You are using these " + name + "s:\n</b>")
-        tableVbox = gtk.VBox()
-        tableVbox.pack_start(header, expand=False, fill=False)
-        tableVbox.pack_start(table, expand=True, fill=True)
-        centeredTable = gtk.Alignment(0.5)
+        tableVbox = Gtk.VBox()
+        tableVbox.pack_start(header, False, False, 0)
+        tableVbox.pack_start(table, True, True, 0)
+        centeredTable = Gtk.Alignment.new(0.5)
         centeredTable.add(tableVbox)
-        vbox.pack_start(centeredTable, expand=True, fill=True, **kw)
+        vbox.pack_start(centeredTable, True, True, 0, **kw)
     
     def addContents(self):
         versionList = [ ("TextTest", texttest_version.version),
                         ("Python", sys.version_info),
-                        ("GTK", gtk.gtk_version),
-                        ("PyGTK",  gtk.pygtk_version),
-                        ("PyGObject", gobject.pygobject_version),
-                        ("GLib", gobject.glib_version) ]
+                        ("GTK", Gtk.gtk_version),
+                        ("PyGTK",  Gtk.pygtk_version),
+                        ("PyGObject", GObject.pygobject_version),
+                        ("GLib", GObject.glib_version) ]
 
         installationList = [ ("Test Suite", os.getenv("TEXTTEST_HOME")),
                              ("TextTest", plugins.installationRoots[0]),
                              ("Python", sys.executable) ]
         
-        vbox = gtk.VBox()
+        vbox = Gtk.VBox()
         self.addTable(vbox, "version", versionList, alignRight=True, columnSpacings=0)
         self.addTable(vbox, "installation", installationList, alignRight=False, columnSpacings=5, padding=10)
-        frame = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
+        frame = Gtk.Alignment.new(0.5, 0.5, 1.0, 1.0)
         frame.set_padding(10, 10, 10, 10)
         frame.add(vbox)
-        self.dialog.vbox.pack_start(frame, expand=True, fill=True)
+        self.dialog.vbox.pack_start(frame, True, True, 0)
         
     def justify(self, label, leftFill, markup = False):
-        alignment = gtk.Alignment(leftFill, 0.0, 0.0, 0.0)
+        alignment = Gtk.Alignment.new(leftFill, 0.0, 0.0, 0.0)
         if markup:
-            l = gtk.Label()
+            l = Gtk.Label()
             l.set_markup(label)
             alignment.add(l)
         else:
-            alignment.add(gtk.Label(label))
+            alignment.add(Gtk.Label(label=label))
         return alignment
 
 class TextFileDisplayDialog(guiplugins.ActionResultDialogGUI):
@@ -195,23 +195,23 @@ class TextFileDisplayDialog(guiplugins.ActionResultDialogGUI):
             file = open(plugins.installationPath("doc", self.fileName))
             text = file.read()
             file.close()
-            buffer = gtk.TextBuffer()
+            buffer = Gtk.TextBuffer()
             buffer.set_text(text)
         except Exception as e: #pragma : no cover - should never happen
             self.showErrorDialog("Failed to show " + self.fileName + " file:\n" + str(e))
             return
 
-        textView = gtk.TextView(buffer)
+        textView = Gtk.TextView(buffer)
         textView.set_editable(False)
         textView.set_cursor_visible(False)
         textView.set_left_margin(5)
         textView.set_right_margin(5)
         useScrollbars = not self.parent and text.count("\n") > 30
-        notebook = gtk.Notebook()
-        label = gtk.Label(self.getTabTitle())
+        notebook = Gtk.Notebook()
+        label = Gtk.Label(label=self.getTabTitle())
         if useScrollbars:
-            window = gtk.ScrolledWindow()
-            window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+            window = Gtk.ScrolledWindow()
+            window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
             window.add(textView)
             notebook.append_page(window, label)        
             parentSize = self.topWindow.get_size()
@@ -219,7 +219,7 @@ class TextFileDisplayDialog(guiplugins.ActionResultDialogGUI):
         else:
             notebook.append_page(textView, label)
             
-        self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
+        self.dialog.vbox.pack_start(notebook, True, True, 0)
         
         
 class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
@@ -239,32 +239,32 @@ class VersionInfoDialogGUI(guiplugins.ActionResultDialogGUI):
         return tuple(versions)
 
     def addContents(self):
-        notebook = gtk.Notebook()
+        notebook = Gtk.Notebook()
         notebook.set_scrollable(True)
         notebook.popup_enable()
         docDir = plugins.installationDir("doc")
         versionInfo = self.readVersionInfo(docDir)
         for version in reversed(sorted(versionInfo.keys())):
-            buffer = gtk.TextBuffer()
+            buffer = Gtk.TextBuffer()
             buffer.set_text(versionInfo[version])
-            textView = gtk.TextView(buffer)
+            textView = Gtk.TextView(buffer)
             textView.set_editable(False)
             textView.set_cursor_visible(False)
             textView.set_left_margin(5)
             textView.set_right_margin(5)
-            scrolledWindow = gtk.ScrolledWindow()
-            scrolledWindow.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+            scrolledWindow = Gtk.ScrolledWindow()
+            scrolledWindow.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
             scrolledWindow.add(textView)
-            scrolledWindow.set_shadow_type(gtk.SHADOW_IN)
+            scrolledWindow.set_shadow_type(Gtk.ShadowType.IN)
             versionStr = ".".join(map(str, version))
-            notebook.append_page(scrolledWindow, gtk.Label(self.labelPrefix() + versionStr))
+            notebook.append_page(scrolledWindow, Gtk.Label(label=self.labelPrefix() + versionStr))
 
         if notebook.get_n_pages() == 0: #pragma : no cover - should never happen
             raise plugins.TextTestError("\nNo " + self.getTitle() + " could be found in\n" + docDir + "\n")
         else:
             parentSize = self.topWindow.get_size()
             self.dialog.resize(int(parentSize[0] * 0.9), int(parentSize[1] * 0.7))
-            self.dialog.vbox.pack_start(notebook, expand=True, fill=True)
+            self.dialog.vbox.pack_start(notebook, True, True, 0)
             
     def labelPrefix(self):
         return ""

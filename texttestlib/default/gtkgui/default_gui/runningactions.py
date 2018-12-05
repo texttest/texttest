@@ -2,8 +2,8 @@
 """
 The various ways to launch the dynamic GUI from the static GUI
 """
-
-import gtk, gobject, os, sys, stat
+from gi.repository import Gtk, GObject
+import os, sys, stat
 from texttestlib import plugins
 from .. import guiplugins
 from copy import copy, deepcopy
@@ -397,13 +397,13 @@ class RunningAction(BasicRunningAction):
             return BasicRunningAction.getConfirmationMessage(self)
 
     def createNotebook(self):
-        notebook = gtk.Notebook()
+        notebook = Gtk.Notebook()
         notebook.set_name("sub-notebook for running")
         tabNames = [ "Basic", "Advanced" ]
         frames = []
         for group in self.optionGroups:
             if group.name in tabNames:
-                label = gtk.Label(group.name)
+                label = Gtk.Label(label=group.name)
                 tab = self.createTab(group, frames)
                 notebook.append_page(tab, label)
             elif len(list(group.keys())) > 0:
@@ -414,19 +414,19 @@ class RunningAction(BasicRunningAction):
         return notebook
 
     def createTab(self, group, frames):
-        tabBox = gtk.VBox()
+        tabBox = Gtk.VBox()
         if frames:
             frames.append(self.createFrame(group, "Miscellaneous"))
             frames.append(self.createFrame(self.temporaryGroup,  self.temporaryGroup.name))
             for frame in frames:
-                tabBox.pack_start(frame, fill=False, expand=False, padding=8)
+                tabBox.pack_start(frame, False, False, 8)
         else:
             self.fillVBox(tabBox, group)
         if isinstance(self, guiplugins.ActionTabGUI):
             # In a tab, we need to duplicate the buttons for each subtab
             # In a dialog we should not do this
             self.createButtons(tabBox)
-        widget = self.addScrollBars(tabBox, hpolicy=gtk.POLICY_AUTOMATIC)
+        widget = self.addScrollBars(tabBox, hpolicy=Gtk.PolicyType.AUTOMATIC)
         widget.set_name(group.name + " Tab")
         return widget
 
@@ -585,7 +585,7 @@ class RerunTests(RunningAction,guiplugins.ActionDialogGUI):
     def fillVBox(self, vbox, optionGroup):
         if optionGroup is self.optionGroup:
             notebook = self.createNotebook()
-            vbox.pack_start(notebook)
+            vbox.pack_start(notebook, True, True, 0)
             return None, None # no file chooser info
         else:
             return guiplugins.ActionDialogGUI.fillVBox(self, vbox, optionGroup, includeOverrides=False)
@@ -800,18 +800,18 @@ class ReplaceText(RunScriptAction, guiplugins.ActionDialogGUI):
 
     def notifyUsecaseRename(self, argstr, *args):
         self.showQueryDialog(self.getParentWindow(), "Usecase names were renamed. Would you like to update them in all usecases now?",
-                             gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respondUsecaseRename, respondData=(argstr, False, "*usecase*,stdout"))
+                             Gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respondUsecaseRename, respondData=(argstr, False, "*usecase*,stdout"))
         
     def notifyShortcutRename(self, argstr, *args):
         self.showQueryDialog(self.getParentWindow(), "Shortcuts were renamed. Would you like to update all usecases now?",
-                             gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respondUsecaseRename, respondData=(argstr, True, "*usecase*"))
+                             Gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respondUsecaseRename, respondData=(argstr, True, "*usecase*"))
 
     def notifyShortcutRemove(self, argstr, *args):
         self.showQueryDialog(self.getParentWindow(), "Shortcuts were removed. Would you like to update all usecases now?",
-                             gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respondUsecaseRename, respondData=(argstr, True, "*usecase*"))
+                             Gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respondUsecaseRename, respondData=(argstr, True, "*usecase*"))
 
     def respondUsecaseRename(self, dialog, ans, args):
-        if ans == gtk.RESPONSE_YES:
+        if ans == Gtk.ResponseType.YES:
             oldName, newName =  args[0].split(" renamed to ")
             if args[1]:
                 self.optionGroup.setValue("regexp", 1)
@@ -930,8 +930,8 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
         if allFilters:
             self.addFilterBoxes(allFilters, fileName, test, versionApp)
         else:
-            messageBox = self.createDialogMessage("No run_dependent_text filters defined for file '" + os.path.basename(fileName) + "' for this test.", gtk.STOCK_DIALOG_INFO)
-            self.dialog.vbox.pack_start(messageBox)
+            messageBox = self.createDialogMessage("No run_dependent_text filters defined for file '" + os.path.basename(fileName) + "' for this test.", Gtk.STOCK_DIALOG_INFO)
+            self.dialog.vbox.pack_start(messageBox, True, True, 0)
             
     def editFilter(self, cell, path, newText, model):
         lineFilter = model[path][0]
@@ -970,12 +970,12 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
             model.remove(iter)
     
     def makePopup(self, *args):
-        menu = gtk.Menu()
-        menuItem = gtk.MenuItem("Add Row")
+        menu = Gtk.Menu()
+        menuItem = Gtk.MenuItem("Add Row")
         menu.append(menuItem)
         menuItem.connect("activate", self.addRow, *args)
         menuItem.show()
-        menuItem = gtk.MenuItem("Remove")
+        menuItem = Gtk.MenuItem("Remove")
         menu.append(menuItem)
         menuItem.connect("activate", self.removeRow, *args)
         menuItem.show()
@@ -989,55 +989,55 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
                 popupMenu.popup(None, None, None, event.button, event.time)
                 
     def addFilterBoxes(self, allFilters, fileName, test, versionApp):
-        filterFrame = gtk.Frame("Filters to apply")
+        filterFrame = Gtk.Frame.new("Filters to apply")
         filterFrame.set_border_width(1)
-        vbox = gtk.VBox()
+        vbox = Gtk.VBox()
         for filterObj in allFilters:
-            listStore = gtk.ListStore(gobject.TYPE_PYOBJECT, bool, str, str, str)
+            listStore = Gtk.ListStore(GObject.TYPE_PYOBJECT, bool, str, str, str)
             for lineFilter in filterObj.lineFilters:
                 lineFilterFile, stem = test.getConfigFileDefining(versionApp, filterObj.configKey, self.getStem(fileName), lineFilter.originalText)
                 relPath = plugins.relpath(lineFilterFile, test.app.getDirectory()) if lineFilterFile else "???"
                 listStore.append([ lineFilter, True, relPath, stem, lineFilter.originalText ])
-            treeView = gtk.TreeView(listStore)
+            treeView = Gtk.TreeView(listStore)
             treeView.set_name(filterObj.configKey + " Tree View")
         
-            cell = gtk.CellRendererText()
+            cell = Gtk.CellRendererText()
             cell.set_property('editable', True)
             cell.connect('edited', self.editFilter, listStore)
-            column = gtk.TreeViewColumn(filterObj.configKey.replace("_", "__"))
-            column.pack_start(cell)
+            column = Gtk.TreeViewColumn(filterObj.configKey.replace("_", "__"))
+            column.pack_start(cell, True)
             column.set_cell_data_func(cell, self.setText)
             treeView.append_column(column)
             
-            toggleCell = gtk.CellRendererToggle()
+            toggleCell = Gtk.CellRendererToggle()
             toggleCell.set_property('activatable', True)
             toggleCell.connect("toggled", self.showToggled, listStore)
-            column = gtk.TreeViewColumn("Enabled", toggleCell, active=1)         
+            column = Gtk.TreeViewColumn("Enabled", toggleCell, active=1)         
             treeView.append_column(column)
             
-            cell = gtk.CellRendererText()
-            column = gtk.TreeViewColumn("Config File", cell, text=2)         
+            cell = Gtk.CellRendererText()
+            column = Gtk.TreeViewColumn("Config File", cell, text=2)         
             treeView.append_column(column)
             
             selection = treeView.get_selection()
-            selection.set_mode(gtk.SELECTION_MULTIPLE)
+            selection.set_mode(Gtk.SelectionMode.MULTIPLE)
             
             popup = self.makePopup(listStore, selection, filterObj.configKey) 
             treeView.connect("button_press_event", self.showPopup, popup)
             
-            frame = gtk.Frame()
+            frame = Gtk.Frame()
             frame.set_border_width(1)
             frame.add(treeView)
-            vbox.pack_start(frame)
+            vbox.pack_start(frame, True, True, 0)
             self.filtersWithModels.append((filterObj, listStore))
         filterFrame.add(vbox)
-        self.dialog.vbox.pack_start(filterFrame, expand=False)
-        self.dialog.vbox.pack_start(gtk.HSeparator(), expand=False)
+        self.dialog.vbox.pack_start(filterFrame, False, True, 0)
+        self.dialog.vbox.pack_start(Gtk.Separator(Gtk.Orientation.HORIZONTAL), False, True, 0)
         frame, self.textBuffer = self.createTextWidget("Filter Text View", scroll=True)
         frame.set_label("Text to filter (copied from " + os.path.basename(fileName) + ")")
         with open(fileName) as f:
             self.textBuffer.set_text(f.read())
-        self.dialog.vbox.pack_start(frame)
+        self.dialog.vbox.pack_start(frame, True, True, 0)
         
     def testFiltering(self, *args):
         filteredText = self.getFilteredText()
@@ -1133,15 +1133,15 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
                         f.write(line)
 
     def createButtons(self):        
-        button = self.dialog.add_button('Test Filtering', gtk.RESPONSE_NONE)
+        button = self.dialog.add_button('Test Filtering', Gtk.ResponseType.NONE)
         button.connect("clicked", self.testFiltering)
-        self.dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL)
-        self.dialog.add_button("Apply and Close", gtk.RESPONSE_ACCEPT)
-        self.dialog.set_default_response(gtk.RESPONSE_ACCEPT)
+        self.dialog.add_button(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
+        self.dialog.add_button("Apply and Close", Gtk.ResponseType.ACCEPT)
+        self.dialog.set_default_response(Gtk.ResponseType.ACCEPT)
         self.dialog.connect("response", self.respond)
 
     def respond(self, dialog, responseId):
-        if responseId == gtk.RESPONSE_ACCEPT:
+        if responseId == Gtk.ResponseType.ACCEPT:
             self.saveChanges()
         guiplugins.ActionResultDialogGUI.respond(self, dialog, responseId)
         
@@ -1165,10 +1165,10 @@ class InsertShortcuts(RunScriptAction, guiplugins.OptionGroupGUI):
     
     def notifyShortcut(self, *args):
         self.showQueryDialog(self.getParentWindow(), "New shortcuts were created. Would you like to insert them into all usecases now?",
-                             gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respondShortcut)
+                             Gtk.STOCK_DIALOG_WARNING, "Confirmation", self.respondShortcut)
         
     def respondShortcut(self, dialog, ans, *args):
-        if ans == gtk.RESPONSE_YES:
+        if ans == Gtk.ResponseType.YES:
             self.performOnCurrent(filterFileOverride=NotImplemented)
         dialog.hide()
         

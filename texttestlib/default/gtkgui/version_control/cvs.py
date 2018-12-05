@@ -1,5 +1,5 @@
-
-import gtk, vcs_independent, datetime, shutil, time, os
+from gi.repository import Gtk
+import vcs_independent, datetime, shutil, time, os
 from texttestlib import plugins
 from .. import guiutils
 from collections import OrderedDict
@@ -197,43 +197,42 @@ class CVSLogLatest(vcs_independent.LogGUI):
     def addContents(self):
         self.pages = OrderedDict()
         self.runAndParse() 
-        self.vbox = gtk.VBox()
+        self.vbox = Gtk.VBox()
         self.addHeader()
         self.addNotebook()
         
     def addHeader(self):
         message = self.getResultDialogMessage()
         if message:
-            hbox = gtk.HBox()
-            icon = gtk.STOCK_DIALOG_INFO
-            hbox.pack_start(self.getStockIcon(icon), expand=False, fill=False)
-            hbox.pack_start(gtk.Label(message), expand=False, fill=False)        
-            alignment = gtk.Alignment()
-            alignment.set(0.0, 1.0, 1.0, 1.0)
+            hbox = Gtk.HBox()
+            icon = Gtk.STOCK_DIALOG_INFO
+            hbox.pack_start(self.getStockIcon(icon), False, False, 0)
+            hbox.pack_start(Gtk.Label(message), False, False, 0)
+            alignment = Gtk.Alignment.new(0.0, 1.0, 1.0, 1.0)
             alignment.set_padding(5, 5, 0, 5)
             alignment.add(hbox)
-            self.vbox.pack_start(alignment, expand=False, fill=False)
+            self.vbox.pack_start(alignment, False, False, 0)
         
     def addNotebook(self):
-        notebook = gtk.Notebook()
+        notebook = Gtk.Notebook()
         notebook.set_scrollable(True)
         notebook.popup_enable()
         for label, content in list(self.pages.items()):
-            buffer = gtk.TextBuffer()
-            # Encode to UTF-8, necessary for gtk.TextView
+            buffer = Gtk.TextBuffer()
+            # Encode to UTF-8, necessary for Gtk.TextView
             buffer.set_text(guiutils.convertToUtf8(content))
-            textView = gtk.TextView(buffer)
+            textView = Gtk.TextView(buffer)
             textView.set_editable(False)
-            window = gtk.ScrolledWindow()
-            window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+            window = Gtk.ScrolledWindow()
+            window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
             window.add(textView)
-            notebook.append_page(window, gtk.Label(label))
+            notebook.append_page(window, Gtk.Label(label=label))
         notebook.show_all()
         if len(notebook.get_children()) > 0: # Resize to a nice-looking dialog window ...
             parentSize = self.topWindow.get_size()
             self.dialog.resize(int(parentSize[0] / 1.5), int(parentSize[0] / 2))
-        self.vbox.pack_start(notebook, expand=True, fill=True)
-        self.dialog.vbox.pack_start(self.vbox, expand=True, fill=True)
+        self.vbox.pack_start(notebook, True, True, 0)
+        self.dialog.vbox.pack_start(self.vbox, True, True, 0)
         
 vcs_independent.vcsClass = CVSInterface
 

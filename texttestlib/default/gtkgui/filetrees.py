@@ -2,8 +2,8 @@
 """
 Module to handle the various file-trees in the GUI
 """
-
-import gtk, gobject, guiutils, os, sys, operator, logging, string
+from gi.repository import Gtk, GObject
+import guiutils, os, sys, operator, logging, string
 from texttestlib import plugins
 from collections import OrderedDict
 from copy import copy
@@ -13,8 +13,8 @@ class FileViewGUI(guiutils.SubGUI):
     inheritedText = "(Inherited from parent suites)"
     def __init__(self, dynamic, title = "", popupGUI = None):
         guiutils.SubGUI.__init__(self)
-        self.model = gtk.TreeStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING,\
-                                   gobject.TYPE_PYOBJECT, gobject.TYPE_STRING, gobject.TYPE_STRING)
+        self.model = Gtk.TreeStore(GObject.TYPE_STRING, GObject.TYPE_STRING, GObject.TYPE_STRING,\
+                                   GObject.TYPE_PYOBJECT, GObject.TYPE_STRING, GObject.TYPE_STRING)
         self.popupGUI = popupGUI
         self.dynamic = dynamic
         self.title = title
@@ -82,14 +82,14 @@ class FileViewGUI(guiutils.SubGUI):
         self.model.clear()
         state = self.getState()
         self.addFilesToModel(state)
-        view = gtk.TreeView(self.model)
+        view = Gtk.TreeView(self.model)
         view.set_name(self.getWidgetName())
         view.set_enable_search(False) # Shouldn't get big enough to need this
         self.selection = view.get_selection()
-        self.selection.set_mode(gtk.SELECTION_MULTIPLE)
+        self.selection.set_mode(Gtk.SelectionMode.MULTIPLE)
         self.selection.set_select_function(self.canSelect)
-        renderer = gtk.CellRendererText()
-        self.nameColumn = gtk.TreeViewColumn(self.title, renderer, text=0, background=1)
+        renderer = Gtk.CellRendererText()
+        self.nameColumn = Gtk.TreeViewColumn(self.title, renderer, text=0, background=1)
         self.nameColumn.set_cell_data_func(renderer, self.renderParentsBold)
         self.nameColumn.set_resizable(True)
         view.append_column(self.nameColumn)
@@ -107,31 +107,31 @@ class FileViewGUI(guiutils.SubGUI):
             self.popupGUI.createView()
 
         view.show()
-        return self.addScrollBars(view, hpolicy=gtk.POLICY_NEVER)
+        return self.addScrollBars(view, hpolicy=Gtk.PolicyType.NEVER)
         # only used in test view
         
     def buttonPressed(self, *args):
         self.selectionChanged(self.selection)
         self.popupGUI.showMenu(*args)
 
-    def renderParentsBold(self, dummyColumn, cell, model, iter):
+    def renderParentsBold(self, dummyColumn, cell, model, iter, data):
         if model.iter_has_child(iter):
             cell.set_property('font', "bold")
         else:
             cell.set_property('font', "")
 
-    def canSelect(self, path):
+    def canSelect(self, selection, model, path, is_selected, user_data):
         pathIter = self.model.get_iter(path)
         return not self.model.iter_has_child(pathIter)
 
     def makeDetailsColumn(self):
         if self.dynamic:
-            renderer = gtk.CellRendererText()
-            column = gtk.TreeViewColumn("Details")
+            renderer = Gtk.CellRendererText()
+            column = Gtk.TreeViewColumn("Details")
             column.set_resizable(True)
-            recalcRenderer = gtk.CellRendererPixbuf()
-            column.pack_start(renderer, expand=True)
-            column.pack_start(recalcRenderer, expand=False)
+            recalcRenderer = Gtk.CellRendererPixbuf()
+            column.pack_start(renderer, True)
+            column.pack_start(recalcRenderer, False)
             column.add_attribute(renderer, 'text', 4)
             column.add_attribute(renderer, 'background', 1)
             column.add_attribute(recalcRenderer, 'stock_id', 5)

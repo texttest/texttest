@@ -2,8 +2,8 @@
 """
 Actions for managing selections and filterings of the test tree
 """
-
-import gtk, os, operator, logging
+from gi.repository import Gtk
+import os, operator, logging
 from texttestlib import plugins
 from .. import guiplugins
 from functools import reduce
@@ -35,7 +35,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         AllTestsHandler.__init__(self)
         self.dynamic = dynamic
         self.filterAccel = None
-        self.filterAction = gtk.Action("Filter", "Filter", \
+        self.filterAction = Gtk.Action("Filter", "Filter", \
                                        self.getFilterTooltip(), self.getStockId())
         self.filterAction.connect("activate", self.filterTests)
         self.selectDiag = logging.getLogger("Select Tests")
@@ -332,10 +332,10 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         return self._createButton(self.filterAction, self.getFilterTooltip())
 
     def createFrame(self, name, group, button):
-        frame = gtk.Frame(name)
+        frame = Gtk.Frame.new(name)
         frame.set_label_align(0.5, 0.5)
-        frame.set_shadow_type(gtk.SHADOW_IN)
-        frameBox = gtk.VBox()
+        frame.set_shadow_type(Gtk.ShadowType.IN)
+        frameBox = Gtk.VBox()
         self.fillVBox(frameBox, group)
         self.addCentralButton(frameBox, button, padding=8)
         frame.add(frameBox)
@@ -354,9 +354,9 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
 
     def createButtons(self, vbox):
         selFrame = self.createFrame("Selection", self.selectionGroup, self.createButton())
-        vbox.pack_start(selFrame, fill=False, expand=False, padding=8)
+        vbox.pack_start(selFrame, False, False, 8)
         filterFrame = self.createFrame("Filtering", self.filteringGroup, self.createFilterButton())
-        vbox.pack_start(filterFrame, fill=False, expand=False, padding=8)
+        vbox.pack_start(filterFrame, False, False, 8)
         self.addCentralButton(vbox, self.createResetButton(), padding=16)
 
 
@@ -455,7 +455,7 @@ class SaveSelection(guiplugins.ActionDialogGUI):
             return "\nThe file \n" + fileName + "\nalready exists.\n\nDo you want to overwrite it?\n"
 
     def getConfirmationDialogSettings(self):
-        return gtk.STOCK_DIALOG_QUESTION, "Query"
+        return Gtk.STOCK_DIALOG_QUESTION, "Query"
 
     def notifySaveSelection(self, fileName, writeCriteria=False):
         try:

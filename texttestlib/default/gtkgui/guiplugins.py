@@ -470,7 +470,8 @@ class ActionGUI(BasicActionGUI):
     
     def _createButton(self, action, tooltip):
         button = Gtk.Button()
-        action.connect_proxy(button)
+        # needs review MB 2018-12-05
+        button.set_related_action(action)
         # In theory all this should be automatic, but it appears not to work
         if self.getStockId():
             image = Gtk.Image.new_from_stock(self.getStockId(), Gtk.IconSize.BUTTON)
@@ -781,7 +782,7 @@ class OptionGroupGUI(ActionGUI):
                 adjustment = Gtk.Adjustment(value=value, lower=option.minimum,
                                             upper=option.maximum, step_incr=1)
                 digits = int(isinstance(value, float))
-                widget = Gtk.SpinButton(adjustment, digits=digits)
+                widget = Gtk.SpinButton.new(adjustment, 0., digits)
                 widget.set_numeric(True)
                 entry = widget
             elif option.usePossibleValues():

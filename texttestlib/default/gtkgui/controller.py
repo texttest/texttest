@@ -515,6 +515,7 @@ class ShortcutBarGUI(guiutils.SubGUI):
         guiutils.SubGUI.__init__(self)
         # Do this first, so we set up interceptors and so on early on
         try:
+            # this should be removed after storytext got ported! MB 2018-12-05
             raise ImportError()
             from storytext import createShortcutBar
             from version_control.custom_widgets_storytext import customEventTypes

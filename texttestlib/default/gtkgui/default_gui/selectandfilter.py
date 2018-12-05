@@ -331,7 +331,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
         return self._createButton(self.filterAction, self.getFilterTooltip())
 
     def createFrame(self, name, group, button):
-        frame = Gtk.Frame(name)
+        frame = Gtk.Frame.new(name)
         frame.set_label_align(0.5, 0.5)
         frame.set_shadow_type(Gtk.ShadowType.IN)
         frameBox = Gtk.VBox()

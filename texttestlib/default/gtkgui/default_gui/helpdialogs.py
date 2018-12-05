@@ -1,3 +1,4 @@
+import gi
 from gi.repository import Gtk, GObject, GdkPixbuf
 import os, sys, glob
 from texttestlib import plugins, texttest_version
@@ -54,7 +55,8 @@ class AboutTextTest(guiplugins.ActionResultDialogGUI):
         messageLabel.set_justify(Gtk.Justification.CENTER)
         # On Windows the default URI hook fails and causes trouble...
         # According to the docs you can set "None" here but that doesn't seem to work...
-        Gtk.link_button_set_uri_hook(lambda x, y : None) 
+        # disabled this MB 2018-12-05
+        # Gtk.link_button_set_uri_hook(lambda x, y : None) 
         urlButton = Gtk.LinkButton(self.website, self.website)
         urlButton.set_property("border-width", 0)
         urlButtonbox = Gtk.HBox()
@@ -117,17 +119,19 @@ class ShowVersions(guiplugins.ActionResultDialogGUI):
         tableVbox = Gtk.VBox()
         tableVbox.pack_start(header, False, False, 0)
         tableVbox.pack_start(table, True, True, 0)
-        centeredTable = Gtk.Alignment.new(0.5)
+        centeredTable = Gtk.Alignment.new(0.5, 0.5, 1.0, 1.0)
         centeredTable.add(tableVbox)
-        vbox.pack_start(centeredTable, True, True, 0, **kw)
+        padding = 0
+        if "padding" in kw:
+            padding = kw["padding"]
+            del kw["padding"]
+        vbox.pack_start(centeredTable, True, True, padding, **kw)
     
     def addContents(self):
         versionList = [ ("TextTest", texttest_version.version),
                         ("Python", sys.version_info),
-                        ("GTK", Gtk.gtk_version),
-                        ("PyGTK",  Gtk.pygtk_version),
-                        ("PyGObject", GObject.pygobject_version),
-                        ("GLib", GObject.glib_version) ]
+                        ("GTK", (Gtk.get_major_version(), Gtk.get_minor_version(), Gtk.get_micro_version())),
+                        ("PyGI", gi.version_info) ]
 
         installationList = [ ("Test Suite", os.getenv("TEXTTEST_HOME")),
                              ("TextTest", plugins.installationRoots[0]),
@@ -200,7 +204,7 @@ class TextFileDisplayDialog(guiplugins.ActionResultDialogGUI):
             self.showErrorDialog("Failed to show " + self.fileName + " file:\n" + str(e))
             return
 
-        textView = Gtk.TextView(buffer)
+        textView = Gtk.TextView.new_with_buffer(buffer)
         textView.set_editable(False)
         textView.set_cursor_visible(False)
         textView.set_left_margin(5)

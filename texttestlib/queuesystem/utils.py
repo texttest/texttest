@@ -5,6 +5,7 @@ Utilities for both master and slave code
 
 import os, socket
 from texttestlib import plugins
+from locale import getpreferredencoding
 
 noReusePostfix = ".NO_REUSE"
 rerunPostfix = ".RERUN_TEST"
@@ -52,19 +53,19 @@ def makeIdentifierLine(identifier, sendFiles=False, getFiles=False, noReuse=Fals
     return identifier
 
 def parseIdentifier(line):
-    rerun = line.endswith(rerunPostfix)
+    rerun = line.endswith(rerunPostfix.encode(getpreferredencoding()))
     if rerun:
         line = line.replace(rerunPostfix, "")
             
-    tryReuse = not line.endswith(noReusePostfix)
+    tryReuse = not line.endswith(noReusePostfix.encode(getpreferredencoding()))
     if not tryReuse:
         line = line.replace(noReusePostfix, "")
 
-    sendFiles = line.endswith(sendFilePostfix)
+    sendFiles = line.endswith(sendFilePostfix.encode(getpreferredencoding()))
     if sendFiles:
         line = line.replace(sendFilePostfix, "")
         
-    getFiles = line.endswith(getFilePostfix)
+    getFiles = line.endswith(getFilePostfix.encode(getpreferredencoding()))
     if getFiles:
         line = line.replace(getFilePostfix, "")
 

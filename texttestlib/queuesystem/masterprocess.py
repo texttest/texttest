@@ -916,7 +916,7 @@ class TestSubmissionRules(SubmissionRules):
 
 class SlaveRequestHandler(StreamRequestHandler):
     def handle(self):
-        identifier = self.rfile.readline().strip()
+        identifier = str(self.rfile.readline().strip(), getpreferredencoding())
         if identifier == "TERMINATE_SERVER":
             return
 
@@ -925,7 +925,7 @@ class SlaveRequestHandler(StreamRequestHandler):
     def handleMessage(self, identifier):
         # Don't use port, it changes all the time
         identifier, sendFiles, getFiles, tryReuse, rerun = parseIdentifier(identifier)
-        testString = self.rfile.readline().strip()
+        testString = str(self.rfile.readline().strip(), getpreferredencoding())
         test = self.server.getTest(testString)    
         if test is None:
             clientHost = self.client_address[0]
@@ -951,7 +951,7 @@ class SlaveRequestHandler(StreamRequestHandler):
             return ipAddress
         
     def pushFiles(self, test):
-        userAndHost = self.rfile.readline().strip()
+        userAndHost = str(self.rfile.readline().strip(), getpreferredencoding())
         paths = []
         for line in self.rfile:
             paths.append(line.strip())

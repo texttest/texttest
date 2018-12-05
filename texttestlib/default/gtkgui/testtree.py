@@ -310,7 +310,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         self.selection = self.treeView.get_selection()
         self.selection.set_mode(Gtk.SelectionMode.MULTIPLE)
         if self.dynamic:
-            self.selection.set_select_function(self.canSelect)
+            self.selection.set_select_function(self.canSelect, self)
 
         testsColumn = self.subguis[0].createView()
         self.treeView.append_column(testsColumn)
@@ -343,7 +343,8 @@ class TestTreeGUI(guiutils.ContainerGUI):
         # avoid the quit button getting initial focus, give it to the tree view (why not?)
         self.treeView.grab_focus()
 
-    def canSelect(self, selection, model, path, is_selected, user_data):
+    @staticmethod
+    def canSelect(selection, model, path, is_selected, self):
         pathIter = self.filteredModel.get_iter(path)
         test = self.filteredModel.get_value(pathIter, 2)[0]
         return test.classId() == "test-case" or test in self.testSuitesWithResults

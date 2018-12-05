@@ -74,11 +74,10 @@ class StatusMonitorGUI(guiutils.SubGUI):
         try:
             staticIcon = os.path.join(imageDir, "throbber_inactive.png")
             temp = GdkPixbuf.Pixbuf.new_from_file(staticIcon)
-            self.throbber = Gtk.Image()
-            self.throbber.set_from_pixbuf(temp)
+            self.throbber = Gtk.Image.new_from_pixbuf(temp)
             animationIcon = os.path.join(imageDir, "throbber_active.gif")
-            self.animation = GdkPixbuf.PixbufAnimation(animationIcon)
-            hbox.pack_end(self.throbber, expand=False, fill=False)
+            self.animation = GdkPixbuf.PixbufAnimation.new_from_file(animationIcon)
+            hbox.pack_end(self.throbber, False, False, 0)
         except Exception, e:
             plugins.printWarning("Failed to create icons for the status throbber:\n" + str(e) + \
                                  "\nAs a result, the throbber will be disabled.", stdout=True)

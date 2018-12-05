@@ -989,7 +989,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
                 popupMenu.popup(None, None, None, event.button, event.time)
                 
     def addFilterBoxes(self, allFilters, fileName, test, versionApp):
-        filterFrame = Gtk.Frame("Filters to apply")
+        filterFrame = Gtk.Frame.new("Filters to apply")
         filterFrame.set_border_width(1)
         vbox = Gtk.VBox()
         for filterObj in allFilters:

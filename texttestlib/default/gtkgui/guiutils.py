@@ -117,10 +117,9 @@ class RefreshTips:
 
 
 def addRefreshTips(view, *args):
-    if Gtk.gtk_version >= (2, 12, 0): # Tree view tooltips don't exist prior to this version
-        view.set_property("has-tooltip", True)
-        refreshTips = RefreshTips(*args)
-        view.connect("query-tooltip", refreshTips.getTooltip)
+    view.set_property("has-tooltip", True)
+    refreshTips = RefreshTips(*args)
+    view.connect("query-tooltip", refreshTips.getTooltip)
 
 
 class GUIConfig:

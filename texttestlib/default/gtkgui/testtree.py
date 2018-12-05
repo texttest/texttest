@@ -2,7 +2,7 @@
 """
 Code associated with the left-hand tree view for tests 
 """
-from gi.repository import Gtk, GObject
+from gi.repository import Gtk, GObject, Pango
 import guiutils, logging
 from texttestlib import plugins
 from ordereddict import OrderedDict
@@ -320,8 +320,8 @@ class TestTreeGUI(guiutils.ContainerGUI):
             detailsRenderer.set_property('wrap-mode', Pango.WrapMode.WORD_CHAR)
             recalcRenderer = Gtk.CellRendererPixbuf()
             detailsColumn = Gtk.TreeViewColumn("Details")
-            detailsColumn.pack_start(detailsRenderer, True, True, 0)
-            detailsColumn.pack_start(recalcRenderer, False, True, 0)
+            detailsColumn.pack_start(detailsRenderer, True)
+            detailsColumn.pack_start(recalcRenderer, False)
             detailsColumn.add_attribute(detailsRenderer, 'text', 3)
             detailsColumn.add_attribute(detailsRenderer, 'background', 4)
             detailsColumn.add_attribute(recalcRenderer, 'stock_id', 6)

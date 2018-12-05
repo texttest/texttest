@@ -168,8 +168,7 @@ class ToolBarGUI(guiutils.ContainerGUI):
         if progressBarGUI.shouldShow():
             progressBar = progressBarGUI.createView()
             width = 7 # Looks good, same as Gtk.Paned border width
-            alignment = Gtk.Alignment.new()
-            alignment.set(1.0, 1.0, 1.0, 1.0)
+            alignment = Gtk.Alignment.new(1.0, 1.0, 1.0, 1.0)
             alignment.set_padding(width, width, 1, width)
             alignment.add(progressBar)
             toolItem = Gtk.ToolItem()

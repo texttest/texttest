@@ -222,7 +222,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
     def createDialogMessage(self, message, stockIcon):
         buffer = Gtk.TextBuffer()
         buffer.set_text(message)
-        textView = Gtk.TextView(buffer)
+        textView = Gtk.TextView.new_with_buffer(buffer)
         textView.set_editable(False)
         textView.set_cursor_visible(False)
         textView.set_left_margin(5)
@@ -239,7 +239,7 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         scrolledWindow.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.NEVER)
         scrolledWindow.add(textView)
         scrolledWindow.set_shadow_type(Gtk.ShadowType.IN)
-        hbox.pack_start(scrolledWindow, True, True)
+        hbox.pack_start(scrolledWindow, True, True, 0)
         alignment = Gtk.Alignment.new(0.5, 0.5, 1.0, 1.0)
         alignment.set_padding(5, 5, 0, 5)
         alignment.add(hbox)
@@ -260,7 +260,9 @@ class BasicActionGUI(SubGUI,GtkActionWrapper):
         dialogTitle = "TextTest " + alarmLevel
         dialog = Gtk.Dialog(dialogTitle, parent, flags=Gtk.DialogFlags.MODAL) 
         dialog.set_modal(True)
-        dialog.set_has_separator(False)
+        # may need review MB 2018-12-05
+        # there may be a flag achieving the behavior, as mentioned here http://docs.adacore.com/live/wave/gtkada/html/gtkada_ug/transition.html
+        # dialog.set_has_separator(False)
         
         contents = self.createDialogMessage(message, stockIcon)
         dialog.vbox.pack_start(contents, True, True, 0)
@@ -1120,7 +1122,7 @@ class ActionDialogGUI(OptionGroupGUI):
             return OptionGroupGUI.createRadioButtonCollection(self, switch, optionGroup)
 
         if switch.name:
-            frame = Gtk.Frame(switch.name)
+            frame = Gtk.Frame.new(switch.name)
         else:
             frame = Gtk.Frame()
         frameBox = Gtk.VBox()

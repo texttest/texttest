@@ -960,7 +960,9 @@ class SlaveRequestHandler(StreamRequestHandler):
     def sendReuseResponse(self, *args):
         newTest = QueueSystemServer.instance.getTestForReuse(*args)
         if newTest:
-            self.wfile.write(socketSerialise(newTest))
+            response = socketSerialise(newTest)
+            self.server.diag.info("Sending reuse response " + response)
+            self.wfile.write(response.encode(getpreferredencoding()))
 
     def handleRequestFromHost(self, test, pid, tryReuse, rerun):
         # The updates are only for testing against old slave traffic,

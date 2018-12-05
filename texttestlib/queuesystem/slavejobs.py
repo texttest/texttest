@@ -141,7 +141,7 @@ class SocketResponder(plugins.Responder,plugins.Observable):
             # Remote socket, possibly firewalls that kill connections, possibly other things. Use timeout and be prepared to retry...
             # TCP timeout is typically 30 seconds, give up a bit before that
             sendSocket.settimeout(25)
-        response = sendSocket.makefile().read()
+        response = sendSocket.makefile('rb').read()
         sendSocket.close()
         return str(response, getpreferredencoding())
 

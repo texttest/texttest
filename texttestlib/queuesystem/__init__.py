@@ -35,7 +35,7 @@ class QueueSystemConfig(default.Config):
 
     def addToOptionGroups(self, apps, groups):
         default.Config.addToOptionGroups(self, apps, groups)
-        minTestCount = min((app.getConfigValue("queue_system_min_test_count") for app in apps))
+        minTestCount = min((app.getConfigValue("queue_system_min_test_count") for app in apps if app.getConfigValue("queue_system_min_test_count") is not None))
         localQueueSystem = utils.useLocalQueueSystem(apps)
         useGrid = all((app.getConfigValue("queue_system_module") not in [ "local", "ec2cloud" ] for app in apps))
         QueueSystemConfig.useCloud = all((app.getConfigValue("queue_system_module") == "ec2cloud" for app in apps))

@@ -72,11 +72,6 @@ class Utf8Converter:
 
         return str(text, encodingsToTry[0], errors="replace")
 
-utf8Converter = Utf8Converter()
-
-def convertToUtf8(*args): # Gtk.TextViews insist we do the conversion ourselves
-    return utf8Converter.convert(*args)
-
 def getImageDir():
     retro = guiConfig.getValue("retro_icons")
     currImageDir = plugins.installationDir("images")
@@ -155,7 +150,8 @@ class GUIConfig:
                 self.apps.append(suite.app)
 
     def makeColourDictionary(self):
-        dict = {}
+        if self.configDir.get("test_colours") is None:
+            return dict
         for key, value in list(self.configDir.get("test_colours").items()):
             dict[self.getConfigName(key)] = value
         return dict

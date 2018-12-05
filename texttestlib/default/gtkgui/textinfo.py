@@ -82,14 +82,12 @@ class TextViewGUI(guiutils.SubGUI):
 
     def updateViewFromText(self, text):
         textbuffer = self.view.get_buffer()
-        # Encode to UTF-8, necessary for Gtk.TextView
-        textToUse = guiutils.convertToUtf8(text, self.getEnvironmentLookup())
-        if self.linkMarker in textToUse:
+        if self.linkMarker in text:
             self.view.connect("event-after", self.event_after)
             self.view.connect("motion-notify-event", self.motion_notify_event)
             self.setHyperlinkText(textbuffer, textToUse)
         else:
-            textbuffer.set_text(textToUse)
+            textbuffer.set_text(text)
 
     def getEnvironmentLookup(self):
         pass

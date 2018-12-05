@@ -9,6 +9,7 @@ from . import guiutils
 from texttestlib import plugins
 from collections import OrderedDict
 from pprint import pformat
+from functools import cmp_to_key
 
 class MenuBarGUI(guiutils.SubGUI):
     def __init__(self, dynamic, uiManager, actionGUIs, menuNames, *args):
@@ -85,7 +86,7 @@ class MenuBarGUI(guiutils.SubGUI):
     def getGUIDescriptionFileNames(self):
         # Pick up all GUI descriptions corresponding to modules we've loaded
         loadFiles = list(filter(self.shouldLoad, self.allFiles))
-        loadFiles.sort(self.cmpDescFiles)
+        loadFiles.sort(key=cmp_to_key(self.cmpDescFiles))
         return loadFiles
 
     def cmpDescFiles(self, file1, file2):
@@ -95,12 +96,12 @@ class MenuBarGUI(guiutils.SubGUI):
         default1 = base1 in basicFiles
         default2 = base2 in basicFiles
         if default1 != default2:
-            return cmp(default2, default1) # Hard code the three files above, they define the basic framework and should come first
+            return (default2 > default1) - (default2 < default1) # Hard code the three files above, they define the basic framework and should come first
         partCount1 = base1.count("-")
         partCount2 = base2.count("-")
         if partCount1 != partCount2:
-            return cmp(partCount1, partCount2) # less - implies read first (not mode-specific)
-        return cmp(base2, base1) # something deterministic, just to make sure it's the same for everyone
+            return (partCount1 > partCount2) - (partCount1 < partCount2)# less - implies read first (not mode-specific)
+        return (base2 > base1) - (base2 < base1) # something deterministic, just to make sure it's the same for everyone
     
     def shouldLoad(self, fileName):
         # Infer whether a file should be loaded

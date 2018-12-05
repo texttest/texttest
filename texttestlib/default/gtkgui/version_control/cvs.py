@@ -3,6 +3,7 @@ import vcs_independent, datetime, shutil, time, os
 from texttestlib import plugins
 from .. import guiutils
 from collections import OrderedDict
+import sys
 
 #
 # Todo/improvements:
@@ -220,7 +221,7 @@ class CVSLogLatest(vcs_independent.LogGUI):
         for label, content in list(self.pages.items()):
             buffer = Gtk.TextBuffer()
             # Encode to UTF-8, necessary for Gtk.TextView
-            buffer.set_text(guiutils.convertToUtf8(content))
+            buffer.set_text(content)
             textView = Gtk.TextView(buffer)
             textView.set_editable(False)
             window = Gtk.ScrolledWindow()

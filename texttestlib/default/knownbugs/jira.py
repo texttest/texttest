@@ -28,14 +28,10 @@ import xmlrpc.client, re, urllib.request, urllib.parse, urllib.error
 from collections import OrderedDict
 
 def convertToString(value):
-    if type(value) in (str, str):
-        ret = value.replace("\r", "") # Get given Windows line endings but Python doesn't use them internally
-        if type(ret) == str:
-            import locale
-            encoding = locale.getdefaultlocale()[1] or "utf-8"
-            return ret.encode(encoding, "replace")
-        else:
-            return ret
+    if type(value) in (str, bytes):
+        if type(value) == str:
+            value = value.replace("\r", "") # Get given Windows line endings but Python doesn't use them internally
+        return value
     else:
         return ", ".join(map(convertDictToString, value))
 

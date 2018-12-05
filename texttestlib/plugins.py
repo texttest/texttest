@@ -87,6 +87,13 @@ def localtime(format=datetimeFormat):
 def startTimeString(format=datetimeFormat):
     return globalStartTime.strftime(format)
 
+def isModuleMissing(errorString, moduleName):
+    if not errorString.startswith("No module named"):
+        return False
+    
+    moduleMissing = errorString.split()[-1][1:-1]
+    return moduleName.startswith(moduleMissing)
+
 def importAndCall(moduleName, callableName, *args):
     command = "from " + moduleName + " import " + callableName + " as _callable"
     namespace = {}
@@ -94,8 +101,7 @@ def importAndCall(moduleName, callableName, *args):
         exec(command, globals(), namespace)
     except ImportError as err:
         # try resolve import by prepending 'texttestlib.' (python3)
-        errorString = "No module named '" + moduleName + "'"
-        if str(err) == errorString:
+        if isModuleMissing(str(err), moduleName):
             moduleName = "texttestlib." + moduleName
             command = "from " + moduleName + " import " + callableName + " as _callable"
             exec(command, globals(), namespace)
@@ -787,8 +793,11 @@ class TestStateUnpickler(Unpickler):
                 raise e
 
 def getNewTestStateFromFile(file):
-    from io import StringIO
-    unpickler = TestStateUnpickler(file)
+    if os.name == "posix":
+        from io import BytesIO
+        unpickler = TestStateUnpickler(BytesIO(file.read().replace(b"\r\n", b"\n")))
+    else:
+        unpickler = TestStateUnpickler(file)
     return unpickler.load()
 
 

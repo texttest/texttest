@@ -277,7 +277,7 @@ class ReconnectTest(plugins.Action):
         stateFile = os.path.join(location, "framework_tmp", "teststate")
         if os.path.isfile(stateFile):
             newTmpPath = os.path.dirname(self.rootDirToCopy)
-            loaded, newState = test.getNewState(open(stateFile, "rU"), updatePaths=True, newTmpPath=newTmpPath)
+            loaded, newState = test.getNewState(open(stateFile, "rb"), updatePaths=True, newTmpPath=newTmpPath)
             self.diag.info("Loaded state file at " + stateFile + " - " + repr(loaded))
             if loaded and self.modifyState(test, newState): # if we can't read it, recompute it
                 stateToUse = newState

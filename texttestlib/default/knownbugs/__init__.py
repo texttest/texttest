@@ -64,8 +64,9 @@ class BugSystemBug(Bug):
         return category, briefText, self.getRerunText() + bugText
 
     def findBugInfo(self, bugId, location, username, password):
-        exec("from " + self.bugSystem + " import findBugInfo as _findBugInfo")
-        return _findBugInfo(self.bugId, location, username, password) #@UndefinedVariable
+        namespace = {}
+        exec("from ." + self.bugSystem + " import findBugInfo as _findBugInfo", globals(), namespace)
+        return namespace["_findBugInfo"](self.bugId, location, username, password) #@UndefinedVariable
 
 class UnreportedBug(Bug):
     def __init__(self, fullText, briefText, internalError, priorityStr, *args):
@@ -358,7 +359,7 @@ class CheckForCrashes(plugins.Action):
     def parseStackTrace(self, test, stackTraceFile):
         lines = open(stackTraceFile).readlines()
         if len(lines) > 2:
-            return lines[0].strip(), string.join(lines[2:], "")
+            return lines[0].strip(), "".join(lines[2:])
         else:
             errFile = test.makeTmpFileName("stacktrace.collate_errs", forFramework=1)
             script = test.getCompositeConfigValue("collate_script", "stacktrace")[0]

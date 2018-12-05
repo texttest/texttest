@@ -2229,7 +2229,7 @@ class OptionFinder(plugins.OptionFinder):
                 return plugins.importAndCall(module, className, actionArgs)
             else:
                 return plugins.importAndCall(module, className)
-        except:
+        except ImportError:
             # Backwards compatibility : many scripts are now in the default package
             excString = plugins.getExceptionString()
             if not module.startswith("default"):

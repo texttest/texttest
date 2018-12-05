@@ -71,7 +71,7 @@ class GenerateGraphs(GenerateFromSummaryData):
     @classmethod
     def generate(cls, dataFinder, appsWithVersions, *args):
         from .resultgraphs import GraphGenerator
-        for appName, versions in list(appsWithVersions.items()):
+        for appName, versions in sorted(list(appsWithVersions.items())):
             for version in versions:
                 results = dataFinder.getAllSummaries(appName, version)
                 if len(results) > 1:

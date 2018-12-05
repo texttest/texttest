@@ -146,14 +146,15 @@ class VirtualDisplayResponder(plugins.Responder):
             preexec_fn = None if machine == "localhost" else self.ignoreSignals
             xvfbOrSshProc = subprocess.Popen(command, preexec_fn=preexec_fn, stdin=open(os.devnull), stdout=subprocess.PIPE, stderr=open(os.devnull, "w"))
             line = plugins.retryOnInterrupt(xvfbOrSshProc.stdout.readline)
-            if "Time Out!" in line:
+            if b"Time Out!" in line:
                 xvfbOrSshProc.wait()
                 xvfbOrSshProc.stdout.close()
                 self.diag.info("Timed out waiting for Xvfb to come up")
                 # We try again and hope for a better process ID!
                 continue
             try:
-                displayNum, xvfbPid = list(map(int, line.strip().split(",")))
+                print(line)
+                displayNum, xvfbPid = list(map(int, line.strip().split(b",")))
                 xvfbOrSshProc.stdout.close()
                 return self.getDisplayName(machine, displayNum), xvfbPid, xvfbOrSshProc
             except ValueError: #pragma : no cover - should never happen, just a fail-safe

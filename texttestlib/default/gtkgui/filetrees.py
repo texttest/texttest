@@ -88,7 +88,7 @@ class FileViewGUI(guiutils.SubGUI):
         view.set_enable_search(False) # Shouldn't get big enough to need this
         self.selection = view.get_selection()
         self.selection.set_mode(Gtk.SelectionMode.MULTIPLE)
-        self.selection.set_select_function(self.canSelect)
+        self.selection.set_select_function(self.canSelect, self.dynamic)
         renderer = Gtk.CellRendererText()
         self.nameColumn = Gtk.TreeViewColumn(self.title, renderer, text=0, background=1)
         self.nameColumn.set_cell_data_func(renderer, self.renderParentsBold)
@@ -121,9 +121,10 @@ class FileViewGUI(guiutils.SubGUI):
         else:
             cell.set_property('font', "")
 
-    def canSelect(self, selection, model, path, is_selected, user_data):
-        pathIter = self.model.get_iter(path)
-        return not self.model.iter_has_child(pathIter)
+    @staticmethod
+    def canSelect(selection, model, path, is_selected, user_data):
+        pathIter = model.get_iter(path)
+        return not model.iter_has_child(pathIter)
 
     def makeDetailsColumn(self):
         if self.dynamic:
@@ -374,10 +375,11 @@ class TestFileGUI(FileViewGUI):
         FileViewGUI.__init__(self, dynamic, "", popupGUI)
         self.currentTest = None
 
-    def canSelect(self, path):
-        if self.dynamic:
-            pathIter = self.model.get_iter(path)
-            return self.model.iter_parent(pathIter) is not None
+    @staticmethod
+    def canSelect(selection, model, path, is_selected, dynamic):
+        if dynamic:
+            pathIter = model.get_iter(path)
+            return model.iter_parent(pathIter) is not None
         else:
             return True
 

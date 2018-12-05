@@ -226,9 +226,10 @@ class TestProgressMonitor(guiutils.SubGUI):
         self.treeView.show()
         return self.addScrollBars(self.treeView, hpolicy=Gtk.PolicyType.NEVER)
 
-    def canSelect(self, selection, model, path, is_selected, user_data):
-        pathIter = self.treeModel.get_iter(path)
-        return self.treeModel.get_value(pathIter, 2)
+    @staticmethod
+    def canSelect(selection, model, path, is_selected, user_data):
+        pathIter = model.get_iter(path)
+        return model.get_value(pathIter, 2)
 
     def notifyAdd(self, test, initial):
         if self.dynamic and test.classId() == "test-case":

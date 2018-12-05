@@ -84,6 +84,7 @@ class SelectTests(guiplugins.ActionTabGUI, AllTestsHandler):
 
     def setRadioButtonName(self, radioButton, option, optionGroup):
         radioButton.set_name(option + " for " + optionGroup.name)
+        radioButton.set_label(option)
 
     def findDefaultTestFile(self, allStems):
         for app in self.validApps:

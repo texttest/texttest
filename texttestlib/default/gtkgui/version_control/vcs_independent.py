@@ -574,7 +574,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
             self.infoColumn = custom_widgets.ButtonedTreeViewColumn(self.getResultDialogSecondColumnTitle(), infoRenderer, markup=2)
             self.infoColumn.set_resizable(True)
             self.treeView.append_column(self.infoColumn)
-        self.treeView.get_selection().set_select_function(self.canSelect)
+        self.treeView.get_selection().set_select_function(self.canSelect, self)
         self.treeView.expand_all()
 
         if len(self.pages) > 0:
@@ -598,7 +598,8 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         else:
             self.extraWidgetArea.set_sensitive(False)
 
-    def canSelect(self, selection, model, path, is_selected, user_data):
+    @staticmethod
+    def canSelect(selection, model, path, is_selected, self):
         return not self.treeModel.iter_has_child(
             self.treeModel.get_iter(self.filteredTreeModel.convert_path_to_child_path(path)))
 

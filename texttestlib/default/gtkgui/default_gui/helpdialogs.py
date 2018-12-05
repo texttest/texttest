@@ -2,7 +2,6 @@ from gi.repository import Gtk, GObject, GdkPixbuf
 import os, sys, glob
 from texttestlib import plugins, texttest_version
 from .. import guiplugins, guiutils
-from types import StringType
 
 # Show useful info about TextTest.
 # I don't particularly like the standard Gtk.AboutDialog, and we also want
@@ -100,7 +99,7 @@ class ShowVersions(guiplugins.ActionResultDialogGUI):
         return "Version Information"
 
     def makeString(self, versionTuple):
-        if type(versionTuple) == StringType:
+        if type(versionTuple) is str:
             return versionTuple
         else:
             return ".".join(map(str, versionTuple))

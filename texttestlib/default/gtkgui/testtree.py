@@ -3,7 +3,8 @@
 Code associated with the left-hand tree view for tests 
 """
 from gi.repository import Gtk, GObject, Pango
-import guiutils, logging
+from . import guiutils
+import logging
 from texttestlib import plugins
 from collections import OrderedDict
 

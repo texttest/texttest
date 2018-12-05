@@ -4,7 +4,8 @@ The various text info views, i.e. the bottom right-corner "Text Info" and
 the "Run Info" tab from the dynamic GUI
 """
 from gi.repository import Gtk, GObject, Gdk
-import guiutils, os, sys, datetime, guiplugins
+import os, sys, datetime
+from . import guiutils, guiplugins
 from texttestlib import plugins
 from texttestlib.default import performance
 

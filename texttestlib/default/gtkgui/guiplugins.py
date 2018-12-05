@@ -1,6 +1,7 @@
 from gi.repository import Gtk, GObject
 
-import entrycompletion, os, subprocess, types, logging, sys
+import os, subprocess, types, logging, sys
+from . import entrycompletion
 from texttestlib import plugins
 from .guiutils import guiConfig, SubGUI, GUIConfig, createApplicationEvent
 from texttestlib.jobprocess import killSubProcessAndChildren

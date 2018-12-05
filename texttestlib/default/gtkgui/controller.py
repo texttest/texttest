@@ -32,7 +32,8 @@ try:
 except Exception as e:
     raiseException("Unable to import module 'gobject' - " + str(e))
 
-import testtree, filetrees, statusviews, textinfo, actionholders, version_control, guiplugins, guiutils, os, sys, logging
+from . import testtree, filetrees, statusviews, textinfo, actionholders, version_control, guiplugins, guiutils
+import os, sys, logging
 from texttestlib import plugins
 from copy import copy
 from collections import OrderedDict
@@ -753,11 +754,14 @@ class InteractiveActionHandler:
         try:
             exec("from " + module + " import InteractiveActionConfig")
             return InteractiveActionConfig() #@UndefinedVariable
-        except ImportError:
-            self.diag.info("Rejected GUI configuration from module " + repr(module) + "\n" + plugins.getExceptionString())
-            self.rejectedModules.append(module) # Make sure we don't try and import it again
-            if module == "default_gui": # pragma: no cover - only to aid debugging default_gui
-                raise
+        except ImportError as err:
+            try:
+                exec("from ." + module + " import InteractiveActionConfig")
+            except:
+                self.diag.info("Rejected GUI configuration from module " + repr(module) + "\n" + plugins.getExceptionString())
+                self.rejectedModules.append(module) # Make sure we don't try and import it again
+                if module == "default_gui": # pragma: no cover - only to aid debugging default_gui
+                    raise
         
     def getInstances(self):
         instances = []

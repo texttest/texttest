@@ -3,7 +3,8 @@
 Module to handle the various file-trees in the GUI
 """
 from gi.repository import Gtk, GObject
-import guiutils, os, sys, operator, logging, string
+from . import guiutils
+import os, sys, operator, logging, string
 from texttestlib import plugins
 from collections import OrderedDict
 from copy import copy

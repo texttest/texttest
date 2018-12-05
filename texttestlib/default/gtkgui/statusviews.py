@@ -4,7 +4,8 @@ Module for the various widgets that keep an overall view of the status or progre
 of the current run/setup
 """
 from gi.repository import Gtk, GObject, Pango, GdkPixbuf
-import guiutils, os, logging
+from . import guiutils
+import os, logging
 from texttestlib import plugins
 from collections import OrderedDict
 from copy import copy

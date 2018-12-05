@@ -11,6 +11,7 @@ from texttestlib.default.sandbox import FindExecutionHosts, MachineInfoFinder
 from texttestlib.default.actionrunner import ActionRunner
 from texttestlib.utils import getUserName
 from pickle import dumps
+from locale import getpreferredencoding
 
 def importAndCallFromQueueSystem(app, *args):
     moduleName = "queuesystem." + queueSystemName(app).lower()
@@ -104,13 +105,13 @@ class SocketResponder(plugins.Responder,plugins.Observable):
 
     def notifyLifecycleChange(self, test, state, changeDesc):
         testData = socketSerialise(test)
-        pickleData = dumps(state)
+        pickleData = dumps(state, protocol=2)
         sendFiles = self.synchFiles and changeDesc == "complete" and (self.transferAll or not test.state.hasSucceeded())
         fullData = self.getProcessIdentifier(test, sendFiles) + os.linesep + testData + os.linesep
         if sendFiles:
             fullData += directorySerialise(test.writeDirectory) + os.linesep
-        fullData += pickleData
-        return self.sendAndInterpret(fullData, self.interpretResponse, state)
+        fullDataBytes = fullData.encode(getpreferredencoding()) + pickleData
+        return self.sendAndInterpret(fullDataBytes, self.interpretResponse, state)
         
     def sendAndInterpret(self, fullData, responseMethod, *args):
         sleepTime = 1
@@ -142,7 +143,7 @@ class SocketResponder(plugins.Responder,plugins.Observable):
             sendSocket.settimeout(25)
         response = sendSocket.makefile().read()
         sendSocket.close()
-        return response
+        return str(response, getpreferredencoding())
 
     def interpretResponse(self, response, state):
         if len(response) > 0:

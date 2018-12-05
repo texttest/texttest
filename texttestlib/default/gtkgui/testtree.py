@@ -343,7 +343,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         # avoid the quit button getting initial focus, give it to the tree view (why not?)
         self.treeView.grab_focus()
 
-    def canSelect(self, path):
+    def canSelect(self, selection, model, path, is_selected, user_data):
         pathIter = self.filteredModel.get_iter(path)
         test = self.filteredModel.get_value(pathIter, 2)[0]
         return test.classId() == "test-case" or test in self.testSuitesWithResults

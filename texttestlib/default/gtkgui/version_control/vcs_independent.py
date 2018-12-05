@@ -598,7 +598,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         else:
             self.extraWidgetArea.set_sensitive(False)
 
-    def canSelect(self, path):
+    def canSelect(self, selection, model, path, is_selected, user_data):
         return not self.treeModel.iter_has_child(
             self.treeModel.get_iter(self.filteredTreeModel.convert_path_to_child_path(path)))
 

@@ -3,7 +3,7 @@
 Module for the various widgets that keep an overall view of the status or progress
 of the current run/setup
 """
-from gi.repository import Gtk, GObject, Pango
+from gi.repository import Gtk, GObject, Pango, GdkPixbuf
 import guiutils, os, logging
 from texttestlib import plugins
 from ordereddict import OrderedDict
@@ -226,7 +226,7 @@ class TestProgressMonitor(guiutils.SubGUI):
         self.treeView.show()
         return self.addScrollBars(self.treeView, hpolicy=Gtk.PolicyType.NEVER)
 
-    def canSelect(self, path):
+    def canSelect(self, selection, model, path, is_selected, user_data):
         pathIter = self.treeModel.get_iter(path)
         return self.treeModel.get_value(pathIter, 2)
 

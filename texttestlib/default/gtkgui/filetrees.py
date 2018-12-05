@@ -119,7 +119,7 @@ class FileViewGUI(guiutils.SubGUI):
         else:
             cell.set_property('font', "")
 
-    def canSelect(self, path):
+    def canSelect(self, selection, model, path, is_selected, user_data):
         pathIter = self.model.get_iter(path)
         return not self.model.iter_has_child(pathIter)
 

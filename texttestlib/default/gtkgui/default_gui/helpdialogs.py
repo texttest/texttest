@@ -1,4 +1,4 @@
-from gi.repository import Gtk, GObject
+from gi.repository import Gtk, GObject, GdkPixbuf
 import os, sys, glob
 from texttestlib import plugins, texttest_version
 from .. import guiplugins, guiutils

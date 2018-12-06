@@ -55,7 +55,7 @@ class DirectoryCache:
         return reduce(operator.add, list(versionSets.values()), [])
 
     def findVersionSets(self, stem, predicate):
-        if "/" in stem:
+        if os.sep in stem:
             root, local = os.path.split(stem)
             newCache = DirectoryCache(os.path.join(self.dir, root))
             return newCache.findVersionSets(local, predicate)
@@ -608,8 +608,8 @@ class Test(plugins.Observable):
         self.setDescription(newDescription)
 
     def updateRelPathReferences(self, targetFile, oldRelPath, newRelPath):
-        oldRelPath = "/" + oldRelPath
-        newRelPath = "/" + newRelPath
+        oldRelPath = os.sep + oldRelPath
+        newRelPath = os.sep + newRelPath
         # Binary mode, otherwise Windows line endings get transformed to UNIX ones (even on Windows!)
         # which will cause the test to fail...
         contents = open(targetFile, "rb").read()
@@ -627,7 +627,7 @@ class Test(plugins.Observable):
         relPath = self.getRelPath()
         if not len(relPath):
             return ""
-        dirCount = relPath.count("/") + 1
+        dirCount = relPath.count(os.sep) + 1
         return " " * (dirCount * 2)
 
     def testCaseList(self, filters=[]):
@@ -1344,7 +1344,7 @@ class TestSuite(Test):
         test.notify("Add", initial=False)
         return test
     def addTestCaseWithPath(self, testPath):
-        pathElements = testPath.split("/", 1)
+        pathElements = testPath.split(os.sep, 1)
         subSuite = self.findSubtest(pathElements[0])
         if len(pathElements) == 1:
             # add it even if it already exists, then we get two of them :)
@@ -1356,7 +1356,7 @@ class TestSuite(Test):
     def findSubtestWithPath(self, testPath):
         if len(testPath) == 0:
             return self
-        pathElements = testPath.split("/", 1)
+        pathElements = testPath.split(os.sep, 1)
         subTest = self.findSubtest(pathElements[0])
         if subTest:
             if len(pathElements) > 1:

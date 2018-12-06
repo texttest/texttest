@@ -743,7 +743,7 @@ class BasicSubmissionRules:
 
     def getJobName(self):
         path = self.test.getRelPath()
-        parts = path.split("/")
+        parts = path.split(os.sep)
         parts.reverse()
         name = self.classPrefix + "-" + ".".join(parts) + "-" + repr(self.test.app).replace(" ", "_").replace("/", "_")
         return name.replace(":", "_")

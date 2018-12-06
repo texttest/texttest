@@ -7,41 +7,6 @@ from queue import Queue, Empty
 from glob import glob
 from datetime import datetime
 from pickle import Unpickler, UnpicklingError
-
-# We standardise around UNIX paths, it's all much easier that way. They work fine,
-# and they don't run into weird issues in being confused with escape characters
-
-# basically posixpath.join, adapted to be portable...
-def _get_sep(path):
-    if isinstance(path, bytes):
-        return b'/'
-    else:
-        return '/'
-
-def joinpath(a, *p):
-    path = a
-    sep =_get_sep(a)
-    for b in p:
-        if os.path.isabs(b) and (path[1:2] != ":" or b[1:2] == ":"):
-            path = b
-        elif path == '' or path.endswith(sep):
-            path +=  b
-        else:
-            path += sep + b
-    return path
-
-
-os.path.join = joinpath
-if os.name == "nt":
-    import posixpath
-    os.sep = posixpath.sep
-    os.path.sep = posixpath.sep
-    os.path.normpath = posixpath.normpath
-    orig_abspath = os.path.abspath
-    def new_abspath(f):
-        return orig_abspath(f).replace("\\", "/")
-    os.path.abspath = new_abspath
-    os.path.realpath = new_abspath
         
     
 class Callable:
@@ -59,7 +24,7 @@ class Callable:
         return self # don't copy these
 
 def findInstallationRoots():
-    packageDir = os.path.dirname(__file__).replace("\\", "/")
+    packageDir = os.path.dirname(__file__)
     installationRoot = os.path.dirname(packageDir)
     if os.path.basename(installationRoot) == "generic":
         siteRoot = os.path.dirname(installationRoot)
@@ -380,6 +345,7 @@ class TestSelectionFilter(TextFilter):
 
     def parseInput(self, filterText, app, suites):
         allEntries = TextFilter.parseInput(self, filterText, app, suites)
+        self.diag.info("allEntries " + repr(allEntries))
         if allEntries[0].startswith("appdata="):
             # chopped up per application
             return self.parseForApp(allEntries, app, suites)
@@ -460,7 +426,7 @@ class TestSelectionFilter(TextFilter):
             if relPath == suitePath:
                 self.fullSuites.append(suite)
                 return True
-            elif relPath.startswith(suitePath + "/"):
+            elif relPath.startswith(suitePath + os.sep):
                 return True
         return False
 
@@ -815,9 +781,10 @@ def configureLogging(configFile=None):
         if configFile:
             # First is for TextTest troubleshooting
             # Second is for self-tests
-            defaults = { "TEXTTEST_PERSONAL_LOG": getPersonalDir("log"),
-                         "TEXTTEST_LOG_DIR": os.getenv("TEXTTEST_LOG_DIR", "") }
-            logging.config.fileConfig(configFile, defaults)
+            # There appears to be a bug on Windows here, along the lines of https://bugs.python.org/issue19528. All backslashes double up!
+            defaults = { "TEXTTEST_PERSONAL_LOG": getPersonalDir("log").replace("\\", "\\\\"),
+                         "TEXTTEST_LOG_DIR": os.getenv("TEXTTEST_LOG_DIR", "").replace("\\", "\\\\") }
+            logging.config.fileConfig(configFile.replace("\\", "\\\\"), defaults)
         log = logging.getLogger("standard log")
 
 def getPersonalConfigDir():
@@ -883,7 +850,7 @@ def commandLineString(cmdArgs, defaultQuoteChar='"'):
             if char in arg:
                 quoteChar = getQuoteChar(char)
                 return quoteChar + arg + quoteChar
-        return arg.replace("\\", "/")
+        return arg
 
     return " ".join(map(quoteArg, cmdArgs))
 
@@ -1745,14 +1712,6 @@ class TextOption(Option):
     def clear(self):
         if self.clearMethod:
             self.clearMethod()
-
-    def getValue(self):
-        basic = Option.getValue(self)
-        if (self.selectFile or self.saveFile or self.selectDir) and basic:
-            # If files are returned, turn the paths into UNIX format...
-            return basic.replace("\\", "/")
-        else:
-            return basic
 
     def getDirectories(self):
         allDirs = self.getPossibleDirs()

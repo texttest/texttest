@@ -207,7 +207,7 @@ class PopupMenuGUI(guiutils.SubGUI):
                     selection.unselect_all()
                     selection.select_path(pathInfo[0])
                 treeview.grab_focus()
-                self.widget.popup(None, None, None, event.button, time)
+                self.widget.popup(None, None, None, None, event.button, time)
                 treeview.emit_stop_by_name("button-press-event")
                 
 

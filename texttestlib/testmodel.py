@@ -55,6 +55,8 @@ class DirectoryCache:
         return reduce(operator.add, list(versionSets.values()), [])
 
     def findVersionSets(self, stem, predicate):
+        # added normpath, needs review MB 2018-12-07
+        stem = os.path.normpath(stem)
         if os.sep in stem:
             root, local = os.path.split(stem)
             newCache = DirectoryCache(os.path.join(self.dir, root))

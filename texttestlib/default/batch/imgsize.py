@@ -13,13 +13,10 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 # CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-try: #Following switcheroo ensures that if PIL is installed it's used instead
-    # of the HTMLgen-bundled copies.
-    import Image
+try:
+    from PIL import Image
 except ImportError:
-    from . import ImageH
-    Image = ImageH
-    del ImageH
+    pass
 
 def imgsize(path):
     """Returns the (width, height) in pixels of the given image file.
@@ -28,4 +25,3 @@ def imgsize(path):
     pict = Image.open(path)  #Too easy.  Thanks Fredrik!
     width, height = pict.size
     return width, height
-

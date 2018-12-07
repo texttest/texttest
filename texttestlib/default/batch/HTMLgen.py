@@ -1723,7 +1723,7 @@ class Image(AbstractTagSingle):
             # she knows the image size already or wants to resize it.
             try:
                 self.width, self.height = imgsize(self.filename)
-            except IOError:
+            except:
                 pass
 
     def calc_rel_path(self, from_dir=None):

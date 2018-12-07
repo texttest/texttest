@@ -163,9 +163,8 @@ class ToolBarGUI(guiutils.ContainerGUI):
         toolbar = self.uiManager.get_widget("/MainToolBar")
         self.ensureVisible(toolbar)
 
-        self.widget = Gtk.HandleBox()
-        self.widget.add(toolbar)
-        toolbar.set_orientation(Gtk.Orientation.HORIZONTAL)
+        self.widget = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        self.widget.pack_start(toolbar, False, False, 0)
         progressBarGUI = self.subguis[0]
         if progressBarGUI.shouldShow():
             progressBar = progressBarGUI.createView()

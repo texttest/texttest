@@ -162,7 +162,8 @@ class ToolBarGUI(guiutils.ContainerGUI):
         self.uiManager.ensure_update()
         toolbar = self.uiManager.get_widget("/MainToolBar")
         self.ensureVisible(toolbar)
-
+        
+        # replaced HAndleBox with Box and widget.add with widget.pack_start, needs review MB 2018-12-07
         self.widget = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         self.widget.pack_start(toolbar, False, False, 0)
         progressBarGUI = self.subguis[0]

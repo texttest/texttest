@@ -996,7 +996,7 @@ class SlaveServerResponder(plugins.Responder, ThreadingTCPServer):
         self.diag = logging.getLogger("Slave Server")
         self.terminate = False
         self.totalReruns = 0
-        self.maxReruns = max((app.getBatchConfigValue("queue_system_max_reruns") for app in allApps))
+        self.maxReruns = max(filter(lambda x: x is not None, (app.getBatchConfigValue("queue_system_max_reruns") for app in allApps)))
         
         # If a client rings in and then the connectivity is lost, we don't want to hang waiting for it forever
         # So we enable keepalive that will check the connection if no data is received for a while

@@ -7,6 +7,7 @@ from queue import Queue, Empty
 from glob import glob
 from datetime import datetime
 from pickle import Unpickler, UnpicklingError
+from locale import getpreferredencoding
         
     
 class Callable:
@@ -765,11 +766,9 @@ class TestStateUnpickler(Unpickler):
                 raise e
 
 def getNewTestStateFromFile(file):
-    if os.name == "posix":
-        from io import BytesIO
-        unpickler = TestStateUnpickler(BytesIO(file.read().replace(b"\r\n", b"\n")))
-    else:
-        unpickler = TestStateUnpickler(file)
+    encoding = getpreferredencoding()
+    from io import BytesIO
+    unpickler = TestStateUnpickler(BytesIO(file.read().replace(b"\r\n", b"\n")), encoding=encoding, errors="replace")
     return unpickler.load()
 
 

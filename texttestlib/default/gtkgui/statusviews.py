@@ -104,6 +104,7 @@ class ProgressBarGUI(guiutils.SubGUI):
     
     def createView(self):
         self.widget = Gtk.ProgressBar()
+        self.widget.set_show_text(True)
         self.resetBar()
         self.widget.show()
         return self.widget

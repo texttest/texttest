@@ -1,4 +1,4 @@
-from gi.repository import Gtk
+from gi.repository import Gtk, Gdk
 import os, time, stat
 from texttestlib import plugins
 from .. import guiplugins
@@ -179,8 +179,8 @@ class CopyPathToClipboard(guiplugins.ActionGUI):
         if comp and hasattr(comp, "tmpFile"):
             fileName = comp.tmpFile
         # Copy to both, for good measure, avoid problems with e.g. Exceed configuration
-        for clipboard in [ Gtk.clipboard_get(), Gtk.clipboard_get("PRIMARY") ]:
-            clipboard.set_text(fileName)
+        for clipboard in [ Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD), Gtk.Clipboard.get(Gdk.SELECTION_PRIMARY) ]:
+            clipboard.set_text(fileName, -1)
 
 def getInteractiveActionClasses():
     return [ ShowFileProperties, CopyPathToClipboard ]

@@ -642,7 +642,8 @@ class CollateFiles(plugins.Action):
         return openBracket == -1 or closeBracket < openBracket
 
     def findWildCardMatches(self, pattern, result):
-        parts = list(zip(pattern.split("/"), result.split("/")))
+        patternSep = os.sep if os.sep in pattern else "/" 
+        parts = list(zip(pattern.split(patternSep), result.split(os.sep)))
         allMatches = []
         # We take wildcards in the file name first, then those in directory names
         for subPattern, subResult in reversed(parts):

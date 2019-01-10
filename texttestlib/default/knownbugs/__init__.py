@@ -269,24 +269,6 @@ class ParseMethod:
         except NoOptionError:
             return default
 
-class ParserSectionDict(OrderedDict):
-    def __init__(self, fileName, *args, **kw):
-        OrderedDict.__init__(self, *args, **kw)
-        self.readingFile = fileName
-        
-    def __getitem__(self, key):
-        if self.readingFile:
-            msg = "Bug file at " + self.readingFile + " has duplicated sections named '" + key + "', the later ones will be ignored"
-            plugins.printWarning(msg)
-        return OrderedDict.__getitem__(self, key)
-
-    def values(self):
-        # Fix for python 2.7... which calls __getitem__ internally
-        origFile = self.readingFile
-        self.readingFile = None
-        ret = OrderedDict.values(self)
-        self.readingFile = origFile
-        return ret
 
 class BugMap(OrderedDict):
     def checkUnchanged(self):
@@ -316,16 +298,12 @@ class BugMap(OrderedDict):
     def makeParser(fileName):
         parser = ConfigParser()
         # Default behaviour transforms to lower case: we want case-sensitive
-        parser.optionxform = str
-        # There isn't a nice way to change the behaviour on getting a duplicate section
-        # so we use a nasty way :)
-        parser._sections = ParserSectionDict(fileName)
+        parser.optionxform = lambda option: option
         try:
             parser.read(fileName)
-            parser._sections.readingFile = None
             return parser
-        except Exception:
-            plugins.printWarning("Bug file at " + fileName + " not understood, ignoring")
+        except Exception as e:
+            plugins.printWarning("Bug file at " + fileName + " could not be parsed, ignoring\n" + str(e))
     
     def readFromParser(self, parser):
         for section in reversed(sorted(parser.sections())):

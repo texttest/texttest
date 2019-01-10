@@ -520,7 +520,7 @@ class TestEnvironmentCreator:
         if replayUseCase is not None:
             vars.append(self.getReplayScriptVariable(replayUseCase))
             delay = self.optionMap.get("delay", 0)
-            if delay > 0:
+            if float(delay) > 0:
                 vars.append(self.getReplayDelayVariable(delay))
                 
             screenshot = "screenshot" in self.optionMap

@@ -687,7 +687,8 @@ class TestTreeGUI(guiutils.ContainerGUI):
             allTests.remove(test)
 
     def removeTest(self, test, iter):
-        filteredIter = self.findIter(test)
+        self.diag.info("Removing test " + self.model.get_value(iter, 0))
+        iterValid, filteredIter = self.findIter(test)
         self.selecting = True
         if self.selection.iter_is_selected(filteredIter):
             self.selection.unselect_iter(filteredIter)
@@ -702,7 +703,7 @@ class TestTreeGUI(guiutils.ContainerGUI):
         if test.name != oldName:
             self.model.set_value(iter, 0, test.name)
 
-        filteredIter = self.filteredModel.convert_child_iter_to_iter(iter)
+        iterValid, filteredIter = self.filteredModel.convert_child_iter_to_iter(iter)
         if self.selection.iter_is_selected(filteredIter):
             self.notify("NameChange", test, origRelPath)
 

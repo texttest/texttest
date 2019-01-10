@@ -8,6 +8,7 @@ from threading import Lock
 from tempfile import mkstemp, mkdtemp
 from copy import deepcopy
 from functools import reduce, cmp_to_key
+from locale import getpreferredencoding
 
 helpIntro = """
 Note: the purpose of this help is primarily to document derived configurations and how they differ from the
@@ -610,8 +611,8 @@ class Test(plugins.Observable):
         self.setDescription(newDescription)
 
     def updateRelPathReferences(self, targetFile, oldRelPath, newRelPath):
-        oldRelPath = os.sep + oldRelPath
-        newRelPath = os.sep + newRelPath
+        oldRelPath = (os.sep + oldRelPath).encode(getpreferredencoding())
+        newRelPath = (os.sep + newRelPath).encode(getpreferredencoding())
         # Binary mode, otherwise Windows line endings get transformed to UNIX ones (even on Windows!)
         # which will cause the test to fail...
         contents = open(targetFile, "rb").read()

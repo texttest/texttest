@@ -1560,7 +1560,7 @@ class ReportBugs(guiplugins.ActionDialogGUI):
                 else:
                     widget = self.createFrame(group, group.name)
                 vbox.pack_start(widget, False, False, 8)
-            vbox.pack_start(Gtk.Separator(Gtk.Orientation.HORIZONTAL), True, True, 8)
+            vbox.pack_start(Gtk.Separator.new(Gtk.Orientation.HORIZONTAL), True, True, 8)
             header = Gtk.Label()
             header.set_markup("<u>Fill in exactly <i>one</i> of the sections below</u>\n")
             vbox.pack_start(header, False, False, 8)
@@ -1570,7 +1570,7 @@ class ReportBugs(guiplugins.ActionDialogGUI):
         return guiplugins.ActionDialogGUI.fillVBox(self, vbox, optionGroup)
 
     def createExpander(self, group):
-        expander = Gtk.Expander(group.name)
+        expander = Gtk.Expander.new(group.name)
         expander.add(self.createGroupBox(group))
         return expander
 

@@ -1032,7 +1032,7 @@ class ShowFilters(TestFileFilterHelper, guiplugins.ActionResultDialogGUI):
             self.filtersWithModels.append((filterObj, listStore))
         filterFrame.add(vbox)
         self.dialog.vbox.pack_start(filterFrame, False, True, 0)
-        self.dialog.vbox.pack_start(Gtk.Separator(Gtk.Orientation.HORIZONTAL), False, True, 0)
+        self.dialog.vbox.pack_start(Gtk.Separator.new(Gtk.Orientation.HORIZONTAL), False, True, 0)
         frame, self.textBuffer = self.createTextWidget("Filter Text View", scroll=True)
         frame.set_label("Text to filter (copied from " + os.path.basename(fileName) + ")")
         with open(fileName) as f:

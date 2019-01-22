@@ -707,27 +707,18 @@ class TestTreeGUI(guiutils.ContainerGUI):
         if self.selection.iter_is_selected(filteredIter):
             self.notify("NameChange", test, origRelPath)
 
-    def notifyContentChange(self, suite):
-        suiteIter = self.itermap.getIterator(suite)
-        newOrder = self.findNewOrder(suiteIter)
-        self.model.reorder(suiteIter, newOrder)
-
-    def findNewOrder(self, suiteIter):
-        child = self.model.iter_children(suiteIter)
-        index = 0
-        posMap = {}
-        while (child != None):
-            subTestName = self.model.get_value(child, 0)
-            posMap[subTestName] = index
-            child = self.model.iter_next(child)
-            index += 1
-        newOrder = []
-        for currSuite in self.model.get_value(suiteIter, 2):
-            for subTest in currSuite.testcases:
-                oldIndex = posMap.get(subTest.name)
-                if oldIndex not in newOrder:
-                    newOrder.append(oldIndex)
-        return newOrder
+    def notifyContentChange(self, *args):
+        col_id, _ = self.model.get_sort_column_id()
+        if col_id is None:
+            self.model.set_default_sort_func(self.sortByTestCases)
+        self.model.set_sort_column_id(Gtk.TREE_SORTABLE_DEFAULT_SORT_COLUMN_ID, Gtk.SortType.ASCENDING)
+        
+    def sortByTestCases(self, model, iter1, iter2, *args):
+        test1 = self.model.get_value(iter1, 2)[0]
+        test2 = self.model.get_value(iter2, 2)[0]
+        index1 = test1.parent.testcases.index(test1)
+        index2 = test2.parent.testcases.index(test2)
+        return -1 if index1 < index2 else 1        
 
     def notifyVisibility(self, tests, newValue):
         self.diag.info("Visibility change for " + repr(tests) + " to " + repr(newValue))

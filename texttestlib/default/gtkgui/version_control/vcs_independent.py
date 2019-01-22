@@ -1,6 +1,6 @@
 
 # Generic interface to version control systems. We try to keep it as general as possible.
-from gi.repository import Gdk, GObject
+from gi.repository import Gtk, Gdk, GObject
 import custom_widgets, os, datetime, subprocess, shutil
 from texttestlib import plugins
 from .. import guiplugins, guiutils, entrycompletion
@@ -422,7 +422,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         self.extraButtonArea = Gtk.HButtonBox()
         self.extraWidgetArea.pack_start(self.extraButtonArea, False, False, 0)
         if len(self.pages) > 0:
-            padding = Gtk.Alignment.new()
+            padding = Gtk.Alignment.new(0.0, 0.0, 0.0, 0.0)
             padding.set_padding(3, 3, 3, 3)
             padding.add(self.extraWidgetArea)
             self.dialog.vbox.pack_end(padding, False, False, 0)

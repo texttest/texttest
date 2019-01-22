@@ -119,8 +119,7 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
 
     # xalign = 1.0 means right aligned, 0.0 means left aligned
     def justify(self, text, xalign = 0.0):
-        alignment = Gtk.Alignment.new()
-        alignment.set(xalign, 0.0, 0.0, 0.0)
+        alignment = Gtk.Alignment.new(xalign, 0.0, 0.0, 0.0)
         label = Gtk.Label(label=text)
         alignment.add(label)
         return alignment
@@ -153,12 +152,12 @@ class ShowFileProperties(guiplugins.ActionResultDialogGUI):
                 row += 1
             hbox = Gtk.HBox()
             hbox.pack_start(table, False, False, 0)
-            innerBorder = Gtk.Alignment.new()
+            innerBorder = Gtk.Alignment.new(0.0, 0.0, 0.0, 0.0)
             innerBorder.set_padding(5, 0, 0, 0)
             innerBorder.add(hbox)
             expander.add(innerBorder)
             expander.set_expanded(True)
-            border = Gtk.Alignment.new()
+            border = Gtk.Alignment.new(0.0, 0.0, 0.0, 0.0)
             border.set_padding(5, 5, 5, 5)
             border.add(expander)
             vbox.pack_start(border, False, False, 0)

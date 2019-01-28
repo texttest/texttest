@@ -85,7 +85,7 @@ class TextViewGUI(guiutils.SubGUI):
         if self.linkMarker in text:
             self.view.connect("event-after", self.event_after)
             self.view.connect("motion-notify-event", self.motion_notify_event)
-            self.setHyperlinkText(textbuffer, textToUse)
+            self.setHyperlinkText(textbuffer, text)
         else:
             textbuffer.set_text(text)
 

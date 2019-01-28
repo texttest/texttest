@@ -10,8 +10,8 @@ from io import StringIO
 
 class Filtering(plugins.TestState):
     def __init__(self, name, **kw):
-        plugins.TestState.__init__(self, name, briefText="", **kw)    
-        
+        plugins.TestState.__init__(self, name, briefText="", **kw)
+
 # Generic base class for filtering standard and temporary files
 class FilterAction(plugins.Action):
     def __init__(self, useFilteringStates=False):
@@ -20,7 +20,7 @@ class FilterAction(plugins.Action):
     def __call__(self, test):
         if self.useFilteringStates:
             self.changeToFilteringState(test)
-            
+
         for fileName, postfix in self.filesToFilter(test):
             self.diag.info("Considering for filtering : " + fileName)
             stem = self.getStem(fileName)
@@ -38,7 +38,7 @@ class FilterAction(plugins.Action):
         filters = self.makeAllFilters(test, stem, test.app)
         for fileFilter in filters:
             writeFileName = newFileName + "." + fileFilter.postfix
-            self.diag.info("Applying " + fileFilter.__class__.__name__ + " to make\n" + writeFileName + " from\n " + currFileName) 
+            self.diag.info("Applying " + fileFilter.__class__.__name__ + " to make\n" + writeFileName + " from\n " + currFileName)
             if os.path.isfile(writeFileName):
                 self.diag.info("Removing previous file at " + writeFileName)
                 os.remove(writeFileName)
@@ -63,7 +63,7 @@ class FilterAction(plugins.Action):
             finally:
                 inFile.close()
         for fileFilter in filters:
-            self.diag.info("Applying " + fileFilter.__class__.__name__ + " to " + fileName) 
+            self.diag.info("Applying " + fileFilter.__class__.__name__ + " to " + fileName)
             outFile = StringIO()
             fileFilter.filterFile(inFile, outFile)
             inFile.close()
@@ -72,7 +72,7 @@ class FilterAction(plugins.Action):
         value = outFile.getvalue()
         outFile.close()
         return value
-        
+
     def makeAllFilters(self, test, stem, app):
         filters = self._makeAllFilters(test, stem, app)
         if len(filters) == 0 and self.changedOs(app):
@@ -80,26 +80,26 @@ class FilterAction(plugins.Action):
         else:
             return filters
 
-    def _makeAllFilters(self, test, stem, app):                    
+    def _makeAllFilters(self, test, stem, app):
         filters = []
         configObj = test
         if test.app is not app: # happens when testing filtering in the static GUI
             configObj = app
-            
+
         for filterClass in [ RunDependentTextFilter, UnorderedTextFilter ]:
             texts = configObj.getCompositeConfigValue(filterClass.configKey, stem)
             if texts:
                 filters.append(filterClass(texts, test.getRelPath()))
 
         return filters
-            
+
     def changedOs(self, app):
         homeOs = app.getConfigValue("home_operating_system")
         return homeOs != "any" and os.name != homeOs
 
     def constantPostfix(self, files, postfix):
         return [ (file, postfix) for file in files ]
-        
+
 
 class FilterOriginal(FilterAction):
     def filesToFilter(self, test):
@@ -127,7 +127,7 @@ class FilterOnTempFile(FilterAction):
                 filters.append(FloatingPointFilter(origFile, floatTolerance, relTolerance))
         return filters
 
-    
+
 class FilterTemporary(FilterOnTempFile):
     def filesToFilter(self, test):
         return self.constantPostfix(test.listTmpFiles(), "cmp")
@@ -152,7 +152,7 @@ class FilterErrorText(FilterAction):
     def _makeAllFilters(self, test, stem, app):
         texts = app.getConfigValue("suppress_stderr_text")
         return [ RunDependentTextFilter(texts) ]
-    
+
 
 class FilterProgressRecompute(FilterOnTempFile):
     def filesToFilter(self, test):
@@ -283,7 +283,7 @@ class RunDependentTextFilter(plugins.Observable):
                     alreadyFilteredAway = True
         for lineFilter, lastRelevantLine in filtersToRemove:
             lineFilters.remove((lineFilter, lastRelevantLine))
-                    
+
         return appliedLineFilter, filteredLine, linesToRemove
 
 
@@ -305,7 +305,7 @@ class UnorderedTextFilter(RunDependentTextFilter):
             for line in unordered:
                 newFile.write(line)
             newFile.write("\n")
-  
+
 
 class LineNumberTrigger:
     def __init__(self, lineNumber):
@@ -324,16 +324,16 @@ class MatchNumberTrigger(plugins.TextTrigger):
         self.matchNumber = matchNumber
         self.matchCounter = 0
         plugins.TextTrigger.__init__(self, text)
-        
+
     def __repr__(self):
         return "Match number trigger for the " + str(self.matchNumber) + ":th match"
-        
+
     def matches(self, line, *args):
         if plugins.TextTrigger.matches(self, line):
             self.matchCounter += 1
             return self.matchNumber == self.matchCounter
         return False
-    
+
     def reset(self):
         self.matchCounter = 0
 
@@ -367,14 +367,14 @@ class LineFilter:
         self.removeWordsAfter = False
         self.parseOriginalText()
         self.diag.info("Created trigger : " + repr(self.trigger))
-        
+
     def makeNew(self, newText):
         return LineFilter(newText, self.testId, self.diag)
-        
+
     def getInternalExpression(self, parameter):
         method = self.internalExpressions.get(parameter)
         return method(self.testId)
-    
+
     def makeRegexTrigger(self, parameter):
         expression = self.getInternalExpression(parameter)
         return plugins.TextTrigger(expression)
@@ -389,7 +389,7 @@ class LineFilter:
                 self.untrigger = self.parseText(afterText)
                 return
         self.trigger = self.parseText(self.originalText)
-        
+
     def parseText(self, text):
         for matchModifierString in self.matchModifierStrings:
             linePoint = text.find(matchModifierString)
@@ -415,7 +415,7 @@ class LineFilter:
         parameter = afterText[:endPos]
         afterText = afterText[endPos + 1:]
         return beforeText, afterText, parameter
-    
+
     def readMatchModifier(self, matchModifierString, parameter):
         if matchModifierString == "{REPLACE ":
             self.replaceText = parameter
@@ -457,11 +457,11 @@ class LineFilter:
             return self.applyMatchingTrigger(line)
         else:
             return False, line, 0
-        
+
     def applyAutoRemove(self, line):
         if self.untrigger:
             if self.untrigger.matches(line.rstrip()):
-                self.diag.info(repr(self.untrigger) + " (end) matched " + line.rstrip()) 
+                self.diag.info(repr(self.untrigger) + " (end) matched " + line.rstrip())
                 self.autoRemove = 0
                 if self.divider.endswith("]}"):
                     return True, None, 0
@@ -478,7 +478,7 @@ class LineFilter:
         if self.linesToRemove:
             self.autoRemove = self.linesToRemove - 1
         return True, self.filterWords(line, self.trigger), self.prevLinesToRemove
-            
+
     def filterWords(self, line, trigger=None):
         if self.wordNumber != None:
             stripped = line.rstrip()
@@ -498,7 +498,7 @@ class LineFilter:
                     else:
                         del words[realNumber]
             if realNumber == -1 or realNumber >= len(words) - 1: # Trim trailing spaces for words at end or beyond
-                postfix = "\n" 
+                postfix = "\n"
             return " ".join(words).rstrip() + postfix
         elif trigger and self.replaceText != None:
             return trigger.replace(line.rstrip("\n"), self.replaceText) + "\n"
@@ -513,7 +513,7 @@ class LineFilter:
                     return realWordNumber
                 wordNumber += 1
         return len(words) + 1
-    
+
     def findRealWordNumberBackwards(self, words):
         wordNumber = -1
         for index in range(len(words)):

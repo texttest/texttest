@@ -3,7 +3,7 @@
 The various text info views, i.e. the bottom right-corner "Text Info" and
 the "Run Info" tab from the dynamic GUI
 """
-from gi.repository import Gtk, GObject, Gdk
+from gi.repository import Gtk, GObject, Gdk, Pango
 import os, sys, datetime
 from . import guiutils, guiplugins
 from texttestlib import plugins
@@ -167,7 +167,7 @@ class TextViewGUI(guiutils.SubGUI):
         words = line.strip().split()
         linkTarget = words[-1][4:] # strip off the URL=
         newLine = " ".join(words[:-1]) + "\n"
-        tag.set_data("target", linkTarget)
+        tag.target = linkTarget
         buffer.insert_with_tags(iter, newLine, tag)
 
     def getDescriptionText(self, test):

@@ -14,12 +14,12 @@ from socket import gethostname
 MAX_DISPLAY = 32768
 Xvfb_ready = False
 
-class ConnectionComplete:
+class ConnectionComplete(BaseException):
     pass
 
-class ConnectionTimeout:
+class ConnectionTimeout(BaseException):
     pass
-    
+
 def setReadyFlag(self, *args): # pragma: no cover - only here to deal with pathological and probably impossible race condition
     global Xvfb_ready
     Xvfb_ready = True

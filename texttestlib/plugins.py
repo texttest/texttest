@@ -1439,7 +1439,11 @@ class MultiEntryDictionary(OrderedDict):
         if name != "end":
             if name in self:
                 value = self[name]
-                if isinstance(value, OrderedDict) or type(value) == dict:
+                if isinstance(value, OrderedDict):
+                    return name
+                elif type(value) == dict:
+                    # important, e.g. for run_dependent_text, replace all dictionaries with ordered versions
+                    self[name] = OrderedDict(value)
                     return name
                 else:
                     self.warn("Config entry name '" + name + "' incorrectly used as a section marker.")
@@ -1550,7 +1554,7 @@ class MultiEntryDictionary(OrderedDict):
             return None
         listVal = []
         usingList = False
-        for currSubKey, currValue in list(dict.items()):
+        for currSubKey, currValue in dict.items():
             if fnmatch.fnmatch(subKey, currSubKey):
                 if type(currValue) == list:
                     listVal += currValue

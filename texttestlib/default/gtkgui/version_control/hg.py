@@ -1,6 +1,7 @@
 
-import vcs_independent, shutil, datetime, time, os
+import shutil, datetime, time, os
 from texttestlib import plugins
+from . import vcs_independent
 
 class HgInterface(vcs_independent.VersionControlInterface):
     def __init__(self, controlDir):

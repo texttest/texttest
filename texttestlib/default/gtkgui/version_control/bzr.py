@@ -1,5 +1,6 @@
 
-import vcs_independent, datetime, time, os
+import datetime, time, os
+from . import vcs_independent
 
 
 class BzrInterface(vcs_independent.VersionControlInterface):

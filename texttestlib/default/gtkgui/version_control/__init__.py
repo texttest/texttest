@@ -1,5 +1,6 @@
 
 import os
+import importlib
 from texttestlib import plugins
 
 def getVersionControlConfig(apps, inputOptions):
@@ -20,8 +21,8 @@ def getConfigFromDirectory(directory):
                 controlDir = os.path.join(directory, controlDirName)
                 if module != "cvs" or not os.path.isdir(os.path.join(controlDir, "CVS")):
                     # Avoid overarching directories "CVS" which are not control directories...
-                    exec("from " + module + " import InteractiveActionConfig")
-                    return InteractiveActionConfig(controlDir) #@UndefinedVariable
+                    mod = importlib.import_module("." + moduleName, __name__)
+                    return mod.InteractiveActionConfig(controlDir)
             except ImportError: # There may well be more VCSs than we have support for...
                 pass
     dirname = os.path.dirname(directory)

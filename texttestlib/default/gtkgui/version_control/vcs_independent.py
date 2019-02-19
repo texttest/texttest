@@ -1,11 +1,12 @@
 
 # Generic interface to version control systems. We try to keep it as general as possible.
+import os, datetime, subprocess, shutil
+import tempfile
 from gi.repository import Gtk, Gdk, GObject
-import custom_widgets, os, datetime, subprocess, shutil
 from texttestlib import plugins
 from .. import guiplugins, guiutils, entrycompletion
 from ..default_gui import adminactions, changeteststate
-import tempfile
+from . import custom_widgets
 
 vcsClass, vcs, annotateClass, basicDiffClasses = None, None, None, None
     

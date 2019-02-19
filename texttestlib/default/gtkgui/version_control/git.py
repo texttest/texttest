@@ -1,5 +1,6 @@
-import vcs_independent, datetime, time, os
+import datetime, time, os
 from texttestlib import plugins
+from . import vcs_independent
 
 class GitInterface(vcs_independent.VersionControlInterface):
     def __init__(self, controlDir):

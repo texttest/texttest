@@ -42,7 +42,7 @@ class FilterAction(plugins.Action):
             if os.path.isfile(writeFileName):
                 self.diag.info("Removing previous file at " + writeFileName)
                 os.remove(writeFileName)
-            currFile = open(currFileName, "rU", errors="replace") # use universal newlines to simplify
+            currFile = open(currFileName, errors="ignore")
             writeFile = plugins.openForWrite(writeFileName)
             fileFilter.filterFile(currFile, writeFile)
             writeFile.close()
@@ -56,7 +56,7 @@ class FilterAction(plugins.Action):
 
     def getFilteredText(self, test, fileName, app):
         filters = self.getAllFilters(test, fileName, app)
-        inFile = open(fileName)
+        inFile = open(fileName, errors="ignore")
         if len(filters) == 0:
             try:
                 return inFile.read()
@@ -181,7 +181,7 @@ class FloatingPointFilter:
             self.relative = relative
 
     def filterFile(self, inFile, writeFile):
-        fromlines = open(self.origFileName, "rU").readlines()
+        fromlines = open(self.origFileName, errors="ignore").readlines()
         tolines = inFile.readlines()
         fpdiff.fpfilter(fromlines, tolines, writeFile, self.tolerance, self.relative)
 

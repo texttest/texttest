@@ -52,7 +52,7 @@ class CVSInterface(vcs_independent.VersionControlInterface):
             raise plugins.TextTestError(self.errorMessage)
         else:
             return self.programArgs
-    
+
     def setProgramArgs(self, cvsDir):
         cvsRoot = os.getenv("CVSROOT")
         if cvsRoot:
@@ -66,9 +66,9 @@ class CVSInterface(vcs_independent.VersionControlInterface):
                 return [], "Could not determine $CVSROOT: environment variable not set and no file present at:\n" + rootFile
 
     def getCvsRootFromFile(self, rootFile):
-        info = open(rootFile).read()  
+        info = open(rootFile).read()
         return info.strip().rstrip(os.sep)
-        
+
     def getDateFromLog(self, output):
         for line in output.splitlines():
             if line.startswith("date:"):
@@ -92,14 +92,14 @@ class CVSInterface(vcs_independent.VersionControlInterface):
             return os.path.isdir(os.path.join(path, "CVS"))
         else:
             return vcs_independent.VersionControlInterface.isVersionControlled(self, path)
-    
+
     # Move in source control also. In CVS this implies a remove and then an add
     def _movePath(self, oldPath, newPath):
         self.checkInstalled() # throws if it isn't, avoid moving paths around
         self.copyPath(oldPath, newPath)
         self.removePath(oldPath)
         self.callProgramOnFiles("add", newPath, recursive=True)
-            
+
     def getMoveCommand(self):
         return "cvs rm' and 'cvs add"
 
@@ -146,9 +146,9 @@ class CVSInterface(vcs_independent.VersionControlInterface):
         else:
             vcs_independent.VersionControlInterface.callProgramOnFiles(self, cmdName, fileArg, recursive, extraArgs, **kwargs)
 
-        
 
-     
+
+
 class CVSLogLatest(vcs_independent.LogGUI):
     def __init__(self, *args):
         vcs_independent.LogGUI.__init__(self, *args)
@@ -161,7 +161,7 @@ class CVSLogLatest(vcs_independent.LogGUI):
         cmdArgs = vcs_independent.vcs.getCmdArgs(self.cmdName, self.getExtraArgs())
         message = "Showing latest log entries for the CVS controlled files.\nCVS command used: " + " ".join(cmdArgs)
         if not self.recursive:
-            message += "\nSubdirectories were ignored."            
+            message += "\nSubdirectories were ignored."
         return message
 
     def storeResult(self, fileName, output, test):
@@ -178,7 +178,7 @@ class CVSLogLatest(vcs_independent.LogGUI):
         # <comments>
         # ============
         #
-        # We only want to show the Working file and the stuff from ----- to ===== ...        
+        # We only want to show the Working file and the stuff from ----- to ===== ...
         linesToShow = ""
         enabled = False
         for line in output.splitlines():
@@ -194,14 +194,14 @@ class CVSLogLatest(vcs_independent.LogGUI):
                 linesToShow += line + "\n"
         self.pages.setdefault(test.uniqueName, "")
         self.pages[test.uniqueName] += linesToShow
-    
+
     def addContents(self):
         self.pages = OrderedDict()
-        self.runAndParse() 
+        self.runAndParse()
         self.vbox = Gtk.VBox()
         self.addHeader()
         self.addNotebook()
-        
+
     def addHeader(self):
         message = self.getResultDialogMessage()
         if message:
@@ -213,7 +213,7 @@ class CVSLogLatest(vcs_independent.LogGUI):
             alignment.set_padding(5, 5, 0, 5)
             alignment.add(hbox)
             self.vbox.pack_start(alignment, False, False, 0)
-        
+
     def addNotebook(self):
         notebook = Gtk.Notebook()
         notebook.set_scrollable(True)
@@ -222,7 +222,7 @@ class CVSLogLatest(vcs_independent.LogGUI):
             buffer = Gtk.TextBuffer()
             # Encode to UTF-8, necessary for Gtk.TextView
             buffer.set_text(content)
-            textView = Gtk.TextView(buffer)
+            textView = Gtk.TextView.new_with_buffer(buffer)
             textView.set_editable(False)
             window = Gtk.ScrolledWindow()
             window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
@@ -234,7 +234,7 @@ class CVSLogLatest(vcs_independent.LogGUI):
             self.dialog.resize(int(parentSize[0] / 1.5), int(parentSize[0] / 2))
         self.vbox.pack_start(notebook, True, True, 0)
         self.dialog.vbox.pack_start(self.vbox, True, True, 0)
-        
+
 vcs_independent.vcsClass = CVSInterface
 
 class RenameTest(vcs_independent.RenameTest):
@@ -247,20 +247,20 @@ class RenameTest(vcs_independent.RenameTest):
             vcs_independent.vcs.callProgram("update", [ local ], cwd=dirname)
         else:
             vcs_independent.RenameTest.handleExistingDirectory(self, dir)
-            
+
 class FilteredDiffGUI(vcs_independent.FilteredDiffGUI):
     def __init__(self, *args):
         vcs_independent.FilteredDiffGUI.__init__(self, *args)
         self.cmdName = "update"
-        
+
     def getTmpFileArgs(self, fileName, revision):
         revArgs = vcs_independent.vcs.getSingleRevisionOptions(revision) if revision else []
         return [ "-p" ] + revArgs + [ fileName ]
-    
+
     def commandHadError(self, retcode, stderr, stdout):
         # Diff returns an error code for differences, not just for errors
         return retcode or (len(stderr) > 0 and len(stdout) == 0)
-    
+
 class FilteredDiffGUIRecursive(FilteredDiffGUI):
     recursive = True
 
@@ -270,9 +270,9 @@ class FilteredDiffGUIRecursive(FilteredDiffGUI):
 class InteractiveActionConfig(vcs_independent.InteractiveActionConfig):
     def diffClasses(self):
         return [ vcs_independent.DiffGUI, vcs_independent.DiffGUIRecursive, FilteredDiffGUI, FilteredDiffGUIRecursive ]
-    
+
     def getInteractiveActionClasses(self, dynamic):
         return vcs_independent.InteractiveActionConfig.getInteractiveActionClasses(self, dynamic) + [ CVSLogLatest ]
-    
+
     def getRenameTestClass(self):
         return RenameTest

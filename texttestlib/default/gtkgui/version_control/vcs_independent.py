@@ -9,7 +9,7 @@ from ..default_gui import adminactions, changeteststate
 from . import custom_widgets
 
 vcsClass, vcs, annotateClass, basicDiffClasses = None, None, None, None
-    
+
 # All VCS specific stuff goes in this class. One global instance, "vcs" above
 class VersionControlInterface:
     def __init__(self, controlDir, name, warningStates, errorStates, latestRevisionName):
@@ -36,7 +36,7 @@ class VersionControlInterface:
     def getFileStatus(self, basicArgs, file):
         output = self.getProcessResults(basicArgs + [ file ])[1]
         return self.getStateFromStatus(output)
-        
+
     def callProgram(self, cmdName, fileArgs=[], **kwargs):
         return subprocess.call(self.getCmdArgs(cmdName, fileArgs),
                                stdout=open(os.devnull, "w"), stderr=open(os.devnull, "w"), **kwargs)
@@ -80,7 +80,7 @@ class VersionControlInterface:
                 return baseFiles + self.getFilesFromDir(fileArg)
         else:
             return []
-            
+
     def getFilesFromDir(self, dirName):
         files = []
         for f in sorted(os.listdir(dirName)):
@@ -104,7 +104,7 @@ class VersionControlInterface:
                 fullPath = os.path.join(root, dir)
                 if os.path.islink(fullPath):
                     allFiles += self.getFilesFromDirRecursive(fullPath, includeDirs)
-                    
+
         return sorted(allFiles)
 
     def getProgramArgs(self):
@@ -112,9 +112,9 @@ class VersionControlInterface:
 
     def getGraphicalDiffArgs(self, diffProgram):
         return [ diffProgram ] # brittle but general...
-    
+
     def getCmdArgs(self, cmdName, extraArgs=[]):
-        return self.getProgramArgs() + [ cmdName ] + self.defaultArgs.get(cmdName, []) + extraArgs 
+        return self.getProgramArgs() + [ cmdName ] + self.defaultArgs.get(cmdName, []) + extraArgs
 
     def getCombinedRevisionOptions(self, r1, r2):
         return [ "-r", r1, "-r", r2 ] # applies to CVS and Mercurial
@@ -131,7 +131,7 @@ class VersionControlInterface:
                     shutil.copyfile(oldSubPath, newSubPath)
         else:
             plugins.copyPath(oldPath, newPath)
-                
+
     def movePath(self, oldPath, newPath):
         self.lastMoveInVCS = self.isVersionControlled(oldPath)
         if self.lastMoveInVCS:
@@ -139,7 +139,7 @@ class VersionControlInterface:
                 newParent = os.path.dirname(newPath)
                 # If it's also a parent of the old directory we don't need to check if it's version-controlled.
                 if not oldPath.startswith(newParent) and not self.isVersionControlled(newParent):
-                    self.callProgramOnFiles("add", newParent) 
+                    self.callProgramOnFiles("add", newParent)
             self._movePath(oldPath, newPath)
         else:
             os.rename(oldPath, newPath)
@@ -155,11 +155,11 @@ class VersionControlInterface:
 
     def getMoveCommand(self):
         return self.program + " mv"
-    
+
     def hasLocalCommits(self, *args):
         return False # Not possible in cvs or bzr
 
-    def getRevisionOptions(self, r1, r2):    
+    def getRevisionOptions(self, r1, r2):
         if r1 and r2:
             return self.getCombinedRevisionOptions(r1, r2)
         elif r1:
@@ -168,13 +168,13 @@ class VersionControlInterface:
             return self.getSingleRevisionOptions(r2)
         else:
             return []
-        
+
     def getSingleRevisionOptions(self, r1):
         return [ "-r", r1 ]
-    
+
     def startGUIProcess(self, cmdArgs, **kw):
         guiplugins.processMonitor.startProcess(cmdArgs, **kw)
-    
+
 
 class BasicVersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
     recursive = False
@@ -186,7 +186,7 @@ class BasicVersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
         if not includeMnemonics:
             # distinguish these from other actions that may have these names
             title = vcs.name + " " + title
-        
+
         if self.recursive:
             title = self.add_recursion_annotation(title, adjectiveAfter)
         return title
@@ -205,7 +205,7 @@ class BasicVersionControlDialogGUI(guiplugins.ActionResultDialogGUI):
 
     def getDialogTitle(self):
         return self.getTitle(adjectiveAfter=False) + " for the selected files"
-            
+
     def getTooltip(self):
         from copy import copy
         return copy(self.getDialogTitle()).replace(vcs.name, "version control").lower()
@@ -219,7 +219,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         self.dynamic = dynamic
         self.needsAttention = False
         self.notInRepository = False
-    
+
     def showWarning(self):
         return self.notInRepository or self.needsAttention
 
@@ -231,10 +231,10 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
 
     def getExtraArgs(self):
         return []
-    
+
     def getFullResultTitle(self):
         return self.getResultTitle()
-    
+
     def getResultDialogMessage(self):
         message = vcs.name + " " + self.getFullResultTitle() + " shown below."
         if self.needsAttention:
@@ -246,7 +246,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         if not self.recursive:
             message += "\nSubdirectories were ignored, use " + self.getTitle() + " Recursive to get the " + self.getResultTitle() + " for all subdirectories."
         return message
-            
+
     def extraResultDialogWidgets(self, exclude=""):
         all = ["log", "status", "diff", "annotate" ]
         if self.cmdName in all:
@@ -254,7 +254,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         if exclude in all:
             all.remove(exclude)
         return all
-            
+
     def commandHadError(self, retcode, *args):
         return retcode
 
@@ -271,7 +271,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         for test, fileArg in self.getFilesForCmd():
             vcs.callProgramOnFiles(self.cmdName, fileArg, self.recursive, extraArgs,
                                    outputHandler=self.handleVcsOutput, outputHandlerArgs=(test,))
-                    
+
     def handleVcsOutput(self, retcode, stdout, stderr, fileName, test):
         if self.commandHadError(retcode, stderr, stdout):
             self.notInRepository = True
@@ -286,22 +286,22 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         dirName, local = os.path.split(fileName)
         self.notify("Status", "Analyzing " + self.getResultTitle() + " for " + local + " in test " + os.path.basename(dirName))
         self.notify("ActionProgress", "")
-                        
+
     def parseOutput(self, output):
         return ""
-    
+
     def updateSelection(self, *args):
         newActive = BasicVersionControlDialogGUI.updateSelection(self, *args)
         if not self.dynamic: # See bugzilla 17653
             self.currFileSelection = []
         return newActive
-    
+
     def isActiveOnCurrent(self, *args):
         return (len(self.currTestSelection) > 0 or len(self.currFileSelection) > 0) and not self.newFilesOnly()
-    
+
     def newFilesOnly(self):
         return len(self.currFileSelection) > 0 and all((comp and hasattr(comp, "newResult") and comp.newResult() for f, comp in self.currFileSelection))
-    
+
     def messageAfterPerform(self):
         return "Performed " + self.getTooltip() + "."
     def getResultDialogTwoColumnsInTreeView(self):
@@ -315,7 +315,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         self.diag.info("Viewing status on file " + file)
         status = StatusGUI()
         self.runWithSelections(status, file)
-        
+
     def getFileApps(self, file):
         if len(self.currFileSelection) == 0:
             return []
@@ -323,7 +323,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
             if f == file:
                 return apps
         return self.currFileSelection[0][1]
-        
+
     def runWithSelections(self, gui, file):
         gui.notifyTopWindow(self.topWindow)
         test = self.fileToTest[file]
@@ -360,7 +360,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         except OSError:
             self.showErrorDialog("\nCannot find graphical " + vcs.name + " difference program '" + diffProgram + \
                                      "'.\nPlease install it somewhere on your $PATH.\n")
-            
+
     def getGraphicalDiffProgramArgs(self, diffProgram, path):
         revOptions = self.getExtraArgs()
         graphDiffArgs = vcs.getGraphicalDiffArgs(diffProgram)
@@ -368,10 +368,10 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
             # In order to get the correct error message if it doesn't exist
             subprocess.call([ diffProgram, "--help" ], stderr=open(os.devnull, "w"), stdout=open(os.devnull, "w"))
         return graphDiffArgs + revOptions + [ path ], ()
-        
+
     def diffingComplete(self, *args):
         self.applicationEvent("the version-control graphical diff program to terminate")
-                                
+
     def getRootPath(self):
         if len(self.currTestSelection) > 0:
             app = self.currTestSelection[0].app
@@ -379,7 +379,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
             app = self.currFileSelection[0][1][0]
         appPath = app.getDirectory()
         return os.path.split(appPath.rstrip(os.sep))[0]
-    
+
     def getFilesForCmd(self):
         if len(self.currTestSelection) == 0:
             return [ (None, f) for (f, _) in self.currFileSelection ]
@@ -408,7 +408,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
 
     def isModal(self):
         return False
-    
+
     def addContents(self):
         self.pages = []
         self.fileToTest = {}
@@ -417,7 +417,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         self.addExtraWidgets()
         self.addHeader()
         self.addTreeView()
-        
+
     def addExtraWidgets(self):
         self.extraWidgetArea = Gtk.HBox()
         self.extraButtonArea = Gtk.HButtonBox()
@@ -477,7 +477,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         self.extraWidgetArea.pack_start(self.revisionEntry1, False, False, 0)
         self.extraWidgetArea.pack_start(label2, False, False, 0)
         self.extraWidgetArea.pack_start(self.revisionEntry2, False, False, 0)
-        
+
     def addGraphicalDiffWidget(self):
         button = Gtk.Button("_Graphical Diffs")
         button.connect("clicked", self.viewGraphicalDiff)
@@ -506,7 +506,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
 
         # We need buffer when creating treeview, so create right-hand side first ...
         self.textBuffer = Gtk.TextBuffer()
-        textView = Gtk.TextView(self.textBuffer)
+        textView = Gtk.TextView.new_with_buffer(self.textBuffer)
         textView.set_editable(False)
         textView.set_name("VCS Output View")
         window2 = Gtk.ScrolledWindow()
@@ -525,7 +525,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
             self.dialog.resize(parentSize[0], int(parentSize[0] / 1.5))
             self.vbox.pack_start(hpaned, True, True, 0)
         self.dialog.vbox.pack_start(self.vbox, True, True, 0)
-                
+
     def createTreeView(self):
         # Columns are: 0 - Tree node name
         #              1 - Content (output from VCS) for the corresponding file
@@ -561,7 +561,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
                     currIter = self.treeModel.append(prevIter, newRow)
                     fileToIter[currentFile] = currIter
                 prevIter = currIter
-                        
+
         self.treeView = Gtk.TreeView(self.filteredTreeModel)
         self.treeView.set_name("VCS " + self.cmdName + " info tree")
         self.treeView.set_enable_search(False)
@@ -585,13 +585,13 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
             self.treeView.get_selection().select_iter(firstIter)
 
         self.treeView.get_selection().connect("changed", self.showOutput)
-        
+
     def updateForIter(self, iter):
         self.extraWidgetArea.set_sensitive(True)
         text = self.filteredTreeModel.get_value(iter, 1)
         self.textBuffer.set_text(text)
         return text
-        
+
     def showOutput(self, selection):
         model, iter = selection.get_selected()
         if iter:
@@ -619,7 +619,7 @@ class LogGUI(VersionControlDialogGUI):
         return True
     def getResultDialogSecondColumnTitle(self):
         return "Last revision committed (UTC)"
-        
+
     def parseOutput(self, output):
         then = vcs.getDateFromLog(output)
         if then is None:
@@ -651,7 +651,7 @@ class LogGUI(VersionControlDialogGUI):
                 stringDiff = "<span weight='bold'>" + stringDiff + "</span>"
         elif difference <= closeLimit and markup:
             stringDiff = "<span weight='bold'>" + stringDiff + "</span>"
-        return stringDiff     
+        return stringDiff
 
 
 class GenericDiffGUI(VersionControlDialogGUI):
@@ -659,11 +659,11 @@ class GenericDiffGUI(VersionControlDialogGUI):
         VersionControlDialogGUI.__init__(self, *args)
         self.revision1 = ""
         self.revision2 = ""
-        
+
     def setRevisions(self, rev1, rev2):
         self.revision1 = rev1
         self.revision2 = rev2
-    
+
     def getResultDialogMessage(self):
         if len(self.pages) == 0:
             return "All files are up-to-date and unmodified compared to the latest repository version."
@@ -675,7 +675,7 @@ class GenericDiffGUI(VersionControlDialogGUI):
 
     def showWarning(self):
         return len(self.pages) > 0
-    
+
     def getRevisionMessage(self):
         if self.revision1 == "" and self.revision2 == "":
             return "compared to the latest revision"
@@ -697,33 +697,33 @@ class DiffGUI(GenericDiffGUI):
 
     def _getTitle(self):
         return "_Difference"
-    
+
     def getResultTitle(self):
         return "differences"
-    
+
     def getExtraArgs(self):
         return vcs.getRevisionOptions(self.revision1, self.revision2)
-    
+
     def commandHadError(self, retcode, stderr, *args):
         # Diff returns an error code for differences, not just for errors
         return retcode and len(stderr) > 0
-    
+
     def outputIsInteresting(self, stdout):
         # Don't show diffs if they're empty
         return len(stdout) > 0
-    
+
 
 class FilteredDiffGUI(GenericDiffGUI):
     def __init__(self, *args):
         GenericDiffGUI.__init__(self, *args)
         self.cmdName = "cat"
-    
+
     def _getTitle(self):
         return "_Filtered Difference"
-    
+
     def getResultTitle(self):
         return "filtered differences"
-    
+
     def getTmpFileArgs(self, fileName, revision):
         extraArgs = vcs.getSingleRevisionOptions(revision) if revision else []
         extraArgs.append(fileName)
@@ -735,15 +735,15 @@ class FilteredDiffGUI(GenericDiffGUI):
         retcode, stdout, stderr = vcs.getProcessResults(args)
         if self.commandHadError(retcode, stderr, stdout):
             return None, stderr
-        
+
         return self.writeTmpFile(stdout, tmpDir, os.path.basename(fileName)), None
-        
+
     def writeTmpFile(self, text, tmpDir, fileName):
         path = os.path.join(tmpDir, fileName)
         with open(path, "w") as f:
             f.write(text)
         return path
-        
+
     def runAndParse(self):
         self.notInRepository = False
         self.needsAttention = False
@@ -759,7 +759,7 @@ class FilteredDiffGUI(GenericDiffGUI):
                 output = proc.communicate()[0]
                 self.storeResult(fileName, output, test)
             shutil.rmtree(tmpDir)
-    
+
     def getDiffProgramArgs(self, diffProgram, fileName, test, tmpDir):
         dir1 = os.path.join(tmpDir, "revision" + self.revision1 if self.revision1 else vcs.name)
         if not os.path.isdir(dir1):
@@ -767,7 +767,7 @@ class FilteredDiffGUI(GenericDiffGUI):
         file1, errors = self.makeTmpFile(fileName, self.revision1, dir1)
         if errors:
             return None, errors
-        
+
         dir2 = os.path.join(tmpDir, "revision" + self.revision2 if self.revision2 else "local")
         if not os.path.isdir(dir2):
             os.mkdir(dir2)
@@ -781,7 +781,7 @@ class FilteredDiffGUI(GenericDiffGUI):
         filteredFile1 = self.writeTmpFile(test.app.applyFiltering(test, file1), dir1, filterName)
         filteredFile2 = self.writeTmpFile(test.app.applyFiltering(test, file2), dir2, filterName)
         return [ diffProgram, filteredFile1, filteredFile2 ], None
-            
+
     def getGraphicalDiffProgramArgs(self, diffProgram, path):
         test = self.fileToTest[path]
         tmpDir = tempfile.mkdtemp()
@@ -789,23 +789,23 @@ class FilteredDiffGUI(GenericDiffGUI):
         if errors:
             self.showErrorDialog("\nCannot show graphical differences. Could not find given files or revisions.\n")
         return args, (tmpDir,)
-    
+
     def diffingComplete(self, tmpDir):
         GenericDiffGUI.diffingComplete(self, tmpDir)
         shutil.rmtree(tmpDir)
 
-                
+
 class StatusGUI(VersionControlDialogGUI):
     def __init__(self, *args):
         VersionControlDialogGUI.__init__(self, *args)
         self.popupMenu = None
-    
+
     def _getTitle(self):
         return "_Status"
-    
+
     def getResultDialogTwoColumnsInTreeView(self):
         return True
-    
+
     def getStatusMarkup(self, status):
         if status in vcs.warningStates:
             return "<span weight='bold'>" + status + "</span>"
@@ -813,7 +813,7 @@ class StatusGUI(VersionControlDialogGUI):
             return "<span weight='bold' foreground='red'>" + status + "</span>"
         else:
             return status
- 
+
     def parseOutput(self, output):
         status = vcs.getStateFromStatus(output)
         if status == "Unknown":
@@ -821,7 +821,7 @@ class StatusGUI(VersionControlDialogGUI):
         elif status in vcs.errorStates:
             self.needsAttention = True
         return self.getStatusMarkup(status)
-            
+
     def createPopupMenu(self):
         # Each unique info column (column 2) gets its own menu item in the popup menu
         uniqueInfos = []
@@ -833,14 +833,14 @@ class StatusGUI(VersionControlDialogGUI):
             menuItem.set_active(True)
             menuItem.set_name(info)
             menu.append(menuItem)
-            menuItem.connect("toggled", self.toggleVisibility)         
+            menuItem.connect("toggled", self.toggleVisibility)
             menuItem.show()
         return menu
 
     def toggleVisibility(self, menuItem):
         self.treeModel.foreach(self.setVisibility, (menuItem.get_name(), menuItem.get_active()))
         self.treeView.expand_row(self.filteredTreeModel.get_path(self.filteredTreeModel.get_iter_first()), True)
-        
+
     def getStatus(self, iter):
         markedUpStatus = self.treeModel.get_value(iter, 2)
         start = markedUpStatus.find(">")
@@ -849,7 +849,7 @@ class StatusGUI(VersionControlDialogGUI):
         else:
             end = markedUpStatus.rfind("<")
             return markedUpStatus[start + 1:end]
-    
+
     def setVisibility(self, model, path, iter, xxx_todo_changeme):
         (actionName, actionState) = xxx_todo_changeme
         if model.iter_parent(iter) is not None and (actionName == "" or self.getStatus(iter) == actionName):
@@ -857,7 +857,7 @@ class StatusGUI(VersionControlDialogGUI):
             parentIter = model.iter_parent(iter)
             if actionState or self.hasNoVisibleChildren(model, parentIter):
                 self.setVisibility(model, model.get_path(parentIter), parentIter, ("", actionState))
-        
+
     def hasNoVisibleChildren(self, model, iter):
         i = model.iter_children(iter)
         while i:
@@ -865,7 +865,7 @@ class StatusGUI(VersionControlDialogGUI):
                 return False
             i = model.iter_next(i)
         return True
-        
+
     def collectInfos(self, model, path, iter, infos):
         info = model.get_value(iter, 2)
         if info != "":
@@ -873,18 +873,18 @@ class StatusGUI(VersionControlDialogGUI):
                                                                        "").replace("</span>", "").strip()
             if rawInfo not in infos:
                 infos.append(rawInfo)
-                    
+
     def addContents(self):
         VersionControlDialogGUI.addContents(self)
         self.popupMenu = self.createPopupMenu()
         self.infoColumn.set_clickable(True)
         self.infoColumn.get_button().connect("button-press-event", self.showPopupMenu)
         self.treeView.grab_focus() # Or the column button gets focus ...
-        
+
     def showPopupMenu(self, button, event):
-        if event.button == 3: 
+        if event.button == 3:
             self.popupMenu.popup(None, None, None, event.button, event.time)
-            
+
 
 class AnnotateGUI(VersionControlDialogGUI):
     def _getTitle(self):
@@ -910,12 +910,12 @@ class UpdateGUI(BasicVersionControlDialogGUI):
             self.notify("ActionStart")
             _, stdout, stderr = vcs.getProcessResults(args, cwd=vcsDirectory)
             text = stdout + stderr
-            
+
         else:
             text = "You have local commits. Aborting updating via TextTest. You will need to merge by hand."
         buffer = Gtk.TextBuffer()
         buffer.set_text(text)
-        textView = Gtk.TextView(buffer)
+        textView = Gtk.TextView.new_with_buffer(buffer)
         self.dialog.vbox.pack_start(textView, True, True, 0)
         if canUpdate:
             self.notify("Refresh")
@@ -967,19 +967,19 @@ class RemoveFiles(VcsRemoveAction, adminactions.RemoveFiles):
 
 class RemoveTestsForPopup(VcsRemoveAction, adminactions.RemoveTestsForPopup):
     pass
-    
+
 class FindKnownBugs(VcsAdminAction, changeteststate.FindKnownBugs):
     pass
-    
+
 class RenameTest(VcsAdminAction, adminactions.RenameTest):
     def getNameChangeMessage(self, newName):
         origMessage = adminactions.RenameTest.getNameChangeMessage(self, newName)
-        return origMessage + vcs.getMoveSuffix() 
+        return origMessage + vcs.getMoveSuffix()
 
 class RenameFile(VcsAdminAction, adminactions.RenameFile):
     def getNameChangeMessage(self, newName):
         origMessage = adminactions.RenameFile.getNameChangeMessage(self, newName)
-        return origMessage + vcs.getMoveSuffix() 
+        return origMessage + vcs.getMoveSuffix()
 
 
 class PasteTests(VcsAdminAction, adminactions.PasteTests):
@@ -990,7 +990,7 @@ class PasteTests(VcsAdminAction, adminactions.PasteTests):
         else:
             return origMessage
 
-            
+
 class LogGUIRecursive(LogGUI):
     recursive = True
 
@@ -1002,9 +1002,9 @@ class FilteredDiffGUIRecursive(FilteredDiffGUI):
 
 class StatusGUIRecursive(StatusGUI):
     recursive = True
-        
+
 class AnnotateGUIRecursive(AnnotateGUI):
-    recursive = True    
+    recursive = True
 
 class AddGUIRecursive(AddGUI):
     recursive = True
@@ -1034,7 +1034,7 @@ class InteractiveActionConfig(guiplugins.InteractiveActionConfig):
 
     def getRenameTestClass(self):
         return RenameTest
-    
+
     def getUpdateClass(self):
         return UpdateGUI
 

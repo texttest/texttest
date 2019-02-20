@@ -220,6 +220,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         self.needsAttention = False
         self.notInRepository = False
 
+
     def showWarning(self):
         return self.notInRepository or self.needsAttention
 
@@ -543,7 +544,6 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
         for fileName, content, info in self.pages:
             label = plugins.relpath(fileName, rootDir)
             self.diag.info("Adding info for file " + label)
-            utfContent = guiutils.convertToUtf8(content)
             path = label.split(os.sep)
             currentFile = rootDir
             prevIter = None
@@ -557,7 +557,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
                     currentElement = "<span weight='bold'>" + currentElement + "</span>"
                 currIter = fileToIter.get(currentFile)
                 if currIter is None:
-                    newRow = (currentElement, utfContent, currentInfo, currentFile, True)
+                    newRow = (currentElement, content, currentInfo, currentFile, True)
                     currIter = self.treeModel.append(prevIter, newRow)
                     fileToIter[currentFile] = currIter
                 prevIter = currIter
@@ -580,7 +580,7 @@ class VersionControlDialogGUI(BasicVersionControlDialogGUI):
 
         if len(self.pages) > 0:
             firstFile = self.pages[0][0]
-            firstIter = self.filteredTreeModel.convert_child_iter_to_iter(fileToIter[firstFile])
+            iterValid, firstIter = self.filteredTreeModel.convert_child_iter_to_iter(fileToIter[firstFile])
             self.updateForIter(firstIter)
             self.treeView.get_selection().select_iter(firstIter)
 
